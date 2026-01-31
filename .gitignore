@@ -1,0 +1,31 @@
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+
+# Test/coverage artifacts
+.pytest_cache/
+
+# Environment secrets
+.env
+.env.local
+
+# Runtime storage & logs (installer/runtime output)
+storage/
+*.db
+*.sqlite
+*.log
+logs/
+
+# OS
+.DS_Store
+
+# Installer/runtime markers & binaries
+.qdrant-initialized
+storage/.knowledge_ingested
+qdrant
