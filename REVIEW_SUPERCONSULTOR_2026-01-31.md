@@ -17,31 +17,31 @@ Findings (ordenat per severitat)
 - Linies: ~286 (datetime.now(timezone.utc).timestamp())
 - Impacte: L'endpoint public /api/bootstrap/info retorna 500 quan hi ha token actiu; afecta UI/clients que depenen d'aquest endpoint.
 - Evidencia: no hi ha import de timezone en aquest fitxer; es fa "from datetime import datetime" a la propia funcio.
-- Recomanacio: importar timezone a nivell de mòdul o dins la funcio.
+- Estat: CORREGIT (import timezone + timestamps UTC).
 
 [MITJA] optional_api_key ignora clau secundaria (rotacio)
 - Fitxer: plugins/security/core/auth_dependencies.py
 - Linies: ~221-233
 - Impacte: durant la finestra de "grace period", endpoints que usen optional_api_key rebutgen clients amb la clau secundaria, mentre require_api_key si la valida. Inconsistencia funcional i d'operacio.
-- Recomanacio: reusar load_api_keys() i acceptar secundaria si es valida (paritat amb require_api_key).
+- Estat: CORREGIT (accepta clau secundaria si es valida).
 
 [MITJA] request.client pot ser None en bootstrap (possible 500)
 - Fitxer: core/endpoints/bootstrap.py
 - Linies: ~109 (client_ip = request.client.host)
 - Impacte: entorns amb proxies/tests poden tenir request.client = None; fallaria abans de checks i retornaria 500.
-- Recomanacio: defensiu: client_ip = request.client.host if request.client else "unknown", i tratar "unknown" com no permès.
+- Estat: CORREGIT (fallback + error 400 per IP invalida).
 
 [MITJA] Comparacio timestamps naive vs UTC a bootstrap
 - Fitxer: core/endpoints/bootstrap.py
 - Linies: ~152 (datetime.now().timestamp() > info["expires"])
 - Impacte: "now" naive vs expiracions guardades amb timezone.utc a DB pot crear inconsistencies subtils si el sistema te TZ offset.
-- Recomanacio: usar datetime.now(timezone.utc).timestamp() per coherencia.
+- Estat: CORREGIT (UTC).
 
 [MITJA] Auto-start de serveis externs (Qdrant/Ollama) sense control granular
 - Fitxer: core/lifespan.py
 - Linies: ~27-142
 - Impacte: en entorns restringits, el servidor intenta arrencar binaris externs i pot bloquejar recursos; en infra compartida pot ser inesperat.
-- Recomanacio: afegir flags config/env per desactivar auto-start per servei, i log clar amb el motiu.
+- Estat: CORREGIT (flags NEXE_AUTOSTART_QDRANT / NEXE_AUTOSTART_OLLAMA).
 
 [BAIX] CORS strict: falla dur si cors_origins buit
 - Fitxer: core/middleware.py
@@ -104,7 +104,7 @@ Nous punts detectats
 - Fitxer: core/endpoints/bootstrap.py
 - Linies: ~45 (split(','))
 - Impacte: valors "1.2.3.4, 5.6.7.8" deixen espai i fallen a la whitelist.
-- Recomanacio: aplicar strip a cada IP.
+- Estat: CORREGIT (strip a cada IP).
 
 [BAIX] Token bootstrap es genera i persisteix fins i tot en produccio
 - Fitxer: core/lifespan.py
