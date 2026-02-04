@@ -1,0 +1,31 @@
+{
+ "security_logger": {
+  "auth": {
+   "failure": "Autenticació fallida: {reason}"
+  },
+  "path_traversal": {
+   "attempt": "Intent de path traversal: {attempted_path}"
+  },
+  "rate_limit": {
+   "exceeded": "Límit de taxa excedit per {source}",
+   "exceeded_unknown": "Límit de taxa excedit per origen desconegut"
+  },
+  "module": {
+   "rejected": "Mòdul '{module_name}' rebutjat: {reason}"
+  },
+  "config": {
+   "validation_failed": "Validació de configuració fallida per '{config_key}': {reason}"
+  },
+  "attacks": {
+   "xss_detected": "Intent d'atac XSS detectat: {preview}",
+   "sql_injection_detected": "Intent d'injecció SQL detectat: {preview}",
+   "command_injection_detected": "Intent d'injecció de comandes detectat: {preview}"
+  },
+  "content": {
+   "invalid_type": "Content-Type invàlid: {content_type}"
+  },
+  "request": {
+   "too_large": "Petició massa gran: {size} bytes (màx: {max_size})"
+  }
+ }
+}

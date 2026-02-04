@@ -1,0 +1,58 @@
+{
+ "_meta": {
+  "component": "core_models",
+  "description": "Translations for core data structures",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+
+ "core_models": {
+  "module_states": {
+   "unknown": "Unknown",
+   "discovered": "Discovered",
+   "loading": "Loading",
+   "loaded": "Loaded",
+   "starting": "Starting",
+   "running": "Running",
+   "stopping": "Stopping",
+   "stopped": "Stopped",
+   "error": "Error",
+   "disabled": "Disabled"
+  },
+
+  "system_status": {
+   "starting": "Starting",
+   "running": "Running",
+   "degraded": "Degraded",
+   "stopping": "Stopping",
+   "stopped": "Stopped",
+   "error": "Error"
+  },
+
+  "health_status": {
+   "healthy": "Healthy",
+   "degraded": "Degraded",
+   "unhealthy": "Unhealthy",
+   "unknown": "Unknown"
+  },
+
+  "files": {
+   "manifest_toml": "manifest.toml"
+  },
+
+  "event_levels": {
+   "info": "info",
+   "warning": "warning",
+   "error": "error",
+   "critical": "critical"
+  },
+
+  "validation": {
+   "dependency_cycle_detected": "Dependency cycle detected: {cycle}",
+   "module_uptime_calculated": "Uptime calculated: {seconds}s",
+   "invalid_module_state": "Invalid module state: {state}",
+   "dependency_cycle_found": "Cycle found - returning path from cycle start",
+   "uptime_calculation_comment": "Uptime in seconds or None if not running"
+  }
+ }
+}

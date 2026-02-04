@@ -1,0 +1,58 @@
+{
+ "_meta": {
+  "component": "core_models",
+  "description": "Traduccions per estructures de dades centrals",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ 
+ "core_models": {
+  "module_states": {
+   "unknown": "Desconegut",
+   "discovered": "Descobert",
+   "loading": "Carregant",
+   "loaded": "Carregat",
+   "starting": "Iniciant",
+   "running": "Executant-se",
+   "stopping": "Aturant",
+   "stopped": "Aturat",
+   "error": "Error",
+   "disabled": "Desactivat"
+  },
+  
+  "system_status": {
+   "starting": "Iniciant",
+   "running": "En funcionament",
+   "degraded": "Degradat",
+   "stopping": "Aturant",
+   "stopped": "Aturat",
+   "error": "Error"
+  },
+  
+  "health_status": {
+   "healthy": "Saludable",
+   "degraded": "Degradat",
+   "unhealthy": "No saludable",
+   "unknown": "Desconegut"
+  },
+  
+  "files": {
+   "manifest_toml": "manifest.toml"
+  },
+  
+  "event_levels": {
+   "info": "info",
+   "warning": "warning",
+   "error": "error",
+   "critical": "critical"
+  },
+  
+  "validation": {
+   "dependency_cycle_detected": "Cicle de dependències detectat: {cycle}",
+   "module_uptime_calculated": "Temps de funcionament calculat: {seconds}s",
+   "invalid_module_state": "Estat de mòdul no vàlid: {state}",
+   "dependency_cycle_found": "Cicle trobat - retorna path des de l'inici del cicle",
+   "uptime_calculation_comment": "Temps de funcionament en segons o None si no està executant-se"
+  }
+ }
+}

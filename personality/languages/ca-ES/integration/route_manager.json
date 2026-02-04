@@ -1,0 +1,44 @@
+{
+ "personality": {
+  "route_manager": {
+   "debug": {
+    "routes_registered": "Registrades {count} rutes per {module}"
+   },
+   "errors": {
+    "failed_to_register": "Error registrant rutes per {module}: {error}",
+    "error_registering_router": "Error registrant router per {module}: {error}",
+    "error_mounting_app": "Error muntant app per {module}: {error}",
+    "error_removing_routes": "Error eliminant rutes per {module}: {error}"
+   },
+   "warnings": {
+    "route_conflict": "Conflicte de ruta: {path} ja registrat per {existing_module}, s'omet per {module}"
+   },
+   "info": {
+    "routes_removed": "Eliminades {count} rutes per {module}"
+   }
+  },
+  "api_integrator": {
+   "info": {
+    "integration_success": "Mòdul {module} API integrat correctament",
+    "removal_success": "Mòdul {module} API eliminat correctament"
+   },
+   "debug": {
+    "no_api_components": "Mòdul {module} no té components d'API"
+   },
+   "errors": {
+    "integration_failed": "Error integrant API de {module}: {error}",
+    "removal_failed": "Error eliminant API de {module}: {error}"
+   }
+  },
+  "openapi_merger": {
+   "debug": {
+    "spec_merged": "Especificació OpenAPI combinada per {module}",
+    "spec_removed": "Especificació OpenAPI eliminada per {module}"
+   },
+   "errors": {
+    "merge_failed": "Error combinant OpenAPI per {module}: {error}",
+    "removal_failed": "Error eliminant OpenAPI per {module}: {error}"
+   }
+  }
+ }
+}

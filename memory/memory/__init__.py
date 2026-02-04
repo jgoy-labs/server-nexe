@@ -1,0 +1,44 @@
+"""
+────────────────────────────────────
+Server Nexe
+Version: 0.8
+Author: Jordi Goy 
+Location: memory/memory/__init__.py
+Description: Mòdul Memory - Flash Memory, RAM Context i Persistence Manager.
+
+www.jgoy.net
+────────────────────────────────────
+"""
+
+from .module import MemoryModule
+from .models.memory_entry import MemoryEntry
+from .models.memory_types import MemoryType
+from .constants import MANIFEST
+
+from .api import (
+  MemoryAPI,
+  Document,
+  SearchResult,
+  CollectionInfo,
+  MemoryAPIError,
+  CollectionNotFoundError,
+  InvalidCollectionNameError,
+  DocumentNotFoundError,
+  validate_collection_name,
+)
+
+__all__ = [
+  "MemoryModule",
+  "MemoryEntry",
+  "MemoryType",
+  "MANIFEST",
+  "MemoryAPI",
+  "Document",
+  "SearchResult",
+  "CollectionInfo",
+  "MemoryAPIError",
+  "CollectionNotFoundError",
+  "InvalidCollectionNameError",
+  "DocumentNotFoundError",
+  "validate_collection_name",
+]

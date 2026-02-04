@@ -1,0 +1,53 @@
+{
+ "_meta": {
+  "component": "core_events",
+  "description": "Translations for global event system",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+
+ "events": {
+  "callback_registered": "Event callback registered: {callback_name}",
+  "callback_removed": "Event callback removed: {callback_name}",
+  "callbacks_cleared": "Cleared {count} event callbacks",
+  "callback_error": "Error in event callback: {error}",
+  "event_emitted": "Event emitted: {event_type} from {source}",
+  "event_ignored": "Event ignored: {event_type}",
+  "history_added": "Event added to history",
+  "history_trimmed": "Event history trimmed to {max_size} entries"
+ },
+
+ "types": {
+  "system_started": "System started",
+  "system_shutdown": "System shutdown",
+  "module_loaded": "Module loaded",
+  "module_started": "Module started",
+  "module_stopped": "Module stopped",
+  "module_error": "Module error",
+  "discovery_completed": "Discovery completed",
+  "config_reloaded": "Configuration reloaded"
+ },
+
+ "management": {
+  "listener_count": "{count} listeners registered",
+  "listener_count_by_type": "{count} listeners for {event_type}",
+  "event_ignored_added": "Event type {event_type} added to ignore list",
+  "event_ignored_removed": "Event type {event_type} removed from ignore list",
+  "max_history_set": "Maximum history size set to {size}",
+  "history_cleared": "Event history cleared: {count} entries removed"
+ },
+
+ "sync": {
+  "called_from_active_loop": "emit_event_sync() called from active event loop",
+  "added_to_history_only": "Event {event_type} added to history but not emitted (active loop)",
+  "sync_wrapper_failed": "Failed to emit event synchronously: {error}"
+ },
+
+ "stats": {
+  "total_callbacks": "Total callbacks: {count}",
+  "general_callbacks": "General callbacks: {count}",
+  "typed_callbacks": "Typed callbacks: {count}",
+  "history_size": "History size: {size}/{max}",
+  "ignored_types": "Ignored types: {count}"
+ }
+}

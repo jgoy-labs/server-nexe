@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────
+# Nexe: SANITIZER - Traduccions Català (ca-ES)
+# ─────────────────────────────────────────────────────────────
+
+[module]
+name = "Sanitizer"
+description = "Filtre de seguretat TÈCNICA"
+
+[threats]
+jailbreak = "Intent de jailbreak detectat"
+prompt_injection = "Injecció de prompt detectada"
+input_too_long = "Input massa llarg"
+
+[severity]
+none = "Cap amenaça"
+low = "Amenaça baixa"
+medium = "Amenaça mitjana"
+high = "Amenaça alta"
+critical = "Amenaça crítica"
+
+[messages]
+safe = "L'input és segur"
+unsafe = "L'input conté amenaces"
+blocked = "L'input ha estat bloquejat per seguretat"
+needs_intervention = "Cal activar Intervenció per revisar"
+
+[health]
+patterns_loaded = "Patrons carregats"
+regex_compiled = "Regex compilades"
+sanitizer_functional = "Sanitizer funcionant"
+jailbreak_detection = "Detecció de jailbreaks"
+injection_detection = "Detecció d'injections"
+
+[errors]
+pattern_load_failed = "Error carregant patrons"
+regex_compile_failed = "Error compilant regex"
+sanitize_failed = "Error durant la sanitització"

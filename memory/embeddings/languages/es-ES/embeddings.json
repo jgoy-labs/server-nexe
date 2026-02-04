@@ -1,0 +1,41 @@
+{
+ "embeddings": {
+  "singleton_error": "EmbeddingsModule es Singleton. Usar get_instance()",
+  "not_initialized": "EmbeddingsModule no inicializado. Llamar a initialize()",
+  "module": {
+   "created": "Módulo embeddings creado",
+   "initializing": "Inicializando módulo embeddings",
+   "initialized": "Módulo embeddings inicializado",
+   "init_failed": "Error inicializando módulo embeddings",
+   "already_initialized": "Módulo embeddings ya inicializado",
+   "not_initialized_shutdown": "Módulo embeddings no inicializado durante shutdown",
+   "shutting_down": "Cerrando módulo embeddings",
+   "shutdown_complete": "Shutdown módulo embeddings completado",
+   "shutdown_failed": "Error shutdown módulo embeddings"
+  },
+  "health": {
+   "initialized_ok": "Módulo inicializado correctamente",
+   "not_initialized": "Módulo no inicializado",
+   "init_check_error": "Error comprobando inicialización: {error}",
+   "dependencies_ok": "sentence-transformers {version} disponible",
+   "dependencies_missing": "sentence-transformers no instalado (pip install sentence-transformers)",
+   "dependencies_error": "Error comprobando dependencies: {error}",
+   "device_mps": "MPS (Apple Silicon) disponible",
+   "device_cuda": "CUDA disponible ({device})",
+   "device_cpu_only": "Solo CPU disponible (rendimiento más lento)",
+   "device_torch_missing": "torch no instalado (pip install torch)",
+   "device_error": "Error comprobando device: {error}",
+   "cache_writable": "Directorio cache accesible: {path}",
+   "cache_not_writable": "Directorio cache no accesible: {path}",
+   "cache_error": "Error comprobando directorios cache: {error}",
+   "memory_ok": "{available}GB disponible (>={required}GB requerido)",
+   "memory_warn": "{available}GB disponible (<{required}GB requerido, puede ser lento)",
+   "memory_critical": "{available}GB disponible (crítico: <{critical}GB)",
+   "memory_error": "Error comprobando memoria: {error}"
+  },
+  "cli": {
+   "initializing": "Inicializando módulo...",
+   "file_not_found": "Error: Archivo no encontrado: {file_path}"
+  }
+ }
+}

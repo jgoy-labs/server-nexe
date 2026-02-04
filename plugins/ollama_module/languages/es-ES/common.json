@@ -1,0 +1,76 @@
+{
+ "module": {
+  "name": "Ollama",
+  "description": "Opción local para modelos LLM (una de muchas opciones)"
+ },
+ "ui": {
+  "title": "Chat con Ollama",
+  "subtitle": "Modelos LLM locales - Streaming en tiempo real",
+  "model_selector": "Modelo",
+  "pull_model": "Descargar Modelo",
+  "status": {
+   "connected": "Conectado",
+   "disconnected": "Desconectado",
+   "loading": "Cargando...",
+   "models_count": "modelos disponibles"
+  },
+  "placeholder": "Escribe tu mensaje...",
+  "send": "Enviar",
+  "streaming_hint": "Enter para enviar • Streaming en tiempo real"
+ },
+ "pull_modal": {
+  "title": "Descargar Modelo",
+  "model_name_label": "Nombre del modelo",
+  "model_name_placeholder": "mistral:7b",
+  "examples": "Ejemplos: mistral:7b, llama3.2, qwen2.5-coder",
+  "cancel": "Cancelar",
+  "download": "Descargar",
+  "downloading": "Descargando...",
+  "success": "¡Descargado correctamente!",
+  "error": "Error durante la descarga"
+ },
+ "chat": {
+  "welcome": "Selecciona un modelo y comienza a conversar",
+  "thinking": "Pensando...",
+  "no_response": "Sin respuesta",
+  "error": "Error"
+ },
+ "health": {
+  "connection_ok": "Conexión con Ollama correcta",
+  "connection_failed": "No se puede conectar con Ollama",
+  "models_found": "Modelos locales encontrados",
+  "no_models": "Ningún modelo instalado",
+  "mistral_found": "Modelo Mistral disponible (recomendado)",
+  "mistral_missing": "Modelo Mistral no encontrado"
+ },
+ "logs": {
+  "connection_check_failed": "Comprobación de conexión con Ollama fallida: {error}",
+  "models_found": "Encontrados {count} modelos de Ollama",
+  "list_models_failed": "Error listando modelos de Ollama: {error}",
+  "invalid_json_pull": "JSON inválido en la respuesta de pull: {line}",
+  "pull_failed": "Error descargando modelo {model}: {error}",
+  "get_info_failed": "Error obteniendo info del modelo {model}: {error}",
+  "invalid_json_chat": "JSON inválido en la respuesta de chat: {line}",
+  "chat_failed": "Petición de chat fallida con modelo {model}: {error}",
+  "model_deleted": "Modelo {model} eliminado correctamente",
+  "delete_failed": "Error eliminando modelo {model}: {error}"
+ },
+ "info": {
+  "description": "Integración con Ollama para gestión de modelos LLM locales"
+ },
+ "cli": {
+  "checking_connection": "🔌 Comprobando conexión con Ollama...",
+  "not_available": "❌ Ollama no está disponible en {url}",
+  "ensure_running": "  Asegúrate de que Ollama está en marcha: ollama serve",
+  "connected": "✅ Conectado a Ollama!",
+  "available_models": "\n📦 Modelos disponibles:",
+  "no_models": "  → Ningún modelo instalado",
+  "download_hint": "  → Descarga un modelo: ollama pull mistral",
+  "error": "  ❌ Error: {error}",
+  "total_models": "\n📊 Total: {count} modelos",
+  "web_chat_info": "\nPara usar el chatbot web:",
+  "start_server": " → Inicia el servidor Nexe",
+  "visit_url": " → Visita: http://localhost:9119/ui-control/ollama/",
+  "model_item": "  • {name} ({size:.2f} GB)"
+ }
+}

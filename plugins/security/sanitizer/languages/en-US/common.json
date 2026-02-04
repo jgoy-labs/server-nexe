@@ -1,0 +1,47 @@
+{
+ "sanitizer": {
+  "info": {
+   "description": "Input sanitization system. Detects and neutralizes threats.",
+   "type": "Security module"
+  },
+  "threats": {
+   "injection_detected": "Injection attempt detected",
+   "xss_detected": "XSS attempt detected",
+   "path_traversal": "Path traversal attempt detected",
+   "prompt_injection": "Prompt injection attempt detected",
+   "sql_injection": "SQL injection attempt detected",
+   "command_injection": "Command injection attempt detected"
+  },
+  "patterns": {
+   "jailbreak": "Jailbreak pattern detected",
+   "role_manipulation": "Role manipulation attempt detected",
+   "system_override": "System override attempt detected",
+   "encoding_attack": "Encoding attack detected"
+  },
+  "actions": {
+   "blocked": "Input blocked",
+   "sanitized": "Input sanitized",
+   "flagged": "Input flagged for review",
+   "allowed": "Input allowed"
+  },
+  "severity": {
+   "critical": "Critical threat",
+   "high": "High threat",
+   "medium": "Medium threat",
+   "low": "Low threat"
+  },
+  "health": {
+   "healthy": "Sanitization system active",
+   "degraded": "System with minor issues",
+   "unhealthy": "System unavailable",
+   "check_patterns": "Patterns loaded",
+   "check_rules": "Sanitization rules",
+   "check_encoding": "Encoding detector"
+  },
+  "log": {
+   "threat_logged": "Threat logged",
+   "pattern_matched": "Pattern matched: {pattern}",
+   "action_taken": "Action taken: {action}"
+  }
+ }
+}

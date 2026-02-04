@@ -1,0 +1,164 @@
+# ─────────────────────────────────────────────────────────────
+# Nexe Memory Module - Manifest TOML
+# ─────────────────────────────────────────────────────────────
+# ModuleID: {{NEXE_MEMORY_MODULE}}
+# Versió: 0.8.0
+# Autoria: Nexe Team (Jordi Goy)
+# Data creació: 2025-10-27
+# Última actualització: 2025-10-27
+# ─────────────────────────────────────────────────────────────
+
+[module]
+module_id = "{{NEXE_MEMORY_MODULE}}"
+name = "memory"
+version = "0.1"
+description = "Sistema de memòria híbrida Flash i RAM Context amb gestió automàtica del cicle de vida. TTL 30min, garbage collection cada 5min, pipeline d'upload i persistència controlada per mantenir context conversacional"
+author = "Nexe Team (Jordi Goy)"
+category = "memory"
+created = "2025-10-27"
+last_updated = "2025-10-27"
+
+[module.status]
+enabled = true
+priority = 10
+auto_start = true
+
+[module.integration]
+workflow_engine = true
+
+# ─────────────────────────────────────────────────────────────
+# DEPENDENCIES
+# ─────────────────────────────────────────────────────────────
+
+[dependencies]
+required = [
+  "{{NEXE_RAG_MODULE}}",
+  "{{NEXE_MEMORY_MODULE}}",
+  "{{NEXE_EMBEDDINGS_MODULE}}"
+]
+
+# ─────────────────────────────────────────────────────────────
+# CAPABILITIES
+# ─────────────────────────────────────────────────────────────
+
+[capabilities]
+exposed = [
+  "flash_memory",
+  "ram_context",
+  "persistence_manager",
+  "lifecycle_management",
+  "garbage_collection",
+  "upload_pipeline"
+]
+
+# ─────────────────────────────────────────────────────────────
+# HEALTH & MONITORING
+# ─────────────────────────────────────────────────────────────
+
+[health]
+check_endpoint = "memory.memory.health:check"
+check_interval_seconds = 60
+
+# ─────────────────────────────────────────────────────────────
+# WORKFLOW INTEGRATION
+# ─────────────────────────────────────────────────────────────
+
+[workflow]
+workflow_engine = true
+nodes = [
+  "memory.memory.workflow.nodes.memory_store_node",
+  "memory.memory.workflow.nodes.memory_recall_node"
+]
+
+# ─────────────────────────────────────────────────────────────
+# SYSTEM SPECIALISTS
+# ─────────────────────────────────────────────────────────────
+
+[specialists]
+handlers = [
+  "memory.memory.specialists.memory_specialist"
+]
+
+# ─────────────────────────────────────────────────────────────
+# I18N CONFIGURATION
+# ─────────────────────────────────────────────────────────────
+
+[i18n]
+supported_languages = ["ca-ES", "en-US", "es-ES"]
+default_language = "ca-ES"
+languages_path = "memory/memory/languages"
+
+# ─────────────────────────────────────────────────────────────
+# DEFAULT CONFIGURATION
+# ─────────────────────────────────────────────────────────────
+
+[config]
+flash_ttl_seconds = 1800 # 30 minuts
+gc_interval_seconds = 300 # 5 minuts
+max_upload_size_mb = 100
+transaction_ledger_enabled = true
+
+[config.flash_memory]
+enabled = true
+ttl_seconds = 1800
+cleanup_interval = 300
+
+[config.ram_context]
+enabled = true
+max_entries = 1000
+
+[config.persistence]
+enabled = true
+auto_commit = true
+ledger_enabled = true
+
+# ─────────────────────────────────────────────────────────────
+# PATHS & RESOURCES
+# ─────────────────────────────────────────────────────────────
+
+[paths]
+module_root = "memory/memory"
+docs = "memory/memory/docs"
+tests = "memory/memory/tests"
+
+# ─────────────────────────────────────────────────────────────
+# STORAGE DECLARATIONS (Auto-Clean)
+# Cada path que Memory escriu a storage/ ha d'estar declarat aquí.
+# El sistema Auto-Clean només gestiona paths declarats.
+# ─────────────────────────────────────────────────────────────
+
+[module.storage]
+
+[[module.storage.paths]]
+path = "storage/memory/flash"
+type = "flash_memory"
+format = "json"
+retention_minutes = 30
+action = "AUTO_GC"
+description = "Flash memory temporal - TTL 30 minuts, GC cada 5 minuts"
+# Auto-clean gestionat pel propi mòdul (garbage collector intern)
+auto_clean = false
+
+[[module.storage.paths]]
+path = "storage/memory/storage"
+type = "persistent_memory"
+format = "json"
+action = "PERMANENT"
+description = "Memòria persistent - MAI esborrar automàticament"
+auto_clean = false
+
+[[module.storage.paths]]
+path = "storage/memory/ledger"
+type = "transaction_ledger"
+format = "json"
+retention_days = 30
+action = "ROTATE"
+max_files = 100
+description = "Ledger de transaccions - rotació a 100 fitxers màxim"
+auto_clean = true
+max_files_per_run = 50
+cooldown_minutes = 60
+
+[module.storage.protection]
+# Fitxers que MAI s'han de tocar
+protected_patterns = ["*.db", "current_context.json", "metadata.json"]

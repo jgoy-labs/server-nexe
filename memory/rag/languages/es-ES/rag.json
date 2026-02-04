@@ -1,0 +1,44 @@
+{
+ "rag": {
+  "singleton_error": "RAGModule es Singleton. Usar get_instance()",
+  "health": {
+   "initialized_ok": "Módulo inicializado correctamente",
+   "not_initialized": "Módulo no inicializado",
+   "init_check_error": "Error comprobando inicialización: {error}",
+   "qdrant_available": "qdrant-client {version} disponible",
+   "qdrant_not_installed": "qdrant-client no instalado (pip install qdrant-client)",
+   "qdrant_check_error": "Error comprobando qdrant-client: {error}",
+   "storage_paths_writable": "Storage paths accesibles: {path}",
+   "storage_paths_not_writable": "Storage paths no accesibles: {path}",
+   "storage_paths_error": "Error comprobando storage paths: {error}",
+   "ledger_importable": "TransactionLedger importable",
+   "ledger_not_importable": "TransactionLedger no importable: {error}",
+   "ledger_check_error": "Error comprobando TransactionLedger: {error}",
+   "write_coordinator_importable": "WriteCoordinator importable",
+   "write_coordinator_not_importable": "WriteCoordinator no importable: {error}",
+   "write_coordinator_check_error": "Error comprobando WriteCoordinator: {error}",
+   "module_not_initialized_no_sources": "Módulo no inicializado - no hay fuentes cargadas",
+   "no_sources_registered": "No hay fuentes RAG registradas",
+   "sources_healthy": "{count} fuentes operativas",
+   "sources_unhealthy": "Algunas fuentes no operativas ({count} total)",
+   "sources_check_error": "Error comprobando fuentes: {error}",
+   "disk_space_ok": "{free}GB disponible (>={required}GB requerido)",
+   "disk_space_warn": "{free}GB disponible (<{required}GB requerido, puede quedarse sin espacio)",
+   "disk_space_critical": "{free}GB disponible (crítico: <{critical}GB)",
+   "disk_space_error": "Error comprobando disk space: {error}"
+  },
+  "workflow": {
+   "nodes_auto_discovery": "Los nodos RAG serán auto-descubiertos por WorkflowEngine",
+   "rag_not_available": "RAGSearchNode no se registrará. Instala qdrant-client para habilitar funcionalidad RAG.",
+   "rag_functionality_not_available": "Funcionalidad RAG no disponible. Instala qdrant-client: pip install qdrant-client",
+   "failed_to_init_rag_source": "Error inicializando RAG source: {error}",
+   "missing_query": "Falta parámetro requerido: 'query'",
+   "no_relevant_documents": "No se encontraron documentos relevantes.",
+   "rag_search_failed": "Búsqueda RAG falló: {error}",
+   "top_k_validation": "top_k debe ser >= 1",
+   "score_threshold_validation": "score_threshold debe estar entre 0.0 y 1.0",
+   "prompt_template_context_missing": "prompt_template debe contener el placeholder {context}",
+   "prompt_template_query_missing": "prompt_template debe contener el placeholder {query}"
+  }
+ }
+}

@@ -1,0 +1,85 @@
+{
+ "cli": {
+  "name": "CLI Central Nexe",
+  "description": "Orquestador de CLIs de módulos Nexe 0.8",
+  "greetings": {
+   "hello": "Hola",
+   "welcome": "Bienvenido al CLI Central Nexe 0.8",
+   "goodbye": "¡Adiós!"
+  },
+  "features": {
+   "cli_discovery": "Descubrimiento de CLIs",
+   "subprocess_execution": "Ejecución de subprocesos",
+   "offline_support": "Soporte offline",
+   "http_client": "Cliente HTTP integrado"
+  },
+  "health_checks": {
+   "module_structure": {
+    "name": "Estructura del módulo",
+    "all_folders_exist": "Todas las carpetas existen",
+    "all_files_exist": "Todos los archivos existen",
+    "missing_folders": "Carpetas faltantes",
+    "missing_files": "Archivos faltantes"
+   },
+   "cli_discovery": {
+    "name": "Descubrimiento de CLIs",
+    "clis_found": "CLIs descubiertos",
+    "no_clis": "No se han descubierto CLIs",
+    "missing_entry": "CLIs sin entry_point",
+    "quadrants": "Cuadrantes cubiertos"
+   },
+   "config_valid": {
+    "name": "Configuración válida",
+    "config_ok": "Configuración correcta",
+    "no_server_url": "No hay URL de servidor configurada",
+    "invalid_timeout": "Timeout inválido"
+   },
+   "basic_functionality": {
+    "name": "Funcionalidad básica",
+    "module_ok": "Módulo CLIModule funciona correctamente",
+    "methods_ok": "Todos los métodos responden"
+   }
+  },
+  "check": {
+   "error": "Error ejecutando check",
+   "missing_files": "Archivos faltantes",
+   "missing_folders": "Carpetas faltantes",
+   "structure_ok": "Estructura correcta",
+   "no_clis": "No se han descubierto CLIs",
+   "missing_entry": "CLIs sin entry_point",
+   "clis_found": "CLIs descubiertos",
+   "quadrants": "Cuadrantes",
+   "no_server_url": "No hay URL de servidor configurada",
+   "invalid_timeout": "Timeout inválido",
+   "config_ok": "Configuración correcta",
+   "config_error": "Error de configuración",
+   "module_ok": "Módulo CLIModule funciona correctamente",
+   "methods_ok": "Todos los métodos responden",
+   "assertion_failed": "Test fallido",
+   "func_error": "Error de funcionalidad",
+   "discovery_error": "Error de descubrimiento"
+  },
+  "commands": {
+   "list": "Lista todos los CLIs disponibles",
+   "run": "Ejecuta un CLI específico",
+   "help": "Muestra ayuda",
+   "version": "Muestra la versión"
+  },
+  "status": {
+   "healthy": "SANO",
+   "degraded": "DEGRADADO",
+   "unhealthy": "NO SANO",
+   "error": "ERROR"
+  },
+  "messages": {
+   "location": "Ubicación",
+   "usage": "Uso",
+   "available_clis": "CLIs disponibles",
+   "no_clis_found": "No se han encontrado CLIs",
+   "cli_not_found": "CLI no encontrado",
+   "executing": "Ejecutando",
+   "success": "Éxito",
+   "failed": "Fallado"
+  }
+ }
+}

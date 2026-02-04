@@ -1,0 +1,113 @@
+{
+ "_meta": {
+  "component": "core_loader",
+  "description": "Traducciones para cargador dinámico de módulos",
+  "version": "1.0.0",
+  "language": "es-ES"
+ },
+
+ "loading": {
+  "starting": "Cargando módulo {module}...",
+  "api_file_search": "Buscando archivo de API para {module}",
+  "api_file_found": "Archivo de API encontrado: {file}",
+  "api_file_not_found": "Archivo de API no encontrado para {module}. Patrones probados: {patterns}",
+  "importing": "Importando módulo {module} desde {file}",
+  "extracting_instance": "Extrayendo instancia principal del módulo {module}",
+  "factory_found": "Factory function encontrada: {factory}",
+  "factory_failed": "Factory function {factory} ha fallado: {error}",
+  "validating": "Validando módulo {module}",
+  "initializing": "Inicializando módulo {module}",
+  "success": "Módulo {module} cargado correctamente",
+  "error": "Error cargando módulo {module}: {error}",
+  "cleanup": "Limpiando recursos para {module}"
+ },
+
+ "validation": {
+  "instance_missing": "Instancia del módulo no válida",
+  "api_router_missing": "Router/app de API requerido pero no encontrado",
+  "ui_file_missing": "Archivo de UI requerido: {file}",
+  "dependency_missing": "Dependencia externa no disponible: {dep}",
+  "validation_passed": "Validación del módulo superada",
+  "validation_failed": "Validación del módulo fallida: {errors}"
+ },
+
+ "unloading": {
+  "starting": "Descargando módulo {module}...",
+  "cleanup_method": "Ejecutando método de limpieza: {method}",
+  "cleanup_error": "Error en método de limpieza {method}: {error}",
+  "sys_modules_removed": "{count} módulos eliminados de sys.modules",
+  "success": "Módulo {module} descargado correctamente",
+  "error": "Error descargando módulo {module}: {error}"
+ },
+
+ "initialization": {
+  "method_found": "Método de inicialización encontrado: {method}",
+  "method_called": "Método {method} ejecutado para {module}",
+  "method_error": "Error ejecutando {method}: {error}",
+  "no_init_method": "Ningún método de inicialización encontrado para {module}"
+ },
+
+ "loader": {
+  "patterns": {
+   "api_module": "api_{module_name}.py",
+   "api_generic": "api.py",
+   "main": "main.py",
+   "init": "__init__.py",
+   "module_name": "{module_name}.py",
+   "module_generic": "module.py",
+   "app": "app.py"
+  },
+  "file_extensions": {
+   "python": ".py"
+  },
+  "ignore_prefixes": {
+   "test": "test_",
+   "underscore": "_",
+   "dot": "."
+  },
+  "ignore_files": {
+   "setup": "setup"
+  },
+  "debug": {
+   "tried_patterns": "Probados: {patterns}",
+   "found_api_file": "Archivo de API encontrado: {file}",
+   "fallback_api_file": "Usando archivo de API alternativo: {file}",
+   "using_module_as_instance": "Usando el módulo mismo como instancia para {module}",
+   "cannot_create_spec": "No se puede crear especificación para {file}",
+   "called_method": "Método {method} llamado para {module}",
+   "cleanup_completed": "Limpieza de recursos completada para {module}",
+   "error_calling_method": "Error llamando {method}: {error}",
+   "error_calling_method_unload": "Error llamando {method} durante la descarga: {error}",
+   "reloading_module": "Recargando módulo {module}"
+  },
+  "module_name_prefix": "module_{module_name}_{id}",
+  "init_methods": {
+   "init": "init",
+   "initialize": "initialize",
+   "setup": "setup",
+   "start_up": "start_up",
+   "on_load": "on_load"
+  },
+  "cleanup_methods": {
+   "cleanup": "cleanup",
+   "shutdown": "shutdown",
+   "teardown": "teardown",
+   "dispose": "dispose",
+   "on_unload": "on_unload"
+  },
+  "common_attributes": {
+   "app": "app",
+   "router": "router",
+   "api": "api",
+   "module": "module",
+   "instance": "instance",
+   "main": "main"
+  },
+  "factory_functions": {
+   "create_module": "create_module",
+   "create_app": "create_app",
+   "create": "create",
+   "init": "init"
+  }
+ }
+}

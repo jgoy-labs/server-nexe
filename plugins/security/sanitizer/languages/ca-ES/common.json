@@ -1,0 +1,47 @@
+{
+ "sanitizer": {
+  "info": {
+   "description": "Sistema de sanititzacio d'entrada. Detecta i neutralitza amenaces.",
+   "type": "Modul de seguretat"
+  },
+  "threats": {
+   "injection_detected": "Intent d'injeccio detectat",
+   "xss_detected": "Intent de XSS detectat",
+   "path_traversal": "Intent de path traversal detectat",
+   "prompt_injection": "Intent de prompt injection detectat",
+   "sql_injection": "Intent de SQL injection detectat",
+   "command_injection": "Intent de command injection detectat"
+  },
+  "patterns": {
+   "jailbreak": "Patro de jailbreak detectat",
+   "role_manipulation": "Intent de manipulacio de rol detectat",
+   "system_override": "Intent de sobreescriure sistema detectat",
+   "encoding_attack": "Atac per encoding detectat"
+  },
+  "actions": {
+   "blocked": "Entrada bloquejada",
+   "sanitized": "Entrada sanititzada",
+   "flagged": "Entrada marcada per revisio",
+   "allowed": "Entrada permesa"
+  },
+  "severity": {
+   "critical": "Amenaca critica",
+   "high": "Amenaca alta",
+   "medium": "Amenaca mitjana",
+   "low": "Amenaca baixa"
+  },
+  "health": {
+   "healthy": "Sistema de sanititzacio actiu",
+   "degraded": "Sistema amb problemes menors",
+   "unhealthy": "Sistema no disponible",
+   "check_patterns": "Patrons carregats",
+   "check_rules": "Regles de sanititzacio",
+   "check_encoding": "Detector d'encoding"
+  },
+  "log": {
+   "threat_logged": "Amenaca registrada",
+   "pattern_matched": "Patro coincidit: {pattern}",
+   "action_taken": "Accio executada: {action}"
+  }
+ }
+}

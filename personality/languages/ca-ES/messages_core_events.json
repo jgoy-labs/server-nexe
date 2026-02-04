@@ -1,0 +1,53 @@
+{
+ "_meta": {
+  "component": "core_events",
+  "description": "Traduccions per sistema global d'esdeveniments",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ 
+ "events": {
+  "callback_registered": "Callback d'esdeveniment registrat: {callback_name}",
+  "callback_removed": "Callback d'esdeveniment eliminat: {callback_name}",
+  "callbacks_cleared": "Eliminats {count} callbacks d'esdeveniments",
+  "callback_error": "Error en callback d'esdeveniment: {error}",
+  "event_emitted": "Esdeveniment emès: {event_type} des de {source}",
+  "event_ignored": "Esdeveniment ignorat: {event_type}",
+  "history_added": "Esdeveniment afegit a l'historial",
+  "history_trimmed": "Historial d'esdeveniments retallat a {max_size} entrades"
+ },
+ 
+ "types": {
+  "system_started": "Sistema iniciat",
+  "system_shutdown": "Sistema aturat",
+  "module_loaded": "Mòdul carregat",
+  "module_started": "Mòdul iniciat",
+  "module_stopped": "Mòdul aturat",
+  "module_error": "Error de mòdul",
+  "discovery_completed": "Descobriment completat",
+  "config_reloaded": "Configuració recarregada"
+ },
+ 
+ "management": {
+  "listener_count": "{count} listeners registrats",
+  "listener_count_by_type": "{count} listeners per {event_type}",
+  "event_ignored_added": "Tipus d'esdeveniment {event_type} afegit a la llista d'ignorats",
+  "event_ignored_removed": "Tipus d'esdeveniment {event_type} eliminat de la llista d'ignorats",
+  "max_history_set": "Mida màxima de l'historial establerta a {size}",
+  "history_cleared": "Historial d'esdeveniments netejat: {count} entrades eliminades"
+ },
+
+ "sync": {
+  "called_from_active_loop": "emit_event_sync() cridat des d'un event loop actiu",
+  "added_to_history_only": "Esdeveniment {event_type} afegit a l'historial però no emès (loop actiu)",
+  "sync_wrapper_failed": "Error emitent esdeveniment de forma síncrona: {error}"
+ },
+ 
+ "stats": {
+  "total_callbacks": "Total callbacks: {count}",
+  "general_callbacks": "Callbacks generals: {count}",
+  "typed_callbacks": "Callbacks per tipus: {count}",
+  "history_size": "Mida de l'historial: {size}/{max}",
+  "ignored_types": "Tipus ignorats: {count}"
+ }
+}

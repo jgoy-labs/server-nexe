@@ -1,0 +1,101 @@
+"""
+────────────────────────────────────
+Server Nexe
+Version: 0.8
+Author: Jordi Goy 
+Location: personality/models/registry.py
+Description: Registre curat de models suportats (MLX & Ollama).
+             Mapeja noms curts (e.g. "llama3") a IDs reals (HF o Ollama library).
+
+www.jgoy.net
+────────────────────────────────────
+"""
+
+from typing import Dict, Optional
+from dataclasses import dataclass
+
+@dataclass
+class ModelEntry:
+    short_name: str
+    description: str
+    size_gb: float
+    ollama_tag: str
+    mlx_hf_id: str
+
+# Registre curat de models verificats per funcionar bé amb Nexe
+MODEL_REGISTRY: Dict[str, ModelEntry] = {
+    # --- Tiny / Micro Models ---
+    "qwen0.5": ModelEntry(
+        short_name="qwen0.5",
+        description="Qwen2 0.5B - Ultra ràpid, per proves o RPi.",
+        size_gb=0.4,
+        ollama_tag="qwen2:0.5b",
+        mlx_hf_id="mlx-community/Qwen2-0.5B-Instruct-4bit"
+    ),
+    "tinyllama": ModelEntry(
+        short_name="tinyllama",
+        description="TinyLlama 1.1B - Molt lleuger.",
+        size_gb=0.7,
+        ollama_tag="tinyllama",
+        mlx_hf_id="mlx-community/TinyLlama-1.1B-Chat-v1.0-4bit"
+    ),
+    
+    # --- Small / Consumer Models (4-8GB RAM) ---
+    "gemma2b": ModelEntry(
+        short_name="gemma2b",
+        description="Google Gemma 2 (2B) - Sorprenentment intel·ligent per la mida.",
+        size_gb=1.5,
+        ollama_tag="gemma2:2b",
+        mlx_hf_id="mlx-community/gemma-2-2b-it-4bit"
+    ),
+    "llama3.2-3b": ModelEntry(
+        short_name="llama3.2-3b",
+        description="Meta Llama 3.2 (3B) - Estàndard actual per edge devices.",
+        size_gb=2.0,
+        ollama_tag="llama3.2:3b",
+        mlx_hf_id="mlx-community/Llama-3.2-3B-Instruct-4bit"
+    ),
+    "phi3.5": ModelEntry(
+        short_name="phi3.5",
+        description="Microsoft Phi-3.5 Mini (3.8B) - Molt bo seguint instruccions.",
+        size_gb=2.3,
+        ollama_tag="phi3.5",
+        mlx_hf_id="mlx-community/Phi-3.5-mini-instruct-4bit"
+    ),
+
+    # --- Medium / Pro Models (8-16GB RAM) ---
+    "llama3.1-8b": ModelEntry(
+        short_name="llama3.1-8b",
+        description="Meta Llama 3.1 (8B) - El millor en la seva classe. Recomanat.",
+        size_gb=4.9,
+        ollama_tag="llama3.1:8b",
+        mlx_hf_id="mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
+    ),
+    "gemma9b": ModelEntry(
+        short_name="gemma9b",
+        description="Google Gemma 2 (9B) - Molt potent, requereix més RAM.",
+        size_gb=5.5,
+        ollama_tag="gemma2:9b",
+        mlx_hf_id="mlx-community/gemma-2-9b-it-4bit"
+    ),
+    "mistral-nemo": ModelEntry(
+        short_name="mistral-nemo",
+        description="Mistral Nemo (12B) - Gran context i raonament.",
+        size_gb=7.5,
+        ollama_tag="mistral-nemo",
+        mlx_hf_id="mlx-community/Mistral-Nemo-Instruct-2407-4bit"
+    ),
+}
+
+def get_model_entry(name: str) -> Optional[ModelEntry]:
+    """Busca un model pel seu nom curt."""
+    return MODEL_REGISTRY.get(name.lower())
+
+def list_models_table() -> str:
+    """Retorna una taula formatada dels models disponibles."""
+    headers = ["Nom Curt", "Mida", "Descripció"]
+    rows = []
+    for m in MODEL_REGISTRY.values():
+        rows.append(f"{m.short_name:<15} {m.size_gb:>4.1f}GB  {m.description}")
+    
+    return "\n".join(rows)

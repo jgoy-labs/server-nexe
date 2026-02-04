@@ -1,0 +1,98 @@
+{
+ "personality": {
+  "loading": {
+   "starting": "Cargando módulo: {module}",
+   "success": "Módulo {module} cargado correctamente",
+   "error": "Error cargando módulo {module}: {error}",
+   "api_file_not_found": "Archivo API no encontrado para {module}. {patterns}",
+   "api_file_found": "Archivo de API encontrado: {file}",
+   "extracting_instance": "Extrayendo instancia principal del módulo {module}",
+   "factory_found": "Factory function encontrada: {factory}",
+   "factory_failed": "Factory function {factory} ha fallado: {error}",
+   "validating": "Validando módulo {module}",
+   "initializing": "Inicializando módulo {module}",
+   "cleanup": "Limpiando recursos para {module}"
+  },
+  "unloading": {
+   "starting": "Descargando módulo {module}...",
+   "success": "Módulo {module} descargado correctamente",
+   "error": "Error descargando módulo {module}: {error}",
+   "cleanup_method": "Ejecutando método de limpieza: {method}"
+  },
+  "validation": {
+   "instance_missing": "Instancia del módulo no válida",
+   "api_router_missing": "Router/app de API requerido pero no encontrado",
+   "ui_file_missing": "Archivo de UI requerido: {file}",
+   "dependency_missing": "Dependencia externa no disponible: {dep}",
+   "validation_failed": "Validación fallida para {module}:\n{errors}"
+  },
+  "initialization": {
+   "method_found": "Método de inicialización encontrado: {method}",
+   "method_called": "Método {method} ejecutado para {module}",
+   "method_error": "Error ejecutando {method}: {error}"
+  },
+  "loader": {
+   "patterns": {
+    "api_module": "api_{module_name}.py",
+    "api_generic": "api.py",
+    "main": "main.py",
+    "init": "__init__.py",
+    "module_name": "{module_name}.py",
+    "module_generic": "module.py",
+    "app": "app.py"
+   },
+   "file_extensions": {
+    "python": ".py"
+   },
+   "ignore_prefixes": {
+    "test": "test_",
+    "underscore": "_",
+    "dot": "."
+   },
+   "ignore_files": {
+    "setup": "setup"
+   },
+   "debug": {
+    "tried_patterns": "Probados: {patterns}",
+    "found_api_file": "Archivo de API encontrado: {file}",
+    "fallback_api_file": "Usando archivo de API alternativo: {file}",
+    "using_module_as_instance": "Usando el módulo mismo como instancia para {module}",
+    "cannot_create_spec": "No se puede crear especificación para {file}",
+    "called_method": "Método {method} llamado para {module}",
+    "cleanup_completed": "Limpieza de recursos completada para {module}",
+    "error_calling_method": "Error llamando {method}: {error}",
+    "error_calling_method_unload": "Error llamando {method} durante la descarga: {error}",
+    "reloading_module": "Recargando módulo {module}"
+   },
+   "module_name_prefix": "module_{module_name}_{id}",
+   "init_methods": {
+    "init": "init",
+    "initialize": "initialize",
+    "setup": "setup",
+    "start_up": "start_up",
+    "on_load": "on_load"
+   },
+   "cleanup_methods": {
+    "cleanup": "cleanup",
+    "shutdown": "shutdown",
+    "teardown": "teardown",
+    "dispose": "dispose",
+    "on_unload": "on_unload"
+   },
+   "common_attributes": {
+    "app": "app",
+    "router": "router",
+    "api": "api",
+    "module": "module",
+    "instance": "instance",
+    "main": "main"
+   },
+   "factory_functions": {
+    "create_module": "create_module",
+    "create_app": "create_app",
+    "create": "create",
+    "init": "init"
+   }
+  }
+ }
+}
