@@ -1,0 +1,46 @@
+# ─────────────────────────────────────────────────────────────
+# Nexe Server 0.8
+# Mòdul: SANITIZER (04.1)
+# ─────────────────────────────────────────────────────────────
+
+[module]
+name = "sanitizer"
+version = "1.0.0"
+description = "Filtre de seguretat TÈCNICA per jailbreaks i prompt injections"
+author = "J.Goy"
+pilar = "plugins"
+order = "04.1"
+enabled = true
+
+[module.position]
+pipeline_order = 1
+before = ["traductor", "audit"]
+after = ["memory"]
+
+[module.dependencies]
+required = []
+optional = []
+blocks = ["audit"]
+
+[module.paths]
+module = "plugins/security/sanitizer"
+tests = "plugins/security/sanitizer/tests"
+languages = "plugins/security/sanitizer/languages"
+
+[module.features]
+jailbreak_detection = true
+injection_detection = true
+redos_protection = true
+needs_intervention_flag = true
+
+[module.performance]
+target_latency_ms = 2
+max_scan_length = 2000
+max_input_length = 10000
+
+[module.health]
+checks = ["patterns_loaded", "regex_compiled", "sanitizer_functional", "jailbreak_detection", "injection_detection"]
+
+[module.i18n]
+languages = ["ca-ES", "es-ES", "en-US"]
+default = "ca-ES"

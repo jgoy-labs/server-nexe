@@ -1,0 +1,53 @@
+{
+ "_meta": {
+  "component": "core_metrics",
+  "description": "Traduccions per col·lector de mètriques",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ 
+ "collection": {
+  "updated": "Mètriques actualitzades per {module}",
+  "snapshot_created": "Instantània de mètriques creada",
+  "history_full": "Historial de mètriques ple, eliminant entrades antigues",
+  "custom_metric_set": "Mètrica personalitzada establerta: {key} = {value}",
+  "custom_metric_removed": "Mètrica personalitzada eliminada: {key}"
+ },
+ 
+ "system": {
+  "memory_usage": "Ús de memòria: {usage}MB",
+  "cpu_usage": "Ús de CPU: {usage}%",
+  "uptime": "Temps en funcionament: {seconds}s",
+  "api_calls": "Crides d'API: {count}",
+  "error_rate": "Taxa d'errors: {rate}%",
+  "load_time": "Temps de càrrega: {time}ms",
+  "modules_total": "Total mòduls: {count}",
+  "modules_running": "Mòduls en execució: {count}",
+  "modules_with_errors": "Mòduls amb errors: {count}"
+ },
+ 
+ "performance": {
+  "summary_generated": "Resum de rendiment generat",
+  "no_running_modules": "Cap mòdul en execució per analitzar",
+  "avg_load_time": "Temps mitjà de càrrega: {time}ms",
+  "max_load_time": "Temps màxim de càrrega: {time}ms",
+  "min_load_time": "Temps mínim de càrrega: {time}ms",
+  "avg_memory": "Memòria mitjana: {memory}MB",
+  "max_memory": "Memòria màxima: {memory}MB",
+  "total_memory": "Memòria total: {memory}MB"
+ },
+ 
+ "history": {
+  "cleared": "Historial de mètriques netejat: {count} entrades",
+  "size_set": "Mida màxima de l'historial establerta a {size}",
+  "trimmed": "Historial retallat a {size} entrades",
+  "exported": "Historial de mètriques exportat: {count} entrades"
+ },
+ 
+ "alerts": {
+  "high_memory": "Avís: Ús de memòria elevat per {module}: {usage}MB",
+  "high_cpu": "Avís: Ús de CPU elevat per {module}: {usage}%",
+  "slow_load": "Avís: Càrrega lenta per {module}: {time}ms",
+  "many_errors": "Avís: Molts errors per {module}: {count} errors"
+ }
+}

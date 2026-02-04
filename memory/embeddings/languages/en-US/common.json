@@ -1,0 +1,53 @@
+{
+ "embeddings_module": {
+  "name": "Embeddings Module",
+  "description": "Semantic embeddings system with multi-level cache and intelligent chunking",
+  
+  "health": {
+   "module_initialized": "Module initialized",
+   "dependencies_available": "Dependencies available",
+   "device_available": "Device available",
+   "cache_directories": "Cache directories",
+   "memory_available": "Memory available",
+   "healthy": "Healthy",
+   "degraded": "Degraded",
+   "unhealthy": "Unhealthy"
+  },
+  
+  "operations": {
+   "encode": "Generate embedding",
+   "encode_batch": "Generate batch embeddings",
+   "chunk_document": "Split document into chunks",
+   "clear_cache": "Clear cache",
+   "get_stats": "Get statistics"
+  },
+  
+  "errors": {
+   "not_initialized": "Module not initialized. Call initialize() first.",
+   "missing_dependencies": "Missing dependencies: {deps}",
+   "encoding_failed": "Error generating embedding: {error}",
+   "chunking_failed": "Error splitting document: {error}",
+   "cache_error": "Cache error: {error}"
+  },
+  
+  "messages": {
+   "initialized": "Embeddings Module initialized successfully",
+   "cache_cleared": "Cache cleared successfully",
+   "model_loaded": "Model {model} loaded",
+   "encoding_complete": "Encoding completed in {latency}ms",
+   "cache_hit": "Cache HIT (latency: {latency}ms)",
+   "cache_miss": "Cache MISS (latency: {latency}ms)"
+  },
+  
+  "workflow": {
+   "embedding_node": {
+    "name": "Embedding Node",
+    "description": "Generate embedding for a text"
+   },
+   "chunking_node": {
+    "name": "Chunking Node",
+    "description": "Split document into semantic chunks"
+   }
+  }
+ }
+}

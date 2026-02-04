@@ -1,0 +1,59 @@
+{
+ "_meta": {
+  "component": "path_discovery",
+  "description": "Traduccions per descobriment automàtic de paths",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ 
+ "discovery": {
+  "starting": "Escanejant paths per mòduls...",
+  "path_added": "Path afegit: {path}",
+  "auto_discovered": "Auto-descobert: {path}",
+  "permission_denied": "Permisos denegats escanejant: {path}",
+  "max_dirs_reached": "Límit màxim de directoris assolit: {max}",
+  "paths_discovered": "Descoberts {count} paths de mòduls",
+  "scanning_complete": "Escaneig completat"
+ },
+ 
+ "modules": {
+  "found": "Mòdul trobat: '{name}' a {path}",
+  "scanning_path": "Escanejant path: {path}",
+  "not_module": "Directori {path} no conté mòduls",
+  "api_indicators_found": "Indicadors d'API trobats a {path}",
+  "manifest_found": "Manifest trobat: {path}",
+  "python_files_found": "Fitxers Python trobats a {path}"
+ },
+ 
+ "cache": {
+  "saved": "Cache de paths desat a {file}",
+  "loaded": "Cache de paths carregat des de {file}",
+  "save_error": "Error desant cache: {error}",
+  "load_error": "Error carregant cache: {error}",
+  "cache_outdated": "Cache obsolet, forçant redescobriment"
+ },
+ 
+ "patterns": {
+  "known_paths": "Processant paths coneguts: {count}",
+  "configured_paths": "Processant paths configurats: {count}",
+  "auto_discovery": "Iniciant auto-descobriment de paths",
+  "pattern_matched": "Patró trobat: {pattern} a {path}",
+  "ignored_pattern": "Patró ignorat: {pattern}"
+ },
+ 
+ "validation": {
+  "path_exists": "Path vàlid: {path}",
+  "path_missing": "Path inexistent: {path}",
+  "not_directory": "{path} no és un directori",
+  "is_module_directory": "{path} és un directori de mòdul vàlid",
+  "not_module_directory": "{path} no sembla un directori de mòdul"
+ },
+ 
+ "stats": {
+  "total_paths": "Total paths descoberts: {count}",
+  "total_modules": "Total mòduls trobats: {count}",
+  "discovery_time": "Temps de descobriment: {time}ms",
+  "cache_hit": "Cache utilitzat per {count} mòduls",
+  "new_discoveries": "Nous descobriments: {count}"
+ }
+}

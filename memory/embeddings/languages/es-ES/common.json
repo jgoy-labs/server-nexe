@@ -1,0 +1,53 @@
+{
+ "embeddings_module": {
+  "name": "Módulo de Embeddings",
+  "description": "Sistema de embeddings semánticos con caché multinivel y chunking inteligente",
+  
+  "health": {
+   "module_initialized": "Módulo inicializado",
+   "dependencies_available": "Dependencias disponibles",
+   "device_available": "Dispositivo disponible",
+   "cache_directories": "Directorios de caché",
+   "memory_available": "Memoria disponible",
+   "healthy": "Saludable",
+   "degraded": "Degradado",
+   "unhealthy": "No saludable"
+  },
+  
+  "operations": {
+   "encode": "Generar embedding",
+   "encode_batch": "Generar embeddings en lote",
+   "chunk_document": "Dividir documento en chunks",
+   "clear_cache": "Limpiar caché",
+   "get_stats": "Obtener estadísticas"
+  },
+  
+  "errors": {
+   "not_initialized": "Módulo no inicializado. Llama a initialize() primero.",
+   "missing_dependencies": "Dependencias faltantes: {deps}",
+   "encoding_failed": "Error generando embedding: {error}",
+   "chunking_failed": "Error dividiendo documento: {error}",
+   "cache_error": "Error de caché: {error}"
+  },
+  
+  "messages": {
+   "initialized": "Módulo Embeddings inicializado correctamente",
+   "cache_cleared": "Caché limpiada correctamente",
+   "model_loaded": "Modelo {model} cargado",
+   "encoding_complete": "Encoding completado en {latency}ms",
+   "cache_hit": "Cache HIT (latencia: {latency}ms)",
+   "cache_miss": "Cache MISS (latencia: {latency}ms)"
+  },
+  
+  "workflow": {
+   "embedding_node": {
+    "name": "Nodo de Embedding",
+    "description": "Genera embedding para un texto"
+   },
+   "chunking_node": {
+    "name": "Nodo de Chunking",
+    "description": "Divide documento en chunks semánticos"
+   }
+  }
+ }
+}

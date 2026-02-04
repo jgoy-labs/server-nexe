@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexe - Local AI</title>
+    <link rel="stylesheet" href="/ui/static/style.css">
+    <!-- Marked.js per renderitzar Markdown (local) -->
+    <script src="/ui/static/marked.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <h1>Nexe</h1>
+                    <span class="version">v0.8</span>
+                </div>
+            </div>
+
+            <div class="sidebar-content">
+                <button id="newChatBtn" class="btn-new-chat">
+                    <span class="icon">+</span>
+                    Nova conversa
+                </button>
+
+                <div class="sessions-header">
+                    <h3>Sessions</h3>
+                </div>
+
+                <div id="sessionsList" class="sessions-list">
+                    <!-- Sessions populated dynamically -->
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <div class="status-dot active"></div>
+                    <span>Connectat</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-main">
+            <div id="chatMessages" class="chat-messages">
+                <div class="welcome-screen">
+                    <div class="welcome-icon">🤖</div>
+                    <h2>Benvingut a Nexe</h2>
+                    <p>IA local amb memòria persistent</p>
+                    <div class="features">
+                        <div class="feature">
+                            <span class="feature-icon">💬</span>
+                            <span>Conversa amb memòria contextual</span>
+                        </div>
+                        <div class="feature">
+                            <span class="feature-icon">📁</span>
+                            <span>Puja documents (.txt, .md, .pdf)</span>
+                        </div>
+                        <div class="feature">
+                            <span class="feature-icon">🔒</span>
+                            <span>100% local i privat</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="chat-input-area">
+                <div class="input-container">
+                    <button id="uploadBtn" class="btn-upload" title="Pujar document">
+                        📎
+                    </button>
+
+                    <textarea
+                        id="messageInput"
+                        placeholder="Escriu un missatge..."
+                        rows="1"
+                    ></textarea>
+
+                    <button id="sendBtn" class="btn-send" title="Enviar">
+                        ➤
+                    </button>
+                    <button id="stopBtn" class="btn-stop" title="Aturar generació" style="display: none;">
+                        ■
+                    </button>
+                </div>
+                <input type="file" id="fileInput" accept=".txt,.md,.markdown,.pdf" style="display: none">
+                <div id="filePreview" class="file-preview"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/ui/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+ "memory": {
+  "singleton_error": "MemoryModule és Singleton. Usar get_instance()",
+  "health": {
+   "initialized_ok": "Mòdul inicialitzat correctament",
+   "not_initialized": "Mòdul no inicialitzat",
+   "init_check_error": "Error comprovant inicialització: {error}",
+   "flash_storage_writable": "Emmagatzematge flash accessible: {path}",
+   "flash_storage_not_writable": "Emmagatzematge flash no accessible: {path}",
+   "flash_storage_error": "Error comprovant emmagatzematge flash: {error}",
+   "ram_ok": "{available}GB disponible (>={required}GB requerit)",
+   "ram_warn": "{available}GB disponible (<{required}GB requerit, pot ser lent)",
+   "ram_critical": "{available}GB disponible (crític: <{critical}GB)",
+   "ram_error": "Error comprovant memòria RAM: {error}",
+   "cleanup_ok": "Polítiques de neteja configurades correctament",
+   "cleanup_error": "Error comprovant polítiques de neteja: {error}"
+  }
+ }
+}

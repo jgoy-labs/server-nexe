@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────
+# Nexe: SANITIZER - Traducciones Español (es-ES)
+# ─────────────────────────────────────────────────────────────
+
+[module]
+name = "Sanitizer"
+description = "Filtro de seguridad TÉCNICA"
+
+[threats]
+jailbreak = "Intento de jailbreak detectado"
+prompt_injection = "Inyección de prompt detectada"
+input_too_long = "Input demasiado largo"
+
+[severity]
+none = "Sin amenazas"
+low = "Amenaza baja"
+medium = "Amenaza media"
+high = "Amenaza alta"
+critical = "Amenaza crítica"
+
+[messages]
+safe = "El input es seguro"
+unsafe = "El input contiene amenazas"
+blocked = "El input ha sido bloqueado por seguridad"
+needs_intervention = "Es necesario activar Intervenció para revisar"
+
+[health]
+patterns_loaded = "Patrones cargados"
+regex_compiled = "Regex compiladas"
+sanitizer_functional = "Sanitizer funcionando"
+jailbreak_detection = "Detección de jailbreaks"
+injection_detection = "Detección de injections"
+
+[errors]
+pattern_load_failed = "Error cargando patrones"
+regex_compile_failed = "Error compilando regex"
+sanitize_failed = "Error durante la sanitización"
