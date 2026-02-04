@@ -1,0 +1,98 @@
+{
+ "personality": {
+  "loading": {
+   "starting": "Loading module: {module}",
+   "success": "Module {module} loaded successfully",
+   "error": "Error loading module {module}: {error}",
+   "api_file_not_found": "API file not found for {module}. {patterns}",
+   "api_file_found": "API file found: {file}",
+   "extracting_instance": "Extracting main instance from module {module}",
+   "factory_found": "Factory function found: {factory}",
+   "factory_failed": "Factory function {factory} failed: {error}",
+   "validating": "Validating module {module}",
+   "initializing": "Initializing module {module}",
+   "cleanup": "Cleaning up resources for {module}"
+  },
+  "unloading": {
+   "starting": "Unloading module {module}...",
+   "success": "Module {module} unloaded successfully",
+   "error": "Error unloading module {module}: {error}",
+   "cleanup_method": "Executing cleanup method: {method}"
+  },
+  "validation": {
+   "instance_missing": "Module instance not valid",
+   "api_router_missing": "API Router/app required but not found",
+   "ui_file_missing": "Required UI file: {file}",
+   "dependency_missing": "External dependency not available: {dep}",
+   "validation_failed": "Validation failed for {module}:\n{errors}"
+  },
+  "initialization": {
+   "method_found": "Initialization method found: {method}",
+   "method_called": "Method {method} executed for {module}",
+   "method_error": "Error executing {method}: {error}"
+  },
+  "loader": {
+   "patterns": {
+    "api_module": "api_{module_name}.py",
+    "api_generic": "api.py",
+    "main": "main.py",
+    "init": "__init__.py",
+    "module_name": "{module_name}.py",
+    "module_generic": "module.py",
+    "app": "app.py"
+   },
+   "file_extensions": {
+    "python": ".py"
+   },
+   "ignore_prefixes": {
+    "test": "test_",
+    "underscore": "_",
+    "dot": "."
+   },
+   "ignore_files": {
+    "setup": "setup"
+   },
+   "debug": {
+    "tried_patterns": "Tried: {patterns}",
+    "found_api_file": "API file found: {file}",
+    "fallback_api_file": "Using fallback API file: {file}",
+    "using_module_as_instance": "Using module itself as instance for {module}",
+    "cannot_create_spec": "Cannot create spec for {file}",
+    "called_method": "Method {method} called for {module}",
+    "cleanup_completed": "Resource cleanup completed for {module}",
+    "error_calling_method": "Error calling {method}: {error}",
+    "error_calling_method_unload": "Error calling {method} during unload: {error}",
+    "reloading_module": "Reloading module {module}"
+   },
+   "module_name_prefix": "module_{module_name}_{id}",
+   "init_methods": {
+    "init": "init",
+    "initialize": "initialize",
+    "setup": "setup",
+    "start_up": "start_up",
+    "on_load": "on_load"
+   },
+   "cleanup_methods": {
+    "cleanup": "cleanup",
+    "shutdown": "shutdown",
+    "teardown": "teardown",
+    "dispose": "dispose",
+    "on_unload": "on_unload"
+   },
+   "common_attributes": {
+    "app": "app",
+    "router": "router",
+    "api": "api",
+    "module": "module",
+    "instance": "instance",
+    "main": "main"
+   },
+   "factory_functions": {
+    "create_module": "create_module",
+    "create_app": "create_app",
+    "create": "create",
+    "init": "init"
+   }
+  }
+ }
+}

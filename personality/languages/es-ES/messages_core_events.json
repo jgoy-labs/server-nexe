@@ -1,0 +1,53 @@
+{
+ "_meta": {
+  "component": "core_events",
+  "description": "Traducciones para sistema global de eventos",
+  "version": "1.0.0",
+  "language": "es-ES"
+ },
+
+ "events": {
+  "callback_registered": "Callback de evento registrado: {callback_name}",
+  "callback_removed": "Callback de evento eliminado: {callback_name}",
+  "callbacks_cleared": "Eliminados {count} callbacks de eventos",
+  "callback_error": "Error en callback de evento: {error}",
+  "event_emitted": "Evento emitido: {event_type} desde {source}",
+  "event_ignored": "Evento ignorado: {event_type}",
+  "history_added": "Evento añadido al historial",
+  "history_trimmed": "Historial de eventos recortado a {max_size} entradas"
+ },
+
+ "types": {
+  "system_started": "Sistema iniciado",
+  "system_shutdown": "Sistema detenido",
+  "module_loaded": "Módulo cargado",
+  "module_started": "Módulo iniciado",
+  "module_stopped": "Módulo detenido",
+  "module_error": "Error de módulo",
+  "discovery_completed": "Descubrimiento completado",
+  "config_reloaded": "Configuración recargada"
+ },
+
+ "management": {
+  "listener_count": "{count} listeners registrados",
+  "listener_count_by_type": "{count} listeners para {event_type}",
+  "event_ignored_added": "Tipo de evento {event_type} añadido a la lista de ignorados",
+  "event_ignored_removed": "Tipo de evento {event_type} eliminado de la lista de ignorados",
+  "max_history_set": "Tamaño máximo del historial establecido a {size}",
+  "history_cleared": "Historial de eventos limpiado: {count} entradas eliminadas"
+ },
+
+ "sync": {
+  "called_from_active_loop": "emit_event_sync() llamado desde un event loop activo",
+  "added_to_history_only": "Evento {event_type} añadido al historial pero no emitido (loop activo)",
+  "sync_wrapper_failed": "Error emitiendo evento de forma síncrona: {error}"
+ },
+
+ "stats": {
+  "total_callbacks": "Total callbacks: {count}",
+  "general_callbacks": "Callbacks generales: {count}",
+  "typed_callbacks": "Callbacks por tipo: {count}",
+  "history_size": "Tamaño del historial: {size}/{max}",
+  "ignored_types": "Tipos ignorados: {count}"
+ }
+}

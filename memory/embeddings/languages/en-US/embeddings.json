@@ -1,0 +1,41 @@
+{
+ "embeddings": {
+  "singleton_error": "EmbeddingsModule is Singleton. Use get_instance()",
+  "not_initialized": "EmbeddingsModule not initialized. Call initialize()",
+  "module": {
+   "created": "Embeddings module created",
+   "initializing": "Initializing embeddings module",
+   "initialized": "Embeddings module initialized",
+   "init_failed": "Embeddings module initialization failed",
+   "already_initialized": "Embeddings module already initialized",
+   "not_initialized_shutdown": "Embeddings module not initialized during shutdown",
+   "shutting_down": "Shutting down embeddings module",
+   "shutdown_complete": "Embeddings module shutdown complete",
+   "shutdown_failed": "Embeddings module shutdown failed"
+  },
+  "health": {
+   "initialized_ok": "Module initialized correctly",
+   "not_initialized": "Module not initialized",
+   "init_check_error": "Error checking initialization: {error}",
+   "dependencies_ok": "sentence-transformers {version} available",
+   "dependencies_missing": "sentence-transformers not installed (pip install sentence-transformers)",
+   "dependencies_error": "Error checking dependencies: {error}",
+   "device_mps": "MPS (Apple Silicon) available",
+   "device_cuda": "CUDA available ({device})",
+   "device_cpu_only": "Only CPU available (slower performance)",
+   "device_torch_missing": "torch not installed (pip install torch)",
+   "device_error": "Error checking device: {error}",
+   "cache_writable": "Cache directory writable: {path}",
+   "cache_not_writable": "Cache directory not writable: {path}",
+   "cache_error": "Error checking cache directories: {error}",
+   "memory_ok": "{available}GB available (>={required}GB required)",
+   "memory_warn": "{available}GB available (<{required}GB required, may be slow)",
+   "memory_critical": "{available}GB available (critical: <{critical}GB)",
+   "memory_error": "Error checking memory: {error}"
+  },
+  "cli": {
+   "initializing": "Initializing module...",
+   "file_not_found": "Error: File not found: {file_path}"
+  }
+ }
+}

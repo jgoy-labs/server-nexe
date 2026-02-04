@@ -1,0 +1,33 @@
+{
+ "security": {
+  "manifest": {
+   "name": "Security",
+   "description": "Nexe 0.8 security module",
+   "errors": {
+    "not_ready": "Security module is not ready"
+   }
+  },
+  "checks": {
+   "auth_running": "Running authentication check...",
+   "auth_completed": "Authentication check completed: {count} findings",
+   "no_vulnerabilities": "No critical vulnerabilities detected",
+   "completed": "Security checks completed: {count} findings",
+   "critical_found": "CRITICAL: {count} critical vulnerabilities detected",
+   "web_security": "Web Security Check",
+   "auth_check": "Authentication Check",
+   "rate_limit_check": "Rate Limit Check"
+  },
+  "status": {
+   "healthy": "HEALTHY",
+   "degraded": "DEGRADED",
+   "unhealthy": "UNHEALTHY",
+   "critical": "CRITICAL"
+  },
+  "messages": {
+   "scanning": "Scanning security...",
+   "scan_complete": "Security scan completed",
+   "vulnerabilities_found": "Vulnerabilities found: {count}",
+   "no_issues": "No security issues detected"
+  }
+ }
+}

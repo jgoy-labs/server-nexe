@@ -1,0 +1,53 @@
+{
+ "_meta": {
+  "component": "core_metrics",
+  "description": "Translations for metrics collector",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+
+ "collection": {
+  "updated": "Metrics updated for {module}",
+  "snapshot_created": "Metrics snapshot created",
+  "history_full": "Metrics history full, removing old entries",
+  "custom_metric_set": "Custom metric set: {key} = {value}",
+  "custom_metric_removed": "Custom metric removed: {key}"
+ },
+
+ "system": {
+  "memory_usage": "Memory usage: {usage}MB",
+  "cpu_usage": "CPU usage: {usage}%",
+  "uptime": "Uptime: {seconds}s",
+  "api_calls": "API calls: {count}",
+  "error_rate": "Error rate: {rate}%",
+  "load_time": "Load time: {time}ms",
+  "modules_total": "Total modules: {count}",
+  "modules_running": "Running modules: {count}",
+  "modules_with_errors": "Modules with errors: {count}"
+ },
+
+ "performance": {
+  "summary_generated": "Performance summary generated",
+  "no_running_modules": "No running modules to analyze",
+  "avg_load_time": "Average load time: {time}ms",
+  "max_load_time": "Maximum load time: {time}ms",
+  "min_load_time": "Minimum load time: {time}ms",
+  "avg_memory": "Average memory: {memory}MB",
+  "max_memory": "Maximum memory: {memory}MB",
+  "total_memory": "Total memory: {memory}MB"
+ },
+
+ "history": {
+  "cleared": "Metrics history cleared: {count} entries",
+  "size_set": "Maximum history size set to {size}",
+  "trimmed": "History trimmed to {size} entries",
+  "exported": "Metrics history exported: {count} entries"
+ },
+
+ "alerts": {
+  "high_memory": "Warning: High memory usage for {module}: {usage}MB",
+  "high_cpu": "Warning: High CPU usage for {module}: {usage}%",
+  "slow_load": "Warning: Slow load for {module}: {time}ms",
+  "many_errors": "Warning: Many errors for {module}: {count} errors"
+ }
+}

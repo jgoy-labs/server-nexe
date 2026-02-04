@@ -1,0 +1,201 @@
+# ═══════════════════════════════════════════════════════════════
+# Nexe 0.8.0 - Embeddings Module Manifest
+# ═══════════════════════════════════════════════════════════════
+# Ubicació: server.nexe/memory/embeddings/manifest.toml
+# Descripció: Sistema d'embeddings multilingüe amb cache multi-nivell i vectorització
+# ═══════════════════════════════════════════════════════════════
+
+[metadata]
+module_id = "{{NEXE_EMBEDDINGS_MODULE}}"
+name = "embeddings"
+version = "0.1"
+description = "Sistema d'embeddings i vectorització multilingüe amb cache multi-nivell (L1/L2), chunking intel·ligent i suport per Apple Silicon"
+author = "Nexe Team (Jordi Goy)"
+category = "memory"
+created = "2025-10-27"
+last_updated = "2025-10-27"
+
+[paths]
+root = "server.nexe/memory/embeddings"
+manifest = "manifest.py"
+module = "module.py"
+health = "health.py"
+simple_embedder = "simple_embedder.py"
+core = "core"
+specialists = "specialists"
+workflow = "workflow"
+tools = "tools"
+tests = "tests"
+languages = "languages"
+docs = "docs"
+
+[capabilities]
+features = [
+  "text_embedding",
+  "batch_embedding",
+  "multilingual_support",
+  "chunking",
+  "vector_storage",
+  "multi_level_cache",
+  "similarity_search",
+  "apple_silicon_acceleration"
+]
+
+[model]
+# Model d'embeddings per defecte
+default_model = "paraphrase-multilingual-MiniLM-L12-v2"
+provider = "sentence-transformers"
+dimension = 384
+max_sequence_length = 512
+
+# Detecció automàtica de device
+device = "auto" # auto-detect: MPS (Apple Silicon) > CUDA > CPU
+supported_devices = ["cpu", "mps", "cuda"]
+
+[cache]
+# Multi-level cache system
+enabled = true
+
+# L1 Cache (in-memory, LRU)
+l1_enabled = true
+l1_size = 1000
+l1_type = "lru"
+
+# L2 Cache (disk-based, persistent)
+l2_enabled = true
+l2_max_gb = 5.0
+l2_ttl_hours = 72
+l2_path = "cache/l2"
+
+[chunking]
+# Chunking configuration
+enabled = true
+default_size = 512
+default_overlap = 50
+strategies = ["fixed", "sentence", "paragraph", "semantic"]
+
+[performance]
+# Concurrent processing
+max_workers = 2
+batch_size = 32
+enable_gpu_acceleration = true
+
+[dependencies]
+# Mòduls Nexe requerits
+modules = []
+
+# Mòduls externs (Python packages)
+python = [
+  "sentence-transformers",
+  "torch",
+  "numpy",
+  "faiss-cpu"
+]
+
+[workflow]
+# Workflow nodes per integració Nexe
+nodes = [
+  "workflow.nodes.embedding_node",
+  "workflow.nodes.chunking_node"
+]
+enabled = true
+
+[specialists]
+# Specialists
+available = [
+  "specialists.embeddings_specialist"
+]
+health_check = "health.check"
+
+[i18n]
+# Internacionalització
+default_language = "ca-ES"
+supported_languages = ["ca-ES", "en-US", "es-ES"]
+translations_dir = "languages"
+multilingual_model = true
+
+[monitoring]
+# Health checks i metrics
+health_check_enabled = true
+metrics_enabled = true
+prometheus_metrics = [
+  "embeddings_generated_total",
+  "embeddings_cache_hits_total",
+  "embeddings_cache_misses_total",
+  "embeddings_duration_seconds",
+  "embeddings_model_load_duration_seconds"
+]
+
+[logging]
+enabled = true
+level = "INFO"
+log_cache_stats = true
+log_performance = true
+
+[config.default_config]
+# Configuració per defecte del mòdul
+model = "paraphrase-multilingual-MiniLM-L12-v2"
+device = "cpu"
+max_workers = 2
+cache_l1_size = 1000
+cache_l2_max_gb = 5.0
+cache_l2_ttl_hours = 72
+chunk_size = 512
+chunk_overlap = 50
+
+[tools]
+# Eines disponibles
+cli_enabled = true
+main_script = "__main__.py"
+simple_embedder = "simple_embedder.py"
+
+[testing]
+# Test configuration
+tests_dir = "tests"
+test_runner = "pytest"
+coverage_enabled = true
+min_coverage = 80
+
+[vector_storage]
+# Vector database integration
+default_backend = "faiss"
+supported_backends = ["faiss", "chromadb", "pinecone"]
+index_type = "IVF"
+similarity_metric = "cosine"
+
+[optimization]
+# Optimitzacions per Apple Silicon
+apple_silicon_optimized = true
+mps_acceleration = true
+metal_performance_shaders = true
+
+# Batch processing optimizations
+dynamic_batching = true
+adaptive_batch_size = true
+
+# ═══════════════════════════════════════════════════════════════
+# STORAGE DECLARATIONS (Auto-Clean)
+# Cada path que Embeddings escriu a storage/ ha d'estar declarat aquí.
+# El sistema Auto-Clean només gestiona paths declarats.
+# ═══════════════════════════════════════════════════════════════
+
+[module.storage]
+
+[[module.storage.paths]]
+path = "storage/cache/embeddings"
+type = "embedding_cache"
+format = "json"
+retention_days = 3
+action = "LRU_EVICTION"
+max_size_gb = 5.0
+ttl_hours = 72
+description = "Cache L2 d'embeddings - LRU eviction quan supera 5GB o 72h"
+# Auto-clean agressiu per cache
+auto_clean = true
+max_files_per_run = 5000
+max_size_mb_per_run = 500
+cooldown_minutes = 15
+
+[module.storage.protection]
+# Fitxers que MAI s'han de tocar
+protected_patterns = ["*.db", "index.json", "metadata.json"]

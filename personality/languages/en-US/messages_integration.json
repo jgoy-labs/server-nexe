@@ -1,0 +1,32 @@
+{
+ "_meta": {
+  "component": "integration",
+  "description": "Translations for API integration system",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+
+ "api_integrator": {
+  "module_integrated": "Module '{module}' integrated with {routes} routes",
+  "module_removed": "Module '{module}' API removed",
+  "no_api_components": "Module '{module}' has no API components",
+  "integration_failed": "Error integrating API for module '{module}': {error}",
+  "routes_registered": "{count} routes registered for {module}",
+  "openapi_updated": "OpenAPI specification updated for {module}"
+ },
+
+ "route_manager": {
+  "routes_registered": "Registered {count} routes for {module}",
+  "route_conflict": "Route conflict: {path} already registered by {existing_module}",
+  "routes_removed": "Removed {count} routes for {module}",
+  "router_included": "Router included with prefix {prefix}",
+  "app_mounted": "Application mounted at {prefix}"
+ },
+
+ "openapi_merger": {
+  "spec_merged": "OpenAPI specification merged for {module}",
+  "spec_removed": "OpenAPI specification removed for {module}",
+  "unified_spec_generated": "Unified specification regenerated",
+  "merge_failed": "Error merging OpenAPI for {module}: {error}"
+ }
+}

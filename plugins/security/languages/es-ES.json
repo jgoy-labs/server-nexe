@@ -1,0 +1,42 @@
+{
+ "module": {
+  "name": "Seguridad",
+  "description": "Módulo de seguridad y validación para Nexe 0.8"
+ },
+ "checks": {
+  "web_security": "Seguridad Web",
+  "auth": "Autenticación",
+  "rate_limit": "Límites de Tasa"
+ },
+ "severity": {
+  "CRITICAL": "CRÍTICO",
+  "HIGH": "ALTO",
+  "MEDIUM": "MEDIO",
+  "LOW": "BAJO"
+ },
+ "findings": {
+  "path_traversal": "Path Traversal Detectado",
+  "rce": "Ejecución Remota de Comandos",
+  "file_disclosure": "Divulgación de Archivos",
+  "missing_authentication": "Autenticación Faltante",
+  "missing_rate_limit": "Rate Limiting Faltante",
+  "unbounded_resource": "Recurso sin Límites"
+ },
+ "messages": {
+  "scan_started": "Escaneo de seguridad iniciado",
+  "scan_completed": "Escaneo completado: {total} hallazgos",
+  "no_vulnerabilities": "No se han detectado vulnerabilidades",
+  "critical_found": "⚠️ {count} vulnerabilidades críticas detectadas",
+  "auth_failed": "Autenticación fallida",
+  "auth_required": "Autenticación requerida para este endpoint",
+  "path_blocked": "Path bloqueado: path traversal detectado",
+  "command_blocked": "Comando bloqueado: no está en la whitelist"
+ },
+ "suggestions": {
+  "use_validate_safe_path": "Utilizar validate_safe_path() de security.core.validators",
+  "use_require_api_key": "Añadir Depends(require_api_key) a los parámetros de la función",
+  "use_validate_command": "Validar comando con validate_command() antes de ejecutar",
+  "add_rate_limit": "Añadir @limiter.limit('10/minute') al decorador",
+  "use_deque_maxlen": "Utilizar collections.deque(maxlen=N) para limitar crecimiento"
+ }
+}

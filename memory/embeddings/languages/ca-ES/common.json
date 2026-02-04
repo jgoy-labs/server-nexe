@@ -1,0 +1,53 @@
+{
+ "embeddings_module": {
+  "name": "Mòdul d'Embeddings",
+  "description": "Sistema d'embeddings semàntics amb cache multi-nivell i chunking intel·ligent",
+  
+  "health": {
+   "module_initialized": "Mòdul inicialitzat",
+   "dependencies_available": "Dependencies disponibles",
+   "device_available": "Device disponible",
+   "cache_directories": "Directoris de cache",
+   "memory_available": "Memòria disponible",
+   "healthy": "Saludable",
+   "degraded": "Degradat",
+   "unhealthy": "No saludable"
+  },
+  
+  "operations": {
+   "encode": "Generar embedding",
+   "encode_batch": "Generar embeddings en lot",
+   "chunk_document": "Dividir document en chunks",
+   "clear_cache": "Netejar cache",
+   "get_stats": "Obtenir estadístiques"
+  },
+  
+  "errors": {
+   "not_initialized": "Mòdul no inicialitzat. Crida initialize() primer.",
+   "missing_dependencies": "Dependencies faltants: {deps}",
+   "encoding_failed": "Error generant embedding: {error}",
+   "chunking_failed": "Error dividint document: {error}",
+   "cache_error": "Error de cache: {error}"
+  },
+  
+  "messages": {
+   "initialized": "Mòdul Embeddings inicialitzat correctament",
+   "cache_cleared": "Cache netejat correctament",
+   "model_loaded": "Model {model} carregat",
+   "encoding_complete": "Encoding completat en {latency}ms",
+   "cache_hit": "Cache HIT (latència: {latency}ms)",
+   "cache_miss": "Cache MISS (latència: {latency}ms)"
+  },
+  
+  "workflow": {
+   "embedding_node": {
+    "name": "Node d'Embedding",
+    "description": "Genera embedding per un text"
+   },
+   "chunking_node": {
+    "name": "Node de Chunking",
+    "description": "Divideix document en chunks semàntics"
+   }
+  }
+ }
+}

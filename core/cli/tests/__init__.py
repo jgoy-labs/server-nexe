@@ -1,0 +1,12 @@
+"""
+────────────────────────────────────
+Server Nexe
+Version: 0.8
+Author: Jordi Goy 
+Location: core/cli/tests/__init__.py
+Description: No description available.
+
+www.jgoy.net
+────────────────────────────────────
+"""
+

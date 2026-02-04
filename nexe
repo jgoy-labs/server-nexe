@@ -1,0 +1,3 @@
+#!/bin/bash
+export PYTHONPATH="$PYTHONPATH:/Users/jgoy/NatSytem/server-nexe"
+/Users/jgoy/NatSytem/server-nexe/venv/bin/python -m core.cli "$@"

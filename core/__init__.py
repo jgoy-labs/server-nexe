@@ -1,0 +1,12 @@
+"""
+────────────────────────────────────
+Server Nexe
+Version: 0.8
+Author: Jordi Goy 
+Location: core/__init__.py
+Description: Package marker per core.
+
+www.jgoy.net
+────────────────────────────────────
+"""
+

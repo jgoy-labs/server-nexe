@@ -1,0 +1,41 @@
+{
+ "embeddings": {
+  "singleton_error": "EmbeddingsModule és Singleton. Usar get_instance()",
+  "not_initialized": "EmbeddingsModule no inicialitzat. Cridar initialize()",
+  "module": {
+   "created": "Mòdul embeddings creat",
+   "initializing": "Inicialitzant mòdul embeddings",
+   "initialized": "Mòdul embeddings inicialitzat",
+   "init_failed": "Error inicialitzant mòdul embeddings",
+   "already_initialized": "Mòdul embeddings ja inicialitzat",
+   "not_initialized_shutdown": "Mòdul embeddings no inicialitzat durant shutdown",
+   "shutting_down": "Tancant mòdul embeddings",
+   "shutdown_complete": "Shutdown mòdul embeddings completat",
+   "shutdown_failed": "Error shutdown mòdul embeddings"
+  },
+  "health": {
+   "initialized_ok": "Mòdul inicialitzat correctament",
+   "not_initialized": "Mòdul no inicialitzat",
+   "init_check_error": "Error comprovant inicialització: {error}",
+   "dependencies_ok": "sentence-transformers {version} disponible",
+   "dependencies_missing": "sentence-transformers no instal·lat (pip install sentence-transformers)",
+   "dependencies_error": "Error comprovant dependencies: {error}",
+   "device_mps": "MPS (Apple Silicon) disponible",
+   "device_cuda": "CUDA disponible ({device})",
+   "device_cpu_only": "Només CPU disponible (rendiment més lent)",
+   "device_torch_missing": "torch no instal·lat (pip install torch)",
+   "device_error": "Error comprovant device: {error}",
+   "cache_writable": "Directori cache accessible: {path}",
+   "cache_not_writable": "Directori cache no accessible: {path}",
+   "cache_error": "Error comprovant directoris cache: {error}",
+   "memory_ok": "{available}GB disponible (>={required}GB requerit)",
+   "memory_warn": "{available}GB disponible (<{required}GB requerit, pot ser lent)",
+   "memory_critical": "{available}GB disponible (crític: <{critical}GB)",
+   "memory_error": "Error comprovant memòria: {error}"
+  },
+  "cli": {
+   "initializing": "Inicialitzant mòdul...",
+   "file_not_found": "Error: Fitxer no trobat: {file_path}"
+  }
+ }
+}

@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────────────────────
+# Nexe Server 0.8 - Dependencies
+# Minimal & Secure
+# ─────────────────────────────────────────────────────────────
+
+# --- Core Server ---
+fastapi==0.109.0
+uvicorn[standard]==0.27.0.post1
+pydantic==2.6.0
+python-multipart==0.0.6
+starlette-csrf==3.0.0
+colorama==0.4.6
+tomli==2.0.1; python_version < "3.11"
+httpx==0.26.0
+qdrant-client==1.12.0
+toml==0.10.2
+structlog==24.1.0
+click==8.1.7
+rich==13.7.0
+typer==0.9.0
+python-dotenv==1.0.1
+pyyaml==6.0.1
+numpy==1.26.4
+slowapi==0.1.9
+prometheus-client==0.19.0
+tenacity==8.2.3
+psutil==5.9.8
+huggingface_hub==0.20.3
+
+# --- Memory & RAG ---
+sentence-transformers==2.3.1
+pypdf==4.0.1  # PDF support for knowledge ingestion
+
+# --- Inference Engines (Apple Silicon / MLX) ---
+# Note: Install only on Mac ARM64
+# mlx-lm  # Installed dynamically by install_nexe.py if hardware detected
+
+# --- Inference Engines (Llama.cpp / GGUF) ---
+# llama-cpp-python  # Installed dynamically with GPU flags by install_nexe.py
