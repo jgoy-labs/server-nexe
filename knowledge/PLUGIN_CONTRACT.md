@@ -20,10 +20,10 @@ NEXE 0.9 implementa un **sistema unificat de contractes** per gestionar plugins 
 
 ### Mètriques
 
-- **Tests**: 19 unitaris + 6 integració (100% passing)
-- **Coverage**: >80% a core/contracts/
+- **Tests**: 122 tests (116 unitaris + 6 integració) - 100% passing
+- **Coverage**: 95% a core/contracts/
 - **Plugins validats**: 5/5 (100%)
-- **Overhead**: +2-3ms per plugin
+- **Overhead**: <1ms per plugin
 
 ---
 
@@ -258,10 +258,10 @@ pytest --cov=core.contracts --cov-report=html
 
 ### Resultats Actuals
 
-✅ 19 tests unitaris
-✅ 6 tests integració
-✅ >80% coverage
+✅ 122 tests (116 unitaris + 6 integració)
+✅ 95% coverage
 ✅ mypy --strict passa
+✅ Tots els tests passing
 
 ---
 
@@ -376,7 +376,8 @@ mypy plugins/plugin/ --strict
 ✅ ContractRegistry singleton
 ✅ ContractBridge per ModuleManager
 ✅ 5 plugins migrats
-✅ 25 tests (19 unitaris + 6 integració)
+✅ 122 tests (116 unitaris + 6 integració)
+✅ 95% test coverage
 ✅ Backward compatibility completa
 
 ---

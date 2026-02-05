@@ -17,7 +17,7 @@ S'ha implementat amb èxit un **sistema unificat de contractes** per NEXE 0.9 qu
 ✅ **Type safety**: Protocols `@runtime_checkable` + mypy strict
 ✅ **Integració transparent**: ContractBridge automàtic amb ModuleManager
 ✅ **Backward compatibility**: 100% preservada amb backups `.old`
-✅ **Tests complets**: 25 tests (19 unitaris + 6 integració) al 100%
+✅ **Tests complets**: 122 tests (116 unitaris + 6 integració) al 100%
 
 ---
 
@@ -257,23 +257,22 @@ ContractBridge.register_module()
 
 ## Tests i Validació
 
-### Tests Unitaris (19 tests)
+### Tests Unitaris (116 tests)
 
-**`core/contracts/tests/test_base.py`:**
-- ✅ ContractMetadata creation
-- ✅ HealthResult serialization
-- ✅ BaseContract implementation
-- ✅ ModuleContract implementation
-- ✅ Helper functions
+**`core/contracts/tests/test_base.py`:** (8 tests)
+- Protocols i dataclasses base
 
-**`core/contracts/tests/test_models.py`:**
-- ✅ ModuleSection validation
-- ✅ Name lowercase conversion
-- ✅ Version pattern validation
-- ✅ UnifiedManifest minimal
-- ✅ Conditional sections validation
-- ✅ API prefix validation
-- ✅ to_contract_metadata()
+**`core/contracts/tests/test_models.py`:** (12 tests)
+- UnifiedManifest Pydantic validation
+
+**`core/contracts/tests/test_migrations.py`:** (28 tests)
+- Format detection, migració de dades, validació
+
+**`core/contracts/tests/test_validators.py`:** (33 tests)
+- Multi-layer validation (schema, runtime, integration)
+
+**`core/contracts/tests/test_registry.py`:** (35 tests)
+- Registry operations, lifecycle, health checks
 
 ### Tests d'Integració (6 tests)
 
@@ -516,7 +515,7 @@ docs: Update PLUGIN_CONTRACT.md with implemented system
 2. **Robustesa**: Validació en 4 capes detecta errors aviat
 3. **Mantenibilitat**: Codi type-safe amb mypy strict
 4. **Escalabilitat**: Base sòlida per futurs plugins
-5. **Confiança**: 25 tests asseguren que tot funciona
+5. **Confiança**: 122 tests asseguren que tot funciona
 
 ### Següents Passos (Opcional - Futur)
 
@@ -539,7 +538,7 @@ S'ha completat amb èxit la unificació del sistema de plugins de NEXE 0.9:
 ✅ **5 plugins migrats** al format unificat UnifiedManifest
 ✅ **Sistema de contractes** implementat (BaseContract, ModuleContract)
 ✅ **Validació robusta** en 4 capes (Schema, Runtime, Integration, Static)
-✅ **25 tests** passant al 100%
+✅ **122 tests** passant al 100%
 ✅ **Integració transparent** amb ModuleManager via ContractBridge
 ✅ **Documentació completa** a knowledge/PLUGIN_CONTRACT.md
 ✅ **Backward compatibility** 100% amb backups
