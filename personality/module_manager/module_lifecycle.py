@@ -115,6 +115,15 @@ class ModuleLifecycleManager:
       self.registry.register_module(module_name, instance,
                      module_info.manifest)
 
+      # Register to ContractRegistry via bridge
+      try:
+        from .contract_bridge import get_contract_bridge
+        bridge = get_contract_bridge()
+        await bridge.register_module(module_name, instance, module_info.path)
+      except Exception as e:
+        if LOGGER_AVAILABLE:
+          logger.warning(f"Failed to register {module_name} to ContractRegistry: {e}")
+
       if self.api_integrator:
         try:
           self.api_integrator.integrate_module_api(
@@ -279,6 +288,15 @@ class ModuleLifecycleManager:
             logger.warning(msg)
 
       self.registry.unregister_module(module_name)
+
+      # Unregister from ContractRegistry via bridge
+      try:
+        from .contract_bridge import get_contract_bridge
+        bridge = get_contract_bridge()
+        await bridge.unregister_module(module_name)
+      except Exception as e:
+        if LOGGER_AVAILABLE:
+          logger.warning(f"Failed to unregister {module_name} from ContractRegistry: {e}")
 
       with lock:
         module_info.state = ModuleState.STOPPED
