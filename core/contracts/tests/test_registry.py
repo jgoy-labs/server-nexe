@@ -381,3 +381,268 @@ class TestContractRegistry:
         assert registered.metadata.contract_id == "mock_module"
         assert registered.status == ContractStatus.REGISTERED
         assert registered.instance is mock_module
+
+    @pytest.mark.asyncio
+    async def test_register_failed_initialization(self, registry):
+        """Test registre amb inicialització que falla completament"""
+        class FailedInitModule:
+            @property
+            def metadata(self):
+                return ContractMetadata(
+                    contract_id="failed_init",
+                    contract_type=ContractType.MODULE,
+                    name="Failed Init",
+                    version="1.0.0"
+                )
+
+            async def initialize(self, context):
+                raise Exception("Initialization error")
+
+            async def shutdown(self):
+                pass
+
+            async def health_check(self):
+                return HealthResult(status=HealthStatus.UNHEALTHY, message="Failed")
+
+        module = FailedInitModule()
+        # Registrar amb auto_initialize - fallarà però es registrarà
+        await registry.register(module, auto_initialize=True)
+
+        # Ha de estar registrat però no initialized
+        assert registry.exists("failed_init")
+
+    @pytest.mark.asyncio
+    async def test_health_check_with_error(self, registry):
+        """Test health check d'un mòdul que llança excepció"""
+        class ErrorModule:
+            @property
+            def metadata(self):
+                return ContractMetadata(
+                    contract_id="error_module",
+                    contract_type=ContractType.MODULE,
+                    name="Error",
+                    version="1.0.0"
+                )
+
+            async def initialize(self, context):
+                return True
+
+            async def shutdown(self):
+                pass
+
+            async def health_check(self):
+                raise Exception("Health check error")
+
+        await registry.register(ErrorModule(), auto_initialize=False)
+
+        # Health check ha de retornar resultat amb error
+        result = await registry.health_check("error_module")
+        assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_unregister_with_shutdown_error(self, registry):
+        """Test desregistrar quan shutdown falla"""
+        class ErrorShutdownModule:
+            @property
+            def metadata(self):
+                return ContractMetadata(
+                    contract_id="error_shutdown",
+                    contract_type=ContractType.MODULE,
+                    name="Error Shutdown",
+                    version="1.0.0"
+                )
+
+            async def initialize(self, context):
+                return True
+
+            async def shutdown(self):
+                raise Exception("Shutdown error")
+
+            async def health_check(self):
+                return HealthResult(status=HealthStatus.HEALTHY, message="OK")
+
+        await registry.register(ErrorShutdownModule(), auto_initialize=False)
+
+        # Unregister ha de funcionar tot i l'error en shutdown
+        success = await registry.unregister("error_shutdown")
+        assert success is True
+        assert not registry.exists("error_shutdown")
+
+    def test_list_by_status_registered(self, registry):
+        """Test llistar per status REGISTERED"""
+        import asyncio
+
+        class RegisteredModule:
+            @property
+            def metadata(self):
+                return ContractMetadata(
+                    contract_id="registered_only",
+                    contract_type=ContractType.MODULE,
+                    name="Registered",
+                    version="1.0.0"
+                )
+
+            async def initialize(self, context):
+                return True
+
+            async def shutdown(self):
+                pass
+
+            async def health_check(self):
+                return HealthResult(status=HealthStatus.HEALTHY, message="OK")
+
+        asyncio.run(registry.register(RegisteredModule(), auto_initialize=False))
+
+        registered = registry.list_by_status(ContractStatus.REGISTERED)
+        assert len(registered) == 1
+
+    def test_list_by_status_failed(self, registry):
+        """Test llistar per status FAILED"""
+        import asyncio
+
+        class Module:
+            @property
+            def metadata(self):
+                return ContractMetadata(
+                    contract_id="will_fail",
+                    contract_type=ContractType.MODULE,
+                    name="Will Fail",
+                    version="1.0.0"
+                )
+
+            async def initialize(self, context):
+                return True
+
+            async def shutdown(self):
+                pass
+
+            async def health_check(self):
+                return HealthResult(status=HealthStatus.HEALTHY, message="OK")
+
+        asyncio.run(registry.register(Module(), auto_initialize=False))
+
+        # Canviar estat a FAILED
+        registered = registry.get("will_fail")
+        registered.status = ContractStatus.FAILED
+
+        failed = registry.list_by_status(ContractStatus.FAILED)
+        assert len(failed) == 1
+
+    @pytest.mark.asyncio
+    async def test_multiple_health_checks(self, registry, mock_module):
+        """Test múltiples health checks consecutius"""
+        await registry.register(mock_module, auto_initialize=False)
+
+        # Primer health check
+        result1 = await registry.health_check("mock_module")
+        assert result1 is not None
+
+        # Segon health check
+        result2 = await registry.health_check("mock_module")
+        assert result2 is not None
+
+        # Ha de guardar last_health_check
+        registered = registry.get("mock_module")
+        assert registered.last_health_check is not None
+
+    def test_get_summary_with_multiple_statuses(self, registry):
+        """Test get_summary amb múltiples statuses"""
+        import asyncio
+
+        class Module1:
+            @property
+            def metadata(self):
+                return ContractMetadata(
+                    contract_id="m1",
+                    contract_type=ContractType.MODULE,
+                    name="M1",
+                    version="1.0.0"
+                )
+
+            async def initialize(self, context):
+                return True
+
+            async def shutdown(self):
+                pass
+
+            async def health_check(self):
+                return HealthResult(status=HealthStatus.HEALTHY, message="OK")
+
+        class Module2:
+            @property
+            def metadata(self):
+                return ContractMetadata(
+                    contract_id="m2",
+                    contract_type=ContractType.MODULE,
+                    name="M2",
+                    version="1.0.0"
+                )
+
+            async def initialize(self, context):
+                return True
+
+            async def shutdown(self):
+                pass
+
+            async def health_check(self):
+                return HealthResult(status=HealthStatus.HEALTHY, message="OK")
+
+        # Registrar dos mòduls
+        asyncio.run(registry.register(Module1(), auto_initialize=False))
+        asyncio.run(registry.register(Module2(), auto_initialize=True))
+
+        summary = registry.get_summary()
+
+        assert summary["total"] == 2
+        assert summary["status"]["registered"] >= 1  # M1
+        assert summary["status"]["initialized"] >= 1  # M2
+
+    @pytest.mark.asyncio
+    async def test_activate_contract(self, registry, mock_module):
+        """Test activar un contracte"""
+        await registry.register(mock_module, auto_initialize=True)
+
+        # Ara està INITIALIZED, activem
+        success = await registry.activate_contract("mock_module")
+
+        assert success is True
+        registered = registry.get("mock_module")
+        assert registered.status == ContractStatus.ACTIVE
+
+    @pytest.mark.asyncio
+    async def test_activate_nonexistent_contract(self, registry):
+        """Test activar contracte inexistent"""
+        success = await registry.activate_contract("nonexistent")
+        assert success is False
+
+    @pytest.mark.asyncio
+    async def test_activate_not_initialized_contract(self, registry, mock_module):
+        """Test activar contracte no initialized"""
+        await registry.register(mock_module, auto_initialize=False)
+
+        # Està REGISTERED, no INITIALIZED
+        success = await registry.activate_contract("mock_module")
+
+        # No es pot activar si no està initialized
+        assert success is False
+
+    @pytest.mark.asyncio
+    async def test_deactivate_contract(self, registry, mock_module):
+        """Test desactivar un contracte"""
+        await registry.register(mock_module, auto_initialize=True)
+
+        # Activar primer
+        await registry.activate_contract("mock_module")
+
+        # Ara desactivar
+        success = await registry.deactivate_contract("mock_module")
+
+        assert success is True
+        registered = registry.get("mock_module")
+        assert registered.status == ContractStatus.INACTIVE
+
+    @pytest.mark.asyncio
+    async def test_deactivate_nonexistent_contract(self, registry):
+        """Test desactivar contracte inexistent"""
+        success = await registry.deactivate_contract("nonexistent")
+        assert success is False

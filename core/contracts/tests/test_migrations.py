@@ -284,3 +284,219 @@ class TestManifestMigrator:
         assert new_data["capabilities"]["has_api"] is True
         assert "api" in new_data
         assert new_data["api"]["prefix"] == "/mlx"
+
+    def test_migrate_manifest_validation_error(self, migrator, temp_plugin_dir):
+        """Test error en validació Pydantic després de migració"""
+        # Crear manifest que migra però no valida
+        manifest_path = temp_plugin_dir / "manifest.toml"
+        # Això migrarà però la validació pot fallar si falta algun camp crític
+        old_data = {
+            "module": {
+                # Nom invàlid que passarà migració però fallarà validació
+                "name": "test plugin with spaces",
+                "version": "1.0.0"
+            }
+        }
+        with open(manifest_path, "w") as f:
+            toml.dump(old_data, f)
+
+        result = migrator.migrate_manifest(manifest_path, dry_run=False)
+
+        # Ha de fallar en validació
+        assert result.success is False
+        assert len(result.errors) > 0
+
+    def test_migrate_with_custom_sections(self, migrator):
+        """Test preservació de seccions custom"""
+        old_data = {
+            "module": {
+                "name": "test",
+                "version": "1.0.0"
+            },
+            "custom_section": {
+                "key1": "value1",
+                "key2": "value2"
+            },
+            "another_custom": "data"
+        }
+        warnings = []
+        new_data = migrator._migrate_data(old_data, warnings)
+
+        # Seccions custom preservades a metadata
+        assert "metadata" in new_data
+        assert "custom_section" in new_data["metadata"]
+
+    def test_migrate_with_i18n(self, migrator):
+        """Test migració amb secció i18n"""
+        old_data = {
+            "module": {
+                "name": "test",
+                "version": "1.0.0",
+                "i18n": {
+                    "enabled": True,
+                    "default_locale": "ca-ES"
+                }
+            }
+        }
+        warnings = []
+        new_data = migrator._migrate_data(old_data, warnings)
+
+        # i18n preservada
+        assert "i18n" in new_data
+        assert new_data["i18n"]["enabled"] is True
+
+    def test_migrate_with_storage(self, migrator):
+        """Test migració amb secció storage"""
+        old_data = {
+            "module": {
+                "name": "test",
+                "version": "1.0.0",
+                "storage": {
+                    "paths": [{"path": "data", "type": "data"}]
+                }
+            }
+        }
+        warnings = []
+        new_data = migrator._migrate_data(old_data, warnings)
+
+        # storage preservada
+        assert "storage" in new_data
+
+    def test_migrate_with_ui_section(self, migrator):
+        """Test migració amb UI"""
+        old_data = {
+            "module": {
+                "name": "test",
+                "version": "1.0.0",
+                "capabilities": {
+                    "has_ui": True
+                },
+                "ui": {
+                    "path": "ui",
+                    "main_file": "index.html"
+                }
+            }
+        }
+        warnings = []
+        new_data = migrator._migrate_data(old_data, warnings)
+
+        # UI section preservada
+        assert new_data["capabilities"]["has_ui"] is True
+        assert "ui" in new_data
+        assert new_data["ui"]["path"] == "ui"
+
+    def test_migrate_with_dependencies(self, migrator):
+        """Test migració amb dependencies"""
+        old_data = {
+            "module": {
+                "name": "test",
+                "version": "1.0.0",
+                "dependencies": {
+                    "modules": ["module1", "module2"],
+                    "optional_modules": ["optional1"]
+                }
+            }
+        }
+        warnings = []
+        new_data = migrator._migrate_data(old_data, warnings)
+
+        # Dependencies preservades
+        assert "dependencies" in new_data
+        assert len(new_data["dependencies"]["modules"]) == 2
+
+    def test_migrate_with_author_in_metadata(self, migrator):
+        """Test migració amb author a module.metadata"""
+        old_data = {
+            "module": {
+                "name": "test",
+                "version": "1.0.0",
+                "metadata": {
+                    "author": "Test Author",
+                    "custom_field": "value"
+                }
+            }
+        }
+        warnings = []
+        new_data = migrator._migrate_data(old_data, warnings)
+
+        # Author extret de metadata
+        assert new_data["module"]["author"] == "Test Author"
+
+    def test_migrate_with_license(self, migrator):
+        """Test migració amb license"""
+        old_data = {
+            "module": {
+                "name": "test",
+                "version": "1.0.0",
+                "license": "MIT"
+            }
+        }
+        warnings = []
+        new_data = migrator._migrate_data(old_data, warnings)
+
+        # License preservada
+        assert new_data["module"]["license"] == "MIT"
+
+    def test_migrate_with_custom_capabilities(self, migrator):
+        """Test migració amb custom capabilities"""
+        old_data = {
+            "module": {
+                "name": "test",
+                "version": "1.0.0",
+                "capabilities": {
+                    "has_api": True,
+                    "custom_feature": True,
+                    "another_custom": False,
+                    "non_bool_field": "string"  # No és bool, no es preserva
+                }
+            }
+        }
+        warnings = []
+        new_data = migrator._migrate_data(old_data, warnings)
+
+        # Capabilities custom preservades
+        assert "custom" in new_data["capabilities"]
+        assert new_data["capabilities"]["custom"]["custom_feature"] is True
+        assert new_data["capabilities"]["custom"]["another_custom"] is False
+        # Non-bool no es preserva
+        assert "non_bool_field" not in new_data["capabilities"].get("custom", {})
+
+    def test_migrate_with_endpoints(self, migrator):
+        """Test migració amb endpoints (format Ollama)"""
+        old_data = {
+            "module": {
+                "name": "test",
+                "version": "1.0.0",
+                "endpoints": ["/chat", "/models"],
+                "cli": {"command_name": "test"}
+            }
+        }
+        warnings = []
+        new_data = migrator._migrate_data(old_data, warnings)
+
+        # Format detectat com ollama
+        assert migrator._detect_format(old_data) == "ollama_format"
+        # Migració completa
+        assert "metadata" in new_data
+
+    def test_migrate_with_router(self, migrator):
+        """Test migració amb router (format MLX)"""
+        old_data = {
+            "module": {
+                "name": "test",
+                "version": "1.0.0",
+                "capabilities": {
+                    "has_api": True
+                },
+                "router": {
+                    "prefix": "/test",
+                    "custom_field": "value"
+                }
+            }
+        }
+        warnings = []
+        new_data = migrator._migrate_data(old_data, warnings)
+
+        # Router transformat a API section
+        assert "api" in new_data
+        assert new_data["api"]["prefix"] == "/test"
