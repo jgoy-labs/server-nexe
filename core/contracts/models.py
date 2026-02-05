@@ -196,15 +196,12 @@ class UnifiedManifest(BaseModel):
         return self
 
     @model_validator(mode='after')
-    def validate_api_prefix_matches_name(self) -> 'UnifiedManifest':
-        """Valida que api.prefix coincideix amb module.name"""
+    def validate_api_prefix(self) -> 'UnifiedManifest':
+        """Valida que api.prefix és vàlid"""
         if self.api:
-            expected_prefix = f"/{self.module.name}"
-            if not self.api.prefix.startswith(expected_prefix):
-                raise ValueError(
-                    f"api.prefix must start with /{self.module.name}, "
-                    f"got: {self.api.prefix}"
-                )
+            # Just check it starts with /
+            if not self.api.prefix.startswith("/"):
+                raise ValueError(f"api.prefix must start with /, got: {self.api.prefix}")
         return self
 
     def to_contract_metadata(self) -> 'ContractMetadata':
