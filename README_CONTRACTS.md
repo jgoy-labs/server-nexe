@@ -20,11 +20,10 @@ Sistema unificat per gestionar plugins a NEXE amb:
 
 ### Tests
 ```
-✅ 88/88 tests passing (100%)
-   - 62 tests unitaris (core/contracts/)
+✅ 122/122 tests passing (100%)
+   - 116 tests unitaris (core/contracts/)
    - 6 tests integració
-   - 20 tests base (protocols)
-Coverage: 91%
+Coverage: 95%
 ```
 
 ### Plugins Migrats
