@@ -100,9 +100,9 @@ class TestUnifiedManifest:
         assert manifest.api is not None
         assert manifest.api.prefix == "/test"
 
-    def test_api_prefix_must_match_name(self):
-        """Test api.prefix must start with /module_name"""
-        with pytest.raises(ValidationError, match="api.prefix must start with"):
+    def test_api_prefix_must_start_with_slash(self):
+        """Test api.prefix must start with /"""
+        with pytest.raises(ValidationError, match="String should match pattern"):
             UnifiedManifest(
                 module=ModuleSection(
                     name="test",
@@ -112,9 +112,26 @@ class TestUnifiedManifest:
                     has_api=True
                 ),
                 api=APISection(
-                    prefix="/wrong"  # Should be /test
+                    prefix="wrong"  # Missing leading /
                 )
             )
+
+    def test_api_prefix_can_be_short(self):
+        """Test api.prefix can be short (doesn't need to match module name exactly)"""
+        # This is valid - allows short prefixes like /ollama instead of /ollama_module
+        manifest = UnifiedManifest(
+            module=ModuleSection(
+                name="ollama_module",
+                version="1.0.0"
+            ),
+            capabilities=CapabilitiesSection(
+                has_api=True
+            ),
+            api=APISection(
+                prefix="/ollama"  # Short prefix is OK
+            )
+        )
+        assert manifest.api.prefix == "/ollama"
 
     def test_to_contract_metadata(self):
         """Test conversion to ContractMetadata"""
