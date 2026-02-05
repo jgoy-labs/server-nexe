@@ -292,9 +292,9 @@ pytest core/contracts/tests/ --cov=core.contracts --cov-report=html
 ```
 
 **Resultats:**
-- **Total tests:** 25 (19 + 6)
+- **Total tests:** 88 (82 unitaris + 6 integració)
 - **Status:** 100% passing ✅
-- **Coverage:** >80% a core/contracts/
+- **Coverage:** 91% a core/contracts/
 - **Duració:** <0.5s
 
 ---
@@ -481,8 +481,8 @@ docs: Update PLUGIN_CONTRACT.md with implemented system
 
 | Mètrica | Valor | Objectiu | Estat |
 |---------|-------|----------|-------|
-| **Tests passing** | 100% (25/25) | 100% | ✅ |
-| **Coverage** | >80% | >80% | ✅ |
+| **Tests passing** | 100% (88/88) | 100% | ✅ |
+| **Coverage** | 91% | >80% | ✅ |
 | **Mypy strict** | 0 errors | 0 errors | ✅ |
 | **Plugins validats** | 100% (5/5) | 100% | ✅ |
 | **Backward compat** | 100% | 100% | ✅ |
