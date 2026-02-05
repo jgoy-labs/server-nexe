@@ -1,47 +1,56 @@
-# ─────────────────────────────────────────────────────────────
-# ModuleID: web_ui_module
-# Nexe v0.8.0 | Web UI Demo Plugin | 2026-01-11
-# server.nexe/plugins/web_ui_module/manifest.toml
-# ─────────────────────────────────────────────────────────────
+manifest_version = "1.0"
 
 [module]
 name = "web_ui_module"
 version = "0.8.0"
-type = "web_interface"
+type = "module"
 description = "Interfície web estil Ollama per demostrar el sistema modular de Nexe. Inclou xat amb streaming, sessions i upload de documents."
-location = "plugins/web_ui_module/"
-permanent = false
-note = "Plugin de demostració del sistema modular"
-
-[module.metadata]
+enabled = true
+auto_start = false
+priority = 10
 author = "Jordi Goy"
-created = "2026-01-11"
-last_updated = "2026-01-11"
-status = "active"
 
-[module.capabilities]
+[capabilities]
 has_api = true
 has_ui = true
-has_specialist = false
+has_cli = false
 has_tests = false
 streaming = true
 real_time = true
+
+[dependencies]
+modules = []
+optional_modules = []
+external_services = []
+python_packages = []
+
+[api]
+enabled = true
+prefix = "/ui"
+tags = []
+public_routes = [ "/", "/static/*",]
+protected_routes = [ "/chat", "/upload", "/sessions",]
+admin_routes = []
+
+[ui]
+enabled = true
+path = "ui"
+main_file = "index.html"
+framework = "vanilla-js"
+theme_support = true
+responsive = true
+
+[metadata]
+original_created = "2026-01-11"
+original_last_updated = "2026-01-11"
+original_status = "active"
+
+[capabilities.custom]
+has_specialist = false
 file_upload = true
 session_management = true
 
-[module.dependencies]
-modules = []
-specialists = []
-external_services = []
-
-[module.endpoints]
-router_prefix = "/ui"
-public_routes = ["/", "/static/*"]
-protected_routes = ["/chat", "/upload", "/sessions"]
-
-[module.entry]
-module = "plugins.web_ui_module.module"
-class = "WebUIModule"
-
-[module.router]
-prefix = "/ui"
+[metadata._migration]
+migrated_at = "2026-02-05T15:47:16.927684"
+migrated_by = "ManifestMigrator v1.0"
+original_format = "mlx_format"

@@ -1,47 +1,47 @@
-# ─────────────────────────────────────────────────────────────
-# ModuleID: mlx_module
-# Nexe v0.8.0 | Antigravity | 2026-01-02
-# server.nexe/plugins/mlx_module/manifest.toml
-# ─────────────────────────────────────────────────────────────
+manifest_version = "1.0"
 
 [module]
 name = "mlx_module"
 version = "0.8.0"
-type = "local_llm_option"
+type = "module"
 description = "Motor d'inferència ultra-optimitzat per a Apple Silicon (M1/M2/M3/M4) usant MLX. Inclou prefix matching real amb TTFT instantani en converses llargues."
-location = "plugins/mlx_module/"
-permanent = true
-external_tool = "mlx-lm"
-note = "Màxim rendiment en hardware Apple"
-
-[module.metadata]
+enabled = true
+auto_start = false
+priority = 10
 author = "Jordi Goy"
-created = "2026-01-02"
-last_updated = "2026-01-02"
-status = "active"
 
-[module.capabilities]
+[capabilities]
 has_api = true
 has_ui = false
-has_specialist = true
+has_cli = false
 has_tests = true
 streaming = true
 real_time = true
+
+[dependencies]
+modules = []
+optional_modules = []
+external_services = []
+python_packages = []
+
+[api]
+enabled = true
+prefix = "/mlx"
+tags = []
+public_routes = [ "/health", "/info",]
+protected_routes = [ "/chat",]
+admin_routes = []
+
+[metadata]
+original_created = "2026-01-02"
+original_last_updated = "2026-01-02"
+original_status = "active"
+
+[capabilities.custom]
+has_specialist = true
 prefix_matching = true
 
-[module.dependencies]
-modules = []
-specialists = []
-external_services = []
-
-[module.endpoints]
-router_prefix = "/mlx"
-public_routes = ["/health", "/info"]
-protected_routes = ["/chat"]
-
-[module.entry]
-module = "plugins.mlx_module.module"
-class = "MLXModule"
-
-[module.router]
-prefix = "/mlx"
+[metadata._migration]
+migrated_at = "2026-02-05T15:47:16.925111"
+migrated_by = "ManifestMigrator v1.0"
+original_format = "mlx_format"

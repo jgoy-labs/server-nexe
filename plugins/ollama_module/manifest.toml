@@ -1,60 +1,63 @@
-# ─────────────────────────────────────────────────────────────
-# ModuleID: {{NEXE_MODULE_ID}}
-# Nexe v0.7.1 | J.Goy | 2025-10-23
-# server.nexe/plugins/ollama_module/manifest.toml
-#
-# Descripció:
-# Manifest operatiu del mòdul Ollama. Utilitzat pel ModuleManager
-# per identificar metadades, dependències i integracions.
-# ─────────────────────────────────────────────────────────────
+manifest_version = "1.0"
 
 [module]
 name = "ollama_module"
 version = "0.5.0"
-type = "local_llm_option"
+type = "module"
 description = "Integració amb Ollama per executar models LLM locals sense dependències de cloud. Gestió de models, streaming de respostes, embeddings locals i interfície d'administració completa"
-location = "plugins/ollama_module/"
-permanent = true
-external_tool = "Ollama"
-note = "Una de les moltes opcions de LLM que Nexe suportarà"
-
-[module.metadata]
+enabled = true
+auto_start = false
+priority = 10
 author = "Nexe Team (Jordi Goy)"
-created = "2025-10-22"
-last_updated = "2025-10-23"
-status = "active"
 
-[module.capabilities]
+[capabilities]
 has_api = true
 has_ui = true
-has_specialist = true
+has_cli = true
 has_tests = true
 streaming = true
 real_time = true
 
-[module.dependencies]
+[dependencies]
 modules = []
-specialists = ["ollama_specialist"]
-external_services = ["Ollama (configurable host)"]
+optional_modules = []
+external_services = [ "Ollama (configurable host)",]
+python_packages = []
 
-[module.endpoints]
-router_prefix = "/ollama"
-ui_path = "/ollama/ui"
-public_routes = ["/", "/assets/{path:path}", "/js/{path:path}", "/api/models", "/health", "/info"]
-protected_routes = ["/api/pull", "/api/chat", "/api/models/{name}"]
+[api]
+enabled = true
+prefix = "/ollama"
+tags = []
+public_routes = [ "/", "/assets/{path:path}", "/js/{path:path}", "/api/models", "/health", "/info",]
+protected_routes = [ "/api/pull", "/api/chat", "/api/models/{name}",]
+admin_routes = []
 
-[module.cli]
+[ui]
+enabled = true
+path = "ui"
+main_file = "index.html"
+framework = "vanilla-js"
+theme_support = true
+responsive = true
+route = "/ollama/ui"
+
+[cli]
+enabled = true
 command_name = "ollama"
-alias = "ollama"
 entry_point = "nexe.tools.ollama_module.cli"
 description = "Gestió de models LLM locals amb Ollama"
-commands = ["status", "models", "pull", "info", "delete", "chat", "ask"]
+commands = [ "status", "models", "pull", "info", "delete", "chat", "ask",]
 framework = "typer"
-offline = false
-quadrant = "nexe"
 
-[module.integration]
-workflow_engine = true
-workflow_node = "nexe.tools.ollama_module.workflow.nodes.ollama_node.OllamaNode"
-ui_control_center = true
+[metadata]
+original_created = "2025-10-22"
+original_last_updated = "2025-10-23"
+original_status = "active"
 
+[capabilities.custom]
+has_specialist = true
+
+[metadata._migration]
+migrated_at = "2026-02-05T15:47:16.928337"
+migrated_by = "ManifestMigrator v1.0"
+original_format = "ollama_format"

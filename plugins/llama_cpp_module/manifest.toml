@@ -1,47 +1,47 @@
-# ─────────────────────────────────────────────────────────────
-# ModuleID: llama_cpp_module
-# Nexe v0.8.0 | Antigravity | 2026-01-02
-# server.nexe/plugins/llama_cpp_module/manifest.toml
-# ─────────────────────────────────────────────────────────────
+manifest_version = "1.0"
 
 [module]
 name = "llama_cpp_module"
 version = "0.8.0"
-type = "local_llm_option"
+type = "module"
 description = "Integració directa amb Llama.cpp (via llama-cpp-python) per a execució de models GGUF amb suport de GPU (Metal/CUDA) i CPU. Inclou gestió de sessions amb ModelPool i prefix caching."
-location = "plugins/llama_cpp_module/"
-permanent = true
-external_tool = "llama-cpp-python"
-note = "Motor d'inferència universal per a hardware divers"
-
-[module.metadata]
+enabled = true
+auto_start = false
+priority = 10
 author = "Jordi Goy"
-created = "2026-01-02"
-last_updated = "2026-01-02"
-status = "active"
 
-[module.capabilities]
+[capabilities]
 has_api = true
 has_ui = false
-has_specialist = true
+has_cli = false
 has_tests = true
 streaming = true
 real_time = true
+
+[dependencies]
+modules = []
+optional_modules = []
+external_services = []
+python_packages = []
+
+[api]
+enabled = true
+prefix = "/llama-cpp"
+tags = []
+public_routes = [ "/health", "/info",]
+protected_routes = [ "/chat",]
+admin_routes = []
+
+[metadata]
+original_created = "2026-01-02"
+original_last_updated = "2026-01-02"
+original_status = "active"
+
+[capabilities.custom]
+has_specialist = true
 prefix_caching = true
 
-[module.dependencies]
-modules = []
-specialists = []
-external_services = []
-
-[module.endpoints]
-router_prefix = "/llama-cpp"
-public_routes = ["/health", "/info"]
-protected_routes = ["/chat"]
-
-[module.entry]
-module = "plugins.llama_cpp_module.module"
-class = "LlamaCppModule"
-
-[module.router]
-prefix = "/llama-cpp"
+[metadata._migration]
+migrated_at = "2026-02-05T15:47:16.927198"
+migrated_by = "ManifestMigrator v1.0"
+original_format = "mlx_format"
