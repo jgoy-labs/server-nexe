@@ -1,0 +1,70 @@
+{
+ "_meta": {
+  "component": "web_ui",
+  "description": "Traduccions del mòdul Web UI",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ "web_ui": {
+  "http": {
+   "ui_not_found": "UI no trobada",
+   "file_not_found": "Fitxer no trobat",
+   "session_not_found": "Sessió no trobada",
+   "extract_text_failed": "No s'ha pogut extreure el text del fitxer",
+   "message_required": "El missatge és obligatori",
+   "content_required": "El contingut és obligatori",
+   "query_required": "La consulta és obligatòria",
+   "module_not_initialized": "Mòdul no inicialitzat",
+   "engine_unavailable": "❌ Error: Cap motor d'IA disponible (prova iniciar Ollama amb 'ollama serve')",
+   "error_generic": "❌ Error: {error}"
+  },
+  "session": {
+   "deleted": "eliminada"
+  },
+  "cleanup": {
+   "deleted_message": "{count} fitxers eliminats"
+  },
+  "file": {
+   "unsupported_format": "Format no suportat. Formats vàlids: {supported}",
+   "too_large": "Fitxer massa gran. Màxim: {max_mb}MB"
+  },
+  "memory": {
+   "save_success": "✅ Guardat a la memòria: \"{content}\"\n\nHo recordaré per a futures converses.",
+   "save_failed": "❌ No s'ha pogut guardar: {error}",
+   "unknown_error": "Error desconegut",
+   "save_prompt": "❓ Què vols que guardi? Escriu el que vols recordar.",
+   "context_header": "\n\n[MEMÒRIA - Informació rellevant guardada anteriorment:]\n",
+   "extractor_empty_tag": "[BUIT]",
+   "extractor_prompt": "Extreu NOMÉS informació factual i rellevant d'aquesta conversa.\n\nREGLES:\n- Extreu fets concrets sobre l'usuari (nom, feina, ubicació, preferències)\n- Ignora salutacions, cortesies i xerrameca\n- Ignora respostes genèriques de l'assistent\n- Si no hi ha res rellevant, respon NOMÉS: {empty_tag}\n- Format: una línia per fet, sense bullets ni numeració\n\nCONVERSA:\n{conversation}\n\nFETS EXTRETS:",
+   "extractor_system": "Ets un extractor de fets. Respon concís.",
+   "api_not_available": "Memory API no disponible",
+   "duplicate_skip": "⏭️ Contingut similar ja existeix, no guardat",
+   "saved": "✓ Guardat a la memòria",
+   "save_error": "Error guardant a memòria: {error}",
+   "trivial_skip": "⏭️ Missatge trivial, no guardat",
+   "conversation_template": "[USUARI]: {user}\n[NEXE]: {assistant}",
+   "no_facts": "⏭️ Cap fet rellevant trobat",
+   "results_found": "Trobats {count} resultats",
+   "recall_error": "Error cercant memòria: {error}",
+   "confirm_required": "Passa confirm=True per esborrar la memòria",
+   "cleared": "✓ Memòria esborrada completament"
+  },
+  "document": {
+   "attached_single": "\n\nDOCUMENT ADJUNTAT ({filename}):\n\n{content}\n",
+   "attached_multi_intro": "\n\nDOCUMENT ADJUNTAT ({filename}):\n",
+   "attached_multi_meta": "[Document gran: {total_chars} caràcters dividits en {total_chunks} parts. Mostrant part {part}/{total_chunks}]\n\n",
+   "attached_multi_footer": "\n[Fi de la part {part}/{total_chunks}. L'usuari pot demanar 'continua' o 'següent part' per veure més.]\n"
+  },
+  "prompts": {
+   "base_system": "Ets Nexe, una IA assistent local, privada i segura.",
+   "document_mode": "# MODE DOCUMENT: ASSISTENT DE DOCUMENTS\n\nINSTRUCCIONS CRÍTIQUES - SEGUEIX-LES ESTRICTAMENT:\n\n1. Respon ÚNICA i EXCLUSIVAMENT basant-te en el document proporcionat a continuació\n2. NO inventis informació que no sigui al document\n3. NO al·lucinis ni afegeixis dades externes\n4. Si la informació NO apareix al document, digues clarament: \"Aquesta informació no apareix al document proporcionat\"\n5. Cita fragments textuals del document quan sigui possible\n6. Sigues precís i concís\n7. Respon en el mateix idioma que l'usuari\n\n---\n\nDOCUMENT ADJUNTAT:\n{document_context}\n\n---\n\nAra respon a la pregunta de l'usuari basant-te EXCLUSIVAMENT en el document anterior. Si no pots respondre amb la informació del document, indica-ho.",
+   "rag_context": "{base_system_prompt}\n\nCONTEXT INTERN (NO mostrar a l'usuari, només usar per respondre):\n{rag_context}\n\nIMPORTANT: El context anterior és informació de fons. NO l'incloguis a la teva resposta. Respon de forma natural usant la informació si és rellevant."
+  },
+  "metadata": {
+   "description": "Interfície web estil Ollama per demostrar el sistema modular"
+  },
+  "chat": {
+   "stream_error": "\n[Error: {error}]"
+  }
+ }
+}

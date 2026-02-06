@@ -1,0 +1,70 @@
+{
+ "_meta": {
+  "component": "web_ui",
+  "description": "Web UI module translations",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+ "web_ui": {
+  "http": {
+   "ui_not_found": "UI not found",
+   "file_not_found": "File not found",
+   "session_not_found": "Session not found",
+   "extract_text_failed": "Could not extract text from file",
+   "message_required": "Message is required",
+   "content_required": "Content is required",
+   "query_required": "Query is required",
+   "module_not_initialized": "Module not initialized",
+   "engine_unavailable": "❌ Error: No AI engine available (try starting Ollama with 'ollama serve')",
+   "error_generic": "❌ Error: {error}"
+  },
+  "session": {
+   "deleted": "deleted"
+  },
+  "cleanup": {
+   "deleted_message": "{count} files deleted"
+  },
+  "file": {
+   "unsupported_format": "Unsupported format. Valid formats: {supported}",
+   "too_large": "File too large. Maximum: {max_mb}MB"
+  },
+  "memory": {
+   "save_success": "✅ Saved to memory: \"{content}\"\n\nI will remember this for future conversations.",
+   "save_failed": "❌ Could not save: {error}",
+   "unknown_error": "Unknown error",
+   "save_prompt": "❓ What would you like me to save? Write what you want me to remember.",
+   "context_header": "\n\n[MEMORY - Relevant information saved earlier:]\n",
+   "extractor_empty_tag": "[EMPTY]",
+   "extractor_prompt": "Extract ONLY factual and relevant information from this conversation.\n\nRULES:\n- Extract concrete facts about the user (name, job, location, preferences)\n- Ignore greetings, courtesies, and small talk\n- Ignore generic assistant responses\n- If nothing relevant, respond ONLY: {empty_tag}\n- Format: one line per fact, no bullets or numbering\n\nCONVERSATION:\n{conversation}\n\nEXTRACTED FACTS:",
+   "extractor_system": "You are a fact extractor. Respond concisely.",
+   "api_not_available": "Memory API not available",
+   "duplicate_skip": "⏭️ Similar content already exists, not saved",
+   "saved": "✓ Saved to memory",
+   "save_error": "Error saving to memory: {error}",
+   "trivial_skip": "⏭️ Trivial message, not saved",
+   "conversation_template": "[USER]: {user}\n[NEXE]: {assistant}",
+   "no_facts": "⏭️ No relevant facts found",
+   "results_found": "Found {count} results",
+   "recall_error": "Error searching memory: {error}",
+   "confirm_required": "Pass confirm=True to clear memory",
+   "cleared": "✓ Memory cleared completely"
+  },
+  "document": {
+   "attached_single": "\n\nATTACHED DOCUMENT ({filename}):\n\n{content}\n",
+   "attached_multi_intro": "\n\nATTACHED DOCUMENT ({filename}):\n",
+   "attached_multi_meta": "[Large document: {total_chars} characters split into {total_chunks} parts. Showing part {part}/{total_chunks}]\n\n",
+   "attached_multi_footer": "\n[End of part {part}/{total_chunks}. The user can ask 'continue' or 'next part' to see more.]\n"
+  },
+  "prompts": {
+   "base_system": "You are Nexe, a private and secure local AI assistant.",
+   "document_mode": "# DOCUMENT MODE: DOCUMENT ASSISTANT\n\nCRITICAL INSTRUCTIONS - FOLLOW STRICTLY:\n\n1. Answer ONLY and EXCLUSIVELY based on the document provided below\n2. Do NOT invent information that is not in the document\n3. Do NOT hallucinate or add external data\n4. If the information does NOT appear in the document, say clearly: \"This information does not appear in the provided document\"\n5. Quote verbatim fragments from the document when possible\n6. Be precise and concise\n7. Respond in the same language as the user\n\n---\n\nATTACHED DOCUMENT:\n{document_context}\n\n---\n\nNow answer the user's question based EXCLUSIVELY on the previous document. If you cannot answer with the document information, say so.",
+   "rag_context": "{base_system_prompt}\n\nINTERNAL CONTEXT (Do not show to user, only use to respond):\n{rag_context}\n\nIMPORTANT: The previous context is background information. Do NOT include it in your response. Respond naturally using the information if relevant."
+  },
+  "metadata": {
+   "description": "Ollama-style web UI to demonstrate the modular system"
+  },
+  "chat": {
+   "stream_error": "\n[Error: {error}]"
+  }
+ }
+}

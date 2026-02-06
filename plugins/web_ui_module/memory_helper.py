@@ -15,6 +15,8 @@ import logging
 from datetime import datetime
 from typing import Optional, Dict, Any, Tuple, List
 
+from .i18n import t
+
 logger = logging.getLogger(__name__)
 
 # ============================================
@@ -34,20 +36,26 @@ MEMORY_TYPES = {
     "conversation": 0.4,   # Logs de conversa purs
 }
 
-# Prompt per extreure fets d'una conversa (Memory Extractor)
-MEMORY_EXTRACTOR_PROMPT = """Extreu NOMÉS informació factual i rellevant d'aquesta conversa.
+def _extractor_empty_tag() -> str:
+    return t("web_ui.memory.extractor_empty_tag", "[EMPTY]")
 
-REGLES:
-- Extreu fets concrets sobre l'usuari (nom, feina, ubicació, preferències)
-- Ignora salutacions, cortesies i xerrameca
-- Ignora respostes genèriques de l'assistent
-- Si no hi ha res rellevant, respon NOMÉS: [BUIT]
-- Format: una línia per fet, sense bullets ni numeració
 
-CONVERSA:
-{conversation}
-
-FETS EXTRETS:"""
+def _memory_extractor_prompt(conversation: str) -> str:
+    return t(
+        "web_ui.memory.extractor_prompt",
+        "Extract ONLY factual and relevant information from this conversation.\n\n"
+        "RULES:\n"
+        "- Extract concrete facts about the user (name, job, location, preferences)\n"
+        "- Ignore greetings, courtesies, and small talk\n"
+        "- Ignore generic assistant responses\n"
+        "- If nothing relevant, respond ONLY: {empty_tag}\n"
+        "- Format: one line per fact, no bullets or numbering\n\n"
+        "CONVERSATION:\n"
+        "{conversation}\n\n"
+        "EXTRACTED FACTS:",
+        conversation=conversation,
+        empty_tag=_extractor_empty_tag()
+    )
 
 # Intent patterns for memory operations (Catalan + Spanish + English)
 # Patterns that indicate user wants to SAVE something
@@ -168,7 +176,7 @@ class MemoryHelper:
             return conversation
 
         try:
-            prompt = MEMORY_EXTRACTOR_PROMPT.format(conversation=conversation)
+            prompt = _memory_extractor_prompt(conversation)
 
             if engine_type == "ollama":
                 result = engine.chat(
@@ -184,13 +192,17 @@ class MemoryHelper:
                 # MLX
                 result = await engine.chat(
                     messages=[{"role": "user", "content": prompt}],
-                    system="Ets un extractor de fets. Respon concís."
+                    system=t(
+                        "web_ui.memory.extractor_system",
+                        "You are a fact extractor. Respond concisely."
+                    )
                 )
                 extracted = result if isinstance(result, str) else str(result)
 
             # Check if extraction found nothing
             extracted = extracted.strip()
-            if not extracted or "[BUIT]" in extracted.upper() or len(extracted) < 5:
+            empty_tag = _extractor_empty_tag()
+            if not extracted or empty_tag.upper() in extracted.upper() or len(extracted) < 5:
                 logger.debug("Memory extraction: no relevant facts found")
                 return None
 
@@ -386,7 +398,10 @@ class MemoryHelper:
             if not memory:
                 return {
                     "success": False,
-                    "message": "Memory API not available"
+                    "message": t(
+                        "web_ui.memory.api_not_available",
+                        "Memory API not available"
+                    )
                 }
 
             # 1. Check for duplicates - skip if very similar content exists
@@ -394,7 +409,10 @@ class MemoryHelper:
                 return {
                     "success": True,
                     "document_id": None,
-                    "message": "⏭️ Contingut similar ja existeix, no guardat"
+                    "message": t(
+                        "web_ui.memory.duplicate_skip",
+                        "⏭️ Similar content already exists, not saved"
+                    )
                 }
 
             # 2. Prune old entries if needed
@@ -415,13 +433,20 @@ class MemoryHelper:
             return {
                 "success": True,
                 "document_id": doc_id,
-                "message": "✓ Guardat a la memòria"
+                "message": t(
+                    "web_ui.memory.saved",
+                    "✓ Saved to memory"
+                )
             }
         except Exception as e:
             logger.error(f"Memory store error: {e}")
             return {
                 "success": False,
-                "message": f"Error guardant a memòria: {str(e)}"
+                "message": t(
+                    "web_ui.memory.save_error",
+                    "Error saving to memory: {error}",
+                    error=str(e)
+                )
             }
 
     async def smart_save(
@@ -449,11 +474,19 @@ class MemoryHelper:
             return {
                 "success": True,
                 "document_id": None,
-                "message": "⏭️ Missatge trivial, no guardat"
+                "message": t(
+                    "web_ui.memory.trivial_skip",
+                    "⏭️ Trivial message, not saved"
+                )
             }
 
         # 2. Combine and extract facts
-        conversation = f"[USUARI]: {user_message}\n[NEXE]: {assistant_response}"
+        conversation = t(
+            "web_ui.memory.conversation_template",
+            "[USER]: {user}\n[NEXE]: {assistant}",
+            user=user_message,
+            assistant=assistant_response
+        )
         extracted = await self.extract_facts(conversation, model_name=model_name)
 
         if not extracted:
@@ -461,7 +494,10 @@ class MemoryHelper:
             return {
                 "success": True,
                 "document_id": None,
-                "message": "⏭️ Cap fet rellevant trobat"
+                "message": t(
+                    "web_ui.memory.no_facts",
+                    "⏭️ No relevant facts found"
+                )
             }
 
         # 3. Determine memory type based on content
@@ -534,7 +570,10 @@ class MemoryHelper:
                 return {
                     "success": False,
                     "results": [],
-                    "message": "Memory API not available"
+                    "message": t(
+                        "web_ui.memory.api_not_available",
+                        "Memory API not available"
+                    )
                 }
 
             collections_to_search = ["nexe_web_ui", "user_knowledge"]
@@ -577,14 +616,22 @@ class MemoryHelper:
                 "success": True,
                 "results": final_results,
                 "total": len(final_results),
-                "message": f"Trobats {len(final_results)} resultats"
+                "message": t(
+                    "web_ui.memory.results_found",
+                    "Found {count} results",
+                    count=len(final_results)
+                )
             }
         except Exception as e:
             logger.error(f"Memory recall error: {e}")
             return {
                 "success": False,
                 "results": [],
-                "message": f"Error cercant memòria: {str(e)}"
+                "message": t(
+                    "web_ui.memory.recall_error",
+                    "Error searching memory: {error}",
+                    error=str(e)
+                )
             }
 
     async def get_memory_stats(self) -> Dict[str, Any]:
@@ -597,7 +644,7 @@ class MemoryHelper:
         try:
             memory = await self.get_memory_api()
             if not memory:
-                return {"error": "Memory API not available"}
+                return {"error": t("web_ui.memory.api_not_available", "Memory API not available")}
 
             count = 0
             if await memory.collection_exists("nexe_web_ui"):
@@ -633,13 +680,19 @@ class MemoryHelper:
         if not confirm:
             return {
                 "success": False,
-                "message": "Pass confirm=True to clear memory"
+                "message": t(
+                    "web_ui.memory.confirm_required",
+                    "Pass confirm=True to clear memory"
+                )
             }
 
         try:
             memory = await self.get_memory_api()
             if not memory:
-                return {"success": False, "message": "Memory API not available"}
+                return {
+                    "success": False,
+                    "message": t("web_ui.memory.api_not_available", "Memory API not available")
+                }
 
             if await memory.collection_exists("nexe_web_ui"):
                 # Delete and recreate collection
@@ -649,7 +702,10 @@ class MemoryHelper:
 
             return {
                 "success": True,
-                "message": "✓ Memòria esborrada completament"
+                "message": t(
+                    "web_ui.memory.cleared",
+                    "✓ Memory cleared completely"
+                )
             }
         except Exception as e:
             logger.error(f"Failed to clear memory: {e}")

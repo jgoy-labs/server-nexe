@@ -1,0 +1,70 @@
+{
+ "_meta": {
+  "component": "web_ui",
+  "description": "Traducciones del módulo Web UI",
+  "version": "1.0.0",
+  "language": "es-ES"
+ },
+ "web_ui": {
+  "http": {
+   "ui_not_found": "UI no encontrada",
+   "file_not_found": "Archivo no encontrado",
+   "session_not_found": "Sesión no encontrada",
+   "extract_text_failed": "No se pudo extraer el texto del archivo",
+   "message_required": "El mensaje es obligatorio",
+   "content_required": "El contenido es obligatorio",
+   "query_required": "La consulta es obligatoria",
+   "module_not_initialized": "Módulo no inicializado",
+   "engine_unavailable": "❌ Error: No hay motor de IA disponible (prueba iniciar Ollama con 'ollama serve')",
+   "error_generic": "❌ Error: {error}"
+  },
+  "session": {
+   "deleted": "eliminada"
+  },
+  "cleanup": {
+   "deleted_message": "{count} archivos eliminados"
+  },
+  "file": {
+   "unsupported_format": "Formato no soportado. Formatos válidos: {supported}",
+   "too_large": "Archivo demasiado grande. Máximo: {max_mb}MB"
+  },
+  "memory": {
+   "save_success": "✅ Guardado en memoria: \"{content}\"\n\nLo recordaré para futuras conversaciones.",
+   "save_failed": "❌ No se pudo guardar: {error}",
+   "unknown_error": "Error desconocido",
+   "save_prompt": "❓ ¿Qué quieres que guarde? Escribe lo que quieres recordar.",
+   "context_header": "\n\n[MEMORIA - Información relevante guardada anteriormente:]\n",
+   "extractor_empty_tag": "[VACIO]",
+   "extractor_prompt": "Extrae SOLO información factual y relevante de esta conversación.\n\nREGLAS:\n- Extrae hechos concretos sobre el usuario (nombre, trabajo, ubicación, preferencias)\n- Ignora saludos, cortesías y charla trivial\n- Ignora respuestas genéricas del asistente\n- Si no hay nada relevante, responde SOLO: {empty_tag}\n- Formato: una línea por hecho, sin viñetas ni numeración\n\nCONVERSACIÓN:\n{conversation}\n\nHECHOS EXTRAÍDOS:",
+   "extractor_system": "Eres un extractor de hechos. Responde de forma concisa.",
+   "api_not_available": "Memory API no disponible",
+   "duplicate_skip": "⏭️ Contenido similar ya existe, no guardado",
+   "saved": "✓ Guardado en memoria",
+   "save_error": "Error guardando en memoria: {error}",
+   "trivial_skip": "⏭️ Mensaje trivial, no guardado",
+   "conversation_template": "[USUARIO]: {user}\n[NEXE]: {assistant}",
+   "no_facts": "⏭️ No se encontraron hechos relevantes",
+   "results_found": "Encontrados {count} resultados",
+   "recall_error": "Error buscando memoria: {error}",
+   "confirm_required": "Pasa confirm=True para borrar la memoria",
+   "cleared": "✓ Memoria borrada completamente"
+  },
+  "document": {
+   "attached_single": "\n\nDOCUMENTO ADJUNTO ({filename}):\n\n{content}\n",
+   "attached_multi_intro": "\n\nDOCUMENTO ADJUNTO ({filename}):\n",
+   "attached_multi_meta": "[Documento grande: {total_chars} caracteres divididos en {total_chunks} partes. Mostrando parte {part}/{total_chunks}]\n\n",
+   "attached_multi_footer": "\n[Fin de la parte {part}/{total_chunks}. El usuario puede pedir 'continua' o 'siguiente parte' para ver más.]\n"
+  },
+  "prompts": {
+   "base_system": "Eres Nexe, un asistente de IA local, privado y seguro.",
+   "document_mode": "# MODO DOCUMENTO: ASISTENTE DE DOCUMENTOS\n\nINSTRUCCIONES CRÍTICAS - SIGUE ESTRICTAMENTE:\n\n1. Responde ÚNICA y EXCLUSIVAMENTE basándote en el documento proporcionado a continuación\n2. NO inventes información que no esté en el documento\n3. NO alucines ni añadas datos externos\n4. Si la información NO aparece en el documento, di claramente: \"Esta información no aparece en el documento proporcionado\"\n5. Cita fragmentos textuales del documento cuando sea posible\n6. Sé preciso y conciso\n7. Responde en el mismo idioma que el usuario\n\n---\n\nDOCUMENTO ADJUNTO:\n{document_context}\n\n---\n\nAhora responde a la pregunta del usuario basándote EXCLUSIVAMENTE en el documento anterior. Si no puedes responder con la información del documento, indícalo.",
+   "rag_context": "{base_system_prompt}\n\nCONTEXTO INTERNO (No mostrar al usuario, solo usar para responder):\n{rag_context}\n\nIMPORTANTE: El contexto anterior es información de fondo. NO lo incluyas en tu respuesta. Responde de forma natural usando la información si es relevante."
+  },
+  "metadata": {
+   "description": "Interfaz web estilo Ollama para demostrar el sistema modular"
+  },
+  "chat": {
+   "stream_error": "\n[Error: {error}]"
+  }
+ }
+}

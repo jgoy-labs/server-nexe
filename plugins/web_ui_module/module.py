@@ -24,6 +24,7 @@ from plugins.security.core.auth_config import get_admin_api_key
 
 from .session_manager import SessionManager
 from .file_handler import FileHandler
+from .i18n import t
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,10 @@ class WebUIModule:
         return ModuleMetadata(
             name="web_ui_module",
             version="0.8.0",
-            description="Interfície web estil Ollama per demostrar sistema modular",
+            description=t(
+                "web_ui.metadata.description",
+                "Ollama-style web UI to demonstrate the modular system"
+            ),
             author="Jordi Goy",
             module_type="web_interface",
             quadrant="demo"
@@ -99,7 +103,7 @@ class WebUIModule:
             html_path = self.static_dir / "index.html"
             if html_path.exists():
                 return FileResponse(html_path)
-            raise HTTPException(status_code=404, detail="UI not found")
+            raise HTTPException(status_code=404, detail=t("web_ui.http.ui_not_found", "UI not found"))
 
         # Serve static files
         @self._router.get("/static/{filename}")
@@ -108,7 +112,7 @@ class WebUIModule:
             file_path = self.static_dir / filename
             if file_path.exists() and file_path.suffix in {".css", ".js"}:
                 return FileResponse(file_path)
-            raise HTTPException(status_code=404, detail="File not found")
+            raise HTTPException(status_code=404, detail=t("web_ui.http.file_not_found", "File not found"))
 
         # Session management
         @self._router.post("/session/new")
@@ -122,7 +126,7 @@ class WebUIModule:
             """Obtenir info de sessió"""
             session = self.session_manager.get_session(session_id)
             if not session:
-                raise HTTPException(status_code=404, detail="Session not found")
+                raise HTTPException(status_code=404, detail=t("web_ui.http.session_not_found", "Session not found"))
             return session.to_dict()
 
         @self._router.get("/session/{session_id}/history")
@@ -130,7 +134,7 @@ class WebUIModule:
             """Obtenir historial de sessió"""
             session = self.session_manager.get_session(session_id)
             if not session:
-                raise HTTPException(status_code=404, detail="Session not found")
+                raise HTTPException(status_code=404, detail=t("web_ui.http.session_not_found", "Session not found"))
             return {"messages": session.get_history()}
 
         @self._router.delete("/session/{session_id}")
@@ -138,8 +142,8 @@ class WebUIModule:
             """Eliminar sessió"""
             deleted = self.session_manager.delete_session(session_id)
             if not deleted:
-                raise HTTPException(status_code=404, detail="Session not found")
-            return {"status": "deleted"}
+                raise HTTPException(status_code=404, detail=t("web_ui.http.session_not_found", "Session not found"))
+            return {"status": t("web_ui.session.deleted", "deleted")}
 
         @self._router.get("/sessions")
         async def list_sessions():
@@ -166,7 +170,7 @@ class WebUIModule:
             text = self.file_handler.extract_text(file_path)
             if not text:
                 self.file_handler.delete_file(file_path)
-                raise HTTPException(status_code=400, detail="Could not extract text from file")
+                raise HTTPException(status_code=400, detail=t("web_ui.http.extract_text_failed", "Could not extract text from file"))
 
             # Add to session context if session_id provided
             if session_id:
@@ -195,7 +199,10 @@ class WebUIModule:
             }
             """
             if not self._initialized:
-                raise HTTPException(status_code=503, detail="Module not initialized")
+                raise HTTPException(
+                    status_code=503,
+                    detail=t("web_ui.http.module_not_initialized", "Module not initialized")
+                )
 
             message = request.get("message", "")
             session_id = request.get("session_id")

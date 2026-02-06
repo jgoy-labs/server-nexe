@@ -14,6 +14,8 @@ import logging
 from pathlib import Path
 from typing import Tuple, Optional
 
+from .i18n import t
+
 logger = logging.getLogger(__name__)
 
 # Formats suportats (sync amb core/ingest/ingest_knowledge.py)
@@ -53,11 +55,19 @@ class FileHandler:
 
         if ext not in SUPPORTED_EXTENSIONS:
             supported = ", ".join(SUPPORTED_EXTENSIONS)
-            return False, f"Format no suportat. Formats vàlids: {supported}"
+            return False, t(
+                "web_ui.file.unsupported_format",
+                "Unsupported format. Valid formats: {supported}",
+                supported=supported
+            )
 
         if file_size > MAX_FILE_SIZE:
             max_mb = MAX_FILE_SIZE / (1024 * 1024)
-            return False, f"Fitxer massa gran. Màxim: {max_mb}MB"
+            return False, t(
+                "web_ui.file.too_large",
+                "File too large. Maximum: {max_mb}MB",
+                max_mb=max_mb
+            )
 
         return True, ""
 

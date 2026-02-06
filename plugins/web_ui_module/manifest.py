@@ -22,6 +22,7 @@ import logging
 from .session_manager import SessionManager
 from .file_handler import FileHandler
 from .memory_helper import get_memory_helper
+from .i18n import t
 
 # Import RAG header parser
 try:
@@ -53,7 +54,7 @@ async def serve_ui():
     html_path = _static_dir / "index.html"
     if html_path.exists():
         return FileResponse(html_path)
-    raise HTTPException(status_code=404, detail="UI not found")
+    raise HTTPException(status_code=404, detail=t("web_ui.http.ui_not_found", "UI not found"))
 
 
 @router_public.get("/static/{filename}")
@@ -63,7 +64,7 @@ async def serve_static(filename: str):
 
     file_path = _static_dir / filename
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail=t("web_ui.http.file_not_found", "File not found"))
 
     # Determine media type
     if file_path.suffix == ".css":
@@ -100,7 +101,7 @@ async def get_session_info(session_id: str):
     """Obtenir info de sessió"""
     session = _session_manager.get_session(session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail=t("web_ui.http.session_not_found", "Session not found"))
     return session.to_dict()
 
 
@@ -109,7 +110,7 @@ async def get_session_history(session_id: str):
     """Obtenir historial de sessió"""
     session = _session_manager.get_session(session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail=t("web_ui.http.session_not_found", "Session not found"))
     return {"messages": session.get_history()}
 
 
@@ -118,8 +119,8 @@ async def delete_session(session_id: str):
     """Eliminar sessió"""
     deleted = _session_manager.delete_session(session_id)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return {"status": "deleted"}
+        raise HTTPException(status_code=404, detail=t("web_ui.http.session_not_found", "Session not found"))
+    return {"status": t("web_ui.session.deleted", "deleted")}
 
 
 @router_public.get("/sessions")
@@ -143,7 +144,7 @@ async def upload_file(
     text = _file_handler.extract_text(file_path)
     if not text:
         _file_handler.delete_file(file_path)
-        raise HTTPException(status_code=400, detail="Could not extract text from file")
+        raise HTTPException(status_code=400, detail=t("web_ui.http.extract_text_failed", "Could not extract text from file"))
 
     # Parse RAG header if available
     rag_header = None
@@ -214,7 +215,14 @@ async def list_uploaded_files():
 async def cleanup_files(max_age_hours: int = 24):
     """Netejar fitxers antics (per defecte > 24h)"""
     deleted = _file_handler.cleanup_old_files(max_age_hours)
-    return {"deleted": deleted, "message": f"{deleted} fitxers eliminats"}
+    return {
+        "deleted": deleted,
+        "message": t(
+            "web_ui.cleanup.deleted_message",
+            "{count} files deleted",
+            count=deleted
+        )
+    }
 
 
 @router_public.post("/chat")
@@ -225,7 +233,7 @@ async def chat(request: Dict[str, Any]):
     stream = request.get("stream", False)
 
     if not message:
-        raise HTTPException(status_code=400, detail="Message is required")
+        raise HTTPException(status_code=400, detail=t("web_ui.http.message_required", "Message is required"))
 
     session = _session_manager.get_or_create_session(session_id)
     session.add_message("user", message)
@@ -251,11 +259,22 @@ async def chat(request: Dict[str, Any]):
                 metadata={"original_message": message, "type": "user_fact"}
             )
             if result["success"]:
-                response_text = f"✅ Guardat a la memòria: \"{content_to_save}\"\n\nHo recordaré per a futures converses."
+                response_text = t(
+                    "web_ui.memory.save_success",
+                    "✅ Saved to memory: \"{content}\"\n\nI will remember this for future conversations.",
+                    content=content_to_save
+                )
             else:
-                response_text = f"❌ No s'ha pogut guardar: {result.get('message', 'Error desconegut')}"
+                response_text = t(
+                    "web_ui.memory.save_failed",
+                    "❌ Could not save: {error}",
+                    error=result.get("message", t("web_ui.memory.unknown_error", "Unknown error"))
+                )
         else:
-            response_text = "❓ Què vols que guardi? Escriu el que vols recordar."
+            response_text = t(
+                "web_ui.memory.save_prompt",
+                "❓ What would you like me to save? Write what you want me to remember."
+            )
         memory_action = "save"
 
     elif intent == "recall":
@@ -336,14 +355,34 @@ async def chat(request: Dict[str, Any]):
                         if total_chunks == 1:
                             # Document petit - passar sencer
                             doc_content = chunks[0][:3500]
-                            document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n\n{doc_content}\n"
+                            document_context = t(
+                                "web_ui.document.attached_single",
+                                "\n\nATTACHED DOCUMENT ({filename}):\n\n{content}\n",
+                                filename=attached_doc["filename"],
+                                content=doc_content
+                            )
                         else:
                             # Document gran - passar primer chunk amb info
                             doc_content = chunks[0]
-                            document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n"
-                            document_context += f"[Document gran: {total_chars} caràcters dividits en {total_chunks} parts. Mostrant part 1/{total_chunks}]\n\n"
+                            document_context = t(
+                                "web_ui.document.attached_multi_intro",
+                                "\n\nATTACHED DOCUMENT ({filename}):\n",
+                                filename=attached_doc["filename"]
+                            )
+                            document_context += t(
+                                "web_ui.document.attached_multi_meta",
+                                "[Large document: {total_chars} characters split into {total_chunks} parts. Showing part {part}/{total_chunks}]\n\n",
+                                total_chars=total_chars,
+                                total_chunks=total_chunks,
+                                part=1
+                            )
                             document_context += f"{doc_content}\n"
-                            document_context += f"\n[Fi de la part 1/{total_chunks}. L'usuari pot demanar 'continua' o 'següent part' per veure més.]\n"
+                            document_context += t(
+                                "web_ui.document.attached_multi_footer",
+                                "\n[End of part {part}/{total_chunks}. The user can ask 'continue' or 'next part' to see more.]\n",
+                                part=1,
+                                total_chunks=total_chunks
+                            )
 
                         logger.info(f"Using attached document: {attached_doc['filename']} (chunk 1/{total_chunks}, {len(doc_content)} chars)")
 
@@ -356,7 +395,10 @@ async def chat(request: Dict[str, Any]):
                                 # Filtrar per score mínim (0.5) per evitar soroll
                                 relevant = [r for r in recall_result["results"] if r.get("score", 0) >= 0.5]
                                 if relevant:
-                                    rag_context = "\n\n[MEMÒRIA - Informació rellevant guardada anteriorment:]\n"
+                                    rag_context = t(
+                                        "web_ui.memory.context_header",
+                                        "\n\n[MEMORY - Relevant information saved earlier:]\n"
+                                    )
                                     for item in relevant:
                                         rag_context += f"- {item['content']}\n"
                                     logger.info(f"RAG: {len(relevant)} memories relevants (score >= 0.5)")
@@ -364,37 +406,41 @@ async def chat(request: Dict[str, Any]):
                             logger.warning(f"RAG lookup failed: {e}")
 
                     # 4. Construct Final System Prompt
-                    base_system_prompt = "Ets Nexe, una IA assistent local, privada i segura."
+                    base_system_prompt = t(
+                        "web_ui.prompts.base_system",
+                        "You are Nexe, a private and secure local AI assistant."
+                    )
                     if document_context:
                         # MODE ZEN: Prompt restrictiu que FORÇA resposta basada en document
                         # Evita al·lucinacions forçant el model a cenyir-se al contingut
-                        system_prompt = f"""# MODE DOCUMENT: ASSISTENT DE DOCUMENTS
-
-INSTRUCCIONS CRÍTIQUES - SEGUEIX-LES ESTRICTAMENT:
-
-1. Respon ÚNICA i EXCLUSIVAMENT basant-te en el document proporcionat a continuació
-2. NO invents informació que no sigui al document
-3. NO al·lucinis ni afegeixis dades externes
-4. Si la informació NO apareix al document, digues clarament: "Aquesta informació no apareix al document proporcionat"
-5. Cita fragments textuals del document quan sigui possible
-6. Sigues precís i concís
-7. Respon en el mateix idioma que l'usuari
-
----
-
-DOCUMENT ADJUNTAT:
-{document_context}
-
----
-
-Ara respon a la pregunta de l'usuari basant-te EXCLUSIVAMENT en el document anterior. Si no pots respondre amb la informació del document, indica-ho."""
+                        system_prompt = t(
+                            "web_ui.prompts.document_mode",
+                            "# DOCUMENT MODE: DOCUMENT ASSISTANT\n\n"
+                            "CRITICAL INSTRUCTIONS - FOLLOW STRICTLY:\n\n"
+                            "1. Answer ONLY and EXCLUSIVELY based on the document provided below\n"
+                            "2. Do NOT invent information that is not in the document\n"
+                            "3. Do NOT hallucinate or add external data\n"
+                            "4. If the information does NOT appear in the document, say clearly: \"This information does not appear in the provided document\"\n"
+                            "5. Quote verbatim fragments from the document when possible\n"
+                            "6. Be precise and concise\n"
+                            "7. Respond in the same language as the user\n\n"
+                            "---\n\n"
+                            "ATTACHED DOCUMENT:\n"
+                            "{document_context}\n\n"
+                            "---\n\n"
+                            "Now answer the user's question based EXCLUSIVELY on the previous document. If you cannot answer with the document information, say so.",
+                            document_context=document_context
+                        )
                     elif rag_context:
-                        system_prompt = f"""{base_system_prompt}
-
-CONTEXT INTERN (NO mostrar a l'usuari, només usar per respondre):
-{rag_context}
-
-IMPORTANT: El context anterior és informació de fons. NO l'incloguis a la teva resposta. Respon de forma natural usant la informació si és rellevant."""
+                        system_prompt = t(
+                            "web_ui.prompts.rag_context",
+                            "{base_system_prompt}\n\n"
+                            "INTERNAL CONTEXT (Do not show to user, only use to respond):\n"
+                            "{rag_context}\n\n"
+                            "IMPORTANT: The previous context is background information. Do NOT include it in your response. Respond naturally using the information if relevant.",
+                            base_system_prompt=base_system_prompt,
+                            rag_context=rag_context
+                        )
                     else:
                         system_prompt = base_system_prompt
 
@@ -507,7 +553,11 @@ IMPORTANT: El context anterior és informació de fons. NO l'incloguis a la teva
 
                             except Exception as e:
                                 logger.error(f"Streaming error: {e}")
-                                yield f"\n[Error: {str(e)}]"
+                                yield t(
+                                    "web_ui.chat.stream_error",
+                                    "\n[Error: {error}]",
+                                    error=str(e)
+                                )
                             
                             # Save to session/disk after streaming completes
                             if full_response:
@@ -560,10 +610,17 @@ IMPORTANT: El context anterior és informació de fons. NO l'incloguis a la teva
                     continue
 
             if not response_text:
-                response_text = "❌ Error: Cap motor d'IA disponible (prova iniciar Ollama amb 'ollama serve')"
+                response_text = t(
+                    "web_ui.http.engine_unavailable",
+                    "❌ Error: No AI engine available (try starting Ollama with 'ollama serve')"
+                )
         except Exception as e:
             logger.error(f"Error calling LLM: {e}")
-            response_text = f"❌ Error: {str(e)}"
+            response_text = t(
+                "web_ui.http.error_generic",
+                "❌ Error: {error}",
+                error=str(e)
+            )
 
     session.add_message("assistant", response_text)
     _session_manager._save_session_to_disk(session)
@@ -609,7 +666,7 @@ async def memory_save(request: Dict[str, Any]):
     metadata = request.get("metadata", {})
 
     if not content:
-        raise HTTPException(status_code=400, detail="Content is required")
+        raise HTTPException(status_code=400, detail=t("web_ui.http.content_required", "Content is required"))
 
     memory_helper = get_memory_helper()
     result = await memory_helper.save_to_memory(
@@ -628,7 +685,7 @@ async def memory_recall(request: Dict[str, Any]):
     limit = request.get("limit", 5)
 
     if not query:
-        raise HTTPException(status_code=400, detail="Query is required")
+        raise HTTPException(status_code=400, detail=t("web_ui.http.query_required", "Query is required"))
 
     memory_helper = get_memory_helper()
     result = await memory_helper.recall_from_memory(
