@@ -36,6 +36,21 @@
   "cli": {
    "initializing": "Initializing module...",
    "file_not_found": "Error: File not found: {file_path}"
+  },
+  "validation": {
+   "text_blank": "Text cannot be empty or only whitespace",
+   "embedding_empty": "Embedding cannot be empty",
+   "dimensions_mismatch": "Dimensions {dimensions} do not match len(embedding)={embedding_len}",
+   "texts_blank": "Each text must be non-empty and not just whitespace",
+   "count_mismatch": "Count {count} does not match len(embeddings)={embedding_len}",
+   "indices_negative": "Indices cannot be negative",
+   "char_end_gt_start": "char_end must be > char_start",
+   "chunk_count_mismatch": "chunk_count {count} does not match len(chunks)={chunk_len}",
+   "cache_hit_rate_range": "cache_hit_rate must be between 0.0 and 1.0",
+   "query_vector_empty": "query_vector cannot be empty",
+   "query_vector_numbers": "query_vector must contain only numbers",
+   "texts_empty": "texts cannot be empty",
+   "texts_non_empty": "All texts must be non-empty"
   }
  }
 }

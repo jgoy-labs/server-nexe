@@ -1,0 +1,17 @@
+{
+ "_meta": {
+  "component": "system",
+  "description": "System admin endpoint translations",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ "supervisor_not_found": "Supervisor no detectat. Executa: python3 scripts/supervisor.py",
+ "supervisor_pid_invalid": "Supervisor PID invàlid: {error}",
+ "supervisor_dead": "Supervisor PID trobat però el procés no existeix (zombie)",
+ "supervisor_dead_suggestion": "Elimina el fitxer PID i reinicia el supervisor",
+ "supervisor_permission_denied": "No tens permisos per accedir al procés supervisor: {error}",
+ "supervisor_read_error": "Error llegint supervisor PID: {error}",
+ "restart_initiated_message": "Servidor reiniciant en ~1 segon",
+ "restart_instructions": "La UI es reconnectarà automàticament",
+ "restart_failed": "Error reiniciant servidor: {error}"
+}

@@ -45,14 +45,14 @@ async def list_integrated_modules(
   if api_integrator:
     stats = api_integrator.get_integration_stats()
     return ModulesListResponse(
-      status=i18n.t('server_core.api.responses.success') if i18n else "correcte",
+      status=i18n.t('server_core.api.responses.success') if i18n else "ok",
       data=stats
     )
   else:
     return ModulesListResponse(
       status=i18n.t('server_core.api.responses.error') if i18n else "error",
       message=i18n.t('server_core.api.errors.integrator_not_initialized') if i18n else
-          "Integrador d'API no inicialitzat"
+          "API integrator not initialized"
     )
 
 @router.get("/modules/{module_name}/routes", response_model=ModuleRoutesResponse)
@@ -68,7 +68,7 @@ async def get_module_routes(
   if api_integrator:
     routes = api_integrator.get_module_routes(module_name)
     return ModuleRoutesResponse(
-      status=i18n.t('server_core.api.responses.success') if i18n else "correcte",
+      status=i18n.t('server_core.api.responses.success') if i18n else "ok",
       module=module_name,
       routes=routes
     )
@@ -76,5 +76,5 @@ async def get_module_routes(
     return ModuleRoutesResponse(
       status=i18n.t('server_core.api.responses.error') if i18n else "error",
       message=i18n.t('server_core.api.errors.integrator_not_initialized') if i18n else
-          "Integrador d'API no inicialitzat"
+          "API integrator not initialized"
     )

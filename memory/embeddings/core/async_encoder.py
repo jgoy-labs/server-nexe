@@ -17,6 +17,19 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 import numpy as np
 import structlog
+from personality.i18n import get_i18n
+
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  try:
+    return get_i18n().t(key, fallback, **kwargs)
+  except Exception:
+    if kwargs:
+      try:
+        return fallback.format(**kwargs)
+      except (KeyError, ValueError):
+        return fallback
+    return fallback
 
 logger = structlog.get_logger()
 
@@ -230,10 +243,20 @@ class AsyncEmbedder:
       ValueError: Si texts buit o conté strings buides
     """
     if not texts:
-      raise ValueError("texts no pot estar buit")
+      raise ValueError(
+        _t(
+          "embeddings.validation.texts_empty",
+          "texts cannot be empty"
+        )
+      )
 
     if any(not t.strip() for t in texts):
-      raise ValueError("Tots els texts han de ser no-buits")
+      raise ValueError(
+        _t(
+          "embeddings.validation.texts_non_empty",
+          "All texts must be non-empty"
+        )
+      )
 
     await self._ensure_loaded()
 

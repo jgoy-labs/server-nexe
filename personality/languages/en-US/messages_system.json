@@ -1,0 +1,17 @@
+{
+ "_meta": {
+  "component": "system",
+  "description": "System admin endpoint translations",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+ "supervisor_not_found": "Supervisor not detected. Run: python3 scripts/supervisor.py",
+ "supervisor_pid_invalid": "Invalid supervisor PID: {error}",
+ "supervisor_dead": "Supervisor PID found but process does not exist (zombie)",
+ "supervisor_dead_suggestion": "Remove PID file and restart the supervisor",
+ "supervisor_permission_denied": "You do not have permission to access the supervisor process: {error}",
+ "supervisor_read_error": "Error reading supervisor PID: {error}",
+ "restart_initiated_message": "Server restarting in ~1 second",
+ "restart_instructions": "The UI will reconnect automatically",
+ "restart_failed": "Error restarting server: {error}"
+}

@@ -80,6 +80,209 @@
    "executing": "Ejecutando",
    "success": "Éxito",
    "failed": "Fallado"
+  },
+  "output": {
+   "banner_subtitle": "CLI Central - Orquestador de Módulos",
+   "banner_title": "server.nexe",
+   "modules_title": "Módulos con CLI disponibles",
+   "columns": {
+    "alias": "Alias",
+    "module": "Módulo",
+    "description": "Descripción",
+    "commands": "Comandos",
+    "offline": "Offline"
+   },
+   "offline": {
+    "yes": "Sí",
+    "no": "No"
+   },
+   "usage": "Uso: nexe <alias> <comando> [args]",
+   "example": "Ejemplo: nexe chat --rag",
+   "server": {
+    "online": "ONLINE",
+    "offline": "OFFLINE"
+   },
+   "labels": {
+    "server": "Servidor",
+    "url": "URL",
+    "version": "Versión",
+    "module": "Módulo",
+    "state": "Estado"
+   },
+   "status_title": "Estado del Sistema Nexe",
+   "error_prefix": "Error"
+  },
+  "router": {
+   "default_clis": {
+    "chat_desc": "Chat interactivo unificado (Auto: MLX, Llama.cpp u Ollama)",
+    "logs_desc": "Ver los logs del sistema en tiempo real (tail -f)",
+    "memory_desc": "Gestión de memoria e ingesta de datos",
+    "rag_desc": "Gestión del motor RAG y vectores"
+   },
+   "cli_not_found": "Error: CLI '{alias}' no encontrado",
+   "python_not_found": "Error: Intérprete de Python no encontrado: {path}",
+   "exec_error": "Error ejecutando el CLI '{alias}': {error}"
+  },
+  "chat": {
+   "default_system_prompt": "Eres Nexe, un asistente de IA local, preciso y seguro.",
+   "options": {
+    "engine": "Motor de inferencia",
+    "system": "System prompt / Identidad",
+    "no_rag": "Desactivar contexto de memoria (RAG)",
+    "model": "Nombre del modelo (para Ollama)"
+   },
+   "server_not_responding": "❌ Error: El servidor Nexe no responde en http://127.0.0.1:9119",
+   "server_not_responding_hint": "Asegúrate de haber ejecutado './nexe go' en otra terminal antes de iniciar el chat.\n",
+   "header_title": "🚀 Nexe Chat",
+   "label": {
+    "engine": "Engine:",
+    "model": "Modelo:",
+    "rag": "RAG:"
+   },
+   "rag_on": "✅ On",
+   "rag_off": "❌ Off",
+   "commands_line": "Comandos: /save <text> · /recall <query> · /context on|off · /help",
+   "quit_line": "Escribe \"exit\" o Ctrl+C para salir",
+   "prompt_user": "Tú",
+   "history_cleared": "🧹 Historial limpiado.",
+   "save_ack_prompt": "El usuario te pidió que recuerdes esto: \"{text}\". Responde brevemente confirmando que lo recordarás, sin repetir toda la información.",
+   "prompt_assistant": "Nexe: ",
+   "save_memory_marker": "[Guardado en memoria: {text}]",
+   "save_error": "❌ Error guardando.",
+   "error_generic": "❌ Error: {error}",
+   "memory_found": "📚 Encontrado en memoria:",
+   "memory_not_found": "🔍 No se ha encontrado nada.",
+   "rag_disabled": "🔕 Contexto RAG desactivado.",
+   "rag_enabled": "🔔 Contexto RAG activado.",
+   "rag_status_on": "✅ Activo",
+   "rag_status_off": "❌ Inactivo",
+   "rag_status": "RAG: {status}",
+   "help_title": "📖 Comandos disponibles:",
+   "help": {
+    "save": "  /save <text>    Guarda texto en memoria",
+    "recall": "  /recall <query> Busca en memoria",
+    "context": "  /context on|off Activa/desactiva RAG",
+    "help": "  /help           Muestra esta ayuda",
+    "clear": "  clear           Limpia historial",
+    "exit": "  exit            Salir del chat\n"
+   },
+   "unknown_command": "❓ Comando desconocido: /{cmd}",
+   "help_hint": "Escribe /help para ver los comandos disponibles.",
+   "goodbye": "\n👋 ¡Adiós!",
+   "client_error": "\n❌ Error de cliente: {error}"
+  },
+  "logs": {
+   "file_not_found": "⚠️ Archivo de log no encontrado: {path}",
+   "following": "👀 Siguiendo logs de: {path} (últimas {lines} líneas)",
+   "exit_hint": "--- Pulsa Ctrl+C para salir ---\n",
+   "stopping": "\n👋 Deteniendo visor de logs.",
+   "option": {
+    "module": "Filtrar por módulo (nombre del log)",
+    "last": "Número de líneas iniciales a mostrar"
+   },
+   "dir_not_found": "❌ Directorio de logs no encontrado: {path}",
+   "no_logs_found": "📭 No se han encontrado archivos de log en storage/logs/"
+  },
+  "api": {
+   "server_error": "Error del servidor ({status_code}): {error}",
+   "connect_error": "❌ Error: No se pudo conectar al servidor Nexe. Asegúrate de que './nexe go' está en marcha.",
+   "offline_not_supported": "❌ El modo offline aún no está soportado. Ejecuta './nexe go' primero."
+  },
+  "manifest": {
+   "description": "CLI Central Nexe - Orquestador de CLIs de módulos",
+   "features": {
+    "discovery": "Descubrimiento dinámico de CLIs via manifest.toml",
+    "subprocess": "Ejecución via subprocess para aislamiento",
+    "offline": "Soporte de modo offline",
+    "ui": "UI web en /ui-control/clis",
+    "api": "API en /ui-control/api/clis"
+   }
+  },
+  "main": {
+   "options": {
+    "version": "Mostrar versión",
+    "no_banner": "Omitir banner",
+    "json": "Salida JSON"
+   },
+   "version": "Nexe CLI v1.0.0",
+   "starting_server": "Iniciando Nexe Server...",
+   "stopping": "\n👋 Deteniendo...",
+   "setup_models": {
+    "options": {
+     "apply": "Aplicar cambios recomendados a server.toml"
+    },
+    "analyzing_hw": "Analizando hardware...",
+    "hw": {
+     "system": "  - Sistema: {system} {machine}",
+     "processor": "  - Procesador: {processor}",
+     "ram": "  - RAM disponible: {ram} GB",
+     "apple_silicon": "  - Apple Silicon: {status}"
+    },
+    "profile": {
+     "title": "\n🔍 Perfil Recomendado: {tier}",
+     "engine": "  - Motor: {engine}",
+     "primary": "  - Primario: {model}",
+     "secondary": "  - Secundario: {model}",
+     "embedding": "  - Embedding: {model}",
+     "context": "  - Contexto: {tokens} tokens",
+     "description": "\n📝 Descripción: {description}"
+    },
+    "config_not_found": "Error: server.toml no encontrado!",
+    "config_applied": "\n✅ Configuración aplicada a server.toml",
+    "mlx_downloading": "Plug & Play: Descargando modelo MLX...",
+    "mlx_model_id": "   Model ID: {model_id}",
+    "mlx_wait": "   Esto puede tardar unos minutos según tu conexión. Espera...",
+    "mlx_destination": "   Destino: {path}",
+    "mlx_local_path_updated": "   Ruta local actualizada en server.toml: {path}",
+    "mlx_downloaded": "¡Modelo descargado y configurado!",
+    "hf_missing": "   ⚠️ huggingface_hub no instalado. No se puede auto-descargar.",
+    "hf_install": "   Ejecuta: pip install huggingface_hub",
+    "hf_error": "   ❌ Error descargando modelo: {error}",
+    "ollama_hint": "\nℹ️  Para Ollama, ejecuta manualmente: ollama pull {model}",
+    "restart_hint": "\nReinicia el servidor para aplicar cambios: ./nexe go",
+    "save_error": "Error guardando configuración: {error}",
+    "apply_hint": "\n💡 Ejecuta con --apply para guardar los cambios."
+   },
+   "aborted": "\nCancelado.",
+   "interrupted": "\nInterrumpido.",
+   "unexpected_error": "Error inesperado: {error}",
+   "models": {
+    "available_title": "📦 MODELOS DISPONIBLES (Verificados por Nexe)",
+    "install_hint": "Usa 'nexe model install <nombre>' para descargar uno.\n",
+    "options": {
+     "force_engine": "Forzar motor"
+    },
+    "not_found": "❌ Modelo '{name}' no encontrado en el registro.",
+    "list_hint": "Ejecuta './nexe model list' para ver la lista.",
+    "installing": "💿 Instalando {model} ({size}GB) para motor {engine}...",
+    "source": "   Fuente: {source}",
+    "destination": "   Destino: {path}",
+    "downloaded": "¡Modelo descargado!",
+    "set_primary_prompt": "¿Establecer como modelo principal?",
+    "config_updated": "   Configuración actualizada.",
+    "hf_missing": "⚠️ Error: huggingface_hub no instalado.",
+    "download_error": "❌ Error descargando: {error}",
+    "ollama_running": "   Ejecutando: ollama pull {tag}",
+    "ollama_downloaded": "¡Modelo descargado en Ollama!",
+    "ollama_error": "❌ Error en ollama pull: {error}",
+    "engine_not_supported": "Motor no soportado para auto-instalación aún."
+   },
+   "knowledge": {
+    "dir_not_found": "❌ Carpeta '{path}' no existe.",
+    "no_docs": "ℹ️  No hay documentos en knowledge/",
+    "supported_formats": "   Formatos soportados: .txt, .md, .pdf",
+    "add_docs": "   Añade documentos: cp archivo.pdf {path}/",
+    "ingesting": "📚 Ingestando {count} documento(s)...",
+    "ingest_done": "✅ ¡Ingesta completada!",
+    "ingest_warn": "⚠️  Ingesta con errores",
+    "status_title": "📊 Colección 'user_knowledge':",
+    "status_docs": "   - Documentos: {count} fragmentos",
+    "status_state": "   - Estado: ✅ Activa",
+    "collection_missing": "ℹ️  La colección 'user_knowledge' no existe.",
+    "ingest_hint": "   Ejecuta: ./nexe knowledge ingest",
+    "qdrant_error": "❌ Error conectando con Qdrant: {error}",
+    "server_hint": "   Asegúrate de que el servidor está corriendo: ./nexe go"
+   }
   }
  }
 }

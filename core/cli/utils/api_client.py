@@ -17,6 +17,8 @@ import httpx
 from typing import Dict, Any, AsyncGenerator, Optional
 from pathlib import Path
 
+from ..i18n import t
+
 logger = logging.getLogger(__name__)
 
 # Configurable CLI timeout via environment variable
@@ -87,7 +89,12 @@ class NexeAPIClient:
                 async with client.stream("POST", url, json=payload, headers=self.headers) as response:
                     if response.status_code != 200:
                         error_msg = await response.aread()
-                        yield f"Error del servidor ({response.status_code}): {error_msg.decode()}"
+                        yield t(
+                            "cli.api.server_error",
+                            "Server error ({status_code}): {error}",
+                            status_code=response.status_code,
+                            error=error_msg.decode()
+                        )
                         return
 
                     async for line in response.aiter_lines():
@@ -109,11 +116,17 @@ class NexeAPIClient:
                             except json.JSONDecodeError:
                                 pass
             except httpx.ConnectError:
-                yield "❌ Error: No s'ha pogut connectar al servidor Nexe. Assegura't que './nexe go' està corrent."
+                yield t(
+                    "cli.api.connect_error",
+                    "❌ Error: Could not connect to Nexe server. Make sure './nexe go' is running."
+                )
 
     async def chat_offline(self, messages: list, engine: str) -> str:
         """Simulació offline si el server no hi és (no recomanat per CLI interactiu complex)."""
-        return "❌ Offline mode not supported yet. Please run './nexe go' first."
+        return t(
+            "cli.api.offline_not_supported",
+            "❌ Offline mode not supported yet. Please run './nexe go' first."
+        )
 
     async def memory_store(self, content: str, metadata: Optional[Dict] = None) -> bool:
         """Guarda contingut a la memòria (RAG)."""

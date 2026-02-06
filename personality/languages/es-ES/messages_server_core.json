@@ -1,0 +1,75 @@
+{
+ "_meta": {
+  "component": "server_core",
+  "description": "Server core translations",
+  "version": "1.0.0",
+  "language": "es-ES"
+ },
+ "api": {
+  "title": "API Nexe 0.8",
+  "description": "Sistema modular de IA",
+  "server_type": "servidor_basico",
+  "welcome": {
+   "description": "Sistema de orquestación de módulos en funcionamiento",
+   "ready": "Sistema listo y operativo"
+  },
+  "health": {
+   "status": "operativo",
+   "message": "Servidor básico operativo",
+   "uptime": "operativo"
+  },
+  "endpoints": {
+   "root_description": "Endpoint raíz del sistema",
+   "health_description": "Verificación de salud del sistema",
+   "info_description": "Información básica del sistema"
+  },
+  "responses": {
+   "success": "correcto",
+   "error": "error"
+  },
+  "errors": {
+   "integrator_not_initialized": "Integrador de API no inicializado"
+  },
+  "v1": {
+   "description": "API versionada Nexe 0.8",
+   "status_operational": "operativo",
+   "status_implemented": "implementado",
+   "status_future": "futuro",
+   "endpoints": {
+    "workflows": {
+     "description": "Endpoints de gestión de workflows"
+    },
+    "chat": {
+     "description": "Endpoints de finalización de chat"
+    },
+    "rag": {
+     "description": "Endpoints de búsqueda RAG (previsto en la FASE 15)"
+    },
+    "embeddings": {
+     "description": "Endpoints de embeddings de texto (previsto en la FASE 15)"
+    },
+    "documents": {
+     "description": "Endpoints de procesamiento de documentos (previsto en la FASE 15)"
+    },
+    "memory": {
+     "description": "Almacenamiento/búsqueda de memoria semántica para chat"
+    }
+   }
+  }
+ },
+ "errors": {
+  "http_error": "Error HTTP",
+  "validation_error": "Error de validación",
+  "internal_error": "Error interno del servidor",
+  "port_in_use": "El puerto {port} ya está en uso en {host}."
+ },
+ "startup": {
+  "config_not_found": "No se encontró el archivo de configuración, se usan valores por defecto",
+  "loading_config": "Cargando configuración desde: {path}",
+  "config_loaded": "Configuración cargada correctamente",
+  "config_error": "Error cargando configuración desde {path}: {error}",
+  "ready": "Sistema listo",
+  "starting_from": "Iniciando Nexe 0.8 desde: {path}",
+  "starting_server_on": "Iniciando servidor en {host}:{port}"
+ }
+}

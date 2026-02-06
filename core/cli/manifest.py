@@ -15,6 +15,8 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 import logging
 
+from .i18n import t
+
 logger = logging.getLogger(__name__)
 
 router_public = APIRouter(prefix="/cli", tags=["cli-central"])
@@ -64,13 +66,31 @@ async def cli_info():
     return JSONResponse(content={
       "name": "cli",
       "version": "1.0.0",
-      "description": "CLI Central Nexe - Orquestrador de CLIs de mòduls",
+      "description": t(
+        "cli.manifest.description",
+        "CLI Central Nexe - Module CLI Orchestrator"
+      ),
       "features": [
-        "Descobriment dinàmic de CLIs via manifest.toml",
-        "Execució via subprocess per aïllament",
-        "Suport mode offline",
-        "UI web a /ui-control/clis",
-        "API a /ui-control/api/clis"
+        t(
+          "cli.manifest.features.discovery",
+          "Dynamic CLI discovery via manifest.toml"
+        ),
+        t(
+          "cli.manifest.features.subprocess",
+          "Subprocess execution for isolation"
+        ),
+        t(
+          "cli.manifest.features.offline",
+          "Offline mode support"
+        ),
+        t(
+          "cli.manifest.features.ui",
+          "Web UI at /ui-control/clis"
+        ),
+        t(
+          "cli.manifest.features.api",
+          "API at /ui-control/api/clis"
+        ),
       ],
       "path": str(MODULE_PATH),
       "clis_available": len(clis),
@@ -104,7 +124,10 @@ async def cli_list():
 MODULE_METADATA = {
   "name": "cli",
   "version": "1.0.0",
-  "description": "CLI Central Nexe - Orquestrador de CLIs de mòduls Nexe 0.8",
+  "description": t(
+    "cli.manifest.description",
+    "CLI Central Nexe - Module CLI Orchestrator"
+  ),
   "router": router_public,
   "prefix": "/cli",
   "tags": ["cli", "terminal", "commands"],

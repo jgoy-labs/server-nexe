@@ -85,11 +85,11 @@ async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
   return SystemResponse(
     system="Nexe 0.8",
     description=i18n.t('server_core.api.welcome.description') if i18n else
-          "Sistema d'orquestració de mòduls en funcionament",
+          "Module orchestration system running",
     status=i18n.t('server_core.api.welcome.ready') if i18n else
-        "Sistema preparat i operatiu",
+        "System ready and operational",
     version="0.8.0",
-    type=i18n.t('server_core.api.server_type') if i18n else "servidor_bàsic"
+    type=i18n.t('server_core.api.server_type') if i18n else "basic_server"
   )
 
 @router.get("/health", response_model=HealthResponse)
@@ -97,11 +97,11 @@ async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
 async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthResponse:
   """System health check"""
   return HealthResponse(
-    status=i18n.t('server_core.api.health.status') if i18n else "operatiu",
+    status=i18n.t('server_core.api.health.status') if i18n else "operational",
     message=i18n.t('server_core.api.health.message') if i18n else
-        "Servidor bàsic operatiu",
+        "Basic server operational",
     version="0.8.0",
-    uptime=i18n.t('server_core.api.health.uptime') if i18n else "operacional"
+    uptime=i18n.t('server_core.api.health.uptime') if i18n else "operational"
   )
 
 @router.get("/health/ready")
@@ -164,19 +164,19 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
       path="/",
       method="GET",
       description=i18n.t('server_core.api.endpoints.root_description') if i18n else
-            "Endpoint arrel del sistema"
+            "System root endpoint"
     ),
     EndpointInfo(
       path="/health",
       method="GET",
       description=i18n.t('server_core.api.endpoints.health_description') if i18n else
-            "Verificació de salut del sistema"
+            "System health check"
     ),
     EndpointInfo(
       path="/api/info",
       method="GET",
       description=i18n.t('server_core.api.endpoints.info_description') if i18n else
-            "Informació bàsica del sistema"
+            "Basic system information"
     )
   ]
 
@@ -184,7 +184,7 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
     name="Nexe 0.8",
     version="0.8.0",
     description=i18n.t('server_core.api.welcome.description') if i18n else
-          "Sistema d'orquestració de mòduls en funcionament",
+          "Module orchestration system running",
     endpoints=endpoints
   )
 

@@ -80,6 +80,209 @@
    "executing": "Executant",
    "success": "Èxit",
    "failed": "Fallat"
+  },
+  "output": {
+   "banner_subtitle": "CLI Central - Orquestrador de Mòduls",
+   "banner_title": "server.nexe",
+   "modules_title": "Mòduls amb CLI Disponibles",
+   "columns": {
+    "alias": "Alias",
+    "module": "Mòdul",
+    "description": "Descripció",
+    "commands": "Comandes",
+    "offline": "Offline"
+   },
+   "offline": {
+    "yes": "Sí",
+    "no": "No"
+   },
+   "usage": "Ús: nexe <alias> <comanda> [args]",
+   "example": "Exemple: nexe chat --rag",
+   "server": {
+    "online": "ONLINE",
+    "offline": "OFFLINE"
+   },
+   "labels": {
+    "server": "Servidor",
+    "url": "URL",
+    "version": "Versió",
+    "module": "Mòdul",
+    "state": "Estat"
+   },
+   "status_title": "Estat del Sistema Nexe",
+   "error_prefix": "Error"
+  },
+  "router": {
+   "default_clis": {
+    "chat_desc": "Chat interactiu unificat (Automàtic: MLX, Llama.cpp o Ollama)",
+    "logs_desc": "Veure els logs del sistema en temps real (tail -f)",
+    "memory_desc": "Gestió de memòria plana i ingesta de dades",
+    "rag_desc": "Gestió del motor RAG i vectors"
+   },
+   "cli_not_found": "Error: CLI '{alias}' no trobat",
+   "python_not_found": "Error: Intèrpret de Python no trobat: {path}",
+   "exec_error": "Error executant el CLI '{alias}': {error}"
+  },
+  "chat": {
+   "default_system_prompt": "Ets Nexe, un assistent d'IA local, precís i segur.",
+   "options": {
+    "engine": "Motor d'inferència",
+    "system": "System prompt / Identitat",
+    "no_rag": "Desactivar context de memòria (RAG)",
+    "model": "Nom del model (per Ollama)"
+   },
+   "server_not_responding": "❌ Error: El servidor Nexe no respon a http://127.0.0.1:9119",
+   "server_not_responding_hint": "Assegura't que has executat './nexe go' en una altra terminal abans d'iniciar el xat.\n",
+   "header_title": "🚀 Nexe Chat",
+   "label": {
+    "engine": "Engine:",
+    "model": "Model:",
+    "rag": "RAG:"
+   },
+   "rag_on": "✅ On",
+   "rag_off": "❌ Off",
+   "commands_line": "Comandes: /save <text> · /recall <query> · /context on|off · /help",
+   "quit_line": "Escriu \"exit\" o Ctrl+C per sortir",
+   "prompt_user": "Tu",
+   "history_cleared": "🧹 Historial netejat.",
+   "save_ack_prompt": "L'usuari acaba de dir-te que recordis això: \"{text}\". Respon breument confirmant que ho recordaràs, sense repetir tota la informació.",
+   "prompt_assistant": "Nexe: ",
+   "save_memory_marker": "[Guardat a memòria: {text}]",
+   "save_error": "❌ Error guardant.",
+   "error_generic": "❌ Error: {error}",
+   "memory_found": "📚 Trobat a memòria:",
+   "memory_not_found": "🔍 No s'ha trobat res.",
+   "rag_disabled": "🔕 Context RAG desactivat.",
+   "rag_enabled": "🔔 Context RAG activat.",
+   "rag_status_on": "✅ Actiu",
+   "rag_status_off": "❌ Inactiu",
+   "rag_status": "RAG: {status}",
+   "help_title": "📖 Comandes disponibles:",
+   "help": {
+    "save": "  /save <text>    Guarda text a memòria",
+    "recall": "  /recall <query> Cerca a memòria",
+    "context": "  /context on|off Activa/desactiva RAG",
+    "help": "  /help           Mostra aquesta ajuda",
+    "clear": "  clear           Neteja historial",
+    "exit": "  sortir          Surt del chat\n"
+   },
+   "unknown_command": "❓ Comanda desconeguda: /{cmd}",
+   "help_hint": "Escriu /help per veure les comandes disponibles.",
+   "goodbye": "\n👋 Adéu!",
+   "client_error": "\n❌ Error client: {error}"
+  },
+  "logs": {
+   "file_not_found": "⚠️ Fitxer de log no trobat: {path}",
+   "following": "👀 Seguint logs de: {path} (últimes {lines} línies)",
+   "exit_hint": "--- Prem Ctrl+C per sortir ---\n",
+   "stopping": "\n👋 Aturant visualitzador de logs.",
+   "option": {
+    "module": "Filtrar per mòdul (nom del log)",
+    "last": "Nombre de línies inicials a mostrar"
+   },
+   "dir_not_found": "❌ Directori de logs no trobat: {path}",
+   "no_logs_found": "📭 No s'han trobat fitxers de log a storage/logs/"
+  },
+  "api": {
+   "server_error": "Error del servidor ({status_code}): {error}",
+   "connect_error": "❌ Error: No s'ha pogut connectar al servidor Nexe. Assegura't que './nexe go' està corrent.",
+   "offline_not_supported": "❌ El mode offline encara no està suportat. Executa './nexe go' primer."
+  },
+  "manifest": {
+   "description": "CLI Central Nexe - Orquestrador de CLIs de mòduls",
+   "features": {
+    "discovery": "Descobriment dinàmic de CLIs via manifest.toml",
+    "subprocess": "Execució via subprocess per aïllament",
+    "offline": "Suport mode offline",
+    "ui": "UI web a /ui-control/clis",
+    "api": "API a /ui-control/api/clis"
+   }
+  },
+  "main": {
+   "options": {
+    "version": "Mostra versió",
+    "no_banner": "Omet banner",
+    "json": "Sortida en JSON"
+   },
+   "version": "Nexe CLI v1.0.0",
+   "starting_server": "Arrencant Nexe Server...",
+   "stopping": "\n👋 Aturant...",
+   "setup_models": {
+    "options": {
+     "apply": "Aplica els canvis recomanats a server.toml"
+    },
+    "analyzing_hw": "Analitzant maquinari...",
+    "hw": {
+     "system": "  - Sistema: {system} {machine}",
+     "processor": "  - Processador: {processor}",
+     "ram": "  - RAM disponible: {ram} GB",
+     "apple_silicon": "  - Apple Silicon: {status}"
+    },
+    "profile": {
+     "title": "\n🔍 Perfil Recomanat: {tier}",
+     "engine": "  - Motor: {engine}",
+     "primary": "  - Primari: {model}",
+     "secondary": "  - Secundari: {model}",
+     "embedding": "  - Embedding: {model}",
+     "context": "  - Context: {tokens} tokens",
+     "description": "\n📝 Descripció: {description}"
+    },
+    "config_not_found": "Error: server.toml no trobat!",
+    "config_applied": "\n✅ Configuració aplicada correctament a server.toml",
+    "mlx_downloading": "Plug & Play: Descarregant model MLX...",
+    "mlx_model_id": "   Model ID: {model_id}",
+    "mlx_wait": "   Això pot trigar uns minuts segons la teva connexió. Paciència...",
+    "mlx_destination": "   Destí: {path}",
+    "mlx_local_path_updated": "   Ruta local actualitzada a server.toml: {path}",
+    "mlx_downloaded": "Model descarregat i configurat!",
+    "hf_missing": "   ⚠️ huggingface_hub no instal·lat. No es pot auto-descarregar.",
+    "hf_install": "   Executa: pip install huggingface_hub",
+    "hf_error": "   ❌ Error descarregant model: {error}",
+    "ollama_hint": "\nℹ️  Per Ollama, executa manualment: ollama pull {model}",
+    "restart_hint": "\nReinicia el servidor per aplicar canvis: ./nexe go",
+    "save_error": "Error desant la configuració: {error}",
+    "apply_hint": "\n💡 Executa amb --apply per guardar els canvis."
+   },
+   "aborted": "\nCancel·lat.",
+   "interrupted": "\nInterromput.",
+   "unexpected_error": "Error inesperat: {error}",
+   "models": {
+    "available_title": "📦 MODELS DISPONIBLES (Verificats per Nexe)",
+    "install_hint": "Usa 'nexe model install <nom>' per descarregar-ne un.\n",
+    "options": {
+     "force_engine": "Forçar motor"
+    },
+    "not_found": "❌ Model '{name}' no trobat al registre.",
+    "list_hint": "Executa './nexe model list' per veure'n la llista.",
+    "installing": "💿 Instal·lant {model} ({size}GB) per a motor {engine}...",
+    "source": "   Font: {source}",
+    "destination": "   Destí: {path}",
+    "downloaded": "Model descarregat!",
+    "set_primary_prompt": "Vols establir-lo com a model principal (Primary)?",
+    "config_updated": "   Configuració actualitzada.",
+    "hf_missing": "⚠️ Error: huggingface_hub no instal·lat.",
+    "download_error": "❌ Error descarregant: {error}",
+    "ollama_running": "   Executant: ollama pull {tag}",
+    "ollama_downloaded": "Model descarregat a Ollama!",
+    "ollama_error": "❌ Error en ollama pull: {error}",
+    "engine_not_supported": "Motor no suportat per auto-instal·lació encara."
+   },
+   "knowledge": {
+    "dir_not_found": "❌ Carpeta '{path}' no existeix.",
+    "no_docs": "ℹ️  No hi ha documents a knowledge/",
+    "supported_formats": "   Formats suportats: .txt, .md, .pdf",
+    "add_docs": "   Afegeix documents: cp fitxer.pdf {path}/",
+    "ingesting": "📚 Ingerint {count} document(s)...",
+    "ingest_done": "✅ Ingesta completada!",
+    "ingest_warn": "⚠️  Ingesta amb errors",
+    "status_title": "📊 Col·lecció 'user_knowledge':",
+    "status_docs": "   - Documents: {count} fragments",
+    "status_state": "   - Estat: ✅ Activa",
+    "collection_missing": "ℹ️  Col·lecció 'user_knowledge' no existeix.",
+    "ingest_hint": "   Executa: ./nexe knowledge ingest",
+    "qdrant_error": "❌ Error connectant amb Qdrant: {error}",
+    "server_hint": "   Assegura't que el servidor està corrent: ./nexe go"
+   }
   }
  }
 }

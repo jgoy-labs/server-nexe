@@ -13,6 +13,19 @@ www.jgoy.net
 from typing import List, Protocol, runtime_checkable, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator, ValidationInfo
 from datetime import datetime
+from personality.i18n import get_i18n
+
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  try:
+    return get_i18n().t(key, fallback, **kwargs)
+  except Exception:
+    if kwargs:
+      try:
+        return fallback.format(**kwargs)
+      except (KeyError, ValueError):
+        return fallback
+    return fallback
 
 class EmbeddingRequest(BaseModel):
   """
@@ -35,7 +48,12 @@ class EmbeddingRequest(BaseModel):
   @classmethod
   def text_not_empty(cls, v):
     if not v.strip():
-      raise ValueError("Text no pot estar buit o només espais")
+      raise ValueError(
+        _t(
+          "embeddings.validation.text_blank",
+          "Text cannot be empty or only whitespace"
+        )
+      )
     return v
 
 class EmbeddingResponse(BaseModel):
@@ -61,14 +79,26 @@ class EmbeddingResponse(BaseModel):
   @classmethod
   def embedding_not_empty(cls, v):
     if not v:
-      raise ValueError("Embedding no pot estar buit")
+      raise ValueError(
+        _t(
+          "embeddings.validation.embedding_empty",
+          "Embedding cannot be empty"
+        )
+      )
     return v
 
   @field_validator('dimensions')
   @classmethod
   def dimensions_match(cls, v, info: ValidationInfo):
     if 'embedding' in info.data and len(info.data['embedding']) != v:
-      raise ValueError(f"Dimensions {v} no coincideix amb len(embedding)={len(info.data['embedding'])}")
+      raise ValueError(
+        _t(
+          "embeddings.validation.dimensions_mismatch",
+          "Dimensions {dimensions} do not match len(embedding)={embedding_len}",
+          dimensions=v,
+          embedding_len=len(info.data['embedding'])
+        )
+      )
     return v
 
 class BatchEmbeddingRequest(BaseModel):
@@ -93,7 +123,12 @@ class BatchEmbeddingRequest(BaseModel):
   def texts_not_empty(cls, v):
     for text in v:
       if not text.strip():
-        raise ValueError("Cap text pot estar buit o només espais")
+        raise ValueError(
+          _t(
+            "embeddings.validation.texts_blank",
+            "Each text must be non-empty and not just whitespace"
+          )
+        )
     return v
 
 class BatchEmbeddingResponse(BaseModel):
@@ -117,7 +152,14 @@ class BatchEmbeddingResponse(BaseModel):
   @classmethod
   def count_match(cls, v, info: ValidationInfo):
     if 'embeddings' in info.data and len(info.data['embeddings']) != v:
-      raise ValueError(f"Count {v} no coincideix amb len(embeddings)={len(info.data['embeddings'])}")
+      raise ValueError(
+        _t(
+          "embeddings.validation.count_mismatch",
+          "Count {count} does not match len(embeddings)={embedding_len}",
+          count=v,
+          embedding_len=len(info.data['embeddings'])
+        )
+      )
     return v
 
 @runtime_checkable
@@ -237,14 +279,24 @@ class ChunkMetadata(BaseModel):
   @classmethod
   def non_negative(cls, v):
     if v < 0:
-      raise ValueError("Els índexs no poden ser negatius")
+      raise ValueError(
+        _t(
+          "embeddings.validation.indices_negative",
+          "Indices cannot be negative"
+        )
+      )
     return v
 
   @field_validator('char_end')
   @classmethod
   def end_after_start(cls, v, info: ValidationInfo):
     if 'char_start' in info.data and v <= info.data['char_start']:
-      raise ValueError("char_end ha de ser > char_start")
+      raise ValueError(
+        _t(
+          "embeddings.validation.char_end_gt_start",
+          "char_end must be > char_start"
+        )
+      )
     return v
 
 class ChunkedDocument(BaseModel):
@@ -268,7 +320,14 @@ class ChunkedDocument(BaseModel):
   @classmethod
   def count_match(cls, v, info: ValidationInfo):
     if 'chunks' in info.data and len(info.data['chunks']) != v:
-      raise ValueError(f"chunk_count {v} no coincideix amb len(chunks)={len(info.data['chunks'])}")
+      raise ValueError(
+        _t(
+          "embeddings.validation.chunk_count_mismatch",
+          "chunk_count {count} does not match len(chunks)={chunk_len}",
+          count=v,
+          chunk_len=len(info.data['chunks'])
+        )
+      )
     return v
 
 class EncoderStats(BaseModel):
@@ -300,7 +359,12 @@ class EncoderStats(BaseModel):
   @classmethod
   def hit_rate_valid(cls, v):
     if not 0.0 <= v <= 1.0:
-      raise ValueError("cache_hit_rate ha d'estar entre 0.0 i 1.0")
+      raise ValueError(
+        _t(
+          "embeddings.validation.cache_hit_rate_range",
+          "cache_hit_rate must be between 0.0 and 1.0"
+        )
+      )
     return v
 
   model_config = {

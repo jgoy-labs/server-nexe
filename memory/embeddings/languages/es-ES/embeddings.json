@@ -36,6 +36,21 @@
   "cli": {
    "initializing": "Inicializando módulo...",
    "file_not_found": "Error: Archivo no encontrado: {file_path}"
+  },
+  "validation": {
+   "text_blank": "El texto no puede estar vacío ni ser solo espacios",
+   "embedding_empty": "El embedding no puede estar vacío",
+   "dimensions_mismatch": "Las dimensiones {dimensions} no coinciden con len(embedding)={embedding_len}",
+   "texts_blank": "Cada texto debe ser no vacío y no solo espacios",
+   "count_mismatch": "El conteo {count} no coincide con len(embeddings)={embedding_len}",
+   "indices_negative": "Los índices no pueden ser negativos",
+   "char_end_gt_start": "char_end debe ser > char_start",
+   "chunk_count_mismatch": "chunk_count {count} no coincide con len(chunks)={chunk_len}",
+   "cache_hit_rate_range": "cache_hit_rate debe estar entre 0.0 y 1.0",
+   "query_vector_empty": "query_vector no puede estar vacío",
+   "query_vector_numbers": "query_vector debe contener solo números",
+   "texts_empty": "texts no puede estar vacío",
+   "texts_non_empty": "Todos los textos deben ser no vacíos"
   }
  }
 }

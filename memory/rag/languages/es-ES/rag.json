@@ -38,7 +38,47 @@
    "top_k_validation": "top_k debe ser >= 1",
    "score_threshold_validation": "score_threshold debe estar entre 0.0 y 1.0",
    "prompt_template_context_missing": "prompt_template debe contener el placeholder {context}",
-   "prompt_template_query_missing": "prompt_template debe contener el placeholder {query}"
+   "prompt_template_query_missing": "prompt_template debe contener el placeholder {query}",
+   "node": {
+    "name": "Búsqueda RAG",
+    "description": "Busca documentos en RAG y genera un prompt con contexto",
+    "input_query_description": "Consulta del usuario para buscar documentos",
+    "input_query_schema_description": "Texto de la consulta",
+    "output_prompt_description": "Prompt generado con contexto de los documentos encontrados",
+    "output_context_description": "Texto concatenado de los documentos encontrados",
+    "output_results_description": "Lista de resultados con metadatos",
+    "output_num_results_description": "Número de resultados encontrados",
+    "config_source_description": "ID de la fuente RAG a usar",
+    "config_top_k_description": "Número de resultados a devolver",
+    "config_score_threshold_description": "Umbral mínimo de similitud (0.0-1.0)",
+    "config_prompt_template_description": "Plantilla del prompt con {context} y {query}",
+    "config_index_name_description": "Nombre del índice Qdrant/LanceDB"
+   }
+  },
+  "header": {
+   "no_header": "No se encontró ninguna cabecera RAG",
+   "validation_errors": "Cabecera RAG con errores: {errors}",
+   "valid_header": "Cabecera RAG válida: id={id}, priority={priority}",
+   "required_id": "Campo 'id' obligatorio",
+   "required_abstract": "Campo 'abstract' obligatorio",
+   "abstract_too_long": "'abstract' demasiado largo ({current}/500 chars)",
+   "min_tags": "Mínimo {min} tags requeridos",
+   "max_tags": "Máximo {max} tags permitidos",
+   "chunk_size_min": "chunk_size mínimo: {min}",
+   "chunk_size_max": "chunk_size máximo: {max}",
+   "priority_invalid": "priority debe ser: {values}",
+   "lang_invalid": "lang debe ser: {values}",
+   "type_invalid": "type debe ser: {values}",
+   "date_invalid": "'data' debe tener formato YYYY-MM-DD",
+   "expires_invalid": "'expires' debe tener formato YYYY-MM-DD o null"
+  },
+  "api": {
+   "document_added": "Documento añadido correctamente",
+   "file_no_extension": "El archivo no tiene extensión. No se puede detectar el formato.",
+   "file_too_large": "Archivo demasiado grande ({size_mb:.1f}MB). Máximo: {max_mb}MB",
+   "file_uploaded": "Archivo subido e indexado correctamente",
+   "file_processing_error": "Error procesando el archivo: {error}",
+   "unknown": "Desconocido"
   }
  }
 }

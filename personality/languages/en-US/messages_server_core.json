@@ -1,0 +1,75 @@
+{
+ "_meta": {
+  "component": "server_core",
+  "description": "Server core translations",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+ "api": {
+  "title": "Nexe 0.8 API",
+  "description": "Modular AI system",
+  "server_type": "basic_server",
+  "welcome": {
+   "description": "Module orchestration system running",
+   "ready": "System ready and operational"
+  },
+  "health": {
+   "status": "operational",
+   "message": "Basic server operational",
+   "uptime": "operational"
+  },
+  "endpoints": {
+   "root_description": "System root endpoint",
+   "health_description": "System health check",
+   "info_description": "Basic system information"
+  },
+  "responses": {
+   "success": "ok",
+   "error": "error"
+  },
+  "errors": {
+   "integrator_not_initialized": "API integrator not initialized"
+  },
+  "v1": {
+   "description": "Nexe 0.8 Versioned API",
+   "status_operational": "operational",
+   "status_implemented": "implemented",
+   "status_future": "future",
+   "endpoints": {
+    "workflows": {
+     "description": "Workflow management endpoints"
+    },
+    "chat": {
+     "description": "Chat completion endpoints"
+    },
+    "rag": {
+     "description": "RAG search endpoints (coming in FASE 15)"
+    },
+    "embeddings": {
+     "description": "Text embeddings endpoints (coming in FASE 15)"
+    },
+    "documents": {
+     "description": "Document processing endpoints (coming in FASE 15)"
+    },
+    "memory": {
+     "description": "Semantic memory store/search for chat"
+    }
+   }
+  }
+ },
+ "errors": {
+  "http_error": "HTTP error",
+  "validation_error": "Validation error",
+  "internal_error": "Internal server error",
+  "port_in_use": "Port {port} is already in use at {host}."
+ },
+ "startup": {
+  "config_not_found": "No config file found, using defaults",
+  "loading_config": "Loading config from: {path}",
+  "config_loaded": "Config loaded successfully",
+  "config_error": "Error loading config from {path}: {error}",
+  "ready": "System ready",
+  "starting_from": "Starting Nexe 0.8 from: {path}",
+  "starting_server_on": "Starting server on {host}:{port}"
+ }
+}

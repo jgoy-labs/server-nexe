@@ -31,7 +31,7 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
 
   app = FastAPI(
     title=translate(i18n, "server_core.api.title", "Nexe 0.8 API"),
-    description=translate(i18n, "server_core.api.description", "Sistema modular d'IA"),
+    description=translate(i18n, "server_core.api.description", "Modular AI system"),
     version="0.8.0",
     lifespan=lifespan
   )

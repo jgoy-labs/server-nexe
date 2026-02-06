@@ -80,6 +80,209 @@
    "executing": "Executing",
    "success": "Success",
    "failed": "Failed"
+  },
+  "output": {
+   "banner_subtitle": "CLI Central - Module Orchestrator",
+   "banner_title": "server.nexe",
+   "modules_title": "Available CLI Modules",
+   "columns": {
+    "alias": "Alias",
+    "module": "Module",
+    "description": "Description",
+    "commands": "Commands",
+    "offline": "Offline"
+   },
+   "offline": {
+    "yes": "Yes",
+    "no": "No"
+   },
+   "usage": "Usage: nexe <alias> <command> [args]",
+   "example": "Example: nexe chat --rag",
+   "server": {
+    "online": "ONLINE",
+    "offline": "OFFLINE"
+   },
+   "labels": {
+    "server": "Server",
+    "url": "URL",
+    "version": "Version",
+    "module": "Module",
+    "state": "State"
+   },
+   "status_title": "Nexe System Status",
+   "error_prefix": "Error"
+  },
+  "router": {
+   "default_clis": {
+    "chat_desc": "Unified interactive chat (Auto: MLX, Llama.cpp or Ollama)",
+    "logs_desc": "View system logs in real time (tail -f)",
+    "memory_desc": "Memory management and data ingestion",
+    "rag_desc": "RAG engine and vector management"
+   },
+   "cli_not_found": "Error: CLI '{alias}' not found",
+   "python_not_found": "Error: Python interpreter not found: {path}",
+   "exec_error": "Error executing CLI '{alias}': {error}"
+  },
+  "chat": {
+   "default_system_prompt": "You are Nexe, a precise and secure local AI assistant.",
+   "options": {
+    "engine": "Inference engine",
+    "system": "System prompt / Identity",
+    "no_rag": "Disable memory context (RAG)",
+    "model": "Model name (for Ollama)"
+   },
+   "server_not_responding": "❌ Error: Nexe server is not responding at http://127.0.0.1:9119",
+   "server_not_responding_hint": "Make sure you've run './nexe go' in another terminal before starting chat.\n",
+   "header_title": "🚀 Nexe Chat",
+   "label": {
+    "engine": "Engine:",
+    "model": "Model:",
+    "rag": "RAG:"
+   },
+   "rag_on": "✅ On",
+   "rag_off": "❌ Off",
+   "commands_line": "Commands: /save <text> · /recall <query> · /context on|off · /help",
+   "quit_line": "Type \"exit\" or Ctrl+C to quit",
+   "prompt_user": "You",
+   "history_cleared": "🧹 History cleared.",
+   "save_ack_prompt": "The user asked you to remember this: \"{text}\". Respond briefly confirming you will remember it, without repeating all information.",
+   "prompt_assistant": "Nexe: ",
+   "save_memory_marker": "[Saved to memory: {text}]",
+   "save_error": "❌ Error saving.",
+   "error_generic": "❌ Error: {error}",
+   "memory_found": "📚 Found in memory:",
+   "memory_not_found": "🔍 Nothing found.",
+   "rag_disabled": "🔕 RAG context disabled.",
+   "rag_enabled": "🔔 RAG context enabled.",
+   "rag_status_on": "✅ Active",
+   "rag_status_off": "❌ Inactive",
+   "rag_status": "RAG: {status}",
+   "help_title": "📖 Available commands:",
+   "help": {
+    "save": "  /save <text>    Save text to memory",
+    "recall": "  /recall <query> Search memory",
+    "context": "  /context on|off Enable/disable RAG",
+    "help": "  /help           Show this help",
+    "clear": "  clear           Clear history",
+    "exit": "  exit            Exit chat\n"
+   },
+   "unknown_command": "❓ Unknown command: /{cmd}",
+   "help_hint": "Type /help to see available commands.",
+   "goodbye": "\n👋 Goodbye!",
+   "client_error": "\n❌ Client error: {error}"
+  },
+  "logs": {
+   "file_not_found": "⚠️ Log file not found: {path}",
+   "following": "👀 Following logs: {path} (last {lines} lines)",
+   "exit_hint": "--- Press Ctrl+C to exit ---\n",
+   "stopping": "\n👋 Stopping log viewer.",
+   "option": {
+    "module": "Filter by module (log name)",
+    "last": "Number of initial lines to show"
+   },
+   "dir_not_found": "❌ Logs directory not found: {path}",
+   "no_logs_found": "📭 No log files found in storage/logs/"
+  },
+  "api": {
+   "server_error": "Server error ({status_code}): {error}",
+   "connect_error": "❌ Error: Could not connect to Nexe server. Make sure './nexe go' is running.",
+   "offline_not_supported": "❌ Offline mode not supported yet. Please run './nexe go' first."
+  },
+  "manifest": {
+   "description": "CLI Central Nexe - Module CLI Orchestrator",
+   "features": {
+    "discovery": "Dynamic CLI discovery via manifest.toml",
+    "subprocess": "Subprocess execution for isolation",
+    "offline": "Offline mode support",
+    "ui": "Web UI at /ui-control/clis",
+    "api": "API at /ui-control/api/clis"
+   }
+  },
+  "main": {
+   "options": {
+    "version": "Show version",
+    "no_banner": "Skip banner",
+    "json": "Output JSON"
+   },
+   "version": "Nexe CLI v1.0.0",
+   "starting_server": "Starting Nexe Server...",
+   "stopping": "\n👋 Stopping...",
+   "setup_models": {
+    "options": {
+     "apply": "Apply recommended changes to server.toml"
+    },
+    "analyzing_hw": "Analyzing hardware...",
+    "hw": {
+     "system": "  - System: {system} {machine}",
+     "processor": "  - Processor: {processor}",
+     "ram": "  - Available RAM: {ram} GB",
+     "apple_silicon": "  - Apple Silicon: {status}"
+    },
+    "profile": {
+     "title": "\n🔍 Recommended Profile: {tier}",
+     "engine": "  - Engine: {engine}",
+     "primary": "  - Primary: {model}",
+     "secondary": "  - Secondary: {model}",
+     "embedding": "  - Embedding: {model}",
+     "context": "  - Context: {tokens} tokens",
+     "description": "\n📝 Description: {description}"
+    },
+    "config_not_found": "Error: server.toml not found!",
+    "config_applied": "\n✅ Configuration applied to server.toml",
+    "mlx_downloading": "Plug & Play: Downloading MLX model...",
+    "mlx_model_id": "   Model ID: {model_id}",
+    "mlx_wait": "   This may take a few minutes depending on your connection. Please wait...",
+    "mlx_destination": "   Destination: {path}",
+    "mlx_local_path_updated": "   Local path updated in server.toml: {path}",
+    "mlx_downloaded": "Model downloaded and configured!",
+    "hf_missing": "   ⚠️ huggingface_hub not installed. Cannot auto-download.",
+    "hf_install": "   Run: pip install huggingface_hub",
+    "hf_error": "   ❌ Error downloading model: {error}",
+    "ollama_hint": "\nℹ️  For Ollama, run manually: ollama pull {model}",
+    "restart_hint": "\nRestart the server to apply changes: ./nexe go",
+    "save_error": "Error saving config: {error}",
+    "apply_hint": "\n💡 Run with --apply to save changes."
+   },
+   "aborted": "\nAborted.",
+   "interrupted": "\nInterrupted.",
+   "unexpected_error": "Unexpected error: {error}",
+   "models": {
+    "available_title": "📦 AVAILABLE MODELS (Verified by Nexe)",
+    "install_hint": "Use 'nexe model install <name>' to download one.\n",
+    "options": {
+     "force_engine": "Force engine"
+    },
+    "not_found": "❌ Model '{name}' not found in registry.",
+    "list_hint": "Run './nexe model list' to see the list.",
+    "installing": "💿 Installing {model} ({size}GB) for engine {engine}...",
+    "source": "   Source: {source}",
+    "destination": "   Destination: {path}",
+    "downloaded": "Model downloaded!",
+    "set_primary_prompt": "Set as primary model?",
+    "config_updated": "   Configuration updated.",
+    "hf_missing": "⚠️ Error: huggingface_hub not installed.",
+    "download_error": "❌ Download error: {error}",
+    "ollama_running": "   Running: ollama pull {tag}",
+    "ollama_downloaded": "Model downloaded to Ollama!",
+    "ollama_error": "❌ Error running ollama pull: {error}",
+    "engine_not_supported": "Engine not supported for auto-install yet."
+   },
+   "knowledge": {
+    "dir_not_found": "❌ Folder '{path}' does not exist.",
+    "no_docs": "ℹ️  No documents found in knowledge/",
+    "supported_formats": "   Supported formats: .txt, .md, .pdf",
+    "add_docs": "   Add documents: cp file.pdf {path}/",
+    "ingesting": "📚 Ingesting {count} document(s)...",
+    "ingest_done": "✅ Ingestion completed!",
+    "ingest_warn": "⚠️  Ingestion with warnings",
+    "status_title": "📊 Collection 'user_knowledge':",
+    "status_docs": "   - Documents: {count} fragments",
+    "status_state": "   - Status: ✅ Active",
+    "collection_missing": "ℹ️  Collection 'user_knowledge' does not exist.",
+    "ingest_hint": "   Run: ./nexe knowledge ingest",
+    "qdrant_error": "❌ Error connecting to Qdrant: {error}",
+    "server_hint": "   Make sure the server is running: ./nexe go"
+   }
   }
  }
 }

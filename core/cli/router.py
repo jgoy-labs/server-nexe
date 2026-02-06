@@ -25,6 +25,8 @@ try:
 except ImportError:
   import tomli as tomllib
 
+from .i18n import t
+
 @dataclass
 class CLIInfo:
   """Informació d'un CLI de mòdul."""
@@ -56,7 +58,10 @@ DEFAULT_CLIS: Dict[str, CLIInfo] = {
     alias="chat",
     module_name="cli",
     entry_point="core.cli.chat_cli",
-    description="Chat interactiu unificat (Automàtic: MLX, Llama.cpp o Ollama)",
+    description=t(
+      "cli.router.default_clis.chat_desc",
+      "Unified interactive chat (Auto: MLX, Llama.cpp or Ollama)"
+    ),
     commands=["--system", "--rag", "--engine"],
     framework="click",
     offline=False,
@@ -66,7 +71,10 @@ DEFAULT_CLIS: Dict[str, CLIInfo] = {
     alias="logs",
     module_name="cli",
     entry_point="core.cli.log_viewer",
-    description="Veure els logs del sistema en temps real (tail -f)",
+    description=t(
+      "cli.router.default_clis.logs_desc",
+      "View system logs in real time (tail -f)"
+    ),
     commands=["--module", "--last"],
     framework="click",
     offline=True,
@@ -76,7 +84,10 @@ DEFAULT_CLIS: Dict[str, CLIInfo] = {
     alias="memory",
     module_name="memory",
     entry_point="memory.memory.cli",
-    description="Gestió de memòria plana i ingesta de dades",
+    description=t(
+      "cli.router.default_clis.memory_desc",
+      "Memory management and data ingestion"
+    ),
     commands=["store", "recall", "stats", "cleanup"],
     framework="argparse",
     offline=True,
@@ -86,7 +97,10 @@ DEFAULT_CLIS: Dict[str, CLIInfo] = {
     alias="rag",
     module_name="rag",
     entry_point="memory.rag.cli",
-    description="Gestió del motor RAG i vectors",
+    description=t(
+      "cli.router.default_clis.rag_desc",
+      "RAG engine and vector management"
+    ),
     commands=["search", "index", "status"],
     framework="argparse",
     offline=True,
@@ -233,7 +247,7 @@ class CLIRouter:
     """
     cli_info = self.get_cli(alias)
     if cli_info is None:
-      print(f"Error: CLI '{alias}' not found", file=sys.stderr)
+      print(t("cli.router.cli_not_found", "Error: CLI '{alias}' not found", alias=alias), file=sys.stderr)
       return 1
 
     cmd = [
@@ -258,10 +272,10 @@ class CLIRouter:
       return result.returncode
 
     except FileNotFoundError:
-      print(f"Error: Python interpreter not found: {sys.executable}", file=sys.stderr)
+      print(t("cli.router.python_not_found", "Error: Python interpreter not found: {path}", path=sys.executable), file=sys.stderr)
       return 1
     except Exception as e:
-      print(f"Error executing CLI '{alias}': {e}", file=sys.stderr)
+      print(t("cli.router.exec_error", "Error executing CLI '{alias}': {error}", alias=alias, error=str(e)), file=sys.stderr)
       return 1
 
   def get_all_clis_dict(self) -> dict:

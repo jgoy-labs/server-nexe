@@ -16,6 +16,8 @@ from datetime import datetime
 from typing import Dict, Any, Optional, Tuple, List
 from dataclasses import dataclass, field
 
+from personality.i18n import get_i18n
+
 logger = logging.getLogger(__name__)
 
 # === CONSTANTS ===
@@ -107,6 +109,21 @@ class RAGHeaderParser:
 
     def __init__(self):
         self.errors = []
+        self._i18n = get_i18n()
+
+    def _t(self, key: str, fallback: str, **kwargs) -> str:
+        """Translate with fallback using global i18n helper."""
+        try:
+            if self._i18n:
+                return self._i18n.t(key, fallback, **kwargs)
+        except Exception:
+            pass
+        if kwargs:
+            try:
+                return fallback.format(**kwargs)
+            except (KeyError, ValueError):
+                return fallback
+        return fallback
 
     def parse(self, content: str) -> Tuple[RAGHeader, str]:
         """
@@ -127,7 +144,9 @@ class RAGHeaderParser:
         if not header_text:
             # No header found - return default values
             header.is_valid = False
-            header.validation_errors = ["No RAG header found"]
+            header.validation_errors = [
+                self._t("rag.header.no_header", "No RAG header found")
+            ]
             return header, content
 
         header.raw_header = header_text
@@ -161,9 +180,22 @@ class RAGHeaderParser:
         header.is_valid = len(header.validation_errors) == 0
 
         if header.validation_errors:
-            logger.warning(f"Capçalera RAG amb errors: {header.validation_errors}")
+            logger.warning(
+                self._t(
+                    "rag.header.validation_errors",
+                    "RAG header has errors: {errors}",
+                    errors=header.validation_errors,
+                )
+            )
         else:
-            logger.info(f"Capçalera RAG vàlida: id={header.id}, priority={header.priority}")
+            logger.info(
+                self._t(
+                    "rag.header.valid_header",
+                    "Valid RAG header: id={id}, priority={priority}",
+                    id=header.id,
+                    priority=header.priority,
+                )
+            )
 
         return header, body
 
@@ -260,49 +292,107 @@ class RAGHeaderParser:
 
         # Camps obligatoris
         if not header.id:
-            errors.append("Camp 'id' obligatori")
+            errors.append(self._t("rag.header.required_id", "Field 'id' is required"))
 
         if not header.abstract:
-            errors.append("Camp 'abstract' obligatori")
+            errors.append(self._t("rag.header.required_abstract", "Field 'abstract' is required"))
         elif len(header.abstract) > 500:
-            errors.append(f"'abstract' massa llarg ({len(header.abstract)}/500 chars)")
+            errors.append(
+                self._t(
+                    "rag.header.abstract_too_long",
+                    "'abstract' too long ({current}/500 chars)",
+                    current=len(header.abstract),
+                )
+            )
 
         if len(header.tags) < MIN_TAGS:
-            errors.append(f"Mínim {MIN_TAGS} tags requerits")
+            errors.append(
+                self._t(
+                    "rag.header.min_tags",
+                    "Minimum {min} tags required",
+                    min=MIN_TAGS,
+                )
+            )
         elif len(header.tags) > MAX_TAGS:
-            errors.append(f"Màxim {MAX_TAGS} tags permesos")
+            errors.append(
+                self._t(
+                    "rag.header.max_tags",
+                    "Maximum {max} tags allowed",
+                    max=MAX_TAGS,
+                )
+            )
 
         # Validar chunk_size
         if header.chunk_size < MIN_CHUNK_SIZE:
-            errors.append(f"chunk_size mínim: {MIN_CHUNK_SIZE}")
+            errors.append(
+                self._t(
+                    "rag.header.chunk_size_min",
+                    "chunk_size minimum: {min}",
+                    min=MIN_CHUNK_SIZE,
+                )
+            )
         elif header.chunk_size > MAX_CHUNK_SIZE:
-            errors.append(f"chunk_size màxim: {MAX_CHUNK_SIZE}")
+            errors.append(
+                self._t(
+                    "rag.header.chunk_size_max",
+                    "chunk_size maximum: {max}",
+                    max=MAX_CHUNK_SIZE,
+                )
+            )
 
         # Validar priority
         if header.priority not in VALID_PRIORITIES:
-            errors.append(f"priority ha de ser: {', '.join(VALID_PRIORITIES)}")
+            errors.append(
+                self._t(
+                    "rag.header.priority_invalid",
+                    "priority must be: {values}",
+                    values=', '.join(VALID_PRIORITIES),
+                )
+            )
 
         # Validar lang
         if header.lang not in VALID_LANGS:
-            errors.append(f"lang ha de ser: {', '.join(VALID_LANGS)}")
+            errors.append(
+                self._t(
+                    "rag.header.lang_invalid",
+                    "lang must be: {values}",
+                    values=', '.join(VALID_LANGS),
+                )
+            )
 
         # Validar type
         if header.type not in VALID_TYPES:
-            errors.append(f"type ha de ser: {', '.join(VALID_TYPES)}")
+            errors.append(
+                self._t(
+                    "rag.header.type_invalid",
+                    "type must be: {values}",
+                    values=', '.join(VALID_TYPES),
+                )
+            )
 
         # Validar data (format YYYY-MM-DD)
         if header.data:
             try:
                 datetime.strptime(header.data, "%Y-%m-%d")
             except ValueError:
-                errors.append("'data' ha de tenir format YYYY-MM-DD")
+                errors.append(
+                    self._t(
+                        "rag.header.date_invalid",
+                        "'data' must be in YYYY-MM-DD format",
+                    )
+                )
 
         # Validar expires si existeix
         if header.expires:
             try:
                 datetime.strptime(header.expires, "%Y-%m-%d")
             except ValueError:
-                errors.append("'expires' ha de tenir format YYYY-MM-DD o null")
+                errors.append(
+                    self._t(
+                        "rag.header.expires_invalid",
+                        "'expires' must be in YYYY-MM-DD format or null",
+                    )
+                )
 
         return errors
 

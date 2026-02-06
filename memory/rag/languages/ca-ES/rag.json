@@ -38,7 +38,47 @@
    "top_k_validation": "top_k ha de ser >= 1",
    "score_threshold_validation": "score_threshold ha d'estar entre 0.0 i 1.0",
    "prompt_template_context_missing": "prompt_template ha de contenir el placeholder {context}",
-   "prompt_template_query_missing": "prompt_template ha de contenir el placeholder {query}"
+   "prompt_template_query_missing": "prompt_template ha de contenir el placeholder {query}",
+   "node": {
+    "name": "Cerca RAG",
+    "description": "Cerca documents al RAG i genera un prompt amb context",
+    "input_query_description": "Consulta de l'usuari per cercar documents",
+    "input_query_schema_description": "Text de la consulta",
+    "output_prompt_description": "Prompt generat amb context dels documents trobats",
+    "output_context_description": "Text concatenat dels documents trobats",
+    "output_results_description": "Llista de resultats amb metadades",
+    "output_num_results_description": "Número de resultats trobats",
+    "config_source_description": "ID de la RAG source a utilitzar",
+    "config_top_k_description": "Número de resultats a retornar",
+    "config_score_threshold_description": "Llindar mínim de similaritat (0.0-1.0)",
+    "config_prompt_template_description": "Template del prompt amb {context} i {query}",
+    "config_index_name_description": "Nom de l'índex Qdrant/LanceDB"
+   }
+  },
+  "header": {
+   "no_header": "No s'ha trobat cap capçalera RAG",
+   "validation_errors": "Capçalera RAG amb errors: {errors}",
+   "valid_header": "Capçalera RAG vàlida: id={id}, priority={priority}",
+   "required_id": "Camp 'id' obligatori",
+   "required_abstract": "Camp 'abstract' obligatori",
+   "abstract_too_long": "'abstract' massa llarg ({current}/500 chars)",
+   "min_tags": "Mínim {min} tags requerits",
+   "max_tags": "Màxim {max} tags permesos",
+   "chunk_size_min": "chunk_size mínim: {min}",
+   "chunk_size_max": "chunk_size màxim: {max}",
+   "priority_invalid": "priority ha de ser: {values}",
+   "lang_invalid": "lang ha de ser: {values}",
+   "type_invalid": "type ha de ser: {values}",
+   "date_invalid": "'data' ha de tenir format YYYY-MM-DD",
+   "expires_invalid": "'expires' ha de tenir format YYYY-MM-DD o null"
+  },
+  "api": {
+   "document_added": "Document afegit correctament",
+   "file_no_extension": "El fitxer no té extensió. No es pot detectar el format.",
+   "file_too_large": "Fitxer massa gran ({size_mb:.1f}MB). Màxim: {max_mb}MB",
+   "file_uploaded": "Fitxer pujat i indexat correctament",
+   "file_processing_error": "Error processant el fitxer: {error}",
+   "unknown": "Desconegut"
   }
  }
 }

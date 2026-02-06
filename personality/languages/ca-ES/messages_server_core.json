@@ -1,0 +1,75 @@
+{
+ "_meta": {
+  "component": "server_core",
+  "description": "Server core translations",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ "api": {
+  "title": "API Nexe 0.8",
+  "description": "Sistema modular d'IA",
+  "server_type": "servidor_basic",
+  "welcome": {
+   "description": "Sistema d'orquestració de mòduls en funcionament",
+   "ready": "Sistema preparat i operatiu"
+  },
+  "health": {
+   "status": "operatiu",
+   "message": "Servidor bàsic operatiu",
+   "uptime": "operacional"
+  },
+  "endpoints": {
+   "root_description": "Endpoint arrel del sistema",
+   "health_description": "Verificació de salut del sistema",
+   "info_description": "Informació bàsica del sistema"
+  },
+  "responses": {
+   "success": "correcte",
+   "error": "error"
+  },
+  "errors": {
+   "integrator_not_initialized": "Integrador d'API no inicialitzat"
+  },
+  "v1": {
+   "description": "API versionada Nexe 0.8",
+   "status_operational": "operatiu",
+   "status_implemented": "implementat",
+   "status_future": "futur",
+   "endpoints": {
+    "workflows": {
+     "description": "Endpoints de gestió de workflows"
+    },
+    "chat": {
+     "description": "Endpoints de completat de xat"
+    },
+    "rag": {
+     "description": "Endpoints de cerca RAG (previst a la FASE 15)"
+    },
+    "embeddings": {
+     "description": "Endpoints d'embeddings de text (previst a la FASE 15)"
+    },
+    "documents": {
+     "description": "Endpoints de processament de documents (previst a la FASE 15)"
+    },
+    "memory": {
+     "description": "Emmagatzematge/cerca de memòria semàntica per a xat"
+    }
+   }
+  }
+ },
+ "errors": {
+  "http_error": "Error HTTP",
+  "validation_error": "Error de validació",
+  "internal_error": "Error intern del servidor",
+  "port_in_use": "El port {port} ja està en ús a {host}."
+ },
+ "startup": {
+  "config_not_found": "No s'ha trobat el fitxer de configuració, s'usen valors per defecte",
+  "loading_config": "Carregant configuració des de: {path}",
+  "config_loaded": "Configuració carregada correctament",
+  "config_error": "Error carregant configuració des de {path}: {error}",
+  "ready": "Sistema preparat",
+  "starting_from": "Iniciant Nexe 0.8 des de: {path}",
+  "starting_server_on": "Iniciant servidor a {host}:{port}"
+ }
+}

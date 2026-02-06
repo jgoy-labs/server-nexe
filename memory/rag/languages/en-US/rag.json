@@ -38,7 +38,47 @@
    "top_k_validation": "top_k must be >= 1",
    "score_threshold_validation": "score_threshold must be between 0.0 and 1.0",
    "prompt_template_context_missing": "prompt_template must contain {context} placeholder",
-   "prompt_template_query_missing": "prompt_template must contain {query} placeholder"
+   "prompt_template_query_missing": "prompt_template must contain {query} placeholder",
+   "node": {
+    "name": "RAG Search",
+    "description": "Search documents in RAG and generate prompt with context",
+    "input_query_description": "User query for searching documents",
+    "input_query_schema_description": "Query text",
+    "output_prompt_description": "Prompt generated with context from retrieved documents",
+    "output_context_description": "Concatenated text from retrieved documents",
+    "output_results_description": "List of results with metadata",
+    "output_num_results_description": "Number of results found",
+    "config_source_description": "RAG source ID to use",
+    "config_top_k_description": "Number of results to return",
+    "config_score_threshold_description": "Minimum similarity threshold (0.0-1.0)",
+    "config_prompt_template_description": "Prompt template with {context} and {query}",
+    "config_index_name_description": "Qdrant/LanceDB index name"
+   }
+  },
+  "header": {
+   "no_header": "No RAG header found",
+   "validation_errors": "RAG header has errors: {errors}",
+   "valid_header": "Valid RAG header: id={id}, priority={priority}",
+   "required_id": "Field 'id' is required",
+   "required_abstract": "Field 'abstract' is required",
+   "abstract_too_long": "'abstract' too long ({current}/500 chars)",
+   "min_tags": "Minimum {min} tags required",
+   "max_tags": "Maximum {max} tags allowed",
+   "chunk_size_min": "chunk_size minimum: {min}",
+   "chunk_size_max": "chunk_size maximum: {max}",
+   "priority_invalid": "priority must be: {values}",
+   "lang_invalid": "lang must be: {values}",
+   "type_invalid": "type must be: {values}",
+   "date_invalid": "'data' must be in YYYY-MM-DD format",
+   "expires_invalid": "'expires' must be in YYYY-MM-DD format or null"
+  },
+  "api": {
+   "document_added": "Document added successfully",
+   "file_no_extension": "File has no extension. Cannot detect format.",
+   "file_too_large": "File too large ({size_mb:.1f}MB). Maximum: {max_mb}MB",
+   "file_uploaded": "File uploaded and indexed successfully",
+   "file_processing_error": "Error processing file: {error}",
+   "unknown": "Unknown"
   }
  }
 }

@@ -21,8 +21,25 @@ from fastapi import Depends, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 from plugins.security.core.auth import require_api_key
+from personality.i18n import get_i18n
 
 logger = structlog.get_logger()
+
+_I18N = get_i18n()
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  """Translate with fallback using global i18n helper."""
+  try:
+    if _I18N:
+      return _I18N.t(key, fallback, **kwargs)
+  except Exception:
+    pass
+  if kwargs:
+    try:
+      return fallback.format(**kwargs)
+    except (KeyError, ValueError):
+      return fallback
+  return fallback
 
 _metrics_imported = False
 _RAG_SEARCHES = None
@@ -69,7 +86,7 @@ async def add_document_endpoint(request: Dict[str, Any]):
     return JSONResponse(content={
       "success": True,
       "doc_id": doc_id,
-      "message": "Document added successfully",
+      "message": _t("rag.api.document_added", "Document added successfully"),
       "source": source
     })
 
@@ -143,7 +160,7 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
     if not ext:
       raise HTTPException(
         status_code=400,
-        detail="File has no extension. Cannot detect format."
+        detail=_t("rag.api.file_no_extension", "File has no extension. Cannot detect format.")
       )
 
     MAX_FILE_SIZE_MB = 50
@@ -160,7 +177,12 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
     if file_size > MAX_FILE_SIZE_BYTES:
       raise HTTPException(
         status_code=413,
-        detail=f"File too large ({file_size / 1024 / 1024:.1f}MB). Maximum: {MAX_FILE_SIZE_MB}MB"
+        detail=_t(
+          "rag.api.file_too_large",
+          "File too large ({size_mb:.1f}MB). Maximum: {max_mb}MB",
+          size_mb=(file_size / 1024 / 1024),
+          max_mb=MAX_FILE_SIZE_MB,
+        )
       )
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
@@ -179,7 +201,7 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
         "filename": file.filename,
         "format": ext,
         "chunks": metrics.get("total_chunks", 0),
-        "message": "File uploaded and indexed successfully",
+        "message": _t("rag.api.file_uploaded", "File uploaded and indexed successfully"),
         "metrics": metrics
       })
 
@@ -191,7 +213,10 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
     raise
   except Exception as e:
     logger.error("Error uploading file via API: %s", e, exc_info=True)
-    raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+    raise HTTPException(
+      status_code=500,
+      detail=_t("rag.api.file_processing_error", "Error processing file: {error}", error=str(e))
+    )
 
 async def health_endpoint():
   """Health check del mòdul RAG."""
@@ -230,8 +255,8 @@ async def files_stats_endpoint():
       for doc_id, doc_info in file_rag._documents.items():
         documents.append({
           "doc_id": doc_id,
-          "filename": doc_info.get("filename", "Unknown"),
-          "format": doc_info.get("format", "Unknown"),
+          "filename": doc_info.get("filename", _t("rag.api.unknown", "Unknown")),
+          "format": doc_info.get("format", _t("rag.api.unknown", "Unknown")),
           "chunks": doc_info.get("chunks", 0),
           "uploaded_at": doc_info.get("uploaded_at", None)
         })

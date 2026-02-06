@@ -78,19 +78,30 @@ def check_rate_limit(client_ip: str, request: Request) -> None:
   result = check_bootstrap_rate_limit(client_ip, window_seconds=300, global_limit=10, ip_limit=3)
 
   if result == "global":
-    msg = _t(request, "core.server.bootstrap_system_blocked",
-      "🚨 Sistema bloquejat: massa intents globals de bootstrap")
+    msg = _t(
+      request,
+      "core.server.bootstrap_system_blocked",
+      "🚨 System blocked: too many global bootstrap attempts"
+    )
     logger.error(msg)
     raise HTTPException(
       status_code=429,
-      detail="Sistema temporalment bloquejat. Espera 5 minuts."
+      detail=_t(
+        request,
+        "core.server.bootstrap_rate_limit_global_detail",
+        "System temporarily blocked. Wait 5 minutes."
+      )
     )
 
   if result == "ip":
     logger.warning("IP %s bloquejada: massa intents", client_ip)
     raise HTTPException(
       status_code=429,
-      detail="Massa intents des de la teva IP. Espera 5 minuts."
+      detail=_t(
+        request,
+        "core.server.bootstrap_rate_limit_ip_detail",
+        "Too many attempts from your IP. Wait 5 minutes."
+      )
     )
 
 @router.post("/api/bootstrap", response_model=BootstrapResponse)
@@ -116,12 +127,19 @@ async def bootstrap_session(
     logger.error("Intent de bootstrap en entorn no-development (NEXE_ENV=%s)", core_env)
     raise HTTPException(
       status_code=503,
-      detail="Bootstrap not available in this environment"
+      detail=_t(
+        request,
+        "core.server.bootstrap_not_available_env",
+        "Bootstrap not available in this environment"
+      )
     )
 
   try:
     if client_ip == "unknown":
-      raise HTTPException(status_code=400, detail="Invalid IP address")
+      raise HTTPException(
+        status_code=400,
+        detail=_t(request, "core.server.bootstrap_invalid_ip", "Invalid IP address")
+      )
     ip_obj = ipaddress.ip_address(client_ip)
     is_local = ip_obj.is_loopback
     is_private = ip_obj.is_private
@@ -131,11 +149,18 @@ async def bootstrap_session(
       logger.warning("Bootstrap attempt from non-allowed IP: %s", client_ip)
       raise HTTPException(
         status_code=403,
-        detail="Access denied from this IP address"
+        detail=_t(
+          request,
+          "core.server.bootstrap_access_denied_ip",
+          "Access denied from this IP address"
+        )
       )
   except ValueError:
     logger.error("Invalid IP received: %s", client_ip)
-    raise HTTPException(status_code=400, detail="Invalid IP address")
+    raise HTTPException(
+      status_code=400,
+      detail=_t(request, "core.server.bootstrap_invalid_ip", "Invalid IP address")
+    )
 
   check_rate_limit(client_ip, request)
   
@@ -148,16 +173,32 @@ async def bootstrap_session(
     info = get_bootstrap_token()
     
     if not info:
-      detail = "Server not ready - bootstrap token not initialized"
+      detail = _t(
+        request,
+        "core.server.bootstrap_token_not_initialized",
+        "Server not ready - bootstrap token not initialized"
+      )
       status_code = 503
     elif info["used"]:
-      detail = "Token already used. Restart server or regenerate token."
+      detail = _t(
+        request,
+        "core.server.bootstrap_token_used",
+        "Token already used. Restart server or regenerate token."
+      )
       status_code = 403
     elif datetime.now(timezone.utc).timestamp() > info["expires"]:
-      detail = "Token expired. Restart server to generate new token."
+      detail = _t(
+        request,
+        "core.server.bootstrap_token_expired",
+        "Token expired. Restart server to generate new token."
+      )
       status_code = 410
     else:
-      detail = "Invalid token. Check the terminal for the correct code."
+      detail = _t(
+        request,
+        "core.server.bootstrap_token_invalid",
+        "Invalid token. Check the terminal for the correct code."
+      )
       status_code = 401
       
     logger.warning("Bootstrap failed from %s: %s", client_ip, detail)
@@ -178,6 +219,17 @@ async def bootstrap_session(
   title = _t(request, "core.server.bootstrap_token_used_title", "TOKEN USED SUCCESSFULLY")
   session_from = _t(request, "core.server.bootstrap_session_from", "Session initialized from: {ip}", ip=client_ip)
 
+  session_token_msg = _t(
+    request,
+    "core.server.bootstrap_session_token_sent",
+    "Session token sent to client (15 min TTL)"
+  )
+  api_key_msg = _t(
+    request,
+    "core.server.bootstrap_api_key_not_exposed",
+    "API key NOT exposed"
+  )
+
   print(f"""
 +========================================================+
 | {title:<52}|
@@ -185,8 +237,8 @@ async def bootstrap_session(
 | {session_from:<52}|
 | {datetime.now().strftime("%Y-%m-%d %H:%M:%S"):<52}|
 |                            |
-| Session token sent to client (15 min TTL)       |
-| API key NOT exposed                   |
+| {session_token_msg:<52}|
+| {api_key_msg:<52}|
 |                            |
 +========================================================+
   """)
@@ -198,9 +250,9 @@ async def bootstrap_session(
     status="initialized",
     message=msg,
     next_steps=[
-      "1. Use X-Session-Token header for initial requests",
-      "2. Generate permanent API key via POST /api/keys/generate",
-      "3. The session_token expires in 15 minutes"
+      _t(request, "core.server.bootstrap_next_step_1", "1. Use X-Session-Token header for initial requests"),
+      _t(request, "core.server.bootstrap_next_step_2", "2. Generate permanent API key via POST /api/keys/generate"),
+      _t(request, "core.server.bootstrap_next_step_3", "3. The session_token expires in 15 minutes")
     ]
   )
 
@@ -217,7 +269,11 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
     logger.warning("Regeneration attempt from %s", client_ip)
     raise HTTPException(
       status_code=403,
-      detail="Only allowed from localhost"
+      detail=_t(
+        request,
+        "core.server.bootstrap_only_localhost",
+        "Only allowed from localhost"
+      )
     )
 
   from core.bootstrap_tokens import set_bootstrap_token, get_bootstrap_token
@@ -227,7 +283,11 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   if current_info and not current_info["used"] and datetime.now().timestamp() < current_info["expires"]:
     raise HTTPException(
       status_code=400,
-      detail="Current token still active and not used yet"
+      detail=_t(
+        request,
+        "core.server.bootstrap_token_still_active",
+        "Current token still active and not used yet"
+      )
     )
 
   bootstrap_ttl = int(os.getenv('BOOTSTRAP_TTL', '30'))
@@ -236,8 +296,17 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   # ✅ FIX: Persistir nou token a DB
   set_bootstrap_token(new_token, ttl_minutes=bootstrap_ttl)
 
-  title = _t(request, "core.server.bootstrap_token_regenerated_title", "🔄 NOU TOKEN D'INICIALITZACIÓ GENERAT")
-  expiry = _t(request, "core.server.bootstrap_token_expiry", "⏰ Expira en: {minutes} minuts", minutes=bootstrap_ttl)
+  title = _t(
+    request,
+    "core.server.bootstrap_token_regenerated_title",
+    "🔄 NEW BOOTSTRAP TOKEN GENERATED"
+  )
+  expiry = _t(
+    request,
+    "core.server.bootstrap_token_expiry",
+    "⏰ Expires in: {minutes} minutes",
+    minutes=bootstrap_ttl
+  )
 
   print(f"""
 ╔════════════════════════════════════════════════════════╗
@@ -250,12 +319,21 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
 ╚════════════════════════════════════════════════════════╝
   """)
 
-  log_msg = _t(request, "core.server.bootstrap_token_regenerated_log", "🔄 Token regenerat des de {ip}", ip=client_ip)
+  log_msg = _t(
+    request,
+    "core.server.bootstrap_token_regenerated_log",
+    "🔄 Token regenerated from {ip}",
+    ip=client_ip
+  )
   logger.info(log_msg)
 
   return {
     "status": "regenerated",
-    "message": "New token generated. Check terminal."
+    "message": _t(
+      request,
+      "core.server.bootstrap_regenerated_message",
+      "New token generated. Check terminal."
+    )
   }
 
 @router.get("/api/bootstrap/info", response_model=BootstrapInfoResponse)

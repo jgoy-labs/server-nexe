@@ -19,6 +19,18 @@ from personality.i18n import get_i18n
 
 logger = structlog.get_logger(__name__)
 
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  try:
+    return get_i18n().t(key, fallback, **kwargs)
+  except Exception:
+    if kwargs:
+      try:
+        return fallback.format(**kwargs)
+      except (KeyError, ValueError):
+        return fallback
+    return fallback
+
 try:
   from memory.rag_sources.file import FileRAGSource
   RAG_AVAILABLE = True
@@ -68,20 +80,29 @@ class RAGSearchNode(Node):
     """Return node metadata."""
     return NodeMetadata(
       id="rag.search",
-      name="RAG Search",
+      name=_t("rag.workflow.node.name", "RAG Search"),
       version="1.0.0",
-      description="Cerca documents al RAG i genera prompt amb context",
+      description=_t(
+        "rag.workflow.node.description",
+        "Search documents in RAG and generate prompt with context"
+      ),
       category="llm",
       inputs=[
         NodeInput(
           name="query",
           type="string",
           required=True,
-          description="Query de l'usuari per cercar documents",
+          description=_t(
+            "rag.workflow.node.input_query_description",
+            "User query for searching documents"
+          ),
           json_schema={
             "type": "string",
             "minLength": 1,
-            "description": "Text de la query"
+            "description": _t(
+              "rag.workflow.node.input_query_schema_description",
+              "Query text"
+            )
           }
         )
       ],
@@ -89,25 +110,37 @@ class RAGSearchNode(Node):
         NodeOutput(
           name="prompt",
           type="string",
-          description="Prompt generat amb context dels documents trobats",
+          description=_t(
+            "rag.workflow.node.output_prompt_description",
+            "Prompt generated with context from retrieved documents"
+          ),
           json_schema={"type": "string"}
         ),
         NodeOutput(
           name="context",
           type="string",
-          description="Text concatenat dels documents trobats",
+          description=_t(
+            "rag.workflow.node.output_context_description",
+            "Concatenated text from retrieved documents"
+          ),
           json_schema={"type": "string"}
         ),
         NodeOutput(
           name="results",
           type="array",
-          description="Llista de resultats amb metadata",
+          description=_t(
+            "rag.workflow.node.output_results_description",
+            "List of results with metadata"
+          ),
           json_schema={"type": "array"}
         ),
         NodeOutput(
           name="num_results",
           type="number",
-          description="Número de resultats trobats",
+          description=_t(
+            "rag.workflow.node.output_num_results_description",
+            "Number of results found"
+          ),
           json_schema={"type": "integer"}
         )
       ],
@@ -117,31 +150,46 @@ class RAGSearchNode(Node):
         "source": {
           "type": "string",
           "default": "my-docs",
-          "description": "ID de la RAG source a utilitzar",
+          "description": _t(
+            "rag.workflow.node.config_source_description",
+            "RAG source ID to use"
+          ),
           "ui_widget": "text"
         },
         "top_k": {
           "type": "integer",
           "default": 5,
-          "description": "Número de resultats a retornar",
+          "description": _t(
+            "rag.workflow.node.config_top_k_description",
+            "Number of results to return"
+          ),
           "ui_widget": "number"
         },
         "score_threshold": {
           "type": "number",
           "default": 0.7,
-          "description": "Threshold mínim de similaritat (0.0-1.0)",
+          "description": _t(
+            "rag.workflow.node.config_score_threshold_description",
+            "Minimum similarity threshold (0.0-1.0)"
+          ),
           "ui_widget": "number"
         },
         "prompt_template": {
           "type": "string",
           "default": "Context:\\n{context}\\n\\nQuestion: {query}",
-          "description": "Template del prompt amb {context} i {query}",
+          "description": _t(
+            "rag.workflow.node.config_prompt_template_description",
+            "Prompt template with {context} and {query}"
+          ),
           "ui_widget": "textarea"
         },
         "index_name": {
           "type": "string",
           "default": "documents",
-          "description": "Nom de l'índex Qdrant/LanceDB",
+          "description": _t(
+            "rag.workflow.node.config_index_name_description",
+            "Qdrant/LanceDB index name"
+          ),
           "ui_widget": "text"
         }
       }

@@ -15,6 +15,7 @@ from typing import List, Dict, Any, Optional
 
 from .router import CLIRouter, CLIInfo
 from .config import NexeConfig
+from .i18n import t
 
 class CLIModule:
   """
@@ -26,7 +27,7 @@ class CLIModule:
 
   name = "cli"
   version = "1.0.0"
-  description = "CLI Central Nexe - Orquestrador de CLIs de mòduls"
+  description = t("cli.description", "CLI Central Nexe - Module CLI Orchestrator")
 
   def __init__(self, config: Optional[NexeConfig] = None):
     """
@@ -111,8 +112,6 @@ class CLIModule:
 | \\| | / _ \\ | | / /_   / /
 | |\\ |/ ___ \\| | / /\\ \\  / /
 |_| \\_/_/  \\_\\_|/_/ \\_\\ /_/
-
-CLI Central - Orquestrador de Mòduls
 """
 
   def greet(self, name: str = "Nexe") -> str:
@@ -125,4 +124,6 @@ CLI Central - Orquestrador de Mòduls
     Returns:
       str: Greeting message with ASCII art
     """
-    return f"{self.get_ascii_art()}\nHola {name}! Benvingut al CLI Central Nexe 0.8."
+    hello = t("cli.greetings.hello", "Hello")
+    welcome = t("cli.greetings.welcome", "Welcome to CLI Central Nexe 0.8")
+    return f"{self.get_ascii_art()}\n{hello} {name}! {welcome}."

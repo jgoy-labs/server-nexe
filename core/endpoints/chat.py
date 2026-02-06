@@ -47,7 +47,7 @@ _RAG_INJECTION_PATTERNS = [
     re.compile(r'\[CONTEXT[^\]]*\]', re.IGNORECASE),    # Our own context markers
 ]
 
-def _sanitize_rag_context(context: str) -> str:
+def _sanitize_rag_context(context: str, truncation_marker: str = "[...truncated]") -> str:
     """
     Sanitize RAG retrieved content before injecting into prompt.
 
@@ -69,7 +69,7 @@ def _sanitize_rag_context(context: str) -> str:
     # 1. Truncate to prevent context overflow
     sanitized = context[:MAX_RAG_CONTEXT_LENGTH]
     if len(context) > MAX_RAG_CONTEXT_LENGTH:
-        sanitized += "\n[...truncat]"
+        sanitized += "\n" + truncation_marker
         logger.warning(f"RAG context truncated from {len(context)} to {MAX_RAG_CONTEXT_LENGTH} chars")
 
     # 2. Remove prompt injection patterns
@@ -81,6 +81,19 @@ def _sanitize_rag_context(context: str) -> str:
     sanitized = sanitized.replace('[CONTEXT', '[CONTEXT_ESCAPED')
 
     return sanitized
+
+def _t_from_state(app_state, key: str, fallback: str, **kwargs) -> str:
+    """Translate using app_state.i18n with fallback."""
+    try:
+        i18n = getattr(app_state, "i18n", None) if app_state else None
+        if not i18n:
+            return fallback.format(**kwargs) if kwargs else fallback
+        value = i18n.t(key, **kwargs)
+        if value == key:
+            return fallback.format(**kwargs) if kwargs else fallback
+        return value
+    except Exception:
+        return fallback.format(**kwargs) if kwargs else fallback
 
 # --- Schemas ---
 
@@ -278,13 +291,34 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
     messages = [m.model_dump() for m in request.messages]
     if context_text and messages:
         # SECURITY: Sanitize RAG context before injection
-        safe_context = _sanitize_rag_context(context_text)
+        truncation_marker = _t_from_state(
+            req.app.state,
+            "core.chat.context_truncated_marker",
+            "[...truncated]",
+        )
+        safe_context = _sanitize_rag_context(context_text, truncation_marker=truncation_marker)
+        context_header = _t_from_state(
+            req.app.state,
+            "core.chat.context_header",
+            "[CONTEXT MEMORY]",
+        )
+        context_instruction = _t_from_state(
+            req.app.state,
+            "core.chat.context_instruction",
+            "Use this retrieved information if relevant:",
+        )
+        context_footer = _t_from_state(
+            req.app.state,
+            "core.chat.context_footer",
+            "[/CONTEXT]",
+        )
+        context_block = f"{context_header}\n{context_instruction}\n{safe_context}\n{context_footer}"
 
         # Find system prompt or insert one
         if messages[0]['role'] == 'system':
-            messages[0]['content'] += f"\n\n[CONTEXT MEMÒRIA]\nUsa aquesta informació recuperada per respondre si és rellevant:\n{safe_context}\n[/CONTEXT]"
+            messages[0]['content'] += f"\n\n{context_block}"
         else:
-            messages.insert(0, {"role": "system", "content": f"[CONTEXT MEMÒRIA]\nUsa aquesta informació recuperada per respondre si és rellevant:\n{safe_context}\n[/CONTEXT]"})
+            messages.insert(0, {"role": "system", "content": context_block})
 
     # 4. Dispatch to Engine
     # Extract last user message for auto-save logic
@@ -418,7 +452,15 @@ async def _forward_to_ollama(
         async with httpx.AsyncClient(timeout=3.0) as client:
             tags_resp = await client.get("http://localhost:11434/api/tags")
             if tags_resp.status_code != 200:
-                 raise HTTPException(status_code=502, detail=f"Ollama error (HTTP {tags_resp.status_code})")
+                 raise HTTPException(
+                     status_code=502,
+                     detail=_t_from_state(
+                         app_state,
+                         "core.chat.ollama_http_error",
+                         "Ollama error (HTTP {status})",
+                         status=tags_resp.status_code,
+                     ),
+                 )
             available_models = [m.get("name", "") for m in tags_resp.json().get("models", [])]
 
             # Filter out embedding models (they can't chat!)
@@ -440,14 +482,21 @@ async def _forward_to_ollama(
                 else:
                     raise HTTPException(
                         status_code=503,
-                        detail=f"No hi ha cap model de CHAT descarregat a Ollama. "
-                               f"Executa: ollama pull llama3.2"
+                        detail=_t_from_state(
+                            app_state,
+                            "core.chat.ollama_no_chat_models",
+                            "No chat model downloaded in Ollama. Run: ollama pull llama3.2",
+                        ),
                     )
     except httpx.ConnectError:
         raise HTTPException(
             status_code=503,
-            detail="Ollama no disponible. El servidor s'està iniciant o Ollama no està instal·lat. "
-                   "Espera uns segons i torna-ho a provar, o executa: curl -fsSL https://ollama.com/install.sh | sh"
+            detail=_t_from_state(
+                app_state,
+                "core.chat.ollama_not_available",
+                "Ollama not available. The server is starting or Ollama is not installed. "
+                "Wait a few seconds and try again, or run: curl -fsSL https://ollama.com/install.sh | sh",
+            ),
         )
 
     payload = {
@@ -479,7 +528,12 @@ async def _forward_to_ollama(
                     try:
                         error_detail = resp.json().get("error", "Unknown Ollama error")
                     except (ValueError, json.JSONDecodeError, AttributeError):
-                        error_detail = f"Ollama returned HTTP {resp.status_code}"
+                        error_detail = _t_from_state(
+                            app_state,
+                            "core.chat.ollama_returned_http",
+                            "Ollama returned HTTP {status}",
+                            status=resp.status_code,
+                        )
                     raise HTTPException(status_code=resp.status_code, detail=error_detail)
                 response = resp.json()
                 response.setdefault("nexe_engine", "ollama")
@@ -492,7 +546,11 @@ async def _forward_to_ollama(
         except httpx.ConnectError:
             raise HTTPException(
                 status_code=503,
-                detail="Ollama no respon. Verifica que està corrent: ollama serve"
+                detail=_t_from_state(
+                    app_state,
+                    "core.chat.ollama_no_response",
+                    "Ollama is not responding. Verify it is running: ollama serve",
+                ),
             )
 
 async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user_msg: str = None):
@@ -503,7 +561,13 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
         async with httpx.AsyncClient(timeout=60.0) as client:
             async with client.stream("POST", url, json=payload) as resp:
                 if resp.status_code != 200:
-                    yield f"data: {json.dumps({'error': f'Ollama stream failed with status {resp.status_code}'})}\n\n"
+                    error_msg = _t_from_state(
+                        app_state,
+                        "core.chat.ollama_stream_failed_status",
+                        "Ollama stream failed with status {status}",
+                        status=resp.status_code,
+                    )
+                    yield f"data: {json.dumps({'error': error_msg})}\n\n"
                     yield "data: [DONE]\n\n"
                     return
 
@@ -536,7 +600,13 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
                     except json.JSONDecodeError:
                         pass
     except httpx.ConnectError:
-        error_msg = {"error": "Ollama no disponible. Espera uns segons i torna-ho a provar."}
+        error_msg = {
+            "error": _t_from_state(
+                app_state,
+                "core.chat.ollama_stream_not_available",
+                "Ollama not available. Wait a few seconds and try again.",
+            )
+        }
         yield f"data: {json.dumps(error_msg)}\n\n"
         yield "data: [DONE]\n\n"
 

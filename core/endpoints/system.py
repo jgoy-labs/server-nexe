@@ -63,7 +63,7 @@ def get_supervisor_pid() -> int:
         "error": "supervisor_not_found",
         "message": _t(
           "system.supervisor_not_found",
-          "Supervisor no detectat. Executa: python3 scripts/supervisor.py"
+          "Supervisor not detected. Run: python3 scripts/supervisor.py"
         ),
         "pid_file": str(SUPERVISOR_PID_FILE)
       }
@@ -83,7 +83,7 @@ def get_supervisor_pid() -> int:
         "error": "invalid_pid",
         "message": _t(
           "system.supervisor_pid_invalid",
-          "Supervisor PID invàlid: {error}",
+          "Invalid supervisor PID: {error}",
           error=str(e)
         ),
         "pid_file": str(SUPERVISOR_PID_FILE)
@@ -96,12 +96,12 @@ def get_supervisor_pid() -> int:
         "error": "supervisor_dead",
         "message": _t(
           "system.supervisor_dead",
-          "Supervisor PID trobat però procés no existeix (zombie)"
+          "Supervisor PID found but process does not exist (zombie)"
         ),
         "pid_file": str(SUPERVISOR_PID_FILE),
         "suggestion": _t(
           "system.supervisor_dead_suggestion",
-          "Elimina el fitxer PID i reinicia el supervisor"
+          "Remove PID file and restart the supervisor"
         )
       }
     )
@@ -112,7 +112,7 @@ def get_supervisor_pid() -> int:
         "error": "permission_denied",
         "message": _t(
           "system.supervisor_permission_denied",
-          "No tens permisos per accedir al procés supervisor: {error}",
+          "You do not have permission to access the supervisor process: {error}",
           error=str(e)
         )
       }
@@ -124,7 +124,7 @@ def get_supervisor_pid() -> int:
         "error": "unknown_error",
         "message": _t(
           "system.supervisor_read_error",
-          "Error llegint supervisor PID: {error}",
+          "Error reading supervisor PID: {error}",
           error=str(e)
         )
       }
@@ -186,13 +186,13 @@ async def restart_server(
       "status": "restart_initiated",
       "message": _t(
         "system.restart_initiated_message",
-        "Servidor reiniciant en ~1 segon"
+        "Server restarting in ~1 second"
       ),
       "supervisor_pid": supervisor_pid,
       "expected_downtime_seconds": 5,
       "instructions": _t(
         "system.restart_instructions",
-        "La UI es reconnectarà automàticament"
+        "The UI will reconnect automatically"
       )
     }
 
@@ -206,7 +206,7 @@ async def restart_server(
         "error": "restart_failed",
         "message": _t(
           "system.restart_failed",
-          "Error reiniciant servidor: {error}",
+          "Error restarting server: {error}",
           error=str(e)
         )
       }

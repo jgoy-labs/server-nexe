@@ -17,11 +17,12 @@ from typing import Optional, List
 from .router import CLIRouter
 from .output import print_banner, print_modules_table, print_status, print_error
 from .config import NexeConfig
+from .i18n import t
 
 class DynamicGroup(click.Group):
   """
-  Click Group que intercepta comandos no definits i els redirigeix
-  al router per invocar CLIs de mòduls via subprocess.
+  Click group that intercepts unknown commands and routes them
+  to module CLIs via subprocess.
   """
 
   def __init__(self, *args, **kwargs):
@@ -57,7 +58,7 @@ class DynamicGroup(click.Group):
     @click.argument('args', nargs=-1, type=click.UNPROCESSED)
     @click.pass_context
     def dynamic_cmd(ctx: click.Context, args: tuple):
-      """Comando dinàmic que delega al CLI del mòdul."""
+      """Dynamic command that delegates to the module CLI."""
       all_args = list(extra_args) + list(args)
 
       exit_code = self._router.execute(cmd_name, all_args)
@@ -68,7 +69,7 @@ class DynamicGroup(click.Group):
     return dynamic_cmd
 
   def list_commands(self, ctx: click.Context) -> List[str]:
-    """Retorna tots els comandos disponibles (built-in + mòduls)."""
+    """Return all available commands (built-in + modules)."""
     builtin = super().list_commands(ctx)
 
     module_clis = [cli.alias for cli in self._router.discover_all()]
@@ -76,8 +77,8 @@ class DynamicGroup(click.Group):
     return sorted(set(builtin + module_clis))
 
 @click.group(cls=DynamicGroup, invoke_without_command=True)
-@click.option('--version', '-V', is_flag=True, help='Show version')
-@click.option('--no-banner', is_flag=True, help='Skip banner')
+@click.option('--version', '-V', is_flag=True, help=t("cli.main.options.version", "Show version"))
+@click.option('--no-banner', is_flag=True, help=t("cli.main.options.no_banner", "Skip banner"))
 @click.pass_context
 def app(ctx: click.Context, version: bool, no_banner: bool):
   """
@@ -110,7 +111,7 @@ def app(ctx: click.Context, version: bool, no_banner: bool):
   ctx.obj['no_banner'] = no_banner
 
   if version:
-    click.echo("Nexe CLI v1.0.0")
+    click.echo(t("cli.main.version", "Nexe CLI v1.0.0"))
     ctx.exit(0)
 
   if ctx.invoked_subcommand is None:
@@ -119,10 +120,10 @@ def app(ctx: click.Context, version: bool, no_banner: bool):
     click.echo(ctx.get_help())
 
 @app.command()
-@click.option('--json', 'as_json', is_flag=True, help='Output JSON')
+@click.option('--json', 'as_json', is_flag=True, help=t("cli.main.options.json", "Output JSON"))
 @click.pass_context
 def modules(ctx: click.Context, as_json: bool):
-  """Llistar mòduls amb CLI disponibles."""
+  """List modules with available CLIs."""
   router = CLIRouter()
   clis = router.discover_all()
 
@@ -137,14 +138,14 @@ def modules(ctx: click.Context, as_json: bool):
     print_modules_table(clis)
 
 def _start_nexe(ctx: click.Context):
-  """Lògica comuna per arrencar Nexe."""
+  """Common logic for starting Nexe."""
   import os
   import subprocess
   from pathlib import Path
 
   project_root = Path(__file__).parent.parent.parent
   
-  click.echo("Arrencant Nexe Server...")
+  click.echo(t("cli.main.starting_server", "Starting Nexe Server..."))
   try:
     result = subprocess.run(
       [sys.executable, "-m", "core.app"],
@@ -153,26 +154,26 @@ def _start_nexe(ctx: click.Context):
     )
     ctx.exit(result.returncode)
   except KeyboardInterrupt:
-    click.echo("\n👋 Aturant...")
+    click.echo(t("cli.main.stopping", "\n👋 Stopping..."))
     ctx.exit(0)
 
 @app.command()
 @click.pass_context
 def go(ctx: click.Context):
-  """Arrencar el sistema Nexe complet (Qdrant + Servidor)."""
+  """Start the complete Nexe system (Qdrant + Server)."""
   _start_nexe(ctx)
 
 @app.command(name="go!")
 @click.pass_context
 def go_bang(ctx: click.Context):
-  """Arrencar el sistema Nexe complet (Qdrant + Servidor). Alias de 'go'."""
+  """Start the complete Nexe system (Qdrant + Server). Alias for 'go'."""
   _start_nexe(ctx)
 
 @app.command()
-@click.option('--json', 'as_json', is_flag=True, help='Output JSON')
+@click.option('--json', 'as_json', is_flag=True, help=t("cli.main.options.json", "Output JSON"))
 @click.pass_context
 def status(ctx: click.Context, as_json: bool):
-  """Mostrar estat del sistema Nexe."""
+  """Show Nexe system status."""
   from .client import NexeClient
 
   config: NexeConfig = ctx.obj.get('config', NexeConfig())
@@ -187,35 +188,80 @@ def status(ctx: click.Context, as_json: bool):
     print_status(status_data)
 
 @app.command(name="setup-models")
-@click.option('--apply', is_flag=True, help='Apply recommended changes to server.toml')
+@click.option('--apply', is_flag=True, help=t("cli.main.setup_models.options.apply", "Apply recommended changes to server.toml"))
 @click.pass_context
 def setup_models(ctx: click.Context, apply: bool):
-    """Detecta maquinari i configura els models recomanats."""
+    """Detect hardware and configure recommended models."""
     from personality.models import ModelSelector
     from pathlib import Path
     import toml
     
-    click.echo("Analitzant maquinari...")
+    click.echo(t("cli.main.setup_models.analyzing_hw", "Analyzing hardware..."))
     selector = ModelSelector()
     hw_info = selector.analyze()
-    click.echo(f"  - Sistema: {hw_info.system} {hw_info.machine}")
-    click.echo(f"  - Processor: {hw_info.processor}")
-    click.echo(f"  - RAM disponible: {hw_info.total_ram_gb} GB")
-    click.echo(f"  - Apple Silicon: {'✅' if hw_info.is_apple_silicon else '❌'}")
+    click.echo(t(
+        "cli.main.setup_models.hw.system",
+        "  - System: {system} {machine}",
+        system=hw_info.system,
+        machine=hw_info.machine
+    ))
+    click.echo(t(
+        "cli.main.setup_models.hw.processor",
+        "  - Processor: {processor}",
+        processor=hw_info.processor
+    ))
+    click.echo(t(
+        "cli.main.setup_models.hw.ram",
+        "  - Available RAM: {ram} GB",
+        ram=hw_info.total_ram_gb
+    ))
+    click.echo(t(
+        "cli.main.setup_models.hw.apple_silicon",
+        "  - Apple Silicon: {status}",
+        status="✅" if hw_info.is_apple_silicon else "❌"
+    ))
     
     profile = selector.recommend()
-    click.echo(f"\n🔍 Perfil Recomanat: {profile.tier.value.upper()}")
-    click.echo(f"  - Engine: {profile.preferred_engine.value}")
-    click.echo(f"  - Primary: {profile.primary_model}")
-    click.echo(f"  - Secondary: {profile.secondary_model}")
-    click.echo(f"  - Embedding: {profile.embedding_model}")
-    click.echo(f"  - Context: {profile.context_window} tokens")
-    click.echo(f"\n📝 Descripció: {profile.description}")
+    click.echo(t(
+        "cli.main.setup_models.profile.title",
+        "\n🔍 Recommended Profile: {tier}",
+        tier=profile.tier.value.upper()
+    ))
+    click.echo(t(
+        "cli.main.setup_models.profile.engine",
+        "  - Engine: {engine}",
+        engine=profile.preferred_engine.value
+    ))
+    click.echo(t(
+        "cli.main.setup_models.profile.primary",
+        "  - Primary: {model}",
+        model=profile.primary_model
+    ))
+    click.echo(t(
+        "cli.main.setup_models.profile.secondary",
+        "  - Secondary: {model}",
+        model=profile.secondary_model
+    ))
+    click.echo(t(
+        "cli.main.setup_models.profile.embedding",
+        "  - Embedding: {model}",
+        model=profile.embedding_model
+    ))
+    click.echo(t(
+        "cli.main.setup_models.profile.context",
+        "  - Context: {tokens} tokens",
+        tokens=profile.context_window
+    ))
+    click.echo(t(
+        "cli.main.setup_models.profile.description",
+        "\n📝 Description: {description}",
+        description=profile.description
+    ))
     
     if apply:
         config_path = Path("personality/server.toml")
         if not config_path.exists():
-            click.echo("Error: server.toml not found!", err=True)
+            click.echo(t("cli.main.setup_models.config_not_found", "Error: server.toml not found!"), err=True)
             return
             
         try:
@@ -225,13 +271,16 @@ def setup_models(ctx: click.Context, apply: bool):
             with open(config_path, 'w') as f:
                 toml.dump(new_config, f)
             
-            click.echo("\n✅ Configuració aplicada correctament a server.toml")
+            click.echo(t(
+                "cli.main.setup_models.config_applied",
+                "\n✅ Configuration applied to server.toml"
+            ))
             
             # --- Auto-Download Logic ---
             if profile.preferred_engine.value == "mlx" and profile.mlx_model_id:
-                click.echo(f"\n{click.style('Plug & Play: Descarregant model MLX...', fg='cyan', bold=True)}")
-                click.echo(f"   Model ID: {profile.mlx_model_id}")
-                click.echo("   Això pot trigar uns minuts segons la teva connexió. Paciència...")
+                click.echo(f"\n{click.style(t('cli.main.setup_models.mlx_downloading', 'Plug & Play: Downloading MLX model...'), fg='cyan', bold=True)}")
+                click.echo(t("cli.main.setup_models.mlx_model_id", "   Model ID: {model_id}", model_id=profile.mlx_model_id))
+                click.echo(t("cli.main.setup_models.mlx_wait", "   This may take a few minutes depending on your connection. Please wait..."))
                 
                 # Check for huggingface-cli
                 import shutil
@@ -246,7 +295,7 @@ def setup_models(ctx: click.Context, apply: bool):
                     # Alternativa: Use huggingface_hub snapshot_download
                     from huggingface_hub import snapshot_download
                     local_dir = Path("storage/models") / profile.mlx_model_id.split("/")[-1]
-                    click.echo(f"   Destí: {local_dir}")
+                    click.echo(t("cli.main.setup_models.mlx_destination", "   Destination: {path}", path=local_dir))
                     
                     snapshot_download(
                         repo_id=profile.mlx_model_id,
@@ -259,25 +308,25 @@ def setup_models(ctx: click.Context, apply: bool):
                     new_config['plugins']['models']['primary'] = str(local_dir.absolute())
                     with open(config_path, 'w') as f:
                         toml.dump(new_config, f)
-                    click.echo(f"   Ruta local actualitzada a server.toml: {local_dir}")
+                    click.echo(t("cli.main.setup_models.mlx_local_path_updated", "   Local path updated in server.toml: {path}", path=local_dir))
                     
-                    click.echo(f"\n✅ {click.style('Model descarregat i configurat!', fg='green')}")
+                    click.echo(f"\n✅ {click.style(t('cli.main.setup_models.mlx_downloaded', 'Model downloaded and configured!'), fg='green')}")
                     
                 except ImportError:
-                     click.echo(click.style("   ⚠️ huggingface_hub not installed. Cannot auto-download.", fg="yellow"))
-                     click.echo(f"   Run: pip install huggingface_hub")
+                    click.echo(click.style(t("cli.main.setup_models.hf_missing", "   ⚠️ huggingface_hub not installed. Cannot auto-download."), fg="yellow"))
+                    click.echo(t("cli.main.setup_models.hf_install", "   Run: pip install huggingface_hub"))
                 except Exception as e:
-                     click.echo(click.style(f"   ❌ Error descarregant model: {e}", fg="red"))
+                    click.echo(click.style(t("cli.main.setup_models.hf_error", "   ❌ Error downloading model: {error}", error=str(e)), fg="red"))
             
             elif profile.preferred_engine.value == "ollama":
-                click.echo(f"\nℹ️  Per Ollama, executa manualment: ollama pull {profile.primary_model}")
+                click.echo(t("cli.main.setup_models.ollama_hint", "\nℹ️  For Ollama, run manually: ollama pull {model}", model=profile.primary_model))
 
-            click.echo("\nReinicia el servidor per aplicar canvis: ./nexe go")
+            click.echo(t("cli.main.setup_models.restart_hint", "\nRestart the server to apply changes: ./nexe go"))
             
         except Exception as e:
-            click.echo(f"Error saving config: {e}", err=True)
+            click.echo(t("cli.main.setup_models.save_error", "Error saving config: {error}", error=str(e)), err=True)
     else:
-        click.echo("\n💡 Executa amb --apply per guardar els canvis.")
+        click.echo(t("cli.main.setup_models.apply_hint", "\n💡 Run with --apply to save changes."))
 
 def main():
   """Entry point for CLI."""
@@ -287,39 +336,40 @@ def main():
     e.show()
     sys.exit(e.exit_code)
   except click.Abort:
-    click.echo("\nAborted.", err=True)
+    click.echo(t("cli.main.aborted", "\nAborted."), err=True)
     sys.exit(1)
   except KeyboardInterrupt:
-    click.echo("\nInterrupted.", err=True)
+    click.echo(t("cli.main.interrupted", "\nInterrupted."), err=True)
     sys.exit(130)
   except SystemExit:
     raise
   except Exception as e:
-    print_error(f"Unexpected error: {e}")
+    print_error(t("cli.main.unexpected_error", "Unexpected error: {error}", error=str(e)))
     sys.exit(1)
 
 @app.group()
 def model():
-    """Gestió de Models d'IA (Descarregar, Llistar)."""
+    """AI model management (download, list)."""
     pass
 
 @model.command(name="list")
 def list_models():
-    """Llista els models verificats disponibles per instal·lar."""
+    """List verified models available for install."""
     from personality.models.registry import list_models_table
-    click.echo(f"\n{click.style('📦 MODELS DISPONIBLES (Verificats per Nexe)', bold=True, fg='cyan')}")
-    click.echo("Use 'nexe model install <nom>' per descarregar-ne un.\n")
+    click.echo(f"\n{click.style(t('cli.main.models.available_title', '📦 AVAILABLE MODELS (Verified by Nexe)'), bold=True, fg='cyan')}")
+    click.echo(t("cli.main.models.install_hint", "Use 'nexe model install <name>' to download one.\n"))
     click.echo(list_models_table())
     click.echo()
 
 @model.command(name="install")
 @click.argument("name")
-@click.option("--engine", "-e", type=click.Choice(['mlx', 'ollama']), default=None, help="Forçar motor")
+@click.option("--engine", "-e", type=click.Choice(['mlx', 'ollama']), default=None,
+              help=t("cli.main.models.options.force_engine", "Force engine"))
 def install_model(name: str, engine: Optional[str]):
     """
-    Instal·la un model pel seu nom curt (ex: 'llama3.1-8b').
+    Install a model by its short name (e.g. 'llama3.1-8b').
     
-    Exemple: ./nexe model install gemma2b
+    Example: ./nexe model install gemma2b
     """
     from personality.models.registry import get_model_entry
     from pathlib import Path
@@ -328,8 +378,11 @@ def install_model(name: str, engine: Optional[str]):
     # 1. Resolve model
     entry = get_model_entry(name)
     if not entry:
-        click.echo(click.style(f"❌ Model '{name}' no trobat al registre.", fg="red"))
-        click.echo("Executa './nexe model list' per veure'n la llista.")
+        click.echo(click.style(
+            t("cli.main.models.not_found", "❌ Model '{name}' not found in registry.", name=name),
+            fg="red"
+        ))
+        click.echo(t("cli.main.models.list_hint", "Run './nexe model list' to see the list."))
         return
 
     # 2. Detect Engine if not specified
@@ -343,7 +396,15 @@ def install_model(name: str, engine: Optional[str]):
         else:
              engine = "ollama"
     
-    click.echo(f"💿 Instal·lant {click.style(entry.short_name, bold=True)} ({entry.size_gb}GB) per a motor {click.style(engine.upper(), fg='yellow')}...")
+    click.echo(
+        t(
+            "cli.main.models.installing",
+            "💿 Installing {model} ({size}GB) for engine {engine}...",
+            model=click.style(entry.short_name, bold=True),
+            size=entry.size_gb,
+            engine=click.style(engine.upper(), fg='yellow')
+        )
+    )
     
     if engine == "mlx":
         # MLX Download Logic
@@ -352,8 +413,8 @@ def install_model(name: str, engine: Optional[str]):
             repo_id = entry.mlx_hf_id
             local_dir = Path("storage/models") / repo_id.split("/")[-1]
             
-            click.echo(f"   Font: {repo_id}")
-            click.echo(f"   Destí: {local_dir}")
+            click.echo(t("cli.main.models.source", "   Source: {source}", source=repo_id))
+            click.echo(t("cli.main.models.destination", "   Destination: {path}", path=local_dir))
             
             snapshot_download(
                 repo_id=repo_id,
@@ -361,54 +422,54 @@ def install_model(name: str, engine: Optional[str]):
                 local_dir_use_symlinks=False
             )
             
-            click.echo(f"\n✅ {click.style('Model descarregat!', fg='green')}")
+            click.echo(f"\n✅ {click.style(t('cli.main.models.downloaded', 'Model downloaded!'), fg='green')}")
             
             # Ask to set as primary
-            if click.confirm("Vols establir-lo com a model principal (Primary)?"):
+            if click.confirm(t("cli.main.models.set_primary_prompt", "Set as primary model?")):
                 config_path = Path("personality/server.toml")
                 config = toml.load(config_path)
                 config['plugins']['models']['primary'] = str(local_dir.absolute())
                 with open(config_path, 'w') as f:
                     toml.dump(config, f)
-                click.echo("   Configuració actualitzada.")
+                click.echo(t("cli.main.models.config_updated", "   Configuration updated."))
                 
         except ImportError:
-             click.echo(click.style("⚠️ Error: huggingface_hub no instal·lat.", fg="red"))
+             click.echo(click.style(t("cli.main.models.hf_missing", "⚠️ Error: huggingface_hub not installed."), fg="red"))
         except Exception as e:
-             click.echo(click.style(f"❌ Error descarregant: {e}", fg="red"))
+             click.echo(click.style(t("cli.main.models.download_error", "❌ Download error: {error}", error=str(e)), fg="red"))
 
     elif engine == "ollama":
         # Ollama Pull 
         import subprocess
         tag = entry.ollama_tag
-        click.echo(f"   Executant: ollama pull {tag}")
+        click.echo(t("cli.main.models.ollama_running", "   Running: ollama pull {tag}", tag=tag))
         try:
             subprocess.run(["ollama", "pull", tag], check=True)
-            click.echo(f"\n✅ {click.style('Model descarregat a Ollama!', fg='green')}")
+            click.echo(f"\n✅ {click.style(t('cli.main.models.ollama_downloaded', 'Model downloaded to Ollama!'), fg='green')}")
             
              # Ask to set as primary
-            if click.confirm("Vols establir-lo com a model principal (Primary)?"):
+            if click.confirm(t("cli.main.models.set_primary_prompt", "Set as primary model?")):
                 config_path = Path("personality/server.toml")
                 config = toml.load(config_path)
                 config['plugins']['models']['primary'] = tag
                 with open(config_path, 'w') as f:
                     toml.dump(config, f)
-                click.echo("   Configuració actualitzada.")
+                click.echo(t("cli.main.models.config_updated", "   Configuration updated."))
                 
         except Exception as e:
-            click.echo(click.style(f"❌ Error en ollama pull: {e}", fg="red"))
+            click.echo(click.style(t("cli.main.models.ollama_error", "❌ Error running ollama pull: {error}", error=str(e)), fg="red"))
 
     else:
-        click.echo("Engine not supported for auto-install yet.")
+        click.echo(t("cli.main.models.engine_not_supported", "Engine not supported for auto-install yet."))
 
 @app.group()
 def knowledge():
-    """Gestió de documents RAG (knowledge/)."""
+    """RAG document management (knowledge/)."""
     pass
 
 @knowledge.command(name="ingest")
 def ingest_knowledge_cmd():
-    """Ingereix els documents de knowledge/ a Qdrant."""
+    """Ingest documents from knowledge/ into Qdrant."""
     import asyncio
     from pathlib import Path
 
@@ -416,7 +477,10 @@ def ingest_knowledge_cmd():
     knowledge_path = project_root / "knowledge"
 
     if not knowledge_path.exists():
-        click.echo(click.style(f"❌ Carpeta '{knowledge_path}' no existeix.", fg="red"))
+        click.echo(click.style(
+            t("cli.main.knowledge.dir_not_found", "❌ Folder '{path}' does not exist.", path=knowledge_path),
+            fg="red"
+        ))
         return
 
     # Check for files
@@ -428,24 +492,27 @@ def ingest_knowledge_cmd():
     files = [f for f in files if not f.name.startswith('.') and f.name != 'README.md']
 
     if not files:
-        click.echo(click.style("ℹ️  No hi ha documents a knowledge/", fg="yellow"))
-        click.echo("   Formats suportats: .txt, .md, .pdf")
-        click.echo(f"   Afegeix documents: cp fitxer.pdf {knowledge_path}/")
+        click.echo(click.style(
+            t("cli.main.knowledge.no_docs", "ℹ️  No documents found in knowledge/"),
+            fg="yellow"
+        ))
+        click.echo(t("cli.main.knowledge.supported_formats", "   Supported formats: .txt, .md, .pdf"))
+        click.echo(t("cli.main.knowledge.add_docs", "   Add documents: cp file.pdf {path}/", path=knowledge_path))
         return
 
-    click.echo(f"📚 Ingerint {len(files)} document(s)...")
+    click.echo(t("cli.main.knowledge.ingesting", "📚 Ingesting {count} document(s)...", count=len(files)))
 
     from core.ingest.ingest_knowledge import ingest_knowledge
     success = asyncio.run(ingest_knowledge(knowledge_path, quiet=False))
 
     if success:
-        click.echo(click.style("✅ Ingesta completada!", fg="green"))
+        click.echo(click.style(t("cli.main.knowledge.ingest_done", "✅ Ingestion completed!"), fg="green"))
     else:
-        click.echo(click.style("⚠️  Ingesta amb errors", fg="yellow"))
+        click.echo(click.style(t("cli.main.knowledge.ingest_warn", "⚠️  Ingestion with warnings"), fg="yellow"))
 
 @knowledge.command(name="status")
 def knowledge_status():
-    """Mostra l'estat de la col·lecció user_knowledge."""
+    """Show status for the user_knowledge collection."""
     import asyncio
 
     async def check_status():
@@ -456,17 +523,23 @@ def knowledge_status():
 
             if await memory.collection_exists("user_knowledge"):
                 count = await memory.count("user_knowledge")
-                click.echo(f"📊 Col·lecció 'user_knowledge':")
-                click.echo(f"   - Documents: {count} fragments")
-                click.echo(f"   - Estat: ✅ Activa")
+                click.echo(t("cli.main.knowledge.status_title", "📊 Collection 'user_knowledge':"))
+                click.echo(t("cli.main.knowledge.status_docs", "   - Documents: {count} fragments", count=count))
+                click.echo(t("cli.main.knowledge.status_state", "   - Status: ✅ Active"))
             else:
-                click.echo(click.style("ℹ️  Col·lecció 'user_knowledge' no existeix.", fg="yellow"))
-                click.echo("   Executa: ./nexe knowledge ingest")
+                click.echo(click.style(
+                    t("cli.main.knowledge.collection_missing", "ℹ️  Collection 'user_knowledge' does not exist."),
+                    fg="yellow"
+                ))
+                click.echo(t("cli.main.knowledge.ingest_hint", "   Run: ./nexe knowledge ingest"))
 
             await memory.close()
         except Exception as e:
-            click.echo(click.style(f"❌ Error connectant amb Qdrant: {e}", fg="red"))
-            click.echo("   Assegura't que el servidor està corrent: ./nexe go")
+            click.echo(click.style(
+                t("cli.main.knowledge.qdrant_error", "❌ Error connecting to Qdrant: {error}", error=str(e)),
+                fg="red"
+            ))
+            click.echo(t("cli.main.knowledge.server_hint", "   Make sure the server is running: ./nexe go"))
 
     asyncio.run(check_status())
 

@@ -27,6 +27,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from personality.i18n.modular_i18n import ModularI18nManager
 from memory.rag.header_parser import parse_rag_header, RAGHeader, VALID_PRIORITIES
 
 # Collection for user knowledge
@@ -36,6 +37,29 @@ CHUNK_OVERLAP = 50
 
 # Supported file extensions
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".markdown", ".text"}
+
+_I18N = None
+
+
+def _get_i18n():
+    global _I18N
+    if _I18N is None:
+        config_path = PROJECT_ROOT / "personality" / "server.toml"
+        if not config_path.exists():
+            config_path = PROJECT_ROOT / "server.toml"
+        _I18N = ModularI18nManager(config_path, PROJECT_ROOT)
+    return _I18N
+
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+    try:
+        i18n = _get_i18n()
+        value = i18n.t(key, **kwargs)
+        if value == key:
+            return fallback.format(**kwargs) if kwargs else fallback
+        return value
+    except Exception:
+        return fallback.format(**kwargs) if kwargs else fallback
 
 
 def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list:
@@ -77,6 +101,7 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
         quiet: If True, suppress output (for auto-ingest at startup)
     """
     from memory.memory.api import MemoryAPI
+    t = _t
 
     def log(msg):
         if not quiet:
@@ -85,14 +110,14 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
     knowledge_path = folder or PROJECT_ROOT / "knowledge"
 
     log(f"\n{'='*60}")
-    log("NEXE KNOWLEDGE INGESTION")
-    log("Afegeix els teus documents a la carpeta 'knowledge/'")
+    log(t("core.ingest.title", "NEXE KNOWLEDGE INGESTION"))
+    log(t("core.ingest.subtitle", "Add your documents to the 'knowledge/' folder"))
     log(f"{'='*60}\n")
 
     if not knowledge_path.exists():
         knowledge_path.mkdir(parents=True)
-        log(f"[INFO] Carpeta '{knowledge_path}' creada.")
-        log("       Afegeix documents (.txt, .md, .pdf) i torna a executar.")
+        log(t("core.ingest.folder_created", "[INFO] Folder '{path}' created.", path=knowledge_path))
+        log(t("core.ingest.folder_hint", "       Add documents (.txt, .md, .pdf) and run again."))
         return True
 
     # Find all supported files
@@ -108,40 +133,48 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
     files = [f for f in files if not f.name.startswith('.') and f.name != 'README.md']
 
     if not files:
-        log(f"[INFO] No hi ha documents a '{knowledge_path}'")
-        log("       Formats suportats: .txt, .md, .pdf")
-        log("\n       Exemple:")
+        log(t("core.ingest.no_docs", "[INFO] No documents found in '{path}'", path=knowledge_path))
+        log(t("core.ingest.supported_formats", "       Supported formats: .txt, .md, .pdf"))
+        log(t("core.ingest.example_title", "\n       Example:"))
         log("         cp ~/Documents/manual.pdf knowledge/")
         log("         python -m core.ingest.ingest_knowledge")
         return True
 
-    log(f"[1/4] Trobats {len(files)} documents")
+    log(t("core.ingest.found_docs", "[1/4] Found {count} documents", count=len(files)))
     for f in files:
         log(f"       - {f.name}")
 
     # Initialize MemoryAPI
-    log(f"\n[2/4] Connectant amb Qdrant...")
+    log(t("core.ingest.connecting_qdrant", "\n[2/4] Connecting to Qdrant..."))
     memory = MemoryAPI()
     try:
         await memory.initialize()
     except Exception as e:
-        log(f"[ERROR] No s'ha pogut connectar amb Qdrant: {e}")
-        log("        Assegura't que el servidor està corrent: ./nexe go")
+        log(t("core.ingest.qdrant_connect_error", "[ERROR] Could not connect to Qdrant: {error}", error=e))
+        log(t("core.ingest.server_hint", "        Make sure the server is running: ./nexe go"))
         return False
 
     # Create/recreate collection
-    log(f"[3/4] Preparant col·lecció '{USER_KNOWLEDGE_COLLECTION}'...")
+    log(t(
+        "core.ingest.prepare_collection",
+        "[3/4] Preparing collection '{collection}'...",
+        collection=USER_KNOWLEDGE_COLLECTION
+    ))
     try:
         if await memory.collection_exists(USER_KNOWLEDGE_COLLECTION):
             await memory.delete_collection(USER_KNOWLEDGE_COLLECTION)
         await memory.create_collection(USER_KNOWLEDGE_COLLECTION, vector_size=384)
-        log(f"       Col·lecció '{USER_KNOWLEDGE_COLLECTION}' preparada.")
+        log(t(
+            "core.ingest.collection_ready",
+            "       Collection '{collection}' ready.",
+            collection=USER_KNOWLEDGE_COLLECTION
+        ))
     except Exception as e:
-        log(f"[ERROR] Error creant col·lecció: {e}")
+        log(t("core.ingest.collection_error", "[ERROR] Error creating collection: {error}", error=e))
         return False
 
     # Ingest each file
-    log(f"[4/4] Processant documents...")
+    log(t("core.ingest.processing_docs", "[4/4] Processing documents..."))
     total_chunks = 0
 
     for idx, file_path in enumerate(files, 1):
@@ -153,13 +186,24 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
             filename = file_path.name
 
             # Show progress indicator
-            log(f"       [{idx}/{len(files)}] Processant {filename}...")
+            log(t(
+                "core.ingest.processing_file",
+                "       [{current}/{total}] Processing {filename}...",
+                current=idx,
+                total=len(files),
+                filename=filename
+            ))
 
             # Parse RAG header if present
             rag_header, body_content = parse_rag_header(content)
 
             if rag_header.is_valid:
-                log(f"              ├─ Capçalera RAG: id={rag_header.id}, priority={rag_header.priority}")
+                log(t(
+                    "core.ingest.rag_header",
+                    "              ├─ RAG header: id={id}, priority={priority}",
+                    id=rag_header.id,
+                    priority=rag_header.priority
+                ))
                 doc_chunk_size = rag_header.chunk_size
                 doc_collection = rag_header.collection or USER_KNOWLEDGE_COLLECTION
                 doc_priority = rag_header.priority
@@ -170,8 +214,12 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
                 doc_lang = rag_header.lang
             else:
                 # No valid header - use defaults
-                if rag_header.validation_errors and rag_header.validation_errors != ["No s'ha trobat capçalera RAG"]:
-                    log(f"              ├─ ⚠️ Capçalera invàlida: {', '.join(rag_header.validation_errors[:2])}")
+                if rag_header.validation_errors and rag_header.raw_header:
+                    log(t(
+                        "core.ingest.rag_header_invalid",
+                        "              ├─ ⚠️ Invalid RAG header: {errors}",
+                        errors=", ".join(rag_header.validation_errors[:2])
+                    ))
                 body_content = content  # Use full content
                 doc_chunk_size = CHUNK_SIZE
                 doc_collection = USER_KNOWLEDGE_COLLECTION
@@ -186,9 +234,9 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
             doc_overlap = max(50, doc_chunk_size // 10)
 
             # Add file header for context
-            header_text = f"[Document: {filename}]\n"
+            header_text = f"[{t('core.ingest.document_label', 'Document')}: {filename}]\n"
             if doc_abstract:
-                header_text += f"[Abstract: {doc_abstract}]\n"
+                header_text += f"[{t('core.ingest.abstract_label', 'Abstract')}: {doc_abstract}]\n"
             header_text += "\n"
 
             # Chunk the content using document-specific settings
@@ -218,21 +266,39 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
 
                 # Show chunk progress for large files
                 if len(chunks) > 5 and (i + 1) % 5 == 0:
-                    log(f"              └─ {i + 1}/{len(chunks)} fragments processats...")
+                    log(t(
+                        "core.ingest.chunk_progress",
+                        "              └─ {current}/{total} chunks processed...",
+                        current=i + 1,
+                        total=len(chunks)
+                    ))
 
-            log(f"              ✓ Completat ({len(chunks)} fragments)")
+            log(t(
+                "core.ingest.file_complete",
+                "              ✓ Completed ({chunks} chunks)",
+                chunks=len(chunks)
+            ))
 
         except Exception as e:
-            log(f"       [ERROR] {file_path.name}: {e}")
+            log(t(
+                "core.ingest.file_error",
+                "       [ERROR] {file}: {error}",
+                file=file_path.name,
+                error=e
+            ))
 
     await memory.close()
 
     log(f"\n{'='*60}")
-    log(f"INGESTA COMPLETADA!")
-    log(f"  - Documents processats: {len(files)}")
-    log(f"  - Fragments totals: {total_chunks}")
-    log(f"  - Col·lecció: {USER_KNOWLEDGE_COLLECTION}")
-    log(f"\nAra pots preguntar sobre els teus documents al chat!")
+    log(t("core.ingest.done_title", "INGESTION COMPLETE!"))
+    log(t("core.ingest.summary_docs", "  - Documents processed: {count}", count=len(files)))
+    log(t("core.ingest.summary_chunks", "  - Total chunks: {count}", count=total_chunks))
+    log(t(
+        "core.ingest.summary_collection",
+        "  - Collection: {collection}",
+        collection=USER_KNOWLEDGE_COLLECTION
+    ))
+    log(t("core.ingest.done_prompt", "\nYou can now ask about your documents in chat!"))
     log(f"{'='*60}\n")
 
     return True

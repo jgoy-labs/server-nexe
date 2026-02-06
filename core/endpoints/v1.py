@@ -20,6 +20,19 @@ logger = logging.getLogger(__name__)
 router_v1 = APIRouter(prefix="/v1", tags=["v1"])
 router_v1.include_router(chat_router)
 
+def _t(request: Request, key: str, fallback: str, **kwargs) -> str:
+  """Translate with fallback using app.state.i18n."""
+  try:
+    i18n = getattr(request.app.state, "i18n", None)
+    if not i18n:
+      return fallback.format(**kwargs) if kwargs else fallback
+    value = i18n.t(key, **kwargs)
+    if value == key:
+      return fallback.format(**kwargs) if kwargs else fallback
+    return value
+  except Exception:
+    return fallback.format(**kwargs) if kwargs else fallback
+
 @router_v1.get("", include_in_schema=True)
 async def v1_root(request: Request):
   """
@@ -30,41 +43,41 @@ async def v1_root(request: Request):
   """
   return JSONResponse({
     "api_version": "v1",
-    "status": "operational",
-    "description": "Nexe 0.8 Versioned API",
+    "status": _t(request, "server_core.api.v1.status_operational", "operational"),
+    "description": _t(request, "server_core.api.v1.description", "Nexe 0.8 Versioned API"),
     "endpoints": {
       "workflows": {
         "base": "/v1/workflows",
-        "status": "implemented",
-        "description": "Workflow management endpoints"
+        "status": _t(request, "server_core.api.v1.status_implemented", "implemented"),
+        "description": _t(request, "server_core.api.v1.endpoints.workflows.description", "Workflow management endpoints")
       },
       "chat": {
         "base": "/v1/chat",
-        "status": "implemented",
-        "description": "Chat completion endpoints"
+        "status": _t(request, "server_core.api.v1.status_implemented", "implemented"),
+        "description": _t(request, "server_core.api.v1.endpoints.chat.description", "Chat completion endpoints")
       },
       "rag": {
         "base": "/v1/rag",
-        "status": "future",
-        "description": "RAG search endpoints (coming in FASE 15)",
+        "status": _t(request, "server_core.api.v1.status_future", "future"),
+        "description": _t(request, "server_core.api.v1.endpoints.rag.description", "RAG search endpoints (coming in FASE 15)"),
         "expected_date": "2025-12-15"
       },
       "embeddings": {
         "base": "/v1/embeddings",
-        "status": "future",
-        "description": "Text embeddings endpoints (coming in FASE 15)",
+        "status": _t(request, "server_core.api.v1.status_future", "future"),
+        "description": _t(request, "server_core.api.v1.endpoints.embeddings.description", "Text embeddings endpoints (coming in FASE 15)"),
         "expected_date": "2025-12-15"
       },
       "documents": {
         "base": "/v1/documents",
-        "status": "future",
-        "description": "Document processing endpoints (coming in FASE 15)",
+        "status": _t(request, "server_core.api.v1.status_future", "future"),
+        "description": _t(request, "server_core.api.v1.endpoints.documents.description", "Document processing endpoints (coming in FASE 15)"),
         "expected_date": "2025-12-15"
       },
       "memory": {
         "base": "/v1/memory",
-        "status": "implemented",
-        "description": "Semantic memory store/search for chat"
+        "status": _t(request, "server_core.api.v1.status_implemented", "implemented"),
+        "description": _t(request, "server_core.api.v1.endpoints.memory.description", "Semantic memory store/search for chat")
       }
     },
     "documentation": {

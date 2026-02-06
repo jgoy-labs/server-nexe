@@ -36,6 +36,21 @@
   "cli": {
    "initializing": "Inicialitzant mòdul...",
    "file_not_found": "Error: Fitxer no trobat: {file_path}"
+  },
+  "validation": {
+   "text_blank": "Text no pot estar buit o només espais",
+   "embedding_empty": "Embedding no pot estar buit",
+   "dimensions_mismatch": "Les dimensions {dimensions} no coincideixen amb len(embedding)={embedding_len}",
+   "texts_blank": "Cada text ha de ser no buit i no només espais",
+   "count_mismatch": "El recompte {count} no coincideix amb len(embeddings)={embedding_len}",
+   "indices_negative": "Els índexs no poden ser negatius",
+   "char_end_gt_start": "char_end ha de ser > char_start",
+   "chunk_count_mismatch": "chunk_count {count} no coincideix amb len(chunks)={chunk_len}",
+   "cache_hit_rate_range": "cache_hit_rate ha d'estar entre 0.0 i 1.0",
+   "query_vector_empty": "query_vector no pot estar buit",
+   "query_vector_numbers": "query_vector ha de contenir només números",
+   "texts_empty": "texts no pot estar buit",
+   "texts_non_empty": "Tots els texts han de ser no buits"
   }
  }
 }

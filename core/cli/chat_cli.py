@@ -20,6 +20,8 @@ from typing import Optional, List, Dict
 
 logger = logging.getLogger(__name__)
 
+from .i18n import t
+
 # Helpers per detecció de motors
 def get_default_system_prompt():
     """Llegeix el system prompt des de personality/server.toml si existeix."""
@@ -37,7 +39,7 @@ def get_default_system_prompt():
                 return data.get("personality", {}).get("prompt", {}).get("system_prompt")
         except Exception as e:
             logger.debug("Failed to load system prompt: %s", e)
-    return "Ets Nexe, un assistent d'IA local, precís i segur."
+    return t("cli.chat.default_system_prompt", "You are Nexe, a precise and secure local AI assistant.")
 
 def detect_engine():
     """
@@ -98,14 +100,18 @@ async def get_response_stream(engine: str, prompt: str, system: str, history: Li
     pass
 
 @click.command()
-@click.option('--engine', '-e', type=click.Choice(['mlx', 'llama_cpp', 'ollama']), help='Motor d\'inferència')
-@click.option('--system', '-s', default=None, help='System prompt / Identitat')
-@click.option('--no-rag', is_flag=True, help='Desactivar context de memòria (RAG)')
-@click.option('--model', '-m', help='Nom del model (per Ollama)')
+@click.option('--engine', '-e', type=click.Choice(['mlx', 'llama_cpp', 'ollama']),
+              help=t("cli.chat.options.engine", "Inference engine"))
+@click.option('--system', '-s', default=None,
+              help=t("cli.chat.options.system", "System prompt / Identity"))
+@click.option('--no-rag', is_flag=True,
+              help=t("cli.chat.options.no_rag", "Disable memory context (RAG)"))
+@click.option('--model', '-m',
+              help=t("cli.chat.options.model", "Model name (for Ollama)"))
 def chat(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str]):
     """
-    Inicia un xat interactiu amb Nexe.
-    Detecta automàticament el motor configurat si no s'especifica.
+    Start an interactive chat with Nexe.
+    Detects the configured engine automatically if not specified.
     """
     asyncio.run(_chat_async(engine, system, no_rag, model))
 
@@ -150,8 +156,18 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
 
     # Check server status
     if not await client.is_server_running():
-        click.echo(click.style("\n❌ Error: El servidor Nexe no respon a http://127.0.0.1:9119", fg="red", bold=True))
-        click.echo("Assegura't que has executat './nexe go' en una altra terminal abans d'iniciar el xat.\n")
+        click.echo(click.style(
+            "\n" + t(
+                "cli.chat.server_not_responding",
+                "❌ Error: Nexe server is not responding at http://127.0.0.1:9119"
+            ),
+            fg="red",
+            bold=True
+        ))
+        click.echo(t(
+            "cli.chat.server_not_responding_hint",
+            "Make sure you've run './nexe go' in another terminal before starting chat.\n"
+        ))
         return
 
     # Get actual engine from server status (not just from .env)
@@ -169,11 +185,22 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
         # If status check fails, use .env engine
         pass
 
-    click.echo(f"\n  {click.style('🚀 Nexe Chat', fg='cyan', bold=True)}")
-    click.echo(f"  {click.style('Engine:', fg='yellow')} {engine}  |  {click.style('Model:', fg='yellow')} {model}  |  {click.style('RAG:', fg='yellow')} {'✅ On' if rag else '❌ Off'}")
+    click.echo(f"\n  {click.style(t('cli.chat.header_title', '🚀 Nexe Chat'), fg='cyan', bold=True)}")
+    rag_label = t("cli.chat.rag_on", "✅ On") if rag else t("cli.chat.rag_off", "❌ Off")
+    click.echo(
+        f"  {click.style(t('cli.chat.label.engine', 'Engine:'), fg='yellow')} {engine}  |  "
+        f"{click.style(t('cli.chat.label.model', 'Model:'), fg='yellow')} {model}  |  "
+        f"{click.style(t('cli.chat.label.rag', 'RAG:'), fg='yellow')} {rag_label}"
+    )
     click.echo(click.style('  ─────────────────────────────────────────', dim=True))
-    click.echo(click.style('  Commands: /save <text> · /recall <query> · /context on|off · /help', dim=True))
-    click.echo(click.style('  Type "exit" or Ctrl+C to quit', dim=True) + "\n")
+    click.echo(click.style(
+        f"  {t('cli.chat.commands_line', 'Commands: /save <text> · /recall <query> · /context on|off · /help')}",
+        dim=True
+    ))
+    click.echo(click.style(
+        "  " + t('cli.chat.quit_line', 'Type "exit" or Ctrl+C to quit'),
+        dim=True
+    ) + "\n")
 
     history = []
     if system:
@@ -181,14 +208,14 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
     
     while True:
         try:
-            user_input = click.prompt(click.style("Tu", fg="green", bold=True))
+            user_input = click.prompt(click.style(t("cli.chat.prompt_user", "You"), fg="green", bold=True))
 
             if user_input.lower() in ["sortir", "exit", "quit", "q"]:
                 break
 
             if user_input.lower() == "clear":
                 history = [h for h in history if h["role"] == "system"]
-                click.echo("🧹 Historial netejat.")
+                click.echo(t("cli.chat.history_cleared", "🧹 History cleared."))
                 continue
 
             # Slash commands
@@ -203,10 +230,14 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                         success = await client.memory_store(cmd_arg)
                         if success:
                             # Ask AI to acknowledge what was saved
-                            ack_prompt = f"L'usuari acaba de dir-te que recordis això: \"{cmd_arg}\". Respon breument confirmant que ho recordaràs, sense repetir tota la informació."
+                            ack_prompt = t(
+                                "cli.chat.save_ack_prompt",
+                                "The user asked you to remember this: \"{text}\". Respond briefly confirming you will remember it, without repeating all information.",
+                                text=cmd_arg
+                            )
                             history.append({"role": "user", "content": ack_prompt})
 
-                            click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
+                            click.echo(click.style(t("cli.chat.prompt_assistant", "Nexe: "), fg="cyan", bold=True), nl=False)
                             full_response = ""
                             async for chunk in client.chat_stream(messages=history, engine=engine, rag=False):
                                 print(chunk, end="", flush=True)
@@ -214,12 +245,19 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                             print()
 
                             # Replace the ack_prompt with original save content in history
-                            history[-1] = {"role": "user", "content": f"[Guardat a memòria: {cmd_arg}]"}
+                            history[-1] = {"role": "user", "content": t(
+                                "cli.chat.save_memory_marker",
+                                "[Saved to memory: {text}]",
+                                text=cmd_arg
+                            )}
                             history.append({"role": "assistant", "content": full_response})
                         else:
-                            click.echo(click.style("❌ Error guardant.", fg="red"))
+                            click.echo(click.style(t("cli.chat.save_error", "❌ Error saving."), fg="red"))
                     except Exception as e:
-                        click.echo(click.style(f"❌ Error: {e}", fg="red"))
+                        click.echo(click.style(
+                            t("cli.chat.error_generic", "❌ Error: {error}", error=str(e)),
+                            fg="red"
+                        ))
                     continue
 
                 elif cmd == "recall" and cmd_arg:
@@ -227,44 +265,51 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                     try:
                         results = await client.memory_search(cmd_arg)
                         if results:
-                            click.echo(click.style("📚 Trobat a memòria:", fg="cyan"))
+                            click.echo(click.style(t("cli.chat.memory_found", "📚 Found in memory:"), fg="cyan"))
                             for r in results[:3]:
                                 click.echo(f"  • {r.get('content', r)[:100]}...")
                         else:
-                            click.echo(click.style("🔍 No s'ha trobat res.", dim=True))
+                            click.echo(click.style(t("cli.chat.memory_not_found", "🔍 Nothing found."), dim=True))
                     except Exception as e:
-                        click.echo(click.style(f"❌ Error: {e}", fg="red"))
+                        click.echo(click.style(
+                            t("cli.chat.error_generic", "❌ Error: {error}", error=str(e)),
+                            fg="red"
+                        ))
                     continue
 
                 elif cmd == "context":
                     if cmd_arg.lower() == "off":
                         rag = False
-                        click.echo(click.style("🔕 Context RAG desactivat.", fg="yellow"))
+                        click.echo(click.style(t("cli.chat.rag_disabled", "🔕 RAG context disabled."), fg="yellow"))
                     elif cmd_arg.lower() == "on":
                         rag = True
-                        click.echo(click.style("🔔 Context RAG activat.", fg="green"))
+                        click.echo(click.style(t("cli.chat.rag_enabled", "🔔 RAG context enabled."), fg="green"))
                     else:
-                        click.echo(f"RAG: {'✅ Actiu' if rag else '❌ Inactiu'}")
+                        status = t("cli.chat.rag_status_on", "✅ Active") if rag else t("cli.chat.rag_status_off", "❌ Inactive")
+                        click.echo(t("cli.chat.rag_status", "RAG: {status}", status=status))
                     continue
 
                 elif cmd == "help":
-                    click.echo(click.style("\n📖 Comandes disponibles:", fg="cyan", bold=True))
-                    click.echo("  /save <text>    Guarda text a memòria")
-                    click.echo("  /recall <query> Cerca a memòria")
-                    click.echo("  /context on|off Activa/desactiva RAG")
-                    click.echo("  /help           Mostra aquesta ajuda")
-                    click.echo("  clear           Neteja historial")
-                    click.echo("  sortir          Surt del chat\n")
+                    click.echo(click.style("\n" + t("cli.chat.help_title", "📖 Available commands:"), fg="cyan", bold=True))
+                    click.echo(t("cli.chat.help.save", "  /save <text>    Save text to memory"))
+                    click.echo(t("cli.chat.help.recall", "  /recall <query> Search memory"))
+                    click.echo(t("cli.chat.help.context", "  /context on|off Enable/disable RAG"))
+                    click.echo(t("cli.chat.help.help", "  /help           Show this help"))
+                    click.echo(t("cli.chat.help.clear", "  clear           Clear history"))
+                    click.echo(t("cli.chat.help.exit", "  exit            Exit chat\n"))
                     continue
 
                 else:
-                    click.echo(click.style(f"❓ Comanda desconeguda: /{cmd}", fg="yellow"))
-                    click.echo("Escriu /help per veure les comandes disponibles.")
+                    click.echo(click.style(
+                        t("cli.chat.unknown_command", "❓ Unknown command: /{cmd}", cmd=cmd),
+                        fg="yellow"
+                    ))
+                    click.echo(t("cli.chat.help_hint", "Type /help to see available commands."))
                     continue
 
             history.append({"role": "user", "content": user_input})
 
-            click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
+            click.echo(click.style(t("cli.chat.prompt_assistant", "Nexe: "), fg="cyan", bold=True), nl=False)
             
             full_response = ""
             async for chunk in client.chat_stream(messages=history, engine=engine, rag=rag):
@@ -275,10 +320,10 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
             history.append({"role": "assistant", "content": full_response})
 
         except KeyboardInterrupt:
-            click.echo("\n👋 Adéu!")
+            click.echo(t("cli.chat.goodbye", "\n👋 Goodbye!"))
             break
         except Exception as e:
-            click.echo(f"\n❌ Error client: {e}")
+            click.echo(t("cli.chat.client_error", "\n❌ Client error: {error}", error=str(e)))
             break
 
 if __name__ == "__main__":

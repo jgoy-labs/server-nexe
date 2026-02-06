@@ -56,7 +56,28 @@
   "delete_failed": "Error eliminant model {model}: {error}"
  },
  "info": {
-  "description": "Integració amb Ollama per gestió de models LLM locals"
+  "description": "Integració amb Ollama per gestió de models LLM locals",
+  "features": {
+   "list_models": "Llistar models locals",
+   "pull_models": "Descarregar nous models amb progrés",
+   "stream_chat": "Chat amb streaming de respostes",
+   "model_info": "Info detallada de models",
+   "delete_models": "Eliminació de models"
+  },
+  "note": "Una de les moltes opcions de LLM que Nexe suportarà"
+ },
+ "workflow": {
+  "node": {
+   "description": "Genera text utilitzant Ollama local (llama, mistral, etc.)",
+   "input_prompt_description": "Text prompt per a l'LLM",
+   "input_model_description": "Model Ollama (llama3.2, mistral, etc.)",
+   "input_temperature_description": "Creativitat 0.0-2.0 (més alt = més creatiu)",
+   "input_max_tokens_description": "Màxim tokens a generar (None = il·limitat)",
+   "input_system_description": "System prompt (instruccions per a l'LLM)",
+   "output_response_description": "Text generat per l'LLM",
+   "output_model_description": "Model utilitzat",
+   "output_tokens_description": "Tokens aproximats utilitzats"
+  }
  },
  "cli": {
   "checking_connection": "🔌 Comprovant connexió amb Ollama...",
@@ -71,6 +92,98 @@
   "web_chat_info": "\nPer usar el chatbot web:",
   "start_server": " → Inicia el servidor Nexe",
   "visit_url": " → Visita: http://localhost:9119/ui-control/ollama/",
-  "model_item": "  • {name} ({size:.2f} GB)"
+  "model_item": "  • {name} ({size:.2f} GB)",
+  "app_help": "Gestió de models LLM locals amb Ollama",
+  "commands": {
+   "status_help": "Mostra l'estat de connexió amb Ollama",
+   "models_help": "Llista els models disponibles localment",
+   "pull_help": "Descarrega un model d'Ollama",
+   "info_help": "Mostra informació detallada d'un model",
+   "delete_help": "Elimina un model local",
+   "chat_help": "Inicia un chat interactiu amb un model LLM",
+   "ask_help": "Fa una pregunta ràpida sense chat interactiu"
+  },
+  "common": {
+   "error": "Error: {error}"
+  },
+  "status": {
+   "title": "Estat d'Ollama",
+   "url": "URL: {url}",
+   "checking": "Comprovant connexió...",
+   "connected": "Estat: CONNECTAT",
+   "disconnected": "Estat: DESCONNECTAT",
+   "models": "Models: {count}",
+   "models_error": "Models: Error obtenint llista",
+   "start_title": "Per iniciar Ollama:",
+   "start_cmd": " ollama serve"
+  },
+  "models": {
+   "loading": "Obtenint models...",
+   "ensure_running": "Assegura't que Ollama està en marxa: ollama serve",
+   "none": "Cap model instal·lat",
+   "download_title": "Per descarregar un model:",
+   "download_cmd1": " nexe ollama pull mistral",
+   "download_cmd2": " nexe ollama pull llama3.2",
+   "table_title": "Models Ollama Locals",
+   "col_model": "Model",
+   "col_size": "Mida",
+   "col_modified": "Modificat",
+   "total": "Total: {count} models"
+  },
+  "pull": {
+   "arg_model": "Nom del model a descarregar (ex: mistral, llama3.2)",
+   "title": "Descarregant model: {model}",
+   "task": "Descarregant {model}...",
+   "success": "Model {model} descarregat correctament!"
+  },
+  "info": {
+   "arg_model": "Nom del model",
+   "loading": "Obtenint info de {model}...",
+   "panel_title": "Model Info",
+   "parameters": "Paràmetres:",
+   "template": "Template:",
+   "details": "Detalls:"
+  },
+  "delete": {
+   "arg_model": "Nom del model a eliminar",
+   "opt_force": "No demanar confirmació",
+   "confirm": "Segur que vols eliminar el model '{model}'?",
+   "cancelled": "Operació cancel·lada",
+   "loading": "Eliminant {model}...",
+   "success": "Model {model} eliminat correctament"
+  },
+  "chat": {
+   "arg_model": "Model a usar per al chat",
+   "opt_system": "Missatge de sistema inicial",
+   "connecting": "Connectant amb Ollama...",
+   "not_available": "Error: Ollama no està disponible",
+   "start_hint": "Inicia Ollama amb: ollama serve",
+   "panel_title": "Nexe Ollama Chat",
+   "panel_body": "Chat amb {model}\nEscriu 'exit' o 'quit' per sortir\nEscriu 'clear' per netejar historial",
+   "system": "Sistema: {system}",
+   "prompt": "Tu:",
+   "exit": "Adéu!",
+   "cleared": "Historial netejat",
+   "model_prefix": "{model}:",
+   "interrupted": "Interromput. Adéu!"
+  },
+  "ask": {
+   "arg_prompt": "Pregunta a fer al model",
+   "opt_model": "Model a usar",
+   "opt_system": "Missatge de sistema",
+   "connecting": "Connectant...",
+   "not_available": "Error: Ollama no està disponible",
+   "question_label": "Pregunta:",
+   "answer_label": "Resposta ({model}):"
+  },
+  "deps": {
+   "missing": "Error: Requereix 'typer' i 'rich'. Instal·la amb:",
+   "install": " pip install typer rich"
+  },
+  "banner": {
+   "title": "🤖 Nexe OLLAMA MODULE v1.0",
+   "line1": "Integració amb Ollama (opció local per LLM)",
+   "line2": "Gestió de models LLM locals"
+  }
  }
 }

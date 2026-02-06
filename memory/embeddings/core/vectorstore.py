@@ -13,6 +13,19 @@ www.jgoy.net
 from typing import Protocol, List, Dict, Optional, Any
 from pydantic import BaseModel, Field, field_validator
 from typing_extensions import Literal
+from personality.i18n import get_i18n
+
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  try:
+    return get_i18n().t(key, fallback, **kwargs)
+  except Exception:
+    if kwargs:
+      try:
+        return fallback.format(**kwargs)
+      except (KeyError, ValueError):
+        return fallback
+    return fallback
 
 class VectorSearchRequest(BaseModel):
   """
@@ -33,22 +46,22 @@ class VectorSearchRequest(BaseModel):
   """
   query_vector: List[float] = Field(
     ...,
-    description="Vector d'embedding per cercar",
+    description="Embedding vector to search",
     min_length=1
   )
   top_k: int = Field(
     default=10,
-    description="Nombre màxim de resultats a retornar",
+    description="Maximum number of results to return",
     ge=1,
     le=1000
   )
   filters: Optional[Dict[str, Any]] = Field(
     default=None,
-    description="Filtres sobre metadades (e.g. {'source': 'pdf'})"
+    description="Metadata filters (e.g. {'source': 'pdf'})"
   )
   metric: Literal["cosine", "euclidean", "dot"] = Field(
     default="cosine",
-    description="Mètrica de distància per la cerca"
+    description="Distance metric for search"
   )
 
   @field_validator('query_vector')
@@ -56,9 +69,19 @@ class VectorSearchRequest(BaseModel):
   def validate_vector_dimensions(cls, v: List[float]) -> List[float]:
     """Valida que el vector tingui dimensions vàlides."""
     if len(v) == 0:
-      raise ValueError("query_vector no pot estar buit")
+      raise ValueError(
+        _t(
+          "embeddings.validation.query_vector_empty",
+          "query_vector cannot be empty"
+        )
+      )
     if not all(isinstance(x, (int, float)) for x in v):
-      raise ValueError("query_vector ha de contenir només números")
+      raise ValueError(
+        _t(
+          "embeddings.validation.query_vector_numbers",
+          "query_vector must contain only numbers"
+        )
+      )
     return v
 
 class VectorSearchHit(BaseModel):
@@ -81,22 +104,22 @@ class VectorSearchHit(BaseModel):
   """
   id: str = Field(
     ...,
-    description="Identificador únic del vector/document",
+    description="Unique vector/document identifier",
     min_length=1
   )
   score: float = Field(
     ...,
-    description="Puntuació de similitud (més alt = més similar)",
+    description="Similarity score (higher = more similar)",
     ge=0.0,
     le=1.0
   )
   text: str = Field(
     ...,
-    description="Text original associat al vector"
+    description="Original text associated with the vector"
   )
   metadata: Dict[str, Any] = Field(
     default_factory=dict,
-    description="Metadades addicionals del document"
+    description="Additional document metadata"
   )
 
 class VectorStore(Protocol):

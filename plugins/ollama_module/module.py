@@ -14,7 +14,6 @@ import json
 import logging
 import os
 from typing import List, Dict, Any, Optional, AsyncIterator
-from pathlib import Path
 
 try:
   import httpx
@@ -23,6 +22,7 @@ except ImportError:
 
 from core.resilience import ollama_breaker, CircuitOpenError
 from core.loader.protocol import HealthResult, HealthStatus
+from .i18n import get_i18n
 
 logger = logging.getLogger(__name__)
 
@@ -337,45 +337,30 @@ class OllamaModule:
     return {
       "name": self.name,
       "version": self.version,
-      "description": self._t("info.description", "Integració amb Ollama per gestió de models LLM locals"),
+      "description": self._t("info.description", "Ollama integration for local LLM model management"),
       "base_url": self.base_url,
       "features": [
-        "Llistar models locals",
-        "Descarregar nous models amb progrés",
-        "Chat amb streaming de respostes",
-        "Info detallada de models",
-        "Eliminació de models"
+        self._t("info.features.list_models", "List local models"),
+        self._t("info.features.pull_models", "Download new models with progress"),
+        self._t("info.features.stream_chat", "Chat with streaming responses"),
+        self._t("info.features.model_info", "Detailed model info"),
+        self._t("info.features.delete_models", "Delete models")
       ],
       "location": "core/tools/ollama_module/",
       "type": "local_llm_option",
-      "note": "Una de les moltes opcions de LLM que Nexe suportarà"
+      "note": self._t("info.note", "One of the many LLM options Nexe will support")
     }
 
 def _load_i18n_for_cli():
   """Helper per carregar i18n per la funció main() de CLI"""
   try:
-    from personality.i18n import I18nService
-    i18n_service = I18nService()
-    i18n_service.load_translations_from_dir(Path(__file__).parent / "languages")
-    return i18n_service
+    return get_i18n()
   except Exception:
     return None
 
 async def main():
   """Funció principal per executar el mòdul"""
-  print("""
-  ╔═══════════════════════════════════════════════════════════╗
-  ║                              ║
-  ║  🤖 Nexe OLLAMA MODULE v1.0               ║
-  ║                              ║
-  ║  Integració amb Ollama (opció local per LLM)     ║
-  ║  Gestió de models LLM locals              ║
-  ║                              ║
-  ╚═══════════════════════════════════════════════════════════╝
-  """)
-
   i18n = _load_i18n_for_cli()
-  ollama = OllamaModule(i18n=i18n)
 
   def _t(key: str, fallback: str, **kwargs) -> str:
     """Helper local per traduir"""
@@ -389,22 +374,44 @@ async def main():
     except Exception:
       return fallback.format(**kwargs) if kwargs else fallback
 
-  print(_t("cli.checking_connection", "🔌 Comprovant connexió amb Ollama..."))
+  def _print_banner(lines: List[str]) -> None:
+    content_width = 59
+    top = "  ╔" + ("═" * content_width) + "╗"
+    empty = "  ║" + (" " * content_width) + "║"
+    print(top)
+    print(empty)
+    for line in lines:
+      text = line.strip()
+      if len(text) > content_width:
+        text = text[:content_width]
+      print("  ║" + text.center(content_width) + "║")
+    print(empty)
+    print("  ╚" + ("═" * content_width) + "╝")
+
+  _print_banner([
+    _t("cli.banner.title", "🤖 Nexe OLLAMA MODULE v1.0"),
+    _t("cli.banner.line1", "Ollama integration (local LLM option)"),
+    _t("cli.banner.line2", "Local LLM model management")
+  ])
+
+  ollama = OllamaModule(i18n=i18n)
+
+  print(_t("cli.checking_connection", "🔌 Checking connection to Ollama..."))
   connected = await ollama.check_connection()
 
   if not connected:
-    print(_t("cli.not_available", "❌ Ollama no està disponible a {url}", url=ollama.base_url))
-    print(_t("cli.ensure_running", "  Assegura't que Ollama està en marxa: ollama serve"))
+    print(_t("cli.not_available", "❌ Ollama is not available at {url}", url=ollama.base_url))
+    print(_t("cli.ensure_running", "  Make sure Ollama is running: ollama serve"))
     return 1
 
-  print(_t("cli.connected", "✅ Connectat a Ollama!"))
+  print(_t("cli.connected", "✅ Connected to Ollama!"))
 
-  print(_t("cli.available_models", "\n📦 Models disponibles:"))
+  print(_t("cli.available_models", "\n📦 Available models:"))
   try:
     models = await ollama.list_models()
     if not models:
-      print(_t("cli.no_models", "  → Cap model instal·lat"))
-      print(_t("cli.download_hint", "  → Descarrega un model: ollama pull mistral"))
+      print(_t("cli.no_models", "  → No models installed"))
+      print(_t("cli.download_hint", "  → Download a model: ollama pull mistral"))
     else:
       for model in models:
         name = model.get("name", "unknown")
@@ -415,9 +422,9 @@ async def main():
     return 1
 
   print(_t("cli.total_models", "\n📊 Total: {count} models", count=len(models)))
-  print(_t("cli.web_chat_info", "\nPer usar el chatbot web:"))
-  print(_t("cli.start_server", " → Inicia el servidor Nexe"))
-  print(_t("cli.visit_url", " → Visita: http://localhost:9119/ui-control/ollama/"))
+  print(_t("cli.web_chat_info", "\nTo use the web chatbot:"))
+  print(_t("cli.start_server", " → Start the Nexe server"))
+  print(_t("cli.visit_url", " → Visit: http://localhost:9119/ui-control/ollama/"))
 
   return 0
 

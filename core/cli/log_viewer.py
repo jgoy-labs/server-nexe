@@ -19,14 +19,23 @@ from pathlib import Path
 import click
 from typing import Optional
 
+from .i18n import t
+
 def tail_file(filepath: Path, last: int = 50):
     """Simula un tail -f en un fitxer."""
     if not filepath.exists():
-        click.echo(click.style(f"⚠️ Fitxer de log no trobat: {filepath}", fg="yellow"))
+        click.echo(click.style(
+            t("cli.logs.file_not_found", "⚠️ Log file not found: {path}", path=filepath),
+            fg="yellow"
+        ))
         return
 
-    click.echo(click.style(f"👀 Seguint logs de: {filepath} (últimes {last} línies)", fg="cyan", bold=True))
-    click.echo(click.style("--- Prem Ctrl+C per sortir ---\n", dim=True))
+    click.echo(click.style(
+        t("cli.logs.following", "👀 Following logs: {path} (last {lines} lines)", path=filepath, lines=last),
+        fg="cyan",
+        bold=True
+    ))
+    click.echo(click.style(t("cli.logs.exit_hint", "--- Press Ctrl+C to exit ---\n"), dim=True))
 
     try:
         # Intentem usar tail si està disponible (més eficient)
@@ -43,11 +52,11 @@ def tail_file(filepath: Path, last: int = 50):
                         continue
                     print(line, end="")
     except KeyboardInterrupt:
-        click.echo("\n👋 Aturant visualitzador de logs.")
+        click.echo(t("cli.logs.stopping", "\n👋 Stopping log viewer."))
 
 @click.command()
-@click.option('--module', '-m', help='Filtrar per mòdul (nom del log)')
-@click.option('--last', '-n', default=50, help='Nombre de línies inicials a mostrar')
+@click.option('--module', '-m', help=t("cli.logs.option.module", "Filter by module (log name)"))
+@click.option('--last', '-n', default=50, help=t("cli.logs.option.last", "Number of initial lines to show"))
 def logs(module: Optional[str], last: int):
     """
     Mostra els logs de Nexe en temps real.
@@ -56,7 +65,10 @@ def logs(module: Optional[str], last: int):
     logs_dir = project_root / "storage" / "logs"
     
     if not logs_dir.exists():
-        click.echo(click.style(f"❌ Directori de logs no trobat: {logs_dir}", fg="red"))
+        click.echo(click.style(
+            t("cli.logs.dir_not_found", "❌ Logs directory not found: {path}", path=logs_dir),
+            fg="red"
+        ))
         return
 
     # Si s'especifica mòdul, busquem el seu log
@@ -69,7 +81,10 @@ def logs(module: Optional[str], last: int):
             # Si no existeix nexe.log, mirem què hi ha
             all_logs = list(logs_dir.glob("*.log"))
             if not all_logs:
-                click.echo(click.style("📭 No s'han trobat fitxers de log a storage/logs/", fg="yellow"))
+                click.echo(click.style(
+                    t("cli.logs.no_logs_found", "📭 No log files found in storage/logs/"),
+                    fg="yellow"
+                ))
                 return
             log_file = all_logs[0]
             
