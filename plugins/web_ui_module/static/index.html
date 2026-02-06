@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="ca">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexe - Local AI</title>
+    <title data-i18n="ui.title">Nexe - Local AI</title>
     <link rel="stylesheet" href="/ui/static/style.css">
-    <!-- Marked.js per renderitzar Markdown (local) -->
+    <!-- Marked.js for rendering Markdown (local) -->
     <script src="/ui/static/marked.min.js"></script>
 </head>
 <body>
@@ -22,11 +22,11 @@
             <div class="sidebar-content">
                 <button id="newChatBtn" class="btn-new-chat">
                     <span class="icon">+</span>
-                    Nova conversa
+                    <span class="btn-label" data-i18n="ui.new_chat">New chat</span>
                 </button>
 
                 <div class="sessions-header">
-                    <h3>Sessions</h3>
+                    <h3 data-i18n="ui.sessions">Sessions</h3>
                 </div>
 
                 <div id="sessionsList" class="sessions-list">
@@ -37,30 +37,30 @@
             <div class="sidebar-footer">
                 <div class="status-indicator">
                     <div class="status-dot active"></div>
-                    <span>Connectat</span>
+                    <span data-i18n="ui.status.connected">Connected</span>
                 </div>
             </div>
         </aside>
 
         <!-- Main Chat Area -->
-        <main class="chat-main">
+        <main class="chat-main" data-drop-text="📁 Drop file here">
             <div id="chatMessages" class="chat-messages">
                 <div class="welcome-screen">
                     <div class="welcome-icon">🤖</div>
-                    <h2>Benvingut a Nexe</h2>
-                    <p>IA local amb memòria persistent</p>
+                    <h2 data-i18n="ui.welcome.title">Welcome to Nexe</h2>
+                    <p data-i18n="ui.welcome.subtitle">Local AI with persistent memory</p>
                     <div class="features">
                         <div class="feature">
                             <span class="feature-icon">💬</span>
-                            <span>Conversa amb memòria contextual</span>
+                            <span data-i18n="ui.welcome.feature.memory">Chat with contextual memory</span>
                         </div>
                         <div class="feature">
                             <span class="feature-icon">📁</span>
-                            <span>Puja documents (.txt, .md, .pdf)</span>
+                            <span data-i18n="ui.welcome.feature.upload">Upload documents (.txt, .md, .pdf)</span>
                         </div>
                         <div class="feature">
                             <span class="feature-icon">🔒</span>
-                            <span>100% local i privat</span>
+                            <span data-i18n="ui.welcome.feature.private">100% local and private</span>
                         </div>
                     </div>
                 </div>
@@ -69,20 +69,21 @@
             <!-- Input Area -->
             <div class="chat-input-area">
                 <div class="input-container">
-                    <button id="uploadBtn" class="btn-upload" title="Pujar document">
+                    <button id="uploadBtn" class="btn-upload" title="Upload document" data-i18n-title="ui.input.upload_title">
                         📎
                     </button>
 
                     <textarea
                         id="messageInput"
-                        placeholder="Escriu un missatge..."
+                        placeholder="Write a message..."
+                        data-i18n-placeholder="ui.input.placeholder"
                         rows="1"
                     ></textarea>
 
-                    <button id="sendBtn" class="btn-send" title="Enviar">
+                    <button id="sendBtn" class="btn-send" title="Send" data-i18n-title="ui.input.send_title">
                         ➤
                     </button>
-                    <button id="stopBtn" class="btn-stop" title="Aturar generació" style="display: none;">
+                    <button id="stopBtn" class="btn-stop" title="Stop generation" data-i18n-title="ui.input.stop_title" style="display: none;">
                         ■
                     </button>
                 </div>

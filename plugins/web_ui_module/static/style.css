@@ -612,7 +612,7 @@ body {
 }
 
 .chat-main.drag-over::after {
-    content: '📁 Deixa anar el fitxer aquí';
+    content: attr(data-drop-text);
     position: absolute;
     inset: 0;
     background: rgba(59, 130, 246, 0.1);
