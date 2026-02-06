@@ -271,6 +271,37 @@ TRANSLATIONS = {
         "model_size": "Mida",
         "model_ram": "RAM mín.",
         "model_speed": "Velocitat",
+        "model_selection_title": "🤖 SELECCIÓ DE MODEL D'IA",
+        "model_selection_ram_label": "La teva RAM:",
+        "model_selection_ram_available_label": "RAM disponible per IA:",
+        "model_selection_ram_percent": "(50-60% del total)",
+        "model_selection_ram_note": "La resta es reserva per macOS, navegador i altres apps.",
+        "model_size_title": "📦 MIDA DE MODELS",
+        "model_size_option_small": "Models petits (8GB RAM) - Ràpids, menys qualitat",
+        "model_size_option_medium": "Models mitjans (16GB RAM) - Equilibrats",
+        "model_size_option_large": "Models grans (32GB+ RAM) - Màxima qualitat",
+        "model_size_label_small": "petits",
+        "model_size_label_medium": "mitjans",
+        "model_size_label_large": "grans",
+        "model_size_recommended": "Recomanat per la teva RAM: models {rec_label}",
+        "model_size_prompt": "Escull mida [1-3] (Enter = {recommended}):",
+        "model_category_small": "MODELS PETITS (per 8GB RAM)",
+        "model_category_medium": "MODELS MITJANS (per 16GB RAM)",
+        "model_category_large": "MODELS GRANS (per 32GB+ RAM)",
+        "model_engines_label": "Motors",
+        "model_disk_label": "Disc",
+        "model_ram_label": "RAM",
+        "model_choice_prompt": "Escull model [1-{count}] (Enter = {default}):",
+        "model_status_compatible": "✓ Compatible",
+        "model_status_maybe_tight": "⚠️ Pot anar just",
+        "model_tag_local_language": "CATALÀ",
+        "engine_desc_mlx": "Optimitzat per Apple Silicon (GPU Metal)",
+        "engine_desc_ollama": "Universal, fàcil d'usar",
+        "engine_desc_gguf": "Execució local directa, sense dependències",
+        "engine_choice_prompt": "Escull [1-{count}] (Enter = {default}):",
+        "engine_single_notice": "{model} s'executarà amb {engine}",
+        "download_gguf": "Per descarregar el model GGUF:",
+        "none": "Cap",
         "model_type_mlx": "MLX (Metal GPU - Més ràpid)",
         "model_type_gguf": "GGUF/Ollama (CPU/GPU Universal)",
         "select_size": "Quina mida de model vols?",
@@ -336,6 +367,21 @@ TRANSLATIONS = {
         "press_enter": "Prem Enter per continuar...",
         "download_skipped": "D'acord! Pots descarregar el model més tard amb les instruccions anteriors.",
         "download_options": "Què vols fer?",
+        "label_model": "Model",
+        "label_ollama_id": "ID d'Ollama",
+        "label_engine": "Motor",
+        "label_command": "Executa",
+        "step_checking_ollama": "Verificant Ollama...",
+        "step_starting_ollama": "Arrencant Ollama...",
+        "step_downloading_model": "Descarregant model (pot trigar uns minuts)...",
+        "step_verify_download": "Verificant descàrrega...",
+        "model_downloaded": "Model {model_id} descarregat correctament!",
+        "model_not_in_list": "Model no trobat a 'ollama list'. Verifica manualment.",
+        "step_download_embeddings": "Descarregant model d'embeddings (per memòria)...",
+        "embeddings_downloaded": "Model d'embeddings (nomic-embed-text) descarregat!",
+        "embeddings_download_failed": "No s'ha pogut descarregar nomic-embed-text. La memòria pot fallar.",
+        "run_manual_command": "Executa manualment: {cmd}",
+        "ollama_not_found": "Ollama no trobat. Instal·la'l primer.",
         "option_download_now": "Descarregar ara",
         "option_manual_later": "Ho faré manualment (mostra instruccions)",
         "download_confirmation_title": "Ara descarregarem tot el necessari",
@@ -439,6 +485,37 @@ TRANSLATIONS = {
         "model_size": "Tamaño",
         "model_ram": "RAM mín.",
         "model_speed": "Velocidad",
+        "model_selection_title": "🤖 SELECCIÓN DE MODELO DE IA",
+        "model_selection_ram_label": "Tu RAM:",
+        "model_selection_ram_available_label": "RAM disponible para IA:",
+        "model_selection_ram_percent": "(50-60% del total)",
+        "model_selection_ram_note": "El resto se reserva para macOS, navegador y otras apps.",
+        "model_size_title": "📦 TAMAÑO DE MODELOS",
+        "model_size_option_small": "Modelos pequeños (8GB RAM) - Rápidos, menor calidad",
+        "model_size_option_medium": "Modelos medianos (16GB RAM) - Equilibrados",
+        "model_size_option_large": "Modelos grandes (32GB+ RAM) - Máxima calidad",
+        "model_size_label_small": "pequeños",
+        "model_size_label_medium": "medianos",
+        "model_size_label_large": "grandes",
+        "model_size_recommended": "Recomendado para tu RAM: modelos {rec_label}",
+        "model_size_prompt": "Elige tamaño [1-3] (Enter = {recommended}):",
+        "model_category_small": "MODELOS PEQUEÑOS (para 8GB RAM)",
+        "model_category_medium": "MODELOS MEDIANOS (para 16GB RAM)",
+        "model_category_large": "MODELOS GRANDES (para 32GB+ RAM)",
+        "model_engines_label": "Motores",
+        "model_disk_label": "Disco",
+        "model_ram_label": "RAM",
+        "model_choice_prompt": "Elige modelo [1-{count}] (Enter = {default}):",
+        "model_status_compatible": "✓ Compatible",
+        "model_status_maybe_tight": "⚠️ Puede ir justo",
+        "model_tag_local_language": "CATALÁN",
+        "engine_desc_mlx": "Optimizado para Apple Silicon (GPU Metal)",
+        "engine_desc_ollama": "Universal, fácil de usar",
+        "engine_desc_gguf": "Ejecución local directa, sin dependencias",
+        "engine_choice_prompt": "Elige [1-{count}] (Enter = {default}):",
+        "engine_single_notice": "{model} se ejecutará con {engine}",
+        "download_gguf": "Para descargar el modelo GGUF:",
+        "none": "Ninguno",
         "model_type_mlx": "MLX (Metal GPU - Más rápido)",
         "model_type_gguf": "GGUF/Ollama (CPU/GPU Universal)",
         "select_size": "¿Qué tamaño de modelo quieres?",
@@ -504,6 +581,21 @@ TRANSLATIONS = {
         "press_enter": "Pulsa Enter para continuar...",
         "download_skipped": "¡De acuerdo! Puedes descargar el modelo más tarde con las instrucciones anteriores.",
         "download_options": "¿Qué quieres hacer?",
+        "label_model": "Modelo",
+        "label_ollama_id": "ID de Ollama",
+        "label_engine": "Motor",
+        "label_command": "Ejecuta",
+        "step_checking_ollama": "Verificando Ollama...",
+        "step_starting_ollama": "Iniciando Ollama...",
+        "step_downloading_model": "Descargando modelo (puede tardar unos minutos)...",
+        "step_verify_download": "Verificando descarga...",
+        "model_downloaded": "Modelo {model_id} descargado correctamente!",
+        "model_not_in_list": "Modelo no encontrado en 'ollama list'. Verifica manualmente.",
+        "step_download_embeddings": "Descargando modelo de embeddings (para memoria)...",
+        "embeddings_downloaded": "Modelo de embeddings (nomic-embed-text) descargado!",
+        "embeddings_download_failed": "No se pudo descargar nomic-embed-text. La memoria puede fallar.",
+        "run_manual_command": "Ejecuta manualmente: {cmd}",
+        "ollama_not_found": "Ollama no encontrado. Instálalo primero.",
         "option_download_now": "Descargar ahora",
         "option_manual_later": "Lo haré manualmente (mostrar instrucciones)",
         "download_confirmation_title": "Ahora descargaremos todo lo necesario",
@@ -607,6 +699,37 @@ TRANSLATIONS = {
         "model_size": "Size",
         "model_ram": "Min. RAM",
         "model_speed": "Speed",
+        "model_selection_title": "🤖 AI MODEL SELECTION",
+        "model_selection_ram_label": "Your RAM:",
+        "model_selection_ram_available_label": "RAM available for AI:",
+        "model_selection_ram_percent": "(50-60% of total)",
+        "model_selection_ram_note": "The rest is reserved for macOS, browser, and other apps.",
+        "model_size_title": "📦 MODEL SIZE",
+        "model_size_option_small": "Small models (8GB RAM) - Fast, lower quality",
+        "model_size_option_medium": "Medium models (16GB RAM) - Balanced",
+        "model_size_option_large": "Large models (32GB+ RAM) - Highest quality",
+        "model_size_label_small": "small",
+        "model_size_label_medium": "medium",
+        "model_size_label_large": "large",
+        "model_size_recommended": "Recommended for your RAM: {rec_label} models",
+        "model_size_prompt": "Choose size [1-3] (Enter = {recommended}):",
+        "model_category_small": "SMALL MODELS (for 8GB RAM)",
+        "model_category_medium": "MEDIUM MODELS (for 16GB RAM)",
+        "model_category_large": "LARGE MODELS (for 32GB+ RAM)",
+        "model_engines_label": "Engines",
+        "model_disk_label": "Disk",
+        "model_ram_label": "RAM",
+        "model_choice_prompt": "Choose model [1-{count}] (Enter = {default}):",
+        "model_status_compatible": "✓ Compatible",
+        "model_status_maybe_tight": "⚠️ Might be tight",
+        "model_tag_local_language": "CATALAN",
+        "engine_desc_mlx": "Optimized for Apple Silicon (Metal GPU)",
+        "engine_desc_ollama": "Universal, easy to use",
+        "engine_desc_gguf": "Direct local execution, no dependencies",
+        "engine_choice_prompt": "Choose [1-{count}] (Enter = {default}):",
+        "engine_single_notice": "{model} will run with {engine}",
+        "download_gguf": "To download the GGUF model:",
+        "none": "None",
         "model_type_mlx": "MLX (Metal GPU - Fastest)",
         "model_type_gguf": "GGUF/Ollama (Universal CPU/GPU)",
         "select_size": "What model size do you want?",
@@ -672,6 +795,21 @@ TRANSLATIONS = {
         "press_enter": "Press Enter to continue...",
         "download_skipped": "Alright! You can download the model later using the instructions above.",
         "download_options": "What do you want to do?",
+        "label_model": "Model",
+        "label_ollama_id": "Ollama ID",
+        "label_engine": "Engine",
+        "label_command": "Run",
+        "step_checking_ollama": "Checking Ollama...",
+        "step_starting_ollama": "Starting Ollama...",
+        "step_downloading_model": "Downloading model (this may take a few minutes)...",
+        "step_verify_download": "Verifying download...",
+        "model_downloaded": "Model {model_id} downloaded successfully!",
+        "model_not_in_list": "Model not found in 'ollama list'. Please verify manually.",
+        "step_download_embeddings": "Downloading embeddings model (for memory)...",
+        "embeddings_downloaded": "Embeddings model (nomic-embed-text) downloaded!",
+        "embeddings_download_failed": "Could not download nomic-embed-text. Memory may fail.",
+        "run_manual_command": "Run manually: {cmd}",
+        "ollama_not_found": "Ollama not found. Install it first.",
         "option_download_now": "Download now",
         "option_manual_later": "I'll do it manually (show instructions)",
         "download_confirmation_title": "We will now download everything needed",
@@ -695,9 +833,15 @@ TRANSLATIONS = {
 LANG = "ca"
 HW_INFO = {}
 
-def t(key: str) -> str:
+def t(key: str, **kwargs) -> str:
     """Get translation for key."""
-    return TRANSLATIONS.get(LANG, TRANSLATIONS["en"]).get(key, key)
+    text = TRANSLATIONS.get(LANG, TRANSLATIONS["en"]).get(key, key)
+    if kwargs:
+        try:
+            return text.format(**kwargs)
+        except Exception:
+            return text
+    return text
 
 def clear():
     """Clear terminal screen safely (no shell injection risk)."""
@@ -875,36 +1019,43 @@ def select_model(hw):
     has_metal = hw["has_metal"]
 
     # Didactic explanation
-    print(f"\n{BOLD}🤖 SELECCIÓ DE MODEL D'IA{RESET}\n")
-    print(f"  {CYAN}La teva RAM:{RESET} {ram} GB")
-    print(f"  {CYAN}RAM disponible per IA:{RESET} ~{usable_ram} GB {DIM}(50-60% del total){RESET}")
-    print(f"  {DIM}La resta es reserva per macOS, navegador i altres apps.{RESET}")
+    print(f"\n{BOLD}{t('model_selection_title')}{RESET}\n")
+    print(f"  {CYAN}{t('model_selection_ram_label')}{RESET} {ram} GB")
+    print(
+        f"  {CYAN}{t('model_selection_ram_available_label')}{RESET} ~{usable_ram} GB "
+        f"{DIM}{t('model_selection_ram_percent')}{RESET}"
+    )
+    print(f"  {DIM}{t('model_selection_ram_note')}{RESET}")
 
     # Determine recommended category based on RAM
     if usable_ram < 5:
         recommended = "1"
-        rec_label = "petits"
+        rec_label = t("model_size_label_small")
     elif usable_ram < 20:
         recommended = "2"
-        rec_label = "mitjans"
+        rec_label = t("model_size_label_medium")
     else:
         recommended = "3"
-        rec_label = "grans"
+        rec_label = t("model_size_label_large")
 
     # Let user choose category regardless of RAM
     print(f"\n{YELLOW}{'─'*60}{RESET}")
-    print(f"\n{BOLD}📦 MIDA DE MODELS{RESET}\n")
-    print(f"  {CYAN}1.{RESET} Models petits (8GB RAM) - Ràpids, menys qualitat")
-    print(f"  {CYAN}2.{RESET} Models mitjans (16GB RAM) - Equilibrats")
-    print(f"  {CYAN}3.{RESET} Models grans (32GB+ RAM) - Màxima qualitat")
+    print(f"\n{BOLD}{t('model_size_title')}{RESET}\n")
+    print(f"  {CYAN}1.{RESET} {t('model_size_option_small')}")
+    print(f"  {CYAN}2.{RESET} {t('model_size_option_medium')}")
+    print(f"  {CYAN}3.{RESET} {t('model_size_option_large')}")
     print()
-    print(f"  {DIM}Recomanat per la teva RAM: models {rec_label}{RESET}")
+    print(f"  {DIM}{t('model_size_recommended', rec_label=rec_label)}{RESET}")
     print()
-    size_choice = input(f"{BOLD}Escull mida [1-3] (Enter = {recommended}):{RESET} ").strip() or recommended
+    size_choice = input(
+        f"{BOLD}{t('model_size_prompt', recommended=recommended)}{RESET} "
+    ).strip() or recommended
 
-    category_map = {"1": ("small", "MODELS PETITS (per 8GB RAM)"),
-                    "2": ("medium", "MODELS MITJANS (per 16GB RAM)"),
-                    "3": ("large", "MODELS GRANS (per 32GB+ RAM)")}
+    category_map = {
+        "1": ("small", t("model_category_small")),
+        "2": ("medium", t("model_category_medium")),
+        "3": ("large", t("model_category_large")),
+    }
     category, category_name = category_map.get(size_choice, category_map[recommended])
 
     models = MODEL_CATALOG[category]
@@ -924,28 +1075,33 @@ def select_model(hw):
             engines.append("Ollama")
         if model.get("gguf"):
             engines.append("GGUF")
-        engine_info = " / ".join(engines) if engines else "Cap"
+        engine_info = " / ".join(engines) if engines else t("none")
 
         # Catalan model highlight
         is_catalan = "AINA" in model["origin"] or "BSC" in model["origin"]
-        catalan_tag = f" {MAGENTA}🏠 CATALÀ{RESET}" if is_catalan else ""
+        catalan_tag = f" {MAGENTA}🏠 {t('model_tag_local_language')}{RESET}" if is_catalan else ""
 
         # Status based on RAM
         if fits:
-            status = f"{GREEN}✓ Compatible{RESET}"
+            status = f"{GREEN}{t('model_status_compatible')}{RESET}"
         else:
-            status = f"{RED}⚠️ Pot anar just{RESET}"
+            status = f"{RED}{t('model_status_maybe_tight')}{RESET}"
 
         print(f"  {CYAN}{i}.{RESET} {BOLD}{model['name']}{RESET} {DIM}({model['params']}){RESET}{catalan_tag}")
-        print(f"     {model['origin']} | Motors: {engine_info}")
-        print(f"     {CYAN}💾 Disc:{RESET} {model['disk_gb']} GB | {CYAN}🧠 RAM:{RESET} {model['ram_gb']} GB")
+        print(f"     {model['origin']} | {t('model_engines_label')}: {engine_info}")
+        print(
+            f"     {CYAN}💾 {t('model_disk_label')}:{RESET} {model['disk_gb']} GB | "
+            f"{CYAN}🧠 {t('model_ram_label')}:{RESET} {model['ram_gb']} GB"
+        )
         print(f"     {DIM}{model['lang']}{RESET}")
         print(f"     {model['description']} | {status}")
         print()
 
     # Model selection
     default = "1"
-    choice = input(f"{BOLD}Escull model [1-{len(models)}] (Enter = {default}):{RESET} ").strip()
+    choice = input(
+        f"{BOLD}{t('model_choice_prompt', count=len(models), default=default)}{RESET} "
+    ).strip()
     if not choice:
         choice = default
 
@@ -957,11 +1113,11 @@ def select_model(hw):
     # Engine selection - show all available options
     available_engines = []
     if has_metal and selected_model.get("mlx"):
-        available_engines.append(("mlx", "MLX", "Optimitzat per Apple Silicon (GPU Metal)", True))
+        available_engines.append(("mlx", "MLX", t("engine_desc_mlx"), True))
     if selected_model.get("ollama"):
-        available_engines.append(("ollama", "Ollama", "Universal, fàcil d'usar", not has_metal))
+        available_engines.append(("ollama", "Ollama", t("engine_desc_ollama"), not has_metal))
     if selected_model.get("gguf"):
-        available_engines.append(("llama_cpp", "llama.cpp (GGUF)", "Execució local directa, sense dependències", False))
+        available_engines.append(("llama_cpp", "llama.cpp (GGUF)", t("engine_desc_gguf"), False))
 
     engine = "ollama"  # Default fallback
 
@@ -979,7 +1135,9 @@ def select_model(hw):
             print(f"     {DIM}{eng_desc}{RESET}\n")
 
         default_idx = next((i for i, (_, _, _, rec) in enumerate(available_engines, 1) if rec), 1)
-        engine_choice = input(f"{BOLD}Escull [1-{len(available_engines)}] (Enter = {default_idx}):{RESET} ").strip()
+        engine_choice = input(
+            f"{BOLD}{t('engine_choice_prompt', count=len(available_engines), default=default_idx)}{RESET} "
+        ).strip()
 
         try:
             idx = int(engine_choice) - 1 if engine_choice else default_idx - 1
@@ -988,7 +1146,11 @@ def select_model(hw):
             engine = available_engines[default_idx - 1][0]
     elif len(available_engines) == 1:
         engine = available_engines[0][0]
-        print(f"\n  {DIM}ℹ️  {selected_model['name']} s'executarà amb {available_engines[0][1]}{RESET}")
+        print(
+            f"\n  {DIM}ℹ️  "
+            f"{t('engine_single_notice', model=selected_model['name'], engine=available_engines[0][1])}"
+            f"{RESET}"
+        )
 
     # Get model ID based on engine
     if engine == "mlx":
@@ -1019,7 +1181,7 @@ def _show_manual_instructions(model, engine):
         print(f"{t('to_download_ollama')}")
         print(f"  {CYAN}ollama pull {model['id']}{RESET}\n")
     elif engine == "llama_cpp":
-        print(f"Per descarregar el model GGUF:")
+        print(f"{t('download_gguf')}")
         print(f"  {CYAN}curl -L -o storage/models/{model['id'].split('/')[-1]} {model['id']}{RESET}\n")
     else:
         print(f"{t('to_download_mlx')}")
@@ -1397,9 +1559,9 @@ def _download_ollama_model(model_config):
 
     model_id = model_config['id']
     print(f"\n{BOLD}📦 {t('downloading_model')}{RESET}")
-    print(f"   Model: {CYAN}{model_config['name']}{RESET}")
-    print(f"   Ollama ID: {CYAN}{model_id}{RESET}")
-    print(f"   Motor: Ollama")
+    print(f"   {t('label_model')}: {CYAN}{model_config['name']}{RESET}")
+    print(f"   {t('label_ollama_id')}: {CYAN}{model_id}{RESET}")
+    print(f"   {t('label_engine')}: Ollama")
     print()
 
     # Ask user
@@ -1413,18 +1575,18 @@ def _download_ollama_model(model_config):
     if choice == "1":
         try:
             # Check if Ollama is running
-            print(f"\n{BLUE}[1/3]{RESET} Verificant Ollama...")
+            print(f"\n{BLUE}[1/3]{RESET} {t('step_checking_ollama')}")
             result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
             if result.returncode != 0:
                 # Try to start Ollama
-                print(f"{YELLOW}[...]{RESET} Arrencant Ollama...")
+                print(f"{YELLOW}[...]{RESET} {t('step_starting_ollama')}")
                 subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 import time
                 time.sleep(3)
 
             # Download model - IMPORTANT: Don't capture output so user sees progress
-            print(f"\n{BLUE}[2/3]{RESET} Descarregant model (pot trigar uns minuts)...")
-            print(f"      {DIM}Executa: ollama pull {model_id}{RESET}\n")
+            print(f"\n{BLUE}[2/3]{RESET} {t('step_downloading_model')}")
+            print(f"      {DIM}{t('label_command')}: ollama pull {model_id}{RESET}\n")
 
             # Run with inherited stdout/stderr so Ollama's progress bar shows
             process = subprocess.Popen(
@@ -1438,18 +1600,18 @@ def _download_ollama_model(model_config):
                 raise subprocess.CalledProcessError(return_code, "ollama pull")
 
             # Verify model was downloaded
-            print(f"\n{BLUE}[3/4]{RESET} Verificant descàrrega...")
+            print(f"\n{BLUE}[3/4]{RESET} {t('step_verify_download')}")
             result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
             model_base = model_id.split(":")[0]
             if model_base in result.stdout or model_id in result.stdout:
-                print_success(f"Model {model_id} descarregat correctament!")
+                print_success(t('model_downloaded', model_id=model_id))
             else:
-                print_warn(f"Model no trobat a 'ollama list'. Verifica manualment.")
-                print(f"  {DIM}Executa: ollama list{RESET}")
+                print_warn(t('model_not_in_list'))
+                print(f"  {DIM}{t('label_command')}: ollama list{RESET}")
 
             # Download embedding model (required for memory/RAG)
-            print(f"\n{BLUE}[4/4]{RESET} Descarregant model d'embeddings (per memòria)...")
-            print(f"      {DIM}Executa: ollama pull nomic-embed-text{RESET}\n")
+            print(f"\n{BLUE}[4/4]{RESET} {t('step_download_embeddings')}")
+            print(f"      {DIM}{t('label_command')}: ollama pull nomic-embed-text{RESET}\n")
 
             embed_process = subprocess.Popen(
                 ["ollama", "pull", "nomic-embed-text"],
@@ -1459,16 +1621,16 @@ def _download_ollama_model(model_config):
             embed_return = embed_process.wait()
 
             if embed_return == 0:
-                print_success("Model d'embeddings (nomic-embed-text) descarregat!")
+                print_success(t('embeddings_downloaded'))
             else:
-                print_warn("No s'ha pogut descarregar nomic-embed-text. La memòria pot fallar.")
-                print(f"  {DIM}Executa manualment: ollama pull nomic-embed-text{RESET}")
+                print_warn(t('embeddings_download_failed'))
+                print(f"  {DIM}{t('run_manual_command', cmd='ollama pull nomic-embed-text')}{RESET}")
 
         except subprocess.CalledProcessError as e:
             print_warn(f"{t('download_failed')} (code: {e.returncode})")
             _show_manual_instructions(model_config, "ollama")
         except FileNotFoundError:
-            print_warn("Ollama no trobat. Instal·la'l primer.")
+            print_warn(t('ollama_not_found'))
             _show_manual_instructions(model_config, "ollama")
     else:
         _show_manual_instructions(model_config, "ollama")
