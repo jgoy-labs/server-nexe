@@ -371,6 +371,7 @@ TRANSLATIONS = {
         "label_ollama_id": "ID d'Ollama",
         "label_engine": "Motor",
         "label_command": "Executa",
+        "label_hf_id": "ID de HuggingFace",
         "step_checking_ollama": "Verificant Ollama...",
         "step_starting_ollama": "Arrencant Ollama...",
         "step_downloading_model": "Descarregant model (pot trigar uns minuts)...",
@@ -380,6 +381,59 @@ TRANSLATIONS = {
         "step_download_embeddings": "Descarregant model d'embeddings (per memòria)...",
         "embeddings_downloaded": "Model d'embeddings (nomic-embed-text) descarregat!",
         "embeddings_download_failed": "No s'ha pogut descarregar nomic-embed-text. La memòria pot fallar.",
+        "download_complete": "Descàrrega completada!",
+        "download_retrying": "Descàrrega interrompuda, reintentant en 5 segons... (intent {attempt}/{max_retries})",
+        "engine_label_gguf": "llama.cpp (GGUF)",
+        "engine_label_mlx": "MLX (Apple Silicon)",
+        "downloading_file": "Descarregant {filename}...",
+        "download_destination": "Destí: {path}",
+        "model_already_downloaded": "Model ja descarregat a {path}",
+        "downloading_mlx": "Descarregant model MLX...",
+        "model_downloaded_to": "Model MLX descarregat a {path}",
+        "model_validating_mlx": "Validant model MLX...",
+        "model_missing_config": "Advertència: {path} no conté config.json",
+        "model_possible_issues": "El model pot tenir problemes, però continuem.",
+        "model_validated": "Model MLX validat correctament",
+        "download_partial_kept": "Els fitxers parcials ja descarregats es mantindran per reprendre.",
+        "download_error_detail": "Error: {error}",
+        "mlx_required_warning": "⚠️  IMPORTANT: Sense el model descarregat, MLX no funcionarà!",
+        "mlx_fallback_ollama": "El xat farà fallback a Ollama (si el tens instal·lat).",
+        "venv_clean_detected": "Venv existent detectat. Esborrant per instal·lació neta...",
+        "venv_cleaned": "Venv eliminat correctament.",
+        "metal_unavailable_title": "✗ Metal no està disponible",
+        "metal_required": "MLX necessita Metal (GPU d'Apple Silicon) per funcionar.",
+        "metal_unavailable_detail": "Tot i que tens Apple Silicon, Metal no es pot inicialitzar.",
+        "metal_options": "⚠️  Opcions:",
+        "metal_option_ollama": "Canviar a Ollama (recomanat)",
+        "metal_option_abort": "Abortar instal·lació",
+        "metal_choice_prompt": "Escull [1/2]:",
+        "metal_switched_ollama": "Canviat a Ollama: {model_id}",
+        "metal_no_ollama_alternative": "No s'ha trobat alternativa Ollama per aquest model",
+        "install_cancelled": "Instal·lació cancel·lada",
+        "symlink_not_created": "Symlink no creat ({error}), usa './nexe' des de {path}",
+        "knowledge_folder_created_ok": "Carpeta 'knowledge/' creada",
+        "embeddings_download_step": "Descarregant model d'embeddings (all-MiniLM-L6-v2)...",
+        "embeddings_download_time": "Això pot trigar uns minuts segons la connexió...",
+        "embeddings_download_start": "📥 Iniciant descàrrega...",
+        "embeddings_download_complete": "✓ Descàrrega completada!",
+        "embeddings_download_success": "✅ Model d'embeddings descarregat correctament",
+        "embeddings_download_error": "⚠️  Error descarregant embeddings",
+        "embeddings_download_auto": "Es descarregarà automàticament al primer ús",
+        "knowledge_processing_step": "Processant documents de coneixement ({count} fitxers)...",
+        "knowledge_processing_time": "Això pot trigar uns minuts (generant embeddings)...",
+        "knowledge_processing_success": "✅ Documents processats i indexats correctament",
+        "knowledge_processing_timeout": "⚠️  Ingesta massa lenta (>5min). Es farà al primer inici.",
+        "knowledge_processing_error": "⚠️  Error processant documents: {error}",
+        "knowledge_processing_auto": "Es processaran automàticament al primer inici del servidor",
+        "knowledge_no_documents": "📝 No hi ha documents a knowledge/ (es poden afegir més tard)",
+        "optional_global_command": "OPCIONAL: Comanda global",
+        "optional_global_instructions": "Per executar 'nexe' des de qualsevol lloc (sense ./), executa:",
+        "commands_available": "📄 Comandes disponibles a: COMMANDS.md",
+        "commands_write_failed": "No s'ha pogut escriure COMMANDS.md: {error}",
+        "auto_download_not_supported": "Plataforma {system}/{machine} no suportada per descàrrega automàtica",
+        "release_asset_not_found": "Asset {asset_name} no trobat a la release",
+        "ollama_auto_install_not_supported": "Auto-instal·lació d'Ollama no suportada a {system}",
+        "ollama_install_timeout": "La instal·lació d'Ollama ha superat el temps (>3 min)",
         "run_manual_command": "Executa manualment: {cmd}",
         "ollama_not_found": "Ollama no trobat. Instal·la'l primer.",
         "option_download_now": "Descarregar ara",
@@ -585,6 +639,7 @@ TRANSLATIONS = {
         "label_ollama_id": "ID de Ollama",
         "label_engine": "Motor",
         "label_command": "Ejecuta",
+        "label_hf_id": "ID de HuggingFace",
         "step_checking_ollama": "Verificando Ollama...",
         "step_starting_ollama": "Iniciando Ollama...",
         "step_downloading_model": "Descargando modelo (puede tardar unos minutos)...",
@@ -594,6 +649,59 @@ TRANSLATIONS = {
         "step_download_embeddings": "Descargando modelo de embeddings (para memoria)...",
         "embeddings_downloaded": "Modelo de embeddings (nomic-embed-text) descargado!",
         "embeddings_download_failed": "No se pudo descargar nomic-embed-text. La memoria puede fallar.",
+        "download_complete": "Descarga completada!",
+        "download_retrying": "Descarga interrumpida, reintentando en 5 segundos... (intento {attempt}/{max_retries})",
+        "engine_label_gguf": "llama.cpp (GGUF)",
+        "engine_label_mlx": "MLX (Apple Silicon)",
+        "downloading_file": "Descargando {filename}...",
+        "download_destination": "Destino: {path}",
+        "model_already_downloaded": "Modelo ya descargado en {path}",
+        "downloading_mlx": "Descargando modelo MLX...",
+        "model_downloaded_to": "Modelo MLX descargado en {path}",
+        "model_validating_mlx": "Validando modelo MLX...",
+        "model_missing_config": "Advertencia: {path} no contiene config.json",
+        "model_possible_issues": "El modelo puede tener problemas, pero continuamos.",
+        "model_validated": "Modelo MLX validado correctamente",
+        "download_partial_kept": "Los archivos parciales ya descargados se mantendrán para reanudar.",
+        "download_error_detail": "Error: {error}",
+        "mlx_required_warning": "⚠️  IMPORTANTE: Sin el modelo descargado, MLX no funcionará!",
+        "mlx_fallback_ollama": "El chat hará fallback a Ollama (si lo tienes instalado).",
+        "venv_clean_detected": "Venv existente detectado. Borrando para instalación limpia...",
+        "venv_cleaned": "Venv eliminado correctamente.",
+        "metal_unavailable_title": "✗ Metal no está disponible",
+        "metal_required": "MLX necesita Metal (GPU de Apple Silicon) para funcionar.",
+        "metal_unavailable_detail": "Aunque tienes Apple Silicon, Metal no se puede inicializar.",
+        "metal_options": "⚠️  Opciones:",
+        "metal_option_ollama": "Cambiar a Ollama (recomendado)",
+        "metal_option_abort": "Abortar instalación",
+        "metal_choice_prompt": "Elige [1/2]:",
+        "metal_switched_ollama": "Cambiado a Ollama: {model_id}",
+        "metal_no_ollama_alternative": "No se encontró alternativa Ollama para este modelo",
+        "install_cancelled": "Instalación cancelada",
+        "symlink_not_created": "Symlink no creado ({error}), usa './nexe' desde {path}",
+        "knowledge_folder_created_ok": "Carpeta 'knowledge/' creada",
+        "embeddings_download_step": "Descargando modelo de embeddings (all-MiniLM-L6-v2)...",
+        "embeddings_download_time": "Esto puede tardar unos minutos según la conexión...",
+        "embeddings_download_start": "📥 Iniciando descarga...",
+        "embeddings_download_complete": "✓ Descarga completada!",
+        "embeddings_download_success": "✅ Modelo de embeddings descargado correctamente",
+        "embeddings_download_error": "⚠️  Error descargando embeddings",
+        "embeddings_download_auto": "Se descargará automáticamente en el primer uso",
+        "knowledge_processing_step": "Procesando documentos de conocimiento ({count} archivos)...",
+        "knowledge_processing_time": "Esto puede tardar unos minutos (generando embeddings)...",
+        "knowledge_processing_success": "✅ Documentos procesados e indexados correctamente",
+        "knowledge_processing_timeout": "⚠️  Ingesta demasiado lenta (>5min). Se hará en el primer inicio.",
+        "knowledge_processing_error": "⚠️  Error procesando documentos: {error}",
+        "knowledge_processing_auto": "Se procesarán automáticamente en el primer inicio del servidor",
+        "knowledge_no_documents": "📝 No hay documentos en knowledge/ (se pueden añadir más tarde)",
+        "optional_global_command": "OPCIONAL: Comando global",
+        "optional_global_instructions": "Para ejecutar 'nexe' desde cualquier lugar (sin ./), ejecuta:",
+        "commands_available": "📄 Comandos disponibles en: COMMANDS.md",
+        "commands_write_failed": "No se pudo escribir COMMANDS.md: {error}",
+        "auto_download_not_supported": "Plataforma {system}/{machine} no compatible con descarga automática",
+        "release_asset_not_found": "Asset {asset_name} no encontrado en la release",
+        "ollama_auto_install_not_supported": "Auto-instalación de Ollama no soportada en {system}",
+        "ollama_install_timeout": "La instalación de Ollama ha excedido el tiempo (>3 min)",
         "run_manual_command": "Ejecuta manualmente: {cmd}",
         "ollama_not_found": "Ollama no encontrado. Instálalo primero.",
         "option_download_now": "Descargar ahora",
@@ -799,6 +907,7 @@ TRANSLATIONS = {
         "label_ollama_id": "Ollama ID",
         "label_engine": "Engine",
         "label_command": "Run",
+        "label_hf_id": "HuggingFace ID",
         "step_checking_ollama": "Checking Ollama...",
         "step_starting_ollama": "Starting Ollama...",
         "step_downloading_model": "Downloading model (this may take a few minutes)...",
@@ -808,6 +917,59 @@ TRANSLATIONS = {
         "step_download_embeddings": "Downloading embeddings model (for memory)...",
         "embeddings_downloaded": "Embeddings model (nomic-embed-text) downloaded!",
         "embeddings_download_failed": "Could not download nomic-embed-text. Memory may fail.",
+        "download_complete": "Download complete!",
+        "download_retrying": "Download interrupted, retrying in 5 seconds... (attempt {attempt}/{max_retries})",
+        "engine_label_gguf": "llama.cpp (GGUF)",
+        "engine_label_mlx": "MLX (Apple Silicon)",
+        "downloading_file": "Downloading {filename}...",
+        "download_destination": "Destination: {path}",
+        "model_already_downloaded": "Model already downloaded at {path}",
+        "downloading_mlx": "Downloading MLX model...",
+        "model_downloaded_to": "MLX model downloaded to {path}",
+        "model_validating_mlx": "Validating MLX model...",
+        "model_missing_config": "Warning: {path} does not contain config.json",
+        "model_possible_issues": "The model may have issues, but we will continue.",
+        "model_validated": "MLX model validated successfully",
+        "download_partial_kept": "Partial files already downloaded will be kept to resume.",
+        "download_error_detail": "Error: {error}",
+        "mlx_required_warning": "⚠️  IMPORTANT: Without the model downloaded, MLX will not work!",
+        "mlx_fallback_ollama": "Chat will fall back to Ollama (if installed).",
+        "venv_clean_detected": "Existing venv detected. Removing for a clean install...",
+        "venv_cleaned": "Venv removed successfully.",
+        "metal_unavailable_title": "✗ Metal is not available",
+        "metal_required": "MLX needs Metal (Apple Silicon GPU) to work.",
+        "metal_unavailable_detail": "Even though you have Apple Silicon, Metal cannot be initialized.",
+        "metal_options": "⚠️  Options:",
+        "metal_option_ollama": "Switch to Ollama (recommended)",
+        "metal_option_abort": "Abort installation",
+        "metal_choice_prompt": "Choose [1/2]:",
+        "metal_switched_ollama": "Switched to Ollama: {model_id}",
+        "metal_no_ollama_alternative": "No Ollama alternative found for this model",
+        "install_cancelled": "Installation cancelled",
+        "symlink_not_created": "Symlink not created ({error}); use './nexe' from {path}",
+        "knowledge_folder_created_ok": "Folder 'knowledge/' created",
+        "embeddings_download_step": "Downloading embeddings model (all-MiniLM-L6-v2)...",
+        "embeddings_download_time": "This may take a few minutes depending on your connection...",
+        "embeddings_download_start": "📥 Starting download...",
+        "embeddings_download_complete": "✓ Download completed!",
+        "embeddings_download_success": "✅ Embeddings model downloaded successfully",
+        "embeddings_download_error": "⚠️  Error downloading embeddings",
+        "embeddings_download_auto": "It will download automatically on first use",
+        "knowledge_processing_step": "Processing knowledge documents ({count} files)...",
+        "knowledge_processing_time": "This may take a few minutes (generating embeddings)...",
+        "knowledge_processing_success": "✅ Documents processed and indexed successfully",
+        "knowledge_processing_timeout": "⚠️  Ingestion too slow (>5min). It will run on first start.",
+        "knowledge_processing_error": "⚠️  Error processing documents: {error}",
+        "knowledge_processing_auto": "They will be processed automatically on first server start",
+        "knowledge_no_documents": "📝 No documents in knowledge/ (you can add them later)",
+        "optional_global_command": "OPTIONAL: Global command",
+        "optional_global_instructions": "To run 'nexe' from anywhere (without ./), run:",
+        "commands_available": "📄 Commands available at: COMMANDS.md",
+        "commands_write_failed": "Could not write COMMANDS.md: {error}",
+        "auto_download_not_supported": "Platform {system}/{machine} not supported for auto-download",
+        "release_asset_not_found": "Asset {asset_name} not found in release",
+        "ollama_auto_install_not_supported": "Ollama auto-install not supported on {system}",
+        "ollama_install_timeout": "Ollama install timed out (>3 min)",
         "run_manual_command": "Run manually: {cmd}",
         "ollama_not_found": "Ollama not found. Install it first.",
         "option_download_now": "Download now",
@@ -1412,7 +1574,7 @@ def download_qdrant(project_root, hw):
         else:
             asset_name = "qdrant-x86_64-unknown-linux-gnu.tar.gz"
     else:
-        print_warn(f"Platform {system}/{machine} not supported for auto-download")
+        print_warn(t('auto_download_not_supported', system=system, machine=machine))
         return False
 
     # Get latest release URL
@@ -1431,7 +1593,7 @@ def download_qdrant(project_root, hw):
                 break
 
         if not download_url:
-            print_warn(f"Asset {asset_name} not found in release")
+            print_warn(t('release_asset_not_found', asset_name=asset_name))
             return False
 
         # Download
@@ -1520,13 +1682,13 @@ def ensure_ollama_installed():
     system = platform.system().lower()
 
     if system not in ("darwin", "linux"):
-        print_warn(f"Ollama auto-install not supported on {system}")
+        print_warn(t('ollama_auto_install_not_supported', system=system))
         print(f"  {DIM}{t('ollama_install_manual')}{RESET}")
         return False
 
     try:
         # Install via official script
-        print(f"  {DIM}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
+        print(f"  {DIM}{t('label_command')}: curl -fsSL https://ollama.com/install.sh | sh{RESET}")
         result = subprocess.run(
             ["bash", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
             timeout=180  # 3 minutes max
@@ -1537,15 +1699,15 @@ def ensure_ollama_installed():
             return True
         else:
             print_warn(t('ollama_install_failed'))
-            print(f"  {CYAN}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
+            print(f"  {CYAN}{t('label_command')}: curl -fsSL https://ollama.com/install.sh | sh{RESET}")
             return False
 
     except subprocess.TimeoutExpired:
-        print_warn("Ollama install timed out (>3 min)")
+        print_warn(t('ollama_install_timeout'))
         return False
     except Exception as e:
         print_warn(f"{t('ollama_install_failed')}: {e}")
-        print(f"  {CYAN}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
+        print(f"  {CYAN}{t('label_command')}: curl -fsSL https://ollama.com/install.sh | sh{RESET}")
         return False
 
 
@@ -1645,8 +1807,8 @@ def _download_gguf_model(model_config, project_root):
     print(APP_LOGO)
 
     print(f"\n{BOLD}📦 {t('downloading_model')}{RESET}")
-    print(f"   Model: {CYAN}{model_config['name']}{RESET}")
-    print(f"   Motor: llama.cpp (GGUF)")
+    print(f"   {t('label_model')}: {CYAN}{model_config['name']}{RESET}")
+    print(f"   {t('label_engine')}: {t('engine_label_gguf')}")
     print()
 
     # Ask user
@@ -1664,7 +1826,7 @@ def _download_gguf_model(model_config, project_root):
             filename = model_config['id'].split('/')[-1]
             output_path = models_dir / filename
 
-            print(f"\n{BLUE}[...]{RESET} Descarregant {filename}...")
+            print(f"\n{BLUE}[...]{RESET} {t('downloading_file', filename=filename)}")
             print(f"   {DIM}{model_config['id']}{RESET}")
 
             subprocess.run([
@@ -1694,9 +1856,9 @@ def _download_mlx_model(model_config, project_root, python_path):
     model_name = model_id.split('/')[-1]
 
     print(f"\n{BOLD}📦 {t('downloading_model')}{RESET}")
-    print(f"   Model: {CYAN}{model_config['name']}{RESET}")
-    print(f"   HuggingFace ID: {CYAN}{model_id}{RESET}")
-    print(f"   Motor: MLX (Apple Silicon)")
+    print(f"   {t('label_model')}: {CYAN}{model_config['name']}{RESET}")
+    print(f"   {t('label_hf_id')}: {CYAN}{model_id}{RESET}")
+    print(f"   {t('label_engine')}: {t('engine_label_mlx')}")
     print()
 
     # Ask user
@@ -1714,7 +1876,7 @@ def _download_mlx_model(model_config, project_root, python_path):
             local_model_path = models_dir / model_name
 
             if local_model_path.exists() and any(local_model_path.iterdir()):
-                print(f"{GREEN}[OK]{RESET} Model ja descarregat a {local_model_path}")
+                print(f"{GREEN}[OK]{RESET} {t('model_already_downloaded', path=local_model_path)}")
                 input(f"\n{DIM}[{t('press_enter')}]{RESET}")
                 return
 
@@ -1730,10 +1892,16 @@ def _download_mlx_model(model_config, project_root, python_path):
 
             confirm = input(f"{GREEN}▶ {t('download_ready')} [Enter]:{RESET} ")
 
-            print(f"\n{BLUE}[1/2]{RESET} Descarregant model MLX...")
-            print(f"      {DIM}Destí: {local_model_path}{RESET}\n")
+            print(f"\n{BLUE}[1/2]{RESET} {t('downloading_mlx')}")
+            print(f"      {DIM}{t('download_destination', path=local_model_path)}{RESET}\n")
 
             # Download using huggingface_hub with resume + retry
+            download_complete_msg = t('download_complete').replace('"', '\\"')
+            download_retry_msg = t(
+                'download_retrying',
+                attempt='{attempt}',
+                max_retries='{max_retries}'
+            ).replace('"', '\\"')
             download_script = f'''
 from huggingface_hub import snapshot_download
 import time
@@ -1748,11 +1916,11 @@ for attempt in range(max_retries):
             resume_download=True,
             max_workers=4
         )
-        print("Download complete!")
+        print("{download_complete_msg}")
         break
     except Exception as e:
         if attempt < max_retries - 1:
-            print(f"Download interrupted, retrying in 5 seconds... (attempt {{attempt+1}}/{{max_retries}})")
+            print("{download_retry_msg}".format(attempt=attempt+1, max_retries=max_retries))
             time.sleep(5)
         else:
             raise e
@@ -1766,30 +1934,30 @@ for attempt in range(max_retries):
             return_code = process.wait()
 
             if return_code == 0:
-                print_success(f"Model MLX descarregat a {local_model_path}")
+                print_success(t('model_downloaded_to', path=local_model_path))
 
                 # Validate model has required files
-                print(f"\n{BLUE}[2/2]{RESET} Validant model MLX...")
+                print(f"\n{BLUE}[2/2]{RESET} {t('model_validating_mlx')}")
                 config_file = local_model_path / "config.json"
                 if not config_file.exists():
-                    print_warn(f"Advertència: {local_model_path} no conté config.json")
-                    print(f"{DIM}El model pot tenir problemes, però continuem.{RESET}")
+                    print_warn(t('model_missing_config', path=local_model_path))
+                    print(f"{DIM}{t('model_possible_issues')}{RESET}")
                 else:
-                    print(f"{GREEN}✓{RESET} Model MLX validat correctament")
+                    print(f"{GREEN}✓{RESET} {t('model_validated')}")
             else:
                 print(f"\n{YELLOW}{t('download_failed_resume')}{RESET}")
-                print(f"{DIM}Els fitxers parcials ja descarregats es mantindran per reprendre.{RESET}\n")
+                print(f"{DIM}{t('download_partial_kept')}{RESET}\n")
                 _show_manual_instructions(model_config, "mlx")
 
         except Exception as e:
             print(f"\n{YELLOW}{t('download_failed_resume')}{RESET}")
-            print(f"{DIM}Error: {str(e)[:200]}{RESET}")
-            print(f"{DIM}Els fitxers parcials ja descarregats es mantindran per reprendre.{RESET}\n")
+            print(f"{DIM}{t('download_error_detail', error=str(e)[:200])}{RESET}")
+            print(f"{DIM}{t('download_partial_kept')}{RESET}\n")
             _show_manual_instructions(model_config, "mlx")
     else:
         _show_manual_instructions(model_config, "mlx")
-        print(f"\n{YELLOW}⚠️  IMPORTANT: Sense el model descarregat, MLX no funcionarà!{RESET}")
-        print(f"   El chat farà fallback a Ollama (si el tens instal·lat).")
+        print(f"\n{YELLOW}{t('mlx_required_warning')}{RESET}")
+        print(f"   {t('mlx_fallback_ollama')}")
         print(f"\n{GREEN}{t('download_skipped')}{RESET}")
 
     input(f"\n{DIM}[{t('press_enter')}]{RESET}")
@@ -1817,10 +1985,10 @@ def main():
     # 3.5. Clean existing venv to avoid conflicts
     venv_path = project_root / "venv"
     if venv_path.exists():
-        print(f"\n{YELLOW}[CLEAN]{RESET} Venv existent detectat. Esborrant per instal·lació neta...")
+        print(f"\n{YELLOW}[CLEAN]{RESET} {t('venv_clean_detected')}")
         import shutil
         shutil.rmtree(venv_path)
-        print(f"{GREEN}[OK]{RESET} Venv eliminat correctament.")
+        print(f"{GREEN}[OK]{RESET} {t('venv_cleaned')}")
 
     storage_path = project_root / "storage"
     if storage_path.exists():
@@ -1892,14 +2060,14 @@ def main():
         if not metal_available:
             clear()
             print(APP_LOGO)
-            print(f"\n{RED}✗ Metal no està disponible{RESET}\n")
-            print(f"{DIM}MLX necessita Metal (GPU d'Apple Silicon) per funcionar.{RESET}")
-            print(f"{DIM}Tot i que tens Apple Silicon, Metal no es pot inicialitzar.{RESET}\n")
-            print(f"{YELLOW}⚠️  Opcions:{RESET}\n")
-            print(f"  {CYAN}1.{RESET} Canviar a Ollama (recomanat)")
-            print(f"  {CYAN}2.{RESET} Abortar instal·lació\n")
+            print(f"\n{RED}{t('metal_unavailable_title')}{RESET}\n")
+            print(f"{DIM}{t('metal_required')}{RESET}")
+            print(f"{DIM}{t('metal_unavailable_detail')}{RESET}\n")
+            print(f"{YELLOW}{t('metal_options')}{RESET}\n")
+            print(f"  {CYAN}1.{RESET} {t('metal_option_ollama')}")
+            print(f"  {CYAN}2.{RESET} {t('metal_option_abort')}\n")
 
-            choice = input(f"{BOLD}Escull [1/2]:{RESET} ").strip()
+            choice = input(f"{BOLD}{t('metal_choice_prompt')}{RESET} ").strip()
 
             if choice == "1":
                 # Get the selected_model to find Ollama equivalent
@@ -1917,16 +2085,19 @@ def main():
                 if selected_model and selected_model.get("ollama"):
                     model_config['engine'] = 'ollama'
                     model_config['id'] = selected_model['ollama']
-                    print(f"\n{GREEN}✓{RESET} Canviat a Ollama: {CYAN}{model_config['id']}{RESET}\n")
+                    print(
+                        f"\n{GREEN}✓{RESET} "
+                        f"{t('metal_switched_ollama', model_id=model_config['id'])}{RESET}\n"
+                    )
 
                     # Download Ollama model
                     ensure_ollama_installed()
                     _download_ollama_model(model_config)
                 else:
-                    print_error("No s'ha trobat alternativa Ollama per aquest model")
+                    print_error(t('metal_no_ollama_alternative'))
                     sys.exit(1)
             else:
-                print(f"\n{YELLOW}Instal·lació cancel·lada{RESET}")
+                print(f"\n{YELLOW}{t('install_cancelled')}{RESET}")
                 sys.exit(0)
         else:
             # Metal is available, proceed with MLX download
@@ -1970,13 +2141,17 @@ def main():
         print(f"     {DIM}{t('symlink_manual')}{RESET}")
         print(f"     {CYAN}export PATH=\"$PATH:{project_root}\"{RESET}\n")
     except Exception as e:
-        print(f"  {DIM}Symlink no creat ({str(e)[:50]}), usa './nexe' des de {project_root}{RESET}")
+        print(
+            f"  {DIM}"
+            f"{t('symlink_not_created', error=str(e)[:50], path=project_root)}"
+            f"{RESET}"
+        )
 
     # 13. Create knowledge folder and inform user
     print_step(f"{BOLD}{t('knowledge_folder_created')}{RESET}")
     knowledge_dir = project_root / "knowledge"
     knowledge_dir.mkdir(exist_ok=True)
-    print(f"  ✅ Carpeta 'knowledge/' creada")
+    print(f"  ✅ {t('knowledge_folder_created_ok')}")
     print(f"  {DIM}{t('knowledge_explanation')}{RESET}")
 
     # 14. Download embedding model (with explanation and permission)
@@ -1989,29 +2164,33 @@ def main():
     if confirm == 'n':
         print(f"  {DIM}{t('embeddings_skipped')}{RESET}")
     else:
-        print_step(f"{BOLD}Descarregant model d'embeddings (all-MiniLM-L6-v2)...{RESET}")
-        print(f"  {DIM}Això pot trigar uns minuts segons la connexió...{RESET}\n")
+        print_step(f"{BOLD}{t('embeddings_download_step')}{RESET}")
+        print(f"  {DIM}{t('embeddings_download_time')}{RESET}\n")
         try:
+            start_msg = t('embeddings_download_start').replace("'", "\\'")
+            done_msg = t('embeddings_download_complete').replace("'", "\\'")
             # Don't capture output so user sees download progress from sentence-transformers
             result = subprocess.run([
                 str(python_path), "-c",
                 "from sentence_transformers import SentenceTransformer; "
-                "print('\\n  📥 Iniciant descàrrega...\\n'); "
+                f"print('\\n  {start_msg}\\n'); "
                 "model = SentenceTransformer('all-MiniLM-L6-v2'); "
-                "print('\\n  ✓ Descàrrega completada!')"
+                f"print('\\n  {done_msg}')"
             ], check=True, capture_output=False)  # ← Changed to False to show progress
-            print(f"\n  ✅ Model d'embeddings descarregat correctament")
+            print(f"\n  {t('embeddings_download_success')}")
         except subprocess.CalledProcessError as e:
-            print(f"  {YELLOW}⚠️  Error descarregant embeddings{RESET}")
-            print(f"  {DIM}Es descarregarà automàticament al primer ús{RESET}")
+            print(f"  {YELLOW}{t('embeddings_download_error')}{RESET}")
+            print(f"  {DIM}{t('embeddings_download_auto')}{RESET}")
 
     # 15. Ingest knowledge documents if any exist
     knowledge_files = list(knowledge_dir.glob("*.md")) + list(knowledge_dir.glob("*.txt")) + list(knowledge_dir.glob("*.pdf"))
     knowledge_files = [f for f in knowledge_files if not f.name.startswith('.') and f.name != 'README.md']
 
     if knowledge_files:
-        print_step(f"{BOLD}Processant documents de coneixement ({len(knowledge_files)} fitxers)...{RESET}")
-        print(f"  {DIM}Això pot trigar uns minuts (generant embeddings)...{RESET}\n")
+        print_step(
+            f"{BOLD}{t('knowledge_processing_step', count=len(knowledge_files))}{RESET}"
+        )
+        print(f"  {DIM}{t('knowledge_processing_time')}{RESET}\n")
         try:
             # Start Qdrant first
             qdrant_bin = project_root / "qdrant"
@@ -2042,7 +2221,7 @@ def main():
                 f"asyncio.run(ingest_knowledge(quiet=False))"  # ← Changed to False to show progress
             ], check=True, capture_output=False, text=True, timeout=300)  # ← Changed to False
 
-            print(f"\n  ✅ Documents processats i indexats correctament")
+            print(f"\n  {t('knowledge_processing_success')}")
 
             # Create marker to skip re-ingestion on first server startup
             marker_file = project_root / "storage" / ".knowledge_ingested"
@@ -2053,19 +2232,21 @@ def main():
             qdrant_process.wait(timeout=5)
 
         except subprocess.TimeoutExpired:
-            print(f"  {YELLOW}⚠️  Ingesta massa lenta (>5min). Es farà al primer inici.{RESET}")
+            print(f"  {YELLOW}{t('knowledge_processing_timeout')}{RESET}")
             if 'qdrant_process' in locals():
                 qdrant_process.terminate()
         except Exception as e:
-            print(f"  {YELLOW}⚠️  Error processant documents: {str(e)[:200]}{RESET}")
-            print(f"  {DIM}Es processaran automàticament al primer inici del servidor{RESET}")
+            print(
+                f"  {YELLOW}{t('knowledge_processing_error', error=str(e)[:200])}{RESET}"
+            )
+            print(f"  {DIM}{t('knowledge_processing_auto')}{RESET}")
             if 'qdrant_process' in locals():
                 try:
                     qdrant_process.terminate()
                 except:
                     pass
     else:
-        print(f"  {DIM}📝 No hi ha documents a knowledge/ (es poden afegir més tard){RESET}")
+        print(f"  {DIM}{t('knowledge_no_documents')}{RESET}")
 
     # 16. Final summary
     input(f"\n{DIM}[{t('press_enter')}]{RESET}")
@@ -2073,7 +2254,7 @@ def main():
     print(APP_LOGO)
     print(f"{GREEN}✅ {t('install_complete')}{RESET}")
 
-    print(f"\n{BOLD}🤖 Model: {CYAN}{model_config['name']}{RESET}")
+    print(f"\n{BOLD}🤖 {t('label_model')}: {CYAN}{model_config['name']}{RESET}")
 
     # Use 'nexe' if global symlink was created, otherwise use './nexe'
     nexe_cmd = "nexe" if global_symlink_created else "./nexe"
@@ -2087,13 +2268,8 @@ def main():
 
     # If symlink not created, show instructions
     if not global_symlink_created:
-        print(f"\n{YELLOW}📌 {t('optional_global_command') if LANG != 'en' else 'OPTIONAL: Global command'}{RESET}")
-        if LANG == 'ca':
-            print(f"  {DIM}Per executar 'nexe' des de qualsevol lloc (sense ./), executa:{RESET}")
-        elif LANG == 'es':
-            print(f"  {DIM}Para ejecutar 'nexe' desde cualquier lugar (sin ./), ejecuta:{RESET}")
-        else:
-            print(f"  {DIM}To run 'nexe' from anywhere (without ./), execute:{RESET}")
+        print(f"\n{YELLOW}📌 {t('optional_global_command')}{RESET}")
+        print(f"  {DIM}{t('optional_global_instructions')}{RESET}")
         print(f"  {CYAN}sudo ln -sf {project_root}/nexe /usr/local/bin/nexe{RESET}")
 
     print(f"\n  {YELLOW}💡 {t('save_memory_tip')}{RESET}")
@@ -2175,9 +2351,9 @@ def main():
         commands_file = project_root / "COMMANDS.md"
         with open(commands_file, 'w', encoding='utf-8') as f:
             f.write(commands_content)
-        print(f"\n  {DIM}📄 Comandes disponibles a: COMMANDS.md{RESET}")
+        print(f"\n  {DIM}{t('commands_available')}{RESET}")
     except Exception as e:
-        print_warn(f"No s'ha pogut escriure COMMANDS.md: {e}")
+        print_warn(t('commands_write_failed', error=e))
 
     print(f"\n{DIM}{'─'*65}{RESET}")
     print(f"\n{BOLD}{t('disclaimer_title')}{RESET}")

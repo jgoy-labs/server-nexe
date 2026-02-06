@@ -34,3 +34,6 @@ qdrant
 
 # Web UI uploads (generated/user content)
 plugins/web_ui_module/static/uploads/
+
+# Module cache
+personality/.module_cache.json
