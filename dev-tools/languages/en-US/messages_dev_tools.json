@@ -1,0 +1,46 @@
+{
+ "_meta": {
+  "component": "dev_tools",
+  "description": "Developer tools translations",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+ "qdrant": {
+  "collections": "Collections: {collections}",
+  "error": "Error: {error}"
+ },
+ "qdrant_count": {
+  "user_knowledge": "Points in user_knowledge: {count}",
+  "chat_memory": "Points in nexe_chat_memory: {count}",
+  "error": "Error: {error}"
+ },
+ "search": {
+  "results": "Results: {count}",
+  "item": "- Score: {score:.4f}, Content: {content}..."
+ },
+ "debug": {
+  "file": "File: {path}",
+  "version": "Version: {version}",
+  "version_not_found": "Version: NOT FOUND",
+  "client_type": "Client type: {client_type}",
+  "has_search": "Has 'search': {value}",
+  "has_query_points": "Has 'query_points': {value}",
+  "query_result_type": "Query result type: {result_type}",
+  "query_points": "Query points: {points}",
+  "no_points_attr": "NO POINTS ATTR",
+  "query_points_failed": "Query points test failed: {error}",
+  "attributes": "Attributes: {attributes}"
+ },
+ "pytest": {
+  "ollama_already_running": "\n[pytest] Ollama: Already running ✓",
+  "ollama_not_installed": "\n[pytest] Ollama: Not installed - tests requiring Ollama will be skipped",
+  "ollama_starting": "\n[pytest] Ollama: Starting for tests...",
+  "ollama_ready": "[pytest] Ollama: Ready ✓ (took {seconds:.1f}s)",
+  "ollama_start_timeout": "[pytest] Ollama: Failed to start within 15s ⚠",
+  "ollama_start_failed": "[pytest] Ollama: Could not start: {error}",
+  "ollama_stopping": "\n[pytest] Ollama: Stopping...",
+  "ollama_stopped": "[pytest] Ollama: Stopped ✓",
+  "ollama_force_killed": "[pytest] Ollama: Force killed",
+  "ollama_not_available": "Ollama not available - skipping test"
+ }
+}

@@ -17,7 +17,12 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from .i18n import t
+
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t(f"web_ui.logs.{key}", fallback, **kwargs)
 
 
 class ChatSession:
@@ -148,10 +153,29 @@ class SessionManager:
                         self._sessions[session.id] = session
                         count += 1
                 except Exception as e:
-                    logger.warning(f"Error loading session {file_path}: {e}")
-            logger.info(f"Loaded {count} sessions from disk")
+                logger.warning(
+                    _t_log(
+                        "session_load_error",
+                        "Error loading session {path}: {error}",
+                        path=file_path,
+                        error=str(e),
+                    )
+                )
+            logger.info(
+                _t_log(
+                    "sessions_loaded",
+                    "Loaded {count} sessions from disk",
+                    count=count,
+                )
+            )
         except Exception as e:
-            logger.error(f"Failed to load sessions: {e}")
+            logger.error(
+                _t_log(
+                    "sessions_load_failed",
+                    "Failed to load sessions: {error}",
+                    error=str(e),
+                )
+            )
 
     def _save_session_to_disk(self, session: ChatSession):
         """Guardar sessió a disc"""
@@ -160,7 +184,14 @@ class SessionManager:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(session.to_dict(), f, indent=2, ensure_ascii=False)
         except Exception as e:
-            logger.error(f"Failed to save session {session.id}: {e}")
+            logger.error(
+                _t_log(
+                    "session_save_failed",
+                    "Failed to save session {session_id}: {error}",
+                    session_id=session.id,
+                    error=str(e),
+                )
+            )
 
     def _delete_session_from_disk(self, session_id: str):
         """Eliminar sessió del disc"""
@@ -169,7 +200,14 @@ class SessionManager:
             if file_path.exists():
                 file_path.unlink()
         except Exception as e:
-            logger.error(f"Failed to delete session file {session_id}: {e}")
+            logger.error(
+                _t_log(
+                    "session_delete_failed",
+                    "Failed to delete session file {session_id}: {error}",
+                    session_id=session_id,
+                    error=str(e),
+                )
+            )
 
     def create_session(self, session_id: str = None) -> ChatSession:
         """Crear nova sessió de xat"""

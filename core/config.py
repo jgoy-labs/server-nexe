@@ -17,7 +17,12 @@ import toml
 import logging
 import os
 
+from personality.i18n.resolve import t_modular
+
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"core.config.{key}", fallback, **kwargs)
 
 # Default configuration
 DEFAULT_CONFIG = {
@@ -90,7 +95,7 @@ def load_config(
         if i18n:
             logger.warning(i18n.t("server_core.startup.config_not_found"))
         else:
-            logger.warning("No config file found, using defaults")
+            logger.warning(_t("config_not_found", "No config file found, using defaults"))
         return DEFAULT_CONFIG.copy()
 
     # Load config
@@ -98,7 +103,7 @@ def load_config(
         if i18n:
             logger.info(i18n.t("server_core.startup.loading_config", path=str(found_path)))
         else:
-            logger.info(f"Loading config from: {found_path}")
+            logger.info(_t("loading_config", "Loading config from: {path}", path=str(found_path)))
 
         with open(found_path, 'r', encoding='utf-8') as f:
             config = toml.load(f)
@@ -109,7 +114,7 @@ def load_config(
         if i18n:
             logger.info(i18n.t("server_core.startup.config_loaded"))
         else:
-            logger.info("Config loaded successfully")
+            logger.info(_t("config_loaded", "Config loaded successfully"))
 
         return merged
 
@@ -118,7 +123,12 @@ def load_config(
             logger.error(i18n.t("server_core.startup.config_error",
                                 path=str(found_path), error=str(e)))
         else:
-            logger.error(f"Error loading config from {found_path}: {e}")
+            logger.error(_t(
+                "config_error",
+                "Error loading config from {path}: {error}",
+                path=str(found_path),
+                error=str(e)
+            ))
         return DEFAULT_CONFIG.copy()
 
 
@@ -136,10 +146,15 @@ def save_config(config: Dict[str, Any], config_path: Path) -> bool:
     try:
         with open(config_path, 'w', encoding='utf-8') as f:
             toml.dump(config, f)
-        logger.info(f"Config saved to {config_path}")
+        logger.info(_t("config_saved", "Config saved to {path}", path=str(config_path)))
         return True
     except Exception as e:
-        logger.error(f"Error saving config to {config_path}: {e}")
+        logger.error(_t(
+            "config_save_error",
+            "Error saving config to {path}: {error}",
+            path=str(config_path),
+            error=str(e)
+        ))
         return False
 
 

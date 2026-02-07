@@ -18,6 +18,9 @@ from .i18n import t
 
 logger = logging.getLogger(__name__)
 
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t(f"web_ui.logs.{key}", fallback, **kwargs)
+
 # Formats suportats (sync amb core/ingest/ingest_knowledge.py)
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".markdown", ".text", ".pdf"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -96,7 +99,13 @@ class FileHandler:
 
         # Write file
         file_path.write_bytes(content)
-        logger.info(f"File saved: {file_path}")
+        logger.info(
+            _t_log(
+                "file_saved",
+                "File saved: {path}",
+                path=file_path,
+            )
+        )
 
         return file_path
 
@@ -124,7 +133,13 @@ class FileHandler:
                     text += page.extract_text() + "\n"
                 return text
             except Exception as e:
-                logger.error(f"Error extracting PDF: {e}")
+                logger.error(
+                    _t_log(
+                        "pdf_extract_error",
+                        "Error extracting PDF: {error}",
+                        error=str(e),
+                    )
+                )
                 return ""
 
         return ""
@@ -169,7 +184,13 @@ class FileHandler:
             # Avançar amb overlap
             start = end - overlap if end < len(text) else len(text)
 
-        logger.info(f"Text divided into {len(chunks)} chunks")
+        logger.info(
+            _t_log(
+                "text_chunked",
+                "Text divided into {count} chunks",
+                count=len(chunks),
+            )
+        )
         return chunks
 
     def delete_file(self, file_path: Path) -> bool:
@@ -185,10 +206,22 @@ class FileHandler:
         try:
             if file_path.exists():
                 file_path.unlink()
-                logger.info(f"File deleted: {file_path}")
+                logger.info(
+                    _t_log(
+                        "file_deleted",
+                        "File deleted: {path}",
+                        path=file_path,
+                    )
+                )
                 return True
         except Exception as e:
-            logger.error(f"Error deleting file: {e}")
+            logger.error(
+                _t_log(
+                    "file_delete_error",
+                    "Error deleting file: {error}",
+                    error=str(e),
+                )
+            )
 
         return False
 
@@ -216,14 +249,39 @@ class FileHandler:
                         try:
                             file_path.unlink()
                             deleted_count += 1
-                            logger.info(f"Cleaned up old file: {file_path.name}")
+                            logger.info(
+                                _t_log(
+                                    "cleanup_file",
+                                    "Cleaned up old file: {name}",
+                                    name=file_path.name,
+                                )
+                            )
                         except Exception as e:
-                            logger.error(f"Error deleting {file_path}: {e}")
+                            logger.error(
+                                _t_log(
+                                    "cleanup_delete_error",
+                                    "Error deleting {path}: {error}",
+                                    path=file_path,
+                                    error=str(e),
+                                )
+                            )
         except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
+            logger.error(
+                _t_log(
+                    "cleanup_error",
+                    "Error during cleanup: {error}",
+                    error=str(e),
+                )
+            )
 
         if deleted_count > 0:
-            logger.info(f"Cleanup completed: {deleted_count} files deleted")
+            logger.info(
+                _t_log(
+                    "cleanup_completed",
+                    "Cleanup completed: {count} files deleted",
+                    count=deleted_count,
+                )
+            )
 
         return deleted_count
 
@@ -248,7 +306,13 @@ class FileHandler:
             # Sort by modified time descending (newest first)
             files.sort(key=lambda x: x["modified"], reverse=True)
         except Exception as e:
-            logger.error(f"Error listing files: {e}")
+            logger.error(
+                _t_log(
+                    "list_files_error",
+                    "Error listing files: {error}",
+                    error=str(e),
+                )
+            )
         return files
 
 

@@ -1,7 +1,7 @@
 """
-Validators per contractes NEXE.
+Validators for NEXE contracts.
 
-Validació multi-capa:
+Multi-layer validation:
 1. Schema validation (Pydantic)
 2. Runtime validation (Protocol)
 3. Integration validation (file structure)
@@ -14,6 +14,10 @@ from enum import Enum
 
 from .base import BaseContract, ModuleContract, validate_contract, contract_is_module
 from .models import load_manifest_from_toml, UnifiedManifest
+from personality.i18n.resolve import t_modular
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"core.contracts.{key}", fallback, **kwargs)
 
 
 # ============================================
@@ -21,14 +25,14 @@ from .models import load_manifest_from_toml, UnifiedManifest
 # ============================================
 
 class ValidationLevel(str, Enum):
-    """Nivell de validació"""
+    """Validation level."""
     SCHEMA = "schema"
     RUNTIME = "runtime"
     INTEGRATION = "integration"
 
 
 class ValidationSeverity(str, Enum):
-    """Severitat d'un error de validació"""
+    """Validation error severity."""
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
@@ -41,7 +45,7 @@ class ValidationSeverity(str, Enum):
 
 @dataclass
 class ValidationIssue:
-    """Issue de validació"""
+    """Validation issue."""
     level: ValidationLevel
     severity: ValidationSeverity
     message: str
@@ -50,41 +54,41 @@ class ValidationIssue:
 
 @dataclass
 class ValidationResult:
-    """Resultat de validació"""
+    """Validation result."""
     valid: bool
     issues: List[ValidationIssue]
     contract_id: Optional[str] = None
 
     def has_errors(self) -> bool:
-        """Check si té errors"""
+        """Check whether it has errors."""
         return any(
             issue.severity in [ValidationSeverity.ERROR, ValidationSeverity.CRITICAL]
             for issue in self.issues
         )
 
     def has_warnings(self) -> bool:
-        """Check si té warnings"""
+        """Check whether it has warnings."""
         return any(
             issue.severity == ValidationSeverity.WARNING
             for issue in self.issues
         )
 
     def get_errors(self) -> List[ValidationIssue]:
-        """Obté només errors"""
+        """Return only errors."""
         return [
             issue for issue in self.issues
             if issue.severity in [ValidationSeverity.ERROR, ValidationSeverity.CRITICAL]
         ]
 
     def get_warnings(self) -> List[ValidationIssue]:
-        """Obté només warnings"""
+        """Return only warnings."""
         return [
             issue for issue in self.issues
             if issue.severity == ValidationSeverity.WARNING
         ]
 
     def to_dict(self) -> dict:
-        """Converteix a diccionari"""
+        """Convert to a dictionary."""
         return {
             "valid": self.valid,
             "contract_id": self.contract_id,
@@ -106,17 +110,17 @@ class ValidationResult:
 
 class ContractValidator:
     """
-    Validator unificat per contractes.
+    Unified validator for contracts.
 
-    Implementa validació en múltiples capes.
+    Implements multi-layer validation.
     """
 
     def validate_manifest_schema(self, manifest_path: Path) -> ValidationResult:
         """
-        Valida l'schema del manifest amb Pydantic.
+        Validate the manifest schema with Pydantic.
 
         Args:
-            manifest_path: Path al manifest.toml
+            manifest_path: Path to manifest.toml
 
         Returns:
             ValidationResult
@@ -128,7 +132,11 @@ class ContractValidator:
             issues.append(ValidationIssue(
                 level=ValidationLevel.SCHEMA,
                 severity=ValidationSeverity.CRITICAL,
-                message=f"Manifest file not found: {manifest_path}"
+                message=_t(
+                    "manifest_file_not_found",
+                    "Manifest file not found: {path}",
+                    path=manifest_path,
+                )
             ))
             return ValidationResult(valid=False, issues=issues)
 
@@ -148,17 +156,20 @@ class ContractValidator:
             issues.append(ValidationIssue(
                 level=ValidationLevel.SCHEMA,
                 severity=ValidationSeverity.ERROR,
-                message="Manifest schema validation failed",
+                message=_t(
+                    "schema_validation_failed",
+                    "Manifest schema validation failed"
+                ),
                 details=str(e)
             ))
             return ValidationResult(valid=False, issues=issues)
 
     def validate_contract_runtime(self, contract: Any) -> ValidationResult:
         """
-        Valida que un objecte implementa BaseContract (runtime).
+        Validate that an object implements BaseContract (runtime).
 
         Args:
-            contract: Objecte a validar
+            contract: Object to validate
 
         Returns:
             ValidationResult
@@ -170,7 +181,10 @@ class ContractValidator:
             issues.append(ValidationIssue(
                 level=ValidationLevel.RUNTIME,
                 severity=ValidationSeverity.CRITICAL,
-                message="Object does not implement BaseContract protocol"
+                message=_t(
+                    "base_contract_missing",
+                    "Object does not implement BaseContract protocol"
+                )
             ))
             return ValidationResult(valid=False, issues=issues)
 
@@ -182,7 +196,10 @@ class ContractValidator:
             issues.append(ValidationIssue(
                 level=ValidationLevel.RUNTIME,
                 severity=ValidationSeverity.ERROR,
-                message="Failed to access contract metadata",
+                message=_t(
+                    "metadata_access_failed",
+                    "Failed to access contract metadata"
+                ),
                 details=str(e)
             ))
             return ValidationResult(valid=False, issues=issues)
@@ -192,7 +209,10 @@ class ContractValidator:
             issues.append(ValidationIssue(
                 level=ValidationLevel.RUNTIME,
                 severity=ValidationSeverity.WARNING,
-                message="Module does not fully implement ModuleContract"
+                message=_t(
+                    "module_contract_incomplete",
+                    "Module does not fully implement ModuleContract"
+                )
             ))
 
         return ValidationResult(
@@ -207,11 +227,11 @@ class ContractValidator:
         manifest: UnifiedManifest
     ) -> ValidationResult:
         """
-        Valida estructura de fitxers del contracte.
+        Validate contract file structure.
 
         Args:
-            contract_path: Path al directori del contracte
-            manifest: Manifest carregat
+            contract_path: Path to the contract directory
+            manifest: Loaded manifest
 
         Returns:
             ValidationResult
@@ -225,7 +245,10 @@ class ContractValidator:
             issues.append(ValidationIssue(
                 level=ValidationLevel.INTEGRATION,
                 severity=ValidationSeverity.WARNING,
-                message="Missing __init__.py"
+                message=_t(
+                    "missing_init",
+                    "Missing __init__.py"
+                )
             ))
 
         # Check module.py si has_api
@@ -235,7 +258,10 @@ class ContractValidator:
                 issues.append(ValidationIssue(
                     level=ValidationLevel.INTEGRATION,
                     severity=ValidationSeverity.ERROR,
-                    message="Missing module.py (required for API modules)"
+                    message=_t(
+                        "missing_module_file",
+                        "Missing module.py (required for API modules)"
+                    )
                 ))
 
         # Check UI path si has_ui
@@ -245,7 +271,11 @@ class ContractValidator:
                 issues.append(ValidationIssue(
                     level=ValidationLevel.INTEGRATION,
                     severity=ValidationSeverity.ERROR,
-                    message=f"Missing UI directory: {manifest.ui.path}"
+                    message=_t(
+                        "missing_ui_dir",
+                        "Missing UI directory: {path}",
+                        path=manifest.ui.path,
+                    )
                 ))
 
         # Check tests si has_tests
@@ -255,7 +285,10 @@ class ContractValidator:
                 issues.append(ValidationIssue(
                     level=ValidationLevel.INTEGRATION,
                     severity=ValidationSeverity.WARNING,
-                    message="Missing tests directory"
+                    message=_t(
+                        "missing_tests_dir",
+                        "Missing tests directory"
+                    )
                 ))
 
         valid = not any(
@@ -275,14 +308,14 @@ class ContractValidator:
         contract_instance: Optional[Any] = None
     ) -> ValidationResult:
         """
-        Valida un contracte en totes les capes.
+        Validate a contract across all layers.
 
         Args:
-            contract_path: Path al contracte
-            contract_instance: Instància del contracte (opcional)
+            contract_path: Path to the contract
+            contract_instance: Contract instance (optional)
 
         Returns:
-            ValidationResult agregat
+            Aggregated ValidationResult
         """
         all_issues = []
         contract_id = None
@@ -342,7 +375,7 @@ _validator_instance: Optional[ContractValidator] = None
 
 def get_validator() -> ContractValidator:
     """
-    Obté la instància singleton del validator.
+    Get the singleton validator instance.
 
     Returns:
         ContractValidator singleton

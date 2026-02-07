@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/i18n/i18n_manager.py
-Description: Sistema global d'internacionalització (i18n) per Nexe 0.8.
+Description: Global internationalization (i18n) system for Nexe 0.8.
 
 www.jgoy.net
 ────────────────────────────────────

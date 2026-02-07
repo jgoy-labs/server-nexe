@@ -1,0 +1,35 @@
+{
+ "_meta": {
+  "component": "sanitizer",
+  "description": "Sanitizer module manifest translations",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+ "manifest": {
+  "description": "Technical security filter for jailbreaks and prompt injections"
+ },
+ "metadata": {
+  "description": "Technical security filter for jailbreaks and prompt injections"
+ },
+ "intervention": {
+  "response": "I think there's a problem with your message. Can you rephrase?",
+  "metadata_description": "Generate a resistance response when threats are detected",
+  "input_threats_desc": "List of detected threats",
+  "input_severity_desc": "Severity level",
+  "output_response_desc": "Resistance response",
+  "output_activated_desc": "Whether it was activated",
+  "output_threat_type_desc": "Primary threat type",
+  "log_activated": "RESISTANCE ACTIVATED - Threats: {threats}, Severity: {severity}"
+ },
+ "check": {
+  "description": "Detect jailbreaks and prompt injections (technical security)",
+  "input_text_desc": "Text to sanitize",
+  "input_user_message_desc": "Alias for text",
+  "output_is_safe_desc": "True if there are no critical threats",
+  "output_needs_intervention_desc": "True if the Auditor should activate Intervention",
+  "output_severity_desc": "none|low|medium|high|critical",
+  "output_threats_desc": "Detected threats",
+  "output_clean_text_desc": "Processed text",
+  "output_scan_time_desc": "Scan time in ms"
+ }
+}

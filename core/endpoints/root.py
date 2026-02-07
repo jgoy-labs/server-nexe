@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/endpoints/root.py
-Description: Endpoints FastAPI bàsics del servidor. Routes: / (system info), /health (health check),
+Description: Basic FastAPI server endpoints. Routes: / (system info), /health (health check),
 
 www.jgoy.net
 ────────────────────────────────────
@@ -110,7 +110,7 @@ async def readiness_check(request: Request) -> dict:
   """
   Readiness check.
 
-  Verifica que els mòduls requerits estiguin carregats i saludables.
+  Verify that required modules are loaded and healthy.
   """
   config = getattr(request.app.state, "config", {}) or {}
   modules = getattr(request.app.state, "modules", {}) or {}

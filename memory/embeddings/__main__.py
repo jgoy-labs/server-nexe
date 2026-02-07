@@ -105,7 +105,7 @@ async def cmd_stats():
   module = EmbeddingsModule.get_instance()
   
   if not module._initialized:
-    print("Module not initialized yet")
+    print(get_i18n().t("embeddings.cli.not_initialized", "Module not initialized yet"))
     return
   
   stats = module.get_stats()
@@ -124,34 +124,66 @@ async def cmd_stats():
 
 def main():
   """Main CLI entry point"""
+  i18n = get_i18n()
   parser = argparse.ArgumentParser(
-    description="Embeddings Module - Nexe 0.8",
+    description=i18n.t("embeddings.cli.description", "Embeddings Module - Nexe 0.8"),
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog="""
-Examples:
- python3 -m memory.embeddings info
- python3 -m memory.embeddings health
- python3 -m memory.embeddings encode "Hola món"
- python3 -m memory.embeddings chunk document.txt
- python3 -m memory.embeddings stats
-    """
+    epilog=i18n.t(
+      "embeddings.cli.epilog",
+      "Examples:\n"
+      " python3 -m memory.embeddings info\n"
+      " python3 -m memory.embeddings health\n"
+      " python3 -m memory.embeddings encode \"Hello world\"\n"
+      " python3 -m memory.embeddings chunk document.txt\n"
+      " python3 -m memory.embeddings stats"
+    )
   )
   
-  subparsers = parser.add_subparsers(dest="command", help="Available commands")
+  subparsers = parser.add_subparsers(
+    dest="command",
+    help=i18n.t("embeddings.cli.commands_help", "Available commands")
+  )
   
-  subparsers.add_parser("info", help="Show module information")
+  subparsers.add_parser(
+    "info",
+    help=i18n.t("embeddings.cli.info_help", "Show module information")
+  )
   
-  subparsers.add_parser("health", help="Run health checks")
+  subparsers.add_parser(
+    "health",
+    help=i18n.t("embeddings.cli.health_help", "Run health checks")
+  )
   
-  encode_parser = subparsers.add_parser("encode", help="Generate embedding for text")
-  encode_parser.add_argument("text", help="Text to encode")
-  encode_parser.add_argument("--model", help="Model to use (optional)")
+  encode_parser = subparsers.add_parser(
+    "encode",
+    help=i18n.t("embeddings.cli.encode_help", "Generate embedding for text")
+  )
+  encode_parser.add_argument(
+    "text",
+    help=i18n.t("embeddings.cli.encode_text_help", "Text to encode")
+  )
+  encode_parser.add_argument(
+    "--model",
+    help=i18n.t("embeddings.cli.encode_model_help", "Model to use (optional)")
+  )
   
-  chunk_parser = subparsers.add_parser("chunk", help="Split document into chunks")
-  chunk_parser.add_argument("file", help="Path to document file")
-  chunk_parser.add_argument("--doc-id", help="Document ID (default: filename)")
+  chunk_parser = subparsers.add_parser(
+    "chunk",
+    help=i18n.t("embeddings.cli.chunk_help", "Split document into chunks")
+  )
+  chunk_parser.add_argument(
+    "file",
+    help=i18n.t("embeddings.cli.chunk_file_help", "Path to document file")
+  )
+  chunk_parser.add_argument(
+    "--doc-id",
+    help=i18n.t("embeddings.cli.chunk_doc_id_help", "Document ID (default: filename)")
+  )
   
-  subparsers.add_parser("stats", help="Show module statistics")
+  subparsers.add_parser(
+    "stats",
+    help=i18n.t("embeddings.cli.stats_help", "Show module statistics")
+  )
   
   args = parser.parse_args()
   

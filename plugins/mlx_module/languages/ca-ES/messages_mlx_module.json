@@ -1,0 +1,78 @@
+{
+ "_meta": {
+  "component": "mlx_module",
+  "description": "Traduccions del mòdul MLX",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ "errors": {
+  "not_initialized": "Mòdul MLX no inicialitzat"
+ },
+ "health": {
+  "active": "Motor MLX actiu"
+ },
+ "manifest": {
+  "description": "Motor d'inferència ultra-optimitzat per a Apple Silicon (M1/M2/M3/M4) usant MLX. Inclou prefix matching real amb TTFT instantani en converses llargues."
+ },
+ "metadata": {
+  "description": "Motor d'inferència ultra-optimitzat per a Apple Silicon (MLX)"
+ },
+ "generate": {
+  "user_placeholder": "(continua)",
+  "assistant_placeholder": "(entès)",
+  "cache_saved": "MLXChatNode: Opció D ha guardat cache net ({prompt_tokens} tokens → {total_tokens} amb resposta)"
+ },
+ "config": {
+  "model_path_empty": "MLXConfig: model_path buit. Configura NEXE_MLX_MODEL o passa model_path.",
+  "read_server_toml_failed": "MLXConfig: Error llegint server.toml: {error}",
+  "loaded": "MLXConfig carregat: model={model}, max_tokens={max_tokens}, max_kv_size={max_kv_size}, temp={temperature:.1f}, top_p={top_p:.1f}, max_caches={max_caches}",
+  "model_path_required": "MLXConfig: cal model_path",
+  "model_path_missing": "MLXConfig: model_path no existeix: {path}",
+  "model_path_not_dir": "MLXConfig: model_path ha de ser un directori: {path}",
+  "config_json_missing": "MLXConfig: model_path no conté config.json: {path}",
+  "max_tokens_min": "MLXConfig: max_tokens mínim és 1",
+  "max_kv_size_min": "MLXConfig: max_kv_size mínim és 512",
+  "temperature_out_of_range": "MLXConfig: temperatura {temperature:.1f} fora de rang recomanat [0, 2]",
+  "top_p_range": "MLXConfig: top_p ha d'estar entre 0 i 1",
+  "mlx_not_installed": "MLXConfig: mlx no instal·lat",
+  "metal_check_failed": "MLXConfig: error verificant Metal: {error}"
+ },
+ "logs": {
+  "cache_clear_failed": "MLXChatNode: error netejant la caché: {error}",
+  "cache_cleared_all": "MLXPromptCacheManager: s'han netejat totes les cachés",
+  "cache_evicted": "MLXPromptCacheManager: caché expulsada per {model}",
+  "cache_exact_match": "MLXPromptCacheManager: coincidència exacta, {count} tokens en caché",
+  "cache_invalidated_model": "MLXPromptCacheManager: s'han invalidat totes les cachés per {model}",
+  "cache_longer_trimmed": "MLXPromptCacheManager: coincidència més llarga retallada, {new} nous",
+  "cache_manager_clear_failed": "MLXChatNode: error netejant el gestor de caché: {error}",
+  "cache_no_match": "MLXPromptCacheManager: sense coincidència, {count} tokens",
+  "cache_save_failed": "MLXChatNode: desat de la caché fallit (no bloquejant): {error}",
+  "cache_saved_prefill": "MLXChatNode: caché desada després del prefill ({tokens} tokens, key={key})",
+  "cache_shorter_match": "MLXPromptCacheManager: coincidència més curta, {cached} en caché, {new} nous",
+  "cache_trim_failed": "MLXPromptCacheManager: retall fallit: {error}",
+  "chatnode_error": "Error de MLXChatNode després de {elapsed_ms}ms: {error}",
+  "chatnode_identity": "MLXChatNode: identitat={identity}, full={full}, en caché={cached}, nous={new}, prefix_reuse={reuse}",
+  "chatnode_loading_model": "MLXChatNode: carregant model {model} (max_kv_size={max_kv_size})",
+  "chatnode_model_loaded": "MLXChatNode: model carregat correctament",
+  "chatnode_prefix_stats": "MLXChatNode: prefix={prefix} (cached={cached}, new={new}), prefill={prompt_tps:.1f} tok/s, gen={gen_tps:.1f} tok/s, {elapsed_ms}ms (p:{prefill_ms} g:{generation_ms}), {peak_memory_mb:.0f} MB",
+  "chatnode_session": "MLXChatNode: sessió={session}, msgs={count}",
+  "config_invalid": "MLXModule: configuració invàlida. Comprova NEXE_MLX_MODEL.",
+  "config_invalid_hint": "S'espera: NEXE_MLX_MODEL hauria d'apuntar a un directori de model MLX vàlid",
+  "exact_match_processing_bos": "MLXChatNode: coincidència exacta, processant token BOS (~10ms de sobrecàrrega)",
+  "generator_empty": "MLXChatNode: generador buit, no s'ha desat la caché de prefill",
+  "init_failed": "No s'ha pogut inicialitzar MLXModule: {error}",
+  "initialized": "MLXModule inicialitzat correctament",
+  "manifest_creating_instance": "Manifest MLX: creant instància de MLXModule...",
+  "manifest_get_instance_called": "Manifest MLX: get_module_instance() cridat",
+  "manifest_instance_created": "Manifest MLX: instància MLXModule creada",
+  "manifest_returning_instance": "Manifest MLX: retornant instància: {instance}",
+  "merged_response_with_cache": "MLXChatNode: resposta combinada amb l'últim assistent (caché)",
+  "metal_unavailable": "MLXModule: Metal no està disponible. No es pot inicialitzar MLX.",
+  "metal_unavailable_hint": "Per usar MLX: assegura't que executes en Apple Silicon amb suport Metal",
+  "model_reset": "MLXChatNode: model i totes les cachés restablerts",
+  "prefix_cache_header": "MLX PREFIX CACHE: prefix_reuse={reuse}",
+  "prefix_cache_stats": "  cached_tokens={cached}, new_tokens={new}",
+  "prefix_match_processing": "MLXChatNode: coincidència de prefix, processant {count} tokens nous (amb memòria)",
+  "stats_collection_failed": "Ha fallat la recollida d'estadístiques MLX: {error}"
+ }
+}

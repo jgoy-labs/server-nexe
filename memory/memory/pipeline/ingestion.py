@@ -20,8 +20,12 @@ from ..models.memory_entry import MemoryEntry
 from ..engines.flash_memory import FlashMemory
 from ..engines.persistence import PersistenceManager
 from .deduplicator import Deduplicator
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.ingestion.{key}", fallback, **kwargs)
 
 class IngestionPipeline:
   """
@@ -60,7 +64,11 @@ class IngestionPipeline:
     }
 
     backend = "Ollama API" if embedding_model is None else f"SentenceTransformer ({embedding_model})"
-    logger.info("IngestionPipeline initialized (embedding_backend=%s)", backend)
+    logger.info(_t(
+      "initialized",
+      "IngestionPipeline initialized (embedding_backend={backend})",
+      backend=backend
+    ))
 
   async def ingest(self, entry: MemoryEntry) -> bool:
     """
@@ -84,7 +92,11 @@ class IngestionPipeline:
     try:
 
       if self.deduplicator.is_duplicate(entry):
-        logger.info("Skipping duplicate entry %s", entry.id)
+        logger.info(_t(
+          "duplicate_skipped",
+          "Skipping duplicate entry {id}",
+          id=entry.id
+        ))
         self.stats["duplicates_skipped"] += 1
         return False
 
@@ -95,12 +107,21 @@ class IngestionPipeline:
       await self.persistence.store(entry, embedding=embedding)
 
       self.stats["total_ingested"] += 1
-      logger.info("Successfully ingested entry %s", entry.id)
+      logger.info(_t(
+        "ingested",
+        "Successfully ingested entry {id}",
+        id=entry.id
+      ))
 
       return True
 
     except Exception as e:
-      logger.error("Ingestion failed for entry %s: %s", entry.id, e)
+      logger.error(_t(
+        "ingestion_failed",
+        "Ingestion failed for entry {id}: {error}",
+        id=entry.id,
+        error=str(e)
+      ))
       self.stats["failures"] += 1
       return False
 
@@ -131,7 +152,11 @@ class IngestionPipeline:
       else:
         batch_stats["duplicates"] += 1
 
-    logger.info("Batch ingestion completed: %s", batch_stats)
+    logger.info(_t(
+      "batch_completed",
+      "Batch ingestion completed: {stats}",
+      stats=batch_stats
+    ))
 
     return batch_stats
 
@@ -174,7 +199,10 @@ class IngestionPipeline:
     import httpx
 
     if not text.strip():
-      raise ValueError("Text no pot estar buit")
+      raise ValueError(_t(
+        "text_empty",
+        "Text cannot be empty"
+      ))
 
     truncated = text[:8000]
 
@@ -192,18 +220,42 @@ class IngestionPipeline:
           data = response.json()
           embedding = data.get("embedding")
           if embedding:
-            logger.debug("Ollama embedding generated (%d dims)", len(embedding))
+            logger.debug(_t(
+              "ollama_embedding_generated",
+              "Ollama embedding generated ({dims} dims)",
+              dims=len(embedding)
+            ))
             return embedding
           else:
-            raise ValueError("Ollama response missing 'embedding' field")
+            raise ValueError(_t(
+              "ollama_missing_embedding",
+              "Ollama response missing 'embedding' field"
+            ))
         else:
-          raise ValueError(f"Ollama error {response.status_code}: {response.text[:100]}")
+          raise ValueError(_t(
+            "ollama_http_error",
+            "Ollama error {status}: {preview}",
+            status=response.status_code,
+            preview=response.text[:100],
+          ))
 
     except httpx.TimeoutException:
-      logger.error("Ollama embedding timeout (%ss)", self.OLLAMA_TIMEOUT)
-      raise ValueError("Ollama embedding timeout")
+      logger.error(_t(
+        "ollama_timeout",
+        "Ollama embedding timeout ({seconds}s)",
+        seconds=self.OLLAMA_TIMEOUT
+      ))
+      raise ValueError(_t(
+        "ollama_timeout",
+        "Ollama embedding timeout ({seconds}s)",
+        seconds=self.OLLAMA_TIMEOUT
+      ))
     except Exception as e:
-      logger.error("Ollama embedding error: %s", e)
+      logger.error(_t(
+        "ollama_error",
+        "Ollama embedding error: {error}",
+        error=str(e)
+      ))
       raise
 
   def _generate_embedding_sync(self, text: str) -> List[float]:
@@ -229,10 +281,17 @@ class IngestionPipeline:
     import numpy as np
 
     if not text.strip():
-      raise ValueError("Text no pot estar buit")
+      raise ValueError(_t(
+        "text_empty",
+        "Text cannot be empty"
+      ))
 
     if not hasattr(self, '_st_model') or self._st_model is None:
-      logger.info("Loading SentenceTransformer model: %s", self.embedding_model)
+      logger.info(_t(
+        "sentence_transformer_loading",
+        "Loading SentenceTransformer model: {model}",
+        model=self.embedding_model
+      ))
       self._st_model = SentenceTransformer(self.embedding_model, device="cpu")
 
     embedding = self._st_model.encode(
@@ -251,7 +310,10 @@ class IngestionPipeline:
     import random
 
     if not text.strip():
-      raise ValueError("Text no pot estar buit")
+      raise ValueError(_t(
+        "text_empty",
+        "Text cannot be empty"
+      ))
 
     seed = int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:16], 16)
     rng = random.Random(seed)
@@ -265,7 +327,11 @@ class IngestionPipeline:
       int: Number of cleaned entries
     """
     deleted = await self.flash.cleanup_expired()
-    logger.info("Cleanup: %s expired entries removed", deleted)
+    logger.info(_t(
+      "cleanup_completed",
+      "Cleanup: {count} expired entries removed",
+      count=deleted
+    ))
     return deleted
 
   def get_stats(self) -> dict:
@@ -278,6 +344,6 @@ class IngestionPipeline:
   def close(self):
     """Close resources"""
     self.executor.shutdown(wait=True)
-    logger.info("IngestionPipeline closed")
+    logger.info(_t("closed", "IngestionPipeline closed"))
 
 __all__ = ["IngestionPipeline"]

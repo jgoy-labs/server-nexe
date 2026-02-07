@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/path_discovery.py
-Description: Descobridor de paths de mòduls Nexe. Escaneja core/tools per cada capa,
+Description: Nexe module path discovery. Scans core/tools per layer,
 
 www.jgoy.net
 ────────────────────────────────────
@@ -58,7 +58,7 @@ class PathDiscovery:
       self.strict_mode = mode != 'development'
 
     if not self.strict_mode:
-      logger.warning("PathDiscovery in DEV MODE - auto-discovery enabled")
+      logger.warning(self._get_message('path_discovery.dev_mode'))
     
     self.known_paths = [
       "plugins/core",
@@ -84,6 +84,8 @@ class PathDiscovery:
       return self.i18n.t(key, **kwargs)
     
     fallbacks = {
+      'path_discovery.dev_mode': "PathDiscovery in DEV MODE - auto-discovery enabled",
+      'path_discovery.strict_mode_skip': "Strict mode: skipping auto-discovery",
       'path_discovery.scanning': "Scanning paths for modules...",
       'path_discovery.path_added': f"Path added: {kwargs.get('path', 'unknown')}",
       'path_discovery.module_found': f"Module found: '{kwargs.get('name', 'unknown')}' at {kwargs.get('path', 'unknown')}",
@@ -119,7 +121,7 @@ class PathDiscovery:
     if not self.strict_mode:
       self._auto_discover_paths()
     else:
-      logger.debug("Strict mode: skipping auto-discovery")
+      logger.debug(self._get_message('path_discovery.strict_mode_skip'))
 
     self._add_configured_paths()
     

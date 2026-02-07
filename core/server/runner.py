@@ -36,8 +36,12 @@ import uvicorn
 
 logger = logging.getLogger(__name__)
 
+from personality.i18n.resolve import t_modular
 from .helpers import setup_signal_handlers, is_port_in_use, translate
 from .factory import create_app
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.server_runner.{key}", fallback, **kwargs)
 
 
 def kill_process_on_port(port: int) -> bool:
@@ -64,7 +68,12 @@ def kill_process_on_port(port: int) -> bool:
       time.sleep(0.5)
       return True
   except Exception as e:
-    logger.debug("Failed to kill process on port %s: %s", port, e)
+    logger.debug(_t(
+      "kill_process_failed",
+      "Failed to kill process on port {port}: {error}",
+      port=port,
+      error=str(e)
+    ))
   return False
 
 def main():
@@ -79,7 +88,10 @@ def main():
 
   # Check basic security config
   if not os.getenv("NEXE_PRIMARY_API_KEY"):
-       logger.warning("No NEXE_PRIMARY_API_KEY found in .env. Authentication might fail or rely on defaults.")
+       logger.warning(_t(
+         "missing_api_key",
+         "No NEXE_PRIMARY_API_KEY found in .env. Authentication might fail or rely on defaults."
+       ))
 
   app = create_app()
 
@@ -96,7 +108,11 @@ def main():
   port = server_config.get('port', 9119)
   workers = server_config.get('workers', 1)
   if workers > 1:
-    logger.warning("Multiple workers detected. Note that bootstrap tokens and rate-limits are currently in-memory and not shared across processes.")
+    logger.warning(translate(
+      i18n,
+      "core.server.multi_worker_warning",
+      "Multiple workers detected. Note that bootstrap tokens and rate-limits are currently in-memory and not shared across processes."
+    ))
     # For IoT core, we might want to force 1, but let's just warn for now as requested.
 
   reload = server_config.get('reload', False)
@@ -113,7 +129,10 @@ def main():
     )
     # Ask user if they want to kill existing process
     try:
-      print(f"\n{YELLOW}Port {port} is in use. Kill existing process? [y/N]: {RESET}", end="")
+      print(
+        f"\n{YELLOW}{translate(i18n, 'core.server_runner.port_in_use_prompt', 'Port {port} is in use. Kill existing process? [y/N]: ', port=port)}{RESET}",
+        end=""
+      )
       response = input().strip().lower()
       if response in ('y', 'yes'):
         if kill_process_on_port(port):
@@ -136,15 +155,15 @@ def main():
   )
 
   # Quick reference commands
-  print(f"\n{BOLD}{RED}QUICK COMMANDS:{RESET}")
-  print(f"  {CYAN}Interactive Chat:{RESET}  ./nexe chat")
-  print(f"  {CYAN}View logs:{RESET}         ./nexe logs")
-  print(f"  {CYAN}RAG ingest:{RESET}        ./nexe memory store \"text\"")
-  print(f"  {CYAN}System status:{RESET}     ./nexe status")
-  print(f"\n{BOLD}QUICK CONFIG:{RESET}")
-  print(f"  To change personality (System Prompt):")
-  print(f"  edit {YELLOW}personality/server.toml{RESET}")
-  print(f"{YELLOW}Server running at: {host}:{port}{RESET}\n")
+  print(f"\n{BOLD}{RED}{translate(i18n, 'core.server_runner.quick_commands_title', 'QUICK COMMANDS:')}{RESET}")
+  print(f"  {CYAN}{translate(i18n, 'core.server_runner.quick_commands_chat', 'Interactive Chat:')}{RESET}  ./nexe chat")
+  print(f"  {CYAN}{translate(i18n, 'core.server_runner.quick_commands_logs', 'View logs:')}{RESET}         ./nexe logs")
+  print(f"  {CYAN}{translate(i18n, 'core.server_runner.quick_commands_rag', 'RAG ingest:')}{RESET}        ./nexe memory store \"text\"")
+  print(f"  {CYAN}{translate(i18n, 'core.server_runner.quick_commands_status', 'System status:')}{RESET}     ./nexe status")
+  print(f"\n{BOLD}{translate(i18n, 'core.server_runner.quick_config_title', 'QUICK CONFIG:')}{RESET}")
+  print(f"  {translate(i18n, 'core.server_runner.quick_config_personality', 'To change personality (System Prompt):')}")
+  print(f"  {translate(i18n, 'core.server_runner.quick_config_edit', 'edit')} {YELLOW}personality/server.toml{RESET}")
+  print(f"{YELLOW}{translate(i18n, 'core.server_runner.server_running', 'Server running at: {host}:{port}', host=host, port=port)}{RESET}\n")
 
   try:
     # Use core.app:app instead of core.server_nexe:app to avoid watchfiles bug

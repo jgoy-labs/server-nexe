@@ -11,6 +11,7 @@ www.jgoy.net
 """
 
 from fastapi import APIRouter, HTTPException
+from personality.i18n.resolve import t_modular
 import logging
 
 logger = logging.getLogger(__name__)
@@ -49,17 +50,26 @@ async def rag_search_v1():
       "query_time_ms": 42
     }
   """
-  logger.warning("RAG search endpoint called but not implemented yet")
+  logger.warning(t_modular(
+    "rag.logs.search_not_implemented",
+    "RAG search endpoint called but not implemented yet"
+  ))
 
   raise HTTPException(
     status_code=501,
     detail={
-      "error": "Not Implemented",
-      "message": "RAG search API scheduled for FASE 15",
-      "internal_status": "RAGModule operational (internal use only)",
+      "error": t_modular("rag.api.not_implemented_error", "Not Implemented"),
+      "message": t_modular("rag.api.search_scheduled", "RAG search API scheduled for FASE 15"),
+      "internal_status": t_modular("rag.api.internal_status", "RAGModule operational (internal use only)"),
       "expected_date": "2025-12-15",
-      "reason": "Waiting for granular auth (FASE 13) before exposing RAG HTTP API",
-      "workaround": "Use RAGModule directly from Python: from memory.rag.module import RAGModule"
+      "reason": t_modular(
+        "rag.api.reason_auth",
+        "Waiting for granular auth (FASE 13) before exposing RAG HTTP API"
+      ),
+      "workaround": t_modular(
+        "rag.api.workaround_direct_module",
+        "Use RAGModule directly from Python: from memory.rag.module import RAGModule"
+      )
     }
   )
 
@@ -86,14 +96,17 @@ async def rag_add_documents_v1():
       "total_added": 2
     }
   """
-  logger.warning("RAG add documents endpoint called but not implemented yet")
+  logger.warning(t_modular(
+    "rag.logs.add_not_implemented",
+    "RAG add documents endpoint called but not implemented yet"
+  ))
 
   raise HTTPException(
     status_code=501,
     detail={
-      "error": "Not Implemented",
-      "message": "RAG document addition API scheduled for FASE 15",
-      "internal_status": "RAGModule operational (internal use only)",
+      "error": t_modular("rag.api.not_implemented_error", "Not Implemented"),
+      "message": t_modular("rag.api.add_scheduled", "RAG document addition API scheduled for FASE 15"),
+      "internal_status": t_modular("rag.api.internal_status", "RAGModule operational (internal use only)"),
       "expected_date": "2025-12-15"
     }
   )
@@ -117,14 +130,18 @@ async def rag_delete_document_v1(document_id: str):
   Errors:
     - 404: Document not found
   """
-  logger.warning("RAG delete document endpoint called for %s but not implemented yet", document_id)
+  logger.warning(t_modular(
+    "rag.logs.delete_not_implemented",
+    "RAG delete document endpoint called for {document_id} but not implemented yet",
+    document_id=document_id
+  ))
 
   raise HTTPException(
     status_code=501,
     detail={
-      "error": "Not Implemented",
-      "message": "RAG document deletion API scheduled for FASE 15",
-      "internal_status": "RAGModule operational (internal use only)",
+      "error": t_modular("rag.api.not_implemented_error", "Not Implemented"),
+      "message": t_modular("rag.api.delete_scheduled", "RAG document deletion API scheduled for FASE 15"),
+      "internal_status": t_modular("rag.api.internal_status", "RAGModule operational (internal use only)"),
       "expected_date": "2025-12-15"
     }
   )

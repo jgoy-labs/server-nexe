@@ -4,13 +4,14 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/metrics/middleware.py
-Description: Prometheus middleware per tracking HTTP requests.
+Description: Prometheus middleware for tracking HTTP requests.
 
 www.jgoy.net
 ────────────────────────────────────
 """
 
 import logging
+from personality.i18n.resolve import t_modular
 import time
 from typing import Callable
 
@@ -28,15 +29,18 @@ from .registry import (
 
 logger = logging.getLogger(__name__)
 
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.metrics_middleware.{key}", fallback, **kwargs)
+
 class PrometheusMiddleware(BaseHTTPMiddleware):
   """
-  Middleware per recollir mètriques Prometheus de requests HTTP.
+  Middleware to collect Prometheus metrics for HTTP requests.
 
-  Mètriques recollides:
+  Collected metrics:
   - core_http_requests_total: Total requests per method/path/status
-  - core_http_request_duration_seconds: Latència per method/path
+  - core_http_request_duration_seconds: Latency per method/path
   - core_http_errors_total: Errors per method/path/error_type
-  - core_active_connections: Connexions actives
+  - core_active_connections: Active connections
   """
 
   EXCLUDED_PATHS = {
@@ -52,14 +56,14 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
     self, request: Request, call_next: Callable
   ) -> Response:
     """
-    Processa request i recull mètriques.
+    Process request and collect metrics.
 
     Args:
-      request: Request HTTP
-      call_next: Handler següent
+      request: HTTP request
+      call_next: Next handler
 
     Returns:
-      Response HTTP
+      HTTP response
     """
     path = request.url.path
 
@@ -127,13 +131,13 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
   def _categorize_error(self, status_code: int) -> str:
     """
-    Categoritza error per status code.
+    Categorize error by status code.
 
     Args:
       status_code: HTTP status code
 
     Returns:
-      Categoria d'error
+      Error category
     """
     if status_code == 400:
       return "bad_request"
@@ -154,10 +158,10 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
 def setup_prometheus_middleware(app) -> None:
   """
-  Configura el middleware de Prometheus a l'aplicació.
+  Configure Prometheus middleware for the application.
 
   Args:
     app: FastAPI application
   """
   app.add_middleware(PrometheusMiddleware)
-  logger.info("prometheus_middleware_enabled")
+  logger.info(_t("prometheus_enabled", "Prometheus middleware enabled"))

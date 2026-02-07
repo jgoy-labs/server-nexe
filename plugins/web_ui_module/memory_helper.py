@@ -19,6 +19,9 @@ from .i18n import t
 
 logger = logging.getLogger(__name__)
 
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t(f"web_ui.logs.{key}", fallback, **kwargs)
+
 # ============================================
 # MEMORY MANAGEMENT CONFIG
 # ============================================
@@ -167,12 +170,16 @@ class MemoryHelper:
 
         # If no model specified, skip extraction (don't guess)
         if not model_name:
-            logger.debug("No model specified for extraction, skipping")
+            logger.debug(
+                _t_log("extract_no_model", "No model specified for extraction, skipping")
+            )
             return conversation
 
         engine_type, engine = await self._get_llm_for_extraction()
         if not engine:
-            logger.debug("No LLM for extraction, using raw conversation")
+            logger.debug(
+                _t_log("extract_no_llm", "No LLM for extraction, using raw conversation")
+            )
             return conversation
 
         try:
@@ -203,14 +210,29 @@ class MemoryHelper:
             extracted = extracted.strip()
             empty_tag = _extractor_empty_tag()
             if not extracted or empty_tag.upper() in extracted.upper() or len(extracted) < 5:
-                logger.debug("Memory extraction: no relevant facts found")
+                logger.debug(
+                    _t_log("extract_no_facts", "Memory extraction: no relevant facts found")
+                )
                 return None
 
-            logger.info(f"Memory extraction: {len(conversation)} chars → {len(extracted)} chars")
+            logger.info(
+                _t_log(
+                    "extract_stats",
+                    "Memory extraction: {input_chars} chars → {output_chars} chars",
+                    input_chars=len(conversation),
+                    output_chars=len(extracted),
+                )
+            )
             return extracted
 
         except Exception as e:
-            logger.warning(f"Fact extraction failed: {e}, using raw")
+            logger.warning(
+                _t_log(
+                    "extract_failed",
+                    "Fact extraction failed: {error}, using raw",
+                    error=str(e),
+                )
+            )
             return conversation  # Fallback to raw
 
     async def get_memory_api(self):
@@ -224,9 +246,20 @@ class MemoryHelper:
                 # Ensure web UI collection exists
                 if not await self._memory_api.collection_exists("nexe_web_ui"):
                     await self._memory_api.create_collection("nexe_web_ui", vector_size=384)
-                    logger.info("Created web UI memory collection")
+                    logger.info(
+                        _t_log(
+                            "collection_created",
+                            "Created web UI memory collection"
+                        )
+                    )
             except Exception as e:
-                logger.error(f"Failed to initialize Memory API: {e}")
+                logger.error(
+                    _t_log(
+                        "memory_api_init_failed",
+                        "Failed to initialize Memory API: {error}",
+                        error=str(e),
+                    )
+                )
                 self._memory_api = None
         return self._memory_api
 
@@ -276,11 +309,23 @@ class MemoryHelper:
             if results and len(results) > 0:
                 # Si similaritat > threshold, és duplicat
                 if results[0].score >= SIMILARITY_THRESHOLD:
-                    logger.debug(f"Duplicate detected (score={results[0].score:.2f}), skipping save")
+                    logger.debug(
+                        _t_log(
+                            "duplicate_detected",
+                            "Duplicate detected (score={score:.2f}), skipping save",
+                            score=results[0].score,
+                        )
+                    )
                     return True
             return False
         except Exception as e:
-            logger.warning(f"Duplicate check failed: {e}")
+            logger.warning(
+                _t_log(
+                    "duplicate_check_failed",
+                    "Duplicate check failed: {error}",
+                    error=str(e),
+                )
+            )
             return False  # En cas de dubte, guardar
 
     def _calculate_retention_score(self, entry) -> float:
@@ -317,7 +362,13 @@ class MemoryHelper:
             return retention
 
         except Exception as e:
-            logger.debug(f"Retention score calc error: {e}")
+            logger.debug(
+                _t_log(
+                    "retention_calc_error",
+                    "Retention score calc error: {error}",
+                    error=str(e),
+                )
+            )
             return 0.5  # Default mid-score
 
     async def _prune_old_entries(self, memory) -> int:
@@ -365,15 +416,41 @@ class MemoryHelper:
                     if hasattr(entry, 'id') and entry.id:
                         await memory.delete(entry.id, collection="nexe_web_ui")
                         deleted += 1
-                        logger.debug(f"Pruned entry (retention={score:.2f}): {entry.text[:50] if entry.text else 'N/A'}...")
+                        logger.debug(
+                            _t_log(
+                                "pruned_entry",
+                                "Pruned entry (retention={score:.2f}): {preview}...",
+                                score=score,
+                                preview=entry.text[:50] if entry.text else "N/A",
+                            )
+                        )
                 except Exception as e:
-                    logger.warning(f"Failed to delete entry: {e}")
+                    logger.warning(
+                        _t_log(
+                            "delete_entry_failed",
+                            "Failed to delete entry: {error}",
+                            error=str(e),
+                        )
+                    )
 
-            logger.info(f"Smart prune: {deleted} low-retention entries removed (was {current_count})")
+            logger.info(
+                _t_log(
+                    "smart_prune",
+                    "Smart prune: {deleted} low-retention entries removed (was {previous})",
+                    deleted=deleted,
+                    previous=current_count,
+                )
+            )
             return deleted
 
         except Exception as e:
-            logger.warning(f"Memory pruning failed: {e}")
+            logger.warning(
+                _t_log(
+                    "pruning_failed",
+                    "Memory pruning failed: {error}",
+                    error=str(e),
+                )
+            )
             return 0
 
     async def save_to_memory(
@@ -439,7 +516,13 @@ class MemoryHelper:
                 )
             }
         except Exception as e:
-            logger.error(f"Memory store error: {e}")
+            logger.error(
+                _t_log(
+                    "store_error",
+                    "Memory store error: {error}",
+                    error=str(e),
+                )
+            )
             return {
                 "success": False,
                 "message": t(
@@ -470,7 +553,13 @@ class MemoryHelper:
         """
         # 1. Skip trivial messages (greetings, thanks, etc.)
         if self._is_trivial_message(user_message):
-            logger.debug(f"Skipping trivial message: {user_message[:30]}...")
+            logger.debug(
+                _t_log(
+                    "skip_trivial",
+                    "Skipping trivial message: {preview}...",
+                    preview=user_message[:30],
+                )
+            )
             return {
                 "success": True,
                 "document_id": None,
@@ -490,7 +579,9 @@ class MemoryHelper:
         extracted = await self.extract_facts(conversation, model_name=model_name)
 
         if not extracted:
-            logger.debug("No facts extracted, skipping save")
+            logger.debug(
+                _t_log("no_facts_skip_save", "No facts extracted, skipping save")
+            )
             return {
                 "success": True,
                 "document_id": None,
@@ -604,7 +695,14 @@ class MemoryHelper:
 
                             # TODO: Increment access_count (would need memory.update)
                 except Exception as e:
-                    logger.warning(f"Error searching collection {collection}: {e}")
+                    logger.warning(
+                        _t_log(
+                            "search_collection_failed",
+                            "Error searching collection {collection}: {error}",
+                            collection=collection,
+                            error=str(e),
+                        )
+                    )
 
             # Sort by score descending
             all_results.sort(key=lambda x: x["score"], reverse=True)
@@ -623,7 +721,13 @@ class MemoryHelper:
                 )
             }
         except Exception as e:
-            logger.error(f"Memory recall error: {e}")
+            logger.error(
+                _t_log(
+                    "recall_error",
+                    "Memory recall error: {error}",
+                    error=str(e),
+                )
+            )
             return {
                 "success": False,
                 "results": [],
@@ -664,7 +768,13 @@ class MemoryHelper:
                 "usage_percent": round((count / MAX_MEMORY_ENTRIES) * 100, 1) if MAX_MEMORY_ENTRIES > 0 else 0
             }
         except Exception as e:
-            logger.error(f"Failed to get memory stats: {e}")
+            logger.error(
+                _t_log(
+                    "stats_failed",
+                    "Failed to get memory stats: {error}",
+                    error=str(e),
+                )
+            )
             return {"error": str(e)}
 
     async def clear_memory(self, confirm: bool = False) -> Dict[str, Any]:
@@ -698,7 +808,12 @@ class MemoryHelper:
                 # Delete and recreate collection
                 await memory.delete_collection("nexe_web_ui")
                 await memory.create_collection("nexe_web_ui", vector_size=384)
-                logger.info("Memory collection cleared and recreated")
+                logger.info(
+                    _t_log(
+                        "collection_cleared",
+                        "Memory collection cleared and recreated"
+                    )
+                )
 
             return {
                 "success": True,
@@ -708,7 +823,13 @@ class MemoryHelper:
                 )
             }
         except Exception as e:
-            logger.error(f"Failed to clear memory: {e}")
+            logger.error(
+                _t_log(
+                    "clear_failed",
+                    "Failed to clear memory: {error}",
+                    error=str(e),
+                )
+            )
             return {"success": False, "message": str(e)}
 
 

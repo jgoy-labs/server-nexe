@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/models/selector.py
-Description: Lògica de detecció de maquinari i selecció de perfil.
+Description: Hardware detection logic and profile selection.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -16,6 +16,8 @@ import logging
 import shutil
 from typing import Tuple
 
+from personality.i18n.resolve import t_modular
+
 from .profiles import PROFILES, HardwareTier, ModelProfile, EngineType
 
 logger = logging.getLogger(__name__)
@@ -24,10 +26,10 @@ class HardwareProfile:
     def __init__(self):
         self.system = platform.system()
         self.processor = platform.processor()
-        self.machine = platform.machine() # 'arm64' per apple silicon
+        self.machine = platform.machine() # 'arm64' for Apple Silicon
         self.total_ram_gb = round(psutil.virtual_memory().total / (1024**3), 2)
         self.is_apple_silicon = self.system == "Darwin" and self.machine == "arm64"
-        self.has_cuda = False # TODO: Detectar NVIDIA
+        self.has_cuda = False # TODO: Detect NVIDIA
 
     def __str__(self):
         return (f"Hardware: {self.system} {self.machine}, "
@@ -35,7 +37,7 @@ class HardwareProfile:
                 f"Apple Silicon: {self.is_apple_silicon}")
 
 class ModelSelector:
-    """Selecciona el millor perfil de models segons el maquinari."""
+    """Select the best model profile based on hardware."""
     
     def __init__(self):
         self.hw = HardwareProfile()
@@ -44,19 +46,26 @@ class ModelSelector:
         return self.hw
 
     def recommend(self) -> ModelProfile:
-        """Retorna el perfil recomanat."""
+        """Return the recommended profile."""
         tier = self._determine_tier()
-        profile = PROFILES[tier].model_copy() # Copia per modificar engine si cal
+        profile = PROFILES[tier].model_copy() # Copy to modify engine if needed
         
-        # Ajustar Engine segons HW real
+        # Adjust engine based on real hardware
         if self.hw.is_apple_silicon:
             profile.preferred_engine = EngineType.MLX
         elif self._check_ollama_available():
             profile.preferred_engine = EngineType.OLLAMA
         else:
-            profile.preferred_engine = EngineType.LLAMA_CPP # Fallback CPU
+            profile.preferred_engine = EngineType.LLAMA_CPP # CPU fallback
             
-        logger.info(f"Recommended Profile: {tier.value} for {self.hw}")
+        logger.info(
+            t_modular(
+                "models.selector.recommended_profile",
+                "Recommended Profile: {tier} for {hardware}",
+                tier=tier.value,
+                hardware=self.hw,
+            )
+        )
         return profile
     
     def _determine_tier(self) -> HardwareTier:
@@ -75,7 +84,7 @@ class ModelSelector:
         return shutil.which("ollama") is not None
 
     def apply_to_config(self, config: dict, profile: ModelProfile) -> dict:
-        """Aplica el perfil a la configuració carregada (server.toml object)."""
+        """Apply the profile to the loaded configuration (server.toml object)."""
         if "plugins" not in config:
             config["plugins"] = {}
         if "models" not in config["plugins"]:

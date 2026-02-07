@@ -1,22 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-MLXChatNode - Node LLM basat en mlx-lm per Apple Silicon.
+MLXChatNode - LLM node based on mlx-lm for Apple Silicon.
 
-VERSIÓ 2.0 - PREFIX MATCHING REAL via MLXPromptCacheManager.
-Split 2026-01-01: Helpers moguts a generate_helpers.py (Lliçó 10)
+VERSION 2.0 - REAL PREFIX MATCHING via MLXPromptCacheManager.
+Split 2026-01-01: Helpers moved to generate_helpers.py (Lesson 10)
 
-Característiques:
-- Model singleton (carregat una vegada, reutilitzat)
-- MLXPromptCacheManager: trie-based cache amb prefix matching
-- Reutilitza KV states del prefix (system + historial)
-- Només processa tokens nous a cada torn → speedup 5-10x
+Features:
+- Singleton model (loaded once, reused)
+- MLXPromptCacheManager: trie-based cache with prefix matching
+- Reuses KV states from the prefix (system + history)
+- Only processes new tokens per turn -> 5-10x speedup
 
-Requereix:
+Requires:
 - Apple Silicon (M1/M2/M3/M4)
 - mlx-lm >= 0.30.0
-- Model MLX format (safetensors)
+- MLX model format (safetensors)
 
-Part of: PLA_OPTIMITZACIO_LLM_MODULAR - Backend MLX
+Part of: PLA_OPTIMITZACIO_LLM_MODULAR - MLX Backend
 """
 import asyncio
 import gc
@@ -26,7 +26,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 
 from .config import MLXConfig
-# Split 2026-01-01: Helpers per _generate_blocking
+# Split 2026-01-01: Helpers for _generate_blocking
 from .generate_helpers import (
     prepare_tokens,
     lookup_prefix_cache,
@@ -36,25 +36,29 @@ from .generate_helpers import (
     extract_metrics,
 )
 from core.utils import compute_system_hash
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"mlx_module.logs.{key}", fallback, **kwargs)
 
 
 class MLXChatNode:
     """
-    Motor d'inferència per a MLX adaptat per a Nexe 0.8.
+    Inference engine for MLX adapted for Nexe 0.8.
 
-    Manté:
-    - Un sol model carregat (singleton)
-    - MLXPromptCacheManager per prefix matching (trie-based)
-    - Reutilitza KV states del prefix (system + historial)
-    - Només processa tokens nous a cada torn
+    Maintains:
+    - A single loaded model (singleton)
+    - MLXPromptCacheManager for prefix matching (trie-based)
+    - Reuses KV states from the prefix (system + history)
+    - Only processes new tokens per turn
 
     Class Attributes:
-        _model: Model MLX singleton
-        _tokenizer: Tokenizer singleton
-        _lock: Lock per thread-safety
-        _config: Configuració activa
+        _model: Singleton MLX model
+        _tokenizer: Singleton tokenizer
+        _lock: Lock for thread safety
+        _config: Active configuration
     """
 
     _model: Optional[Any] = None
@@ -64,75 +68,86 @@ class MLXChatNode:
 
     def __init__(self, config: Optional[MLXConfig] = None):
         """
-        Inicialitza el node MLX.
+        Initialize the MLX node.
 
         Args:
-            config: Configuració MLX (o carrega de .env si None)
+            config: MLX configuration (or load from .env if None)
         """
         self.config = config or MLXConfig.from_env()
 
-        # Actualitzar config singleton si canvia
+        # Update singleton config if it changes
         if (MLXChatNode._config is None or
                 MLXChatNode._config.model_path != self.config.model_path):
             MLXChatNode._config = self.config
-            MLXChatNode._model = None  # Forçar reload
+            MLXChatNode._model = None  # Force reload
 
     def _get_model(self) -> tuple:
         """
-        Obtenir model i tokenizer (lazy load singleton).
+        Get model and tokenizer (lazy singleton load).
 
         Returns:
             tuple: (model, tokenizer)
         """
         if MLXChatNode._model is None:
-            # Import lazy per evitar carregar mlx si no s'usa
+            # Lazy import to avoid loading mlx if unused
             from mlx_lm import load
 
             logger.info(
-                "MLXChatNode: loading model %s (max_kv_size=%d)",
-                self.config.model_path[-50:] if self.config.model_path else "(empty)",
-                self.config.max_kv_size
+                _t_log(
+                    "chatnode_loading_model",
+                    "MLXChatNode: loading model {model} (max_kv_size={max_kv_size})",
+                    model=self.config.model_path[-50:] if self.config.model_path else "(empty)",
+                    max_kv_size=self.config.max_kv_size,
+                )
             )
 
             MLXChatNode._model, MLXChatNode._tokenizer = load(
                 self.config.model_path
             )
 
-            logger.info("MLXChatNode: model loaded successfully")
+            logger.info(
+                _t_log(
+                    "chatnode_model_loaded",
+                    "MLXChatNode: model loaded successfully"
+                )
+            )
 
         return MLXChatNode._model, MLXChatNode._tokenizer
 
     # NOTE: Legacy cache methods (_get_or_create_cache, _touch_lru, _destroy_cache)
-    # han estat eliminats. Ara usem MLXPromptCacheManager per prefix matching real.
+    # have been removed. We now use MLXPromptCacheManager for real prefix matching.
 
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Executa generació amb MLX.
+        Run generation with MLX.
 
         Args:
-            inputs: Dict amb system, messages, messages_for_cache, session_id, stream_callback
+            inputs: Dict with system, messages, messages_for_cache, session_id, stream_callback
 
         Returns:
-            Dict amb response, tokens, metrics, etc.
+            Dict with response, tokens, metrics, etc.
         """
         start_time = time.time()
 
         system = inputs.get("system", "")
         messages = inputs.get("messages", [])
-        # OPCIÓ D: messages_for_cache per guardar cache sense memòria
+        # OPTION D: messages_for_cache to store cache without memory
         messages_for_cache = inputs.get("messages_for_cache", messages)
         session_id = inputs.get("session_id", "default")
         stream_callback = inputs.get("stream_callback")
 
-        # Log per debugging
+        # Log for debugging
         logger.info(
-            "MLXChatNode: session=%s, msgs=%d",
-            session_id[:8] if session_id else "none",
-            len(messages)
+            _t_log(
+                "chatnode_session",
+                "MLXChatNode: session={session}, msgs={count}",
+                session=session_id[:8] if session_id else "none",
+                count=len(messages),
+            )
         )
 
-        # Capturar event loop per streaming thread-safe
+        # Capture event loop for thread-safe streaming
         loop = asyncio.get_running_loop()
 
         def threadsafe_callback(text: str) -> None:
@@ -140,53 +155,55 @@ class MLXChatNode:
                 loop.call_soon_threadsafe(stream_callback, text)
 
         try:
-            # Executar generació en thread (MLX és blocking)
-            # Amb PREFIX MATCHING via MLXPromptCacheManager
-            # OPCIÓ D: Passem messages (per generació) i messages_for_cache (per guardar)
+            # Run generation in a thread (MLX is blocking)
+            # With PREFIX MATCHING via MLXPromptCacheManager
+            # OPTION D: Pass messages (for generation) and messages_for_cache (for storage)
             result = await asyncio.to_thread(
                 self._generate_blocking,
                 system,
                 messages,
-                messages_for_cache,  # NOU: Per guardar cache net (Opció D)
+                messages_for_cache,  # NEW: Store clean cache (Option D)
                 threadsafe_callback if stream_callback else None,
-                session_id  # Per separar caches per sessió
+                session_id  # Separate caches per session
             )
 
             elapsed_ms = int((time.time() - start_time) * 1000)
 
             context_used = result["prompt_tokens"] + result["tokens"]
-            system_tokens = len(system) // 4  # Estimació
+            system_tokens = len(system) // 4  # Estimate
             prompt_tps = result.get("prompt_tps", 0)
 
-            # Utilitzar prefix_reused del cache manager (basat en tokens reals)
+            # Use prefix_reused from cache manager (based on real tokens)
             prefix_reuse = result.get("prefix_reused", False)
             cached_tokens = result.get("cached_tokens", 0)
             actual_prefill = result.get("actual_prefill_tokens", result["prompt_tokens"])
 
-            # Calcular speedup real
+            # Compute real speedup
             if cached_tokens > 0:
                 reuse_ratio = (cached_tokens + actual_prefill) / max(actual_prefill, 1)
             else:
                 reuse_ratio = 1.0
 
-            # Calcular temps per fase (ms)
+            # Compute per-phase timings (ms)
             generation_tps = result["tokens_per_second"]
             prefill_ms = int((actual_prefill / prompt_tps * 1000) if prompt_tps > 0 else 0)
             generation_ms = int((result["tokens"] / generation_tps * 1000) if generation_tps > 0 else 0)
             overhead_ms = elapsed_ms - prefill_ms - generation_ms
 
             logger.info(
-                "MLXChatNode: prefix=%s (cached=%d, new=%d), "
-                "prefill=%.1f tok/s, gen=%.1f tok/s, %dms (p:%d g:%d), %.0f MB",
-                "REUSED" if prefix_reuse else "FULL",
-                cached_tokens,
-                actual_prefill,
-                prompt_tps,
-                generation_tps,
-                elapsed_ms,
-                prefill_ms,
-                generation_ms,
-                result.get("peak_memory_mb", 0)
+                _t_log(
+                    "chatnode_prefix_stats",
+                    "MLXChatNode: prefix={prefix} (cached={cached}, new={new}), prefill={prompt_tps:.1f} tok/s, gen={gen_tps:.1f} tok/s, {elapsed_ms}ms (p:{prefill_ms} g:{generation_ms}), {peak_memory_mb:.0f} MB",
+                    prefix="REUSED" if prefix_reuse else "FULL",
+                    cached=cached_tokens,
+                    new=actual_prefill,
+                    prompt_tps=prompt_tps,
+                    gen_tps=generation_tps,
+                    elapsed_ms=elapsed_ms,
+                    prefill_ms=prefill_ms,
+                    generation_ms=generation_ms,
+                    peak_memory_mb=result.get("peak_memory_mb", 0),
+                )
             )
 
             return {
@@ -199,18 +216,18 @@ class MLXChatNode:
                 "context_used": context_used,
                 "system_tokens": system_tokens,
                 "system_prompt": system,
-                "cache_active": result.get("cache_active", False),  # Compatibilitat
-                "prefix_reuse": prefix_reuse,  # True = prefix matching va funcionar
-                "reuse_ratio": round(reuse_ratio, 2),  # Ràtio cached/new tokens
-                "cached_tokens": cached_tokens,  # Tokens reutilitzats del cache
-                "actual_prefill_tokens": actual_prefill,  # Tokens realment processats
-                "identity_hash": result.get("identity_hash", ""),  # Hash del system
+                "cache_active": result.get("cache_active", False),  # Compatibility
+                "prefix_reuse": prefix_reuse,  # True = prefix matching worked
+                "reuse_ratio": round(reuse_ratio, 2),  # Cached/new token ratio
+                "cached_tokens": cached_tokens,  # Tokens reused from cache
+                "actual_prefill_tokens": actual_prefill,  # Tokens actually processed
+                "identity_hash": result.get("identity_hash", ""),  # System hash
                 "peak_memory_mb": round(result.get("peak_memory_mb", 0), 1),
                 "prompt_tps": round(prompt_tps, 1),
                 # Timing breakdown
                 "timing": {
-                    "prefill_ms": prefill_ms,      # Temps processar tokens nous
-                    "generation_ms": generation_ms, # Temps generar output
+                    "prefill_ms": prefill_ms,      # Time to process new tokens
+                    "generation_ms": generation_ms, # Time to generate output
                     "overhead_ms": max(0, overhead_ms),  # Overhead
                 },
             }
@@ -218,9 +235,12 @@ class MLXChatNode:
         except Exception as e:
             elapsed_ms = int((time.time() - start_time) * 1000)
             logger.error(
-                "MLXChatNode error after %dms: %s",
-                elapsed_ms,
-                str(e)
+                _t_log(
+                    "chatnode_error",
+                    "MLXChatNode error after {elapsed_ms}ms: {error}",
+                    elapsed_ms=elapsed_ms,
+                    error=str(e),
+                )
             )
             raise
 
@@ -233,10 +253,10 @@ class MLXChatNode:
         session_id: str = "default"
     ) -> Dict[str, Any]:
         """
-        Generació blocking amb MLX i PREFIX MATCHING (executat en thread).
+        Blocking generation with MLX and PREFIX MATCHING (runs in a thread).
 
-        Refactoritzat 2026-01-01 (Lliçó 10): De ~295 a ~45 línies.
-        Helpers a generate_helpers.py.
+        Refactored 2026-01-01 (Lesson 10): from ~295 to ~45 lines.
+        Helpers in generate_helpers.py.
         """
         from mlx_lm.sample_utils import make_sampler
         from .prompt_cache_manager import get_prompt_cache_manager
@@ -244,12 +264,12 @@ class MLXChatNode:
         model, tokenizer = self._get_model()
         cache_manager = get_prompt_cache_manager(max_size=8)
 
-        # Model key per cache (path + identity_hash + session_id)
+        # Model key for cache (path + identity_hash + session_id)
         identity_hash = compute_system_hash(system)
         session_key = session_id[:8] if session_id else "default"
         model_key = f"{self.config.model_path}:{identity_hash}:{session_key}"
 
-        # 1. Preparar tokens (tokenització + sanitització)
+        # 1. Prepare tokens (tokenization + sanitization)
         full_tokens, cache_lookup_tokens, all_messages, all_cache_messages = prepare_tokens(
             system, messages, messages_for_cache, tokenizer
         )
@@ -260,39 +280,58 @@ class MLXChatNode:
             cache_manager, model_key, cache_lookup_tokens, model, self.config.max_kv_size
         )
 
-        # Log visible per debug
+        # Visible log for debug
         print(f"\n{'='*60}")
-        print(f"MLX PREFIX CACHE: prefix_reuse={'YES' if prefix_reused else 'NO'}")
-        print(f"  cached_tokens={cached_token_count}, new_tokens={total_tokens - cached_token_count}")
+        print(
+            _t_log(
+                "prefix_cache_header",
+                "MLX PREFIX CACHE: prefix_reuse={reuse}",
+                reuse="YES" if prefix_reused else "NO",
+            )
+        )
+        print(
+            _t_log(
+                "prefix_cache_stats",
+                "  cached_tokens={cached}, new_tokens={new}",
+                cached=cached_token_count,
+                new=total_tokens - cached_token_count,
+            )
+        )
         print(f"{'='*60}\n")
         logger.info(
-            "MLXChatNode: identity=%s, full=%d, cached=%d, new=%d, prefix_reuse=%s",
-            identity_hash[:8], total_tokens, cached_token_count,
-            total_tokens - cached_token_count, "YES" if prefix_reused else "NO"
+            _t_log(
+                "chatnode_identity",
+                "MLXChatNode: identity={identity}, full={full}, cached={cached}, new={new}, prefix_reuse={reuse}",
+                identity=identity_hash[:8],
+                full=total_tokens,
+                cached=cached_token_count,
+                new=total_tokens - cached_token_count,
+                reuse="YES" if prefix_reused else "NO",
+            )
         )
 
-        # 3. Determinar tokens a processar
+        # 3. Determine tokens to process
         tokens_to_process, new_tokens = determine_tokens_to_process(
             full_tokens, cached_token_count, prefix_reused
         )
 
-        # 4. Crear sampler
+        # 4. Create sampler
         sampler = make_sampler(temp=self.config.temperature, top_p=self.config.top_p)
 
-        # 5. Executar generació amb streaming
+        # 5. Run streaming generation
         text, last_response, _ = run_streaming_generation(
             model, tokenizer, tokens_to_process, self.config.max_tokens,
             sampler, cached_kv, stream_callback,
             cache_manager, model_key, cache_lookup_tokens
         )
 
-        # 6. Guardar cache post-generació (OPCIÓ D: messages nets)
+        # 6. Store post-generation cache (OPTION D: clean messages)
         save_cache_post_generation(
             cache_manager, model_key, all_cache_messages,
             text, tokenizer, cached_kv, len(full_tokens)
         )
 
-        # 7. Extreure i retornar mètriques
+        # 7. Extract and return metrics
         return extract_metrics(
             last_response, text, prefix_reused, cached_token_count,
             total_tokens, new_tokens, identity_hash
@@ -300,17 +339,23 @@ class MLXChatNode:
 
     @classmethod
     def reset_model(cls) -> None:
-        """Destruir model, tokenizer i tots els caches."""
+        """Destroy model, tokenizer, and all caches."""
         with cls._lock:
-            # Netejar cache manager (prefix matching)
+            # Clear cache manager (prefix matching)
             try:
                 from .prompt_cache_manager import get_prompt_cache_manager
                 cache_manager = get_prompt_cache_manager()
                 cache_manager.clear()
             except Exception as e:
-                logger.warning("MLXChatNode: error clearing cache manager: %s", e)
+                logger.warning(
+                    _t_log(
+                        "cache_manager_clear_failed",
+                        "MLXChatNode: error clearing cache manager: {error}",
+                        error=str(e),
+                    )
+                )
 
-            # Destruir model
+            # Destroy model
             if cls._model is not None:
                 del cls._model
                 cls._model = None
@@ -321,27 +366,44 @@ class MLXChatNode:
 
             cls._config = None
 
-            # Alliberar memòria
+            # Free memory
             try:
                 import mlx.core as mx
-                mx.clear_cache()  # Substitueix mx.metal.clear_cache (deprecated)
+                mx.clear_cache()  # Replaces mx.metal.clear_cache (deprecated)
             except Exception as e:
-                logger.warning("MLXChatNode: error clearing cache: %s", e)
+                logger.warning(
+                    _t_log(
+                        "cache_clear_failed",
+                        "MLXChatNode: error clearing cache: {error}",
+                        error=str(e),
+                    )
+                )
 
             gc.collect()
-            logger.info("MLXChatNode: model and all caches reset")
+            logger.info(
+                _t_log(
+                    "model_reset",
+                    "MLXChatNode: model and all caches reset"
+                )
+            )
 
     @classmethod
     def get_pool_stats(cls) -> Dict[str, Any]:
-        """Retorna estadístiques del cache."""
-        # Obtenir stats del cache manager
+        """Return cache statistics."""
+        # Get cache manager stats
         cache_manager_stats = {}
         try:
             from .prompt_cache_manager import get_prompt_cache_manager
             cache_manager = get_prompt_cache_manager()
             cache_manager_stats = cache_manager.get_stats()
         except Exception as e:
-            logger.debug("MLX stats collection failed: %s", e)  # nosec B110 - Stats opcionals
+            logger.debug(
+                _t_log(
+                    "stats_collection_failed",
+                    "MLX stats collection failed: {error}",
+                    error=str(e),
+                )
+            )  # nosec B110 - Optional stats
 
         return {
             "model_loaded": cls._model is not None,

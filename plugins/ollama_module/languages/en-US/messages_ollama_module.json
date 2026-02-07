@@ -1,0 +1,39 @@
+{
+ "_meta": {
+  "component": "ollama_module",
+  "description": "Ollama module manifest translations",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+ "errors": {
+  "not_initialized": "Ollama module not initialized",
+  "connection_failed": "Ollama connection failed: {error}",
+  "model_not_found": "Model not found or error: {error}",
+  "delete_failed": "Delete failed: {error}",
+  "httpx_missing": "httpx not installed (pip install httpx)",
+  "connection_unavailable": "Cannot connect to Ollama (not running?)"
+ },
+ "logs": {
+  "lazy_initialized": "OllamaModule lazy-initialized",
+  "list_models_failed": "Failed to list Ollama models: {error}",
+  "pull_model_failed": "Pull model failed: {error}",
+  "chat_failed": "Chat failed: {error}",
+  "get_info_failed": "Failed to get model info: {error}",
+  "delete_model_failed": "Failed to delete model: {error}",
+  "health_check_failed": "Ollama health check failed: {error}",
+  "not_reachable": "Ollama not reachable at localhost:11434"
+ },
+ "ui": {
+  "not_found": "Ollama UI not found"
+ },
+ "messages": {
+  "model_deleted": "Model {model} deleted successfully"
+ },
+ "manifest": {
+  "description": "Integration with Ollama to run local LLMs without cloud dependencies. Model management, response streaming, local embeddings, and a full admin UI.",
+  "cli_description": "Manage local LLM models with Ollama"
+ },
+ "metadata": {
+  "description": "Ollama integration (local LLM option)"
+ }
+}

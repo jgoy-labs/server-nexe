@@ -2,10 +2,32 @@
  "security": {
   "manifest": {
    "name": "Seguretat",
-   "description": "Mòdul de seguretat de Nexe 0.8",
+   "description": "Sistema de seguretat integral amb scanning, detecció de vulnerabilitats, autenticació API key, rate limiting i checks automatitzats per validar la seguretat del sistema Nexe.",
    "errors": {
     "not_ready": "El mòdul de seguretat no està llest"
    }
+  },
+  "auth": {
+   "missing_key": "Falta la clau API",
+   "invalid_key": "Clau API invàlida",
+   "key_not_configured": "Configuració del servidor incorrecta: clau API no configurada",
+   "server_misconfigured_no_valid_key": "Configuració del servidor incorrecta: cap clau API vàlida configurada",
+   "dev_mode_localhost_only": "El bypass en mode DEV només es permet des de localhost",
+   "invalid_or_expired_key": "Clau API invàlida o caducada",
+   "dev_mode_bypass": "MODE DEV: Clau API bypassed",
+   "dev_mode_warning": "NO per producció!",
+   "primary_key_auth": "Autenticació amb clau API primària",
+   "secondary_key_auth": "Autenticació amb clau API secundària (deprecated)",
+   "secondary_key_action_required": "MIGRAR A CLAU PRIMÀRIA"
+  },
+  "api": {
+   "scan_hint": "Fes POST /security/scan per executar un escaneig complet de seguretat"
+  },
+  "ui": {
+   "not_implemented": "La interfície de seguretat encara no està implementada"
+  },
+  "storage": {
+   "logs_desc": "Security logs - compliance 90 dies"
   },
   "checks": {
    "auth_running": "Executant check d'autenticació...",
@@ -28,6 +50,18 @@
    "scan_complete": "Escaneig de seguretat completat",
    "vulnerabilities_found": "Vulnerabilitats trobades: {count}",
    "no_issues": "No s'han detectat problemes de seguretat"
+  },
+  "logs": {
+   "check_failed": "La comprovació {check} ha fallat: {error}",
+   "scan_failed": "L'escaneig de seguretat ha fallat: {error}",
+   "report_failed": "No s'ha pogut obtenir l'informe de seguretat: {error}",
+   "initialized": "Mòdul de seguretat inicialitzat: {name} v{version}",
+   "dev_mode_blocked": "BLOCATGE DE SEGURETAT: DEV_MODE no es pot activar en producció! NEXE_DEV_MODE=true s'ignora quan NEXE_ENV=production",
+   "xss_query_param": "🚫 Intent d'XSS al paràmetre de consulta '{param}' des de {ip}",
+   "sql_query_param": "🚫 Intent d'injecció SQL al paràmetre de consulta '{param}' des de {ip}",
+   "command_query_param": "🚫 Intent d'injecció d'ordres al paràmetre de consulta '{param}' des de {ip}",
+   "path_query_param": "🚫 Intent de path traversal al paràmetre de consulta '{param}' des de {ip}",
+   "path_request": "🚫 Intent de path traversal: {path} des de {ip}"
   }
  }
 }

@@ -4,7 +4,7 @@ manifest_version = "1.0"
 name = "ollama_module"
 version = "0.5.0"
 type = "module"
-description = "Integració amb Ollama per executar models LLM locals sense dependències de cloud. Gestió de models, streaming de respostes, embeddings locals i interfície d'administració completa"
+description = "i18n:ollama_module.manifest.description|Integration with Ollama to run local LLMs without cloud dependencies. Model management, response streaming, local embeddings, and a full admin UI."
 enabled = true
 auto_start = false
 priority = 10
@@ -45,7 +45,7 @@ route = "/ollama/ui"
 enabled = true
 command_name = "ollama"
 entry_point = "nexe.tools.ollama_module.cli"
-description = "Gestió de models LLM locals amb Ollama"
+description = "i18n:ollama_module.manifest.cli_description|Manage local LLM models with Ollama"
 commands = [ "status", "models", "pull", "info", "delete", "chat", "ask",]
 framework = "typer"
 

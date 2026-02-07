@@ -19,8 +19,12 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
 from .helpers import translate
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.server_exceptions.{key}", fallback, **kwargs)
 
 def register_exception_handlers(app: FastAPI, i18n) -> None:
   """Register global exception handlers for the application."""
@@ -53,17 +57,23 @@ def register_exception_handlers(app: FastAPI, i18n) -> None:
     """HTTP exception handler"""
     if exc.status_code == 401:
       logger.debug(
-        "HTTP %s: %s - Path: %s (expected from UI)",
-        exc.status_code,
-        exc.detail,
-        request.url.path
+        _t_log(
+          "http_expected",
+          "HTTP {status}: {detail} - Path: {path} (expected from UI)",
+          status=exc.status_code,
+          detail=exc.detail,
+          path=request.url.path
+        )
       )
     else:
       logger.warning(
-        "HTTP %s: %s - Path: %s",
-        exc.status_code,
-        exc.detail,
-        request.url.path
+        _t_log(
+          "http_warning",
+          "HTTP {status}: {detail} - Path: {path}",
+          status=exc.status_code,
+          detail=exc.detail,
+          path=request.url.path
+        )
       )
 
     return JSONResponse(
@@ -78,9 +88,12 @@ def register_exception_handlers(app: FastAPI, i18n) -> None:
   async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Validation error handler"""
     logger.error(
-      "Validation error on %s: %s",
-      request.url.path,
-      exc.errors()
+      _t_log(
+        "validation_error",
+        "Validation error on {path}: {errors}",
+        path=request.url.path,
+        errors=exc.errors()
+      )
     )
 
     return JSONResponse(
@@ -97,10 +110,13 @@ def register_exception_handlers(app: FastAPI, i18n) -> None:
     trace_id = str(uuid.uuid4())
 
     logger.exception(
-      "Unhandled exception [trace_id: %s] on %s: %s",
-      trace_id,
-      request.url.path,
-      str(exc)
+      _t_log(
+        "unhandled_exception",
+        "Unhandled exception [trace_id: {trace_id}] on {path}: {error}",
+        trace_id=trace_id,
+        path=request.url.path,
+        error=str(exc)
+      )
     )
 
     return JSONResponse(

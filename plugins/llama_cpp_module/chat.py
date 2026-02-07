@@ -12,11 +12,16 @@ import time
 import logging
 from typing import Any, Dict, List, Optional
 
+from personality.i18n.resolve import t_modular
+
 from .config import LlamaCppConfig
 from .model_pool import ModelPool
 from core.utils import compute_system_hash
 
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"llama_cpp_module.logs.{key}", fallback, **kwargs)
 
 
 class LlamaCppChatNode:
@@ -41,8 +46,11 @@ class LlamaCppChatNode:
             LlamaCppChatNode._config = self.config
             LlamaCppChatNode._pool = ModelPool(self.config)
             logger.info(
-                "LlamaCppChatNode: initialized ModelPool (max_sessions=%d)",
-                self.config.max_sessions
+                _t_log(
+                    "pool_initialized",
+                    "LlamaCppChatNode: initialized ModelPool (max_sessions={max_sessions})",
+                    max_sessions=self.config.max_sessions,
+                )
             )
 
     def _get_model(self, session_id: str, system_hash: str) -> tuple[Any, bool]:
@@ -77,10 +85,13 @@ class LlamaCppChatNode:
             system_hash = compute_system_hash(system)
 
         logger.info(
-            "LlamaCppChatNode: session=%s, hash=%s, messages=%d",
-            session_id[:8],
-            system_hash[:8],
-            len(messages)
+            _t_log(
+                "session_info",
+                "LlamaCppChatNode: session={session}, hash={hash}, messages={count}",
+                session=session_id[:8],
+                hash=system_hash[:8],
+                count=len(messages),
+            )
         )
 
         # Capturar event loop per streaming thread-safe
@@ -120,14 +131,17 @@ class LlamaCppChatNode:
 
             # Refinament 4: Logging mínim (pool ja fa log de session/hash)
             logger.info(
-                "LlamaCppChatNode: %s in %dms (p:%d g:%d), %.1f tok/s, prompt=%d, gen=%d",
-                "HIT" if cache_hit else "MISS",
-                elapsed_ms,
-                timing.get("prefill_ms", 0),
-                timing.get("generation_ms", 0),
-                tokens_per_second,
-                result["prompt_tokens"],
-                result["tokens"]
+                _t_log(
+                    "timing",
+                    "LlamaCppChatNode: {cache} in {elapsed_ms}ms (p:{prefill_ms} g:{generation_ms}), {tps:.1f} tok/s, prompt={prompt_tokens}, gen={gen_tokens}",
+                    cache="HIT" if cache_hit else "MISS",
+                    elapsed_ms=elapsed_ms,
+                    prefill_ms=timing.get("prefill_ms", 0),
+                    generation_ms=timing.get("generation_ms", 0),
+                    tps=tokens_per_second,
+                    prompt_tokens=result["prompt_tokens"],
+                    gen_tokens=result["tokens"],
+                )
             )
 
             return {
@@ -147,7 +161,14 @@ class LlamaCppChatNode:
 
         except Exception as e:
             elapsed_ms = int((time.time() - start_time) * 1000)
-            logger.error("LlamaCppChatNode error after %dms: %s", elapsed_ms, str(e))
+            logger.error(
+                _t_log(
+                    "error",
+                    "LlamaCppChatNode error after {elapsed_ms}ms: {error}",
+                    elapsed_ms=elapsed_ms,
+                    error=str(e),
+                )
+            )
             raise
 
     def _generate(
@@ -275,7 +296,12 @@ class LlamaCppChatNode:
         """Destruir totes les sessions del pool i alliberar memòria."""
         if cls._pool is not None:
             cls._pool.destroy_all()
-            logger.info("LlamaCppChatNode: all sessions destroyed via pool")
+            logger.info(
+                _t_log(
+                    "sessions_destroyed",
+                    "LlamaCppChatNode: all sessions destroyed via pool"
+                )
+            )
 
     @classmethod
     def get_pool_stats(cls) -> Optional[Dict]:

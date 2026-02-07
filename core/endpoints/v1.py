@@ -13,9 +13,13 @@ www.jgoy.net
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 import logging
+from personality.i18n.resolve import t_modular
 from .chat import router as chat_router
 
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.endpoints_v1.{key}", fallback, **kwargs)
 
 router_v1 = APIRouter(prefix="/v1", tags=["v1"])
 router_v1.include_router(chat_router)
@@ -108,24 +112,48 @@ try:
   from memory.rag.api.v1 import router as rag_v1_router
   router_v1.include_router(rag_v1_router)
 except ImportError as e:
-  logger.warning(f"Could not import RAG API v1: {e}")
+  logger.warning(
+    _t_log(
+      "rag_import_failed",
+      "Could not import RAG API v1: {error}",
+      error=str(e),
+    )
+  )
 
 try:
   from memory.embeddings.api.v1 import router as embeddings_v1_router
   router_v1.include_router(embeddings_v1_router)
 except ImportError as e:
-  logger.warning(f"Could not import Embeddings API v1: {e}")
+  logger.warning(
+    _t_log(
+      "embeddings_import_failed",
+      "Could not import Embeddings API v1: {error}",
+      error=str(e),
+    )
+  )
 
 try:
   from memory.rag_sources.file.api.v1 import router as documents_v1_router
   router_v1.include_router(documents_v1_router)
 except ImportError as e:
-  logger.warning(f"Could not import Documents API v1: {e}")
+  logger.warning(
+    _t_log(
+      "documents_import_failed",
+      "Could not import Documents API v1: {error}",
+      error=str(e),
+    )
+  )
 
 try:
   from memory.memory.api.v1 import router as memory_v1_router
   router_v1.include_router(memory_v1_router)
 except ImportError as e:
-  logger.warning(f"Could not import Memory API v1: {e}")
+  logger.warning(
+    _t_log(
+      "memory_import_failed",
+      "Could not import Memory API v1: {error}",
+      error=str(e),
+    )
+  )
 
 __all__ = ['router_v1']

@@ -11,6 +11,7 @@ www.jgoy.net
 """
 
 from fastapi import APIRouter, HTTPException, Request, Depends
+from personality.i18n.resolve import t_modular
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import logging
@@ -19,6 +20,9 @@ from plugins.security.core.auth_dependencies import require_api_key
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/memory", tags=["memory-v1"])
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"memory.api.logs.{key}", fallback, **kwargs)
 
 class MemoryStoreRequest(BaseModel):
     """Request body for storing content in memory."""
@@ -63,9 +67,21 @@ async def get_memory_api():
         try:
             if not await _memory_api.collection_exists("nexe_chat_memory"):
                 await _memory_api.create_collection("nexe_chat_memory", vector_size=384)
-                logger.info("Created default collection: nexe_chat_memory")
+                logger.info(
+                    _t_log(
+                        "default_collection_created",
+                        "Created default collection: {collection}",
+                        collection="nexe_chat_memory",
+                    )
+                )
         except Exception as e:
-            logger.warning("Could not create default collection: %s", e)
+            logger.warning(
+                _t_log(
+                    "default_collection_failed",
+                    "Could not create default collection: {error}",
+                    error=str(e),
+                )
+            )
     return _memory_api
 
 @router.post("/store", response_model=MemoryStoreResponse, dependencies=[Depends(require_api_key)])
@@ -87,7 +103,13 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
         # Ensure collection exists
         if not await memory.collection_exists(body.collection):
             await memory.create_collection(body.collection, vector_size=384)
-            logger.info("Created collection on demand: %s", body.collection)
+            logger.info(
+                _t_log(
+                    "collection_created_on_demand",
+                    "Created collection on demand: {collection}",
+                    collection=body.collection,
+                )
+            )
 
         # Store the content
         metadata = body.metadata or {}
@@ -99,22 +121,38 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
             metadata=metadata
         )
 
-        logger.info("Stored document %s in collection %s", doc_id, body.collection)
+        logger.info(
+            _t_log(
+                "document_stored",
+                "Stored document {doc_id} in collection {collection}",
+                doc_id=doc_id,
+                collection=body.collection,
+            )
+        )
 
         return MemoryStoreResponse(
             success=True,
             document_id=doc_id,
-            message="Content stored successfully"
+            message=t_modular("memory.api.store_success", "Content stored successfully")
         )
 
     except Exception as e:
-        logger.error("Memory store failed: %s", e)
+        logger.error(
+            _t_log(
+                "store_failed",
+                "Memory store failed: {error}",
+                error=str(e),
+            )
+        )
         raise HTTPException(
             status_code=500,
             detail={
-                "error": "Store failed",
+                "error": t_modular("memory.api.store_failed", "Store failed"),
                 "message": str(e),
-                "hint": "Ensure Qdrant is running (./nexe go starts it automatically)"
+                "hint": t_modular(
+                    "memory.api.qdrant_hint",
+                    "Ensure Qdrant is running (./nexe go starts it automatically)"
+                )
             }
         )
 
@@ -155,7 +193,14 @@ async def memory_search(request: Request, body: MemorySearchRequest):
             for r in results
         ]
 
-        logger.debug("Memory search for '%s' returned %d results", body.query[:50], len(formatted_results))
+        logger.debug(
+            _t_log(
+                "search_results",
+                "Memory search for '{query}' returned {count} results",
+                query=body.query[:50],
+                count=len(formatted_results),
+            )
+        )
 
         return MemorySearchResponse(
             results=formatted_results,
@@ -163,13 +208,22 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         )
 
     except Exception as e:
-        logger.error("Memory search failed: %s", e)
+        logger.error(
+            _t_log(
+                "search_failed",
+                "Memory search failed: {error}",
+                error=str(e),
+            )
+        )
         raise HTTPException(
             status_code=500,
             detail={
-                "error": "Search failed",
+                "error": t_modular("memory.api.search_failed", "Search failed"),
                 "message": str(e),
-                "hint": "Ensure Qdrant is running (./nexe go starts it automatically)"
+                "hint": t_modular(
+                    "memory.api.qdrant_hint",
+                    "Ensure Qdrant is running (./nexe go starts it automatically)"
+                )
             }
         )
 
@@ -188,7 +242,10 @@ async def memory_health():
         return {
             "status": "unhealthy",
             "error": str(e),
-            "hint": "Ensure Qdrant is running"
+            "hint": t_modular(
+                "memory.api.qdrant_hint",
+                "Ensure Qdrant is running (./nexe go starts it automatically)"
+            )
         }
 
 __all__ = ['router']

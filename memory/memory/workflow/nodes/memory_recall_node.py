@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/workflow/nodes/memory_recall_node.py
-Description: Node per recuperar memòries de Memory.
+Description: Node to recall memories from Memory.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -17,19 +17,23 @@ from nexe_flow.core.node import Node, NodeMetadata, NodeInput, NodeOutput
 
 from memory.memory import MemoryModule, MemoryType, MemoryEntry
 from memory.memory.rag_logger import get_rag_logger
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
 
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.workflow.recall.logs.{key}", fallback, **kwargs)
+
 class MemoryRecallNode(Node):
   """
-  Node per recuperar memòries de Memory.
+  Node to recall memories from Memory.
 
   Fallback chain:
-  1. FlashMemory (RAM) - més ràpid
-  2. SQLite (persistence) - si RAM buida
-  3. Qdrant (semantic search) - si query provided
+  1. FlashMemory (RAM) - fastest
+  2. SQLite (persistence) - if RAM is empty
+  3. Qdrant (semantic search) - if query provided
 
-  Exemple d'ús en workflow:
+  Example usage in a workflow:
     ```yaml
     nodes:
      - id: recall_context
@@ -41,11 +45,14 @@ class MemoryRecallNode(Node):
   """
 
   def get_metadata(self) -> NodeMetadata:
-    """Metadata del node."""
+    """Node metadata."""
     return NodeMetadata(
       id="memory.recall",
       name="Memory Recall",
-      description="Recupera memòries (FlashMemory → SQLite → Qdrant)",
+      description=t_modular(
+        "memory.workflow.recall.description",
+        "Recall memories (FlashMemory → SQLite → Qdrant)"
+      ),
       category="nexe_native",
       version="1.1.0",
       inputs=[
@@ -53,42 +60,82 @@ class MemoryRecallNode(Node):
           name="limit",
           type="number",
           required=False,
-          description="Nombre màxim d'entrades",
+          description=t_modular(
+            "memory.workflow.recall.input_limit",
+            "Maximum number of entries"
+          ),
           default=10
         ),
         NodeInput(
           name="entry_type",
           type="string",
           required=False,
-          description="Tipus: episodic, semantic, o null per tots",
+          description=t_modular(
+            "memory.workflow.recall.input_entry_type",
+            "Type: episodic, semantic, or null for all"
+          ),
           default="episodic"
         ),
         NodeInput(
           name="query",
           type="string",
           required=False,
-          description="Query per cerca semàntica a Qdrant",
+          description=t_modular(
+            "memory.workflow.recall.input_query",
+            "Query for semantic search in Qdrant"
+          ),
           default=None
         ),
         NodeInput(
           name="person_id",
           type="string",
           required=False,
-          description="ID de la persona",
+          description=t_modular(
+            "memory.workflow.recall.input_person_id",
+            "Person ID"
+          ),
           default="default"
         )
       ],
       outputs=[
-        NodeOutput(name="context", type="string", description="Context per LLM"),
-        NodeOutput(name="entries", type="array", description="Entrades trobades"),
-        NodeOutput(name="entry_count", type="number", description="Nombre d'entrades"),
-        NodeOutput(name="source", type="string", description="Font: flash/sqlite/qdrant")
+        NodeOutput(
+          name="context",
+          type="string",
+          description=t_modular(
+            "memory.workflow.recall.output_context",
+            "Context for LLM"
+          )
+        ),
+        NodeOutput(
+          name="entries",
+          type="array",
+          description=t_modular(
+            "memory.workflow.recall.output_entries",
+            "Entries found"
+          )
+        ),
+        NodeOutput(
+          name="entry_count",
+          type="number",
+          description=t_modular(
+            "memory.workflow.recall.output_entry_count",
+            "Number of entries"
+          )
+        ),
+        NodeOutput(
+          name="source",
+          type="string",
+          description=t_modular(
+            "memory.workflow.recall.output_source",
+            "Source: flash/sqlite/qdrant"
+          )
+        )
       ]
     )
 
   async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Executa el recall amb fallback chain.
+    Execute recall with fallback chain.
     """
     start_time = time.time()
     limit = inputs.get("limit", 10)
@@ -100,41 +147,61 @@ class MemoryRecallNode(Node):
     rag_log.recall_start(query, limit, entry_type_str, person_id)
 
     logger.info("═" * 50)
-    logger.info("MEMORY RECALL START")
-    logger.info(f"  limit={limit}, type={entry_type_str}, query={query[:30] if query else 'None'}...")
+    logger.info(_t_log("start", "MEMORY RECALL START"))
+    logger.info(
+      _t_log(
+        "params",
+        "  limit={limit}, type={entry_type}, query={query}...",
+        limit=limit,
+        entry_type=entry_type_str,
+        query=query[:30] if query else "None",
+      )
+    )
 
     try:
       module = MemoryModule.get_instance()
 
       if not module._initialized:
-        logger.info("  Auto-initializing MemoryModule...")
+        logger.info(_t_log("auto_init", "  Auto-initializing MemoryModule..."))
         await module.initialize()
-        logger.info("  MemoryModule initialized")
+        logger.info(_t_log("auto_init_done", "  MemoryModule initialized"))
 
       entries: List[MemoryEntry] = []
       source = "none"
 
       step_start = time.time()
-      logger.info("  STEP 1: FlashMemory (RAM)")
+      logger.info(_t_log("step_flash", "  STEP 1: FlashMemory (RAM)"))
 
       if module._flash_memory:
         flash_entries = await module._flash_memory.get_all(limit=limit)
         step_ms = (time.time() - step_start) * 1000
-        logger.info(f"   FlashMemory entries: {len(flash_entries)}")
+        logger.info(
+          _t_log(
+            "flash_entries",
+            "   FlashMemory entries: {count}",
+            count=len(flash_entries),
+          )
+        )
 
         rag_log.recall_step_flash(len(flash_entries), step_ms)
 
         if flash_entries:
           entries = flash_entries
           source = "flash"
-          logger.info(f"  Found {len(entries)} in FlashMemory")
+          logger.info(
+            _t_log(
+              "flash_found",
+              "  Found {count} in FlashMemory",
+              count=len(entries),
+            )
+          )
       else:
         rag_log.recall_step_flash(0, 0)
-        logger.warning("   FlashMemory not available")
+        logger.warning(_t_log("flash_unavailable", "   FlashMemory not available"))
 
       if not entries and module._persistence:
         step_start = time.time()
-        logger.info("  STEP 2: SQLite (fallback)")
+        logger.info(_t_log("step_sqlite", "  STEP 2: SQLite (fallback)"))
 
         try:
           sqlite_entries = await module._persistence.get_recent(
@@ -142,28 +209,48 @@ class MemoryRecallNode(Node):
             entry_types=[entry_type_str] if entry_type_str else None
           )
           step_ms = (time.time() - step_start) * 1000
-          logger.info(f"   SQLite entries: {len(sqlite_entries)}")
+          logger.info(
+            _t_log(
+              "sqlite_entries",
+              "   SQLite entries: {count}",
+              count=len(sqlite_entries),
+            )
+          )
 
           cached_count = 0
           if sqlite_entries:
             entries = sqlite_entries
             source = "sqlite"
-            logger.info(f"  Found {len(entries)} in SQLite")
+            logger.info(
+              _t_log(
+                "sqlite_found",
+                "  Found {count} in SQLite",
+                count=len(entries),
+              )
+            )
 
             if module._flash_memory:
               for entry in sqlite_entries:
                 await module._flash_memory.store(entry)
               cached_count = len(sqlite_entries)
-              logger.info(f"   Cached {len(sqlite_entries)} to FlashMemory")
+              logger.info(
+                _t_log(
+                  "sqlite_cached",
+                  "   Cached {count} to FlashMemory",
+                  count=len(sqlite_entries),
+                )
+              )
 
           rag_log.recall_step_sqlite(len(sqlite_entries), step_ms, cached_count)
         except Exception as e:
-          logger.warning(f"   SQLite error: {e}")
+          logger.warning(
+            _t_log("sqlite_error", "   SQLite error: {error}", error=str(e))
+          )
           rag_log.recall_step_sqlite(0, 0)
 
       if not entries and query and module._persistence:
         step_start = time.time()
-        logger.info("  STEP 3: Qdrant (semantic search)")
+        logger.info(_t_log("step_qdrant", "  STEP 3: Qdrant (semantic search)"))
 
         try:
           from memory.memory.pipeline.ingestion import IngestionPipeline
@@ -171,14 +258,26 @@ class MemoryRecallNode(Node):
           embedding = await self._get_embedding(query)
 
           if embedding:
-            logger.info(f"   Embedding generated: {len(embedding)} dims")
+            logger.info(
+              _t_log(
+                "embedding_generated",
+                "   Embedding generated: {dims} dims",
+                dims=len(embedding),
+              )
+            )
 
             qdrant_results = await module._persistence.search(
               query_vector=embedding,
               limit=limit
             )
             step_ms = (time.time() - step_start) * 1000
-            logger.info(f"   Qdrant results: {len(qdrant_results)}")
+            logger.info(
+              _t_log(
+                "qdrant_results",
+                "   Qdrant results: {count}",
+                count=len(qdrant_results),
+              )
+            )
 
             qdrant_dicts = []
             if qdrant_results:
@@ -193,24 +292,34 @@ class MemoryRecallNode(Node):
                   })
 
               source = "qdrant"
-              logger.info(f"  Found {len(entries)} via Qdrant")
+              logger.info(
+                _t_log(
+                  "qdrant_found",
+                  "  Found {count} via Qdrant",
+                  count=len(entries),
+                )
+              )
 
             rag_log.recall_step_qdrant(len(entries), step_ms, qdrant_dicts)
           else:
-            logger.warning("   Could not generate embedding")
+            logger.warning(_t_log("embedding_missing", "   Could not generate embedding"))
             rag_log.recall_step_qdrant(0, 0)
         except Exception as e:
-          logger.warning(f"   Qdrant error: {e}")
+          logger.warning(
+            _t_log("qdrant_error", "   Qdrant error: {error}", error=str(e))
+          )
           rag_log.recall_step_qdrant(0, 0)
 
       context = self._format_context(entries)
       total_ms = (time.time() - start_time) * 1000
 
       logger.info("═" * 50)
-      logger.info("MEMORY RECALL COMPLETE")
-      logger.info(f"  Source: {source}")
-      logger.info(f"  Entries: {len(entries)}")
-      logger.info(f"  Context: {len(context)} chars")
+      logger.info(_t_log("complete", "MEMORY RECALL COMPLETE"))
+      logger.info(_t_log("source", "  Source: {source}", source=source))
+      logger.info(_t_log("entries", "  Entries: {count}", count=len(entries)))
+      logger.info(
+        _t_log("context", "  Context: {count} chars", count=len(context))
+      )
       logger.info("═" * 50)
 
       rag_log.recall_complete(source, len(entries), len(context), total_ms)
@@ -223,7 +332,10 @@ class MemoryRecallNode(Node):
       }
 
     except Exception as e:
-      logger.error(f"MEMORY RECALL ERROR: {e}", exc_info=True)
+      logger.error(
+        _t_log("error", "MEMORY RECALL ERROR: {error}", error=str(e)),
+        exc_info=True
+      )
       rag_log.recall_error(str(e))
       return {
         "context": "",
@@ -233,7 +345,7 @@ class MemoryRecallNode(Node):
       }
 
   async def _get_embedding(self, text: str) -> Optional[List[float]]:
-    """Genera embedding via Ollama API."""
+    """Generate embedding via Ollama API."""
     try:
       import httpx
 
@@ -247,16 +359,21 @@ class MemoryRecallNode(Node):
           data = response.json()
           return data.get("embedding")
     except Exception as e:
-      logger.warning(f"Embedding error: {e}")
+      logger.warning(
+        _t_log("embedding_error", "Embedding error: {error}", error=str(e))
+      )
 
     return None
 
   def _format_context(self, entries: List[MemoryEntry]) -> str:
-    """Formata entries com a context per LLM."""
+    """Format entries as context for the LLM."""
     if not entries:
       return ""
 
-    parts = ["[Memòries recents]"]
+    parts = [t_modular(
+      "memory.workflow.recall.context_label",
+      "[Recent memories]"
+    )]
     for entry in entries[:10]:
       timestamp = entry.timestamp.strftime("%Y-%m-%d %H:%M") if entry.timestamp else "?"
       content = entry.content[:300] + "..." if len(entry.content) > 300 else entry.content
@@ -265,7 +382,7 @@ class MemoryRecallNode(Node):
     return "\n".join(parts)
 
   def _entry_to_dict(self, entry: MemoryEntry) -> Dict[str, Any]:
-    """Converteix MemoryEntry a dict."""
+    """Convert MemoryEntry to dict."""
     return {
       "id": entry.id,
       "content": entry.content[:200],

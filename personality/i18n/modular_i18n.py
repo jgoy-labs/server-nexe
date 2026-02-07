@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/i18n/modular_i18n.py
-Description: Sistema modular d'internacionalització. Auto-descobreix messages_*.json per
+Description: Modular internationalization system. Auto-discovers messages_*.json for
 
 www.jgoy.net
 ────────────────────────────────────
@@ -20,8 +20,56 @@ logger = logging.getLogger(__name__)
 
 __all__ = ['ModularI18nManager']
 
+_LOG_MESSAGES = {
+  "discovering": {
+    "en-US": "Discovering translations for {lang}...",
+    "ca-ES": "Descobrint traduccions per {lang}...",
+    "es-ES": "Descubriendo traducciones para {lang}...",
+  },
+  "none_found": {
+    "en-US": "No translation files found for {lang}",
+    "ca-ES": "Cap fitxer de traduccions trobat per {lang}",
+    "es-ES": "No se encontró ningún archivo de traducciones para {lang}",
+  },
+  "loaded_count": {
+    "en-US": "Loaded {loaded}/{total} translations",
+    "ca-ES": "Carregades {loaded}/{total} traduccions",
+    "es-ES": "Cargadas {loaded}/{total} traducciones",
+  },
+  "components": {
+    "en-US": "Components with translations: {components}",
+    "ca-ES": "Components amb traduccions: {components}",
+    "es-ES": "Componentes con traducciones: {components}",
+  },
+  "file_loaded": {
+    "en-US": " {prefix} : {file}",
+    "ca-ES": " {prefix} : {file}",
+    "es-ES": " {prefix} : {file}",
+  },
+  "file_error": {
+    "en-US": "Error loading {file}: {error}",
+    "ca-ES": "Error carregant {file}: {error}",
+    "es-ES": "Error cargando {file}: {error}",
+  },
+  "registered": {
+    "en-US": "Translations registered for {component}",
+    "ca-ES": "Traduccions registrades per {component}",
+    "es-ES": "Traducciones registradas para {component}",
+  },
+}
+
+def _log_msg(lang: str, key: str, **kwargs) -> str:
+  """Local i18n for bootstrap logging (no external translations available yet)."""
+  language = lang or "en-US"
+  variants = _LOG_MESSAGES.get(key, {})
+  template = variants.get(language) or variants.get("en-US") or key
+  try:
+    return template.format(**kwargs)
+  except (KeyError, ValueError):
+    return template
+
 class ModularI18nManager:
-  """Gestor d'internacionalització modular per Nexe 0.8"""
+  """Modular internationalization manager for Nexe 0.8."""
   
   def __init__(self, config_path: Path = None, base_path: Path = None):
     """
@@ -76,7 +124,7 @@ class ModularI18nManager:
   
   def _discover_and_load_translations(self) -> None:
     """Discover and load all translation files"""
-    logger.info("Descobrint traduccions per %s...", self.current_language)
+    logger.info(_log_msg(self.current_language, "discovering", lang=self.current_language))
 
     search_patterns = [
       f"**/languages/{self.current_language}/messages_*.json",
@@ -91,7 +139,7 @@ class ModularI18nManager:
     found_files = list(set(found_files))
 
     if not found_files:
-      logger.warning("Cap fitxer de traduccions trobat per %s", self.current_language)
+      logger.warning(_log_msg(self.current_language, "none_found", lang=self.current_language))
       return
 
     loaded_count = 0
@@ -99,11 +147,20 @@ class ModularI18nManager:
       if self._load_translation_file(file_path):
         loaded_count += 1
 
-    logger.info("Carregades %d/%d traduccions", loaded_count, len(found_files))
+    logger.info(_log_msg(
+      self.current_language,
+      "loaded_count",
+      loaded=loaded_count,
+      total=len(found_files)
+    ))
 
     if self.current_language in self.translations:
       components = list(self.translations[self.current_language].keys())
-      logger.debug("Components amb traduccions: %s", ', '.join(components))
+      logger.debug(_log_msg(
+        self.current_language,
+        "components",
+        components=', '.join(components)
+      ))
   
   def _load_translation_file(self, file_path: Path) -> bool:
     """Load a specific translation file"""
@@ -128,11 +185,21 @@ class ModularI18nManager:
       else:
         self.translations[self.current_language][prefix] = data
 
-      logger.debug(" %s : %s", prefix, file_path.name)
+      logger.debug(_log_msg(
+        self.current_language,
+        "file_loaded",
+        prefix=prefix,
+        file=file_path.name
+      ))
       return True
 
     except Exception as e:
-      logger.error("Error carregant %s: %s", file_path, e)
+      logger.error(_log_msg(
+        self.current_language,
+        "file_error",
+        file=file_path,
+        error=str(e)
+      ))
       return False
   
   def t(self, key: str, **kwargs) -> str:
@@ -190,7 +257,11 @@ class ModularI18nManager:
       self.translations[self.current_language] = {}
 
     self.translations[self.current_language][component] = translations
-    logger.info("Traduccions registrades per %s", component)
+    logger.info(_log_msg(
+      self.current_language,
+      "registered",
+      component=component
+    ))
   
   def get_available_components(self) -> List[str]:
     """Return list of components with translations"""

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/config_validator.py
-Description: Validador de configuració server.toml. Comprova sections obligatòries,
+Description: server.toml configuration validator. Checks required sections,
 
 www.jgoy.net
 ────────────────────────────────────

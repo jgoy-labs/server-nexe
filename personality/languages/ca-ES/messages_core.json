@@ -62,9 +62,9 @@
   "auto_clean_nothing": "Auto-Clean: Res a netejar",
   "auto_clean_error": "Error d'Auto-Clean: {error}",
   "critical_error": "Error crític del sistema: {error}",
-  "shutdown_initiated": "Aturada iniciada",
-  "cleanup_error": "Error de neteja: {error}",
-  "shutdown_goodbye": "Aturada completada. Fins aviat!",
+  "shutdown_initiated": "Aturada del sistema iniciada...",
+  "cleanup_error": "Error durant la neteja: {error}",
+  "shutdown_goodbye": "Nexe 0.8 s'ha aturat correctament. Fins aviat!",
   "auto_discovering": "Auto-descobrint mòduls des de: {path}",
   "modules_discovered": "Descoberts {count} mòduls: {modules}",
   "api_integrator_configured": "🔌 Integrador d'API configurat",
@@ -83,7 +83,9 @@
   "server_stopped_by_user": "Servidor aturat per l'usuari",
   "server_startup_error": "Error d'inici del servidor: {error}",
   "startup_error": "Error d'inici del servidor: {error}",
-  "rate_limit_exceeded_error": "Límit de peticions excedit: {detail}"
+  "rate_limit_exceeded_error": "Límit de peticions excedit: {detail}",
+  "auto_clean_action_would": "es netejarien",
+  "auto_clean_action_cleaned": "netejats"
  },
  "chat": {
   "context_header": "[CONTEXT MEMÒRIA]",
@@ -94,26 +96,61 @@
   "ollama_no_chat_models": "No hi ha cap model de CHAT descarregat a Ollama. Executa: ollama pull llama3.2",
   "ollama_not_available": "Ollama no disponible. El servidor s'està iniciant o Ollama no està instal·lat. Espera uns segons i torna-ho a provar, o executa: curl -fsSL https://ollama.com/install.sh | sh",
   "ollama_returned_http": "Ollama ha retornat HTTP {status}",
+  "ollama_unknown_error": "Error desconegut d'Ollama",
   "ollama_no_response": "Ollama no respon. Verifica que està corrent: ollama serve",
   "ollama_stream_failed_status": "El streaming d'Ollama ha fallat amb l'estat {status}",
   "ollama_stream_not_available": "Ollama no disponible. Espera uns segons i torna-ho a provar."
  },
  "endpoints": {
   "system": {
+   "sighup_sent_log": "Enviant SIGHUP al PID del supervisor {pid}",
    "restart_signal_sent": "Senyal de reinici enviat correctament",
    "restart_signal_error": "Error enviant senyal de reinici: {detail}",
    "restart_signal_unexpected": "Error inesperat enviant senyal de reinici: {error}",
-   "restart_initiation_error": "Error iniciant el reinici: {error}"
+   "restart_initiation_error": "Error iniciant el reinici: {error}",
+   "restart_initiated_log": "Reinici iniciat per usuari autenticat (PID del supervisor: {pid})"
   }
  },
  "middleware": {
   "rate_limit_advanced_failed": "La configuració avançada de rate limiting ha fallat: {error}",
   "rate_limit_fallback": "  Es fa fallback a rate limiting bàsic",
-  "rate_limit_basic": "S'està usant rate limiting bàsic (només per IP)"
+  "rate_limit_basic": "S'està usant rate limiting bàsic (només per IP)",
+  "rate_limit_advanced_enabled": "Fase 3.1: Limitació avançada activada",
+  "rate_limit_ip_ok": "  - Limitació per IP: OK",
+  "rate_limit_api_key_ok": "  - Limitació per clau API: OK",
+  "rate_limit_composite_ok": "  - Limitació composta: OK",
+  "rate_limit_headers_ok": "  - Capçaleres X-RateLimit-*: OK",
+  "request_size_limit": "Límit de mida de la petició: {size_mb:.1f} MB",
+  "cors_configured": "CORS configurat: orígens={origins}",
+  "cors_methods": "  mètodes={methods}",
+  "cors_headers": "  capçaleres={headers}",
+  "prometheus_enabled": "Middleware de mètriques Prometheus activat",
+  "prometheus_not_available": "Mètriques Prometheus no disponibles: {error}",
+  "csrf_secret_missing": "NEXE_CSRF_SECRET no configurat en mode producció!",
+  "csrf_sessions_invalidated": "   Les sessions s'invalidaran en cada reinici.",
+  "csrf_set_env_hint": "   Configureu NEXE_CSRF_SECRET al .env per a sessions persistents.",
+  "csrf_secret_temp": "CSRF_SECRET no configurat. S'utilitza un secret temporal (només mode dev)",
+  "csrf_cookie_override": "  Override manual de cookie_secure de CSRF: {value}",
+  "csrf_enabled": "Protecció CSRF activada",
+  "csrf_not_installed": "starlette-csrf no instal·lat. Protecció CSRF desactivada.",
+  "csrf_install_hint": "  Instal·leu amb: pip install starlette-csrf"
  },
  "cors": {
   "wildcard_not_allowed": "El comodí CORS '*' no és permès en mode air-gapped. Defineix orígens explícits a server.toml [core.server] cors_origins",
   "origins_not_configured": "Orígens CORS no configurats. Defineix orígens explícits a server.toml [core.server] cors_origins"
+ },
+ "request_size": {
+  "limiter_enabled": "Limitador de mida de petició activat: màx {size_mb:.1f} MB",
+ "request_rejected": "Petició rebutjada: mida {size_mb:.2f} MB supera el límit {limit_mb:.2f} MB de {ip} a {path}",
+ "invalid_content_length": "Capçalera Content-Length invàlida: {value}",
+ "negative_content_length": "Content-Length negatiu",
+ "streaming_rejected": "Petició en streaming rebutjada: {size} bytes supera el límit {limit} de {ip}",
+  "body_read_error_log": "Error llegint el cos de la petició: {error}",
+  "error_entity_too_large": "Petició massa gran",
+  "detail_content_length": "Content-Length ({content_length}) supera el màxim ({max_size})",
+  "error_entity_too_large_streaming": "Petició massa gran (streaming)",
+  "detail_body_size": "Mida del cos ({body_size}) supera el màxim ({max_size})",
+  "error_body_read": "Error llegint el cos de la petició"
  },
  "ingest": {
   "title": "INGESTA DE CONEIXEMENT NEXE",
@@ -144,5 +181,160 @@
   "summary_chunks": "  - Fragments totals: {count}",
   "summary_collection": "  - Col·lecció: {collection}",
   "done_prompt": "\nAra pots preguntar sobre els teus documents al xat!"
+ },
+ "resources": {
+  "importlib_failed_fallback": "importlib.resources ha fallat per {package}/{resource}: {error}. Provant fallback...",
+  "file_fallback_failed": "__file__ fallback ha fallat per {package}/{resource}: {error}. Provant repo_root...",
+  "resource_not_found": "No s'ha pogut trobar el recurs {package}/{resource}. Proves: importlib.resources, __file__, repo_root. Últim error: {error}",
+  "importlib_resources_not_available": "importlib.resources.files no disponible",
+  "resource_not_found_importlib": "Recurs no trobat via importlib.resources: {package}/{resource}",
+  "import_package_failed": "No s'ha pogut importar el package {package}: {error}",
+  "package_no_file": "El package {package} no té __file__ (pot ser namespace package o builtin)",
+  "resource_not_found_file": "Recurs no trobat via __file__: {package}/{resource} (buscat a {path})",
+  "resource_not_found_repo_root": "Recurs no trobat via repo_root: {package}/{resource} (buscat a {path})",
+  "get_asset_deprecated": "get_asset_path() està deprecated. Usa get_resource_path()."
+ },
+ "lifespan": {
+  "startup_triggered": "INICI DE LIFESPAN ACTIVAT",
+  "reload_trigger_cleaned": "Trigger de recàrrega netejat: {path}",
+  "reload_trigger_delete_failed": "No s'ha pogut eliminar el trigger de recàrrega: {error}",
+  "qdrant_ok": "Qdrant: OK (ja s'està executant)",
+  "qdrant_autostart_disabled": "Qdrant: Auto-inici desactivat (NEXE_AUTOSTART_QDRANT=false)",
+  "qdrant_starting": "Qdrant: Iniciant des de {path}...",
+  "qdrant_started": "Qdrant: OK (iniciat al port {port})",
+  "qdrant_process_died": "Qdrant: El procés ha mort. Executeu './qdrant' manualment per veure els logs.",
+  "qdrant_start_timeout": "Qdrant: No s'ha pogut iniciar (timeout 15s)",
+  "qdrant_start_failed": "Qdrant: No s'ha pogut iniciar: {error}",
+  "qdrant_binary_not_found": "Qdrant: Binari no trobat a {path}",
+  "qdrant_setup_hint": "  Executeu ./setup.sh per descarregar Qdrant automàticament",
+  "ollama_ok": "Ollama: OK (ja s'està executant)",
+  "ollama_health_check_failed_startup": "Comprovació de salut d'Ollama fallida durant l'inici: {error}",
+  "ollama_autostart_disabled": "Ollama: Auto-inici desactivat (NEXE_AUTOSTART_OLLAMA=false)",
+  "ollama_not_installed": "Ollama: No instal·lat. Instal·leu manualment des de https://ollama.com/download",
+  "ollama_install_hint": "  O executeu: curl -fsSL https://ollama.com/install.sh | sh",
+  "ollama_starting": "Ollama: Iniciant...",
+  "ollama_started": "Ollama: OK (iniciat)",
+  "ollama_not_ready": "Ollama encara no està llest durant l'espera d'inici: {error}",
+  "ollama_start_timeout": "Ollama: No s'ha pogut iniciar (timeout 15s)",
+  "ollama_start_failed": "Ollama: No s'ha pogut iniciar: {error}",
+  "ollama_cleaning": "Netejant Ollama: {count} model(s) carregats de sessions anteriors...",
+  "ollama_unloaded": "  - Descarregat: {model}",
+  "ollama_clean_success": "Ollama netejat correctament",
+  "ollama_clean_none": "Ollama està net (cap model carregat)",
+  "ollama_unload_start": "Descarregant {count} model(s) d'Ollama de la RAM...",
+  "ollama_unload_success": "Models d'Ollama descarregats correctament",
+  "ollama_unload_none": "Cap model d'Ollama carregat",
+  "ollama_unload_failed": "No s'han pogut descarregar els models d'Ollama: {error}",
+  "module_loaded_item": "  - {name} ({id})",
+  "module_health_skipped": "Actualització d'estat de salut del mòdul omitida: {error}",
+  "module_registry_skipped": "Actualització del registre de mòduls omesa: {error}",
+  "plugin_init_start": "Inicialitzant mòduls de plugins...",
+  "plugin_init_item": "Inicialitzant plugin: {module}",
+  "plugin_init_success": "✅ {module} inicialitzat correctament",
+  "plugin_init_false": "⚠️  La inicialització de {module} ha retornat False",
+  "plugin_init_failed": "No s'ha pogut inicialitzar {module}: {error}",
+  "plugin_init_error": "Error durant la inicialització de plugins: {error}",
+  "knowledge_already_ingested": "Coneixement: Ja ingerit. S'omet l'auto-ingerència.",
+  "knowledge_reingest_hint": "Coneixement: Per reingerir, useu: ./nexe knowledge ingest",
+  "knowledge_first_run": "Coneixement: Primera execució - auto-ingerint {count} document(s)...",
+  "knowledge_ingest_success": "Coneixement: Ingesta completada correctament",
+  "knowledge_ingest_errors": "Coneixement: La ingesta ha tingut alguns errors",
+  "knowledge_no_docs": "Coneixement: No hi ha documents per ingerir (carpeta buida o només README)",
+  "knowledge_auto_ingest_failed": "Coneixement: Auto-ingerència fallida: {error}",
+  "bootstrap_new_token": "Nou token mestre de bootstrap generat i persistit",
+  "bootstrap_existing_token": "S'utilitza el token mestre de bootstrap existent de la BD",
+  "auto_clean_not_available": "Auto-Clean no disponible",
+  "server_ready": "✅  SERVER.NEXE A PUNT · Escoltant a http://localhost:9119",
+  "web_ui_ready": "📱 Web UI: http://localhost:9119/ui/",
+  "critical_startup_error": "Error crític d'inici",
+  "process_stopping": "Aturant procés {name}...",
+  "process_force_stop_failed": "No s'ha pogut aturar forçadament el procés {name}",
+  "closing_api_integrator": "Tancant APIIntegrator...",
+  "closing_module_manager": "Tancant ModuleManager...",
+  "cleaning_registry": "Netejant el registre..."
+ },
+ "paths_validation": {
+  "detection_success": "{prefix} Arrel Nexe detectada via {method}:\n  Camí: {path}\n  Validació:\n{reasons}",
+  "detection_failure": "[FAIL] Detecció via {method} fallida:\n  Camí intentat: {path}\n  Raons:\n{reasons}",
+  "cwd_fallback_used": "[MÈTRICA] Ús de fallback de CWD des de: {caller}"
+ },
+"paths_detection": {
+  "cache_cleared": "Cache de get_repo_root() netejada",
+  "markers_not_found": "No s'han trobat marcadors pujant des de {path}",
+  "pip_install_detected": "Instal·lació per pip detectada. S'utilitza {path} per dades/configuració",
+  "invalid_env_root": "NEXE_HOME apunta a un root invàlid: {path}\nRaons:\n{reasons}\n\nSolucions:\n 1. Arregla NEXE_HOME: export NEXE_HOME=/correct/path\n 2. Elimina NEXE_HOME: unset NEXE_HOME\n",
+  "root_not_detected": "No s'ha pogut detectar l'arrel de Nexe 0.8.\n\nCap estratègia ha trobat un root vàlid:\n 1. NEXE_HOME env var: {env_status}\n 2. Marcadors (server.toml): no trobats\n 3. Site-packages: no detectat\n\nSolucions:\n 1. Defineix NEXE_HOME: export NEXE_HOME=/path/to/NEXE-0.8\n 2. Executa des de l'arrel: cd /path/to/NEXE-0.8\n 3. Passa --project-root: nexe-security --project-root /path/to/NEXE-0.8\n\nDirectori actual: {cwd}\nUbicació de paths.py: {path}\n"
+},
+ "contracts": {
+  "name_spaces": "el nom no pot contenir espais",
+  "name_invalid_chars": "el nom només pot contenir lletres minúscules, números i guions baixos",
+  "framework_invalid": "framework ha de ser un d'aquests: {allowed}",
+  "api_section_required": "la secció [api] és obligatòria quan capabilities.has_api = true",
+  "ui_section_required": "la secció [ui] és obligatòria quan capabilities.has_ui = true",
+  "cli_section_required": "la secció [cli] és obligatòria quan capabilities.has_cli = true",
+  "api_prefix_invalid": "api.prefix ha de començar amb /, rebut: {prefix}",
+  "manifest_not_found": "No s'ha trobat el manifest: {path}",
+  "manifest_file_not_found": "Fitxer manifest no trobat: {path}",
+  "schema_validation_failed": "La validació d'esquema del manifest ha fallat",
+  "base_contract_missing": "L'objecte no implementa el protocol BaseContract",
+  "metadata_access_failed": "No s'ha pogut accedir a les metadades del contracte",
+  "module_contract_incomplete": "El mòdul no implementa completament ModuleContract",
+  "missing_init": "Falta __init__.py",
+  "missing_module_file": "Falta module.py (requerit per mòduls amb API)",
+  "missing_ui_dir": "Falta el directori UI: {path}",
+  "missing_tests_dir": "Falta el directori de tests"
+ },
+ "circuit_breaker": {
+  "closed_recovered": "CircuitBreaker [{name}]: TANCAT (recuperat)",
+  "open_after_failures": "CircuitBreaker [{name}]: OBERT després de {count} fallades. Últim error: {error}",
+  "half_open_failed": "CircuitBreaker [{name}]: OBERT (half-open fallit)",
+  "half_open_testing": "CircuitBreaker [{name}]: HALF_OPEN (prova)",
+  "open_error": "Circuit [{name}] és OBERT. Reintent en {timeout}s"
+ },
+ "endpoints_v1": {
+  "rag_import_failed": "No s'ha pogut importar l'API RAG v1: {error}",
+  "embeddings_import_failed": "No s'ha pogut importar l'API d'Embeddings v1: {error}",
+  "documents_import_failed": "No s'ha pogut importar l'API de Documents v1: {error}",
+  "memory_import_failed": "No s'ha pogut importar l'API de Memory v1: {error}"
+ },
+ "metrics_registry": {
+  "reset_requested": "Reinici de mètriques sol·licitat - només per a proves"
+ },
+"metrics_middleware": {
+  "prometheus_enabled": "Middleware de Prometheus activat"
+},
+ "loader": {
+  "import_failed": "No s'ha pogut importar el mòdul {module}",
+  "invalid_protocol": "El mòdul {module} no implementa el protocol NexeModule"
+ },
+ "module_loader": {
+  "memory_deprecated": "module_loader_memory està ELIMINAT. Usa ModuleManager.load_memory_modules() directament. Vegeu: docs/NEXE_ARCHITECTURAL_DECISIONS.md (ADR-001)",
+  "plugins_deprecated": "module_loader_plugins està ELIMINAT. Usa ModuleManager.load_plugin_routers() directament. Vegeu: docs/NEXE_ARCHITECTURAL_DECISIONS.md (ADR-001)"
+ },
+"loader_registry": {
+  "router_fetch_failed": "No s'ha pogut obtenir el router de {module}: {error}"
+},
+ "server_exceptions": {
+  "http_expected": "HTTP {status}: {detail} - Ruta: {path} (esperat des de la UI)",
+  "http_warning": "HTTP {status}: {detail} - Ruta: {path}",
+  "validation_error": "Error de validació a {path}: {errors}",
+  "unhandled_exception": "Excepció no controlada [trace_id: {trace_id}] a {path}: {error}"
+ },
+ "server_helpers": {
+  "signal_received": "🛑 Senyal {signal} rebut, aturant el servidor..."
+ },
+ "server_runner": {
+  "kill_process_failed": "No s'ha pogut aturar el procés al port {port}: {error}",
+  "missing_api_key": "No s'ha trobat NEXE_PRIMARY_API_KEY a .env. L'autenticació podria fallar o usar valors per defecte.",
+  "port_in_use_prompt": "El port {port} està en ús. Aturar el procés existent? [y/N]: ",
+  "quick_commands_title": "COMANDES RÀPIDES:",
+  "quick_commands_chat": "Xat interactiu:",
+  "quick_commands_logs": "Veure logs:",
+  "quick_commands_rag": "Ingesta RAG:",
+  "quick_commands_status": "Estat del sistema:",
+  "quick_config_title": "CONFIGURACIÓ RÀPIDA:",
+  "quick_config_personality": "Per canviar personalitat (System Prompt):",
+  "quick_config_edit": "edita",
+  "server_running": "Servidor en marxa a: {host}:{port}"
  }
 }

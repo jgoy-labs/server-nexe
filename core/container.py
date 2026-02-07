@@ -14,7 +14,12 @@ www.jgoy.net
 import logging
 from typing import Any, Dict, Optional, Type, TypeVar
 
+from personality.i18n.resolve import t_modular
+
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.container.{key}", fallback, **kwargs)
 
 T = TypeVar('T')
 
@@ -38,13 +43,13 @@ class Container:
   def register(cls, name: str, service: Any) -> None:
     """Registers an already created service instance."""
     cls._services[name] = service
-    logger.debug(f"Service registered: {name}")
+    logger.debug(_t("service_registered", "Service registered: {name}", name=name))
 
   @classmethod
   def register_factory(cls, name: str, factory: Any) -> None:
     """Registers a function that creates the service on demand (Lazy)."""
     cls._factories[name] = factory
-    logger.debug(f"Service factory registered: {name}")
+    logger.debug(_t("factory_registered", "Service factory registered: {name}", name=name))
 
   @classmethod
   def get(cls, name: str, default: Any = None) -> Any:
@@ -53,7 +58,11 @@ class Container:
       return cls._services[name]
     
     if name in cls._factories:
-      logger.debug(f"Initializing service from factory: {name}")
+      logger.debug(_t(
+        "factory_initializing",
+        "Initializing service from factory: {name}",
+        name=name
+      ))
       service = cls._factories[name]()
       cls._services[name] = service
       return service
@@ -65,7 +74,7 @@ class Container:
     """Clears the container (useful for tests)."""
     cls._services.clear()
     cls._factories.clear()
-    logger.info("DI Container cleared")
+    logger.info(_t("cleared", "DI Container cleared"))
 
 # Shortcut functions
 def get_service(name: str, default: Any = None) -> Any:

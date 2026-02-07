@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/core/async_encoder.py
-Description: AsyncEmbedder: Wrapper async per SentenceTransformer que NO bloqueja l'event loop.
+Description: AsyncEmbedder: Async wrapper for SentenceTransformer that does NOT block the event loop.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -17,43 +17,35 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 import numpy as np
 import structlog
-from personality.i18n import get_i18n
+from personality.i18n.resolve import t_modular
 
 
 def _t(key: str, fallback: str, **kwargs) -> str:
-  try:
-    return get_i18n().t(key, fallback, **kwargs)
-  except Exception:
-    if kwargs:
-      try:
-        return fallback.format(**kwargs)
-      except (KeyError, ValueError):
-        return fallback
-    return fallback
+  return t_modular(key, fallback, **kwargs)
 
 logger = structlog.get_logger()
 
 class AsyncEmbedder:
   """
-  Wrapper async per SentenceTransformer (no bloqueja event loop).
+  Async wrapper for SentenceTransformer (does not block the event loop).
 
-  CRÍTIC: SentenceTransformer és síncron i bloquejant. Aquest wrapper
-  executa encode() en ThreadPoolExecutor per evitar bloquejar FastAPI.
+  CRITICAL: SentenceTransformer is synchronous and blocking. This wrapper
+  runs encode() in a ThreadPoolExecutor to avoid blocking FastAPI.
 
   Features:
-  - Lazy loading del model (només carrega quan es necessita)
-  - Thread-safe amb asyncio.Lock
-  - Singleton per model (evita múltiples instàncies)
-  - Support per CPU i MPS (Apple Silicon)
-  - Graceful shutdown del ThreadPool
+  - Lazy model loading (only loads when needed)
+  - Thread-safe with asyncio.Lock
+  - Singleton per model (avoids multiple instances)
+  - Support for CPU and MPS (Apple Silicon)
+  - Graceful ThreadPool shutdown
 
   Attributes:
-    model_name: Nom del model sentence-transformers
+    model_name: Sentence-transformers model name
     device: Device (cpu, mps, cuda)
-    max_workers: Màxim threads al pool (2 per Mac per thermal limits)
-    _model: Instància de SentenceTransformer (lazy loaded)
-    _load_lock: Lock per lazy loading thread-safe
-    executor: ThreadPoolExecutor per encoding async
+    max_workers: Max threads in the pool (2 on Mac for thermal limits)
+    _model: SentenceTransformer instance (lazy loaded)
+    _load_lock: Lock for thread-safe lazy loading
+    executor: ThreadPoolExecutor for async encoding
   """
 
   _instances = {}
@@ -61,10 +53,10 @@ class AsyncEmbedder:
 
   def __new__(cls, model_name: str, **kwargs):
     """
-    Singleton pattern: Retorna instància existent si ja està carregada.
+    Singleton pattern: Return existing instance if already loaded.
 
-    Evita carregar el mateix model múltiples vegades (memòria limitada).
-    Thread-safe amb lock per evitar race conditions en multi-worker.
+    Avoids loading the same model multiple times (limited memory).
+    Thread-safe with a lock to avoid race conditions in multi-worker.
     """
     with cls._instances_lock:
       if model_name not in cls._instances:
@@ -83,9 +75,9 @@ class AsyncEmbedder:
     Init AsyncEmbedder.
 
     Args:
-      model_name: Model sentence-transformers (ex: paraphrase-multilingual-MiniLM-L12-v2)
-      max_workers: Threads al pool (2 per Mac, 4 per servers)
-      device: cpu, mps, o cuda
+      model_name: Sentence-transformers model (e.g. paraphrase-multilingual-MiniLM-L12-v2)
+      max_workers: Threads in the pool (2 for Mac, 4 for servers)
+      device: cpu, mps, or cuda
     """
     if self._initialized:
       return
@@ -103,6 +95,13 @@ class AsyncEmbedder:
 
     logger.info(
       "async_embedder_initialized",
+      message=_t(
+        "embeddings.logs.async_embedder_initialized",
+        "AsyncEmbedder initialized (model={model}, device={device}, max_workers={max_workers})",
+        model=model_name,
+        device=device,
+        max_workers=max_workers,
+      ),
       model=model_name,
       device=device,
       max_workers=max_workers
@@ -110,15 +109,25 @@ class AsyncEmbedder:
 
   async def _ensure_loaded(self):
     """
-    Lazy loading del model (carrega només quan es necessita).
+    Lazy model loading (load only when needed).
 
-    Thread-safe amb double-check locking pattern.
-    Executa la càrrega en ThreadPoolExecutor per no bloquejar event loop.
+    Thread-safe with double-check locking pattern.
+    Loads in a ThreadPoolExecutor to avoid blocking the event loop.
     """
     if self._model is None:
       async with self._load_lock:
         if self._model is None:
-          logger.info("loading_model", model=self.model_name, device=self.device)
+          logger.info(
+            "loading_model",
+            message=_t(
+              "embeddings.logs.loading_model",
+              "Loading embeddings model (model={model}, device={device})",
+              model=self.model_name,
+              device=self.device,
+            ),
+            model=self.model_name,
+            device=self.device
+          )
           start = time.time()
 
           loop = asyncio.get_running_loop()
@@ -130,6 +139,13 @@ class AsyncEmbedder:
           load_time = (time.time() - start) * 1000
           logger.info(
             "model_loaded",
+            message=_t(
+              "embeddings.logs.model_loaded",
+              "Embeddings model loaded (model={model}, device={device}, load_time_ms={load_time_ms})",
+              model=self.model_name,
+              device=self.device,
+              load_time_ms=load_time,
+            ),
             model=self.model_name,
             load_time_ms=load_time,
             device=self.device
@@ -137,10 +153,10 @@ class AsyncEmbedder:
 
   def _load_model(self):
     """
-    Carrega model en thread separat (bloquejant).
+    Load model in a separate (blocking) thread.
 
-    IMPORTANT: Aquest mètode s'executa al ThreadPool, NO al main thread.
-    SentenceTransformer.encode() només pot córrer al thread que va crear el model.
+    IMPORTANT: This method runs in the ThreadPool, NOT on the main thread.
+    SentenceTransformer.encode() can only run on the thread that created the model.
 
     Returns:
       SentenceTransformer instance
@@ -158,20 +174,25 @@ class AsyncEmbedder:
     normalize: bool = True
   ) -> List[float]:
     """
-    Encode un text async (no bloqueja event loop).
+    Encode text asynchronously (does not block the event loop).
 
     Args:
-      text: Text a convertir en embedding
-      normalize: Si normalitzar embedding (L2 norm)
+      text: Text to convert into an embedding
+      normalize: Whether to normalize embedding (L2 norm)
 
     Returns:
-      Vector d'embedding (384 dimensions per defecte)
+      Embedding vector (384 dimensions by default)
 
     Raises:
-      ValueError: Si text buit
+      ValueError: If text is empty
     """
     if not text.strip():
-      raise ValueError("Text no pot estar buit")
+      raise ValueError(
+        _t(
+          "embeddings.validation.text_empty",
+          "Text cannot be empty"
+        )
+      )
 
     await self._ensure_loaded()
 
@@ -189,6 +210,14 @@ class AsyncEmbedder:
 
     logger.debug(
       "encode_completed",
+      message=_t(
+        "embeddings.logs.encode_completed",
+        "Encode completed (model={model}, text_len={text_len}, latency_ms={latency_ms}, dimensions={dimensions})",
+        model=self.model_name,
+        text_len=len(text),
+        latency_ms=latency,
+        dimensions=len(embedding),
+      ),
       model=self.model_name,
       text_len=len(text),
       latency_ms=latency,
@@ -199,16 +228,16 @@ class AsyncEmbedder:
 
   def _encode_sync(self, text: str, normalize: bool) -> List[float]:
     """
-    Encode síncron (executa al ThreadPool).
+    Synchronous encode (runs in the ThreadPool).
 
-    IMPORTANT: Aquest mètode s'executa al ThreadPool, NO al main event loop.
+    IMPORTANT: This method runs in the ThreadPool, NOT on the main event loop.
 
     Args:
-      text: Text a convertir
-      normalize: Si normalitzar
+      text: Text to convert
+      normalize: Whether to normalize
 
     Returns:
-      Embedding com a llista de floats
+      Embedding as a list of floats
     """
     embedding = self._model.encode(
       text,
@@ -226,21 +255,21 @@ class AsyncEmbedder:
     batch_size: int = 32
   ) -> List[List[float]]:
     """
-    Encode batch de texts async (optimitzat).
+    Encode a batch of texts asynchronously (optimized).
 
-    Més eficient que encode_async individual perquè SentenceTransformer
-    pot processar batches en paral·lel internament.
+    More efficient than individual encode_async because SentenceTransformer
+    can process batches in parallel internally.
 
     Args:
-      texts: Llista de texts
-      normalize: Si normalitzar embeddings
-      batch_size: Mida del batch intern (per SentenceTransformer)
+      texts: List of texts
+      normalize: Whether to normalize embeddings
+      batch_size: Internal batch size (for SentenceTransformer)
 
     Returns:
-      Llista d'embeddings (mateix ordre que texts)
+      List of embeddings (same order as texts)
 
     Raises:
-      ValueError: Si texts buit o conté strings buides
+      ValueError: If texts is empty or contains empty strings
     """
     if not texts:
       raise ValueError(
@@ -275,6 +304,15 @@ class AsyncEmbedder:
 
     logger.debug(
       "encode_batch_completed",
+      message=_t(
+        "embeddings.logs.encode_batch_completed",
+        "Batch encode completed (model={model}, count={count}, batch_size={batch_size}, total_latency_ms={total_latency_ms}, avg_latency_ms={avg_latency_ms})",
+        model=self.model_name,
+        count=len(texts),
+        batch_size=batch_size,
+        total_latency_ms=latency,
+        avg_latency_ms=latency / len(texts),
+      ),
       model=self.model_name,
       count=len(texts),
       batch_size=batch_size,
@@ -291,15 +329,15 @@ class AsyncEmbedder:
     batch_size: int
   ) -> List[List[float]]:
     """
-    Encode batch síncron (executa al ThreadPool).
+    Synchronous batch encode (runs in the ThreadPool).
 
     Args:
-      texts: Llista de texts
-      normalize: Si normalitzar
-      batch_size: Mida del batch
+      texts: List of texts
+      normalize: Whether to normalize
+      batch_size: Batch size
 
     Returns:
-      Llista d'embeddings
+      List of embeddings
     """
     embeddings = self._model.encode(
       texts,
@@ -313,26 +351,42 @@ class AsyncEmbedder:
 
   async def shutdown(self):
     """
-    Graceful shutdown del ThreadPoolExecutor.
+    Graceful shutdown of the ThreadPoolExecutor.
 
-    IMPORTANT: Cridar aquest mètode abans de tancar l'aplicació
-    per evitar tasks pendents.
+    IMPORTANT: Call this method before shutting down the application
+    to avoid pending tasks.
     """
-    logger.info("shutting_down_embedder", model=self.model_name)
+    logger.info(
+      "shutting_down_embedder",
+      message=_t(
+        "embeddings.logs.shutting_down_embedder",
+        "Shutting down embedder (model={model})",
+        model=self.model_name,
+      ),
+      model=self.model_name
+    )
     self.executor.shutdown(wait=True)
     self._model = None
 
     if self.model_name in self._instances:
       del self._instances[self.model_name]
 
-    logger.info("embedder_shutdown_complete", model=self.model_name)
+    logger.info(
+      "embedder_shutdown_complete",
+      message=_t(
+        "embeddings.logs.embedder_shutdown_complete",
+        "Embedder shutdown complete (model={model})",
+        model=self.model_name,
+      ),
+      model=self.model_name
+    )
 
   def get_info(self) -> dict:
     """
-    Get informació del encoder.
+    Get encoder information.
 
     Returns:
-      Dict amb model_name, device, loaded status
+      Dict with model_name, device, loaded status
     """
     return {
       "model_name": self.model_name,

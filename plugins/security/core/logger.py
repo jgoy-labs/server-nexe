@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/logger.py
-Description: Logger d'esdeveniments de seguretat. Registra events en format JSONL.
+Description: Security event logger. Records events in JSONL format.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -30,12 +30,12 @@ def log_security_event(
   severity: str = "INFO"
 ) -> None:
   """
-  Registra un event de seguretat en format JSONL
+  Record a security event in JSONL format
 
   Args:
-    event_type: Tipus d'event (path_traversal_blocked, rce_blocked, auth_failed, etc.)
-    details: Detalls de l'event (dict amb info rellevant)
-    severity: Severitat (INFO, WARNING, ERROR, CRITICAL)
+    event_type: Event type (path_traversal_blocked, rce_blocked, auth_failed, etc.)
+    details: Event details (dict with relevant info)
+    severity: Severity (INFO, WARNING, ERROR, CRITICAL)
 
   Logs a:
     storage/system-logs/security/security_YYYYMMDD.jsonl
@@ -78,15 +78,15 @@ def log_vulnerability_detected(
   fix_suggestion: Optional[str] = None
 ) -> None:
   """
-  Registra una vulnerabilitat detectada pels checks
+  Record a vulnerability detected by checks
 
   Args:
-    vuln_type: Tipus de vulnerabilitat (path_traversal, rce, sql_injection, etc.)
-    file_path: Fitxer on s'ha detectat
-    line: Línia del codi
+    vuln_type: Vulnerability type (path_traversal, rce, sql_injection, etc.)
+    file_path: File where it was detected
+    line: Line number in code
     severity: CRITICAL, HIGH, MEDIUM, LOW
-    description: Descripció de la vulnerabilitat
-    fix_suggestion: Sugerència de com arreglar-ho (opcional)
+    description: Vulnerability description
+    fix_suggestion: Suggested fix (optional)
 
   Usage:
     log_vulnerability_detected(
@@ -120,14 +120,14 @@ def log_security_scan(
   duration_seconds: float
 ) -> None:
   """
-  Registra execució d'un scan de seguretat
+  Record a security scan execution
 
   Args:
-    scan_type: Tipus de scan (full, web_security, auth_check, etc.)
-    findings_count: Total de findings
-    critical_count: Findings crítics
-    high_count: Findings alts
-    duration_seconds: Durada del scan
+    scan_type: Scan type (full, web_security, auth_check, etc.)
+    findings_count: Total findings
+    critical_count: Critical findings
+    high_count: High findings
+    duration_seconds: Scan duration
 
   Usage:
     import time
@@ -160,13 +160,13 @@ def log_security_scan(
 
 def get_security_logs(date: Optional[str] = None) -> list:
   """
-  Llegeix els logs de seguretat d'una data
+  Read security logs for a given date
 
   Args:
-    date: Data en format YYYYMMDD (default: avui)
+    date: Date in YYYYMMDD format (default: today)
 
   Returns:
-    Llista d'events (dicts)
+    List of events (dicts)
 
   Usage:
     logs = get_security_logs("20251005")
@@ -194,13 +194,13 @@ def get_security_logs(date: Optional[str] = None) -> list:
 
 def get_latest_security_events(limit: int = 100) -> list:
   """
-  Obté els últims N events de seguretat (de tots els logs)
+  Get the latest N security events (from all logs)
 
   Args:
-    limit: Nombre màxim d'events a retornar
+    limit: Maximum number of events to return
 
   Returns:
-    Llista d'events ordenats per timestamp descendent
+    List of events sorted by descending timestamp
 
   Usage:
     recent_events = get_latest_security_events(limit=50)
@@ -230,13 +230,13 @@ def get_latest_security_events(limit: int = 100) -> list:
 
 def clear_old_logs(days_to_keep: int = 30) -> int:
   """
-  Neteja logs de seguretat més antics de N dies
+  Clean security logs older than N days
 
   Args:
-    days_to_keep: Dies a mantenir (default 30)
+    days_to_keep: Days to keep (default 30)
 
   Returns:
-    Nombre de fitxers eliminats
+    Number of deleted files
 
   Usage:
     deleted = clear_old_logs(days_to_keep=90)

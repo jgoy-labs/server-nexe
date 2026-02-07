@@ -19,8 +19,12 @@ from functools import lru_cache
 from enum import Enum
 
 from .validation import _is_valid_core_root, _log_detection_success, _log_detection_failure
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.paths_detection.{key}", fallback, **kwargs)
 
 class DetectionMethod(Enum):
   """Root detection methods (for metrics and logging)"""
@@ -59,7 +63,7 @@ def reset_repo_root_cache():
   with _cache_lock:
     get_repo_root.cache_clear()
     _detection_history.clear()
-    logger.debug("get_repo_root() cache cleared")
+    logger.debug(_t("cache_cleared", "get_repo_root() cache cleared"))
 
 @lru_cache(maxsize=1)
 def get_repo_root(start_path: Optional[Path] = None) -> Path:
@@ -106,12 +110,18 @@ def get_repo_root(start_path: Optional[Path] = None) -> Path:
       return path
     else:
       _log_detection_failure(DetectionMethod.ENV_VAR, path, reasons)
+      reasons_text = "\n".join(f" {r}" for r in reasons)
       raise RuntimeError(
-        f"NEXE_HOME points to invalid root: {core_home}\n"
-        f"Reasons:\n" + "\n".join(f" {r}" for r in reasons) + "\n\n"
-        f"Solutions:\n"
-        f" 1. Fix NEXE_HOME: export NEXE_HOME=/correct/path\n"
-        f" 2. Remove NEXE_HOME: unset NEXE_HOME\n"
+        _t(
+          "invalid_env_root",
+          "NEXE_HOME points to invalid root: {path}\n"
+          "Reasons:\n{reasons}\n\n"
+          "Solutions:\n"
+          " 1. Fix NEXE_HOME: export NEXE_HOME=/correct/path\n"
+          " 2. Remove NEXE_HOME: unset NEXE_HOME\n",
+          path=core_home,
+          reasons=reasons_text,
+        )
       )
 
   if start_path:
@@ -129,18 +139,25 @@ def get_repo_root(start_path: Optional[Path] = None) -> Path:
   if root := _detect_via_site_packages():
     return root
 
+  env_status = "not set" if not os.getenv('NEXE_HOME') else "invalid"
   raise RuntimeError(
-    "Could not detect Nexe 0.8 root.\n\n"
-    "No strategy found a valid root:\n"
-    f" 1. NEXE_HOME env var: {'not set' if not os.getenv('NEXE_HOME') else 'invalid'}\n"
-    f" 2. Markers (server.toml): not found\n"
-    f" 3. Site-packages: not detected\n\n"
-    "Solutions:\n"
-    " 1. Set NEXE_HOME: export NEXE_HOME=/path/to/NEXE-0.8\n"
-    " 2. Run from root: cd /path/to/NEXE-0.8\n"
-    " 3. Pass --project-root: nexe-security --project-root /path/to/NEXE-0.8\n\n"
-    f"Current directory: {Path.cwd()}\n"
-    f"paths.py location: {Path(__file__).parent}\n"
+    _t(
+      "root_not_detected",
+      "Could not detect Nexe 0.8 root.\n\n"
+      "No strategy found a valid root:\n"
+      " 1. NEXE_HOME env var: {env_status}\n"
+      " 2. Markers (server.toml): not found\n"
+      " 3. Site-packages: not detected\n\n"
+      "Solutions:\n"
+      " 1. Set NEXE_HOME: export NEXE_HOME=/path/to/NEXE-0.8\n"
+      " 2. Run from root: cd /path/to/NEXE-0.8\n"
+      " 3. Pass --project-root: nexe-security --project-root /path/to/NEXE-0.8\n\n"
+      "Current directory: {cwd}\n"
+      "paths.py location: {path}\n",
+      env_status=env_status,
+      cwd=Path.cwd(),
+      path=Path(__file__).parent,
+    )
   )
 
 def _detect_via_markers() -> Optional[Path]:
@@ -163,7 +180,13 @@ def _detect_via_markers() -> Optional[Path]:
       break
     current = parent
 
-  logger.debug(f"Markers not found walking up from {Path(__file__)}")
+  logger.debug(
+    _t(
+      "markers_not_found",
+      "Markers not found walking up from {path}",
+      path=Path(__file__),
+    )
+  )
   return None
 
 def _detect_via_site_packages() -> Optional[Path]:
@@ -179,8 +202,11 @@ def _detect_via_site_packages() -> Optional[Path]:
     core_home.mkdir(parents=True, exist_ok=True)
 
     logger.info(
-      f"Detected pip installation. "
-      f"Using {core_home} for data/configuration"
+      _t(
+        "pip_install_detected",
+        "Detected pip installation. Using {path} for data/configuration",
+        path=core_home,
+      )
     )
 
     with _cache_lock:

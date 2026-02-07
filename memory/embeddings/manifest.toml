@@ -9,7 +9,7 @@
 module_id = "{{NEXE_EMBEDDINGS_MODULE}}"
 name = "embeddings"
 version = "0.1"
-description = "Sistema d'embeddings i vectorització multilingüe amb cache multi-nivell (L1/L2), chunking intel·ligent i suport per Apple Silicon"
+description = "i18n:embeddings.manifest.description|Multilingual embeddings and vectorization system with multi-level cache (L1/L2), intelligent chunking, and Apple Silicon support."
 author = "Nexe Team (Jordi Goy)"
 category = "memory"
 created = "2025-10-27"
@@ -189,7 +189,7 @@ retention_days = 3
 action = "LRU_EVICTION"
 max_size_gb = 5.0
 ttl_hours = 72
-description = "Cache L2 d'embeddings - LRU eviction quan supera 5GB o 72h"
+description = "i18n:embeddings.storage.cache_desc|Embeddings L2 cache - LRU eviction when over 5GB or 72h"
 # Auto-clean agressiu per cache
 auto_clean = true
 max_files_per_run = 5000

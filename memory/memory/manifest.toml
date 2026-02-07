@@ -12,7 +12,7 @@
 module_id = "{{NEXE_MEMORY_MODULE}}"
 name = "memory"
 version = "0.1"
-description = "Sistema de memòria híbrida Flash i RAM Context amb gestió automàtica del cicle de vida. TTL 30min, garbage collection cada 5min, pipeline d'upload i persistència controlada per mantenir context conversacional"
+description = "i18n:memory.manifest.description|Hybrid Flash and RAM Context memory system with automatic lifecycle management. 30-minute TTL, garbage collection every 5 minutes, upload pipeline, and controlled persistence to maintain conversational context."
 author = "Nexe Team (Jordi Goy)"
 category = "memory"
 created = "2025-10-27"
@@ -135,7 +135,7 @@ type = "flash_memory"
 format = "json"
 retention_minutes = 30
 action = "AUTO_GC"
-description = "Flash memory temporal - TTL 30 minuts, GC cada 5 minuts"
+description = "i18n:memory.storage.flash_desc|Temporary flash memory - TTL 30 minutes, GC every 5 minutes"
 # Auto-clean gestionat pel propi mòdul (garbage collector intern)
 auto_clean = false
 
@@ -144,7 +144,7 @@ path = "storage/memory/storage"
 type = "persistent_memory"
 format = "json"
 action = "PERMANENT"
-description = "Memòria persistent - MAI esborrar automàticament"
+description = "i18n:memory.storage.persistent_desc|Persistent memory - DO NOT auto-delete"
 auto_clean = false
 
 [[module.storage.paths]]
@@ -154,7 +154,7 @@ format = "json"
 retention_days = 30
 action = "ROTATE"
 max_files = 100
-description = "Ledger de transaccions - rotació a 100 fitxers màxim"
+description = "i18n:memory.storage.ledger_desc|Transaction ledger - rotate at 100 files max"
 auto_clean = true
 max_files_per_run = 50
 cooldown_minutes = 60

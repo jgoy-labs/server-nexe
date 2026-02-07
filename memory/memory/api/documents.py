@@ -22,8 +22,12 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchValue, PointStruct, PointIdsList
 
 from .models import Document, SearchResult
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.documents.{key}", fallback, **kwargs)
 
 _metrics_imported = False
 _MEMORY_OPERATIONS = None
@@ -113,7 +117,15 @@ async def store_document(
       payload={"original_id": doc_id, **final_metadata},
     )
     qdrant.upsert(collection_name=collection, points=[point])
-    logger.debug("Stored document %s in collection %s (ttl=%s)", doc_id, collection, ttl_seconds)
+    logger.debug(
+      _t(
+        "stored",
+        "Stored document {doc_id} in collection {collection} (ttl={ttl})",
+        doc_id=doc_id,
+        collection=collection,
+        ttl=ttl_seconds,
+      )
+    )
 
   await loop.run_in_executor(executor, _store)
 
@@ -258,7 +270,14 @@ async def get_document(
       )
 
     except Exception as e:
-      logger.warning("Failed to get document %s: %s", doc_id, e)
+      logger.warning(
+        _t(
+          "get_failed",
+          "Failed to get document {doc_id}: {error}",
+          doc_id=doc_id,
+          error=str(e),
+        )
+      )
       return None
 
   return await loop.run_in_executor(executor, _get)
@@ -276,11 +295,25 @@ async def delete_document(
     uuid_id = hex_to_uuid(doc_id)
     try:
       _delete_points(qdrant, collection, [uuid_id])
-      logger.debug("Deleted document %s from collection %s", doc_id, collection)
+    logger.debug(
+      _t(
+        "deleted",
+        "Deleted document {doc_id} from collection {collection}",
+        doc_id=doc_id,
+        collection=collection,
+      )
+    )
       return True
 
     except Exception as e:
-      logger.warning("Failed to delete document %s: %s", doc_id, e)
+      logger.warning(
+        _t(
+          "delete_failed",
+          "Failed to delete document {doc_id}: {error}",
+          doc_id=doc_id,
+          error=str(e),
+        )
+      )
       return False
 
   result = await loop.run_in_executor(executor, _delete)
@@ -339,7 +372,14 @@ async def cleanup_expired(
       if expired_ids:
         _delete_points(qdrant, collection, expired_ids)
         deleted_count += len(expired_ids)
-        logger.debug("Deleted %d expired documents from %s", len(expired_ids), collection)
+      logger.debug(
+        _t(
+          "expired_deleted",
+          "Deleted {count} expired documents from {collection}",
+          count=len(expired_ids),
+          collection=collection,
+        )
+      )
 
       if offset is None:
         break

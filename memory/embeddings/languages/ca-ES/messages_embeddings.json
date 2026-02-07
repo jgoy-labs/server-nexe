@@ -1,0 +1,105 @@
+{
+ "_meta": {
+  "component": "embeddings",
+  "description": "Traduccions del manifest del mòdul d'embeddings",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ "api": {
+  "not_implemented_error": "No implementat",
+  "scheduled": "API d'embeddings programada per a la FASE 15",
+  "models_scheduled": "API de models d'embeddings programada per a la FASE 15"
+ },
+ "cli": {
+  "not_initialized": "Mòdul encara no inicialitzat",
+  "description": "Mòdul Embeddings - Nexe 0.8",
+  "epilog": "Exemples:\n python3 -m memory.embeddings info\n python3 -m memory.embeddings health\n python3 -m memory.embeddings encode \"Hello world\"\n python3 -m memory.embeddings chunk document.txt\n python3 -m memory.embeddings stats",
+  "commands_help": "Comandes disponibles",
+  "info_help": "Mostrar informació del mòdul",
+  "health_help": "Executar comprovacions de salut",
+  "encode_help": "Generar embedding per al text",
+  "encode_text_help": "Text a codificar",
+  "encode_model_help": "Model a utilitzar (opcional)",
+  "chunk_help": "Dividir document en fragments",
+  "chunk_file_help": "Ruta al fitxer de document",
+  "chunk_doc_id_help": "ID del document (per defecte: nom del fitxer)",
+  "stats_help": "Mostrar estadístiques del mòdul",
+  "initializing": "Inicialitzant el mòdul...",
+  "file_not_found": "Error: Fitxer no trobat: {file_path}"
+ },
+ "manifest": {
+  "description": "Sistema d'embeddings i vectorització multilingüe amb cache multi-nivell (L1/L2), chunking intel·ligent i suport per Apple Silicon."
+ },
+ "storage": {
+  "cache_desc": "Cache L2 d'embeddings - LRU eviction quan supera 5GB o 72h"
+ },
+ "logs": {
+  "module_created": "Mòdul d'embeddings creat",
+  "already_initialized": "Mòdul d'embeddings ja inicialitzat",
+  "initializing": "Mòdul d'embeddings inicialitzant",
+  "initialized": "Mòdul d'embeddings inicialitzat (model={model}, device={device}, cache_enabled={cache_enabled})",
+  "init_failed": "Inicialització del mòdul d'embeddings fallida: {error}",
+  "shutdown_not_initialized": "Mòdul d'embeddings no inicialitzat; s'omet l'aturada",
+  "shutting_down": "Aturant mòdul d'embeddings",
+  "shutdown_complete": "Aturada del mòdul d'embeddings completada",
+  "shutdown_failed": "Aturada del mòdul d'embeddings fallida: {error}",
+  "cached_embedder_initialized": "CachedEmbedder inicialitzat (model={model}, cache_enabled={cache_enabled})",
+  "cache_hit": "Encert de cache (model={model}, text_len={text_len})",
+  "cache_miss": "Falla de cache (model={model}, text_len={text_len})",
+  "batch_encode_completed": "Batch encode completat (model={model}, count={count}, cache_hits={cache_hits})",
+  "cache_cleared": "Cache netejada (model={model})",
+  "cached_embedder_shutdown": "CachedEmbedder aturat completament (model={model})",
+  "async_embedder_initialized": "AsyncEmbedder inicialitzat (model={model}, device={device}, max_workers={max_workers})",
+  "loading_model": "Carregant model d'embeddings (model={model}, device={device})",
+  "model_loaded": "Model d'embeddings carregat (model={model}, device={device}, load_time_ms={load_time_ms})",
+  "encode_completed": "Encode completat (model={model}, text_len={text_len}, latency_ms={latency_ms}, dimensions={dimensions})",
+  "encode_batch_completed": "Batch encode completat (model={model}, count={count}, batch_size={batch_size}, total_latency_ms={total_latency_ms}, avg_latency_ms={avg_latency_ms})",
+  "shutting_down_embedder": "Aturant embedder (model={model})",
+  "embedder_shutdown_complete": "Aturada d'embedder completada (model={model})",
+  "smart_chunker_initialized": "SmartChunker inicialitzat (max_size={max_size}, overlap={overlap}, min_size={min_size})",
+  "document_chunked": "Document fragmentat (document_id={document_id}, original_len={original_len}, chunk_count={chunk_count})",
+  "simple_embedder_loading": "Carregant model {model} a {device}",
+  "simple_embedder_initialized": "SimpleEmbedder inicialitzat: {model}"
+ },
+ "validation": {
+  "text_empty": "El text no pot estar buit",
+  "texts_empty": "Els textos no poden estar buits",
+  "texts_non_empty": "Tots els textos han de ser no buits"
+ },
+ "health": {
+  "initialized_ok": "Mòdul inicialitzat correctament",
+  "not_initialized": "Mòdul no inicialitzat",
+  "init_check_error": "Error comprovant inicialització: {error}",
+  "dependencies_ok": "sentence-transformers {version} disponible",
+  "dependencies_missing": "sentence-transformers no instal·lat (pip install sentence-transformers)",
+  "dependencies_error": "Error comprovant dependències: {error}",
+  "device_mps": "MPS (Apple Silicon) disponible",
+  "device_cuda": "CUDA disponible ({device})",
+  "device_cpu_only": "Només CPU disponible (rendiment més lent)",
+  "device_torch_missing": "torch no instal·lat (pip install torch)",
+  "device_error": "Error comprovant dispositiu: {error}",
+  "cache_writable": "Directoris de cache escrivibles",
+  "cache_not_writable": "Directoris de cache no escrivibles: {path}",
+  "cache_error": "Error comprovant directoris de cache: {error}",
+  "memory_ok": "Memòria disponible: {available_mb} MB",
+  "memory_warn": "Memòria baixa: {available_mb} MB disponibles",
+  "memory_critical": "Memòria crítica: {available_mb} MB disponibles",
+  "memory_error": "Error comprovant memòria: {error}",
+  "logs": {
+   "check_complete": "Health check d'embeddings complet (status={status}, total={total}, pass={passed}, warn={warned}, fail={failed})",
+   "check_failed": "Health check d'embeddings fallit: {error}"
+  }
+ },
+ "chunkers": {
+  "registry_initialized": "ChunkerRegistry inicialitzat",
+  "invalid_chunker_class": "S'esperava subclass de BaseChunker, rebut {chunker_class}",
+  "duplicate_chunker": "Chunker '{chunker_id}' ja registrat",
+  "chunker_registered": "Chunker registrat: {chunker_id} (formats: {formats})",
+  "chunker_not_found": "Chunker '{chunker_id}' no trobat. Disponibles: {available}",
+  "no_chunkers_registered": "Cap chunker registrat",
+  "chunkers_dir_not_found": "Directori de chunkers no trobat: {path}",
+  "register_failed": "No s'ha pogut registrar {name}: {error}",
+  "import_failed": "No s'ha pogut importar {path}: {error}",
+ "auto_discovery_completed": "Auto-descobriment completat: {count} chunkers trobats"
+ }
+}

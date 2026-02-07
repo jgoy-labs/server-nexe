@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import threading
 
+from personality.i18n.resolve import t_modular
+
 from .protocol import (
   ModuleStatus,
   HealthStatus,
@@ -35,12 +37,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.loader_registry.{key}", fallback, **kwargs)
+
 @dataclass
 class RegisteredModule:
   """
-  Informació d'un mòdul registrat al sistema.
+  Information about a module registered in the system.
 
-  Combina la informació de descobriment amb l'estat runtime.
+  Combines discovery information with runtime state.
   """
   discovery: ModuleDiscovery
   instance: Optional[NexeModule] = None
@@ -69,7 +74,7 @@ class RegisteredModule:
     return self.last_health_result.status == HealthStatus.HEALTHY
 
   def to_dict(self) -> Dict[str, Any]:
-    """Converteix a diccionari per API"""
+    """Convert to a dictionary for the API."""
     return {
       "name": self.name,
       "version": self.metadata.version,
@@ -84,13 +89,13 @@ class RegisteredModule:
 
 class ModuleRegistry:
   """
-  Registre central de tots els mòduls del sistema.
+  Central registry of all system modules.
 
-  Singleton thread-safe que emmagatzema:
-  - Mòduls descoberts (per carregar)
-  - Mòduls carregats (instàncies actives)
-  - Mòduls amb routers (per registrar a FastAPI)
-  - Mòduls amb specialists (per routing)
+  Thread-safe singleton that stores:
+  - Discovered modules (to load)
+  - Loaded modules (active instances)
+  - Modules with routers (to register in FastAPI)
+  - Modules with specialists (for routing)
   """
 
   _instance: Optional["ModuleRegistry"] = None
@@ -118,36 +123,40 @@ class ModuleRegistry:
     self._registry_lock = asyncio.Lock()
 
     self._initialized = True
-    logger.info("ModuleRegistry initialized")
+    logger.info(_t("initialized", "ModuleRegistry initialized"))
 
   def reset(self) -> None:
     """
-    Reseteja el registre (útil per tests).
+    Reset the registry (useful for tests).
 
-    PERILL: Això elimina tots els mòduls registrats!
+    WARNING: This removes all registered modules!
     """
     self._modules.clear()
     self._by_quadrant.clear()
     self._by_type.clear()
     self._with_router.clear()
     self._with_specialists.clear()
-    logger.warning("ModuleRegistry reset - all modules cleared")
+    logger.warning(_t("reset", "ModuleRegistry reset - all modules cleared"))
 
   async def register(self, discovery: ModuleDiscovery) -> RegisteredModule:
     """
-    Registra un mòdul descobert.
+    Register a discovered module.
 
     Args:
-      discovery: Informació del mòdul descobert
+      discovery: Discovered module information
 
     Returns:
-      RegisteredModule creat
+      Created RegisteredModule
     """
     async with self._registry_lock:
       name = discovery.metadata.name
 
       if name in self._modules:
-        logger.warning("Module %s already registered, skipping", name)
+        logger.warning(_t(
+          "already_registered",
+          "Module {module} already registered, skipping",
+          module=name
+        ))
         return self._modules[name]
 
       registered = RegisteredModule(
@@ -167,13 +176,14 @@ class ModuleRegistry:
         self._by_type[mod_type] = []
       self._by_type[mod_type].append(name)
 
-      logger.info(
-        "Registered module: %s v%s (%s/%s)",
-        name,
-        discovery.metadata.version,
-        quadrant,
-        mod_type
-      )
+      logger.info(_t(
+        "registered",
+        "Registered module: {module} v{version} ({quadrant}/{mod_type})",
+        module=name,
+        version=discovery.metadata.version,
+        quadrant=quadrant,
+        mod_type=mod_type
+      ))
 
       return registered
 
@@ -184,19 +194,23 @@ class ModuleRegistry:
     status: ModuleStatus = ModuleStatus.INITIALIZED
   ) -> bool:
     """
-    Assigna una instància a un mòdul registrat.
+    Assign an instance to a registered module.
 
     Args:
-      name: Nom del mòdul
-      instance: Instància del mòdul
-      status: Estat a assignar
+      name: Module name
+      instance: Module instance
+      status: Status to assign
 
     Returns:
-      True si s'ha assignat correctament
+      True if assigned successfully
     """
     async with self._registry_lock:
       if name not in self._modules:
-        logger.error("Cannot set instance: module %s not registered", name)
+        logger.error(_t(
+          "set_instance_not_registered",
+          "Cannot set instance: module {module} not registered",
+          module=name
+        ))
         return False
 
       registered = self._modules[name]
@@ -212,20 +226,25 @@ class ModuleRegistry:
         if name not in self._with_specialists:
           self._with_specialists.append(name)
 
-      logger.info("Module %s instance set, status=%s", name, status.value)
+      logger.info(_t(
+        "instance_set",
+        "Module {module} instance set, status={status}",
+        module=name,
+        status=status.value
+      ))
       return True
 
   async def set_status(self, name: str, status: ModuleStatus, error: Optional[str] = None) -> bool:
     """
-    Actualitza l'estat d'un mòdul.
+    Update a module status.
 
     Args:
-      name: Nom del mòdul
-      status: Nou estat
-      error: Missatge d'error (opcional)
+      name: Module name
+      status: New status
+      error: Error message (optional)
 
     Returns:
-      True si s'ha actualitzat
+      True if updated
     """
     if name not in self._modules:
       return False
@@ -236,14 +255,14 @@ class ModuleRegistry:
 
   async def set_health(self, name: str, result: HealthResult) -> bool:
     """
-    Actualitza el resultat de health check d'un mòdul.
+    Update a module's health check result.
 
     Args:
-      name: Nom del mòdul
-      result: Resultat del health check
+      name: Module name
+      result: Health check result
 
     Returns:
-      True si s'ha actualitzat
+      True if updated
     """
     if name not in self._modules:
       return False
@@ -254,25 +273,25 @@ class ModuleRegistry:
 
   def get(self, name: str) -> Optional[RegisteredModule]:
     """
-    Obté un mòdul pel seu nom.
+    Get a module by name.
 
     Args:
-      name: Nom del mòdul
+      name: Module name
 
     Returns:
-      RegisteredModule o None
+      RegisteredModule or None
     """
     return self._modules.get(name)
 
   def get_instance(self, name: str) -> Optional[NexeModule]:
     """
-    Obté la instància d'un mòdul.
+    Get a module instance.
 
     Args:
-      name: Nom del mòdul
+      name: Module name
 
     Returns:
-      Instància o None
+      Instance or None
     """
     registered = self._modules.get(name)
     if registered:
@@ -280,37 +299,37 @@ class ModuleRegistry:
     return None
 
   def get_all(self) -> List[RegisteredModule]:
-    """Retorna tots els mòduls registrats"""
+    """Return all registered modules."""
     return list(self._modules.values())
 
   def get_loaded(self) -> List[RegisteredModule]:
-    """Retorna només els mòduls carregats (amb instància)"""
+    """Return only loaded modules (with instance)."""
     return [m for m in self._modules.values() if m.is_loaded]
 
   def get_by_quadrant(self, quadrant: str) -> List[RegisteredModule]:
-    """Retorna mòduls d'un quadrant específic"""
+    """Return modules from a specific quadrant."""
     names = self._by_quadrant.get(quadrant, [])
     return [self._modules[n] for n in names if n in self._modules]
 
   def get_by_type(self, mod_type: str) -> List[RegisteredModule]:
-    """Retorna mòduls d'un tipus específic"""
+    """Return modules of a specific type."""
     names = self._by_type.get(mod_type, [])
     return [self._modules[n] for n in names if n in self._modules]
 
   def get_with_router(self) -> List[RegisteredModule]:
-    """Retorna mòduls que tenen router HTTP"""
+    """Return modules that have an HTTP router."""
     return [self._modules[n] for n in self._with_router if n in self._modules]
 
   def get_with_specialists(self) -> List[RegisteredModule]:
-    """Retorna mòduls que gestionen specialists"""
+    """Return modules that manage specialists."""
     return [self._modules[n] for n in self._with_specialists if n in self._modules]
 
   def get_routers(self) -> List[tuple]:
     """
-    Retorna tots els routers per registrar a FastAPI.
+    Return all routers to register in FastAPI.
 
     Returns:
-      Llista de tuples (router, prefix)
+      List of tuples (router, prefix)
     """
     routers = []
 
@@ -321,16 +340,17 @@ class ModuleRegistry:
           prefix = registered.instance.get_router_prefix()
           routers.append((router, prefix))
         except Exception as e:
-          logger.error(
-            "Failed to get router from %s: %s",
-            registered.name,
-            str(e)
-          )
+          logger.error(_t(
+            "router_fetch_failed",
+            "Failed to get router from {module}: {error}",
+            module=registered.name,
+            error=str(e)
+          ))
 
     return routers
 
   def count(self) -> Dict[str, int]:
-    """Retorna estadístiques del registre"""
+    """Return registry statistics."""
     return {
       "total": len(self._modules),
       "loaded": len(self.get_loaded()),
@@ -341,7 +361,7 @@ class ModuleRegistry:
     }
 
   def to_dict(self) -> Dict[str, Any]:
-    """Retorna el registre com a diccionari per API"""
+    """Return the registry as a dictionary for the API."""
     return {
       "modules": [m.to_dict() for m in self._modules.values()],
       "stats": self.count()
@@ -351,7 +371,7 @@ _registry: Optional[ModuleRegistry] = None
 
 def get_registry() -> ModuleRegistry:
   """
-  Obté el registre global de mòduls.
+  Get the global module registry.
 
   Returns:
     ModuleRegistry singleton

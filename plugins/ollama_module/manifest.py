@@ -21,8 +21,12 @@ from pydantic import BaseModel
 
 from plugins.security.core.validators import validate_safe_path
 from plugins.security.core.auth import require_api_key
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"ollama_module.logs.{key}", fallback, **kwargs)
 
 router_public = APIRouter(prefix="/ollama", tags=["ollama"])
 
@@ -39,7 +43,7 @@ def _get_module():
     if _ollama_module is None:
         from .module import OllamaModule
         _ollama_module = OllamaModule()
-        logger.info("OllamaModule lazy-initialized")
+        logger.info(_t_log("lazy_initialized", "OllamaModule lazy-initialized"))
     return _ollama_module
 
 
@@ -49,7 +53,10 @@ def get_ollama_module():
     if module is None:
         raise HTTPException(
             status_code=503,
-            detail="OllamaModule not initialized"
+            detail=t_modular(
+              "ollama_module.errors.not_initialized",
+              "Ollama module not initialized"
+            )
         )
     return module
 
@@ -82,7 +89,7 @@ async def serve_ui():
 
   if not index_path.exists():
     return HTMLResponse(
-      content="<h1>Ollama UI not found</h1>",
+      content=f"<h1>{t_modular('ollama_module.ui.not_found', 'Ollama UI not found')}</h1>",
       status_code=404
     )
 
@@ -125,10 +132,20 @@ async def list_models(
     }
 
   except Exception as e:
-    logger.error(f"Failed to list Ollama models: {e}")
+    logger.error(
+      _t_log(
+        "list_models_failed",
+        "Failed to list Ollama models: {error}",
+        error=str(e),
+      )
+    )
     raise HTTPException(
       status_code=503,
-      detail=f"Ollama connection failed: {str(e)}"
+      detail=t_modular(
+        "ollama_module.errors.connection_failed",
+        "Ollama connection failed: {error}",
+        error=str(e)
+      )
     )
 
 @router_public.post("/api/pull")
@@ -157,7 +174,13 @@ async def pull_model(
         yield f"data: {data}\n\n"
 
     except Exception as e:
-      logger.error(f"Pull model failed: {e}")
+      logger.error(
+        _t_log(
+          "pull_model_failed",
+          "Pull model failed: {error}",
+          error=str(e),
+        )
+      )
       error_data = {"error": str(e), "status": "error"}
       import json
       yield f"data: {json.dumps(error_data)}\n\n"
@@ -206,7 +229,13 @@ async def chat(
           break
 
     except Exception as e:
-      logger.error(f"Chat failed: {e}")
+      logger.error(
+        _t_log(
+          "chat_failed",
+          "Chat failed: {error}",
+          error=str(e),
+        )
+      )
       error_data = {"error": str(e), "done": True}
       import json
       yield f"data: {json.dumps(error_data)}\n\n"
@@ -245,10 +274,20 @@ async def get_model_info(
     }
 
   except Exception as e:
-    logger.error(f"Failed to get model info: {e}")
+    logger.error(
+      _t_log(
+        "get_info_failed",
+        "Failed to get model info: {error}",
+        error=str(e),
+      )
+    )
     raise HTTPException(
       status_code=404,
-      detail=f"Model not found or error: {str(e)}"
+      detail=t_modular(
+        "ollama_module.errors.model_not_found",
+        "Model not found or error: {error}",
+        error=str(e)
+      )
     )
 
 @router_public.delete("/api/models/{model_name}")
@@ -273,14 +312,28 @@ async def delete_model(
 
     return {
       "status": "ok",
-      "message": f"Model {model_name} deleted successfully"
+      "message": t_modular(
+        "ollama_module.messages.model_deleted",
+        "Model {model} deleted successfully",
+        model=model_name
+      )
     }
 
   except Exception as e:
-    logger.error(f"Failed to delete model: {e}")
+    logger.error(
+      _t_log(
+        "delete_model_failed",
+        "Failed to delete model: {error}",
+        error=str(e),
+      )
+    )
     raise HTTPException(
       status_code=500,
-      detail=f"Delete failed: {str(e)}"
+      detail=t_modular(
+        "ollama_module.errors.delete_failed",
+        "Delete failed: {error}",
+        error=str(e)
+      )
     )
 
 @router_public.get("/health")
@@ -297,7 +350,13 @@ async def health():
     return result
 
   except Exception as e:
-    logger.error(f"Health check failed: {e}")
+    logger.error(
+      _t_log(
+        "health_check_failed",
+        "Health check failed: {error}",
+        error=str(e),
+      )
+    )
     return {
       "status": "error",
       "connected": False,
@@ -317,7 +376,10 @@ async def info(module = Depends(get_ollama_module)):
 MODULE_METADATA = {
   "name": "ollama_module",
   "version": "1.0.0",
-  "description": "Integració amb Ollama (opció local per LLM)",
+  "description": t_modular(
+    "ollama_module.metadata.description",
+    "Ollama integration (local LLM option)"
+  ),
   "router": router_public,
   "prefix": "/ollama",
   "tags": ["ollama", "llm", "chat", "local"],

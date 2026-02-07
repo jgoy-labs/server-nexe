@@ -18,12 +18,17 @@ import threading
 import logging
 from typing import Dict, List, Tuple, TYPE_CHECKING
 
+from personality.i18n.resolve import t_modular
+
 if TYPE_CHECKING:
     from llama_cpp import Llama
 
 from .config import LlamaCppConfig
 
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"llama_cpp_module.logs.{key}", fallback, **kwargs)
 
 
 class ModelPool:
@@ -52,9 +57,12 @@ class ModelPool:
         self._lock = threading.Lock()
 
         logger.info(
-            "ModelPool initialized: max_sessions=%d, model=%s",
-            config.max_sessions,
-            config.model_path[-40:] if config.model_path else "(empty)"
+            _t_log(
+                "pool_initialized_detail",
+                "ModelPool initialized: max_sessions={max_sessions}, model={model}",
+                max_sessions=config.max_sessions,
+                model=config.model_path[-40:] if config.model_path else "(empty)",
+            )
         )
 
     def get_or_create(self, session_id: str, system_hash: str) -> Tuple["Llama", bool]:
@@ -75,16 +83,22 @@ class ModelPool:
             if session_id in self._instances:
                 if self._hashes[session_id] == system_hash:
                     logger.debug(
-                        "ModelPool: reusing instance for session %s (hash match)",
-                        session_id[:8]
+                        _t_log(
+                            "pool_reusing_instance",
+                            "ModelPool: reusing instance for session {session} (hash match)",
+                            session=session_id[:8],
+                        )
                     )
                     self._touch_lru(session_id)
                     return self._instances[session_id], True  # Cache HIT
                 else:
                     # Hash canviat → reset sessió
                     logger.info(
-                        "ModelPool: hash changed for session %s, resetting",
-                        session_id[:8]
+                        _t_log(
+                            "pool_hash_changed",
+                            "ModelPool: hash changed for session {session}, resetting",
+                            session=session_id[:8],
+                        )
                     )
                     self._destroy(session_id)
 
@@ -94,15 +108,21 @@ class ModelPool:
                     break
                 oldest = self._lru[0]
                 logger.info(
-                    "ModelPool: LRU eviction, removing session %s",
-                    oldest[:8]
+                    _t_log(
+                        "pool_lru_eviction",
+                        "ModelPool: LRU eviction, removing session {session}",
+                        session=oldest[:8],
+                    )
                 )
                 self._destroy(oldest)
 
             # Cas 3: Crear nova instància
             logger.info(
-                "ModelPool: creating new instance for session %s",
-                session_id[:8]
+                _t_log(
+                    "pool_creating_instance",
+                    "ModelPool: creating new instance for session {session}",
+                    session=session_id[:8],
+                )
             )
             instance = self._create_instance()
             self._instances[session_id] = instance
@@ -110,9 +130,12 @@ class ModelPool:
             self._lru.append(session_id)
 
             logger.info(
-                "ModelPool: active sessions=%d/%d",
-                len(self._instances),
-                self.config.max_sessions
+                _t_log(
+                    "pool_active_sessions",
+                    "ModelPool: active sessions={current}/{max}",
+                    current=len(self._instances),
+                    max=self.config.max_sessions,
+                )
             )
 
             return instance, False  # Cache MISS
@@ -128,15 +151,18 @@ class ModelPool:
         from llama_cpp import Llama
 
         logger.info(
-            "ModelPool: loading model %s (n_ctx=%d, n_batch=%d, gpu_layers=%d, "
-            "mlock=%s, mmap=%s, flash_attn=%s)",
-            self.config.model_path[-40:],
-            self.config.n_ctx,
-            self.config.n_batch,
-            self.config.n_gpu_layers,
-            self.config.use_mlock,
-            self.config.use_mmap,
-            self.config.flash_attn
+            _t_log(
+                "pool_loading_model",
+                "ModelPool: loading model {model} (n_ctx={n_ctx}, n_batch={n_batch}, gpu_layers={gpu_layers}, "
+                "mlock={mlock}, mmap={mmap}, flash_attn={flash_attn})",
+                model=self.config.model_path[-40:],
+                n_ctx=self.config.n_ctx,
+                n_batch=self.config.n_batch,
+                gpu_layers=self.config.n_gpu_layers,
+                mlock=self.config.use_mlock,
+                mmap=self.config.use_mmap,
+                flash_attn=self.config.flash_attn,
+            )
         )
 
         instance = Llama(
@@ -152,7 +178,9 @@ class ModelPool:
             verbose=False,  # Silenciar output de llama.cpp
         )
 
-        logger.info("ModelPool: model loaded successfully")
+        logger.info(
+            _t_log("model_loaded", "ModelPool: model loaded successfully")
+        )
         return instance
 
     def _touch_lru(self, session_id: str) -> None:
@@ -182,7 +210,11 @@ class ModelPool:
                     instance.close()
                 except Exception as e:
                     logger.warning(
-                        "ModelPool: error closing instance: %s", e
+                        _t_log(
+                            "close_failed",
+                            "ModelPool: error closing instance: {error}",
+                            error=str(e),
+                        )
                     )
 
             del self._instances[session_id]
@@ -195,8 +227,11 @@ class ModelPool:
             gc.collect()
 
             logger.debug(
-                "ModelPool: destroyed session %s, gc.collect() called",
-                session_id[:8]
+                _t_log(
+                    "session_destroyed",
+                    "ModelPool: destroyed session {session}, gc.collect() called",
+                    session=session_id[:8],
+                )
             )
 
     def destroy_all(self) -> None:
@@ -205,7 +240,9 @@ class ModelPool:
             session_ids = list(self._instances.keys())
             for session_id in session_ids:
                 self._destroy(session_id)
-            logger.info("ModelPool: all instances destroyed")
+            logger.info(
+                _t_log("all_destroyed", "ModelPool: all instances destroyed")
+            )
 
     @property
     def active_sessions(self) -> int:

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/auth_dependencies.py
-Description: FastAPI Dependencies per autenticació Nexe amb suport dual-key.
+Description: FastAPI dependencies for Nexe authentication with dual-key support.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -45,37 +45,44 @@ def _is_loopback_ip(ip: str) -> bool:
     return False
   return addr.is_loopback
 
+def _get_i18n(request: Request):
+  try:
+    return getattr(request.app.state, "i18n", None)
+  except Exception:
+    return None
+
 async def require_api_key(
   request: Request,
   x_api_key: Optional[str] = Header(None, description="Admin API Key")
 ) -> str:
   """
-  FastAPI Dependency per validar API key obligatòria
+  FastAPI dependency to validate a required API key
   ✅ Phase 2.1: Dual-key support with expiry validation
-  ✅ SECURITY FIX: Fail-closed per defecte (no bypàs sense configuració explícita)
+  ✅ SECURITY FIX: Fail-closed by default (no bypass without explicit configuration)
 
-  Retorna l'API key si és vàlida, sinó HTTPException 401/500
+  Returns the API key if valid, otherwise HTTPException 401/500
 
-  Usage en routers:
+  Usage in routers:
 
     @router.post("/admin/endpoint")
     async def protected_endpoint(api_key: str = Depends(require_api_key)):
       return {"status": "authenticated"}
 
-  Configuració PRODUCCIÓ (Phase 2.1 dual-key):
+  PRODUCTION config (Phase 2.1 dual-key):
     export NEXE_PRIMARY_API_KEY="new-key-here"
     export NEXE_PRIMARY_KEY_EXPIRES="2026-01-10T00:00:00Z"
     export NEXE_SECONDARY_API_KEY="old-key-here"
     export NEXE_SECONDARY_KEY_EXPIRES="2025-10-17T00:00:00Z"
 
-  Configuració PRODUCCIÓ (Phase 1 backward compat):
+  PRODUCTION config (Phase 1 backward compat):
     export NEXE_ADMIN_API_KEY="your-secret-key-here"
 
-  Configuració DEV (opcional, només per desenvolupament local):
+  DEV config (optional, local development only):
     export NEXE_DEV_MODE="true"
   """
   keys_config = load_api_keys()
   dev_mode = is_dev_mode()
+  i18n = _get_i18n(request)
 
   if keys_config.primary:
     if keys_config.primary.expires_at:
@@ -106,7 +113,11 @@ async def require_api_key(
       if not allow_remote and not _is_loopback_ip(client_ip):
         raise HTTPException(
           status_code=403,
-          detail="DEV mode bypass only allowed from localhost"
+          detail=get_message(
+            i18n,
+            "security.auth.dev_mode_localhost_only",
+            fallback="DEV mode bypass only allowed from localhost"
+          )
         )
       try:
         from plugins.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
@@ -114,8 +125,8 @@ async def require_api_key(
         security_logger.log_event(
           event_type=SecurityEventType.AUTH_SUCCESS,
           severity=SecuritySeverity.WARNING,
-          message="MODE DEV: Clau API bypassed",
-          details={"warning": "NO per producció!"}
+          message=get_message(i18n, "security.auth.dev_mode_bypass"),
+          details={"warning": get_message(i18n, "security.auth.dev_mode_warning")}
         )
       except ImportError:
         pass
@@ -123,7 +134,11 @@ async def require_api_key(
     else:
       raise HTTPException(
         status_code=500,
-        detail="Server misconfiguration: No valid API key configured"
+        detail=get_message(
+          i18n,
+          "security.auth.server_misconfigured_no_valid_key",
+          fallback="Server misconfiguration: No valid API key configured"
+        )
       )
 
   if not x_api_key:
@@ -132,7 +147,7 @@ async def require_api_key(
     record_auth_failure('missing_key')
     raise HTTPException(
       status_code=401,
-      detail=get_message(None, "security.auth.missing_key"),
+      detail=get_message(i18n, "security.auth.missing_key"),
       headers={"WWW-Authenticate": "ApiKey"}
     )
 
@@ -146,7 +161,7 @@ async def require_api_key(
         security_logger.log_event(
           event_type=SecurityEventType.AUTH_SUCCESS,
           severity=SecuritySeverity.INFO,
-          message="Autenticació amb clau API primària",
+          message=get_message(i18n, "security.auth.primary_key_auth"),
           details={
             "key_type": "primary",
             "expires_at": keys_config.primary.expires_at.isoformat() if keys_config.primary.expires_at else None
@@ -166,10 +181,10 @@ async def require_api_key(
         security_logger.log_event(
           event_type=SecurityEventType.AUTH_SUCCESS,
           severity=SecuritySeverity.WARNING,
-          message="Autenticació amb clau API secundària (deprecated)",
+          message=get_message(i18n, "security.auth.secondary_key_auth"),
           details={
             "key_type": "secondary",
-            "action_required": "MIGRAR A CLAU PRIMÀRIA",
+            "action_required": get_message(i18n, "security.auth.secondary_key_action_required"),
             "expires_at": keys_config.secondary.expires_at.isoformat() if keys_config.secondary.expires_at else None
           }
         )
@@ -197,7 +212,11 @@ async def require_api_key(
 
   raise HTTPException(
     status_code=401,
-    detail="Invalid or expired API key",
+    detail=get_message(
+      i18n,
+      "security.auth.invalid_or_expired_key",
+      fallback="Invalid or expired API key"
+    ),
     headers={"WWW-Authenticate": "ApiKey"}
   )
 
@@ -205,9 +224,9 @@ async def optional_api_key(
   x_api_key: Optional[str] = Header(None, description="Optional API Key")
 ) -> Optional[str]:
   """
-  Dependency opcional: valida si key present, però no bloqueja si absent
+  Optional dependency: validate if key is present, but do not block if absent
 
-  Retorna l'API key si és vàlida, None si absent/invàlida
+  Returns the API key if valid, None if absent/invalid
 
   Usage:
     @router.get("/endpoint")

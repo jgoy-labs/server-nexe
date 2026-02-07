@@ -1,9 +1,9 @@
 {
  "_meta": {
   "component": "module_manager",
-  "description": "Traduccions per coordinador principal de mòduls",
+  "description": "Traducciones para el gestor principal de módulos",
   "version": "1.0.0",
-  "language": "ca-ES"
+  "language": "es-ES"
  },
  
  "paths": {
@@ -16,6 +16,7 @@
  },
  
  "manifest": {
+  "description": "Sistema de gestión centralizada de módulos Nexe 0.8. Autodescubrimiento, registro y gestión del ciclo de vida.",
   "default": {
    "version": "1.0.0",
    "enabled": true
@@ -24,106 +25,166 @@
    "module": "module",
    "version": "version",
    "enabled": "enabled"
-  }
+  },
+  "import_not_found": "No se pudo encontrar el manifest en ninguno de: {tried_paths}"
  },
  
  "api": {
   "integration": {
-   "failed": "Error integrant API per {module}: {error}"
+   "failed": "Error integrando API para {module}: {error}"
   },
   "removal": {
-   "failed": "Error eliminant API per {module}: {error}"
+   "failed": "Error eliminando API para {module}: {error}"
   },
   "integrator": {
-   "set": "Integrador d'API establert per al gestor de mòduls"
+   "set": "Integrador de API establecido para el gestor de módulos"
   }
  },
  
  "init": {
-  "started": "ModuleManager inicialitzat",
-  "config_loaded": "Configuració carregada des de {path}",
-  "config_error": "Error carregant configuració: {error}",
-  "components_initialized": "Components especialitzats inicialitzats",
-  "base_path_set": "Path base establert: {path}"
+  "started": "ModuleManager inicializado",
+  "config_loaded": "Configuración cargada desde {path}",
+  "config_error": "Error cargando configuración: {error}",
+  "components_initialized": "Componentes especializados inicializados",
+  "base_path_set": "Ruta base establecida: {path}"
  },
  
  "discovery": {
-  "starting": "Descobrint mòduls...",
-  "completed": "Descobriment completat: {new_count} nous, {total_count} total",
-  "cycles_detected": "Cicles de dependències: {cycles}"
+  "starting": "Descubriendo módulos...",
+  "completed": "Descubrimiento completado: {new_count} nuevos, {total_count} total",
+  "cycles_detected": "Ciclos de dependencias: {cycles}"
  },
  
  "loading": {
-  "not_found": "Mòdul {module} no trobat",
-  "disabled": "Mòdul {module} està desactivat",
-  "dependency_failed": "No es pot carregar dependència {dep} per {module}",
-  "loading": "Carregant mòdul {module}...",
-  "loaded": "Mòdul {module} carregat correctament",
-  "error": "Error carregant {module}: {error}"
+  "not_found": "Módulo {module} no encontrado",
+  "disabled": "Módulo {module} está deshabilitado",
+  "dependency_failed": "No se puede cargar la dependencia {dep} para {module}",
+  "loading": "Cargando módulo {module}...",
+  "loaded": "Módulo {module} cargado correctamente",
+  "error": "Error cargando {module}: {error}"
  },
  
  "starting": {
-  "starting": "Iniciant mòdul {module}...",
-  "started": "Mòdul {module} iniciat correctament",
-  "error": "Error iniciant {module}: {error}"
+  "starting": "Iniciando módulo {module}...",
+  "started": "Módulo {module} iniciado correctamente",
+  "error": "Error iniciando {module}: {error}"
  },
  
  "stopping": {
-  "stopping": "Aturant mòdul {module}...",
-  "stopped": "Mòdul {module} aturat correctament",
-  "error": "Error aturant {module}: {error}"
+  "stopping": "Deteniendo módulo {module}...",
+  "stopped": "Módulo {module} detenido correctamente",
+  "error": "Error deteniendo {module}: {error}"
  },
  
  "lifecycle": {
-  "loading_module": "Carregant mòdul {module}...",
-  "module_loaded": "Mòdul {module} carregat correctament",
-  "starting_module": "Iniciant mòdul {module}...",
-  "module_started": "Mòdul {module} iniciat correctament",
-  "stopping_module": "Aturant mòdul {module}...",
-  "module_stopped": "Mòdul {module} aturat correctament",
-  "module_not_found": "Mòdul {module} no trobat",
-  "module_disabled": "Mòdul {module} està desactivat",
-  "dependency_failed": "No es pot carregar dependència {dep} per {module}",
-  "already_loaded": "Mòdul {module} ja està carregat",
-  "already_running": "Mòdul {module} ja està en execució"
+  "loading_module": "Cargando módulo {module}...",
+  "module_loaded": "Módulo {module} cargado correctamente",
+  "starting_module": "Iniciando módulo {module}...",
+  "module_started": "Módulo {module} iniciado correctamente",
+  "stopping_module": "Deteniendo módulo {module}...",
+  "module_stopped": "Módulo {module} detenido correctamente",
+  "module_not_found": "Módulo {module} no encontrado",
+  "module_disabled": "Módulo {module} está deshabilitado",
+  "dependency_failed": "No se puede cargar la dependencia {dep} para {module}",
+  "already_loaded": "Módulo {module} ya cargado",
+  "already_running": "Módulo {module} ya en ejecución"
  },
  
  "system": {
-  "starting": "Iniciant sistema de mòduls...",
-  "started": "Sistema de mòduls iniciat correctament",
-  "stopping": "Aturant sistema de mòduls...",
-  "stopped": "Sistema de mòduls aturat correctament",
-  "discovery_starting": "Iniciant descobriment de mòduls...",
-  "discovery_completed": "Descobriment completat: {new_count} nous, {total_count} total",
-  "auto_start_modules": "Iniciant {count} mòduls amb auto_start activat",
+  "starting": "Iniciando sistema de módulos...",
+  "started": "Sistema de módulos iniciado correctamente",
+  "stopping": "Deteniendo sistema de módulos...",
+  "stopped": "Sistema de módulos detenido correctamente",
+  "discovery_starting": "Iniciando descubrimiento de módulos...",
+  "discovery_completed": "Descubrimiento completado: {new_count} nuevos, {total_count} total",
+  "auto_start_modules": "Iniciando {count} módulos con auto_start activado",
   "startup": {
-   "initializing": "Inicialitzant sistema...",
-   "ready": "Sistema llest i operatiu"
+   "initializing": "Inicializando sistema...",
+   "ready": "Sistema listo y operativo"
   },
   "shutdown": {
-   "initiated": "Aturada del sistema iniciada...",
-   "completed": "Aturada del sistema completada"
+   "initiated": "Apagado del sistema iniciado...",
+   "completed": "Apagado del sistema completado"
   },
   "errors": {
-   "critical": "Error crític del sistema: {error}"
+   "critical": "Error crítico del sistema: {error}"
   }
  },
  
+ "ui": {
+  "not_found": "UI del gestor de módulos no encontrada"
+ },
+
+ "info": {
+  "description": "Sistema de gestión centralizada de módulos Nexe 0.8",
+  "feature_auto_discovery": "Autodescubrimiento de módulos",
+  "feature_lifecycle": "Gestión del ciclo de vida",
+  "feature_registry": "Registro centralizado",
+  "feature_config_validation": "Validación de configuración",
+  "feature_ui": "UI web de gestión"
+ },
+
+ "metadata": {
+  "description": "Sistema de gestión centralizada de módulos Nexe 0.8"
+ },
+
+ "config_manager": {
+  "core_module_always_enabled": "El módulo {name} es CORE, siempre habilitado",
+  "config_path_not_found": "Ruta de configuración no encontrada o inaccesible: {path} - {error}",
+  "central_manifest_not_found": "Manifest central no encontrado: {path} - {error}",
+  "local_manifest_not_found": "Manifest local no encontrado: {path} - {error}",
+  "manifest_not_found": "Archivo de manifest no encontrado: {path} - {error}",
+  "manifest_read_error": "Error leyendo manifest: {path} - {error}",
+  "layer_detect_failed": "No se pudo determinar la capa del módulo para {path}: {error}",
+  "enabled_from_dict": "Módulo {module} enabled={enabled} (desde configuración dict)",
+  "enabled_from_list": "Módulo {module} habilitado (desde lista)",
+  "disabled_not_in_list": "Módulo {module} no está en la lista de habilitados, deshabilitando",
+  "skip_plugins_allowlist": "Módulo {module} omitiendo allowlist de plugins (módulo fuera de plugins/*)",
+  "enabled_from_manifest": "Módulo {module} enabled={enabled} (desde el manifest por defecto)",
+  "disabled_via_config": "Módulo {module} deshabilitado vía configuración",
+  "saved_enabled": "Guardado módulo {module} enabled={enabled} en la configuración"
+},
+
+ "security": {
+  "allowlist_required": "ERROR DE SEGURIDAD: NEXE_APPROVED_MODULES es obligatorio en producción. Define NEXE_APPROVED_MODULES o NEXE_ENV=development.",
+  "allowlist_rejected_reason": "No está en la lista NEXE_APPROVED_MODULES"
+ },
+
+ "contract_bridge": {
+  "initialize_failed": "No se pudo inicializar {contract_id}: {error}",
+  "shutdown_failed": "Error durante el apagado de {contract_id}: {error}",
+  "health_ok": "Módulo cargado y operativo",
+  "health_failed": "Comprobación de salud fallida: {error}",
+  "manifest_missing": "No se encontró manifest para {module} en {path}",
+  "registered": "✓ {module} registrado en ContractRegistry",
+  "register_failed": "No se pudo registrar {module}: {error}",
+  "unregistered": "✓ {module} desregistrado del ContractRegistry",
+  "unregister_failed": "No se pudo desregistrar {module}: {error}"
+ },
+
+ "logs": {
+  "health_failed": "Comprobación de salud fallida: {error}",
+  "info_failed": "Error obteniendo información del módulo: {error}",
+  "list_failed": "Error listando módulos: {error}"
+ },
+
+ "error_saving_config": "Error guardando configuración",
+ 
  "errors": {
-  "critical": "Error crític del sistema: {error}",
-  "module_failed": "El mòdul {module} ha fallat: {error}",
-  "load_error": "Error carregant {module}: {error}",
-  "start_error": "Error iniciant {module}: {error}",
-  "stop_error": "Error aturant {module}: {error}",
-  "dependency_cycle": "Cicle de dependències detectat: {cycle}"
+  "critical": "Error crítico del sistema: {error}",
+  "module_failed": "El módulo {module} falló: {error}",
+  "load_error": "Error cargando {module}: {error}",
+  "start_error": "Error iniciando {module}: {error}",
+  "stop_error": "Error deteniendo {module}: {error}",
+  "dependency_cycle": "Ciclo de dependencias detectado: {cycle}"
  },
  
  "status": {
-  "running": "Sistema en funcionament",
-  "stopped": "Sistema aturat",
-  "modules_total": "Total mòduls: {count}",
-  "modules_running": "Mòduls en execució: {count}",
-  "modules_by_state": "Mòduls per estat: {states}",
-  "uptime": "Temps de funcionament: {seconds}s"
+  "running": "Sistema en funcionamiento",
+  "stopped": "Sistema detenido",
+  "modules_total": "Total módulos: {count}",
+  "modules_running": "Módulos en ejecución: {count}",
+  "modules_by_state": "Módulos por estado: {states}",
+  "uptime": "Tiempo de funcionamiento: {seconds}s"
  }
 }

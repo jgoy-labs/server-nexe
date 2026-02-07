@@ -1,7 +1,7 @@
 """
 Base contracts system for NEXE 0.9
 
-Protocols i dataclasses per definir contractes unificats de plugins.
+Protocols and dataclasses to define unified plugin contracts.
 """
 
 from typing import Dict, List, Optional, Any, Protocol, runtime_checkable
@@ -15,13 +15,13 @@ from datetime import datetime
 # ============================================
 
 class ContractType(str, Enum):
-    """Tipus de contracte"""
+    """Contract type."""
     MODULE = "module"
     CORE = "core"
 
 
 class HealthStatus(str, Enum):
-    """Estat de salut d'un contracte"""
+    """Contract health status."""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
@@ -35,9 +35,9 @@ class HealthStatus(str, Enum):
 @dataclass
 class ContractMetadata:
     """
-    Metadata unificada per tots els contractes.
+    Unified metadata for all contracts.
 
-    Defineix informació bàsica que tot contracte (plugin) ha de proporcionar.
+    Defines the basic information every contract (plugin) must provide.
     """
     # Identificació
     contract_id: str
@@ -67,44 +67,44 @@ class ContractMetadata:
     custom: Dict[str, Any] = field(default_factory=dict)
 
     def is_module(self) -> bool:
-        """Retorna True si és un module"""
+        """Return True if it is a module."""
         return self.contract_type == ContractType.MODULE
 
     def is_core(self) -> bool:
-        """Retorna True si és core"""
+        """Return True if it is core."""
         return self.contract_type == ContractType.CORE
 
     def has_capability(self, capability: str) -> bool:
-        """Check si té una capability específica"""
+        """Check whether it has a specific capability."""
         return self.capabilities.get(capability, False)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Converteix a diccionari"""
+        """Convert to a dictionary."""
         return asdict(self)
 
 
 @dataclass
 class HealthResult:
-    """Resultat d'un health check"""
+    """Health check result."""
     status: HealthStatus
     message: str = ""
     details: Dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.now)
 
     def is_healthy(self) -> bool:
-        """Retorna True si està healthy"""
+        """Return True if healthy."""
         return self.status == HealthStatus.HEALTHY
 
     def is_degraded(self) -> bool:
-        """Retorna True si està degraded"""
+        """Return True if degraded."""
         return self.status == HealthStatus.DEGRADED
 
     def is_unhealthy(self) -> bool:
-        """Retorna True si està unhealthy"""
+        """Return True if unhealthy."""
         return self.status == HealthStatus.UNHEALTHY
 
     def to_dict(self) -> Dict[str, Any]:
-        """Converteix a diccionari"""
+        """Convert to a dictionary."""
         return {
             "status": self.status.value,
             "message": self.message,
@@ -120,38 +120,38 @@ class HealthResult:
 @runtime_checkable
 class BaseContract(Protocol):
     """
-    Protocol base per tots els contractes NEXE.
+    Base protocol for all NEXE contracts.
 
-    Defineix el mínim comú que tot contracte (plugin) ha d'implementar.
+    Defines the minimum common interface that every contract (plugin) must implement.
     """
 
     @property
     def metadata(self) -> ContractMetadata:
-        """Retorna metadata del contracte"""
+        """Return contract metadata."""
         ...
 
     async def initialize(self, context: Dict[str, Any]) -> bool:
         """
-        Inicialitza el contracte.
+        Initialize the contract.
 
         Args:
-            context: Diccionari amb configuració i dependències
+            context: Dictionary with configuration and dependencies
 
         Returns:
-            True si inicialització OK, False altrament
+            True if initialization succeeds, False otherwise
         """
         ...
 
     async def shutdown(self) -> None:
-        """Shutdown graceful del contracte"""
+        """Gracefully shut down the contract."""
         ...
 
     async def health_check(self) -> HealthResult:
         """
-        Health check del contracte.
+        Health check for the contract.
 
         Returns:
-            HealthResult amb estat actual
+            HealthResult with current status
         """
         ...
 
@@ -159,25 +159,25 @@ class BaseContract(Protocol):
 @runtime_checkable
 class ModuleContract(BaseContract, Protocol):
     """
-    Protocol per modules (plugins estàndard).
+    Protocol for modules (standard plugins).
 
-    Extends BaseContract amb funcionalitat específica de plugins:
-    - Proporcionar router FastAPI (si has_api=true)
-    - Proporcionar prefix de rutes
+    Extends BaseContract with plugin-specific functionality:
+    - Provide a FastAPI router (if has_api=true)
+    - Provide a routes prefix
     """
 
     def get_router(self) -> Optional[Any]:
         """
-        Retorna el router FastAPI del module.
+        Return the module's FastAPI router.
 
         Returns:
-            APIRouter si el module té API, None altrament
+            APIRouter if the module has an API, None otherwise
         """
         ...
 
     def get_router_prefix(self) -> str:
         """
-        Retorna el prefix de rutes del module.
+        Return the module routes prefix.
 
         Returns:
             Prefix (e.g., "/ollama", "/security")
@@ -191,39 +191,39 @@ class ModuleContract(BaseContract, Protocol):
 
 def validate_contract(obj: Any) -> bool:
     """
-    Valida que un objecte implementa BaseContract.
+    Validate that an object implements BaseContract.
 
     Args:
-        obj: Objecte a validar
+        obj: Object to validate
 
     Returns:
-        True si implementa BaseContract
+        True if it implements BaseContract
     """
     return isinstance(obj, BaseContract)
 
 
 def contract_is_module(obj: Any) -> bool:
     """
-    Check si un objecte és un ModuleContract.
+    Check whether an object is a ModuleContract.
 
     Args:
-        obj: Objecte a verificar
+        obj: Object to check
 
     Returns:
-        True si implementa ModuleContract
+        True if it implements ModuleContract
     """
     return isinstance(obj, ModuleContract)
 
 
 def get_contract_info(contract: BaseContract) -> Dict[str, Any]:
     """
-    Extreu informació resumida d'un contracte.
+    Extract summary information about a contract.
 
     Args:
-        contract: Contracte a inspeccionar
+        contract: Contract to inspect
 
     Returns:
-        Diccionari amb info del contracte
+        Dictionary with contract info
     """
     meta = contract.metadata
     return {

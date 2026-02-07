@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/manifest.py
-Description: Manifest FastAPI del CLI Central Nexe. Defineix router públic /cli amb endpoints
+Description: FastAPI manifest for the Nexe Central CLI. Defines public /cli router with endpoints
 
 www.jgoy.net
 ────────────────────────────────────
@@ -26,7 +26,7 @@ MODULE_PATH = Path(__file__).parent
 @router_public.get("/health")
 async def cli_health():
   """
-  Retorna l'estat de salut del CLI Central Nexe.
+  Return health status for the Nexe Central CLI.
   """
   try:
     from .router import CLIRouter
@@ -43,7 +43,13 @@ async def cli_health():
       }
     })
   except Exception as e:
-    logger.error(f"Error checking CLI health: {e}")
+    logger.error(
+      t(
+        "cli.manifest.health_error",
+        "Error checking CLI health: {error}",
+        error=str(e)
+      )
+    )
     return JSONResponse(
       content={
         "name": "cli",
@@ -56,7 +62,7 @@ async def cli_health():
 @router_public.get("/info")
 async def cli_info():
   """
-  Retorna informació del CLI Central Nexe.
+  Return information about the Nexe Central CLI.
   """
   try:
     from .router import CLIRouter
@@ -99,7 +105,13 @@ async def cli_info():
       "api_path": "/ui-control/api/clis"
     })
   except Exception as e:
-    logger.error(f"Error getting CLI info: {e}")
+    logger.error(
+      t(
+        "cli.manifest.info_error",
+        "Error getting CLI info: {error}",
+        error=str(e)
+      )
+    )
     return JSONResponse(
       content={"error": str(e)},
       status_code=500
@@ -108,14 +120,20 @@ async def cli_info():
 @router_public.get("/list")
 async def cli_list():
   """
-  Retorna la llista de CLIs disponibles (redirect a /ui-control/api/clis).
+  Return the list of available CLIs (redirects to /ui-control/api/clis).
   """
   try:
     from .router import CLIRouter
     router = CLIRouter()
     return JSONResponse(content=router.get_all_clis_dict())
   except Exception as e:
-    logger.error(f"Error listing CLIs: {e}")
+    logger.error(
+      t(
+        "cli.manifest.list_error",
+        "Error listing CLIs: {error}",
+        error=str(e)
+      )
+    )
     return JSONResponse(
       content={"error": str(e)},
       status_code=500
@@ -138,11 +156,11 @@ MODULE_METADATA = {
 }
 
 def get_router():
-  """Retorna el router públic del mòdul"""
+  """Return the module public router."""
   return router_public
 
 def get_metadata():
-  """Retorna la metadata del mòdul"""
+  """Return the module metadata."""
   return MODULE_METADATA
 
 __all__ = [

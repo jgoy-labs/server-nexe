@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/patterns.py
-Description: Patrons de cerca i convencions de noms per Module Loader. Defineix prioritats
+Description: Search patterns and naming conventions for Module Loader. Defines priorities
 
 www.jgoy.net
 ────────────────────────────────────
@@ -13,13 +13,13 @@ www.jgoy.net
 from .messages import get_message
 
 class LoaderPatterns:
-  """Gestiona patrons de cerca de fitxers i convencions de noms"""
+  """Manage file search patterns and naming conventions."""
 
   def __init__(self, i18n=None):
     self.i18n = i18n
 
   def get_api_file_patterns(self) -> list:
-    """Retorna patrons de cerca de fitxers API en ordre de prioritat"""
+    """Return API file search patterns in priority order."""
     return [
       get_message(self.i18n, 'loader.patterns.api_module'),
       get_message(self.i18n, 'loader.patterns.api_generic'),
@@ -31,7 +31,7 @@ class LoaderPatterns:
     ]
 
   def get_init_methods(self) -> list:
-    """Retorna llista de mètodes d'inicialització possibles"""
+    """Return list of possible initialization methods."""
     return [
       get_message(self.i18n, 'loader.init_methods.init'),
       get_message(self.i18n, 'loader.init_methods.initialize'),
@@ -41,7 +41,7 @@ class LoaderPatterns:
     ]
 
   def get_cleanup_methods(self) -> list:
-    """Retorna llista de mètodes de neteja possibles"""
+    """Return list of possible cleanup methods."""
     return [
       get_message(self.i18n, 'loader.cleanup_methods.cleanup'),
       get_message(self.i18n, 'loader.cleanup_methods.shutdown'),
@@ -51,7 +51,7 @@ class LoaderPatterns:
     ]
 
   def get_factory_functions(self) -> list:
-    """Retorna llista de factory functions possibles"""
+    """Return list of possible factory functions."""
     return [
       get_message(self.i18n, 'loader.factory_functions.create_module'),
       get_message(self.i18n, 'loader.factory_functions.create_app'),
@@ -60,7 +60,7 @@ class LoaderPatterns:
     ]
 
   def get_common_attributes(self) -> list:
-    """Retorna llista d'atributs comuns per buscar instàncies"""
+    """Return list of common attributes to find instances."""
     return [
       get_message(self.i18n, 'loader.common_attributes.app'),
       get_message(self.i18n, 'loader.common_attributes.router'),
@@ -71,7 +71,7 @@ class LoaderPatterns:
     ]
 
   def get_priority_keywords(self) -> list:
-    """Retorna keywords de prioritat per detectar classes principals"""
+    """Return priority keywords to detect main classes."""
     return [
       get_message(self.i18n, 'loader.common_attributes.module'),
       get_message(self.i18n, 'loader.common_attributes.api'),
@@ -80,7 +80,7 @@ class LoaderPatterns:
     ]
 
   def get_ignore_prefixes(self) -> tuple:
-    """Retorna prefixos de fitxers a ignorar"""
+    """Return file prefixes to ignore."""
     return (
       get_message(self.i18n, 'loader.ignore_prefixes.test'),
       get_message(self.i18n, 'loader.ignore_prefixes.underscore'),
@@ -88,10 +88,10 @@ class LoaderPatterns:
     )
 
   def get_python_extension(self) -> str:
-    """Retorna extensió de fitxers Python"""
+    """Return Python file extension."""
     return get_message(self.i18n, 'loader.file_extensions.python')
 
   def get_module_name_prefix(self, module_name: str, file_id: int) -> str:
-    """Genera prefix únic per nom de mòdul"""
+    """Generate unique prefix for a module name."""
     return get_message(self.i18n, 'loader.module_name_prefix',
              module_name=module_name, id=file_id)

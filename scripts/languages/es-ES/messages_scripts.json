@@ -1,0 +1,27 @@
+{
+ "_meta": {
+  "component": "scripts",
+  "description": "Traducciones de scripts",
+  "version": "1.0.0",
+  "language": "es-ES"
+ },
+ "migrate": {
+  "plugin": "Plugin: {name}",
+  "status_success": "✓ ÉXITO",
+  "status_failed": "✗ FALLIDO",
+  "status_line": "Estado: {status}",
+  "warnings_title": "\nAdvertencias:",
+  "warning_item": "  ⚠️  {warning}",
+  "errors_title": "\nErrores:",
+  "error_item": "  ❌ {error}",
+  "migrated_written": "\nManifiesto migrado guardado en:",
+  "migrated_path": "  {path}",
+  "plugins_dir_not_found": "❌ Directorio de plugins no encontrado: {path}",
+  "plugin_not_found": "❌ Plugin no encontrado: {path}",
+  "manifest_not_found": "❌ Manifiesto no encontrado: {path}",
+  "summary_title": "RESUMEN DE MIGRACIÓN",
+  "summary_total": "Total de plugins: {count}",
+  "summary_successful": "Correctos: {count}",
+  "summary_failed": "Fallidos: {count}"
+ }
+}

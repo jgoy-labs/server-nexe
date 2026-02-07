@@ -22,16 +22,21 @@ except ImportError:
   import tomli as tomllib
 
 from .protocol import ModuleMetadata, SpecialistInfo
+from personality.i18n.resolve import resolve_i18n_string, resolve_i18n_tree
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.loader_scanner.{key}", fallback, **kwargs)
 
 @dataclass
 class ModuleDiscovery:
   """
-  Resultat del descobriment d'un mòdul.
+  Result of module discovery.
 
-  Conté tota la informació extreta del manifest.toml
-  necessària per carregar el mòdul.
+  Contains all information extracted from manifest.toml
+  needed to load the module.
   """
   metadata: ModuleMetadata
   manifest_path: Path
@@ -54,7 +59,7 @@ class ModuleDiscovery:
   raw_data: Dict[str, Any] = field(default_factory=dict)
 
   def to_dict(self) -> Dict[str, Any]:
-    """Converteix a diccionari per serialització"""
+    """Convert to a dictionary for serialization."""
     return {
       "name": self.metadata.name,
       "version": self.metadata.version,
@@ -71,10 +76,10 @@ class ModuleDiscovery:
 
 class ModuleScanner:
   """
-  Escaneja el sistema de fitxers cercant mòduls Nexe.
+  Scan the file system looking for Nexe modules.
 
-  Cerca fitxers manifest.toml en els directoris configurats
-  i extreu la informació necessària per carregar cada mòdul.
+  Finds manifest.toml files in configured directories
+  and extracts the information needed to load each module.
   """
 
   DEFAULT_SCAN_PATHS = [
@@ -90,11 +95,11 @@ class ModuleScanner:
     scan_paths: Optional[List[str]] = None
   ):
     """
-    Inicialitza l'scanner.
+    Initialize the scanner.
 
     Args:
-      base_path: Directori arrel del projecte
-      scan_paths: Llista de subdirectoris on cercar
+      base_path: Project root directory
+      scan_paths: List of subdirectories to scan
     """
     if base_path is None:
       base_path = Path(__file__).parent.parent.parent
@@ -102,18 +107,19 @@ class ModuleScanner:
     self.base_path = Path(base_path)
     self.scan_paths = scan_paths or self.DEFAULT_SCAN_PATHS
 
-    logger.info(
-      "ModuleScanner initialized - base=%s, paths=%s",
-      self.base_path,
-      self.scan_paths
-    )
+    logger.info(_t(
+      "initialized",
+      "ModuleScanner initialized - base={base}, paths={paths}",
+      base=self.base_path,
+      paths=self.scan_paths
+    ))
 
   def scan(self) -> List[ModuleDiscovery]:
     """
-    Escaneja tots els directoris configurats.
+    Scan all configured directories.
 
     Returns:
-      Llista de ModuleDiscovery amb els mòduls trobats
+      List of ModuleDiscovery with found modules
     """
     discoveries = []
 
@@ -122,34 +128,42 @@ class ModuleScanner:
       if full_path.exists():
         discoveries.extend(self._scan_directory(full_path))
 
-    logger.info("Scan complete - found %d modules", len(discoveries))
+    logger.info(_t(
+      "scan_complete",
+      "Scan complete - found {count} modules",
+      count=len(discoveries)
+    ))
     return discoveries
 
   def scan_path(self, path: Path) -> List[ModuleDiscovery]:
     """
-    Escaneja un directori específic.
+    Scan a specific directory.
 
     Args:
-      path: Directori a escanejar
+      path: Directory to scan
 
     Returns:
-      Llista de ModuleDiscovery
+      List of ModuleDiscovery
     """
     if not path.exists():
-      logger.warning("Path does not exist: %s", path)
+      logger.warning(_t(
+        "path_missing",
+        "Path does not exist: {path}",
+        path=path
+      ))
       return []
 
     return self._scan_directory(path)
 
   def _scan_directory(self, directory: Path) -> List[ModuleDiscovery]:
     """
-    Escaneja recursivament un directori cercant manifest.toml.
+    Recursively scan a directory for manifest.toml.
 
     Args:
-      directory: Directori a escanejar
+      directory: Directory to scan
 
     Returns:
-      Llista de mòduls descoberts
+      List of discovered modules
     """
     discoveries = []
 
@@ -159,46 +173,59 @@ class ModuleScanner:
         if discovery:
           discoveries.append(discovery)
           logger.debug(
-            "Discovered module: %s at %s",
-            discovery.metadata.name,
-            manifest_path
+            _t(
+              "discovered",
+              "Discovered module: {module} at {path}",
+              module=discovery.metadata.name,
+              path=manifest_path
+            )
           )
       except Exception as e:
-        logger.error(
-          "Failed to parse manifest %s: %s",
-          manifest_path,
-          str(e)
-        )
+        logger.error(_t(
+          "manifest_parse_failed",
+          "Failed to parse manifest {path}: {error}",
+          path=manifest_path,
+          error=str(e)
+        ))
 
     return discoveries
 
   def _parse_manifest(self, manifest_path: Path) -> Optional[ModuleDiscovery]:
     """
-    Parseja un fitxer manifest.toml.
+    Parse a manifest.toml file.
 
     Args:
-      manifest_path: Path al fitxer manifest.toml
+      manifest_path: Path to the manifest.toml file
 
     Returns:
-      ModuleDiscovery o None si el manifest és invàlid
+      ModuleDiscovery or None if the manifest is invalid
     """
     with open(manifest_path, "rb") as f:
       data = tomllib.load(f)
+    data = resolve_i18n_tree(data)
 
     module_section = data.get("module", {})
     if not module_section:
-      logger.warning("No [module] section in %s", manifest_path)
+      logger.warning(_t(
+        "missing_module_section",
+        "No [module] section in {path}",
+        path=manifest_path
+      ))
       return None
 
     name = module_section.get("name")
     if not name:
-      logger.warning("No module name in %s", manifest_path)
+      logger.warning(_t(
+        "missing_module_name",
+        "No module name in {path}",
+        path=manifest_path
+      ))
       return None
 
     metadata = ModuleMetadata(
       name=name,
       version=module_section.get("version", "0.0.0"),
-      description=module_section.get("description", ""),
+      description=resolve_i18n_string(module_section.get("description", "")),
       author=module_section.get("author", ""),
       license=module_section.get("license", "AGPL-3.0"),
       module_type=module_section.get("type", "module"),
@@ -251,13 +278,13 @@ class ModuleScanner:
 
   def _infer_module_path(self, manifest_path: Path) -> str:
     """
-    Infereix el path del mòdul Python des del path del manifest.
+    Infer the Python module path from the manifest path.
 
     Args:
-      manifest_path: Path al manifest.toml
+      manifest_path: Path to manifest.toml
 
     Returns:
-      String amb el mòdul Python (ex: "plugins.security.module")
+      String with the Python module (ex: "plugins.security.module")
     """
     try:
       relative = manifest_path.parent.relative_to(self.base_path)
@@ -274,26 +301,26 @@ class ModuleScanner:
 
 def scan_modules(base_path: Optional[Path] = None) -> List[ModuleDiscovery]:
   """
-  Funció helper per escanejar mòduls.
+  Helper function to scan modules.
 
   Args:
-    base_path: Directori arrel (opcional)
+    base_path: Root directory (optional)
 
   Returns:
-    Llista de mòduls descoberts
+    List of discovered modules
   """
   scanner = ModuleScanner(base_path)
   return scanner.scan()
 
 def discover_module(manifest_path: Path) -> Optional[ModuleDiscovery]:
   """
-  Descobreix un mòdul individual des del seu manifest.
+  Discover a single module from its manifest.
 
   Args:
-    manifest_path: Path al manifest.toml
+    manifest_path: Path to manifest.toml
 
   Returns:
-    ModuleDiscovery o None
+    ModuleDiscovery or None
   """
   scanner = ModuleScanner()
   return scanner._parse_manifest(manifest_path)

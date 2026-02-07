@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/manifest.py
-Description: Router FastAPI del mòdul ModuleManager. Exposa endpoints REST per:
+Description: FastAPI router for the ModuleManager module. Exposes REST endpoints for:
 
 www.jgoy.net
 ────────────────────────────────────
@@ -16,7 +16,12 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from personality.i18n.resolve import t_modular
+
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"module_manager.logs.{key}", fallback, **kwargs)
 
 router_public = APIRouter(prefix="/modules", tags=["modules"])
 
@@ -26,16 +31,16 @@ UI_PATH = MODULE_PATH / "ui"
 @router_public.get("/ui", response_class=HTMLResponse)
 async def serve_modules_ui():
   """
-  Serveix la pàgina principal de la UI del ModuleManager.
+  Serve the main ModuleManager UI page.
 
   Returns:
-    HTMLResponse: Contingut HTML de la UI
+    HTMLResponse: UI HTML content
   """
   index_path = UI_PATH / "index.html"
 
   if not index_path.exists():
     return HTMLResponse(
-      content="<h1>Module Manager UI not found</h1>",
+      content=f"<h1>{t_modular('module_manager.ui.not_found', 'Module Manager UI not found')}</h1>",
       status_code=404
     )
 
@@ -47,7 +52,7 @@ async def serve_modules_ui():
 @router_public.get("/health")
 async def module_manager_health():
   """
-  Health check del mòdul ModuleManager.
+  Health check for the ModuleManager module.
 
   Returns:
     {"name": "module_manager", "status": "HEALTHY|UNHEALTHY", ...}
@@ -67,7 +72,13 @@ async def module_manager_health():
     })
 
   except Exception as e:
-    logger.error(f"Health check failed: {e}")
+    logger.error(
+      _t_log(
+        "health_failed",
+        "Health check failed: {error}",
+        error=str(e),
+      )
+    )
     return JSONResponse(
       content={
         "name": "module_manager",
@@ -80,7 +91,7 @@ async def module_manager_health():
 @router_public.get("/info")
 async def module_manager_info():
   """
-  Retorna informació del mòdul ModuleManager.
+  Return information about the ModuleManager module.
 
   Returns:
     {"name": "module_manager", "version": "...", ...}
@@ -91,20 +102,29 @@ async def module_manager_info():
     return JSONResponse(content={
       "name": "module_manager",
       "version": __version__,
-      "description": "Sistema de gestió centralitzada de mòduls Nexe 0.8",
+      "description": t_modular(
+        "module_manager.info.description",
+        "Centralized management system for Nexe 0.8 modules"
+      ),
       "features": [
-        "Auto-descoberta de mòduls",
-        "Gestió de cicle de vida",
-        "Registre centralitzat",
-        "Validació de configuració",
-        "UI web de gestió"
+        t_modular("module_manager.info.feature_auto_discovery", "Module auto-discovery"),
+        t_modular("module_manager.info.feature_lifecycle", "Lifecycle management"),
+        t_modular("module_manager.info.feature_registry", "Centralized registry"),
+        t_modular("module_manager.info.feature_config_validation", "Configuration validation"),
+        t_modular("module_manager.info.feature_ui", "Web management UI"),
       ],
       "path": str(MODULE_PATH),
       "ui_available": UI_PATH.exists()
     })
 
   except Exception as e:
-    logger.error(f"Error getting module info: {e}")
+    logger.error(
+      _t_log(
+        "info_failed",
+        "Error getting module info: {error}",
+        error=str(e),
+      )
+    )
     return JSONResponse(
       content={"error": str(e)},
       status_code=500
@@ -113,7 +133,7 @@ async def module_manager_info():
 @router_public.get("/list")
 async def list_registered_modules():
   """
-  Retorna la llista de mòduls registrats.
+  Return the list of registered modules.
 
   Returns:
     {"modules": [...], "total": N}
@@ -139,7 +159,13 @@ async def list_registered_modules():
     })
 
   except Exception as e:
-    logger.error(f"Error listing modules: {e}")
+    logger.error(
+      _t_log(
+        "list_failed",
+        "Error listing modules: {error}",
+        error=str(e),
+      )
+    )
     return JSONResponse(
       content={"error": str(e), "modules": [], "total": 0},
       status_code=500
@@ -148,7 +174,10 @@ async def list_registered_modules():
 MODULE_METADATA = {
   "name": "module_manager",
   "version": "0.8.0",
-  "description": "Sistema de gestió centralitzada de mòduls Nexe 0.8",
+  "description": t_modular(
+    "module_manager.metadata.description",
+    "Centralized management system for Nexe 0.8 modules"
+  ),
   "router": router_public,
   "prefix": "/modules",
   "tags": ["modules", "management", "core"],
@@ -159,11 +188,11 @@ MODULE_METADATA = {
 }
 
 def get_router():
-  """Retorna el router públic del mòdul"""
+  """Return the public router for the module."""
   return router_public
 
 def get_metadata():
-  """Retorna la metadata del mòdul"""
+  """Return the module metadata."""
   return MODULE_METADATA
 
 __all__ = [

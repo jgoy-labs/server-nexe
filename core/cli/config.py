@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/config.py
-Description: Configuració del CLI Central Nexe.
+Description: Configuration for the Nexe Central CLI.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -30,11 +30,11 @@ DEFAULT_VERIFY_SSL = False
 @dataclass
 class NexeConfig:
   """
-  Configuració del CLI Nexe.
+  Nexe CLI configuration.
 
-  Cerca config a:
+  Looks for config in:
   1. ~/.nexe/config.yaml
-  2. Variables d'entorn NEXE_*
+  2. NEXE_* environment variables
   3. Defaults
   """
 
@@ -90,7 +90,13 @@ class NexeConfig:
       self.extra = data
 
     except Exception as e:
-      logger.debug("Failed to load CLI config: %s", e)
+      logger.debug(
+        t(
+          "cli.config.load_failed",
+          "Failed to load CLI config: {error}",
+          error=str(e)
+        )
+      )
 
   def _load_from_env(self) -> None:
     """Load config from environment variables."""

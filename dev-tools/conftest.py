@@ -18,10 +18,15 @@ import subprocess
 import time
 from typing import Generator
 
+from personality.i18n.resolve import t_modular
+
 # Configure environment for tests
 os.environ.setdefault("NEXE_ENV", "test")
 os.environ.setdefault("NEXE_LOG_LEVEL", "WARNING")
 os.environ.setdefault("NEXE_APPROVED_MODULES", "security,rag,memory,ollama_module,mlx_module,llama_cpp_module")
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"dev_tools.pytest.{key}", fallback, **kwargs)
 
 
 def _get_test_api_key() -> str:
@@ -156,7 +161,7 @@ def ensure_ollama_running():
     # Check if Ollama is already running
     try:
         httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
-        print("\n[pytest] Ollama: Already running ✓")
+        print(_t("ollama_already_running", "\n[pytest] Ollama: Already running ✓"))
         yield
         return
     except Exception:
@@ -165,12 +170,12 @@ def ensure_ollama_running():
     # Check if Ollama is installed
     ollama_path = shutil.which("ollama")
     if not ollama_path:
-        print("\n[pytest] Ollama: Not installed - tests requiring Ollama will be skipped")
+        print(_t("ollama_not_installed", "\n[pytest] Ollama: Not installed - tests requiring Ollama will be skipped"))
         yield
         return
 
     # Start Ollama
-    print("\n[pytest] Ollama: Starting for tests...")
+    print(_t("ollama_starting", "\n[pytest] Ollama: Starting for tests..."))
     try:
         _ollama_process = subprocess.Popen(
             ["ollama", "serve"],
@@ -183,28 +188,32 @@ def ensure_ollama_running():
             time.sleep(0.5)
             try:
                 httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
-                print(f"[pytest] Ollama: Ready ✓ (took {(i+1)*0.5:.1f}s)")
+                print(_t(
+                    "ollama_ready",
+                    "[pytest] Ollama: Ready ✓ (took {seconds:.1f}s)",
+                    seconds=(i + 1) * 0.5,
+                ))
                 break
             except Exception:
                 pass
         else:
-            print("[pytest] Ollama: Failed to start within 15s ⚠")
+            print(_t("ollama_start_timeout", "[pytest] Ollama: Failed to start within 15s ⚠"))
 
     except Exception as e:
-        print(f"[pytest] Ollama: Could not start: {e}")
+        print(_t("ollama_start_failed", "[pytest] Ollama: Could not start: {error}", error=e))
 
     yield
 
     # Cleanup: terminate Ollama if we started it
     if _ollama_process:
-        print("\n[pytest] Ollama: Stopping...")
+        print(_t("ollama_stopping", "\n[pytest] Ollama: Stopping..."))
         _ollama_process.terminate()
         try:
             _ollama_process.wait(timeout=5)
-            print("[pytest] Ollama: Stopped ✓")
+            print(_t("ollama_stopped", "[pytest] Ollama: Stopped ✓"))
         except subprocess.TimeoutExpired:
             _ollama_process.kill()
-            print("[pytest] Ollama: Force killed")
+            print(_t("ollama_force_killed", "[pytest] Ollama: Force killed"))
 
 
 @pytest.fixture(scope="function")
@@ -227,4 +236,4 @@ def ollama_available():
     except Exception:
         pass
 
-    pytest.skip("Ollama not available - skipping test")
+    pytest.skip(_t("ollama_not_available", "Ollama not available - skipping test"))

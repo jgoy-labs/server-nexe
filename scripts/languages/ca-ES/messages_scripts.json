@@ -1,0 +1,27 @@
+{
+ "_meta": {
+  "component": "scripts",
+  "description": "Traduccions dels scripts",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ "migrate": {
+  "plugin": "Plugin: {name}",
+  "status_success": "✓ ÈXIT",
+  "status_failed": "✗ FALLIT",
+  "status_line": "Estat: {status}",
+  "warnings_title": "\nAvisos:",
+  "warning_item": "  ⚠️  {warning}",
+  "errors_title": "\nErrors:",
+  "error_item": "  ❌ {error}",
+  "migrated_written": "\nManifest migrat escrit a:",
+  "migrated_path": "  {path}",
+  "plugins_dir_not_found": "❌ Directori de plugins no trobat: {path}",
+  "plugin_not_found": "❌ Plugin no trobat: {path}",
+  "manifest_not_found": "❌ Manifest no trobat: {path}",
+  "summary_title": "RESUM DE MIGRACIÓ",
+  "summary_total": "Total de plugins: {count}",
+  "summary_successful": "Correctes: {count}",
+  "summary_failed": "Fallits: {count}"
+ }
+}

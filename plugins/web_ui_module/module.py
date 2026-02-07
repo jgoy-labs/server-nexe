@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy
 Location: plugins/web_ui_module/module.py
-Description: Plugin UI web estil Ollama per demostrar el sistema modular de Nexe
+Description: Ollama-style web UI plugin to showcase Nexe's modular system
 
 www.jgoy.net
 ────────────────────────────────────
@@ -28,16 +28,19 @@ from .i18n import t
 
 logger = logging.getLogger(__name__)
 
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t(f"web_ui.logs.{key}", fallback, **kwargs)
+
 
 class WebUIModule:
     """
-    Plugin UI web per Nexe.
+    Web UI plugin for Nexe.
 
-    Característiques:
-    - Interfície web estil Ollama
-    - Sessions de xat amb historial
-    - Upload de fitxers (.txt, .md, .pdf)
-    - Streaming de respostes
+    Features:
+    - Ollama-style web interface
+    - Chat sessions with history
+    - File uploads (.txt, .md, .pdf)
+    - Streaming responses
     """
 
     def __init__(self):
@@ -63,7 +66,7 @@ class WebUIModule:
         )
 
     async def initialize(self, context: Dict[str, Any]) -> bool:
-        """Inicialització del plugin"""
+        """Initialize the plugin."""
         if self._initialized:
             return True
 
@@ -85,21 +88,27 @@ class WebUIModule:
             self._init_router()
 
             self._initialized = True
-            logger.info("WebUIModule initialized successfully")
+            logger.info(_t_log("initialized", "WebUIModule initialized successfully"))
             return True
 
         except Exception as e:
-            logger.error(f"Failed to initialize WebUIModule: {e}")
+            logger.error(
+                _t_log(
+                    "init_failed",
+                    "Failed to initialize WebUIModule: {error}",
+                    error=str(e),
+                )
+            )
             return False
 
     def _init_router(self):
-        """Crear routers de FastAPI"""
+        """Create FastAPI routers."""
         self._router = APIRouter(prefix="/ui", tags=["ui", "web", "demo"])
 
         # Serve main UI
         @self._router.get("/", response_class=HTMLResponse)
         async def serve_ui():
-            """Servir la pàgina principal"""
+            """Serve the main page."""
             html_path = self.static_dir / "index.html"
             if html_path.exists():
                 return FileResponse(html_path)
@@ -108,7 +117,7 @@ class WebUIModule:
         # Serve static files
         @self._router.get("/static/{filename}")
         async def serve_static(filename: str):
-            """Servir CSS/JS"""
+            """Serve CSS/JS."""
             file_path = self.static_dir / filename
             if file_path.exists() and file_path.suffix in {".css", ".js"}:
                 return FileResponse(file_path)
@@ -117,13 +126,13 @@ class WebUIModule:
         # Session management
         @self._router.post("/session/new")
         async def create_session():
-            """Crear nova sessió"""
+            """Create a new session."""
             session = self.session_manager.create_session()
             return {"session_id": session.id, "created_at": session.created_at.isoformat()}
 
         @self._router.get("/session/{session_id}")
         async def get_session_info(session_id: str):
-            """Obtenir info de sessió"""
+            """Get session info."""
             session = self.session_manager.get_session(session_id)
             if not session:
                 raise HTTPException(status_code=404, detail=t("web_ui.http.session_not_found", "Session not found"))
@@ -131,7 +140,7 @@ class WebUIModule:
 
         @self._router.get("/session/{session_id}/history")
         async def get_session_history(session_id: str):
-            """Obtenir historial de sessió"""
+            """Get session history."""
             session = self.session_manager.get_session(session_id)
             if not session:
                 raise HTTPException(status_code=404, detail=t("web_ui.http.session_not_found", "Session not found"))
@@ -139,7 +148,7 @@ class WebUIModule:
 
         @self._router.delete("/session/{session_id}")
         async def delete_session(session_id: str):
-            """Eliminar sessió"""
+            """Delete session."""
             deleted = self.session_manager.delete_session(session_id)
             if not deleted:
                 raise HTTPException(status_code=404, detail=t("web_ui.http.session_not_found", "Session not found"))
@@ -147,7 +156,7 @@ class WebUIModule:
 
         @self._router.get("/sessions")
         async def list_sessions():
-            """Llistar totes les sessions"""
+            """List all sessions."""
             return {"sessions": self.session_manager.list_sessions()}
 
         # File upload
@@ -156,7 +165,7 @@ class WebUIModule:
             file: UploadFile = File(...),
             session_id: Optional[str] = Form(None)
         ):
-            """Pujar fitxer i afegir al context de la sessió"""
+            """Upload a file and add it to the session context."""
             # Validate file
             content = await file.read()
             valid, error = self.file_handler.validate_file(file.filename, len(content))
@@ -189,7 +198,7 @@ class WebUIModule:
         @self._router.post("/chat")
         async def chat(request: Dict[str, Any]):
             """
-            Endpoint de xat amb streaming
+            Chat endpoint with streaming.
 
             Request:
             {
@@ -209,7 +218,10 @@ class WebUIModule:
             stream = request.get("stream", False)
 
             if not message:
-                raise HTTPException(status_code=400, detail="Message is required")
+                raise HTTPException(
+                    status_code=400,
+                    detail=t("web_ui.http.message_required", "Message is required")
+                )
 
             # Get or create session
             session = self.session_manager.get_or_create_session(session_id)
@@ -234,7 +246,7 @@ class WebUIModule:
         # Health check
         @self._router.get("/health")
         async def health():
-            """Health check del plugin"""
+            """Health check for the plugin."""
             return {
                 "status": "healthy",
                 "initialized": self._initialized,
@@ -242,24 +254,24 @@ class WebUIModule:
             }
 
     def get_router(self) -> APIRouter:
-        """Obtenir router de FastAPI"""
+        """Get the FastAPI router."""
         return self._router
 
     def get_router_prefix(self) -> str:
-        """Obtenir prefix del router"""
+        """Get the router prefix."""
         return "/ui"
 
     async def health_check(self) -> HealthResult:
-        """Health check del mòdul"""
+        """Health check for the module."""
         if not self._initialized:
             return HealthResult(
                 status=HealthStatus.UNKNOWN,
-                message="Module not initialized"
+                message=t("web_ui.http.module_not_initialized", "Module not initialized")
             )
 
         return HealthResult(
             status=HealthStatus.HEALTHY,
-            message="Web UI active",
+            message=t("web_ui.health.active", "Web UI active"),
             details={
                 "sessions": len(self.session_manager.list_sessions()),
                 "static_dir": str(self.static_dir)
@@ -267,12 +279,12 @@ class WebUIModule:
         )
 
     async def shutdown(self) -> None:
-        """Cleanup logic"""
-        logger.info("WebUIModule shutting down")
+        """Cleanup logic."""
+        logger.info(_t_log("shutting_down", "WebUIModule shutting down"))
         self._initialized = False
 
     def get_info(self) -> Dict[str, Any]:
-        """Info del mòdul"""
+        """Module info."""
         return {
             "name": self.metadata.name,
             "version": self.metadata.version,
@@ -334,7 +346,10 @@ class WebUIModule:
                     detail = resp.json().get("detail")
                 except Exception:
                     detail = resp.text
-                raise HTTPException(status_code=resp.status_code, detail=detail or "Chat request failed")
+                raise HTTPException(
+                    status_code=resp.status_code,
+                    detail=detail or t("web_ui.http.chat_request_failed", "Chat request failed")
+                )
 
             data = resp.json()
             return (
@@ -355,7 +370,7 @@ class WebUIModule:
                 if resp.status_code != 200:
                     error_text = await resp.aread()
                     message = error_text.decode(errors="ignore")
-                    yield f"❌ Error: {message}"
+                    yield t("web_ui.chat.stream_error", "\n[Error: {error}]", error=message)
                     return
 
                 async for line in resp.aiter_lines():

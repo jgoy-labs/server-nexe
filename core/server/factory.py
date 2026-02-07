@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/server/factory.py
-Description: Application Factory pattern per creació i configuració de FastAPI app Nexe 0.8.
+Description: Application Factory pattern for creating and configuring the Nexe 0.8 FastAPI app.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -18,6 +18,7 @@ from typing import Optional
 
 from fastapi import FastAPI
 
+from personality.i18n.resolve import t_modular
 from .helpers import translate
 from .factory_i18n import setup_i18n_and_config
 from .factory_app import create_fastapi_instance
@@ -27,6 +28,9 @@ from .factory_modules import discover_and_load_modules
 from .factory_routers import register_core_routers
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.server_factory.{key}", fallback, **kwargs)
 
 _app_instance: Optional[FastAPI] = None
 _app_lock = threading.Lock()
@@ -64,24 +68,38 @@ def create_app(project_root: Optional[Path] = None, force_reload: bool = False) 
 
   if _app_instance is not None and not force_reload:
     if _cache_project_root == project_root:
-      logger.debug("Returning cached app instance (fast path <10ms)")
+      logger.debug(_t(
+        "cached_fast_path",
+        "Returning cached app instance (fast path <10ms)"
+      ))
       return _app_instance
     else:
-      logger.warning(f"project_root changed ({_cache_project_root} → {project_root}), rebuilding app")
+      logger.warning(_t(
+        "project_root_changed",
+        "project_root changed ({old} → {new}), rebuilding app",
+        old=_cache_project_root,
+        new=project_root,
+      ))
       force_reload = True
 
   with _app_lock:
     if _app_instance is not None and not force_reload and _cache_project_root == project_root:
-      logger.debug("Returning cached app instance (double-check)")
+      logger.debug(_t(
+        "cached_double_check",
+        "Returning cached app instance (double-check)"
+      ))
       return _app_instance
 
     if force_reload and _app_instance is not None:
-      logger.info("Force reload requested - clearing singleton cache")
+      logger.info(_t(
+        "force_reload",
+        "Force reload requested - clearing singleton cache"
+      ))
       _app_instance = None
       _cache_project_root = None
 
-    logger.info("Building FastAPI app...")
-    logger.info(f"  force_reload={force_reload}")
+    logger.info(_t("building_app", "Building FastAPI app..."))
+    logger.info(_t("force_reload_flag", "  force_reload={flag}", flag=force_reload))
     start_time = time.time()
 
     i18n, config, module_manager = setup_i18n_and_config(project_root)
@@ -118,6 +136,6 @@ def reset_app_cache() -> None:
   with _app_lock:
     _app_instance = None
     _cache_project_root = None
-    logger.debug("App cache cleared")
+    logger.debug(_t("cache_cleared", "App cache cleared"))
 
 __all__ = ['create_app', 'reset_app_cache']

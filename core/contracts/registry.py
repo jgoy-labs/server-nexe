@@ -1,5 +1,5 @@
 """
-Registry unificat per contractes NEXE.
+Unified registry for NEXE contracts.
 """
 
 from typing import Dict, List, Optional, Set
@@ -17,7 +17,7 @@ from .base import BaseContract, ContractMetadata, HealthResult, HealthStatus
 # ============================================
 
 class ContractStatus(str, Enum):
-    """Estat d'un contracte al registry"""
+    """Contract status in the registry."""
     REGISTERED = "registered"
     INITIALIZED = "initialized"
     ACTIVE = "active"
@@ -31,7 +31,7 @@ class ContractStatus(str, Enum):
 
 @dataclass
 class RegisteredContract:
-    """Contracte registrat"""
+    """Registered contract."""
     metadata: ContractMetadata
     instance: BaseContract
     status: ContractStatus = ContractStatus.REGISTERED
@@ -41,7 +41,7 @@ class RegisteredContract:
     last_health_check_at: Optional[datetime] = None
 
     def to_dict(self) -> Dict:
-        """Converteix a diccionari"""
+        """Convert to a dictionary."""
         return {
             "metadata": self.metadata.to_dict(),
             "status": self.status.value,
@@ -58,7 +58,7 @@ class RegisteredContract:
 
 class ContractRegistry:
     """
-    Registry central per tots els contractes.
+    Central registry for all contracts.
 
     Thread-safe singleton pattern.
     """
@@ -93,15 +93,15 @@ class ContractRegistry:
         context: Optional[Dict] = None
     ) -> bool:
         """
-        Registra un contracte.
+        Register a contract.
 
         Args:
-            contract: Contracte a registrar
-            auto_initialize: Si True, inicialitza automàticament
-            context: Context per inicialització
+            contract: Contract to register
+            auto_initialize: If True, auto-initialize
+            context: Initialization context
 
         Returns:
-            True si registrat correctament
+            True if registered successfully
         """
         meta = contract.metadata
         contract_id = meta.contract_id
@@ -128,13 +128,13 @@ class ContractRegistry:
 
     async def unregister(self, contract_id: str) -> bool:
         """
-        Desregistra un contracte.
+        Unregister a contract.
 
         Args:
-            contract_id: ID del contracte
+            contract_id: Contract ID
 
         Returns:
-            True si desregistrat correctament
+            True if unregistered successfully
         """
         with self._lock_instance:
             if contract_id not in self._contracts:
@@ -157,47 +157,47 @@ class ContractRegistry:
 
     def get(self, contract_id: str) -> Optional[RegisteredContract]:
         """
-        Obté un contracte registrat.
+        Get a registered contract.
 
         Args:
-            contract_id: ID del contracte
+            contract_id: Contract ID
 
         Returns:
-            RegisteredContract o None
+            RegisteredContract or None
         """
         return self._contracts.get(contract_id)
 
     def get_instance(self, contract_id: str) -> Optional[BaseContract]:
         """
-        Obté la instància d'un contracte.
+        Get a contract instance.
 
         Args:
-            contract_id: ID del contracte
+            contract_id: Contract ID
 
         Returns:
-            BaseContract o None
+            BaseContract or None
         """
         registered = self.get(contract_id)
         return registered.instance if registered else None
 
     def list_all(self) -> List[RegisteredContract]:
         """
-        Llista tots els contractes registrats.
+        List all registered contracts.
 
         Returns:
-            Llista de RegisteredContract
+            List of RegisteredContract
         """
         return list(self._contracts.values())
 
     def list_by_status(self, status: ContractStatus) -> List[RegisteredContract]:
         """
-        Llista contractes per estat.
+        List contracts by status.
 
         Args:
-            status: Estat a filtrar
+            status: Status to filter by
 
         Returns:
-            Llista de contractes amb aquest estat
+            List of contracts with this status
         """
         return [
             rc for rc in self._contracts.values()
@@ -206,31 +206,31 @@ class ContractRegistry:
 
     def list_active(self) -> List[RegisteredContract]:
         """
-        Llista contractes actius.
+        List active contracts.
 
         Returns:
-            Llista de contractes actius
+            List of active contracts
         """
         return self.list_by_status(ContractStatus.ACTIVE)
 
     def exists(self, contract_id: str) -> bool:
         """
-        Check si un contracte existeix.
+        Check whether a contract exists.
 
         Args:
-            contract_id: ID del contracte
+            contract_id: Contract ID
 
         Returns:
-            True si existeix
+            True if it exists
         """
         return contract_id in self._contracts
 
     def count(self) -> int:
         """
-        Retorna nombre de contractes registrats.
+        Return the number of registered contracts.
 
         Returns:
-            Nombre de contractes
+            Number of contracts
         """
         return len(self._contracts)
 
@@ -244,14 +244,14 @@ class ContractRegistry:
         context: Dict
     ) -> bool:
         """
-        Inicialitza un contracte.
+        Initialize a contract.
 
         Args:
-            contract_id: ID del contracte
-            context: Context d'inicialització
+            contract_id: Contract ID
+            context: Initialization context
 
         Returns:
-            True si inicialitzat correctament
+            True if initialized successfully
         """
         registered = self.get(contract_id)
         if not registered:
@@ -274,13 +274,13 @@ class ContractRegistry:
 
     async def activate_contract(self, contract_id: str) -> bool:
         """
-        Activa un contracte.
+        Activate a contract.
 
         Args:
-            contract_id: ID del contracte
+            contract_id: Contract ID
 
         Returns:
-            True si activat correctament
+            True if activated successfully
         """
         registered = self.get(contract_id)
         if not registered:
@@ -296,13 +296,13 @@ class ContractRegistry:
 
     async def deactivate_contract(self, contract_id: str) -> bool:
         """
-        Desactiva un contracte.
+        Deactivate a contract.
 
         Args:
-            contract_id: ID del contracte
+            contract_id: Contract ID
 
         Returns:
-            True si desactivat correctament
+            True if deactivated successfully
         """
         registered = self.get(contract_id)
         if not registered:
@@ -319,13 +319,13 @@ class ContractRegistry:
 
     async def health_check(self, contract_id: str) -> Optional[HealthResult]:
         """
-        Executa health check d'un contracte.
+        Run a health check for a contract.
 
         Args:
-            contract_id: ID del contracte
+            contract_id: Contract ID
 
         Returns:
-            HealthResult o None
+            HealthResult or None
         """
         registered = self.get(contract_id)
         if not registered:
@@ -354,10 +354,10 @@ class ContractRegistry:
 
     async def health_check_all(self) -> Dict[str, HealthResult]:
         """
-        Executa health check de tots els contractes.
+        Run health checks for all contracts.
 
         Returns:
-            Diccionari {contract_id: HealthResult}
+            Dictionary {contract_id: HealthResult}
         """
         results = {}
 
@@ -374,10 +374,10 @@ class ContractRegistry:
 
     def get_summary(self) -> Dict:
         """
-        Obté resum del registry.
+        Get a summary of the registry.
 
         Returns:
-            Diccionari amb resum
+            Summary dictionary
         """
         status_counts = {}
         for status in ContractStatus:
@@ -400,9 +400,9 @@ class ContractRegistry:
 
     def clear(self) -> None:
         """
-        Neteja el registry (per testing).
+        Clear the registry (for testing).
 
-        WARNING: Això elimina tots els contractes registrats!
+        WARNING: This removes all registered contracts!
         """
         with self._lock_instance:
             self._contracts.clear()
@@ -417,7 +417,7 @@ _registry_instance: Optional[ContractRegistry] = None
 
 def get_contract_registry() -> ContractRegistry:
     """
-    Obté la instància singleton del registry.
+    Get the singleton registry instance.
 
     Returns:
         ContractRegistry singleton

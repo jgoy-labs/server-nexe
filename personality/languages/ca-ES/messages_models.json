@@ -1,0 +1,32 @@
+{
+ "_meta": {
+  "component": "models",
+  "description": "Traduccions per perfils i registre de models",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ "models": {
+  "profiles": {
+   "micro_desc": "Perfil lleuger per equips amb poca RAM (<8GB).",
+   "consumer_desc": "Equilibri velocitat/qualitat per ús diari (8-16GB).",
+   "pro_desc": "Potència per desenvolupadors i creatius (16-32GB).",
+   "ultra_desc": "Màxima capacitat per models grans (>32GB)."
+  },
+  "registry": {
+   "qwen0_5_desc": "Qwen2 0.5B - Ultra ràpid, per proves o RPi.",
+   "tinyllama_desc": "TinyLlama 1.1B - Molt lleuger.",
+   "gemma2b_desc": "Google Gemma 2 (2B) - Sorprenentment intel·ligent per la mida.",
+   "llama3_2_3b_desc": "Meta Llama 3.2 (3B) - Estàndard actual per edge devices.",
+   "phi3_5_desc": "Microsoft Phi-3.5 Mini (3.8B) - Molt bo seguint instruccions.",
+   "llama3_1_8b_desc": "Meta Llama 3.1 (8B) - El millor en la seva classe. Recomanat.",
+   "gemma9b_desc": "Google Gemma 2 (9B) - Molt potent, requereix més RAM.",
+   "mistral_nemo_desc": "Mistral Nemo (12B) - Gran context i raonament.",
+   "header_short_name": "Nom curt",
+   "header_size": "Mida",
+   "header_description": "Descripció"
+  },
+  "selector": {
+   "recommended_profile": "Perfil recomanat: {tier} per {hardware}"
+  }
+ }
+}

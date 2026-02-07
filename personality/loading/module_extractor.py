@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_extractor.py
-Description: Extractor d'instàncies principals de mòduls. Cerca en ordre: factory functions
+Description: Extractor for main module instances. Searches in order: factory functions
 
 www.jgoy.net
 ────────────────────────────────────
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 LOGGER_AVAILABLE = False
 
 class ModuleExtractor:
-  """Extreu instància principal d'un mòdul"""
+  """Extract the main instance of a module."""
 
   def __init__(self, i18n=None):
     self.i18n = i18n
@@ -30,22 +30,22 @@ class ModuleExtractor:
   def extract_module_instance(self, module: Any, module_name: str,
                 module_info: ModuleInfo) -> Any:
     """
-    Extreu instància principal d'un mòdul carregat.
+    Extract the main instance of a loaded module.
 
-    Cerca en aquest ordre:
+    Searches in this order:
     1. Factory functions (create_module, create_app, etc.)
-    2. Atribut amb nom del mòdul
-    3. Atributs comuns (app, router, api, module)
-    4. Classe principal
-    5. El mòdul mateix com a fallback
+    2. Attribute with the module name
+    3. Common attributes (app, router, api, module)
+    4. Main class
+    5. The module itself as fallback
 
     Args:
-      module: Mòdul carregat
-      module_name: Nom del mòdul
-      module_info: Informació del mòdul
+      module: Loaded module
+      module_name: Module name
+      module_info: Module info
 
     Returns:
-      Instància del mòdul
+      Module instance
     """
     instance = self._try_factory_functions(module, module_name, module_info)
     if instance is not None:
@@ -71,7 +71,7 @@ class ModuleExtractor:
 
   def _try_factory_functions(self, module: Any, module_name: str,
                 module_info: ModuleInfo) -> Any:
-    """Cerca factory functions"""
+    """Search factory functions."""
     factory_names = self.patterns.get_factory_functions()
 
     for factory_name in factory_names:
@@ -94,7 +94,7 @@ class ModuleExtractor:
     return None
 
   def _try_module_name_attribute(self, module: Any, module_name: str) -> Any:
-    """Cerca atribut amb nom del mòdul"""
+    """Search attribute with module name."""
     if hasattr(module, module_name):
       attr = getattr(module, module_name)
       if attr is not None:
@@ -108,7 +108,7 @@ class ModuleExtractor:
     return None
 
   def _try_common_attributes(self, module: Any) -> Any:
-    """Cerca atributs comuns"""
+    """Search common attributes."""
     common_attrs = self.patterns.get_common_attributes()
 
     for attr_name in common_attrs:
@@ -125,7 +125,7 @@ class ModuleExtractor:
     return None
 
   def _try_main_class(self, module: Any, module_name: str) -> Any:
-    """Cerca classe principal del mòdul"""
+    """Search for the module's main class."""
     module_classes = []
     for name in dir(module):
       if name.startswith('_'):

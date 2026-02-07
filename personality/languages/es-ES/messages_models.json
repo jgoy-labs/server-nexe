@@ -1,0 +1,32 @@
+{
+ "_meta": {
+  "component": "models",
+  "description": "Traducciones para perfiles y registro de modelos",
+  "version": "1.0.0",
+  "language": "es-ES"
+ },
+ "models": {
+  "profiles": {
+   "micro_desc": "Perfil ligero para equipos con poca RAM (<8GB).",
+   "consumer_desc": "Equilibrio velocidad/calidad para uso diario (8-16GB).",
+   "pro_desc": "Potencia para desarrolladores y creativos (16-32GB).",
+   "ultra_desc": "Máxima capacidad para modelos grandes (>32GB)."
+  },
+  "registry": {
+   "qwen0_5_desc": "Qwen2 0.5B - Ultra rápido, para pruebas o RPi.",
+   "tinyllama_desc": "TinyLlama 1.1B - Muy ligero.",
+   "gemma2b_desc": "Google Gemma 2 (2B) - Sorprendentemente inteligente para su tamaño.",
+   "llama3_2_3b_desc": "Meta Llama 3.2 (3B) - Estándar actual para edge devices.",
+   "phi3_5_desc": "Microsoft Phi-3.5 Mini (3.8B) - Muy bueno siguiendo instrucciones.",
+   "llama3_1_8b_desc": "Meta Llama 3.1 (8B) - El mejor en su clase. Recomendado.",
+   "gemma9b_desc": "Google Gemma 2 (9B) - Muy potente, requiere más RAM.",
+   "mistral_nemo_desc": "Mistral Nemo (12B) - Gran contexto y razonamiento.",
+   "header_short_name": "Nombre corto",
+   "header_size": "Tamaño",
+   "header_description": "Descripción"
+  },
+  "selector": {
+   "recommended_profile": "Perfil recomendado: {tier} para {hardware}"
+  }
+ }
+}

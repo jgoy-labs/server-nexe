@@ -11,6 +11,7 @@ www.jgoy.net
 """
 
 from fastapi import APIRouter, HTTPException
+from personality.i18n.resolve import t_modular
 
 router = APIRouter(prefix="/documents", tags=["documents-v1", "future"])
 
@@ -23,8 +24,8 @@ async def list_documents_v1():
     raise HTTPException(
         status_code=501,
         detail={
-            "error": "Not Implemented",
-            "message": "Documents API scheduled for FASE 15",
+            "error": t_modular("rag.api.not_implemented_error", "Not Implemented"),
+            "message": t_modular("rag.api.documents_scheduled", "Documents API scheduled for FASE 15"),
             "expected_date": "2025-12-15"
         }
     )

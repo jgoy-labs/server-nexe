@@ -32,6 +32,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t(f"web_ui.logs.{key}", fallback, **kwargs)
+
 # Module state
 _session_manager = SessionManager()
 _file_handler = None
@@ -168,7 +171,14 @@ async def upload_file(
                 "lang": rag_header.lang,
                 "collection": rag_header.collection
             })
-            logger.info(f"RAG header found: id={rag_header.id}, priority={rag_header.priority}")
+            logger.info(
+                _t_log(
+                    "rag_header_found",
+                    "RAG header found: id={id}, priority={priority}",
+                    id=rag_header.id,
+                    priority=rag_header.priority,
+                )
+            )
 
     # Ingest document into memory system automatically
     memory_helper = get_memory_helper()
@@ -178,7 +188,14 @@ async def upload_file(
         metadata=doc_metadata
     )
 
-    logger.info(f"Document '{file.filename}' ingested: {ingestion_result.get('message', 'OK')}")
+    logger.info(
+        _t_log(
+            "document_ingested",
+            "Document '{filename}' ingested: {message}",
+            filename=file.filename,
+            message=ingestion_result.get("message", "OK"),
+        )
+    )
 
     # Attach document to session for immediate use in next chat
     session = _session_manager.get_or_create_session(session_id)
@@ -190,7 +207,14 @@ async def upload_file(
     session.attach_document(file.filename, body_content, chunks)
     _session_manager._save_session_to_disk(session)
 
-    logger.info(f"Document '{file.filename}' attached with {len(chunks)} chunks")
+    logger.info(
+        _t_log(
+            "document_attached",
+            "Document '{filename}' attached with {count} chunks",
+            filename=file.filename,
+            count=len(chunks),
+        )
+    )
 
     return {
         "filename": file.filename,
@@ -295,7 +319,13 @@ async def chat(request: Dict[str, Any]):
 
             # Log available modules
             available_modules = [m.name for m in module_manager.registry.list_modules()]
-            logger.info(f"Available modules: {available_modules}")
+            logger.info(
+                _t_log(
+                    "available_modules",
+                    "Available modules: {modules}",
+                    modules=available_modules,
+                )
+            )
 
             # Engine priority based on config
             engines_to_try = []
@@ -310,31 +340,74 @@ async def chat(request: Dict[str, Any]):
 
             response_text = None
             for engine_name in engines_to_try:
-                logger.info(f"Trying engine: {engine_name}")
+                logger.info(
+                    _t_log(
+                        "trying_engine",
+                        "Trying engine: {engine}",
+                        engine=engine_name,
+                    )
+                )
                 registration = module_manager.registry.get_module(engine_name)
                 if not registration:
-                    logger.warning(f"{engine_name} not registered")
+                    logger.warning(
+                        _t_log(
+                            "engine_not_registered",
+                            "{engine} not registered",
+                            engine=engine_name,
+                        )
+                    )
                     continue
                 if not registration.instance:
-                    logger.warning(f"{engine_name} has no instance")
+                    logger.warning(
+                        _t_log(
+                            "engine_no_instance",
+                            "{engine} has no instance",
+                            engine=engine_name,
+                        )
+                    )
                     continue
 
                 manifest_module = registration.instance
                 # Get actual module instance via get_module_instance() function
                 if not hasattr(manifest_module, 'get_module_instance'):
-                    logger.warning(f"{engine_name} has no get_module_instance()")
+                    logger.warning(
+                        _t_log(
+                            "engine_no_get_instance",
+                            "{engine} has no get_module_instance()",
+                            engine=engine_name,
+                        )
+                    )
                     continue
 
                 engine = manifest_module.get_module_instance()
                 if not engine:
-                    logger.warning(f"{engine_name} get_module_instance() returned None")
+                    logger.warning(
+                        _t_log(
+                            "engine_instance_none",
+                            "{engine} get_module_instance() returned None",
+                            engine=engine_name,
+                        )
+                    )
                     continue
                 if not hasattr(engine, 'chat'):
-                    logger.warning(f"{engine_name} has no chat method")
+                    logger.warning(
+                        _t_log(
+                            "engine_no_chat",
+                            "{engine} has no chat method",
+                            engine=engine_name,
+                        )
+                    )
                     continue
 
                 try:
-                    logger.info(f"Calling {engine_name}.chat with model={model_name}")
+                    logger.info(
+                        _t_log(
+                            "engine_calling_chat",
+                            "Calling {engine}.chat with model={model}",
+                            engine=engine_name,
+                            model=model_name,
+                        )
+                    )
                     
                     # --- Build Context ---
                     # 1. Get recent conversation history from session
@@ -384,7 +457,15 @@ async def chat(request: Dict[str, Any]):
                                 total_chunks=total_chunks
                             )
 
-                        logger.info(f"Using attached document: {attached_doc['filename']} (chunk 1/{total_chunks}, {len(doc_content)} chars)")
+                        logger.info(
+                            _t_log(
+                                "attached_doc_used",
+                                "Using attached document: {filename} (chunk 1/{total}, {chars} chars)",
+                                filename=attached_doc["filename"],
+                                total=total_chunks,
+                                chars=len(doc_content),
+                            )
+                        )
 
                     # 3. Get Memory Context (RAG) - SEMPRE buscar, no només amb patterns
                     rag_context = ""
@@ -401,9 +482,21 @@ async def chat(request: Dict[str, Any]):
                                     )
                                     for item in relevant:
                                         rag_context += f"- {item['content']}\n"
-                                    logger.info(f"RAG: {len(relevant)} memories relevants (score >= 0.5)")
+                                    logger.info(
+                                        _t_log(
+                                            "rag_memories_found",
+                                            "RAG: {count} memories relevant (score >= 0.5)",
+                                            count=len(relevant),
+                                        )
+                                    )
                         except Exception as e:
-                            logger.warning(f"RAG lookup failed: {e}")
+                            logger.warning(
+                                _t_log(
+                                    "rag_lookup_failed",
+                                    "RAG lookup failed: {error}",
+                                    error=str(e),
+                                )
+                            )
 
                     # 4. Construct Final System Prompt
                     base_system_prompt = t(
@@ -552,7 +645,13 @@ async def chat(request: Dict[str, Any]):
                                         yield content
 
                             except Exception as e:
-                                logger.error(f"Streaming error: {e}")
+                                logger.error(
+                                    _t_log(
+                                        "streaming_error",
+                                        "Streaming error: {error}",
+                                        error=str(e),
+                                    )
+                                )
                                 yield t(
                                     "web_ui.chat.stream_error",
                                     "\n[Error: {error}]",
@@ -574,7 +673,13 @@ async def chat(request: Dict[str, Any]):
                                             model_name=model_name
                                         )
                                     except Exception as e:
-                                        logger.debug("RAG auto-save failed: %s", e)
+                                        logger.debug(
+                                            _t_log(
+                                                "rag_auto_save_failed",
+                                                "RAG auto-save failed: {error}",
+                                                error=str(e),
+                                            )
+                                        )
                                 
                         return StreamingResponse(response_generator(), media_type="text/plain")
 
@@ -602,11 +707,30 @@ async def chat(request: Dict[str, Any]):
                             
                     response_text = "".join(response_chunks)
                     if response_text:
-                        logger.info(f"✅ {engine_name} succeeded!")
+                        logger.info(
+                            _t_log(
+                                "engine_succeeded",
+                                "✅ {engine} succeeded!",
+                                engine=engine_name,
+                            )
+                        )
                         break
                 except Exception as e:
-                    logger.warning(f"{engine_name} failed: {e}")
-                    logger.debug("Engine error details:", exc_info=True)
+                    logger.warning(
+                        _t_log(
+                            "engine_failed",
+                            "{engine} failed: {error}",
+                            engine=engine_name,
+                            error=str(e),
+                        )
+                    )
+                    logger.debug(
+                        _t_log(
+                            "engine_error_details",
+                            "Engine error details:"
+                        ),
+                        exc_info=True
+                    )
                     continue
 
             if not response_text:
@@ -615,7 +739,13 @@ async def chat(request: Dict[str, Any]):
                     "❌ Error: No AI engine available (try starting Ollama with 'ollama serve')"
                 )
         except Exception as e:
-            logger.error(f"Error calling LLM: {e}")
+            logger.error(
+                _t_log(
+                    "llm_call_error",
+                    "Error calling LLM: {error}",
+                    error=str(e),
+                )
+            )
             response_text = t(
                 "web_ui.http.error_generic",
                 "❌ Error: {error}",
@@ -638,11 +768,29 @@ async def chat(request: Dict[str, Any]):
                 model_name=locals().get('model_name')
             )
             if save_result.get("document_id"):
-                logger.debug(f"Smart-saved to RAG: {save_result.get('message')}")
+                logger.debug(
+                    _t_log(
+                        "smart_saved",
+                        "Smart-saved to RAG: {message}",
+                        message=save_result.get("message"),
+                    )
+                )
             else:
-                logger.debug(f"No save needed: {save_result.get('message')}")
+                logger.debug(
+                    _t_log(
+                        "smart_save_not_needed",
+                        "No save needed: {message}",
+                        message=save_result.get("message"),
+                    )
+                )
         except Exception as e:
-            logger.warning(f"Smart auto-save to RAG failed: {e}")
+            logger.warning(
+                _t_log(
+                    "smart_auto_save_failed",
+                    "Smart auto-save to RAG failed: {error}",
+                    error=str(e),
+                )
+            )
 
     if stream:
         async def generate():

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy
 Location: plugins/mlx_module/manifest.py
-Description: Router FastAPI per mòdul MLX (Apple Silicon).
+Description: FastAPI router for the MLX module (Apple Silicon).
              Lazy initialization to avoid side effects at import.
 
 www.jgoy.net
@@ -14,7 +14,12 @@ www.jgoy.net
 import logging
 from typing import Optional
 
+from personality.i18n.resolve import t_modular
+
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"mlx_module.logs.{key}", fallback, **kwargs)
 
 # Lazy singleton - no side effects at import
 _module: Optional["MLXModule"] = None
@@ -26,10 +31,14 @@ def _get_module():
     global _module
     if _module is None:
         from .module import MLXModule
-        logger.info("MLX manifest: Creating MLXModule instance...")
+        logger.info(
+            _t_log("manifest_creating_instance", "MLX manifest: Creating MLXModule instance...")
+        )
         _module = MLXModule()
         _module._init_router()
-        logger.info("MLX manifest: MLXModule instance created")
+        logger.info(
+            _t_log("manifest_instance_created", "MLX manifest: MLXModule instance created")
+        )
     return _module
 
 
@@ -51,7 +60,15 @@ def get_metadata():
 
 def get_module_instance():
     """Get module instance (lazy)."""
-    logger.info("MLX manifest: get_module_instance() called")
+    logger.info(
+        _t_log("manifest_get_instance_called", "MLX manifest: get_module_instance() called")
+    )
     instance = _get_module()
-    logger.info(f"MLX manifest: Returning instance: {instance}")
+    logger.info(
+        _t_log(
+            "manifest_returning_instance",
+            "MLX manifest: Returning instance: {instance}",
+            instance=instance,
+        )
+    )
     return instance

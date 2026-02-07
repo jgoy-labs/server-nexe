@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/messages.py
-Description: Diccionari centralitzat de missatges fallback per module_manager. Defineix
+Description: Centralized fallback message dictionary for module_manager. Defines
 
 www.jgoy.net
 ────────────────────────────────────
@@ -57,15 +57,15 @@ FALLBACK_MESSAGES = {
 
 def get_message(i18n, key: str, **kwargs) -> str:
   """
-  Obté missatge traduït o fallback.
+  Get translated message or fallback.
 
   Args:
-    i18n: Gestor i18n (pot ser None)
-    key: Clau del missatge
-    **kwargs: Arguments per format
+    i18n: i18n manager (can be None)
+    key: Message key
+    **kwargs: Formatting arguments
 
   Returns:
-    Missatge formatat
+    Formatted message
   """
   if i18n:
     try:

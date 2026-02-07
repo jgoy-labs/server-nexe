@@ -16,7 +16,71 @@
    "query_required": "La consulta és obligatòria",
    "module_not_initialized": "Mòdul no inicialitzat",
    "engine_unavailable": "❌ Error: Cap motor d'IA disponible (prova iniciar Ollama amb 'ollama serve')",
-   "error_generic": "❌ Error: {error}"
+   "error_generic": "❌ Error: {error}",
+   "chat_request_failed": "La petició de xat ha fallat"
+  },
+  "health": {
+   "active": "Interfície web activa"
+  },
+  "logs": {
+   "attached_doc_used": "S'utilitza el document adjunt: {filename} (fragment 1/{total}, {chars} caràcters)",
+   "available_modules": "Mòduls disponibles: {modules}",
+   "cleanup_completed": "Neteja completada: {count} fitxers eliminats",
+   "cleanup_delete_error": "Error eliminant {path}: {error}",
+   "cleanup_error": "Error durant la neteja: {error}",
+   "cleanup_file": "Fitxer antic netejat: {name}",
+   "clear_failed": "No s'ha pogut esborrar la memòria: {error}",
+   "collection_cleared": "Col·lecció de memòria esborrada i recreada",
+   "collection_created": "Col·lecció de memòria del web UI creada",
+   "delete_entry_failed": "No s'ha pogut eliminar l'entrada: {error}",
+   "document_attached": "Document '{filename}' adjuntat amb {count} fragments",
+   "document_ingested": "Document '{filename}' ingerit: {message}",
+   "duplicate_check_failed": "Comprovació de duplicats fallida: {error}",
+   "duplicate_detected": "Duplicat detectat (score={score:.2f}), s'omet el desat",
+   "engine_calling_chat": "Cridant {engine}.chat amb model={model}",
+   "engine_error_details": "Detalls d'error del motor:",
+   "engine_failed": "{engine} ha fallat: {error}",
+   "engine_instance_none": "{engine} get_module_instance() ha retornat None",
+   "engine_no_chat": "{engine} no té mètode chat",
+   "engine_no_get_instance": "{engine} no té get_module_instance()",
+   "engine_no_instance": "{engine} no té instància",
+   "engine_not_registered": "{engine} no registrat",
+   "engine_succeeded": "✅ {engine} correcte!",
+   "extract_failed": "L'extracció de fets ha fallat: {error}, s'usa en brut",
+   "extract_no_facts": "Extracció de memòria: no s'han trobat fets rellevants",
+   "extract_no_llm": "Sense LLM per a l'extracció, s'usa la conversa en brut",
+   "extract_no_model": "No s'ha especificat cap model per a l'extracció, s'omet",
+   "extract_stats": "Extracció de memòria: {input_chars} caràcters → {output_chars} caràcters",
+   "file_delete_error": "Error eliminant fitxer: {error}",
+   "file_deleted": "Fitxer eliminat: {path}",
+   "file_saved": "Fitxer desat: {path}",
+   "init_failed": "No s'ha pogut inicialitzar WebUIModule: {error}",
+   "initialized": "WebUIModule inicialitzat correctament",
+   "list_files_error": "Error llistant fitxers: {error}",
+   "llm_call_error": "Error cridant LLM: {error}",
+   "memory_api_init_failed": "No s'ha pogut inicialitzar Memory API: {error}",
+   "no_facts_skip_save": "No s'han extret fets, s'omet el desat",
+   "pdf_extract_error": "Error extraient PDF: {error}",
+   "pruned_entry": "Entrada depurada (retenció={score:.2f}): {preview}...",
+   "pruning_failed": "Poda de memòria fallida: {error}",
+   "rag_auto_save_failed": "Desat automàtic RAG fallit: {error}",
+   "rag_header_found": "Capçalera RAG trobada: id={id}, priority={priority}",
+   "rag_lookup_failed": "Cerca RAG fallida: {error}",
+   "rag_memories_found": "RAG: {count} memòries rellevants (score >= 0.5)",
+   "recall_error": "Error recuperant memòria: {error}",
+   "retention_calc_error": "Error calculant la retenció: {error}",
+   "search_collection_failed": "Error cercant la col·lecció {collection}: {error}",
+   "shutting_down": "WebUIModule aturant-se",
+   "skip_trivial": "S'omet missatge trivial: {preview}...",
+   "smart_auto_save_failed": "Desat automàtic intel·ligent a RAG fallit: {error}",
+   "smart_prune": "Poda intel·ligent: {deleted} entrades de baixa retenció eliminades (era {previous})",
+   "smart_save_not_needed": "No cal desar: {message}",
+   "smart_saved": "Desat intel·ligent a RAG: {message}",
+   "stats_failed": "No s'han pogut obtenir estadístiques de memòria: {error}",
+   "store_error": "Error desant a memòria: {error}",
+   "streaming_error": "Error de streaming: {error}",
+   "text_chunked": "Text dividit en {count} fragments",
+   "trying_engine": "Provant motor: {engine}"
   },
   "session": {
    "deleted": "eliminada"
@@ -62,6 +126,9 @@
   },
   "metadata": {
    "description": "Interfície web estil Ollama per demostrar el sistema modular"
+  },
+  "manifest": {
+   "description": "Interfície web estil Ollama per demostrar el sistema modular de Nexe. Inclou xat amb streaming, sessions i upload de documents."
   },
   "chat": {
    "stream_error": "\n[Error: {error}]"

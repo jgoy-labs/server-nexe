@@ -15,6 +15,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from personality.i18n.resolve import t_modular
+
+def _t_col(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.collections.{key}", fallback, **kwargs)
+
 def _coerce_aware(dt: datetime) -> datetime:
   if dt.tzinfo is None:
     return dt.replace(tzinfo=timezone.utc)
@@ -57,9 +62,13 @@ def validate_collection_name(name: str) -> None:
   """
   if not COLLECTION_NAME_PATTERN.match(name):
     raise InvalidCollectionNameError(
-      f"Invalid collection name '{name}'. "
-      f"Must follow pattern '{{modul}}_{{tipus}}' with only lowercase, numbers and underscores. "
-      f"Examples: 'nexe_knowledge', 'memory_sources', 'system_logs'"
+      _t_col(
+        "invalid_name",
+        "Invalid collection name '{name}'. Must follow pattern '{{module}}_{{type}}' "
+        "with only lowercase, numbers and underscores. Examples: 'nexe_knowledge', "
+        "'memory_sources', 'system_logs'",
+        name=name
+      )
     )
 
 @dataclass

@@ -18,12 +18,16 @@ from pathlib import Path
 from typing import Optional, Any, Dict, List
 import hashlib
 import asyncio
+from personality.i18n.resolve import t_modular
 
 # Constants de colors per logs
 RED = "\033[1;31m"
 RESET = "\033[0m"
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"memory.cache.{key}", fallback, **kwargs)
 
 class MultiLevelCache:
     """
@@ -88,7 +92,13 @@ class MultiLevelCache:
             cursor.close()
             
         except Exception as e:
-            logger.error(f"Failed to initialize L2 cache: {e}")
+            logger.error(
+                _t(
+                    "l2_init_failed",
+                    "Failed to initialize L2 cache: {error}",
+                    error=str(e),
+                )
+            )
             self.conn = None
 
     def _serialize_embedding(self, embedding: Any) -> str:
@@ -146,7 +156,13 @@ class MultiLevelCache:
                         except Exception as e:
                             cursor.execute("DELETE FROM cache WHERE key = ?", (key,))
                             self.conn.commit()
-                            logger.warning(f"L2 cache decode error: {e}")
+                            logger.warning(
+                                _t(
+                                    "l2_decode_error",
+                                    "L2 cache decode error: {error}",
+                                    error=str(e),
+                                )
+                            )
                             return None
 
                         # Promocionar a L1
@@ -162,7 +178,13 @@ class MultiLevelCache:
                         return data
 
                 except Exception as e:
-                    logger.warning(f"L2 cache read error: {e}")
+                    logger.warning(
+                        _t(
+                            "l2_read_error",
+                            "L2 cache read error: {error}",
+                            error=str(e),
+                        )
+                    )
                 finally:
                     cursor.close()
                 
@@ -198,7 +220,13 @@ class MultiLevelCache:
                     # Implementació simplificada: No fem cleanup a cada write per rendiment
 
                 except Exception as e:
-                    logger.warning(f"L2 cache write error: {e}")
+                    logger.warning(
+                        _t(
+                            "l2_write_error",
+                            "L2 cache write error: {error}",
+                            error=str(e),
+                        )
+                    )
                 finally:
                     cursor.close()
 
@@ -226,7 +254,13 @@ class MultiLevelCache:
                     self.conn.commit()
                     cursor.execute("VACUUM")
                 except Exception as e:
-                    logger.error(f"L2 cache clear error: {e}")
+                    logger.error(
+                        _t(
+                            "l2_clear_error",
+                            "L2 cache clear error: {error}",
+                            error=str(e),
+                        )
+                    )
                 finally:
                     cursor.close()
 

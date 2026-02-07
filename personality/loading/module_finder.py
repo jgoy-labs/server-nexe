@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_finder.py
-Description: Cercador de fitxers API per mòduls Nexe. Busca fitxers segons patrons prioritaris
+Description: API file finder for Nexe modules. Searches files by priority patterns
 
 www.jgoy.net
 ────────────────────────────────────
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 LOGGER_AVAILABLE = False
 
 class ModuleFinder:
-  """Cerca fitxers API per a mòduls"""
+  """Find API files for modules."""
 
   def __init__(self, i18n=None):
     self.i18n = i18n
@@ -28,14 +28,14 @@ class ModuleFinder:
 
   def find_api_file(self, module_path: Path, module_name: str) -> Optional[Path]:
     """
-    Cerca fitxer API per mòdul seguint diferents patrons.
+    Find API file for a module following different patterns.
 
     Args:
-      module_path: Path del directori del mòdul
-      module_name: Nom del mòdul
+      module_path: Module directory path
+      module_name: Module name
 
     Returns:
-      Path del fitxer trobat o None
+      Path to the found file or None
     """
     api_file = self._find_by_patterns(module_path, module_name)
     if api_file:
@@ -44,7 +44,7 @@ class ModuleFinder:
     return self._find_fallback_py_file(module_path, module_name)
 
   def _find_by_patterns(self, module_path: Path, module_name: str) -> Optional[Path]:
-    """Cerca per patrons definits"""
+    """Search by defined patterns."""
     api_file_patterns = self.patterns.get_api_file_patterns()
     python_ext = self.patterns.get_python_extension()
 
@@ -63,7 +63,7 @@ class ModuleFinder:
     return None
 
   def _find_fallback_py_file(self, module_path: Path, module_name: str) -> Optional[Path]:
-    """Cerca qualsevol fitxer .py com a fallback"""
+    """Search any .py file as a fallback."""
     python_ext = self.patterns.get_python_extension()
     py_files = list(module_path.glob(f"*{python_ext}"))
 

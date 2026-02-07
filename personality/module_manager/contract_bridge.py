@@ -1,13 +1,15 @@
 """
 Bridge between ModuleManager and ContractRegistry.
 
-Integra el nou sistema de contractes amb el ModuleManager existent
-sense modificar l'arquitectura actual.
+Integrates the new contracts system with the existing ModuleManager
+without changing the current architecture.
 """
 
 import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
+
+from personality.i18n.resolve import t_modular
 
 from core.contracts import (
     ContractRegistry,
@@ -22,20 +24,23 @@ from core.contracts import (
 
 logger = logging.getLogger(__name__)
 
+def _t(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"module_manager.contract_bridge.{key}", fallback, **kwargs)
+
 
 class ModuleContractAdapter:
     """
-    Adapta un mòdul NEXE carregat per implementar BaseContract.
+    Adapt a loaded NEXE module to implement BaseContract.
 
-    Permet que mòduls existents treballin amb el nou sistema de contractes.
+    Allows existing modules to work with the new contracts system.
     """
 
     def __init__(self, module_instance: Any, manifest: UnifiedManifest, module_path: Path):
         """
         Args:
-            module_instance: Instància del mòdul carregat
-            manifest: UnifiedManifest del mòdul
-            module_path: Path al directori del mòdul
+            module_instance: Loaded module instance
+            manifest: Module UnifiedManifest
+            module_path: Path to the module directory
         """
         self._instance = module_instance
         self._manifest = manifest
@@ -44,13 +49,13 @@ class ModuleContractAdapter:
 
     @property
     def metadata(self) -> ContractMetadata:
-        """Retorna metadata del contracte"""
+        """Return contract metadata."""
         return self._metadata
 
     async def initialize(self, context: Dict[str, Any]) -> bool:
-        """Inicialitza el mòdul"""
+        """Initialize the module."""
         try:
-            # Si el mòdul té initialize, cridar-lo
+            # If the module has initialize, call it
             if hasattr(self._instance, 'initialize'):
                 if callable(getattr(self._instance, 'initialize')):
                     result = self._instance.initialize(context)
@@ -60,11 +65,18 @@ class ModuleContractAdapter:
                     return bool(result)
             return True
         except Exception as e:
-            logger.error(f"Failed to initialize {self._metadata.contract_id}: {e}")
+            logger.error(
+                _t(
+                    "initialize_failed",
+                    "Failed to initialize {contract_id}: {error}",
+                    contract_id=self._metadata.contract_id,
+                    error=str(e),
+                )
+            )
             return False
 
     async def shutdown(self) -> None:
-        """Shutdown del mòdul"""
+        """Shutdown the module."""
         try:
             if hasattr(self._instance, 'shutdown'):
                 if callable(getattr(self._instance, 'shutdown')):
@@ -72,12 +84,19 @@ class ModuleContractAdapter:
                     if hasattr(result, '__await__'):
                         await result
         except Exception as e:
-            logger.warning(f"Error during shutdown of {self._metadata.contract_id}: {e}")
+            logger.warning(
+                _t(
+                    "shutdown_failed",
+                    "Error during shutdown of {contract_id}: {error}",
+                    contract_id=self._metadata.contract_id,
+                    error=str(e),
+                )
+            )
 
     async def health_check(self) -> HealthResult:
-        """Health check del mòdul"""
+        """Module health check."""
         try:
-            # Si el mòdul té health_check, usar-lo
+            # If the module has health_check, use it
             if hasattr(self._instance, 'health_check'):
                 if callable(getattr(self._instance, 'health_check')):
                     result = self._instance.health_check()
@@ -85,19 +104,26 @@ class ModuleContractAdapter:
                         return await result
                     return result
 
-            # Default: assumir healthy si està carregat
+            # Default: assume healthy if it is loaded
             return HealthResult(
                 status=HealthStatus.HEALTHY,
-                message="Module loaded and operational"
+                message=_t(
+                    "health_ok",
+                    "Module loaded and operational"
+                )
             )
         except Exception as e:
             return HealthResult(
                 status=HealthStatus.UNHEALTHY,
-                message=f"Health check failed: {str(e)}"
+                message=_t(
+                    "health_failed",
+                    "Health check failed: {error}",
+                    error=str(e),
+                )
             )
 
     def get_router(self) -> Optional[Any]:
-        """Retorna router del mòdul (si n'hi ha)"""
+        """Return the module router (if any)."""
         if hasattr(self._instance, 'get_router'):
             return self._instance.get_router()
         if hasattr(self._instance, 'router'):
@@ -105,7 +131,7 @@ class ModuleContractAdapter:
         return None
 
     def get_router_prefix(self) -> str:
-        """Retorna prefix del router"""
+        """Return router prefix."""
         if self._manifest.api:
             return self._manifest.api.prefix
         return f"/{self._metadata.contract_id}"
@@ -113,13 +139,13 @@ class ModuleContractAdapter:
 
 class ContractBridge:
     """
-    Bridge entre ModuleManager i ContractRegistry.
+    Bridge between ModuleManager and ContractRegistry.
 
-    Registra automàticament mòduls carregats al ContractRegistry.
+    Automatically registers loaded modules in the ContractRegistry.
     """
 
     def __init__(self):
-        """Inicialitza el bridge"""
+        """Initialize the bridge."""
         self._registry = get_contract_registry()
         self._adapters: Dict[str, ModuleContractAdapter] = {}
 
@@ -130,93 +156,126 @@ class ContractBridge:
         module_path: Path
     ) -> bool:
         """
-        Registra un mòdul al ContractRegistry.
+        Register a module in the ContractRegistry.
 
         Args:
-            module_name: Nom del mòdul
-            module_instance: Instància del mòdul carregat
-            module_path: Path al directori del mòdul
+            module_name: Module name
+            module_instance: Loaded module instance
+            module_path: Path to the module directory
 
         Returns:
-            True si registrat correctament
+            True if registered successfully
         """
         try:
-            # Carregar manifest
+            # Load manifest
             manifest_path = module_path / "manifest.toml"
             if not manifest_path.exists():
-                logger.warning(f"No manifest found for {module_name} at {manifest_path}")
+                logger.warning(
+                    _t(
+                        "manifest_missing",
+                        "No manifest found for {module} at {path}",
+                        module=module_name,
+                        path=manifest_path,
+                    )
+                )
                 return False
 
             manifest = load_manifest_from_toml(str(manifest_path))
 
-            # Crear adapter
+            # Create adapter
             adapter = ModuleContractAdapter(module_instance, manifest, module_path)
 
-            # Registrar al ContractRegistry
+            # Register in ContractRegistry
             success = await self._registry.register(
                 adapter,
-                auto_initialize=False  # ModuleManager ja inicialitza
+                auto_initialize=False  # ModuleManager already initializes
             )
 
             if success:
                 self._adapters[module_name] = adapter
-                logger.info(f"✓ Registered {module_name} to ContractRegistry")
+                logger.info(
+                    _t(
+                        "registered",
+                        "✓ Registered {module} to ContractRegistry",
+                        module=module_name,
+                    )
+                )
 
             return success
 
         except Exception as e:
-            logger.error(f"Failed to register {module_name}: {e}")
+            logger.error(
+                _t(
+                    "register_failed",
+                    "Failed to register {module}: {error}",
+                    module=module_name,
+                    error=str(e),
+                )
+            )
             return False
 
     async def unregister_module(self, module_name: str) -> bool:
         """
-        Desregistra un mòdul del ContractRegistry.
+        Unregister a module from the ContractRegistry.
 
         Args:
-            module_name: Nom del mòdul
+            module_name: Module name
 
         Returns:
-            True si desregistrat correctament
+            True if unregistered successfully
         """
         try:
             if module_name in self._adapters:
                 success = await self._registry.unregister(module_name)
                 if success:
                     del self._adapters[module_name]
-                    logger.info(f"✓ Unregistered {module_name} from ContractRegistry")
+                    logger.info(
+                        _t(
+                            "unregistered",
+                            "✓ Unregistered {module} from ContractRegistry",
+                            module=module_name,
+                        )
+                    )
                 return success
             return False
         except Exception as e:
-            logger.error(f"Failed to unregister {module_name}: {e}")
+            logger.error(
+                _t(
+                    "unregister_failed",
+                    "Failed to unregister {module}: {error}",
+                    module=module_name,
+                    error=str(e),
+                )
+            )
             return False
 
     def get_adapter(self, module_name: str) -> Optional[ModuleContractAdapter]:
         """
-        Obté l'adapter d'un mòdul.
+        Get the adapter for a module.
 
         Args:
-            module_name: Nom del mòdul
+            module_name: Module name
 
         Returns:
-            ModuleContractAdapter o None
+            ModuleContractAdapter or None
         """
         return self._adapters.get(module_name)
 
     async def health_check_all(self) -> Dict[str, HealthResult]:
         """
-        Executa health check de tots els mòduls registrats.
+        Run health checks for all registered modules.
 
         Returns:
-            Diccionari {module_name: HealthResult}
+            Dictionary {module_name: HealthResult}
         """
         return await self._registry.health_check_all()
 
     def get_registry_summary(self) -> Dict[str, Any]:
         """
-        Obté resum del registry.
+        Get registry summary.
 
         Returns:
-            Diccionari amb resum
+            Summary dictionary
         """
         return self._registry.get_summary()
 
@@ -227,7 +286,7 @@ _bridge_instance: Optional[ContractBridge] = None
 
 def get_contract_bridge() -> ContractBridge:
     """
-    Obté la instància singleton del ContractBridge.
+    Get the singleton ContractBridge instance.
 
     Returns:
         ContractBridge singleton

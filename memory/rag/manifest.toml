@@ -12,7 +12,7 @@
 module_id = "{{NEXE_RAG_MODULE}}"
 name = "rag"
 version = "0.1"
-description = "Sistema RAG (Retrieval-Augmented Generation) amb cerca vectorial, multi-source i circuit breaker per resiliència. top_k=5, threshold=0.7, gestió intel·ligent de fonts de coneixement per augmentar respostes LLM"
+description = "i18n:rag.manifest.description|RAG (Retrieval-Augmented Generation) system with vector search, multi-source support, and a circuit breaker for resilience. top_k=5, threshold=0.7, intelligent knowledge-source management to improve LLM responses."
 author = "Nexe Team (Jordi Goy)"
 category = "memory"
 created = "2025-10-27"
@@ -168,7 +168,7 @@ path = "storage/documents"
 type = "document_store"
 format = "mixed"
 action = "PERMANENT"
-description = "Documents i coneixement del sistema - MAI esborrar"
+description = "i18n:rag.storage.documents_desc|System documents and knowledge - DO NOT delete"
 auto_clean = false
 
 [[module.storage.paths]]
@@ -176,7 +176,7 @@ path = "storage/rag/vectors"
 type = "vector_store"
 format = "binary"
 action = "PERMANENT"
-description = "Vector stores FAISS - MAI esborrar automàticament"
+description = "i18n:rag.storage.vector_store_desc|Vector stores (FAISS) - DO NOT auto-delete"
 auto_clean = false
 
 [[module.storage.paths]]
@@ -184,7 +184,7 @@ path = "storage/rag/indexes"
 type = "index_metadata"
 format = "json"
 action = "PERMANENT"
-description = "Metadades dels índexs vectorials - MAI esborrar"
+description = "i18n:rag.storage.index_metadata_desc|Vector index metadata - DO NOT delete"
 auto_clean = false
 
 [module.storage.protection]

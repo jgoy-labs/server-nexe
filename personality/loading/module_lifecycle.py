@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_lifecycle.py
-Description: Gestor de cicle de vida de mòduls. Controla inicialització (init, setup,
+Description: Module lifecycle manager. Controls initialization (init, setup,
 
 www.jgoy.net
 ────────────────────────────────────
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 LOGGER_AVAILABLE = False
 
 class ModuleLifecycle:
-  """Gestiona cicle de vida dels mòduls"""
+  """Manage module lifecycle."""
 
   def __init__(self, i18n=None):
     self.i18n = i18n
@@ -29,11 +29,11 @@ class ModuleLifecycle:
 
   async def initialize_module(self, instance: Any, module_name: str) -> None:
     """
-    Inicialitza mòdul si té mètodes d'inicialització.
+    Initialize module if it has initialization methods.
 
     Args:
-      instance: Instància del mòdul
-      module_name: Nom del mòdul
+      instance: Module instance
+      module_name: Module name
     """
     init_methods = self.patterns.get_init_methods()
 
@@ -66,11 +66,11 @@ class ModuleLifecycle:
 
   async def cleanup_module(self, instance: Any, module_name: str) -> None:
     """
-    Neteja recursos del mòdul abans de descarregar-lo.
+    Clean module resources before unloading.
 
     Args:
-      instance: Instància del mòdul
-      module_name: Nom del mòdul
+      instance: Module instance
+      module_name: Module name
     """
     cleanup_methods = self.patterns.get_cleanup_methods()
 

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_importer.py
-Description: Importador dinàmic de mòduls Python. Carrega fitxers via importlib.util amb
+Description: Dynamic Python module importer. Loads files via importlib.util with
 
 www.jgoy.net
 ────────────────────────────────────
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 LOGGER_AVAILABLE = False
 
 class ModuleImporter:
-  """Importa mòduls Python dinàmicament"""
+  """Dynamically imports Python modules."""
 
   def __init__(self, i18n=None):
     self.i18n = i18n
@@ -30,17 +30,17 @@ class ModuleImporter:
 
   def import_module(self, api_file: Path, module_name: str) -> Any:
     """
-    Importa dinàmicament un mòdul Python.
+    Dynamically import a Python module.
 
     Args:
-      api_file: Path del fitxer a importar
-      module_name: Nom del mòdul
+      api_file: Path to the file to import
+      module_name: Module name
 
     Returns:
-      Mòdul importat
+      Imported module
 
     Raises:
-      ImportError: Si no es pot importar
+      ImportError: If the module cannot be imported
     """
     module_full_name = self.patterns.get_module_name_prefix(
       module_name, id(api_file)
@@ -65,13 +65,13 @@ class ModuleImporter:
 
   def cleanup_module(self, module_name: str) -> int:
     """
-    Neteja mòdul de sys.modules.
+    Clean module entries from sys.modules.
 
     Args:
-      module_name: Nom del mòdul a netejar
+      module_name: Module name to clean
 
     Returns:
-      Nombre de mòduls eliminats
+      Number of modules removed
     """
     modules_to_remove = []
     prefix = f"module_{module_name}"

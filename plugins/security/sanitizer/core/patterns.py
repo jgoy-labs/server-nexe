@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/sanitizer/core/patterns.py
-Description: Patrons precompilats per detecció de jailbreaks i prompt injections.
+Description: Precompiled patterns for detecting jailbreaks and prompt injections.
 
 www.jgoy.net
 ────────────────────────────────────

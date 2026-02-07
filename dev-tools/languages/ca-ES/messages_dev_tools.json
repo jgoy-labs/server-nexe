@@ -1,0 +1,46 @@
+{
+ "_meta": {
+  "component": "dev_tools",
+  "description": "Traduccions d'eines de desenvolupament",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ "qdrant": {
+  "collections": "Col·leccions: {collections}",
+  "error": "Error: {error}"
+ },
+ "qdrant_count": {
+  "user_knowledge": "Punts a user_knowledge: {count}",
+  "chat_memory": "Punts a nexe_chat_memory: {count}",
+  "error": "Error: {error}"
+ },
+ "search": {
+  "results": "Resultats: {count}",
+  "item": "- Puntuació: {score:.4f}, Contingut: {content}..."
+ },
+ "debug": {
+  "file": "Fitxer: {path}",
+  "version": "Versió: {version}",
+  "version_not_found": "Versió: NO TROBADA",
+  "client_type": "Tipus de client: {client_type}",
+  "has_search": "Té 'search': {value}",
+  "has_query_points": "Té 'query_points': {value}",
+  "query_result_type": "Tipus de resultat de consulta: {result_type}",
+  "query_points": "Punts de la consulta: {points}",
+  "no_points_attr": "SENSE ATRIBUT POINTS",
+  "query_points_failed": "La prova de query_points ha fallat: {error}",
+  "attributes": "Atributs: {attributes}"
+ },
+ "pytest": {
+  "ollama_already_running": "\n[pytest] Ollama: Ja està en marxa ✓",
+  "ollama_not_installed": "\n[pytest] Ollama: No instal·lat - es saltaran les proves que requereixen Ollama",
+  "ollama_starting": "\n[pytest] Ollama: Iniciant per a proves...",
+  "ollama_ready": "[pytest] Ollama: Llest ✓ (ha trigat {seconds:.1f}s)",
+  "ollama_start_timeout": "[pytest] Ollama: No s'ha pogut iniciar en 15s ⚠",
+  "ollama_start_failed": "[pytest] Ollama: No s'ha pogut iniciar: {error}",
+  "ollama_stopping": "\n[pytest] Ollama: Aturant...",
+  "ollama_stopped": "[pytest] Ollama: Aturat ✓",
+  "ollama_force_killed": "[pytest] Ollama: Forçat a finalitzar",
+  "ollama_not_available": "Ollama no disponible - s'omet la prova"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "_meta": {
+  "component": "embeddings",
+  "description": "Traducciones del manifiesto del módulo de embeddings",
+  "version": "1.0.0",
+  "language": "es-ES"
+ },
+ "api": {
+  "not_implemented_error": "No implementado",
+  "scheduled": "API de embeddings programada para la FASE 15",
+  "models_scheduled": "API de modelos de embeddings programada para la FASE 15"
+ },
+ "cli": {
+  "not_initialized": "Módulo aún no inicializado",
+  "description": "Módulo Embeddings - Nexe 0.8",
+  "epilog": "Ejemplos:\n python3 -m memory.embeddings info\n python3 -m memory.embeddings health\n python3 -m memory.embeddings encode \"Hello world\"\n python3 -m memory.embeddings chunk document.txt\n python3 -m memory.embeddings stats",
+  "commands_help": "Comandos disponibles",
+  "info_help": "Mostrar información del módulo",
+  "health_help": "Ejecutar comprobaciones de salud",
+  "encode_help": "Generar embedding para el texto",
+  "encode_text_help": "Texto a codificar",
+  "encode_model_help": "Modelo a usar (opcional)",
+  "chunk_help": "Dividir documento en fragmentos",
+  "chunk_file_help": "Ruta al archivo del documento",
+  "chunk_doc_id_help": "ID del documento (por defecto: nombre del archivo)",
+  "stats_help": "Mostrar estadísticas del módulo",
+  "initializing": "Inicializando el módulo...",
+  "file_not_found": "Error: Archivo no encontrado: {file_path}"
+ },
+ "manifest": {
+  "description": "Sistema de embeddings y vectorización multilingüe con caché multinivel (L1/L2), chunking inteligente y soporte para Apple Silicon."
+ },
+ "storage": {
+  "cache_desc": "Caché L2 de embeddings - LRU eviction cuando supera 5GB o 72h"
+ },
+ "logs": {
+  "module_created": "Módulo de embeddings creado",
+  "already_initialized": "Módulo de embeddings ya inicializado",
+  "initializing": "Módulo de embeddings inicializando",
+  "initialized": "Módulo de embeddings inicializado (model={model}, device={device}, cache_enabled={cache_enabled})",
+  "init_failed": "Inicialización del módulo de embeddings fallida: {error}",
+  "shutdown_not_initialized": "Módulo de embeddings no inicializado; se omite el apagado",
+  "shutting_down": "Apagando módulo de embeddings",
+  "shutdown_complete": "Apagado del módulo de embeddings completado",
+  "shutdown_failed": "Apagado del módulo de embeddings fallido: {error}",
+  "cached_embedder_initialized": "CachedEmbedder inicializado (model={model}, cache_enabled={cache_enabled})",
+  "cache_hit": "Acierto de caché (model={model}, text_len={text_len})",
+  "cache_miss": "Fallo de caché (model={model}, text_len={text_len})",
+  "batch_encode_completed": "Batch encode completado (model={model}, count={count}, cache_hits={cache_hits})",
+  "cache_cleared": "Caché limpiada (model={model})",
+  "cached_embedder_shutdown": "CachedEmbedder apagado completo (model={model})",
+  "async_embedder_initialized": "AsyncEmbedder inicializado (model={model}, device={device}, max_workers={max_workers})",
+  "loading_model": "Cargando modelo de embeddings (model={model}, device={device})",
+  "model_loaded": "Modelo de embeddings cargado (model={model}, device={device}, load_time_ms={load_time_ms})",
+  "encode_completed": "Encode completado (model={model}, text_len={text_len}, latency_ms={latency_ms}, dimensions={dimensions})",
+  "encode_batch_completed": "Batch encode completado (model={model}, count={count}, batch_size={batch_size}, total_latency_ms={total_latency_ms}, avg_latency_ms={avg_latency_ms})",
+  "shutting_down_embedder": "Apagando embedder (model={model})",
+  "embedder_shutdown_complete": "Apagado de embedder completado (model={model})",
+  "smart_chunker_initialized": "SmartChunker inicializado (max_size={max_size}, overlap={overlap}, min_size={min_size})",
+  "document_chunked": "Documento fragmentado (document_id={document_id}, original_len={original_len}, chunk_count={chunk_count})",
+  "simple_embedder_loading": "Cargando modelo {model} en {device}",
+  "simple_embedder_initialized": "SimpleEmbedder inicializado: {model}"
+ },
+ "validation": {
+  "text_empty": "El texto no puede estar vacío",
+  "texts_empty": "Los textos no pueden estar vacíos",
+  "texts_non_empty": "Todos los textos deben ser no vacíos"
+ },
+ "health": {
+  "initialized_ok": "Módulo inicializado correctamente",
+  "not_initialized": "Módulo no inicializado",
+  "init_check_error": "Error comprobando inicialización: {error}",
+  "dependencies_ok": "sentence-transformers {version} disponible",
+  "dependencies_missing": "sentence-transformers no instalado (pip install sentence-transformers)",
+  "dependencies_error": "Error comprobando dependencias: {error}",
+  "device_mps": "MPS (Apple Silicon) disponible",
+  "device_cuda": "CUDA disponible ({device})",
+  "device_cpu_only": "Solo CPU disponible (rendimiento más lento)",
+  "device_torch_missing": "torch no instalado (pip install torch)",
+  "device_error": "Error comprobando dispositivo: {error}",
+  "cache_writable": "Directorios de caché escribibles",
+  "cache_not_writable": "Directorios de caché no escribibles: {path}",
+  "cache_error": "Error comprobando directorios de caché: {error}",
+  "memory_ok": "Memoria disponible: {available_mb} MB",
+  "memory_warn": "Memoria baja: {available_mb} MB disponibles",
+  "memory_critical": "Memoria crítica: {available_mb} MB disponibles",
+  "memory_error": "Error comprobando memoria: {error}",
+  "logs": {
+   "check_complete": "Health check de embeddings completo (status={status}, total={total}, pass={passed}, warn={warned}, fail={failed})",
+   "check_failed": "Health check de embeddings fallido: {error}"
+  }
+ },
+ "chunkers": {
+  "registry_initialized": "ChunkerRegistry inicializado",
+  "invalid_chunker_class": "Se esperaba subclass de BaseChunker, recibido {chunker_class}",
+  "duplicate_chunker": "Chunker '{chunker_id}' ya registrado",
+  "chunker_registered": "Chunker registrado: {chunker_id} (formats: {formats})",
+  "chunker_not_found": "Chunker '{chunker_id}' no encontrado. Disponibles: {available}",
+  "no_chunkers_registered": "No hay chunkers registrados",
+  "chunkers_dir_not_found": "Directorio de chunkers no encontrado: {path}",
+  "register_failed": "No se pudo registrar {name}: {error}",
+  "import_failed": "No se pudo importar {path}: {error}",
+ "auto_discovery_completed": "Auto-descubrimiento completado: {count} chunkers encontrados"
+ }
+}

@@ -1,0 +1,13 @@
+{
+ "_meta": {
+  "component": "cli",
+  "description": "CLI manifest translations",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+ "manifest": {
+  "description": "Nexe Central CLI - orchestrator that unifies access to all Nexe module CLIs under the 'nexe' command. Discovers CLIs dynamically via manifest.toml, runs them via subprocess for isolation, and supports offline mode.",
+  "cli_description": "Nexe Central CLI - Module orchestrator",
+  "note": "Single entry point for all Nexe system CLIs"
+ }
+}

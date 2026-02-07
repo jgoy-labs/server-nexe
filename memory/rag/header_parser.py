@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, Tuple, List
 from dataclasses import dataclass, field
 
-from personality.i18n import get_i18n
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
 
@@ -109,21 +109,10 @@ class RAGHeaderParser:
 
     def __init__(self):
         self.errors = []
-        self._i18n = get_i18n()
 
     def _t(self, key: str, fallback: str, **kwargs) -> str:
         """Translate with fallback using global i18n helper."""
-        try:
-            if self._i18n:
-                return self._i18n.t(key, fallback, **kwargs)
-        except Exception:
-            pass
-        if kwargs:
-            try:
-                return fallback.format(**kwargs)
-            except (KeyError, ValueError):
-                return fallback
-        return fallback
+        return t_modular(key, fallback, **kwargs)
 
     def parse(self, content: str) -> Tuple[RAGHeader, str]:
         """

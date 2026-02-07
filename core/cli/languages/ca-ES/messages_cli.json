@@ -1,0 +1,13 @@
+{
+ "_meta": {
+  "component": "cli",
+  "description": "Traduccions del manifest del CLI",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ "manifest": {
+  "description": "CLI Central Nexe - Orquestrador que unifica l'accés a tots els CLIs dels mòduls Nexe sota la comanda 'nexe'. Descobreix CLIs dinàmicament via manifest.toml, executa via subprocess per aïllament, i suporta mode offline.",
+  "cli_description": "CLI Central Nexe - Orquestrador de mòduls",
+  "note": "Punt d'entrada únic per tots els CLIs del sistema Nexe"
+ }
+}

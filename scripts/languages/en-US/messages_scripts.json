@@ -1,0 +1,27 @@
+{
+ "_meta": {
+  "component": "scripts",
+  "description": "Scripts translations",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+ "migrate": {
+  "plugin": "Plugin: {name}",
+  "status_success": "✓ SUCCESS",
+  "status_failed": "✗ FAILED",
+  "status_line": "Status: {status}",
+  "warnings_title": "\nWarnings:",
+  "warning_item": "  ⚠️  {warning}",
+  "errors_title": "\nErrors:",
+  "error_item": "  ❌ {error}",
+  "migrated_written": "\nMigrated manifest written to:",
+  "migrated_path": "  {path}",
+  "plugins_dir_not_found": "❌ Plugins directory not found: {path}",
+  "plugin_not_found": "❌ Plugin not found: {path}",
+  "manifest_not_found": "❌ Manifest not found: {path}",
+  "summary_title": "MIGRATION SUMMARY",
+  "summary_total": "Total plugins: {count}",
+  "summary_successful": "Successful: {count}",
+  "summary_failed": "Failed: {count}"
+ }
+}

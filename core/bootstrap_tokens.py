@@ -19,16 +19,21 @@ from pathlib import Path
 from typing import Dict, Optional, Any
 import logging
 
+from personality.i18n.resolve import t_modular
+
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.bootstrap_tokens.{key}", fallback, **kwargs)
 
 class BootstrapTokenManager:
   """
-  Gestiona tokens de sessio efimers post-bootstrap amb persistència a SQLite.
+  Manage ephemeral post-bootstrap session tokens with SQLite persistence.
 
-  Suport per a múltiples workers (multiprocess) via DB persistents.
-  El client rep un session_token temporal que pot usar per:
-  1. Completar configuracio inicial
-  2. Generar la seva propia API key permanent
+  Supports multiple workers (multiprocess) via persistent DB.
+  The client receives a temporary session_token that can be used to:
+  1. Complete initial configuration
+  2. Generate a permanent API key
   """
 
   _instance: Optional['BootstrapTokenManager'] = None
@@ -43,7 +48,7 @@ class BootstrapTokenManager:
     return cls._instance
 
   def initialize_on_startup(self, project_root: Path):
-    """Inicialitza la base de dades persistents de tokens."""
+    """Initialize the persistent token database."""
     if self._initialized:
       return
 
@@ -78,16 +83,20 @@ class BootstrapTokenManager:
     conn.close()
     
     self._initialized = True
-    logger.info("BootstrapTokenManager initialized with persistent storage: %s", self._db_path)
+    logger.info(_t(
+      "initialized",
+      "BootstrapTokenManager initialized with persistent storage: {path}",
+      path=self._db_path
+    ))
 
   def _get_conn(self):
     if not self._initialized:
-      # Fallback a un path per defecte si no s'ha cridat initialize_on_startup
+      # Fallback to a default path if initialize_on_startup was not called
       self.initialize_on_startup(Path.cwd())
     return sqlite3.connect(str(self._db_path))
 
   def create_session_token(self, ttl_seconds: int = 900) -> str:
-    """Crea token de sessio efimer i el guarda a la DB."""
+    """Create an ephemeral session token and store it in the DB."""
     token = secrets.token_urlsafe(32)
     expires_dt = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
     expires_ts = expires_dt.timestamp()
@@ -101,11 +110,15 @@ class BootstrapTokenManager:
     finally:
       conn.close()
 
-    logger.info("Session token created (persistent), expires in %d seconds", ttl_seconds)
+    logger.info(_t(
+      "session_token_created",
+      "Session token created (persistent), expires in {seconds} seconds",
+      seconds=ttl_seconds
+    ))
     return token
 
   def validate_session_token(self, token: str) -> bool:
-    """Valida si el token de sessio es a la DB i no ha expirat."""
+    """Validate that the session token exists in the DB and is not expired."""
     conn = self._get_conn()
     try:
       cursor = conn.cursor()
@@ -113,14 +126,14 @@ class BootstrapTokenManager:
       row = cursor.fetchone()
       
       if row is None:
-        logger.warning("Session token not found in DB")
+        logger.warning(_t("session_token_not_found", "Session token not found in DB"))
         return False
         
       expires_ts = row[0]
       if datetime.now(timezone.utc).timestamp() > expires_ts:
         cursor.execute("DELETE FROM session_tokens WHERE token = ?", (token,))
         conn.commit()
-        logger.warning("Session token expired in DB")
+        logger.warning(_t("session_token_expired", "Session token expired in DB"))
         return False
         
       return True
@@ -128,28 +141,32 @@ class BootstrapTokenManager:
       conn.close()
 
   def invalidate_token(self, token: str) -> None:
-    """Invalida un token eliminant-lo de la DB."""
+    """Invalidate a token by deleting it from the DB."""
     conn = self._get_conn()
     try:
       cursor = conn.cursor()
       cursor.execute("DELETE FROM session_tokens WHERE token = ?", (token,))
       conn.commit()
-      logger.info("Session token invalidated in DB")
+      logger.info(_t("session_token_invalidated", "Session token invalidated in DB"))
     finally:
       conn.close()
 
   def _cleanup_expired(self, conn: sqlite3.Connection) -> None:
-    """Neteja tokens expirats de la DB."""
+    """Clean expired tokens from the DB."""
     now_ts = datetime.now(timezone.utc).timestamp()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM session_tokens WHERE expires < ?", (now_ts,))
     if cursor.rowcount > 0:
-      logger.debug("Cleaned up %d expired session tokens from DB", cursor.rowcount)
+      logger.debug(_t(
+        "session_tokens_cleaned",
+        "Cleaned up {count} expired session tokens from DB",
+        count=cursor.rowcount
+      ))
 
   # --- Master Bootstrap Token Methods ---
 
   def set_bootstrap_token(self, token: str, ttl_minutes: int = 30) -> None:
-    """Guarda el token de bootstrap inicial a la DB."""
+    """Store the initial bootstrap token in the DB."""
     expires_ts = (datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)).timestamp()
     conn = self._get_conn()
     try:
@@ -166,10 +183,14 @@ class BootstrapTokenManager:
       conn.commit()
     finally:
       conn.close()
-    logger.info("Master bootstrap token stored in DB (expires in %d min)", ttl_minutes)
+    logger.info(_t(
+      "master_token_stored",
+      "Master bootstrap token stored in DB (expires in {minutes} min)",
+      minutes=ttl_minutes
+    ))
 
   def get_bootstrap_token(self) -> Optional[Dict[str, Any]]:
-    """Recupera el token de bootstrap actiu."""
+    """Retrieve the active bootstrap token."""
     conn = self._get_conn()
     try:
       cursor = conn.cursor()
@@ -186,7 +207,7 @@ class BootstrapTokenManager:
       conn.close()
 
   def validate_master_bootstrap(self, token: str) -> bool:
-    """Valida el token de bootstrap contra la DB."""
+    """Validate the bootstrap token against the DB."""
     now_ts = datetime.now(timezone.utc).timestamp()
 
     # Atomic single-use update guarded by token + expiry.
@@ -219,15 +240,24 @@ class BootstrapTokenManager:
       return False
 
     if info["used"]:
-      logger.warning("Master bootstrap token already used (persistent check)")
+      logger.warning(_t(
+        "master_token_used_persistent",
+        "Master bootstrap token already used (persistent check)"
+      ))
       return False
 
     if now_ts > info["expires"]:
-      logger.warning("Master bootstrap token expired (persistent check)")
+      logger.warning(_t(
+        "master_token_expired",
+        "Master bootstrap token expired (persistent check)"
+      ))
       return False
 
     if token == info["token"]:
-      logger.warning("Master bootstrap token already used (atomic check)")
+      logger.warning(_t(
+        "master_token_used_atomic",
+        "Master bootstrap token already used (atomic check)"
+      ))
       return False
 
     return False
@@ -277,7 +307,7 @@ class BootstrapTokenManager:
 _manager = BootstrapTokenManager()
 
 def initialize_tokens(project_root: Path):
-  """Inicialització externa del manager."""
+  """External initialization for the manager."""
   _manager.initialize_on_startup(project_root)
 
 def set_bootstrap_token(token: str, ttl_minutes: int = 30):

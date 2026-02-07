@@ -1,0 +1,105 @@
+{
+ "_meta": {
+  "component": "embeddings",
+  "description": "Embeddings module manifest translations",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+ "api": {
+  "not_implemented_error": "Not Implemented",
+  "scheduled": "Embeddings API scheduled for FASE 15",
+  "models_scheduled": "Embeddings models API scheduled for FASE 15"
+ },
+ "cli": {
+  "not_initialized": "Module not initialized yet",
+  "description": "Embeddings Module - Nexe 0.8",
+  "epilog": "Examples:\n python3 -m memory.embeddings info\n python3 -m memory.embeddings health\n python3 -m memory.embeddings encode \"Hello world\"\n python3 -m memory.embeddings chunk document.txt\n python3 -m memory.embeddings stats",
+  "commands_help": "Available commands",
+  "info_help": "Show module information",
+  "health_help": "Run health checks",
+  "encode_help": "Generate embedding for text",
+  "encode_text_help": "Text to encode",
+  "encode_model_help": "Model to use (optional)",
+  "chunk_help": "Split document into chunks",
+  "chunk_file_help": "Path to document file",
+  "chunk_doc_id_help": "Document ID (default: filename)",
+  "stats_help": "Show module statistics",
+  "initializing": "Initializing module...",
+  "file_not_found": "Error: File not found: {file_path}"
+ },
+ "manifest": {
+  "description": "Multilingual embeddings and vectorization system with multi-level cache (L1/L2), intelligent chunking, and Apple Silicon support."
+ },
+ "storage": {
+  "cache_desc": "Embeddings L2 cache - LRU eviction when over 5GB or 72h"
+ },
+ "logs": {
+  "module_created": "Embeddings module created",
+  "already_initialized": "Embeddings module already initialized",
+  "initializing": "Embeddings module initializing",
+  "initialized": "Embeddings module initialized (model={model}, device={device}, cache_enabled={cache_enabled})",
+  "init_failed": "Embeddings module initialization failed: {error}",
+  "shutdown_not_initialized": "Embeddings module not initialized; skipping shutdown",
+  "shutting_down": "Embeddings module shutting down",
+  "shutdown_complete": "Embeddings module shutdown complete",
+  "shutdown_failed": "Embeddings module shutdown failed: {error}",
+  "cached_embedder_initialized": "CachedEmbedder initialized (model={model}, cache_enabled={cache_enabled})",
+  "cache_hit": "Cache hit (model={model}, text_len={text_len})",
+  "cache_miss": "Cache miss (model={model}, text_len={text_len})",
+  "batch_encode_completed": "Batch encode completed (model={model}, count={count}, cache_hits={cache_hits})",
+  "cache_cleared": "Cache cleared (model={model})",
+  "cached_embedder_shutdown": "CachedEmbedder shutdown complete (model={model})",
+  "async_embedder_initialized": "AsyncEmbedder initialized (model={model}, device={device}, max_workers={max_workers})",
+  "loading_model": "Loading embeddings model (model={model}, device={device})",
+  "model_loaded": "Embeddings model loaded (model={model}, device={device}, load_time_ms={load_time_ms})",
+  "encode_completed": "Encode completed (model={model}, text_len={text_len}, latency_ms={latency_ms}, dimensions={dimensions})",
+  "encode_batch_completed": "Batch encode completed (model={model}, count={count}, batch_size={batch_size}, total_latency_ms={total_latency_ms}, avg_latency_ms={avg_latency_ms})",
+  "shutting_down_embedder": "Shutting down embedder (model={model})",
+  "embedder_shutdown_complete": "Embedder shutdown complete (model={model})",
+  "smart_chunker_initialized": "SmartChunker initialized (max_size={max_size}, overlap={overlap}, min_size={min_size})",
+  "document_chunked": "Document chunked (document_id={document_id}, original_len={original_len}, chunk_count={chunk_count})",
+  "simple_embedder_loading": "Loading model {model} on {device}",
+  "simple_embedder_initialized": "SimpleEmbedder initialized: {model}"
+ },
+ "validation": {
+  "text_empty": "Text cannot be empty",
+  "texts_empty": "texts cannot be empty",
+  "texts_non_empty": "All texts must be non-empty"
+ },
+ "health": {
+  "initialized_ok": "Module initialized correctly",
+  "not_initialized": "Module not initialized",
+  "init_check_error": "Error checking initialization: {error}",
+  "dependencies_ok": "sentence-transformers {version} available",
+  "dependencies_missing": "sentence-transformers not installed (pip install sentence-transformers)",
+  "dependencies_error": "Error checking dependencies: {error}",
+  "device_mps": "MPS (Apple Silicon) available",
+  "device_cuda": "CUDA available ({device})",
+  "device_cpu_only": "Only CPU available (slower performance)",
+  "device_torch_missing": "torch not installed (pip install torch)",
+  "device_error": "Error checking device: {error}",
+  "cache_writable": "Cache directories writable",
+  "cache_not_writable": "Cache directories not writable: {path}",
+  "cache_error": "Error checking cache directories: {error}",
+  "memory_ok": "Memory available: {available_mb} MB",
+  "memory_warn": "Low memory: {available_mb} MB available",
+  "memory_critical": "Critical memory: {available_mb} MB available",
+  "memory_error": "Error checking memory: {error}",
+  "logs": {
+   "check_complete": "Embeddings health check complete (status={status}, total={total}, pass={passed}, warn={warned}, fail={failed})",
+   "check_failed": "Embeddings health check failed: {error}"
+  }
+ },
+ "chunkers": {
+  "registry_initialized": "ChunkerRegistry initialized",
+  "invalid_chunker_class": "Expected BaseChunker subclass, got {chunker_class}",
+  "duplicate_chunker": "Chunker '{chunker_id}' already registered",
+  "chunker_registered": "Registered chunker: {chunker_id} (formats: {formats})",
+  "chunker_not_found": "Chunker '{chunker_id}' not found. Available: {available}",
+  "no_chunkers_registered": "No chunkers registered",
+  "chunkers_dir_not_found": "Chunkers directory not found: {path}",
+  "register_failed": "Failed to register {name}: {error}",
+  "import_failed": "Failed to import {path}: {error}",
+ "auto_discovery_completed": "Auto-discovery completed: {count} chunkers found"
+ }
+}

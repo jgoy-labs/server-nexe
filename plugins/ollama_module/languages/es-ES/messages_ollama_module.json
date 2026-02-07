@@ -1,0 +1,39 @@
+{
+ "_meta": {
+  "component": "ollama_module",
+  "description": "Traducciones del manifiesto del módulo Ollama",
+  "version": "1.0.0",
+  "language": "es-ES"
+ },
+ "errors": {
+  "not_initialized": "Módulo Ollama no inicializado",
+  "connection_failed": "Conexión con Ollama fallida: {error}",
+  "model_not_found": "Modelo no encontrado o error: {error}",
+  "delete_failed": "Error al eliminar: {error}",
+  "httpx_missing": "httpx no está instalado (pip install httpx)",
+  "connection_unavailable": "No se puede conectar a Ollama (¿no está en ejecución?)"
+ },
+ "logs": {
+  "lazy_initialized": "OllamaModule inicializado de forma lazy",
+  "list_models_failed": "No se pudo listar modelos de Ollama: {error}",
+  "pull_model_failed": "Descarga de modelo fallida: {error}",
+  "chat_failed": "Chat fallido: {error}",
+  "get_info_failed": "No se pudo obtener info del modelo: {error}",
+  "delete_model_failed": "No se pudo eliminar el modelo: {error}",
+  "health_check_failed": "Comprobación de salud de Ollama fallida: {error}",
+  "not_reachable": "Ollama no accesible en localhost:11434"
+ },
+ "ui": {
+  "not_found": "Interfaz de Ollama no encontrada"
+ },
+ "messages": {
+  "model_deleted": "Modelo {model} eliminado correctamente"
+ },
+ "manifest": {
+  "description": "Integración con Ollama para ejecutar modelos LLM locales sin dependencias de nube. Gestión de modelos, streaming de respuestas, embeddings locales y una interfaz de administración completa.",
+  "cli_description": "Gestiona modelos LLM locales con Ollama"
+ },
+ "metadata": {
+  "description": "Integración con Ollama (opción local para LLM)"
+ }
+}

@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from plugins.security.core.auth_dependencies import require_api_key
 from memory.memory.models.memory_entry import MemoryEntry
 from memory.rag_sources.base import SearchRequest
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,12 @@ def _sanitize_rag_context(context: str, truncation_marker: str = "[...truncated]
     sanitized = context[:MAX_RAG_CONTEXT_LENGTH]
     if len(context) > MAX_RAG_CONTEXT_LENGTH:
         sanitized += "\n" + truncation_marker
-        logger.warning(f"RAG context truncated from {len(context)} to {MAX_RAG_CONTEXT_LENGTH} chars")
+        logger.warning(_t_global(
+            "context_truncated",
+            "RAG context truncated from {original} to {max} chars",
+            original=len(context),
+            max=MAX_RAG_CONTEXT_LENGTH,
+        ))
 
     # 2. Remove prompt injection patterns
     for pattern in _RAG_INJECTION_PATTERNS:
@@ -94,6 +100,10 @@ def _t_from_state(app_state, key: str, fallback: str, **kwargs) -> str:
         return value
     except Exception:
         return fallback.format(**kwargs) if kwargs else fallback
+
+def _t_global(key: str, fallback: str, **kwargs) -> str:
+    """Translate using modular i18n without app_state (fallback safe)."""
+    return t_modular(f"core.chat.{key}", fallback, **kwargs)
 
 # --- Schemas ---
 
@@ -160,7 +170,12 @@ def _resolve_engine(request_engine: Optional[str], app_state) -> tuple[str, Opti
     if preferred and preferred != "auto":
         if _engine_available(preferred, app_state):
             return preferred, None
-        logger.warning("Preferred engine '%s' not available, falling back", preferred)
+        logger.warning(_t_from_state(
+            app_state,
+            "core.chat.preferred_engine_unavailable",
+            "Preferred engine '{engine}' not available, falling back",
+            engine=preferred,
+        ))
         for candidate in ["mlx", "llama_cpp", "ollama"]:
             if _engine_available(candidate, app_state):
                 return candidate, preferred
@@ -198,7 +213,12 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
             # Extract last user message for query
             last_user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), None)
             if last_user_msg:
-                logger.info(f"RAG Search for: '{last_user_msg}'")
+                logger.info(_t_from_state(
+                    req.app.state,
+                    "core.chat.rag_search",
+                    "RAG Search for: '{query}'",
+                    query=last_user_msg,
+                ))
 
                 # Try MemoryAPI first (same as /v1/memory/store uses)
                 try:
@@ -218,9 +238,19 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                             )
                             if doc_results:
                                 all_results.extend(doc_results)
-                                logger.info(f"RAG: Found {len(doc_results)} docs from documentation")
+                                logger.info(_t_from_state(
+                                    req.app.state,
+                                    "core.chat.rag_docs_found",
+                                    "RAG: Found {count} docs from documentation",
+                                    count=len(doc_results),
+                                ))
                     except Exception as e:
-                        logger.debug("RAG docs search failed: %s", e)
+                        logger.debug(_t_from_state(
+                            req.app.state,
+                            "core.chat.rag_docs_failed",
+                            "RAG docs search failed: {error}",
+                            error=str(e),
+                        ))
 
                     # 2. Search user knowledge (custom documents in knowledge/ folder)
                     try:
@@ -233,9 +263,19 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                             )
                             if knowledge_results:
                                 all_results.extend(knowledge_results)
-                                logger.info(f"RAG: Found {len(knowledge_results)} docs from user knowledge")
+                                logger.info(_t_from_state(
+                                    req.app.state,
+                                    "core.chat.rag_knowledge_found",
+                                    "RAG: Found {count} docs from user knowledge",
+                                    count=len(knowledge_results),
+                                ))
                     except Exception as e:
-                        logger.debug("RAG knowledge search failed: %s", e)
+                        logger.debug(_t_from_state(
+                            req.app.state,
+                            "core.chat.rag_knowledge_failed",
+                            "RAG knowledge search failed: {error}",
+                            error=str(e),
+                        ))
 
                     # 3. Search user memory (nexe_chat_memory - conversations)
                     try:
@@ -248,9 +288,19 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                             )
                             if mem_results:
                                 all_results.extend(mem_results)
-                                logger.info(f"RAG: Found {len(mem_results)} docs from chat memory")
+                                logger.info(_t_from_state(
+                                    req.app.state,
+                                    "core.chat.rag_memory_found",
+                                    "RAG: Found {count} docs from chat memory",
+                                    count=len(mem_results),
+                                ))
                     except Exception as e:
-                        logger.debug("RAG chat memory search failed: %s", e)
+                        logger.debug(_t_from_state(
+                            req.app.state,
+                            "core.chat.rag_memory_failed",
+                            "RAG chat memory search failed: {error}",
+                            error=str(e),
+                        ))
 
                     if all_results:
                         # Build context with clear source headers
@@ -259,9 +309,20 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                             source = getattr(r, 'metadata', {}).get('source', 'unknown') if hasattr(r, 'metadata') else 'unknown'
                             context_parts.append(f"[Font: {source}]\n{r.text}")
                         context_text = "\n\n".join(context_parts)
-                        logger.info(f"RAG Context found (MemoryAPI): {len(context_text)} chars, {len(all_results)} results")
+                        logger.info(_t_from_state(
+                            req.app.state,
+                            "core.chat.rag_context_memoryapi",
+                            "RAG Context found (MemoryAPI): {chars} chars, {count} results",
+                            chars=len(context_text),
+                            count=len(all_results),
+                        ))
                 except Exception as mem_err:
-                    logger.debug(f"MemoryAPI not available: {mem_err}")
+                    logger.debug(_t_from_state(
+                        req.app.state,
+                        "core.chat.memory_api_not_available",
+                        "MemoryAPI not available: {error}",
+                        error=str(mem_err),
+                    ))
 
                     # Fallback to RAG module if MemoryAPI fails
                     rag_module = None
@@ -277,14 +338,32 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                                 context_text = "\n".join([_rag_result_to_text(r) for r in results])
                             else:
                                 context_text = str(results)
-                            logger.info(f"RAG Context found (RAG module): {len(context_text)} chars")
+                            logger.info(_t_from_state(
+                                req.app.state,
+                                "core.chat.rag_context_module",
+                                "RAG Context found (RAG module): {chars} chars",
+                                chars=len(context_text),
+                            ))
                         else:
-                            logger.info("RAG Search returned no results")
+                            logger.info(_t_from_state(
+                                req.app.state,
+                                "core.chat.rag_no_results",
+                                "RAG Search returned no results",
+                            ))
                     else:
-                        logger.debug("No RAG source available")
+                        logger.debug(_t_from_state(
+                            req.app.state,
+                            "core.chat.rag_no_source",
+                            "No RAG source available",
+                        ))
 
         except Exception as e:
-            logger.error(f"RAG Error: {e}")
+            logger.error(_t_from_state(
+                req.app.state,
+                "core.chat.rag_error",
+                "RAG Error: {error}",
+                error=str(e),
+            ))
             # Continue without context rather than failing
 
     # 3. Augment System Prompt (with sanitized RAG context)
@@ -345,7 +424,12 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
             CHAT_ENGINE_REQUESTS.labels(engine=engine, status=engine_status).inc()
             CHAT_ENGINE_DURATION.labels(engine=engine).observe(time.time() - start_time)
         except Exception as e:
-            logger.debug("Chat engine metrics update failed: %s", e)
+            logger.debug(_t_from_state(
+                req.app.state,
+                "core.chat.metrics_update_failed",
+                "Chat engine metrics update failed: {error}",
+                error=str(e),
+            ))
 
     # 5. Episodic Memory Storage (Auto-Save for NON-streaming)
     # Streaming responses handle their own saving inside the generator now
@@ -367,7 +451,12 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                     content
                 )
         except Exception as e:
-            logger.error(f"Failed to schedule memory save: {e}")
+            logger.error(_t_from_state(
+                req.app.state,
+                "core.chat.autosave_schedule_failed",
+                "Failed to schedule memory save: {error}",
+                error=str(e),
+            ))
     if isinstance(response, StreamingResponse):
         if "X-Nexe-Engine" not in response.headers:
             response.headers["X-Nexe-Engine"] = engine
@@ -392,7 +481,11 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
         # Create conversation text
         conversation_text = f"User: {user_msg}\nAssistant: {assistant_msg}"
 
-        logger.info("💾 Auto-saving conversation to RAG memory (nexe_chat_memory)...")
+        logger.info(_t_from_state(
+            app_state,
+            "core.chat.autosave_start",
+            "💾 Auto-saving conversation to RAG memory (nexe_chat_memory)...",
+        ))
 
         # Use MemoryAPI to store in Qdrant HTTP (same place RAG searches)
         memory = await get_memory_api()
@@ -400,7 +493,11 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
         # Ensure collection exists
         if not await memory.collection_exists("nexe_chat_memory"):
             await memory.create_collection("nexe_chat_memory", vector_size=384)
-            logger.info("Created nexe_chat_memory collection")
+            logger.info(_t_from_state(
+                app_state,
+                "core.chat.autosave_collection_created",
+                "Created nexe_chat_memory collection",
+            ))
 
         # Store the conversation
         doc_id = await memory.store(
@@ -414,16 +511,31 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
             }
         )
 
-        logger.info(f"Conversation saved to nexe_chat_memory (id={doc_id})")
+        logger.info(_t_from_state(
+            app_state,
+            "core.chat.autosave_saved",
+            "Conversation saved to nexe_chat_memory (id={id})",
+            id=doc_id,
+        ))
 
         try:
             from core.metrics.registry import MEMORY_OPERATIONS
             MEMORY_OPERATIONS.labels(operation="autosave").inc()
         except Exception as e:
-            logger.debug("Autosave metrics update failed: %s", e)
+            logger.debug(_t_from_state(
+                app_state,
+                "core.chat.autosave_metrics_failed",
+                "Autosave metrics update failed: {error}",
+                error=str(e),
+            ))
 
     except Exception as e:
-        logger.error(f"Error saving conversation to memory: {e}")
+        logger.error(_t_from_state(
+            app_state,
+            "core.chat.autosave_error",
+            "Error saving conversation to memory: {error}",
+            error=str(e),
+        ))
 
 async def _forward_to_ollama(
     messages: List[Dict],
@@ -474,11 +586,21 @@ async def _forward_to_ollama(
                 matching = [m for m in chat_models if model_name.split(":")[0] in m]
                 if matching:
                     model_name = matching[0]
-                    logger.info(f"Using available model: {model_name}")
+                    logger.info(_t_from_state(
+                        app_state,
+                        "core.chat.ollama_model_fallback",
+                        "Using available model: {model}",
+                        model=model_name,
+                    ))
                 elif chat_models:
                     # Use first available chat model as fallback
                     model_name = chat_models[0]
-                    logger.warning(f"Requested model not found. Using available model: {model_name}")
+                    logger.warning(_t_from_state(
+                        app_state,
+                        "core.chat.ollama_model_not_found",
+                        "Requested model not found. Using available model: {model}",
+                        model=model_name,
+                    ))
                 else:
                     raise HTTPException(
                         status_code=503,
@@ -526,7 +648,11 @@ async def _forward_to_ollama(
                 resp = await client.post(url, json=payload, timeout=60.0)
                 if resp.status_code != 200:
                     try:
-                        error_detail = resp.json().get("error", "Unknown Ollama error")
+                        error_detail = resp.json().get("error") or _t_from_state(
+                            app_state,
+                            "core.chat.ollama_unknown_error",
+                            "Unknown Ollama error",
+                        )
                     except (ValueError, json.JSONDecodeError, AttributeError):
                         error_detail = _t_from_state(
                             app_state,
@@ -594,7 +720,12 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
                                  try:
                                      await _save_conversation_to_memory(app_state, user_msg, full_response_text)
                                  except Exception as e:
-                                     logger.error(f"Stream Auto-Save failed: {e}")
+                                     logger.error(_t_from_state(
+                                         app_state,
+                                         "core.chat.autosave_stream_failed",
+                                         "Stream Auto-Save failed: {error}",
+                                         error=str(e),
+                                     ))
                             break
 
                     except json.JSONDecodeError:
@@ -642,7 +773,12 @@ async def _mlx_stream_generator(
                 token
             )
         except Exception as e:
-            logger.debug("Stream token enqueue failed (queue closed): %s", e)  # Queue tancada, ignorar
+            logger.debug(_t_from_state(
+                app_state,
+                "core.chat.mlx_token_enqueue_failed",
+                "Stream token enqueue failed (queue closed): {error}",
+                error=str(e),
+            ))  # Queue tancada, ignorar
 
     async def run_mlx():
         """Executa MLX en background amb stream_callback."""
@@ -656,7 +792,12 @@ async def _mlx_stream_generator(
             result_holder["result"] = result
         except Exception as e:
             result_holder["error"] = str(e)
-            logger.error(f"MLX streaming error: {e}")
+            logger.error(_t_from_state(
+                app_state,
+                "core.chat.mlx_stream_error",
+                "MLX streaming error: {error}",
+                error=str(e),
+            ))
         finally:
             generation_done.set()
 
@@ -711,19 +852,30 @@ async def _mlx_stream_generator(
             try:
                 await _save_conversation_to_memory(app_state, user_msg, full_response_text)
             except Exception as e:
-                logger.error(f"MLX Stream Auto-Save failed: {e}")
+                logger.error(_t_from_state(
+                    app_state,
+                    "core.chat.mlx_autosave_failed",
+                    "MLX Stream Auto-Save failed: {error}",
+                    error=str(e),
+                ))
 
         # Log mètriques si tenim resultat
         if result_holder["result"]:
             result = result_holder["result"]
-            logger.info(
-                "MLX stream completed: %d tokens, %.1f tok/s",
-                result.get("tokens", 0),
-                result.get("tokens_per_second", 0)
-            )
+            logger.info(_t_from_state(
+                app_state,
+                "core.chat.mlx_stream_completed",
+                "MLX stream completed: {tokens} tokens, {tps:.1f} tok/s",
+                tokens=result.get("tokens", 0),
+                tps=result.get("tokens_per_second", 0),
+            ))
 
     except Exception as e:
-        logger.exception("MLX streaming failed")
+        logger.exception(_t_from_state(
+            app_state,
+            "core.chat.mlx_stream_failed",
+            "MLX streaming failed",
+        ))
         error_chunk = {"error": str(e)}
         yield f"data: {json.dumps(error_chunk)}\n\n"
 
@@ -743,8 +895,16 @@ async def _forward_to_mlx(messages: List[Dict], request: ChatCompletionRequest, 
 
         if not mlx_module or not hasattr(mlx_module, 'chat'):
             # MLX module not loaded or not available - fallback to Ollama
-            logger.warning("MLX module not available (Metal/model not configured). Falling back to Ollama.")
-            logger.info("To use MLX: Set NEXE_MLX_MODEL in .env and ensure Metal is available")
+            logger.warning(_t_from_state(
+                req.app.state,
+                "core.chat.mlx_unavailable",
+                "MLX module not available (Metal/model not configured). Falling back to Ollama.",
+            ))
+            logger.info(_t_from_state(
+                req.app.state,
+                "core.chat.mlx_setup_hint",
+                "To use MLX: Set NEXE_MLX_MODEL in .env and ensure Metal is available",
+            ))
             return await _forward_to_ollama(
                 messages,
                 request,
@@ -768,7 +928,11 @@ async def _forward_to_mlx(messages: List[Dict], request: ChatCompletionRequest, 
 
         # STREAMING MODE
         if request.stream:
-            logger.info("Forwarding to MLX module (streaming)...")
+            logger.info(_t_from_state(
+                req.app.state,
+                "core.chat.mlx_forward_streaming",
+                "Forwarding to MLX module (streaming)...",
+            ))
             return StreamingResponse(
                 _mlx_stream_generator(
                     mlx_module,
@@ -787,7 +951,11 @@ async def _forward_to_mlx(messages: List[Dict], request: ChatCompletionRequest, 
             )
 
         # NON-STREAMING MODE
-        logger.info("Forwarding to MLX module...")
+        logger.info(_t_from_state(
+            req.app.state,
+            "core.chat.mlx_forward",
+            "Forwarding to MLX module...",
+        ))
         result = await mlx_module.chat(
             messages=user_messages,
             system=system_msg,
@@ -815,7 +983,12 @@ async def _forward_to_mlx(messages: List[Dict], request: ChatCompletionRequest, 
         }
 
     except Exception as e:
-        logger.error("MLX execution failed: %s. Falling back to Ollama.", e)
+        logger.error(_t_from_state(
+            req.app.state,
+            "core.chat.mlx_execution_failed",
+            "MLX execution failed: {error}. Falling back to Ollama.",
+            error=str(e),
+        ))
         return await _forward_to_ollama(
             messages,
             request,
@@ -840,8 +1013,16 @@ async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionReq
 
         if not llama_module or not hasattr(llama_module, 'chat'):
             # Llama.cpp module not loaded - fallback to Ollama
-            logger.warning("Llama.cpp module not available (model not configured). Falling back to Ollama.")
-            logger.info("To use Llama.cpp: Set NEXE_LLAMA_CPP_MODEL in .env")
+            logger.warning(_t_from_state(
+                req.app.state,
+                "core.chat.llamacpp_unavailable",
+                "Llama.cpp module not available (model not configured). Falling back to Ollama.",
+            ))
+            logger.info(_t_from_state(
+                req.app.state,
+                "core.chat.llamacpp_setup_hint",
+                "To use Llama.cpp: Set NEXE_LLAMA_CPP_MODEL in .env",
+            ))
             return await _forward_to_ollama(
                 messages,
                 request,
@@ -881,7 +1062,11 @@ async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionReq
             )
 
         # Call llama.cpp module
-        logger.info("Forwarding to Llama.cpp module...")
+        logger.info(_t_from_state(
+            req.app.state,
+            "core.chat.llamacpp_forward",
+            "Forwarding to Llama.cpp module...",
+        ))
         result = await llama_module.chat(
             messages=user_messages,
             system=system_msg,
@@ -910,7 +1095,12 @@ async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionReq
         }
 
     except Exception as e:
-        logger.error("Llama.cpp execution failed: %s. Falling back to Ollama.", e)
+        logger.error(_t_from_state(
+            req.app.state,
+            "core.chat.llamacpp_execution_failed",
+            "Llama.cpp execution failed: {error}. Falling back to Ollama.",
+            error=str(e),
+        ))
         return await _forward_to_ollama(
             messages,
             request,
@@ -950,7 +1140,12 @@ async def _llama_cpp_stream_generator(
                 token
             )
         except Exception as e:
-            logger.debug("Llama.cpp stream token enqueue failed (queue closed): %s", e)
+            logger.debug(_t_from_state(
+                app_state,
+                "core.chat.llamacpp_token_enqueue_failed",
+                "Llama.cpp stream token enqueue failed (queue closed): {error}",
+                error=str(e),
+            ))
 
     async def run_llama():
         """Executa Llama.cpp en background amb stream_callback."""
@@ -964,7 +1159,12 @@ async def _llama_cpp_stream_generator(
             result_holder["result"] = result
         except Exception as e:
             result_holder["error"] = str(e)
-            logger.error("Llama.cpp streaming error: %s", e)
+            logger.error(_t_from_state(
+                app_state,
+                "core.chat.llamacpp_stream_error",
+                "Llama.cpp streaming error: {error}",
+                error=str(e),
+            ))
         finally:
             generation_done.set()
 
@@ -1013,9 +1213,18 @@ async def _llama_cpp_stream_generator(
             try:
                 await _save_conversation_to_memory(app_state, user_msg, full_response_text)
             except Exception as e:
-                logger.error("Llama.cpp Stream Auto-Save failed: %s", e)
+                logger.error(_t_from_state(
+                    app_state,
+                    "core.chat.llamacpp_autosave_failed",
+                    "Llama.cpp Stream Auto-Save failed: {error}",
+                    error=str(e),
+                ))
 
     except Exception as e:
-        logger.exception("Llama.cpp streaming failed")
+        logger.exception(_t_from_state(
+            app_state,
+            "core.chat.llamacpp_stream_failed",
+            "Llama.cpp streaming failed",
+        ))
         error_chunk = {"error": str(e)}
         yield f"data: {json.dumps(error_chunk)}\n\n"

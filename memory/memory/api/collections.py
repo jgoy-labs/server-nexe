@@ -19,8 +19,12 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
 from .models import CollectionInfo, validate_collection_name
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.collections.{key}", fallback, **kwargs)
 
 async def create_collection(
   qdrant: QdrantClient,
@@ -48,7 +52,11 @@ async def create_collection(
   def _create():
     collections = qdrant.get_collections().collections
     if name in [c.name for c in collections]:
-      logger.info("Collection '%s' already exists", name)
+      logger.info(_t(
+        "already_exists",
+        "Collection '{name}' already exists",
+        name=name
+      ))
       return False
 
     distance_map = {
@@ -63,7 +71,13 @@ async def create_collection(
         size=vector_size, distance=distance_map.get(distance, Distance.COSINE)
       ),
     )
-    logger.info("Created collection '%s' (size=%d, distance=%s)", name, vector_size, distance)
+    logger.info(_t(
+      "created",
+      "Created collection '{name}' (size={size}, distance={distance})",
+      name=name,
+      size=vector_size,
+      distance=distance
+    ))
     return True
 
   return await loop.run_in_executor(executor, _create)
@@ -79,11 +93,19 @@ async def delete_collection(
   def _delete():
     collections = qdrant.get_collections().collections
     if name not in [c.name for c in collections]:
-      logger.warning("Collection '%s' does not exist", name)
+      logger.warning(_t(
+        "not_found",
+        "Collection '{name}' does not exist",
+        name=name
+      ))
       return False
 
     qdrant.delete_collection(collection_name=name)
-    logger.info("Deleted collection '%s'", name)
+    logger.info(_t(
+      "deleted",
+      "Deleted collection '{name}'",
+      name=name
+    ))
     return True
 
   return await loop.run_in_executor(executor, _delete)

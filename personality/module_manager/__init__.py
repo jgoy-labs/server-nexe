@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/__init__.py
-Description: Package marker per ModuleManager (sistema complet de gestió de mòduls). Exporta
+Description: Package marker for ModuleManager (complete module management system). Exports
 
 www.jgoy.net
 ────────────────────────────────────

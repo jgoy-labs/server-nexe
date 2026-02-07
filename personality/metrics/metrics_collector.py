@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/metrics/metrics_collector.py
-Description: Col·lector global de mètriques del sistema Nexe. Recull, processa i gestiona
+Description: Global metrics collector for the Nexe system. Collects, processes, and manages
 
 www.jgoy.net
 ────────────────────────────────────

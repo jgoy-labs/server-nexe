@@ -62,9 +62,9 @@
   "auto_clean_nothing": "Auto-Clean: Nada que limpiar",
   "auto_clean_error": "Error de Auto-Clean: {error}",
   "critical_error": "Error crítico del sistema: {error}",
-  "shutdown_initiated": "Apagado iniciado",
-  "cleanup_error": "Error de limpieza: {error}",
-  "shutdown_goodbye": "Apagado completado. ¡Hasta luego!",
+  "shutdown_initiated": "Apagado del sistema iniciado...",
+  "cleanup_error": "Error durante la limpieza: {error}",
+  "shutdown_goodbye": "Nexe 0.8 se detuvo correctamente. ¡Hasta pronto!",
   "auto_discovering": "Auto-descubriendo módulos desde: {path}",
   "modules_discovered": "Descubiertos {count} módulos: {modules}",
   "api_integrator_configured": "🔌 Integrador de API configurado",
@@ -83,7 +83,9 @@
   "server_stopped_by_user": "Servidor detenido por el usuario",
   "server_startup_error": "Error de arranque del servidor: {error}",
   "startup_error": "Error de arranque del servidor: {error}",
-  "rate_limit_exceeded_error": "Límite de peticiones excedido: {detail}"
+  "rate_limit_exceeded_error": "Límite de peticiones excedido: {detail}",
+  "auto_clean_action_would": "se limpiarían",
+  "auto_clean_action_cleaned": "limpiados"
  },
  "chat": {
   "context_header": "[CONTEXT MEMORIA]",
@@ -94,26 +96,61 @@
   "ollama_no_chat_models": "No hay ningún modelo de CHAT descargado en Ollama. Ejecuta: ollama pull llama3.2",
   "ollama_not_available": "Ollama no disponible. El servidor se está iniciando o Ollama no está instalado. Espera unos segundos e inténtalo de nuevo, o ejecuta: curl -fsSL https://ollama.com/install.sh | sh",
   "ollama_returned_http": "Ollama devolvió HTTP {status}",
+  "ollama_unknown_error": "Error desconocido de Ollama",
   "ollama_no_response": "Ollama no responde. Verifica que está en marcha: ollama serve",
   "ollama_stream_failed_status": "El streaming de Ollama falló con el estado {status}",
   "ollama_stream_not_available": "Ollama no disponible. Espera unos segundos e inténtalo de nuevo."
  },
  "endpoints": {
   "system": {
+   "sighup_sent_log": "Enviando SIGHUP al PID del supervisor {pid}",
    "restart_signal_sent": "Señal de reinicio enviada correctamente",
    "restart_signal_error": "Error enviando señal de reinicio: {detail}",
    "restart_signal_unexpected": "Error inesperado enviando señal de reinicio: {error}",
-   "restart_initiation_error": "Error iniciando el reinicio: {error}"
+   "restart_initiation_error": "Error iniciando el reinicio: {error}",
+   "restart_initiated_log": "Reinicio iniciado por usuario autenticado (PID del supervisor: {pid})"
   }
  },
  "middleware": {
   "rate_limit_advanced_failed": "La configuración avanzada de rate limiting falló: {error}",
   "rate_limit_fallback": "  Se usa fallback a rate limiting básico",
-  "rate_limit_basic": "Usando rate limiting básico (solo por IP)"
+  "rate_limit_basic": "Usando rate limiting básico (solo por IP)",
+  "rate_limit_advanced_enabled": "Fase 3.1: Limitación de tasa avanzada activada",
+  "rate_limit_ip_ok": "  - Limitación por IP: OK",
+  "rate_limit_api_key_ok": "  - Limitación por clave API: OK",
+  "rate_limit_composite_ok": "  - Limitación compuesta: OK",
+  "rate_limit_headers_ok": "  - Cabeceras X-RateLimit-*: OK",
+  "request_size_limit": "Límite de tamaño de la petición: {size_mb:.1f} MB",
+  "cors_configured": "CORS configurado: orígenes={origins}",
+  "cors_methods": "  métodos={methods}",
+  "cors_headers": "  cabeceras={headers}",
+  "prometheus_enabled": "Middleware de métricas Prometheus activado",
+  "prometheus_not_available": "Métricas Prometheus no disponibles: {error}",
+  "csrf_secret_missing": "NEXE_CSRF_SECRET no configurado en modo producción!",
+  "csrf_sessions_invalidated": "   Las sesiones se invalidarán en cada reinicio.",
+  "csrf_set_env_hint": "   Configure NEXE_CSRF_SECRET en el .env para sesiones persistentes.",
+  "csrf_secret_temp": "CSRF_SECRET no configurado. Se usa un secreto temporal (solo modo dev)",
+  "csrf_cookie_override": "  Anulación manual de cookie_secure de CSRF: {value}",
+  "csrf_enabled": "Protección CSRF activada",
+  "csrf_not_installed": "starlette-csrf no instalado. Protección CSRF desactivada.",
+  "csrf_install_hint": "  Instale con: pip install starlette-csrf"
  },
  "cors": {
   "wildcard_not_allowed": "El comodín CORS '*' no está permitido en modo air-gapped. Define orígenes explícitos en server.toml [core.server] cors_origins",
   "origins_not_configured": "Orígenes CORS no configurados. Define orígenes explícitos en server.toml [core.server] cors_origins"
+ },
+ "request_size": {
+  "limiter_enabled": "Limitador de tamaño de solicitud activado: máx {size_mb:.1f} MB",
+ "request_rejected": "Solicitud rechazada: tamaño {size_mb:.2f} MB supera el límite {limit_mb:.2f} MB de {ip} a {path}",
+ "invalid_content_length": "Cabecera Content-Length inválida: {value}",
+ "negative_content_length": "Content-Length negativo",
+ "streaming_rejected": "Solicitud en streaming rechazada: {size} bytes supera el límite {limit} de {ip}",
+  "body_read_error_log": "Error al leer el cuerpo de la solicitud: {error}",
+  "error_entity_too_large": "Solicitud demasiado grande",
+  "detail_content_length": "Content-Length ({content_length}) supera el máximo ({max_size})",
+  "error_entity_too_large_streaming": "Solicitud demasiado grande (streaming)",
+  "detail_body_size": "El tamaño del cuerpo ({body_size}) supera el máximo ({max_size})",
+  "error_body_read": "Error al leer el cuerpo de la solicitud"
  },
  "ingest": {
   "title": "INGESTA DE CONOCIMIENTO NEXE",
@@ -144,5 +181,160 @@
   "summary_chunks": "  - Fragmentos totales: {count}",
   "summary_collection": "  - Colección: {collection}",
   "done_prompt": "\n¡Ahora puedes preguntar sobre tus documentos en el chat!"
+ },
+ "resources": {
+  "importlib_failed_fallback": "importlib.resources falló para {package}/{resource}: {error}. Probando fallback...",
+  "file_fallback_failed": "__file__ fallback falló para {package}/{resource}: {error}. Probando repo_root...",
+  "resource_not_found": "No se pudo encontrar el recurso {package}/{resource}. Pruebas: importlib.resources, __file__, repo_root. Último error: {error}",
+  "importlib_resources_not_available": "importlib.resources.files no disponible",
+  "resource_not_found_importlib": "Recurso no encontrado vía importlib.resources: {package}/{resource}",
+  "import_package_failed": "No se pudo importar el paquete {package}: {error}",
+  "package_no_file": "El paquete {package} no tiene __file__ (puede ser namespace package o builtin)",
+  "resource_not_found_file": "Recurso no encontrado vía __file__: {package}/{resource} (buscado en {path})",
+  "resource_not_found_repo_root": "Recurso no encontrado vía repo_root: {package}/{resource} (buscado en {path})",
+  "get_asset_deprecated": "get_asset_path() está deprecated. Usa get_resource_path()."
+ },
+ "lifespan": {
+  "startup_triggered": "INICIO DE LIFESPAN ACTIVADO",
+  "reload_trigger_cleaned": "Trigger de recarga limpiado: {path}",
+  "reload_trigger_delete_failed": "No se pudo eliminar el trigger de recarga: {error}",
+  "qdrant_ok": "Qdrant: OK (ya en ejecución)",
+  "qdrant_autostart_disabled": "Qdrant: Autoarranque desactivado (NEXE_AUTOSTART_QDRANT=false)",
+  "qdrant_starting": "Qdrant: Iniciando desde {path}...",
+  "qdrant_started": "Qdrant: OK (iniciado en el puerto {port})",
+  "qdrant_process_died": "Qdrant: El proceso murió. Ejecute './qdrant' manualmente para ver los logs.",
+  "qdrant_start_timeout": "Qdrant: No se pudo iniciar (timeout 15s)",
+  "qdrant_start_failed": "Qdrant: No se pudo iniciar: {error}",
+  "qdrant_binary_not_found": "Qdrant: Binario no encontrado en {path}",
+  "qdrant_setup_hint": "  Ejecute ./setup.sh para descargar Qdrant automáticamente",
+  "ollama_ok": "Ollama: OK (ya en ejecución)",
+  "ollama_health_check_failed_startup": "Comprobación de salud de Ollama fallida durante el inicio: {error}",
+  "ollama_autostart_disabled": "Ollama: Autoarranque desactivado (NEXE_AUTOSTART_OLLAMA=false)",
+  "ollama_not_installed": "Ollama: No instalado. Instale manualmente desde https://ollama.com/download",
+  "ollama_install_hint": "  O ejecute: curl -fsSL https://ollama.com/install.sh | sh",
+  "ollama_starting": "Ollama: Iniciando...",
+  "ollama_started": "Ollama: OK (iniciado)",
+  "ollama_not_ready": "Ollama aún no está listo durante la espera de inicio: {error}",
+  "ollama_start_timeout": "Ollama: No se pudo iniciar (timeout 15s)",
+  "ollama_start_failed": "Ollama: No se pudo iniciar: {error}",
+  "ollama_cleaning": "Limpiando Ollama: {count} modelo(s) cargados de sesiones anteriores...",
+  "ollama_unloaded": "  - Descargado: {model}",
+  "ollama_clean_success": "Ollama limpiado correctamente",
+  "ollama_clean_none": "Ollama está limpio (sin modelos cargados)",
+  "ollama_unload_start": "Descargando {count} modelo(s) de Ollama de la RAM...",
+  "ollama_unload_success": "Modelos de Ollama descargados correctamente",
+  "ollama_unload_none": "No hay modelos de Ollama cargados",
+  "ollama_unload_failed": "No se pudieron descargar los modelos de Ollama: {error}",
+  "module_loaded_item": "  - {name} ({id})",
+  "module_health_skipped": "Actualización de salud del módulo omitida: {error}",
+  "module_registry_skipped": "Actualización del registro de módulos omitida: {error}",
+  "plugin_init_start": "Inicializando módulos de plugins...",
+  "plugin_init_item": "Inicializando plugin: {module}",
+  "plugin_init_success": "✅ {module} inicializado correctamente",
+  "plugin_init_false": "⚠️  La inicialización de {module} devolvió False",
+  "plugin_init_failed": "No se pudo inicializar {module}: {error}",
+  "plugin_init_error": "Error durante la inicialización de plugins: {error}",
+  "knowledge_already_ingested": "Conocimiento: Ya ingerido. Se omite la auto-ingesta.",
+  "knowledge_reingest_hint": "Conocimiento: Para reingerir, use: ./nexe knowledge ingest",
+  "knowledge_first_run": "Conocimiento: Primera ejecución - auto-ingiriendo {count} documento(s)...",
+  "knowledge_ingest_success": "Conocimiento: Ingesta completada correctamente",
+  "knowledge_ingest_errors": "Conocimiento: La ingesta tuvo algunos errores",
+  "knowledge_no_docs": "Conocimiento: No hay documentos para ingerir (carpeta vacía o solo README)",
+  "knowledge_auto_ingest_failed": "Conocimiento: Auto-ingesta fallida: {error}",
+  "bootstrap_new_token": "Nuevo token maestro de bootstrap generado y persistido",
+  "bootstrap_existing_token": "Usando el token maestro de bootstrap existente de la BD",
+  "auto_clean_not_available": "Auto-Clean no disponible",
+  "server_ready": "✅  SERVER.NEXE LISTO · Escuchando en http://localhost:9119",
+  "web_ui_ready": "📱 Web UI: http://localhost:9119/ui/",
+  "critical_startup_error": "Error crítico de inicio",
+  "process_stopping": "Deteniendo el proceso {name}...",
+  "process_force_stop_failed": "No se pudo detener forzosamente el proceso {name}",
+  "closing_api_integrator": "Cerrando APIIntegrator...",
+  "closing_module_manager": "Cerrando ModuleManager...",
+  "cleaning_registry": "Limpiando el registro..."
+ },
+ "paths_validation": {
+  "detection_success": "{prefix} Raíz Nexe detectada vía {method}:\n  Ruta: {path}\n  Validación:\n{reasons}",
+  "detection_failure": "[FAIL] Detección vía {method} fallida:\n  Ruta intentada: {path}\n  Razones:\n{reasons}",
+  "cwd_fallback_used": "[MÉTRICA] Fallback de CWD usado desde: {caller}"
+ },
+"paths_detection": {
+  "cache_cleared": "Caché de get_repo_root() limpiada",
+  "markers_not_found": "Marcadores no encontrados subiendo desde {path}",
+  "pip_install_detected": "Instalación por pip detectada. Se usa {path} para datos/configuración",
+  "invalid_env_root": "NEXE_HOME apunta a un root inválido: {path}\nRazones:\n{reasons}\n\nSoluciones:\n 1. Arregla NEXE_HOME: export NEXE_HOME=/correct/path\n 2. Elimina NEXE_HOME: unset NEXE_HOME\n",
+  "root_not_detected": "No se pudo detectar la raíz de Nexe 0.8.\n\nNinguna estrategia encontró un root válido:\n 1. NEXE_HOME env var: {env_status}\n 2. Marcadores (server.toml): no encontrados\n 3. Site-packages: no detectado\n\nSoluciones:\n 1. Establece NEXE_HOME: export NEXE_HOME=/path/to/NEXE-0.8\n 2. Ejecuta desde la raíz: cd /path/to/NEXE-0.8\n 3. Pasa --project-root: nexe-security --project-root /path/to/NEXE-0.8\n\nDirectorio actual: {cwd}\nUbicación de paths.py: {path}\n"
+},
+ "contracts": {
+  "name_spaces": "el nombre no puede contener espacios",
+  "name_invalid_chars": "el nombre solo puede contener letras minúsculas, números y guiones bajos",
+  "framework_invalid": "el framework debe ser uno de: {allowed}",
+  "api_section_required": "la sección [api] es obligatoria cuando capabilities.has_api = true",
+  "ui_section_required": "la sección [ui] es obligatoria cuando capabilities.has_ui = true",
+  "cli_section_required": "la sección [cli] es obligatoria cuando capabilities.has_cli = true",
+  "api_prefix_invalid": "api.prefix debe empezar con /, recibido: {prefix}",
+  "manifest_not_found": "No se encontró el manifest: {path}",
+  "manifest_file_not_found": "Archivo manifest no encontrado: {path}",
+  "schema_validation_failed": "La validación del esquema del manifest falló",
+  "base_contract_missing": "El objeto no implementa el protocolo BaseContract",
+  "metadata_access_failed": "No se pudo acceder a los metadatos del contrato",
+  "module_contract_incomplete": "El módulo no implementa completamente ModuleContract",
+  "missing_init": "Falta __init__.py",
+  "missing_module_file": "Falta module.py (requerido para módulos con API)",
+  "missing_ui_dir": "Falta el directorio UI: {path}",
+  "missing_tests_dir": "Falta el directorio de tests"
+ },
+ "circuit_breaker": {
+  "closed_recovered": "CircuitBreaker [{name}]: CERRADO (recuperado)",
+  "open_after_failures": "CircuitBreaker [{name}]: ABIERTO tras {count} fallos. Último error: {error}",
+  "half_open_failed": "CircuitBreaker [{name}]: ABIERTO (half-open fallido)",
+  "half_open_testing": "CircuitBreaker [{name}]: HALF_OPEN (prueba)",
+  "open_error": "Circuit [{name}] está ABIERTO. Reintentará en {timeout}s"
+ },
+ "endpoints_v1": {
+  "rag_import_failed": "No se pudo importar API RAG v1: {error}",
+  "embeddings_import_failed": "No se pudo importar API de Embeddings v1: {error}",
+  "documents_import_failed": "No se pudo importar API de Documents v1: {error}",
+  "memory_import_failed": "No se pudo importar API de Memory v1: {error}"
+ },
+ "metrics_registry": {
+  "reset_requested": "Reinicio de métricas solicitado - solo para pruebas"
+ },
+"metrics_middleware": {
+  "prometheus_enabled": "Middleware de Prometheus activado"
+},
+ "loader": {
+  "import_failed": "No se pudo importar el módulo {module}",
+  "invalid_protocol": "El módulo {module} no implementa el protocolo NexeModule"
+ },
+ "module_loader": {
+  "memory_deprecated": "module_loader_memory está ELIMINADO. Usa ModuleManager.load_memory_modules() directamente. Ver: docs/NEXE_ARCHITECTURAL_DECISIONS.md (ADR-001)",
+  "plugins_deprecated": "module_loader_plugins está ELIMINADO. Usa ModuleManager.load_plugin_routers() directamente. Ver: docs/NEXE_ARCHITECTURAL_DECISIONS.md (ADR-001)"
+ },
+"loader_registry": {
+  "router_fetch_failed": "No se pudo obtener el router de {module}: {error}"
+},
+ "server_exceptions": {
+  "http_expected": "HTTP {status}: {detail} - Ruta: {path} (esperado desde la UI)",
+  "http_warning": "HTTP {status}: {detail} - Ruta: {path}",
+  "validation_error": "Error de validación en {path}: {errors}",
+  "unhandled_exception": "Excepción no controlada [trace_id: {trace_id}] en {path}: {error}"
+ },
+ "server_helpers": {
+  "signal_received": "🛑 Señal {signal} recibida, deteniendo el servidor..."
+ },
+ "server_runner": {
+  "kill_process_failed": "No se pudo detener el proceso en el puerto {port}: {error}",
+  "missing_api_key": "No se encontró NEXE_PRIMARY_API_KEY en .env. La autenticación podría fallar o usar valores por defecto.",
+  "port_in_use_prompt": "El puerto {port} está en uso. ¿Detener el proceso existente? [y/N]: ",
+  "quick_commands_title": "COMANDOS RÁPIDOS:",
+  "quick_commands_chat": "Chat interactivo:",
+  "quick_commands_logs": "Ver logs:",
+  "quick_commands_rag": "Ingesta RAG:",
+  "quick_commands_status": "Estado del sistema:",
+  "quick_config_title": "CONFIGURACIÓN RÁPIDA:",
+  "quick_config_personality": "Para cambiar personalidad (System Prompt):",
+  "quick_config_edit": "editar",
+  "server_running": "Servidor en marcha en: {host}:{port}"
  }
 }

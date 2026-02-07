@@ -15,6 +15,7 @@ import threading
 import structlog
 
 from personality.i18n import get_i18n
+from personality.i18n.resolve import t_modular
 from .constants import MANIFEST, MODULE_ID
 from .core import (
   AsyncEmbedder,
@@ -29,6 +30,9 @@ from .core import (
 )
 
 logger = structlog.get_logger()
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"embeddings.logs.{key}", fallback, **kwargs)
 
 class EmbeddingsModule:
   """
@@ -85,6 +89,7 @@ class EmbeddingsModule:
 
     logger.info(
       "embeddings_module_created",
+      message=_t_log("module_created", "Embeddings module created"),
       module_id=self.module_id,
       version=self.version
     )
@@ -131,7 +136,10 @@ class EmbeddingsModule:
       ImportError: If dependencies not available
     """
     if self._initialized:
-      logger.warning("embeddings_module_already_initialized")
+      logger.warning(
+        "embeddings_module_already_initialized",
+        message=_t_log("already_initialized", "Embeddings module already initialized")
+      )
       return True
 
     try:
@@ -152,6 +160,7 @@ class EmbeddingsModule:
 
       logger.info(
         "embeddings_module_initializing",
+        message=_t_log("initializing", "Embeddings module initializing"),
         config=self._config
       )
 
@@ -179,6 +188,13 @@ class EmbeddingsModule:
 
       logger.info(
         "embeddings_module_initialized",
+        message=_t_log(
+          "initialized",
+          "Embeddings module initialized (model={model}, device={device}, cache_enabled={cache_enabled})",
+          model=self._config.get("model_name"),
+          device=self._config.get("device"),
+          cache_enabled=self._config.get("cache_enabled"),
+        ),
         version=self.version,
         model=self._config["model_name"],
         device=self._config["device"],
@@ -190,6 +206,11 @@ class EmbeddingsModule:
     except Exception as e:
       logger.error(
         "embeddings_module_init_failed",
+        message=_t_log(
+          "init_failed",
+          "Embeddings module initialization failed: {error}",
+          error=str(e),
+        ),
         error=str(e),
         exc_info=True
       )
@@ -319,11 +340,20 @@ class EmbeddingsModule:
       bool: True if shutdown successful
     """
     if not self._initialized:
-      logger.warning("embeddings_module_not_initialized_shutdown")
+      logger.warning(
+        "embeddings_module_not_initialized_shutdown",
+        message=_t_log(
+          "shutdown_not_initialized",
+          "Embeddings module not initialized; skipping shutdown"
+        )
+      )
       return True
 
     try:
-      logger.info("embeddings_module_shutting_down")
+      logger.info(
+        "embeddings_module_shutting_down",
+        message=_t_log("shutting_down", "Embeddings module shutting down")
+      )
 
       if self._cached_embedder:
         await self._cached_embedder.shutdown()
@@ -333,12 +363,20 @@ class EmbeddingsModule:
       self._chunker = None
       self._config = {}
 
-      logger.info("embeddings_module_shutdown_complete")
+      logger.info(
+        "embeddings_module_shutdown_complete",
+        message=_t_log("shutdown_complete", "Embeddings module shutdown complete")
+      )
       return True
 
     except Exception as e:
       logger.error(
         "embeddings_module_shutdown_failed",
+        message=_t_log(
+          "shutdown_failed",
+          "Embeddings module shutdown failed: {error}",
+          error=str(e),
+        ),
         error=str(e),
         exc_info=True
       )

@@ -16,6 +16,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from personality.i18n import get_i18n
+from personality.i18n.resolve import t_modular
+
 from qdrant_client import QdrantClient
 
 from .models import (
@@ -44,6 +47,12 @@ from .operations import (
 )
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.api.{key}", fallback, **kwargs)
+
+def _t_col(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.collections.{key}", fallback, **kwargs)
 
 class MemoryAPI:
   """
@@ -95,38 +104,62 @@ class MemoryAPI:
 
     if qdrant_path:
       logger.info(
-        "MemoryAPI created (qdrant_path=%s, model=%s)",
-        self.qdrant_path,
-        self.embedding_model,
+        _t(
+          "created_with_path",
+          "MemoryAPI created (qdrant_path={path}, model={model})",
+          path=self.qdrant_path,
+          model=self.embedding_model,
+        )
       )
     else:
       logger.info(
-        "MemoryAPI created (qdrant_url=%s, model=%s)",
-        self.qdrant_url,
-        self.embedding_model,
+        _t(
+          "created_with_url",
+          "MemoryAPI created (qdrant_url={url}, model={model})",
+          url=self.qdrant_url,
+          model=self.embedding_model,
+        )
       )
 
   async def initialize(self) -> bool:
     """Inicialitza connexions i models."""
     if self._initialized:
-      logger.warning("MemoryAPI already initialized")
+      logger.warning(_t("already_initialized", "MemoryAPI already initialized"))
       return True
 
     try:
       # Usar mode local si qdrant_path està definit, sinó connectar a URL
       if self.qdrant_path:
         self._qdrant = QdrantClient(path=str(self.qdrant_path))
-        logger.info("MemoryAPI initialized (path=%s)", self.qdrant_path)
+        logger.info(
+          _t(
+            "initialized_path",
+            "MemoryAPI initialized (path={path})",
+            path=self.qdrant_path,
+          )
+        )
       else:
         self._qdrant = QdrantClient(url=self.qdrant_url, prefer_grpc=False)
-        logger.info("MemoryAPI initialized (url=%s)", self.qdrant_url)
+        logger.info(
+          _t(
+            "initialized_url",
+            "MemoryAPI initialized (url={url})",
+            url=self.qdrant_url,
+          )
+        )
 
       await self._init_embedder()
       self._initialized = True
       return True
 
     except Exception as e:
-      logger.error("MemoryAPI initialization failed: %s", e)
+      logger.error(
+        _t(
+          "initialization_failed",
+          "MemoryAPI initialization failed: {error}",
+          error=str(e),
+        )
+      )
       raise
 
   async def _init_embedder(self):
@@ -138,12 +171,24 @@ class MemoryAPI:
       return SentenceTransformer(self.embedding_model)
 
     self._embedder = await loop.run_in_executor(self._executor, _load_model)
-    logger.info("Embedder initialized: %s", self.embedding_model)
+    logger.info(
+      _t(
+        "embedder_initialized",
+        "Embedder initialized: {model}",
+        model=self.embedding_model,
+      )
+    )
 
   def _ensure_initialized(self):
     """Verificar que l'API està inicialitzada."""
     if not self._initialized:
-      raise RuntimeError("MemoryAPI not initialized. Call initialize() first.")
+      i18n = get_i18n()
+      raise RuntimeError(
+        i18n.t(
+          "memory.api.not_initialized",
+          "MemoryAPI not initialized. Call initialize() first."
+        )
+      )
 
   async def close(self):
     """Tanca connexions i allibera recursos."""
@@ -151,7 +196,13 @@ class MemoryAPI:
       try:
         self._qdrant.close()
       except Exception as e:
-        logger.debug("MemoryAPI close failed: %s", e)
+        logger.debug(
+          _t(
+            "close_failed",
+            "MemoryAPI close failed: {error}",
+            error=str(e),
+          )
+        )
       finally:
         if hasattr(self._qdrant, "_client"):
           delattr(self._qdrant, "_client")
@@ -162,7 +213,7 @@ class MemoryAPI:
     self._qdrant = None
     self._embedder = None
     self._initialized = False
-    logger.info("MemoryAPI closed")
+    logger.info(_t("closed", "MemoryAPI closed"))
 
   async def __aenter__(self):
     """Context manager entry."""
@@ -232,7 +283,11 @@ class MemoryAPI:
 
     if not await self.collection_exists(collection):
       raise CollectionNotFoundError(
-        f"Collection '{collection}' does not exist. Create it first."
+        _t_col(
+          "not_found_create",
+          "Collection '{name}' does not exist. Create it first.",
+          name=collection
+        )
       )
 
     return await store_document(
@@ -272,7 +327,13 @@ class MemoryAPI:
     self._ensure_initialized()
 
     if not await self.collection_exists(collection):
-      raise CollectionNotFoundError(f"Collection '{collection}' does not exist.")
+      raise CollectionNotFoundError(
+        _t_col(
+          "not_found",
+          "Collection '{name}' does not exist",
+          name=collection
+        )
+      )
 
     return await search_documents(
       self._qdrant,
@@ -291,7 +352,13 @@ class MemoryAPI:
     self._ensure_initialized()
 
     if not await self.collection_exists(collection):
-      raise CollectionNotFoundError(f"Collection '{collection}' does not exist.")
+      raise CollectionNotFoundError(
+        _t_col(
+          "not_found",
+          "Collection '{name}' does not exist",
+          name=collection
+        )
+      )
 
     return await get_document(self._qdrant, self._executor, doc_id, collection)
 
@@ -300,7 +367,13 @@ class MemoryAPI:
     self._ensure_initialized()
 
     if not await self.collection_exists(collection):
-      raise CollectionNotFoundError(f"Collection '{collection}' does not exist.")
+      raise CollectionNotFoundError(
+        _t_col(
+          "not_found",
+          "Collection '{name}' does not exist",
+          name=collection
+        )
+      )
 
     return await delete_document(self._qdrant, self._executor, doc_id, collection)
 
@@ -309,7 +382,13 @@ class MemoryAPI:
     self._ensure_initialized()
 
     if not await self.collection_exists(collection):
-      raise CollectionNotFoundError(f"Collection '{collection}' does not exist.")
+      raise CollectionNotFoundError(
+        _t_col(
+          "not_found",
+          "Collection '{name}' does not exist",
+          name=collection
+        )
+      )
 
     return await count_documents(self._qdrant, self._executor, collection)
 
@@ -318,7 +397,13 @@ class MemoryAPI:
     self._ensure_initialized()
 
     if not await self.collection_exists(collection):
-      raise CollectionNotFoundError(f"Collection '{collection}' does not exist.")
+      raise CollectionNotFoundError(
+        _t_col(
+          "not_found",
+          "Collection '{name}' does not exist",
+          name=collection
+        )
+      )
 
     return await cleanup_expired(self._qdrant, self._executor, collection)
 
@@ -335,11 +420,12 @@ class MemoryAPI:
         results[col.name] = deleted
 
     total = sum(results.values())
-    logger.info(
-      "Cleanup completed: %d documents deleted from %d collections",
-      total,
-      len(results),
-    )
+    logger.info(_t(
+      "logs.cleanup_completed",
+      "Cleanup completed: {count} documents deleted from {collections} collections",
+      count=total,
+      collections=len(results)
+    ))
 
     return results
 

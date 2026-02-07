@@ -4,8 +4,8 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/chat_cli.py
-Description: CLI de Chat unificat. Detecta motor disponible (MLX, Llama.cpp, Ollama)
-             i proporciona una interfície interactiva simple.
+Description: Unified chat CLI. Detects available engine (MLX, Llama.cpp, Ollama)
+             and provides a simple interactive interface.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 from .i18n import t
 
-# Helpers per detecció de motors
+# Helpers for engine detection
 def get_default_system_prompt():
-    """Llegeix el system prompt des de personality/server.toml si existeix."""
+    """Read the system prompt from personality/server.toml if it exists."""
     import os
     try:
         import tomllib
@@ -38,18 +38,24 @@ def get_default_system_prompt():
                 data = tomllib.load(f)
                 return data.get("personality", {}).get("prompt", {}).get("system_prompt")
         except Exception as e:
-            logger.debug("Failed to load system prompt: %s", e)
+            logger.debug(
+                t(
+                    "cli.chat.load_system_prompt_failed",
+                    "Failed to load system prompt: {error}",
+                    error=str(e)
+                )
+            )
     return t("cli.chat.default_system_prompt", "You are Nexe, a precise and secure local AI assistant.")
 
 def detect_engine():
     """
-    Detecta quin motor està configurat/disponible.
+    Detect which engine is configured/available.
 
-    Prioritat:
-    1. NEXE_MODEL_ENGINE (configurat per l'instal·lador al .env)
+    Priority:
+    1. NEXE_MODEL_ENGINE (configured by the installer in .env)
     2. server.toml preferred_engine
-    3. Detecció per variables de model específiques
-    4. Fallback a ollama
+    3. Detection via specific model environment variables
+    4. Fallback to ollama
     """
     import os
     try:
@@ -57,19 +63,19 @@ def detect_engine():
     except ImportError:
         import tomli as tomllib
 
-    # IMPORTANT: Carregar .env ABANS de llegir variables d'entorn
+    # IMPORTANT: Load .env BEFORE reading environment variables
     from dotenv import load_dotenv
     project_root = Path(__file__).parent.parent.parent
     env_path = project_root / ".env"
     if env_path.exists():
         load_dotenv(env_path)
 
-    # 1. PRIORITAT MÀXIMA: Variable d'entorn del instal·lador
+    # 1. HIGHEST PRIORITY: Installer environment variable
     env_engine = os.getenv("NEXE_MODEL_ENGINE")
     if env_engine and env_engine.lower() not in ("auto", ""):
         return env_engine.lower()
 
-    # 2. Intentar llegir des de server.toml
+    # 2. Try reading from server.toml
     config_path = Path(__file__).parent.parent.parent / "personality" / "server.toml"
     if config_path.exists():
         try:
@@ -79,9 +85,15 @@ def detect_engine():
                 if engine != "auto":
                     return engine
         except Exception as e:
-            logger.debug("Failed to read engine config: %s", e)
+            logger.debug(
+                t(
+                    "cli.chat.read_engine_config_failed",
+                    "Failed to read engine config: {error}",
+                    error=str(e)
+                )
+            )
 
-    # 3. Fallback a variables d'entorn de models específics
+    # 3. Fallback to specific model environment variables
     if os.getenv("NEXE_MLX_MODEL"):
         return "mlx"
     if os.getenv("NEXE_LLAMA_CPP_MODEL"):
@@ -91,12 +103,12 @@ def detect_engine():
     return "ollama"
 
 async def get_response_stream(engine: str, prompt: str, system: str, history: List[Dict], use_rag: bool):
-    """Obté resposta en streaming segons el motor."""
-    # Nota: Aquí es faria el dispatch real cap als mòduls. 
-    # Per simplicitat en CLI, fem una crida a l'API local si el server està up,
-    # o instanciem el node directament si volem "offline chat".
+    """Get a streaming response based on the engine."""
+    # Note: The real dispatch to modules would happen here.
+    # For CLI simplicity, we call the local API if the server is up,
+    # or instantiate the node directly if we want "offline chat".
     
-    # En aquesta fase, deleguem al mòdul corresponent si està carregat.
+    # At this stage, we delegate to the corresponding module if it is loaded.
     pass
 
 @click.command()
@@ -116,7 +128,7 @@ def chat(engine: Optional[str], system: Optional[str], no_rag: bool, model: Opti
     asyncio.run(_chat_async(engine, system, no_rag, model))
 
 def detect_model():
-    """Detecta quin model està configurat."""
+    """Detect which model is configured."""
     import os
     from dotenv import load_dotenv
 

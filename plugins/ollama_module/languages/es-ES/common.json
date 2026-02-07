@@ -53,7 +53,21 @@
   "invalid_json_chat": "JSON inválido en la respuesta de chat: {line}",
   "chat_failed": "Petición de chat fallida con modelo {model}: {error}",
   "model_deleted": "Modelo {model} eliminado correctamente",
-  "delete_failed": "Error eliminando modelo {model}: {error}"
+  "delete_failed": "Error eliminando modelo {model}: {error}",
+  "module_initialized": "OllamaModule inicializado - base_url={base_url}",
+  "circuit_open": "Circuit breaker ABIERTO para Ollama - se omite la comprobación de conexión",
+  "circuit_open_error": "Circuito [ollama] está ABIERTO. Se reintentará en {timeout}s",
+  "httpx_missing": "httpx no instalado",
+  "ollama_reachable": "Ollama accesible",
+  "ollama_unreachable": "Ollama no accesible",
+  "prompt_injection_detected": "SEGURIDAD: Intento de inyección de prompt detectado: pattern='{pattern}' prompt_preview='{preview}...'",
+  "model_not_allowed": "SEGURIDAD: Modelo no está en allowlist: model='{model}' allowed={allowed}"
+ },
+ "errors": {
+  "httpx_required": "httpx es necesario para OllamaNode. Instálalo con: pip install httpx>=0.25.0",
+  "prompt_empty": "El prompt no puede estar vacío",
+  "prompt_rejected": "Prompt rechazado: contiene un patrón sospechoso que podría intentar sobrescribir el comportamiento del sistema o extraer secretos",
+  "model_not_allowed": "El modelo '{model}' no está en allowlist. Modelos permitidos: {allowed}"
  },
  "info": {
   "description": "Integración con Ollama para gestión de modelos LLM locales",
@@ -77,6 +91,11 @@
    "output_response_description": "Texto generado por el LLM",
    "output_model_description": "Modelo utilizado",
    "output_tokens_description": "Tokens aproximados utilizados"
+  },
+  "errors": {
+   "connection_failed": "No se puede conectar a Ollama en {url}. Asegúrate de que Ollama esté en ejecución (ollama serve)",
+   "timeout": "La solicitud a Ollama agotó el tiempo tras 120s. El modelo '{model}' puede ser demasiado grande o el prompt demasiado complejo.",
+   "model_not_found": "Modelo '{model}' no encontrado. Descárgalo primero: ollama pull {model}"
   }
  },
  "cli": {

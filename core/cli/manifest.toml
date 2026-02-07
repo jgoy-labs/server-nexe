@@ -13,14 +13,14 @@
 name = "cli"
 version = "1.0.0"
 type = "core"
-description = "CLI Central Nexe - Orquestrador que unifica l'accés a tots els CLIs dels mòduls Nexe 0.8 sota la comanda 'nexe'. Descobreix CLIs dinàmicament via manifest.toml, executa via subprocess per aïllament, i suporta mode offline"
+description = "i18n:cli.manifest.description|Nexe Central CLI - orchestrator that unifies access to all Nexe module CLIs under the 'nexe' command. Discovers CLIs dynamically via manifest.toml, runs them via subprocess for isolation, and supports offline mode."
 location = "core/cli/"
 permanent = true
 author = "Nexe Team (Jordi Goy 0.8)"
 created = "2025-12-01"
 last_updated = "2025-12-01"
 example = false
-note = "Punt d'entrada únic per tots els CLIs del sistema Nexe"
+note = "i18n:cli.manifest.note|Single entry point for all Nexe system CLIs"
 
 [module.metadata]
 status = "active"
@@ -63,7 +63,7 @@ rate_limiting = false
 command_name = "nexe"
 alias = "nexe"
 entry_point = "nexe.cli.cli"
-description = "CLI Central Nexe - Orquestrador de mòduls"
+description = "i18n:cli.manifest.cli_description|Nexe Central CLI - Module orchestrator"
 commands = ["list", "status", "<module> <args>"]
 framework = "click"
 offline = true

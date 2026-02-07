@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/discovery.py
-Description: Component de descobriment de mòduls.
+Description: Module discovery component.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -26,13 +26,13 @@ LOGGER_AVAILABLE = False
 
 class ModuleDiscovery:
   """
-  Component especialitzat en descobriment de mòduls.
+  Specialized module discovery component.
 
-  Responsabilitats:
-  - Descobriment de paths de mòduls
-  - Creació/actualització de ModuleInfo
-  - Detecció de cicles de dependències
-  - Emissió d'events de descobriment
+  Responsibilities:
+  - Discover module paths
+  - Create/update ModuleInfo
+  - Detect dependency cycles
+  - Emit discovery events
   """
 
   def __init__(
@@ -43,11 +43,11 @@ class ModuleDiscovery:
     i18n
   ):
     """
-    Inicialitza el component de descobriment.
+    Initialize the discovery component.
 
     Args:
-      path_discovery: Component PathDiscovery
-      config_manager: Component ConfigManager
+      path_discovery: PathDiscovery component
+      config_manager: ConfigManager component
       events: EventSystem
       i18n: I18nManager
     """
@@ -63,15 +63,15 @@ class ModuleDiscovery:
     force: bool = False
   ) -> List[str]:
     """
-    Descobreix mòduls disponibles.
+    Discover available modules.
 
     Args:
-      modules_dict: Diccionari de mòduls (es modifica in-place)
-      lock: Lock per sincronització
-      force: Força redescobriment encara que hi hagi cache
+      modules_dict: Module dict (modified in-place)
+      lock: Synchronization lock
+      force: Force rediscovery even if there is cache
 
     Returns:
-      Llista de noms de mòduls descoberts
+      List of discovered module names
     """
     if LOGGER_AVAILABLE:
       msg = get_message(self.i18n, 'discovery.starting')

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/sanitizer/workflow/nodes/resistencia_node.py
-Description: Node de Intervenció - Resposta predefinida quan es detecta jailbreak.
+Description: Intervention node - predefined response when jailbreak is detected.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -14,72 +14,98 @@ import logging
 from typing import Any, Dict, List
 
 from nexe_flow.core.node import Node, NodeMetadata
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
 
-RESISTANCE_RESPONSE = "Crec que hi ha un problema amb el teu missatge. Pots reformular?"
+RESISTANCE_RESPONSE = t_modular(
+  "sanitizer.intervention.response",
+  "I think there's a problem with your message. Can you rephrase?"
+)
 
 class InterventionNode(Node):
   """
-  Node de Intervenció per a Nexe.
+  Intervention node for Nexe.
 
-  Quan el Sanitizer detecta amenaces, aquest node:
-  1. Genera una resposta de resistència adequada
-  2. Atura el pipeline (és terminal)
-  3. No crida el LLM (estalvia recursos i evita riscos)
+  When the Sanitizer detects threats, this node:
+  1. Generates an appropriate resistance response
+  2. Stops the pipeline (terminal)
+  3. Does not call the LLM (saves resources and avoids risk)
 
   Inputs:
-    threats: List[str] - Llista d'amenaces detectades pel Sanitizer
-    severity: str - Nivell de severitat ("low", "medium", "high", "critical")
+    threats: List[str] - List of threats detected by the Sanitizer
+    severity: str - Severity level ("low", "medium", "high", "critical")
 
   Outputs:
-    response: str - Resposta de resistència
-    activated: bool - True (sempre, si s'executa)
-    threat_type: str - Tipus principal d'amenaça
+    response: str - Resistance response
+    activated: bool - True (always, if executed)
+    threat_type: str - Primary threat type
   """
 
   def get_metadata(self) -> NodeMetadata:
     return NodeMetadata(
       node_type="intervention.respond",
       version="1.0.0",
-      description="Genera resposta de resistència quan es detecten amenaces",
+      description=t_modular(
+        "sanitizer.intervention.metadata_description",
+        "Generate a resistance response when threats are detected"
+      ),
       inputs={
         "threats": {
           "type": "array",
-          "description": "Llista d'amenaces detectades",
+          "description": t_modular(
+            "sanitizer.intervention.input_threats_desc",
+            "List of detected threats"
+          ),
           "required": False,
           "default": [],
         },
         "severity": {
           "type": "string",
-          "description": "Nivell de severitat",
+          "description": t_modular(
+            "sanitizer.intervention.input_severity_desc",
+            "Severity level"
+          ),
           "required": False,
           "default": "medium",
         },
       },
       outputs={
-        "response": {"type": "string", "description": "Resposta de resistència"},
-        "activated": {"type": "boolean", "description": "Si s'ha activat"},
-        "threat_type": {"type": "string", "description": "Tipus d'amenaça principal"},
+        "response": {"type": "string", "description": t_modular(
+          "sanitizer.intervention.output_response_desc",
+          "Resistance response"
+        )},
+        "activated": {"type": "boolean", "description": t_modular(
+          "sanitizer.intervention.output_activated_desc",
+          "Whether it was activated"
+        )},
+        "threat_type": {"type": "string", "description": t_modular(
+          "sanitizer.intervention.output_threat_type_desc",
+          "Primary threat type"
+        )},
       },
     )
 
   async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Genera resposta de resistència basada en les amenaces.
+    Generate a resistance response based on threats.
 
     Args:
-      inputs: Dict amb threats i severity
+      inputs: Dict with threats and severity
 
     Returns:
-      Dict amb response, activated, threat_type
+      Dict with response, activated, threat_type
     """
     threats: List[str] = inputs.get("threats", [])
     severity: str = inputs.get("severity", "medium")
 
     logger.warning(
-      "RESISTÈNCIA ACTIVADA - Threats: %s, Severity: %s",
-      threats, severity
+      t_modular(
+        "sanitizer.intervention.log_activated",
+        "RESISTANCE ACTIVATED - Threats: {threats}, Severity: {severity}",
+        threats=threats,
+        severity=severity
+      )
     )
 
     threat_type = threats[0] if threats else "unknown"

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/log_viewer.py
-Description: Visualitzador de logs en temps real per a Nexe Server.
+Description: Real-time log viewer for Nexe Server.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -22,7 +22,7 @@ from typing import Optional
 from .i18n import t
 
 def tail_file(filepath: Path, last: int = 50):
-    """Simula un tail -f en un fitxer."""
+    """Simulate tail -f on a file."""
     if not filepath.exists():
         click.echo(click.style(
             t("cli.logs.file_not_found", "⚠️ Log file not found: {path}", path=filepath),
@@ -38,11 +38,11 @@ def tail_file(filepath: Path, last: int = 50):
     click.echo(click.style(t("cli.logs.exit_hint", "--- Press Ctrl+C to exit ---\n"), dim=True))
 
     try:
-        # Intentem usar tail si està disponible (més eficient)
+        # Try to use tail if available (more efficient)
         if shutil.which("tail"):
             subprocess.run(["tail", "-n", str(last), "-f", str(filepath)])
         else:
-            # Fallback manual en python
+            # Manual fallback in Python
             with open(filepath, "r") as f:
                 f.seek(0, os.SEEK_END)
                 while True:
@@ -59,7 +59,7 @@ def tail_file(filepath: Path, last: int = 50):
 @click.option('--last', '-n', default=50, help=t("cli.logs.option.last", "Number of initial lines to show"))
 def logs(module: Optional[str], last: int):
     """
-    Mostra els logs de Nexe en temps real.
+    Show Nexe logs in real time.
     """
     project_root = Path(__file__).parent.parent.parent
     logs_dir = project_root / "storage" / "logs"
@@ -71,14 +71,14 @@ def logs(module: Optional[str], last: int):
         ))
         return
 
-    # Si s'especifica mòdul, busquem el seu log
+    # If a module is specified, look for its log
     if module:
         log_file = logs_dir / f"{module}.log"
     else:
-        # Per defecte busquem el log principal del sistema
+        # By default, use the main system log
         log_file = logs_dir / "nexe.log"
         if not log_file.exists():
-            # Si no existeix nexe.log, mirem què hi ha
+            # If nexe.log doesn't exist, pick any log
             all_logs = list(logs_dir.glob("*.log"))
             if not all_logs:
                 click.echo(click.style(

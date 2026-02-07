@@ -13,7 +13,12 @@ import logging
 import uuid
 from typing import List, Dict, Any
 
+from personality.i18n.resolve import t_modular
+
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"rag.logs.{key}", fallback, **kwargs)
 
 class PersonalityRAG:
     """Font de coneixement basada en la identitat del sistema."""
@@ -21,7 +26,7 @@ class PersonalityRAG:
     def __init__(self):
         self.name = "personality_core"
         self._documents: List[Dict[str, Any]] = []
-        logger.info("PersonalityRAG source initialized")
+        logger.info(_t("personality_source_initialized", "PersonalityRAG source initialized"))
 
     async def add_document(self, request) -> str:
         """Afegeix un document a la font."""

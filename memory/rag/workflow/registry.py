@@ -12,7 +12,7 @@ www.jgoy.net
 
 import structlog
 
-from personality.i18n import get_i18n
+from personality.i18n.resolve import t_modular
 
 logger = structlog.get_logger(__name__)
 
@@ -28,10 +28,9 @@ def register_rag_nodes() -> None:
   Nodes auto-descoberts:
     - RAGSearchNode: Node de cerca al RAG amb generació de prompt
   """
-  i18n = get_i18n()
   logger.info(
     "rag_nodes_auto_discovery_enabled",
-    message=i18n.t("rag.workflow.nodes_auto_discovery", "RAG nodes will be auto-discovered by WorkflowEngine"),
+    message=t_modular("rag.workflow.nodes_auto_discovery", "RAG nodes will be auto-discovered by WorkflowEngine"),
     nodes=["RAGSearchNode"]
   )
 

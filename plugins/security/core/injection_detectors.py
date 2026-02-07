@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/injection_detectors.py
-Description: Detectors d'atacs d'injecció. Detecta SQL, XSS, NoSQL, command i path traversal.
+Description: Injection attack detectors. Detects SQL, XSS, NoSQL, command, and path traversal.
 
 www.jgoy.net
 ────────────────────────────────────

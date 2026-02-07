@@ -15,7 +15,12 @@ import threading
 from pathlib import Path
 from typing import List, Tuple
 
+from personality.i18n.resolve import t_modular
+
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.paths_validation.{key}", fallback, **kwargs)
 
 NEXE_CORE_DIRS = ["plugins", "core", "memory", "storage"]
 
@@ -87,9 +92,14 @@ def _log_detection_success(
 
   logger.log(
     level,
-    f"{prefix} Nexe root detected via {method.value}:\n"
-    f"  Path: {path}\n"
-    f"  Validation:\n" + "\n".join(f"   {r}" for r in reasons)
+    _t(
+      "detection_success",
+      "{prefix} Nexe root detected via {method}:\n  Path: {path}\n  Validation:\n{reasons}",
+      prefix=prefix,
+      method=method.value,
+      path=path,
+      reasons="\\n".join(f"   {r}" for r in reasons),
+    )
   )
 
   with _cache_lock:
@@ -108,9 +118,13 @@ def _log_detection_failure(
 ):
   """Detailed log of failed detection."""
   logger.debug(
-    f"[FAIL] Detection via {method.value} failed:\n"
-    f"  Attempted path: {path}\n"
-    f"  Reasons:\n" + "\n".join(f"   {r}" for r in reasons)
+    _t(
+      "detection_failure",
+      "[FAIL] Detection via {method} failed:\n  Attempted path: {path}\n  Reasons:\n{reasons}",
+      method=method.value,
+      path=path,
+      reasons="\\n".join(f"   {r}" for r in reasons),
+    )
   )
 
   with _cache_lock:
@@ -134,7 +148,13 @@ def _track_cwd_fallback_usage():
   for frame in reversed(stack[:-3]):
     if 'get_repo_root' not in frame.name:
       caller = f"{frame.filename}:{frame.lineno} ({frame.name})"
-      logger.warning(f"[METRIC] CWD fallback used from: {caller}")
+      logger.warning(
+        _t(
+          "cwd_fallback_used",
+          "[METRIC] CWD fallback used from: {caller}",
+          caller=caller,
+        )
+      )
       break
 
 __all__ = [

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/i18n/__init__.py
-Description: Package marker per sistema d'internacionalització. Exporta I18nManager (base)
+Description: Package marker for the internationalization system. Exports I18nManager (base)
 
 www.jgoy.net
 ────────────────────────────────────
@@ -18,25 +18,27 @@ I18n = I18nManager
 _global_i18n = None
 
 class I18nHelper:
-  """Helper wrapper per compatibilitat amb funcions standalone."""
+  """Helper wrapper for compatibility with standalone functions."""
 
   def __init__(self, manager: I18nManager):
     self._manager = manager
 
   def t(self, key: str, fallback: str = "", **kwargs) -> str:
     """
-    Tradueix amb fallback automàtic.
+    Translate with automatic fallback.
 
     Args:
-      key: Clau de traducció (e.g. "loaders.csv.not_found")
-      fallback: Text per defecte si no hi ha traducció
-      **kwargs: Paràmetres per interpolació
+      key: Translation key (e.g. "loaders.csv.not_found")
+      fallback: Default text if translation is missing
+      **kwargs: Parameters for interpolation
 
     Returns:
-      str: Text traduït o fallback
+      str: Translated text or fallback
     """
     try:
-      return self._manager.t(key, **kwargs)
+      value = self._manager.t(key, **kwargs)
+      if value != key:
+        return value
     except (KeyError, Exception):
       if fallback and kwargs:
         try:
@@ -45,15 +47,22 @@ class I18nHelper:
           return fallback
       return fallback or key
 
+    if fallback and kwargs:
+      try:
+        return fallback.format(**kwargs)
+      except (KeyError, ValueError):
+        return fallback
+    return fallback or key
+
 def get_i18n() -> I18nHelper:
   """
-  Retorna instància global de I18nHelper.
+  Return the global I18nHelper instance.
 
-  Útil per funcions standalone que no tenen accés a self._t().
-  Usa singleton pattern per performance.
+  Useful for standalone functions that do not have access to self._t().
+  Uses a singleton pattern for performance.
 
   Returns:
-    I18nHelper: Helper amb suport per fallback
+    I18nHelper: Helper with fallback support
 
   Example:
     >>> from personality.i18n import get_i18n

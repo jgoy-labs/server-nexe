@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/ollama_module/module.py
-Description: Mòdul principal d'integració amb Ollama. Gestiona connexió amb API local,
+Description: Main integration module for Ollama. Manages connection to the local API,
 
 www.jgoy.net
 ────────────────────────────────────
@@ -31,26 +31,26 @@ OLLAMA_CONNECTION_TIMEOUT = float(os.getenv('NEXE_OLLAMA_CONNECTION_TIMEOUT', '1
 
 class OllamaModule:
   """
-  Mòdul d'integració amb Ollama (opció local per LLM).
+  Ollama integration module (local LLM option).
 
-  Funcionalitats:
-  - Llistar models locals disponibles
-  - Descarregar nous models
-  - Chat amb streaming
-  - Info detallada de models
+  Features:
+  - List available local models
+  - Download new models
+  - Chat with streaming
+  - Detailed model info
 
-  Una de les moltes opcions de LLM que Nexe suportarà.
+  One of the many LLM options that Nexe will support.
   """
 
   DEFAULT_BASE_URL = "http://localhost:11434"
 
   def __init__(self, base_url: Optional[str] = None, i18n=None):
     """
-    Inicialitza el mòdul Ollama.
+    Initialize the Ollama module.
 
     Args:
-      base_url: URL base d'Ollama API (default: localhost:11434)
-      i18n: Servei d'internacionalització (opcional)
+      base_url: Ollama API base URL (default: localhost:11434)
+      i18n: Internationalization service (optional)
     """
     if base_url is None:
       base_url = (
@@ -66,19 +66,25 @@ class OllamaModule:
     self.timeout = 30.0
     self.pull_timeout = 600.0
 
-    logger.info("OllamaModule initialized - base_url=%s", self.base_url)
+    logger.info(
+      self._t(
+        "logs.module_initialized",
+        "OllamaModule initialized - base_url={base_url}",
+        base_url=self.base_url,
+      )
+    )
 
   def _t(self, key: str, fallback: str, **kwargs) -> str:
     """
-    Helper per traduir amb fallback.
+    Helper to translate with fallback.
 
     Args:
-      key: Clau de traducció
-      fallback: Text per defecte
-      **kwargs: Paràmetres de format
+      key: Translation key
+      fallback: Default text
+      **kwargs: Format parameters
 
     Returns:
-      Text traduït o fallback
+      Translated text or fallback
     """
     if not self.i18n:
       return fallback.format(**kwargs) if kwargs else fallback
@@ -92,25 +98,33 @@ class OllamaModule:
 
   async def check_connection(self) -> bool:
     """
-    Verifica si Ollama està accessible.
+    Check whether Ollama is reachable.
 
     Returns:
-      True si connectat, False altrament
+      True if connected, False otherwise
     """
     try:
       async with httpx.AsyncClient(timeout=OLLAMA_CONNECTION_TIMEOUT) as client:
         response = await client.get(f"{self.base_url}/api/tags")
         return response.status_code == 200
     except CircuitOpenError:
-      logger.warning("Circuit breaker OPEN for Ollama - skipping connection check")
+      logger.warning(
+        self._t(
+          "logs.circuit_open",
+          "Circuit breaker OPEN for Ollama - skipping connection check"
+        )
+      )
       return False
 
   async def health_check(self) -> HealthResult:
-    """Health check del mòdul Ollama."""
+    """Health check for the Ollama module."""
     if httpx is None:
       return HealthResult(
         status=HealthStatus.UNKNOWN,
-        message="httpx not installed"
+        message=self._t(
+          "logs.httpx_missing",
+          "httpx not installed"
+        )
       )
 
     try:
@@ -118,11 +132,17 @@ class OllamaModule:
       if connected:
         return HealthResult(
           status=HealthStatus.HEALTHY,
-          message="Ollama reachable"
+          message=self._t(
+            "logs.ollama_reachable",
+            "Ollama reachable"
+          )
         )
       return HealthResult(
         status=HealthStatus.UNHEALTHY,
-        message="Ollama not reachable"
+        message=self._t(
+          "logs.ollama_unreachable",
+          "Ollama not reachable"
+        )
       )
     except Exception as e:
       return HealthResult(
@@ -137,15 +157,15 @@ class OllamaModule:
   @ollama_breaker.protect
   async def list_models(self) -> List[Dict[str, Any]]:
     """
-    Llista tots els models locals disponibles.
+    List all available local models.
     Protected by Circuit Breaker.
 
     Returns:
-      Llista de models amb metadata
+      List of models with metadata
 
     Raises:
-      httpx.HTTPError: Si Ollama no esta disponible
-      CircuitOpenError: Si el circuit breaker esta obert
+      httpx.HTTPError: If Ollama is not available
+      CircuitOpenError: If the circuit breaker is open
     """
     async with httpx.AsyncClient(timeout=self.timeout) as client:
       response = await client.get(f"{self.base_url}/api/tags")
@@ -160,22 +180,26 @@ class OllamaModule:
 
   async def pull_model(self, model_name: str) -> AsyncIterator[Dict[str, Any]]:
     """
-    Descarrega un model d'Ollama (streaming de progres).
+    Download an Ollama model (streaming progress).
     Protected by Circuit Breaker via guard_streaming.
 
     Args:
-      model_name: Nom del model a descarregar (ex: "mistral:latest")
+      model_name: Model name to download (ex: "mistral:latest")
 
     Yields:
-      Diccionaris amb status de la descarrega
+      Dicts with download status
 
     Raises:
-      httpx.HTTPError: Si falla la descarrega
-      CircuitOpenError: Si el circuit breaker esta obert
+      httpx.HTTPError: If the download fails
+      CircuitOpenError: If the circuit breaker is open
     """
     if not await ollama_breaker.check_circuit():
       raise CircuitOpenError(
-        f"Circuit [ollama] is OPEN. Will retry in {ollama_breaker.config.timeout_seconds}s"
+        self._t(
+          "logs.circuit_open_error",
+          "Circuit [ollama] is OPEN. Will retry in {timeout}s",
+          timeout=ollama_breaker.config.timeout_seconds,
+        )
       )
 
     try:
@@ -206,18 +230,18 @@ class OllamaModule:
   @ollama_breaker.protect
   async def get_model_info(self, model_name: str) -> Dict[str, Any]:
     """
-    Obte informacio detallada d'un model.
+    Get detailed model information.
     Protected by Circuit Breaker.
 
     Args:
-      model_name: Nom del model
+      model_name: Model name
 
     Returns:
-      Dict amb info del model (modelfile, parameters, template, etc.)
+      Dict with model info (modelfile, parameters, template, etc.)
 
     Raises:
-      httpx.HTTPError: Si model no existeix o error d'API
-      CircuitOpenError: Si el circuit breaker esta obert
+      httpx.HTTPError: If the model does not exist or API error
+      CircuitOpenError: If the circuit breaker is open
     """
     async with httpx.AsyncClient(timeout=self.timeout) as client:
       response = await client.post(
@@ -235,25 +259,29 @@ class OllamaModule:
     stream: bool = True
   ) -> AsyncIterator[Dict[str, Any]]:
     """
-    Envia missatges al model i rep respostes (amb streaming opcional).
+    Send messages to a model and receive responses (optional streaming).
     Protected by Circuit Breaker via public methods.
 
     Args:
-      model: Nom del model a usar
-      messages: Llista de missatges [{"role": "user", "content": "..."}]
-      stream: Si True, fa streaming de la resposta
+      model: Model name to use
+      messages: List of messages [{"role": "user", "content": "..."}]
+      stream: If True, stream the response
 
     Yields:
-      Diccionaris amb chunks de resposta si stream=True
-      O un sol dict amb resposta completa si stream=False
+      Dicts with response chunks if stream=True
+      Or a single dict with the full response if stream=False
 
     Raises:
-      httpx.HTTPError: Si falla la peticio
-      CircuitOpenError: Si el circuit breaker esta obert
+      httpx.HTTPError: If the request fails
+      CircuitOpenError: If the circuit breaker is open
     """
     if not await ollama_breaker.check_circuit():
       raise CircuitOpenError(
-        f"Circuit [ollama] is OPEN. Will retry in {ollama_breaker.config.timeout_seconds}s"
+        self._t(
+          "logs.circuit_open_error",
+          "Circuit [ollama] is OPEN. Will retry in {timeout}s",
+          timeout=ollama_breaker.config.timeout_seconds,
+        )
       )
 
     try:
@@ -308,18 +336,18 @@ class OllamaModule:
   @ollama_breaker.protect
   async def delete_model(self, model_name: str) -> bool:
     """
-    Elimina un model local.
+    Delete a local model.
     Protected by Circuit Breaker.
 
     Args:
-      model_name: Nom del model a eliminar
+      model_name: Model name to delete
 
     Returns:
-      True si eliminat correctament
+      True if deleted successfully
 
     Raises:
-      httpx.HTTPError: Si falla l'eliminacio
-      CircuitOpenError: Si el circuit breaker esta obert
+      httpx.HTTPError: If deletion fails
+      CircuitOpenError: If the circuit breaker is open
     """
     async with httpx.AsyncClient(timeout=self.timeout) as client:
       response = await client.delete(
@@ -333,7 +361,7 @@ class OllamaModule:
       return True
 
   def get_info(self) -> Dict[str, Any]:
-    """Retorna informació del mòdul"""
+    """Return module information."""
     return {
       "name": self.name,
       "version": self.version,
@@ -352,18 +380,18 @@ class OllamaModule:
     }
 
 def _load_i18n_for_cli():
-  """Helper per carregar i18n per la funció main() de CLI"""
+  """Helper to load i18n for the CLI main() function."""
   try:
     return get_i18n()
   except Exception:
     return None
 
 async def main():
-  """Funció principal per executar el mòdul"""
+  """Main function to run the module."""
   i18n = _load_i18n_for_cli()
 
   def _t(key: str, fallback: str, **kwargs) -> str:
-    """Helper local per traduir"""
+    """Local translation helper."""
     if not i18n:
       return fallback.format(**kwargs) if kwargs else fallback
     try:

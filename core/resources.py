@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/resources.py
-Description: Gestió centralitzada de recursos (assets) del projecte Nexe.
+Description: Centralized resource management (assets) for the Nexe project.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -32,24 +32,24 @@ def get_resource_path(
   use_importlib: bool = True
 ) -> Path:
   """
-  Obté path a un recurs (asset) de forma robust.
+  Get a resource (asset) path robustly.
 
-  Estratègia multi-mode:
-  1. Development (__file__ exists): Usa Path relatius (més ràpid)
-  2. Pip install (importlib.resources): Usa API estàndard
-  3. Fallback: Busca via get_repo_root()
+  Multi-mode strategy:
+  1. Development (__file__ exists): Use relative Path (faster)
+  2. Pip install (importlib.resources): Use the standard API
+  3. Fallback: Search via get_repo_root()
 
   Args:
-    package: Package Python (e.g., "core.security")
-    resource: Path relatiu al package (e.g., "ui/index.html")
-    use_importlib: Si False, força mode dev (__file__)
+    package: Python package (e.g., "core.security")
+    resource: Path relative to the package (e.g., "ui/index.html")
+    use_importlib: If False, force dev mode (__file__)
 
   Returns:
-    Path absolut al recurs
+    Absolute path to the resource
 
   Raises:
-    FileNotFoundError: Si el recurs no existeix
-    RuntimeError: Si cap estratègia funciona
+    FileNotFoundError: If the resource does not exist
+    RuntimeError: If no strategy works
 
   Examples:
     >>>
@@ -70,7 +70,7 @@ def get_resource_path(
     except Exception as e:
       i18n = get_i18n()
       logger.warning(
-        i18n.t("core.resources.importlib_failed_fallback",
+        i18n.t("resources.importlib_failed_fallback",
            "importlib.resources failed for {package}/{resource}: {error}. Trying fallback...",
            package=package, resource=resource, error=str(e))
       )
@@ -78,29 +78,39 @@ def get_resource_path(
   try:
     return _get_resource_via_file(package, resource)
   except Exception as e:
+    i18n = get_i18n()
     logger.warning(
-      f"__file__ fallback failed for {package}/{resource}: {e}. "
-      f"Trying repo_root fallback..."
+      i18n.t(
+        "resources.file_fallback_failed",
+        "__file__ fallback failed for {package}/{resource}: {error}. Trying repo_root fallback...",
+        package=package, resource=resource, error=str(e)
+      )
     )
 
   try:
     return _get_resource_via_repo_root(package, resource)
   except Exception as e:
+    i18n = get_i18n()
     raise RuntimeError(
-      f"No s'ha pogut trobar el recurs {package}/{resource}. "
-      f"Proves: importlib.resources, __file__, repo_root. "
-      f"Últim error: {e}"
+      i18n.t(
+        "resources.resource_not_found",
+        "Could not find resource {package}/{resource}. Tried: importlib.resources, __file__, repo_root. Last error: {error}",
+        package=package, resource=resource, error=str(e)
+      )
     )
 
 def _get_resource_via_importlib(package: str, resource: str) -> Path:
   """
-  Obté recurs via importlib.resources (Python 3.9+).
-  Funciona en pip install i wheel distribution.
+  Get resource via importlib.resources (Python 3.9+).
+  Works with pip install and wheel distribution.
   """
   if files is None:
     i18n = get_i18n()
     raise ImportError(
-      i18n.t("core.resources.importlib_resources_not_available", "importlib.resources.files not available")
+      i18n.t(
+        "resources.importlib_resources_not_available",
+        "importlib.resources.files not available"
+      )
     )
 
   package_files = files(package)
@@ -113,28 +123,44 @@ def _get_resource_via_importlib(package: str, resource: str) -> Path:
     path = Path(str(resource_path))
 
   if not path.exists():
+    i18n = get_i18n()
     raise FileNotFoundError(
-      f"Recurs no trobat via importlib.resources: {package}/{resource}"
+      i18n.t(
+        "resources.resource_not_found_importlib",
+        "Resource not found via importlib.resources: {package}/{resource}",
+        package=package, resource=resource
+      )
     )
 
   return path
 
 def _get_resource_via_file(package: str, resource: str) -> Path:
   """
-  Obté recurs via __file__ (development mode).
-  Més ràpid però només funciona en dev i pip install editable.
+  Get resource via __file__ (development mode).
+  Faster but only works in dev and editable installs.
   """
   import importlib
 
   try:
     mod = importlib.import_module(package)
   except ImportError as e:
-    raise ImportError(f"No s'ha pogut importar package {package}: {e}")
+    i18n = get_i18n()
+    raise ImportError(
+      i18n.t(
+        "resources.import_package_failed",
+        "Could not import package {package}: {error}",
+        package=package, error=str(e)
+      )
+    )
 
   if not hasattr(mod, '__file__') or mod.__file__ is None:
+    i18n = get_i18n()
     raise RuntimeError(
-      f"Package {package} no té __file__ "
-      f"(pot ser namespace package o builtin)"
+      i18n.t(
+        "resources.package_no_file",
+        "Package {package} has no __file__ (may be namespace package or builtin)",
+        package=package
+      )
     )
 
   package_dir = Path(mod.__file__).parent
@@ -142,17 +168,21 @@ def _get_resource_via_file(package: str, resource: str) -> Path:
   resource_path = package_dir / resource
 
   if not resource_path.exists():
+    i18n = get_i18n()
     raise FileNotFoundError(
-      f"Recurs no trobat via __file__: {package}/{resource} "
-      f"(buscat a {resource_path})"
+      i18n.t(
+        "resources.resource_not_found_file",
+        "Resource not found via __file__: {package}/{resource} (searched at {path})",
+        package=package, resource=resource, path=str(resource_path)
+      )
     )
 
   return resource_path
 
 def _get_resource_via_repo_root(package: str, resource: str) -> Path:
   """
-  Obté recurs via get_repo_root() (últim recurs).
-  Fallback per casos extrems.
+  Get resource via get_repo_root() (last resort).
+  Fallback for edge cases.
   """
   from core.paths import get_repo_root
 
@@ -163,23 +193,27 @@ def _get_resource_via_repo_root(package: str, resource: str) -> Path:
   resource_path = repo_root / package_path / resource
 
   if not resource_path.exists():
+    i18n = get_i18n()
     raise FileNotFoundError(
-      f"Recurs no trobat via repo_root: {package}/{resource} "
-      f"(buscat a {resource_path})"
+      i18n.t(
+        "resources.resource_not_found_repo_root",
+        "Resource not found via repo_root: {package}/{resource} (searched at {path})",
+        package=package, resource=resource, path=str(resource_path)
+      )
     )
 
   return resource_path
 
 def get_ui_path(package: str, filename: str = "index.html") -> Path:
   """
-  Shortcut per obtenir path a UI assets.
+  Shortcut to get a path to UI assets.
 
   Args:
-    package: Package Python (e.g., "core.security")
-    filename: Fitxer dins de ui/ (default: "index.html")
+    package: Python package (e.g., "core.security")
+    filename: File inside ui/ (default: "index.html")
 
   Returns:
-    Path absolut al fitxer UI
+    Absolute path to the UI file
 
   Examples:
     >>> path = get_ui_path("core.security")
@@ -192,14 +226,14 @@ def get_ui_path(package: str, filename: str = "index.html") -> Path:
 
 def get_template_path(package: str, template_name: str) -> Path:
   """
-  Shortcut per obtenir path a templates.
+  Shortcut to get a path to templates.
 
   Args:
-    package: Package Python
-    template_name: Nom del template (e.g., "index.html")
+    package: Python package
+    template_name: Template name (e.g., "index.html")
 
   Returns:
-    Path absolut al template
+    Absolute path to the template
 
   Examples:
     >>> path = get_template_path("core.security", "report.html")
@@ -213,15 +247,15 @@ def get_translation_path(
   component: str = "messages"
 ) -> Path:
   """
-  Shortcut per obtenir path a traduccions.
+  Shortcut to get a path to translations.
 
   Args:
-    package: Package Python
-    language: Codi idioma (e.g., "ca-ES", "en-US")
-    component: Component de traducció (default: "messages")
+    package: Python package
+    language: Language code (e.g., "ca-ES", "en-US")
+    component: Translation component (default: "messages")
 
   Returns:
-    Path absolut al fitxer de traducció
+    Absolute path to the translation file
 
   Examples:
     >>> path = get_translation_path("core.security", "ca-ES")
@@ -237,14 +271,14 @@ def get_translation_path(
 
 def get_static_path(package: str, asset: str) -> Path:
   """
-  Shortcut per obtenir path a static assets (CSS, JS, images).
+  Shortcut to get a path to static assets (CSS, JS, images).
 
   Args:
-    package: Package Python
-    asset: Path relatiu dins de static/ (e.g., "css/styles.css")
+    package: Python package
+    asset: Path relative inside static/ (e.g., "css/styles.css")
 
   Returns:
-    Path absolut a l'asset
+    Absolute path to the asset
 
   Examples:
     >>> path = get_static_path("core.security", "css/styles.css")
@@ -257,14 +291,14 @@ def get_static_path(package: str, asset: str) -> Path:
 
 def resource_exists(package: str, resource: str) -> bool:
   """
-  Verifica si un recurs existeix.
+  Check whether a resource exists.
 
   Args:
-    package: Package Python
-    resource: Path relatiu al package
+    package: Python package
+    resource: Path relative to the package
 
   Returns:
-    True si el recurs existeix, False altrament
+    True if the resource exists, False otherwise
 
   Examples:
     >>> if resource_exists("core.security", "ui/index.html"):
@@ -278,14 +312,14 @@ def resource_exists(package: str, resource: str) -> bool:
 
 def list_resources(package: str, subdir: str = "") -> list[Path]:
   """
-  Llista tots els recursos dins d'un package/subdirectori.
+  List all resources inside a package/subdirectory.
 
   Args:
-    package: Package Python
-    subdir: Subdirectori opcional (e.g., "ui", "languages")
+    package: Python package
+    subdir: Optional subdirectory (e.g., "ui", "languages")
 
   Returns:
-    Llista de Paths als recursos
+    List of Paths to resources
 
   Examples:
     >>> ui_files = list_resources("core.security", "ui")
@@ -323,13 +357,17 @@ def list_resources(package: str, subdir: str = "") -> list[Path]:
 
 def get_asset_path(package: str, asset: str) -> Path:
   """
-  DEPRECATED: Usa get_resource_path() directament.
+  DEPRECATED: Use get_resource_path() directly.
 
-  Mantingut per backwards compatibility amb codi existent.
+  Kept for backwards compatibility with existing code.
   """
   import warnings
+  i18n = get_i18n()
   warnings.warn(
-    "get_asset_path() està deprecated. Usa get_resource_path().",
+    i18n.t(
+      "resources.get_asset_deprecated",
+      "get_asset_path() is deprecated. Use get_resource_path()."
+    ),
     DeprecationWarning,
     stacklevel=2
   )

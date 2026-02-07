@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/integration/openapi_merger.py
-Description: Fusionador d'especificacions OpenAPI de mòduls. Combina schemas de múltiples
+Description: OpenAPI specification merger for modules. Combines schemas from multiple
 
 www.jgoy.net
 ────────────────────────────────────
@@ -21,21 +21,21 @@ LOGGER_AVAILABLE = False
 
 class OpenAPIMerger:
   """
-  Unifica especificacions OpenAPI de múltiples mòduls.
+  Unifies OpenAPI specifications from multiple modules.
   
-  Funcionalitats:
-  - Combina schemas de múltiples mòduls
-  - Evita conflictes de noms
-  - Manté documentació unificada
+  Features:
+  - Combine schemas from multiple modules
+  - Avoid name conflicts
+  - Keep unified documentation
   """
   
   def __init__(self, main_app: FastAPI, i18n_manager=None):
     """
-    Inicialitza el merger d'OpenAPI.
+    Initialize the OpenAPI merger.
     
     Args:
-      main_app: Aplicació FastAPI principal
-      i18n_manager: Gestor d'internacionalització
+      main_app: Main FastAPI application
+      i18n_manager: Internationalization manager
     """
     self.main_app = main_app
     self.i18n = i18n_manager
@@ -46,15 +46,15 @@ class OpenAPIMerger:
   def merge_module_openapi(self, module_name: str, api_components: Dict[str, Any], 
               prefix: str) -> bool:
     """
-    Combina l'especificació OpenAPI d'un mòdul.
+    Merge a module's OpenAPI specification.
     
     Args:
-      module_name: Nom del mòdul
-      api_components: Components d'API del mòdul
-      prefix: Prefix de les rutes
+      module_name: Module name
+      api_components: Module API components
+      prefix: Routes prefix
       
     Returns:
-      True si s'ha combinat correctament
+      True if merged successfully
     """
     with self._lock:
       try:
@@ -89,13 +89,13 @@ class OpenAPIMerger:
   
   def remove_module_openapi(self, module_name: str) -> bool:
     """
-    Elimina l'especificació OpenAPI d'un mòdul.
+    Remove a module's OpenAPI specification.
     
     Args:
-      module_name: Nom del mòdul
+      module_name: Module name
       
     Returns:
-      True si s'ha eliminat correctament
+      True if removed successfully
     """
     with self._lock:
       try:
@@ -127,18 +127,18 @@ class OpenAPIMerger:
   
   def _extract_module_openapi(self, api_components: Dict[str, Any], 
                prefix: str) -> Optional[Dict[str, Any]]:
-    """Extreu especificació OpenAPI dels components del mòdul"""
+    """Extract OpenAPI specification from module components."""
     return {
       "prefix": prefix,
       "components": list(api_components.keys()),
     }
   
   def _regenerate_unified_openapi(self) -> None:
-    """Regenera l'especificació OpenAPI unificada"""
+    """Regenerate the unified OpenAPI specification."""
     pass
   
   def get_unified_spec(self) -> Dict[str, Any]:
-    """Retorna l'especificació OpenAPI unificada"""
+    """Return the unified OpenAPI specification."""
     with self._lock:
       return {
         "modules": list(self._module_specs.keys()),

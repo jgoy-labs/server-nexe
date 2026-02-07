@@ -1,12 +1,12 @@
 """
 Core Contracts System for NEXE 0.9
 
-Sistema unificat de contractes per plugins NEXE.
+Unified contracts system for NEXE plugins.
 
-Suporta:
-- Modules (plugins estàndard amb API, UI, CLI)
+Supports:
+- Modules (standard plugins with API, UI, CLI)
 
-Validació multi-capa:
+Multi-layer validation:
 - Schema validation (Pydantic)
 - Runtime validation (Protocol)
 - Integration validation (file structure)

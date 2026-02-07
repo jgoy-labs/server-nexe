@@ -18,8 +18,12 @@ from fastapi import APIRouter, HTTPException
 from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
 from .chat import LlamaCppChatNode
 from .config import LlamaCppConfig
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"llama_cpp_module.logs.{key}", fallback, **kwargs)
 
 class LlamaCppModule:
     """
@@ -37,7 +41,10 @@ class LlamaCppModule:
         return ModuleMetadata(
             name="llama_cpp_module",
             version="1.0.0",
-            description="Motor d'inferència universal Llama.cpp (GGUF)",
+            description=t_modular(
+                "llama_cpp_module.metadata.description",
+                "Universal Llama.cpp inference engine (GGUF)"
+            ),
             author="Jordi Goy",
             module_type="local_llm_option",
             quadrant="core"
@@ -57,17 +64,30 @@ class LlamaCppModule:
             
             # Intentar validar si el model existeix abans d'arrancar
             if not llama_config.validate():
-                logger.warning("LlamaCppModule: Configuration validation failed. Module started in degraded mode.")
+                logger.warning(
+                    _t_log(
+                        "config_validation_failed",
+                        "LlamaCppModule: Configuration validation failed. Module started in degraded mode."
+                    )
+                )
                 self._initialized = True
                 return True # Permetem arrancar per diagnòstic
 
             self._node = LlamaCppChatNode(config=llama_config)
             self._initialized = True
             
-            logger.info("LlamaCppModule initialized successfully")
+            logger.info(
+                _t_log("initialized", "LlamaCppModule initialized successfully")
+            )
             return True
         except Exception as e:
-            logger.error(f"Failed to initialize LlamaCppModule: {e}")
+            logger.error(
+                _t_log(
+                    "init_failed",
+                    "Failed to initialize LlamaCppModule: {error}",
+                    error=str(e),
+                )
+            )
             # En cas d'error catastròfic, mantenim initialized=False 
             # però el router ja s'hauria d'haver creat si no ha fallat abans
             return False
@@ -82,7 +102,13 @@ class LlamaCppModule:
         @self._router.post("/chat")
         async def chat_endpoint(request: Dict[str, Any]):
             if not self._initialized:
-                raise HTTPException(status_code=503, detail="Module not initialized")
+                raise HTTPException(
+                    status_code=503,
+                    detail=t_modular(
+                        "llama_cpp_module.errors.not_initialized",
+                        "Module not initialized"
+                    )
+                )
             
             messages = request.get("messages", [])
             system = request.get("system", "")
@@ -103,7 +129,12 @@ class LlamaCppModule:
     async def chat(self, messages: List[Dict[str, str]], system: str = "", session_id: str = "default", stream_callback=None):
         """Mètode principal de xat"""
         if not self._initialized or not self._node:
-            raise RuntimeError("LlamaCppModule not initialized")
+            raise RuntimeError(
+                t_modular(
+                    "llama_cpp_module.errors.not_initialized",
+                    "LlamaCppModule not initialized"
+                )
+            )
 
         inputs = {
             "system": system,
@@ -116,13 +147,22 @@ class LlamaCppModule:
 
     async def health_check(self) -> HealthResult:
         if not self._initialized:
-            return HealthResult(status=HealthStatus.UNKNOWN, message="Module not initialized")
+            return HealthResult(
+                status=HealthStatus.UNKNOWN,
+                message=t_modular(
+                    "llama_cpp_module.errors.not_initialized",
+                    "Module not initialized"
+                )
+            )
         
         try:
             stats = self._node.get_pool_stats()
             return HealthResult(
                 status=HealthStatus.HEALTHY,
-                message="Llama.cpp motor active",
+                message=t_modular(
+                    "llama_cpp_module.health.active",
+                    "Llama.cpp engine active"
+                ),
                 details=stats
             )
         except Exception as e:

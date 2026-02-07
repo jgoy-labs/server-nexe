@@ -1,0 +1,50 @@
+{
+ "_meta": {
+  "component": "llama_cpp_module",
+  "description": "Llama.cpp module manifest translations",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+ "errors": {
+  "not_initialized": "Llama.cpp module not initialized"
+ },
+ "health": {
+  "active": "Llama.cpp engine active"
+ },
+ "manifest": {
+  "description": "Direct integration with Llama.cpp (via llama-cpp-python) to run GGUF models with GPU (Metal/CUDA) and CPU support. Includes session management with ModelPool and prefix caching."
+ },
+ "metadata": {
+  "description": "Universal Llama.cpp inference engine (GGUF)"
+ },
+ "config": {
+  "model_path_empty": "LlamaCppConfig: model_path is empty. Configure NEXE_LLAMA_CPP_MODEL or pass model_path.",
+  "loaded": "LlamaCppConfig loaded: model={model}, n_ctx={n_ctx}, n_batch={n_batch}, gpu_layers={gpu_layers}, threads={threads}, mlock={mlock}, mmap={mmap}, flash_attn={flash_attn}",
+  "model_path_required": "LlamaCppConfig: model_path is required",
+  "model_path_missing": "LlamaCppConfig: model_path does not exist: {path}",
+  "n_ctx_min": "LlamaCppConfig: n_ctx minimum is 512",
+  "max_sessions_min": "LlamaCppConfig: max_sessions minimum is 1",
+  "chat_format_unrecognized": "LlamaCppConfig: chat_format '{chat_format}' not recognized. Valid formats: {valid_formats}"
+ },
+ "logs": {
+  "all_destroyed": "ModelPool: all instances destroyed",
+  "close_failed": "ModelPool: error closing instance: {error}",
+  "config_validation_failed": "LlamaCppModule: Configuration validation failed. Module started in degraded mode.",
+  "error": "LlamaCppChatNode error after {elapsed_ms}ms: {error}",
+  "init_failed": "Failed to initialize LlamaCppModule: {error}",
+  "initialized": "LlamaCppModule initialized successfully",
+  "model_loaded": "ModelPool: model loaded successfully",
+  "pool_active_sessions": "ModelPool: active sessions={current}/{max}",
+  "pool_creating_instance": "ModelPool: creating new instance for session {session}",
+  "pool_hash_changed": "ModelPool: hash changed for session {session}, resetting",
+  "pool_initialized": "LlamaCppChatNode: initialized ModelPool (max_sessions={max_sessions})",
+  "pool_initialized_detail": "ModelPool initialized: max_sessions={max_sessions}, model={model}",
+  "pool_loading_model": "ModelPool: loading model {model} (n_ctx={n_ctx}, n_batch={n_batch}, gpu_layers={gpu_layers}, mlock={mlock}, mmap={mmap}, flash_attn={flash_attn})",
+  "pool_lru_eviction": "ModelPool: LRU eviction, removing session {session}",
+  "pool_reusing_instance": "ModelPool: reusing instance for session {session} (hash match)",
+  "session_destroyed": "ModelPool: destroyed session {session}, gc.collect() called",
+  "session_info": "LlamaCppChatNode: session={session}, hash={hash}, messages={count}",
+  "sessions_destroyed": "LlamaCppChatNode: all sessions destroyed via pool",
+  "timing": "LlamaCppChatNode: {cache} in {elapsed_ms}ms (p:{prefill_ms} g:{generation_ms}), {tps:.1f} tok/s, prompt={prompt_tokens}, gen={gen_tokens}"
+ }
+}

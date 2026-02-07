@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/events/event_system.py
-Description: Sistema global de gestió d'esdeveniments asíncrons per Nexe 0.8.
+Description: Global asynchronous event management system for Nexe 0.8.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -18,7 +18,11 @@ from datetime import datetime, timezone
 from ..data.models import SystemEvent
 
 import logging
+from personality.i18n.resolve import t_modular
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core_events.{key}", fallback, **kwargs)
 LOGGER_AVAILABLE = False
 
 __all__ = ['EventSystem']
@@ -60,26 +64,26 @@ class EventSystem:
 
   def emit_event_sync(self, event: SystemEvent) -> None:
     """
-    Wrapper síncron per emit_event().
+    Synchronous wrapper for emit_event().
 
-    Permet emetre events des de contextos síncrons creant un event loop temporal.
+    Allows emitting events from synchronous contexts by creating a temporary event loop.
 
     Args:
-      event: SystemEvent a emetre
+      event: SystemEvent to emit
 
     Raises:
-      RuntimeError: Si es crida des d'un event loop ja actiu
+      RuntimeError: If called from an already running event loop
 
     Notes:
-      - Usa asyncio.run() per crear un event loop temporal
-      - Si ja estàs dins d'un event loop, usar 'await emit_event()' directament
+      - Uses asyncio.run() to create a temporary event loop
+      - If you are already inside an event loop, use 'await emit_event()' directly
 
-    **LIMITACIÓ IMPORTANT:**
-      Si es crida des d'un context amb event loop actiu, l'event s'afegeix
-      a l'historial però NO s'emet als callbacks (per evitar errors de loop).
-      En aquests casos, usar 'await emit_event()' per emetre correctament.
+    **IMPORTANT LIMITATION:**
+      If called from a context with an active event loop, the event is added
+      to history but NOT emitted to callbacks (to avoid loop errors).
+      In those cases, use 'await emit_event()' to emit properly.
 
-    **Exemple d'ús correcte:**
+    **Correct usage example:**
       ```python
       event_system.emit_event_sync(event)
 
@@ -106,8 +110,11 @@ class EventSystem:
     except Exception as e:
       if LOGGER_AVAILABLE:
         logger.error(
-          "Failed to emit event sync: %s",
-          e,
+          _t(
+            "sync.sync_wrapper_failed",
+            "Failed to emit event synchronously: {error}",
+            error=str(e)
+          ),
           component="event_system",
           exc_info=True
         )
@@ -276,7 +283,11 @@ class EventSystem:
     self._event_history.clear()
     
     if LOGGER_AVAILABLE:
-      logger.info("Event history cleared: %s events", count, component="event_system")
+      logger.info(_t(
+        "management.history_cleared",
+        "Event history cleared: {count} events",
+        count=count
+      ), component="event_system")
 
     return count
   

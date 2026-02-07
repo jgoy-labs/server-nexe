@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/core/cached_embedder.py
-Description: CachedEmbedder: Integra AsyncEmbedder amb MultiLevelCache per optimitzar latència.
+Description: CachedEmbedder: Integrates AsyncEmbedder with MultiLevelCache to optimize latency.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -12,6 +12,7 @@ www.jgoy.net
 
 import time
 import structlog
+from personality.i18n.resolve import t_modular
 
 from memory.shared.cache import MultiLevelCache
 from memory.embeddings.core.async_encoder import AsyncEmbedder
@@ -24,6 +25,9 @@ from memory.embeddings.core.interfaces import (
 )
 
 logger = structlog.get_logger()
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"embeddings.logs.{key}", fallback, **kwargs)
 
 _metrics_imported = False
 _EMBEDDING_OPERATIONS = None
@@ -50,24 +54,24 @@ def _get_metrics():
 
 class CachedEmbedder:
   """
-  Embedder amb cache multi-nivell integrat.
+  Embedder with integrated multi-level cache.
 
   Combina AsyncEmbedder (async encoding) amb MultiLevelCache (L1+L2)
-  per optimitzar latència i reduir càrrega del model.
+  to optimize latency and reduce model load.
 
   Features:
-  - Cache L1 (memòria): Hit rate >80% en producció
-  - Cache L2 (disc): Quota 5GB, TTL 72h
-  - Batch optimization: Agrupa requests per eficiència
+  - L1 cache (memory): Hit rate >80% in production
+  - L2 cache (disk): 5GB quota, 72h TTL
+  - Batch optimization: Group requests for efficiency
   - Stats tracking: Hit rate, latencies, throughput
-  - Versioning: Suport per invalidar cache al canviar model
+  - Versioning: Support for cache invalidation when the model changes
 
   Attributes:
     encoder: AsyncEmbedder instance
     cache: MultiLevelCache instance
-    model_name: Nom del model
-    cache_enabled: Si cache activa globalment
-    _stats: Estadístiques acumulades
+    model_name: Model name
+    cache_enabled: Whether cache is globally enabled
+    _stats: Accumulated statistics
   """
 
   def __init__(
@@ -83,9 +87,9 @@ class CachedEmbedder:
 
     Args:
       encoder: AsyncEmbedder instance
-      cache_enabled: Si activar cache (False per debug)
-      l1_max_size: Màxim items L1 cache
-      l2_max_size_gb: Quota màxima L2 (GB)
+      cache_enabled: Whether to enable cache (False for debug)
+      l1_max_size: Max items in L1 cache
+      l2_max_size_gb: Max L2 quota (GB)
       l2_ttl_hours: TTL per items L2
     """
     self.encoder = encoder
@@ -107,6 +111,12 @@ class CachedEmbedder:
 
     logger.info(
       "cached_embedder_initialized",
+      message=_t_log(
+        "cached_embedder_initialized",
+        "CachedEmbedder initialized (model={model}, cache_enabled={cache_enabled})",
+        model=self.model_name,
+        cache_enabled=cache_enabled,
+      ),
       model=self.model_name,
       cache_enabled=cache_enabled,
       l1_max=l1_max_size,
@@ -118,19 +128,19 @@ class CachedEmbedder:
     request: EmbeddingRequest
   ) -> EmbeddingResponse:
     """
-    Encode text amb cache.
+    Encode text with cache.
 
     Pipeline:
-    1. Check cache (si enabled)
-    2. Generate embedding (si cache miss)
+    1. Check cache (if enabled)
+    2. Generate embedding (if cache miss)
     3. Store to cache
-    4. Return response amb metadata
+    4. Return response with metadata
 
     Args:
       request: EmbeddingRequest
 
     Returns:
-      EmbeddingResponse amb embedding i stats
+      EmbeddingResponse with embedding and stats
     """
     start = time.time()
     cache_hit = False
@@ -147,6 +157,12 @@ class CachedEmbedder:
         embedding = cached
         logger.debug(
           "cache_hit",
+          message=_t_log(
+            "cache_hit",
+            "Cache hit (model={model}, text_len={text_len})",
+            model=request.model,
+            text_len=len(request.text),
+          ),
           model=request.model,
           text_len=len(request.text)
         )
@@ -165,6 +181,12 @@ class CachedEmbedder:
 
         logger.debug(
           "cache_miss",
+          message=_t_log(
+            "cache_miss",
+            "Cache miss (model={model}, text_len={text_len})",
+            model=request.model,
+            text_len=len(request.text),
+          ),
           model=request.model,
           text_len=len(request.text)
         )
@@ -206,19 +228,19 @@ class CachedEmbedder:
     request: BatchEmbeddingRequest
   ) -> BatchEmbeddingResponse:
     """
-    Encode batch amb cache optimization.
+    Encode batch with cache optimization.
 
     Pipeline:
-    1. Check cache per cada text
-    2. Generate embeddings només per cache misses (batch)
-    3. Store nous embeddings al cache
+    1. Check cache for each text
+    2. Generate embeddings only for cache misses (batch)
+    3. Store new embeddings in cache
     4. Return batch response
 
     Args:
       request: BatchEmbeddingRequest
 
     Returns:
-      BatchEmbeddingResponse amb embeddings i stats
+      BatchEmbeddingResponse with embeddings and stats
     """
     start = time.time()
     embeddings = []
@@ -279,6 +301,13 @@ class CachedEmbedder:
 
     logger.info(
       "batch_encode_completed",
+      message=_t_log(
+        "batch_encode_completed",
+        "Batch encode completed (model={model}, count={count}, cache_hits={cache_hits})",
+        model=request.model,
+        count=len(request.texts),
+        cache_hits=cache_hits,
+      ),
       model=request.model,
       count=len(request.texts),
       cache_hits=cache_hits,
@@ -306,10 +335,10 @@ class CachedEmbedder:
 
   def get_stats(self) -> EncoderStats:
     """
-    Get estadístiques acumulades del encoder.
+    Get accumulated encoder stats.
 
     Returns:
-      EncoderStats amb hit rate, latencies, etc.
+      EncoderStats with hit rate, latencies, etc.
     """
     hit_rate = self._cache_hits / self._total_requests if self._total_requests > 0 else 0.0
 
@@ -338,12 +367,28 @@ class CachedEmbedder:
     )
 
   async def clear_cache(self):
-    """Clear tot el cache (L1 + L2)"""
+    """Clear all cache (L1 + L2)."""
     if self.cache:
       await self.cache.clear()
-      logger.info("cache_cleared", model=self.model_name)
+      logger.info(
+        "cache_cleared",
+        message=_t_log(
+          "cache_cleared",
+          "Cache cleared (model={model})",
+          model=self.model_name,
+        ),
+        model=self.model_name
+      )
 
   async def shutdown(self):
-    """Graceful shutdown"""
+    """Graceful shutdown."""
     await self.encoder.shutdown()
-    logger.info("cached_embedder_shutdown", model=self.model_name)
+    logger.info(
+      "cached_embedder_shutdown",
+      message=_t_log(
+        "cached_embedder_shutdown",
+        "CachedEmbedder shutdown complete (model={model})",
+        model=self.model_name,
+      ),
+      model=self.model_name
+    )

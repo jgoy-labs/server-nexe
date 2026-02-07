@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/module_lifecycle.py
-Description: Gestor de cicle de vida de mòduls individuals. Controla load, start, stop amb
+Description: Lifecycle manager for individual modules. Controls load, start, stop with
 
 www.jgoy.net
 ────────────────────────────────────
@@ -23,19 +23,19 @@ logger = logging.getLogger(__name__)
 LOGGER_AVAILABLE = False
 
 class ModuleLifecycleManager:
-  """Gestiona cicle de vida de mòduls individuals"""
+  """Manage the lifecycle of individual modules."""
 
   def __init__(self, modules: Dict, loader, registry, events, metrics, i18n=None):
     """
-    Inicialitza gestor de cicle de vida.
+    Initialize lifecycle manager.
 
     Args:
-      modules: Diccionari de mòduls
+      modules: Module dictionary
       loader: ModuleLoader
       registry: ModuleRegistry
       events: EventSystem
       metrics: MetricsCollector
-      i18n: Gestor i18n opcional
+      i18n: Optional i18n manager
     """
     self.modules = modules
     self.loader = loader
@@ -46,19 +46,19 @@ class ModuleLifecycleManager:
     self.api_integrator = None
 
   def set_api_integrator(self, api_integrator):
-    """Estableix API integrator"""
+    """Set API integrator."""
     self.api_integrator = api_integrator
 
   async def load_module(self, module_name: str, lock) -> bool:
     """
-    Carrega un mòdul.
+    Load a module.
 
     Args:
-      module_name: Nom del mòdul a carregar
-      lock: Lock de threading
+      module_name: Module name to load
+      lock: Threading lock
 
     Returns:
-      True si s'ha carregat correctament
+      True if loaded successfully
     """
     with lock:
       if module_name not in self.modules:
@@ -122,7 +122,13 @@ class ModuleLifecycleManager:
         await bridge.register_module(module_name, instance, module_info.path)
       except Exception as e:
         if LOGGER_AVAILABLE:
-          logger.warning(f"Failed to register {module_name} to ContractRegistry: {e}")
+          msg = get_message(
+            self.i18n,
+            'contract.register_failed',
+            module=module_name,
+            error=str(e)
+          )
+          logger.warning(msg)
 
       if self.api_integrator:
         try:
@@ -168,14 +174,14 @@ class ModuleLifecycleManager:
 
   async def start_module(self, module_name: str, lock) -> bool:
     """
-    Inicia un mòdul carregat.
+    Start a loaded module.
 
     Args:
-      module_name: Nom del mòdul
-      lock: Lock de threading
+      module_name: Module name
+      lock: Threading lock
 
     Returns:
-      True si s'ha iniciat correctament
+      True if started successfully
     """
     with lock:
       if module_name not in self.modules:
@@ -243,14 +249,14 @@ class ModuleLifecycleManager:
 
   async def stop_module(self, module_name: str, lock) -> bool:
     """
-    Atura un mòdul en execució.
+    Stop a running module.
 
     Args:
-      module_name: Nom del mòdul
-      lock: Lock de threading
+      module_name: Module name
+      lock: Threading lock
 
     Returns:
-      True si s'ha aturat correctament
+      True if stopped successfully
     """
     with lock:
       if module_name not in self.modules:
@@ -296,7 +302,13 @@ class ModuleLifecycleManager:
         await bridge.unregister_module(module_name)
       except Exception as e:
         if LOGGER_AVAILABLE:
-          logger.warning(f"Failed to unregister {module_name} from ContractRegistry: {e}")
+          msg = get_message(
+            self.i18n,
+            'contract.unregister_failed',
+            module=module_name,
+            error=str(e)
+          )
+          logger.warning(msg)
 
       with lock:
         module_info.state = ModuleState.STOPPED

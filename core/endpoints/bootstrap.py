@@ -94,7 +94,12 @@ def check_rate_limit(client_ip: str, request: Request) -> None:
     )
 
   if result == "ip":
-    logger.warning("IP %s bloquejada: massa intents", client_ip)
+    logger.warning(_t(
+      request,
+      "core.server.bootstrap_rate_limit_ip_log",
+      "IP {ip} blocked: too many attempts",
+      ip=client_ip
+    ))
     raise HTTPException(
       status_code=429,
       detail=_t(
@@ -124,7 +129,12 @@ async def bootstrap_session(
 
   core_env = os.getenv('NEXE_ENV', 'production').lower()
   if core_env != 'development':
-    logger.error("Intent de bootstrap en entorn no-development (NEXE_ENV=%s)", core_env)
+    logger.error(_t(
+      request,
+      "core.server.bootstrap_not_available_log",
+      "Bootstrap attempt in non-development environment (NEXE_ENV={env})",
+      env=core_env
+    ))
     raise HTTPException(
       status_code=503,
       detail=_t(
@@ -146,7 +156,12 @@ async def bootstrap_session(
     is_whitelisted = client_ip in VPN_ALLOWED_IPS
 
     if not (is_local or is_private or is_whitelisted):
-      logger.warning("Bootstrap attempt from non-allowed IP: %s", client_ip)
+      logger.warning(_t(
+        request,
+        "core.server.bootstrap_non_allowed_ip",
+        "Bootstrap attempt from non-allowed IP: {ip}",
+        ip=client_ip
+      ))
       raise HTTPException(
         status_code=403,
         detail=_t(
@@ -156,7 +171,12 @@ async def bootstrap_session(
         )
       )
   except ValueError:
-    logger.error("Invalid IP received: %s", client_ip)
+    logger.error(_t(
+      request,
+      "core.server.bootstrap_invalid_ip_log",
+      "Invalid IP received: {ip}",
+      ip=client_ip
+    ))
     raise HTTPException(
       status_code=400,
       detail=_t(request, "core.server.bootstrap_invalid_ip", "Invalid IP address")
@@ -201,7 +221,13 @@ async def bootstrap_session(
       )
       status_code = 401
       
-    logger.warning("Bootstrap failed from %s: %s", client_ip, detail)
+    logger.warning(_t(
+      request,
+      "core.server.bootstrap_failed_log",
+      "Bootstrap failed from {ip}: {detail}",
+      ip=client_ip,
+      detail=detail
+    ))
     raise HTTPException(status_code=status_code, detail=detail)
 
   session_ttl = 900
@@ -214,7 +240,12 @@ async def bootstrap_session(
     "user_agent": request.headers.get('user-agent', 'Unknown'),
     "session_token_created": True
   }
-  logger.info("Nexe Framework initialized: %s", log_data)
+  logger.info(_t(
+    request,
+    "core.server.bootstrap_initialized_log",
+    "Nexe Framework initialized: {data}",
+    data=log_data
+  ))
 
   title = _t(request, "core.server.bootstrap_token_used_title", "TOKEN USED SUCCESSFULLY")
   session_from = _t(request, "core.server.bootstrap_session_from", "Session initialized from: {ip}", ip=client_ip)
@@ -266,7 +297,12 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   client_ip = request.client.host
 
   if client_ip not in ["127.0.0.1", "::1", "localhost"]:
-    logger.warning("Regeneration attempt from %s", client_ip)
+    logger.warning(_t(
+      request,
+      "core.server.bootstrap_regen_attempt",
+      "Regeneration attempt from {ip}",
+      ip=client_ip
+    ))
     raise HTTPException(
       status_code=403,
       detail=_t(
@@ -378,8 +414,15 @@ async def bootstrap_info(request: Request) -> BootstrapInfoResponse:
   ssl_enabled = (request.url.scheme == "https")
 
   logger.debug(
-    "📊 Bootstrap info request: enabled=%s, mode=%s, token_active=%s, ssl=%s",
-    bootstrap_enabled, mode, token_active, ssl_enabled
+    _t(
+      request,
+      "core.server.bootstrap_info_log",
+      "📊 Bootstrap info request: enabled={enabled}, mode={mode}, token_active={active}, ssl={ssl}",
+      enabled=bootstrap_enabled,
+      mode=mode,
+      active=token_active,
+      ssl=ssl_enabled
+    )
   )
 
   return BootstrapInfoResponse(

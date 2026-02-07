@@ -48,12 +48,25 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
 
     try:
       await client.get(f"{qdrant_url}/health", timeout=QDRANT_HEALTH_TIMEOUT)
-      logger.info("Qdrant: OK (already running)")
+      logger.info(_translate(
+        server_state.i18n,
+        "core.lifespan.qdrant_ok",
+        "Qdrant: OK (already running)"
+      ))
     except Exception:
       if not auto_start_qdrant:
-        logger.info("Qdrant: Auto-start disabled (NEXE_AUTOSTART_QDRANT=false)")
+        logger.info(_translate(
+          server_state.i18n,
+          "core.lifespan.qdrant_autostart_disabled",
+          "Qdrant: Auto-start disabled (NEXE_AUTOSTART_QDRANT=false)"
+        ))
       elif qdrant_bin.exists():
-        logger.info(f"Qdrant: Starting from {qdrant_bin}...")
+        logger.info(_translate(
+          server_state.i18n,
+          "core.lifespan.qdrant_starting",
+          "Qdrant: Starting from {path}...",
+          path=str(qdrant_bin)
+        ))
         try:
           qdrant_storage.mkdir(parents=True, exist_ok=True)
           env = os.environ.copy()
@@ -75,20 +88,47 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
             await asyncio.sleep(0.5)
             try:
               await client.get(f"{qdrant_url}/health", timeout=QDRANT_HEALTH_TIMEOUT)
-              logger.info(f"Qdrant: OK (started on port {qdrant_port})")
+              logger.info(_translate(
+                server_state.i18n,
+                "core.lifespan.qdrant_started",
+                "Qdrant: OK (started on port {port})",
+                port=qdrant_port
+              ))
               break
             except Exception:
               # Check if process died
               if process.poll() is not None:
-                logger.error("Qdrant: Process died. Run './qdrant' manually to see logs.")
+                logger.error(_translate(
+                  server_state.i18n,
+                  "core.lifespan.qdrant_process_died",
+                  "Qdrant: Process died. Run './qdrant' manually to see logs."
+                ))
                 break
           else:
-            logger.warning("Qdrant: Failed to start (timeout 15s)")
+            logger.warning(_translate(
+              server_state.i18n,
+              "core.lifespan.qdrant_start_timeout",
+              "Qdrant: Failed to start (timeout 15s)"
+            ))
         except Exception as e:
-          logger.error(f"Qdrant: Failed to start: {e}")
+          logger.error(_translate(
+            server_state.i18n,
+            "core.lifespan.qdrant_start_failed",
+            "Qdrant: Failed to start: {error}",
+            error=str(e)
+          ))
       else:
-        logger.warning(f"Qdrant: Binary not found at {qdrant_bin}")
-        logger.info("  Run ./setup.sh to download Qdrant automatically")
+        logger.warning(_translate(
+          server_state.i18n,
+          "core.lifespan.qdrant_binary_not_found",
+          "Qdrant: Binary not found at {path}",
+          path=str(qdrant_bin)
+        ))
+        logger.info(_translate(
+          server_state.i18n,
+          "core.lifespan.qdrant_setup_hint",
+          "  Run ./setup.sh to download Qdrant automatically"
+        ))
 
     # === OLLAMA (fallback engine) ===
     auto_start_ollama = os.getenv("NEXE_AUTOSTART_OLLAMA", "true").lower() == "true"
@@ -99,24 +139,49 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
     ollama_running = False
     try:
       await client.get(f"{ollama_url}/api/tags", timeout=OLLAMA_HEALTH_TIMEOUT)
-      logger.info("Ollama: OK (already running)")
+      logger.info(_translate(
+        server_state.i18n,
+        "core.lifespan.ollama_ok",
+        "Ollama: OK (already running)"
+      ))
       ollama_running = True
     except Exception as e:
-      logger.debug("Ollama health check failed during startup: %s", e)
+      logger.debug(_translate(
+        server_state.i18n,
+        "core.lifespan.ollama_health_check_failed_startup",
+        "Ollama health check failed during startup: {error}",
+        error=str(e)
+      ))
 
     if not ollama_running and not auto_start_ollama:
-      logger.info("Ollama: Auto-start disabled (NEXE_AUTOSTART_OLLAMA=false)")
+      logger.info(_translate(
+        server_state.i18n,
+        "core.lifespan.ollama_autostart_disabled",
+        "Ollama: Auto-start disabled (NEXE_AUTOSTART_OLLAMA=false)"
+      ))
     if not ollama_running and auto_start_ollama:
       # Check if Ollama is installed
       ollama_path = shutil.which("ollama")
 
       if not ollama_path:
-        logger.warning("Ollama: Not installed. Install manually from https://ollama.com/download")
-        logger.info("  Or run: curl -fsSL https://ollama.com/install.sh | sh")
+        logger.warning(_translate(
+          server_state.i18n,
+          "core.lifespan.ollama_not_installed",
+          "Ollama: Not installed. Install manually from https://ollama.com/download"
+        ))
+        logger.info(_translate(
+          server_state.i18n,
+          "core.lifespan.ollama_install_hint",
+          "  Or run: curl -fsSL https://ollama.com/install.sh | sh"
+        ))
 
       # Start Ollama if installed
       if ollama_path or shutil.which("ollama"):
-        logger.info("Ollama: Starting...")
+        logger.info(_translate(
+          server_state.i18n,
+          "core.lifespan.ollama_starting",
+          "Ollama: Starting..."
+        ))
         try:
           process = subprocess.Popen(
             ["ollama", "serve"],
@@ -129,14 +194,32 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
             await asyncio.sleep(0.5)
             try:
               await client.get(f"{ollama_url}/api/tags", timeout=OLLAMA_HEALTH_TIMEOUT)
-              logger.info("Ollama: OK (started)")
+              logger.info(_translate(
+                server_state.i18n,
+                "core.lifespan.ollama_started",
+                "Ollama: OK (started)"
+              ))
               break
             except Exception as e:
-              logger.debug("Ollama not ready yet during startup wait: %s", e)
+              logger.debug(_translate(
+                server_state.i18n,
+                "core.lifespan.ollama_not_ready",
+                "Ollama not ready yet during startup wait: {error}",
+                error=str(e)
+              ))
           else:
-            logger.warning("Ollama: Failed to start (timeout 15s)")
+            logger.warning(_translate(
+              server_state.i18n,
+              "core.lifespan.ollama_start_timeout",
+              "Ollama: Failed to start (timeout 15s)"
+            ))
         except Exception as e:
-          logger.warning(f"Ollama: Failed to start: {e}")
+          logger.warning(_translate(
+            server_state.i18n,
+            "core.lifespan.ollama_start_failed",
+            "Ollama: Failed to start: {error}",
+            error=str(e)
+          ))
 
 def _translate(i18n, key: str, fallback: str, **kwargs) -> str:
   """Helper to translate with fallback (for lifespan)"""
@@ -196,7 +279,11 @@ async def lifespan(app: FastAPI):
   """
   try:
     logger.info("=" * 70)
-    logger.info("LIFESPAN STARTUP TRIGGERED")
+    logger.info(_translate(
+      server_state.i18n,
+      "core.lifespan.startup_triggered",
+      "LIFESPAN STARTUP TRIGGERED"
+    ))
     logger.info("=" * 70)
 
     msg = _translate(server_state.i18n, "core.server.banner",
@@ -207,9 +294,19 @@ async def lifespan(app: FastAPI):
     if reload_trigger.exists():
       try:
         reload_trigger.unlink()
-        logger.debug("Cleaned up reload trigger: %s", reload_trigger)
+        logger.debug(_translate(
+          server_state.i18n,
+          "core.lifespan.reload_trigger_cleaned",
+          "Cleaned up reload trigger: {path}",
+          path=str(reload_trigger)
+        ))
       except Exception as e:
-        logger.warning("Could not delete reload trigger: %s", e)
+        logger.warning(_translate(
+          server_state.i18n,
+          "core.lifespan.reload_trigger_delete_failed",
+          "Could not delete reload trigger: {error}",
+          error=str(e)
+        ))
 
     msg = _translate(server_state.i18n, "core.server.project_root",
       "Project root: {path}",
@@ -251,7 +348,12 @@ async def lifespan(app: FastAPI):
             loaded_models = health_response.json().get("models", [])
 
             if loaded_models:
-              logger.info("Cleaning Ollama: %s model(s) loaded from previous sessions...", len(loaded_models))
+              logger.info(_translate(
+                server_state.i18n,
+                "core.lifespan.ollama_cleaning",
+                "Cleaning Ollama: {count} model(s) loaded from previous sessions...",
+                count=len(loaded_models)
+              ))
 
               for model_info in loaded_models:
                 model_name = model_info.get("name") or model_info.get("model")
@@ -262,16 +364,29 @@ async def lifespan(app: FastAPI):
                       json={"model": model_name, "keep_alive": 0},
                       timeout=OLLAMA_UNLOAD_TIMEOUT
                     )
-                    logger.debug("  - Unloaded: %s", model_name)
+                    logger.debug(_translate(
+                      server_state.i18n,
+                      "core.lifespan.ollama_unloaded",
+                      "  - Unloaded: {model}",
+                      model=model_name
+                    ))
                   except Exception as e:
                     msg = _translate(server_state.i18n, "core.server.ollama_unload_error",
                       "Error unloading {model}: {error}",
                       model=model_name, error=str(e))
-                    logger.warning("  %s", msg)
+                    logger.warning(msg)
 
-              logger.info("Ollama cleaned successfully")
+              logger.info(_translate(
+                server_state.i18n,
+                "core.lifespan.ollama_clean_success",
+                "Ollama cleaned successfully"
+              ))
             else:
-              logger.debug("Ollama is clean (no models loaded)")
+              logger.debug(_translate(
+                server_state.i18n,
+                "core.lifespan.ollama_clean_none",
+                "Ollama is clean (no models loaded)"
+              ))
           else:
             msg = _translate(server_state.i18n, "core.server.ollama_health_check_failed",
               "Ollama health check failed: HTTP {status_code}",
@@ -346,13 +461,24 @@ async def lifespan(app: FastAPI):
       logger.info(msg)
 
       for id_res, instance in loaded.items():
-        logger.info("  - %s (%s)", instance.name, id_res)
+        logger.info(_translate(
+          server_state.i18n,
+          "core.lifespan.module_loaded_item",
+          "  - {name} ({id})",
+          name=getattr(instance, "name", id_res),
+          id=id_res
+        ))
         try:
           from core.metrics.registry import set_module_health
           health = instance.get_health()
           set_module_health(instance.name, health.get("status", "unhealthy"))
         except Exception as e:
-          logger.debug("Module health update skipped: %s", e)
+          logger.debug(_translate(
+            server_state.i18n,
+            "core.lifespan.module_health_skipped",
+            "Module health update skipped: {error}",
+            error=str(e)
+          ))
 
       if not hasattr(app.state, 'modules'):
         app.state.modules = {}
@@ -373,7 +499,12 @@ async def lifespan(app: FastAPI):
               priority=10,
             )
         except Exception as e:
-          logger.debug("Module registry update skipped: %s", e)
+          logger.debug(_translate(
+            server_state.i18n,
+            "core.lifespan.module_registry_skipped",
+            "Module registry update skipped: {error}",
+            error=str(e)
+          ))
 
     except Exception as e:
       msg = _translate(server_state.i18n, "core.server.memory_error",
@@ -382,7 +513,11 @@ async def lifespan(app: FastAPI):
 
     # === INITIALIZE PLUGIN MODULES (MLX, LlamaCpp, Ollama, etc.) ===
     try:
-      logger.info("Initializing plugin modules...")
+      logger.info(_translate(
+        server_state.i18n,
+        "core.lifespan.plugin_init_start",
+        "Initializing plugin modules..."
+      ))
       plugin_modules = getattr(app.state, 'modules', {})
 
       for module_name, instance in plugin_modules.items():
@@ -393,17 +528,43 @@ async def lifespan(app: FastAPI):
         # Initialize if module has initialize method
         if hasattr(instance, 'initialize') and callable(instance.initialize):
           try:
-            logger.info(f"Initializing plugin: {module_name}")
+            logger.info(_translate(
+              server_state.i18n,
+              "core.lifespan.plugin_init_item",
+              "Initializing plugin: {module}",
+              module=module_name
+            ))
             context = {"config": server_state.config, "project_root": server_state.project_root}
             success = await instance.initialize(context)
             if success:
-              logger.info(f"✅ {module_name} initialized successfully")
+              logger.info(_translate(
+                server_state.i18n,
+                "core.lifespan.plugin_init_success",
+                "✅ {module} initialized successfully",
+                module=module_name
+              ))
             else:
-              logger.warning(f"⚠️  {module_name} initialization returned False")
+              logger.warning(_translate(
+                server_state.i18n,
+                "core.lifespan.plugin_init_false",
+                "⚠️  {module} initialization returned False",
+                module=module_name
+              ))
           except Exception as e:
-            logger.error(f"Failed to initialize {module_name}: {e}", exc_info=True)
+            logger.error(_translate(
+              server_state.i18n,
+              "core.lifespan.plugin_init_failed",
+              "Failed to initialize {module}: {error}",
+              module=module_name,
+              error=str(e)
+            ), exc_info=True)
     except Exception as e:
-      logger.error(f"Error during plugin initialization: {e}", exc_info=True)
+      logger.error(_translate(
+        server_state.i18n,
+        "core.lifespan.plugin_init_error",
+        "Error during plugin initialization: {error}",
+        error=str(e)
+      ), exc_info=True)
 
     # === AUTO-INGEST KNOWLEDGE FOLDER (FIRST RUN ONLY) ===
     # Auto-ingest happens in two scenarios:
@@ -429,22 +590,52 @@ async def lifespan(app: FastAPI):
         if files_to_ingest:
           # Only auto-ingest if never done before (no marker file)
           if ingested_marker.exists():
-            logger.debug("Knowledge: Already ingested. Skipping auto-ingest.")
-            logger.debug("Knowledge: To re-ingest, use: ./nexe knowledge ingest")
+            logger.debug(_translate(
+              server_state.i18n,
+              "core.lifespan.knowledge_already_ingested",
+              "Knowledge: Already ingested. Skipping auto-ingest."
+            ))
+            logger.debug(_translate(
+              server_state.i18n,
+              "core.lifespan.knowledge_reingest_hint",
+              "Knowledge: To re-ingest, use: ./nexe knowledge ingest"
+            ))
           else:
             # First run - auto-ingest as fallback if installer didn't do it
-            logger.info("Knowledge: First run - auto-ingesting %d document(s)...", len(files_to_ingest))
+            logger.info(_translate(
+              server_state.i18n,
+              "core.lifespan.knowledge_first_run",
+              "Knowledge: First run - auto-ingesting {count} document(s)...",
+              count=len(files_to_ingest)
+            ))
             success = await ingest_knowledge(knowledge_path, quiet=True)
             if success:
-              logger.info("Knowledge: Ingestion completed successfully")
+              logger.info(_translate(
+                server_state.i18n,
+                "core.lifespan.knowledge_ingest_success",
+                "Knowledge: Ingestion completed successfully"
+              ))
               # Create marker to prevent re-ingestion on next startup
               ingested_marker.touch()
             else:
-              logger.warning("Knowledge: Ingestion had some errors")
+              logger.warning(_translate(
+                server_state.i18n,
+                "core.lifespan.knowledge_ingest_errors",
+                "Knowledge: Ingestion had some errors"
+              ))
         else:
-          logger.debug("Knowledge: No documents to ingest (folder empty or only README)")
+          logger.debug(_translate(
+            server_state.i18n,
+            "core.lifespan.knowledge_no_docs",
+            "Knowledge: No documents to ingest (folder empty or only README)"
+          ))
     except Exception as e:
-      logger.warning("Knowledge: Auto-ingest failed: %s", str(e))
+      logger.warning(_translate(
+        server_state.i18n,
+        "core.lifespan.knowledge_auto_ingest_failed",
+        "Knowledge: Auto-ingest failed: {error}",
+        error=str(e)
+      ))
 
     bootstrap_ttl = int(os.getenv('BOOTSTRAP_TTL', '30'))
     
@@ -460,10 +651,18 @@ async def lifespan(app: FastAPI):
     if not existing_bootstrap or (datetime.now(timezone.utc).timestamp() > existing_bootstrap["expires"]):
       token_to_display = generate_bootstrap_token()
       set_bootstrap_token(token_to_display, ttl_minutes=bootstrap_ttl)
-      logger.info("New master bootstrap token generated and persisted")
+      logger.info(_translate(
+        server_state.i18n,
+        "core.lifespan.bootstrap_new_token",
+        "New master bootstrap token generated and persisted"
+      ))
     else:
       token_to_display = existing_bootstrap["token"]
-      logger.info("Using existing master bootstrap token from DB")
+      logger.info(_translate(
+        server_state.i18n,
+        "core.lifespan.bootstrap_existing_token",
+        "Using existing master bootstrap token from DB"
+      ))
 
     nexe_env = os.getenv('NEXE_ENV', 'production').lower()
     # Bootstrap logic is only relevant in development mode
@@ -525,7 +724,12 @@ async def lifespan(app: FastAPI):
         )
 
         if result.get("files_cleaned", 0) > 0 or result.get("would_clean", 0) > 0:
-          action = "would clean" if dry_run else "cleaned"
+          action_key = "core.server.auto_clean_action_would" if dry_run else "core.server.auto_clean_action_cleaned"
+          action = _translate(
+            server_state.i18n,
+            action_key,
+            "would clean" if dry_run else "cleaned"
+          )
           count = result.get("would_clean", 0) if dry_run else result.get("files_cleaned", 0)
           msg = _translate(server_state.i18n, "core.server.auto_clean_done",
             "Auto-Clean: {count} files {action}", count=count, action=action)
@@ -536,7 +740,11 @@ async def lifespan(app: FastAPI):
           logger.debug(msg)
 
       except ImportError:
-        logger.debug("Auto-Clean not available")
+        logger.debug(_translate(
+          server_state.i18n,
+          "core.lifespan.auto_clean_not_available",
+          "Auto-Clean not available"
+        ))
       except Exception as e:
         msg = _translate(server_state.i18n, "core.server.auto_clean_error",
           "Auto-Clean error: {error}", error=str(e))
@@ -547,8 +755,16 @@ async def lifespan(app: FastAPI):
 
     # Final message: Server ready
     logger.info("=" * 70)
-    logger.info("✅  SERVER.NEXE READY · Listening on http://localhost:9119")
-    logger.info("📱 Web UI: http://localhost:9119/ui/")
+    logger.info(_translate(
+      server_state.i18n,
+      "core.lifespan.server_ready",
+      "✅  SERVER.NEXE READY · Listening on http://localhost:9119"
+    ))
+    logger.info(_translate(
+      server_state.i18n,
+      "core.lifespan.web_ui_ready",
+      "📱 Web UI: http://localhost:9119/ui/"
+    ))
     logger.info("=" * 70)
 
     yield
@@ -557,7 +773,11 @@ async def lifespan(app: FastAPI):
     msg = _translate(server_state.i18n, "core.server.critical_error",
       "Critical system error: {error}", error=str(e))
     logger.error(msg)
-    logger.exception("Critical startup error", exc_info=True)
+    logger.exception(_translate(
+      server_state.i18n,
+      "core.lifespan.critical_startup_error",
+      "Critical startup error"
+    ), exc_info=True)
     raise
 
   finally:
@@ -576,7 +796,12 @@ async def lifespan(app: FastAPI):
             loaded_models = ps_response.json().get("models", [])
 
             if loaded_models:
-              logger.info("Unloading %s Ollama model(s) from RAM...", len(loaded_models))
+              logger.info(_translate(
+                server_state.i18n,
+                "core.lifespan.ollama_unload_start",
+                "Unloading {count} Ollama model(s) from RAM...",
+                count=len(loaded_models)
+              ))
 
               for model_info in loaded_models:
                 model_name = model_info.get("name") or model_info.get("model")
@@ -586,13 +811,31 @@ async def lifespan(app: FastAPI):
                     json={"model": model_name, "keep_alive": 0},
                     timeout=OLLAMA_UNLOAD_TIMEOUT
                   )
-                  logger.debug("  - Unloaded: %s", model_name)
+                  logger.debug(_translate(
+                    server_state.i18n,
+                    "core.lifespan.ollama_unloaded",
+                    "  - Unloaded: {model}",
+                    model=model_name
+                  ))
 
-              logger.info("Ollama models unloaded successfully")
+              logger.info(_translate(
+                server_state.i18n,
+                "core.lifespan.ollama_unload_success",
+                "Ollama models unloaded successfully"
+              ))
             else:
-              logger.debug("No Ollama models loaded")
+              logger.debug(_translate(
+                server_state.i18n,
+                "core.lifespan.ollama_unload_none",
+                "No Ollama models loaded"
+              ))
       except Exception as e:
-        logger.debug("Could not unload Ollama models: %s", e)
+        logger.debug(_translate(
+          server_state.i18n,
+          "core.lifespan.ollama_unload_failed",
+          "Could not unload Ollama models: {error}",
+          error=str(e)
+        ))
 
       def _stop_process(process, name: str):
         if not process:
@@ -600,28 +843,50 @@ async def lifespan(app: FastAPI):
         if process.poll() is not None:
           return
         try:
-          logger.info("Stopping %s process...", name)
+          logger.info(_translate(
+            server_state.i18n,
+            "core.lifespan.process_stopping",
+            "Stopping {name} process...",
+            name=name
+          ))
           process.terminate()
           process.wait(timeout=5)
         except Exception:
           try:
             process.kill()
           except Exception:
-            logger.debug("Failed to force-stop %s process", name)
+            logger.debug(_translate(
+              server_state.i18n,
+              "core.lifespan.process_force_stop_failed",
+              "Failed to force-stop {name} process",
+              name=name
+            ))
 
       _stop_process(server_state.qdrant_process, "Qdrant")
       _stop_process(server_state.ollama_process, "Ollama")
 
       if server_state.api_integrator:
-        logger.debug("Closing APIIntegrator...")
+        logger.debug(_translate(
+          server_state.i18n,
+          "core.lifespan.closing_api_integrator",
+          "Closing APIIntegrator..."
+        ))
         server_state.api_integrator = None
 
       if server_state.module_manager:
-        logger.debug("Closing ModuleManager...")
+        logger.debug(_translate(
+          server_state.i18n,
+          "core.lifespan.closing_module_manager",
+          "Closing ModuleManager..."
+        ))
         server_state.module_manager = None
 
       if server_state.registry:
-        logger.debug("Cleaning Registry...")
+        logger.debug(_translate(
+          server_state.i18n,
+          "core.lifespan.cleaning_registry",
+          "Cleaning Registry..."
+        ))
         server_state.registry = None
 
     except Exception as e:

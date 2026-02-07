@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/request_size_limiter.py
-Description: Middleware per limitar mida de requests. Prevé DoS via large payloads (CWE-400).
+Description: Middleware to limit request size. Prevents DoS via large payloads (CWE-400).
 
 www.jgoy.net
 ────────────────────────────────────
@@ -14,8 +14,33 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 import logging
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.request_size.{key}", fallback, **kwargs)
+
+def _t(request: Request, key: str, fallback: str, **kwargs) -> str:
+  try:
+    i18n = getattr(request.app.state, "i18n", None)
+  except Exception:
+    i18n = None
+
+  if i18n:
+    try:
+      value = i18n.t(key, **kwargs)
+      if value != key:
+        return value
+    except Exception:
+      pass
+
+  if kwargs:
+    try:
+      return fallback.format(**kwargs)
+    except (KeyError, ValueError):
+      return fallback
+  return fallback
 
 class RequestSizeLimiterMiddleware(BaseHTTPMiddleware):
   """
@@ -42,13 +67,19 @@ class RequestSizeLimiterMiddleware(BaseHTTPMiddleware):
     """
     super().__init__(app)
     self.max_size = max_size
-    logger.info(f"Request size limiter enabled: max {max_size / (1024**2):.1f} MB")
+    logger.info(
+      _t_log(
+        "limiter_enabled",
+        "Request size limiter enabled: max {size_mb:.1f} MB",
+        size_mb=max_size / (1024**2),
+      )
+    )
 
   async def dispatch(self, request: Request, call_next):
     """
     Check request size and reject if too large.
 
-    SEGURETAT: Controla tant Content-Length com chunked/streaming.
+    SECURITY: Checks both Content-Length and chunked/streaming.
 
     Args:
       request: Incoming HTTP request
@@ -65,7 +96,10 @@ class RequestSizeLimiterMiddleware(BaseHTTPMiddleware):
       try:
         content_length_int = int(content_length)
         if content_length_int < 0:
-          raise ValueError("Negative Content-Length")
+          raise ValueError(_t_log(
+            "negative_content_length",
+            "Negative Content-Length"
+          ))
 
         if content_length_int > self.max_size:
           if hasattr(request.app.state, 'security_logger'):
@@ -77,22 +111,45 @@ class RequestSizeLimiterMiddleware(BaseHTTPMiddleware):
             )
 
           logger.warning(
-            f"Request rejected: size {content_length_int / (1024**2):.2f} MB "
-            f"exceeds limit {self.max_size / (1024**2):.2f} MB "
-            f"from {client_ip} to {request.url.path}"
+            _t(
+              request,
+              "core.request_size.request_rejected",
+              "Request rejected: size {size_mb:.2f} MB exceeds limit {limit_mb:.2f} MB from {ip} to {path}",
+              size_mb=content_length_int / (1024**2),
+              limit_mb=self.max_size / (1024**2),
+              ip=client_ip,
+              path=request.url.path,
+            )
           )
 
           return JSONResponse(
             status_code=413,
             content={
-              "error": "Request Entity Too Large",
-              "detail": f"Content-Length ({content_length_int}) exceeds max ({self.max_size})",
+              "error": _t(
+                request,
+                "core.request_size.error_entity_too_large",
+                "Request Entity Too Large"
+              ),
+              "detail": _t(
+                request,
+                "core.request_size.detail_content_length",
+                "Content-Length ({content_length}) exceeds max ({max_size})",
+                content_length=content_length_int,
+                max_size=self.max_size
+              ),
               "max_size_mb": round(self.max_size / (1024**2), 2),
             }
           )
 
       except ValueError:
-        logger.warning(f"Invalid Content-Length header: {content_length}")
+        logger.warning(
+          _t(
+            request,
+            "core.request_size.invalid_content_length",
+            "Invalid Content-Length header: {value}",
+            value=content_length,
+          )
+        )
         content_length = None
 
     if request.method in ("POST", "PUT", "PATCH") and not content_length:
@@ -113,15 +170,31 @@ class RequestSizeLimiterMiddleware(BaseHTTPMiddleware):
               )
 
             logger.warning(
-              f"Streaming request rejected: {body_bytes} bytes "
-              f"exceeds limit {self.max_size} from {client_ip}"
+              _t(
+                request,
+                "core.request_size.streaming_rejected",
+                "Streaming request rejected: {size} bytes exceeds limit {limit} from {ip}",
+                size=body_bytes,
+                limit=self.max_size,
+                ip=client_ip,
+              )
             )
 
             return JSONResponse(
               status_code=413,
               content={
-                "error": "Request Entity Too Large (streaming)",
-                "detail": f"Body size ({body_bytes}) exceeds max ({self.max_size})",
+                "error": _t(
+                  request,
+                  "core.request_size.error_entity_too_large_streaming",
+                  "Request Entity Too Large (streaming)"
+                ),
+                "detail": _t(
+                  request,
+                  "core.request_size.detail_body_size",
+                  "Body size ({body_size}) exceeds max ({max_size})",
+                  body_size=body_bytes,
+                  max_size=self.max_size
+                ),
                 "max_size_mb": round(self.max_size / (1024**2), 2),
               }
             )
@@ -142,10 +215,23 @@ class RequestSizeLimiterMiddleware(BaseHTTPMiddleware):
         request._receive = receive
 
       except Exception as e:
-        logger.error(f"Error reading request body: {e}")
+        logger.error(
+          _t(
+            request,
+            "core.request_size.body_read_error_log",
+            "Error reading request body: {error}",
+            error=str(e),
+          )
+        )
         return JSONResponse(
           status_code=400,
-          content={"error": "Failed to read request body"}
+          content={
+            "error": _t(
+              request,
+              "core.request_size.error_body_read",
+              "Failed to read request body"
+            )
+          }
         )
 
     response = await call_next(request)

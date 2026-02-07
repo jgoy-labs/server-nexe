@@ -14,6 +14,7 @@ import re
 import uuid
 from typing import List, Optional
 import structlog
+from personality.i18n.resolve import t_modular
 
 from memory.embeddings.core.interfaces import (
   ChunkMetadata,
@@ -21,6 +22,9 @@ from memory.embeddings.core.interfaces import (
 )
 
 logger = structlog.get_logger()
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"embeddings.logs.{key}", fallback, **kwargs)
 
 class SmartChunker:
   """
@@ -59,6 +63,13 @@ class SmartChunker:
 
     logger.info(
       "smart_chunker_initialized",
+      message=_t_log(
+        "smart_chunker_initialized",
+        "SmartChunker initialized (max_size={max_size}, overlap={overlap}, min_size={min_size})",
+        max_size=max_chunk_size,
+        overlap=chunk_overlap,
+        min_size=min_chunk_size,
+      ),
       max_size=max_chunk_size,
       overlap=chunk_overlap,
       min_size=min_chunk_size
@@ -106,6 +117,13 @@ class SmartChunker:
 
     logger.debug(
       "document_chunked",
+      message=_t_log(
+        "document_chunked",
+        "Document chunked (document_id={document_id}, original_len={original_len}, chunk_count={chunk_count})",
+        document_id=document_id,
+        original_len=len(content),
+        chunk_count=len(chunks),
+      ),
       document_id=document_id,
       original_len=len(content),
       chunk_count=len(chunks)

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy
 Location: personality/module_manager/config_manager.py
-Description: Gestor de configuració i manifests Nexe.
+Description: Configuration and manifest manager for Nexe.
              Uses core/config.py for unified config loading.
 
 www.jgoy.net
@@ -31,7 +31,7 @@ LOGGER_AVAILABLE = False
 
 class ConfigManager:
   """
-  Gestiona configuració i manifests del sistema.
+  Manage system configuration and manifests.
 
   Uses core/config.py for unified config loading.
   Adds module-specific functionality (manifests, enabled state).
@@ -39,11 +39,11 @@ class ConfigManager:
 
   def __init__(self, config_path: Optional[Path], i18n=None):
     """
-    Inicialitza gestor de configuració.
+    Initialize the configuration manager.
 
     Args:
-      config_path: Path al fitxer server.toml
-      i18n: Gestor i18n opcional
+      config_path: Path to server.toml
+      i18n: Optional i18n manager
     """
     self.i18n = i18n
     self.config_path = self._find_config_path(config_path)
@@ -59,15 +59,15 @@ class ConfigManager:
 
   def _t(self, key: str, fallback: str, **kwargs) -> str:
     """
-    Helper per traduir amb fallback.
+    Helper to translate with fallback.
 
     Args:
-      key: Clau de traducció
-      fallback: Text per defecte
-      **kwargs: Paràmetres de format
+      key: Translation key
+      fallback: Default text
+      **kwargs: Formatting parameters
 
     Returns:
-      Text traduït o fallback
+      Translated text or fallback
     """
     if not self.i18n:
       return fallback.format(**kwargs) if kwargs else fallback
@@ -80,12 +80,17 @@ class ConfigManager:
       return fallback.format(**kwargs) if kwargs else fallback
 
   def _find_config_path(self, config_path: Optional[Path]) -> Path:
-    """Cerca fitxer de configuració"""
+    """Find configuration file."""
     if config_path:
       try:
         return Path(config_path).resolve(strict=True)
       except (FileNotFoundError, OSError) as e:
-        logger.debug("Config path not found or inaccessible: %s - %s", config_path, e)
+        logger.debug(self._t(
+          "module_manager.config_manager.config_path_not_found",
+          "Config path not found or inaccessible: {path} - {error}",
+          path=config_path,
+          error=str(e)
+        ))
         pass
 
     search_paths = [
@@ -105,7 +110,7 @@ class ConfigManager:
     return Path("personality/server.toml")
 
   def _load_config(self) -> None:
-    """Carrega configuració des del fitxer TOML usant core/config."""
+    """Load configuration from TOML file using core/config."""
     try:
       # Use unified config loading from core/config.py
       self._config = core_load_config(
@@ -119,19 +124,19 @@ class ConfigManager:
       self._config = {}
 
   def get_config(self) -> Dict[str, Any]:
-    """Retorna la configuració completa"""
+    """Return the full configuration."""
     return self._config
 
   def find_manifest(self, module_name: str, module_path: Path) -> Path:
     """
-    Cerca fitxer manifest per un mòdul.
+    Find manifest file for a module.
 
     Args:
-      module_name: Nom del mòdul
-      module_path: Path del mòdul
+      module_name: Module name
+      module_path: Module path
 
     Returns:
-      Path al manifest
+      Path to the manifest
     """
     manifest_filename = get_message(
       self.i18n, 'files.module_manifest_format',
@@ -142,7 +147,12 @@ class ConfigManager:
       central.resolve(strict=True)
       return central
     except (FileNotFoundError, OSError) as e:
-      logger.debug("Central manifest not found: %s - %s", central, e)
+      logger.debug(self._t(
+        "module_manager.config_manager.central_manifest_not_found",
+        "Central manifest not found: {path} - {error}",
+        path=central,
+        error=str(e)
+      ))
       pass
 
     local_manifest_name = get_message(self.i18n, 'files.manifest_toml')
@@ -151,29 +161,44 @@ class ConfigManager:
       local.resolve(strict=True)
       return local
     except (FileNotFoundError, OSError) as e:
-      logger.debug("Local manifest not found: %s - %s", local, e)
+      logger.debug(self._t(
+        "module_manager.config_manager.local_manifest_not_found",
+        "Local manifest not found: {path} - {error}",
+        path=local,
+        error=str(e)
+      ))
       pass
 
     return central
 
   def load_manifest(self, manifest_path: Path) -> Dict[str, Any]:
     """
-    Carrega fitxer manifest.
+    Load manifest file.
 
     Args:
-      manifest_path: Path al manifest
+      manifest_path: Path to the manifest
 
     Returns:
-      Diccionari amb dades del manifest
+      Dictionary with manifest data
     """
     try:
       with open(manifest_path, 'r', encoding='utf-8') as f:
         return toml.load(f)
     except FileNotFoundError as e:
-      logger.debug("Manifest file not found: %s - %s", manifest_path, e)
+      logger.debug(self._t(
+        "module_manager.config_manager.manifest_not_found",
+        "Manifest file not found: {path} - {error}",
+        path=manifest_path,
+        error=str(e)
+      ))
       pass
     except (IOError, KeyError) as e:
-      logger.debug("Error reading manifest: %s - %s", manifest_path, e)
+      logger.debug(self._t(
+        "module_manager.config_manager.manifest_read_error",
+        "Error reading manifest: {path} - {error}",
+        path=manifest_path,
+        error=str(e)
+      ))
       pass
 
     module_key = get_message(self.i18n, 'manifest.keys.module')
@@ -191,16 +216,16 @@ class ConfigManager:
 
   def apply_config_to_module(self, module_info) -> None:
     """
-    Aplica configuració a un ModuleInfo.
+    Apply configuration to a ModuleInfo.
 
-    M-2: Suporta dos formats de configuració:
+    M-2: Supports two configuration formats:
     - FORMAT 1 (list): [plugins.modules] enabled = ["security", "security"]
     - FORMAT 2 (dict): [plugins.modules.security] enabled = true
 
-    Prioritat: dict > list (més específic guanya)
+    Priority: dict > list (more specific wins)
 
     Args:
-      module_info: ModuleInfo a configurar
+      module_info: ModuleInfo to configure
     """
     from personality.data.models import ModuleState
 
@@ -215,15 +240,20 @@ class ConfigManager:
         if len(relative.parts) > 0:
           layer = relative.parts[0]
       except Exception as e:
-        logger.debug("Could not determine module layer for %s: %s", module_path, e)
+        logger.debug(self._t(
+          "module_manager.config_manager.layer_detect_failed",
+          "Could not determine module layer for {path}: {error}",
+          path=module_path,
+          error=str(e)
+        ))
         pass
 
     modules_config = self._config.get(layer, {}).get('modules', {})
 
     def _is_plugins_module() -> bool:
       """
-      Determina si el mòdul forma part de l'espai plugins/*.
-      Serveix per aplicar l'allowlist [plugins.modules].enabled només a aquests mòduls.
+      Determine whether the module is part of the plugins/* space.
+      Used to apply the [plugins.modules].enabled allowlist only to these modules.
       """
       module_path = getattr(module_info, "path", None)
       if module_path is None:
@@ -250,33 +280,58 @@ class ConfigManager:
     module_path = getattr(module_info, "path", None)
     if module_path and '/core/' in str(module_path):
       module_info.enabled = True
-      msg = self._t("module_manager.core_module_always_enabled",
-             "Mòdul {name} és CORE, sempre habilitat",
+      msg = self._t("module_manager.config_manager.core_module_always_enabled",
+             "Module {name} is CORE, always enabled",
              name=module_info.name)
       logger.info(msg)
     elif isinstance(module_config, dict) and 'enabled' in module_config:
       module_info.enabled = module_config.get('enabled', True)
-      logger.debug("Module %s enabled=%s (from dict config)", module_info.name, module_info.enabled)
+      logger.debug(self._t(
+        "module_manager.config_manager.enabled_from_dict",
+        "Module {module} enabled={enabled} (from dict config)",
+        module=module_info.name,
+        enabled=module_info.enabled
+      ))
     else:
       enabled_list = modules_config.get('enabled', None)
       if isinstance(enabled_list, list) and _is_plugins_module():
         if module_info.name in enabled_list:
           module_info.enabled = True
-          logger.debug("Module %s enabled (from list)", module_info.name)
+          logger.debug(self._t(
+            "module_manager.config_manager.enabled_from_list",
+            "Module {module} enabled (from list)",
+            module=module_info.name
+          ))
         else:
           module_info.enabled = False
-          logger.info("Module %s not in enabled list, disabling", module_info.name)
+          logger.info(self._t(
+            "module_manager.config_manager.disabled_not_in_list",
+            "Module {module} not in enabled list, disabling",
+            module=module_info.name
+          ))
           module_info.state = ModuleState.DISABLED
           return
       elif isinstance(enabled_list, list):
-        logger.debug(
-          "Module %s skipping plugins allowlist (module outside plugins/*)", module_info.name
-        )
+        logger.debug(self._t(
+          "module_manager.config_manager.skip_plugins_allowlist",
+          "Module {module} skipping plugins allowlist (module outside plugins/*)",
+          module=module_info.name
+        ))
         module_info.enabled = module_info.manifest.get('module', {}).get('enabled', True)
-        logger.debug("Module %s enabled=%s (from manifest default)", module_info.name, module_info.enabled)
+        logger.debug(self._t(
+          "module_manager.config_manager.enabled_from_manifest",
+          "Module {module} enabled={enabled} (from manifest default)",
+          module=module_info.name,
+          enabled=module_info.enabled
+        ))
       else:
         module_info.enabled = module_info.manifest.get('module', {}).get('enabled', True)
-        logger.debug("Module %s enabled=%s (from manifest default)", module_info.name, module_info.enabled)
+        logger.debug(self._t(
+          "module_manager.config_manager.enabled_from_manifest",
+          "Module {module} enabled={enabled} (from manifest default)",
+          module=module_info.name,
+          enabled=module_info.enabled
+        ))
 
     module_info.priority = module_config.get(
       'priority',
@@ -291,20 +346,24 @@ class ConfigManager:
     module_info.dependencies = deps.get('internal', [])
 
     if not module_info.enabled:
-      logger.info("Module %s disabled via config", module_info.name)
+      logger.info(self._t(
+        "module_manager.config_manager.disabled_via_config",
+        "Module {module} disabled via config",
+        module=module_info.name
+      ))
       module_info.state = ModuleState.DISABLED
 
   def update_module_enabled(self, module_name: str, enabled: bool, module_path: Path) -> bool:
     """
-    Actualitza l'estat enabled d'un mòdul i guarda al server.toml.
+    Update a module's enabled state and save to server.toml.
 
     Args:
-      module_name: Nom del mòdul
-      enabled: True per activar, False per desactivar
-      module_path: Path del mòdul
+      module_name: Module name
+      enabled: True to enable, False to disable
+      module_path: Module path
 
     Returns:
-      True si s'ha guardat correctament
+      True if saved successfully
     """
     try:
       project_root = self.config_path.parent
@@ -329,10 +388,15 @@ class ConfigManager:
     # Use unified save from core/config.py
     success = core_save_config(self._config, self.config_path)
     if success:
-      logger.info("Saved module %s enabled=%s to config", module_name, enabled)
+      logger.info(self._t(
+        "module_manager.config_manager.saved_enabled",
+        "Saved module {module} enabled={enabled} to config",
+        module=module_name,
+        enabled=enabled
+      ))
     else:
       msg = self._t("module_manager.error_saving_config",
-             "Error guardant configuració",
+             "Error saving configuration",
              error="save failed")
       logger.error(msg)
     return success

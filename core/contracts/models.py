@@ -1,5 +1,5 @@
 """
-Pydantic models per validació de manifests NEXE.
+Pydantic models for NEXE manifest validation.
 """
 
 from typing import Dict, List, Optional, Any
@@ -7,18 +7,22 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from enum import Enum
 from pathlib import Path
 
+from personality.i18n.resolve import t_modular
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"core.contracts.{key}", fallback, **kwargs)
 
 # ============================================
 # ENUMS
 # ============================================
 
 class ManifestVersion(str, Enum):
-    """Versió del format de manifest"""
+    """Manifest format version."""
     V1 = "1.0"
 
 
 class ContractTypeModel(str, Enum):
-    """Tipus de contracte (per Pydantic)"""
+    """Contract type (for Pydantic)."""
     MODULE = "module"
     CORE = "core"
 
@@ -28,7 +32,7 @@ class ContractTypeModel(str, Enum):
 # ============================================
 
 class ModuleSection(BaseModel):
-    """[module] section - OBLIGATORI"""
+    """[module] section - REQUIRED"""
     name: str = Field(..., min_length=1, max_length=100)
     version: str = Field(..., pattern=r'^\d+\.\d+\.\d+$')
     type: ContractTypeModel = ContractTypeModel.MODULE
@@ -43,7 +47,7 @@ class ModuleSection(BaseModel):
     @field_validator('name')
     @classmethod
     def name_lowercase_no_spaces(cls, v: str) -> str:
-        """Valida que name no tingui espais i sigui lowercase"""
+        """Validate that name has no spaces and is lowercase."""
         import re
 
         # Convert to lowercase first
@@ -51,17 +55,24 @@ class ModuleSection(BaseModel):
 
         # Check no spaces
         if ' ' in v:
-            raise ValueError("name cannot contain spaces")
+            raise ValueError(
+                _t("name_spaces", "name cannot contain spaces")
+            )
 
         # Check pattern
         if not re.match(r'^[a-z0-9_]+$', v):
-            raise ValueError("name must contain only lowercase letters, numbers, and underscores")
+            raise ValueError(
+                _t(
+                    "name_invalid_chars",
+                    "name must contain only lowercase letters, numbers, and underscores"
+                )
+            )
 
         return v
 
 
 class CapabilitiesSection(BaseModel):
-    """[capabilities] section"""
+    """[capabilities] section."""
     # Module capabilities
     has_api: bool = False
     has_ui: bool = False
@@ -75,7 +86,7 @@ class CapabilitiesSection(BaseModel):
 
 
 class DependenciesSection(BaseModel):
-    """[dependencies] section"""
+    """[dependencies] section."""
     modules: List[str] = Field(default_factory=list)
     optional_modules: List[str] = Field(default_factory=list)
     external_services: List[str] = Field(default_factory=list)
@@ -83,7 +94,7 @@ class DependenciesSection(BaseModel):
 
 
 class APISection(BaseModel):
-    """[api] section - Obligatori si has_api=true"""
+    """[api] section - Required if has_api=true."""
     enabled: bool = True
     prefix: str = Field(..., pattern=r'^/[a-z0-9/_-]*$')
     tags: List[str] = Field(default_factory=list)
@@ -94,7 +105,7 @@ class APISection(BaseModel):
 
 
 class UISection(BaseModel):
-    """[ui] section - Obligatori si has_ui=true"""
+    """[ui] section - Required if has_ui=true."""
     enabled: bool = True
     path: str = "ui"
     main_file: str = "index.html"
@@ -105,7 +116,7 @@ class UISection(BaseModel):
 
 
 class CLISection(BaseModel):
-    """[cli] section - Obligatori si has_cli=true"""
+    """[cli] section - Required if has_cli=true."""
     enabled: bool = True
     command_name: str = Field(..., min_length=1)
     entry_point: str = Field(..., min_length=1)
@@ -116,15 +127,21 @@ class CLISection(BaseModel):
     @field_validator('framework')
     @classmethod
     def valid_framework(cls, v: str) -> str:
-        """Valida framework CLI"""
+        """Validate CLI framework."""
         allowed = ["click", "typer", "argparse"]
         if v not in allowed:
-            raise ValueError(f"framework must be one of: {allowed}")
+            raise ValueError(
+                _t(
+                    "framework_invalid",
+                    "framework must be one of: {allowed}",
+                    allowed=", ".join(allowed),
+                )
+            )
         return v
 
 
 class I18nSection(BaseModel):
-    """[i18n] section - Opcional"""
+    """[i18n] section - Optional."""
     enabled: bool = False
     default_locale: str = "ca-ES"
     supported_locales: List[str] = Field(default_factory=lambda: ["ca-ES", "en-US"])
@@ -132,7 +149,7 @@ class I18nSection(BaseModel):
 
 
 class StoragePathDeclaration(BaseModel):
-    """Declaració de path d'emmagatzematge"""
+    """Storage path declaration."""
     path: str
     type: str
     format: str = "json"
@@ -142,7 +159,7 @@ class StoragePathDeclaration(BaseModel):
 
 
 class StorageSection(BaseModel):
-    """[storage] section - Opcional"""
+    """[storage] section - Optional."""
     paths: List[StoragePathDeclaration] = Field(default_factory=list)
     protected_patterns: List[str] = Field(default_factory=list)
 
@@ -153,9 +170,9 @@ class StorageSection(BaseModel):
 
 class UnifiedManifest(BaseModel):
     """
-    Root model per manifest.toml unificat.
+    Root model for the unified manifest.toml.
 
-    Suporta modules (plugins estàndard).
+    Supports modules (standard plugins).
     """
 
     manifest_version: ManifestVersion = ManifestVersion.V1
@@ -179,33 +196,54 @@ class UnifiedManifest(BaseModel):
 
     @model_validator(mode='after')
     def validate_conditional_sections(self) -> 'UnifiedManifest':
-        """Valida seccions condicionals segons capabilities"""
+        """Validate conditional sections based on capabilities."""
 
         # Si has_api, [api] és obligatori
         if self.capabilities.has_api and self.api is None:
-            raise ValueError("[api] section required when capabilities.has_api = true")
+            raise ValueError(
+                _t(
+                    "api_section_required",
+                    "[api] section required when capabilities.has_api = true"
+                )
+            )
 
         # Si has_ui, [ui] és obligatori
         if self.capabilities.has_ui and self.ui is None:
-            raise ValueError("[ui] section required when capabilities.has_ui = true")
+            raise ValueError(
+                _t(
+                    "ui_section_required",
+                    "[ui] section required when capabilities.has_ui = true"
+                )
+            )
 
         # Si has_cli, [cli] és obligatori
         if self.capabilities.has_cli and self.cli is None:
-            raise ValueError("[cli] section required when capabilities.has_cli = true")
+            raise ValueError(
+                _t(
+                    "cli_section_required",
+                    "[cli] section required when capabilities.has_cli = true"
+                )
+            )
 
         return self
 
     @model_validator(mode='after')
     def validate_api_prefix(self) -> 'UnifiedManifest':
-        """Valida que api.prefix és vàlid"""
+        """Validate that api.prefix is valid."""
         if self.api:
             # Just check it starts with /
             if not self.api.prefix.startswith("/"):
-                raise ValueError(f"api.prefix must start with /, got: {self.api.prefix}")
+                raise ValueError(
+                    _t(
+                        "api_prefix_invalid",
+                        "api.prefix must start with /, got: {prefix}",
+                        prefix=self.api.prefix,
+                    )
+                )
         return self
 
     def to_contract_metadata(self) -> 'ContractMetadata':
-        """Converteix UnifiedManifest a ContractMetadata"""
+        """Convert UnifiedManifest to ContractMetadata."""
         from .base import ContractMetadata, ContractType
 
         return ContractMetadata(
@@ -230,23 +268,29 @@ class UnifiedManifest(BaseModel):
 
 def load_manifest_from_toml(toml_path: str) -> UnifiedManifest:
     """
-    Carrega i valida un manifest.toml.
+    Load and validate a manifest.toml.
 
     Args:
-        toml_path: Path al fitxer manifest.toml
+        toml_path: Path to the manifest.toml file
 
     Returns:
-        UnifiedManifest validat
+        Validated UnifiedManifest
 
     Raises:
-        ValidationError: Si el manifest no compleix l'schema
-        FileNotFoundError: Si el fitxer no existeix
+        ValidationError: If the manifest does not match the schema
+        FileNotFoundError: If the file does not exist
     """
     import toml
 
     path = Path(toml_path)
     if not path.exists():
-        raise FileNotFoundError(f"Manifest not found: {toml_path}")
+        raise FileNotFoundError(
+            _t(
+                "manifest_not_found",
+                "Manifest not found: {path}",
+                path=toml_path,
+            )
+        )
 
     with open(path, 'r', encoding='utf-8') as f:
         data = toml.load(f)
@@ -256,25 +300,25 @@ def load_manifest_from_toml(toml_path: str) -> UnifiedManifest:
 
 def validate_manifest_dict(data: Dict[str, Any]) -> UnifiedManifest:
     """
-    Valida un diccionari com a manifest.
+    Validate a dictionary as a manifest.
 
     Args:
-        data: Diccionari amb dades del manifest
+        data: Dictionary with manifest data
 
     Returns:
-        UnifiedManifest validat
+        Validated UnifiedManifest
     """
     return UnifiedManifest(**data)
 
 
 def manifest_to_dict(manifest: UnifiedManifest) -> Dict[str, Any]:
     """
-    Converteix UnifiedManifest a diccionari.
+    Convert UnifiedManifest to a dictionary.
 
     Args:
-        manifest: UnifiedManifest a convertir
+        manifest: UnifiedManifest to convert
 
     Returns:
-        Diccionari amb dades del manifest
+        Dictionary with manifest data
     """
     return manifest.model_dump(exclude_none=True)

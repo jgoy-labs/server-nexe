@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/auth.py
-Description: Sistema d'autenticació centralitzat Nexe amb suport per API keys.
+Description: Centralized Nexe authentication system with API key support.
 
 www.jgoy.net
 ────────────────────────────────────

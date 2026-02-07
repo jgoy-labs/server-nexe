@@ -2,10 +2,32 @@
  "security": {
   "manifest": {
    "name": "Security",
-   "description": "Nexe 0.8 security module",
+   "description": "Comprehensive security system with scanning, vulnerability detection, API key authentication, rate limiting, and automated checks to validate the Nexe system's security.",
    "errors": {
     "not_ready": "Security module is not ready"
    }
+  },
+  "auth": {
+   "missing_key": "Missing API key",
+   "invalid_key": "Invalid API key",
+   "key_not_configured": "Server misconfiguration: API key not configured",
+   "server_misconfigured_no_valid_key": "Server misconfiguration: No valid API key configured",
+   "dev_mode_localhost_only": "DEV mode bypass only allowed from localhost",
+   "invalid_or_expired_key": "Invalid or expired API key",
+   "dev_mode_bypass": "DEV MODE: API key bypassed",
+   "dev_mode_warning": "NOT for production!",
+   "primary_key_auth": "Authenticated with primary API key",
+   "secondary_key_auth": "Authenticated with secondary API key (deprecated)",
+   "secondary_key_action_required": "MIGRATE TO PRIMARY KEY"
+  },
+  "api": {
+   "scan_hint": "Use POST /security/scan to run a full security scan"
+  },
+  "ui": {
+   "not_implemented": "Security UI not implemented yet"
+  },
+  "storage": {
+   "logs_desc": "Security logs - 90-day compliance"
   },
   "checks": {
    "auth_running": "Running authentication check...",
@@ -28,6 +50,18 @@
    "scan_complete": "Security scan completed",
    "vulnerabilities_found": "Vulnerabilities found: {count}",
    "no_issues": "No security issues detected"
+  },
+  "logs": {
+   "check_failed": "Check {check} failed: {error}",
+   "scan_failed": "Security scan failed: {error}",
+   "report_failed": "Failed to get security report: {error}",
+   "initialized": "Security module initialized: {name} v{version}",
+   "dev_mode_blocked": "SECURITY BLOCK: DEV_MODE cannot be enabled in production! NEXE_DEV_MODE=true is ignored when NEXE_ENV=production",
+   "xss_query_param": "🚫 XSS attempt in query param '{param}' from {ip}",
+   "sql_query_param": "🚫 SQL injection attempt in query param '{param}' from {ip}",
+   "command_query_param": "🚫 Command injection attempt in query param '{param}' from {ip}",
+   "path_query_param": "🚫 Path traversal attempt in query param '{param}' from {ip}",
+   "path_request": "🚫 Path traversal attempt: {path} from {ip}"
   }
  }
 }

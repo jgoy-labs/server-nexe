@@ -49,5 +49,19 @@
   "high_cpu": "Avís: Ús de CPU elevat per {module}: {usage}%",
   "slow_load": "Avís: Càrrega lenta per {module}: {time}ms",
   "many_errors": "Avís: Molts errors per {module}: {count} errors"
+ },
+
+ "endpoint": {
+  "prometheus_summary": "Mètriques Prometheus",
+  "prometheus_description": "Exposa mètriques en format Prometheus per scraping",
+  "prometheus_response_desc": "Mètriques Prometheus",
+  "health_summary": "Health check de mètriques",
+  "health_description": "Verifica que el sistema de mètriques funciona",
+  "json_summary": "Resum de mètriques (JSON)",
+  "json_description": "Resum de mètriques principals en format JSON"
+ },
+ "logs": {
+  "health_check_failed": "Comprovació de salut de mètriques fallida: {error}",
+  "module_health_update_skipped": "Actualització de salut de mòduls omesa: {error}"
  }
 }

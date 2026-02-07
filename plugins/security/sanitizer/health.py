@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/sanitizer/health.py
-Description: Health checks per al mòdul SANITIZER.
+Description: Health checks for the SANITIZER module.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -23,10 +23,10 @@ from .core.patterns import (
 
 def get_health() -> Dict[str, Any]:
   """
-  Retorna l'estat de salut del mòdul SANITIZER.
+  Return health status for the SANITIZER module.
 
   Returns:
-    Dict amb checks de salut
+    Dict with health checks
   """
   checks = {}
   overall_healthy = True

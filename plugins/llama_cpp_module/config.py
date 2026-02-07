@@ -1,24 +1,26 @@
 # -*- coding: utf-8 -*-
 """
-LlamaCppConfig - Configuració centralitzada per llama-cpp-python.
+LlamaCppConfig - Centralized configuration for llama-cpp-python.
 
-Totes les opcions es poden configurar via variables d'entorn:
-- NEXE_LLAMA_CPP_MODEL: Ruta al fitxer .gguf
+All options can be configured via environment variables:
+- NEXE_LLAMA_CPP_MODEL: Path to the .gguf file
 - NEXE_LLAMA_CPP_N_CTX: Context window (default: 8192)
-- NEXE_LLAMA_CPP_N_BATCH: Batch size per generació (default: 512) - MÉS ALT = MÉS RÀPID
-- NEXE_LLAMA_CPP_GPU_LAYERS: Capes a GPU, -1=tot (default: -1)
+- NEXE_LLAMA_CPP_N_BATCH: Batch size for generation (default: 512) - HIGHER = FASTER
+- NEXE_LLAMA_CPP_GPU_LAYERS: GPU layers, -1=all (default: -1)
 - NEXE_LLAMA_CPP_THREADS: CPU threads (default: 8)
-- NEXE_LLAMA_CPP_MAX_SESSIONS: Sessions actives màxim (default: 1)
-- NEXE_LLAMA_CPP_CHAT_FORMAT: Format del chat (default: gemma)
-- NEXE_LLAMA_CPP_USE_MLOCK: Mantenir model a RAM (default: true)
-- NEXE_LLAMA_CPP_USE_MMAP: Memory-map del model (default: true)
+- NEXE_LLAMA_CPP_MAX_SESSIONS: Max active sessions (default: 1)
+- NEXE_LLAMA_CPP_CHAT_FORMAT: Chat format (default: gemma)
+- NEXE_LLAMA_CPP_USE_MLOCK: Keep model in RAM (default: true)
+- NEXE_LLAMA_CPP_USE_MMAP: Memory-map the model (default: true)
 - NEXE_LLAMA_CPP_FLASH_ATTN: Flash attention (default: true)
 
-Part of: PLA_OPTIMITZACIO_LLM_MODULAR v1.9 - FASE 2
+Part of: PLA_OPTIMITZACIO_LLM_MODULAR v1.9 - PHASE 2
 """
 import os
 from dataclasses import dataclass
 import logging
+
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
 
@@ -26,40 +28,42 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LlamaCppConfig:
     """
-    Configuració per llama-cpp-python.
+    Configuration for llama-cpp-python.
 
     Attributes:
-        model_path: Ruta absoluta al fitxer .gguf
-        n_ctx: Context window en tokens (conservador per 27B)
-        n_batch: Batch size per generació (512-2048, més alt = més ràpid)
-        n_gpu_layers: Capes a carregar a GPU (-1 = totes, Metal)
-        n_threads: Threads de CPU per inferència
-        max_sessions: Màxim de sessions actives (LRU eviction)
-        chat_format: Format del chat template (gemma, llama-2, chatml, mistral)
-        use_mlock: Mantenir model a RAM (evita swapping)
-        use_mmap: Memory-map del model (més eficient)
-        flash_attn: Flash attention (més ràpid si suportat)
+        model_path: Absolute path to the .gguf file
+        n_ctx: Context window in tokens (conservative for 27B)
+        n_batch: Batch size for generation (512-2048, higher = faster)
+        n_gpu_layers: Layers to load on GPU (-1 = all, Metal)
+        n_threads: CPU threads for inference
+        max_sessions: Max active sessions (LRU eviction)
+        chat_format: Chat template format (gemma, llama-2, chatml, mistral)
+        use_mlock: Keep model in RAM (avoid swapping)
+        use_mmap: Memory-map the model (more efficient)
+        flash_attn: Flash attention (faster if supported)
     """
 
     model_path: str = ""
     n_ctx: int = 8192
-    n_batch: int = 512  # IMPORTANT: més alt = més tok/s
+    n_batch: int = 512  # IMPORTANT: higher = more tok/s
     n_gpu_layers: int = -1
     n_threads: int = 8
-    max_sessions: int = 1  # Opció B: conservador, escalable si cal
+    max_sessions: int = 1  # Option B: conservative, scalable if needed
     chat_format: str = "gemma"
     use_mlock: bool = True
     use_mmap: bool = True
     flash_attn: bool = True
 
     def __post_init__(self):
-        """Valida la configuració després de crear-la."""
+        """Validate configuration after creation."""
         if not self.model_path:
             logger.warning(
-                "LlamaCppConfig: model_path buit. "
-                "Configura NEXE_LLAMA_CPP_MODEL o passa model_path."
+                t_modular(
+                    "llama_cpp_module.config.model_path_empty",
+                    "LlamaCppConfig: model_path is empty. Configure NEXE_LLAMA_CPP_MODEL or pass model_path."
+                )
             )
-        # Expandir ~ a home directory
+        # Expand ~ to home directory
         if self.model_path.startswith("~"):
             self.model_path = os.path.expanduser(self.model_path)
         # Resolve relative paths based on project root
@@ -71,10 +75,10 @@ class LlamaCppConfig:
     @classmethod
     def from_env(cls) -> "LlamaCppConfig":
         """
-        Carrega configuració de variables d'entorn.
+        Load configuration from environment variables.
 
         Returns:
-            LlamaCppConfig amb valors de l'entorn o defaults.
+            LlamaCppConfig with environment values or defaults.
         """
         config = cls(
             model_path=os.getenv("NEXE_LLAMA_CPP_MODEL", ""),
@@ -89,54 +93,78 @@ class LlamaCppConfig:
             flash_attn=os.getenv("NEXE_LLAMA_CPP_FLASH_ATTN", "true").lower() == "true",
         )
 
+        model_short = config.model_path[-40:] if config.model_path else "(empty)"
         logger.info(
-            "LlamaCppConfig loaded: model=%s, n_ctx=%d, n_batch=%d, gpu_layers=%d, "
-            "threads=%d, mlock=%s, mmap=%s, flash_attn=%s",
-            config.model_path[-40:] if config.model_path else "(empty)",
-            config.n_ctx,
-            config.n_batch,
-            config.n_gpu_layers,
-            config.n_threads,
-            config.use_mlock,
-            config.use_mmap,
-            config.flash_attn,
+            t_modular(
+                "llama_cpp_module.config.loaded",
+                "LlamaCppConfig loaded: model={model}, n_ctx={n_ctx}, n_batch={n_batch}, gpu_layers={gpu_layers}, "
+                "threads={threads}, mlock={mlock}, mmap={mmap}, flash_attn={flash_attn}",
+                model=model_short,
+                n_ctx=config.n_ctx,
+                n_batch=config.n_batch,
+                gpu_layers=config.n_gpu_layers,
+                threads=config.n_threads,
+                mlock=config.use_mlock,
+                mmap=config.use_mmap,
+                flash_attn=config.flash_attn,
+            )
         )
 
         return config
 
     def validate(self) -> bool:
         """
-        Valida que la configuració és correcta.
+        Validate that the configuration is correct.
 
         Returns:
-            True si la config és vàlida, False si no.
+            True if config is valid, False otherwise.
         """
         if not self.model_path:
-            logger.error("LlamaCppConfig: model_path is required")
+            logger.error(
+                t_modular(
+                    "llama_cpp_module.config.model_path_required",
+                    "LlamaCppConfig: model_path is required"
+                )
+            )
             return False
 
         if not os.path.exists(self.model_path):
             logger.error(
-                "LlamaCppConfig: model_path no existeix: %s",
-                self.model_path
+                t_modular(
+                    "llama_cpp_module.config.model_path_missing",
+                    "LlamaCppConfig: model_path does not exist: {path}",
+                    path=self.model_path
+                )
             )
             return False
 
         if self.n_ctx < 512:
-            logger.error("LlamaCppConfig: n_ctx minimum is 512")
+            logger.error(
+                t_modular(
+                    "llama_cpp_module.config.n_ctx_min",
+                    "LlamaCppConfig: n_ctx minimum is 512"
+                )
+            )
             return False
 
         if self.max_sessions < 1:
-            logger.error("LlamaCppConfig: max_sessions minimum is 1")
+            logger.error(
+                t_modular(
+                    "llama_cpp_module.config.max_sessions_min",
+                    "LlamaCppConfig: max_sessions minimum is 1"
+                )
+            )
             return False
 
         valid_formats = {"gemma", "llama-2", "chatml", "mistral", "alpaca"}
         if self.chat_format not in valid_formats:
             logger.warning(
-                "LlamaCppConfig: chat_format '%s' no reconegut. "
-                "Formats vàlids: %s",
-                self.chat_format,
-                valid_formats
+                t_modular(
+                    "llama_cpp_module.config.chat_format_unrecognized",
+                    "LlamaCppConfig: chat_format '{chat_format}' not recognized. Valid formats: {valid_formats}",
+                    chat_format=self.chat_format,
+                    valid_formats=", ".join(sorted(valid_formats))
+                )
             )
 
         return True

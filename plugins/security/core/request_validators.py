@@ -13,6 +13,8 @@ www.jgoy.net
 import logging
 from fastapi import HTTPException, Request
 
+from personality.i18n.resolve import t_modular
+
 from .injection_detectors import (
   detect_xss_attempt,
   detect_sql_injection,
@@ -23,6 +25,9 @@ from .injection_detectors import (
 from .messages import get_message
 
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"security.logs.{key}", fallback, **kwargs)
 
 ALLOWED_CONTENT_TYPES = {
   "application/json",
@@ -159,9 +164,12 @@ async def validate_request_params(request: Request) -> bool:
     client_ip = request.client.host if request.client else "unknown"
 
     if detect_xss_attempt(value):
-      logger.warning(
-        "🚫 XSS attempt in query param '%s' from %s", key, client_ip
-      )
+      logger.warning(_t_log(
+        "xss_query_param",
+        "🚫 XSS attempt in query param '{param}' from {ip}",
+        param=key,
+        ip=client_ip
+      ))
 
       if hasattr(request, 'app') and hasattr(request.app, 'state'):
         if hasattr(request.app.state, 'security_logger'):
@@ -177,9 +185,12 @@ async def validate_request_params(request: Request) -> bool:
       )
 
     if detect_sql_injection(value):
-      logger.warning(
-        "🚫 SQL injection attempt in query param '%s' from %s", key, client_ip
-      )
+      logger.warning(_t_log(
+        "sql_query_param",
+        "🚫 SQL injection attempt in query param '{param}' from {ip}",
+        param=key,
+        ip=client_ip
+      ))
 
       if hasattr(request, 'app') and hasattr(request.app, 'state'):
         if hasattr(request.app.state, 'security_logger'):
@@ -195,9 +206,12 @@ async def validate_request_params(request: Request) -> bool:
       )
 
     if detect_command_injection(value):
-      logger.warning(
-        "🚫 Command injection attempt in query param '%s' from %s", key, client_ip
-      )
+      logger.warning(_t_log(
+        "command_query_param",
+        "🚫 Command injection attempt in query param '{param}' from {ip}",
+        param=key,
+        ip=client_ip
+      ))
 
       if hasattr(request, 'app') and hasattr(request.app, 'state'):
         if hasattr(request.app.state, 'security_logger'):
@@ -213,9 +227,12 @@ async def validate_request_params(request: Request) -> bool:
       )
 
     if detect_path_traversal(value):
-      logger.warning(
-        "🚫 Path traversal attempt in query param '%s' from %s", key, client_ip
-      )
+      logger.warning(_t_log(
+        "path_query_param",
+        "🚫 Path traversal attempt in query param '{param}' from {ip}",
+        param=key,
+        ip=client_ip
+      ))
       raise HTTPException(
         400,
         get_message(i18n, 'security.request.invalid_query_param', param=key)
@@ -243,9 +260,13 @@ async def validate_request_path(request: Request) -> bool:
   path = str(request.url.path)
 
   if detect_path_traversal(path):
-    logger.warning(
-      f"🚫 Path traversal attempt: {path} from {request.client.host}"
-    )
+    client_ip = request.client.host if request.client else "unknown"
+    logger.warning(_t_log(
+      "path_request",
+      "🚫 Path traversal attempt: {path} from {ip}",
+      path=path,
+      ip=client_ip
+    ))
     raise HTTPException(
       400,
       get_message(i18n, 'security.request.invalid_path')

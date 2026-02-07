@@ -13,10 +13,14 @@ www.jgoy.net
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 import structlog
+from personality.i18n.resolve import t_modular
 
 from .constants import MANIFEST
 
 logger = structlog.get_logger()
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.router.{key}", fallback, **kwargs)
 
 router_public = APIRouter(prefix="/memory", tags=["Memory"])
 
@@ -38,7 +42,11 @@ async def get_memory_health():
     module = MemoryModule.get_instance()
     health_data = module.get_health()
 
-    logger.debug("memory_health_check_requested", status=health_data.get("status"))
+    logger.debug(
+      "memory_health_check_requested",
+      message=_t("health_check_requested", "Memory health check requested"),
+      status=health_data.get("status")
+    )
 
     return JSONResponse(
       content=health_data,
@@ -46,7 +54,16 @@ async def get_memory_health():
     )
 
   except Exception as e:
-    logger.error("memory_health_check_error", error=str(e), exc_info=True)
+    logger.error(
+      "memory_health_check_error",
+      message=_t(
+        "health_check_error",
+        "Memory health check error: {error}",
+        error=str(e)
+      ),
+      error=str(e),
+      exc_info=True
+    )
 
     return JSONResponse(
       content={

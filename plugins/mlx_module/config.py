@@ -1,24 +1,26 @@
 # -*- coding: utf-8 -*-
 """
-MLXConfig - Configuració centralitzada per mlx-lm.
+MLXConfig - Centralized configuration for mlx-lm.
 
-Totes les opcions es poden configurar via variables d'entorn:
-- NEXE_MLX_MODEL: Ruta LOCAL al model MLX (obligatori)
-- NEXE_MLX_MAX_TOKENS: Màxim tokens a generar (default: 2048)
-- NEXE_MLX_MAX_KV_SIZE: Mida màxima KV cache (default: 16384)
-- NEXE_MLX_TEMPERATURE: Temperatura de sampling (default: 0.7)
+All options can be configured via environment variables:
+- NEXE_MLX_MODEL: LOCAL path to the MLX model (required)
+- NEXE_MLX_MAX_TOKENS: Max tokens to generate (default: 2048)
+- NEXE_MLX_MAX_KV_SIZE: Max KV cache size (default: 16384)
+- NEXE_MLX_TEMPERATURE: Sampling temperature (default: 0.7)
 - NEXE_MLX_TOP_P: Top-p sampling (default: 0.9)
-- NEXE_MLX_MAX_SESSION_CACHES: Màxim caches per sessió (default: 4)
+- NEXE_MLX_MAX_SESSION_CACHES: Max caches per session (default: 4)
 
-Part of: PLA_OPTIMITZACIO_LLM_MODULAR - Backend MLX
+Part of: PLA_OPTIMITZACIO_LLM_MODULAR - MLX backend
 """
 import os
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-# Carregar .env automàticament quan s'importa aquest mòdul
-# (Consistència amb llm_router/config.py - redundant però harmless)
+from personality.i18n.resolve import t_modular
+
+# Load .env automatically when this module is imported
+# (Consistency with llm_router/config.py - redundant but harmless)
 try:
     from dotenv import load_dotenv
     _env_path = Path(__file__).parents[3] / ".env"  # root directory .env
@@ -35,32 +37,34 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MLXConfig:
     """
-    Configuració per mlx-lm.
+    Configuration for mlx-lm.
 
     Attributes:
-        model_path: Ruta LOCAL al model MLX (safetensors format)
-        max_tokens: Màxim tokens a generar
-        max_kv_size: Mida màxima del KV cache
-        temperature: Temperatura de sampling (0.0 = determinístic)
+        model_path: LOCAL path to the MLX model (safetensors format)
+        max_tokens: Max tokens to generate
+        max_kv_size: Max KV cache size
+        temperature: Sampling temperature (0.0 = deterministic)
         top_p: Top-p nucleus sampling
-        max_session_caches: Màxim de caches per sessió (LRU eviction)
+        max_session_caches: Max caches per session (LRU eviction)
     """
 
     model_path: str = ""
     max_tokens: int = 2048
-    max_kv_size: int = 16384  # 128GB RAM permet context gran
+    max_kv_size: int = 16384  # 128GB RAM allows a large context
     temperature: float = 0.7
     top_p: float = 0.9
-    max_session_caches: int = 4  # Com ModelPool.max_sessions
+    max_session_caches: int = 4  # Like ModelPool.max_sessions
 
     def __post_init__(self):
-        """Valida la configuració després de crear-la."""
+        """Validate configuration after creation."""
         if not self.model_path:
             logger.warning(
-                "MLXConfig: model_path buit. "
-                "Configura NEXE_MLX_MODEL o passa model_path."
+                t_modular(
+                    "mlx_module.config.model_path_empty",
+                    "MLXConfig: model_path is empty. Configure NEXE_MLX_MODEL or pass model_path."
+                )
             )
-        # Expandir ~ a home directory
+        # Expand ~ to home directory
         if self.model_path.startswith("~"):
             self.model_path = os.path.expanduser(self.model_path)
         # Resolve relative paths based on project root
@@ -72,10 +76,10 @@ class MLXConfig:
     @classmethod
     def from_env(cls) -> "MLXConfig":
         """
-        Carrega configuració de variables d'entorn o fallback a server.toml.
+        Load configuration from environment variables or fallback to server.toml.
 
         Returns:
-            MLXConfig amb valors de l'entorn o defaults.
+            MLXConfig with environment values or defaults.
         """
         # 1. Start with env vars
         model_path = os.getenv("NEXE_MLX_MODEL", "")
@@ -100,7 +104,13 @@ class MLXConfig:
                         if "/" in candidate_path or "\\" in candidate_path:
                              model_path = candidate_path
             except Exception as e:
-                logger.warning(f"MLXConfig: Failed to read server.toml: {e}")
+                logger.warning(
+                    t_modular(
+                        "mlx_module.config.read_server_toml_failed",
+                        "MLXConfig: Failed to read server.toml: {error}",
+                        error=e
+                    )
+                )
 
         config = cls(
             model_path=model_path,
@@ -111,77 +121,113 @@ class MLXConfig:
             max_session_caches=int(os.getenv("NEXE_MLX_MAX_SESSION_CACHES", "4")),
         )
 
+        model_short = config.model_path[-40:] if config.model_path else "(empty)"
         logger.info(
-            "MLXConfig loaded: model=%s, max_tokens=%d, max_kv_size=%d, "
-            "temp=%.1f, top_p=%.1f, max_caches=%d",
-            config.model_path[-40:] if config.model_path else "(empty)",
-            config.max_tokens,
-            config.max_kv_size,
-            config.temperature,
-            config.top_p,
-            config.max_session_caches,
+            t_modular(
+                "mlx_module.config.loaded",
+                "MLXConfig loaded: model={model}, max_tokens={max_tokens}, max_kv_size={max_kv_size}, "
+                "temp={temperature:.1f}, top_p={top_p:.1f}, max_caches={max_caches}",
+                model=model_short,
+                max_tokens=config.max_tokens,
+                max_kv_size=config.max_kv_size,
+                temperature=config.temperature,
+                top_p=config.top_p,
+                max_caches=config.max_session_caches,
+            )
         )
 
         return config
 
     def validate(self) -> bool:
         """
-        Valida que la configuració és correcta.
+        Validate that the configuration is correct.
 
-        NOTA: Només suporta paths locals, NO HuggingFace repo IDs.
-        Això és volgut per evitar dependència de xarxa en producció.
-        Si voleu HF repos, descarregueu prèviament amb:
+        NOTE: Only supports local paths, NOT HuggingFace repo IDs.
+        This is intentional to avoid network dependency in production.
+        If you want HF repos, download them first with:
             huggingface-cli download <repo> --local-dir <path>
 
         Returns:
-            True si la config és vàlida, False si no.
+            True if the config is valid, False otherwise.
         """
         if not self.model_path:
-            logger.error("MLXConfig: model_path is required")
+            logger.error(
+                t_modular(
+                    "mlx_module.config.model_path_required",
+                    "MLXConfig: model_path is required"
+                )
+            )
             return False
 
-        # Validar que path local existeix (NO suportem HF repo IDs)
+        # Validate local path exists (we do NOT support HF repo IDs)
         model_path = Path(self.model_path)
         if not model_path.exists():
             logger.error(
-                "MLXConfig: model_path no existeix: %s",
-                self.model_path
+                t_modular(
+                    "mlx_module.config.model_path_missing",
+                    "MLXConfig: model_path does not exist: {path}",
+                    path=self.model_path
+                )
             )
             return False
 
-        # Verificar que és un directori (models MLX són directoris)
+        # Verify it is a directory (MLX models are directories)
         if not model_path.is_dir():
             logger.error(
-                "MLXConfig: model_path ha de ser un directori: %s",
-                self.model_path
+                t_modular(
+                    "mlx_module.config.model_path_not_dir",
+                    "MLXConfig: model_path must be a directory: {path}",
+                    path=self.model_path
+                )
             )
             return False
 
-        # Verificar que conté config.json (format MLX)
+        # Verify it contains config.json (MLX format)
         config_file = model_path / "config.json"
         if not config_file.exists():
             logger.warning(
-                "MLXConfig: model_path no conté config.json: %s",
-                self.model_path
+                t_modular(
+                    "mlx_module.config.config_json_missing",
+                    "MLXConfig: model_path does not contain config.json: {path}",
+                    path=self.model_path
+                )
             )
-            # No és error fatal, potser és format diferent
+            # Not a fatal error, may be a different format
 
         if self.max_tokens < 1:
-            logger.error("MLXConfig: max_tokens minimum is 1")
+            logger.error(
+                t_modular(
+                    "mlx_module.config.max_tokens_min",
+                    "MLXConfig: max_tokens minimum is 1"
+                )
+            )
             return False
 
         if self.max_kv_size < 512:
-            logger.error("MLXConfig: max_kv_size minimum is 512")
+            logger.error(
+                t_modular(
+                    "mlx_module.config.max_kv_size_min",
+                    "MLXConfig: max_kv_size minimum is 512"
+                )
+            )
             return False
 
         if not 0.0 <= self.temperature <= 2.0:
             logger.warning(
-                "MLXConfig: temperature %.1f fora de rang recomanat [0, 2]",
-                self.temperature
+                t_modular(
+                    "mlx_module.config.temperature_out_of_range",
+                    "MLXConfig: temperature {temperature:.1f} outside recommended range [0, 2]",
+                    temperature=self.temperature
+                )
             )
 
         if not 0.0 <= self.top_p <= 1.0:
-            logger.error("MLXConfig: top_p ha d'estar entre 0 i 1")
+            logger.error(
+                t_modular(
+                    "mlx_module.config.top_p_range",
+                    "MLXConfig: top_p must be between 0 and 1"
+                )
+            )
             return False
 
         return True
@@ -189,17 +235,28 @@ class MLXConfig:
     @staticmethod
     def is_metal_available() -> bool:
         """
-        Verifica si Metal (Apple Silicon) està disponible.
+        Check whether Metal (Apple Silicon) is available.
 
         Returns:
-            True si Metal està disponible, False si no.
+            True if Metal is available, False otherwise.
         """
         try:
             import mlx.core as mx
             return mx.metal.is_available()
         except ImportError:
-            logger.warning("MLXConfig: mlx no instal·lat")
+            logger.warning(
+                t_modular(
+                    "mlx_module.config.mlx_not_installed",
+                    "MLXConfig: mlx not installed"
+                )
+            )
             return False
         except Exception as e:
-            logger.warning("MLXConfig: error verificant Metal: %s", e)
+            logger.warning(
+                t_modular(
+                    "mlx_module.config.metal_check_failed",
+                    "MLXConfig: error checking Metal: {error}",
+                    error=e
+                )
+            )
             return False

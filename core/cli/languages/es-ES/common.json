@@ -121,10 +121,13 @@
    },
    "cli_not_found": "Error: CLI '{alias}' no encontrado",
    "python_not_found": "Error: Intérprete de Python no encontrado: {path}",
-   "exec_error": "Error ejecutando el CLI '{alias}': {error}"
+   "exec_error": "Error ejecutando el CLI '{alias}': {error}",
+   "skip_manifest": "Se omite el manifiesto: {path}"
   },
   "chat": {
    "default_system_prompt": "Eres Nexe, un asistente de IA local, preciso y seguro.",
+   "load_system_prompt_failed": "No se pudo cargar el system prompt: {error}",
+   "read_engine_config_failed": "No se pudo leer la configuración del motor: {error}",
    "options": {
     "engine": "Motor de inferencia",
     "system": "System prompt / Identidad",
@@ -171,6 +174,15 @@
    "goodbye": "\n👋 ¡Adiós!",
    "client_error": "\n❌ Error de cliente: {error}"
   },
+  "input": {
+   "prompt_default": ">>> ",
+   "paste_indicator": "[pegadas {count} líneas]",
+   "readline_setup_failed": "La configuración de readline falló: {error}",
+   "paste_detection_failed": "La detección de pegado falló: {error}",
+   "add_history_failed": "Añadir al historial falló: {error}",
+   "clear_history_failed": "Limpiar historial falló: {error}",
+   "get_history_failed": "Obtener historial falló: {error}"
+  },
   "logs": {
    "file_not_found": "⚠️ Archivo de log no encontrado: {path}",
    "following": "👀 Siguiendo logs de: {path} (últimas {lines} líneas)",
@@ -186,10 +198,22 @@
   "api": {
    "server_error": "Error del servidor ({status_code}): {error}",
    "connect_error": "❌ Error: No se pudo conectar al servidor Nexe. Asegúrate de que './nexe go' está en marcha.",
-   "offline_not_supported": "❌ El modo offline aún no está soportado. Ejecuta './nexe go' primero."
+   "offline_not_supported": "❌ El modo offline aún no está soportado. Ejecuta './nexe go' primero.",
+   "memory_store_error": "Error al guardar en memoria: {error}",
+   "memory_search_error": "Error al buscar en memoria: {error}"
+  },
+  "client": {
+   "invalid_url_scheme": "Esquema de URL inválido: {scheme}. Solo se permite http/https.",
+   "http_error": "Error del servidor: {error}",
+   "connection_error": "Error de conexión: {error}",
+   "unexpected_error": "Error inesperado: {error}",
+   "server_not_available": "Servidor no disponible"
   },
   "manifest": {
    "description": "CLI Central Nexe - Orquestador de CLIs de módulos",
+   "health_error": "Error de health check: {error}",
+   "info_error": "Error de información: {error}",
+   "list_error": "Error de lista: {error}",
    "features": {
     "discovery": "Descubrimiento dinámico de CLIs via manifest.toml",
     "subprocess": "Ejecución via subprocess para aislamiento",
@@ -197,6 +221,9 @@
     "ui": "UI web en /ui-control/clis",
     "api": "API en /ui-control/api/clis"
    }
+  },
+  "config": {
+   "load_failed": "No se pudo cargar la configuración: {error}"
   },
   "main": {
    "options": {

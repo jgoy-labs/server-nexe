@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/sanitizer/core/__init__.py
-Description: Core del SANITIZER - Detecció de jailbreaks i prompt injections per LLM.
+Description: SANITIZER core - Detection of jailbreaks and prompt injections for LLMs.
 
 www.jgoy.net
 ────────────────────────────────────

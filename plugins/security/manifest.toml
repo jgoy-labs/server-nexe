@@ -4,7 +4,7 @@ manifest_version = "1.0"
 name = "security"
 version = "0.2.0"
 type = "module"
-description = "Sistema de seguretat integral amb scanning, detecció de vulnerabilitats, autenticació API key, rate limiting i checks automatitzats per validar la seguretat del sistema Nexe"
+description = "i18n:security.manifest.description|Comprehensive security system with scanning, vulnerability detection, API key authentication, rate limiting, and automated checks to validate the Nexe system's security."
 enabled = true
 auto_start = false
 priority = 10
@@ -55,7 +55,7 @@ format = "json"
 retention_days = 90
 action = "ARCHIVE"
 archive_to = "storage/archives/security/{year}-{month}/"
-description = "Security logs - compliance 90 dies"
+description = "i18n:security.storage.logs_desc|Security logs - 90-day compliance"
 auto_clean = false
 
 [capabilities.custom]

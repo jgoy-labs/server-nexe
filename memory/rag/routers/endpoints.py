@@ -91,7 +91,11 @@ async def add_document_endpoint(request: Dict[str, Any]):
     })
 
   except Exception as e:
-    logger.error("Error adding document via API: %s", e, exc_info=True)
+    logger.error(_t(
+      "rag.logs.add_document_error",
+      "Error adding document via API: {error}",
+      error=str(e)
+    ), exc_info=True)
     raise HTTPException(status_code=500, detail=str(e))
 
 async def search_endpoint(request: Dict[str, Any]):
@@ -140,7 +144,11 @@ async def search_endpoint(request: Dict[str, Any]):
     })
 
   except Exception as e:
-    logger.error("Error searching via API: %s", e, exc_info=True)
+    logger.error(_t(
+      "rag.logs.search_error",
+      "Error searching via API: {error}",
+      error=str(e)
+    ), exc_info=True)
     raise HTTPException(status_code=500, detail=str(e))
 
 async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}"):
@@ -212,7 +220,11 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
   except HTTPException:
     raise
   except Exception as e:
-    logger.error("Error uploading file via API: %s", e, exc_info=True)
+    logger.error(_t(
+      "rag.logs.upload_error",
+      "Error uploading file via API: {error}",
+      error=str(e)
+    ), exc_info=True)
     raise HTTPException(
       status_code=500,
       detail=_t("rag.api.file_processing_error", "Error processing file: {error}", error=str(e))
@@ -229,7 +241,11 @@ async def health_endpoint():
     return JSONResponse(content=health, status_code=status_code)
 
   except Exception as e:
-    logger.error("Error checking health via API: %s", e, exc_info=True)
+    logger.error(_t(
+      "rag.logs.health_error",
+      "Error checking health via API: {error}",
+      error=str(e)
+    ), exc_info=True)
     return JSONResponse(content={"status": "error", "error": str(e)}, status_code=500)
 
 async def info_endpoint():
@@ -241,7 +257,11 @@ async def info_endpoint():
     return JSONResponse(content=module.get_info())
 
   except Exception as e:
-    logger.error("Error getting info via API: %s", e, exc_info=True)
+    logger.error(_t(
+      "rag.logs.info_error",
+      "Error getting info via API: {error}",
+      error=str(e)
+    ), exc_info=True)
     raise HTTPException(status_code=500, detail=str(e))
 
 async def files_stats_endpoint():
@@ -269,7 +289,11 @@ async def files_stats_endpoint():
     })
 
   except Exception as e:
-    logger.error("Error getting file stats via API: %s", e, exc_info=True)
+    logger.error(_t(
+      "rag.logs.file_stats_error",
+      "Error getting file stats via API: {error}",
+      error=str(e)
+    ), exc_info=True)
     raise HTTPException(status_code=500, detail=str(e))
 
 __all__ = [

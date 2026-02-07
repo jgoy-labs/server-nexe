@@ -85,11 +85,31 @@ def setup_rate_limiting(app: FastAPI, i18n = None) -> None:
 
       app.state.start_rate_limit_cleanup = start_rate_limit_cleanup_task
 
-      logger.info("Phase 3.1: Advanced rate limiting enabled")
-      logger.info("  - IP rate limiting: OK")
-      logger.info("  - API key rate limiting: OK")
-      logger.info("  - Composite rate limiting: OK")
-      logger.info("  - X-RateLimit-* headers: OK")
+      logger.info(_translate(
+        i18n,
+        "core.middleware.rate_limit_advanced_enabled",
+        "Phase 3.1: Advanced rate limiting enabled"
+      ))
+      logger.info(_translate(
+        i18n,
+        "core.middleware.rate_limit_ip_ok",
+        "  - IP rate limiting: OK"
+      ))
+      logger.info(_translate(
+        i18n,
+        "core.middleware.rate_limit_api_key_ok",
+        "  - API key rate limiting: OK"
+      ))
+      logger.info(_translate(
+        i18n,
+        "core.middleware.rate_limit_composite_ok",
+        "  - Composite rate limiting: OK"
+      ))
+      logger.info(_translate(
+        i18n,
+        "core.middleware.rate_limit_headers_ok",
+        "  - X-RateLimit-* headers: OK"
+      ))
 
     except Exception as e:
       msg1 = _translate(i18n, "core.middleware.rate_limit_advanced_failed", "Advanced rate limiting setup failed: {error}", error=str(e))
@@ -150,9 +170,24 @@ def setup_cors(app: FastAPI, config: Dict[str, Any], i18n = None) -> None:
 
     raise ValueError(msg)
 
-  logger.info(f"CORS configured: origins={cors_origins}")
-  logger.debug(f"  methods={cors_methods}")
-  logger.debug(f"  headers={cors_headers}")
+  logger.info(_translate(
+    i18n,
+    "core.middleware.cors_configured",
+    "CORS configured: origins={origins}",
+    origins=cors_origins
+  ))
+  logger.debug(_translate(
+    i18n,
+    "core.middleware.cors_methods",
+    "  methods={methods}",
+    methods=cors_methods
+  ))
+  logger.debug(_translate(
+    i18n,
+    "core.middleware.cors_headers",
+    "  headers={headers}",
+    headers=cors_headers
+  ))
 
   app.add_middleware(
     CORSMiddleware,
@@ -162,7 +197,7 @@ def setup_cors(app: FastAPI, config: Dict[str, Any], i18n = None) -> None:
     allow_headers=cors_headers,
   )
 
-def setup_request_size_limit(app: FastAPI, config: Dict[str, Any]) -> None:
+def setup_request_size_limit(app: FastAPI, config: Dict[str, Any], i18n = None) -> None:
   """
   Setup request size limiter middleware
 
@@ -179,9 +214,14 @@ def setup_request_size_limit(app: FastAPI, config: Dict[str, Any]) -> None:
 
   app.add_middleware(RequestSizeLimiterMiddleware, max_size=max_request_size)
 
-  logger.info(f"Request size limit: {max_request_size / (1024**2):.1f} MB")
+  logger.info(_translate(
+    i18n,
+    "core.middleware.request_size_limit",
+    "Request size limit: {size_mb:.1f} MB",
+    size_mb=max_request_size / (1024**2)
+  ))
 
-def setup_prometheus_metrics(app: FastAPI) -> None:
+def setup_prometheus_metrics(app: FastAPI, i18n = None) -> None:
   """
   Setup Prometheus metrics middleware.
 
@@ -191,11 +231,20 @@ def setup_prometheus_metrics(app: FastAPI) -> None:
   try:
     from core.metrics.middleware import PrometheusMiddleware
     app.add_middleware(PrometheusMiddleware)
-    logger.info("prometheus_metrics_middleware_enabled")
+    logger.info(_translate(
+      i18n,
+      "core.middleware.prometheus_enabled",
+      "Prometheus metrics middleware enabled"
+    ))
   except ImportError as e:
-    logger.warning(f"prometheus_metrics_not_available: {e}")
+    logger.warning(_translate(
+      i18n,
+      "core.middleware.prometheus_not_available",
+      "Prometheus metrics not available: {error}",
+      error=str(e)
+    ))
 
-def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
+def setup_csrf_protection(app: FastAPI, config: Dict[str, Any], i18n = None) -> None:
   """
   Setup CSRF protection middleware.
 
@@ -213,9 +262,21 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
   if not csrf_secret:
     if is_prod:
       # In production, require explicit CSRF secret configuration
-      logger.error("NEXE_CSRF_SECRET not configured in production mode!")
-      logger.error("   Sessions will be invalidated on each restart.")
-      logger.error("   Set NEXE_CSRF_SECRET in .env for persistent sessions.")
+      logger.error(_translate(
+        i18n,
+        "core.middleware.csrf_secret_missing",
+        "NEXE_CSRF_SECRET not configured in production mode!"
+      ))
+      logger.error(_translate(
+        i18n,
+        "core.middleware.csrf_sessions_invalidated",
+        "   Sessions will be invalidated on each restart."
+      ))
+      logger.error(_translate(
+        i18n,
+        "core.middleware.csrf_set_env_hint",
+        "   Set NEXE_CSRF_SECRET in .env for persistent sessions."
+      ))
       # Generate temporary but log clearly
       import secrets
       csrf_secret = secrets.token_hex(32)
@@ -223,7 +284,11 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
       # Development mode: generate temporary secret with warning
       import secrets
       csrf_secret = secrets.token_hex(32)
-      logger.warning("CSRF_SECRET not configured. Using temporary secret (dev mode only)")
+      logger.warning(_translate(
+        i18n,
+        "core.middleware.csrf_secret_temp",
+        "CSRF_SECRET not configured. Using temporary secret (dev mode only)"
+      ))
 
   try:
     from starlette.middleware import Middleware
@@ -244,7 +309,12 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
     # Allow manual override if user has SSL locally or not in prod
     if "csrf_cookie_secure" in server_config:
       cookie_secure = server_config["csrf_cookie_secure"]
-      logger.info(f"  CSRF cookie_secure manual override: {cookie_secure}")
+      logger.info(_translate(
+        i18n,
+        "core.middleware.csrf_cookie_override",
+        "  CSRF cookie_secure manual override: {value}",
+        value=cookie_secure
+      ))
 
     # Use pre-compiled patterns from module level (more efficient)
     app.add_middleware(
@@ -255,10 +325,22 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
       cookie_samesite="strict",
       exempt_urls=_CSRF_EXEMPT_PATTERNS,  # Pre-compiled at module load
     )
-    logger.info("CSRF protection enabled")
+    logger.info(_translate(
+      i18n,
+      "core.middleware.csrf_enabled",
+      "CSRF protection enabled"
+    ))
   except ImportError:
-    logger.warning("starlette-csrf not installed. CSRF protection disabled.")
-    logger.warning("  Install with: pip install starlette-csrf")
+    logger.warning(_translate(
+      i18n,
+      "core.middleware.csrf_not_installed",
+      "starlette-csrf not installed. CSRF protection disabled."
+    ))
+    logger.warning(_translate(
+      i18n,
+      "core.middleware.csrf_install_hint",
+      "  Install with: pip install starlette-csrf"
+    ))
 
 def setup_all_middleware(app: FastAPI, config: Dict[str, Any], i18n = None) -> None:
   """
@@ -269,13 +351,13 @@ def setup_all_middleware(app: FastAPI, config: Dict[str, Any], i18n = None) -> N
     config: Configuration dictionary
     i18n: Optional I18n instance for translations
   """
-  setup_prometheus_metrics(app)
+  setup_prometheus_metrics(app, i18n)
 
   app.add_middleware(SecurityHeadersMiddleware)
 
-  setup_csrf_protection(app, config)
+  setup_csrf_protection(app, config, i18n)
 
-  setup_request_size_limit(app, config)
+  setup_request_size_limit(app, config, i18n)
 
   setup_rate_limiting(app, i18n)
   setup_cors(app, config, i18n)

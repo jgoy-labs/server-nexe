@@ -15,9 +15,12 @@ from pathlib import Path
 import psutil
 import structlog
 
-from personality.i18n import get_i18n
+from personality.i18n.resolve import t_modular
 
 logger = structlog.get_logger()
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(key, fallback, **kwargs)
 
 def check_module_initialized(module) -> Dict[str, Any]:
   """
@@ -32,9 +35,9 @@ def check_module_initialized(module) -> Dict[str, Any]:
   try:
     is_init = module._initialized
     message = (
-      get_i18n().t("embeddings.health.initialized_ok", "Module initialized correctly")
+      _t("embeddings.health.initialized_ok", "Module initialized correctly")
       if is_init
-      else get_i18n().t("embeddings.health.not_initialized", "Module not initialized")
+      else _t("embeddings.health.not_initialized", "Module not initialized")
     )
     return {
       "name": "module_initialized",
@@ -45,7 +48,7 @@ def check_module_initialized(module) -> Dict[str, Any]:
     return {
       "name": "module_initialized",
       "status": "fail",
-      "message": get_i18n().t(
+      "message": _t(
         "embeddings.health.init_check_error",
         "Error checking initialization: {error}",
         error=str(e)
@@ -65,7 +68,7 @@ def check_dependencies_available() -> Dict[str, Any]:
     return {
       "name": "dependencies_available",
       "status": "pass",
-      "message": get_i18n().t(
+      "message": _t(
         "embeddings.health.dependencies_ok",
         "sentence-transformers {version} available",
         version=version
@@ -75,7 +78,7 @@ def check_dependencies_available() -> Dict[str, Any]:
     return {
       "name": "dependencies_available",
       "status": "fail",
-      "message": get_i18n().t(
+      "message": _t(
         "embeddings.health.dependencies_missing",
         "sentence-transformers not installed (pip install sentence-transformers)"
       )
@@ -84,7 +87,7 @@ def check_dependencies_available() -> Dict[str, Any]:
     return {
       "name": "dependencies_available",
       "status": "fail",
-      "message": get_i18n().t(
+      "message": _t(
         "embeddings.health.dependencies_error",
         "Error checking dependencies: {error}",
         error=str(e)
@@ -107,12 +110,12 @@ def check_device_available() -> Dict[str, Any]:
     if torch.backends.mps.is_available():
       device = "mps"
       status = "pass"
-      message = get_i18n().t("embeddings.health.device_mps", "MPS (Apple Silicon) available")
+      message = _t("embeddings.health.device_mps", "MPS (Apple Silicon) available")
     elif torch.cuda.is_available():
       device = f"cuda:{torch.cuda.current_device()}"
       status = "pass"
       device_name = torch.cuda.get_device_name(0)
-      message = get_i18n().t(
+      message = _t(
         "embeddings.health.device_cuda",
         "CUDA available ({device})",
         device=device_name
@@ -120,7 +123,7 @@ def check_device_available() -> Dict[str, Any]:
     else:
       device = "cpu"
       status = "warn"
-      message = get_i18n().t("embeddings.health.device_cpu_only", "Only CPU available (slower performance)")
+      message = _t("embeddings.health.device_cpu_only", "Only CPU available (slower performance)")
 
     return {
       "name": "device_available",
@@ -133,13 +136,13 @@ def check_device_available() -> Dict[str, Any]:
     return {
       "name": "device_available",
       "status": "fail",
-      "message": get_i18n().t("embeddings.health.device_torch_missing", "torch not installed (pip install torch)")
+      "message": _t("embeddings.health.device_torch_missing", "torch not installed (pip install torch)")
     }
   except Exception as e:
     return {
       "name": "device_available",
       "status": "fail",
-      "message": get_i18n().t(
+      "message": _t(
         "embeddings.health.device_error",
         "Error checking device: {error}",
         error=str(e)
@@ -173,28 +176,28 @@ def check_cache_directories() -> Dict[str, Any]:
       return {
         "name": "cache_directories",
         "status": "pass",
-        "message": get_i18n().t(
-          "embeddings.health.cache_writable",
-          "Cache directory writable: {path}",
-          path=str(cache_dir)
-        )
+      "message": _t(
+        "embeddings.health.cache_writable",
+        "Cache directory writable: {path}",
+        path=str(cache_dir)
+      )
       }
     else:
       return {
         "name": "cache_directories",
         "status": "fail",
-        "message": get_i18n().t(
-          "embeddings.health.cache_not_writable",
-          "Cache directory not writable: {path}",
-          path=str(cache_dir)
-        )
+      "message": _t(
+        "embeddings.health.cache_not_writable",
+        "Cache directory not writable: {path}",
+        path=str(cache_dir)
+      )
       }
 
   except Exception as e:
     return {
       "name": "cache_directories",
       "status": "fail",
-      "message": get_i18n().t(
+      "message": _t(
         "embeddings.health.cache_error",
         "Error checking cache directories: {error}",
         error=str(e)
@@ -217,7 +220,7 @@ def check_memory_available(min_gb: float = 2.0) -> Dict[str, Any]:
 
     if available_gb >= min_gb:
       status = "pass"
-      message = get_i18n().t(
+      message = _t(
         "embeddings.health.memory_ok",
         "{available}GB available (>={required}GB required)",
         available=f"{available_gb:.1f}",
@@ -225,7 +228,7 @@ def check_memory_available(min_gb: float = 2.0) -> Dict[str, Any]:
       )
     elif available_gb >= min_gb / 2:
       status = "warn"
-      message = get_i18n().t(
+      message = _t(
         "embeddings.health.memory_warn",
         "{available}GB available (<{required}GB required, may be slow)",
         available=f"{available_gb:.1f}",
@@ -233,7 +236,7 @@ def check_memory_available(min_gb: float = 2.0) -> Dict[str, Any]:
       )
     else:
       status = "fail"
-      message = get_i18n().t(
+      message = _t(
         "embeddings.health.memory_critical",
         "{available}GB available (critical: <{critical}GB)",
         available=f"{available_gb:.1f}",
@@ -251,7 +254,7 @@ def check_memory_available(min_gb: float = 2.0) -> Dict[str, Any]:
     return {
       "name": "memory_available",
       "status": "fail",
-      "message": get_i18n().t(
+      "message": _t(
         "embeddings.health.memory_error",
         "Error checking memory: {error}",
         error=str(e)
@@ -310,6 +313,15 @@ def check_health(module) -> Dict[str, Any]:
 
     logger.info(
       "embeddings_health_check_complete",
+      message=_t(
+        "embeddings.health.logs.check_complete",
+        "Embeddings health check complete (status={status}, total={total}, pass={passed}, warn={warned}, fail={failed})",
+        status=overall_status,
+        total=len(checks),
+        passed=sum(1 for c in checks if c["status"] == "pass"),
+        warned=sum(1 for c in checks if c["status"] == "warn"),
+        failed=sum(1 for c in checks if c["status"] == "fail"),
+      ),
       status=overall_status,
       checks_total=len(checks),
       checks_pass=sum(1 for c in checks if c["status"] == "pass"),
@@ -322,6 +334,11 @@ def check_health(module) -> Dict[str, Any]:
   except Exception as e:
     logger.error(
       "embeddings_health_check_failed",
+      message=_t(
+        "embeddings.health.logs.check_failed",
+        "Embeddings health check failed: {error}",
+        error=str(e)
+      ),
       error=str(e),
       exc_info=True
     )

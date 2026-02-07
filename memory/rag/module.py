@@ -14,10 +14,16 @@ from typing import Optional, Dict, Any, List
 import threading
 import structlog
 
-from personality.i18n import get_i18n
+from personality.i18n.resolve import t_modular
 from memory.rag_sources.base import AddDocumentRequest, SearchRequest, SearchHit
 
 logger = structlog.get_logger()
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(key, fallback, **kwargs)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"rag.logs.{key}", fallback, **kwargs)
 
 class RAGModule:
   """
@@ -48,9 +54,8 @@ class RAGModule:
   def __init__(self):
     """Private constructor. Use get_instance()."""
     if RAGModule._instance is not None:
-      i18n = get_i18n()
       raise RuntimeError(
-        i18n.t("rag.singleton_error", "RAGModule is Singleton. Use get_instance()")
+        _t("rag.singleton_error", "RAGModule is Singleton. Use get_instance()")
       )
 
     from .constants import MANIFEST, MODULE_ID
@@ -75,6 +80,7 @@ class RAGModule:
 
     logger.info(
       "rag_module_created",
+      message=_t_log("module_created", "RAG module created"),
       module_id=self.module_id,
       version=self.version
     )
@@ -108,7 +114,10 @@ class RAGModule:
       RuntimeError: If already initialized
     """
     if self._initialized:
-      logger.warning("rag_module_already_initialized")
+      logger.warning(
+        "rag_module_already_initialized",
+        message=_t_log("already_initialized", "RAG module already initialized")
+      )
       return True
 
     try:
@@ -118,12 +127,13 @@ class RAGModule:
 
       logger.info(
         "rag_module_initializing",
+        message=_t_log("initializing", "RAG module initializing"),
         config=final_config
       )
 
       from memory.rag_sources.personality import PersonalityRAG
 
-      logger.debug("Loading PersonalityRAG source...")
+      logger.debug(_t_log("loading_personality_source", "Loading PersonalityRAG source..."))
       personality_rag = PersonalityRAG()
 
       self._sources = {
@@ -132,6 +142,7 @@ class RAGModule:
 
       logger.info(
         "rag_sources_loaded",
+        message=_t_log("sources_loaded", "RAG sources loaded: {sources}", sources=list(self._sources.keys())),
         sources=list(self._sources.keys())
       )
 
@@ -146,6 +157,12 @@ class RAGModule:
 
       logger.info(
         "rag_module_initialized",
+        message=_t_log(
+          "initialized",
+          "RAG module initialized (version={version}, sources_count={count})",
+          version=self.version,
+          count=len(self._sources),
+        ),
         version=self.version,
         sources_count=len(self._sources),
         initialized=self._initialized
@@ -156,6 +173,7 @@ class RAGModule:
     except Exception as e:
       logger.error(
         "rag_module_init_failed",
+        message=_t_log("init_failed", "RAG module initialization failed: {error}", error=str(e)),
         error=str(e),
         exc_info=True
       )
@@ -174,23 +192,33 @@ class RAGModule:
       bool: True if shutdown correct
     """
     if not self._initialized:
-      logger.warning("rag_module_not_initialized_shutdown")
+      logger.warning(
+        "rag_module_not_initialized_shutdown",
+        message=_t_log("not_initialized_shutdown", "RAG module not initialized; skipping shutdown")
+      )
       return True
 
     try:
-      logger.info("rag_module_shutting_down")
+      logger.info(
+        "rag_module_shutting_down",
+        message=_t_log("shutting_down", "RAG module shutting down")
+      )
 
       self._initialized = False
       self._vector_store = None
       self._ledger = None
       self._write_coordinator = None
 
-      logger.info("rag_module_shutdown_complete")
+      logger.info(
+        "rag_module_shutdown_complete",
+        message=_t_log("shutdown_complete", "RAG module shutdown complete")
+      )
       return True
 
     except Exception as e:
       logger.error(
         "rag_module_shutdown_failed",
+        message=_t_log("shutdown_failed", "RAG module shutdown failed: {error}", error=str(e)),
         error=str(e),
         exc_info=True
       )
@@ -216,12 +244,18 @@ class RAGModule:
       ValueError: If source unknown
     """
     if not self._initialized:
-      raise RuntimeError("RAGModule not initialized. Call initialize() first.")
+      raise RuntimeError(
+        _t("rag.not_initialized", "RAGModule not initialized. Call initialize() first.")
+      )
 
     if source not in self._sources:
       raise ValueError(
-        f"Unknown RAG source: {source}. "
-        f"Available: {list(self._sources.keys())}"
+        _t(
+          "rag.source_unknown",
+          "Unknown RAG source: {source}. Available: {sources}",
+          source=source,
+          sources=list(self._sources.keys())
+        )
       )
 
     rag_source = self._sources[source]
@@ -233,6 +267,14 @@ class RAGModule:
 
       logger.info(
         "document_added",
+        message=_t_log(
+          "document_added",
+          "Document added (source={source}, doc_id={doc_id}, text_len={text_len}, total_docs={total_docs})",
+          source=source,
+          doc_id=doc_id,
+          text_len=len(request.text),
+          total_docs=self._stats["documents_added"],
+        ),
         doc_id=doc_id,
         source=source,
         text_len=len(request.text),
@@ -244,6 +286,12 @@ class RAGModule:
     except Exception as e:
       logger.error(
         "add_document_failed",
+        message=_t_log(
+          "add_document_failed",
+          "Add document failed (source={source}): {error}",
+          source=source,
+          error=str(e),
+        ),
         error=str(e),
         source=source,
         exc_info=True
@@ -270,12 +318,18 @@ class RAGModule:
       ValueError: If source unknown
     """
     if not self._initialized:
-      raise RuntimeError("RAGModule not initialized. Call initialize() first.")
+      raise RuntimeError(
+        _t("rag.not_initialized", "RAGModule not initialized. Call initialize() first.")
+      )
 
     if source not in self._sources:
       raise ValueError(
-        f"Unknown RAG source: {source}. "
-        f"Available: {list(self._sources.keys())}"
+        _t(
+          "rag.source_unknown",
+          "Unknown RAG source: {source}. Available: {sources}",
+          source=source,
+          sources=list(self._sources.keys())
+        )
       )
 
     rag_source = self._sources[source]
@@ -287,6 +341,14 @@ class RAGModule:
 
       logger.info(
         "search_performed",
+        message=_t_log(
+          "search_performed",
+          "Search performed (source={source}, query_len={query_len}, results_count={results_count}, total_searches={total_searches})",
+          source=source,
+          query_len=len(request.query),
+          results_count=len(results),
+          total_searches=self._stats["searches_performed"],
+        ),
         query=request.query,
         source=source,
         results_count=len(results),
@@ -298,6 +360,13 @@ class RAGModule:
     except Exception as e:
       logger.error(
         "search_failed",
+        message=_t_log(
+          "search_failed",
+          "Search failed (source={source}, query={query}): {error}",
+          source=source,
+          query=request.query,
+          error=str(e),
+        ),
         error=str(e),
         source=source,
         query=request.query,
@@ -320,8 +389,12 @@ class RAGModule:
     """
     if name not in self._sources:
       raise ValueError(
-        f"Unknown RAG source: {name}. "
-        f"Available: {list(self._sources.keys())}"
+        _t(
+          "rag.source_unknown",
+          "Unknown RAG source: {source}. Available: {sources}",
+          source=name,
+          sources=list(self._sources.keys())
+        )
       )
     return self._sources[name]
 

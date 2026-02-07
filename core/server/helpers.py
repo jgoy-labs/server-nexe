@@ -15,7 +15,12 @@ import signal
 import socket
 import sys
 
+from personality.i18n.resolve import t_modular
+
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.server_helpers.{key}", fallback, **kwargs)
 
 def is_port_in_use(host: str, port: int) -> bool:
   """
@@ -42,7 +47,11 @@ def setup_signal_handlers():
   """
   def signal_handler(signum, frame):
     signame = signal.Signals(signum).name
-    logger.info(f"🛑 Rebut senyal {signame}, aturant servidor...")
+    logger.info(_t(
+      "signal_received",
+      "🛑 Received signal {signal}, stopping server...",
+      signal=signame
+    ))
     sys.exit(0)
 
   signal.signal(signal.SIGINT, signal_handler)

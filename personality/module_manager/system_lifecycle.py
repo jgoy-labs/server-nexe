@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/system_lifecycle.py
-Description: Gestor de cicle de vida del sistema Nexe. Controla start_system (discovery +
+Description: Nexe system lifecycle manager. Controls start_system (discovery +
 
 www.jgoy.net
 ────────────────────────────────────
@@ -18,19 +18,19 @@ logger = logging.getLogger(__name__)
 LOGGER_AVAILABLE = False
 
 class SystemLifecycleManager:
-  """Gestiona cicle de vida del sistema complet"""
+  """Manage the full system lifecycle."""
 
   def __init__(self, modules, module_lifecycle, discovery_func, list_modules_func,
          i18n=None):
     """
-    Inicialitza gestor de cicle de vida del sistema.
+    Initialize the system lifecycle manager.
 
     Args:
-      modules: Diccionari de mòduls
+      modules: Module dictionary
       module_lifecycle: ModuleLifecycleManager
-      discovery_func: Funció per descobrir mòduls
-      list_modules_func: Funció per llistar mòduls
-      i18n: Gestor i18n opcional
+      discovery_func: Function to discover modules
+      list_modules_func: Function to list modules
+      i18n: Optional i18n manager
     """
     self.modules = modules
     self.module_lifecycle = module_lifecycle
@@ -41,10 +41,10 @@ class SystemLifecycleManager:
 
   async def start_system(self) -> bool:
     """
-    Inicia el sistema complet.
+    Start the full system.
 
     Returns:
-      True si s'ha iniciat correctament
+      True if started successfully
     """
     try:
       self._running = True
@@ -82,7 +82,7 @@ class SystemLifecycleManager:
       return False
 
   async def shutdown_system(self) -> None:
-    """Atura el sistema complet"""
+    """Stop the full system."""
     if LOGGER_AVAILABLE:
       msg = get_message(self.i18n, 'system.shutdown.initiated')
       logger.info(msg, component="system_lifecycle")
@@ -100,9 +100,9 @@ class SystemLifecycleManager:
       logger.info(msg, component="system_lifecycle")
 
   def is_running(self) -> bool:
-    """Retorna si el sistema està en execució"""
+    """Return whether the system is running."""
     return self._running
 
   def _get_lock(self):
-    """Obté el lock del context (serà injectat)"""
+    """Get the context lock (injected later)."""
     return None

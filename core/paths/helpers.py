@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/paths/helpers.py
-Description: Path helpers i convenience functions per accés ràpid a directoris Nexe.
+Description: Path helpers and convenience functions for quick access to Nexe directories.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -18,13 +18,13 @@ from .detection import get_repo_root
 
 def get_project_path(*parts: str) -> Path:
   """
-  Construeix un path relatiu a l'arrel del projecte.
+  Build a path relative to the project root.
 
   Args:
-    *parts: Components del path (e.g. "plugins", "core", "security")
+    *parts: Path components (e.g. "plugins", "core", "security")
 
   Returns:
-    Path absolut
+    Absolute path
 
   Examples:
     >>> security_dir = get_project_path("plugins", "core", "security")
@@ -33,38 +33,38 @@ def get_project_path(*parts: str) -> Path:
   return get_repo_root().joinpath(*parts)
 
 def get_plugins_path(*parts: str) -> Path:
-  """Shortcut per paths a plugins/"""
+  """Shortcut for paths under plugins/."""
   return get_project_path("plugins", *parts)
 
 def get_memory_path(*parts: str) -> Path:
-  """Shortcut per paths a memory/"""
+  """Shortcut for paths under memory/."""
   return get_project_path("memory", *parts)
 
 def get_core_path(*parts: str) -> Path:
-  """Shortcut per paths a core/"""
+  """Shortcut for paths under core/."""
   return get_project_path("core", *parts)
 
 def get_personality_path(*parts: str) -> Path:
-  """Shortcut per paths a personality/"""
+  """Shortcut for paths under personality/."""
   return get_project_path("personality", *parts)
 
 def get_storage_path(*parts: str) -> Path:
-  """Shortcut per paths a storage/"""
+  """Shortcut for paths under storage/."""
   return get_project_path("storage", *parts)
 
 def get_logs_dir() -> Path:
   """
-  Determina el directori de logs de forma robusta.
+  Determine the logs directory robustly.
 
-  ACTUALITZAT v2.0.0: Ara usa get_repo_root() eliminant fallback cwd unsafe.
+  UPDATED v2.0.0: Now uses get_repo_root() removing unsafe cwd fallback.
 
-  Prioritat:
-  1. Variable d'entorn NEXE_LOGS_DIR (si existeix)
-  2. Si estem en site-packages (pip install): ~/.nexe/logs/
-  3. En desenvolupament: {project_root}/storage/system-logs/
+  Priority:
+  1. NEXE_LOGS_DIR environment variable (if set)
+  2. If in site-packages (pip install): ~/.nexe/logs/
+  3. In development: {project_root}/storage/system-logs/
 
   Returns:
-    Path al directori base de logs
+    Path to the base logs directory
 
   Examples:
     >>> logs = get_logs_dir()
@@ -88,23 +88,23 @@ def get_logs_dir() -> Path:
 
 def get_config_dir() -> Path:
   """
-  Retorna el directori de configuració (personality/).
+  Return the configuration directory (personality/).
 
-  ACTUALITZAT v2.0.0: Usa get_repo_root() en lloc de find_project_root().
+  UPDATED v2.0.0: Uses get_repo_root() instead of find_project_root().
   """
   return get_repo_root() / "personality"
 
 def get_data_dir(subdir: Optional[str] = None) -> Path:
   """
-  Retorna el directori de dades (storage/data/).
+  Return the data directory (storage/data/).
 
-  ACTUALITZAT v2.0.0: Usa get_repo_root() en lloc de find_project_root().
+  UPDATED v2.0.0: Uses get_repo_root() instead of find_project_root().
 
   Args:
-    subdir: Subdirectori opcional dins de storage/data/
+    subdir: Optional subdirectory inside storage/data/
 
   Returns:
-    Path al directori de dades
+    Path to the data directory
   """
   data_dir = get_repo_root() / "storage" / "data"
 
@@ -116,15 +116,15 @@ def get_data_dir(subdir: Optional[str] = None) -> Path:
 
 def get_cache_dir(subdir: Optional[str] = None) -> Path:
   """
-  Retorna el directori de cache (storage/cache/).
+  Return the cache directory (storage/cache/).
 
-  ACTUALITZAT v2.0.0: Usa get_repo_root() en lloc de find_project_root().
+  UPDATED v2.0.0: Uses get_repo_root() instead of find_project_root().
 
   Args:
-    subdir: Subdirectori opcional dins de storage/cache/
+    subdir: Optional subdirectory inside storage/cache/
 
   Returns:
-    Path al directori de cache
+    Path to the cache directory
   """
   cache_dir = get_repo_root() / "storage" / "cache"
 

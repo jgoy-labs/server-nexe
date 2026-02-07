@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import logging
 from functools import wraps
+from personality.i18n.resolve import t_modular
 
 T = TypeVar("T")
 
@@ -31,15 +32,18 @@ from tenacity import (
 
 logger = logging.getLogger(__name__)
 
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.circuit_breaker.{key}", fallback, **kwargs)
+
 class CircuitState(Enum):
-  """Estats del circuit breaker"""
+  """Circuit breaker states."""
   CLOSED = "closed"
   OPEN = "open"
   HALF_OPEN = "half_open"
 
 @dataclass
 class CircuitBreakerConfig:
-  """Configuració del circuit breaker"""
+  """Circuit breaker configuration."""
   failure_threshold: int = 5
   success_threshold: int = 2
   timeout_seconds: int = 30
@@ -50,7 +54,7 @@ class CircuitBreakerConfig:
 
 @dataclass
 class CircuitBreakerState:
-  """Estat actual del circuit breaker"""
+  """Current circuit breaker state."""
   state: CircuitState = CircuitState.CLOSED
   failure_count: int = 0
   success_count: int = 0
@@ -59,9 +63,9 @@ class CircuitBreakerState:
 
 class CircuitBreaker:
   """
-  Circuit Breaker per protegir serveis externs
+  Circuit breaker to protect external services.
 
-  Ús:
+  Usage:
     cb = CircuitBreaker("ollama", config)
 
     @cb.protect
@@ -77,7 +81,7 @@ class CircuitBreaker:
 
   @property
   def _lock(self) -> asyncio.Lock:
-    """Lazy initialization del lock per evitar problemes amb event loops."""
+    """Lazy initialization of the lock to avoid event loop issues."""
     if self.__lock is None:
       self.__lock = asyncio.Lock()
     return self.__lock
@@ -95,7 +99,7 @@ class CircuitBreaker:
     return self._state.state == CircuitState.OPEN
 
   async def _check_timeout(self) -> bool:
-    """Comprova si ha passat el timeout per passar a HALF_OPEN"""
+    """Check if timeout has elapsed to transition to HALF_OPEN."""
     if self._state.last_failure_time is None:
       return False
 
@@ -103,7 +107,7 @@ class CircuitBreaker:
     return elapsed.total_seconds() >= self.config.timeout_seconds
 
   async def _record_success(self):
-    """Registra un èxit"""
+    """Record a success."""
     async with self._lock:
       self._state.success_count += 1
       self._state.failure_count = 0
@@ -111,10 +115,16 @@ class CircuitBreaker:
       if self._state.state == CircuitState.HALF_OPEN:
         if self._state.success_count >= self.config.success_threshold:
           self._transition_to(CircuitState.CLOSED)
-          logger.info(f"CircuitBreaker [{self.name}]: CLOSED (recovered)")
+          logger.info(
+            _t(
+              "closed_recovered",
+              "CircuitBreaker [{name}]: CLOSED (recovered)",
+              name=self.name,
+            )
+          )
 
   async def _record_failure(self, error: Exception):
-    """Registra una fallada"""
+    """Record a failure."""
     async with self._lock:
       self._state.failure_count += 1
       self._state.success_count = 0
@@ -124,22 +134,33 @@ class CircuitBreaker:
         if self._state.failure_count >= self.config.failure_threshold:
           self._transition_to(CircuitState.OPEN)
           logger.warning(
-            f"CircuitBreaker [{self.name}]: OPEN after {self._state.failure_count} failures. "
-            f"Last error: {error}"
+            _t(
+              "open_after_failures",
+              "CircuitBreaker [{name}]: OPEN after {count} failures. Last error: {error}",
+              name=self.name,
+              count=self._state.failure_count,
+              error=error,
+            )
           )
       elif self._state.state == CircuitState.HALF_OPEN:
         self._transition_to(CircuitState.OPEN)
-        logger.warning(f"CircuitBreaker [{self.name}]: OPEN (half-open failed)")
+        logger.warning(
+          _t(
+            "half_open_failed",
+            "CircuitBreaker [{name}]: OPEN (half-open failed)",
+            name=self.name,
+          )
+        )
 
   def _transition_to(self, new_state: CircuitState):
-    """Canvia d'estat"""
+    """Transition to a new state."""
     self._state.state = new_state
     self._state.last_state_change = datetime.now()
     self._state.success_count = 0
     self._state.failure_count = 0
 
   async def _can_execute(self) -> bool:
-    """Determina si es pot executar"""
+    """Determine whether execution is allowed."""
     async with self._lock:
       if self._state.state == CircuitState.CLOSED:
         return True
@@ -147,7 +168,13 @@ class CircuitBreaker:
       if self._state.state == CircuitState.OPEN:
         if await self._check_timeout():
           self._transition_to(CircuitState.HALF_OPEN)
-          logger.info(f"CircuitBreaker [{self.name}]: HALF_OPEN (testing)")
+          logger.info(
+            _t(
+              "half_open_testing",
+              "CircuitBreaker [{name}]: HALF_OPEN (testing)",
+              name=self.name,
+            )
+          )
           return True
         return False
 
@@ -155,9 +182,9 @@ class CircuitBreaker:
 
   def protect(self, func: Callable) -> Callable:
     """
-    Decorador per protegir funcions amb circuit breaker
+    Decorator to protect functions with the circuit breaker.
 
-    Ús:
+    Usage:
       @circuit_breaker.protect
       async def my_function():
         ...
@@ -166,8 +193,12 @@ class CircuitBreaker:
     async def wrapper(*args, **kwargs):
       if not await self._can_execute():
         raise CircuitOpenError(
-          f"Circuit [{self.name}] is OPEN. "
-          f"Will retry in {self.config.timeout_seconds}s"
+          _t(
+            "open_error",
+            "Circuit [{name}] is OPEN. Will retry in {timeout}s",
+            name=self.name,
+            timeout=self.config.timeout_seconds,
+          )
         )
 
       try:
@@ -195,7 +226,7 @@ class CircuitBreaker:
     return wrapper
 
   def get_status(self) -> dict:
-    """Retorna estat actual per monitorització"""
+    """Return current status for monitoring."""
     return {
       "name": self.name,
       "state": self._state.state.value,
@@ -208,21 +239,25 @@ class CircuitBreaker:
   @asynccontextmanager
   async def guard_streaming(self):
     """
-    Context manager public per protegir async generators/streaming.
+    Public context manager to protect async generators/streaming.
 
-    Us:
+    Usage:
       async def my_streaming_function():
         async with breaker.guard_streaming():
           async for chunk in stream:
             yield chunk
 
     Raises:
-      CircuitOpenError: Si el circuit esta obert
+      CircuitOpenError: If the circuit is open
     """
     if not await self._can_execute():
       raise CircuitOpenError(
-        f"Circuit [{self.name}] is OPEN. "
-        f"Will retry in {self.config.timeout_seconds}s"
+        _t(
+          "open_error",
+          "Circuit [{name}] is OPEN. Will retry in {timeout}s",
+          name=self.name,
+          timeout=self.config.timeout_seconds,
+        )
       )
 
     try:
@@ -234,24 +269,24 @@ class CircuitBreaker:
 
   async def check_circuit(self) -> bool:
     """
-    Metode public per comprovar si el circuit permet execucio.
-    Alternatiu a guard_streaming per casos on no es pot usar context manager.
+    Public method to check whether the circuit allows execution.
+    Alternative to guard_streaming when a context manager cannot be used.
 
     Returns:
-      True si es pot executar, False si el circuit esta obert
+      True if execution is allowed, False if the circuit is open
     """
     return await self._can_execute()
 
   async def record_success(self):
-    """Metode public per registrar exit (per async generators)"""
+    """Public method to record success (for async generators)."""
     await self._record_success()
 
   async def record_failure(self, error: Exception):
-    """Metode public per registrar fallada (per async generators)"""
+    """Public method to record failure (for async generators)."""
     await self._record_failure(error)
 
 class CircuitOpenError(Exception):
-  """Excepció quan el circuit està obert"""
+  """Exception raised when the circuit is open."""
   pass
 
 ollama_breaker = CircuitBreaker(

@@ -14,8 +14,12 @@ from typing import List
 import logging
 from sentence_transformers import SentenceTransformer
 import numpy as np
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"embeddings.logs.{key}", fallback, **kwargs)
 
 class SimpleEmbedder:
   """
@@ -53,11 +57,24 @@ class SimpleEmbedder:
     self.model_name = model_name
     self.device = device
 
-    logger.info(f"Loading model {model_name} on {device}")
+    logger.info(
+      _t_log(
+        "simple_embedder_loading",
+        "Loading model {model} on {device}",
+        model=model_name,
+        device=device,
+      )
+    )
     self.model = SentenceTransformer(model_name, device=device)
     self._initialized = True
 
-    logger.info(f"SimpleEmbedder initialized: {model_name}")
+    logger.info(
+      _t_log(
+        "simple_embedder_initialized",
+        "SimpleEmbedder initialized: {model}",
+        model=model_name,
+      )
+    )
 
   def encode(self, text: str, normalize: bool = True) -> List[float]:
     """

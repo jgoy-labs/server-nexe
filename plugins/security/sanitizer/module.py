@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/sanitizer/module.py
-Description: SANITIZER - Mòdul de seguretat TÈCNICA per filtrar jailbreaks i
+Description: SANITIZER - TECHNICAL security module to filter jailbreaks and
 
 www.jgoy.net
 ────────────────────────────────────
@@ -20,16 +20,16 @@ from .core.detectors import detect_jailbreak, detect_prompt_injection, get_sever
 @dataclass
 class SanitizeResult:
   """
-  Resultat de la sanitització d'un input.
+  Result of input sanitization.
 
   Attributes:
-    clean_text: Text netejat (o original si és segur)
-    is_safe: True si l'input és segur per processar
-    threats_detected: Llista d'amenaces detectades
+    clean_text: Cleaned text (or original if safe)
+    is_safe: True if the input is safe to process
+    threats_detected: List of detected threats
     severity: "none" | "low" | "medium" | "high" | "critical"
-    needs_intervention: Si True, Auditor ha d'activar Intervenció
-    patterns_matched: Patrons concrets que han fet match (per logging)
-    scan_time_ms: Temps d'escaneig en ms
+    needs_intervention: If True, Auditor must activate Intervention
+    patterns_matched: Specific matched patterns (for logging)
+    scan_time_ms: Scan time in ms
   """
   clean_text: str
   is_safe: bool
@@ -41,15 +41,15 @@ class SanitizeResult:
 
 class SanitizerModule:
   """
-  SANITIZER - Filtre de seguretat TÈCNICA.
+  SANITIZER - TECHNICAL security filter.
 
-  Detecta jailbreaks i prompt injections abans que l'input
-  arribi als mòduls filosòfics (Auditor, BRÚIXOLA).
+  Detects jailbreaks and prompt injections before the input
+  reaches philosophical modules (Auditor, BRÚIXOLA).
 
-  NOTA: Només seguretat TÈCNICA. La seguretat FILOSÒFICA
-  (manipulació d'identitat) la fa Intervenció dins Auditor.
+  NOTE: Technical security only. PHILOSOPHICAL security
+  (identity manipulation) is handled by Intervention inside Auditor.
 
-  Temps objectiu:
+  Target timings:
   - sanitize(): <2ms
   - is_safe(): <1ms
   """
@@ -57,21 +57,21 @@ class SanitizerModule:
   PATTERNS_VERSION = "1.0.0"
 
   def __init__(self):
-    """Inicialitza el Sanitizer."""
+    """Initialize the Sanitizer."""
     self._initialized = True
     self._init_time = datetime.now()
 
   def sanitize(self, text: str) -> SanitizeResult:
     """
-    Sanititza l'input i detecta amenaces.
+    Sanitize the input and detect threats.
 
     Args:
-      text: Text d'entrada de l'usuari
+      text: User input text
 
     Returns:
-      SanitizeResult amb el resultat de l'anàlisi
+      SanitizeResult with analysis outcome
 
-    Temps objectiu: <2ms
+    Target time: <2ms
     """
     import time
     start = time.perf_counter()
@@ -128,15 +128,15 @@ class SanitizerModule:
 
   def is_safe(self, text: str) -> bool:
     """
-    Check ràpid si l'input és segur.
+    Fast check whether the input is safe.
 
     Args:
-      text: Text a verificar
+      text: Text to check
 
     Returns:
-      True si és segur, False si no
+      True if safe, False otherwise
 
-    Temps objectiu: <1ms
+    Target time: <1ms
     """
     if not text:
       return True
@@ -155,11 +155,11 @@ class SanitizerModule:
     return True
 
   def get_patterns_version(self) -> str:
-    """Retorna la versió dels patrons."""
+    """Return the patterns version."""
     return self.PATTERNS_VERSION
 
   def get_stats(self) -> dict:
-    """Retorna estadístiques del mòdul."""
+    """Return module statistics."""
     return {
       "patterns_version": self.PATTERNS_VERSION,
       "max_scan_length": MAX_SCAN_LENGTH,
@@ -170,7 +170,7 @@ class SanitizerModule:
 _sanitizer_instance: Optional[SanitizerModule] = None
 
 def get_sanitizer() -> SanitizerModule:
-  """Obté la instància singleton del Sanitizer."""
+  """Get the Sanitizer singleton instance."""
   global _sanitizer_instance
   if _sanitizer_instance is None:
     _sanitizer_instance = SanitizerModule()

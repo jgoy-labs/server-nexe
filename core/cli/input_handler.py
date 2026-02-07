@@ -17,12 +17,14 @@ import select
 import sys
 from typing import Optional
 
+from .i18n import t
+
 logger = logging.getLogger(__name__)
 
 def setup_readline():
   """
-  Configura readline per suport de fletxes i historial.
-  Cridar una vegada al inici del CLI.
+  Configure readline for arrow keys and history.
+  Call once at CLI startup.
   """
   try:
     readline.parse_and_bind('set editing-mode emacs')
@@ -33,12 +35,18 @@ def setup_readline():
     readline.parse_and_bind('"\e[H": beginning-of-line')
     readline.parse_and_bind('"\e[F": end-of-line')
   except Exception as e:
-    logger.debug("Readline setup failed: %s", e)
+    logger.debug(
+      t(
+        "cli.input.readline_setup_failed",
+        "Readline setup failed: {error}",
+        error=str(e)
+      )
+    )
 
 setup_readline()
 
 class Colors:
-  """Colors ANSI per output del CLI."""
+  """ANSI colors for CLI output."""
   RESET = "\033[0m"
   BOLD = "\033[1m"
   DIM = "\033[2m"
@@ -59,35 +67,38 @@ class Colors:
   BRIGHT_CYAN = "\033[96m"
 
 def sync_input(
-  prompt: str = ">>> ",
+  prompt: Optional[str] = None,
   paste_timeout_ms: int = 100,
   show_paste_indicator: bool = True,
   join_with: str = "\n"
 ) -> str:
   """
-  Input síncron amb detecció de paste multilínia.
+  Synchronous input with multiline paste detection.
 
-  Quan l'usuari fa Ctrl+V de text multilínia:
-  - Detecta que arriben múltiples línies ràpidament
-  - Les ajunta en un sol string
-  - Mostra "[pasted X lines]" com a indicador visual
+  When the user pastes multiline text (Ctrl+V):
+  - Detects multiple lines arriving quickly
+  - Joins them into a single string
+  - Shows "[pasted X lines]" as a visual indicator
 
   Args:
-    prompt: Prompt a mostrar (default: ">>> ")
-    paste_timeout_ms: Timeout per detectar paste (default: 50ms)
-    show_paste_indicator: Mostrar "[pasted X lines]" (default: True)
-    join_with: Com ajuntar línies (default: "\\n")
+    prompt: Prompt to show (default: ">>> ")
+    paste_timeout_ms: Timeout to detect paste (default: 50ms)
+    show_paste_indicator: Show "[pasted X lines]" (default: True)
+    join_with: How to join lines (default: "\\n")
 
   Returns:
-    String amb tot l'input (línies ajuntades si paste)
+    String with all input (lines joined if pasted)
 
   Example:
     >>> user_input = sync_input("Tu: ")
-    Tu: [usuari enganxa 5 línies]
+    Tu: [user pastes 5 lines]
     [pasted 5 lines]
     >>> print(user_input)
-    "línia 1\\nlínia 2\\nlínia 3\\nlínia 4\\nlínia 5"
+    "line 1\\nline 2\\nline 3\\nline 4\\nline 5"
   """
+  if prompt is None:
+    prompt = t("cli.input.prompt_default", ">>> ")
+
   try:
     first_line = input(prompt)
   except (EOFError, KeyboardInterrupt):
@@ -107,37 +118,45 @@ def sync_input(
       else:
         break
   except Exception as e:
-    logger.debug("Paste detection failed: %s", e)
+    logger.debug(
+      t(
+        "cli.input.paste_detection_failed",
+        "Paste detection failed: {error}",
+        error=str(e)
+      )
+    )
 
   if len(lines) > 1 and show_paste_indicator:
-    print(f"{Colors.DIM}[pasted {len(lines)} lines]{Colors.RESET}")
+    print(
+      f"{Colors.DIM}{t('cli.input.paste_indicator', '[pasted {count} lines]', count=len(lines))}{Colors.RESET}"
+    )
 
   return join_with.join(lines)
 
 async def async_input(
-  prompt: str = ">>> ",
+  prompt: Optional[str] = None,
   paste_timeout_ms: int = 50,
   show_paste_indicator: bool = True,
   join_with: str = "\n"
 ) -> str:
   """
-  Input asíncron amb detecció de paste multilínia.
+  Async input with multiline paste detection.
 
-  Executa sync_input() en un thread executor per no bloquejar
-  l'event loop async, mantenint el suport de readline.
+  Runs sync_input() in a thread executor to avoid blocking
+  the async event loop, while keeping readline support.
 
   Args:
-    prompt: Prompt a mostrar (default: ">>> ")
-    paste_timeout_ms: Timeout per detectar paste (default: 50ms)
-    show_paste_indicator: Mostrar "[pasted X lines]" (default: True)
-    join_with: Com ajuntar línies (default: "\\n")
+    prompt: Prompt to show (default: ">>> ")
+    paste_timeout_ms: Timeout to detect paste (default: 50ms)
+    show_paste_indicator: Show "[pasted X lines]" (default: True)
+    join_with: How to join lines (default: "\\n")
 
   Returns:
-    String amb tot l'input (línies ajuntades si paste)
+    String with all input (lines joined if pasted)
 
   Example:
     >>> user_input = await async_input("Tu: ")
-    Tu: [usuari enganxa text]
+    Tu: [user pastes text]
     [pasted 3 lines]
   """
   loop = asyncio.get_running_loop()
@@ -148,34 +167,52 @@ async def async_input(
 
 def add_to_history(text: str):
   """
-  Afegeix text a l'historial de readline.
+  Add text to readline history.
 
   Args:
-    text: Text a afegir a l'historial
+    text: Text to add to history
   """
   try:
     readline.add_history(text)
   except Exception as e:
-    logger.debug("Add to history failed: %s", e)
+    logger.debug(
+      t(
+        "cli.input.add_history_failed",
+        "Add to history failed: {error}",
+        error=str(e)
+      )
+    )
 
 def clear_history():
-  """Neteja l'historial de readline."""
+  """Clear readline history."""
   try:
     readline.clear_history()
   except Exception as e:
-    logger.debug("Clear history failed: %s", e)
+    logger.debug(
+      t(
+        "cli.input.clear_history_failed",
+        "Clear history failed: {error}",
+        error=str(e)
+      )
+    )
 
 def get_history() -> list:
   """
-  Retorna l'historial de readline.
+  Return readline history.
 
   Returns:
-    Llista amb els elements de l'historial
+    List of history entries
   """
   try:
     return [readline.get_history_item(i) for i in range(1, readline.get_current_history_length() + 1)]
   except Exception as e:
-    logger.debug("Get history failed: %s", e)
+    logger.debug(
+      t(
+        "cli.input.get_history_failed",
+        "Get history failed: {error}",
+        error=str(e)
+      )
+    )
     return []
 
 __all__ = [

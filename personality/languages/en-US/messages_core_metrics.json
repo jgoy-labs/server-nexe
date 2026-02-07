@@ -49,5 +49,19 @@
   "high_cpu": "Warning: High CPU usage for {module}: {usage}%",
   "slow_load": "Warning: Slow load for {module}: {time}ms",
   "many_errors": "Warning: Many errors for {module}: {count} errors"
+ },
+
+ "endpoint": {
+  "prometheus_summary": "Prometheus metrics",
+  "prometheus_description": "Expose metrics in Prometheus format for scraping",
+  "prometheus_response_desc": "Prometheus metrics",
+  "health_summary": "Metrics health check",
+  "health_description": "Verify the metrics system is working",
+  "json_summary": "Metrics summary (JSON)",
+  "json_description": "Summary of key metrics in JSON format"
+ },
+ "logs": {
+  "health_check_failed": "Metrics health check failed: {error}",
+  "module_health_update_skipped": "Module health update skipped: {error}"
  }
 }

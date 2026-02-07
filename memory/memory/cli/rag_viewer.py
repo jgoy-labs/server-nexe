@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 from core.cli.output import NEXE_LOGO
+from personality.i18n.resolve import t_modular
 
 # Configurable CLI timeout via environment variable
 CLI_QDRANT_TIMEOUT = float(os.getenv('NEXE_CLI_QDRANT_TIMEOUT', '5.0'))
@@ -28,7 +29,7 @@ FALLBACK_PATHS = [
 ]
 
 def find_log_path() -> Path:
-  """Troba el path del log RAG."""
+  """Find the RAG log path."""
   if RAG_LOG_PATH.exists():
     return RAG_LOG_PATH
 
@@ -41,7 +42,7 @@ def find_log_path() -> Path:
   return RAG_LOG_PATH
 
 def show_stats():
-  """Mostra estadístiques del RAG."""
+  """Show RAG statistics."""
   import asyncio
 
   async def _get_stats():
@@ -90,62 +91,85 @@ def show_stats():
   stats = asyncio.run(_get_stats())
 
   print("\n" + "═" * 60)
-  print("📊 Nexe RAG STATISTICS")
+  print(t_modular("memory.cli.rag_viewer.stats_title", "📊 Nexe RAG STATISTICS"))
   print("═" * 60)
 
   if "error" in stats:
-    print(f"❌ Error: {stats['error']}")
+    print(t_modular(
+      "memory.cli.rag_viewer.error",
+      "❌ Error: {error}",
+      error=stats["error"]
+    ))
     return
 
   if "sqlite" in stats:
     s = stats["sqlite"]
-    print(f"\n🗄️ SQLite:")
-    print(f"  Total entries: {s.get('total_entries', 0)}")
-    print(f"  Episodic: {s.get('episodic_count', 0)}")
-    print(f"  Semantic: {s.get('semantic_count', 0)}")
+    print(f"\n{t_modular('memory.cli.rag_viewer.section_sqlite', '🗄️ SQLite:')}")
+    print(f"  {t_modular('memory.cli.rag_viewer.sqlite_total_entries', 'Total entries')}: {s.get('total_entries', 0)}")
+    print(f"  {t_modular('memory.cli.rag_viewer.sqlite_episodic', 'Episodic')}: {s.get('episodic_count', 0)}")
+    print(f"  {t_modular('memory.cli.rag_viewer.sqlite_semantic', 'Semantic')}: {s.get('semantic_count', 0)}")
 
   if "qdrant" in stats:
     q = stats["qdrant"]
-    print(f"\n🔷 Qdrant:")
-    print(f"  Collection: {q.get('collection', 'nexe_memory')}")
-    print(f"  Vectors: {q.get('vectors', 0)}")
-    print(f"  Dimensions: {q.get('dimensions', 768)}")
-    print(f"  Status: {q.get('status', 'unknown')}")
+    print(f"\n{t_modular('memory.cli.rag_viewer.section_qdrant', '🔷 Qdrant:')}")
+    print(f"  {t_modular('memory.cli.rag_viewer.qdrant_collection', 'Collection')}: {q.get('collection', 'nexe_memory')}")
+    print(f"  {t_modular('memory.cli.rag_viewer.qdrant_vectors', 'Vectors')}: {q.get('vectors', 0)}")
+    print(f"  {t_modular('memory.cli.rag_viewer.qdrant_dimensions', 'Dimensions')}: {q.get('dimensions', 768)}")
+    print(f"  {t_modular('memory.cli.rag_viewer.qdrant_status', 'Status')}: {q.get('status', 'unknown')}")
 
   if "flash" in stats:
     f = stats["flash"]
-    print(f"\n⚡ FlashMemory:")
-    print(f"  Cached entries: {f.get('total_entries', 0)}")
-    print(f"  Expired pending: {f.get('expired_pending', 0)}")
+    print(f"\n{t_modular('memory.cli.rag_viewer.section_flash', '⚡ FlashMemory:')}")
+    print(f"  {t_modular('memory.cli.rag_viewer.flash_cached_entries', 'Cached entries')}: {f.get('total_entries', 0)}")
+    print(f"  {t_modular('memory.cli.rag_viewer.flash_expired_pending', 'Expired pending')}: {f.get('expired_pending', 0)}")
 
   print("\n" + "═" * 60)
-  print(f"📋 Log path: {find_log_path()}")
+  print(t_modular(
+    "memory.cli.rag_viewer.log_path",
+    "📋 Log path: {path}",
+    path=str(find_log_path())
+  ))
   print("═" * 60 + "\n")
 
 def main():
   parser = argparse.ArgumentParser(
-    description="Veure logs RAG/Memory de Nexe en temps real"
+    description=t_modular(
+      "memory.cli.rag_viewer.description",
+      "View Nexe RAG/Memory logs in real time"
+    )
   )
   parser.add_argument(
     "--lines", "-n",
     type=int,
     default=30,
-    help="Nombre de línies a mostrar inicialment (default: 30)"
+    help=t_modular(
+      "memory.cli.rag_viewer.arg_lines",
+      "Number of lines to show initially (default: 30)"
+    )
   )
   parser.add_argument(
     "--clear", "-c",
     action="store_true",
-    help="Netejar el log abans de seguir"
+    help=t_modular(
+      "memory.cli.rag_viewer.arg_clear",
+      "Clear the log before continuing"
+    )
   )
   parser.add_argument(
     "--path", "-p",
     action="store_true",
-    help="Mostrar path del log i sortir"
+    help=t_modular(
+      "memory.cli.rag_viewer.arg_path",
+      "Show log path and exit"
+    )
   )
   parser.add_argument(
     "--stats", "-s",
     action="store_true",
-    help="Mostrar estadístiques RAG i sortir"
+    help=t_modular(
+      "memory.cli.rag_viewer.arg_stats",
+      "Show RAG statistics and exit"
+    )
   )
   args = parser.parse_args()
 
@@ -161,13 +185,17 @@ def main():
 
   if args.clear:
     log_path.write_text("")
-    print(f"🗑️ RAG log netejat: {log_path}")
+    print(t_modular(
+      "memory.cli.rag_viewer.log_cleared",
+      "🗑️ RAG log cleared: {path}",
+      path=str(log_path)
+    ))
 
   GREEN = "\033[32m"
   GRAY = "\033[90m"
   RESET = "\033[0m"
   print(f"{GREEN}{NEXE_LOGO}{RESET}")
-  print(f"{GRAY}Mode: RAG Log Viewer | Log: {log_path}{RESET}")
+  print(f"{GRAY}{t_modular('memory.cli.rag_viewer.mode_banner', 'Mode: RAG Log Viewer | Log: {path}', path=str(log_path))}{RESET}")
   print()
 
   try:
@@ -176,12 +204,15 @@ def main():
       check=True
     )
   except KeyboardInterrupt:
-    print("\n\n👋 Sortint del visor de logs RAG")
+    print("\n\n" + t_modular(
+      "memory.cli.rag_viewer.exit",
+      "👋 Exiting RAG log viewer"
+    ))
   except FileNotFoundError:
     _python_tail(log_path, args.lines)
 
 def _python_tail(log_path: Path, lines: int):
-  """Fallback a Python pur si tail no existeix."""
+  """Fallback to pure Python if tail is unavailable."""
   import time
 
   if log_path.exists():
@@ -200,7 +231,10 @@ def _python_tail(log_path: Path, lines: int):
         else:
           time.sleep(0.1)
   except KeyboardInterrupt:
-    print("\n\n👋 Sortint del visor de logs RAG")
+    print("\n\n" + t_modular(
+      "memory.cli.rag_viewer.exit",
+      "👋 Exiting RAG log viewer"
+    ))
 
 if __name__ == "__main__":
   main()

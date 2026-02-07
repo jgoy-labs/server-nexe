@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/workflow/nodes/memory_store_node.py
-Description: Node per emmagatzemar contingut a Memory (FlashMemory + Persistence).
+Description: Node to store content in Memory (FlashMemory + Persistence).
 
 www.jgoy.net
 ────────────────────────────────────
@@ -15,19 +15,23 @@ from typing import Dict, Any
 from nexe_flow.core.node import Node, NodeMetadata, NodeInput, NodeOutput
 
 from memory.memory import MemoryModule, MemoryEntry, MemoryType
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
 
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.workflow.store.logs.{key}", fallback, **kwargs)
+
 class MemoryStoreNode(Node):
   """
-  Node per emmagatzemar contingut a Memory.
+  Node to store content in Memory.
 
-  Funcionalitats:
-  - Crea MemoryEntry des del content
-  - Ingereix via IngestionPipeline
-  - Retorna entry_id per referència futura
+  Capabilities:
+  - Create MemoryEntry from content
+  - Ingest via IngestionPipeline
+  - Return entry_id for future reference
 
-  Exemple d'ús en workflow:
+  Example usage in a workflow:
     ```yaml
     nodes:
      - id: store_conversation
@@ -42,15 +46,18 @@ class MemoryStoreNode(Node):
 
   def get_metadata(self) -> NodeMetadata:
     """
-    Metadata del node per al registre del Workflow Engine.
+    Node metadata for Workflow Engine registration.
 
     Returns:
-      NodeMetadata: Informació del node
+      NodeMetadata: Node information
     """
     return NodeMetadata(
       id="memory.store",
       name="Memory Store",
-      description="Emmagatzema contingut a Memory (Flash + Persistence)",
+      description=t_modular(
+        "memory.workflow.store.description",
+        "Store content in Memory (Flash + Persistence)"
+      ),
       category="nexe_native",
       version="1.0.0",
       inputs=[
@@ -58,27 +65,39 @@ class MemoryStoreNode(Node):
           name="content",
           type="string",
           required=True,
-          description="Contingut a emmagatzemar"
+          description=t_modular(
+            "memory.workflow.store.input_content",
+            "Content to store"
+          )
         ),
         NodeInput(
           name="entry_type",
           type="string",
           required=False,
-          description="Tipus: episodic o semantic",
+          description=t_modular(
+            "memory.workflow.store.input_entry_type",
+            "Type: episodic or semantic"
+          ),
           default="episodic"
         ),
         NodeInput(
           name="source",
           type="string",
           required=False,
-          description="Font de la memòria",
+          description=t_modular(
+            "memory.workflow.store.input_source",
+            "Memory source"
+          ),
           default="workflow"
         ),
         NodeInput(
           name="ttl_seconds",
           type="number",
           required=False,
-          description="Time-to-live en segons (default: 1800)",
+          description=t_modular(
+            "memory.workflow.store.input_ttl",
+            "Time-to-live in seconds (default: 1800)"
+          ),
           default=1800
         )
       ],
@@ -86,25 +105,31 @@ class MemoryStoreNode(Node):
         NodeOutput(
           name="entry_id",
           type="string",
-          description="ID de l'entrada emmagatzemada"
+          description=t_modular(
+            "memory.workflow.store.output_entry_id",
+            "Stored entry ID"
+          )
         ),
         NodeOutput(
           name="success",
           type="boolean",
-          description="True si s'ha emmagatzemat correctament"
+          description=t_modular(
+            "memory.workflow.store.output_success",
+            "True if stored successfully"
+          )
         )
       ]
     )
 
   async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Executa el node: emmagatzema contingut a Memory.
+    Execute the node: store content in Memory.
 
     Args:
-      inputs: Dict amb content, entry_type, source, ttl_seconds
+      inputs: Dict with content, entry_type, source, ttl_seconds
 
     Returns:
-      Dict amb entry_id i success
+      Dict with entry_id and success
     """
     try:
       content = inputs.get("content")
@@ -113,7 +138,7 @@ class MemoryStoreNode(Node):
       ttl_seconds = inputs.get("ttl_seconds", 1800)
 
       if not content or not content.strip():
-        logger.warning("Empty content provided to memory.store")
+        logger.warning(_t_log("empty_content", "Empty content provided to memory.store"))
         return {
           "entry_id": None,
           "success": False
@@ -122,7 +147,13 @@ class MemoryStoreNode(Node):
       try:
         entry_type = MemoryType(entry_type_str)
       except ValueError:
-        logger.warning(f"Invalid entry_type: {entry_type_str}, using EPISODIC")
+        logger.warning(
+          _t_log(
+            "invalid_entry_type",
+            "Invalid entry_type: {entry_type}, using EPISODIC",
+            entry_type=entry_type_str,
+          )
+        )
         entry_type = MemoryType.EPISODIC
 
       entry = MemoryEntry(
@@ -135,11 +166,16 @@ class MemoryStoreNode(Node):
       module = MemoryModule.get_instance()
 
       if not module._initialized:
-        logger.info("Auto-initializing MemoryModule for workflow")
+        logger.info(_t_log("auto_init", "Auto-initializing MemoryModule for workflow"))
         await module.initialize()
 
       if not module._pipeline:
-        logger.error("IngestionPipeline not initialized after initialize()")
+        logger.error(
+          _t_log(
+            "pipeline_not_initialized",
+            "IngestionPipeline not initialized after initialize()"
+          )
+        )
         return {
           "entry_id": None,
           "success": False
@@ -147,7 +183,14 @@ class MemoryStoreNode(Node):
 
       success = await module._pipeline.ingest(entry)
 
-      logger.info(f"Memory stored: {entry.id} (success={success})")
+      logger.info(
+        _t_log(
+          "stored",
+          "Memory stored: {entry_id} (success={success})",
+          entry_id=entry.id,
+          success=success,
+        )
+      )
 
       return {
         "entry_id": entry.id,
@@ -155,7 +198,10 @@ class MemoryStoreNode(Node):
       }
 
     except Exception as e:
-      logger.error(f"Error in memory.store: {e}", exc_info=True)
+      logger.error(
+        _t_log("store_error", "Error in memory.store: {error}", error=str(e)),
+        exc_info=True
+      )
       return {
         "entry_id": None,
         "success": False

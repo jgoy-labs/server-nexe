@@ -16,48 +16,70 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .memory_types import MemoryType
+from personality.i18n.resolve import t_modular
 
 class MemoryEntry(BaseModel):
   """Memory entry with basic metadata support."""
 
   id: Optional[str] = Field(
     default=None,
-    description="ID únic determinista (SHA256(content)[:16]) - auto-generat"
+    description=t_modular(
+      "memory.models.entry.id_desc",
+      "Deterministic unique ID (SHA256(content)[:16]) - auto-generated"
+    )
   )
 
   entry_type: MemoryType = Field(
     ...,
-    description="Tipus de memòria: episodic o semantic"
+    description=t_modular(
+      "memory.models.entry.entry_type_desc",
+      "Memory type: episodic or semantic"
+    )
   )
 
   content: str = Field(
     ...,
     min_length=1,
     max_length=100_000,
-    description="Contingut de la memòria (max 100KB)"
+    description=t_modular(
+      "memory.models.entry.content_desc",
+      "Memory content (max 100KB)"
+    )
   )
 
   source: str = Field(
     default="unknown",
-    description="Font de la memòria (e.g., 'chat', 'pdf', 'api')"
+    description=t_modular(
+      "memory.models.entry.source_desc",
+      "Memory source (e.g., 'chat', 'pdf', 'api')"
+    )
   )
 
   timestamp: datetime = Field(
     default_factory=lambda: datetime.now(timezone.utc),
-    description="Timestamp UTC de creació"
+    description=t_modular(
+      "memory.models.entry.timestamp_desc",
+      "UTC timestamp of creation"
+    )
   )
 
   ttl_seconds: Optional[int] = Field(
     default=1800,
     ge=60,
     le=86400 * 30,
-    description="Time-to-live en segons (default: 30 min)"
+    description=t_modular(
+      "memory.models.entry.ttl_desc",
+      "Time-to-live in seconds (default: 30 min)"
+    )
   )
 
 
   metadata: Dict[str, Any] = Field(
     default_factory=dict,
-    description="Metadata lliure (tags, context, etc.)"
+    description=t_modular(
+      "memory.models.entry.metadata_desc",
+      "Free metadata (tags, context, etc.)"
+    )
   )
 
   @field_validator('content')
@@ -65,7 +87,12 @@ class MemoryEntry(BaseModel):
   def validate_content_not_empty(cls, v: str) -> str:
     """Validar que el contingut no sigui només espais"""
     if not v.strip():
-      raise ValueError("Content cannot be empty or whitespace only")
+      raise ValueError(
+        t_modular(
+          "memory.models.entry.content_empty",
+          "Content cannot be empty or whitespace only"
+        )
+      )
     return v
 
   @model_validator(mode='after')

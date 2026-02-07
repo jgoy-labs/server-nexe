@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/endpoints/system.py
-Description: Endpoints d'administració del sistema: reinici del servidor,
+Description: System administration endpoints: server restart,
 
 www.jgoy.net
 ────────────────────────────────────
@@ -51,10 +51,10 @@ def get_supervisor_pid() -> int:
   Read supervisor PID from file.
 
   Returns:
-    int: PID del supervisor
+    int: Supervisor PID
 
   Raises:
-    HTTPException: Si el fitxer no existeix o no es pot llegir
+    HTTPException: If the file does not exist or cannot be read
   """
   if not SUPERVISOR_PID_FILE.exists():
     raise HTTPException(
@@ -134,14 +134,20 @@ async def send_restart_signal():
   """
   Send SIGHUP to supervisor after brief delay.
 
-  El delay permet que la resposta HTTP es retorni abans del reinici,
-  evitant errors de connexió al client.
+  The delay allows the HTTP response to be returned before restart,
+  avoiding client connection errors.
   """
   await asyncio.sleep(0.5)
 
   try:
     supervisor_pid = get_supervisor_pid()
-    logger.info(f"Sending SIGHUP to supervisor PID {supervisor_pid}")
+    logger.info(
+      _t(
+        "core.endpoints.system.sighup_sent_log",
+        "Sending SIGHUP to supervisor PID {pid}",
+        pid=supervisor_pid,
+      )
+    )
 
     os.kill(supervisor_pid, signal.SIGHUP)
 
@@ -158,29 +164,35 @@ async def restart_server(
   _: str = Depends(require_api_key)
 ) -> Dict[str, Any]:
   """
-  Reinicia el servidor Nexe via supervisor.
+  Restart the Nexe server via supervisor.
 
-  🔒 Requereix autenticació amb API key (X-API-Key header).
+  🔒 Requires API key authentication (X-API-Key header).
 
-  Funcionament:
-  1. Endpoint retorna resposta immediatament
-  2. Background task envia SIGHUP al supervisor (0.5s delay)
-  3. Supervisor fa graceful shutdown del worker
-  4. Supervisor reinicia worker amb configuració nova
-  5. Downtime esperat: 3-6 segons
+  Flow:
+  1. Endpoint returns response immediately
+  2. Background task sends SIGHUP to the supervisor (0.5s delay)
+  3. Supervisor performs a graceful shutdown of the worker
+  4. Supervisor restarts the worker with new configuration
+  5. Expected downtime: 3-6 seconds
 
   Returns:
-    dict: Estat del reinici i temps estimat
+    dict: Restart status and estimated time
 
   Raises:
-    HTTPException: Si el supervisor no està disponible
+    HTTPException: If the supervisor is not available
   """
   try:
     supervisor_pid = get_supervisor_pid()
 
     background_tasks.add_task(send_restart_signal)
 
-    logger.info(f"Restart initiated by authenticated user (supervisor PID: {supervisor_pid})")
+    logger.info(
+      _t(
+        "core.endpoints.system.restart_initiated_log",
+        "Restart initiated by authenticated user (supervisor PID: {pid})",
+        pid=supervisor_pid,
+      )
+    )
 
     return {
       "status": "restart_initiated",
@@ -217,10 +229,10 @@ async def supervisor_status(_: str = Depends(require_api_key)) -> Dict[str, Any]
   """
   Check supervisor status.
 
-  🔒 Requereix autenticació amb API key (X-API-Key header).
+  🔒 Requires API key authentication (X-API-Key header).
 
   Returns:
-    dict: Informació sobre l'estat del supervisor
+    dict: Information about supervisor status
 
   Example Response:
     {
@@ -254,13 +266,13 @@ async def supervisor_status(_: str = Depends(require_api_key)) -> Dict[str, Any]
 @router_admin.get("/health")
 async def system_health() -> Dict[str, Any]:
   """
-  Health check simple (NO requereix auth).
+  Simple health check (NO auth required).
 
-  Aquest endpoint es fa servir per la UI per comprovar si el servidor
-  està disponible després d'un reinici.
+  This endpoint is used by the UI to verify the server
+  is available after a restart.
 
   Returns:
-    dict: Estat bàsic del sistema
+    dict: Basic system status
 
   Example Response:
     {
@@ -278,9 +290,9 @@ async def system_health() -> Dict[str, Any]:
 
 def get_router() -> APIRouter:
   """
-  Retorna el router admin del sistema.
+  Return the system admin router.
 
-  Aquest router s'ha d'incloure a server_core.py:
+  This router should be included in server_core.py:
     from core.endpoints import system
     app.include_router(system.get_router())
   """

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_validator.py
-Description: Validador de mòduls carregats. Comprova instància vàlida, existència d'API
+Description: Validator for loaded modules. Checks valid instance, API existence
 
 www.jgoy.net
 ────────────────────────────────────
@@ -30,11 +30,11 @@ except ImportError:
   IntegrityChecker = None
 
 class ModuleValidationError(Exception):
-  """Error de validació de mòdul"""
+  """Module validation error."""
   pass
 
 class ModuleValidator:
-  """Valida mòduls carregats"""
+  """Validate loaded modules."""
 
   def __init__(self, i18n=None, core_root: Optional[Path] = None):
     self.i18n = i18n
@@ -51,20 +51,27 @@ class ModuleValidator:
       lock_path = core_root / "storage" / ".auto_clean" / "manifests.lock"
       try:
         self._integrity_checker = IntegrityChecker(lock_path)
-        logger.debug("IntegrityChecker initialized for manifest validation")
+        logger.debug(get_message(
+          self.i18n,
+          'validation.integrity_checker_initialized'
+        ))
       except Exception as e:
-        logger.warning(f"Failed to initialize IntegrityChecker: {e}")
+        logger.warning(get_message(
+          self.i18n,
+          'validation.integrity_checker_failed',
+          error=str(e)
+        ))
 
   def validate_module(self, instance: Any, module_info: ModuleInfo) -> None:
     """
-    Valida que un mòdul compleixi els requisits mínims.
+    Validate that a module meets minimum requirements.
 
     Args:
-      instance: Instància del mòdul
-      module_info: Informació del mòdul
+      instance: Module instance
+      module_info: Module information
 
     Raises:
-      ModuleValidationError: Si la validació falla
+      ModuleValidationError: If validation fails
     """
     validations = []
 
@@ -89,7 +96,7 @@ class ModuleValidator:
 
   def _validate_api(self, instance: Any, manifest: dict,
            validations: List[str]) -> None:
-    """Valida API si està especificat al manifest"""
+    """Validate API if specified in manifest."""
     api_section = manifest.get('api', {})
 
     if api_section.get('endpoints_auto_discovery', False):
@@ -105,7 +112,7 @@ class ModuleValidator:
 
   def _validate_ui(self, instance: Any, module_info: ModuleInfo,
           validations: List[str]) -> None:
-    """Valida UI si està especificat al manifest"""
+    """Validate UI if specified in manifest."""
     ui_section = module_info.manifest.get('ui', {})
 
     if ui_section.get('enabled', False):
@@ -122,10 +129,10 @@ class ModuleValidator:
     self, module_info: ModuleInfo, validations: List[str]
   ) -> None:
     """
-    SECURITY: Valida integritat del manifest (TOFU - Trust On First Use).
+    SECURITY: Validate manifest integrity (TOFU - Trust On First Use).
 
-    Si el manifest no està al lock, l'afegeix automàticament (TOFU).
-    Si està al lock però el checksum no coincideix, rebutja el mòdul.
+    If the manifest is not in the lock, add it automatically (TOFU).
+    If it is in the lock but the checksum does not match, reject the module.
     """
     if not self._integrity_checker:
       return
@@ -137,7 +144,12 @@ class ModuleValidator:
     is_valid, message = self._integrity_checker.verify(manifest_path)
 
     if not is_valid:
-      error_msg = f"SECURITY: Manifest integrity check failed for '{module_info.name}': {message}"
+      error_msg = get_message(
+        self.i18n,
+        'validation.integrity_check_failed',
+        module=module_info.name,
+        reason=message
+      )
       logger.error(error_msg)
 
       try:
@@ -150,7 +162,11 @@ class ModuleValidator:
         security_logger.log_event(
           event_type=SecurityEventType.MODULE_REJECTED,
           severity=SecuritySeverity.CRITICAL,
-          message=f"Manifest integrity check failed for module '{module_info.name}'",
+          message=get_message(
+            self.i18n,
+            'validation.integrity_check_failed_short',
+            module=module_info.name
+          ),
           details={"module": module_info.name, "reason": message},
         )
       except ImportError:
@@ -159,10 +175,16 @@ class ModuleValidator:
       validations.append(error_msg)
     elif "New manifest (TOFU)" in message:
       self._integrity_checker.trust(manifest_path)
-      logger.info(f"TOFU: Trusted new manifest for module '{module_info.name}'")
+      logger.info(
+        get_message(
+          self.i18n,
+          'validation.tofu_trusted',
+          module=module_info.name
+        )
+      )
 
   def _validate_dependencies(self, module_info: ModuleInfo) -> None:
-    """Valida dependències externes (només warning)"""
+    """Validate external dependencies (warnings only)."""
     deps = module_info.manifest.get('dependencies', {})
     external_deps = deps.get('external', [])
     missing_deps = []

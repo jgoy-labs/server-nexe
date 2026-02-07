@@ -121,10 +121,13 @@
    },
    "cli_not_found": "Error: CLI '{alias}' not found",
    "python_not_found": "Error: Python interpreter not found: {path}",
-   "exec_error": "Error executing CLI '{alias}': {error}"
+   "exec_error": "Error executing CLI '{alias}': {error}",
+   "skip_manifest": "Skipping manifest file: {path}"
   },
   "chat": {
    "default_system_prompt": "You are Nexe, a precise and secure local AI assistant.",
+   "load_system_prompt_failed": "Failed to load system prompt: {error}",
+   "read_engine_config_failed": "Failed to read engine config: {error}",
    "options": {
     "engine": "Inference engine",
     "system": "System prompt / Identity",
@@ -171,6 +174,15 @@
    "goodbye": "\n👋 Goodbye!",
    "client_error": "\n❌ Client error: {error}"
   },
+  "input": {
+   "prompt_default": ">>> ",
+   "paste_indicator": "[pasted {count} lines]",
+   "readline_setup_failed": "Readline setup failed: {error}",
+   "paste_detection_failed": "Paste detection failed: {error}",
+   "add_history_failed": "Add to history failed: {error}",
+   "clear_history_failed": "Clear history failed: {error}",
+   "get_history_failed": "Get history failed: {error}"
+  },
   "logs": {
    "file_not_found": "⚠️ Log file not found: {path}",
    "following": "👀 Following logs: {path} (last {lines} lines)",
@@ -186,10 +198,22 @@
   "api": {
    "server_error": "Server error ({status_code}): {error}",
    "connect_error": "❌ Error: Could not connect to Nexe server. Make sure './nexe go' is running.",
-   "offline_not_supported": "❌ Offline mode not supported yet. Please run './nexe go' first."
+   "offline_not_supported": "❌ Offline mode not supported yet. Please run './nexe go' first.",
+   "memory_store_error": "Memory store error: {error}",
+   "memory_search_error": "Memory search error: {error}"
+  },
+  "client": {
+   "invalid_url_scheme": "Invalid URL scheme: {scheme}. Only http/https allowed.",
+   "http_error": "Server error: {error}",
+   "connection_error": "Connection error: {error}",
+   "unexpected_error": "Unexpected error: {error}",
+   "server_not_available": "Server not available"
   },
   "manifest": {
    "description": "CLI Central Nexe - Module CLI Orchestrator",
+   "health_error": "Health check error: {error}",
+   "info_error": "Info error: {error}",
+   "list_error": "List error: {error}",
    "features": {
     "discovery": "Dynamic CLI discovery via manifest.toml",
     "subprocess": "Subprocess execution for isolation",
@@ -197,6 +221,9 @@
     "ui": "Web UI at /ui-control/clis",
     "api": "API at /ui-control/api/clis"
    }
+  },
+  "config": {
+   "load_failed": "Failed to load config: {error}"
   },
   "main": {
    "options": {

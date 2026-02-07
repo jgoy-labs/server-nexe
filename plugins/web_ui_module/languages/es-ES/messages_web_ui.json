@@ -16,7 +16,71 @@
    "query_required": "La consulta es obligatoria",
    "module_not_initialized": "Módulo no inicializado",
    "engine_unavailable": "❌ Error: No hay motor de IA disponible (prueba iniciar Ollama con 'ollama serve')",
-   "error_generic": "❌ Error: {error}"
+   "error_generic": "❌ Error: {error}",
+   "chat_request_failed": "La solicitud de chat falló"
+  },
+  "health": {
+   "active": "Interfaz web activa"
+  },
+  "logs": {
+   "attached_doc_used": "Usando documento adjunto: {filename} (fragmento 1/{total}, {chars} caracteres)",
+   "available_modules": "Módulos disponibles: {modules}",
+   "cleanup_completed": "Limpieza completada: {count} archivos eliminados",
+   "cleanup_delete_error": "Error eliminando {path}: {error}",
+   "cleanup_error": "Error durante la limpieza: {error}",
+   "cleanup_file": "Archivo antiguo limpiado: {name}",
+   "clear_failed": "No se pudo borrar la memoria: {error}",
+   "collection_cleared": "Colección de memoria borrada y recreada",
+   "collection_created": "Colección de memoria de la web UI creada",
+   "delete_entry_failed": "No se pudo eliminar la entrada: {error}",
+   "document_attached": "Documento '{filename}' adjuntado con {count} fragmentos",
+   "document_ingested": "Documento '{filename}' ingerido: {message}",
+   "duplicate_check_failed": "Comprobación de duplicados fallida: {error}",
+   "duplicate_detected": "Duplicado detectado (score={score:.2f}), se omite el guardado",
+   "engine_calling_chat": "Llamando a {engine}.chat con model={model}",
+   "engine_error_details": "Detalles del error del motor:",
+   "engine_failed": "{engine} falló: {error}",
+   "engine_instance_none": "{engine} get_module_instance() devolvió None",
+   "engine_no_chat": "{engine} no tiene método chat",
+   "engine_no_get_instance": "{engine} no tiene get_module_instance()",
+   "engine_no_instance": "{engine} no tiene instancia",
+   "engine_not_registered": "{engine} no registrado",
+   "engine_succeeded": "✅ {engine} correcto!",
+   "extract_failed": "La extracción de hechos falló: {error}, usando en bruto",
+   "extract_no_facts": "Extracción de memoria: no se encontraron hechos relevantes",
+   "extract_no_llm": "Sin LLM para extracción, usando conversación en bruto",
+   "extract_no_model": "No se especificó modelo para extracción, se omite",
+   "extract_stats": "Extracción de memoria: {input_chars} caracteres → {output_chars} caracteres",
+   "file_delete_error": "Error eliminando archivo: {error}",
+   "file_deleted": "Archivo eliminado: {path}",
+   "file_saved": "Archivo guardado: {path}",
+   "init_failed": "No se pudo inicializar WebUIModule: {error}",
+   "initialized": "WebUIModule inicializado correctamente",
+   "list_files_error": "Error listando archivos: {error}",
+   "llm_call_error": "Error llamando LLM: {error}",
+   "memory_api_init_failed": "No se pudo inicializar Memory API: {error}",
+   "no_facts_skip_save": "No se extrajeron hechos, se omite el guardado",
+   "pdf_extract_error": "Error extrayendo PDF: {error}",
+   "pruned_entry": "Entrada podada (retención={score:.2f}): {preview}...",
+   "pruning_failed": "Poda de memoria fallida: {error}",
+   "rag_auto_save_failed": "Auto-guardado RAG fallido: {error}",
+   "rag_header_found": "Cabecera RAG encontrada: id={id}, priority={priority}",
+   "rag_lookup_failed": "Búsqueda RAG fallida: {error}",
+   "rag_memories_found": "RAG: {count} memorias relevantes (score >= 0.5)",
+   "recall_error": "Error recuperando memoria: {error}",
+   "retention_calc_error": "Error calculando retención: {error}",
+   "search_collection_failed": "Error buscando la colección {collection}: {error}",
+   "shutting_down": "WebUIModule apagándose",
+   "skip_trivial": "Se omite mensaje trivial: {preview}...",
+   "smart_auto_save_failed": "Auto-guardado inteligente a RAG fallido: {error}",
+   "smart_prune": "Poda inteligente: {deleted} entradas de baja retención eliminadas (era {previous})",
+   "smart_save_not_needed": "No hace falta guardar: {message}",
+   "smart_saved": "Guardado inteligente en RAG: {message}",
+   "stats_failed": "No se pudieron obtener estadísticas de memoria: {error}",
+   "store_error": "Error guardando en memoria: {error}",
+   "streaming_error": "Error de streaming: {error}",
+   "text_chunked": "Texto dividido en {count} fragmentos",
+   "trying_engine": "Probando motor: {engine}"
   },
   "session": {
    "deleted": "eliminada"
@@ -62,6 +126,9 @@
   },
   "metadata": {
    "description": "Interfaz web estilo Ollama para demostrar el sistema modular"
+  },
+  "manifest": {
+   "description": "Interfaz web estilo Ollama para demostrar el sistema modular de Nexe. Incluye chat con streaming, sesiones y subida de documentos."
   },
   "chat": {
    "stream_error": "\n[Error: {error}]"

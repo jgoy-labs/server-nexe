@@ -15,28 +15,34 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from core.contracts.migrations.manifest_migrator import ManifestMigrator, MigrationResult
+from personality.i18n.resolve import t_modular
+
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"scripts.migrate.{key}", fallback, **kwargs)
 
 
 def print_result(result: MigrationResult):
     """Print migration result"""
     print(f"\n{'='*60}")
-    print(f"Plugin: {result.original_path.parent.name}")
-    print(f"Status: {'✓ SUCCESS' if result.success else '✗ FAILED'}")
+    print(_t("plugin", "Plugin: {name}", name=result.original_path.parent.name))
+    status = _t("status_success", "✓ SUCCESS") if result.success else _t("status_failed", "✗ FAILED")
+    print(_t("status_line", "Status: {status}", status=status))
     print(f"{'='*60}")
 
     if result.warnings:
-        print("\nWarnings:")
+        print(_t("warnings_title", "\nWarnings:"))
         for warning in result.warnings:
-            print(f"  ⚠️  {warning}")
+            print(_t("warning_item", "  ⚠️  {warning}", warning=warning))
 
     if result.errors:
-        print("\nErrors:")
+        print(_t("errors_title", "\nErrors:"))
         for error in result.errors:
-            print(f"  ❌ {error}")
+            print(_t("error_item", "  ❌ {error}", error=error))
 
     if result.success:
-        print(f"\nMigrated manifest written to:")
-        print(f"  {result.migrated_path}")
+        print(_t("migrated_written", "\nMigrated manifest written to:"))
+        print(_t("migrated_path", "  {path}", path=result.migrated_path))
 
 
 def main():
@@ -48,7 +54,7 @@ def main():
     plugins_dir = project_root / "plugins"
 
     if not plugins_dir.exists():
-        print(f"❌ Plugins directory not found: {plugins_dir}")
+        print(_t("plugins_dir_not_found", "❌ Plugins directory not found: {path}", path=plugins_dir))
         return 1
 
     migrator = ManifestMigrator()
@@ -57,12 +63,12 @@ def main():
     if args.plugin:
         plugin_dir = plugins_dir / args.plugin
         if not plugin_dir.exists():
-            print(f"❌ Plugin not found: {plugin_dir}")
+            print(_t("plugin_not_found", "❌ Plugin not found: {path}", path=plugin_dir))
             return 1
 
         manifest_path = plugin_dir / "manifest.toml"
         if not manifest_path.exists():
-            print(f"❌ Manifest not found: {manifest_path}")
+            print(_t("manifest_not_found", "❌ Manifest not found: {path}", path=manifest_path))
             return 1
 
         result = migrator.migrate_manifest(manifest_path, dry_run=args.dry_run)
@@ -76,11 +82,11 @@ def main():
 
         # Print summary
         print(f"\n{'='*60}")
-        print("MIGRATION SUMMARY")
+        print(_t("summary_title", "MIGRATION SUMMARY"))
         print(f"{'='*60}")
-        print(f"Total plugins: {len(results)}")
-        print(f"Successful: {sum(1 for r in results if r.success)}")
-        print(f"Failed: {sum(1 for r in results if not r.success)}")
+        print(_t("summary_total", "Total plugins: {count}", count=len(results)))
+        print(_t("summary_successful", "Successful: {count}", count=sum(1 for r in results if r.success)))
+        print(_t("summary_failed", "Failed: {count}", count=sum(1 for r in results if not r.success)))
 
         # Print individual results
         for result in results:

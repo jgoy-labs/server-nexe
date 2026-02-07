@@ -2,10 +2,32 @@
  "security": {
   "manifest": {
    "name": "Seguridad",
-   "description": "Módulo de seguridad de Nexe 0.8",
+   "description": "Sistema de seguridad integral con scanning, detección de vulnerabilidades, autenticación API key, rate limiting y checks automatizados para validar la seguridad del sistema Nexe.",
    "errors": {
     "not_ready": "El módulo de seguridad no está listo"
    }
+  },
+  "auth": {
+   "missing_key": "Falta la clave API",
+   "invalid_key": "Clave API inválida",
+   "key_not_configured": "Configuración del servidor incorrecta: clave API no configurada",
+   "server_misconfigured_no_valid_key": "Configuración del servidor incorrecta: no hay una clave API válida configurada",
+   "dev_mode_localhost_only": "El bypass en modo DEV solo se permite desde localhost",
+   "invalid_or_expired_key": "Clave API inválida o caducada",
+   "dev_mode_bypass": "MODO DEV: Clave API bypassed",
+   "dev_mode_warning": "¡NO para producción!",
+   "primary_key_auth": "Autenticación con clave API primaria",
+   "secondary_key_auth": "Autenticación con clave API secundaria (deprecated)",
+   "secondary_key_action_required": "MIGRAR A CLAVE PRIMARIA"
+  },
+  "api": {
+   "scan_hint": "Usa POST /security/scan para ejecutar un escaneo completo de seguridad"
+  },
+  "ui": {
+   "not_implemented": "La interfaz de seguridad aún no está implementada"
+  },
+  "storage": {
+   "logs_desc": "Logs de seguridad - cumplimiento 90 días"
   },
   "checks": {
    "auth_running": "Ejecutando check de autenticación...",
@@ -28,6 +50,18 @@
    "scan_complete": "Escaneo de seguridad completado",
    "vulnerabilities_found": "Vulnerabilidades encontradas: {count}",
    "no_issues": "No se han detectado problemas de seguridad"
+  },
+  "logs": {
+   "check_failed": "La comprobación {check} falló: {error}",
+   "scan_failed": "El escaneo de seguridad falló: {error}",
+   "report_failed": "No se pudo obtener el informe de seguridad: {error}",
+   "initialized": "Módulo de seguridad inicializado: {name} v{version}",
+   "dev_mode_blocked": "BLOQUEO DE SEGURIDAD: DEV_MODE no puede habilitarse en producción. NEXE_DEV_MODE=true se ignora cuando NEXE_ENV=production",
+   "xss_query_param": "🚫 Intento de XSS en el parámetro de consulta '{param}' desde {ip}",
+   "sql_query_param": "🚫 Intento de inyección SQL en el parámetro de consulta '{param}' desde {ip}",
+   "command_query_param": "🚫 Intento de inyección de comandos en el parámetro de consulta '{param}' desde {ip}",
+   "path_query_param": "🚫 Intento de path traversal en el parámetro de consulta '{param}' desde {ip}",
+   "path_request": "🚫 Intento de path traversal: {path} desde {ip}"
   }
  }
 }

@@ -6,7 +6,7 @@
 [module]
 name = "sanitizer"
 version = "1.0.0"
-description = "Filtre de seguretat TÈCNICA per jailbreaks i prompt injections"
+description = "i18n:sanitizer.manifest.description|Technical security filter for jailbreaks and prompt injections"
 author = "J.Goy"
 pilar = "plugins"
 order = "04.1"

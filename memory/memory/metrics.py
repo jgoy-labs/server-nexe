@@ -14,8 +14,12 @@ from typing import Dict, Any, Optional
 import threading
 import time
 import structlog
+from personality.i18n.resolve import t_modular
 
 logger = structlog.get_logger()
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.metrics.{key}", fallback, **kwargs)
 
 class MemoryMetrics:
   """
@@ -45,31 +49,90 @@ class MemoryMetrics:
       "memory_ingestion_duration_seconds": []
     }
 
-    logger.info("memory_metrics_initialized")
+    logger.info(
+      "memory_metrics_initialized",
+      message=_t("initialized", "Memory metrics initialized")
+    )
 
   def inc_counter(self, name: str, value: int = 1):
     """Increment counter metric"""
     if name in self._counters:
       self._counters[name] += value
-      logger.debug("metric_counter_incremented", name=name, value=value, total=self._counters[name])
+      logger.debug(
+        "metric_counter_incremented",
+        message=_t(
+          "counter_incremented",
+          "Counter '{name}' incremented by {value} (total={total})",
+          name=name,
+          value=value,
+          total=self._counters[name],
+        ),
+        name=name,
+        value=value,
+        total=self._counters[name]
+      )
     else:
-      logger.warning("unknown_counter_metric", name=name)
+      logger.warning(
+        "unknown_counter_metric",
+        message=_t(
+          "counter_unknown",
+          "Unknown counter metric: {name}",
+          name=name,
+        ),
+        name=name
+      )
 
   def set_gauge(self, name: str, value: float):
     """Set gauge metric value"""
     if name in self._gauges:
       self._gauges[name] = value
-      logger.debug("metric_gauge_set", name=name, value=value)
+      logger.debug(
+        "metric_gauge_set",
+        message=_t(
+          "gauge_set",
+          "Gauge '{name}' set to {value}",
+          name=name,
+          value=value,
+        ),
+        name=name,
+        value=value
+      )
     else:
-      logger.warning("unknown_gauge_metric", name=name)
+      logger.warning(
+        "unknown_gauge_metric",
+        message=_t(
+          "gauge_unknown",
+          "Unknown gauge metric: {name}",
+          name=name,
+        ),
+        name=name
+      )
 
   def observe_histogram(self, name: str, value: float):
     """Observe histogram metric"""
     if name in self._histograms:
       self._histograms[name].append(value)
-      logger.debug("metric_histogram_observed", name=name, value=value)
+      logger.debug(
+        "metric_histogram_observed",
+        message=_t(
+          "histogram_observed",
+          "Histogram '{name}' observed value {value}",
+          name=name,
+          value=value,
+        ),
+        name=name,
+        value=value
+      )
     else:
-      logger.warning("unknown_histogram_metric", name=name)
+      logger.warning(
+        "unknown_histogram_metric",
+        message=_t(
+          "histogram_unknown",
+          "Unknown histogram metric: {name}",
+          name=name,
+        ),
+        name=name
+      )
 
   def get_metrics(self) -> Dict[str, Any]:
     """
@@ -112,7 +175,13 @@ class MemoryMetrics:
     """
     try:
       if not module._initialized:
-        logger.debug("metrics_update_skipped_not_initialized")
+        logger.debug(
+          "metrics_update_skipped_not_initialized",
+          message=_t(
+            "update_skipped_not_initialized",
+            "Metrics update skipped: module not initialized"
+          )
+        )
         return
 
       if module._flash_memory:
@@ -132,10 +201,22 @@ class MemoryMetrics:
       if module._persistence:
         pass
 
-      logger.debug("metrics_updated_from_module")
+      logger.debug(
+        "metrics_updated_from_module",
+        message=_t("updated_from_module", "Metrics updated from module state")
+      )
 
     except Exception as e:
-      logger.error("metrics_update_failed", error=str(e), exc_info=True)
+      logger.error(
+        "metrics_update_failed",
+        message=_t(
+          "update_failed",
+          "Metrics update failed: {error}",
+          error=str(e),
+        ),
+        error=str(e),
+        exc_info=True
+      )
 
   def record_ingestion_duration(self, duration: float):
     """
@@ -154,7 +235,10 @@ class MemoryMetrics:
       self._gauges[key] = 0
     for key in self._histograms:
       self._histograms[key] = []
-    logger.info("metrics_reset")
+    logger.info(
+      "metrics_reset",
+      message=_t("reset", "Metrics reset")
+    )
 
 class MetricsTimer:
   """Context manager to measure operation duration"""

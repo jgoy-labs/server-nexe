@@ -16,6 +16,8 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Type
 
+from personality.i18n.resolve import t_modular
+
 from .protocol import (
   NexeModule,
   ModuleStatus,
@@ -28,20 +30,23 @@ from .registry import ModuleRegistry, RegisteredModule, get_registry
 
 logger = logging.getLogger(__name__)
 
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core.loader.{key}", fallback, **kwargs)
+
 class ModuleLoadError(Exception):
-  """Error durant la càrrega d'un mòdul"""
+  """Error during module loading."""
   pass
 
 class ModuleLoader:
   """
-  Carrega i inicialitza mòduls Nexe.
+  Load and initialize Nexe modules.
 
-  Procés de càrrega:
-  1. Escaneja el sistema cercant manifest.toml
-  2. Registra els mòduls descoberts
-  3. Carrega (importa) els mòduls Python
-  4. Valida que compleixen el NexeModule Protocol
-  5. Inicialitza els mòduls amb el context
+  Loading process:
+  1. Scan the system for manifest.toml
+  2. Register discovered modules
+  3. Load (import) Python modules
+  4. Validate they implement the NexeModule Protocol
+  5. Initialize modules with the context
   """
 
   def __init__(
@@ -51,12 +56,12 @@ class ModuleLoader:
     context: Optional[Dict[str, Any]] = None
   ):
     """
-    Inicialitza el loader.
+    Initialize the loader.
 
     Args:
-      base_path: Directori arrel del projecte
-      registry: Registre de mòduls (usa singleton si no es proporciona)
-      context: Context per passar als mòduls durant inicialització
+      base_path: Project root directory
+      registry: Module registry (uses singleton if not provided)
+      context: Context to pass to modules during initialization
     """
     self.base_path = base_path or Path(__file__).parent.parent.parent
     self.registry = registry or get_registry()
@@ -64,43 +69,44 @@ class ModuleLoader:
 
     self.scanner = ModuleScanner(base_path=self.base_path)
 
-    logger.info(
-      "ModuleLoader initialized - base_path=%s",
-      self.base_path
-    )
+    logger.info(_t(
+      "initialized",
+      "ModuleLoader initialized - base_path={path}",
+      path=self.base_path
+    ))
 
   async def discover(self) -> List[ModuleDiscovery]:
     """
-    Descobreix tots els mòduls disponibles.
+    Discover all available modules.
 
     Returns:
-      Llista de mòduls descoberts
+      List of discovered modules
     """
     discoveries = self.scanner.scan()
 
     for discovery in discoveries:
       await self.registry.register(discovery)
 
-    logger.info("Discovered %d modules", len(discoveries))
+    logger.info(_t("discovered", "Discovered {count} modules", count=len(discoveries)))
     return discoveries
 
   async def load_module(self, name: str) -> Optional[NexeModule]:
     """
-    Carrega un mòdul pel seu nom.
+    Load a module by name.
 
     Args:
-      name: Nom del mòdul a carregar
+      name: Module name to load
 
     Returns:
-      Instància del mòdul o None si falla
+      Module instance or None if it fails
     """
     registered = self.registry.get(name)
     if not registered:
-      logger.error("Module %s not found in registry", name)
+      logger.error(_t("module_not_found", "Module {module} not found in registry", module=name))
       return None
 
     if registered.is_loaded:
-      logger.debug("Module %s already loaded", name)
+      logger.debug(_t("module_already_loaded", "Module {module} already loaded", module=name))
       return registered.instance
 
     try:
@@ -109,37 +115,56 @@ class ModuleLoader:
       instance = self._import_module(registered.discovery)
 
       if instance is None:
-        raise ModuleLoadError(f"Failed to import module {name}")
+        raise ModuleLoadError(
+          _t(
+            "import_failed",
+            "Failed to import module {module}",
+            module=name,
+          )
+        )
 
       if not validate_module(instance):
         raise ModuleLoadError(
-          f"Module {name} does not implement NexeModule Protocol"
+          _t(
+            "invalid_protocol",
+            "Module {module} does not implement NexeModule Protocol",
+            module=name,
+          )
         )
 
       await self.registry.set_instance(name, instance)
 
-      logger.info("Module %s loaded successfully", name)
+      logger.info(_t("module_loaded", "Module {module} loaded successfully", module=name))
       return instance
 
     except Exception as e:
       error_msg = str(e)
       await self.registry.set_status(name, ModuleStatus.FAILED, error_msg)
-      logger.error("Failed to load module %s: %s", name, error_msg)
+      logger.error(_t(
+        "module_load_failed",
+        "Failed to load module {module}: {error}",
+        module=name,
+        error=error_msg
+      ))
       return None
 
   async def initialize_module(self, name: str) -> bool:
     """
-    Inicialitza un mòdul carregat.
+    Initialize a loaded module.
 
     Args:
-      name: Nom del mòdul
+      name: Module name
 
     Returns:
-      True si la inicialització és correcta
+      True if initialization succeeds
     """
     registered = self.registry.get(name)
     if not registered or not registered.instance:
-      logger.error("Module %s not loaded, cannot initialize", name)
+      logger.error(_t(
+        "module_not_loaded",
+        "Module {module} not loaded, cannot initialize",
+        module=name
+      ))
       return False
 
     try:
@@ -153,7 +178,7 @@ class ModuleLoader:
 
       if success:
         await self.registry.set_status(name, ModuleStatus.RUNNING)
-        logger.info("Module %s initialized", name)
+        logger.info(_t("module_initialized", "Module {module} initialized", module=name))
       else:
         await self.registry.set_status(
           name,
@@ -165,18 +190,23 @@ class ModuleLoader:
 
     except Exception as e:
       await self.registry.set_status(name, ModuleStatus.FAILED, str(e))
-      logger.error("Failed to initialize module %s: %s", name, str(e))
+      logger.error(_t(
+        "module_init_failed",
+        "Failed to initialize module {module}: {error}",
+        module=name,
+        error=str(e)
+      ))
       return False
 
   async def load_and_initialize(self, name: str) -> bool:
     """
-    Carrega i inicialitza un mòdul.
+    Load and initialize a module.
 
     Args:
-      name: Nom del mòdul
+      name: Module name
 
     Returns:
-      True si tot ha anat bé
+      True if everything succeeded
     """
     instance = await self.load_module(name)
     if not instance:
@@ -186,10 +216,10 @@ class ModuleLoader:
 
   async def load_all(self) -> Dict[str, bool]:
     """
-    Carrega tots els mòduls descoberts.
+    Load all discovered modules.
 
     Returns:
-      Dict amb nom -> èxit de cada mòdul
+      Dict of name -> success for each module
     """
     results = {}
 
@@ -199,19 +229,24 @@ class ModuleLoader:
       results[name] = success
 
     loaded = sum(1 for v in results.values() if v)
-    logger.info("Loaded %d/%d modules", loaded, len(results))
+    logger.info(_t(
+      "modules_loaded_summary",
+      "Loaded {loaded}/{total} modules",
+      loaded=loaded,
+      total=len(results)
+    ))
 
     return results
 
   async def shutdown_module(self, name: str) -> bool:
     """
-    Atura un mòdul.
+    Stop a module.
 
     Args:
-      name: Nom del mòdul
+      name: Module name
 
     Returns:
-      True si s'ha aturat correctament
+      True if shutdown succeeded
     """
     registered = self.registry.get(name)
     if not registered or not registered.instance:
@@ -220,19 +255,24 @@ class ModuleLoader:
     try:
       await registered.instance.shutdown()
       await self.registry.set_status(name, ModuleStatus.STOPPED)
-      logger.info("Module %s shutdown complete", name)
+      logger.info(_t("module_shutdown_complete", "Module {module} shutdown complete", module=name))
       return True
 
     except Exception as e:
-      logger.error("Error shutting down module %s: %s", name, str(e))
+      logger.error(_t(
+        "module_shutdown_error",
+        "Error shutting down module {module}: {error}",
+        module=name,
+        error=str(e)
+      ))
       return False
 
   async def shutdown_all(self) -> Dict[str, bool]:
     """
-    Atura tots els mòduls carregats.
+    Stop all loaded modules.
 
     Returns:
-      Dict amb nom -> èxit de cada mòdul
+      Dict of name -> success for each module
     """
     results = {}
 
@@ -245,13 +285,13 @@ class ModuleLoader:
 
   async def health_check_module(self, name: str) -> HealthResult:
     """
-    Executa health check d'un mòdul.
+    Run a health check for a module.
 
     Args:
-      name: Nom del mòdul
+      name: Module name
 
     Returns:
-      HealthResult amb l'estat
+      HealthResult with the status
     """
     registered = self.registry.get(name)
 
@@ -282,10 +322,10 @@ class ModuleLoader:
 
   async def health_check_all(self) -> Dict[str, HealthResult]:
     """
-    Executa health check de tots els mòduls.
+    Run health checks for all modules.
 
     Returns:
-      Dict amb nom -> HealthResult
+      Dict of name -> HealthResult
     """
     results = {}
 
@@ -298,21 +338,24 @@ class ModuleLoader:
 
   def _import_module(self, discovery: ModuleDiscovery) -> Optional[NexeModule]:
     """
-    Importa un mòdul Python i retorna la instància.
+    Import a Python module and return the instance.
 
     Args:
-      discovery: Informació del mòdul
+      discovery: Module information
 
     Returns:
-      Instància del mòdul o None
+      Module instance or None
     """
     entry_module = discovery.entry_module
     entry_class = discovery.entry_class
 
     if not entry_module:
       logger.error(
-        "No entry_module specified for %s",
-        discovery.metadata.name
+        _t(
+          "entry_module_missing",
+          "No entry_module specified for {module}",
+          module=discovery.metadata.name,
+        )
       )
       return None
 
@@ -322,9 +365,12 @@ class ModuleLoader:
       if entry_class:
         if not hasattr(module, entry_class):
           logger.error(
-            "Class %s not found in %s",
-            entry_class,
-            entry_module
+            _t(
+              "entry_class_missing",
+              "Class {class_name} not found in {module}",
+              class_name=entry_class,
+              module=entry_module,
+            )
           )
           return None
 
@@ -346,25 +392,38 @@ class ModuleLoader:
             continue
 
       logger.error(
-        "No valid NexeModule found in %s",
-        entry_module
+        _t(
+          "no_valid_module",
+          "No valid NexeModule found in {module}",
+          module=entry_module,
+        )
       )
       return None
 
     except ImportError as e:
-      logger.error("Cannot import %s: %s", entry_module, str(e))
+      logger.error(_t(
+        "cannot_import",
+        "Cannot import {module}: {error}",
+        module=entry_module,
+        error=str(e)
+      ))
       return None
     except Exception as e:
-      logger.error("Error loading %s: %s", entry_module, str(e))
+      logger.error(_t(
+        "error_loading",
+        "Error loading {module}: {error}",
+        module=entry_module,
+        error=str(e)
+      ))
       return None
 
   def set_context(self, key: str, value: Any) -> None:
     """
-    Afegeix un servei al context.
+    Add a service to the context.
 
     Args:
-      key: Nom del servei
-      value: Valor/instància del servei
+      key: Service name
+      value: Service value/instance
     """
     self.context[key] = value
 
@@ -372,7 +431,7 @@ _loader: Optional[ModuleLoader] = None
 
 def get_loader() -> ModuleLoader:
   """
-  Obté el loader global.
+  Get the global loader.
 
   Returns:
     ModuleLoader singleton
@@ -387,14 +446,14 @@ async def bootstrap(
   auto_load: bool = True
 ) -> ModuleLoader:
   """
-  Inicialitza el sistema de mòduls.
+  Initialize the module system.
 
   Args:
-    context: Context inicial per als mòduls
-    auto_load: Si True, carrega automàticament tots els mòduls
+    context: Initial context for modules
+    auto_load: If True, automatically load all modules
 
   Returns:
-    ModuleLoader inicialitzat
+    Initialized ModuleLoader
   """
   loader = get_loader()
 

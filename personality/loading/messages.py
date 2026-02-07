@@ -4,39 +4,39 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/messages.py
-Description: Diccionari centralitzat de missatges fallback per sistema loading. Defineix
+Description: Centralized fallback message dictionary for loading system. Defines
 
 www.jgoy.net
 ────────────────────────────────────
 """
 
 FALLBACK_MESSAGES = {
-  'loading.starting': 'Carregant mòdul {module}...',
-  'loading.success': 'Mòdul {module} carregat correctament',
-  'loading.error': 'Error carregant mòdul {module}: {error}',
-  'loading.api_file_not_found': 'Fitxer d\'API no trobat per {module}. Patrons provats: {patterns}',
-  'loading.api_file_found': 'Fitxer d\'API trobat: {file}',
-  'loading.extracting_instance': 'Extraient instància principal del mòdul {module}',
-  'loading.factory_found': 'Factory function trobada: {factory}',
-  'loading.factory_failed': 'Factory function {factory} ha fallat: {error}',
-  'loading.validating': 'Validant mòdul {module}',
-  'loading.initializing': 'Inicialitzant mòdul {module}',
-  'loading.cleanup': 'Netejant recursos per {module}',
+  'loading.starting': 'Loading module {module}...',
+  'loading.success': 'Module {module} loaded successfully',
+  'loading.error': 'Error loading module {module}: {error}',
+  'loading.api_file_not_found': 'API file not found for {module}. Patterns tried: {patterns}',
+  'loading.api_file_found': 'API file found: {file}',
+  'loading.extracting_instance': 'Extracting main instance from module {module}',
+  'loading.factory_found': 'Factory function found: {factory}',
+  'loading.factory_failed': 'Factory function {factory} failed: {error}',
+  'loading.validating': 'Validating module {module}',
+  'loading.initializing': 'Initializing module {module}',
+  'loading.cleanup': 'Cleaning up resources for {module}',
 
-  'unloading.starting': 'Descarregant mòdul {module}...',
-  'unloading.success': 'Mòdul {module} descarregat correctament',
-  'unloading.error': 'Error descarregant mòdul {module}: {error}',
-  'unloading.cleanup_method': 'Executant mètode de neteja: {method}',
+  'unloading.starting': 'Unloading module {module}...',
+  'unloading.success': 'Module {module} unloaded successfully',
+  'unloading.error': 'Error unloading module {module}: {error}',
+  'unloading.cleanup_method': 'Running cleanup method: {method}',
 
-  'validation.instance_missing': 'Instància del mòdul no vàlida',
-  'validation.api_router_missing': 'Router/app d\'API requerit però no trobat',
-  'validation.ui_file_missing': 'Fitxer d\'UI requerit: {file}',
-  'validation.dependency_missing': 'Dependència externa no disponible: {dep}',
-  'validation.validation_failed': 'Validació fallida per {module}:\n{errors}',
+  'validation.instance_missing': 'Invalid module instance',
+  'validation.api_router_missing': 'Required API router/app not found',
+  'validation.ui_file_missing': 'Required UI file: {file}',
+  'validation.dependency_missing': 'External dependency not available: {dep}',
+  'validation.validation_failed': 'Validation failed for {module}:\n{errors}',
 
-  'initialization.method_found': 'Mètode d\'inicialització trobat: {method}',
-  'initialization.method_called': 'Mètode {method} executat per {module}',
-  'initialization.method_error': 'Error executant {method}: {error}',
+  'initialization.method_found': 'Initialization method found: {method}',
+  'initialization.method_called': 'Method {method} executed for {module}',
+  'initialization.method_error': 'Error executing {method}: {error}',
 
   'loader.patterns.api_module': 'api_{module_name}.py',
   'loader.patterns.api_generic': 'api.py',
@@ -52,16 +52,16 @@ FALLBACK_MESSAGES = {
   'loader.ignore_prefixes.dot': '.',
   'loader.ignore_files.setup': 'setup',
 
-  'loader.debug.tried_patterns': 'Provats: {patterns}',
-  'loader.debug.found_api_file': 'Fitxer d\'API trobat: {file}',
-  'loader.debug.fallback_api_file': 'Usant fitxer d\'API alternatiu: {file}',
-  'loader.debug.using_module_as_instance': 'Usant el mòdul mateix com a instància per {module}',
-  'loader.debug.cannot_create_spec': 'No es pot crear especificació per {file}',
-  'loader.debug.called_method': 'Mètode {method} cridat per {module}',
-  'loader.debug.cleanup_completed': 'Neteja de recursos completada per {module}',
-  'loader.debug.error_calling_method': 'Error cridant {method}: {error}',
-  'loader.debug.error_calling_method_unload': 'Error cridant {method} durant la descàrrega: {error}',
-  'loader.debug.reloading_module': 'Recarregant mòdul {module}',
+  'loader.debug.tried_patterns': 'Tried: {patterns}',
+  'loader.debug.found_api_file': 'API file found: {file}',
+  'loader.debug.fallback_api_file': 'Using fallback API file: {file}',
+  'loader.debug.using_module_as_instance': 'Using module itself as instance for {module}',
+  'loader.debug.cannot_create_spec': 'Cannot create specification for {file}',
+  'loader.debug.called_method': 'Method {method} called for {module}',
+  'loader.debug.cleanup_completed': 'Cleanup completed for {module}',
+  'loader.debug.error_calling_method': 'Error calling {method}: {error}',
+  'loader.debug.error_calling_method_unload': 'Error calling {method} during unload: {error}',
+  'loader.debug.reloading_module': 'Reloading module {module}',
 
   'loader.module_name_prefix': 'module_{module_name}_{id}',
 
@@ -92,15 +92,15 @@ FALLBACK_MESSAGES = {
 
 def get_message(i18n, key: str, **kwargs) -> str:
   """
-  Obté missatge traduït o fallback.
+  Get translated message or fallback.
 
   Args:
-    i18n: Gestor i18n (pot ser None)
-    key: Clau del missatge
-    **kwargs: Arguments per format
+    i18n: i18n manager (can be None)
+    key: Message key
+    **kwargs: Formatting arguments
 
   Returns:
-    Missatge formatat
+    Formatted message
   """
   if i18n:
     return i18n.t(key, **kwargs)

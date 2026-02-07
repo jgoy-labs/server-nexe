@@ -15,21 +15,16 @@ import structlog
 
 from nexe_flow.core.node import Node, NodeMetadata, NodeInput, NodeOutput
 
-from personality.i18n import get_i18n
+from personality.i18n.resolve import t_modular
 
 logger = structlog.get_logger(__name__)
 
 
 def _t(key: str, fallback: str, **kwargs) -> str:
-  try:
-    return get_i18n().t(key, fallback, **kwargs)
-  except Exception:
-    if kwargs:
-      try:
-        return fallback.format(**kwargs)
-      except (KeyError, ValueError):
-        return fallback
-    return fallback
+  return t_modular(key, fallback, **kwargs)
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"rag.workflow.logs.{key}", fallback, **kwargs)
 
 try:
   from memory.rag_sources.file import FileRAGSource
@@ -39,7 +34,10 @@ except ImportError as e:
   logger.warning(
     "rag_sources_not_available",
     error=str(e),
-    message=get_i18n().t("rag.workflow.rag_not_available", "RAGSearchNode will not be registered. Install qdrant-client to enable RAG functionality.")
+    message=_t(
+      "rag.workflow.rag_not_available",
+      "RAGSearchNode will not be registered. Install qdrant-client to enable RAG functionality."
+    )
   )
 
 class RAGSearchNode(Node):
@@ -74,7 +72,10 @@ class RAGSearchNode(Node):
     self._rag_source: Optional[FileRAGSource] = None
     self.config = {}
 
-    logger.info("rag_search_node_initialized")
+    logger.info(
+      "rag_search_node_initialized",
+      message=_t_log("node_initialized", "RAGSearchNode initialized")
+    )
 
   def get_metadata(self) -> NodeMetadata:
     """Return node metadata."""
@@ -206,9 +207,11 @@ class RAGSearchNode(Node):
       RuntimeError: Si no es pot inicialitzar la source o RAG no disponible
     """
     if not RAG_AVAILABLE:
-      i18n = get_i18n()
       raise RuntimeError(
-        i18n.t("rag.workflow.rag_functionality_not_available", "RAG functionality not available. Install qdrant-client: pip install qdrant-client")
+        _t(
+          "rag.workflow.rag_functionality_not_available",
+          "RAG functionality not available. Install qdrant-client: pip install qdrant-client"
+        )
       )
 
     if self._rag_source is None:
@@ -221,17 +224,31 @@ class RAGSearchNode(Node):
         )
         logger.info(
           "rag_source_initialized",
+          message=_t_log(
+            "source_initialized",
+            "RAG source initialized (source_id={source_id}, index_name={index_name})",
+            source_id=source_id,
+            index_name=index_name,
+          ),
           source_id=source_id,
           index_name=index_name
         )
       except Exception as e:
         logger.error(
           "rag_source_init_failed",
+          message=_t_log(
+            "source_init_failed",
+            "Failed to initialize RAG source: {error}",
+            error=str(e),
+          ),
           error=str(e)
         )
-        i18n = get_i18n()
         raise RuntimeError(
-          i18n.t("rag.workflow.failed_to_init_rag_source", "Failed to initialize RAG source: {error}", error=str(e))
+          _t(
+            "rag.workflow.failed_to_init_rag_source",
+            "Failed to initialize RAG source: {error}",
+            error=str(e)
+          )
         )
 
     return self._rag_source
@@ -259,9 +276,8 @@ class RAGSearchNode(Node):
 
     query = inputs.get("query")
     if not query:
-      i18n = get_i18n()
       raise ValueError(
-        i18n.t("rag.workflow.missing_query", "Missing required input: 'query'")
+        _t("rag.workflow.missing_query", "Missing required input: 'query'")
       )
 
     top_k = self.config.get('top_k', 5)
@@ -270,6 +286,12 @@ class RAGSearchNode(Node):
 
     logger.info(
       "rag_search_started",
+      message=_t_log(
+        "search_started",
+        "RAG search started (query_len={query_len}, top_k={top_k})",
+        query_len=len(query),
+        top_k=top_k,
+      ),
       query=query[:100],
       top_k=top_k
     )
@@ -295,8 +317,10 @@ class RAGSearchNode(Node):
           f"[{i}] (score: {score:.2f}, file: {file_path})\n{text}"
         )
 
-      i18n = get_i18n()
-      context = "\n\n".join(context_chunks) if context_chunks else i18n.t("rag.workflow.no_relevant_documents", "No relevant documents found.")
+      context = "\n\n".join(context_chunks) if context_chunks else _t(
+        "rag.workflow.no_relevant_documents",
+        "No relevant documents found."
+      )
 
       prompt = prompt_template.format(
         context=context,
@@ -305,6 +329,13 @@ class RAGSearchNode(Node):
 
       logger.info(
         "rag_search_completed",
+        message=_t_log(
+          "search_completed",
+          "RAG search completed (num_results={num_results}, context_length={context_length}, prompt_length={prompt_length})",
+          num_results=len(results),
+          context_length=len(context),
+          prompt_length=len(prompt),
+        ),
         num_results=len(results),
         context_length=len(context),
         prompt_length=len(prompt)
@@ -320,13 +351,17 @@ class RAGSearchNode(Node):
     except Exception as e:
       logger.error(
         "rag_search_failed",
+        message=_t_log(
+          "search_failed",
+          "RAG search failed: {error}",
+          error=str(e),
+        ),
         query=query[:100],
         error=str(e),
         exc_info=True
       )
-      i18n = get_i18n()
       raise RuntimeError(
-        i18n.t("rag.workflow.rag_search_failed", "RAG search failed: {error}", error=str(e))
+        _t("rag.workflow.rag_search_failed", "RAG search failed: {error}", error=str(e))
       )
 
   def validate_config(self) -> bool:
@@ -343,26 +378,28 @@ class RAGSearchNode(Node):
     score_threshold = self.config.get('score_threshold', 0.7)
     prompt_template = self.config.get('prompt_template', "Context:\n{context}\n\nQuestion: {query}")
 
-    i18n = get_i18n()
     if top_k < 1:
       raise ValueError(
-        i18n.t("rag.workflow.top_k_validation", "top_k must be >= 1")
+        _t("rag.workflow.top_k_validation", "top_k must be >= 1")
       )
 
     if not 0.0 <= score_threshold <= 1.0:
       raise ValueError(
-        i18n.t("rag.workflow.score_threshold_validation", "score_threshold must be between 0.0 and 1.0")
+        _t("rag.workflow.score_threshold_validation", "score_threshold must be between 0.0 and 1.0")
       )
 
     if "{context}" not in prompt_template:
       raise ValueError(
-        i18n.t("rag.workflow.prompt_template_context_missing", "prompt_template must contain {context} placeholder")
+        _t("rag.workflow.prompt_template_context_missing", "prompt_template must contain {context} placeholder")
       )
 
     if "{query}" not in prompt_template:
       raise ValueError(
-        i18n.t("rag.workflow.prompt_template_query_missing", "prompt_template must contain {query} placeholder")
+        _t("rag.workflow.prompt_template_query_missing", "prompt_template must contain {query} placeholder")
       )
 
-    logger.debug("rag_search_node_config_valid")
+    logger.debug(
+      "rag_search_node_config_valid",
+      message=_t_log("config_valid", "RAGSearchNode configuration valid")
+    )
     return True

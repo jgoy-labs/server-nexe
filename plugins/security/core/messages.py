@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/messages.py
-Description: Missatges fallback i18n per security core.
+Description: i18n fallback messages for the security core.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -15,6 +15,14 @@ FALLBACK_MESSAGES = {
   'security.auth.invalid_key': 'Invalid API key',
   'security.auth.server_misconfigured': 'Server misconfiguration: NEXE_ADMIN_API_KEY not configured. Set NEXE_ADMIN_API_KEY environment variable.',
   'security.auth.key_not_configured': 'Server misconfiguration: API key not configured',
+  'security.auth.server_misconfigured_no_valid_key': 'Server misconfiguration: No valid API key configured',
+  'security.auth.dev_mode_localhost_only': 'DEV mode bypass only allowed from localhost',
+  'security.auth.invalid_or_expired_key': 'Invalid or expired API key',
+  'security.auth.dev_mode_bypass': 'DEV MODE: API key bypassed',
+  'security.auth.dev_mode_warning': 'NOT for production!',
+  'security.auth.primary_key_auth': 'Authenticated with primary API key',
+  'security.auth.secondary_key_auth': 'Authenticated with secondary API key (deprecated)',
+  'security.auth.secondary_key_action_required': 'MIGRATE TO PRIMARY KEY',
 
   'security.validators.path_traversal': 'Invalid path: path traversal detected',
   'security.validators.file_not_found': 'File not found: {filename}',
@@ -53,22 +61,28 @@ FALLBACK_MESSAGES = {
   'security.logger.failed_process_file': 'Failed to process {file}: {error}',
 }
 
-def get_message(i18n, key: str, **kwargs) -> str:
+def get_message(i18n, key: str, fallback: str = None, **kwargs) -> str:
   """
-  Obté missatge traduït o fallback.
+  Get translated message or fallback.
 
   Args:
-    i18n: Gestor i18n (pot ser None)
-    key: Clau del missatge
-    **kwargs: Arguments per format
+    i18n: i18n manager (can be None)
+    key: Message key
+    fallback: Optional fallback string
+    **kwargs: Formatting arguments
 
   Returns:
-    Missatge formatat
+    Formatted message
   """
   if i18n:
-    return i18n.t(key, **kwargs)
+    try:
+      value = i18n.t(key, **kwargs)
+      if value != key:
+        return value
+    except Exception:
+      pass
 
-  template = FALLBACK_MESSAGES.get(key, key)
+  template = fallback or FALLBACK_MESSAGES.get(key, key)
   try:
     return template.format(**kwargs)
   except KeyError:

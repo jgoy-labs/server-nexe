@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/client.py
-Description: Client HTTP per comunicar-se amb el servidor Nexe.
+Description: HTTP client to communicate with the Nexe server.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -18,15 +18,16 @@ import json
 import ssl
 
 from .config import NexeConfig
+from .i18n import t
 
 ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
 
 class NexeClient:
   """
-  Client HTTP per comunicar-se amb el servidor Nexe.
+  HTTP client to communicate with the Nexe server.
 
-  Usa urllib per evitar dependències externes.
-  Suporta HTTPS amb certificats self-signed.
+  Uses urllib to avoid external dependencies.
+  Supports HTTPS with self-signed certificates.
   """
 
   def __init__(self, config: Optional[NexeConfig] = None):
@@ -69,7 +70,11 @@ class NexeClient:
       return {
         "error": True,
         "status_code": 0,
-        "message": f"Invalid URL scheme: {parsed.scheme}. Only http/https allowed.",
+        "message": t(
+          "cli.client.invalid_url_scheme",
+          "Invalid URL scheme: {scheme}. Only http/https allowed.",
+          scheme=parsed.scheme
+        ),
       }
 
     headers = {
@@ -102,20 +107,28 @@ class NexeClient:
       return {
         "error": True,
         "status_code": e.code,
-        "message": str(e.reason),
+        "message": t(
+          "cli.client.http_error",
+          "Server error: {error}",
+          error=str(e.reason)
+        ),
       }
     except urllib.error.URLError as e:
       return {
         "error": True,
         "status_code": 0,
-        "message": f"Connection error: {e.reason}",
+        "message": t(
+          "cli.client.connection_error",
+          "Connection error: {error}",
+          error=str(e.reason)
+        ),
         "server_offline": True,
       }
     except Exception as e:
       return {
         "error": True,
         "status_code": 0,
-        "message": str(e),
+        "message": t("cli.client.unexpected_error", "Unexpected error: {error}", error=str(e)),
       }
 
   def get_status(self) -> Dict[str, Any]:
@@ -131,7 +144,7 @@ class NexeClient:
       return {
         "url": self.config.server_url,
         "server": {"online": False},
-        "error": health.get("message", "Server not available"),
+        "error": health.get("message", t("cli.client.server_not_available", "Server not available")),
       }
 
     modules_data = self._request("GET", "/modules")

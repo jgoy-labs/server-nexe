@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/registry.py
-Description: Registry central de mòduls carregats. Indexa mòduls, endpoints, metadata i
+Description: Central registry of loaded modules. Indexes modules, endpoints, metadata, and
 
 www.jgoy.net
 ────────────────────────────────────
@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 
 from personality.data.models import EndpointInfo, ModuleRegistration
+from personality.i18n.resolve import resolve_i18n_string
 
 import logging
 logger = logging.getLogger(__name__)
@@ -136,7 +137,7 @@ class ModuleRegistry:
     module_section = manifest.get('module', {})
     registration.metadata = {
       'version': module_section.get('version', '1.0.0'),
-      'description': module_section.get('description', ''),
+      'description': resolve_i18n_string(module_section.get('description', '')),
       'category': module_section.get('category', 'general'),
       'enabled': module_section.get('enabled', True)
     }

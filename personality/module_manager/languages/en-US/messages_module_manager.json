@@ -1,9 +1,9 @@
 {
  "_meta": {
   "component": "module_manager",
-  "description": "Traduccions per coordinador principal de mòduls",
+  "description": "Translations for main module manager",
   "version": "1.0.0",
-  "language": "ca-ES"
+  "language": "en-US"
  },
  
  "paths": {
@@ -16,6 +16,7 @@
  },
  
  "manifest": {
+  "description": "Centralized management system for Nexe 0.8 modules. Auto-discovery, registration, and lifecycle management.",
   "default": {
    "version": "1.0.0",
    "enabled": true
@@ -24,106 +25,166 @@
    "module": "module",
    "version": "version",
    "enabled": "enabled"
-  }
+  },
+  "import_not_found": "Could not find manifest in any of: {tried_paths}"
  },
  
  "api": {
   "integration": {
-   "failed": "Error integrant API per {module}: {error}"
+   "failed": "Failed to integrate API for {module}: {error}"
   },
   "removal": {
-   "failed": "Error eliminant API per {module}: {error}"
+   "failed": "Failed to remove API for {module}: {error}"
   },
   "integrator": {
-   "set": "Integrador d'API establert per al gestor de mòduls"
+   "set": "API integrator set for module manager"
   }
  },
  
  "init": {
-  "started": "ModuleManager inicialitzat",
-  "config_loaded": "Configuració carregada des de {path}",
-  "config_error": "Error carregant configuració: {error}",
-  "components_initialized": "Components especialitzats inicialitzats",
-  "base_path_set": "Path base establert: {path}"
+  "started": "ModuleManager initialized",
+  "config_loaded": "Configuration loaded from {path}",
+  "config_error": "Error loading configuration: {error}",
+  "components_initialized": "Specialized components initialized",
+  "base_path_set": "Base path set: {path}"
  },
  
  "discovery": {
-  "starting": "Descobrint mòduls...",
-  "completed": "Descobriment completat: {new_count} nous, {total_count} total",
-  "cycles_detected": "Cicles de dependències: {cycles}"
+  "starting": "Discovering modules...",
+  "completed": "Discovery completed: {new_count} new, {total_count} total",
+  "cycles_detected": "Dependency cycles: {cycles}"
  },
  
  "loading": {
-  "not_found": "Mòdul {module} no trobat",
-  "disabled": "Mòdul {module} està desactivat",
-  "dependency_failed": "No es pot carregar dependència {dep} per {module}",
-  "loading": "Carregant mòdul {module}...",
-  "loaded": "Mòdul {module} carregat correctament",
-  "error": "Error carregant {module}: {error}"
+  "not_found": "Module {module} not found",
+  "disabled": "Module {module} is disabled",
+  "dependency_failed": "Failed to load dependency {dep} for {module}",
+  "loading": "Loading module {module}...",
+  "loaded": "Module {module} loaded successfully",
+  "error": "Error loading {module}: {error}"
  },
  
  "starting": {
-  "starting": "Iniciant mòdul {module}...",
-  "started": "Mòdul {module} iniciat correctament",
-  "error": "Error iniciant {module}: {error}"
+  "starting": "Starting module {module}...",
+  "started": "Module {module} started successfully",
+  "error": "Error starting {module}: {error}"
  },
  
  "stopping": {
-  "stopping": "Aturant mòdul {module}...",
-  "stopped": "Mòdul {module} aturat correctament",
-  "error": "Error aturant {module}: {error}"
+  "stopping": "Stopping module {module}...",
+  "stopped": "Module {module} stopped successfully",
+  "error": "Error stopping {module}: {error}"
  },
  
  "lifecycle": {
-  "loading_module": "Carregant mòdul {module}...",
-  "module_loaded": "Mòdul {module} carregat correctament",
-  "starting_module": "Iniciant mòdul {module}...",
-  "module_started": "Mòdul {module} iniciat correctament",
-  "stopping_module": "Aturant mòdul {module}...",
-  "module_stopped": "Mòdul {module} aturat correctament",
-  "module_not_found": "Mòdul {module} no trobat",
-  "module_disabled": "Mòdul {module} està desactivat",
-  "dependency_failed": "No es pot carregar dependència {dep} per {module}",
-  "already_loaded": "Mòdul {module} ja està carregat",
-  "already_running": "Mòdul {module} ja està en execució"
+  "loading_module": "Loading module {module}...",
+  "module_loaded": "Module {module} loaded successfully",
+  "starting_module": "Starting module {module}...",
+  "module_started": "Module {module} started successfully",
+  "stopping_module": "Stopping module {module}...",
+  "module_stopped": "Module {module} stopped successfully",
+  "module_not_found": "Module {module} not found",
+  "module_disabled": "Module {module} is disabled",
+  "dependency_failed": "Failed to load dependency {dep} for {module}",
+  "already_loaded": "Module {module} already loaded",
+  "already_running": "Module {module} already running"
  },
  
  "system": {
-  "starting": "Iniciant sistema de mòduls...",
-  "started": "Sistema de mòduls iniciat correctament",
-  "stopping": "Aturant sistema de mòduls...",
-  "stopped": "Sistema de mòduls aturat correctament",
-  "discovery_starting": "Iniciant descobriment de mòduls...",
-  "discovery_completed": "Descobriment completat: {new_count} nous, {total_count} total",
-  "auto_start_modules": "Iniciant {count} mòduls amb auto_start activat",
+  "starting": "Starting module system...",
+  "started": "Module system started successfully",
+  "stopping": "Stopping module system...",
+  "stopped": "Module system stopped successfully",
+  "discovery_starting": "Starting module discovery...",
+  "discovery_completed": "Discovery completed: {new_count} new, {total_count} total",
+  "auto_start_modules": "Starting {count} modules with auto_start enabled",
   "startup": {
-   "initializing": "Inicialitzant sistema...",
-   "ready": "Sistema llest i operatiu"
+   "initializing": "Initializing system...",
+   "ready": "System ready and operational"
   },
   "shutdown": {
-   "initiated": "Aturada del sistema iniciada...",
-   "completed": "Aturada del sistema completada"
+   "initiated": "System shutdown initiated...",
+   "completed": "System shutdown completed"
   },
   "errors": {
-   "critical": "Error crític del sistema: {error}"
+   "critical": "Critical system error: {error}"
   }
  },
  
+ "ui": {
+  "not_found": "Module Manager UI not found"
+ },
+
+ "info": {
+  "description": "Centralized management system for Nexe 0.8 modules",
+  "feature_auto_discovery": "Module auto-discovery",
+  "feature_lifecycle": "Lifecycle management",
+  "feature_registry": "Centralized registry",
+  "feature_config_validation": "Configuration validation",
+  "feature_ui": "Web management UI"
+ },
+
+ "metadata": {
+  "description": "Centralized management system for Nexe 0.8 modules"
+ },
+
+ "config_manager": {
+  "core_module_always_enabled": "Module {name} is CORE, always enabled",
+  "config_path_not_found": "Config path not found or inaccessible: {path} - {error}",
+  "central_manifest_not_found": "Central manifest not found: {path} - {error}",
+  "local_manifest_not_found": "Local manifest not found: {path} - {error}",
+  "manifest_not_found": "Manifest file not found: {path} - {error}",
+  "manifest_read_error": "Error reading manifest: {path} - {error}",
+  "layer_detect_failed": "Could not determine module layer for {path}: {error}",
+  "enabled_from_dict": "Module {module} enabled={enabled} (from dict config)",
+  "enabled_from_list": "Module {module} enabled (from list)",
+  "disabled_not_in_list": "Module {module} not in enabled list, disabling",
+  "skip_plugins_allowlist": "Module {module} skipping plugins allowlist (module outside plugins/*)",
+  "enabled_from_manifest": "Module {module} enabled={enabled} (from manifest default)",
+  "disabled_via_config": "Module {module} disabled via config",
+  "saved_enabled": "Saved module {module} enabled={enabled} to config"
+ },
+
+ "security": {
+  "allowlist_required": "SECURITY ERROR: NEXE_APPROVED_MODULES is required in production. Set NEXE_APPROVED_MODULES or NEXE_ENV=development.",
+  "allowlist_rejected_reason": "Not in NEXE_APPROVED_MODULES allowlist"
+ },
+
+ "contract_bridge": {
+  "initialize_failed": "Failed to initialize {contract_id}: {error}",
+  "shutdown_failed": "Error during shutdown of {contract_id}: {error}",
+  "health_ok": "Module loaded and operational",
+  "health_failed": "Health check failed: {error}",
+  "manifest_missing": "No manifest found for {module} at {path}",
+  "registered": "✓ Registered {module} to ContractRegistry",
+  "register_failed": "Failed to register {module}: {error}",
+  "unregistered": "✓ Unregistered {module} from ContractRegistry",
+  "unregister_failed": "Failed to unregister {module}: {error}"
+ },
+
+ "logs": {
+  "health_failed": "Health check failed: {error}",
+  "info_failed": "Error getting module info: {error}",
+  "list_failed": "Error listing modules: {error}"
+ },
+
+ "error_saving_config": "Error saving configuration",
+ 
  "errors": {
-  "critical": "Error crític del sistema: {error}",
-  "module_failed": "El mòdul {module} ha fallat: {error}",
-  "load_error": "Error carregant {module}: {error}",
-  "start_error": "Error iniciant {module}: {error}",
-  "stop_error": "Error aturant {module}: {error}",
-  "dependency_cycle": "Cicle de dependències detectat: {cycle}"
+  "critical": "Critical system error: {error}",
+  "module_failed": "Module {module} failed: {error}",
+  "load_error": "Error loading {module}: {error}",
+  "start_error": "Error starting {module}: {error}",
+  "stop_error": "Error stopping {module}: {error}",
+  "dependency_cycle": "Dependency cycle detected: {cycle}"
  },
  
  "status": {
-  "running": "Sistema en funcionament",
-  "stopped": "Sistema aturat",
-  "modules_total": "Total mòduls: {count}",
-  "modules_running": "Mòduls en execució: {count}",
-  "modules_by_state": "Mòduls per estat: {states}",
-  "uptime": "Temps de funcionament: {seconds}s"
+  "running": "System running",
+  "stopped": "System stopped",
+  "modules_total": "Total modules: {count}",
+  "modules_running": "Modules running: {count}",
+  "modules_by_state": "Modules by state: {states}",
+  "uptime": "Uptime: {seconds}s"
  }
 }

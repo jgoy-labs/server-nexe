@@ -16,7 +16,71 @@
    "query_required": "Query is required",
    "module_not_initialized": "Module not initialized",
    "engine_unavailable": "❌ Error: No AI engine available (try starting Ollama with 'ollama serve')",
-   "error_generic": "❌ Error: {error}"
+   "error_generic": "❌ Error: {error}",
+   "chat_request_failed": "Chat request failed"
+  },
+  "health": {
+   "active": "Web UI active"
+  },
+  "logs": {
+   "attached_doc_used": "Using attached document: {filename} (chunk 1/{total}, {chars} chars)",
+   "available_modules": "Available modules: {modules}",
+   "cleanup_completed": "Cleanup completed: {count} files deleted",
+   "cleanup_delete_error": "Error deleting {path}: {error}",
+   "cleanup_error": "Error during cleanup: {error}",
+   "cleanup_file": "Cleaned up old file: {name}",
+   "clear_failed": "Failed to clear memory: {error}",
+   "collection_cleared": "Memory collection cleared and recreated",
+   "collection_created": "Created web UI memory collection",
+   "delete_entry_failed": "Failed to delete entry: {error}",
+   "document_attached": "Document '{filename}' attached with {count} chunks",
+   "document_ingested": "Document '{filename}' ingested: {message}",
+   "duplicate_check_failed": "Duplicate check failed: {error}",
+   "duplicate_detected": "Duplicate detected (score={score:.2f}), skipping save",
+   "engine_calling_chat": "Calling {engine}.chat with model={model}",
+   "engine_error_details": "Engine error details:",
+   "engine_failed": "{engine} failed: {error}",
+   "engine_instance_none": "{engine} get_module_instance() returned None",
+   "engine_no_chat": "{engine} has no chat method",
+   "engine_no_get_instance": "{engine} has no get_module_instance()",
+   "engine_no_instance": "{engine} has no instance",
+   "engine_not_registered": "{engine} not registered",
+   "engine_succeeded": "✅ {engine} succeeded!",
+   "extract_failed": "Fact extraction failed: {error}, using raw",
+   "extract_no_facts": "Memory extraction: no relevant facts found",
+   "extract_no_llm": "No LLM for extraction, using raw conversation",
+   "extract_no_model": "No model specified for extraction, skipping",
+   "extract_stats": "Memory extraction: {input_chars} chars → {output_chars} chars",
+   "file_delete_error": "Error deleting file: {error}",
+   "file_deleted": "File deleted: {path}",
+   "file_saved": "File saved: {path}",
+   "init_failed": "Failed to initialize WebUIModule: {error}",
+   "initialized": "WebUIModule initialized successfully",
+   "list_files_error": "Error listing files: {error}",
+   "llm_call_error": "Error calling LLM: {error}",
+   "memory_api_init_failed": "Failed to initialize Memory API: {error}",
+   "no_facts_skip_save": "No facts extracted, skipping save",
+   "pdf_extract_error": "Error extracting PDF: {error}",
+   "pruned_entry": "Pruned entry (retention={score:.2f}): {preview}...",
+   "pruning_failed": "Memory pruning failed: {error}",
+   "rag_auto_save_failed": "RAG auto-save failed: {error}",
+   "rag_header_found": "RAG header found: id={id}, priority={priority}",
+   "rag_lookup_failed": "RAG lookup failed: {error}",
+   "rag_memories_found": "RAG: {count} memories relevant (score >= 0.5)",
+   "recall_error": "Memory recall error: {error}",
+   "retention_calc_error": "Retention score calc error: {error}",
+   "search_collection_failed": "Error searching collection {collection}: {error}",
+   "shutting_down": "WebUIModule shutting down",
+   "skip_trivial": "Skipping trivial message: {preview}...",
+   "smart_auto_save_failed": "Smart auto-save to RAG failed: {error}",
+   "smart_prune": "Smart prune: {deleted} low-retention entries removed (was {previous})",
+   "smart_save_not_needed": "No save needed: {message}",
+   "smart_saved": "Smart-saved to RAG: {message}",
+   "stats_failed": "Failed to get memory stats: {error}",
+   "store_error": "Memory store error: {error}",
+   "streaming_error": "Streaming error: {error}",
+   "text_chunked": "Text divided into {count} chunks",
+   "trying_engine": "Trying engine: {engine}"
   },
   "session": {
    "deleted": "deleted"
@@ -62,6 +126,9 @@
   },
   "metadata": {
    "description": "Ollama-style web UI to demonstrate the modular system"
+  },
+  "manifest": {
+   "description": "Ollama-style web UI to demonstrate Nexe's modular system. Includes streaming chat, sessions, and document upload."
   },
   "chat": {
    "stream_error": "\n[Error: {error}]"

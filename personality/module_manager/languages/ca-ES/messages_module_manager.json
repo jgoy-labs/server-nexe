@@ -16,6 +16,7 @@
  },
  
  "manifest": {
+  "description": "Sistema de gestió centralitzada de mòduls Nexe 0.8. Auto-descoberta, registre i gestió del cicle de vida.",
   "default": {
    "version": "1.0.0",
    "enabled": true
@@ -24,7 +25,8 @@
    "module": "module",
    "version": "version",
    "enabled": "enabled"
-  }
+  },
+  "import_not_found": "No s'ha pogut trobar el manifest a cap de: {tried_paths}"
  },
  
  "api": {
@@ -108,6 +110,66 @@
    "critical": "Error crític del sistema: {error}"
   }
  },
+ 
+ "ui": {
+  "not_found": "UI del ModuleManager no trobada"
+ },
+
+ "info": {
+  "description": "Sistema de gestió centralitzada de mòduls Nexe 0.8",
+  "feature_auto_discovery": "Auto-descoberta de mòduls",
+  "feature_lifecycle": "Gestió de cicle de vida",
+  "feature_registry": "Registre centralitzat",
+  "feature_config_validation": "Validació de configuració",
+  "feature_ui": "UI web de gestió"
+ },
+
+ "metadata": {
+  "description": "Sistema de gestió centralitzada de mòduls Nexe 0.8"
+ },
+
+ "config_manager": {
+  "core_module_always_enabled": "Mòdul {name} és CORE, sempre habilitat",
+  "config_path_not_found": "Path de configuració no trobat o inaccessible: {path} - {error}",
+  "central_manifest_not_found": "Manifest central no trobat: {path} - {error}",
+  "local_manifest_not_found": "Manifest local no trobat: {path} - {error}",
+  "manifest_not_found": "Fitxer de manifest no trobat: {path} - {error}",
+  "manifest_read_error": "Error llegint manifest: {path} - {error}",
+  "layer_detect_failed": "No s'ha pogut determinar la capa del mòdul per a {path}: {error}",
+  "enabled_from_dict": "Mòdul {module} enabled={enabled} (des de configuració dict)",
+  "enabled_from_list": "Mòdul {module} habilitat (des de llista)",
+  "disabled_not_in_list": "Mòdul {module} no és a la llista d'habilitats, deshabilitant",
+  "skip_plugins_allowlist": "Mòdul {module} s'omet l'allowlist de plugins (mòdul fora de plugins/*)",
+  "enabled_from_manifest": "Mòdul {module} enabled={enabled} (del manifest per defecte)",
+  "disabled_via_config": "Mòdul {module} deshabilitat via configuració",
+  "saved_enabled": "Desat mòdul {module} enabled={enabled} a la configuració",
+  "error_saving_config": "Error desant la configuració"
+ },
+
+ "security": {
+  "allowlist_required": "ERROR DE SEGURETAT: NEXE_APPROVED_MODULES és obligatori en producció. Defineix NEXE_APPROVED_MODULES o NEXE_ENV=development.",
+  "allowlist_rejected_reason": "No està a la llista NEXE_APPROVED_MODULES"
+ },
+
+ "contract_bridge": {
+  "initialize_failed": "No s'ha pogut inicialitzar {contract_id}: {error}",
+  "shutdown_failed": "Error durant l'aturada de {contract_id}: {error}",
+  "health_ok": "Mòdul carregat i operatiu",
+  "health_failed": "Comprovació de salut fallida: {error}",
+  "manifest_missing": "No s'ha trobat manifest per {module} a {path}",
+  "registered": "✓ {module} registrat al ContractRegistry",
+  "register_failed": "No s'ha pogut registrar {module}: {error}",
+  "unregistered": "✓ {module} desregistrat del ContractRegistry",
+  "unregister_failed": "No s'ha pogut desregistrar {module}: {error}"
+ },
+
+ "logs": {
+  "health_failed": "Comprovació de salut fallida: {error}",
+  "info_failed": "Error obtenint informació del mòdul: {error}",
+  "list_failed": "Error llistant mòduls: {error}"
+ },
+
+ "error_saving_config": "Error desant la configuració",
  
  "errors": {
   "critical": "Error crític del sistema: {error}",

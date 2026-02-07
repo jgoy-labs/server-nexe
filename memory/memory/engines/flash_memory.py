@@ -17,8 +17,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from ..models.memory_entry import MemoryEntry
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.flash_memory.{key}", fallback, **kwargs)
 
 def _normalize_expiry(expiry: datetime) -> datetime:
   if expiry.tzinfo is None:
@@ -44,7 +48,13 @@ class FlashMemory:
     self._lock = asyncio.Lock()
     self._default_ttl = default_ttl_seconds
 
-    logger.info("FlashMemory initialized (TTL=%ss)", default_ttl_seconds)
+    logger.info(
+      _t(
+        "initialized",
+        "FlashMemory initialized (TTL={ttl}s)",
+        ttl=default_ttl_seconds,
+      )
+    )
 
   async def store(self, entry: MemoryEntry) -> str:
     """
@@ -64,7 +74,15 @@ class FlashMemory:
 
       heapq.heappush(self._expiry_heap, (expiry.timestamp(), entry.id))
 
-      logger.debug("Stored entry %s (TTL=%ss, expires=%s)", entry.id, ttl, expiry)
+      logger.debug(
+        _t(
+          "stored",
+          "Stored entry {entry_id} (TTL={ttl}s, expires={expiry})",
+          entry_id=entry.id,
+          ttl=ttl,
+          expiry=expiry,
+        )
+      )
 
     return entry.id
 
@@ -86,7 +104,13 @@ class FlashMemory:
 
       if self._is_expired(entry):
         del self._store[entry_id]
-        logger.debug("Entry %s expired, removed", entry_id)
+        logger.debug(
+          _t(
+            "expired_removed",
+            "Entry {entry_id} expired, removed",
+            entry_id=entry_id,
+          )
+        )
         return None
 
       return entry
@@ -120,7 +144,7 @@ class FlashMemory:
     async with self._lock:
       if entry_id in self._store:
         del self._store[entry_id]
-        logger.debug("Deleted entry %s", entry_id)
+        logger.debug(_t("deleted", "Deleted entry {entry_id}", entry_id=entry_id))
         return True
       return False
 
@@ -157,7 +181,13 @@ class FlashMemory:
         deleted_count += 1
 
     if deleted_count > 0:
-      logger.info("Cleaned up %s expired entries", deleted_count)
+      logger.info(
+        _t(
+          "cleanup",
+          "Cleaned up {count} expired entries",
+          count=deleted_count,
+        )
+      )
 
     return deleted_count
 

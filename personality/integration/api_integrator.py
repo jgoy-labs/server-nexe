@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/integration/api_integrator.py
-Description: Integrador automàtic d'APIs de mòduls al servidor FastAPI. Detecta routers,
+Description: Automatic module API integrator for the FastAPI server. Detects routers,
 
 www.jgoy.net
 ────────────────────────────────────
@@ -26,22 +26,22 @@ LOGGER_AVAILABLE = False
 
 class APIIntegrator:
   """
-  Integra automàticament les APIs dels mòduls al servidor principal.
+  Automatically integrates module APIs into the main server.
   
-  Funcionalitats:
-  - Detecta routers FastAPI en mòduls carregats
-  - Registra rutes dinàmicament
-  - Gestiona prefixos per evitar col·lisions
-  - Unifica especificacions OpenAPI
+  Features:
+  - Detect FastAPI routers in loaded modules
+  - Register routes dynamically
+  - Manage prefixes to avoid collisions
+  - Merge OpenAPI specifications
   """
   
   def __init__(self, main_app: FastAPI, i18n_manager=None):
     """
-    Inicialitza l'integrador d'APIs.
+    Initialize the API integrator.
     
     Args:
-      main_app: Aplicació FastAPI principal
-      i18n_manager: Gestor d'internacionalització
+      main_app: Main FastAPI application
+      i18n_manager: I18n manager
     """
     self.main_app = main_app
     self.i18n = i18n_manager
@@ -57,15 +57,15 @@ class APIIntegrator:
   def integrate_module_api(self, module_name: str, module_instance: Any,
               module_info: Optional[ModuleInfo] = None) -> bool:
     """
-    Integra l'API d'un mòdul al servidor principal.
+    Integrate a module API into the main server.
 
     Args:
-      module_name: Nom del mòdul
-      module_instance: Instància del mòdul carregat
-      module_info: Informació del mòdul (opcional)
+      module_name: Module name
+      module_instance: Loaded module instance
+      module_info: Module info (optional)
 
     Returns:
-      True si s'ha integrat correctament
+      True if integrated successfully
     """
     with self._lock:
       try:
@@ -103,7 +103,7 @@ class APIIntegrator:
         return self._handle_integration_error(module_name, e)
 
   def _detect_and_validate_api(self, module_name: str, module_instance: Any) -> Optional[Dict[str, Any]]:
-    """Detecta i valida components d'API."""
+    """Detect and validate API components."""
     api_components = self._detect_api_components(module_instance)
 
     if not api_components:
@@ -120,7 +120,7 @@ class APIIntegrator:
 
   def _register_module_routes(self, module_name: str, api_components: Dict[str, Any],
                 api_prefix: str) -> List[Dict[str, Any]]:
-    """Registra rutes de tots els components d'API."""
+    """Register routes for all API components."""
     registered_routes = []
     for component_type, component in api_components.items():
       routes = self.route_manager.register_module_routes(
@@ -133,7 +133,7 @@ class APIIntegrator:
   def _save_integration_info(self, module_name: str, module_instance: Any,
                api_components: Dict[str, Any], api_prefix: str,
                registered_routes: List[Dict[str, Any]]) -> None:
-    """Guarda informació d'integració i actualitza estadístiques."""
+    """Store integration info and update stats."""
     self._integrated_modules[module_name] = {
       'instance': module_instance,
       'api_components': api_components,
@@ -146,7 +146,7 @@ class APIIntegrator:
     self._total_modules_integrated += 1
 
   def _handle_integration_error(self, module_name: str, error: Exception) -> bool:
-    """Gestiona errors d'integració."""
+    """Handle integration errors."""
     if LOGGER_AVAILABLE:
       msg = get_message(
         self.i18n,
@@ -159,13 +159,13 @@ class APIIntegrator:
 
   def remove_module_api(self, module_name: str) -> bool:
     """
-    Elimina l'API d'un mòdul del servidor.
+    Remove a module API from the server.
     
     Args:
-      module_name: Nom del mòdul
+      module_name: Module name
       
     Returns:
-      True si s'ha eliminat correctament
+      True if removed successfully
     """
     with self._lock:
       try:
@@ -207,13 +207,13 @@ class APIIntegrator:
   
   def _detect_api_components(self, module_instance: Any) -> Dict[str, Any]:
     """
-    Detecta components d'API en un mòdul.
+    Detect API components in a module.
     
     Args:
-      module_instance: Instància del mòdul
+      module_instance: Module instance
       
     Returns:
-      Diccionari amb components d'API detectats
+      Dict with detected API components
     """
     components = {}
     
@@ -243,14 +243,14 @@ class APIIntegrator:
   def _determine_api_prefix(self, module_name: str, 
               module_info: Optional[ModuleInfo] = None) -> str:
     """
-    Determina el prefix d'API per un mòdul.
+    Determine API prefix for a module.
     
     Args:
-      module_name: Nom del mòdul
-      module_info: Informació del mòdul
+      module_name: Module name
+      module_info: Module info
       
     Returns:
-      Prefix d'API
+      API prefix
     """
     if module_info and module_info.manifest:
       api_config = module_info.manifest.get('api', {})
@@ -263,7 +263,7 @@ class APIIntegrator:
     return f"/api/{module_name}"
   
   def get_integration_stats(self) -> Dict[str, Any]:
-    """Retorna estadístiques d'integració"""
+    """Return integration statistics."""
     with self._lock:
       return {
         'total_modules_integrated': self._total_modules_integrated,
@@ -280,12 +280,12 @@ class APIIntegrator:
       }
   
   def is_module_integrated(self, module_name: str) -> bool:
-    """Comprova si un mòdul està integrat"""
+    """Check if a module is integrated."""
     with self._lock:
       return module_name in self._integrated_modules
   
   def get_module_routes(self, module_name: str) -> List[str]:
-    """Retorna les rutes d'un mòdul integrat"""
+    """Return routes for an integrated module."""
     with self._lock:
       if module_name in self._integrated_modules:
         return [route['path'] for route in 

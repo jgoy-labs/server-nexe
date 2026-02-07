@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/cli.py
-Description: CLI Central Nexe 0.8 - Aplicació Click principal.
+Description: Nexe 0.8 Central CLI - Main Click application.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -31,9 +31,9 @@ class DynamicGroup(click.Group):
 
   def get_command(self, ctx: click.Context, cmd_name: str) -> Optional[click.Command]:
     """
-    Intenta trobar el comando:
-    1. Primer busca en comandos registrats (modules, status, etc.)
-    2. Si no el troba, busca en CLIs de mòduls
+    Try to resolve the command:
+    1. First search in registered commands (modules, status, etc.)
+    2. If not found, search in module CLIs
     """
     cmd = super().get_command(ctx, cmd_name)
     if cmd is not None:

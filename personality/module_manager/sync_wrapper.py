@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/sync_wrapper.py
-Description: Wrappers síncrons per operacions async del ModuleManager.
+Description: Synchronous wrappers for ModuleManager async operations.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -24,10 +24,10 @@ T = TypeVar('T')
 
 def is_event_loop_running() -> bool:
   """
-  Comprova si hi ha un event loop actiu.
+  Check if there is an active event loop.
 
   Returns:
-    True si hi ha un event loop actiu
+    True if there is an active event loop
   """
   try:
     asyncio.get_running_loop()
@@ -37,30 +37,30 @@ def is_event_loop_running() -> bool:
 
 def run_async_in_new_loop(coro) -> Any:
   """
-  Executa una coroutine en un event loop nou.
+  Run a coroutine in a new event loop.
 
   Args:
-    coro: Coroutine a executar
+    coro: Coroutine to run
 
   Returns:
-    Resultat de la coroutine
+    Result of the coroutine
   """
   return asyncio.run(coro)
 
 def run_async_in_thread(coro) -> Any:
   """
-  Executa una coroutine en un thread separat amb el seu propi event loop.
+  Run a coroutine in a separate thread with its own event loop.
 
-  Útil quan ja hi ha un event loop actiu i no podem usar asyncio.run().
+  Useful when an event loop is already running and we cannot use asyncio.run().
 
   Args:
-    coro: Coroutine a executar
+    coro: Coroutine to run
 
   Returns:
-    Resultat de la coroutine
+    Result of the coroutine
 
   Raises:
-    Exception: Si la coroutine falla
+    Exception: If the coroutine fails
   """
   result: Dict[str, Any] = {}
   error_holder: Dict[str, Exception] = {}
@@ -92,37 +92,37 @@ def run_async_in_thread(coro) -> Any:
 
 class SyncWrapper:
   """
-  Classe que proporciona wrappers síncrons per mètodes async.
+  Class providing synchronous wrappers for async methods.
 
-  Permet cridar mètodes async del ModuleManager des de contextos
-  síncrons (com create_app de FastAPI).
+  Allows calling async ModuleManager methods from synchronous
+  contexts (like FastAPI's create_app).
   """
 
   def __init__(self, i18n=None):
     """
-    Inicialitza el wrapper.
+    Initialize the wrapper.
 
     Args:
-      i18n: I18nManager opcional per missatges
+      i18n: Optional I18nManager for messages
     """
     self.i18n = i18n
 
   def run_sync(self, coro, error_msg_key: str = 'sync_wrapper_failed') -> Any:
     """
-    Executa una coroutine de forma síncrona.
+    Run a coroutine synchronously.
 
-    Detecta automàticament si hi ha un event loop actiu i
-    utilitza l'estratègia adequada.
+    Automatically detects if an event loop is active and
+    uses the appropriate strategy.
 
     Args:
-      coro: Coroutine a executar
-      error_msg_key: Clau del missatge d'error per i18n
+      coro: Coroutine to run
+      error_msg_key: Error message key for i18n
 
     Returns:
-      Resultat de la coroutine
+      Result of the coroutine
 
     Raises:
-      Exception: Si la coroutine falla
+      Exception: If the coroutine fails
     """
     if not is_event_loop_running():
       try:
@@ -138,7 +138,7 @@ class SyncWrapper:
         raise
 
   def _log_error(self, msg_key: str, error: Exception) -> None:
-    """Log d'error amb i18n."""
+    """Log an error with i18n."""
     if LOGGER_AVAILABLE and self.i18n:
       msg = get_message(
         self.i18n,

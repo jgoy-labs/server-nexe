@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/mlx_module/module.py
-Description: Mòdul Nexe per a MLX (Apple Silicon). Adaptació del MLXChatNode original.
+Description: Nexe module for MLX (Apple Silicon). Adapted from the original MLXChatNode.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -18,13 +18,17 @@ from fastapi import APIRouter, HTTPException
 from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
 from .chat import MLXChatNode
 from .config import MLXConfig
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
 
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+    return t_modular(f"mlx_module.logs.{key}", fallback, **kwargs)
+
 class MLXModule:
     """
-    Motor Nexe per a MLX.
-    Implementa el NexeModule Protocol per a Apple Silicon.
+    Nexe engine for MLX.
+    Implements the NexeModule Protocol for Apple Silicon.
     """
 
     def __init__(self):
@@ -37,14 +41,17 @@ class MLXModule:
         return ModuleMetadata(
             name="mlx_module",
             version="1.0.0",
-            description="Motor d'inferència ultra-optimitzat per a Apple Silicon (MLX)",
+            description=t_modular(
+                "mlx_module.metadata.description",
+                "Ultra-optimized inference engine for Apple Silicon (MLX)"
+            ),
             author="Jordi Goy",
             module_type="local_llm_option",
             quadrant="core"
         )
 
     async def initialize(self, context: Dict[str, Any]) -> bool:
-        """Inicialització via Nexe Launcher"""
+        """Initialize via the Nexe Launcher."""
         if self._initialized:
             return True
 
@@ -52,25 +59,53 @@ class MLXModule:
         self._init_router()
 
         if not MLXConfig.is_metal_available():
-            logger.error("MLXModule: Metal is not available. Cannot initialize MLX.")
-            logger.info("To use MLX: Ensure you're running on Apple Silicon with Metal support")
+            logger.error(
+                _t_log(
+                    "metal_unavailable",
+                    "MLXModule: Metal is not available. Cannot initialize MLX."
+                )
+            )
+            logger.info(
+                _t_log(
+                    "metal_unavailable_hint",
+                    "To use MLX: Ensure you're running on Apple Silicon with Metal support"
+                )
+            )
             return False
 
         try:
             mlx_config = MLXConfig.from_env()
 
             if not mlx_config.validate():
-                logger.error("MLXModule: Configuration invalid. Check NEXE_MLX_MODEL.")
-                logger.info("Expected: NEXE_MLX_MODEL should point to a valid MLX model directory")
+                logger.error(
+                    _t_log(
+                        "config_invalid",
+                        "MLXModule: Configuration invalid. Check NEXE_MLX_MODEL."
+                    )
+                )
+                logger.info(
+                    _t_log(
+                        "config_invalid_hint",
+                        "Expected: NEXE_MLX_MODEL should point to a valid MLX model directory"
+                    )
+                )
                 return False
 
             self._node = MLXChatNode(config=mlx_config)
             self._initialized = True
 
-            logger.info("MLXModule initialized successfully")
+            logger.info(
+                _t_log("initialized", "MLXModule initialized successfully")
+            )
             return True
         except Exception as e:
-            logger.error(f"Failed to initialize MLXModule: {e}")
+            logger.error(
+                _t_log(
+                    "init_failed",
+                    "Failed to initialize MLXModule: {error}",
+                    error=str(e),
+                )
+            )
             return False
 
     def _init_router(self):
@@ -83,7 +118,13 @@ class MLXModule:
         @self._router.post("/chat")
         async def chat_endpoint(request: Dict[str, Any]):
             if not self._initialized:
-                raise HTTPException(status_code=503, detail="Module not initialized")
+                raise HTTPException(
+                    status_code=503,
+                    detail=t_modular(
+                        "mlx_module.errors.not_initialized",
+                        "Module not initialized"
+                    )
+                )
             
             messages = request.get("messages", [])
             system = request.get("system", "")
@@ -102,9 +143,14 @@ class MLXModule:
         return "/mlx"
 
     async def chat(self, messages: List[Dict[str, str]], system: str = "", session_id: str = "default", stream_callback=None):
-        """Mètode de xat amb MLX"""
+        """Chat method for MLX."""
         if not self._initialized or not self._node:
-            raise RuntimeError("MLXModule not initialized")
+            raise RuntimeError(
+                t_modular(
+                    "mlx_module.errors.not_initialized",
+                    "MLXModule not initialized"
+                )
+            )
 
         inputs = {
             "system": system,
@@ -117,20 +163,29 @@ class MLXModule:
 
     async def health_check(self) -> HealthResult:
         if not self._initialized:
-            return HealthResult(status=HealthStatus.UNKNOWN, message="Module not initialized")
+            return HealthResult(
+                status=HealthStatus.UNKNOWN,
+                message=t_modular(
+                    "mlx_module.errors.not_initialized",
+                    "Module not initialized"
+                )
+            )
         
         try:
             stats = self._node.get_pool_stats()
             return HealthResult(
                 status=HealthStatus.HEALTHY,
-                message="MLX motor active",
+                message=t_modular(
+                    "mlx_module.health.active",
+                    "MLX engine active"
+                ),
                 details=stats
             )
         except Exception as e:
             return HealthResult(status=HealthStatus.UNHEALTHY, message=str(e))
 
     async def shutdown(self) -> None:
-        """Cleanup logic"""
+        """Cleanup logic."""
         if self._node:
             self._node.reset_model()
         self._initialized = False

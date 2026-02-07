@@ -20,36 +20,37 @@ from nexe_flow.core.node import (
   NodeOutput,
 )
 from plugins.security.sanitizer.module import get_sanitizer
+from personality.i18n.resolve import t_modular
 
 @dataclass
 class SanitizerNodeConfig:
-  """Configuracio del node SANITIZER."""
+  """Configuration for the SANITIZER node."""
   fail_on_critical: bool = False
   enable_telemetry: bool = True
 
 class SanitizerNode(Node):
   """
-  Node de workflow per SANITIZER (seguretat TECNICA).
+  Workflow node for SANITIZER (technical security).
 
-  Detecta jailbreaks i prompt injections.
-  NO bloqueja (graceful degradation), nomes marca i avisa.
+  Detects jailbreaks and prompt injections.
+  Does NOT block (graceful degradation), only flags and warns.
 
-  Inputs esperats:
-  - text: str - Text a sanititzar
-  - user_message: str - Alias per text (compatibilitat)
+  Expected inputs:
+  - text: str - Text to sanitize
+  - user_message: str - Alias for text (compatibility)
 
   Outputs:
-  - is_safe: bool - True si no hi ha amenaces critiques
-  - needs_intervention: bool - True si Auditor ha d'activar Intervenció
+  - is_safe: bool - True if there are no critical threats
+  - needs_intervention: bool - True if Auditor should activate Intervention
   - severity: str - "none" | "low" | "medium" | "high" | "critical"
-  - threats: List[str] - Amenaces detectades
-  - clean_text: str - Text processat (igual a input)
-  - scan_time_ms: float - Temps d'escaneig
+  - threats: List[str] - Detected threats
+  - clean_text: str - Processed text (same as input)
+  - scan_time_ms: float - Scan time
 
-  Filosofia Graceful Degradation:
-  - severity != critical -> continua (is_safe=True)
-  - severity == critical -> OPCIONALMENT bloqueja (configurable)
-  - needs_intervention -> Auditor activa Intervenció
+  Graceful Degradation philosophy:
+  - severity != critical -> continue (is_safe=True)
+  - severity == critical -> optionally block (configurable)
+  - needs_intervention -> Auditor activates Intervention
   """
 
   def __init__(self, config: Optional[SanitizerNodeConfig] = None):
@@ -58,24 +59,85 @@ class SanitizerNode(Node):
     super().__init__()
 
   def get_metadata(self) -> NodeMetadata:
-    """Retorna el metadata del node SANITIZER."""
+    """Return SANITIZER node metadata."""
     return NodeMetadata(
       id="sanitizer.check",
       name="SANITIZER Check",
       version="1.0.0",
-      description="Detecta jailbreaks i prompt injections (seguretat TECNICA)",
+      description=t_modular(
+        "sanitizer.check.description",
+        "Detect jailbreaks and prompt injections (technical security)"
+      ),
       category="nexe_native",
       inputs=[
-        NodeInput(name="text", type="string", required=False, description="Text a sanititzar"),
-        NodeInput(name="user_message", type="string", required=False, description="Alias per text"),
+        NodeInput(
+          name="text",
+          type="string",
+          required=False,
+          description=t_modular(
+            "sanitizer.check.input_text_desc",
+            "Text to sanitize"
+          )
+        ),
+        NodeInput(
+          name="user_message",
+          type="string",
+          required=False,
+          description=t_modular(
+            "sanitizer.check.input_user_message_desc",
+            "Alias for text"
+          )
+        ),
       ],
       outputs=[
-        NodeOutput(name="is_safe", type="boolean", description="True si no hi ha amenaces crítiques"),
-        NodeOutput(name="needs_intervention", type="boolean", description="True si Auditor ha d'activar Intervenció"),
-        NodeOutput(name="severity", type="string", description="none|low|medium|high|critical"),
-        NodeOutput(name="threats", type="array", description="Amenaces detectades"),
-        NodeOutput(name="clean_text", type="string", description="Text processat"),
-        NodeOutput(name="scan_time_ms", type="number", description="Temps d'escaneig en ms"),
+        NodeOutput(
+          name="is_safe",
+          type="boolean",
+          description=t_modular(
+            "sanitizer.check.output_is_safe_desc",
+            "True if there are no critical threats"
+          )
+        ),
+        NodeOutput(
+          name="needs_intervention",
+          type="boolean",
+          description=t_modular(
+            "sanitizer.check.output_needs_intervention_desc",
+            "True if the Auditor should activate Intervention"
+          )
+        ),
+        NodeOutput(
+          name="severity",
+          type="string",
+          description=t_modular(
+            "sanitizer.check.output_severity_desc",
+            "none|low|medium|high|critical"
+          )
+        ),
+        NodeOutput(
+          name="threats",
+          type="array",
+          description=t_modular(
+            "sanitizer.check.output_threats_desc",
+            "Detected threats"
+          )
+        ),
+        NodeOutput(
+          name="clean_text",
+          type="string",
+          description=t_modular(
+            "sanitizer.check.output_clean_text_desc",
+            "Processed text"
+          )
+        ),
+        NodeOutput(
+          name="scan_time_ms",
+          type="number",
+          description=t_modular(
+            "sanitizer.check.output_scan_time_desc",
+            "Scan time in ms"
+          )
+        ),
       ],
       icon="🛡️",
       color="#e74c3c"
@@ -83,9 +145,9 @@ class SanitizerNode(Node):
 
   async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Executa el node SANITIZER.
+    Execute the SANITIZER node.
 
-    Temps objectiu: <2ms
+    Target time: <2ms
     """
     text = inputs.get("text") or inputs.get("user_message", "")
 

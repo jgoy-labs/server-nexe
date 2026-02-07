@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/auth_models.py
-Description: Models de dades per al sistema d'autenticació Nexe.
+Description: Data models for the Nexe authentication system.
 
 www.jgoy.net
 ────────────────────────────────────

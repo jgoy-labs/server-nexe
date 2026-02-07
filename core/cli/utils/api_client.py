@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/utils/api_client.py
-Description: Client HTTP simple per comunicar CLI amb Server Nexe.
+Description: Simple HTTP client to communicate the CLI with Nexe Server.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 CLI_HEALTH_TIMEOUT = float(os.getenv('NEXE_CLI_HEALTH_TIMEOUT', '5.0'))
 
 class NexeAPIClient:
-    """Client per interactuar amb la API de Nexe Server."""
+    """Client to interact with the Nexe Server API."""
     
     
     def __init__(self, base_url: str = "http://127.0.0.1:9119"):
@@ -51,7 +51,7 @@ class NexeAPIClient:
         }
         
     async def is_server_running(self) -> bool:
-        """Comprova si el servidor està actiu."""
+        """Check whether the server is active."""
         try:
             async with httpx.AsyncClient(timeout=CLI_HEALTH_TIMEOUT) as client:
                 resp = await client.get(f"{self.base_url}/health")
@@ -66,10 +66,10 @@ class NexeAPIClient:
         rag: bool = False
     ) -> AsyncGenerator[str, None]:
         """
-        Fa request a /chat/completions amb streaming.
+        Make a request to /chat/completions with streaming.
         
-        Nota: Normalment OpenAI format usa /v1/chat/completions.
-        Aquí assumim que Nexe exposa un endpoint similar o el router de xat unificat.
+        Note: OpenAI format usually uses /v1/chat/completions.
+        Here we assume Nexe exposes a similar endpoint or a unified chat router.
         """
         
         # Endpoint unificat de chat (TODO: confirmar ruta exacte a core.endpoints)
@@ -122,14 +122,14 @@ class NexeAPIClient:
                 )
 
     async def chat_offline(self, messages: list, engine: str) -> str:
-        """Simulació offline si el server no hi és (no recomanat per CLI interactiu complex)."""
+        """Offline simulation if the server is not available (not recommended for complex interactive CLI)."""
         return t(
             "cli.api.offline_not_supported",
             "❌ Offline mode not supported yet. Please run './nexe go' first."
         )
 
     async def memory_store(self, content: str, metadata: Optional[Dict] = None) -> bool:
-        """Guarda contingut a la memòria (RAG)."""
+        """Store content in memory (RAG)."""
         url = f"{self.base_url}/v1/memory/store"
         payload = {
             "content": content,
@@ -140,11 +140,17 @@ class NexeAPIClient:
                 response = await client.post(url, json=payload, headers=self.headers)
                 return response.status_code in (200, 201)
             except Exception as e:
-                logger.error(f"Memory store error: {e}")
+                logger.error(
+                    t(
+                        "cli.api.memory_store_error",
+                        "Memory store error: {error}",
+                        error=str(e)
+                    )
+                )
                 return False
 
     async def memory_search(self, query: str, limit: int = 3) -> list:
-        """Cerca a la memòria (RAG)."""
+        """Search memory (RAG)."""
         url = f"{self.base_url}/v1/memory/search"
         payload = {
             "query": query,
@@ -158,5 +164,11 @@ class NexeAPIClient:
                     return data.get("results", [])
                 return []
             except Exception as e:
-                logger.error(f"Memory search error: {e}")
+                logger.error(
+                    t(
+                        "cli.api.memory_search_error",
+                        "Memory search error: {error}",
+                        error=str(e)
+                    )
+                )
                 return []

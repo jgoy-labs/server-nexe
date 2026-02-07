@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/metrics/endpoint.py
-Description: Endpoint /metrics per exposar mètriques Prometheus.
+Description: /metrics endpoint to expose Prometheus metrics.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -21,29 +21,42 @@ from prometheus_client import (
 )
 
 from .registry import set_module_health
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"core_metrics.logs.{key}", fallback, **kwargs)
 
 metrics_router = APIRouter(tags=["metrics"])
 
 @metrics_router.get(
   "/metrics",
-  summary="Prometheus metrics",
-  description="Exposa mètriques en format Prometheus per scraping",
+  summary=t_modular(
+    "core_metrics.endpoint.prometheus_summary",
+    "Prometheus metrics"
+  ),
+  description=t_modular(
+    "core_metrics.endpoint.prometheus_description",
+    "Expose metrics in Prometheus format for scraping"
+  ),
   response_class=Response,
   responses={
     200: {
-      "description": "Mètriques Prometheus",
+      "description": t_modular(
+        "core_metrics.endpoint.prometheus_response_desc",
+        "Prometheus metrics"
+      ),
       "content": {"text/plain": {}},
     }
   },
 )
 async def get_metrics() -> Response:
   """
-  Retorna mètriques en format Prometheus.
+  Return metrics in Prometheus format.
 
   Returns:
-    Response amb mètriques text/plain
+    Response with text/plain metrics
   """
   await _update_module_health()
 
@@ -56,15 +69,21 @@ async def get_metrics() -> Response:
 
 @metrics_router.get(
   "/metrics/health",
-  summary="Metrics health check",
-  description="Verifica que el sistema de mètriques funciona",
+  summary=t_modular(
+    "core_metrics.endpoint.health_summary",
+    "Metrics health check"
+  ),
+  description=t_modular(
+    "core_metrics.endpoint.health_description",
+    "Verify the metrics system is working"
+  ),
 )
 async def metrics_health() -> Dict[str, Any]:
   """
-  Health check del sistema de mètriques.
+  Health check for the metrics system.
 
   Returns:
-    Dict amb estat del sistema
+    Dict with system status
   """
   try:
     metrics_output = generate_latest(REGISTRY)
@@ -76,7 +95,11 @@ async def metrics_health() -> Dict[str, Any]:
       "registry": "prometheus_client",
     }
   except Exception as e:
-    logger.error("metrics_health_check_failed", extra={"error": str(e)})
+    logger.error(_t(
+      "health_check_failed",
+      "Metrics health check failed: {error}",
+      error=str(e)
+    ))
     return {
       "status": "unhealthy",
       "error": str(e),
@@ -84,15 +107,21 @@ async def metrics_health() -> Dict[str, Any]:
 
 @metrics_router.get(
   "/metrics/json",
-  summary="Metrics summary (JSON)",
-  description="Resum de mètriques principals en format JSON",
+  summary=t_modular(
+    "core_metrics.endpoint.json_summary",
+    "Metrics summary (JSON)"
+  ),
+  description=t_modular(
+    "core_metrics.endpoint.json_description",
+    "Summary of key metrics in JSON format"
+  ),
 )
 async def get_metrics_json() -> Dict[str, Any]:
   """
-  Retorna resum de mètriques en JSON (per debugging).
+  Return a metrics summary in JSON (for debugging).
 
   Returns:
-    Dict amb resum de mètriques
+    Dict with metrics summary
   """
   from .registry import ACTIVE_CONNECTIONS
 
@@ -110,7 +139,7 @@ async def get_metrics_json() -> Dict[str, Any]:
 
 async def _update_module_health() -> None:
   """
-  Actualitza l'estat de salut dels mòduls abans d'exposar mètriques.
+  Update module health status before exposing metrics.
   """
   try:
     from personality.module_manager.module_manager import ModuleManager
@@ -130,4 +159,8 @@ async def _update_module_health() -> None:
   except ImportError:
     pass
   except Exception as e:
-    logger.debug("module_health_update_skipped", extra={"reason": str(e)})
+    logger.debug(_t(
+      "module_health_update_skipped",
+      "Module health update skipped: {error}",
+      error=str(e)
+    ))

@@ -121,10 +121,13 @@
    },
    "cli_not_found": "Error: CLI '{alias}' no trobat",
    "python_not_found": "Error: Intèrpret de Python no trobat: {path}",
-   "exec_error": "Error executant el CLI '{alias}': {error}"
+   "exec_error": "Error executant el CLI '{alias}': {error}",
+   "skip_manifest": "S'omet el manifest: {path}"
   },
   "chat": {
    "default_system_prompt": "Ets Nexe, un assistent d'IA local, precís i segur.",
+   "load_system_prompt_failed": "No s'ha pogut carregar el system prompt: {error}",
+   "read_engine_config_failed": "No s'ha pogut llegir la configuració del motor: {error}",
    "options": {
     "engine": "Motor d'inferència",
     "system": "System prompt / Identitat",
@@ -171,6 +174,15 @@
    "goodbye": "\n👋 Adéu!",
    "client_error": "\n❌ Error client: {error}"
   },
+  "input": {
+   "prompt_default": ">>> ",
+   "paste_indicator": "[enganxades {count} línies]",
+   "readline_setup_failed": "La configuració de readline ha fallat: {error}",
+   "paste_detection_failed": "La detecció d'enganxat ha fallat: {error}",
+   "add_history_failed": "Afegir a l'historial ha fallat: {error}",
+   "clear_history_failed": "Netejar l'historial ha fallat: {error}",
+   "get_history_failed": "Obtenir l'historial ha fallat: {error}"
+  },
   "logs": {
    "file_not_found": "⚠️ Fitxer de log no trobat: {path}",
    "following": "👀 Seguint logs de: {path} (últimes {lines} línies)",
@@ -186,10 +198,22 @@
   "api": {
    "server_error": "Error del servidor ({status_code}): {error}",
    "connect_error": "❌ Error: No s'ha pogut connectar al servidor Nexe. Assegura't que './nexe go' està corrent.",
-   "offline_not_supported": "❌ El mode offline encara no està suportat. Executa './nexe go' primer."
+   "offline_not_supported": "❌ El mode offline encara no està suportat. Executa './nexe go' primer.",
+   "memory_store_error": "Error en desar a memòria: {error}",
+   "memory_search_error": "Error en cercar memòria: {error}"
+  },
+  "client": {
+   "invalid_url_scheme": "Esquema d'URL invàlid: {scheme}. Només s'admet http/https.",
+   "http_error": "Error del servidor: {error}",
+   "connection_error": "Error de connexió: {error}",
+   "unexpected_error": "Error inesperat: {error}",
+   "server_not_available": "Servidor no disponible"
   },
   "manifest": {
    "description": "CLI Central Nexe - Orquestrador de CLIs de mòduls",
+   "health_error": "Error de health check: {error}",
+   "info_error": "Error d'informació: {error}",
+   "list_error": "Error de llista: {error}",
    "features": {
     "discovery": "Descobriment dinàmic de CLIs via manifest.toml",
     "subprocess": "Execució via subprocess per aïllament",
@@ -197,6 +221,9 @@
     "ui": "UI web a /ui-control/clis",
     "api": "API a /ui-control/api/clis"
    }
+  },
+  "config": {
+   "load_failed": "No s'ha pogut carregar la configuració: {error}"
   },
   "main": {
    "options": {

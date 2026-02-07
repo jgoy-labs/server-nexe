@@ -1,0 +1,78 @@
+{
+ "_meta": {
+  "component": "mlx_module",
+  "description": "MLX module translations",
+  "version": "1.0.0",
+  "language": "en-US"
+ },
+ "errors": {
+  "not_initialized": "MLX module not initialized"
+ },
+ "health": {
+  "active": "MLX engine active"
+ },
+ "manifest": {
+  "description": "Ultra-optimized inference engine for Apple Silicon (M1/M2/M3/M4) using MLX. Includes real prefix matching with instant TTFT in long conversations."
+ },
+ "metadata": {
+  "description": "Ultra-optimized inference engine for Apple Silicon (MLX)"
+ },
+ "generate": {
+  "user_placeholder": "(continue)",
+  "assistant_placeholder": "(understood)",
+  "cache_saved": "MLXChatNode: Option D saved clean cache ({prompt_tokens} tokens → {total_tokens} with response)"
+ },
+ "config": {
+  "model_path_empty": "MLXConfig: model_path is empty. Configure NEXE_MLX_MODEL or pass model_path.",
+  "read_server_toml_failed": "MLXConfig: Failed to read server.toml: {error}",
+  "loaded": "MLXConfig loaded: model={model}, max_tokens={max_tokens}, max_kv_size={max_kv_size}, temp={temperature:.1f}, top_p={top_p:.1f}, max_caches={max_caches}",
+  "model_path_required": "MLXConfig: model_path is required",
+  "model_path_missing": "MLXConfig: model_path does not exist: {path}",
+  "model_path_not_dir": "MLXConfig: model_path must be a directory: {path}",
+  "config_json_missing": "MLXConfig: model_path does not contain config.json: {path}",
+  "max_tokens_min": "MLXConfig: max_tokens minimum is 1",
+  "max_kv_size_min": "MLXConfig: max_kv_size minimum is 512",
+  "temperature_out_of_range": "MLXConfig: temperature {temperature:.1f} outside recommended range [0, 2]",
+  "top_p_range": "MLXConfig: top_p must be between 0 and 1",
+  "mlx_not_installed": "MLXConfig: mlx not installed",
+  "metal_check_failed": "MLXConfig: error checking Metal: {error}"
+ },
+ "logs": {
+  "cache_clear_failed": "MLXChatNode: error clearing cache: {error}",
+  "cache_cleared_all": "MLXPromptCacheManager: cleared all caches",
+  "cache_evicted": "MLXPromptCacheManager: evicted cache for {model}",
+  "cache_exact_match": "MLXPromptCacheManager: exact match, {count} tokens cached",
+  "cache_invalidated_model": "MLXPromptCacheManager: invalidated all caches for {model}",
+  "cache_longer_trimmed": "MLXPromptCacheManager: longer match trimmed, {new} new",
+  "cache_manager_clear_failed": "MLXChatNode: error clearing cache manager: {error}",
+  "cache_no_match": "MLXPromptCacheManager: no match, {count} tokens",
+  "cache_save_failed": "MLXChatNode: cache save failed (non-blocking): {error}",
+  "cache_saved_prefill": "MLXChatNode: cache saved post-prefill ({tokens} tokens, key={key})",
+  "cache_shorter_match": "MLXPromptCacheManager: shorter match, {cached} cached, {new} new",
+  "cache_trim_failed": "MLXPromptCacheManager: trim failed: {error}",
+  "chatnode_error": "MLXChatNode error after {elapsed_ms}ms: {error}",
+  "chatnode_identity": "MLXChatNode: identity={identity}, full={full}, cached={cached}, new={new}, prefix_reuse={reuse}",
+  "chatnode_loading_model": "MLXChatNode: loading model {model} (max_kv_size={max_kv_size})",
+  "chatnode_model_loaded": "MLXChatNode: model loaded successfully",
+  "chatnode_prefix_stats": "MLXChatNode: prefix={prefix} (cached={cached}, new={new}), prefill={prompt_tps:.1f} tok/s, gen={gen_tps:.1f} tok/s, {elapsed_ms}ms (p:{prefill_ms} g:{generation_ms}), {peak_memory_mb:.0f} MB",
+  "chatnode_session": "MLXChatNode: session={session}, msgs={count}",
+  "config_invalid": "MLXModule: Configuration invalid. Check NEXE_MLX_MODEL.",
+  "config_invalid_hint": "Expected: NEXE_MLX_MODEL should point to a valid MLX model directory",
+  "exact_match_processing_bos": "MLXChatNode: exact match, processing BOS token (~10ms overhead)",
+  "generator_empty": "MLXChatNode: generator empty, no prefill cache saved",
+  "init_failed": "Failed to initialize MLXModule: {error}",
+  "initialized": "MLXModule initialized successfully",
+  "manifest_creating_instance": "MLX manifest: Creating MLXModule instance...",
+  "manifest_get_instance_called": "MLX manifest: get_module_instance() called",
+  "manifest_instance_created": "MLX manifest: MLXModule instance created",
+  "manifest_returning_instance": "MLX manifest: Returning instance: {instance}",
+  "merged_response_with_cache": "MLXChatNode: merged response with last assistant (cache)",
+  "metal_unavailable": "MLXModule: Metal is not available. Cannot initialize MLX.",
+  "metal_unavailable_hint": "To use MLX: Ensure you're running on Apple Silicon with Metal support",
+  "model_reset": "MLXChatNode: model and all caches reset",
+  "prefix_cache_header": "MLX PREFIX CACHE: prefix_reuse={reuse}",
+  "prefix_cache_stats": "  cached_tokens={cached}, new_tokens={new}",
+  "prefix_match_processing": "MLXChatNode: prefix match, processing {count} new tokens (with memory)",
+  "stats_collection_failed": "MLX stats collection failed: {error}"
+ }
+}

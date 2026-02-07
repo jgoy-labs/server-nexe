@@ -14,7 +14,12 @@ from datetime import datetime
 from typing import Optional
 import os
 
+from personality.i18n.resolve import t_modular
+
 from .auth_models import ApiKeyData, ApiKeyConfig
+
+def _t_log(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"security.logs.{key}", fallback, **kwargs)
 
 def parse_datetime_or_none(value: Optional[str]) -> Optional[datetime]:
   """Parse ISO datetime string or return None."""
@@ -104,10 +109,11 @@ def is_dev_mode() -> bool:
   if is_production and dev_mode_requested:
     import logging
     logger = logging.getLogger(__name__)
-    logger.error(
+    logger.error(_t_log(
+      "dev_mode_blocked",
       "SECURITY BLOCK: DEV_MODE cannot be enabled in production! "
       "NEXE_DEV_MODE=true is ignored when NEXE_ENV=production"
-    )
+    ))
     return False
 
   return dev_mode_requested

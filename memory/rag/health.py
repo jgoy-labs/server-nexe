@@ -15,19 +15,22 @@ from pathlib import Path
 import psutil
 import structlog
 
-from personality.i18n import get_i18n
+from personality.i18n.resolve import t_modular
 
 logger = structlog.get_logger()
 
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(key, fallback, **kwargs)
+
 def check_module_initialized(module) -> Dict[str, Any]:
   """Check 1: Verifica que el mòdul està inicialitzat."""
-  i18n = get_i18n()
   try:
     is_init = module._initialized
     message = (
-      i18n.t("rag.health.initialized_ok", "Module initialized correctly")
+      _t("rag.health.initialized_ok", "Module initialized correctly")
       if is_init
-      else i18n.t("rag.health.not_initialized", "Module not initialized")
+      else _t("rag.health.not_initialized", "Module not initialized")
     )
     return {
       "name": "module_initialized",
@@ -38,7 +41,7 @@ def check_module_initialized(module) -> Dict[str, Any]:
     return {
       "name": "module_initialized",
       "status": "fail",
-      "message": i18n.t(
+      "message": _t(
         "rag.health.init_check_error",
         "Error checking initialization: {error}",
         error=str(e)
@@ -47,7 +50,6 @@ def check_module_initialized(module) -> Dict[str, Any]:
 
 def check_qdrant_available() -> Dict[str, Any]:
   """Check 2: Verifica Qdrant disponible."""
-  i18n = get_i18n()
   try:
     pass
     try:
@@ -59,24 +61,23 @@ def check_qdrant_available() -> Dict[str, Any]:
     return {
       "name": "qdrant_available",
       "status": "pass",
-      "message": i18n.t("rag.health.qdrant_available", "qdrant-client {version} available", version=version)
+      "message": _t("rag.health.qdrant_available", "qdrant-client {version} available", version=version)
     }
   except ImportError:
     return {
       "name": "qdrant_available",
       "status": "fail",
-      "message": i18n.t("rag.health.qdrant_not_installed", "qdrant-client not installed (pip install qdrant-client)")
+      "message": _t("rag.health.qdrant_not_installed", "qdrant-client not installed (pip install qdrant-client)")
     }
   except Exception as e:
     return {
       "name": "qdrant_available",
       "status": "fail",
-      "message": i18n.t("rag.health.qdrant_check_error", "Error checking qdrant-client: {error}", error=str(e))
+      "message": _t("rag.health.qdrant_check_error", "Error checking qdrant-client: {error}", error=str(e))
     }
 
 def check_storage_paths() -> Dict[str, Any]:
   """Check 3: Verifica storage paths existeixen (storage/vectors/)."""
-  i18n = get_i18n()
   try:
     vector_dir = Path("storage/vectors")
     catalog_dir = Path("storage/vectors/catalog")
@@ -96,84 +97,81 @@ def check_storage_paths() -> Dict[str, Any]:
       return {
         "name": "storage_paths",
         "status": "pass",
-        "message": i18n.t("rag.health.storage_paths_writable", "Storage paths writable: {path}", path=str(vector_dir))
+        "message": _t("rag.health.storage_paths_writable", "Storage paths writable: {path}", path=str(vector_dir))
       }
     else:
       return {
         "name": "storage_paths",
         "status": "fail",
-        "message": i18n.t("rag.health.storage_paths_not_writable", "Storage paths not writable: {path}", path=str(vector_dir))
+        "message": _t("rag.health.storage_paths_not_writable", "Storage paths not writable: {path}", path=str(vector_dir))
       }
 
   except Exception as e:
     return {
       "name": "storage_paths",
       "status": "fail",
-      "message": i18n.t("rag.health.storage_paths_error", "Error checking storage paths: {error}", error=str(e))
+      "message": _t("rag.health.storage_paths_error", "Error checking storage paths: {error}", error=str(e))
     }
 
 def check_transaction_ledger() -> Dict[str, Any]:
   """Check 4: Verifica TransactionLedger accessible."""
-  i18n = get_i18n()
   try:
     pass
     return {
       "name": "transaction_ledger",
       "status": "pass",
-      "message": i18n.t("rag.health.ledger_importable", "TransactionLedger importable")
+      "message": _t("rag.health.ledger_importable", "TransactionLedger importable")
     }
   except ImportError as e:
     return {
       "name": "transaction_ledger",
       "status": "fail",
-      "message": i18n.t("rag.health.ledger_not_importable", "TransactionLedger not importable: {error}", error=str(e))
+      "message": _t("rag.health.ledger_not_importable", "TransactionLedger not importable: {error}", error=str(e))
     }
   except Exception as e:
     return {
       "name": "transaction_ledger",
       "status": "fail",
-      "message": i18n.t("rag.health.ledger_check_error", "Error checking TransactionLedger: {error}", error=str(e))
+      "message": _t("rag.health.ledger_check_error", "Error checking TransactionLedger: {error}", error=str(e))
     }
 
 def check_write_coordinator() -> Dict[str, Any]:
   """Check 5: Verifica WriteCoordinator functional."""
-  i18n = get_i18n()
   try:
     pass
     return {
       "name": "write_coordinator",
       "status": "pass",
-      "message": i18n.t("rag.health.write_coordinator_importable", "WriteCoordinator importable")
+      "message": _t("rag.health.write_coordinator_importable", "WriteCoordinator importable")
     }
   except ImportError as e:
     return {
       "name": "write_coordinator",
       "status": "fail",
-      "message": i18n.t("rag.health.write_coordinator_not_importable", "WriteCoordinator not importable: {error}", error=str(e))
+      "message": _t("rag.health.write_coordinator_not_importable", "WriteCoordinator not importable: {error}", error=str(e))
     }
   except Exception as e:
     return {
       "name": "write_coordinator",
       "status": "fail",
-      "message": i18n.t("rag.health.write_coordinator_check_error", "Error checking WriteCoordinator: {error}", error=str(e))
+      "message": _t("rag.health.write_coordinator_check_error", "Error checking WriteCoordinator: {error}", error=str(e))
     }
 
 def check_rag_sources(module) -> Dict[str, Any]:
   """Check: Verifica health de cada RAG source."""
-  i18n = get_i18n()
   try:
     if not module._initialized:
       return {
         "name": "rag_sources",
         "status": "warn",
-        "message": i18n.t("rag.health.module_not_initialized_no_sources", "Module not initialized - no sources loaded")
+        "message": _t("rag.health.module_not_initialized_no_sources", "Module not initialized - no sources loaded")
       }
 
     if not module._sources:
       return {
         "name": "rag_sources",
         "status": "fail",
-        "message": i18n.t("rag.health.no_sources_registered", "No RAG sources registered")
+        "message": _t("rag.health.no_sources_registered", "No RAG sources registered")
       }
 
     sources_health = {}
@@ -195,14 +193,14 @@ def check_rag_sources(module) -> Dict[str, Any]:
       return {
         "name": "rag_sources",
         "status": "pass",
-        "message": i18n.t("rag.health.sources_healthy", "{count} sources healthy", count=len(module._sources)),
+        "message": _t("rag.health.sources_healthy", "{count} sources healthy", count=len(module._sources)),
         "sources": sources_health
       }
     else:
       return {
         "name": "rag_sources",
         "status": "fail",
-        "message": i18n.t("rag.health.sources_unhealthy", "Some sources unhealthy ({count} total)", count=len(module._sources)),
+        "message": _t("rag.health.sources_unhealthy", "Some sources unhealthy ({count} total)", count=len(module._sources)),
         "sources": sources_health
       }
 
@@ -210,19 +208,18 @@ def check_rag_sources(module) -> Dict[str, Any]:
     return {
       "name": "rag_sources",
       "status": "fail",
-      "message": i18n.t("rag.health.sources_check_error", "Error checking sources: {error}", error=str(e))
+      "message": _t("rag.health.sources_check_error", "Error checking sources: {error}", error=str(e))
     }
 
 def check_disk_space(min_gb: float = 10.0) -> Dict[str, Any]:
   """Check 6: Verifica disk space disponible (>10GB)."""
-  i18n = get_i18n()
   try:
     disk = psutil.disk_usage(".")
     free_gb = disk.free / (1024**3)
 
     if free_gb >= min_gb:
       status = "pass"
-      message = i18n.t(
+      message = _t(
         "rag.health.disk_space_ok",
         "{free}GB available (>={required}GB required)",
         free=f"{free_gb:.1f}",
@@ -230,7 +227,7 @@ def check_disk_space(min_gb: float = 10.0) -> Dict[str, Any]:
       )
     elif free_gb >= min_gb / 2:
       status = "warn"
-      message = i18n.t(
+      message = _t(
         "rag.health.disk_space_warn",
         "{free}GB available (<{required}GB required, may run out)",
         free=f"{free_gb:.1f}",
@@ -238,7 +235,7 @@ def check_disk_space(min_gb: float = 10.0) -> Dict[str, Any]:
       )
     else:
       status = "fail"
-      message = i18n.t(
+      message = _t(
         "rag.health.disk_space_critical",
         "{free}GB available (critical: <{critical}GB)",
         free=f"{free_gb:.1f}",
@@ -256,7 +253,7 @@ def check_disk_space(min_gb: float = 10.0) -> Dict[str, Any]:
     return {
       "name": "disk_space",
       "status": "fail",
-      "message": i18n.t("rag.health.disk_space_error", "Error checking disk space: {error}", error=str(e))
+      "message": _t("rag.health.disk_space_error", "Error checking disk space: {error}", error=str(e))
     }
 
 def check_health(module) -> Dict[str, Any]:

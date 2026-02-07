@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/auth_utils.py
-Description: Utilitats per al sistema d'autenticació Nexe.
+Description: Utilities for the Nexe authentication system.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -15,16 +15,24 @@ from typing import Optional
 import secrets
 
 from .auth_config import get_admin_api_key, is_dev_mode
+from .messages import get_message
+
+def _resolve_i18n() -> Optional[object]:
+  try:
+    from core.container import get_service
+    return get_service("i18n")
+  except Exception:
+    return None
 
 def generate_api_key(length: int = 32) -> str:
   """
-  Genera una API key segura
+  Generate a secure API key.
 
   Args:
-    length: Longitud de la key (default 32 bytes = 64 hex chars)
+    length: Key length (default 32 bytes = 64 hex chars)
 
   Returns:
-    API key hexadecimal
+    Hexadecimal API key
 
   Usage:
     new_key = generate_api_key()
@@ -36,21 +44,21 @@ def verify_api_key(
   x_api_key: Optional[str] = Header(None, alias="X-API-Key", description="API Key")
 ) -> str:
   """
-  Verifica una API key i llença 401 si no és vàlida
+  Verify an API key and raise 401 if it is invalid.
 
-  ✅ SECURITY FIX: Ara llença HTTPException(401) en lloc de retornar False
-  Això garanteix que endpoints amb Depends(verify_api_key) estan protegits.
+  ✅ SECURITY FIX: Now raises HTTPException(401) instead of returning False
+  This ensures endpoints with Depends(verify_api_key) are protected.
 
-  Compatible amb FastAPI Depends() i crides manuals.
+  Compatible with FastAPI Depends() and manual calls.
 
   Args:
-    x_api_key: API key del header X-API-Key (automàtic amb Depends)
+    x_api_key: API key from X-API-Key header (automatic with Depends)
 
   Returns:
-    str: La API key vàlida (si correcta)
+    str: The valid API key (if correct)
 
   Raises:
-    HTTPException: 401 si la key no és vàlida o no configurada
+    HTTPException: 401 if the key is invalid or not configured
 
   Usage:
     @router.get("/protected")
@@ -63,23 +71,36 @@ def verify_api_key(
       pass
   """
   admin_key = get_admin_api_key()
+  i18n = _resolve_i18n()
 
   if not admin_key:
     raise HTTPException(
       status_code=401,
-      detail="API key not configured on server"
+      detail=get_message(
+        i18n,
+        "security.auth.key_not_configured",
+        fallback="API key not configured on server"
+      )
     )
 
   if not x_api_key:
     raise HTTPException(
       status_code=401,
-      detail="API key required"
+      detail=get_message(
+        i18n,
+        "security.auth.missing_key",
+        fallback="API key required"
+      )
     )
 
   if not secrets.compare_digest(x_api_key, admin_key):
     raise HTTPException(
       status_code=401,
-      detail="Invalid API key"
+      detail=get_message(
+        i18n,
+        "security.auth.invalid_key",
+        fallback="Invalid API key"
+      )
     )
 
   return x_api_key

@@ -24,8 +24,12 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
 from ..models.memory_entry import MemoryEntry
+from personality.i18n.resolve import t_modular
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.persistence.{key}", fallback, **kwargs)
 
 # Configurable timeouts via environment variables
 # SECURITY: Capped to MAX_TIMEOUT to prevent resource exhaustion
@@ -80,7 +84,14 @@ class PersistenceManager:
 
     self._init_qdrant()
 
-    logger.info("PersistenceManager initialized (db=%s, qdrant=%s)", db_path, self.qdrant_url or "Embedded")
+    logger.info(
+      _t(
+        "initialized",
+        "PersistenceManager initialized (db={db}, qdrant={qdrant})",
+        db=db_path,
+        qdrant=self.qdrant_url or "Embedded",
+      )
+    )
 
   def _init_sqlite(self):
     """Initialize SQLite database with WAL mode"""
@@ -117,7 +128,7 @@ class PersistenceManager:
     conn.commit()
     conn.close()
 
-    logger.info("SQLite initialized with WAL mode")
+    logger.info(_t("sqlite_initialized", "SQLite initialized with WAL mode"))
 
   def _connect_sqlite(self) -> sqlite3.Connection:
     """Open SQLite connection with busy timeout to reduce writer contention."""
@@ -143,7 +154,13 @@ class PersistenceManager:
         # Mode Embedded (Local files)
         self.qdrant_path.mkdir(parents=True, exist_ok=True)
         self.qdrant = QdrantClient(path=str(self.qdrant_path))
-        logger.info("Qdrant initialized in EMBEDDED mode at %s", self.qdrant_path)
+        logger.info(
+          _t(
+            "qdrant_embedded",
+            "Qdrant initialized in EMBEDDED mode at {path}",
+            path=self.qdrant_path,
+          )
+        )
       else:
         # Mode Server (HTTP)
         self.qdrant = QdrantClient(
@@ -151,7 +168,13 @@ class PersistenceManager:
           prefer_grpc=False,
           timeout=QDRANT_TIMEOUT
         )
-        logger.info("Qdrant initialized in SERVER mode at %s", self.qdrant_url)
+        logger.info(
+          _t(
+            "qdrant_server",
+            "Qdrant initialized in SERVER mode at {url}",
+            url=self.qdrant_url,
+          )
+        )
 
       collections = self.qdrant.get_collections().collections
       collection_names = [c.name for c in collections]
@@ -164,17 +187,33 @@ class PersistenceManager:
             distance=Distance.COSINE
           )
         )
-        logger.info("Created Qdrant collection '%s'", self.collection_name)
+        logger.info(
+          _t(
+            "qdrant_collection_created",
+            "Created Qdrant collection '{collection}'",
+            collection=self.collection_name,
+          )
+        )
       else:
-        logger.debug("Qdrant collection '%s' already exists", self.collection_name)
+        logger.debug(
+          _t(
+            "qdrant_collection_exists",
+            "Qdrant collection '{collection}' already exists",
+            collection=self.collection_name,
+          )
+        )
 
       self._qdrant_available = True
 
     except Exception as e:
       mode = "Embedded" if self.qdrant_path else "Server"
       logger.warning(
-        "Qdrant %s mode failed: %s. Memory will use SQLite only (degraded mode).",
-        mode, e
+        _t(
+          "qdrant_init_failed",
+          "Qdrant {mode} mode failed: {error}. Memory will use SQLite only (degraded mode).",
+          mode=mode,
+          error=str(e),
+        )
       )
       self.qdrant = None
       self._qdrant_available = False
@@ -215,18 +254,36 @@ class PersistenceManager:
       except Exception as e:
         if strict:
           logger.error(
-            "CRITICAL: Qdrant storage failed for %s: %s. Performing ROLLBACK on SQLite to prevent divergence.",
-            entry.id, e
+            _t(
+              "qdrant_store_failed_critical",
+              "CRITICAL: Qdrant storage failed for {entry_id}: {error}. Performing ROLLBACK on SQLite to prevent divergence.",
+              entry_id=entry.id,
+              error=str(e),
+            )
           )
           await self._delete_sqlite(entry.id)
-          raise StorageError(f"Storage failed (Strict mode: Rollback performed): {e}")
+          raise StorageError(_t(
+            "storage_failed_strict",
+            "Storage failed (Strict mode: Rollback performed): {error}",
+            error=str(e),
+          ))
         else:
           logger.warning(
-            "DEGRADED: Qdrant storage failed for %s: %s. Entry kept in SQLite only.",
-            entry.id, e
+            _t(
+              "qdrant_store_failed_degraded",
+              "DEGRADED: Qdrant storage failed for {entry_id}: {error}. Entry kept in SQLite only.",
+              entry_id=entry.id,
+              error=str(e),
+            )
           )
     elif embedding and not self._qdrant_available:
-      logger.debug("Entry %s stored only in SQLite (Qdrant service is unavailable/degraded).", entry.id)
+      logger.debug(
+        _t(
+          "stored_sqlite_only",
+          "Entry {entry_id} stored only in SQLite (Qdrant service is unavailable/degraded).",
+          entry_id=entry.id,
+        )
+      )
 
     return entry.id
 
@@ -262,7 +319,13 @@ class PersistenceManager:
       conn.close()
 
     await loop.run_in_executor(self.executor, _sync_store)
-    logger.debug("Stored entry %s to SQLite", entry.id)
+    logger.debug(
+      _t(
+        "sqlite_stored",
+        "Stored entry {entry_id} to SQLite",
+        entry_id=entry.id,
+      )
+    )
 
   @staticmethod
   def _hex_to_uuid(hex_id: str) -> str:
@@ -305,7 +368,13 @@ class PersistenceManager:
       loop = asyncio.get_running_loop()
       await loop.run_in_executor(self.executor, _sync_upsert)
       
-    logger.debug("Stored vector for %s to Qdrant", entry_id)
+    logger.debug(
+      _t(
+        "qdrant_vector_stored",
+        "Stored vector for {entry_id} to Qdrant",
+        entry_id=entry_id,
+      )
+    )
 
   async def _delete_sqlite(self, entry_id: str):
     """Delete entry from SQLite (rollback helper)"""
@@ -319,7 +388,13 @@ class PersistenceManager:
       conn.close()
 
     await loop.run_in_executor(self.executor, _sync_delete)
-    logger.debug("Deleted entry %s from SQLite (rollback)", entry_id)
+    logger.debug(
+      _t(
+        "sqlite_deleted_rollback",
+        "Deleted entry {entry_id} from SQLite (rollback)",
+        entry_id=entry_id,
+      )
+    )
 
   async def get(self, entry_id: str) -> Optional[MemoryEntry]:
     """Retrieve entry by ID"""
@@ -392,7 +467,13 @@ class PersistenceManager:
       loop = asyncio.get_running_loop()
       results = await loop.run_in_executor(self.executor, _sync_search)
 
-    logger.debug("Qdrant search returned %s results", len(results))
+    logger.debug(
+      _t(
+        "qdrant_search_results",
+        "Qdrant search returned {count} results",
+        count=len(results),
+      )
+    )
     return results
 
   def _row_to_entry(self, row: tuple) -> MemoryEntry:
@@ -524,13 +605,31 @@ class PersistenceManager:
         loop.run_in_executor(self.executor, _sync_get_recent),
         timeout=SQLITE_PRELOAD_TIMEOUT
       )
-      logger.info("Loaded %d recent entries from SQLite", len(entries))
+      logger.info(
+        _t(
+          "sqlite_preload_loaded",
+          "Loaded {count} recent entries from SQLite",
+          count=len(entries),
+        )
+      )
       return entries
     except asyncio.TimeoutError:
-      logger.warning("SQLite preload timeout (%.1fs), continuing with empty RAM", SQLITE_PRELOAD_TIMEOUT)
+      logger.warning(
+        _t(
+          "sqlite_preload_timeout",
+          "SQLite preload timeout ({timeout:.1f}s), continuing with empty RAM",
+          timeout=SQLITE_PRELOAD_TIMEOUT,
+        )
+      )
       return []
     except Exception as e:
-      logger.warning("SQLite preload failed: %s, continuing with empty RAM", e)
+      logger.warning(
+        _t(
+          "sqlite_preload_failed",
+          "SQLite preload failed: {error}, continuing with empty RAM",
+          error=str(e),
+        )
+      )
       return []
 
   def close(self):
@@ -540,10 +639,16 @@ class PersistenceManager:
       try:
         self.qdrant.close()
       except Exception as e:
-        logger.debug("PersistenceManager close failed: %s", e)
+        logger.debug(
+          _t(
+            "close_failed",
+            "PersistenceManager close failed: {error}",
+            error=str(e),
+          )
+        )
       finally:
         if hasattr(self.qdrant, "_client"):
           delattr(self.qdrant, "_client")
-    logger.info("PersistenceManager closed")
+    logger.info(_t("closed", "PersistenceManager closed"))
 
 __all__ = ["PersistenceManager", "StorageError"]

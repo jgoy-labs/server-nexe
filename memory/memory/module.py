@@ -16,6 +16,7 @@ import logging
 from pathlib import Path
 
 from personality.i18n import get_i18n
+from personality.i18n.resolve import t_modular
 
 from .engines.flash_memory import FlashMemory
 from .engines.ram_context import RAMContext
@@ -23,6 +24,9 @@ from .engines.persistence import PersistenceManager
 from .pipeline.ingestion import IngestionPipeline
 
 logger = logging.getLogger(__name__)
+
+def _t(key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"memory.logs.{key}", fallback, **kwargs)
 
 class MemoryModule:
   """
@@ -73,7 +77,12 @@ class MemoryModule:
     self._persistence = None
     self._pipeline = None
 
-    logger.debug(f"MemoryModule created: {self.module_id} v{self.version} (DI Container active)")
+    logger.debug(_t(
+      "created",
+      "MemoryModule created: {module_id} v{version} (DI Container active)",
+      module_id=self.module_id,
+      version=self.version
+    ))
 
   @classmethod
   def get_instance(cls) -> 'MemoryModule':
@@ -102,7 +111,7 @@ class MemoryModule:
       bool: True if initialization correct
     """
     if self._initialized:
-      logger.debug("MemoryModule already initialized")
+      logger.debug(_t("already_initialized", "MemoryModule already initialized"))
       return True
 
     try:
@@ -112,13 +121,17 @@ class MemoryModule:
       if config:
         final_config.update(config)
 
-      logger.debug("MemoryModule initializing...")
+      logger.debug(_t("initializing", "MemoryModule initializing..."))
 
       project_root = get_service("project_root")
       if not project_root:
         from pathlib import Path
         project_root = Path.cwd()
-        logger.warning("project_root not found in Container, using cwd: %s", project_root)
+        logger.warning(_t(
+          "project_root_fallback",
+          "project_root not found in Container, using cwd: {path}",
+          path=project_root
+        ))
 
       # ✅ FIX: Unify paths with installer (storage/vectors/)
       vectors_path = project_root / "storage" / "vectors"
@@ -162,18 +175,35 @@ class MemoryModule:
           await self._flash_memory.store(entry)
           preload_count += 1
 
-        logger.debug(f"Memory preload: {preload_count}/{preload_limit} entries loaded")
+        logger.debug(_t(
+          "preload_loaded",
+          "Memory preload: {count}/{limit} entries loaded",
+          count=preload_count,
+          limit=preload_limit
+        ))
       except Exception as e:
-        logger.warning(f"Memory preload failed: {e}")
+        logger.warning(_t(
+          "preload_failed",
+          "Memory preload failed: {error}",
+          error=str(e)
+        ))
 
       self._initialized = True
 
-      logger.debug(f"MemoryModule initialized v{self.version}")
+      logger.debug(_t(
+        "initialized",
+        "MemoryModule initialized v{version}",
+        version=self.version
+      ))
 
       return True
 
     except Exception as e:
-      logger.error(f"MemoryModule init failed: {e}", exc_info=True)
+      logger.error(_t(
+        "init_failed",
+        "MemoryModule init failed: {error}",
+        error=str(e)
+      ), exc_info=True)
       raise
 
   async def shutdown(self) -> bool:
@@ -184,11 +214,11 @@ class MemoryModule:
       bool: True if shutdown correct
     """
     if not self._initialized:
-      logger.debug("MemoryModule not initialized, skip shutdown")
+      logger.debug(_t("shutdown_skip", "MemoryModule not initialized, skip shutdown"))
       return True
 
     try:
-      logger.debug("MemoryModule shutting down...")
+      logger.debug(_t("shutdown_start", "MemoryModule shutting down..."))
 
       if self._flash_memory:
         await self._flash_memory.cleanup_expired()
@@ -205,11 +235,15 @@ class MemoryModule:
       self._persistence = None
       self._pipeline = None
 
-      logger.debug("MemoryModule shutdown complete")
+      logger.debug(_t("shutdown_complete", "MemoryModule shutdown complete"))
       return True
 
     except Exception as e:
-      logger.error(f"MemoryModule shutdown failed: {e}", exc_info=True)
+      logger.error(_t(
+        "shutdown_failed",
+        "MemoryModule shutdown failed: {error}",
+        error=str(e)
+      ), exc_info=True)
       return False
 
   def get_health(self) -> Dict[str, Any]:
@@ -251,7 +285,13 @@ class MemoryModule:
       bool: True if successfully ingested
     """
     if not self._initialized or not self._pipeline:
-      raise RuntimeError("MemoryModule not initialized. Call initialize() first.")
+      i18n = get_i18n()
+      raise RuntimeError(
+        i18n.t(
+          "memory.not_initialized",
+          "MemoryModule not initialized. Call initialize() first."
+        )
+      )
 
     return await self._pipeline.ingest(entry)
 
@@ -266,7 +306,13 @@ class MemoryModule:
       dict: Batch stats
     """
     if not self._initialized or not self._pipeline:
-      raise RuntimeError("MemoryModule not initialized. Call initialize() first.")
+      i18n = get_i18n()
+      raise RuntimeError(
+        i18n.t(
+          "memory.not_initialized",
+          "MemoryModule not initialized. Call initialize() first."
+        )
+      )
 
     return await self._pipeline.ingest_batch(entries)
 

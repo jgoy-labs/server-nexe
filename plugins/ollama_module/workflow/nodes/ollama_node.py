@@ -10,20 +10,22 @@ www.jgoy.net
 ────────────────────────────────────
 """
 
-try:
-  import httpx
-except ImportError as e:
-  raise ImportError(
-    "httpx is required for OllamaNode. "
-    "Install it with: pip install httpx>=0.25.0"
-  ) from e
-
 import os
 import re
 import logging
 from typing import Dict, Any, Optional
 from nexe_flow.core.node import Node, NodeMetadata, NodeInput, NodeOutput
 from plugins.ollama_module.i18n import t as _t
+
+try:
+  import httpx
+except ImportError as e:
+  raise ImportError(
+    _t(
+      "errors.httpx_required",
+      "httpx is required for OllamaNode. Install it with: pip install httpx>=0.25.0"
+    )
+  ) from e
 
 DEFAULT_BASE_URL = "http://localhost:11434"
 logger = logging.getLogger(__name__)
@@ -87,12 +89,18 @@ def validate_ollama_prompt(prompt: str) -> None:
   for pattern in DANGEROUS_PROMPT_PATTERNS:
     if re.search(pattern, prompt_lower, re.IGNORECASE):
       logger.warning(
-        f"🚨 SECURITY: Prompt injection attempt detected: pattern='{pattern}' "
-        f"prompt_preview='{prompt[:100]}...'"
+        _t(
+          "logs.prompt_injection_detected",
+          "SECURITY: Prompt injection attempt detected: pattern='{pattern}' prompt_preview='{preview}...'",
+          pattern=pattern,
+          preview=prompt[:100],
+        )
       )
       raise ValueError(
-        f"Prompt rejected: contains suspicious pattern that may attempt "
-        f"to override system behavior or extract secrets"
+        _t(
+          "errors.prompt_rejected",
+          "Prompt rejected: contains suspicious pattern that may attempt to override system behavior or extract secrets"
+        )
       )
 
 def validate_ollama_model(model: str) -> None:
@@ -111,11 +119,20 @@ def validate_ollama_model(model: str) -> None:
 
   if model not in ALLOWED_OLLAMA_MODELS and model_base not in ALLOWED_OLLAMA_MODELS:
     logger.warning(
-      f"🚨 SECURITY: Model not in allowlist: model='{model}' "
-      f"allowed={ALLOWED_OLLAMA_MODELS}"
+      _t(
+        "logs.model_not_allowed",
+        "SECURITY: Model not in allowlist: model='{model}' allowed={allowed}",
+        model=model,
+        allowed=ALLOWED_OLLAMA_MODELS,
+      )
     )
     raise ValueError(
-      f"Model '{model}' not in allowlist. Allowed models: {', '.join(ALLOWED_OLLAMA_MODELS)}"
+      _t(
+        "errors.model_not_allowed",
+        "Model '{model}' not in allowlist. Allowed models: {allowed}",
+        model=model,
+        allowed=", ".join(ALLOWED_OLLAMA_MODELS),
+      )
     )
 
 def sanitize_ollama_response(response: str) -> str:
@@ -182,7 +199,13 @@ class OllamaNode(Node):
       )
 
     self.base_url = base_url.rstrip("/")
-    logger.info("OllamaNode initialized - base_url=%s", self.base_url)
+    logger.info(
+      _t(
+        "logs.node_initialized",
+        "OllamaNode initialized - base_url={base_url}",
+        base_url=self.base_url,
+      )
+    )
 
   def get_metadata(self) -> NodeMetadata:
     """Return node metadata."""
@@ -299,7 +322,12 @@ class OllamaNode(Node):
     system = inputs.get('system', None)
 
     if not prompt or not prompt.strip():
-      raise ValueError("Prompt cannot be empty")
+      raise ValueError(
+        _t(
+          "errors.prompt_empty",
+          "Prompt cannot be empty"
+        )
+      )
 
     validate_ollama_prompt(prompt)
     if system:
@@ -373,19 +401,28 @@ class OllamaNode(Node):
 
     except httpx.ConnectError:
       raise ConnectionError(
-        f"Cannot connect to Ollama at {self.base_url}. "
-        "Make sure Ollama is running (ollama serve)"
+        _t(
+          "workflow.errors.connection_failed",
+          "Cannot connect to Ollama at {url}. Make sure Ollama is running (ollama serve)",
+          url=self.base_url
+        )
       )
     except httpx.TimeoutException:
       raise TimeoutError(
-        f"Ollama request timed out after 120s. "
-        f"Model '{model}' might be too large or prompt too complex."
+        _t(
+          "workflow.errors.timeout",
+          "Ollama request timed out after 120s. Model '{model}' might be too large or prompt too complex.",
+          model=model
+        )
       )
     except httpx.HTTPStatusError as e:
       if e.response.status_code == 404:
         raise ValueError(
-          f"Model '{model}' not found. "
-          f"Pull it first: ollama pull {model}"
+          _t(
+            "workflow.errors.model_not_found",
+            "Model '{model}' not found. Pull it first: ollama pull {model}",
+            model=model
+          )
         )
       raise
 

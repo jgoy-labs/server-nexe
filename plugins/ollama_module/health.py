@@ -14,6 +14,8 @@ import logging
 import os
 from typing import Dict, Any
 
+from personality.i18n.resolve import t_modular
+
 try:
   import httpx
 except ImportError:
@@ -38,7 +40,10 @@ def get_health() -> Dict[str, Any]:
       "name": "ollama_module",
       "status": "DEGRADED",
       "connected": False,
-      "error": "httpx not installed (pip install httpx)"
+      "error": t_modular(
+        "ollama_module.errors.httpx_missing",
+        "httpx not installed (pip install httpx)"
+      )
     }
 
   try:
@@ -58,17 +63,31 @@ def get_health() -> Dict[str, Any]:
       }
 
   except httpx.ConnectError:
-    logger.warning("Ollama not reachable at localhost:11434")
+    logger.warning(
+      t_modular(
+        "ollama_module.logs.not_reachable",
+        "Ollama not reachable at localhost:11434"
+      )
+    )
     return {
       "name": "ollama_module",
       "status": "UNHEALTHY",
       "connected": False,
-      "error": "Cannot connect to Ollama (not running?)",
+      "error": t_modular(
+        "ollama_module.errors.connection_unavailable",
+        "Cannot connect to Ollama (not running?)"
+      ),
       "base_url": OLLAMA_BASE_URL
     }
 
   except Exception as e:
-    logger.error(f"Ollama health check failed: {e}")
+    logger.error(
+      t_modular(
+        "ollama_module.logs.health_check_failed",
+        "Ollama health check failed: {error}",
+        error=str(e)
+      )
+    )
     return {
       "name": "ollama_module",
       "status": "ERROR",
