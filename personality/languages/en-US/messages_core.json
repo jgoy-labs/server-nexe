@@ -130,10 +130,13 @@
   "csrf_sessions_invalidated": "   Sessions will be invalidated on each restart.",
   "csrf_set_env_hint": "   Set NEXE_CSRF_SECRET in .env for persistent sessions.",
   "csrf_secret_temp": "CSRF_SECRET not configured. Using temporary secret (dev mode only)",
-  "csrf_cookie_override": "  CSRF cookie_secure manual override: {value}",
-  "csrf_enabled": "CSRF protection enabled",
-  "csrf_not_installed": "starlette-csrf not installed. CSRF protection disabled.",
-  "csrf_install_hint": "  Install with: pip install starlette-csrf"
+    "csrf_cookie_override": "  CSRF cookie_secure manual override: {value}",
+    "csrf_enabled": "CSRF protection enabled",
+    "csrf_not_installed": "starlette-csrf not installed. CSRF protection disabled.",
+    "csrf_not_installed_prod": "starlette-csrf not installed in production. Install with: pip install starlette-csrf",
+    "csrf_exempt_config_invalid": "CSRF exempt list must be a list. Using defaults.",
+    "csrf_exempt_invalid": "Invalid CSRF exempt pattern: {pattern}",
+    "csrf_install_hint": "  Install with: pip install starlette-csrf"
  },
  "cors": {
   "wildcard_not_allowed": "CORS wildcard '*' not allowed in air-gapped mode. Define explicit origins in server.toml [core.server] cors_origins",

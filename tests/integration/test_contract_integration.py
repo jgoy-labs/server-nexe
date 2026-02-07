@@ -117,20 +117,6 @@ class TestContractIntegration:
         assert success is True
         assert registry.count() == 0
 
-    def test_manifest_backwards_compatibility(self):
-        """Test que manifests amb .old encara existeixen com a backup"""
-        plugins = [
-            'ollama_module',
-            'mlx_module',
-            'security',
-            'llama_cpp_module',
-            'web_ui_module'
-        ]
-
-        for plugin in plugins:
-            old_manifest = Path(f"plugins/{plugin}/manifest.toml.old")
-            assert old_manifest.exists(), f"Backup not found: {old_manifest}"
-
     def test_manifest_metadata_preservation(self):
         """Test que metadata custom es preserva en migració"""
         # Security té moltes seccions custom

@@ -162,26 +162,6 @@ MODEL_CATALOG = {
     ],
 }
 
-# Legacy MODELS dict for backward compatibility
-MODELS = {
-    "small": {
-        "mlx": {"id": "mlx-community/Phi-3.5-mini-instruct-4bit", "name": "Phi-3.5 Mini", "size": "~2.4 GB", "ram": 4},
-        "ollama": {"id": "phi3:mini", "name": "Phi-3 Mini", "size": "~2.3 GB", "ram": 4},
-    },
-    "medium": {
-        "mlx": {"id": "mlx-community/Mistral-7B-Instruct-v0.3-4bit", "name": "Mistral 7B", "size": "~4 GB", "ram": 6},
-        "ollama": {"id": "mistral:7b", "name": "Mistral 7B", "size": "~4.1 GB", "ram": 6},
-    },
-    "large": {
-        "mlx": {"id": "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit", "name": "Llama 3.1 8B", "size": "~4.5 GB", "ram": 8},
-        "ollama": {"id": "llama3.1:8b", "name": "Llama 3.1 8B", "size": "~4.7 GB", "ram": 8},
-    },
-    "xl": {
-        "mlx": {"id": "mlx-community/Mixtral-8x7B-Instruct-v0.1-4bit", "name": "Mixtral 8x7B", "size": "~26 GB", "ram": 32},
-        "ollama": {"id": "mixtral:8x7b", "name": "Mixtral 8x7B", "size": "~26 GB", "ram": 32},
-    },
-}
-
 # ═══════════════════════════════════════════════════════════════════════════
 # TRANSLATIONS
 # ═══════════════════════════════════════════════════════════════════════════

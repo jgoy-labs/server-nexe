@@ -28,20 +28,6 @@ from core.request_size_limiter import RequestSizeLimiterMiddleware
 
 logger = logging.getLogger(__name__)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# CSRF EXEMPT PATTERNS - Pre-compiled at module load (not per-request)
-# Using simple prefix patterns that starlette-csrf can match efficiently
-# ═══════════════════════════════════════════════════════════════════════════
-import re
-_CSRF_EXEMPT_PATTERNS = [
-    re.compile(r"^/v1/chat/completions"),
-    re.compile(r"^/v1/memory/"),  # Memory API (CLI calls)
-    re.compile(r"^/v1/audio/transcriptions"),
-    re.compile(r"^/health"),
-    re.compile(r"^/metrics"),
-    re.compile(r"^/ui/"),  # Web UI (internal use, same-origin)
-]
-
 def _translate(i18n, key: str, fallback: str, **kwargs) -> str:
   """Helper to translate with fallback (for non-endpoint functions)"""
   if not i18n:
@@ -50,6 +36,60 @@ def _translate(i18n, key: str, fallback: str, **kwargs) -> str:
   if value == key:
     return fallback.format(**kwargs) if kwargs else fallback
   return value
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CSRF EXEMPT PATTERNS
+# - Defaults are prefix matches (safe for most installs)
+# - Configurable via core.security.csrf_exempt (list of prefixes)
+# - Regex patterns allowed via "re:<pattern>"
+# ═══════════════════════════════════════════════════════════════════════════
+import re
+
+DEFAULT_CSRF_EXEMPT_PREFIXES = [
+    "/v1/chat/completions",
+    "/v1/memory/",  # Memory API (CLI calls)
+    "/v1/audio/transcriptions",
+    "/health",
+    "/metrics",
+    "/ui/",  # Web UI (internal use, same-origin)
+]
+
+def _build_csrf_exempt_patterns(config: Dict[str, Any], i18n = None):
+  """Compile CSRF exempt URL patterns based on config."""
+  security_config = config.get('core', {}).get('security', {})
+  exemptions = security_config.get('csrf_exempt', None)
+
+  if exemptions is None:
+    exemptions = DEFAULT_CSRF_EXEMPT_PREFIXES
+  elif not isinstance(exemptions, list):
+    logger.warning(_translate(
+      i18n,
+      "core.middleware.csrf_exempt_config_invalid",
+      "CSRF exempt list must be a list. Using defaults."
+    ))
+    exemptions = DEFAULT_CSRF_EXEMPT_PREFIXES
+
+  patterns = []
+  for entry in exemptions:
+    if not entry:
+      continue
+    if isinstance(entry, str) and entry.startswith("re:"):
+      pattern = entry[3:].strip()
+      try:
+        patterns.append(re.compile(pattern))
+      except re.error:
+        logger.warning(_translate(
+          i18n,
+          "core.middleware.csrf_exempt_invalid",
+          "Invalid CSRF exempt pattern: {pattern}",
+          pattern=entry
+        ))
+      continue
+    if isinstance(entry, str):
+      prefix = entry if entry.startswith("/") else f"/{entry}"
+      patterns.append(re.compile("^" + re.escape(prefix)))
+
+  return patterns
 
 def setup_rate_limiting(app: FastAPI, i18n = None) -> None:
   """
@@ -316,21 +356,32 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any], i18n = None) -> 
         value=cookie_secure
       ))
 
-    # Use pre-compiled patterns from module level (more efficient)
+    exempt_patterns = _build_csrf_exempt_patterns(config, i18n)
+
+    # Use pre-compiled patterns from config (more efficient)
     app.add_middleware(
       CSRFMiddleware,
       secret=csrf_secret,
       cookie_name="nexe_csrf_token",
       cookie_secure=cookie_secure,
       cookie_samesite="strict",
-      exempt_urls=_CSRF_EXEMPT_PATTERNS,  # Pre-compiled at module load
+      exempt_urls=exempt_patterns,
     )
     logger.info(_translate(
       i18n,
       "core.middleware.csrf_enabled",
       "CSRF protection enabled"
     ))
-  except ImportError:
+  except ImportError as e:
+    if is_prod:
+      msg = _translate(
+        i18n,
+        "core.middleware.csrf_not_installed_prod",
+        "starlette-csrf not installed in production. Install with: pip install starlette-csrf"
+      )
+      logger.error(msg)
+      raise RuntimeError(msg) from e
+
     logger.warning(_translate(
       i18n,
       "core.middleware.csrf_not_installed",

@@ -11,9 +11,12 @@ www.jgoy.net
 """
 
 import asyncio
+import atexit
 import logging
 import shutil
+import signal
 import subprocess
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Any
@@ -267,6 +270,82 @@ class ServerState:
 
 server_state = ServerState()
 
+_cleanup_registered = False
+_cleanup_running = False
+_cleanup_lock = threading.Lock()
+_previous_signal_handlers = {}
+
+
+def _stop_process(process, name: str, i18n=None) -> None:
+  if not process:
+    return
+  if process.poll() is not None:
+    return
+  try:
+    logger.info(_translate(
+      i18n,
+      "core.lifespan.process_stopping",
+      "Stopping {name} process...",
+      name=name
+    ))
+    process.terminate()
+    process.wait(timeout=5)
+  except Exception:
+    try:
+      process.kill()
+    except Exception:
+      logger.debug(_translate(
+        i18n,
+        "core.lifespan.process_force_stop_failed",
+        "Failed to force-stop {name} process",
+        name=name
+      ))
+
+
+def _cleanup_child_processes(i18n=None) -> None:
+  global _cleanup_running
+  with _cleanup_lock:
+    if _cleanup_running:
+      return
+    _cleanup_running = True
+
+  try:
+    _stop_process(server_state.qdrant_process, "Qdrant", i18n)
+    _stop_process(server_state.ollama_process, "Ollama", i18n)
+  finally:
+    with _cleanup_lock:
+      _cleanup_running = False
+
+
+def _register_process_cleanup(i18n=None) -> None:
+  global _cleanup_registered
+  if _cleanup_registered:
+    return
+  _cleanup_registered = True
+
+  atexit.register(_cleanup_child_processes, i18n)
+
+  def _signal_handler(signum, frame):
+    _cleanup_child_processes(i18n)
+    prev = _previous_signal_handlers.get(signum)
+    if callable(prev):
+      try:
+        prev(signum, frame)
+      except Exception:
+        pass
+    elif prev == signal.SIG_DFL:
+      raise SystemExit(0)
+
+  for sig in (signal.SIGTERM, signal.SIGINT):
+    try:
+      prev = signal.getsignal(sig)
+      _previous_signal_handlers[sig] = prev
+      if prev != _signal_handler:
+        signal.signal(sig, _signal_handler)
+    except ValueError:
+      # Signal handling only allowed in main thread
+      continue
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
   """
@@ -312,6 +391,8 @@ async def lifespan(app: FastAPI):
       "Project root: {path}",
       path=str(server_state.project_root))
     logger.info(msg)
+
+    _register_process_cleanup(server_state.i18n)
 
     server_state.config = load_config(server_state.project_root, server_state.i18n)
 
@@ -837,33 +918,7 @@ async def lifespan(app: FastAPI):
           error=str(e)
         ))
 
-      def _stop_process(process, name: str):
-        if not process:
-          return
-        if process.poll() is not None:
-          return
-        try:
-          logger.info(_translate(
-            server_state.i18n,
-            "core.lifespan.process_stopping",
-            "Stopping {name} process...",
-            name=name
-          ))
-          process.terminate()
-          process.wait(timeout=5)
-        except Exception:
-          try:
-            process.kill()
-          except Exception:
-            logger.debug(_translate(
-              server_state.i18n,
-              "core.lifespan.process_force_stop_failed",
-              "Failed to force-stop {name} process",
-              name=name
-            ))
-
-      _stop_process(server_state.qdrant_process, "Qdrant")
-      _stop_process(server_state.ollama_process, "Ollama")
+      _cleanup_child_processes(server_state.i18n)
 
       if server_state.api_integrator:
         logger.debug(_translate(

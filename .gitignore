@@ -32,6 +32,7 @@ logs/
 storage/.knowledge_ingested
 qdrant
 nexe
+**/manifest.toml.old
 
 # Web UI uploads (generated/user content)
 plugins/web_ui_module/static/uploads/

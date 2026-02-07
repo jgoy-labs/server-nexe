@@ -107,7 +107,7 @@ scripts/
 
 plugins/*/
 ├── manifest.toml                    # Format nou (UnifiedManifest)
-└── manifest.toml.old                # Backup format antic
+└── manifest.toml.old                # Backup local (generat per migració, no versionat)
 ```
 
 ---
@@ -218,13 +218,16 @@ python3 scripts/migrate_manifests.py --dry-run
 ./scripts/apply_migrations.sh
 ```
 
-### Rollback
+### Rollback (si existeixen backups)
 
 ```bash
 for f in plugins/*/manifest.toml.old; do
     mv "$f" "${f%.old}"
 done
 ```
+Notes:
+- `manifest.toml.old` es crea localment quan s'executa una migració.
+- Aquests backups no es versionen (estan a `.gitignore`).
 
 ---
 

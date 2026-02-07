@@ -131,9 +131,12 @@
   "csrf_set_env_hint": "   Configureu NEXE_CSRF_SECRET al .env per a sessions persistents.",
   "csrf_secret_temp": "CSRF_SECRET no configurat. S'utilitza un secret temporal (només mode dev)",
   "csrf_cookie_override": "  Override manual de cookie_secure de CSRF: {value}",
-  "csrf_enabled": "Protecció CSRF activada",
-  "csrf_not_installed": "starlette-csrf no instal·lat. Protecció CSRF desactivada.",
-  "csrf_install_hint": "  Instal·leu amb: pip install starlette-csrf"
+    "csrf_enabled": "Protecció CSRF activada",
+    "csrf_not_installed": "starlette-csrf no instal·lat. Protecció CSRF desactivada.",
+    "csrf_not_installed_prod": "starlette-csrf no està instal·lat en producció. Instal·leu amb: pip install starlette-csrf",
+    "csrf_exempt_config_invalid": "La llista d'exempcions CSRF ha de ser una llista. S'usen els valors per defecte.",
+    "csrf_exempt_invalid": "Patró d'exempció CSRF invàlid: {pattern}",
+    "csrf_install_hint": "  Instal·leu amb: pip install starlette-csrf"
  },
  "cors": {
   "wildcard_not_allowed": "El comodí CORS '*' no és permès en mode air-gapped. Defineix orígens explícits a server.toml [core.server] cors_origins",
