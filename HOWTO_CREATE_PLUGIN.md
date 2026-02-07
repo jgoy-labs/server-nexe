@@ -1,6 +1,7 @@
 # How to Create a Plugin
 
 This is a minimal, OSS-friendly guide for adding a new module under `plugins/`.
+There is also a starter folder at `plugins/_template_module/`.
 
 ## 1. Create the folder
 ```

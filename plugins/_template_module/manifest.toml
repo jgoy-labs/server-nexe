@@ -1,0 +1,23 @@
+manifest_version = "1.0"
+
+[module]
+name = "template_module"
+version = "0.1.0"
+type = "module"
+description = "Template module for new plugins."
+enabled = false
+auto_start = false
+priority = 10
+author = "Template"
+
+[capabilities]
+has_api = false
+has_ui = false
+has_cli = false
+has_tests = false
+
+[dependencies]
+modules = []
+optional_modules = []
+external_services = []
+python_packages = []
