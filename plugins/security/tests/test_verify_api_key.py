@@ -20,9 +20,9 @@ def test_verify_api_key_without_admin_key():
 
   Finding
   """
-  original_key = os.environ.get("NEXE_ADMIN_API_KEY")
-  if "NEXE_ADMIN_API_KEY" in os.environ:
-    del os.environ["NEXE_ADMIN_API_KEY"]
+  original_key = os.environ.get("NEXE_PRIMARY_API_KEY")
+  if "NEXE_PRIMARY_API_KEY" in os.environ:
+    del os.environ["NEXE_PRIMARY_API_KEY"]
 
   try:
     from plugins.security.core.auth import verify_api_key
@@ -35,7 +35,7 @@ def test_verify_api_key_without_admin_key():
 
   finally:
     if original_key:
-      os.environ["NEXE_ADMIN_API_KEY"] = original_key
+      os.environ["NEXE_PRIMARY_API_KEY"] = original_key
 
 def test_verify_api_key_with_none():
   """
@@ -44,7 +44,7 @@ def test_verify_api_key_with_none():
   Finding
   """
   from plugins.security.core.auth import generate_api_key, verify_api_key
-  os.environ["NEXE_ADMIN_API_KEY"] = generate_api_key()
+  os.environ["NEXE_PRIMARY_API_KEY"] = generate_api_key()
 
   with pytest.raises(HTTPException) as exc_info:
     verify_api_key(x_api_key=None)
@@ -59,7 +59,7 @@ def test_verify_api_key_with_empty_string():
   Finding
   """
   from plugins.security.core.auth import generate_api_key, verify_api_key
-  os.environ["NEXE_ADMIN_API_KEY"] = generate_api_key()
+  os.environ["NEXE_PRIMARY_API_KEY"] = generate_api_key()
 
   with pytest.raises(HTTPException) as exc_info:
     verify_api_key(x_api_key="")
@@ -75,7 +75,7 @@ def test_verify_api_key_with_invalid_key():
   """
   from plugins.security.core.auth import generate_api_key, verify_api_key
   valid_key = generate_api_key()
-  os.environ["NEXE_ADMIN_API_KEY"] = valid_key
+  os.environ["NEXE_PRIMARY_API_KEY"] = valid_key
 
   with pytest.raises(HTTPException) as exc_info:
     verify_api_key(x_api_key="invalid-key-123")
@@ -91,7 +91,7 @@ def test_verify_api_key_with_valid_key():
   """
   from plugins.security.core.auth import generate_api_key, verify_api_key
   valid_key = generate_api_key()
-  os.environ["NEXE_ADMIN_API_KEY"] = valid_key
+  os.environ["NEXE_PRIMARY_API_KEY"] = valid_key
 
   result = verify_api_key(x_api_key=valid_key)
 
@@ -108,7 +108,7 @@ def test_verify_api_key_timing_safe():
   import time
 
   valid_key = generate_api_key()
-  os.environ["NEXE_ADMIN_API_KEY"] = valid_key
+  os.environ["NEXE_PRIMARY_API_KEY"] = valid_key
 
   different_key = "x" * len(valid_key)
 
@@ -154,7 +154,7 @@ def test_verify_api_key_as_fastapi_dependency():
   from plugins.security.core.auth import generate_api_key, verify_api_key
 
   valid_key = generate_api_key()
-  os.environ["NEXE_ADMIN_API_KEY"] = valid_key
+  os.environ["NEXE_PRIMARY_API_KEY"] = valid_key
 
   app = FastAPI()
 
@@ -184,7 +184,7 @@ def test_verify_api_key_backwards_compatibility():
   from plugins.security.core.auth import generate_api_key, verify_api_key
 
   valid_key = generate_api_key()
-  os.environ["NEXE_ADMIN_API_KEY"] = valid_key
+  os.environ["NEXE_PRIMARY_API_KEY"] = valid_key
 
   try:
     result = verify_api_key(x_api_key="invalid-key")
@@ -199,9 +199,9 @@ def test_verify_api_key_backwards_compatibility():
 @pytest.fixture(autouse=True)
 def cleanup_env():
   """Cleanup automàtic de variables d'entorn després de cada test"""
-  original_key = os.environ.get("NEXE_ADMIN_API_KEY")
+  original_key = os.environ.get("NEXE_PRIMARY_API_KEY")
   yield
   if original_key:
-    os.environ["NEXE_ADMIN_API_KEY"] = original_key
-  elif "NEXE_ADMIN_API_KEY" in os.environ:
-    del os.environ["NEXE_ADMIN_API_KEY"]
+    os.environ["NEXE_PRIMARY_API_KEY"] = original_key
+  elif "NEXE_PRIMARY_API_KEY" in os.environ:
+    del os.environ["NEXE_PRIMARY_API_KEY"]

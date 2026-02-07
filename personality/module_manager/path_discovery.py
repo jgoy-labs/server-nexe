@@ -292,7 +292,6 @@ class PathDiscovery:
     A TRUE module MUST have one of:
     - manifest.toml
     - manifest.py
-    - module.py with proper structure
 
     Args:
       path: Directory path
@@ -308,16 +307,6 @@ class PathDiscovery:
     for pattern in manifest_indicators:
       if list(path.glob(pattern)):
         return True
-
-    module_py = path / 'module.py'
-    if module_py.exists():
-      try:
-        content = module_py.read_text(encoding='utf-8')
-        if 'def init_module' in content or 'def get_metadata' in content:
-          return True
-      except Exception as e:
-        logging.debug("Could not read module.py for validation: %s", e)
-        pass
 
     return False
   

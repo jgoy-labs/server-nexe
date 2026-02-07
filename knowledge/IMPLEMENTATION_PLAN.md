@@ -1122,13 +1122,12 @@ class ManifestMigrator:
 
         return "generic"
 
-    def migrate_manifest(self, manifest_path: Path, backup: bool = True) -> MigrationResult:
+    def migrate_manifest(self, manifest_path: Path) -> MigrationResult:
         """
         Migra un manifest al nou format.
 
         Args:
             manifest_path: Path al manifest.toml antic
-            backup: Si True, crea backup (.old)
 
         Returns:
             MigrationResult amb els canvis
@@ -1183,13 +1182,6 @@ class ManifestMigrator:
                 toml.dump(new_data, f)
 
             changes.append(f"Written to {migrated_path.name}")
-
-            # Create backup if requested
-            if backup:
-                backup_path = manifest_path.parent / f"{manifest_path.stem}.toml.old"
-                import shutil
-                shutil.copy2(manifest_path, backup_path)
-                changes.append(f"Backup created: {backup_path.name}")
 
             logger.info(f"Successfully migrated {manifest_path.name}")
 
@@ -1396,8 +1388,8 @@ class ManifestMigrator:
         results = []
 
         for manifest_path in plugins_dir.rglob("manifest.toml"):
-            # Skip backups and migrations
-            if ".old" in manifest_path.name or ".new" in manifest_path.name:
+            # Skip generated .new files
+            if ".new" in manifest_path.name:
                 continue
 
             logger.info(f"Migrating {manifest_path}")
@@ -1406,14 +1398,14 @@ class ManifestMigrator:
                 logger.info(f"[DRY RUN] Would migrate {manifest_path}")
                 continue
 
-            result = self.migrate_manifest(manifest_path, backup=backup)
+            result = self.migrate_manifest(manifest_path)
             results.append(result)
 
         return results
 
 # Helper functions
 
-def migrate_manifest(manifest_path: Path, backup: bool = True) -> MigrationResult:
+def migrate_manifest(manifest_path: Path) -> MigrationResult:
     """Helper function to migrate a single manifest"""
     migrator = ManifestMigrator()
     return migrator.migrate_manifest(manifest_path, backup=backup)
@@ -1549,14 +1541,12 @@ find "$PLUGINS_DIR" -name "*.toml.new" | while read new_file; do
 
     echo "Replacing $original_file"
 
-    # Backup already exists (.old)
     mv "$new_file" "$original_file"
 done
 
 echo "✓ Migrations applied"
 echo ""
-echo "Old manifests backed up as .toml.old"
-echo "To rollback: ./scripts/rollback_migrations.sh"
+echo "To rollback: use git revert or checkout a stable tag"
 ```
 
 **Executar:**
@@ -1619,7 +1609,6 @@ git add core/contracts/migrations/
 git add scripts/migrate_manifests.py
 git add scripts/apply_migrations.sh
 git add plugins/*/manifest.toml.new
-git add plugins/*/manifest.toml.old
 
 git commit -m "feat: Implement manifest migrator and migrate plugins (Phase 2)
 
@@ -1634,7 +1623,6 @@ git push
 **Go/No-Go Decision:**
 - ✅ 6 manifests migrats
 - ✅ Tots validats amb Pydantic
-- ✅ Backups creats (.old)
 - **→ Proceed to Phase 3**
 
 ---

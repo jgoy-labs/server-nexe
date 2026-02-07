@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/tests/test_api_key_rotation.py
-Description: Tests per rotació d'API keys amb suport dual-key. Valida expiracions, prioritats, backward compatibility i zero-downtime rotation.
+Description: Tests per rotació d'API keys amb suport dual-key. Valida expiracions, prioritats i zero-downtime rotation.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -30,16 +30,10 @@ def cleanup_api_key_env(monkeypatch):
 
   This prevents test pollution when running the full suite.
   """
-  original_admin = os.getenv("NEXE_ADMIN_API_KEY")
   original_primary = os.getenv("NEXE_PRIMARY_API_KEY")
   original_secondary = os.getenv("NEXE_SECONDARY_API_KEY")
 
   yield
-
-  if original_admin:
-    os.environ["NEXE_ADMIN_API_KEY"] = original_admin
-  else:
-    os.environ.pop("NEXE_ADMIN_API_KEY", None)
 
   os.environ.pop("NEXE_PRIMARY_API_KEY", None)
   os.environ.pop("NEXE_PRIMARY_KEY_EXPIRES", None)
@@ -146,7 +140,6 @@ def test_load_api_keys_primary_only(monkeypatch):
   """Test loading primary key only (new Phase 2.1 format)."""
   monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "new-primary-key")
   monkeypatch.setenv("NEXE_PRIMARY_KEY_EXPIRES", "2026-01-10T00:00:00Z")
-  monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
   monkeypatch.delenv("NEXE_SECONDARY_API_KEY", raising=False)
 
   config = load_api_keys()
@@ -171,31 +164,9 @@ def test_load_api_keys_dual_key(monkeypatch):
   assert config.secondary is not None
   assert config.secondary.key == "old-key"
 
-def test_load_api_keys_backward_compat(monkeypatch):
-  """Test backward compatibility with NEXE_ADMIN_API_KEY."""
-  monkeypatch.delenv("NEXE_PRIMARY_API_KEY", raising=False)
-  monkeypatch.setenv("NEXE_ADMIN_API_KEY", "legacy-key")
-
-  config = load_api_keys()
-
-  assert config.primary is not None
-  assert config.primary.key == "legacy-key"
-  assert config.primary.expires_at is None
-  assert config.secondary is None
-
-def test_load_api_keys_priority_new_over_legacy(monkeypatch):
-  """Test that NEXE_PRIMARY_API_KEY takes priority over NEXE_ADMIN_API_KEY."""
-  monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "new-key")
-  monkeypatch.setenv("NEXE_ADMIN_API_KEY", "legacy-key")
-
-  config = load_api_keys()
-
-  assert config.primary.key == "new-key"
-
 def test_load_api_keys_no_keys_configured(monkeypatch):
   """Test load_api_keys when no keys configured."""
   monkeypatch.delenv("NEXE_PRIMARY_API_KEY", raising=False)
-  monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
   monkeypatch.delenv("NEXE_SECONDARY_API_KEY", raising=False)
 
   config = load_api_keys()
@@ -212,7 +183,6 @@ def client():
 def test_require_api_key_with_valid_primary(client, monkeypatch):
   """Test authentication succeeds with valid primary key."""
   monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-primary-key")
-  monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
   monkeypatch.delenv("NEXE_SECONDARY_API_KEY", raising=False)
 
   response = client.get(
@@ -263,18 +233,6 @@ def test_require_api_key_with_expired_key(client, monkeypatch):
 
   assert response.status_code in [401, 500]
 
-def test_require_api_key_backward_compat_phase1(client, monkeypatch):
-  """Test backward compatibility with Phase 1 (NEXE_ADMIN_API_KEY)."""
-  monkeypatch.delenv("NEXE_PRIMARY_API_KEY", raising=False)
-  monkeypatch.setenv("NEXE_ADMIN_API_KEY", "legacy-key")
-
-  response = client.get(
-    "/health",
-    headers={"X-API-Key": "legacy-key"}
-  )
-
-  assert response.status_code == 200
-
 def test_require_api_key_invalid_key(client, monkeypatch):
   """Test that invalid key is rejected."""
   monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "correct-key")
@@ -299,7 +257,6 @@ def test_require_api_key_missing_header(client, monkeypatch):
 def test_require_api_key_fail_closed_no_keys(client, monkeypatch):
   """Test fail-closed behavior when no keys configured (non-dev mode)."""
   monkeypatch.delenv("NEXE_PRIMARY_API_KEY", raising=False)
-  monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
   monkeypatch.setenv("NEXE_DEV_MODE", "false")
 
   response = client.get(
@@ -312,7 +269,6 @@ def test_require_api_key_fail_closed_no_keys(client, monkeypatch):
 def test_require_api_key_dev_mode_bypass(client, monkeypatch):
   """Test that DEV_MODE allows bypass when no keys configured."""
   monkeypatch.delenv("NEXE_PRIMARY_API_KEY", raising=False)
-  monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
   monkeypatch.setenv("NEXE_DEV_MODE", "true")
 
   response = client.get(

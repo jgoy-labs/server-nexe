@@ -35,12 +35,12 @@ class NexeAPIClient:
         from dotenv import load_dotenv
         load_dotenv()
         
-        # Get Key (Support new dual-key or legacy)
-        self.api_key = os.getenv("NEXE_PRIMARY_API_KEY") or os.getenv("NEXE_ADMIN_API_KEY")
+        # Get API key
+        self.api_key = os.getenv("NEXE_PRIMARY_API_KEY")
         
         if not self.api_key:
              # Fallback warning but don't crash yet
-             logging.warning("No API Key found involved. CLI might fail.")
+             logging.warning("No API key found (NEXE_PRIMARY_API_KEY). CLI might fail.")
              self.api_key = "unconfigured"
 
         self.headers = {

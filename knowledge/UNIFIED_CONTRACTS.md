@@ -679,8 +679,6 @@ flowchart TD
         plugins/ollama_module/manifest.toml.migrated
 
    # 4. Confirmar i reemplaçar
-   mv plugins/ollama_module/manifest.toml \
-      plugins/ollama_module/manifest.toml.old
    mv plugins/ollama_module/manifest.toml.migrated \
       plugins/ollama_module/manifest.toml
 
@@ -691,7 +689,6 @@ flowchart TD
 **Deliverables:**
 
 ✅ 6 manifests migrats i validats
-✅ Fitxers `.old` com a backup
 ✅ Tests d'integració passen per cada plugin
 ✅ Documentació de canvis per cada manifest
 
@@ -699,7 +696,7 @@ flowchart TD
 
 ### Fase 3: Actualització ModuleManager (3-4 dies)
 
-**Objectiu:** Integrar el nou sistema de contractes amb el ModuleManager actual, mantenint backward compatibility.
+**Objectiu:** Integrar el nou sistema de contractes amb el ModuleManager actual.
 
 #### Tasques:
 
@@ -732,41 +729,22 @@ flowchart TD
 
    ```python
    async def load_module(self, module_path: Path):
-       """Carrega amb backward compatibility"""
+       """Carrega manifest UnifiedManifest"""
        manifest_path = module_path / "manifest.toml"
+       from core.contracts.models import load_manifest_from_toml
+       from core.contracts.validators import get_validator
 
-       # Try new format first
-       try:
-           from core.contracts.models import load_manifest_from_toml
-           from core.contracts.validators import get_validator
+       manifest = load_manifest_from_toml(str(manifest_path))
+       validator = get_validator()
 
-           manifest = load_manifest_from_toml(str(manifest_path))
-           validator = get_validator()
+       # Validate
+       result = validator.validate_manifest_schema(manifest_path)
+       if not result.valid:
+           logger.error(f"Invalid manifest: {result.errors}")
+           raise ValueError("Invalid manifest")
 
-           # Validate
-           result = validator.validate_manifest_schema(manifest_path)
-           if not result.valid:
-               logger.error(f"Invalid manifest: {result.errors}")
-               raise ValueError("Invalid manifest")
-
-           # Load with new contract system
-           return await self._load_with_contract(module_path, manifest)
-
-       except Exception as e:
-           logger.warning(f"Failed new format, trying migration: {e}")
-
-           # Auto-migrate
-           from core.contracts.migrations.manifest_migrator import ManifestMigrator
-           migrator = ManifestMigrator()
-
-           result = migrator.migrate_manifest(manifest_path)
-           if not result.success:
-               logger.error(f"Migration failed: {result.errors}")
-               raise ValueError("Migration failed")
-
-           # Load migrated
-           manifest = load_manifest_from_toml(str(result.migrated_path))
-           return await self._load_with_contract(module_path, manifest)
+       # Load with new contract system
+       return await self._load_with_contract(module_path, manifest)
 
    async def _load_with_contract(
        self,
@@ -797,7 +775,6 @@ flowchart TD
 3. **Deprecar progressivament `personality/module_manager/registry.py`**
 
    - Afegir warnings de deprecació
-   - Mantenir només per backward compatibility temporal
    - Planificar eliminació en v1.0
 
    ```python
@@ -830,12 +807,6 @@ flowchart TD
        assert instance is not None
        assert hasattr(instance, 'metadata')
        assert instance.metadata.contract_id == "ollama_module"
-
-   @pytest.mark.asyncio
-   async def test_load_plugin_with_old_manifest_auto_migrate():
-       """Test backward compatibility with auto-migration"""
-       # Create old-format manifest temporarily
-       # ... test auto-migration ...
 
    @pytest.mark.asyncio
    async def test_contract_registry_integration():
@@ -2133,27 +2104,8 @@ python -m core.contracts.migrations.manifest_migrator \
 
 En cas de problemes:
 
-1. **Backups automàtics**: Cada migració crea `.old` backup
-2. **Rollback script**:
-
-   ```bash
-   # Restore all backups
-   find plugins/ -name "manifest.toml.old" | while read old; do
-       new="${old%.old}"
-       mv "$old" "$new"
-   done
-   ```
-
-3. **Feature flag**: Desactivar nou sistema temporalment
-
-   ```python
-   # .env
-   NEXE_USE_UNIFIED_CONTRACTS=false
-
-   # loader.py
-   if os.getenv("NEXE_USE_UNIFIED_CONTRACTS", "true") == "false":
-       return await self._load_legacy(module_path)
-   ```
+1. Revertir el commit de migració amb git.
+2. Tornar a una versió estable (tag/release) si cal.
 
 ---
 
@@ -2453,19 +2405,14 @@ jobs:
 Migració de manifests i actualització de code poden trencar plugins existents.
 
 **Mitigació:**
-- ✅ **Backward compatibility**: Auto-migració transparent
-- ✅ **Dual mode**: Suport per ambdós formats durant transició
-- ✅ **Feature flag**: `NEXE_USE_UNIFIED_CONTRACTS=false` per rollback
-- ✅ **Backups automàtics**: `.old` files created automatically
 - ✅ **Tests exhaustius**: Integration tests per cada plugin
 - ✅ **Migració gradual**: Plugin per plugin, no tot alhora
 
 **Pla de contingència:**
 1. Detectar plugin trencat
-2. Activar feature flag: `NEXE_USE_UNIFIED_CONTRACTS=false`
-3. Restore backup: `mv manifest.toml.old manifest.toml`
-4. Investigar error
-5. Fix i retry
+2. Revertir el commit de migració
+3. Investigar error
+4. Fix i retry
 
 #### Risc 2: Complexitat de Jerarquia Recursiva
 
@@ -2640,7 +2587,7 @@ El **Sistema Unificat de Contractes** és una refactorització arquitectònica s
 
 **Timeline:** 14-20 dies de desenvolupament en 5 fases.
 
-**Riscos:** Mitigats amb backward compatibility, tests exhaustius, documentació completa i feature flags.
+**Riscos:** Mitigats amb tests exhaustius i documentació completa.
 
 **Beneficis a llarg termini:**
 - Codebase més mantenible

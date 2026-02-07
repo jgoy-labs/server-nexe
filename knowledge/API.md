@@ -79,7 +79,6 @@ NEXE fa servir **API keys** via header `X-API-Key`.
 - `NEXE_PRIMARY_KEY_EXPIRES` (opcional, ISO datetime)
 - `NEXE_SECONDARY_API_KEY` (opcional, clau antiga en període de gràcia)
 - `NEXE_SECONDARY_KEY_EXPIRES` (opcional)
-- `NEXE_ADMIN_API_KEY` (legacy, fallback si no hi ha primary)
 
 ### Exemple d'ús
 
@@ -551,7 +550,7 @@ UI web del mòdul RAG.
 
 ---
 
-### Mòdul Memory (legacy)
+### Mòdul Memory
 
 #### GET /memory/health
 Health check del mòdul Memory.

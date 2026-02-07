@@ -13,7 +13,6 @@ www.jgoy.net
 from typing import Any, Dict, Optional
 
 from memory.embeddings.chunkers import get_chunker_registry
-from memory.embeddings.core.chunker import SmartChunker
 
 async def chunking_node(
   content: str,
@@ -23,7 +22,6 @@ async def chunking_node(
   min_chunk_size: int = 100,
   file_path: Optional[str] = None,
   content_type: Optional[str] = None,
-  use_registry: bool = True,
 ) -> Dict[str, Any]:
   """
   Workflow node: Chunk document amb selecció automàtica de chunker.
@@ -31,7 +29,7 @@ async def chunking_node(
   INTEGRACIÓ AMB MEMORY (FASE 18):
   - Si file_path té extensió .py/.js/.ts → CodeChunker (NO overlap)
   - Si file_path té extensió .txt/.md → TextChunker
-  - Sense file_path → SmartChunker (comportament legacy)
+  - Sense file_path → Chunker per defecte (text)
 
   Args:
     content: Text del document
@@ -41,8 +39,6 @@ async def chunking_node(
     min_chunk_size: Mínim chars per chunk
     file_path: Ruta del fitxer (per seleccionar chunker)
     content_type: Tipus de contingut ('code', 'text', etc.)
-    use_registry: Si True, usa ChunkerRegistry (default True)
-
   Returns:
     Dict amb:
     - document_id: str
@@ -51,24 +47,15 @@ async def chunking_node(
     - original_length: int
     - chunker_id: str (ID del chunker usat)
   """
-  if use_registry and (file_path or content_type):
-    return await _chunk_with_registry(
-      content=content,
-      document_id=document_id,
-      file_path=file_path,
-      content_type=content_type,
-      max_chunk_size=max_chunk_size,
-      chunk_overlap=chunk_overlap,
-      min_chunk_size=min_chunk_size,
-    )
-  else:
-    return await _chunk_with_smart_chunker(
-      content=content,
-      document_id=document_id,
-      max_chunk_size=max_chunk_size,
-      chunk_overlap=chunk_overlap,
-      min_chunk_size=min_chunk_size,
-    )
+  return await _chunk_with_registry(
+    content=content,
+    document_id=document_id,
+    file_path=file_path,
+    content_type=content_type,
+    max_chunk_size=max_chunk_size,
+    chunk_overlap=chunk_overlap,
+    min_chunk_size=min_chunk_size,
+  )
 
 async def _chunk_with_registry(
   content: str,
@@ -139,46 +126,4 @@ async def _chunk_with_registry(
     "original_length": result.original_length,
     "created_at": result.created_at,
     "chunker_id": result.chunker_id,
-  }
-
-async def _chunk_with_smart_chunker(
-  content: str,
-  document_id: str,
-  max_chunk_size: int,
-  chunk_overlap: int,
-  min_chunk_size: int,
-) -> Dict[str, Any]:
-  """
-  Chunk amb SmartChunker (comportament legacy).
-
-  Mantingut per retrocompatibilitat.
-  """
-  chunker = SmartChunker(
-    max_chunk_size=max_chunk_size,
-    chunk_overlap=chunk_overlap,
-    min_chunk_size=min_chunk_size,
-  )
-
-  chunked_doc = chunker.chunk_document(content, document_id)
-
-  chunks_data = [
-    {
-      "chunk_id": chunk.chunk_id,
-      "chunk_index": chunk.chunk_index,
-      "char_start": chunk.char_start,
-      "char_end": chunk.char_end,
-      "section_title": chunk.section_title,
-      "chunk_type": chunk.chunk_type,
-      "token_count": chunk.token_count,
-    }
-    for chunk in chunked_doc.chunks
-  ]
-
-  return {
-    "document_id": chunked_doc.document_id,
-    "chunk_count": chunked_doc.chunk_count,
-    "chunks": chunks_data,
-    "original_length": chunked_doc.original_length,
-    "created_at": chunked_doc.created_at.isoformat(),
-    "chunker_id": "legacy.smart_chunker",
   }

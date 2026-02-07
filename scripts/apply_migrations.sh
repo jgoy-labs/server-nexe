@@ -1,6 +1,6 @@
 #!/bin/bash
 # Apply migrated manifests
-# Backup old manifests to .old and rename .new to .toml
+# Replace manifest.toml.new over manifest.toml
 
 set -e
 
@@ -23,7 +23,7 @@ echo "Found $NEW_COUNT migrated manifests"
 echo ""
 
 # Confirm
-read -p "This will backup old manifests to .old and apply new ones. Continue? (y/N) " -n 1 -r
+read -p "This will replace existing manifests with .new files. Continue? (y/N) " -n 1 -r
 echo ""
 
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -40,15 +40,7 @@ for NEW_FILE in $(find "$PLUGINS_DIR" -name "manifest.toml.new"); do
     DIR=$(dirname "$NEW_FILE")
     PLUGIN=$(basename "$DIR")
     OLD_FILE="$DIR/manifest.toml"
-    BACKUP_FILE="$DIR/manifest.toml.old"
-
     echo "  - $PLUGIN"
-
-    # Backup old manifest
-    if [ -f "$OLD_FILE" ]; then
-        cp "$OLD_FILE" "$BACKUP_FILE"
-        echo "    ✓ Backed up to .old"
-    fi
 
     # Apply new manifest
     mv "$NEW_FILE" "$OLD_FILE"
@@ -60,5 +52,3 @@ echo "=================================================="
 echo "✓ Migrations applied successfully!"
 echo "=================================================="
 echo ""
-echo "Old manifests backed up to .old"
-echo "To rollback: for f in plugins/*/manifest.toml.old; do mv \"\$f\" \"\${f%.old}\"; done"

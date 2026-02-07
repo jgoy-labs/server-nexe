@@ -575,16 +575,16 @@ Contingut del document."""
     assert result["chunker_id"] == "chunker.text"
 
   @pytest.mark.asyncio
-  async def test_chunking_node_legacy_mode(self):
-    """chunking_node sense file_path usa SmartChunker legacy."""
+  async def test_chunking_node_default_chunker(self):
+    """chunking_node sense file_path usa el chunker per defecte."""
     from memory.embeddings.workflow.nodes.chunking_node import chunking_node
 
     result = await chunking_node(
       content="Test content.",
-      document_id="legacy",
+      document_id="default",
     )
 
-    assert result["chunker_id"] == "legacy.smart_chunker"
+    assert result["chunker_id"] == "chunker.text"
 
   @pytest.mark.asyncio
   async def test_chunking_node_with_content_type(self):

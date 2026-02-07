@@ -13,7 +13,7 @@ www.jgoy.net
 FALLBACK_MESSAGES = {
   'security.auth.missing_key': 'Missing API key',
   'security.auth.invalid_key': 'Invalid API key',
-  'security.auth.server_misconfigured': 'Server misconfiguration: NEXE_ADMIN_API_KEY not configured. Set NEXE_ADMIN_API_KEY environment variable.',
+  'security.auth.server_misconfigured': 'Server misconfiguration: NEXE_PRIMARY_API_KEY not configured. Set NEXE_PRIMARY_API_KEY environment variable.',
   'security.auth.key_not_configured': 'Server misconfiguration: API key not configured',
   'security.auth.server_misconfigured_no_valid_key': 'Server misconfiguration: No valid API key configured',
   'security.auth.dev_mode_localhost_only': 'DEV mode bypass only allowed from localhost',

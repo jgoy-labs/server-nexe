@@ -1,26 +1,68 @@
-# Contributing
+# Contributing to Nexe
 
-Thanks for helping improve Nexe.
+Thank you for your interest in contributing to Nexe! We welcome contributions from everyone.
 
-**Workflow**
-1. Fork and create a feature branch.
-2. Keep changes focused and small.
-3. Open a PR with a clear description and test notes.
+## Getting Started
 
-**Code Style**
-- Follow existing project style and patterns.
-- Avoid introducing new hardcoded user-facing strings.
-- If you use formatters locally, prefer `black` and `ruff` conventions.
+1.  **Fork the repository** on GitHub.
+2.  **Clone your fork** locally:
+    ```bash
+    git clone https://github.com/StartYourFork/nexe.git
+    cd nexe
+    ```
+3.  **Install dependencies**:
+    ```bash
+    ./setup.sh
+    # or manually:
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    ```
 
-**i18n Guidelines**
-- Wrap user-facing strings with `t()` or `t_modular()`.
-- Add keys to `messages_*.json` for all supported languages.
-- Run `python3 scripts/i18n_lint.py` and `python3 scripts/lint_i18n.py`.
+## Development Workflow
 
-**Testing**
-- Add or update tests for new behavior.
-- Example: `pytest core/contracts/tests/ tests/integration/ -v`
+1.  Create a new branch for your feature or bugfix:
+    ```bash
+    git checkout -b feature/my-new-feature
+    ```
+2.  Make your changes.
+3.  **Test your changes**:
+    - Run the server: `./nexe go`
+    - Verify functionality in the Web UI or via API.
+    - Check logs: `./nexe logs`
+4.  **Linting & Formatting**:
+    - We use `ruff` for linting and formatting (if configured).
+    - Ensure all user-facing strings are wrapped in `t()` for i18n support.
+    - Run `python3 scripts/lint_i18n.py` (if available) to check for untranslated strings.
 
-**Security**
-- Avoid weakening security defaults.
-- If adding new public endpoints, review CSRF exemptions in `personality/server.toml`.
+## Code Style
+
+-   Follow PEP 8 guidelines.
+-   Use type hints wherever possible.
+-   Write clear, concise comments.
+-   Keep functions small and focused.
+
+## I18n (Internationalization)
+
+Nexe supports multiple languages (CA/ES/EN).
+-   **Do not hardcode strings.**
+-   Use `t("key.subkey", "Default English text")`.
+-   Add translations to `personality/i18n/`.
+
+## Pull Requests
+
+1.  Push your branch to your fork.
+2.  Open a Pull Request against the `main` branch.
+3.  Describe your changes clearly in the PR description.
+4.  Link to any related issues.
+
+## Reporting Bugs
+
+Please open an issue on GitHub if you encounter any bugs. Include:
+-   Steps to reproduce.
+-   Expected behavior.
+-   Actual behavior.
+-   Logs/Error messages.
+-   System information (OS, Python version).
+
+Thank you for contributing!

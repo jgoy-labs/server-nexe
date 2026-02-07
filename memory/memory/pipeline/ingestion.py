@@ -260,10 +260,9 @@ class IngestionPipeline:
 
   def _generate_embedding_sync(self, text: str) -> List[float]:
     """
-    Generate embedding with SentenceTransformer (legacy/fallback mode).
+    Generate embedding with SentenceTransformer (sync backend).
 
-    DEPRECATED: FIX 6.T migrates to Ollama API.
-    Kept for compatibility if embedding_model != None.
+    Used when embedding_model is set.
 
     Args:
       text: Text to process

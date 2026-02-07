@@ -77,9 +77,6 @@ NEXE_PRIMARY_KEY_EXPIRES=2026-12-31T23:59:59Z
 
 NEXE_SECONDARY_API_KEY=clau-antiga-aqui
 NEXE_SECONDARY_KEY_EXPIRES=2026-02-28T23:59:59Z
-
-# Legacy (backward compatibility)
-NEXE_ADMIN_API_KEY=clau-unica-aqui
 ```
 
 **Ús:**

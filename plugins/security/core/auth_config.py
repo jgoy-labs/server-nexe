@@ -41,9 +41,6 @@ def load_api_keys() -> ApiKeyConfig:
   - NEXE_SECONDARY_API_KEY: Grace period key (optional)
   - NEXE_SECONDARY_KEY_EXPIRES: ISO datetime (optional)
 
-  Backward compatibility:
-  - NEXE_ADMIN_API_KEY: Falls back to primary if new vars not set
-
   Returns:
     ApiKeyConfig with primary/secondary keys
 
@@ -60,9 +57,6 @@ def load_api_keys() -> ApiKeyConfig:
   secondary_key = os.getenv("NEXE_SECONDARY_API_KEY", "")
   secondary_expires = parse_datetime_or_none(os.getenv("NEXE_SECONDARY_KEY_EXPIRES"))
   secondary_created = parse_datetime_or_none(os.getenv("NEXE_SECONDARY_KEY_CREATED"))
-
-  if not primary_key:
-    primary_key = os.getenv("NEXE_ADMIN_API_KEY", "")
 
   primary = ApiKeyData(
     key=primary_key,
@@ -82,8 +76,7 @@ def get_admin_api_key() -> str:
   """
   Get admin API key from environment (dynamic, supports rotation)
 
-  Prioritizes NEXE_PRIMARY_API_KEY over NEXE_ADMIN_API_KEY for
-  compatibility with dual-key rotation system.
+  Uses NEXE_PRIMARY_API_KEY from the dual-key rotation system.
 
   Returns:
     Admin API key or empty string if not configured

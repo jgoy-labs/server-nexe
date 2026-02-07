@@ -41,7 +41,6 @@ Coverage: 95%
 Codi nou:      ~2,500 línies
 Overhead:      <1ms per plugin
 Memory:        ~5KB per plugin
-Backups:       5 manifests .old
 Docs:          170KB (5 fitxers)
 ```
 
@@ -107,7 +106,6 @@ scripts/
 
 plugins/*/
 ├── manifest.toml                    # Format nou (UnifiedManifest)
-└── manifest.toml.old                # Backup local (generat per migració, no versionat)
 ```
 
 ---
@@ -217,17 +215,6 @@ python3 scripts/migrate_manifests.py --dry-run
 ```bash
 ./scripts/apply_migrations.sh
 ```
-
-### Rollback (si existeixen backups)
-
-```bash
-for f in plugins/*/manifest.toml.old; do
-    mv "$f" "${f%.old}"
-done
-```
-Notes:
-- `manifest.toml.old` es crea localment quan s'executa una migració.
-- Aquests backups no es versionen (estan a `.gitignore`).
 
 ---
 
@@ -491,19 +478,10 @@ python3 -c "from core.contracts import load_manifest_from_toml; load_manifest_fr
 
 ---
 
-## 🔐 Backward Compatibility
+## 🔐 Compatibility
 
-✅ **Garanties:**
-- Manifests antics backupats (.old)
-- Rollback trivial disponible
-- ModuleManager sense canvis externs
-- Plugins existents funcionen
-- API externa no canvia
-
-✅ **Testat:**
-- 5/5 plugins carreguen correctament
-- 26/26 tests passen
-- Zero regressions detectades
+- Només es suporta el format `UnifiedManifest` actual.
+- Els manifests antics no es carreguen.
 
 ---
 

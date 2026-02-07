@@ -137,7 +137,7 @@ def _log_detection_failure(
 
 def _track_cwd_fallback_usage():
   """
-  Metric to monitor cwd fallback usage (legacy).
+  Metric to monitor cwd fallback usage.
 
   This allows detecting when the system still depends on cwd
   and planning its removal.

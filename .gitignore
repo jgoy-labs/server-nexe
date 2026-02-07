@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.nexe_reload_trigger.py
 
 # Virtual environments
 venv/
@@ -24,18 +25,42 @@ storage/
 *.log
 logs/
 
+# Build artifacts (OSS readiness)
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Backup/old files
+*.old
+*.bak
+*.backup
+**/*~
+
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # Installer/runtime markers & binaries
 .qdrant-initialized
 storage/.knowledge_ingested
 qdrant
 nexe
-**/manifest.toml.old
+COMMANDS.md
 
 # Web UI uploads (generated/user content)
 plugins/web_ui_module/static/uploads/
 
 # Module cache
 personality/.module_cache.json
+
+# IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo

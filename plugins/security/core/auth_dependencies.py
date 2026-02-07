@@ -74,9 +74,6 @@ async def require_api_key(
     export NEXE_SECONDARY_API_KEY="old-key-here"
     export NEXE_SECONDARY_KEY_EXPIRES="2025-10-17T00:00:00Z"
 
-  PRODUCTION config (Phase 1 backward compat):
-    export NEXE_ADMIN_API_KEY="your-secret-key-here"
-
   DEV config (optional, local development only):
     export NEXE_DEV_MODE="true"
   """

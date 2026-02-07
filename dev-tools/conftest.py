@@ -32,7 +32,7 @@ def _t(key: str, fallback: str, **kwargs) -> str:
 def _get_test_api_key() -> str:
     """
     Get API key for tests.
-    Priority: NEXE_PRIMARY_API_KEY > NEXE_ADMIN_API_KEY > generated
+    Priority: NEXE_PRIMARY_API_KEY > generated
     """
     # Load .env if it exists
     from pathlib import Path
@@ -45,10 +45,10 @@ def _get_test_api_key() -> str:
         pass  # Ignore dotenv errors, rely on env vars
 
     # Get existing key or generate a new one
-    key = os.environ.get("NEXE_PRIMARY_API_KEY") or os.environ.get("NEXE_ADMIN_API_KEY")
+    key = os.environ.get("NEXE_PRIMARY_API_KEY")
     if not key:
         key = f"nexe_test_{secrets.token_hex(16)}"
-        os.environ["NEXE_ADMIN_API_KEY"] = key
+        os.environ["NEXE_PRIMARY_API_KEY"] = key
     return key
 
 

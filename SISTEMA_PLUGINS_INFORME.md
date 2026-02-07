@@ -16,7 +16,7 @@ S'ha implementat amb èxit un **sistema unificat de contractes** per NEXE 0.9 qu
 ✅ **Validació robusta**: 4 capes (Schema + Runtime + Integration + Static)
 ✅ **Type safety**: Protocols `@runtime_checkable` + mypy strict
 ✅ **Integració transparent**: ContractBridge automàtic amb ModuleManager
-✅ **Backward compatibility**: 100% preservada amb backups `.old`
+✅ **Compatibility definida**: només UnifiedManifest suportat
 ✅ **Tests complets**: 122 tests (116 unitaris + 6 integració) al 100%
 
 ---
@@ -281,7 +281,7 @@ ContractBridge.register_module()
 - ✅ ContractRegistry singleton
 - ✅ ContractBridge singleton
 - ✅ Mock module registration
-- ✅ Backward compatibility (backups .old)
+- ✅ Contract validation end-to-end
 - ✅ Metadata preservation
 
 ### Coverage
@@ -357,27 +357,10 @@ pytest core/contracts/tests/ --cov=core.contracts --cov-report=html
 
 ---
 
-## Backward Compatibility
+## Compatibility
 
-### Garanties
-
-✅ **Manifests antics backupats**: Tots els `.toml` → `.toml.old`
-✅ **Rollback trivial**: Script de rollback proporcionat
-✅ **ModuleManager** funciona sense canvis externs
-✅ **Plugins existents** continuen funcionant
-✅ **API externa** no canvia
-
-### Rollback
-
-```bash
-# Restaurar manifests antics
-for f in plugins/*/manifest.toml.old; do
-    mv "$f" "${f%.old}"
-done
-
-# Revertir commits
-git revert HEAD~3..HEAD
-```
+- Només es suporta el format `UnifiedManifest` actual.
+- Si cal rollback, usar `git revert` o un tag estable.
 
 ---
 
@@ -428,7 +411,6 @@ feat: Migrate 5 plugins to UnifiedManifest format
 - Preserve custom sections in metadata
 - Normalize versions (0.2 → 0.2.0)
 - Relax api.prefix validation
-- Backup old manifests to .old
 - All 5 plugins validate successfully
 ```
 
@@ -443,7 +425,6 @@ feat: Integrate ModuleManager with ContractRegistry
 - Auto-register modules on load
 - Auto-unregister on stop
 - Add 6 integration tests (all passing)
-- Maintain full backward compatibility
 ```
 
 **Fitxers:** 3 nous (405 línies)

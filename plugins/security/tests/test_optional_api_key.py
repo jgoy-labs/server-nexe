@@ -36,7 +36,6 @@ def client(app):
 def test_optional_api_key_accepts_primary(client, monkeypatch):
   monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "primary-key")
   monkeypatch.delenv("NEXE_SECONDARY_API_KEY", raising=False)
-  monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
 
   response = client.get("/optional", headers={"X-API-Key": "primary-key"})
 
@@ -46,7 +45,6 @@ def test_optional_api_key_accepts_primary(client, monkeypatch):
 
 def test_optional_api_key_accepts_secondary(client, monkeypatch):
   monkeypatch.delenv("NEXE_PRIMARY_API_KEY", raising=False)
-  monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
   monkeypatch.setenv("NEXE_SECONDARY_API_KEY", "secondary-key")
 
   response = client.get("/optional", headers={"X-API-Key": "secondary-key"})
@@ -58,7 +56,6 @@ def test_optional_api_key_accepts_secondary(client, monkeypatch):
 def test_optional_api_key_rejects_invalid(client, monkeypatch):
   monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "primary-key")
   monkeypatch.delenv("NEXE_SECONDARY_API_KEY", raising=False)
-  monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
 
   response = client.get("/optional", headers={"X-API-Key": "wrong-key"})
 

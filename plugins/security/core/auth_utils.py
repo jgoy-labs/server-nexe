@@ -36,7 +36,7 @@ def generate_api_key(length: int = 32) -> str:
 
   Usage:
     new_key = generate_api_key()
-    print(f"export NEXE_ADMIN_API_KEY='{new_key}'")
+    print(f"export NEXE_PRIMARY_API_KEY='{new_key}'")
   """
   return secrets.token_hex(length)
 

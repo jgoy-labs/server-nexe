@@ -26,7 +26,7 @@ def cleanup_app_cache(monkeypatch):
   ✅ M-3: Essencial per evitar estat compartit entre tests.
   """
   monkeypatch.setenv("NEXE_ENV", "development")
-  monkeypatch.setenv("NEXE_ADMIN_API_KEY", "test-key-" + os.urandom(16).hex())
+  monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-key-" + os.urandom(16).hex())
 
   yield
 

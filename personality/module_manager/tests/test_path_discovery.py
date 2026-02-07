@@ -246,15 +246,15 @@ class TestPathDiscoveryModuleDetection:
 
     assert discovery._is_module_directory(module_dir) is True
 
-  def test_is_module_with_module_py(self, tmp_path):
-    """Should detect legacy module with module.py."""
+  def test_is_module_with_module_py_is_ignored(self, tmp_path):
+    """Should ignore module.py-only directories."""
     module_dir = tmp_path / "test_module"
     module_dir.mkdir()
     (module_dir / "module.py").write_text("def init_module(): pass")
 
     discovery = PathDiscovery()
 
-    assert discovery._is_module_directory(module_dir) is True
+    assert discovery._is_module_directory(module_dir) is False
 
   def test_is_module_empty_dir(self, tmp_path):
     """Should not detect empty directory as module."""
@@ -264,16 +264,6 @@ class TestPathDiscoveryModuleDetection:
     discovery = PathDiscovery()
 
     assert discovery._is_module_directory(empty_dir) is False
-
-  def test_is_module_no_init_functions(self, tmp_path):
-    """Should not detect module.py without init functions."""
-    module_dir = tmp_path / "test_module"
-    module_dir.mkdir()
-    (module_dir / "module.py").write_text("# just a comment")
-
-    discovery = PathDiscovery()
-
-    assert discovery._is_module_directory(module_dir) is False
 
 class TestPathDiscoveryScanModules:
   """Tests for module scanning."""

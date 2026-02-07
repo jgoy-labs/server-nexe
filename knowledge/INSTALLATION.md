@@ -309,9 +309,6 @@ NEXE_PRIMARY_KEY_EXPIRES=2026-06-30T00:00:00Z  # ISO 8601 format
 NEXE_SECONDARY_API_KEY=your-secondary-key-here  # Grace period rotation
 NEXE_SECONDARY_KEY_EXPIRES=2026-01-31T00:00:00Z
 
-# Backward compatibility (Phase 1)
-# NEXE_ADMIN_API_KEY=single-key-here
-
 # CSRF Protection
 NEXE_CSRF_SECRET=auto-generated-secret-32-chars
 
@@ -651,7 +648,7 @@ rm -rf storage/
 rm -f .env
 rm -f .qdrant-initialized
 
-# 5. Elimina snapshots legacy (si existeix)
+# 5. Elimina snapshots (si existeix)
 rm -rf snapshots/
 
 # 6. (Opcional) Elimina la carpeta del projecte
@@ -719,7 +716,6 @@ Ara que tens NEXE instal·lat:
 | `NEXE_PRIMARY_KEY_EXPIRES` | - | Expiry date ISO 8601 |
 | `NEXE_SECONDARY_API_KEY` | - | API key secundària (rotation) |
 | `NEXE_SECONDARY_KEY_EXPIRES` | - | Expiry date ISO 8601 |
-| `NEXE_ADMIN_API_KEY` | - | API key única (legacy) |
 | `NEXE_CSRF_SECRET` | auto | Secret CSRF tokens |
 | **Environment** |||
 | `NEXE_ENV` | `development` | production o development |

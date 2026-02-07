@@ -59,7 +59,6 @@ __all__ = [
   'create_orchestrator',
   'get_default_config_path',
   'create_module_manager_with_config',
-  'create_module_system',
   'create_validated_module_manager',
 ]
 
@@ -124,18 +123,6 @@ def create_module_manager_with_config(config_dict=None, **kwargs):
     manager._config.update(config_dict)
 
   return manager
-
-def create_module_system(config_path=None):
-  """
-  Legacy function name for backward compatibility.
-
-  Args:
-    config_path: Path to config file
-
-  Returns:
-    ModuleManager: Configured instance
-  """
-  return create_orchestrator(config_path)
 
 def create_validated_module_manager(config_path=None, validate_config=True):
   """

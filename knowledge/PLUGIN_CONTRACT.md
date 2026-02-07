@@ -16,7 +16,7 @@ NEXE 0.9 implementa un **sistema unificat de contractes** per gestionar plugins 
 ✅ **5 plugins migrats**: ollama, mlx, security, llama_cpp, web_ui
 ✅ **Validació completa**: Schema (Pydantic) + Runtime (Protocol) + Tests
 ✅ **Integració ModuleManager**: ContractBridge automàtic
-✅ **Backward compatibility**: Manifests antics backupats com `.old`
+✅ **Compatibility definida**: només UnifiedManifest suportat
 
 ### Mètriques
 
@@ -175,8 +175,6 @@ class ModuleContract(BaseContract, Protocol):
 | llama_cpp_module | 0.8.0 | ✅ | ❌ | ❌ | ✅ |
 | web_ui_module | 0.8.0 | ✅ | ✅ | ❌ | ✅ |
 
-**Backups**: Tots els manifests antics → `.old`
-
 ---
 
 ## Crear Plugin Nou
@@ -285,11 +283,6 @@ python3 scripts/migrate_manifests.py --dry-run
 ```bash
 # Amb confirmació
 ./scripts/apply_migrations.sh
-
-# Rollback
-for f in plugins/*/manifest.toml.old; do
-    mv "$f" "${f%.old}"
-done
 ```
 
 ---
