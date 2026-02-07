@@ -19,6 +19,7 @@ import sys
 import subprocess
 import platform
 import re
+import shutil
 import time
 from pathlib import Path
 
@@ -197,6 +198,7 @@ TRANSLATIONS = {
         "no": "No",
         "proceed_install": "Vols procedir amb la instal·lació?",
         "yes_no": "(S/n)",
+        "yes_no_default_no": "(S/N)",
         "setting_up_env": "Configurant entorn virtual i dependències...",
         "creating_venv": "Creant entorn virtual...",
         "installing_deps": "Instal·lant dependències des de requirements.txt...",
@@ -333,8 +335,10 @@ TRANSLATIONS = {
         "download_failed": "Error descarregant el model. Pots fer-ho manualment més tard.",
         "download_now": "Vols descarregar el model ara?",
         "manual_install_note": "Guarda aquestes instruccions per descarregar el model manualment.",
+        "storage_cleanup_confirm": "Carpeta storage existent detectada. Vols esborrar-la?",
         "cleaning_storage": "Carpeta storage existent detectada. Esborrant per instal·lació neta...",
         "storage_removed": "storage/ eliminada correctament.",
+        "storage_kept": "S'ha conservat storage/.",
         "qdrant_quarantine_info": """
   {bold}ℹ️  Què és Qdrant?{reset}
   Qdrant és una base de dades vectorial de codi obert (https://qdrant.tech).
@@ -432,10 +436,19 @@ TRANSLATIONS = {
         "commands_write_failed": "No s'ha pogut escriure COMMANDS.md: {error}",
         "auto_download_not_supported": "Plataforma {system}/{machine} no suportada per descàrrega automàtica",
         "release_asset_not_found": "Asset {asset_name} no trobat a la release",
+        "checksum_fetching": "Descarregant checksum...",
+        "checksum_not_found": "Checksum no disponible per aquest asset. Continuant sense verificació.",
+        "checksum_parse_failed": "Checksum invàlid. Continuant sense verificació.",
+        "checksum_download_failed": "No s'ha pogut descarregar el checksum. Continuant sense verificació.",
+        "checksum_verifying": "Verificant checksum...",
+        "checksum_mismatch": "Checksum incorrecte. S'ha cancel·lat la descàrrega.",
+        "checksum_verified": "Checksum correcte.",
         "ollama_auto_install_not_supported": "Auto-instal·lació d'Ollama no suportada a {system}",
         "ollama_install_timeout": "La instal·lació d'Ollama ha superat el temps (>3 min)",
+        "ollama_script_fetching": "Descarregant l'script d'instal·lació d'Ollama...",
         "run_manual_command": "Executa manualment: {cmd}",
         "ollama_not_found": "Ollama no trobat. Instal·la'l primer.",
+        "curl_not_found": "curl no trobat. Descarregant amb el client integrat.",
         "option_download_now": "Descarregar ara",
         "option_manual_later": "Ho faré manualment (mostra instruccions)",
         "download_confirmation_title": "Ara descarregarem tot el necessari",
@@ -465,6 +478,7 @@ TRANSLATIONS = {
         "no": "No",
         "proceed_install": "¿Quieres proceder con la instalación?",
         "yes_no": "(S/n)",
+        "yes_no_default_no": "(S/N)",
         "setting_up_env": "Configurando entorno virtual y dependencias...",
         "creating_venv": "Creando entorno virtual...",
         "installing_deps": "Instalando dependencias desde requirements.txt...",
@@ -601,8 +615,10 @@ TRANSLATIONS = {
         "download_failed": "Error descargando el modelo. Puedes hacerlo manualmente más tarde.",
         "download_now": "¿Quieres descargar el modelo ahora?",
         "manual_install_note": "Guarda estas instrucciones para descargar el modelo manualmente.",
+        "storage_cleanup_confirm": "Carpeta storage existente detectada. ¿Quieres borrarla?",
         "cleaning_storage": "Carpeta storage existente detectada. Borrando para instalación limpia...",
         "storage_removed": "storage/ eliminada correctamente.",
+        "storage_kept": "Se ha conservado storage/.",
         "qdrant_quarantine_info": """
   {bold}ℹ️  ¿Qué es Qdrant?{reset}
   Qdrant es una base de datos vectorial de código abierto (https://qdrant.tech).
@@ -700,10 +716,19 @@ TRANSLATIONS = {
         "commands_write_failed": "No se pudo escribir COMMANDS.md: {error}",
         "auto_download_not_supported": "Plataforma {system}/{machine} no compatible con descarga automática",
         "release_asset_not_found": "Asset {asset_name} no encontrado en la release",
+        "checksum_fetching": "Descargando checksum...",
+        "checksum_not_found": "Checksum no disponible para este asset. Continuando sin verificación.",
+        "checksum_parse_failed": "Checksum inválido. Continuando sin verificación.",
+        "checksum_download_failed": "No se pudo descargar el checksum. Continuando sin verificación.",
+        "checksum_verifying": "Verificando checksum...",
+        "checksum_mismatch": "Checksum incorrecto. Descarga cancelada.",
+        "checksum_verified": "Checksum correcto.",
         "ollama_auto_install_not_supported": "Auto-instalación de Ollama no soportada en {system}",
         "ollama_install_timeout": "La instalación de Ollama ha excedido el tiempo (>3 min)",
+        "ollama_script_fetching": "Descargando el script de instalación de Ollama...",
         "run_manual_command": "Ejecuta manualmente: {cmd}",
         "ollama_not_found": "Ollama no encontrado. Instálalo primero.",
+        "curl_not_found": "curl no encontrado. Descargando con el cliente integrado.",
         "option_download_now": "Descargar ahora",
         "option_manual_later": "Lo haré manualmente (mostrar instrucciones)",
         "download_confirmation_title": "Ahora descargaremos todo lo necesario",
@@ -733,6 +758,7 @@ TRANSLATIONS = {
         "no": "No",
         "proceed_install": "Do you want to proceed with the installation?",
         "yes_no": "(Y/n)",
+        "yes_no_default_no": "(Y/N)",
         "setting_up_env": "Setting up virtual environment and dependencies...",
         "creating_venv": "Creating virtual environment...",
         "installing_deps": "Installing dependencies from requirements.txt...",
@@ -869,8 +895,10 @@ TRANSLATIONS = {
         "download_failed": "Error downloading model. You can do it manually later.",
         "download_now": "Do you want to download the model now?",
         "manual_install_note": "Save these instructions to download the model manually.",
+        "storage_cleanup_confirm": "Existing storage folder detected. Delete it?",
         "cleaning_storage": "Existing storage folder detected. Removing for a clean install...",
         "storage_removed": "storage/ removed successfully.",
+        "storage_kept": "Kept existing storage/.",
         "qdrant_quarantine_info": """
   {bold}ℹ️  What is Qdrant?{reset}
   Qdrant is an open-source vector database (https://qdrant.tech).
@@ -968,10 +996,19 @@ TRANSLATIONS = {
         "commands_write_failed": "Could not write COMMANDS.md: {error}",
         "auto_download_not_supported": "Platform {system}/{machine} not supported for auto-download",
         "release_asset_not_found": "Asset {asset_name} not found in release",
+        "checksum_fetching": "Fetching checksum...",
+        "checksum_not_found": "Checksum not available for this asset. Continuing without verification.",
+        "checksum_parse_failed": "Checksum file invalid. Continuing without verification.",
+        "checksum_download_failed": "Failed to download checksum. Continuing without verification.",
+        "checksum_verifying": "Verifying checksum...",
+        "checksum_mismatch": "Checksum mismatch. Download aborted.",
+        "checksum_verified": "Checksum OK.",
         "ollama_auto_install_not_supported": "Ollama auto-install not supported on {system}",
         "ollama_install_timeout": "Ollama install timed out (>3 min)",
+        "ollama_script_fetching": "Downloading Ollama install script...",
         "run_manual_command": "Run manually: {cmd}",
         "ollama_not_found": "Ollama not found. Install it first.",
+        "curl_not_found": "curl not found. Using built-in downloader.",
         "option_download_now": "Download now",
         "option_manual_later": "I'll do it manually (show instructions)",
         "download_confirmation_title": "We will now download everything needed",
@@ -1021,6 +1058,33 @@ def print_warn(msg):
 
 def print_error(msg):
     print(f"{RED}[ERROR]{RESET} {msg}")
+
+def _fetch_text(url: str) -> str:
+    """Fetch text content from URL with a small timeout."""
+    import urllib.request
+
+    with urllib.request.urlopen(url, timeout=30) as response:
+        return response.read().decode("utf-8", errors="replace")
+
+def _parse_checksum(text: str):
+    """Return the first SHA256 checksum found in text."""
+    match = re.search(r"\b[a-fA-F0-9]{64}\b", text)
+    return match.group(0).lower() if match else None
+
+def _sha256_file(path: Path) -> str:
+    import hashlib
+
+    hasher = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+def _download_file(url: str, dest_path: Path) -> None:
+    import urllib.request
+
+    with urllib.request.urlopen(url, timeout=60) as response, open(dest_path, "wb") as out_file:
+        shutil.copyfileobj(response, out_file)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LANGUAGE SELECTION
@@ -1586,21 +1650,54 @@ def download_qdrant(project_root, hw):
         with urllib.request.urlopen(api_url, timeout=10) as response:
             release_data = json.loads(response.read().decode())
 
+        assets = release_data.get("assets", [])
         download_url = None
-        for asset in release_data.get("assets", []):
-            if asset["name"] == asset_name:
-                download_url = asset["browser_download_url"]
-                break
+        checksum_url = None
+        checksum_candidates = [
+            f"{asset_name}.sha256",
+            f"{asset_name}.sha256sum",
+            f"{asset_name}.sha256.txt",
+            f"{asset_name}.sha256sum.txt",
+        ]
+
+        for asset in assets:
+            name = asset.get("name")
+            if name == asset_name:
+                download_url = asset.get("browser_download_url")
+            if name in checksum_candidates:
+                checksum_url = asset.get("browser_download_url")
 
         if not download_url:
             print_warn(t('release_asset_not_found', asset_name=asset_name))
             return False
+
+        checksum_value = None
+        if checksum_url:
+            try:
+                print(f"  {DIM}{t('checksum_fetching')}{RESET}")
+                checksum_text = _fetch_text(checksum_url)
+                checksum_value = _parse_checksum(checksum_text)
+                if not checksum_value:
+                    print_warn(t('checksum_parse_failed'))
+            except Exception:
+                print_warn(t('checksum_download_failed'))
+        else:
+            print_warn(t('checksum_not_found'))
 
         # Download
         tar_path = project_root / asset_name
         print(f"  {BLUE}[...]{RESET} {download_url}")
 
         urllib.request.urlretrieve(download_url, tar_path)
+
+        if checksum_value:
+            print_step(t('checksum_verifying'))
+            actual_checksum = _sha256_file(tar_path)
+            if actual_checksum != checksum_value:
+                print_warn(t('checksum_mismatch'))
+                tar_path.unlink(missing_ok=True)
+                return False
+            print_success(t('checksum_verified'))
 
         # Extract
         with tarfile.open(tar_path, "r:gz") as tar:
@@ -1667,8 +1764,7 @@ def ensure_ollama_installed():
     import platform
 
     # Check if already installed
-    result = subprocess.run(["which", "ollama"], capture_output=True)
-    if result.returncode == 0:
+    if shutil.which("ollama"):
         print_success(t('ollama_installed'))
         return True
 
@@ -1686,20 +1782,40 @@ def ensure_ollama_installed():
         print(f"  {DIM}{t('ollama_install_manual')}{RESET}")
         return False
 
+    install_url = "https://ollama.com/install.sh"
+    install_cmd = f"curl -fsSL {install_url} -o /tmp/ollama_install.sh && sh /tmp/ollama_install.sh"
+
     try:
-        # Install via official script
-        print(f"  {DIM}{t('label_command')}: curl -fsSL https://ollama.com/install.sh | sh{RESET}")
-        result = subprocess.run(
-            ["bash", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
-            timeout=180  # 3 minutes max
-        )
+        import tempfile
+        import urllib.request
+
+        print(f"  {DIM}{t('ollama_script_fetching')}{RESET}")
+        print(f"  {DIM}{t('label_command')}: {install_cmd}{RESET}")
+
+        with urllib.request.urlopen(install_url, timeout=30) as response:
+            script = response.read()
+
+        script_path = None
+        try:
+            with tempfile.NamedTemporaryFile("wb", delete=False) as handle:
+                handle.write(script)
+                script_path = Path(handle.name)
+            script_path.chmod(0o700)
+
+            result = subprocess.run(
+                ["sh", str(script_path)],
+                timeout=180  # 3 minutes max
+            )
+        finally:
+            if script_path:
+                script_path.unlink(missing_ok=True)
 
         if result.returncode == 0:
             print_success(t('ollama_installed'))
             return True
         else:
             print_warn(t('ollama_install_failed'))
-            print(f"  {CYAN}{t('label_command')}: curl -fsSL https://ollama.com/install.sh | sh{RESET}")
+            print(f"  {CYAN}{t('label_command')}: {install_cmd}{RESET}")
             return False
 
     except subprocess.TimeoutExpired:
@@ -1707,7 +1823,7 @@ def ensure_ollama_installed():
         return False
     except Exception as e:
         print_warn(f"{t('ollama_install_failed')}: {e}")
-        print(f"  {CYAN}{t('label_command')}: curl -fsSL https://ollama.com/install.sh | sh{RESET}")
+        print(f"  {CYAN}{t('label_command')}: {install_cmd}{RESET}")
         return False
 
 
@@ -1829,16 +1945,45 @@ def _download_gguf_model(model_config, project_root):
             print(f"\n{BLUE}[...]{RESET} {t('downloading_file', filename=filename)}")
             print(f"   {DIM}{model_config['id']}{RESET}")
 
-            subprocess.run([
-                "curl", "-L", "--progress-bar",
-                "-o", str(output_path),
-                model_config['id']
-            ], check=True)
+            checksum_value = None
+            for suffix in (".sha256", ".sha256sum"):
+                try:
+                    checksum_text = _fetch_text(model_config['id'] + suffix)
+                    checksum_value = _parse_checksum(checksum_text)
+                    if checksum_value:
+                        break
+                except Exception:
+                    continue
+
+            if shutil.which("curl"):
+                subprocess.run([
+                    "curl", "-L", "--progress-bar",
+                    "-o", str(output_path),
+                    model_config['id']
+                ], check=True)
+            else:
+                print_warn(t('curl_not_found'))
+                _download_file(model_config['id'], output_path)
+
+            if checksum_value:
+                print_step(t('checksum_verifying'))
+                actual_checksum = _sha256_file(output_path)
+                if actual_checksum != checksum_value:
+                    print_warn(t('checksum_mismatch'))
+                    output_path.unlink(missing_ok=True)
+                    _show_manual_instructions(model_config, "llama_cpp")
+                    return
+                print_success(t('checksum_verified'))
+            else:
+                print_warn(t('checksum_not_found'))
 
             print_success(t('download_success'))
             print(f"  📁 {output_path}")
         except subprocess.CalledProcessError:
             print_warn(t('download_failed'))
+            _show_manual_instructions(model_config, "llama_cpp")
+        except Exception as e:
+            print_warn(f"{t('download_failed')}: {e}")
             _show_manual_instructions(model_config, "llama_cpp")
     else:
         _show_manual_instructions(model_config, "llama_cpp")
@@ -1992,10 +2137,16 @@ def main():
 
     storage_path = project_root / "storage"
     if storage_path.exists():
-        print(f"\n{YELLOW}[CLEAN]{RESET} {t('cleaning_storage')}")
-        import shutil
-        shutil.rmtree(storage_path)
-        print(f"{GREEN}[OK]{RESET} {t('storage_removed')}")
+        confirm = input(
+            f"\n{YELLOW}[CLEAN]{RESET} {t('storage_cleanup_confirm')} {t('yes_no_default_no')}: "
+        ).strip().lower()
+        if confirm in ("s", "y"):
+            print(f"{YELLOW}[CLEAN]{RESET} {t('cleaning_storage')}")
+            import shutil
+            shutil.rmtree(storage_path)
+            print(f"{GREEN}[OK]{RESET} {t('storage_removed')}")
+        else:
+            print(f"{DIM}{t('storage_kept')}{RESET}")
 
     # 4. MODEL SELECTION FIRST - while user is engaged
     model_config = select_model(hw)

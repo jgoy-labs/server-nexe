@@ -5,6 +5,9 @@
 
 set -e
 
+# Resolve current user for safer process cleanup
+CURRENT_USER="${USER:-$(id -un)}"
+
 # Installer metadata
 BLUE='\033[1;34m'
 CYAN='\033[1;36m'
@@ -48,9 +51,9 @@ if [ -d "venv" ] || [ -f ".env" ] || [ -d "storage" ]; then
         echo -e "${YELLOW}[CLEAN]${NC} Cleaning previous installation..."
 
         # Stop processes
-        pkill -f "qdrant.*disable-telemetry" 2>/dev/null && echo "  ✓ Qdrant stopped" || true
-        pkill -f "ollama serve" 2>/dev/null && echo "  ✓ Ollama stopped" || true
-        pkill -f "uvicorn.*nexe" 2>/dev/null && echo "  ✓ Nexe Server stopped" || true
+        pkill -u "$CURRENT_USER" -f "qdrant.*disable-telemetry" 2>/dev/null && echo "  ✓ Qdrant stopped" || true
+        pkill -u "$CURRENT_USER" -f "ollama serve" 2>/dev/null && echo "  ✓ Ollama stopped" || true
+        pkill -u "$CURRENT_USER" -f "uvicorn.*nexe" 2>/dev/null && echo "  ✓ Nexe Server stopped" || true
         sleep 1
 
         # Delete generated files
