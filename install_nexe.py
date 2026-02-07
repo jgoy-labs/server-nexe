@@ -2251,8 +2251,9 @@ def main():
     nexe_wrapper = project_root / "nexe"
     with open(nexe_wrapper, "w") as f:
         f.write("#!/bin/bash\n")
-        f.write(f"export PYTHONPATH=\"$PYTHONPATH:{project_root}\"\n")
-        f.write(f"{python_path} -m core.cli \"$@\"\n")
+        f.write("SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n")
+        f.write("export PYTHONPATH=\"$PYTHONPATH:${SCRIPT_DIR}\"\n")
+        f.write("\"${SCRIPT_DIR}/venv/bin/python\" -m core.cli \"$@\"\n")
     nexe_wrapper.chmod(0o755)
     print(f"  ✅ {t('executable_created')}")
     print(f"     {DIM}{t('executable_explanation')}{RESET}")

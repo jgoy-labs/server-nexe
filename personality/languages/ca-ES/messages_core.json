@@ -250,8 +250,9 @@
   "server_ready": "✅  SERVER.NEXE A PUNT · Escoltant a http://localhost:9119",
   "web_ui_ready": "📱 Web UI: http://localhost:9119/ui/",
   "critical_startup_error": "Error crític d'inici",
-  "process_stopping": "Aturant procés {name}...",
-  "process_force_stop_failed": "No s'ha pogut aturar forçadament el procés {name}",
+   "process_stopping": "Aturant procés {name}...",
+   "process_force_stop_failed": "No s'ha pogut aturar forçadament el procés {name}",
+   "pid_write_failed": "No s'ha pogut escriure el fitxer pid {path}: {error}",
   "closing_api_integrator": "Tancant APIIntegrator...",
   "closing_module_manager": "Tancant ModuleManager...",
   "cleaning_registry": "Netejant el registre..."

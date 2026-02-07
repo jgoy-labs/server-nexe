@@ -250,8 +250,9 @@
   "server_ready": "✅  SERVER.NEXE LISTO · Escuchando en http://localhost:9119",
   "web_ui_ready": "📱 Web UI: http://localhost:9119/ui/",
   "critical_startup_error": "Error crítico de inicio",
-  "process_stopping": "Deteniendo el proceso {name}...",
-  "process_force_stop_failed": "No se pudo detener forzosamente el proceso {name}",
+   "process_stopping": "Deteniendo el proceso {name}...",
+   "process_force_stop_failed": "No se pudo detener forzosamente el proceso {name}",
+   "pid_write_failed": "No se pudo escribir el archivo pid {path}: {error}",
   "closing_api_integrator": "Cerrando APIIntegrator...",
   "closing_module_manager": "Cerrando ModuleManager...",
   "cleaning_registry": "Limpiando el registro..."

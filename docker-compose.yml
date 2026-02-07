@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    environment:
+      QDRANT__SERVICE__DISABLE_TELEMETRY: "true"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  nexe:
+    build: .
+    ports:
+      - "9119:9119"
+    environment:
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6333"
+      NEXE_AUTOSTART_QDRANT: "false"
+      NEXE_ENV: production
+    depends_on:
+      - qdrant
+    volumes:
+      - nexe_storage:/app/storage
+
+volumes:
+  qdrant_data:
+  nexe_storage:

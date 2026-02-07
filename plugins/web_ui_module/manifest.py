@@ -14,15 +14,22 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import asyncio
 import logging
+import os
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-import logging
 
 from .session_manager import SessionManager
 from .file_handler import FileHandler
 from .memory_helper import get_memory_helper
 from .i18n import t
+
+try:
+    from plugins.security.sanitizer import get_sanitizer
+    from plugins.security.sanitizer.core.patterns import MAX_INPUT_LENGTH
+except ImportError:
+    get_sanitizer = None
+    MAX_INPUT_LENGTH = 10000
 
 # Import RAG header parser
 try:
@@ -149,6 +156,55 @@ async def upload_file(
         _file_handler.delete_file(file_path)
         raise HTTPException(status_code=400, detail=t("web_ui.http.extract_text_failed", "Could not extract text from file"))
 
+    sanitize_uploads = os.getenv("NEXE_UPLOAD_SANITIZER", "true").lower() != "false"
+    sanitize_result = None
+    if sanitize_uploads:
+        if get_sanitizer is None:
+            logger.warning(
+                _t_log(
+                    "sanitizer_unavailable",
+                    "Upload sanitizer not available. Install the security plugin.",
+                )
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=t(
+                    "web_ui.http.sanitizer_unavailable",
+                    "Upload sanitizer not available. Try again later.",
+                ),
+            )
+        sanitizer = get_sanitizer()
+        scan_text = text[:MAX_INPUT_LENGTH]
+        sanitize_result = sanitizer.sanitize(scan_text)
+        if not sanitize_result.is_safe or sanitize_result.severity == "critical":
+            _file_handler.delete_file(file_path)
+            logger.warning(
+                _t_log(
+                    "sanitizer_blocked",
+                    "Upload blocked (severity={severity}, threats={threats})",
+                    severity=sanitize_result.severity,
+                    threats=",".join(sanitize_result.threats_detected),
+                )
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=t(
+                    "web_ui.http.sanitizer_rejected",
+                    "Upload rejected by security filter.",
+                ),
+            )
+        if sanitize_result.needs_intervention:
+            logger.warning(
+                _t_log(
+                    "sanitizer_warning",
+                    "Upload flagged (severity={severity}, threats={threats})",
+                    severity=sanitize_result.severity,
+                    threats=",".join(sanitize_result.threats_detected),
+                )
+            )
+        if sanitize_result.clean_text:
+            text = sanitize_result.clean_text
+
     # Parse RAG header if available
     rag_header = None
     body_content = text
@@ -158,6 +214,12 @@ async def upload_file(
         "size": len(content),
         "source": "web_ui"
     }
+    if sanitize_result:
+        doc_metadata.update({
+            "sanitizer_severity": sanitize_result.severity,
+            "sanitizer_threats": sanitize_result.threats_detected,
+            "sanitizer_patterns": sanitize_result.patterns_matched,
+        })
 
     if parse_rag_header:
         rag_header, body_content = parse_rag_header(text)

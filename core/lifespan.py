@@ -85,6 +85,9 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
             env=env
           )
           server_state.qdrant_process = process
+          server_state.qdrant_pid = process.pid
+          server_state.qdrant_pid_file = project_root / "storage" / "qdrant.pid"
+          _write_pid_file(server_state.qdrant_pid_file, process.pid, server_state.i18n)
 
           # Wait for Qdrant to be ready (FIX: use asyncio.sleep to not block event loop)
           for i in range(30):  # 15 seconds max
@@ -192,6 +195,9 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
             stderr=subprocess.DEVNULL
           )
           server_state.ollama_process = process
+          server_state.ollama_pid = process.pid
+          server_state.ollama_pid_file = project_root / "storage" / "ollama.pid"
+          _write_pid_file(server_state.ollama_pid_file, process.pid, server_state.i18n)
           # Wait for Ollama to be ready (FIX: use asyncio.sleep to not block event loop)
           for _ in range(30):  # 15 seconds max
             await asyncio.sleep(0.5)
@@ -267,6 +273,10 @@ class ServerState:
     self.registry = None
     self.qdrant_process = None
     self.ollama_process = None
+    self.qdrant_pid = None
+    self.ollama_pid = None
+    self.qdrant_pid_file = None
+    self.ollama_pid_file = None
 
 server_state = ServerState()
 
@@ -312,9 +322,35 @@ def _cleanup_child_processes(i18n=None) -> None:
   try:
     _stop_process(server_state.qdrant_process, "Qdrant", i18n)
     _stop_process(server_state.ollama_process, "Ollama", i18n)
+    _cleanup_pid_file(server_state.qdrant_pid_file)
+    _cleanup_pid_file(server_state.ollama_pid_file)
   finally:
     with _cleanup_lock:
       _cleanup_running = False
+
+
+def _write_pid_file(pid_path: Path, pid: int, i18n=None) -> None:
+  try:
+    pid_path.parent.mkdir(parents=True, exist_ok=True)
+    pid_path.write_text(str(pid))
+  except Exception as e:
+    logger.debug(_translate(
+      i18n,
+      "core.lifespan.pid_write_failed",
+      "Failed to write pid file {path}: {error}",
+      path=str(pid_path),
+      error=str(e)
+    ))
+
+
+def _cleanup_pid_file(pid_path: Path) -> None:
+  if not pid_path:
+    return
+  try:
+    if pid_path.exists():
+      pid_path.unlink()
+  except Exception:
+    pass
 
 
 def _register_process_cleanup(i18n=None) -> None:
