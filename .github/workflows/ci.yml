@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - codex/**
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run tests (unit only) with coverage
+        env:
+          NEXE_ENV: test
+          NEXE_LOG_LEVEL: WARNING
+          NEXE_DEV_MODE: "false"
+        run: |
+          pytest -m "not integration and not e2e and not slow" \
+            --cov=core --cov=plugins --cov=memory --cov=personality \
+            --cov-report=term-missing --cov-fail-under=90

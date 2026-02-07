@@ -90,6 +90,28 @@ You can run Nexe using Docker.
 
 ---
 
+## ✅ Testing & Coverage
+
+CI enforces **90% coverage** on unit tests.
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+pytest -m "not integration and not e2e and not slow" \
+  --cov=core --cov=plugins --cov=memory --cov=personality \
+  --cov-report=term-missing --cov-fail-under=90
+```
+
+---
+
+## 🔋 Resource & Power Notes
+
+Local inference is compute-heavy and can drain battery:
+- **Laptops**: plug in for long sessions.
+- **Thermals**: expect heat under sustained load.
+- **Lower power**: choose smaller models, reduce concurrency, and prefer quantized models.
+
+---
+
 ## 📚 Documentation
 
 -   [Installation Guide](knowledge/INSTALLATION.md)

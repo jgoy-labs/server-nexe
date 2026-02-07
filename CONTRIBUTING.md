@@ -18,6 +18,10 @@ Thank you for your interest in contributing to Nexe! We welcome contributions fr
     source venv/bin/activate
     pip install -r requirements.txt
     ```
+4.  **Install dev dependencies (tests/coverage)**:
+    ```bash
+    pip install -r requirements-dev.txt
+    ```
 
 ## Development Workflow
 
@@ -30,6 +34,12 @@ Thank you for your interest in contributing to Nexe! We welcome contributions fr
     - Run the server: `./nexe go`
     - Verify functionality in the Web UI or via API.
     - Check logs: `./nexe logs`
+    - Run unit tests with coverage (CI enforces 90%):
+      ```bash
+      pytest -m "not integration and not e2e and not slow" \
+        --cov=core --cov=plugins --cov=memory --cov=personality \
+        --cov-report=term-missing --cov-fail-under=90
+      ```
 4.  **Linting & Formatting**:
     - We use `ruff` for linting and formatting (if configured).
     - Ensure all user-facing strings are wrapped in `t()` for i18n support.
