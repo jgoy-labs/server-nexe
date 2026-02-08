@@ -153,14 +153,14 @@ class SessionManager:
                         self._sessions[session.id] = session
                         count += 1
                 except Exception as e:
-                logger.warning(
-                    _t_log(
-                        "session_load_error",
-                        "Error loading session {path}: {error}",
-                        path=file_path,
-                        error=str(e),
+                    logger.warning(
+                        _t_log(
+                            "session_load_error",
+                            "Error loading session {path}: {error}",
+                            path=file_path,
+                            error=str(e),
+                        )
                     )
-                )
             logger.info(
                 _t_log(
                     "sessions_loaded",
