@@ -26,8 +26,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def _t(key: str, fallback: str, **kwargs) -> str:
-  return t_modular(f"rag.cli.{key}", fallback, **kwargs)
+def _t(msg_key: str, fallback: str, **kwargs) -> str:
+  return t_modular(f"rag.cli.{msg_key}", fallback, **kwargs)
 
 class RAGCLI:
   """CLI interface for RAG Module"""
@@ -94,7 +94,7 @@ class RAGCLI:
       logger.info(_t("config_title", "Config:"))
       config = info.get("config", {})
       for key, value in config.items():
-        logger.info(_t("config_item", " {key}: {value}", key=key, value=value))
+        logger.info(_t("config_item", " {config_key}: {value}", config_key=key, value=value))
 
       return 0
 

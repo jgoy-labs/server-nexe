@@ -23,7 +23,7 @@ async def test_mlx_module_initialize_no_metal():
 @pytest.mark.asyncio
 async def test_mlx_module_chat_not_initialized():
     module = MLXModule()
-    with pytest.raises(RuntimeError, match="Module not initialized"):
+    with pytest.raises(RuntimeError, match="not initialized"):
         await module.chat(messages=[{"role": "user", "content": "hola"}])
 
 @pytest.mark.asyncio

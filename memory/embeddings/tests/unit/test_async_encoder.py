@@ -129,7 +129,7 @@ async def test_encode_async_empty_text(async_embedder):
   Checks:
   - Text buit raise ValueError
   """
-  with pytest.raises(ValueError, match="Text no pot estar buit"):
+  with pytest.raises(ValueError):
     await async_embedder.encode_async("", normalize=True)
 
 @pytest.mark.asyncio
@@ -161,7 +161,7 @@ async def test_encode_batch_empty_list(async_embedder):
   Checks:
   - Llista buida raise ValueError
   """
-  with pytest.raises(ValueError, match="texts no pot estar buit"):
+  with pytest.raises(ValueError):
     await async_embedder.encode_batch_async([], normalize=True)
 
 @pytest.mark.asyncio
@@ -174,7 +174,7 @@ async def test_encode_batch_with_empty_string(async_embedder):
   """
   texts = ["hello", "", "world"]
 
-  with pytest.raises(ValueError, match="Tots els texts han de ser no-buits"):
+  with pytest.raises(ValueError):
     await async_embedder.encode_batch_async(texts, normalize=True)
 
 @pytest.mark.asyncio

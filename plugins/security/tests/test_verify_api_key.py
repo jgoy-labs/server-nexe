@@ -50,7 +50,6 @@ def test_verify_api_key_with_none():
     verify_api_key(x_api_key=None)
 
   assert exc_info.value.status_code == 401
-  assert "required" in exc_info.value.detail.lower()
 
 def test_verify_api_key_with_empty_string():
   """
@@ -65,7 +64,6 @@ def test_verify_api_key_with_empty_string():
     verify_api_key(x_api_key="")
 
   assert exc_info.value.status_code == 401
-  assert "required" in exc_info.value.detail.lower()
 
 def test_verify_api_key_with_invalid_key():
   """

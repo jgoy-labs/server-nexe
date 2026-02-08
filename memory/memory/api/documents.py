@@ -295,14 +295,14 @@ async def delete_document(
     uuid_id = hex_to_uuid(doc_id)
     try:
       _delete_points(qdrant, collection, [uuid_id])
-    logger.debug(
-      _t(
-        "deleted",
-        "Deleted document {doc_id} from collection {collection}",
-        doc_id=doc_id,
-        collection=collection,
+      logger.debug(
+        _t(
+          "deleted",
+          "Deleted document {doc_id} from collection {collection}",
+          doc_id=doc_id,
+          collection=collection,
+        )
       )
-    )
       return True
 
     except Exception as e:

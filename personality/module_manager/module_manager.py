@@ -138,7 +138,7 @@ class ModuleManager:
             return validated_path
         except Exception as e:
           logger.warning(get_message(
-            self.i18n,
+            None,
             "config.path_rejected",
             path=config_path,
             error=str(e)

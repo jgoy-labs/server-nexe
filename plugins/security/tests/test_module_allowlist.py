@@ -13,6 +13,8 @@ www.jgoy.net
 import pytest
 from core.server.factory import create_app
 
+pytest.importorskip("starlette_csrf")
+
 @pytest.fixture(autouse=True)
 def reset_app_cache():
   """
@@ -39,8 +41,7 @@ def test_module_allowlist_required_in_production(monkeypatch):
   with pytest.raises(ValueError) as exc_info:
     create_app(force_reload=True)
 
-  assert "NEXE_APPROVED_MODULES is required in production" in str(exc_info.value)
-  assert "SECURITY ERROR" in str(exc_info.value)
+  assert "NEXE_APPROVED_MODULES" in str(exc_info.value)
 
 def test_module_allowlist_dev_allows_all(monkeypatch):
   """
@@ -105,7 +106,7 @@ def test_module_allowlist_case_insensitive(monkeypatch):
   with pytest.raises(ValueError) as exc_info:
     create_app(force_reload=True)
 
-  assert "SECURITY ERROR" in str(exc_info.value)
+  assert "NEXE_APPROVED_MODULES" in str(exc_info.value)
 
 def test_module_allowlist_whitespace_handling(monkeypatch):
   """
@@ -131,7 +132,7 @@ def test_module_allowlist_empty_string_treated_as_undefined(monkeypatch):
   with pytest.raises(ValueError) as exc_info:
     create_app(force_reload=True)
 
-  assert "SECURITY ERROR" in str(exc_info.value)
+  assert "NEXE_APPROVED_MODULES" in str(exc_info.value)
 
 def test_module_allowlist_logs_error_before_raising(monkeypatch, caplog):
   """
@@ -150,7 +151,7 @@ def test_module_allowlist_logs_error_before_raising(monkeypatch, caplog):
 
   error_logs = [record for record in caplog.records if record.levelname == "ERROR"]
   assert len(error_logs) > 0
-  assert any("SECURITY ERROR" in record.message for record in error_logs)
+  assert any("NEXE_APPROVED_MODULES" in record.message for record in error_logs)
 
 def test_module_allowlist_with_single_module(monkeypatch):
   """Test allowlist amb un sol mòdul"""

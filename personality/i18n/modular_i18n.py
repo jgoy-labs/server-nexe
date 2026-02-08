@@ -58,9 +58,9 @@ _LOG_MESSAGES = {
   },
 }
 
-def _log_msg(lang: str, key: str, **kwargs) -> str:
+def _log_msg(language: str, key: str, **kwargs) -> str:
   """Local i18n for bootstrap logging (no external translations available yet)."""
-  language = lang or "en-US"
+  language = language or "en-US"
   variants = _LOG_MESSAGES.get(key, {})
   template = variants.get(language) or variants.get("en-US") or key
   try:
