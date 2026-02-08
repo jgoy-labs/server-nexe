@@ -186,6 +186,7 @@ TRANSLATIONS = {
         "installing_inference": "Instal·lant motors d'inferència optimitzats...",
         "detected_apple": "Detectat Apple Silicon. Instal·lant",
         "mlx_version_fallback": "mlx-lm>=0.30.0 no disponible, instal·lant una versió compatible.",
+        "mlx_install_failed": "No s'ha pogut instal·lar mlx-lm. Es continuarà sense MLX.",
         "installing_universal": "Instal·lant motor universal...",
         "installed_gpu": "instal·lat amb suport hardware.",
         "gpu_failed": "No s'ha pogut compilar amb GPU. Instal·lant versió CPU...",
@@ -467,6 +468,7 @@ TRANSLATIONS = {
         "installing_inference": "Instalando motores de inferencia optimizados...",
         "detected_apple": "Detectado Apple Silicon. Instalando",
         "mlx_version_fallback": "mlx-lm>=0.30.0 no disponible, instalando una versión compatible.",
+        "mlx_install_failed": "No se pudo instalar mlx-lm. Se continuará sin MLX.",
         "installing_universal": "Instalando motor universal...",
         "installed_gpu": "instalado con soporte hardware.",
         "gpu_failed": "No se pudo compilar con GPU. Instalando versión CPU...",
@@ -748,6 +750,7 @@ TRANSLATIONS = {
         "installing_inference": "Installing optimized inference engines...",
         "detected_apple": "Detected Apple Silicon. Installing",
         "mlx_version_fallback": "mlx-lm>=0.30.0 not available, installing a compatible version.",
+        "mlx_install_failed": "Could not install mlx-lm. Continuing without MLX.",
         "installing_universal": "Installing universal engine...",
         "installed_gpu": "installed with hardware support.",
         "gpu_failed": "Could not compile with GPU. Installing CPU version...",
@@ -1440,11 +1443,11 @@ def setup_environment(project_root, hw):
         try:
             subprocess.run([str(pip_path), "install", "mlx-lm>=0.30.0"], check=True)
         except subprocess.CalledProcessError:
-            print_warn(t(
-                "mlx_version_fallback",
-                "mlx-lm>=0.30.0 not available, installing latest compatible version."
-            ))
-            subprocess.run([str(pip_path), "install", "mlx-lm"], check=True)
+            print_warn(t("mlx_version_fallback"))
+            try:
+                subprocess.run([str(pip_path), "install", "mlx-lm"], check=True)
+            except subprocess.CalledProcessError:
+                print_warn(t("mlx_install_failed"))
 
     print(f"  🏗️ {t('installing_universal')} {CYAN}llama-cpp-python{RESET}...")
     env = os.environ.copy()
