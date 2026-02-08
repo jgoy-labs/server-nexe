@@ -105,6 +105,164 @@ def _t_global(key: str, fallback: str, **kwargs) -> str:
     """Translate using modular i18n without app_state (fallback safe)."""
     return t_modular(f"core.chat.{key}", fallback, **kwargs)
 
+# --- Memory command helpers (HTTP /v1/chat/completions) ---
+
+def _parse_memory_command(text: Optional[str]) -> Optional[Dict[str, str]]:
+    if not text:
+        return None
+    stripped = text.strip()
+    if not stripped.startswith("/"):
+        return None
+    parts = stripped.split(maxsplit=1)
+    cmd = parts[0][1:].lower()
+    arg = parts[1].strip() if len(parts) > 1 else ""
+
+    save_aliases = {"save", "guardar", "recorda"}
+    recall_aliases = {"recall"}
+
+    if cmd in save_aliases:
+        return {"action": "save", "arg": arg}
+    if cmd in recall_aliases:
+        return {"action": "recall", "arg": arg}
+    return None
+
+def _memory_stream_response(text: str, model_name: str = "nexe-memory"):
+    async def _gen():
+        chunk = {
+            "id": f"memory-{uuid.uuid4().hex}",
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": model_name,
+            "choices": [{
+                "index": 0,
+                "delta": {"content": text},
+                "finish_reason": None
+            }]
+        }
+        yield f"data: {json.dumps(chunk)}\n\n"
+        final_chunk = {
+            "id": f"memory-{uuid.uuid4().hex}",
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": model_name,
+            "choices": [{
+                "index": 0,
+                "delta": {},
+                "finish_reason": "stop"
+            }]
+        }
+        yield f"data: {json.dumps(final_chunk)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={"X-Nexe-Engine": "memory"},
+    )
+
+def _memory_nonstream_response(text: str, model_name: str = "nexe-memory") -> Dict[str, Any]:
+    return {
+        "id": f"memory-{uuid.uuid4().hex}",
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": model_name,
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": text},
+            "finish_reason": "stop"
+        }],
+        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        "nexe_engine": "memory",
+    }
+
+async def _handle_memory_command(
+    cmd: Dict[str, str],
+    request: ChatCompletionRequest,
+    app_state=None,
+) -> Union[Dict[str, Any], StreamingResponse]:
+    action = cmd.get("action")
+    arg = cmd.get("arg", "")
+
+    if action == "save":
+        if not arg:
+            msg = _t_from_state(
+                app_state,
+                "core.chat.memory_save_missing",
+                "Missing text. Usage: /save <text>"
+            )
+            return _memory_stream_response(msg) if request.stream else _memory_nonstream_response(msg)
+
+        from memory.memory.api.v1 import get_memory_api
+        memory = await get_memory_api()
+
+        if not await memory.collection_exists("nexe_chat_memory"):
+            await memory.create_collection("nexe_chat_memory", vector_size=384)
+
+        await memory.store(
+            text=arg,
+            collection="nexe_chat_memory",
+            metadata={
+                "type": "manual_save",
+                "source": "chat-api",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
+        msg = _t_from_state(
+            app_state,
+            "core.chat.memory_save_ok",
+            "Saved to memory."
+        )
+        return _memory_stream_response(msg) if request.stream else _memory_nonstream_response(msg)
+
+    if action == "recall":
+        if not arg:
+            msg = _t_from_state(
+                app_state,
+                "core.chat.memory_recall_missing",
+                "Missing query. Usage: /recall <query>"
+            )
+            return _memory_stream_response(msg) if request.stream else _memory_nonstream_response(msg)
+
+        from memory.memory.api.v1 import get_memory_api
+        memory = await get_memory_api()
+
+        if not await memory.collection_exists("nexe_chat_memory"):
+            msg = _t_from_state(
+                app_state,
+                "core.chat.memory_recall_empty",
+                "Nothing found in memory."
+            )
+            return _memory_stream_response(msg) if request.stream else _memory_nonstream_response(msg)
+
+        results = await memory.search(query=arg, collection="nexe_chat_memory", top_k=3, threshold=0.3)
+        if not results:
+            msg = _t_from_state(
+                app_state,
+                "core.chat.memory_recall_empty",
+                "Nothing found in memory."
+            )
+            return _memory_stream_response(msg) if request.stream else _memory_nonstream_response(msg)
+
+        lines = []
+        for r in results[:3]:
+            text = getattr(r, "text", "") or ""
+            compact = " ".join(text.split())
+            if len(compact) > 160:
+                compact = compact[:157] + "..."
+            lines.append(f"- {compact}")
+
+        header = _t_from_state(
+            app_state,
+            "core.chat.memory_recall_found",
+            "Found in memory:"
+        )
+        msg = header + "\n" + "\n".join(lines)
+        return _memory_stream_response(msg) if request.stream else _memory_nonstream_response(msg)
+
+    # Unknown command -> let normal chat handle it
+    return None
+
 # --- Schemas ---
 
 class Message(BaseModel):
@@ -206,12 +364,19 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
     start_time = time.time()
     engine_status = "success"
 
+    # Detect memory commands (/save, /recall) before RAG/engine routing
+    last_user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), None)
+    mem_cmd = _parse_memory_command(last_user_msg)
+    if mem_cmd:
+        mem_response = await _handle_memory_command(mem_cmd, request, req.app.state)
+        if mem_response is not None:
+            return mem_response
+
     # 2. RAG Context Injection
     context_text = ""
     if request.use_rag:
         try:
             # Extract last user message for query
-            last_user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), None)
             if last_user_msg:
                 logger.info(_t_from_state(
                     req.app.state,
@@ -400,8 +565,7 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
             messages.insert(0, {"role": "system", "content": context_block})
 
     # 4. Dispatch to Engine
-    # Extract last user message for auto-save logic
-    last_user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), None)
+    # last_user_msg already resolved above for auto-save logic
 
     response = None
     try:

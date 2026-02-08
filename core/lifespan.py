@@ -48,6 +48,8 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
     qdrant_url = f"http://{qdrant_host}:{qdrant_port}"
     qdrant_bin = project_root / "qdrant"
     qdrant_storage = project_root / "storage" / "qdrant"
+    qdrant_log_dir = project_root / "storage" / "logs"
+    qdrant_log_path = qdrant_log_dir / "qdrant.log"
 
     try:
       await client.get(f"{qdrant_url}/health", timeout=QDRANT_HEALTH_TIMEOUT)
@@ -78,16 +80,26 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
           env["QDRANT__SERVICE__DISABLE_TELEMETRY"] = "true"
 
           # Start Qdrant process
+          qdrant_log_dir.mkdir(parents=True, exist_ok=True)
+          qdrant_log_file = open(qdrant_log_path, "a", encoding="utf-8")
           process = subprocess.Popen(
             [str(qdrant_bin), "--disable-telemetry"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=qdrant_log_file,
+            stderr=qdrant_log_file,
             env=env
           )
           server_state.qdrant_process = process
           server_state.qdrant_pid = process.pid
           server_state.qdrant_pid_file = project_root / "storage" / "qdrant.pid"
+          server_state.qdrant_log_file = qdrant_log_file
+          server_state.qdrant_log_path = qdrant_log_path
           _write_pid_file(server_state.qdrant_pid_file, process.pid, server_state.i18n)
+          logger.info(_translate(
+            server_state.i18n,
+            "core.lifespan.qdrant_log_path",
+            "Qdrant logs: {path}",
+            path=str(qdrant_log_path)
+          ))
 
           # Wait for Qdrant to be ready (FIX: use asyncio.sleep to not block event loop)
           for i in range(30):  # 15 seconds max
@@ -109,12 +121,24 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
                   "core.lifespan.qdrant_process_died",
                   "Qdrant: Process died. Run './qdrant' manually to see logs."
                 ))
+                logger.info(_translate(
+                  server_state.i18n,
+                  "core.lifespan.qdrant_log_path",
+                  "Qdrant logs: {path}",
+                  path=str(qdrant_log_path)
+                ))
                 break
           else:
             logger.warning(_translate(
               server_state.i18n,
               "core.lifespan.qdrant_start_timeout",
               "Qdrant: Failed to start (timeout 15s)"
+            ))
+            logger.info(_translate(
+              server_state.i18n,
+              "core.lifespan.qdrant_log_path",
+              "Qdrant logs: {path}",
+              path=str(qdrant_log_path)
             ))
         except Exception as e:
           logger.error(_translate(
@@ -277,6 +301,8 @@ class ServerState:
     self.ollama_pid = None
     self.qdrant_pid_file = None
     self.ollama_pid_file = None
+    self.qdrant_log_file = None
+    self.qdrant_log_path = None
 
 server_state = ServerState()
 
@@ -324,6 +350,11 @@ def _cleanup_child_processes(i18n=None) -> None:
     _stop_process(server_state.ollama_process, "Ollama", i18n)
     _cleanup_pid_file(server_state.qdrant_pid_file)
     _cleanup_pid_file(server_state.ollama_pid_file)
+    if server_state.qdrant_log_file:
+      try:
+        server_state.qdrant_log_file.close()
+      except Exception:
+        pass
   finally:
     with _cleanup_lock:
       _cleanup_running = False
