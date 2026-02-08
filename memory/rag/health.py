@@ -61,7 +61,8 @@ def check_qdrant_available() -> Dict[str, Any]:
 
     host = os.getenv("QDRANT_HOST", "localhost")
     port = os.getenv("QDRANT_PORT", "6333")
-    qdrant_url = f"http://{host}:{port}/health"
+    # Qdrant 1.16.x responds on /collections (health endpoint is not exposed)
+    qdrant_url = f"http://{host}:{port}/collections"
     try:
       resp = httpx.get(qdrant_url, timeout=1.5)
       if resp.status_code != 200:
