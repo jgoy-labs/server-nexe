@@ -52,7 +52,7 @@ startup_timeout = 60
 shutdown_timeout = 30
 
 [plugins.modules]
-enabled = [ "security", "rag", "ollama_module", "mlx_module", "llama_cpp_module", "web_ui_module", "office365_mcp_module",]
+enabled = [ "security", "rag", "ollama_module", "mlx_module", "llama_cpp_module", "web_ui_module",]
 
 [plugins.models]
 preferred_engine = "auto"  # Configurat per l'instal·lador via .env (NEXE_MODEL_ENGINE)

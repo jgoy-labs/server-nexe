@@ -114,6 +114,8 @@ async def readiness_check(request: Request) -> dict:
   """
   config = getattr(request.app.state, "config", {}) or {}
   modules = getattr(request.app.state, "modules", {}) or {}
+  module_manager = getattr(request.app.state, "module_manager", None)
+  registry = getattr(module_manager, "registry", None) if module_manager else None
 
   required = _required_modules_from_config(config)
 
@@ -124,6 +126,11 @@ async def readiness_check(request: Request) -> dict:
 
   for module_name in sorted(required):
     instance = modules.get(module_name)
+    if not instance and registry:
+      registration = registry.get_module(module_name)
+      if registration and getattr(registration, "instance", None):
+        instance = registration.instance
+        modules.setdefault(module_name, instance)
     if not instance:
       missing.append(module_name)
       continue
