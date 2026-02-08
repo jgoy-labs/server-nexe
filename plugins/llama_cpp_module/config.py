@@ -49,7 +49,7 @@ class LlamaCppConfig:
     n_gpu_layers: int = -1
     n_threads: int = 8
     max_sessions: int = 1  # Option B: conservative, scalable if needed
-    chat_format: str = "gemma"
+    chat_format: str = "auto"
     use_mlock: bool = True
     use_mmap: bool = True
     flash_attn: bool = True
@@ -72,6 +72,22 @@ class LlamaCppConfig:
             project_root = Path(__file__).parents[2]  # From plugins/llama_cpp_module/ to project root
             self.model_path = str(project_root / self.model_path)
 
+        # Auto-detect chat format if not explicitly set
+        if not self.chat_format or self.chat_format == "auto":
+            name = (self.model_path or "").lower()
+            if "phi" in name:
+                self.chat_format = "chatml"
+            elif "mistral" in name:
+                self.chat_format = "mistral"
+            elif "llama-3" in name or "llama3" in name:
+                self.chat_format = "llama-3"
+            elif "llama" in name:
+                self.chat_format = "llama-2"
+            elif "gemma" in name:
+                self.chat_format = "gemma"
+            else:
+                self.chat_format = "llama-2"
+
     @classmethod
     def from_env(cls) -> "LlamaCppConfig":
         """
@@ -87,7 +103,7 @@ class LlamaCppConfig:
             n_gpu_layers=int(os.getenv("NEXE_LLAMA_CPP_GPU_LAYERS", "-1")),
             n_threads=int(os.getenv("NEXE_LLAMA_CPP_THREADS", "8")),
             max_sessions=int(os.getenv("NEXE_LLAMA_CPP_MAX_SESSIONS", "1")),
-            chat_format=os.getenv("NEXE_LLAMA_CPP_CHAT_FORMAT", "gemma"),
+            chat_format=os.getenv("NEXE_LLAMA_CPP_CHAT_FORMAT", "auto"),
             use_mlock=os.getenv("NEXE_LLAMA_CPP_USE_MLOCK", "true").lower() == "true",
             use_mmap=os.getenv("NEXE_LLAMA_CPP_USE_MMAP", "true").lower() == "true",
             flash_attn=os.getenv("NEXE_LLAMA_CPP_FLASH_ATTN", "true").lower() == "true",
@@ -156,7 +172,7 @@ class LlamaCppConfig:
             )
             return False
 
-        valid_formats = {"gemma", "llama-2", "chatml", "mistral", "alpaca"}
+        valid_formats = {"gemma", "llama-2", "llama-3", "chatml", "mistral", "alpaca"}
         if self.chat_format not in valid_formats:
             logger.warning(
                 t_modular(

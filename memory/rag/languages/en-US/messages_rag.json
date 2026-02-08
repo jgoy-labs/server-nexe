@@ -54,6 +54,8 @@
   "not_initialized": "Module not initialized",
   "init_check_error": "Error checking initialization: {error}",
   "qdrant_available": "qdrant-client {version} available",
+  "qdrant_unhealthy": "Qdrant not responding at {url} (HTTP {status})",
+  "qdrant_unreachable": "Qdrant not reachable at {url}: {error}",
   "qdrant_not_installed": "qdrant-client not installed (pip install qdrant-client)",
   "qdrant_check_error": "Error checking qdrant-client: {error}",
   "storage_paths_writable": "Storage paths writable: {path}",

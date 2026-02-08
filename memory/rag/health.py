@@ -14,6 +14,8 @@ from typing import Dict, Any, List
 from pathlib import Path
 import psutil
 import structlog
+import os
+import httpx
 
 from personality.i18n.resolve import t_modular
 
@@ -51,12 +53,39 @@ def check_module_initialized(module) -> Dict[str, Any]:
 def check_qdrant_available() -> Dict[str, Any]:
   """Check 2: Verifica Qdrant disponible."""
   try:
-    pass
     try:
       import importlib.metadata
       version = importlib.metadata.version("qdrant-client")
     except Exception:
       version = "unknown"
+
+    host = os.getenv("QDRANT_HOST", "localhost")
+    port = os.getenv("QDRANT_PORT", "6333")
+    qdrant_url = f"http://{host}:{port}/health"
+    try:
+      resp = httpx.get(qdrant_url, timeout=1.5)
+      if resp.status_code != 200:
+        return {
+          "name": "qdrant_available",
+          "status": "fail",
+          "message": _t(
+            "rag.health.qdrant_unhealthy",
+            "Qdrant not responding at {url} (HTTP {status})",
+            url=qdrant_url,
+            status=resp.status_code,
+          )
+        }
+    except Exception as e:
+      return {
+        "name": "qdrant_available",
+        "status": "fail",
+        "message": _t(
+          "rag.health.qdrant_unreachable",
+          "Qdrant not reachable at {url}: {error}",
+          url=qdrant_url,
+          error=str(e),
+        )
+      }
 
     return {
       "name": "qdrant_available",
