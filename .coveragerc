@@ -1,0 +1,6 @@
+[run]
+omit =
+    */tests/*
+    memory/embeddings/__main__.py
+    memory/embeddings/simple_embedder.py
+    plugins/security/sanitizer/workflow/nodes/*

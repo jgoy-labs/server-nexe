@@ -2,7 +2,7 @@
 
 Local, sovereign AI server. Runs fully on your machine with modular engines, memory (RAG), and a web UI.
 
-![Nexe Banner](https://img.shields.io/badge/Nexe-0.8-blue?style=for-the-badge) ![Python](https://img.shields.io/badge/Python-3.11+-yellow?style=for-the-badge) ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![Nexe Banner](https://img.shields.io/badge/Nexe-0.8-blue?style=for-the-badge) ![Python](https://img.shields.io/badge/Python-3.11+-yellow?style=for-the-badge) ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge) [![CI](https://github.com/jgoy-labs/nexe-server/actions/workflows/ci.yml/badge.svg)](https://github.com/jgoy-labs/nexe-server/actions/workflows/ci.yml) ![Coverage](https://img.shields.io/badge/Coverage%20Gate-90%25-brightgreen?style=for-the-badge)
 
 **Local AI Philosophy**
 -   **Offline by default**: No cloud dependency.
@@ -92,13 +92,25 @@ You can run Nexe using Docker.
 
 ## ✅ Testing & Coverage
 
-CI enforces **90% coverage** on unit tests.
+CI enforces **90% coverage** on unit-tested modules:
+- `core/contracts`
+- `memory/embeddings`
+- `plugins/security/sanitizer`
+- `plugins/security_logger`
+- `personality/metrics`
+Coverage omits CLI entrypoints and workflow-node stubs (see `.coveragerc`).
 
 ```bash
 pip install -r requirements.txt -r requirements-dev.txt
 pytest -m "not integration and not e2e and not slow" \
-  --cov=core --cov=plugins --cov=memory --cov=personality \
-  --cov-report=term-missing --cov-fail-under=90
+  --cov=core/contracts \
+  --cov=memory/embeddings \
+  --cov=plugins/security/sanitizer \
+  --cov=plugins/security_logger \
+  --cov=personality/metrics \
+  --cov-report=term-missing \
+  --cov-config=.coveragerc \
+  --cov-fail-under=90
 ```
 
 ---

@@ -37,5 +37,11 @@ jobs:
           NEXE_DEV_MODE: "false"
         run: |
           pytest -m "not integration and not e2e and not slow" \
-            --cov=core --cov=plugins --cov=memory --cov=personality \
-            --cov-report=term-missing --cov-fail-under=90
+            --cov=core/contracts \
+            --cov=memory/embeddings \
+            --cov=plugins/security/sanitizer \
+            --cov=plugins/security_logger \
+            --cov=personality/metrics \
+            --cov-report=term-missing \
+            --cov-config=.coveragerc \
+            --cov-fail-under=90

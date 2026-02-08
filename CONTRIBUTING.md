@@ -34,11 +34,19 @@ Thank you for your interest in contributing to Nexe! We welcome contributions fr
     - Run the server: `./nexe go`
     - Verify functionality in the Web UI or via API.
     - Check logs: `./nexe logs`
-    - Run unit tests with coverage (CI enforces 90%):
+    - Run unit tests with coverage (CI enforces 90% on unit-tested modules).
+      Modules: `core/contracts`, `memory/embeddings`, `plugins/security/sanitizer`, `plugins/security_logger`, `personality/metrics`.
+      Coverage omits CLI entrypoints and workflow-node stubs (see `.coveragerc`).
       ```bash
       pytest -m "not integration and not e2e and not slow" \
-        --cov=core --cov=plugins --cov=memory --cov=personality \
-        --cov-report=term-missing --cov-fail-under=90
+        --cov=core/contracts \
+        --cov=memory/embeddings \
+        --cov=plugins/security/sanitizer \
+        --cov=plugins/security_logger \
+        --cov=personality/metrics \
+        --cov-report=term-missing \
+        --cov-config=.coveragerc \
+        --cov-fail-under=90
       ```
 4.  **Linting & Formatting**:
     - We use `ruff` for linting and formatting (if configured).
