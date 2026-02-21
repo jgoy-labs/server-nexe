@@ -25,17 +25,10 @@ def setup_app_state(app: FastAPI, i18n: Any, config: dict, project_root: Path, m
     project_root: Project root path
     module_manager: ModuleManager instance
   """
-  from core.container import register_service
   from core.bootstrap_tokens import initialize_tokens
   from core.lifespan import get_server_state
   from core.endpoints.modules import configure_dependencies as configure_modules_deps
   from core.endpoints.root import configure_i18n as configure_root_i18n
-  
-  # Register services in DI Container early to prevent circularities
-  register_service("i18n", i18n)
-  register_service("config", config)
-  register_service("project_root", project_root)
-  register_service("module_manager", module_manager)
 
   from core.module_registry import ModuleRegistry
   app.state.module_registry = ModuleRegistry()

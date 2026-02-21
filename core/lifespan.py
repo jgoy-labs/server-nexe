@@ -217,6 +217,7 @@ async def lifespan(app: FastAPI):
     logger.info(msg)
 
     server_state.config = load_config(server_state.project_root, server_state.i18n)
+    app.state.config = server_state.config  # Sync: elimina el desync entre server_state i app.state
 
     # Auto-start services (Qdrant, Ollama) if not running
     await _auto_start_services(server_state.config, server_state.project_root)
