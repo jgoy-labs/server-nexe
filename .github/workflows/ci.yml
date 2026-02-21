@@ -30,6 +30,10 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
+      - name: Security audit (dependencies)
+        run: |
+          pip-audit --requirement requirements.txt --desc on
+
       - name: Run tests (unit only) with coverage
         env:
           NEXE_ENV: test

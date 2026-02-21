@@ -6,7 +6,9 @@ services:
     container_name: nexe-server
     restart: unless-stopped
     ports:
-      - "9119:9119"
+      # Bind to localhost only for security
+      # For remote access, use a reverse proxy (nginx/caddy) or VPN (Tailscale/WireGuard)
+      - "127.0.0.1:9119:9119"
     environment:
       - NEXE_ENV=production
       - QDRANT_HOST=qdrant
@@ -16,19 +18,35 @@ services:
       - ./storage:/app/storage
       - ./knowledge:/app/knowledge
       - ./personality:/app/personality
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9119/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
     depends_on:
       - qdrant
+    networks:
+      - nexe-internal
 
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.12.0
     container_name: nexe-qdrant
     restart: unless-stopped
     environment:
       - QDRANT__SERVICE__DISABLE_TELEMETRY=true
     ports:
-      - "6333:6333"
+      # Bind to localhost only - Qdrant should not be publicly accessible
+      # Nexe server accesses it via internal Docker network
+      - "127.0.0.1:6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    networks:
+      - nexe-internal
+
+networks:
+  nexe-internal:
+    driver: bridge
 
 volumes:
   qdrant_data:

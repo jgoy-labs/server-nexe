@@ -2,6 +2,40 @@
 
 Aquest document descriu **honestament** les mesures de seguretat implementades a NEXE i les seves limitacions.
 
+## 🔒 Millores de Seguretat (Febrer 2026)
+
+### Canvis Recents
+
+**✅ Completat:**
+- **Secrets rotats i protegits:** `.env` no està al repositori, `.env.example` amb placeholders
+- **Docker hardened:** Usuari no-root (`nexe`), permisos 750, execució segura
+- **Validació de scripts:** Verificació SHA256 per descàrrega del script d'Ollama
+- **API key obligatori:** Validació estricta en mode producció
+- **Ports restringits:** Qdrant i Nexe només accessibles des de localhost
+- **Dependencies actualitzades:** psutil >= 5.10.0, pip-audit per security scanning
+- **Shutdown graceful:** Cleanup complet de processos i recursos
+
+**📖 Nova Documentació:**
+- `DEPLOYMENT.md` - Guia completa de deployment segur
+- `scripts/generate_secrets.sh` - Script per generar secrets criptogràficament segurs
+
+**🔧 Eines de Seguretat:**
+```bash
+# Generar secrets
+./scripts/generate_secrets.sh
+
+# Scan de vulnerabilitats
+pip install -r requirements-dev.txt
+pip-audit
+
+# Verificar configuració Docker
+docker run --rm nexe-server:0.8 whoami  # Hauria de retornar: nexe
+```
+
+Consulta `DEPLOYMENT.md` per instruccions completes de deployment segur.
+
+---
+
 ## Índex
 
 1. [Context d'execució](#context-dexecució)

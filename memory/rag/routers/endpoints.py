@@ -33,7 +33,7 @@ def _t(key: str, fallback: str, **kwargs) -> str:
     if _I18N:
       return _I18N.t(key, fallback, **kwargs)
   except Exception:
-    pass
+    logger.debug("i18n translation failed for key: %s", key)
   if kwargs:
     try:
       return fallback.format(**kwargs)
@@ -96,7 +96,7 @@ async def add_document_endpoint(request: Dict[str, Any]):
       "Error adding document via API: {error}",
       error=str(e)
     ), exc_info=True)
-    raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=500, detail="Internal server error. Check logs.")
 
 async def search_endpoint(request: Dict[str, Any]):
   """Cercar documents rellevants."""
@@ -149,7 +149,9 @@ async def search_endpoint(request: Dict[str, Any]):
       "Error searching via API: {error}",
       error=str(e)
     ), exc_info=True)
-    raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=500, detail="Internal server error. Check logs.")
+
+ALLOWED_UPLOAD_EXTENSIONS = {'.txt', '.md', '.pdf', '.csv', '.rst', '.html'}
 
 async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}"):
   """Pujar fitxer al RAG amb auto-detecció de format."""
@@ -159,16 +161,41 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
     except Exception:
       meta_dict = {}
 
-    meta_dict["filename"] = file.filename
-    meta_dict["content_type"] = file.content_type
+    # SECURITY: Sanitize filename - only take the basename to prevent path traversal
+    if not file.filename:
+      raise HTTPException(
+        status_code=400,
+        detail=_t("rag.api.file_no_name", "File has no name.")
+      )
+    safe_name = Path(file.filename).name
+    if not safe_name or '..' in safe_name or safe_name.startswith('/'):
+      raise HTTPException(
+        status_code=400,
+        detail=_t("rag.api.invalid_filename", "Invalid filename.")
+      )
 
-    file_path = Path(file.filename)
+    meta_dict["filename"] = safe_name
+    # SECURITY: Do NOT trust client-provided content_type for security decisions
+
+    file_path = Path(safe_name)
     ext = file_path.suffix.lower()
 
     if not ext:
       raise HTTPException(
         status_code=400,
         detail=_t("rag.api.file_no_extension", "File has no extension. Cannot detect format.")
+      )
+
+    # SECURITY: Validate extension against whitelist
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+      raise HTTPException(
+        status_code=400,
+        detail=_t(
+          "rag.api.file_type_not_allowed",
+          "File type '{ext}' not allowed. Allowed: {allowed}",
+          ext=ext,
+          allowed=', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS)),
+        )
       )
 
     MAX_FILE_SIZE_MB = 50
@@ -206,7 +233,7 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
       return JSONResponse(content={
         "success": True,
         "doc_id": doc_id,
-        "filename": file.filename,
+        "filename": safe_name,
         "format": ext,
         "chunks": metrics.get("total_chunks", 0),
         "message": _t("rag.api.file_uploaded", "File uploaded and indexed successfully"),
@@ -227,7 +254,7 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
     ), exc_info=True)
     raise HTTPException(
       status_code=500,
-      detail=_t("rag.api.file_processing_error", "Error processing file: {error}", error=str(e))
+      detail="Internal server error. Check logs."
     )
 
 async def health_endpoint():

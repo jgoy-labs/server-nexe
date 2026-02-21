@@ -1,3 +1,22 @@
-# Development / Testing dependencies
+# ─────────────────────────────────────────────────────────────
+# Nexe Server 0.8 - Development Dependencies
+# Security scanning, testing, and development tools
+# ─────────────────────────────────────────────────────────────
+
+# --- Security Scanning ---
+pip-audit>=2.7.0  # Scan dependencies for known vulnerabilities
+safety>=3.0.0     # Check Python dependencies for security issues
+
+# --- Testing ---
 pytest>=8.0,<9
 pytest-cov>=5.0,<6
+pytest-asyncio>=0.23.0
+# httpx is in requirements.txt (already available in dev)
+
+# --- Code Quality ---
+ruff>=0.1.0  # Fast Python linter
+black>=24.0.0  # Code formatter
+mypy>=1.8.0  # Type checker
+
+# --- Development Tools ---
+ipython>=8.20.0  # Better REPL

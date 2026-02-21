@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user for running the application
+RUN groupadd -r nexe && useradd -r -g nexe nexe
+
 # Create app directory
 WORKDIR /app
 
@@ -24,9 +27,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
-# Create storage directory and set permissions
+# Create storage directory and set secure permissions
 RUN mkdir -p /app/storage/qdrant && \
-    chmod -R 777 /app/storage
+    chmod -R 750 /app/storage && \
+    chown -R nexe:nexe /app
+
+# Switch to non-root user
+USER nexe
 
 # Expose port
 EXPOSE 9119

@@ -352,7 +352,9 @@ def _cleanup_child_processes(i18n=None) -> None:
     _cleanup_pid_file(server_state.ollama_pid_file)
     if server_state.qdrant_log_file:
       try:
+        server_state.qdrant_log_file.flush()
         server_state.qdrant_log_file.close()
+        server_state.qdrant_log_file = None
       except Exception:
         pass
   finally:

@@ -87,6 +87,32 @@ You can run Nexe using Docker.
 -   **Qdrant**: Started with `--disable-telemetry` by default.
 -   **No Telemetry**: Nexe does not phone home.
 -   **Sanitization**: Uploaded files are scanned for potential jailbreaks before processing.
+-   **API Key Authentication**: Dual-key rotation system with automatic expiry.
+-   **Rate Limiting**: Configurable per-endpoint limits (2-1000 req/min).
+-   **Docker Hardened**: Non-root user execution, minimal permissions.
+-   **Localhost Only**: Ports restricted to `127.0.0.1` by default for maximum security.
+
+### 🔐 First-Time Setup
+
+After installation, generate secure secrets:
+
+```bash
+# Generate cryptographically secure secrets
+./scripts/generate_secrets.sh
+
+# Add the generated values to your .env file
+# NEXE_PRIMARY_API_KEY=...
+# NEXE_CSRF_SECRET=...
+```
+
+**⚠️ IMPORTANT:** Nexe is designed for **local use**. To expose it remotely:
+- ✅ Use a VPN (Tailscale recommended)
+- ✅ Or configure a reverse proxy with HTTPS (see `DEPLOYMENT.md`)
+- ❌ Never expose ports directly to the Internet
+
+For detailed security information, see:
+- `knowledge/SECURITY.md` - Complete security documentation
+- `DEPLOYMENT.md` - Secure deployment guide
 
 ---
 

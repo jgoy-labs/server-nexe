@@ -44,6 +44,70 @@ def _t(key: str, fallback: str, **kwargs) -> str:
   return t_modular(f"core.server_runner.{key}", fallback, **kwargs)
 
 
+def validate_production_config():
+  """
+  Validate critical security configuration in production mode.
+
+  Ensures that required secrets are configured when NEXE_ENV=production.
+  This prevents accidentally running an unauthenticated server in production.
+  """
+  env = os.getenv("NEXE_ENV", "development").lower()
+
+  if env != "production":
+    # Only enforce in production mode
+    return
+
+  missing_configs = []
+
+  # Check API key
+  if not os.getenv("NEXE_PRIMARY_API_KEY"):
+    missing_configs.append({
+      "var": "NEXE_PRIMARY_API_KEY",
+      "desc": "Primary API key for authentication",
+      "generate": "openssl rand -hex 32"
+    })
+
+  # Check CSRF secret
+  if not os.getenv("NEXE_CSRF_SECRET"):
+    missing_configs.append({
+      "var": "NEXE_CSRF_SECRET",
+      "desc": "CSRF protection secret",
+      "generate": "openssl rand -hex 32"
+    })
+
+  # Check module allowlist
+  if not os.getenv("NEXE_APPROVED_MODULES"):
+    missing_configs.append({
+      "var": "NEXE_APPROVED_MODULES",
+      "desc": "Comma-separated list of approved modules",
+      "generate": "security,llama_cpp_module,ollama_module,web_ui_module"
+    })
+
+  if missing_configs:
+    print(f"\n{RED}{BOLD}╔═══════════════════════════════════════════════════════════════╗{RESET}")
+    print(f"{RED}{BOLD}║  CRITICAL SECURITY ERROR - Production Mode Configuration     ║{RESET}")
+    print(f"{RED}{BOLD}╚═══════════════════════════════════════════════════════════════╝{RESET}\n")
+    print(f"{BOLD}The following required environment variables are missing:{RESET}\n")
+
+    for config in missing_configs:
+      print(f"  {RED}✗{RESET} {BOLD}{config['var']}{RESET}")
+      print(f"    {config['desc']}")
+      print(f"    {CYAN}Generate: {config['generate']}{RESET}\n")
+
+    print(f"{YELLOW}To fix this:{RESET}")
+    print(f"  1. Copy .env.example to .env")
+    print(f"  2. Generate secrets with: {CYAN}./scripts/generate_secrets.sh{RESET}")
+    print(f"  3. Add the generated values to your .env file")
+    print(f"  4. Or set NEXE_ENV=development for testing\n")
+
+    sys.exit(1)
+
+  logger.info(_t(
+    "production_config_validated",
+    "✓ Production security configuration validated"
+  ))
+
+
 def kill_process_on_port(port: int) -> bool:
   """Kill any process using the specified port.
 
@@ -86,12 +150,8 @@ def main():
 
   # Note: .env is now loaded at module level (top of file) for better test compatibility
 
-  # Check basic security config
-  if not os.getenv("NEXE_PRIMARY_API_KEY"):
-       logger.warning(_t(
-         "missing_api_key",
-         "No NEXE_PRIMARY_API_KEY found in .env. Authentication might fail or rely on defaults."
-       ))
+  # Validate production configuration (will exit if critical config missing)
+  validate_production_config()
 
   app = create_app()
 

@@ -1,0 +1,62 @@
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+tests/
+
+# Environment secrets - NEVER copy into image
+.env
+.env.local
+
+# Runtime storage & data
+storage/
+*.db
+*.sqlite
+*.log
+logs/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Git history
+.git/
+.gitignore
+
+# OS artifacts
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# CI/CD
+.github/
+
+# Dev tools
+dev-tools/
+
+# Large binaries (downloaded at runtime)
+qdrant
+
+# Documentation (not needed in image)
+*.md
+docs/

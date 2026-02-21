@@ -151,13 +151,10 @@ async def readiness_check(request: Request) -> dict:
   else:
     overall = "healthy"
 
+  # SECURITY: Return minimal status without auth to avoid exposing module info.
+  # Full details only available via authenticated /health/ready/detail endpoint.
   return {
     "status": overall,
-    "required_modules": sorted(required),
-    "missing_modules": missing,
-    "unhealthy_modules": unhealthy,
-    "degraded_modules": degraded,
-    "module_status": statuses,
     "timestamp": datetime.now().isoformat(),
   }
 

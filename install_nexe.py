@@ -1755,6 +1755,7 @@ def ensure_ollama_installed():
     3. It's the easiest way to run models
     """
     import platform
+    import hashlib
 
     # Check if already installed
     if shutil.which("ollama"):
@@ -1778,6 +1779,12 @@ def ensure_ollama_installed():
     install_url = "https://ollama.com/install.sh"
     install_cmd = f"curl -fsSL {install_url} -o /tmp/ollama_install.sh && sh /tmp/ollama_install.sh"
 
+    # Expected SHA256 hash of the Ollama install script
+    # NOTE: This should be updated periodically by checking the official script
+    # Obtain the current hash with: curl -fsSL https://ollama.com/install.sh | sha256sum
+    # SECURITY WARNING: If this check fails, DO NOT proceed with installation
+    OLLAMA_INSTALL_EXPECTED_SHA256 = None  # Set to None to skip verification (user must update manually)
+
     try:
         import tempfile
         import urllib.request
@@ -1787,6 +1794,31 @@ def ensure_ollama_installed():
 
         with urllib.request.urlopen(install_url, timeout=30) as response:
             script = response.read()
+
+        # Verify SHA256 checksum if configured
+        if OLLAMA_INSTALL_EXPECTED_SHA256:
+            actual_sha256 = hashlib.sha256(script).hexdigest()
+            print(f"  {DIM}Verificant integritat del script...{RESET}")
+            print(f"  {DIM}SHA256 esperat: {OLLAMA_INSTALL_EXPECTED_SHA256}{RESET}")
+            print(f"  {DIM}SHA256 actual:  {actual_sha256}{RESET}")
+
+            if actual_sha256 != OLLAMA_INSTALL_EXPECTED_SHA256:
+                print_warn("⚠️  CRITICAL SECURITY ERROR: Ollama script integrity check FAILED!")
+                print(f"  {RED}Expected SHA256: {OLLAMA_INSTALL_EXPECTED_SHA256}{RESET}")
+                print(f"  {RED}Got SHA256:      {actual_sha256}{RESET}")
+                print(f"\n  {BOLD}The downloaded script does not match the expected checksum.{RESET}")
+                print(f"  {BOLD}This could indicate a man-in-the-middle attack or corrupted download.{RESET}")
+                print(f"\n  {CYAN}Please:{RESET}")
+                print(f"    1. Verify your network connection is secure")
+                print(f"    2. Update OLLAMA_INSTALL_EXPECTED_SHA256 in install_nexe.py")
+                print(f"    3. Or install Ollama manually from https://ollama.com/download")
+                return False
+            print_success("✓ Verificació SHA256 correcta")
+        else:
+            print_warn("⚠️  WARNING: Skipping SHA256 verification (OLLAMA_INSTALL_EXPECTED_SHA256 not set)")
+            print(f"  {YELLOW}For improved security, obtain the current hash with:{RESET}")
+            print(f"  {CYAN}curl -fsSL https://ollama.com/install.sh | sha256sum{RESET}")
+            print(f"  {YELLOW}And update OLLAMA_INSTALL_EXPECTED_SHA256 in install_nexe.py{RESET}")
 
         script_path = None
         try:

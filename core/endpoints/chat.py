@@ -895,7 +895,11 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
                             break
 
                     except json.JSONDecodeError:
-                        pass
+                        logger.debug("Ollama stream: could not decode JSON line, skipping")
+    except asyncio.CancelledError:
+        # Client disconnected - stop the generator cleanly
+        logger.debug("Ollama stream cancelled (client disconnected)")
+        return
     except httpx.ConnectError:
         error_msg = {
             "error": _t_from_state(

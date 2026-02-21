@@ -7,10 +7,13 @@ Multi-layer validation:
 3. Integration validation (file structure)
 """
 
+import logging
 from typing import List, Optional, Any
 from dataclasses import dataclass
 from pathlib import Path
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 from .base import BaseContract, ModuleContract, validate_contract, contract_is_module
 from .models import load_manifest_from_toml, UnifiedManifest
@@ -337,7 +340,8 @@ class ContractValidator:
         # Carregar manifest
         try:
             manifest = load_manifest_from_toml(str(manifest_path))
-        except:
+        except Exception as e:
+            logger.warning("Failed to load manifest from %s: %s", manifest_path, e)
             return ValidationResult(
                 valid=False,
                 issues=all_issues,
