@@ -17,7 +17,6 @@ import logging
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-import logging
 
 from .session_manager import SessionManager
 from .file_handler import FileHandler
@@ -35,7 +34,6 @@ logger = logging.getLogger(__name__)
 _session_manager = SessionManager()
 _file_handler = None
 _static_dir = Path(__file__).parent / "static"
-_initialized = False
 
 # Initialize directories
 _static_dir.mkdir(parents=True, exist_ok=True)
@@ -56,12 +54,14 @@ async def serve_ui():
     raise HTTPException(status_code=404, detail="UI not found")
 
 
-@router_public.get("/static/{filename}")
+@router_public.get("/static/{filename:path}")
 async def serve_static(filename: str):
     """Servir CSS/JS"""
     from fastapi.responses import Response
 
-    file_path = _static_dir / filename
+    file_path = (_static_dir / filename).resolve()
+    if not str(file_path).startswith(str(_static_dir.resolve())):
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
@@ -647,6 +647,23 @@ async def health():
         "initialized": True,
         "sessions": len(_session_manager.list_sessions())
     }
+
+
+async def _session_cleanup_loop():
+    """Background loop that removes inactive sessions every hour."""
+    while True:
+        await asyncio.sleep(3600)  # cada hora
+        try:
+            removed = _session_manager.cleanup_inactive(max_age_hours=24)
+            if removed:
+                logger.info("Session cleanup: %d sessions removed", removed)
+        except Exception as e:
+            logger.warning("Session cleanup failed: %s", e)
+
+
+def start_session_cleanup_task():
+    """Start session cleanup background task. Call from lifespan startup."""
+    asyncio.create_task(_session_cleanup_loop())
 
 
 # Module instance getter

@@ -803,7 +803,140 @@ Per protecció robusta contra DDoS, necessitaries Cloudflare o similar.
 
 ---
 
-**Última actualització:** Febrer 2026 (NEXE 0.8.0)
+---
+
+## Auditoria Final — N-Series (21 febrer 2026)
+
+Exploració profunda post-merge de tots els ítems anteriors. 8 problemes nous detectats i corregits.
+
+### N-1: Configuració producció a server.toml
+
+**Severitat:** 🟠 Alta
+**Fitxer:** `personality/server.toml`
+
+El fitxer inclòs al repositori tenia `debug = true` i `reload = true`. Amb `debug = true`, FastAPI exposa el stack trace Python complet a les respostes HTTP d'error (HTTP 500), filtrant rutes internes, noms de mòduls i paths del sistema.
+
+**Fix:** `environment = "production"`, `debug = false`, `reload = false`
+
+---
+
+### N-2: PID i comandos kill eliminats de respostes HTTP
+
+**Severitat:** 🟠 Alta
+**Fitxer:** `core/endpoints/system.py`
+
+Els endpoints `/admin/system/restart` i `/admin/system/status` retornaven:
+- `supervisor_pid` — el PID del procés supervisor
+- `restart_command: "kill -HUP <pid>"` — la comanda exacta per reiniciar
+- `shutdown_command: "kill -TERM <pid>"` — la comanda exacta per aturar
+
+Tot i que requereixen API key, exposar el PID + comandos facilita lateral movement si la clau és compromesa: l'atacant sap exactament quin procés aturar.
+
+**Fix:** Eliminats els tres camps. Es manté `supervisor_running: bool` i `restart_available: bool`.
+
+---
+
+### N-3: Errors interns de memòria no exposats al client
+
+**Severitat:** 🟠 Alta
+**Fitxer:** `memory/memory/api/v1.py`
+
+Els endpoints `/memory/store`, `/memory/search` i `/memory/health` retornaven `str(e)` directament al client. Això pot filtrar:
+- URL interna de Qdrant (`http://localhost:6333`)
+- Missatges de connexió amb detalls de xarxa
+- Noms de col·leccions internes
+
+L'endpoint `/memory/health` és especialment greu perquè **no requereix autenticació**.
+
+**Fix:**
+- `store` i `search`: HTTPException amb `"Internal error. Check server logs."` + `logger.error(..., exc_info=True)`
+- `health`: `{"status": "unhealthy", "hint": "Ensure Qdrant is running"}` (sense `str(e)`)
+
+---
+
+### N-4: Path traversal bloquejat a `/ui/static/`
+
+**Severitat:** 🟠 Alta
+**Fitxer:** `plugins/web_ui_module/manifest.py`
+
+L'endpoint `/ui/static/{filename}` llegía fitxers sense cap validació de path. `GET /ui/static/../../etc/passwd` podia llegir fitxers del sistema operatiu.
+
+**Fix:**
+```python
+@router_public.get("/static/{filename:path}")
+async def serve_static(filename: str):
+    file_path = (_static_dir / filename).resolve()
+    if not str(file_path).startswith(str(_static_dir.resolve())):
+        raise HTTPException(status_code=403, detail="Forbidden")
+```
+
+El mòdul Ollama ja usava `validate_safe_path()`. Ara web_ui segueix el mateix patró.
+
+---
+
+### N-5: Cleanup automàtic de sessions (tasca asyncio periòdica)
+
+**Severitat:** 🟡 Mitja
+**Fitxers:** `plugins/web_ui_module/manifest.py`, `core/lifespan.py`
+
+La funció `cleanup_inactive()` del `SessionManager` existia i funcionava (testejada a la suite A-6), però **mai era cridada automàticament**. Les sessions s'acumulaven en RAM i a `storage/sessions/` indefinidament.
+
+**Fix:** Tasca asyncio `_session_cleanup_loop()` que s'executa cada hora i elimina sessions inactives de més de 24 hores. S'inicia al startup via `start_session_cleanup_task()` cridat des del lifespan.
+
+---
+
+### N-6: Versió llegida de config (no hardcoded)
+
+**Severitat:** 🟢 Baixa
+**Fitxer:** `core/endpoints/system.py`
+
+`/admin/system/health` retornava `"version": "0.7.1"` hardcoded (versió incorrecta del projecte).
+
+**Fix:** `get_server_state().config.get('meta', {}).get('version', '0.8.0')`
+
+---
+
+### N-7: Import duplicat eliminat
+
+**Severitat:** 🟢 Baixa
+**Fitxer:** `plugins/web_ui_module/manifest.py`
+
+`import logging` apareixia dues vegades (línies 16 i 20). Eliminat el duplicat.
+
+---
+
+### N-8: Variable morta eliminada
+
+**Severitat:** 🟢 Baixa
+**Fitxer:** `plugins/web_ui_module/manifest.py`
+
+`_initialized = False` era declarada però mai llegida. Eliminada.
+
+---
+
+### Tests associats (N-series)
+
+**Fitxer:** `core/endpoints/tests/test_security_n_series.py`
+**35 tests** cobreixen tots els ítems N-1..N-8:
+
+| Classe | Ítems | Tests |
+|--------|-------|-------|
+| `TestServerTomlProductionConfig` | N-1 | 3 |
+| `TestSystemEndpointInfoDisclosure` | N-2 | 6 |
+| `TestMemoryAPIErrorDisclosure` | N-3 | 7 |
+| `TestStaticFilePathTraversal` | N-4 | 7 |
+| `TestSessionCleanupTask` | N-5 | 7 |
+| `TestSystemHealthVersion` | N-6 | 3 |
+| `TestManifestDeadCodeRemoved` | N-7, N-8 | 2 |
+
+```bash
+venv/bin/python -m pytest core/endpoints/tests/test_security_n_series.py -v
+# → 35 passed
+```
+
+---
+
+**Última actualització:** 21 febrer 2026 (NEXE 0.8.0 — auditoria final N-series)
 
 **Nota:** Aquesta documentació està basada en revisió exhaustiva del codi real. Si trobes discrepàncies entre el codi i aquest document, el codi és la font de veritat. Reporta discrepàncies per actualitzar la documentació.
 
@@ -814,3 +947,4 @@ Per protecció robusta contra DDoS, necessitaries Cloudflare o similar.
 - Security logging: `plugins/security_logger/`
 - Rate limiting: `plugins/security/core/rate_limiting.py`
 - Security scanning: `plugins/security/manifest.py`
+- Auditoria N-series: `core/endpoints/tests/test_security_n_series.py`
