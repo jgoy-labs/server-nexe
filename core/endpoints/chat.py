@@ -533,8 +533,12 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
                                      logger.error(f"Stream Auto-Save failed: {e}")
                             break
 
-                    except json.JSONDecodeError:
-                        pass
+                    except json.JSONDecodeError as jde:
+                        logger.debug("Ollama stream: JSON decode error on line: %s", jde)
+    except asyncio.CancelledError:
+        # Client disconnected during streaming — clean exit, no error.
+        logger.debug("Ollama stream cancelled (client disconnected)")
+        return
     except httpx.ConnectError:
         error_msg = {"error": "Ollama no disponible. Espera uns segons i torna-ho a provar."}
         yield f"data: {json.dumps(error_msg)}\n\n"

@@ -14,7 +14,7 @@ import uuid
 import json
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -211,7 +211,7 @@ class SessionManager:
 
     def cleanup_inactive(self, max_age_hours: int = 24) -> int:
         """
-        Netejar sessions inactives (no implementat encara)
+        Netejar sessions inactives.
 
         Args:
             max_age_hours: Màxim temps d'inactivitat en hores
@@ -219,8 +219,20 @@ class SessionManager:
         Returns:
             Nombre de sessions eliminades
         """
-        # TODO: Implementar si cal
-        return 0
+        cutoff = datetime.now() - timedelta(hours=max_age_hours)
+        expired_ids = [
+            sid for sid, session in self._sessions.items()
+            if session.last_activity < cutoff
+        ]
+        for sid in expired_ids:
+            del self._sessions[sid]
+            self._delete_session_from_disk(sid)
+        if expired_ids:
+            logger.info(
+                "Cleaned %d inactive session(s) older than %dh",
+                len(expired_ids), max_age_hours
+            )
+        return len(expired_ids)
 
 
 __all__ = ["SessionManager", "ChatSession"]
