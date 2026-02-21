@@ -108,14 +108,10 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
         )
 
     except Exception as e:
-        logger.error("Memory store failed: %s", e)
+        logger.error("Memory store failed: %s", e, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail={
-                "error": "Store failed",
-                "message": str(e),
-                "hint": "Ensure Qdrant is running (./nexe go starts it automatically)"
-            }
+            detail="Internal error. Check server logs."
         )
 
 @router.post("/search", response_model=MemorySearchResponse, dependencies=[Depends(require_api_key)])
@@ -163,14 +159,10 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         )
 
     except Exception as e:
-        logger.error("Memory search failed: %s", e)
+        logger.error("Memory search failed: %s", e, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail={
-                "error": "Search failed",
-                "message": str(e),
-                "hint": "Ensure Qdrant is running (./nexe go starts it automatically)"
-            }
+            detail="Internal error. Check server logs."
         )
 
 @router.get("/health")
@@ -185,9 +177,9 @@ async def memory_health():
             "initialized": True
         }
     except Exception as e:
+        logger.error("Memory health check failed: %s", e)
         return {
             "status": "unhealthy",
-            "error": str(e),
             "hint": "Ensure Qdrant is running"
         }
 

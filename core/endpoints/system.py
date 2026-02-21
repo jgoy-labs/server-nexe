@@ -188,7 +188,6 @@ async def restart_server(
         "system.restart_initiated_message",
         "Servidor reiniciant en ~1 segon"
       ),
-      "supervisor_pid": supervisor_pid,
       "expected_downtime_seconds": 5,
       "instructions": _t(
         "system.restart_instructions",
@@ -225,8 +224,6 @@ async def supervisor_status(_: str = Depends(require_api_key)) -> Dict[str, Any]
   Example Response:
     {
       "supervisor_running": true,
-      "supervisor_pid": 12345,
-      "pid_file": "/tmp/core_supervisor.pid",
       "restart_available": true
     }
   """
@@ -235,18 +232,12 @@ async def supervisor_status(_: str = Depends(require_api_key)) -> Dict[str, Any]
 
     return {
       "supervisor_running": True,
-      "supervisor_pid": supervisor_pid,
-      "pid_file": str(SUPERVISOR_PID_FILE),
-      "restart_available": True,
-      "restart_command": f"kill -HUP {supervisor_pid}",
-      "shutdown_command": f"kill -TERM {supervisor_pid}"
+      "restart_available": True
     }
 
   except HTTPException as e:
     return {
       "supervisor_running": False,
-      "supervisor_pid": None,
-      "pid_file": str(SUPERVISOR_PID_FILE),
       "restart_available": False,
       "error": e.detail
     }
@@ -265,13 +256,18 @@ async def system_health() -> Dict[str, Any]:
   Example Response:
     {
       "status": "healthy",
-      "version": "0.7.1",
+      "version": "0.8.0",
       "platform": "Nexe Framework"
     }
   """
+  try:
+    from core.lifespan import get_server_state
+    version = get_server_state().config.get('meta', {}).get('version', '0.8.0')
+  except Exception:
+    version = '0.8.0'
   return {
     "status": "healthy",
-    "version": "0.7.1",
+    "version": version,
     "platform": "Nexe Framework",
     "uptime": "available"
   }

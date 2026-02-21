@@ -546,6 +546,14 @@ async def lifespan(app: FastAPI):
     if hasattr(server_state, 'configure_modules_callback'):
       server_state.configure_modules_callback(server_state.api_integrator, server_state.i18n)
 
+    # Session cleanup background task (N-5)
+    try:
+      from plugins.web_ui_module.manifest import start_session_cleanup_task
+      start_session_cleanup_task()
+      logger.info("Session cleanup task started (runs every hour)")
+    except Exception as e:
+      logger.warning("Could not start session cleanup task: %s", e)
+
     # Final message: Server ready
     logger.info("=" * 70)
     logger.info("✅  SERVER.NEXE READY · Listening on http://localhost:9119")
