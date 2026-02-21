@@ -10,12 +10,15 @@ www.jgoy.net
 ────────────────────────────────────
 """
 
+import threading
+
 from .i18n_manager import I18nManager
 from .modular_i18n import ModularI18nManager
 
 I18n = I18nManager
 
 _global_i18n = None
+_global_i18n_lock = threading.Lock()
 
 class I18nHelper:
   """Helper wrapper per compatibilitat amb funcions standalone."""
@@ -50,7 +53,8 @@ def get_i18n() -> I18nHelper:
   Retorna instància global de I18nHelper.
 
   Útil per funcions standalone que no tenen accés a self._t().
-  Usa singleton pattern per performance.
+  Usa singleton pattern per performance amb double-checked locking
+  per evitar race conditions en entorns async/multi-thread.
 
   Returns:
     I18nHelper: Helper amb suport per fallback
@@ -61,5 +65,7 @@ def get_i18n() -> I18nHelper:
   """
   global _global_i18n
   if _global_i18n is None:
-    _global_i18n = I18nHelper(I18nManager())
+    with _global_i18n_lock:
+      if _global_i18n is None:
+        _global_i18n = I18nHelper(I18nManager())
   return _global_i18n

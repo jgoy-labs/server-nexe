@@ -39,22 +39,11 @@ class I18nManager:
     self._load_config()
   
   def _find_config_path(self, config_path: Optional[Path]) -> Path:
-    """Find configuration file"""
+    """Find configuration file using centralized search from core.config."""
     if config_path and config_path.exists():
       return config_path
-    
-    search_paths = [
-      Path("server.toml"),
-      Path("personality/server.toml"),
-      Path("../server.toml"),
-      Path("../../server.toml")
-    ]
-    
-    for path in search_paths:
-      if path.exists():
-        return path.resolve()
-    
-    return Path("personality/server.toml")
+    from core.config import find_config_path as core_find_config_path
+    return core_find_config_path() or Path("personality/server.toml")
   
   def _load_config(self) -> None:
     """Load language configuration from server.toml"""
