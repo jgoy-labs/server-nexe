@@ -75,7 +75,7 @@ async def add_document_endpoint(request: Dict[str, Any]):
 
   except Exception as e:
     logger.error("Error adding document via API: %s", e, exc_info=True)
-    raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=500, detail="Internal server error.")
 
 async def search_endpoint(request: Dict[str, Any]):
   """Cercar documents rellevants."""
@@ -124,7 +124,9 @@ async def search_endpoint(request: Dict[str, Any]):
 
   except Exception as e:
     logger.error("Error searching via API: %s", e, exc_info=True)
-    raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=500, detail="Internal server error.")
+
+ALLOWED_UPLOAD_EXTENSIONS = {".txt", ".md", ".pdf", ".csv", ".json", ".rst"}
 
 async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}"):
   """Pujar fitxer al RAG amb auto-detecció de format."""
@@ -134,16 +136,28 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
     except Exception:
       meta_dict = {}
 
-    meta_dict["filename"] = file.filename
+    # SECURITY: Use only the base name — reject any path components (path traversal).
+    safe_name = Path(file.filename).name if file.filename else ""
+    if not safe_name or ".." in safe_name:
+      raise HTTPException(status_code=400, detail="Invalid filename.")
+
+    meta_dict["filename"] = safe_name
     meta_dict["content_type"] = file.content_type
 
-    file_path = Path(file.filename)
+    file_path = Path(safe_name)
     ext = file_path.suffix.lower()
 
     if not ext:
       raise HTTPException(
         status_code=400,
         detail="File has no extension. Cannot detect format."
+      )
+
+    # SECURITY: Whitelist allowed extensions.
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+      raise HTTPException(
+        status_code=400,
+        detail=f"File type '{ext}' not allowed. Allowed: {sorted(ALLOWED_UPLOAD_EXTENSIONS)}"
       )
 
     MAX_FILE_SIZE_MB = 50
@@ -191,7 +205,7 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
     raise
   except Exception as e:
     logger.error("Error uploading file via API: %s", e, exc_info=True)
-    raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+    raise HTTPException(status_code=500, detail="Internal server error processing file.")
 
 async def health_endpoint():
   """Health check del mòdul RAG."""
@@ -217,7 +231,7 @@ async def info_endpoint():
 
   except Exception as e:
     logger.error("Error getting info via API: %s", e, exc_info=True)
-    raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=500, detail="Internal server error.")
 
 async def files_stats_endpoint():
   """Obtenir estadístiques dels fitxers pujats."""
@@ -245,7 +259,7 @@ async def files_stats_endpoint():
 
   except Exception as e:
     logger.error("Error getting file stats via API: %s", e, exc_info=True)
-    raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=500, detail="Internal server error.")
 
 __all__ = [
   "add_document_endpoint",

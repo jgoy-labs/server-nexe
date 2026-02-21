@@ -146,8 +146,10 @@ class PersistenceManager:
         logger.info("Qdrant initialized in EMBEDDED mode at %s", self.qdrant_path)
       else:
         # Mode Server (HTTP)
+        qdrant_api_key = os.getenv("QDRANT_API_KEY")  # None = no auth (local)
         self.qdrant = QdrantClient(
           url=self.qdrant_url,
+          api_key=qdrant_api_key,
           prefer_grpc=False,
           timeout=QDRANT_TIMEOUT
         )
