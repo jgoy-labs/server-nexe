@@ -144,13 +144,9 @@ async def readiness_check(request: Request) -> dict:
   else:
     overall = "healthy"
 
+  # SECURITY: Return minimal status without exposing internal module details.
   return {
     "status": overall,
-    "required_modules": sorted(required),
-    "missing_modules": missing,
-    "unhealthy_modules": unhealthy,
-    "degraded_modules": degraded,
-    "module_status": statuses,
     "timestamp": datetime.now().isoformat(),
   }
 

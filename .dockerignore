@@ -1,0 +1,38 @@
+# Secrets — NEVER include in Docker image
+.env
+
+# Virtual environment
+venv/
+.venv/
+
+# Storage (runtime data, models)
+storage/
+qdrant/
+snapshots/
+knowledge/
+
+# Git history
+.git/
+.gitignore
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Tests and dev tools
+tests/
+.pytest_cache/
+pytest.ini
+conftest.py
+dev-tools/
+
+# IDE / editor
+.vscode/
+.idea/
+*.code-workspace

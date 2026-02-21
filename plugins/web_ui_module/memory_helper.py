@@ -116,8 +116,8 @@ class MemoryHelper:
                 if ollama.is_available():
                     self._llm_engine = ("ollama", ollama)
                     return self._llm_engine
-            except:
-                pass
+            except Exception as e:
+                logger.debug("Ollama not available for extraction: %s", e)
 
             try:
                 # Fallback to MLX
@@ -126,8 +126,8 @@ class MemoryHelper:
                 if mlx.is_available():
                     self._llm_engine = ("mlx", mlx)
                     return self._llm_engine
-            except:
-                pass
+            except Exception as e:
+                logger.debug("MLX not available for extraction: %s", e)
 
             self._llm_engine = (None, None)
         return self._llm_engine
@@ -297,8 +297,8 @@ class MemoryHelper:
                     days_old = (datetime.now() - saved_date).days
                     # Decay: 1.0 at day 0, 0.5 at TEMPORAL_DECAY_DAYS, approaches 0.1 after
                     recency_score = max(0.1, 1.0 - (days_old / (TEMPORAL_DECAY_DAYS * 3)))
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug("Recency score calculation failed: %s", e)
 
             # Combined score
             retention = (type_weight * 0.4) + (access_score * 0.3) + (recency_score * 0.3)
@@ -504,8 +504,8 @@ class MemoryHelper:
             # Small penalty for very old
             elif days_old > TEMPORAL_DECAY_DAYS * 4:
                 return score * 0.9
-        except:
-            pass
+        except Exception as e:
+            logger.debug("Temporal decay calculation failed: %s", e)
 
         return score
 
