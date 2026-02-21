@@ -267,10 +267,10 @@ async def chat(request: Dict[str, Any]):
     if intent == "chat":
         # Normal chat - Auto-detect and use available LLM engine
         try:
-            from core.container import get_service
+            from core.lifespan import get_server_state
             import os
 
-            module_manager = get_service("module_manager")
+            module_manager = get_server_state().module_manager
             model_name = os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
             preferred_engine = os.getenv("NEXE_MODEL_ENGINE", "auto").lower()
 

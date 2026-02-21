@@ -11,6 +11,10 @@ www.jgoy.net
 ────────────────────────────────────
 """
 
+# DEPRECATED: Container no s'usa en producció des de v0.8.2
+# Els serveis s'obtenen via app.state (FastAPI DI) o get_server_state().
+# Mantingut per compatibilitat amb tests. Planificat per eliminar en v0.9.
+
 import logging
 from typing import Any, Dict, Optional, Type, TypeVar
 

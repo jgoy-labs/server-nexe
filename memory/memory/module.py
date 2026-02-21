@@ -16,6 +16,7 @@ import logging
 from pathlib import Path
 
 from personality.i18n import get_i18n
+from core.lifespan import get_server_state
 
 from .engines.flash_memory import FlashMemory
 from .engines.ram_context import RAMContext
@@ -56,24 +57,23 @@ class MemoryModule:
         i18n.t("memory.singleton_error", "MemoryModule is Singleton. Use get_instance()")
       )
 
-    from core.container import get_service
     from .constants import MANIFEST, MODULE_ID
 
     self.module_id = MODULE_ID
     self.manifest = MANIFEST
     self.name = MANIFEST["name"]
     self.version = MANIFEST["version"]
-    
-    # Dependencies obtained via DI Container instead of hacks
-    self.i18n = get_service("i18n")
-    self.config = get_service("config")
+
+    # Dependencies obtained via server_state (single source of truth)
+    self.i18n = get_i18n()
+    self.config = get_server_state().config
 
     self._flash_memory = None
     self._ram_context = None
     self._persistence = None
     self._pipeline = None
 
-    logger.debug(f"MemoryModule created: {self.module_id} v{self.version} (DI Container active)")
+    logger.debug(f"MemoryModule created: {self.module_id} v{self.version}")
 
   @classmethod
   def get_instance(cls) -> 'MemoryModule':
@@ -106,19 +106,17 @@ class MemoryModule:
       return True
 
     try:
-      from core.container import get_service
-      
       final_config = {**self.manifest.get("config", {})}
       if config:
         final_config.update(config)
 
       logger.debug("MemoryModule initializing...")
 
-      project_root = get_service("project_root")
+      project_root = get_server_state().project_root
       if not project_root:
         from pathlib import Path
         project_root = Path.cwd()
-        logger.warning("project_root not found in Container, using cwd: %s", project_root)
+        logger.warning("project_root not found in server_state, using cwd: %s", project_root)
 
       # ✅ FIX: Unify paths with installer (storage/vectors/)
       vectors_path = project_root / "storage" / "vectors"
