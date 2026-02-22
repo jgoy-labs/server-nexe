@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────
 # ModuleID: llama_cpp_module
 # Nexe v0.8.0 | Antigravity | 2026-01-02
-# server.nexe/plugins/llama_cpp_module/manifest.toml
+# server-nexe/plugins/llama_cpp_module/manifest.toml
 # ─────────────────────────────────────────────────────────────
 
 [module]

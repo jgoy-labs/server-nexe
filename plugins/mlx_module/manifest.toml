@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────
 # ModuleID: mlx_module
 # Nexe v0.8.0 | Antigravity | 2026-01-02
-# server.nexe/plugins/mlx_module/manifest.toml
+# server-nexe/plugins/mlx_module/manifest.toml
 # ─────────────────────────────────────────────────────────────
 
 [module]

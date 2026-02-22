@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────
 # ModuleID: web_ui_module
 # Nexe v0.8.0 | Web UI Demo Plugin | 2026-01-11
-# server.nexe/plugins/web_ui_module/manifest.toml
+# server-nexe/plugins/web_ui_module/manifest.toml
 # ─────────────────────────────────────────────────────────────
 
 [module]

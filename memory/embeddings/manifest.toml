@@ -1,7 +1,7 @@
 # ═══════════════════════════════════════════════════════════════
 # Nexe 0.8.0 - Embeddings Module Manifest
 # ═══════════════════════════════════════════════════════════════
-# Ubicació: server.nexe/memory/embeddings/manifest.toml
+# Ubicació: server-nexe/memory/embeddings/manifest.toml
 # Descripció: Sistema d'embeddings multilingüe amb cache multi-nivell i vectorització
 # ═══════════════════════════════════════════════════════════════
 
@@ -16,7 +16,7 @@ created = "2025-10-27"
 last_updated = "2025-10-27"
 
 [paths]
-root = "server.nexe/memory/embeddings"
+root = "server-nexe/memory/embeddings"
 manifest = "manifest.py"
 module = "module.py"
 health = "health.py"
