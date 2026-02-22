@@ -106,7 +106,7 @@ async def run_security_scan(
     from .checks.rate_limit_check import RateLimitCheck
 
     results = []
-    project_root = Path(__file__).parent.parent.parent  # server.nexe root
+    project_root = Path(__file__).parent.parent.parent  # server-nexe root
 
     # Execute all security checks (each may need project_root)
     checks = [

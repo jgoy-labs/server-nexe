@@ -48,7 +48,7 @@ def print_banner():
   if RICH_AVAILABLE:
     console.print(Panel(
       NEXE_BANNER,
-      title="[bold red]server.nexe[/bold red]",
+      title="[bold red]server-nexe[/bold red]",
       border_style="red",
       box=box.ROUNDED,
     ))
