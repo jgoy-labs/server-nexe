@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────
 # ModuleID: {{NEXE_MODULE_ID}}
 # Nexe v0.7.1 | Jordi Goy | 2025-12-01
-# server.nexe/core/cli/manifest.toml
+# server-nexe/core/cli/manifest.toml
 #
 # Descripció:
 # Manifest operatiu del CLI Central Nexe. Utilitzat pel ModuleManager

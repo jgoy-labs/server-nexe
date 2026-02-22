@@ -1,7 +1,7 @@
 # ═══════════════════════════════════════════════════════════════
 # Nexe 0.8.0 - Security Module Manifest
 # ═══════════════════════════════════════════════════════════════
-# Ubicació: server.nexe/plugins/security/manifest.toml
+# Ubicació: server-nexe/plugins/security/manifest.toml
 # Descripció: Mòdul de seguretat amb scanning, autenticació i rate limiting
 # ═══════════════════════════════════════════════════════════════
 
@@ -78,7 +78,7 @@ supported_locales = ["ca-ES", "es-ES", "en-US"]
 translations_path = "languages/"
 
 [paths]
-root = "server.nexe/plugins/security"
+root = "server-nexe/plugins/security"
 manifest = "manifest.py"
 ui = "ui"
 checks = "checks"
@@ -131,7 +131,7 @@ specialist_path = "specialists/security_specialist.py"
 
 [logging]
 enabled = true
-log_dir = "server.nexe/storage/logs/security"
+log_dir = "server-nexe/storage/logs/security"
 level = "INFO"
 
 [i18n]
