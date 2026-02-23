@@ -29,3 +29,6 @@ logs/
 .qdrant-initialized
 storage/.knowledge_ingested
 qdrant
+
+COMMANDS.md
+personality/.module_cache.json

@@ -206,6 +206,9 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
     start_time = time.time()
     engine_status = "success"
 
+    # Server language: NEXE_LANG env var (not i18n module, which tracks UI translation language)
+    _server_lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()  # "ca-ES" → "ca"
+
     # 2. RAG Context Injection
     context_text = ""
     if request.use_rag:
@@ -238,14 +241,6 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                         logger.debug("RAG docs search failed: %s", e)
 
                     # 2. Search user knowledge (custom documents in knowledge/ folder)
-                    # Filter by server language so only docs in the active lang are returned.
-                    # Priority: i18n runtime selector > NEXE_LANG env > "ca"
-                    _i18n = getattr(req.app.state, "i18n", None)
-                    _lang_full = (
-                        getattr(_i18n, "current_language", None)
-                        or os.getenv("NEXE_LANG", "ca")
-                    )
-                    _server_lang = _lang_full.split("-")[0].lower()  # "ca-ES" → "ca"
                     try:
                         if await memory.collection_exists("user_knowledge"):
                             knowledge_results = await memory.search(
