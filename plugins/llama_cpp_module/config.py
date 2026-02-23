@@ -47,7 +47,7 @@ class LlamaCppConfig:
     n_gpu_layers: int = -1
     n_threads: int = 8
     max_sessions: int = 1  # Opció B: conservador, escalable si cal
-    chat_format: str = "gemma"
+    chat_format: str = "chatml"  # chatml és compatible amb Phi-3.5, Llama 3, Salamandra
     use_mlock: bool = True
     use_mmap: bool = True
     flash_attn: bool = True
@@ -83,7 +83,7 @@ class LlamaCppConfig:
             n_gpu_layers=int(os.getenv("NEXE_LLAMA_CPP_GPU_LAYERS", "-1")),
             n_threads=int(os.getenv("NEXE_LLAMA_CPP_THREADS", "8")),
             max_sessions=int(os.getenv("NEXE_LLAMA_CPP_MAX_SESSIONS", "1")),
-            chat_format=os.getenv("NEXE_LLAMA_CPP_CHAT_FORMAT", "gemma"),
+            chat_format=os.getenv("NEXE_LLAMA_CPP_CHAT_FORMAT", "chatml"),
             use_mlock=os.getenv("NEXE_LLAMA_CPP_USE_MLOCK", "true").lower() == "true",
             use_mmap=os.getenv("NEXE_LLAMA_CPP_USE_MMAP", "true").lower() == "true",
             flash_attn=os.getenv("NEXE_LLAMA_CPP_FLASH_ATTN", "true").lower() == "true",
@@ -130,7 +130,7 @@ class LlamaCppConfig:
             logger.error("LlamaCppConfig: max_sessions minimum is 1")
             return False
 
-        valid_formats = {"gemma", "llama-2", "chatml", "mistral", "alpaca"}
+        valid_formats = {"gemma", "llama-2", "llama-3", "chatml", "mistral", "alpaca", "phi-3"}
         if self.chat_format not in valid_formats:
             logger.warning(
                 "LlamaCppConfig: chat_format '%s' no reconegut. "
