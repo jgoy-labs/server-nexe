@@ -410,10 +410,15 @@ def knowledge():
 def ingest_knowledge_cmd():
     """Ingereix els documents de knowledge/ a Qdrant."""
     import asyncio
+    import os
     from pathlib import Path
 
     project_root = Path(__file__).parent.parent.parent
     knowledge_path = project_root / "knowledge"
+    _nexe_lang = os.getenv("NEXE_LANG", "ca")
+    lang_path = knowledge_path / _nexe_lang
+    if lang_path.is_dir():
+        knowledge_path = lang_path
 
     if not knowledge_path.exists():
         click.echo(click.style(f"❌ Carpeta '{knowledge_path}' no existeix.", fg="red"))

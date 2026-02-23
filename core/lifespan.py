@@ -415,6 +415,10 @@ async def lifespan(app: FastAPI):
     # To manually re-ingest: ./nexe knowledge ingest
     try:
       knowledge_path = server_state.project_root / "knowledge"
+      _nexe_lang = os.getenv("NEXE_LANG", "ca")
+      lang_path = knowledge_path / _nexe_lang
+      if lang_path.is_dir():
+        knowledge_path = lang_path
       ingested_marker = server_state.project_root / "storage" / ".knowledge_ingested"
 
       if knowledge_path.exists():
