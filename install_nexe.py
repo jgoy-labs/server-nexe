@@ -44,8 +44,8 @@ APP_LOGO = f"""{RED}
 {RESET}
                      {BOLD}NEXE{RESET}
 
-      {DIM}Personal project by Jordi Goy learning by doing
-           assisted by IA · www.jgoy.net{RESET}
+      {DIM}Projecte personal de Jordi Goy, aprenent fent-ho
+           assistit per IA · www.jgoy.net{RESET}
 """
 
 # ═══════════════════════════════════════════════════════════════════════════
