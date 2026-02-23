@@ -61,11 +61,11 @@ MODEL_CATALOG = {
             "key": "phi35",
             "name": "Phi-3.5 Mini",
             "origin": "Microsoft",
-            "lang": "Multilingüe (Anglès principal)",
+            "lang": {"ca": "Multilingüe (Anglès principal)", "es": "Multilingüe (Inglés principal)", "en": "Multilingual (English primary)"},
             "params": "3.8B",
-            "disk_gb": 2.4,   # Disk space
-            "ram_gb": 3.5,    # RAM needed when running
-            "description": "Molt ràpid, bo per tasques generals",
+            "disk_gb": 2.4,
+            "ram_gb": 3.5,
+            "description": {"ca": "Molt ràpid, bo per tasques generals", "es": "Muy rápido, bueno para tareas generales", "en": "Very fast, good for general tasks"},
             "mlx": "mlx-community/Phi-3.5-mini-instruct-4bit",
             "ollama": "phi3:mini",
             "gguf": "https://huggingface.co/microsoft/Phi-3.5-mini-instruct-gguf/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf",
@@ -74,11 +74,11 @@ MODEL_CATALOG = {
             "key": "salamandra2b",
             "name": "Salamandra 2B",
             "origin": "BSC/AINA (Catalunya)",
-            "lang": "Català, Castellà, Euskera, Gallec",
+            "lang": {"ca": "Català, Castellà, Euskera, Gallec", "es": "Catalán, Castellano, Euskera, Gallego", "en": "Catalan, Spanish, Basque, Galician"},
             "params": "2B",
-            "disk_gb": 1.5,   # Disk space
-            "ram_gb": 2.5,    # RAM needed when running
-            "description": "Optimitzat per llengües ibèriques",
+            "disk_gb": 1.5,
+            "ram_gb": 2.5,
+            "description": {"ca": "Optimitzat per llengües ibèriques", "es": "Optimizado para lenguas ibéricas", "en": "Optimized for Iberian languages"},
             "mlx": None,
             "ollama": "hdnh2006/salamandra-2b-instruct",
             "gguf": None,  # No GGUF available yet
@@ -92,11 +92,11 @@ MODEL_CATALOG = {
             "key": "mistral7b",
             "name": "Mistral 7B",
             "origin": "Mistral AI (França)",
-            "lang": "Multilingüe",
+            "lang": {"ca": "Multilingüe", "es": "Multilingüe", "en": "Multilingual"},
             "params": "7B",
-            "disk_gb": 4.1,   # Disk space
-            "ram_gb": 5.5,    # RAM needed when running
-            "description": "Excel·lent equilibri qualitat/velocitat",
+            "disk_gb": 4.1,
+            "ram_gb": 5.5,
+            "description": {"ca": "Excel·lent equilibri qualitat/velocitat", "es": "Excelente equilibrio calidad/velocidad", "en": "Excellent quality/speed balance"},
             "mlx": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
             "ollama": "mistral:7b",
             "gguf": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf",
@@ -105,11 +105,11 @@ MODEL_CATALOG = {
             "key": "salamandra7b",
             "name": "Salamandra 7B",
             "origin": "BSC/AINA (Catalunya)",
-            "lang": "Català, Castellà, Euskera, Gallec",
+            "lang": {"ca": "Català, Castellà, Euskera, Gallec", "es": "Catalán, Castellano, Euskera, Gallego", "en": "Catalan, Spanish, Basque, Galician"},
             "params": "7B",
-            "disk_gb": 4.9,   # Disk space
-            "ram_gb": 6.5,    # RAM needed when running
-            "description": "El millor per català i llengües ibèriques",
+            "disk_gb": 4.9,
+            "ram_gb": 6.5,
+            "description": {"ca": "El millor per català i llengües ibèriques", "es": "El mejor para catalán y lenguas ibéricas", "en": "Best for Catalan and Iberian languages"},
             "mlx": None,
             "ollama": "cas/salamandra-7b-instruct",
             "gguf": "https://huggingface.co/cstr/salamandra-7b-instruct-GGUF/resolve/main/salamandra-7b-instruct-Q4_K_M.gguf",
@@ -118,11 +118,11 @@ MODEL_CATALOG = {
             "key": "llama31_8b",
             "name": "Llama 3.1 8B",
             "origin": "Meta",
-            "lang": "Multilingüe",
+            "lang": {"ca": "Multilingüe", "es": "Multilingüe", "en": "Multilingual"},
             "params": "8B",
-            "disk_gb": 4.7,   # Disk space
-            "ram_gb": 6.0,    # RAM needed when running
-            "description": "Molt popular, excel·lent qualitat",
+            "disk_gb": 4.7,
+            "ram_gb": 6.0,
+            "description": {"ca": "Molt popular, excel·lent qualitat", "es": "Muy popular, excelente calidad", "en": "Very popular, excellent quality"},
             "mlx": "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit",
             "ollama": "llama3.1:8b",
             "gguf": "https://huggingface.co/lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
@@ -136,11 +136,11 @@ MODEL_CATALOG = {
             "key": "mixtral",
             "name": "Mixtral 8x7B",
             "origin": "Mistral AI (França)",
-            "lang": "Multilingüe",
+            "lang": {"ca": "Multilingüe", "es": "Multilingüe", "en": "Multilingual"},
             "params": "47B (MoE)",
-            "disk_gb": 26,    # Disk space
-            "ram_gb": 32,     # RAM needed when running
-            "description": "Màxima qualitat, model MoE",
+            "disk_gb": 26,
+            "ram_gb": 32,
+            "description": {"ca": "Màxima qualitat, model MoE", "es": "Máxima calidad, modelo MoE", "en": "Maximum quality, MoE model"},
             "mlx": "mlx-community/Mixtral-8x7B-Instruct-v0.1-4bit",
             "ollama": "mixtral:8x7b",
             "gguf": "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/resolve/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf",
@@ -149,11 +149,11 @@ MODEL_CATALOG = {
             "key": "llama31_70b",
             "name": "Llama 3.1 70B",
             "origin": "Meta",
-            "lang": "Multilingüe",
+            "lang": {"ca": "Multilingüe", "es": "Multilingüe", "en": "Multilingual"},
             "params": "70B",
-            "disk_gb": 40,    # Disk space
-            "ram_gb": 48,     # RAM needed when running
-            "description": "El millor de Meta, qualitat professional",
+            "disk_gb": 40,
+            "ram_gb": 48,
+            "description": {"ca": "El millor de Meta, qualitat professional", "es": "El mejor de Meta, calidad profesional", "en": "Meta's best, professional quality"},
             "mlx": "mlx-community/Meta-Llama-3.1-70B-Instruct-4bit",
             "ollama": "llama3.1:70b",
             "gguf": "https://huggingface.co/lmstudio-community/Meta-Llama-3.1-70B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-70B-Instruct-Q4_K_M.gguf",
@@ -390,6 +390,8 @@ TRANSLATIONS = {
         "no_ollama_alternative": "No s'ha trobat alternativa Ollama per aquest model",
         "installation_cancelled": "Instal·lació cancel·lada",
         "engines_label": "Motors",
+        "disk_label": "Disc",
+        "fits_tight": "⚠️ Pot anar just",
     },
     "es": {
         "lang_name": "Español",
@@ -596,6 +598,8 @@ TRANSLATIONS = {
         "no_ollama_alternative": "No se encontró alternativa Ollama para este modelo",
         "installation_cancelled": "Instalación cancelada",
         "engines_label": "Motores",
+        "disk_label": "Disco",
+        "fits_tight": "⚠️ Puede ir justo",
     },
     "en": {
         "lang_name": "English",
@@ -802,6 +806,8 @@ TRANSLATIONS = {
         "no_ollama_alternative": "No Ollama alternative found for this model",
         "installation_cancelled": "Installation cancelled",
         "engines_label": "Engines",
+        "disk_label": "Disk",
+        "fits_tight": "⚠️ May be tight",
     },
 }
 
@@ -1038,7 +1044,7 @@ def select_model(hw):
             engines.append("Ollama")
         if model.get("gguf"):
             engines.append("GGUF")
-        engine_info = " / ".join(engines) if engines else "Cap"
+        engine_info = " / ".join(engines) if engines else t('no')
 
         # Catalan model highlight
         is_catalan = "AINA" in model["origin"] or "BSC" in model["origin"]
@@ -1048,13 +1054,16 @@ def select_model(hw):
         if fits:
             status = f"{GREEN}✓ Compatible{RESET}"
         else:
-            status = f"{RED}⚠️ Pot anar just{RESET}"
+            status = f"{RED}{t('fits_tight')}{RESET}"
+
+        lang_str = model['lang'].get(LANG, model['lang']['ca']) if isinstance(model['lang'], dict) else model['lang']
+        desc_str = model['description'].get(LANG, model['description']['ca']) if isinstance(model['description'], dict) else model['description']
 
         print(f"  {CYAN}{i}.{RESET} {BOLD}{model['name']}{RESET} {DIM}({model['params']}){RESET}{catalan_tag}")
         print(f"     {model['origin']} | {t('engines_label')}: {engine_info}")
-        print(f"     {CYAN}💾 Disc:{RESET} {model['disk_gb']} GB | {CYAN}🧠 RAM:{RESET} {model['ram_gb']} GB")
-        print(f"     {DIM}{model['lang']}{RESET}")
-        print(f"     {model['description']} | {status}")
+        print(f"     {CYAN}💾 {t('disk_label')}:{RESET} {model['disk_gb']} GB | {CYAN}🧠 RAM:{RESET} {model['ram_gb']} GB")
+        print(f"     {DIM}{lang_str}{RESET}")
+        print(f"     {desc_str} | {status}")
         print()
 
     # Model selection
