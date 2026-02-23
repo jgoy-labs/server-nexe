@@ -112,6 +112,7 @@ NEXE inclou un instal·lador interactiu que detecta el teu hardware i et guia pe
 
 ```bash
 cd server-nexe
+chmod +x setup.sh   # només cal la primera vegada (ZIP de GitHub no preserva permisos)
 ./setup.sh
 ```
 
