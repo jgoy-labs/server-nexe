@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional, Dict, Any, Union
 import asyncio
 import logging
+import os
 import httpx
 import json
 import time
@@ -210,13 +211,16 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                         logger.debug("RAG docs search failed: %s", e)
 
                     # 2. Search user knowledge (custom documents in knowledge/ folder)
+                    # Filter by server language so only docs in the active lang are returned
+                    _server_lang = os.getenv("NEXE_LANG", "ca")
                     try:
                         if await memory.collection_exists("user_knowledge"):
                             knowledge_results = await memory.search(
                                 query=last_user_msg,
                                 collection="user_knowledge",
                                 top_k=3,
-                                threshold=0.35
+                                threshold=0.35,
+                                filter_metadata={"lang": _server_lang}
                             )
                             if knowledge_results:
                                 all_results.extend(knowledge_results)
