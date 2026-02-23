@@ -23,25 +23,36 @@ echo "  /_/    |___/\___|_|    \_/ \___|_| (_) |_| |_|\___/_/\_\\___| "
 echo -e "${NC}"
 echo -e "${BLUE}[STEP]${NC} Verifying environment..."
 
-# Check if Python is installed
-if ! command -v python3 &> /dev/null
-then
-    echo -e "${RED}[ERROR]${NC} Python3 no trobat. Instal·la Python 3.10 o superior."
-    echo -e "  ${CYAN}→${NC} brew install python@3.11"
-    exit 1
-fi
+# Find Python >= 3.10 (checks python3.11, python3.12, python3.10, brew paths, then python3)
+PYTHON_BIN=""
+for candidate in \
+    python3.12 python3.11 python3.10 \
+    /opt/homebrew/bin/python3.12 \
+    /opt/homebrew/bin/python3.11 \
+    /opt/homebrew/bin/python3.10 \
+    /usr/local/bin/python3.11 \
+    /usr/local/bin/python3.10 \
+    python3
+do
+    if command -v "$candidate" &> /dev/null; then
+        _MAJOR=$("$candidate" -c "import sys; print(sys.version_info.major)" 2>/dev/null)
+        _MINOR=$("$candidate" -c "import sys; print(sys.version_info.minor)" 2>/dev/null)
+        if [ "$_MAJOR" -eq 3 ] && [ "$_MINOR" -ge 10 ]; then
+            PYTHON_BIN="$candidate"
+            break
+        fi
+    fi
+done
 
-# Check Python version >= 3.10
-PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-PYTHON_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
-PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
-if [ "$PYTHON_MAJOR" -lt 3 ] || { [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 10 ]; }; then
-    echo -e "${RED}[ERROR]${NC} Python ${PYTHON_VERSION} no és compatible. Cal Python 3.10 o superior."
+if [ -z "$PYTHON_BIN" ]; then
+    echo -e "${RED}[ERROR]${NC} No s'ha trobat Python 3.10 o superior."
     echo -e "  ${CYAN}→${NC} brew install python@3.11"
     echo -e "  ${CYAN}→${NC} Després torna a executar: ./setup.sh"
     exit 1
 fi
-echo -e "  ${GREEN}✓${NC} Python ${PYTHON_VERSION} detectat"
+
+PYTHON_VERSION=$("$PYTHON_BIN" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+echo -e "  ${GREEN}✓${NC} Python ${PYTHON_VERSION} detectat ($PYTHON_BIN)"
 
 # AUTOMATIC PYTHON CACHE CLEANUP (always, no prompt)
 # Necessary when copying directory between locations
@@ -87,4 +98,4 @@ fi
 echo ""
 
 # Run the actual Python installer
-python3 install_nexe.py "$@"
+"$PYTHON_BIN" install_nexe.py "$@"
