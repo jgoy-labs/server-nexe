@@ -1282,6 +1282,8 @@ def generate_env_file(project_root, model_config):
                 # GGUF models are downloaded as single files
                 filename = model_config['id'].split('/')[-1]
                 f.write(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
+            elif model_config['engine'] == 'ollama':
+                f.write(f"NEXE_OLLAMA_MODEL={model_config['id']}\n")
             f.write("QDRANT_HOST=localhost\n")
             f.write("QDRANT_PORT=6333\n")
             f.write("# Configurable timeouts (seconds)\n")
@@ -1318,6 +1320,7 @@ def _update_env_model_config(env_file, model_config):
     found_csrf = False
     found_mlx_model = False
     found_llama_cpp_model = False
+    found_ollama_model = False
     new_lines = []
 
     for line in lines:
@@ -1344,6 +1347,12 @@ def _update_env_model_config(env_file, model_config):
                 new_lines.append(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
             else:
                 new_lines.append(line)
+        elif line.startswith('NEXE_OLLAMA_MODEL='):
+            found_ollama_model = True
+            if model_engine == 'ollama':
+                new_lines.append(f"NEXE_OLLAMA_MODEL={model_id}\n")
+            else:
+                new_lines.append(line)
         else:
             new_lines.append(line)
 
@@ -1366,6 +1375,8 @@ def _update_env_model_config(env_file, model_config):
     if not found_llama_cpp_model and model_engine == 'llama_cpp':
         filename = model_id.split('/')[-1]
         new_lines.append(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
+    if not found_ollama_model and model_engine == 'ollama':
+        new_lines.append(f"NEXE_OLLAMA_MODEL={model_id}\n")
 
     # Write back
     with open(env_file, 'w') as f:

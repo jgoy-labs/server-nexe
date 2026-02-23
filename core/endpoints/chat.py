@@ -413,10 +413,15 @@ async def _forward_to_ollama(
     import os
     url = "http://localhost:11434/api/chat"
 
-    # Get model from: request > env var > config > fallback
+    # Get model from: request > NEXE_OLLAMA_MODEL > NEXE_DEFAULT_MODEL (si no és URL) > config > fallback
     model_name = request.model
     if not model_name:
-        model_name = os.environ.get("NEXE_DEFAULT_MODEL")
+        model_name = os.environ.get("NEXE_OLLAMA_MODEL")
+    if not model_name:
+        # Legacy: NEXE_DEFAULT_MODEL pot ser una URL HF o path — ignorar-la per Ollama
+        _default = os.environ.get("NEXE_DEFAULT_MODEL", "")
+        if _default and not _default.startswith(("http", "/", "~", "storage/")):
+            model_name = _default
     if not model_name and app_state:
         config = getattr(app_state, "config", {}) or {}
         model_name = config.get("plugins", {}).get("models", {}).get("primary")
