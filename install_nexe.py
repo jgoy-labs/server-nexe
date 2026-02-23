@@ -397,6 +397,14 @@ TRANSLATIONS = {
         "mlx_validated_ok": "Model MLX validat correctament",
         "mlx_config_missing": "Advertència: {path} no conté config.json",
         "mlx_may_have_issues": "El model pot tenir problemes, però continuem.",
+        "embeddings_starting": "📥 Iniciant descàrrega...",
+        "embeddings_done": "✓ Descàrrega completada!",
+        "embeddings_downloaded_ok": "✅ Model d'embeddings descarregat correctament",
+        "embeddings_download_error": "⚠️  Error descarregant embeddings",
+        "embeddings_auto_download": "Es descarregarà automàticament al primer ús",
+        "processing_knowledge": "Processant documents de coneixement ({n} fitxers)...",
+        "processing_knowledge_wait": "Això pot trigar uns minuts (generant embeddings)...",
+        "knowledge_indexed_ok": "✅ Documents processats i indexats correctament",
     },
     "es": {
         "lang_name": "Español",
@@ -610,6 +618,14 @@ TRANSLATIONS = {
         "mlx_validated_ok": "Modelo MLX validado correctamente",
         "mlx_config_missing": "Advertencia: {path} no contiene config.json",
         "mlx_may_have_issues": "El modelo puede tener problemas, pero continuamos.",
+        "embeddings_starting": "📥 Iniciando descarga...",
+        "embeddings_done": "✓ ¡Descarga completada!",
+        "embeddings_downloaded_ok": "✅ Modelo de embeddings descargado correctamente",
+        "embeddings_download_error": "⚠️  Error descargando embeddings",
+        "embeddings_auto_download": "Se descargará automáticamente en el primer uso",
+        "processing_knowledge": "Procesando documentos de conocimiento ({n} archivos)...",
+        "processing_knowledge_wait": "Esto puede tardar unos minutos (generando embeddings)...",
+        "knowledge_indexed_ok": "✅ Documentos procesados e indexados correctamente",
     },
     "en": {
         "lang_name": "English",
@@ -823,6 +839,14 @@ TRANSLATIONS = {
         "mlx_validated_ok": "MLX model validated successfully",
         "mlx_config_missing": "Warning: {path} does not contain config.json",
         "mlx_may_have_issues": "The model may have issues, but continuing.",
+        "embeddings_starting": "📥 Starting download...",
+        "embeddings_done": "✓ Download complete!",
+        "embeddings_downloaded_ok": "✅ Embeddings model downloaded successfully",
+        "embeddings_download_error": "⚠️  Error downloading embeddings",
+        "embeddings_auto_download": "Will download automatically on first use",
+        "processing_knowledge": "Processing knowledge documents ({n} files)...",
+        "processing_knowledge_wait": "This may take a few minutes (generating embeddings)...",
+        "knowledge_indexed_ok": "✅ Documents processed and indexed successfully",
     },
 }
 
@@ -1969,25 +1993,27 @@ def main():
         print(f"  {DIM}{t('downloading_model_progress')}{RESET}\n")
         try:
             # Don't capture output so user sees download progress from sentence-transformers
+            msg_start = t('embeddings_starting').replace("'", "\\'")
+            msg_done = t('embeddings_done').replace("'", "\\'")
             result = subprocess.run([
                 str(python_path), "-c",
-                "from sentence_transformers import SentenceTransformer; "
-                "print('\\n  📥 Iniciant descàrrega...\\n'); "
-                "model = SentenceTransformer('all-MiniLM-L6-v2'); "
-                "print('\\n  ✓ Descàrrega completada!')"
-            ], check=True, capture_output=False)  # ← Changed to False to show progress
-            print(f"\n  ✅ Model d'embeddings descarregat correctament")
+                f"from sentence_transformers import SentenceTransformer; "
+                f"print('\\n  {msg_start}\\n'); "
+                f"model = SentenceTransformer('all-MiniLM-L6-v2'); "
+                f"print('\\n  {msg_done}')"
+            ], check=True, capture_output=False)
+            print(f"\n  {t('embeddings_downloaded_ok')}")
         except subprocess.CalledProcessError as e:
-            print(f"  {YELLOW}⚠️  Error descarregant embeddings{RESET}")
-            print(f"  {DIM}Es descarregarà automàticament al primer ús{RESET}")
+            print(f"  {YELLOW}{t('embeddings_download_error')}{RESET}")
+            print(f"  {DIM}{t('embeddings_auto_download')}{RESET}")
 
     # 15. Ingest knowledge documents if any exist
     knowledge_files = list(knowledge_dir.glob("*.md")) + list(knowledge_dir.glob("*.txt")) + list(knowledge_dir.glob("*.pdf"))
     knowledge_files = [f for f in knowledge_files if not f.name.startswith('.') and f.name != 'README.md']
 
     if knowledge_files:
-        print_step(f"{BOLD}Processant documents de coneixement ({len(knowledge_files)} fitxers)...{RESET}")
-        print(f"  {DIM}Això pot trigar uns minuts (generant embeddings)...{RESET}\n")
+        print_step(f"{BOLD}{t('processing_knowledge').format(n=len(knowledge_files))}{RESET}")
+        print(f"  {DIM}{t('processing_knowledge_wait')}{RESET}\n")
         try:
             # Start Qdrant first
             qdrant_bin = project_root / "qdrant"
@@ -2010,15 +2036,16 @@ def main():
             time.sleep(3)
 
             # Run ingestion with progress output (quiet=False)
+            ingest_env = {**os.environ, "NEXE_LANG": LANG}
             result = subprocess.run([
                 str(python_path), "-c",
                 f"import sys; sys.path.insert(0, '{project_root}'); "
                 "import asyncio; "
                 "from core.ingest.ingest_knowledge import ingest_knowledge; "
-                f"asyncio.run(ingest_knowledge(quiet=False))"  # ← Changed to False to show progress
-            ], check=True, capture_output=False, text=True, timeout=300)  # ← Changed to False
+                f"asyncio.run(ingest_knowledge(quiet=False))"
+            ], check=True, capture_output=False, text=True, timeout=300, env=ingest_env)
 
-            print(f"\n  ✅ Documents processats i indexats correctament")
+            print(f"\n  {t('knowledge_indexed_ok')}")
 
             # Create marker to skip re-ingestion on first server startup
             marker_file = project_root / "storage" / ".knowledge_ingested"
