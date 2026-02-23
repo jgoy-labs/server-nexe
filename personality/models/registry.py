@@ -63,7 +63,30 @@ MODEL_REGISTRY: Dict[str, ModelEntry] = {
         mlx_hf_id="mlx-community/Phi-3.5-mini-instruct-4bit"
     ),
 
+    # --- Iberian Language Models ---
+    "salamandra2b": ModelEntry(
+        short_name="salamandra2b",
+        description="BSC/AINA Salamandra (2B) - Optimitzat per català, castellà, euskera i gallec.",
+        size_gb=1.5,
+        ollama_tag="hdnh2006/salamandra-2b-instruct",
+        mlx_hf_id=""   # Sense suport MLX de moment
+    ),
+    "salamandra7b": ModelEntry(
+        short_name="salamandra7b",
+        description="BSC/AINA Salamandra (7B) - El millor model per a les llengües ibèriques.",
+        size_gb=4.9,
+        ollama_tag="cas/salamandra-7b-instruct",
+        mlx_hf_id=""   # Sense suport MLX de moment
+    ),
+
     # --- Medium / Pro Models (8-16GB RAM) ---
+    "mistral7b": ModelEntry(
+        short_name="mistral7b",
+        description="Mistral AI (7B) - Excel·lent equilibri qualitat/velocitat. Multilingüe.",
+        size_gb=4.1,
+        ollama_tag="mistral:7b",
+        mlx_hf_id="mlx-community/Mistral-7B-Instruct-v0.3-4bit"
+    ),
     "llama3.1-8b": ModelEntry(
         short_name="llama3.1-8b",
         description="Meta Llama 3.1 (8B) - El millor en la seva classe. Recomanat.",
@@ -84,6 +107,22 @@ MODEL_REGISTRY: Dict[str, ModelEntry] = {
         size_gb=7.5,
         ollama_tag="mistral-nemo",
         mlx_hf_id="mlx-community/Mistral-Nemo-Instruct-2407-4bit"
+    ),
+
+    # --- Large / Ultra Models (>32GB RAM) ---
+    "llama3.1-70b": ModelEntry(
+        short_name="llama3.1-70b",
+        description="Meta Llama 3.1 (70B) - Qualitat professional. Requereix >48GB RAM.",
+        size_gb=40.0,
+        ollama_tag="llama3.1:70b",
+        mlx_hf_id="mlx-community/Meta-Llama-3.1-70B-Instruct-4bit"
+    ),
+    "mixtral": ModelEntry(
+        short_name="mixtral",
+        description="Mistral Mixtral 8x7B (MoE) - Màxima qualitat, arquitectura MoE. Requereix 32GB RAM.",
+        size_gb=26.0,
+        ollama_tag="mixtral:8x7b",
+        mlx_hf_id="mlx-community/Mixtral-8x7B-Instruct-v0.1-4bit"
     ),
 }
 

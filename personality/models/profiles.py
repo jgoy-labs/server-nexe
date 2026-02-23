@@ -53,35 +53,35 @@ PROFILES = {
     ),
     HardwareTier.CONSUMER: ModelProfile(
         tier=HardwareTier.CONSUMER,
-        primary_model="gemma2:2b", # 2B és molt eficient
-        secondary_model="phi3:3.8b",
+        primary_model="phi3.5",         # Phi-3.5 Mini 3.8B — ràpid, bo seguint instruccions
+        secondary_model="llama3.2:3b",
         embedding_model="all-MiniLM-L6-v2",
-        preferred_engine=EngineType.MLX, # Assumim Mac per defecte si CONSUMER, selector ajustarà
+        preferred_engine=EngineType.MLX,
         max_tokens=2048,
         context_window=8192,
         description="Equilibri velocitat/qualitat per ús diari (8-16GB).",
-        mlx_model_id="mlx-community/gemma-2-2b-it-4bit" 
+        mlx_model_id="mlx-community/Phi-3.5-mini-instruct-4bit"
     ),
     HardwareTier.PRO: ModelProfile(
         tier=HardwareTier.PRO,
-        primary_model="llama3.2:3b",
-        secondary_model="gemma2:9b",
-        embedding_model="nomic-embed-text",
+        primary_model="llama3.1:8b",    # Llama 3.1 8B — millor qualitat per 16-32GB
+        secondary_model="mistral:7b",
+        embedding_model="all-MiniLM-L6-v2",
         preferred_engine=EngineType.MLX,
         max_tokens=4096,
-        context_window=16384,
+        context_window=32768,
         description="Potència per desenvolupadors i creatius (16-32GB).",
-        mlx_model_id="mlx-community/Llama-3.2-3B-Instruct-4bit"
+        mlx_model_id="mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
     ),
     HardwareTier.ULTRA: ModelProfile(
         tier=HardwareTier.ULTRA,
-        primary_model="llama3.1:8b", 
-        secondary_model="mistral-nemo:12b",
-        embedding_model="mxbai-embed-large",
+        primary_model="llama3.1:70b",   # Llama 3.1 70B — qualitat màxima per >32GB
+        secondary_model="mixtral:8x7b",
+        embedding_model="all-MiniLM-L6-v2",
         preferred_engine=EngineType.MLX,
         max_tokens=8192,
-        context_window=32768,
+        context_window=65536,
         description="Màxima capacitat per models grans (>32GB).",
-        mlx_model_id="mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
+        mlx_model_id="mlx-community/Meta-Llama-3.1-70B-Instruct-4bit"
     )
 }
