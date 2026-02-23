@@ -117,6 +117,11 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
 
     knowledge_path = folder or PROJECT_ROOT / "knowledge"
 
+    # Use language-specific subfolder if it exists (e.g. knowledge/ca/)
+    lang_path = knowledge_path / _LANG
+    if lang_path.is_dir():
+        knowledge_path = lang_path
+
     log(f"\n{'='*60}")
     log(_t("title"))
     log(_t("add_docs"))

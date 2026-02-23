@@ -2008,7 +2008,8 @@ def main():
             print(f"  {DIM}{t('embeddings_auto_download')}{RESET}")
 
     # 15. Ingest knowledge documents if any exist
-    knowledge_files = list(knowledge_dir.glob("*.md")) + list(knowledge_dir.glob("*.txt")) + list(knowledge_dir.glob("*.pdf"))
+    _ingest_dir = knowledge_dir / LANG if (knowledge_dir / LANG).is_dir() else knowledge_dir
+    knowledge_files = list(_ingest_dir.glob("*.md")) + list(_ingest_dir.glob("*.txt")) + list(_ingest_dir.glob("*.pdf"))
     knowledge_files = [f for f in knowledge_files if not f.name.startswith('.')]
 
     if knowledge_files:
