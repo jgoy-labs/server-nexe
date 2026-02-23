@@ -352,6 +352,44 @@ TRANSLATIONS = {
         "laptop_warning": "Si tens un portàtil:",
         "knowledge_folder_created": "Preparant carpeta de coneixement (RAG)...",
         "knowledge_explanation": "Aquí pots posar els teus documents (.txt, .md, .pdf) i la IA els llegirà.\nPer defecte, conté la documentació del propi sistema.\nTambé pots canviar el prompt de la IA editant 'personality/server.toml'",
+        # Model size screen
+        "model_sizes_title": "📦 MIDA DE MODELS",
+        "model_small_desc": "Models petits (8GB RAM) - Ràpids, menys qualitat",
+        "model_medium_desc": "Models mitjans (16GB RAM) - Equilibrats",
+        "model_large_desc": "Models grans (32GB+ RAM) - Màxima qualitat",
+        "model_recommended_label": "Recomanat per la teva RAM: models {label}",
+        "select_size_prompt": "Escull mida [1-3] (Enter = {default}):",
+        "category_small": "MODELS PETITS (per 8GB RAM)",
+        "category_medium": "MODELS MITJANS (per 16GB RAM)",
+        "category_large": "MODELS GRANS (per 32GB+ RAM)",
+        "select_model_prompt": "Escull model [1-{n}] (Enter = {default}):",
+        "select_engine_prompt": "Escull [1-{n}] (Enter = {default}):",
+        # Download progress
+        "ollama_checking": "Verificant Ollama...",
+        "starting_ollama": "Arrencant Ollama...",
+        "downloading_model_progress": "Descarregant model (pot trigar uns minuts)...",
+        "verifying_download": "Verificant descàrrega...",
+        "downloading_embeddings_step": "Descarregant model d'embeddings (per memòria)...",
+        "downloading_file": "Descarregant {filename}...",
+        "engine_mlx_label": "Motor: MLX (Apple Silicon)",
+        "model_already_downloaded": "Model ja descarregat a {path}",
+        "downloading_mlx_step": "Descarregant model MLX...",
+        "mlx_destination": "Destí: {path}",
+        "partial_files_preserved": "Els fitxers parcials ja descarregats es mantindran per reprendre.",
+        "mlx_no_model_warning": "⚠️  IMPORTANT: Sense el model descarregat, MLX no funcionarà!",
+        "mlx_fallback_ollama": "El chat farà fallback a Ollama (si el tens instal·lat).",
+        # Metal fallback
+        "metal_unavailable": "✗ Metal no està disponible",
+        "metal_needs_explanation": "MLX necessita Metal (GPU d'Apple Silicon) per funcionar.",
+        "metal_cannot_init": "Tot i que tens Apple Silicon, Metal no es pot inicialitzar.",
+        "mlx_fallback_options": "⚠️  Opcions:",
+        "switch_to_ollama_option": "Canviar a Ollama (recomanat)",
+        "abort_install_option": "Abortar instal·lació",
+        "select_fallback_prompt": "Escull [1/2]:",
+        "switched_to_ollama_msg": "Canviat a Ollama: {id}",
+        "no_ollama_alternative": "No s'ha trobat alternativa Ollama per aquest model",
+        "installation_cancelled": "Instal·lació cancel·lada",
+        "engines_label": "Motors",
     },
     "es": {
         "lang_name": "Español",
@@ -520,6 +558,44 @@ TRANSLATIONS = {
         "laptop_warning": "Si tienes un portátil:",
         "knowledge_folder_created": "Preparando carpeta de conocimiento (RAG)...",
         "knowledge_explanation": "Aquí puedes poner tus documentos (.txt, .md, .pdf) y la IA los leerá.\nPor defecto, contiene la documentación del propio sistema.\nTambién puedes cambiar el prompt de la IA editando 'personality/server.toml'",
+        # Model size screen
+        "model_sizes_title": "📦 TAMAÑO DE MODELOS",
+        "model_small_desc": "Modelos pequeños (8GB RAM) - Rápidos, menos calidad",
+        "model_medium_desc": "Modelos medianos (16GB RAM) - Equilibrados",
+        "model_large_desc": "Modelos grandes (32GB+ RAM) - Máxima calidad",
+        "model_recommended_label": "Recomendado para tu RAM: modelos {label}",
+        "select_size_prompt": "Elige tamaño [1-3] (Enter = {default}):",
+        "category_small": "MODELOS PEQUEÑOS (8GB RAM)",
+        "category_medium": "MODELOS MEDIANOS (16GB RAM)",
+        "category_large": "MODELOS GRANDES (32GB+ RAM)",
+        "select_model_prompt": "Elige modelo [1-{n}] (Enter = {default}):",
+        "select_engine_prompt": "Elige [1-{n}] (Enter = {default}):",
+        # Download progress
+        "ollama_checking": "Verificando Ollama...",
+        "starting_ollama": "Iniciando Ollama...",
+        "downloading_model_progress": "Descargando modelo (puede tardar unos minutos)...",
+        "verifying_download": "Verificando descarga...",
+        "downloading_embeddings_step": "Descargando modelo de embeddings (para memoria)...",
+        "downloading_file": "Descargando {filename}...",
+        "engine_mlx_label": "Motor: MLX (Apple Silicon)",
+        "model_already_downloaded": "Modelo ya descargado en {path}",
+        "downloading_mlx_step": "Descargando modelo MLX...",
+        "mlx_destination": "Destino: {path}",
+        "partial_files_preserved": "Los archivos parciales ya descargados se mantendrán para reanudar.",
+        "mlx_no_model_warning": "⚠️  IMPORTANTE: ¡Sin el modelo descargado, MLX no funcionará!",
+        "mlx_fallback_ollama": "El chat hará fallback a Ollama (si lo tienes instalado).",
+        # Metal fallback
+        "metal_unavailable": "✗ Metal no está disponible",
+        "metal_needs_explanation": "MLX necesita Metal (GPU de Apple Silicon) para funcionar.",
+        "metal_cannot_init": "Aunque tienes Apple Silicon, Metal no se puede inicializar.",
+        "mlx_fallback_options": "⚠️  Opciones:",
+        "switch_to_ollama_option": "Cambiar a Ollama (recomendado)",
+        "abort_install_option": "Abortar instalación",
+        "select_fallback_prompt": "Elige [1/2]:",
+        "switched_to_ollama_msg": "Cambiado a Ollama: {id}",
+        "no_ollama_alternative": "No se encontró alternativa Ollama para este modelo",
+        "installation_cancelled": "Instalación cancelada",
+        "engines_label": "Motores",
     },
     "en": {
         "lang_name": "English",
@@ -688,6 +764,44 @@ TRANSLATIONS = {
         "laptop_warning": "If you have a laptop:",
         "knowledge_folder_created": "Preparing knowledge folder (RAG)...",
         "knowledge_explanation": "Here you can put your documents (.txt, .md, .pdf) and the AI will read them.\nBy default, it contains the system's own documentation.\nYou can also change the AI prompt by editing 'personality/server.toml'",
+        # Model size screen
+        "model_sizes_title": "📦 MODEL SIZE",
+        "model_small_desc": "Small models (8GB RAM) - Fast, less quality",
+        "model_medium_desc": "Medium models (16GB RAM) - Balanced",
+        "model_large_desc": "Large models (32GB+ RAM) - Maximum quality",
+        "model_recommended_label": "Recommended for your RAM: {label} models",
+        "select_size_prompt": "Choose size [1-3] (Enter = {default}):",
+        "category_small": "SMALL MODELS (8GB RAM)",
+        "category_medium": "MEDIUM MODELS (16GB RAM)",
+        "category_large": "LARGE MODELS (32GB+ RAM)",
+        "select_model_prompt": "Choose model [1-{n}] (Enter = {default}):",
+        "select_engine_prompt": "Choose [1-{n}] (Enter = {default}):",
+        # Download progress
+        "ollama_checking": "Checking Ollama...",
+        "starting_ollama": "Starting Ollama...",
+        "downloading_model_progress": "Downloading model (may take a few minutes)...",
+        "verifying_download": "Verifying download...",
+        "downloading_embeddings_step": "Downloading embeddings model (for memory)...",
+        "downloading_file": "Downloading {filename}...",
+        "engine_mlx_label": "Engine: MLX (Apple Silicon)",
+        "model_already_downloaded": "Model already downloaded at {path}",
+        "downloading_mlx_step": "Downloading MLX model...",
+        "mlx_destination": "Destination: {path}",
+        "partial_files_preserved": "Partial files already downloaded will be preserved to resume.",
+        "mlx_no_model_warning": "⚠️  IMPORTANT: Without the downloaded model, MLX won't work!",
+        "mlx_fallback_ollama": "Chat will fall back to Ollama (if you have it installed).",
+        # Metal fallback
+        "metal_unavailable": "✗ Metal not available",
+        "metal_needs_explanation": "MLX requires Metal (Apple Silicon GPU) to work.",
+        "metal_cannot_init": "Even though you have Apple Silicon, Metal cannot be initialized.",
+        "mlx_fallback_options": "⚠️  Options:",
+        "switch_to_ollama_option": "Switch to Ollama (recommended)",
+        "abort_install_option": "Abort installation",
+        "select_fallback_prompt": "Choose [1/2]:",
+        "switched_to_ollama_msg": "Switched to Ollama: {id}",
+        "no_ollama_alternative": "No Ollama alternative found for this model",
+        "installation_cancelled": "Installation cancelled",
+        "engines_label": "Engines",
     },
 }
 
@@ -883,28 +997,28 @@ def select_model(hw):
     # Determine recommended category based on RAM
     if usable_ram < 5:
         recommended = "1"
-        rec_label = "petits"
+        rec_label = t('size_small')
     elif usable_ram < 20:
         recommended = "2"
-        rec_label = "mitjans"
+        rec_label = t('size_medium')
     else:
         recommended = "3"
-        rec_label = "grans"
+        rec_label = t('size_large')
 
     # Let user choose category regardless of RAM
     print(f"\n{YELLOW}{'─'*60}{RESET}")
-    print(f"\n{BOLD}📦 MIDA DE MODELS{RESET}\n")
-    print(f"  {CYAN}1.{RESET} Models petits (8GB RAM) - Ràpids, menys qualitat")
-    print(f"  {CYAN}2.{RESET} Models mitjans (16GB RAM) - Equilibrats")
-    print(f"  {CYAN}3.{RESET} Models grans (32GB+ RAM) - Màxima qualitat")
+    print(f"\n{BOLD}{t('model_sizes_title')}{RESET}\n")
+    print(f"  {CYAN}1.{RESET} {t('model_small_desc')}")
+    print(f"  {CYAN}2.{RESET} {t('model_medium_desc')}")
+    print(f"  {CYAN}3.{RESET} {t('model_large_desc')}")
     print()
-    print(f"  {DIM}Recomanat per la teva RAM: models {rec_label}{RESET}")
+    print(f"  {DIM}{t('model_recommended_label').format(label=rec_label)}{RESET}")
     print()
-    size_choice = input(f"{BOLD}Escull mida [1-3] (Enter = {recommended}):{RESET} ").strip() or recommended
+    size_choice = input(f"{BOLD}{t('select_size_prompt').format(default=recommended)}{RESET} ").strip() or recommended
 
-    category_map = {"1": ("small", "MODELS PETITS (per 8GB RAM)"),
-                    "2": ("medium", "MODELS MITJANS (per 16GB RAM)"),
-                    "3": ("large", "MODELS GRANS (per 32GB+ RAM)")}
+    category_map = {"1": ("small", t('category_small')),
+                    "2": ("medium", t('category_medium')),
+                    "3": ("large", t('category_large'))}
     category, category_name = category_map.get(size_choice, category_map[recommended])
 
     models = MODEL_CATALOG[category]
@@ -937,7 +1051,7 @@ def select_model(hw):
             status = f"{RED}⚠️ Pot anar just{RESET}"
 
         print(f"  {CYAN}{i}.{RESET} {BOLD}{model['name']}{RESET} {DIM}({model['params']}){RESET}{catalan_tag}")
-        print(f"     {model['origin']} | Motors: {engine_info}")
+        print(f"     {model['origin']} | {t('engines_label')}: {engine_info}")
         print(f"     {CYAN}💾 Disc:{RESET} {model['disk_gb']} GB | {CYAN}🧠 RAM:{RESET} {model['ram_gb']} GB")
         print(f"     {DIM}{model['lang']}{RESET}")
         print(f"     {model['description']} | {status}")
@@ -945,7 +1059,7 @@ def select_model(hw):
 
     # Model selection
     default = "1"
-    choice = input(f"{BOLD}Escull model [1-{len(models)}] (Enter = {default}):{RESET} ").strip()
+    choice = input(f"{BOLD}{t('select_model_prompt').format(n=len(models), default=default)}{RESET} ").strip()
     if not choice:
         choice = default
 
@@ -979,7 +1093,7 @@ def select_model(hw):
             print(f"     {DIM}{eng_desc}{RESET}\n")
 
         default_idx = next((i for i, (_, _, _, rec) in enumerate(available_engines, 1) if rec), 1)
-        engine_choice = input(f"{BOLD}Escull [1-{len(available_engines)}] (Enter = {default_idx}):{RESET} ").strip()
+        engine_choice = input(f"{BOLD}{t('select_engine_prompt').format(n=len(available_engines), default=default_idx)}{RESET} ").strip()
 
         try:
             idx = int(engine_choice) - 1 if engine_choice else default_idx - 1
@@ -1413,17 +1527,17 @@ def _download_ollama_model(model_config):
     if choice == "1":
         try:
             # Check if Ollama is running
-            print(f"\n{BLUE}[1/3]{RESET} Verificant Ollama...")
+            print(f"\n{BLUE}[1/3]{RESET} {t('ollama_checking')}")
             result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
             if result.returncode != 0:
                 # Try to start Ollama
-                print(f"{YELLOW}[...]{RESET} Arrencant Ollama...")
+                print(f"{YELLOW}[...]{RESET} {t('starting_ollama')}")
                 subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 import time
                 time.sleep(3)
 
             # Download model - IMPORTANT: Don't capture output so user sees progress
-            print(f"\n{BLUE}[2/3]{RESET} Descarregant model (pot trigar uns minuts)...")
+            print(f"\n{BLUE}[2/3]{RESET} {t('downloading_model_progress')}")
             print(f"      {DIM}Executa: ollama pull {model_id}{RESET}\n")
 
             # Run with inherited stdout/stderr so Ollama's progress bar shows
@@ -1438,7 +1552,7 @@ def _download_ollama_model(model_config):
                 raise subprocess.CalledProcessError(return_code, "ollama pull")
 
             # Verify model was downloaded
-            print(f"\n{BLUE}[3/4]{RESET} Verificant descàrrega...")
+            print(f"\n{BLUE}[3/4]{RESET} {t('verifying_download')}")
             result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
             model_base = model_id.split(":")[0]
             if model_base in result.stdout or model_id in result.stdout:
@@ -1448,7 +1562,7 @@ def _download_ollama_model(model_config):
                 print(f"  {DIM}Executa: ollama list{RESET}")
 
             # Download embedding model (required for memory/RAG)
-            print(f"\n{BLUE}[4/4]{RESET} Descarregant model d'embeddings (per memòria)...")
+            print(f"\n{BLUE}[4/4]{RESET} {t('downloading_embeddings_step')}")
             print(f"      {DIM}Executa: ollama pull nomic-embed-text{RESET}\n")
 
             embed_process = subprocess.Popen(
@@ -1502,7 +1616,7 @@ def _download_gguf_model(model_config, project_root):
             filename = model_config['id'].split('/')[-1]
             output_path = models_dir / filename
 
-            print(f"\n{BLUE}[...]{RESET} Descarregant {filename}...")
+            print(f"\n{BLUE}[...]{RESET} {t('downloading_file').format(filename=filename)}")
             print(f"   {DIM}{model_config['id']}{RESET}")
 
             subprocess.run([
@@ -1534,7 +1648,7 @@ def _download_mlx_model(model_config, project_root, python_path):
     print(f"\n{BOLD}📦 {t('downloading_model')}{RESET}")
     print(f"   Model: {CYAN}{model_config['name']}{RESET}")
     print(f"   HuggingFace ID: {CYAN}{model_id}{RESET}")
-    print(f"   Motor: MLX (Apple Silicon)")
+    print(f"   {t('engine_mlx_label')}")
     print()
 
     # Ask user
@@ -1552,7 +1666,7 @@ def _download_mlx_model(model_config, project_root, python_path):
             local_model_path = models_dir / model_name
 
             if local_model_path.exists() and any(local_model_path.iterdir()):
-                print(f"{GREEN}[OK]{RESET} Model ja descarregat a {local_model_path}")
+                print(f"{GREEN}[OK]{RESET} {t('model_already_downloaded').format(path=local_model_path)}")
                 input(f"\n{DIM}[{t('press_enter')}]{RESET}")
                 return
 
@@ -1568,8 +1682,8 @@ def _download_mlx_model(model_config, project_root, python_path):
 
             confirm = input(f"{GREEN}▶ {t('download_ready')} [Enter]:{RESET} ")
 
-            print(f"\n{BLUE}[1/2]{RESET} Descarregant model MLX...")
-            print(f"      {DIM}Destí: {local_model_path}{RESET}\n")
+            print(f"\n{BLUE}[1/2]{RESET} {t('downloading_mlx_step')}")
+            print(f"      {DIM}{t('mlx_destination').format(path=local_model_path)}{RESET}\n")
 
             # Download using huggingface_hub with resume + retry
             download_script = f'''
@@ -1616,18 +1730,18 @@ for attempt in range(max_retries):
                     print(f"{GREEN}✓{RESET} Model MLX validat correctament")
             else:
                 print(f"\n{YELLOW}{t('download_failed_resume')}{RESET}")
-                print(f"{DIM}Els fitxers parcials ja descarregats es mantindran per reprendre.{RESET}\n")
+                print(f"{DIM}{t('partial_files_preserved')}{RESET}\n")
                 _show_manual_instructions(model_config, "mlx")
 
         except Exception as e:
             print(f"\n{YELLOW}{t('download_failed_resume')}{RESET}")
             print(f"{DIM}Error: {str(e)[:200]}{RESET}")
-            print(f"{DIM}Els fitxers parcials ja descarregats es mantindran per reprendre.{RESET}\n")
+            print(f"{DIM}{t('partial_files_preserved')}{RESET}\n")
             _show_manual_instructions(model_config, "mlx")
     else:
         _show_manual_instructions(model_config, "mlx")
-        print(f"\n{YELLOW}⚠️  IMPORTANT: Sense el model descarregat, MLX no funcionarà!{RESET}")
-        print(f"   El chat farà fallback a Ollama (si el tens instal·lat).")
+        print(f"\n{YELLOW}{t('mlx_no_model_warning')}{RESET}")
+        print(f"   {t('mlx_fallback_ollama')}")
         print(f"\n{GREEN}{t('download_skipped')}{RESET}")
 
     input(f"\n{DIM}[{t('press_enter')}]{RESET}")
@@ -1730,14 +1844,14 @@ def main():
         if not metal_available:
             clear()
             print(APP_LOGO)
-            print(f"\n{RED}✗ Metal no està disponible{RESET}\n")
-            print(f"{DIM}MLX necessita Metal (GPU d'Apple Silicon) per funcionar.{RESET}")
-            print(f"{DIM}Tot i que tens Apple Silicon, Metal no es pot inicialitzar.{RESET}\n")
-            print(f"{YELLOW}⚠️  Opcions:{RESET}\n")
-            print(f"  {CYAN}1.{RESET} Canviar a Ollama (recomanat)")
-            print(f"  {CYAN}2.{RESET} Abortar instal·lació\n")
+            print(f"\n{RED}{t('metal_unavailable')}{RESET}\n")
+            print(f"{DIM}{t('metal_needs_explanation')}{RESET}")
+            print(f"{DIM}{t('metal_cannot_init')}{RESET}\n")
+            print(f"{YELLOW}{t('mlx_fallback_options')}{RESET}\n")
+            print(f"  {CYAN}1.{RESET} {t('switch_to_ollama_option')}")
+            print(f"  {CYAN}2.{RESET} {t('abort_install_option')}\n")
 
-            choice = input(f"{BOLD}Escull [1/2]:{RESET} ").strip()
+            choice = input(f"{BOLD}{t('select_fallback_prompt')}{RESET} ").strip()
 
             if choice == "1":
                 # Get the selected_model to find Ollama equivalent
@@ -1755,16 +1869,16 @@ def main():
                 if selected_model and selected_model.get("ollama"):
                     model_config['engine'] = 'ollama'
                     model_config['id'] = selected_model['ollama']
-                    print(f"\n{GREEN}✓{RESET} Canviat a Ollama: {CYAN}{model_config['id']}{RESET}\n")
+                    print(f"\n{GREEN}✓{RESET} {t('switched_to_ollama_msg').format(id=model_config['id'])}\n")
 
                     # Download Ollama model
                     ensure_ollama_installed()
                     _download_ollama_model(model_config)
                 else:
-                    print_error("No s'ha trobat alternativa Ollama per aquest model")
+                    print_error(t('no_ollama_alternative'))
                     sys.exit(1)
             else:
-                print(f"\n{YELLOW}Instal·lació cancel·lada{RESET}")
+                print(f"\n{YELLOW}{t('installation_cancelled')}{RESET}")
                 sys.exit(0)
         else:
             # Metal is available, proceed with MLX download
@@ -1827,8 +1941,8 @@ def main():
     if confirm == 'n':
         print(f"  {DIM}{t('embeddings_skipped')}{RESET}")
     else:
-        print_step(f"{BOLD}Descarregant model d'embeddings (all-MiniLM-L6-v2)...{RESET}")
-        print(f"  {DIM}Això pot trigar uns minuts segons la connexió...{RESET}\n")
+        print_step(f"{BOLD}{t('downloading_embeddings_step')} (all-MiniLM-L6-v2)...{RESET}")
+        print(f"  {DIM}{t('downloading_model_progress')}{RESET}\n")
         try:
             # Don't capture output so user sees download progress from sentence-transformers
             result = subprocess.run([
