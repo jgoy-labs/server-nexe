@@ -1,3 +1,22 @@
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-02-23
+id: nexe-limitations
+
+# === CONTINGUT RAG (OBLIGATORI) ===
+abstract: "Documentació honesta de les limitacions de NEXE 0.8. Plataformes no testejades, qualitat de model inferior a GPT-4, limitacions RAG, API parcial, instància única, vulnerabilitats de seguretat acceptades i suport limitat."
+tags: [limitacions, rendiment, seguretat, rag, models, plataformes, advertències]
+chunk_size: 1000
+priority: P2
+
+# === OPCIONAL ===
+lang: ca
+type: docs
+collection: user_knowledge
+author: "Jordi Goy"
+expires: null
+---
+
 # Limitacions - NEXE 0.8
 
 > **📝 Document actualitzat:** 2026-02-04

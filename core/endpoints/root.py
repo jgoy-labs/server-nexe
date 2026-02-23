@@ -28,7 +28,7 @@ from core.models import (
   EndpointInfo
 )
 
-router = APIRouter()
+router = APIRouter(tags=["system"])
 
 def get_i18n(request: Request):
   """Get i18n from app state"""
@@ -78,7 +78,7 @@ async def _module_health_status(instance) -> str:
       return "unhealthy"
   return "unknown"
 
-@router.get("/", response_model=SystemResponse)
+@router.get("/", response_model=SystemResponse, summary="Informació general del sistema")
 @limiter.limit("30/minute")
 async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
   """Root endpoint with system information"""
@@ -92,7 +92,7 @@ async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
     type=i18n.t('server_core.api.server_type') if i18n else "servidor_bàsic"
   )
 
-@router.get("/health", response_model=HealthResponse)
+@router.get("/health", response_model=HealthResponse, summary="Health check bàsic del servidor")
 @limiter.limit("60/minute")
 async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthResponse:
   """System health check"""
@@ -104,7 +104,7 @@ async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthRespon
     uptime=i18n.t('server_core.api.health.uptime') if i18n else "operacional"
   )
 
-@router.get("/health/ready")
+@router.get("/health/ready", summary="Readiness check — verifica mòduls requerits")
 @limiter.limit("30/minute")
 async def readiness_check(request: Request) -> dict:
   """
@@ -150,7 +150,7 @@ async def readiness_check(request: Request) -> dict:
     "timestamp": datetime.now().isoformat(),
   }
 
-@router.get("/api/info", response_model=ApiInfoResponse)
+@router.get("/api/info", response_model=ApiInfoResponse, summary="Informació API i llista d'endpoints disponibles")
 @limiter.limit("30/minute")
 async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoResponse:
   """Basic system information"""
@@ -184,7 +184,7 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
     endpoints=endpoints
   )
 
-@router.get("/status")
+@router.get("/status", summary="Estat en temps real: engine actiu, model i mòduls carregats")
 @limiter.limit("60/minute")
 async def server_status(request: Request) -> dict:
   """
@@ -243,7 +243,7 @@ async def server_status(request: Request) -> dict:
     "timestamp": datetime.now().isoformat(),
   }
 
-@router.get("/health/circuits")
+@router.get("/health/circuits", summary="Estat dels circuit breakers (Ollama, Qdrant, HTTP extern)")
 @limiter.limit("30/minute")
 async def circuit_status(request: Request) -> dict:
   """

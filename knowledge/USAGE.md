@@ -1,3 +1,22 @@
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-02-23
+id: nexe-usage-guide
+
+# === CONTINGUT RAG (OBLIGATORI) ===
+abstract: "Guia pràctica d'ús de NEXE. Inici i parada del servidor, comandes CLI, xat interactiu, sistema de memòria, gestió de documents RAG, ús de l'API i casos d'ús pràctics com assistent personal o base de coneixement."
+tags: [ús, cli, chat, memory, rag, api, web-ui, casos-dús]
+chunk_size: 900
+priority: P1
+
+# === OPCIONAL ===
+lang: ca
+type: tutorial
+collection: user_knowledge
+author: "Jordi Goy"
+expires: null
+---
+
 # Guia d'Ús - NEXE 0.8
 
 Aquesta guia t'ensenya a usar NEXE amb exemples pràctics. Assumeix que ja tens NEXE instal·lat (si no, consulta **INSTALLATION.md**).

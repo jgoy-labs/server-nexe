@@ -68,7 +68,7 @@ async def get_memory_api():
             logger.warning("Could not create default collection: %s", e)
     return _memory_api
 
-@router.post("/store", response_model=MemoryStoreResponse, dependencies=[Depends(require_api_key)])
+@router.post("/store", response_model=MemoryStoreResponse, dependencies=[Depends(require_api_key)], summary="Guardar contingut a la memòria semàntica (🔒 API key)")
 async def memory_store(request: Request, body: MemoryStoreRequest):
     """
     Store content in semantic memory (RAG).
@@ -114,7 +114,7 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
             detail="Internal error. Check server logs."
         )
 
-@router.post("/search", response_model=MemorySearchResponse, dependencies=[Depends(require_api_key)])
+@router.post("/search", response_model=MemorySearchResponse, dependencies=[Depends(require_api_key)], summary="Cercar a la memòria semàntica per similitud vectorial (🔒 API key)")
 async def memory_search(request: Request, body: MemorySearchRequest):
     """
     Search semantic memory (RAG).
@@ -165,7 +165,7 @@ async def memory_search(request: Request, body: MemorySearchRequest):
             detail="Internal error. Check server logs."
         )
 
-@router.get("/health")
+@router.get("/health", summary="Health check del subsistema de memòria i col·leccions Qdrant")
 async def memory_health():
     """Health check for memory subsystem."""
     try:

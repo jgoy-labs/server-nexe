@@ -1,3 +1,22 @@
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-02-23
+id: nexe-architecture
+
+# === CONTINGUT RAG (OBLIGATORI) ===
+abstract: "Visió general de l'arquitectura interna de NEXE 0.8. Tres capes: Interfaces → Core → Plugins → Serveis Base. Cobreix Factory Pattern, lifespan manager, sistema de memòria en 3 capes, CLI i decisions de disseny."
+tags: [arquitectura, fastapi, plugins, qdrant, memory, lifespan, cli, disseny]
+chunk_size: 1500
+priority: P2
+
+# === OPCIONAL ===
+lang: ca
+type: docs
+collection: user_knowledge
+author: "Jordi Goy"
+expires: null
+---
+
 # Arquitectura - NEXE 0.8
 
 > **📝 Document actualitzat:** 2026-02-04

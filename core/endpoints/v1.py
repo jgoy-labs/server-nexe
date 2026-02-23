@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router_v1 = APIRouter(prefix="/v1", tags=["v1"])
 router_v1.include_router(chat_router)
 
-@router_v1.get("", include_in_schema=True)
+@router_v1.get("", include_in_schema=True, summary="Arrel API v1 — endpoints disponibles i estat")
 async def v1_root(request: Request):
   """
   API v1 root endpoint - Informació general API versionada.
@@ -77,7 +77,7 @@ async def v1_root(request: Request):
     }
   })
 
-@router_v1.get("/health", include_in_schema=True)
+@router_v1.get("/health", include_in_schema=True, summary="Health check específic de l'API v1")
 async def v1_health(request: Request):
   """
   Health check específic per API v1.

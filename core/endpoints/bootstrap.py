@@ -93,7 +93,7 @@ def check_rate_limit(client_ip: str, request: Request) -> None:
       detail="Massa intents des de la teva IP. Espera 5 minuts."
     )
 
-@router.post("/api/bootstrap", response_model=BootstrapResponse)
+@router.post("/api/bootstrap", response_model=BootstrapResponse, summary="Inicialitza sessió amb token bootstrap (només development)")
 async def bootstrap_session(
   bootstrap_data: BootstrapRequest,
   request: Request
@@ -204,7 +204,7 @@ async def bootstrap_session(
     ]
   )
 
-@router.post("/api/regenerate-bootstrap")
+@router.post("/api/regenerate-bootstrap", summary="Regenera token bootstrap expirat o usat (localhost only)")
 async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   """
   Regenera token bootstrap si l'anterior ja s'ha utilitzat.
@@ -258,7 +258,7 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
     "message": "New token generated. Check terminal."
   }
 
-@router.get("/api/bootstrap/info", response_model=BootstrapInfoResponse)
+@router.get("/api/bootstrap/info", response_model=BootstrapInfoResponse, summary="Estat del sistema de bootstrap (públic, sense auth)")
 async def bootstrap_info(request: Request) -> BootstrapInfoResponse:
   """
   Retorna informació sobre l'estat del bootstrap.

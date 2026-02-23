@@ -189,8 +189,10 @@ class RAGHeaderParser:
                 if stripped == "---":
                     body_start = i + 1
                 else:
-                    # Línia buida - comprovar si ve més capçalera
-                    if i + 1 < len(lines) and ":" in lines[i + 1]:
+                    # Línia buida - comprovar si ve més capçalera (camp o comentari de secció)
+                    if i + 1 < len(lines) and (
+                        ":" in lines[i + 1] or lines[i + 1].strip().startswith('#')
+                    ):
                         continue
                     body_start = i + 1
                 break

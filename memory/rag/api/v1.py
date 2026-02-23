@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/rag", tags=["rag-v1", "future"])
 
-@router.post("/search")
+@router.post("/search", summary="[FASE 15] Cerca semàntica al vector store RAG")
 async def rag_search_v1():
   """
   Cerca semàntica RAG (API v1).
@@ -63,7 +63,7 @@ async def rag_search_v1():
     }
   )
 
-@router.post("/add")
+@router.post("/add", summary="[FASE 15] Afegir documents al vector store RAG")
 async def rag_add_documents_v1():
   """
   Afegeix documents al vector store RAG (API v1).
@@ -98,7 +98,7 @@ async def rag_add_documents_v1():
     }
   )
 
-@router.delete("/documents/{document_id}")
+@router.delete("/documents/{document_id}", summary="[FASE 15] Eliminar document del vector store RAG")
 async def rag_delete_document_v1(document_id: str):
   """
   Elimina un document del vector store RAG (API v1).

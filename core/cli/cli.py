@@ -425,7 +425,7 @@ def ingest_knowledge_cmd():
     for ext in SUPPORTED_EXTENSIONS:
         files.extend(knowledge_path.glob(f"**/*{ext}"))
     files.extend(knowledge_path.glob("**/*.pdf"))
-    files = [f for f in files if not f.name.startswith('.') and f.name != 'README.md']
+    files = [f for f in files if not f.name.startswith('.')]
 
     if not files:
         click.echo(click.style("ℹ️  No hi ha documents a knowledge/", fg="yellow"))

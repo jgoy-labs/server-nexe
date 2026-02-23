@@ -31,7 +31,21 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
 
   app = FastAPI(
     title=translate(i18n, "server_core.api.title", "Nexe 0.8 API"),
-    description=translate(i18n, "server_core.api.description", "Sistema modular d'IA"),
+    description=translate(
+      i18n,
+      "server_core.api.description",
+      "**Nexe 0.8** — Servidor IA local amb memòria persistent.\n\n"
+      "## Autenticació\n"
+      "La majoria d'endpoints requereixen `X-API-Key` header.\n\n"
+      "## Grups d'endpoints\n"
+      "- **system** — Health checks, status i circuit breakers\n"
+      "- **v1 / chat** — Chat completion amb RAG opcional (OpenAI-compatible)\n"
+      "- **memory-v1** — Memòria semàntica persistent (store/search)\n"
+      "- **modules** — Mòduls i plugins carregats\n"
+      "- **bootstrap** — Inicialització de sessió (mode development)\n"
+      "- **system-admin** — Restart i supervisió del servidor\n"
+      "- **rag-v1 / embeddings-v1 / documents-v1** — Endpoints futurs (FASE 15, retornen 501)"
+    ),
     version="0.8.0",
     lifespan=lifespan
   )

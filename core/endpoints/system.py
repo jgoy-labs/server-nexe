@@ -152,7 +152,7 @@ async def send_restart_signal():
   except Exception as e:
     logger.error(_t("core.endpoints.system.restart_signal_unexpected", "Unexpected error sending restart signal: {error}", error=str(e)))
 
-@router_admin.post("/restart")
+@router_admin.post("/restart", summary="Reinicia el servidor via supervisor (🔒 API key)")
 async def restart_server(
   background_tasks: BackgroundTasks,
   _: str = Depends(require_api_key)
@@ -211,7 +211,7 @@ async def restart_server(
       }
     )
 
-@router_admin.get("/status")
+@router_admin.get("/status", summary="Estat del supervisor i disponibilitat de restart (🔒 API key)")
 async def supervisor_status(_: str = Depends(require_api_key)) -> Dict[str, Any]:
   """
   Check supervisor status.
@@ -242,7 +242,7 @@ async def supervisor_status(_: str = Depends(require_api_key)) -> Dict[str, Any]
       "error": e.detail
     }
 
-@router_admin.get("/health")
+@router_admin.get("/health", summary="Health check admin (públic, usat per la UI post-restart)")
 async def system_health() -> Dict[str, Any]:
   """
   Health check simple (NO requereix auth).

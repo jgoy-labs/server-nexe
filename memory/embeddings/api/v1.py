@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/embeddings", tags=["embeddings-v1", "future"])
 
-@router.post("/encode")
+@router.post("/encode", summary="[FASE 15] Generar embeddings vectorials per textos")
 async def encode_embeddings_v1():
   """
   Genera embeddings per textos (API v1).
@@ -30,7 +30,7 @@ async def encode_embeddings_v1():
     }
   )
 
-@router.get("/models")
+@router.get("/models", summary="[FASE 15] Llistar models d'embeddings disponibles")
 async def list_embedding_models_v1():
   """
   Llista models d'embeddings disponibles (API v1).

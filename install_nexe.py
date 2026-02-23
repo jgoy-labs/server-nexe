@@ -2009,7 +2009,7 @@ def main():
 
     # 15. Ingest knowledge documents if any exist
     knowledge_files = list(knowledge_dir.glob("*.md")) + list(knowledge_dir.glob("*.txt")) + list(knowledge_dir.glob("*.pdf"))
-    knowledge_files = [f for f in knowledge_files if not f.name.startswith('.') and f.name != 'README.md']
+    knowledge_files = [f for f in knowledge_files if not f.name.startswith('.')]
 
     if knowledge_files:
         print_step(f"{BOLD}{t('processing_knowledge').format(n=len(knowledge_files))}{RESET}")

@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/documents", tags=["documents-v1", "future"])
 
-@router.get("/")
+@router.get("/", summary="[FASE 15] Llistar documents disponibles al sistema de fitxers")
 async def list_documents_v1():
     """
     Llista documents disponibles (API v1).

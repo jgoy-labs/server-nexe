@@ -1,3 +1,22 @@
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-02-23
+id: nexe-plugins-system
+
+# === CONTINGUT RAG (OBLIGATORI) ===
+abstract: "Documentació del sistema de plugins de NEXE. Arquitectura modular amb BasePlugin, plugins existents (MLX, llama.cpp, Ollama, Security, Web UI), tutorial de creació de nous plugins i cicle de vida complet."
+tags: [plugins, extensibilitat, mlx, ollama, llama-cpp, BasePlugin, cicle-de-vida]
+chunk_size: 1000
+priority: P2
+
+# === OPCIONAL ===
+lang: ca
+type: docs
+collection: user_knowledge
+author: "Jordi Goy"
+expires: null
+---
+
 # Sistema de Plugins - NEXE 0.8
 
 NEXE utilitza una **arquitectura de plugins** per fer el sistema modular, extensible i fàcil de mantenir. Aquest document explica com funciona i com crear plugins propis.
