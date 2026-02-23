@@ -392,6 +392,11 @@ TRANSLATIONS = {
         "engines_label": "Motors",
         "disk_label": "Disc",
         "fits_tight": "⚠️ Pot anar just",
+        "mlx_downloaded_ok": "Model MLX descarregat a {path}",
+        "mlx_validating": "Validant model MLX...",
+        "mlx_validated_ok": "Model MLX validat correctament",
+        "mlx_config_missing": "Advertència: {path} no conté config.json",
+        "mlx_may_have_issues": "El model pot tenir problemes, però continuem.",
     },
     "es": {
         "lang_name": "Español",
@@ -600,6 +605,11 @@ TRANSLATIONS = {
         "engines_label": "Motores",
         "disk_label": "Disco",
         "fits_tight": "⚠️ Puede ir justo",
+        "mlx_downloaded_ok": "Modelo MLX descargado en {path}",
+        "mlx_validating": "Validando modelo MLX...",
+        "mlx_validated_ok": "Modelo MLX validado correctamente",
+        "mlx_config_missing": "Advertencia: {path} no contiene config.json",
+        "mlx_may_have_issues": "El modelo puede tener problemas, pero continuamos.",
     },
     "en": {
         "lang_name": "English",
@@ -808,6 +818,11 @@ TRANSLATIONS = {
         "engines_label": "Engines",
         "disk_label": "Disk",
         "fits_tight": "⚠️ May be tight",
+        "mlx_downloaded_ok": "MLX model downloaded at {path}",
+        "mlx_validating": "Validating MLX model...",
+        "mlx_validated_ok": "MLX model validated successfully",
+        "mlx_config_missing": "Warning: {path} does not contain config.json",
+        "mlx_may_have_issues": "The model may have issues, but continuing.",
     },
 }
 
@@ -1727,16 +1742,16 @@ for attempt in range(max_retries):
             return_code = process.wait()
 
             if return_code == 0:
-                print_success(f"Model MLX descarregat a {local_model_path}")
+                print_success(t('mlx_downloaded_ok').format(path=local_model_path))
 
                 # Validate model has required files
-                print(f"\n{BLUE}[2/2]{RESET} Validant model MLX...")
+                print(f"\n{BLUE}[2/2]{RESET} {t('mlx_validating')}")
                 config_file = local_model_path / "config.json"
                 if not config_file.exists():
-                    print_warn(f"Advertència: {local_model_path} no conté config.json")
-                    print(f"{DIM}El model pot tenir problemes, però continuem.{RESET}")
+                    print_warn(t('mlx_config_missing').format(path=local_model_path))
+                    print(f"{DIM}{t('mlx_may_have_issues')}{RESET}")
                 else:
-                    print(f"{GREEN}✓{RESET} Model MLX validat correctament")
+                    print(f"{GREEN}✓{RESET} {t('mlx_validated_ok')}")
             else:
                 print(f"\n{YELLOW}{t('download_failed_resume')}{RESET}")
                 print(f"{DIM}{t('partial_files_preserved')}{RESET}\n")
