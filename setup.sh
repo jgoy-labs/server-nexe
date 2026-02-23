@@ -26,9 +26,22 @@ echo -e "${BLUE}[STEP]${NC} Verifying environment..."
 # Check if Python is installed
 if ! command -v python3 &> /dev/null
 then
-    echo -e "${RED}[ERROR]${NC} Python3 not found. Please install Python 3.9 or higher."
+    echo -e "${RED}[ERROR]${NC} Python3 no trobat. Instal·la Python 3.10 o superior."
+    echo -e "  ${CYAN}→${NC} brew install python@3.11"
     exit 1
 fi
+
+# Check Python version >= 3.10
+PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+PYTHON_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
+PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
+if [ "$PYTHON_MAJOR" -lt 3 ] || { [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 10 ]; }; then
+    echo -e "${RED}[ERROR]${NC} Python ${PYTHON_VERSION} no és compatible. Cal Python 3.10 o superior."
+    echo -e "  ${CYAN}→${NC} brew install python@3.11"
+    echo -e "  ${CYAN}→${NC} Després torna a executar: ./setup.sh"
+    exit 1
+fi
+echo -e "  ${GREEN}✓${NC} Python ${PYTHON_VERSION} detectat"
 
 # AUTOMATIC PYTHON CACHE CLEANUP (always, no prompt)
 # Necessary when copying directory between locations
