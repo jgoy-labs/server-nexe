@@ -70,6 +70,7 @@ MODEL_CATALOG = {
             "ollama": "phi3:mini",
             "gguf": "https://huggingface.co/microsoft/Phi-3.5-mini-instruct-gguf/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf",
             "chat_format": "chatml",
+            "prompt_tier": "small",
         },
         {
             "key": "salamandra2b",
@@ -84,6 +85,7 @@ MODEL_CATALOG = {
             "ollama": "hdnh2006/salamandra-2b-instruct",
             "gguf": None,  # No GGUF available yet
             "chat_format": "chatml",
+            "prompt_tier": "small",
         },
     ],
     # ─────────────────────────────────────────────────────────────────────────
@@ -103,6 +105,7 @@ MODEL_CATALOG = {
             "ollama": "mistral:7b",
             "gguf": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf",
             "chat_format": "mistral",
+            "prompt_tier": "full",
         },
         {
             "key": "salamandra7b",
@@ -117,6 +120,7 @@ MODEL_CATALOG = {
             "ollama": "cas/salamandra-7b-instruct",
             "gguf": "https://huggingface.co/cstr/salamandra-7b-instruct-GGUF/resolve/main/salamandra-7b-instruct-Q4_K_M.gguf",
             "chat_format": "chatml",
+            "prompt_tier": "full",
         },
         {
             "key": "llama31_8b",
@@ -131,6 +135,7 @@ MODEL_CATALOG = {
             "ollama": "llama3.1:8b",
             "gguf": "https://huggingface.co/lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
             "chat_format": "llama-3",
+            "prompt_tier": "full",
         },
     ],
     # ─────────────────────────────────────────────────────────────────────────
@@ -150,6 +155,7 @@ MODEL_CATALOG = {
             "ollama": "mixtral:8x7b",
             "gguf": "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/resolve/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf",
             "chat_format": "mistral",
+            "prompt_tier": "full",
         },
         {
             "key": "llama31_70b",
@@ -164,6 +170,7 @@ MODEL_CATALOG = {
             "ollama": "llama3.1:70b",
             "gguf": "https://huggingface.co/lmstudio-community/Meta-Llama-3.1-70B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-70B-Instruct-Q4_K_M.gguf",
             "chat_format": "llama-3",
+            "prompt_tier": "full",
         },
     ],
 }
@@ -1281,6 +1288,7 @@ def generate_env_file(project_root, model_config):
             f.write(f"# Model configuration\n")
             f.write(f"NEXE_DEFAULT_MODEL={model_config['id']}\n")
             f.write(f"NEXE_MODEL_ENGINE={model_config['engine']}\n")
+            f.write(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
             # Engine-specific model paths (using relative paths for portability)
             if model_config['engine'] == 'mlx':
                 model_name = model_config['id'].split('/')[-1]
@@ -1329,6 +1337,7 @@ def _update_env_model_config(env_file, model_config):
     found_mlx_model = False
     found_llama_cpp_model = False
     found_llama_cpp_chat_format = False
+    found_prompt_tier = False
     found_ollama_model = False
     new_lines = []
 
@@ -1363,6 +1372,9 @@ def _update_env_model_config(env_file, model_config):
                 new_lines.append(f"NEXE_LLAMA_CPP_CHAT_FORMAT={chat_fmt}\n")
             else:
                 new_lines.append(line)
+        elif line.startswith('NEXE_PROMPT_TIER='):
+            found_prompt_tier = True
+            new_lines.append(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
         elif line.startswith('NEXE_OLLAMA_MODEL='):
             found_ollama_model = True
             if model_engine == 'ollama':
@@ -1394,6 +1406,8 @@ def _update_env_model_config(env_file, model_config):
     if not found_llama_cpp_chat_format and model_engine == 'llama_cpp':
         chat_fmt = model_config.get('chat_format', 'chatml')
         new_lines.append(f"NEXE_LLAMA_CPP_CHAT_FORMAT={chat_fmt}\n")
+    if not found_prompt_tier:
+        new_lines.append(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
     if not found_ollama_model and model_engine == 'ollama':
         new_lines.append(f"NEXE_OLLAMA_MODEL={model_id}\n")
 
