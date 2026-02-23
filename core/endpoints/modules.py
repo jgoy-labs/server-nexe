@@ -19,7 +19,7 @@ from core.models import (
   ModuleRoutesResponse
 )
 
-router = APIRouter()
+router = APIRouter(tags=["modules"])
 
 def get_i18n(request: Request):
   """Get i18n from app state"""
@@ -34,7 +34,7 @@ def get_api_integrator(request: Request):
 def configure_dependencies(api_integrator_instance, i18n_manager):
   """Legacy compatibility - dependencies now injected via app.state"""
 
-@router.get("/modules", response_model=ModulesListResponse)
+@router.get("/modules", response_model=ModulesListResponse, summary="Llista mòduls integrats i les seves APIs")
 @limiter.limit("10/minute")
 async def list_integrated_modules(
   request: Request,
@@ -55,7 +55,7 @@ async def list_integrated_modules(
           "Integrador d'API no inicialitzat"
     )
 
-@router.get("/modules/{module_name}/routes", response_model=ModuleRoutesResponse)
+@router.get("/modules/{module_name}/routes", response_model=ModuleRoutesResponse, summary="Rutes registrades d'un mòdul específic")
 @limiter.limit("10/minute")
 async def get_module_routes(
   module_name: str,

@@ -1,3 +1,22 @@
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-02-23
+id: nexe-rag-system
+
+# === CONTINGUT RAG (OBLIGATORI) ===
+abstract: "Guia completa del sistema RAG de NEXE. Cobreix embeddings, Qdrant, chunking, cerca multi-col·lecció i limitacions. Explica com afegir documents, fer cerques semàntiques i optimitzar la recuperació de context."
+tags: [rag, embeddings, qdrant, chunking, vectors, cerca-semàntica, documents]
+chunk_size: 1000
+priority: P1
+
+# === OPCIONAL ===
+lang: ca
+type: docs
+collection: user_knowledge
+author: "Jordi Goy"
+expires: null
+---
+
 # Sistema RAG - NEXE 0.8
 
 RAG (Retrieval-Augmented Generation) és el sistema de **memòria persistent** de NEXE. Aquest document explica com funciona, per què és útil i com usar-lo efectivament.

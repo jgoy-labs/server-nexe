@@ -1,3 +1,22 @@
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-02-23
+id: nexe-overview
+
+# === CONTINGUT RAG (OBLIGATORI) ===
+abstract: "Visió general de NEXE 0.8, servidor IA local amb memòria persistent. Cobreix backends (MLX, llama.cpp, Ollama), funcionalitats, arquitectura, models disponibles, casos d'ús i roadmap. Projecte educatiu de Jordi Goy."
+tags: [overview, nexe, backends, rag, memory, arquitectura, roadmap, models, instal·lació]
+chunk_size: 1000
+priority: P1
+
+# === OPCIONAL ===
+lang: ca
+type: docs
+collection: user_knowledge
+author: "Jordi Goy"
+expires: null
+---
+
 # NEXE 0.8 - Servidor IA Local amb Memòria
 
 **Versió:** 0.8.0

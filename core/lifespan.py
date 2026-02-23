@@ -425,7 +425,7 @@ async def lifespan(app: FastAPI):
           files_to_ingest.extend(knowledge_path.glob(f"**/*{ext}"))
         files_to_ingest.extend(knowledge_path.glob("**/*.pdf"))
 
-        files_to_ingest = [f for f in files_to_ingest if not f.name.startswith('.') and f.name != 'README.md']
+        files_to_ingest = [f for f in files_to_ingest if not f.name.startswith('.')]
 
         if files_to_ingest:
           # Only auto-ingest if never done before (no marker file)

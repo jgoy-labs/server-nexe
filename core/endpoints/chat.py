@@ -166,7 +166,7 @@ def _rag_result_to_text(result: Any) -> str:
         return result.text
     return str(result)
 
-@router.post("/chat/completions", dependencies=[Depends(require_api_key)])
+@router.post("/chat/completions", dependencies=[Depends(require_api_key)], summary="Chat completion amb suport RAG i auto-routing d'engines")
 async def chat_completions(request: ChatCompletionRequest, req: Request, background_tasks: BackgroundTasks):
     """
     Unified Chat Completion endpoint.

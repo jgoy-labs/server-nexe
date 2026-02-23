@@ -1,3 +1,22 @@
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-02-23
+id: nexe-installation-guide
+
+# === CONTINGUT RAG (OBLIGATORI) ===
+abstract: "Guia completa d'instal·lació de NEXE 0.8. macOS (testejat), Linux i Windows (teòric). Requisits, instal·lació guiada amb setup.sh, configuració .env, backends MLX/llama.cpp/Ollama i resolució de problemes."
+tags: [instal·lació, setup, macos, configuració, homebrew, python, venv]
+chunk_size: 1000
+priority: P1
+
+# === OPCIONAL ===
+lang: ca
+type: tutorial
+collection: user_knowledge
+author: "Jordi Goy"
+expires: null
+---
+
 # Guia d'Instal·lació - NEXE 0.8
 
 > **📝 Document actualitzat:** 2026-02-04

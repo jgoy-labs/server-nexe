@@ -1,3 +1,22 @@
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-02-23
+id: nexe-api-reference
+
+# === CONTINGUT RAG (OBLIGATORI) ===
+abstract: "Referència completa de l'API REST de NEXE 0.8. Cobreix autenticació X-API-Key, endpoints de chat, memory, RAG, admin i mètriques Prometheus. Inclou exemples en Python, JavaScript i cURL amb compatibilitat parcial OpenAI."
+tags: [api, rest, endpoints, chat, memory, rag, autenticació, rate-limiting]
+chunk_size: 1200
+priority: P1
+
+# === OPCIONAL ===
+lang: ca
+type: api
+collection: user_knowledge
+author: "Jordi Goy"
+expires: null
+---
+
 # API Reference - NEXE 0.8
 
 NEXE ofereix una **API REST** per integrar-lo amb altres aplicacions. Aquesta documentació descriu els endpoints disponibles i els comportaments reals segons el codi actual.

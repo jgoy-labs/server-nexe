@@ -137,8 +137,8 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
     pdf_files = list(knowledge_path.glob("**/*.pdf"))
     files.extend(pdf_files)
 
-    # Filter out README and hidden files
-    files = [f for f in files if not f.name.startswith('.') and f.name != 'README.md']
+    # Filter out hidden files
+    files = [f for f in files if not f.name.startswith('.')]
 
     if not files:
         log(f"[INFO] {_t('no_docs', p=knowledge_path)}")

@@ -1,3 +1,22 @@
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-02-23
+id: nexe-security-guide
+
+# === CONTINGUT RAG (OBLIGATORI) ===
+abstract: "Documentació de seguretat de NEXE. Autenticació API key, rate limiting, headers HTTP, validació d'entrada, logging SIEM i auditoria N-series (21 feb 2026). Inclou checklist de seguretat i guies de configuració segura."
+tags: [seguretat, autenticació, api-key, rate-limiting, headers, validació, auditoria]
+chunk_size: 1000
+priority: P1
+
+# === OPCIONAL ===
+lang: ca
+type: docs
+collection: user_knowledge
+author: "Jordi Goy"
+expires: null
+---
+
 # Seguretat - NEXE 0.8
 
 Aquest document descriu **honestament** les mesures de seguretat implementades a NEXE i les seves limitacions.
