@@ -364,7 +364,16 @@ async def chat(request: Dict[str, Any]):
                             logger.warning(f"RAG lookup failed: {e}")
 
                     # 4. Construct Final System Prompt
-                    base_system_prompt = "Ets Nexe, una IA assistent local, privada i segura."
+                    # Llegir el prompt de server.toml via app_state (llengua + tier)
+                    try:
+                        from core.lifespan import get_server_state
+                        from core.endpoints.chat import _get_system_prompt
+                        import os as _os
+                        _state = get_server_state()
+                        _lang = _os.getenv("NEXE_LANG", "ca")
+                        base_system_prompt = _get_system_prompt(_state, _lang)
+                    except Exception:
+                        base_system_prompt = "Ets Nexe, l'assistent oficial de Server Nexe. Respon de forma clara i útil."
                     if document_context:
                         # MODE ZEN: Prompt restrictiu que FORÇA resposta basada en document
                         # Evita al·lucinacions forçant el model a cenyir-se al contingut

@@ -102,6 +102,33 @@ class ChatCompletionRequest(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
+# --- System Prompt ---
+
+def _get_system_prompt(app_state, lang: str = "ca") -> str:
+    """
+    Selecciona el system prompt per idioma i tier de model.
+
+    Prioritat:
+    1. server.toml [personality.prompt].<lang>_<tier>
+    2. server.toml [personality.prompt].<lang>_full  (fallback de tier)
+    3. server.toml [personality.prompt].ca_full       (fallback de llengua)
+    4. Prompt mínim hardcoded
+    """
+    config = getattr(app_state, "config", {}) or {}
+    prompts = config.get("personality", {}).get("prompt", {})
+
+    tier = os.getenv("NEXE_PROMPT_TIER", "full")
+    lang_short = lang.split("-")[0].lower()  # "ca-ES" → "ca"
+
+    # Busca prompt específic → fallback full → fallback ca → mínim
+    for key in [f"{lang_short}_{tier}", f"{lang_short}_full", "ca_full"]:
+        prompt = prompts.get(key, "")
+        if prompt:
+            return prompt
+
+    return "Ets Nexe, l'assistent oficial de Server Nexe. Respon de forma clara i útil."
+
+
 # --- Router Logic ---
 
 def _normalize_engine(engine: Optional[str]) -> Optional[str]:
@@ -284,17 +311,21 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
             logger.error(f"RAG Error: {e}")
             # Continue without context rather than failing
 
-    # 3. Augment System Prompt (with sanitized RAG context)
+    # 3. Augment System Prompt (Nexe persona + sanitized RAG context)
     messages = [m.model_dump() for m in request.messages]
+
+    # Injectar system prompt de Nexe si el client no n'envia cap
+    has_system = messages and messages[0]['role'] == 'system'
+    if not has_system:
+        nexe_prompt = _get_system_prompt(req.app.state, _server_lang)
+        messages.insert(0, {"role": "system", "content": nexe_prompt})
+
     if context_text and messages:
         # SECURITY: Sanitize RAG context before injection
         safe_context = _sanitize_rag_context(context_text)
 
-        # Find system prompt or insert one
-        if messages[0]['role'] == 'system':
-            messages[0]['content'] += f"\n\n[CONTEXT MEMÒRIA]\nUsa aquesta informació recuperada per respondre si és rellevant:\n{safe_context}\n[/CONTEXT]"
-        else:
-            messages.insert(0, {"role": "system", "content": f"[CONTEXT MEMÒRIA]\nUsa aquesta informació recuperada per respondre si és rellevant:\n{safe_context}\n[/CONTEXT]"})
+        # Afegir context RAG al system prompt existent (sempre a index 0)
+        messages[0]['content'] += f"\n\n[CONTEXT MEMÒRIA]\nUsa aquesta informació recuperada per respondre si és rellevant:\n{safe_context}\n[/CONTEXT]"
 
     # 4. Dispatch to Engine
     # Extract last user message for auto-save logic
