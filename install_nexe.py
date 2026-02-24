@@ -102,9 +102,9 @@ MODEL_CATALOG = {
             "ram_gb": 5.5,
             "description": {"ca": "Excel·lent equilibri qualitat/velocitat", "es": "Excelente equilibrio calidad/velocidad", "en": "Excellent quality/speed balance"},
             "mlx": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
-            "ollama": "mistral:7b",
+            "ollama": "mistral:latest",
             "gguf": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf",
-            "chat_format": "mistral",
+            "chat_format": "chatml",  # 'mistral' no vàlid a llama.cpp; chatml suporta system msgs (RAG)
             "prompt_tier": "full",
         },
         {
@@ -117,8 +117,23 @@ MODEL_CATALOG = {
             "ram_gb": 6.5,
             "description": {"ca": "El millor per català i llengües ibèriques", "es": "El mejor para catalán y lenguas ibéricas", "en": "Best for Catalan and Iberian languages"},
             "mlx": None,
-            "ollama": "cas/salamandra-7b-instruct",
+            "ollama": "hdnh2006/salamandra-7b-instruct:q4_K_M",  # testat i verificat
             "gguf": "https://huggingface.co/cstr/salamandra-7b-instruct-GGUF/resolve/main/salamandra-7b-instruct-Q4_K_M.gguf",
+            "chat_format": "chatml",
+            "prompt_tier": "full",
+        },
+        {
+            "key": "gemma3_12b",
+            "name": "Gemma 3 12B",
+            "origin": "Google DeepMind",
+            "lang": {"ca": "Multilingüe (excel·lent català)", "es": "Multilingüe (excelente catalán)", "en": "Multilingual (excellent Catalan)"},
+            "params": "12B",
+            "disk_gb": 7.0,
+            "ram_gb": 9.0,
+            "description": {"ca": "Molt bon seguiment d'instruccions i RAG", "es": "Muy buen seguimiento de instrucciones y RAG", "en": "Excellent instruction following and RAG"},
+            "mlx": "mlx-community/gemma-3-12b-it-4bit",
+            "ollama": "gemma3:12b",
+            "gguf": None,
             "chat_format": "chatml",
             "prompt_tier": "full",
         },
@@ -143,6 +158,21 @@ MODEL_CATALOG = {
     # ─────────────────────────────────────────────────────────────────────────
     "large": [
         {
+            "key": "gemma3_27b",
+            "name": "Gemma 3 27B",
+            "origin": "Google DeepMind",
+            "lang": {"ca": "Multilingüe (excel·lent català)", "es": "Multilingüe (excelente catalán)", "en": "Multilingual (excellent Catalan)"},
+            "params": "27B",
+            "disk_gb": 16.2,
+            "ram_gb": 20,
+            "description": {"ca": "Excel·lent memòria RAG i català. Testat i recomanat", "es": "Excelente memoria RAG y catalán. Testado y recomendado", "en": "Excellent RAG memory and Catalan. Tested and recommended"},
+            "mlx": "mlx-community/gemma-3-27b-it-4bit",
+            "ollama": "gemma3:27b",
+            "gguf": None,
+            "chat_format": "chatml",
+            "prompt_tier": "full",
+        },
+        {
             "key": "mixtral",
             "name": "Mixtral 8x7B",
             "origin": "Mistral AI (França)",
@@ -150,11 +180,11 @@ MODEL_CATALOG = {
             "params": "47B (MoE)",
             "disk_gb": 26,
             "ram_gb": 32,
-            "description": {"ca": "Màxima qualitat, model MoE", "es": "Máxima calidad, modelo MoE", "en": "Maximum quality, MoE model"},
+            "description": {"ca": "Alta qualitat, model MoE eficient", "es": "Alta calidad, modelo MoE eficiente", "en": "High quality, efficient MoE model"},
             "mlx": "mlx-community/Mixtral-8x7B-Instruct-v0.1-4bit",
-            "ollama": "mixtral:8x7b",
+            "ollama": "mixtral:latest",
             "gguf": "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/resolve/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf",
-            "chat_format": "mistral",
+            "chat_format": "chatml",  # 'mistral' no vàlid a llama.cpp; chatml suporta system msgs (RAG)
             "prompt_tier": "full",
         },
         {
