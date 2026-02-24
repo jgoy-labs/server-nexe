@@ -29,6 +29,10 @@ logs/
 .qdrant-initialized
 storage/.knowledge_ingested
 qdrant
+nexe
+
+# IDE / editor
+*.code-workspace
 
 COMMANDS.md
 personality/.module_cache.json
