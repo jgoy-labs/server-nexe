@@ -173,6 +173,21 @@ MODEL_CATALOG = {
             "prompt_tier": "full",
         },
         {
+            "key": "gpt_oss_20b",
+            "name": "GPT-OSS 20B",
+            "origin": "OpenAI (Open Source)",
+            "lang": {"ca": "Multilingüe", "es": "Multilingüe", "en": "Multilingual"},
+            "params": "21B (MoE, 3.6B actius)",
+            "disk_gb": 12,
+            "ram_gb": 16,
+            "description": {"ca": "Model obert d'OpenAI, MoE eficient. Corre en 16 GB RAM", "es": "Modelo abierto de OpenAI, MoE eficiente. Corre en 16 GB RAM", "en": "OpenAI open model, efficient MoE. Runs in 16 GB RAM"},
+            "mlx": None,  # No hi ha versió MLX a mlx-community encara
+            "ollama": "gpt-oss:20b",
+            "gguf": None,
+            "chat_format": "chatml",
+            "prompt_tier": "full",
+        },
+        {
             "key": "mixtral",
             "name": "Mixtral 8x7B",
             "origin": "Mistral AI (França)",
