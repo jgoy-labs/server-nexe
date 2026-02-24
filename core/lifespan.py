@@ -43,7 +43,7 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
     qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
     qdrant_port = os.getenv('QDRANT_PORT', '6333')
     qdrant_url = f"http://{qdrant_host}:{qdrant_port}"
-    qdrant_bin = project_root / "qdrant"
+    qdrant_bin = Path(os.getenv("NEXE_QDRANT_BIN", str(project_root / "qdrant")))
     qdrant_storage = project_root / "storage" / "qdrant"
 
     try:
@@ -89,6 +89,7 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
       else:
         logger.warning(f"Qdrant: Binary not found at {qdrant_bin}")
         logger.info("  Run ./setup.sh to download Qdrant automatically")
+        logger.info("  Or set NEXE_QDRANT_BIN=/path/to/qdrant in .env to use a custom location")
 
     # === OLLAMA (fallback engine) ===
     auto_start_ollama = os.getenv("NEXE_AUTOSTART_OLLAMA", "true").lower() == "true"
