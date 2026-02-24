@@ -360,6 +360,10 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                 if choices:
                     content = choices[0].get("message", {}).get("content", "")
             
+            # Try Ollama native format: {"message": {"content": "..."}}
+            if not content and isinstance(response, dict):
+                content = response.get("message", {}).get("content", "")
+
             if content and last_user_msg:
                 # Add storage task
                 background_tasks.add_task(
