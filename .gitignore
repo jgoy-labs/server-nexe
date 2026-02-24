@@ -35,6 +35,7 @@ nexe
 *.code-workspace
 
 COMMANDS.md
+TESTING_REPORT.md
 personality/.module_cache.json
 
 # User-uploaded files (mai al repo — poden contenir dades personals)
