@@ -161,7 +161,7 @@ def check_cleanup_policies() -> Dict[str, Any]:
     return {
       "name": "cleanup_policies",
       "status": "pass",
-      "message": i18n.t("memory.health.cleanup_ok", "Cleanup policies ready (FASE 4 will implement)")
+      "message": i18n.t("memory.health.cleanup_ok", "Cleanup policies ready")
     }
 
   except Exception as e:

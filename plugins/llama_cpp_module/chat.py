@@ -5,7 +5,6 @@ LlamaCppChatNode - Node llama-cpp-python amb cache.
 VERSIÓ 2.2 - Usa ModelPool per gestió de sessions amb LRU.
 llama.cpp té prefix caching automàtic quan el prefix és idèntic.
 
-Part of: PLA_OPTIMITZACIO_LLM_MODULAR v1.9 - FASE 2
 """
 import asyncio
 import time

@@ -11,7 +11,6 @@ Funcionament:
 3. LRU eviction quan max_sessions superat
 4. gc.collect() per alliberar VRAM
 
-Part of: PLA_OPTIMITZACIO_LLM_MODULAR v1.9 - FASE 2
 """
 import gc
 import threading

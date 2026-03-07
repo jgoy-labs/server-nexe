@@ -218,7 +218,7 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
                 doc_abstract = ""
                 doc_id = filename
                 doc_type = "docs"
-                doc_lang = "ca"
+                doc_lang = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
 
             # Calculate overlap based on chunk size
             doc_overlap = max(50, doc_chunk_size // 10)

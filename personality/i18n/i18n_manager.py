@@ -11,6 +11,7 @@ www.jgoy.net
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -33,8 +34,9 @@ class I18nManager:
     self.base_path = base_path or self.config_path.parent
     self.config = {}
     self.translations = {}
-    self.current_language = "ca-ES"
-    self.fallback_language = "ca-ES"
+    _default_lang = os.getenv("NEXE_LANG", "ca-ES")
+    self.current_language = _default_lang
+    self.fallback_language = _default_lang
     self._translations_loaded = False
     self._load_config()
   
@@ -57,8 +59,9 @@ class I18nManager:
       self.fallback_language = loc_config.get('fallback_idioma', 'ca-ES')
       
     except Exception:
-      self.current_language = "ca-ES"
-      self.fallback_language = "ca-ES"
+      _fallback = os.getenv("NEXE_LANG", "ca-ES")
+      self.current_language = _fallback
+      self.fallback_language = _fallback
   
   def _ensure_translations_loaded(self) -> None:
     """Lazy load translations when first needed"""

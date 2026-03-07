@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/models/memory_entry.py
-Description: Model principal MemoryEntry (FASE 13 MVP).
+Description: Model principal MemoryEntry.
 
 www.jgoy.net
 ────────────────────────────────────
