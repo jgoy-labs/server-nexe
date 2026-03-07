@@ -417,7 +417,8 @@ async def main():
   print(_t("cli.total_models", "\n📊 Total: {count} models", count=len(models)))
   print(_t("cli.web_chat_info", "\nPer usar el chatbot web:"))
   print(_t("cli.start_server", " → Inicia el servidor Nexe"))
-  print(_t("cli.visit_url", " → Visita: http://localhost:9119/ui-control/ollama/"))
+  _nexe_url = os.environ.get("NEXE_API_BASE_URL", "http://localhost:9119")
+  print(_t("cli.visit_url", f" → Visita: {_nexe_url}/ui-control/ollama/"))
 
   return 0
 

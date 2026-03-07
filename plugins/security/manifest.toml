@@ -6,7 +6,7 @@
 # ═══════════════════════════════════════════════════════════════
 
 [module]
-module_id = "{{NEXE_SECURITY_MODULE}}"
+module_id = "security"
 name = "security"
 version = "0.2"
 type = "core"

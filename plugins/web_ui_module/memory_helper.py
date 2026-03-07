@@ -12,7 +12,7 @@ www.jgoy.net
 
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple, List
 
 logger = logging.getLogger(__name__)
@@ -294,7 +294,9 @@ class MemoryHelper:
             if saved_at:
                 try:
                     saved_date = datetime.fromisoformat(saved_at)
-                    days_old = (datetime.now() - saved_date).days
+                    if saved_date.tzinfo is None:
+                        saved_date = saved_date.replace(tzinfo=timezone.utc)
+                    days_old = (datetime.now(timezone.utc) - saved_date).days
                     # Decay: 1.0 at day 0, 0.5 at TEMPORAL_DECAY_DAYS, approaches 0.1 after
                     recency_score = max(0.1, 1.0 - (days_old / (TEMPORAL_DECAY_DAYS * 3)))
                 except Exception as e:
@@ -404,7 +406,7 @@ class MemoryHelper:
             meta = metadata or {}
             meta["source"] = "web_ui"
             meta["session_id"] = session_id
-            meta["saved_at"] = datetime.now().isoformat()
+            meta["saved_at"] = datetime.now(timezone.utc).isoformat()
 
             doc_id = await memory.store(
                 text=content,
@@ -495,7 +497,9 @@ class MemoryHelper:
 
         try:
             saved_date = datetime.fromisoformat(saved_at)
-            days_old = (datetime.now() - saved_date).days
+            if saved_date.tzinfo is None:
+                saved_date = saved_date.replace(tzinfo=timezone.utc)
+            days_old = (datetime.now(timezone.utc) - saved_date).days
 
             # Bonus for recent (within TEMPORAL_DECAY_DAYS)
             if days_old <= TEMPORAL_DECAY_DAYS:

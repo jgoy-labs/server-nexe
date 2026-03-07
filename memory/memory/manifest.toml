@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────
 # Nexe Memory Module - Manifest TOML
 # ─────────────────────────────────────────────────────────────
-# ModuleID: {{NEXE_MEMORY_MODULE}}
+# ModuleID: memory
 # Versió: 0.8.0
 # Autoria: Nexe Team (Jordi Goy)
 # Data creació: 2025-10-27
@@ -9,7 +9,7 @@
 # ─────────────────────────────────────────────────────────────
 
 [module]
-module_id = "{{NEXE_MEMORY_MODULE}}"
+module_id = "memory"
 name = "memory"
 version = "0.1"
 description = "Sistema de memòria híbrida Flash i RAM Context amb gestió automàtica del cicle de vida. TTL 30min, garbage collection cada 5min, pipeline d'upload i persistència controlada per mantenir context conversacional"
@@ -32,9 +32,9 @@ workflow_engine = true
 
 [dependencies]
 required = [
-  "{{NEXE_RAG_MODULE}}",
-  "{{NEXE_MEMORY_MODULE}}",
-  "{{NEXE_EMBEDDINGS_MODULE}}"
+  "rag",
+  "memory",
+  "embeddings"
 ]
 
 # ─────────────────────────────────────────────────────────────

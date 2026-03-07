@@ -12,7 +12,7 @@ www.jgoy.net
 
 from typing import Dict, Any
 
-MODULE_ID = "{{NEXE_MEMORY_MODULE}}"
+MODULE_ID = "memory"
 
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
@@ -23,9 +23,9 @@ MANIFEST: Dict[str, Any] = {
   "category": "memory.core",
 
   "dependencies": [
-    "{{NEXE_RAG_MODULE}}",
-    "{{NEXE_MEMORY_MODULE}}",
-    "{{NEXE_EMBEDDINGS_MODULE}}"
+    "rag",
+    "memory",
+    "embeddings"
   ],
 
   "capabilities": [
