@@ -15,7 +15,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from typing import Callable
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import asyncio
 import os
 
@@ -155,7 +155,7 @@ class RateLimitTracker:
       Dict with 'remaining', 'limit', 'reset' keys
     """
     async with self._lock:
-      now = datetime.now()
+      now = datetime.now(timezone.utc)
 
       # SECURITY: Check memory limit before adding new identifiers
       if identifier not in self._counters:
@@ -210,7 +210,7 @@ class RateLimitTracker:
     Should be called periodically to prevent memory buildup.
     """
     async with self._lock:
-      now = datetime.now()
+      now = datetime.now(timezone.utc)
       expired = [
         key for key, value in self._counters.items()
         if value["reset"] and now >= value["reset"] + timedelta(hours=1)

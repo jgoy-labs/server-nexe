@@ -39,7 +39,7 @@ def _t(request: Request, key: str, fallback: str, **kwargs) -> str:
     return fallback.format(**kwargs) if kwargs else fallback
 
 VPN_ALLOWED_IPS = set(
-  ip.strip() for ip in os.getenv('VPN_ALLOWED_IPS', '').split(',') if ip.strip()
+  ip.strip() for ip in os.getenv('NEXE_VPN_ALLOWED_IPS', os.getenv('VPN_ALLOWED_IPS', '')).split(',') if ip.strip()
 )
 
 class BootstrapRequest(BaseModel):
