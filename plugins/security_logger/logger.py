@@ -47,7 +47,7 @@ class SecurityEventLogger(SecurityLoggerHelpers):
     self.log_dir = log_dir
     self.log_dir.mkdir(parents=True, exist_ok=True)
 
-    self.log_file = self.log_dir / f"security_{datetime.now().strftime('%Y%m%d')}.log"
+    self.log_file = self.log_dir / f"security_{datetime.now(timezone.utc).strftime('%Y%m%d')}.log"
 
     logger_name = f"nexe.security.events.{hash(str(log_dir))}"
     self.logger = logging.getLogger(logger_name)

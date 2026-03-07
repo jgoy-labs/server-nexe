@@ -67,6 +67,7 @@ ALLOWED_OLLAMA_MODELS = [
   "gemma2:9b",
   "gemma3:27b",
   "hdnh2006/salamandra-7b-instruct:q4_K_M",
+  "hdnh2006/salamandra-2b-instruct",
 ]
 
 def validate_ollama_prompt(prompt: str) -> None:

@@ -63,8 +63,8 @@ class OllamaModule:
     self.i18n = i18n
     self.name = "ollama_module"
     self.version = "1.0.0"
-    self.timeout = 30.0
-    self.pull_timeout = 600.0
+    self.timeout = float(os.getenv("NEXE_OLLAMA_CHAT_TIMEOUT", "30.0"))
+    self.pull_timeout = float(os.getenv("NEXE_OLLAMA_PULL_TIMEOUT", "600.0"))
 
     logger.info("OllamaModule initialized - base_url=%s", self.base_url)
 
@@ -129,10 +129,6 @@ class OllamaModule:
         status=HealthStatus.DEGRADED,
         message=str(e)
       )
-    except Exception as e:
-      msg = self._t("logs.connection_check_failed", "Comprovacio de connexio amb Ollama fallida: {error}", error=str(e))
-      logger.warning(msg)
-      return False
 
   @ollama_breaker.protect
   async def list_models(self) -> List[Dict[str, Any]]:

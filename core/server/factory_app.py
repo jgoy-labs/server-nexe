@@ -44,7 +44,7 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
       "- **modules** — Mòduls i plugins carregats\n"
       "- **bootstrap** — Inicialització de sessió (mode development)\n"
       "- **system-admin** — Restart i supervisió del servidor\n"
-      "- **rag-v1 / embeddings-v1 / documents-v1** — Endpoints futurs (coming soon, retornen 501)"
+      "- **rag-v1 / embeddings-v1 / documents-v1** — Endpoints en desenvolupament (retornen 501)"
     ),
     version="0.8.0",
     lifespan=lifespan
