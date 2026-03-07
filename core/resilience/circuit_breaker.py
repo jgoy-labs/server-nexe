@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/resilience/circuit_breaker.py
-Description: No description available.
+Description: Circuit Breaker amb retry exponencial per protegir serveis externs (Ollama, Qdrant, HTTP).
 
 www.jgoy.net
 ────────────────────────────────────
@@ -55,7 +55,7 @@ class CircuitBreakerState:
   failure_count: int = 0
   success_count: int = 0
   last_failure_time: Optional[datetime] = None
-  last_state_change: datetime = field(default_factory=datetime.now)
+  last_state_change: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 class CircuitBreaker:
   """
