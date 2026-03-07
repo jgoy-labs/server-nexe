@@ -172,7 +172,7 @@ def check_cleanup_policies() -> Dict[str, Any]:
     }
 
 def check_flash_memory_size(module) -> Dict[str, Any]:
-  """Check 5 (FASE 13): Verify FlashMemory cache size."""
+  """Check 5: Verify FlashMemory cache size."""
   i18n = get_i18n()
   try:
     if not module._initialized or not module._flash_memory:
@@ -219,7 +219,7 @@ def check_flash_memory_size(module) -> Dict[str, Any]:
     }
 
 def check_persistence_connectivity(module) -> Dict[str, Any]:
-  """Check 6 (FASE 13): Verify Persistence connectivity (SQLite + Qdrant)."""
+  """Check 6: Verify Persistence connectivity (SQLite + Qdrant)."""
   i18n = get_i18n()
   try:
     if not module._initialized or not module._persistence:
@@ -270,7 +270,7 @@ def check_persistence_connectivity(module) -> Dict[str, Any]:
     }
 
 def check_pipeline_stats(module) -> Dict[str, Any]:
-  """Check 7 (FASE 13): Verify Pipeline statistics."""
+  """Check 7: Verify Pipeline statistics."""
   i18n = get_i18n()
   try:
     if not module._initialized or not module._pipeline:

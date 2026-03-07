@@ -12,7 +12,7 @@ www.jgoy.net
 
 from dataclasses import dataclass, field
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .core.patterns import MAX_SCAN_LENGTH, MAX_INPUT_LENGTH
 from .core.detectors import detect_jailbreak, detect_prompt_injection, get_severity
@@ -59,7 +59,7 @@ class SanitizerModule:
   def __init__(self):
     """Inicialitza el Sanitizer."""
     self._initialized = True
-    self._init_time = datetime.now()
+    self._init_time = datetime.now(timezone.utc)
 
   def sanitize(self, text: str) -> SanitizeResult:
     """

@@ -202,7 +202,7 @@ def create_parser() -> argparse.ArgumentParser:
   """Create argument parser for Memory CLI"""
   parser = argparse.ArgumentParser(
     prog="memory",
-    description="Nexe 0.8 - Memory Module CLI (FASE 13 MVP)",
+    description="Nexe 0.8 - Memory Module CLI",
     formatter_class=argparse.RawDescriptionHelpFormatter
   )
 

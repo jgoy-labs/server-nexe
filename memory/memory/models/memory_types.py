@@ -16,11 +16,11 @@ class MemoryType(str, Enum):
   """
   Tipus de memòria suportats.
 
-  FASE 13 MVP:
+  Supported types:
   - EPISODIC: Interaccions (sense Anàlisi Contextual encara)
   - SEMANTIC: Documents tècnics (sense alignment)
 
-  FASE 19:
+  Planned:
   - SEMANTIC_INTIMATE: Diaris amb Anàlisi Contextual opcional
   """
 

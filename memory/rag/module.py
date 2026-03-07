@@ -10,6 +10,7 @@ www.jgoy.net
 ────────────────────────────────────
 """
 
+import os
 from typing import Optional, Dict, Any, List
 import threading
 import structlog
@@ -29,11 +30,11 @@ class RAGModule:
   - TransactionLedger (multi-store coherence)
   - WriteCoordinator (single-writer policy)
 
-  Features (PRE-PHASE 1):
+  Features:
   - Base Singleton structure
   - Health checks
-  - VectorStore preparation (PHASE 2)
-  - TransactionLedger integration preparation (PHASE 2)
+  - VectorStore
+  - TransactionLedger integration
 
   Usage:
     module = RAGModule.get_instance()
@@ -391,8 +392,12 @@ def get_file_rag():
   with _file_rag_lock:
     if _file_rag_instance is None:
       from memory.rag_sources.file.source import FileRAGSource
+      _qdrant_url = (
+        os.environ.get("NEXE_QDRANT_URL")
+        or f"http://{os.environ.get('NEXE_QDRANT_HOST', 'localhost')}:{os.environ.get('NEXE_QDRANT_PORT', '6333')}"
+      )
       _file_rag_instance = FileRAGSource(
-        qdrant_url="http://localhost:6333",
+        qdrant_url=_qdrant_url,
         table_name="uploaded_files"
       )
   return _file_rag_instance
