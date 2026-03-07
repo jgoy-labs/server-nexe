@@ -40,8 +40,8 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
 
     # === QDRANT (local binary, no Docker!) ===
     auto_start_qdrant = os.getenv("NEXE_AUTOSTART_QDRANT", "true").lower() == "true"
-    qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
-    qdrant_port = os.getenv('QDRANT_PORT', '6333')
+    qdrant_host = os.getenv('NEXE_QDRANT_HOST', os.getenv('QDRANT_HOST', 'localhost'))
+    qdrant_port = os.getenv('NEXE_QDRANT_PORT', os.getenv('QDRANT_PORT', '6333'))
     qdrant_url = f"http://{qdrant_host}:{qdrant_port}"
     qdrant_bin = Path(os.getenv("NEXE_QDRANT_BIN", str(project_root / "qdrant")))
     qdrant_storage = project_root / "storage" / "qdrant"

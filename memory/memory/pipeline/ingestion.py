@@ -36,8 +36,8 @@ class IngestionPipeline:
 
   OLLAMA_URL = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
   OLLAMA_EMBED_URL = f"{OLLAMA_URL}/api/embeddings"
-  OLLAMA_MODEL = "nomic-embed-text"
-  OLLAMA_TIMEOUT = 30.0
+  OLLAMA_MODEL = os.environ.get("NEXE_OLLAMA_EMBED_MODEL", "nomic-embed-text")
+  OLLAMA_TIMEOUT = float(os.environ.get("NEXE_OLLAMA_EMBED_TIMEOUT", "30.0"))
 
   def __init__(
     self,
@@ -137,7 +137,7 @@ class IngestionPipeline:
 
   async def _generate_embedding(self, text: str) -> List[float]:
     """
-    Generate embedding via Ollama API (FIX 6.T) or SentenceTransformer (fallback).
+    Generate embedding via Ollama API or SentenceTransformer (fallback).
 
     Args:
       text: Text to process
@@ -157,7 +157,7 @@ class IngestionPipeline:
 
   async def _generate_embedding_ollama(self, text: str) -> List[float]:
     """
-    Generate embedding via Ollama API (FIX 6.T).
+    Generate embedding via Ollama API.
 
     Model: nomic-embed-text (768 dimensions)
     Time: ~400ms (vs 8-10s with SentenceTransformer)
@@ -210,8 +210,7 @@ class IngestionPipeline:
     """
     Generate embedding with SentenceTransformer (legacy/fallback mode).
 
-    DEPRECATED: FIX 6.T migrates to Ollama API.
-    Kept for compatibility if embedding_model != None.
+    DEPRECATED: Kept for compatibility if embedding_model != None.
 
     Args:
       text: Text to process

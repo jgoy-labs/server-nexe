@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag_sources/file/api/v1.py
-Description: API v1 per gestió de fitxers documentals (placeholder FASE 15).
+Description: API v1 per gestió de fitxers documentals (not yet available).
 
 www.jgoy.net
 ────────────────────────────────────

@@ -10,6 +10,7 @@ www.jgoy.net
 ────────────────────────────────────────
 """
 
+import os
 import re
 import logging
 from datetime import datetime
@@ -52,7 +53,7 @@ class RAGHeader:
     priority: str = "P2"
 
     # Opcionals
-    lang: str = "ca"
+    lang: str = field(default_factory=lambda: os.getenv("NEXE_LANG", "ca").split("-")[0].lower())
     type: str = "docs"
     collection: str = "user_knowledge"
     author: str = ""
@@ -145,7 +146,8 @@ class RAGHeaderParser:
         header.priority = str(parsed.get("priority", "P2")).strip('"\'').upper()
 
         # Assignar camps opcionals
-        header.lang = str(parsed.get("lang", "ca")).strip('"\'').lower()
+        _default_lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+        header.lang = str(parsed.get("lang", _default_lang)).strip('"\'').lower()
         header.type = str(parsed.get("type", "docs")).strip('"\'').lower()
         header.collection = str(parsed.get("collection", "user_knowledge")).strip('"\'')
         header.author = str(parsed.get("author", "")).strip('"\'')

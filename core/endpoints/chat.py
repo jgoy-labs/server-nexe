@@ -105,29 +105,32 @@ class ChatCompletionRequest(BaseModel):
 
 # --- System Prompt ---
 
-def _get_system_prompt(app_state, lang: str = "ca") -> str:
+def _get_system_prompt(app_state, lang: str = None) -> str:
     """
     Selecciona el system prompt per idioma i tier de model.
 
     Prioritat:
     1. server.toml [personality.prompt].<lang>_<tier>
     2. server.toml [personality.prompt].<lang>_full  (fallback de tier)
-    3. server.toml [personality.prompt].ca_full       (fallback de llengua)
+    3. server.toml [personality.prompt].en_full       (fallback neutre)
     4. Prompt mínim hardcoded
     """
+    if lang is None:
+        lang = os.getenv("NEXE_LANG", "en")
+
     config = getattr(app_state, "config", {}) or {}
     prompts = config.get("personality", {}).get("prompt", {})
 
     tier = os.getenv("NEXE_PROMPT_TIER", "full")
     lang_short = lang.split("-")[0].lower()  # "ca-ES" → "ca"
 
-    # Busca prompt específic → fallback full → fallback ca → mínim
-    for key in [f"{lang_short}_{tier}", f"{lang_short}_full", "ca_full"]:
+    # Busca prompt específic → fallback full → fallback en → mínim
+    for key in [f"{lang_short}_{tier}", f"{lang_short}_full", "en_full"]:
         prompt = prompts.get(key, "")
         if prompt:
             return prompt
 
-    return "Ets Nexe, l'assistent oficial de Server Nexe. Respon de forma clara i útil."
+    return "You are Nexe, an AI assistant. Respond clearly and helpfully."
 
 
 # --- Router Logic ---

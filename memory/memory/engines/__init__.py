@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/engines/__init__.py
-Description: Storage engines per Memory Module (FASE 13 MVP).
+Description: Storage engines per Memory Module.
 
 www.jgoy.net
 ────────────────────────────────────

@@ -57,8 +57,7 @@ async def rag_search_v1():
       "error": "Not Implemented",
       "message": "RAG search API not yet available",
       "internal_status": "RAGModule operational (internal use only)",
-      "expected_date": "2026-06-01",
-      "workaround": "Use RAGModule directly from Python: from memory.rag.module import RAGModule"
+      "expected_date": "2026-06-01"
     }
   )
 
