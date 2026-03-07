@@ -31,6 +31,10 @@ huggingface_hub==0.36.2
 sentence-transformers==2.7.0
 pypdf==6.7.1  # PDF support for knowledge ingestion
 
+# --- Testing ---
+pytest>=8.0.0
+pytest-asyncio>=1.2.0
+
 # --- Inference Engines (Apple Silicon / MLX) ---
 # Note: Install only on Mac ARM64
 # mlx-lm  # Installed dynamically by install_nexe.py if hardware detected
