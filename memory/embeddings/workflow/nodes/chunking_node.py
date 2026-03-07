@@ -28,7 +28,7 @@ async def chunking_node(
   """
   Workflow node: Chunk document amb selecció automàtica de chunker.
 
-  INTEGRACIÓ AMB MEMORY (FASE 18):
+  Selecció automàtica de chunker:
   - Si file_path té extensió .py/.js/.ts → CodeChunker (NO overlap)
   - Si file_path té extensió .txt/.md → TextChunker
   - Sense file_path → SmartChunker (comportament legacy)

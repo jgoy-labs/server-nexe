@@ -97,8 +97,7 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
     if _nexe_ollama:
       ollama_url = _nexe_ollama.rstrip("/")
     else:
-      ollama_host = os.getenv("OLLAMA_HOST", "localhost")
-      ollama_url = f"http://{ollama_host}:11434"
+      ollama_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
     # Check if Ollama is running
     ollama_running = False
