@@ -14,35 +14,35 @@ from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/embeddings", tags=["embeddings-v1", "future"])
 
-@router.post("/encode", summary="[FASE 15] Generar embeddings vectorials per textos")
+@router.post("/encode", summary="Generar embeddings vectorials per textos")
 async def encode_embeddings_v1():
   """
   Genera embeddings per textos (API v1).
 
-  STATUS: NOT IMPLEMENTED (Coming in FASE 15)
+  STATUS: NOT IMPLEMENTED (coming soon)
   """
   raise HTTPException(
     status_code=501,
     detail={
       "error": "Not Implemented",
-      "message": "Embeddings API scheduled for FASE 15",
-      "expected_date": "2025-12-15"
+      "message": "Embeddings API not yet available",
+      "expected_date": "2026-06-01"
     }
   )
 
-@router.get("/models", summary="[FASE 15] Llistar models d'embeddings disponibles")
+@router.get("/models", summary="Llistar models d'embeddings disponibles")
 async def list_embedding_models_v1():
   """
   Llista models d'embeddings disponibles (API v1).
 
-  STATUS: NOT IMPLEMENTED (Coming in FASE 15)
+  STATUS: NOT IMPLEMENTED (coming soon)
   """
   raise HTTPException(
     status_code=501,
     detail={
       "error": "Not Implemented",
-      "message": "Embeddings models API scheduled for FASE 15",
-      "expected_date": "2025-12-15"
+      "message": "Embeddings models API not yet available",
+      "expected_date": "2026-06-01"
     }
   )
 

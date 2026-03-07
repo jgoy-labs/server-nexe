@@ -14,18 +14,18 @@ from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/documents", tags=["documents-v1", "future"])
 
-@router.get("/", summary="[FASE 15] Llistar documents disponibles al sistema de fitxers")
+@router.get("/", summary="Llistar documents disponibles al sistema de fitxers")
 async def list_documents_v1():
     """
     Llista documents disponibles (API v1).
-    STATUS: NOT IMPLEMENTED (Coming in FASE 15)
+    STATUS: NOT IMPLEMENTED (coming soon)
     """
     raise HTTPException(
         status_code=501,
         detail={
             "error": "Not Implemented",
-            "message": "Documents API scheduled for FASE 15",
-            "expected_date": "2025-12-15"
+            "message": "Documents API not yet available",
+            "expected_date": "2026-06-01"
         }
     )
 

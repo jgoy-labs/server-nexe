@@ -45,7 +45,7 @@ class WebUIModule:
         self.session_manager = SessionManager()
         self.file_handler = None
         self.static_dir = None
-        self.api_base_url = "http://127.0.0.1:9119"
+        self.api_base_url = os.getenv("NEXE_API_BASE_URL", "http://127.0.0.1:9119")
 
     @property
     def metadata(self) -> ModuleMetadata:

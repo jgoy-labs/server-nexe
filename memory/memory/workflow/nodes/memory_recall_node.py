@@ -11,6 +11,7 @@ www.jgoy.net
 """
 
 import logging
+import os
 import time
 from typing import Dict, Any, List, Optional
 from nexe_flow.core.node import Node, NodeMetadata, NodeInput, NodeOutput
@@ -239,7 +240,7 @@ class MemoryRecallNode(Node):
 
       async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.post(
-          "http://localhost:11434/api/embeddings",
+          f"{os.environ.get('NEXE_OLLAMA_HOST', 'http://localhost:11434').rstrip('/')}/api/embeddings",
           json={"model": "nomic-embed-text", "prompt": text[:8000]}
         )
 
