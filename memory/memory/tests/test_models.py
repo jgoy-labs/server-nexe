@@ -157,7 +157,7 @@ class TestMemoryEntry:
       )
 
   def test_memory_entry_should_encrypt_fase13(self):
-    """FASE 13: should_encrypt sempre False (no Anàlisi Contextual)"""
+    """should_encrypt retorna sempre False (Anàlisi Contextual no implementada)"""
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Test",

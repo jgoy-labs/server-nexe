@@ -58,7 +58,10 @@ class PersistenceManager:
   - run_in_executor for blocking operations
   """
 
-  DEFAULT_QDRANT_URL = "http://localhost:6333"
+  DEFAULT_QDRANT_URL = os.getenv(
+    "NEXE_QDRANT_URL",
+    f"http://{os.getenv('NEXE_QDRANT_HOST', 'localhost')}:{os.getenv('NEXE_QDRANT_PORT', '6333')}"
+  )
 
   def __init__(
     self,

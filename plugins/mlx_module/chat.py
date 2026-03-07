@@ -16,7 +16,6 @@ Requereix:
 - mlx-lm >= 0.30.0
 - Model MLX format (safetensors)
 
-Part of: PLA_OPTIMITZACIO_LLM_MODULAR - Backend MLX
 """
 import asyncio
 import gc

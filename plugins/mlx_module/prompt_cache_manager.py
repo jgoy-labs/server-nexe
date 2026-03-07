@@ -11,7 +11,6 @@ Característiques:
 - Retorna només els tokens nous per processar
 - LRU eviction quan massa entrades
 
-Part of: PLA_OPTIMITZACIO_LLM_MODULAR - MLX Prefix Cache
 """
 import copy
 import logging

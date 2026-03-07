@@ -57,7 +57,6 @@ async def rag_search_v1():
       "error": "Not Implemented",
       "message": "RAG search API not yet available",
       "internal_status": "RAGModule operational (internal use only)",
-      "expected_date": "2026-06-01"
     }
   )
 
@@ -92,7 +91,6 @@ async def rag_add_documents_v1():
       "error": "Not Implemented",
       "message": "RAG document addition API not yet available",
       "internal_status": "RAGModule operational (internal use only)",
-      "expected_date": "2026-06-01"
     }
   )
 
@@ -123,7 +121,6 @@ async def rag_delete_document_v1(document_id: str):
       "error": "Not Implemented",
       "message": "RAG document deletion API not yet available",
       "internal_status": "RAGModule operational (internal use only)",
-      "expected_date": "2026-06-01"
     }
   )
 
