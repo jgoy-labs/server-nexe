@@ -168,7 +168,7 @@ async def bootstrap_session(
 
   log_data = {
     "event": "bootstrap_success",
-    "timestamp": datetime.now().isoformat(),
+    "timestamp": datetime.now(timezone.utc).isoformat(),
     "client_ip": client_ip,
     "user_agent": request.headers.get('user-agent', 'Unknown'),
     "session_token_created": True
@@ -183,7 +183,7 @@ async def bootstrap_session(
 | {title:<52}|
 |                            |
 | {session_from:<52}|
-| {datetime.now().strftime("%Y-%m-%d %H:%M:%S"):<52}|
+| {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"):<52}|
 |                            |
 | Session token sent to client (15 min TTL)       |
 | API key NOT exposed                   |
@@ -224,13 +224,13 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   from core.lifespan import generate_bootstrap_token
 
   current_info = get_bootstrap_token()
-  if current_info and not current_info["used"] and datetime.now().timestamp() < current_info["expires"]:
+  if current_info and not current_info["used"] and datetime.now(timezone.utc).timestamp() < current_info["expires"]:
     raise HTTPException(
       status_code=400,
       detail="Current token still active and not used yet"
     )
 
-  bootstrap_ttl = int(os.getenv('BOOTSTRAP_TTL', '30'))
+  bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
   new_token = generate_bootstrap_token()
   
   # ✅ FIX: Persistir nou token a DB

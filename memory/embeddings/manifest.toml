@@ -6,7 +6,7 @@
 # ═══════════════════════════════════════════════════════════════
 
 [metadata]
-module_id = "{{NEXE_EMBEDDINGS_MODULE}}"
+module_id = "embeddings"
 name = "embeddings"
 version = "0.1"
 description = "Sistema d'embeddings i vectorització multilingüe amb cache multi-nivell (L1/L2), chunking intel·ligent i suport per Apple Silicon"

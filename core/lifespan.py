@@ -93,8 +93,12 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
 
     # === OLLAMA (fallback engine) ===
     auto_start_ollama = os.getenv("NEXE_AUTOSTART_OLLAMA", "true").lower() == "true"
-    ollama_host = os.getenv("OLLAMA_HOST", "localhost")
-    ollama_url = f"http://{ollama_host}:11434"
+    _nexe_ollama = os.getenv("NEXE_OLLAMA_HOST")
+    if _nexe_ollama:
+      ollama_url = _nexe_ollama.rstrip("/")
+    else:
+      ollama_host = os.getenv("OLLAMA_HOST", "localhost")
+      ollama_url = f"http://{ollama_host}:11434"
 
     # Check if Ollama is running
     ollama_running = False
@@ -244,7 +248,7 @@ async def lifespan(app: FastAPI):
 
     try:
       import httpx
-      ollama_url = "http://localhost:11434"
+      ollama_url = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 
       async with httpx.AsyncClient() as client:
         try:
@@ -452,7 +456,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
       logger.warning("Knowledge: Auto-ingest failed: %s", str(e))
 
-    bootstrap_ttl = int(os.getenv('BOOTSTRAP_TTL', '30'))
+    bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
     
     # FIX: Manage bootstrap token via persistent DB (BootstrapTokenManager)
     # Prevent each worker from overwriting the token if a valid one already exists in the DB.
@@ -478,8 +482,10 @@ async def lifespan(app: FastAPI):
     if nexe_env == "development" and bootstrap_display:
       title = _translate(server_state.i18n, "core.server.bootstrap_token_title",
         "NEXE FRAMEWORK INITIALIZATION CODE")
+      _srv = server_state.config.get("core", {}).get("server", {})
+      _nexe_url = os.environ.get("NEXE_API_BASE_URL", f"http://{_srv.get('host', '127.0.0.1')}:{_srv.get('port', 9119)}")
       url_msg = _translate(server_state.i18n, "core.server.bootstrap_token_url",
-        "URL: {url}", url="http://localhost:9119")
+        "URL: {url}", url=_nexe_url)
       expiry_msg = _translate(server_state.i18n, "core.server.bootstrap_token_expiry",
         "Expires in: {minutes} minutes", minutes=bootstrap_ttl)
       copy_msg = _translate(server_state.i18n, "core.server.bootstrap_token_copy_instruction",
@@ -515,7 +521,7 @@ async def lifespan(app: FastAPI):
         "Phase 3.1: Rate limit cleanup task started")
       logger.info(msg)
 
-    auto_clean_enabled = os.getenv('AUTO_CLEAN_ENABLED', 'false').lower() == 'true'
+    auto_clean_enabled = os.getenv('NEXE_AUTO_CLEAN_ENABLED', os.getenv('AUTO_CLEAN_ENABLED', 'false')).lower() == 'true'
     if auto_clean_enabled:
       try:
         from personality.auto_clean.core.auto_clean import run_auto_clean
@@ -524,7 +530,7 @@ async def lifespan(app: FastAPI):
           "Auto-Clean: Running automatic cleanup...")
         logger.info(msg)
 
-        dry_run = os.getenv('AUTO_CLEAN_DRY_RUN', 'true').lower() == 'true'
+        dry_run = os.getenv('NEXE_AUTO_CLEAN_DRY_RUN', os.getenv('AUTO_CLEAN_DRY_RUN', 'true')).lower() == 'true'
         result = await run_auto_clean(
           core_root=server_state.project_root,
           dry_run=dry_run
@@ -560,9 +566,11 @@ async def lifespan(app: FastAPI):
       logger.warning("Could not start session cleanup task: %s", e)
 
     # Final message: Server ready
+    _srv_cfg = server_state.config.get("core", {}).get("server", {})
+    _nexe_url = os.environ.get("NEXE_API_BASE_URL", f"http://{_srv_cfg.get('host', '127.0.0.1')}:{_srv_cfg.get('port', 9119)}")
     logger.info("=" * 70)
-    logger.info("✅  SERVER.NEXE READY · Listening on http://localhost:9119")
-    logger.info("📱 Web UI: http://localhost:9119/ui/")
+    logger.info("✅  SERVER.NEXE READY · Listening on %s", _nexe_url)
+    logger.info("📱 Web UI: %s/ui/", _nexe_url)
     logger.info("=" * 70)
 
     yield
@@ -582,7 +590,7 @@ async def lifespan(app: FastAPI):
     try:
       try:
         import httpx
-        ollama_url = "http://localhost:11434"
+        ollama_url = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 
         async with httpx.AsyncClient() as client:
           ps_response = await client.get(f"{ollama_url}/api/ps", timeout=OLLAMA_HEALTH_TIMEOUT)

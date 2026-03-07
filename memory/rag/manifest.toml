@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────
 # Nexe RAG Module - Manifest TOML
 # ─────────────────────────────────────────────────────────────
-# ModuleID: {{NEXE_RAG_MODULE}}
+# ModuleID: rag
 # Versió: 0.8.0
 # Autoria: Nexe Team (Jordi Goy)
 # Data creació: 2025-10-27
@@ -9,7 +9,7 @@
 # ─────────────────────────────────────────────────────────────
 
 [module]
-module_id = "{{NEXE_RAG_MODULE}}"
+module_id = "rag"
 name = "rag"
 version = "0.1"
 description = "Sistema RAG (Retrieval-Augmented Generation) amb cerca vectorial, multi-source i circuit breaker per resiliència. top_k=5, threshold=0.7, gestió intel·ligent de fonts de coneixement per augmentar respostes LLM"
@@ -46,7 +46,7 @@ protected_routes = []
 
 [dependencies]
 required = [
-  "{{NEXE_EMBEDDINGS_MODULE}}"
+  "embeddings"
 ]
 
 # ─────────────────────────────────────────────────────────────

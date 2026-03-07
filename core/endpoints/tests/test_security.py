@@ -12,7 +12,7 @@ www.jgoy.net
 
 import io
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch, AsyncMock
 
@@ -156,7 +156,7 @@ class TestSessionCleanup:
 
         # Crear sessió amb activitat antiga
         session = manager.create_session()
-        session.last_activity = datetime.now() - timedelta(hours=25)
+        session.last_activity = datetime.now(timezone.utc) - timedelta(hours=25)
 
         removed = manager.cleanup_inactive(max_age_hours=24)
         assert removed == 1

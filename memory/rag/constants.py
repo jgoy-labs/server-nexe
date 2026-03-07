@@ -12,7 +12,7 @@ www.jgoy.net
 
 from typing import Dict, Any
 
-MODULE_ID = "{{NEXE_RAG_MODULE}}"
+MODULE_ID = "rag"
 
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
@@ -22,7 +22,7 @@ MANIFEST: Dict[str, Any] = {
   "author": "J.Goy",
   "category": "memory.core",
 
-  "dependencies": ["{{NEXE_EMBEDDINGS_MODULE}}"],
+  "dependencies": ["embeddings"],
 
   "capabilities": [
     "vector_search",

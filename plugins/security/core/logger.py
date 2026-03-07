@@ -12,7 +12,7 @@ www.jgoy.net
 
 from pathlib import Path
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 import logging
 from .messages import get_message
@@ -50,10 +50,10 @@ def log_security_event(
     }, severity="WARNING")
   """
   try:
-    log_file = SECURITY_LOG_PATH / f"security_{datetime.now().strftime('%Y%m%d')}.jsonl"
+    log_file = SECURITY_LOG_PATH / f"security_{datetime.now(timezone.utc).strftime('%Y%m%d')}.jsonl"
 
     event = {
-      "timestamp": datetime.now().isoformat(),
+      "timestamp": datetime.now(timezone.utc).isoformat(),
       "type": event_type,
       "severity": severity,
       "details": details,
@@ -174,7 +174,7 @@ def get_security_logs(date: Optional[str] = None) -> list:
       print(event["type"], event["severity"])
   """
   if not date:
-    date = datetime.now().strftime('%Y%m%d')
+    date = datetime.now(timezone.utc).strftime('%Y%m%d')
 
   log_file = SECURITY_LOG_PATH / f"security_{date}.jsonl"
 
@@ -243,7 +243,7 @@ def clear_old_logs(days_to_keep: int = 30) -> int:
   """
   from datetime import timedelta
 
-  cutoff_date = datetime.now() - timedelta(days=days_to_keep)
+  cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
   deleted_count = 0
 
   for log_file in SECURITY_LOG_PATH.glob("security_*.jsonl"):

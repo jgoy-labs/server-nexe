@@ -10,7 +10,7 @@ www.jgoy.net
 ────────────────────────────────────
 """
 
-MODULE_ID = "{{NEXE_EMBEDDINGS_MODULE}}"
+MODULE_ID = "embeddings"
 
 MANIFEST = {
     "name": "embeddings",

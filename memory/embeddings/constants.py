@@ -12,7 +12,7 @@ www.jgoy.net
 
 from typing import Dict, Any
 
-MODULE_ID = "{{NEXE_EMBEDDINGS_MODULE}}"
+MODULE_ID = "embeddings"
 
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,

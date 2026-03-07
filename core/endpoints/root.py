@@ -10,7 +10,7 @@ www.jgoy.net
 ────────────────────────────────────
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Depends
 
 from core.dependencies import limiter
@@ -147,7 +147,7 @@ async def readiness_check(request: Request) -> dict:
   # SECURITY: Return minimal status without exposing internal module details.
   return {
     "status": overall,
-    "timestamp": datetime.now().isoformat(),
+    "timestamp": datetime.now(timezone.utc).isoformat(),
   }
 
 @router.get("/api/info", response_model=ApiInfoResponse, summary="Informació API i llista d'endpoints disponibles")
@@ -240,7 +240,7 @@ async def server_status(request: Request) -> dict:
       "llama_cpp": llama_cpp_available,
       "ollama": ollama_available
     },
-    "timestamp": datetime.now().isoformat(),
+    "timestamp": datetime.now(timezone.utc).isoformat(),
   }
 
 @router.get("/health/circuits", summary="Estat dels circuit breakers (Ollama, Qdrant, HTTP extern)")
@@ -265,5 +265,5 @@ async def circuit_status(request: Request) -> dict:
       qdrant_breaker.get_status(),
       http_breaker.get_status(),
     ],
-    "timestamp": datetime.now().isoformat(),
+    "timestamp": datetime.now(timezone.utc).isoformat(),
   }

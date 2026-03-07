@@ -63,7 +63,7 @@ class TestModuleId:
 
   def test_module_id_format(self):
     """Verify MODULE_ID follows expected format."""
-    assert "Nexe" in MODULE_ID or "RAG" in MODULE_ID or "{{" in MODULE_ID
+    assert MODULE_ID == "rag" or "Nexe" in MODULE_ID or "RAG" in MODULE_ID
 
 class TestManifestDefaultConfig:
   """Tests for MANIFEST default_config."""

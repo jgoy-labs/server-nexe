@@ -14,7 +14,7 @@ import uuid
 import json
 import logging
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -25,8 +25,8 @@ class ChatSession:
 
     def __init__(self, session_id: str = None):
         self.id = session_id or str(uuid.uuid4())
-        self.created_at = datetime.now()
-        self.last_activity = datetime.now()
+        self.created_at = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(timezone.utc)
         self.messages: List[Dict[str, str]] = []
         self.context_files: List[str] = []
         self.attached_document: Optional[Dict[str, str]] = None  # {"filename": "...", "content": "..."}
@@ -36,9 +36,9 @@ class ChatSession:
         self.messages.append({
             "role": role,
             "content": content,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
-        self.last_activity = datetime.now()
+        self.last_activity = datetime.now(timezone.utc)
 
     def add_context_file(self, filename: str):
         """Afegir fitxer al context de la sessió"""
@@ -54,7 +54,7 @@ class ChatSession:
             "total_chars": len(content),
             "current_chunk": 0
         }
-        self.last_activity = datetime.now()
+        self.last_activity = datetime.now(timezone.utc)
 
     def get_next_chunk(self) -> Optional[Dict[str, any]]:
         """Obtenir el següent chunk del document adjuntat"""
@@ -219,7 +219,7 @@ class SessionManager:
         Returns:
             Nombre de sessions eliminades
         """
-        cutoff = datetime.now() - timedelta(hours=max_age_hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
         expired_ids = [
             sid for sid, session in self._sessions.items()
             if session.last_activity < cutoff
