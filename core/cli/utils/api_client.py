@@ -41,14 +41,14 @@ class NexeAPIClient:
         if not self.api_key:
              # Fallback warning but don't crash yet
              logging.warning("No API Key found involved. CLI might fail.")
-             self.api_key = "unconfigured"
 
         self.headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
-            "x-api-key": self.api_key,
             "X-Client-ID": "nexe-cli-0.8"
         }
+        if self.api_key:
+            self.headers["Authorization"] = f"Bearer {self.api_key}"
+            self.headers["x-api-key"] = self.api_key
         
     async def is_server_running(self) -> bool:
         """Comprova si el servidor està actiu."""

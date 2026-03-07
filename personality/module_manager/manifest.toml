@@ -1,6 +1,6 @@
 # ─────────────────────────────────────────────────────────────
-# ModuleID: {{NEXE_MODULE_MANAGER}}
-# Nexe v0.7.1 | J.Goy | 2025-12-01
+# ModuleID: module_manager
+# Nexe v0.8 | J.Goy | 2025-12-01
 # server-nexe/personality/module_manager/manifest.toml
 #
 # Descripció:
@@ -9,7 +9,7 @@
 # ─────────────────────────────────────────────────────────────
 
 [module]
-module_id = "{{NEXE_MODULE_MANAGER}}"
+module_id = "module_manager"
 name = "module_manager"
 version = "0.8.0"
 type = "core"

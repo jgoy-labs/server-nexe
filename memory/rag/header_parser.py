@@ -13,7 +13,7 @@ www.jgoy.net
 import os
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple, List
 from dataclasses import dataclass, field
 
@@ -333,7 +333,7 @@ class RAGHeaderParser:
         Returns:
             str: Formatted header
         """
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         header = f"""# === METADATA RAG ===
 versio: "{HEADER_VERSION}"
