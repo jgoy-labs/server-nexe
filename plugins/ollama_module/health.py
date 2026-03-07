@@ -21,7 +21,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_BASE_URL = "http://localhost:11434"
+OLLAMA_BASE_URL = os.getenv("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 
 # Configurable timeout via environment variable
 OLLAMA_HEALTH_TIMEOUT = float(os.getenv('NEXE_OLLAMA_HEALTH_TIMEOUT', '5.0'))
@@ -58,7 +58,7 @@ def get_health() -> Dict[str, Any]:
       }
 
   except httpx.ConnectError:
-    logger.warning("Ollama not reachable at localhost:11434")
+    logger.warning("Ollama not reachable at %s", OLLAMA_BASE_URL)
     return {
       "name": "ollama_module",
       "status": "UNHEALTHY",

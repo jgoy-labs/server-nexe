@@ -72,8 +72,7 @@ class NexeAPIClient:
         Aquí assumim que Nexe exposa un endpoint similar o el router de xat unificat.
         """
         
-        # Endpoint unificat de chat (TODO: confirmar ruta exacte a core.endpoints)
-        # Assumim /v1/chat/completions compatible amb OpenAI o /v1/chat/generate
+        # OpenAI-compatible chat completions endpoint
         url = f"{self.base_url}/v1/chat/completions"
         
         payload = {

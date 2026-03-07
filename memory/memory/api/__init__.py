@@ -12,6 +12,7 @@ www.jgoy.net
 
 import asyncio
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -66,7 +67,10 @@ class MemoryAPI:
       await memory.store("text", "nexe_knowledge", {"type": "road"})
   """
 
-  DEFAULT_QDRANT_URL = "http://localhost:6333"
+  DEFAULT_QDRANT_URL = os.getenv(
+    "NEXE_QDRANT_URL",
+    f"http://{os.getenv('NEXE_QDRANT_HOST', 'localhost')}:{os.getenv('NEXE_QDRANT_PORT', '6333')}"
+  )
   DEFAULT_VECTOR_SIZE = 768
 
   def __init__(

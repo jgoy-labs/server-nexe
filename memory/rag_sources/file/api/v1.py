@@ -25,7 +25,6 @@ async def list_documents_v1():
         detail={
             "error": "Not Implemented",
             "message": "Documents API not yet available",
-            "expected_date": "2026-06-01"
         }
     )
 

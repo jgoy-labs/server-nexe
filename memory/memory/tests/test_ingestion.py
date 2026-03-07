@@ -111,7 +111,7 @@ class TestIngestionPipeline:
     assert pipeline.stats["duplicates_skipped"] == 1
 
   async def test_embedding_generation(self, temp_pipeline):
-    """Generació d'embedding (dummy vector a FASE 13)"""
+    """Generació d'embedding retorna dummy vector"""
     pipeline = temp_pipeline
 
     text = "Test text for embedding"

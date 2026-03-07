@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/cli.py
-Description: CLI executable per Memory Module (FASE 13 MVP).
+Description: CLI executable per Memory Module.
 
 www.jgoy.net
 ────────────────────────────────────

@@ -26,7 +26,6 @@ async def encode_embeddings_v1():
     detail={
       "error": "Not Implemented",
       "message": "Embeddings API not yet available",
-      "expected_date": "2026-06-01"
     }
   )
 
@@ -42,7 +41,6 @@ async def list_embedding_models_v1():
     detail={
       "error": "Not Implemented",
       "message": "Embeddings models API not yet available",
-      "expected_date": "2026-06-01"
     }
   )
 
