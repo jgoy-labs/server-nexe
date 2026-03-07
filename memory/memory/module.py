@@ -118,7 +118,6 @@ class MemoryModule:
         project_root = Path.cwd()
         logger.warning("project_root not found in server_state, using cwd: %s", project_root)
 
-      # ✅ FIX: Unify paths with installer (storage/vectors/)
       vectors_path = project_root / "storage" / "vectors"
       db_path = vectors_path / "metadata_memory.db"
       qdrant_path = vectors_path / "qdrant_local"

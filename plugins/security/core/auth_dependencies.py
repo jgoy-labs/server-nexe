@@ -50,9 +50,9 @@ async def require_api_key(
   x_api_key: Optional[str] = Header(None, description="Admin API Key")
 ) -> str:
   """
-  FastAPI Dependency per validar API key obligatòria
-  ✅ Phase 2.1: Dual-key support with expiry validation
-  ✅ SECURITY FIX: Fail-closed per defecte (no bypàs sense configuració explícita)
+  FastAPI Dependency per validar API key obligatòria.
+  Suport dual-key amb validació d'expiració.
+  Fail-closed per defecte (no bypàs sense configuració explícita).
 
   Retorna l'API key si és vàlida, sinó HTTPException 401/500
 
@@ -62,17 +62,15 @@ async def require_api_key(
     async def protected_endpoint(api_key: str = Depends(require_api_key)):
       return {"status": "authenticated"}
 
-  Configuració PRODUCCIÓ (Phase 2.1 dual-key):
-    export NEXE_PRIMARY_API_KEY="new-key-here"
-    export NEXE_PRIMARY_KEY_EXPIRES="2026-01-10T00:00:00Z"
-    export NEXE_SECONDARY_API_KEY="old-key-here"
-    export NEXE_SECONDARY_KEY_EXPIRES="2025-10-17T00:00:00Z"
+  Configuració (dual-key recomanat):
+    NEXE_PRIMARY_API_KEY, NEXE_PRIMARY_KEY_EXPIRES
+    NEXE_SECONDARY_API_KEY, NEXE_SECONDARY_KEY_EXPIRES
 
-  Configuració PRODUCCIÓ (Phase 1 backward compat):
-    export NEXE_ADMIN_API_KEY="your-secret-key-here"
+  Configuració (llegat, un sol camp):
+    NEXE_ADMIN_API_KEY
 
-  Configuració DEV (opcional, només per desenvolupament local):
-    export NEXE_DEV_MODE="true"
+  Mode dev (opcional):
+    NEXE_DEV_MODE=true
   """
   keys_config = load_api_keys()
   dev_mode = is_dev_mode()

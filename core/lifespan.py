@@ -457,15 +457,13 @@ async def lifespan(app: FastAPI):
 
     bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
     
-    # FIX: Manage bootstrap token via persistent DB (BootstrapTokenManager)
-    # Prevent each worker from overwriting the token if a valid one already exists in the DB.
+    # Use persistent DB to share token across workers without overwriting a valid existing one.
     from core.bootstrap_tokens import set_bootstrap_token, get_bootstrap_token
     
     existing_bootstrap = get_bootstrap_token()
     token_to_display = None
     
     # If it doesn't exist or has expired, generate a new one
-    # FIX: Use UTC timestamps to match DB storage
     if not existing_bootstrap or (datetime.now(timezone.utc).timestamp() > existing_bootstrap["expires"]):
       token_to_display = generate_bootstrap_token()
       set_bootstrap_token(token_to_display, ttl_minutes=bootstrap_ttl)
@@ -492,7 +490,6 @@ async def lifespan(app: FastAPI):
       single_use_msg = _translate(server_state.i18n, "core.server.bootstrap_token_single_use",
         "This code only works ONCE")
 
-      # FIX: Display token_to_display (persistent)
       print(f"""
 +==================================================================+
 |                                  |
@@ -517,7 +514,7 @@ async def lifespan(app: FastAPI):
       import asyncio
       asyncio.create_task(app.state.start_rate_limit_cleanup())
       msg = _translate(server_state.i18n, "core.server.rate_limit_cleanup_started",
-        "Phase 3.1: Rate limit cleanup task started")
+        "Rate limit cleanup task started")
       logger.info(msg)
 
     auto_clean_enabled = os.getenv('NEXE_AUTO_CLEAN_ENABLED', os.getenv('AUTO_CLEAN_ENABLED', 'false')).lower() == 'true'
