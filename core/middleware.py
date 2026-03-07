@@ -55,7 +55,7 @@ def setup_rate_limiting(app: FastAPI, i18n = None) -> None:
   """
   Setup rate limiting for the application
 
-  Phase 3.1: Advanced rate limiting with:
+  Advanced rate limiting with:
   - Multiple limiters (IP, API key, composite, endpoint)
   - X-RateLimit-* headers
   - Background cleanup task (started via startup event)
@@ -85,7 +85,7 @@ def setup_rate_limiting(app: FastAPI, i18n = None) -> None:
 
       app.state.start_rate_limit_cleanup = start_rate_limit_cleanup_task
 
-      logger.info("Phase 3.1: Advanced rate limiting enabled")
+      logger.info("Advanced rate limiting enabled")
       logger.info("  - IP rate limiting: OK")
       logger.info("  - API key rate limiting: OK")
       logger.info("  - Composite rate limiting: OK")
@@ -198,8 +198,6 @@ def setup_prometheus_metrics(app: FastAPI) -> None:
 def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
   """
   Setup CSRF protection middleware.
-
-  SECURITY FIX (Consulting 2025-12-02): Add CSRF protection to POST endpoints.
 
   Args:
     app: FastAPI application instance

@@ -71,7 +71,6 @@ class LlamaCppChatNode:
         session_id = inputs.get("session_id", "default") or "default"  # Refinament 1
         stream_callback = inputs.get("stream_callback")
 
-        # FIX 4: System hash unificat amb MLX (normalitzat, 8 chars)
         if not system_hash:
             system_hash = compute_system_hash(system)
 
@@ -187,7 +186,7 @@ class LlamaCppChatNode:
                 "prefill_ms": 0,  # No mesurable sense streaming
                 "generation_ms": total_ms,
                 "overhead_ms": 0,
-                "prefill_available": False,  # FIX 5: indicar que TTFT no disponible
+                "prefill_available": False,  # TTFT not measurable without streaming
             },
         }
 
@@ -263,7 +262,7 @@ class LlamaCppChatNode:
             "prompt_tokens": prompt_tokens,
             "timing": {
                 "prefill_ms": prefill_ms,      # TTFT - Time To First Token
-                "prefill_available": True,     # FIX 5: TTFT mesurat correctament
+                "prefill_available": True,     # TTFT available via streaming
                 "generation_ms": generation_ms, # Temps generació
                 "overhead_ms": 0,
             },

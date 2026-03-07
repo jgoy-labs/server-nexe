@@ -136,7 +136,6 @@ class PersistenceManager:
     1. Local Path (Embedded mode): If qdrant_path is provided.
     2. URL (Server mode): If qdrant_url is configured.
 
-    ✅ FIX: Real support for embedded mode without external server.
     """
     self.qdrant = None
     self._qdrant_available = False

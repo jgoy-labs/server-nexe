@@ -60,7 +60,6 @@ class BootstrapTokenManager:
         expires REAL NOT NULL
       )
     """)
-    # ✅ FIX: Taula per guardar el token de bootstrap inicial i que sigui compartit entre workers
     cursor.execute("""
       CREATE TABLE IF NOT EXISTS bootstrap_config (
         key TEXT PRIMARY KEY,

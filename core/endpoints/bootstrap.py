@@ -141,7 +141,6 @@ async def bootstrap_session(
   
   from core.bootstrap_tokens import validate_master_bootstrap
 
-  # ✅ FIX: Validació persistent contra la DB (suport multi-worker)
   if not validate_master_bootstrap(token):
     # Intentem loguejar la raó de la fallada (expirat vs invàlid vs usat)
     from core.bootstrap_tokens import get_bootstrap_token
@@ -233,7 +232,6 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
   new_token = generate_bootstrap_token()
   
-  # ✅ FIX: Persistir nou token a DB
   set_bootstrap_token(new_token, ttl_minutes=bootstrap_ttl)
 
   title = _t(request, "core.server.bootstrap_token_regenerated_title", "🔄 NOU TOKEN D'INICIALITZACIÓ GENERAT")
