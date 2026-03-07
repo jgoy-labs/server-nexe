@@ -296,7 +296,7 @@ class ModuleManager:
 
     Example:
       modules = await module_manager.load_memory_modules()
-      embeddings = modules.get("{{NEXE_EMBEDDINGS_MODULE}}")
+      embeddings = modules.get("embeddings")
     """
     import importlib
 
