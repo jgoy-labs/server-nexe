@@ -149,8 +149,10 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
     client = NexeAPIClient()
 
     # Check server status
+    import os as _os
+    _nexe_url = _os.environ.get("NEXE_API_BASE_URL", "http://127.0.0.1:9119").rstrip("/")
     if not await client.is_server_running():
-        click.echo(click.style("\n❌ Error: El servidor Nexe no respon a http://127.0.0.1:9119", fg="red", bold=True))
+        click.echo(click.style(f"\n❌ Error: El servidor Nexe no respon a {_nexe_url}", fg="red", bold=True))
         click.echo("Assegura't que has executat './nexe go' en una altra terminal abans d'iniciar el xat.\n")
         return
 
@@ -158,7 +160,7 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
     try:
         import httpx
         async with httpx.AsyncClient() as http_client:
-            response = await http_client.get("http://127.0.0.1:9119/status", timeout=5.0)
+            response = await http_client.get(f"{_nexe_url}/status", timeout=5.0)
             if response.status_code == 200:
                 status = response.json()
                 actual_engine = status.get("engine", engine)

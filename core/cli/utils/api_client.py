@@ -26,7 +26,9 @@ class NexeAPIClient:
     """Client per interactuar amb la API de Nexe Server."""
     
     
-    def __init__(self, base_url: str = "http://127.0.0.1:9119"):
+    def __init__(self, base_url: str = None):
+        if base_url is None:
+            base_url = os.environ.get("NEXE_API_BASE_URL", "http://127.0.0.1:9119")
         self.base_url = base_url.rstrip("/")
         
         # Load environment variables

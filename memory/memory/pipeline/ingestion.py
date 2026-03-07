@@ -34,7 +34,7 @@ class IngestionPipeline:
   - Automatic rollback if persistence fails
   """
 
-  OLLAMA_URL = "http://localhost:11434"
+  OLLAMA_URL = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
   OLLAMA_EMBED_URL = f"{OLLAMA_URL}/api/embeddings"
   OLLAMA_MODEL = "nomic-embed-text"
   OLLAMA_TIMEOUT = 30.0

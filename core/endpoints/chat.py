@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional, Dict, Any, Union
 import asyncio
+import hashlib
 import logging
 import os
 import httpx
@@ -441,7 +442,8 @@ async def _forward_to_ollama(
 ):
     """Forward request to local Ollama instance."""
     import os
-    url = "http://localhost:11434/api/chat"
+    _ollama_host = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    url = f"{_ollama_host}/api/chat"
 
     # Get model from: request > NEXE_OLLAMA_MODEL > NEXE_DEFAULT_MODEL (si no és URL) > config > fallback
     model_name = request.model
@@ -461,7 +463,7 @@ async def _forward_to_ollama(
     # Check if Ollama is available before trying to connect
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
-            tags_resp = await client.get("http://localhost:11434/api/tags")
+            tags_resp = await client.get(f"{_ollama_host}/api/tags")
             if tags_resp.status_code != 200:
                  raise HTTPException(status_code=502, detail=f"Ollama error (HTTP {tags_resp.status_code})")
             available_models = [m.get("name", "") for m in tags_resp.json().get("models", [])]
@@ -596,7 +598,8 @@ async def _mlx_stream_generator(
     system_msg: str,
     model_name: str,
     app_state=None,
-    user_msg: str = None
+    user_msg: str = None,
+    session_id: str = "chat_session",
 ):
     """
     Generator SSE per MLX streaming.
@@ -629,7 +632,7 @@ async def _mlx_stream_generator(
             result = await mlx_module.chat(
                 messages=user_messages,
                 system=system_msg,
-                session_id="chat_session",
+                session_id=session_id,
                 stream_callback=on_token
             )
             result_holder["result"] = result
@@ -745,6 +748,10 @@ async def _forward_to_mlx(messages: List[Dict], request: ChatCompletionRequest, 
 
         model_name = request.model or "mlx-local"
 
+        # Derive session_id from X-Session-Id header or API key hash
+        _api_key = (req.headers.get("x-api-key") or req.headers.get("authorization", "")).encode()
+        session_id = req.headers.get("x-session-id") or f"sess_{hashlib.sha256(_api_key).hexdigest()[:16]}"
+
         # STREAMING MODE
         if request.stream:
             logger.info("Forwarding to MLX module (streaming)...")
@@ -756,6 +763,7 @@ async def _forward_to_mlx(messages: List[Dict], request: ChatCompletionRequest, 
                     model_name,
                     app_state=req.app.state,
                     user_msg=last_user_msg,
+                    session_id=session_id,
                 ),
                 media_type="text/event-stream",
                 headers={
@@ -770,7 +778,7 @@ async def _forward_to_mlx(messages: List[Dict], request: ChatCompletionRequest, 
         result = await mlx_module.chat(
             messages=user_messages,
             system=system_msg,
-            session_id="chat_session",
+            session_id=session_id,
         )
 
         return {
@@ -840,6 +848,10 @@ async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionReq
             else:
                 user_messages.append(msg)
 
+        # Derive session_id from X-Session-Id header or API key hash
+        _api_key = (req.headers.get("x-api-key") or req.headers.get("authorization", "")).encode()
+        session_id = req.headers.get("x-session-id") or f"sess_{hashlib.sha256(_api_key).hexdigest()[:16]}"
+
         if request.stream:
             model_name = request.model or "llama-cpp-local"
             return StreamingResponse(
@@ -850,6 +862,7 @@ async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionReq
                     model_name,
                     app_state=req.app.state,
                     user_msg=last_user_msg,
+                    session_id=session_id,
                 ),
                 media_type="text/event-stream",
                 headers={
@@ -864,7 +877,7 @@ async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionReq
         result = await llama_module.chat(
             messages=user_messages,
             system=system_msg,
-            session_id="chat_session",
+            session_id=session_id,
         )
 
         # Convert llama.cpp response to OpenAI format
@@ -905,7 +918,8 @@ async def _llama_cpp_stream_generator(
     system_msg: str,
     model_name: str,
     app_state=None,
-    user_msg: str = None
+    user_msg: str = None,
+    session_id: str = "chat_session",
 ):
     """
     Generator SSE per Llama.cpp streaming.
@@ -937,7 +951,7 @@ async def _llama_cpp_stream_generator(
             result = await llama_module.chat(
                 messages=user_messages,
                 system=system_msg,
-                session_id="chat_session",
+                session_id=session_id,
                 stream_callback=on_token
             )
             result_holder["result"] = result

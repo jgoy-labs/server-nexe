@@ -46,19 +46,19 @@ async def v1_root(request: Request):
       "rag": {
         "base": "/v1/rag",
         "status": "future",
-        "description": "RAG search endpoints (coming in FASE 15)",
+        "description": "RAG search endpoints (coming soon)",
         "expected_date": "2026-06-01"
       },
       "embeddings": {
         "base": "/v1/embeddings",
         "status": "future",
-        "description": "Text embeddings endpoints (coming in FASE 15)",
+        "description": "Text embeddings endpoints (coming soon)",
         "expected_date": "2026-06-01"
       },
       "documents": {
         "base": "/v1/documents",
         "status": "future",
-        "description": "Document processing endpoints (coming in FASE 15)",
+        "description": "Document processing endpoints (coming soon)",
         "expected_date": "2026-06-01"
       },
       "memory": {
