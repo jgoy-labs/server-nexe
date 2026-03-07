@@ -10,7 +10,6 @@ www.jgoy.net
 ────────────────────────────────────
 """
 
-import re
 import html
 from typing import Optional, List, Dict, Any
 from fastapi import HTTPException
@@ -26,31 +25,24 @@ from .injection_detectors import (
 
 from .messages import get_message
 
-def sanitize_html(text: str, allow_tags: Optional[List[str]] = None) -> str:
+def sanitize_html(text: str) -> str:
   """
   Sanitize HTML content to prevent XSS attacks.
 
+  Escapes all HTML tags unconditionally — no whitelist supported.
+
   Args:
     text: Raw text that may contain HTML
-    allow_tags: List of allowed HTML tags (default: None = escape all)
 
   Returns:
-    Sanitized text with HTML escaped or stripped
+    Text with all HTML characters escaped
 
   Examples:
     >>> sanitize_html("<script>alert('xss')</script>")
     "&lt;script&gt;alert('xss')&lt;/script&gt;"
-
-    >>> sanitize_html("<b>bold</b>", allow_tags=["b"])
-    "<b>bold</b>"
   """
   if not text:
     return text
-
-  if not allow_tags:
-    return html.escape(text)
-
-  allowed_pattern = "|".join(re.escape(tag) for tag in allow_tags)
 
   return html.escape(text)
 
