@@ -14,7 +14,6 @@ Totes les opcions es poden configurar via variables d'entorn:
 - NEXE_LLAMA_CPP_USE_MMAP: Memory-map del model (default: true)
 - NEXE_LLAMA_CPP_FLASH_ATTN: Flash attention (default: true)
 
-Part of: PLA_OPTIMITZACIO_LLM_MODULAR v1.9 - FASE 2
 """
 import os
 from dataclasses import dataclass

@@ -10,7 +10,6 @@ Totes les opcions es poden configurar via variables d'entorn:
 - NEXE_MLX_TOP_P: Top-p sampling (default: 0.9)
 - NEXE_MLX_MAX_SESSION_CACHES: Màxim caches per sessió (default: 4)
 
-Part of: PLA_OPTIMITZACIO_LLM_MODULAR - Backend MLX
 """
 import os
 import logging

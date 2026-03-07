@@ -373,7 +373,7 @@ async def chat(request: Dict[str, Any]):
                         _lang = _os.getenv("NEXE_LANG", "ca")
                         base_system_prompt = _get_system_prompt(_state, _lang)
                     except Exception:
-                        base_system_prompt = "Ets Nexe, l'assistent oficial de Server Nexe. Respon de forma clara i útil."
+                        base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
                     if document_context:
                         # MODE ZEN: Prompt restrictiu que FORÇA resposta basada en document
                         # Evita al·lucinacions forçant el model a cenyir-se al contingut
