@@ -12,7 +12,7 @@ www.jgoy.net
 
 from enum import Enum
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, Optional, TypeVar
 from contextlib import asynccontextmanager
 import asyncio
@@ -99,7 +99,7 @@ class CircuitBreaker:
     if self._state.last_failure_time is None:
       return False
 
-    elapsed = datetime.now() - self._state.last_failure_time
+    elapsed = datetime.now(timezone.utc) - self._state.last_failure_time
     return elapsed.total_seconds() >= self.config.timeout_seconds
 
   async def _record_success(self):
@@ -118,7 +118,7 @@ class CircuitBreaker:
     async with self._lock:
       self._state.failure_count += 1
       self._state.success_count = 0
-      self._state.last_failure_time = datetime.now()
+      self._state.last_failure_time = datetime.now(timezone.utc)
 
       if self._state.state == CircuitState.CLOSED:
         if self._state.failure_count >= self.config.failure_threshold:
@@ -134,7 +134,7 @@ class CircuitBreaker:
   def _transition_to(self, new_state: CircuitState):
     """Canvia d'estat"""
     self._state.state = new_state
-    self._state.last_state_change = datetime.now()
+    self._state.last_state_change = datetime.now(timezone.utc)
     self._state.success_count = 0
     self._state.failure_count = 0
 

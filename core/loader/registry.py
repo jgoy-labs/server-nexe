@@ -14,7 +14,7 @@ import asyncio
 import logging
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import threading
 
 from .protocol import (
@@ -202,7 +202,7 @@ class ModuleRegistry:
       registered = self._modules[name]
       registered.instance = instance
       registered.status = status
-      registered.load_time = datetime.now()
+      registered.load_time = datetime.now(timezone.utc)
 
       if module_has_router(instance):
         if name not in self._with_router:
@@ -248,7 +248,7 @@ class ModuleRegistry:
     if name not in self._modules:
       return False
 
-    self._modules[name].last_health_check = datetime.now()
+    self._modules[name].last_health_check = datetime.now(timezone.utc)
     self._modules[name].last_health_result = result
     return True
 
