@@ -10,6 +10,7 @@ www.jgoy.net
 ────────────────────────────────────
 """
 
+import os
 from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Depends
 
@@ -195,9 +196,6 @@ async def server_status(request: Request) -> dict:
   - model: Current model loaded
   - modules: Loaded modules status
   """
-  import os
-  from dotenv import load_dotenv
-
   # Load .env to get configured engine
   env_engine = os.getenv("NEXE_MODEL_ENGINE", "auto")
   env_model = os.getenv("NEXE_DEFAULT_MODEL", "unknown")

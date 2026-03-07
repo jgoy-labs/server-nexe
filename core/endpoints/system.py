@@ -44,7 +44,8 @@ def _t(key: str, fallback: str, **kwargs) -> str:
   except Exception:
     return fallback.format(**kwargs) if kwargs else fallback
 
-SUPERVISOR_PID_FILE = Path.home() / 'Nexe-Logs' / 'core_supervisor.pid'
+_logs_dir = Path(os.environ.get("NEXE_LOGS_DIR", str(Path.home() / "Nexe-Logs")))
+SUPERVISOR_PID_FILE = _logs_dir / 'core_supervisor.pid'
 
 def get_supervisor_pid() -> int:
   """
@@ -63,7 +64,7 @@ def get_supervisor_pid() -> int:
         "error": "supervisor_not_found",
         "message": _t(
           "system.supervisor_not_found",
-          "Supervisor no detectat. Executa: python3 scripts/supervisor.py"
+          "Supervisor no detectat. Executa: ./nexe go"
         ),
         "pid_file": str(SUPERVISOR_PID_FILE)
       }
@@ -228,7 +229,7 @@ async def supervisor_status(_: str = Depends(require_api_key)) -> Dict[str, Any]
     }
   """
   try:
-    supervisor_pid = get_supervisor_pid()
+    get_supervisor_pid()
 
     return {
       "supervisor_running": True,

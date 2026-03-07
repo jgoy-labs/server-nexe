@@ -87,7 +87,8 @@ class RAGLogger:
 
   def _get_writable_log_path(self) -> Path:
     """Troba una ruta writable pel log."""
-    primary_path = Path.home() / "Nexe-Logs" / "rag.log"
+    import os as _os
+    primary_path = Path(_os.environ.get("NEXE_LOGS_DIR", str(Path.home() / "Nexe-Logs"))) / "rag.log"
     try:
       primary_path.parent.mkdir(exist_ok=True)
       test_file = primary_path.parent / ".write_test_rag"
