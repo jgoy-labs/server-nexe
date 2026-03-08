@@ -207,7 +207,7 @@ def test_load_api_keys_no_keys_configured(monkeypatch):
 @pytest.fixture
 def client():
   """Test client for FastAPI app."""
-  return TestClient(app)
+  return TestClient(app, base_url="http://localhost")
 
 def test_require_api_key_with_valid_primary(client, monkeypatch):
   """Test authentication succeeds with valid primary key."""

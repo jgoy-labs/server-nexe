@@ -18,7 +18,7 @@ from core.app import app
 @pytest.fixture(scope="module")
 def client() -> TestClient:
   """Shared test client for the Nexe FastAPI application."""
-  with TestClient(app) as test_client:
+  with TestClient(app, base_url="http://localhost") as test_client:
     yield test_client
 
 def test_request_within_size_limit_accepted(client: TestClient) -> None:

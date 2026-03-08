@@ -78,7 +78,7 @@ def test_no_modules_loaded_outside_allowlist() -> None:
 def test_module_endpoints_require_authentication() -> None:
   """Test that module endpoints require authentication."""
   from fastapi.testclient import TestClient
-  with TestClient(app) as client:
+  with TestClient(app, base_url="http://localhost") as client:
     response = client.get("/security/status")
     if response.status_code != 404:
       assert response.status_code in [401, 403, 500]

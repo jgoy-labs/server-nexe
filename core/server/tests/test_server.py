@@ -18,7 +18,7 @@ from core.app import app
 @pytest.fixture
 def client():
   """Create test client"""
-  return TestClient(app)
+  return TestClient(app, base_url="http://localhost")
 
 def test_root_endpoint(client):
   """Test root endpoint returns correct structure"""
