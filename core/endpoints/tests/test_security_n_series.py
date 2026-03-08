@@ -311,13 +311,13 @@ class TestSystemHealthVersion:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# N-7 + N-8: Dead code eliminat de manifest.py
+# Dead code eliminat de manifest.py (import duplicat i variable no llegida)
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestManifestDeadCodeRemoved:
     """
-    N-7: 'import logging' duplicat eliminat.
-    N-8: Variable _initialized (declarada però mai llegida) eliminada.
+    Verifica que 'import logging' no apareix duplicat.
+    Verifica que la variable _initialized ha estat eliminada.
     """
 
     def _read_manifest(self) -> str:
@@ -325,7 +325,7 @@ class TestManifestDeadCodeRemoved:
         return path.read_text(encoding="utf-8")
 
     def test_no_duplicate_import_logging(self):
-        """N-7: 'import logging' apareix exactament una vegada."""
+        """'import logging' apareix exactament una vegada."""
         content = self._read_manifest()
         count = content.count("import logging")
         assert count == 1, (
@@ -333,7 +333,7 @@ class TestManifestDeadCodeRemoved:
         )
 
     def test_no_initialized_variable(self):
-        """N-8: La variable _initialized ha estat eliminada (mai s'usava)."""
+        """La variable _initialized ha estat eliminada (mai s'usava)."""
         content = self._read_manifest()
         assert "_initialized" not in content, (
             "_initialized encara existeix a manifest.py però mai s'usa"
