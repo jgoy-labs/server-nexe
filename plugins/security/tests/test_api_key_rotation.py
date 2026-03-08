@@ -264,7 +264,7 @@ def test_require_api_key_with_expired_key(client, monkeypatch):
   assert response.status_code in [401, 500]
 
 def test_require_api_key_backward_compat_phase1(client, monkeypatch):
-  """Test backward compatibility with Phase 1 (NEXE_ADMIN_API_KEY)."""
+  """Test backward compatibility with legacy NEXE_ADMIN_API_KEY."""
   monkeypatch.delenv("NEXE_PRIMARY_API_KEY", raising=False)
   monkeypatch.setenv("NEXE_ADMIN_API_KEY", "legacy-key")
 

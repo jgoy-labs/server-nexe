@@ -11,7 +11,7 @@ www.jgoy.net
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -134,7 +134,7 @@ class RAGLogger:
 
   def _timestamp(self) -> str:
     """Retorna timestamp formatat"""
-    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    return datetime.now(timezone.utc).strftime("%H:%M:%S.%f")[:-3]
 
   def _timing(self, ms: float) -> str:
     """Formata timing amb color segons rendiment"""
