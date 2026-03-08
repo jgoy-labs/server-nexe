@@ -167,9 +167,9 @@ class RAGModule:
     Graceful module shutdown.
 
     Cleanup:
-    - Flush pending writes (PHASE 2)
-    - Close vector store (PHASE 2)
-    - Shutdown WriteCoordinator (PHASE 2)
+    - Flush pending writes
+    - Close vector store
+    - Shutdown WriteCoordinator
 
     Returns:
       bool: True if shutdown correct

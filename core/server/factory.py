@@ -36,10 +36,9 @@ def create_app(project_root: Optional[Path] = None, force_reload: bool = False) 
   """
   Application factory - creates and configures FastAPI application.
 
-  M-3: Singleton cached for performance (0.58s → <0.01s on subsequent calls).
+  Singleton cached for performance (0.58s → <0.01s on subsequent calls).
   Thread-safe with double-check locking pattern.
-
-  PHASE 3.0: Refactored into modular components for maintainability.
+  Refactored into modular components for maintainability.
 
   Args:
     project_root: Project root directory. If None, auto-detected.
