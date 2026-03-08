@@ -27,7 +27,7 @@ class HardwareProfile:
         self.machine = platform.machine() # 'arm64' per apple silicon
         self.total_ram_gb = round(psutil.virtual_memory().total / (1024**3), 2)
         self.is_apple_silicon = self.system == "Darwin" and self.machine == "arm64"
-        self.has_cuda = False # TODO: Detectar NVIDIA
+        self.has_cuda = False  # NVIDIA detection not implemented
 
     def __str__(self):
         return (f"Hardware: {self.system} {self.machine}, "

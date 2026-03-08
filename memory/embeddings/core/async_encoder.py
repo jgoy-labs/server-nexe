@@ -44,7 +44,7 @@ class AsyncEmbedder:
   """
 
   _instances = {}
-  _instances_lock = threading.Lock()  # FIX: Thread-safe singleton creation
+  _instances_lock = threading.Lock()  # Thread-safe singleton creation across workers
 
   def __new__(cls, model_name: str, **kwargs):
     """

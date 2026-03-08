@@ -285,7 +285,8 @@ async def lifespan(app: FastAPI):
 
         except httpx.ConnectError:
           msg = _translate(server_state.i18n, "core.server.ollama_not_available",
-            "Ollama not available (localhost:11434). If using Ollama, start it manually.")
+            "Ollama not available ({url}). If using Ollama, start it manually.",
+            url=ollama_url)
           logger.warning(msg)
         except httpx.TimeoutException:
           msg = _translate(server_state.i18n, "core.server.ollama_timeout",
