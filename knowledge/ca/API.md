@@ -447,7 +447,7 @@ Health check del subsistema de memòria.
 ### RAG (mòdul)
 
 ⚠️ **NOTA IMPORTANT:** Hi ha dos conjunts d'endpoints RAG:
-- `/v1/rag/*` → Endpoints versionats **no implementats** (501) planificats per FASE 15
+- `/v1/rag/*` → Endpoints versionats **no implementats** (501) disponibles pròximament
 - `/rag/*` → Endpoints **funcionals** del mòdul RAG (documentats a continuació)
 
 Aquests endpoints són del mòdul RAG (`/rag`). S'utilitzen per afegir documents i fer cerques directes.
@@ -580,17 +580,17 @@ Info del mòdul Memory.
 
 ---
 
-### Endpoints no implementats (FASE 15)
+### Endpoints no implementats (pròximament)
 
 Aquests endpoints existeixen però retornen **501 Not Implemented**:
 
 **API versionada (futura):**
-- `POST /v1/embeddings/encode` → FASE 15
-- `GET /v1/embeddings/models` → FASE 15
-- `GET /v1/documents/` → FASE 15
-- `POST /v1/rag/search` → FASE 15
-- `POST /v1/rag/add` → FASE 15
-- `DELETE /v1/rag/documents/{id}` → FASE 15
+- `POST /v1/embeddings/encode` → pròximament
+- `GET /v1/embeddings/models` → pròximament
+- `GET /v1/documents/` → pròximament
+- `POST /v1/rag/search` → pròximament
+- `POST /v1/rag/add` → pròximament
+- `DELETE /v1/rag/documents/{id}` → pròximament
 
 **Nota:** Els endpoints `/rag/*` (sense /v1) **SÍ que són funcionals** (vegeu secció RAG).
 

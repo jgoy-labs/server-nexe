@@ -447,7 +447,7 @@ Health check del subsistema de memoria.
 ### RAG (módulo)
 
 ⚠️ **NOTA IMPORTANTE:** Hay dos conjuntos de endpoints RAG:
-- `/v1/rag/*` → Endpoints versionados **no implementados** (501) planificados para FASE 15
+- `/v1/rag/*` → Endpoints versionados **no implementados** (501) disponibles próximamente
 - `/rag/*` → Endpoints **funcionales** del módulo RAG (documentados a continuación)
 
 Estos endpoints son del módulo RAG (`/rag`). Se utilizan para añadir documentos y hacer búsquedas directas.
@@ -580,17 +580,17 @@ Info del módulo Memory.
 
 ---
 
-### Endpoints no implementados (FASE 15)
+### Endpoints no implementados (próximamente)
 
 Estos endpoints existen pero devuelven **501 Not Implemented**:
 
 **API versionada (futura):**
-- `POST /v1/embeddings/encode` → FASE 15
-- `GET /v1/embeddings/models` → FASE 15
-- `GET /v1/documents/` → FASE 15
-- `POST /v1/rag/search` → FASE 15
-- `POST /v1/rag/add` → FASE 15
-- `DELETE /v1/rag/documents/{id}` → FASE 15
+- `POST /v1/embeddings/encode` → próximamente
+- `GET /v1/embeddings/models` → próximamente
+- `GET /v1/documents/` → próximamente
+- `POST /v1/rag/search` → próximamente
+- `POST /v1/rag/add` → próximamente
+- `DELETE /v1/rag/documents/{id}` → próximamente
 
 **Nota:** Los endpoints `/rag/*` (sin /v1) **SÍ son funcionales** (ver sección RAG).
 
