@@ -334,7 +334,7 @@ Si alguien accede a `storage/qdrant/`, puede ver el contenido (aunque los vector
   - Respuestas en formato OpenAI
 
 **NO implementado (devuelven 501 Not Implemented):**
-- ❌ `/v1/embeddings` - Planeado para FASE 15, actualmente 0% funcional
+- ❌ `/v1/embeddings` - Próximamente, actualmente 0% funcional
 - ❌ `/v1/documents/*` - Planeado, no implementado
 - ❌ `/v1/models` - No existe el endpoint
 - ❌ `/v1/completions` - Legacy, no implementado
@@ -771,7 +771,7 @@ Pero:
 
 3. **✅ Compatibilidad OpenAI CORREGIDA**
    - Antes: `/v1/embeddings` 90% compatible
-   - Ahora: `/v1/embeddings` **NO implementado** (501), planeado FASE 15
+   - Ahora: `/v1/embeddings` **NO implementado** (501), disponible próximamente
    - Solo `/v1/chat/completions` funcional
 
 4. **✅ Rate limiting reconocido como avanzado**

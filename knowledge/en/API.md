@@ -447,7 +447,7 @@ Health check for the memory subsystem.
 ### RAG (module)
 
 ⚠️ **IMPORTANT NOTE:** There are two sets of RAG endpoints:
-- `/v1/rag/*` → Versioned endpoints **not implemented** (501), planned for PHASE 15
+- `/v1/rag/*` → Versioned endpoints **not implemented** (501), coming soon
 - `/rag/*` → **Functional** endpoints of the RAG module (documented below)
 
 These endpoints belong to the RAG module (`/rag`). They are used to add documents and perform direct searches.
