@@ -54,6 +54,34 @@ jobs:
           --cov-report=xml:coverage.xml
           --tb=short -q
 
+      - name: Coverage summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import xml.etree.ElementTree as ET
+
+          path = pathlib.Path("coverage.xml")
+          if not path.exists():
+            print("coverage.xml not found")
+            raise SystemExit(0)
+
+          root = ET.parse(path).getroot()
+          line_rate = float(root.attrib.get("line-rate", "0") or 0)
+          lines_covered = int(root.attrib.get("lines-covered", "0") or 0)
+          lines_valid = int(root.attrib.get("lines-valid", "0") or 0)
+
+          summary = f"Total line coverage: {line_rate * 100:.1f}% ({lines_covered}/{lines_valid})"
+          print(summary)
+
+          out = os.environ.get("GITHUB_STEP_SUMMARY")
+          if out:
+            with open(out, "a", encoding="utf-8") as f:
+              f.write("## Coverage\\n\\n")
+              f.write(summary + "\\n")
+          PY
+
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
