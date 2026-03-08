@@ -40,7 +40,7 @@ _CSRF_EXEMPT_PATTERNS = [
     re.compile(r"^/v1/audio/transcriptions"),
     re.compile(r"^/health"),
     re.compile(r"^/metrics"),
-    re.compile(r"^/ui/"),  # Web UI (internal use, same-origin)
+    # /ui/ is NOT exempt: the UI sends X-CSRF-Token via fetchWithCsrf()
 ]
 
 def _translate(i18n, key: str, fallback: str, **kwargs) -> str:
@@ -246,10 +246,12 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
       logger.info(f"  CSRF cookie_secure manual override: {cookie_secure}")
 
     # Use pre-compiled patterns from module level (more efficient)
+    # header_name must match the JS fetchWithCsrf() which sends 'X-CSRF-Token'
     app.add_middleware(
       CSRFMiddleware,
       secret=csrf_secret,
       cookie_name="nexe_csrf_token",
+      header_name="X-CSRF-Token",
       cookie_secure=cookie_secure,
       cookie_samesite="strict",
       exempt_urls=_CSRF_EXEMPT_PATTERNS,  # Pre-compiled at module load
