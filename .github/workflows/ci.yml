@@ -33,8 +33,9 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     needs: security-audit
+    # contents: read only — badge commit is handled by the separate 'badge' job
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -50,8 +51,10 @@ jobs:
       - name: Run tests (with coverage)
         env:
           NEXE_ENV: testing
-          NEXE_PRIMARY_API_KEY: test-key-for-ci
-          NEXE_CSRF_SECRET: test-csrf-secret-for-ci
+          # Non-secret dummy values for CI. Override via GitHub Secrets if desired:
+          # Settings → Secrets → Actions → NEXE_CI_API_KEY / NEXE_CI_CSRF_SECRET
+          NEXE_PRIMARY_API_KEY: ${{ secrets.NEXE_CI_API_KEY || 'nexe-ci-test-key' }}
+          NEXE_CSRF_SECRET: ${{ secrets.NEXE_CI_CSRF_SECRET || 'nexe-ci-csrf-secret' }}
         run: >
           pytest core memory personality plugins
           -m "not integration and not e2e and not slow"
@@ -88,12 +91,38 @@ jobs:
               f.write(summary + "\\n")
           PY
 
-      - name: Generate coverage badge (main only)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+  badge:
+    name: Update Coverage Badge
+    runs-on: ubuntu-latest
+    needs: tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # contents: write isolated here — only this job needs to commit
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-xml
+
+      - name: Generate coverage badge
         run: python .github/scripts/generate_coverage_badge.py coverage.xml .github/badges/coverage.svg
 
-      - name: Commit coverage badge (main only)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Commit coverage badge
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -109,10 +138,3 @@ jobs:
           git add .github/badges/coverage.svg
           git commit -m "chore: update coverage badge"
           git push
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-xml
-          path: coverage.xml

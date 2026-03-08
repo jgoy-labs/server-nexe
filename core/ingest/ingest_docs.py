@@ -13,12 +13,15 @@ www.jgoy.net
 """
 
 import asyncio
+import logging
 import sys
 from pathlib import Path
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+logger = logging.getLogger(__name__)
 
 
 DOCS_COLLECTION = "nexe_documentation"
@@ -46,45 +49,43 @@ async def ingest_documentation():
     docs_path = PROJECT_ROOT / "docs"
     readme_path = PROJECT_ROOT / "README.md"
 
-    print(f"\n{'='*60}")
-    print("NEXE DOCUMENTATION INGESTION")
-    print(f"{'='*60}\n")
+    logger.info("Documentation ingestion started")
 
     # Initialize MemoryAPI
-    print("[1/4] Initializing MemoryAPI...")
+    logger.info("[1/4] Initializing MemoryAPI...")
     memory = MemoryAPI()
     try:
         await memory.initialize()
     except Exception as e:
-        print(f"[ERROR] Failed to initialize MemoryAPI: {e}")
-        print("        Make sure Qdrant is running (./nexe go)")
+        logger.error("[ERROR] Failed to initialize MemoryAPI: %s", e)
+        logger.error("        Make sure Qdrant is running (./nexe go)")
         return False
 
     # Create collection if not exists
-    print(f"[2/4] Creating collection '{DOCS_COLLECTION}'...")
+    logger.info("[2/4] Creating collection '%s'...", DOCS_COLLECTION)
     try:
         if not await memory.collection_exists(DOCS_COLLECTION):
             await memory.create_collection(DOCS_COLLECTION, vector_size=384)
-            print(f"       Collection '{DOCS_COLLECTION}' created.")
+            logger.info("       Collection '%s' created.", DOCS_COLLECTION)
         else:
             # Clear existing docs for fresh ingestion
             await memory.delete_collection(DOCS_COLLECTION)
             await memory.create_collection(DOCS_COLLECTION, vector_size=384)
-            print(f"       Collection '{DOCS_COLLECTION}' recreated (fresh ingestion).")
+            logger.info("       Collection '%s' recreated (fresh ingestion).", DOCS_COLLECTION)
     except Exception as e:
-        print(f"[ERROR] Failed to create collection: {e}")
+        logger.error("[ERROR] Failed to create collection: %s", e)
         return False
 
     # Find all markdown files
-    print("[3/4] Finding documentation files...")
+    logger.info("[3/4] Finding documentation files...")
     md_files = list(docs_path.glob("**/*.md"))
     if readme_path.exists():
         md_files.append(readme_path)
 
-    print(f"       Found {len(md_files)} documentation files.")
+    logger.info("       Found %d documentation files.", len(md_files))
 
     # Ingest each file
-    print("[4/4] Ingesting documents...")
+    logger.info("[4/4] Ingesting documents...")
     total_chunks = 0
     for md_file in md_files:
         try:
@@ -110,19 +111,15 @@ async def ingest_documentation():
                 )
                 total_chunks += 1
 
-            print(f"       [OK] {filename} ({len(chunks)} chunks)")
+            logger.info("       [OK] %s (%d chunks)", filename, len(chunks))
 
         except Exception as e:
-            print(f"       [ERROR] {md_file.name}: {e}")
+            logger.error("       [ERROR] %s: %s", md_file.name, e)
 
     await memory.close()
 
-    print(f"\n{'='*60}")
-    print(f"INGESTION COMPLETE!")
-    print(f"  - Files processed: {len(md_files)}")
-    print(f"  - Total chunks: {total_chunks}")
-    print(f"  - Collection: {DOCS_COLLECTION}")
-    print(f"{'='*60}\n")
+    logger.info("Ingestion complete — files: %d, chunks: %d, collection: %s",
+                len(md_files), total_chunks, DOCS_COLLECTION)
 
     return True
 

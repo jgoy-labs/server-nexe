@@ -253,4 +253,8 @@ def test_create_app_after_exception_in_previous_call(monkeypatch):
 
   Si primer create_app() falla, segon hauria de funcionar.
   """
-  pytest.skip("Test complex, requires mocking internal dependencies")
+  pytest.skip(
+      "Requires deep mocking of factory internals (config loader, lifespan, "
+      "module discovery). Tracked for future improvement — add integration "
+      "test instead of unit mock."
+  )
