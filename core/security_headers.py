@@ -46,7 +46,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     # - style-src: 'unsafe-inline' allowed (needed for Web UI, low security risk)
     response.headers["Content-Security-Policy"] = (
       "default-src 'self'; "
-      "script-src 'self' https://cdn.jsdelivr.net; "
+      "script-src 'self'; "
       "style-src 'self' 'unsafe-inline'; "
       "img-src 'self' data:; "
       "font-src 'self' data:; "

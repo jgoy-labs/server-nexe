@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 import logging
 
 from core.dependencies import (
@@ -258,6 +259,32 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
     logger.warning("starlette-csrf not installed. CSRF protection disabled.")
     logger.warning("  Install with: pip install starlette-csrf")
 
+def setup_trusted_hosts(app: FastAPI, config: Dict[str, Any]) -> None:
+  """
+  Setup TrustedHostMiddleware to block DNS rebinding attacks.
+
+  A malicious web page could bind its domain to 127.0.0.1 and then
+  make cross-origin requests to localhost:9119. This middleware rejects
+  requests with unexpected Host headers.
+
+  Args:
+    app: FastAPI application instance
+    config: Configuration dictionary
+  """
+  server_config = config.get('core', {}).get('server', {})
+  host = server_config.get('host', '127.0.0.1')
+
+  # Base allowed hosts: always include localhost variants
+  allowed = {"localhost", "127.0.0.1", "::1"}
+
+  # If server binds to a custom host/domain, allow it too
+  if host and host not in ("0.0.0.0", ""):
+    allowed.add(host)
+
+  app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed))
+  logger.info("TrustedHostMiddleware: allowed_hosts=%s", sorted(allowed))
+
+
 def setup_all_middleware(app: FastAPI, config: Dict[str, Any], i18n = None) -> None:
   """
   Setup all middleware for the application
@@ -277,3 +304,6 @@ def setup_all_middleware(app: FastAPI, config: Dict[str, Any], i18n = None) -> N
 
   setup_rate_limiting(app, i18n)
   setup_cors(app, config, i18n)
+
+  # TrustedHostMiddleware last (outermost layer — first to see requests)
+  setup_trusted_hosts(app, config)

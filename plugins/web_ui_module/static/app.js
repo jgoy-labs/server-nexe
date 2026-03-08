@@ -336,13 +336,14 @@ class NexeUI {
         // Use marked.js to render Markdown
         if (typeof marked !== 'undefined' && text) {
             try {
-                // Configure marked for safety
-                marked.setOptions({
-                    breaks: true,      // Convert \n to <br>
-                    gfm: true,         // GitHub Flavored Markdown
-                    sanitize: false    // We trust our own content
-                });
-                return marked.parse(text);
+                // Override raw HTML renderer to prevent XSS injection via HTML blocks
+                const renderer = new marked.Renderer();
+                const _escape = this.escapeHtml.bind(this);
+                renderer.html = function(token) {
+                    const raw = typeof token === 'string' ? token : (token.text || '');
+                    return _escape(raw);
+                };
+                return marked.parse(text, { breaks: true, gfm: true, renderer });
             } catch (e) {
                 console.error('Markdown parsing error:', e);
                 return this.escapeHtml(text);
