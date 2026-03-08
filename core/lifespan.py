@@ -419,40 +419,50 @@ async def lifespan(app: FastAPI):
     # After first ingestion, the marker file prevents re-ingestion on every startup.
     # To manually re-ingest: ./nexe knowledge ingest
     try:
-      knowledge_path = server_state.project_root / "knowledge"
-      _nexe_lang = os.getenv("NEXE_LANG", "ca")
-      lang_path = knowledge_path / _nexe_lang
-      if lang_path.is_dir():
-        knowledge_path = lang_path
-      ingested_marker = server_state.project_root / "storage" / ".knowledge_ingested"
+      nexe_env = os.getenv("NEXE_ENV", "production").lower()
+      auto_ingest_enabled = os.getenv("NEXE_AUTO_INGEST_KNOWLEDGE", "true").lower() == "true"
 
-      if knowledge_path.exists():
-        from core.ingest.ingest_knowledge import ingest_knowledge, SUPPORTED_EXTENSIONS
+      if nexe_env in ("test", "testing") or not auto_ingest_enabled:
+        logger.debug(
+          "Knowledge: Auto-ingest disabled (NEXE_ENV=%s, NEXE_AUTO_INGEST_KNOWLEDGE=%s)",
+          nexe_env,
+          auto_ingest_enabled,
+        )
+      else:
+        knowledge_path = server_state.project_root / "knowledge"
+        _nexe_lang = os.getenv("NEXE_LANG", "ca")
+        lang_path = knowledge_path / _nexe_lang
+        if lang_path.is_dir():
+          knowledge_path = lang_path
+        ingested_marker = server_state.project_root / "storage" / ".knowledge_ingested"
 
-        files_to_ingest = []
-        for ext in SUPPORTED_EXTENSIONS:
-          files_to_ingest.extend(knowledge_path.glob(f"**/*{ext}"))
-        files_to_ingest.extend(knowledge_path.glob("**/*.pdf"))
+        if knowledge_path.exists():
+          from core.ingest.ingest_knowledge import ingest_knowledge, SUPPORTED_EXTENSIONS
 
-        files_to_ingest = [f for f in files_to_ingest if not f.name.startswith('.')]
+          files_to_ingest = []
+          for ext in SUPPORTED_EXTENSIONS:
+            files_to_ingest.extend(knowledge_path.glob(f"**/*{ext}"))
+          files_to_ingest.extend(knowledge_path.glob("**/*.pdf"))
 
-        if files_to_ingest:
-          # Only auto-ingest if never done before (no marker file)
-          if ingested_marker.exists():
-            logger.debug("Knowledge: Already ingested. Skipping auto-ingest.")
-            logger.debug("Knowledge: To re-ingest, use: ./nexe knowledge ingest")
-          else:
-            # First run - auto-ingest as fallback if installer didn't do it
-            logger.info("Knowledge: First run - auto-ingesting %d document(s)...", len(files_to_ingest))
-            success = await ingest_knowledge(knowledge_path, quiet=True)
-            if success:
-              logger.info("Knowledge: Ingestion completed successfully")
-              # Create marker to prevent re-ingestion on next startup
-              ingested_marker.touch()
+          files_to_ingest = [f for f in files_to_ingest if not f.name.startswith('.')]
+
+          if files_to_ingest:
+            # Only auto-ingest if never done before (no marker file)
+            if ingested_marker.exists():
+              logger.debug("Knowledge: Already ingested. Skipping auto-ingest.")
+              logger.debug("Knowledge: To re-ingest, use: ./nexe knowledge ingest")
             else:
-              logger.warning("Knowledge: Ingestion had some errors")
-        else:
-          logger.debug("Knowledge: No documents to ingest (folder empty or only README)")
+              # First run - auto-ingest as fallback if installer didn't do it
+              logger.info("Knowledge: First run - auto-ingesting %d document(s)...", len(files_to_ingest))
+              success = await ingest_knowledge(knowledge_path, quiet=True)
+              if success:
+                logger.info("Knowledge: Ingestion completed successfully")
+                # Create marker to prevent re-ingestion on next startup
+                ingested_marker.touch()
+              else:
+                logger.warning("Knowledge: Ingestion had some errors")
+          else:
+            logger.debug("Knowledge: No documents to ingest (folder empty or only README)")
     except Exception as e:
       logger.warning("Knowledge: Auto-ingest failed: %s", str(e))
 
