@@ -20,7 +20,7 @@ import pytest
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# A-1: Upload — Path Traversal & Extension Whitelist
+# Upload — Path Traversal & Extension Whitelist
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestUploadSecurity:
@@ -74,7 +74,7 @@ class TestUploadSecurity:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# C-2: RAG Context Sanitization
+# RAG Context Sanitization
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestRAGContextSanitization:
@@ -111,7 +111,7 @@ class TestRAGContextSanitization:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# A-3: Health Endpoint — Informació mínima sense auth
+# Health Endpoint — Informació mínima sense auth
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestHealthEndpointSecurity:
@@ -142,7 +142,7 @@ class TestHealthEndpointSecurity:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# A-6: Session TTL — Memory Leak Prevention
+# Session TTL — Memory Leak Prevention
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestSessionCleanup:

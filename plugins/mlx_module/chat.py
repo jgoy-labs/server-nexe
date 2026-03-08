@@ -117,7 +117,7 @@ class MLXChatNode:
 
         system = inputs.get("system", "")
         messages = inputs.get("messages", [])
-        # OPCIÓ D: messages_for_cache per guardar cache sense memòria
+        # messages_for_cache: versió de messages per a cache (sense context de memòria)
         messages_for_cache = inputs.get("messages_for_cache", messages)
         session_id = inputs.get("session_id", "default")
         stream_callback = inputs.get("stream_callback")
@@ -139,12 +139,12 @@ class MLXChatNode:
         try:
             # Executar generació en thread (MLX és blocking)
             # Amb PREFIX MATCHING via MLXPromptCacheManager
-            # OPCIÓ D: Passem messages (per generació) i messages_for_cache (per guardar)
+            # Passem messages (per generació) i messages_for_cache (per desar el cache)
             result = await asyncio.to_thread(
                 self._generate_blocking,
                 system,
                 messages,
-                messages_for_cache,  # NOU: Per guardar cache net (Opció D)
+                messages_for_cache,  # Per guardar cache net (sense context de memòria)
                 threadsafe_callback if stream_callback else None,
                 session_id  # Per separar caches per sessió
             )
@@ -256,11 +256,6 @@ class MLXChatNode:
             cache_manager, model_key, cache_lookup_tokens, model, self.config.max_kv_size
         )
 
-        # Log visible per debug
-        print(f"\n{'='*60}")
-        print(f"MLX PREFIX CACHE: prefix_reuse={'YES' if prefix_reused else 'NO'}")
-        print(f"  cached_tokens={cached_token_count}, new_tokens={total_tokens - cached_token_count}")
-        print(f"{'='*60}\n")
         logger.info(
             "MLXChatNode: identity=%s, full=%d, cached=%d, new=%d, prefix_reuse=%s",
             identity_hash[:8], total_tokens, cached_token_count,
@@ -282,7 +277,7 @@ class MLXChatNode:
             cache_manager, model_key, cache_lookup_tokens
         )
 
-        # 6. Guardar cache post-generació (OPCIÓ D: messages nets)
+        # 6. Guardar cache post-generació (messages nets, sense context de memòria)
         save_cache_post_generation(
             cache_manager, model_key, all_cache_messages,
             text, tokenizer, cached_kv, len(full_tokens)
