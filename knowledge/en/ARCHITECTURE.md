@@ -1383,13 +1383,13 @@ class CodeChunker:
 **Configuration (environment variables):**
 
 ```bash
-# Phase 2.1: Dual-key rotation support
+# Dual-key rotation support
 export NEXE_PRIMARY_API_KEY="new-key-2026"
 export NEXE_PRIMARY_KEY_EXPIRES="2026-06-30T00:00:00Z"  # ISO 8601
 export NEXE_SECONDARY_API_KEY="old-key-2025"
 export NEXE_SECONDARY_KEY_EXPIRES="2026-01-31T00:00:00Z"
 
-# Backward compatibility (Phase 1)
+# Backward compatibility (single key)
 export NEXE_ADMIN_API_KEY="single-key"
 
 # Development mode (optional, dev only)

@@ -323,13 +323,13 @@ NEXE_OLLAMA_MODEL=phi3:mini                                   # Específic Ollam
 NEXE_ENV=development  # "production" o "development"
 
 # ─── SECURITY (CRÍTIC EN PRODUCCIÓ) ───
-# Dual-key support (Phase 2.1)
+# Dual-key support (rotació de claus)
 NEXE_PRIMARY_API_KEY=your-primary-key-here
 NEXE_PRIMARY_KEY_EXPIRES=2026-06-30T00:00:00Z  # ISO 8601 format
 NEXE_SECONDARY_API_KEY=your-secondary-key-here  # Grace period rotation
 NEXE_SECONDARY_KEY_EXPIRES=2026-01-31T00:00:00Z
 
-# Backward compatibility (Phase 1)
+# Retrocompatibilitat (clau única)
 # NEXE_ADMIN_API_KEY=single-key-here
 
 # CSRF Protection

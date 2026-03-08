@@ -334,7 +334,7 @@ If someone accesses `storage/qdrant/`, they can see the content (although the ve
   - OpenAI format responses
 
 **NOT implemented (return 501 Not Implemented):**
-- ❌ `/v1/embeddings` - Planned for PHASE 15, currently 0% functional
+- ❌ `/v1/embeddings` - Not yet implemented, currently 0% functional
 - ❌ `/v1/documents/*` - Planned, not implemented
 - ❌ `/v1/models` - Endpoint does not exist
 - ❌ `/v1/completions` - Legacy, not implemented
@@ -406,7 +406,7 @@ Models are the ones you download from HuggingFace, as-is.
 **Authentication system (plugins/security/core/):**
 
 **Implemented features:**
-- ✅ **Dual-key support** with expiry dates (Phase 2.1)
+- ✅ **Dual-key support** with expiry dates
   - `NEXE_PRIMARY_API_KEY` + `NEXE_PRIMARY_KEY_EXPIRES`
   - `NEXE_SECONDARY_API_KEY` + `NEXE_SECONDARY_KEY_EXPIRES`
   - Grace period for key rotation
@@ -771,7 +771,7 @@ But:
 
 3. **✅ OpenAI compatibility CORRECTED**
    - Before: `/v1/embeddings` 90% compatible
-   - Now: `/v1/embeddings` **NOT implemented** (501), planned PHASE 15
+   - Now: `/v1/embeddings` **NOT implemented** (501), not yet available
    - Only `/v1/chat/completions` functional
 
 4. **✅ Rate limiting recognized as advanced**

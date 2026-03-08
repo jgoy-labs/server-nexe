@@ -406,7 +406,7 @@ Los modelos son los que descargas de HuggingFace, tal cual.
 **Sistema de autenticación (plugins/security/core/):**
 
 **Features implementadas:**
-- ✅ **Soporte dual-key** con fechas de expiración (Phase 2.1)
+- ✅ **Soporte dual-key** con fechas de expiración
   - `NEXE_PRIMARY_API_KEY` + `NEXE_PRIMARY_KEY_EXPIRES`
   - `NEXE_SECONDARY_API_KEY` + `NEXE_SECONDARY_KEY_EXPIRES`
   - Grace period para rotación de claves
