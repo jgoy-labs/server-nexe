@@ -567,7 +567,6 @@ class MemoryHelper:
                                 "_id": r.id if hasattr(r, 'id') else None
                             })
 
-                            # TODO: Increment access_count (would need memory.update)
                 except Exception as e:
                     logger.warning(f"Error searching collection {collection}: {e}")
 

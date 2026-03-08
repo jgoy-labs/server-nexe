@@ -86,7 +86,6 @@ class ModuleManager:
     self.metrics = MetricsCollector(self.i18n)
     self.registry = ModuleRegistry(self.i18n)
     # suppress_deprecation=True because ModuleManager is the primary user
-    # TODO: Migrate to core.loader.ModuleLoader in future version
     self.loader = ModuleLoader(self.i18n, suppress_deprecation=True)
     self.path_discovery = PathDiscovery(
       self.config_manager.get_config(), self.i18n

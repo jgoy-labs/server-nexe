@@ -143,7 +143,7 @@ def test_api_key_config_has_any_valid_key():
   assert config.has_any_valid_key is False
 
 def test_load_api_keys_primary_only(monkeypatch):
-  """Test loading primary key only (new Phase 2.1 format)."""
+  """Test loading primary key only (dual-key format)."""
   monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "new-primary-key")
   monkeypatch.setenv("NEXE_PRIMARY_KEY_EXPIRES", "2026-01-10T00:00:00Z")
   monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
