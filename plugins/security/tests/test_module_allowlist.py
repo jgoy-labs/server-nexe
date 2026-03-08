@@ -18,7 +18,7 @@ def reset_app_cache():
   """
   Reset app cache abans i després de cada test per evitar estat compartit.
 
-  ✅ M-3: Implementat - crida reset_app_cache() per netejar singleton.
+  Implementat - crida reset_app_cache() per netejar singleton.
   """
   from core.server.factory import reset_app_cache as reset_factory_cache
   reset_factory_cache()

@@ -23,7 +23,7 @@ def cleanup_app_cache(monkeypatch):
   """
   Reset app cache i variables d'entorn després de cada test.
 
-  ✅ M-3: Essencial per evitar estat compartit entre tests.
+  Essencial per evitar estat compartit entre tests.
   """
   monkeypatch.setenv("NEXE_ENV", "development")
   monkeypatch.setenv("NEXE_ADMIN_API_KEY", "test-key-" + os.urandom(16).hex())
@@ -36,7 +36,7 @@ def test_create_app_basic(monkeypatch):
   """
   Test bàsic: create_app() retorna FastAPI app vàlida.
 
-  M-3: Verificar que caching no trenca funcionalitat bàsica.
+  Verificar que caching no trenca funcionalitat bàsica.
   """
   app = create_app()
 
@@ -48,7 +48,7 @@ def test_create_app_caches_instance(monkeypatch):
   """
   Test que create_app() retorna la mateixa instància (cached).
 
-  M-3: Core feature - singleton pattern.
+  Core feature - singleton pattern.
   """
   app1 = create_app()
   app2 = create_app()
@@ -60,7 +60,7 @@ def test_create_app_force_reload(monkeypatch):
   """
   Test que force_reload=True rebuilds app.
 
-  M-3: Necessari per tests que volen app fresca.
+  Necessari per tests que volen app fresca.
   """
   app1 = create_app()
   app2 = create_app(force_reload=True)
@@ -72,7 +72,7 @@ def test_create_app_cache_improves_performance(monkeypatch):
   """
   Test que cache millora startup time significativament.
 
-  M-3: Performance win - 0.58s → <0.01s
+  Performance win - 0.58s → <0.01s
   """
   start1 = time.time()
   app1 = create_app(force_reload=True)
@@ -96,7 +96,7 @@ def test_reset_app_cache(monkeypatch):
   """
   Test que reset_app_cache() esborra cache correctament.
 
-  M-3: Necessari per teardown en tests.
+  Necessari per teardown en tests.
   """
   app1 = create_app()
 
@@ -110,7 +110,7 @@ def test_create_app_thread_safe(monkeypatch):
   """
   Test que cache és thread-safe (no race conditions).
 
-  M-3: Important per multi-worker deployments.
+  Important per multi-worker deployments.
   """
   reset_app_cache()
 
@@ -143,7 +143,7 @@ def test_create_app_different_project_root_rebuilds(monkeypatch, tmp_path):
   """
   Test que canviar project_root rebuilds app.
 
-  M-3: Evitar usar cache quan project_root canvia.
+  Evitar usar cache quan project_root canvia.
   """
   app1 = create_app()
 
@@ -161,7 +161,7 @@ def test_create_app_concurrent_first_call(monkeypatch):
   """
   Test que concurrent first calls no creen múltiples instances.
 
-  M-3: Double-check locking ha de prevenir race condition.
+  Double-check locking ha de prevenir race condition.
   """
   reset_app_cache()
 
@@ -184,7 +184,7 @@ def test_create_app_cache_key_includes_project_root(monkeypatch):
   """
   Test que cache key inclou project_root.
 
-  M-3: Mateix app però diferent project_root → cache miss.
+  Mateix app però diferent project_root → cache miss.
   """
   app1 = create_app()
   project_root1 = app1.state.project_root
@@ -202,7 +202,7 @@ def test_create_app_benchmark_cold_vs_warm(monkeypatch):
   """
   Benchmark detallat: mesura startup time cold vs warm.
 
-  M-3: Demostrar millora de performance.
+  Demostrar millora de performance.
 
   Run with: pytest -m slow
   """
