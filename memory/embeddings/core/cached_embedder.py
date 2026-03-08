@@ -345,5 +345,7 @@ class CachedEmbedder:
 
   async def shutdown(self):
     """Graceful shutdown"""
+    if self.cache:
+      await self.cache.shutdown()
     await self.encoder.shutdown()
     logger.info("cached_embedder_shutdown", model=self.model_name)

@@ -11,7 +11,7 @@ www.jgoy.net
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 import numpy as np
 
 from memory.embeddings.workflow.nodes import embedding_node, chunking_node
@@ -38,11 +38,13 @@ async def setup_module(mock_sentence_transformer):
 
   module = EmbeddingsModule.get_instance()
 
-  with patch('sentence_transformers.SentenceTransformer',
-        return_value=mock_sentence_transformer):
-    await module.initialize(config={"model_name": "test-model", "device": "cpu"})
+  await module.initialize(config={"model_name": "test-model", "device": "cpu"})
 
-    yield module
+  # Evitar importar sentence_transformers als unit tests (deps pesades a Linux)
+  assert module._cached_embedder is not None
+  module._cached_embedder.encoder._load_model = Mock(return_value=mock_sentence_transformer)
+
+  yield module
 
   await module.shutdown()
   EmbeddingsModule._instance = None
