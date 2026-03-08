@@ -122,6 +122,7 @@ class TestMemoryModule:
 
     MemoryModule._instance = None
 
+  @pytest.mark.integration
   async def test_full_lifecycle(self):
     """Test cicle complet: init -> store -> recall -> shutdown"""
     MemoryModule._instance = None
@@ -181,6 +182,7 @@ class TestMemoryModule:
       await module.shutdown()
       MemoryModule._instance = None
 
+  @pytest.mark.integration
   async def test_integration_smoke(self):
     """Smoke test complert"""
     MemoryModule._instance = None

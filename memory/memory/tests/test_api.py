@@ -284,6 +284,7 @@ async def memory_api(tmp_path):
   yield api
   await api.close()
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 class TestMemoryAPIIntegration:
   """Tests d'integració amb Qdrant real."""

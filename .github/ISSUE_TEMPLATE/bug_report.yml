@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible problem in Server Nexe
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. This is a **local-first** project, so OS + hardware details matter.
+
+  - type: input
+    id: version
+    attributes:
+      label: Nexe version
+      description: Output of `./nexe --version` (or commit hash if running from source)
+      placeholder: "0.8.0"
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: OS / Hardware
+      description: Example: macOS 15.x (Apple Silicon), Ubuntu 24.04 (x86_64), Windows 11 (WSL2)
+      placeholder: "macOS 15.x (Apple Silicon)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Clear, minimal steps. Include commands and relevant config.
+      placeholder: |
+        1) ...
+        2) ...
+        3) ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / stack traces
+      description: Paste relevant logs. Remove secrets (API keys, tokens).
+      render: shell
+    validations:
+      required: false
+
