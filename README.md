@@ -18,6 +18,23 @@ python3 install_nexe.py   # guided installation
 ./nexe chat --rag         # chat with RAG memory
 ```
 
+## Testing (Linux)
+
+CI runs on Ubuntu and executes the unit suite with coverage.
+
+```bash
+pip install -r requirements.txt
+pytest core memory personality plugins -m "not integration and not e2e and not slow" \
+  --cov=core --cov=memory --cov=personality --cov=plugins \
+  --cov-report=term --cov-report=xml:coverage.xml --tb=short -q
+```
+
+To run the same suite on Linux via Docker:
+
+```bash
+./dev-tools/run_linux_ci.sh
+```
+
 ## Documentation
 
 Full documentation is in the `knowledge/` directory:
