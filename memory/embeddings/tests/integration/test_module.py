@@ -21,6 +21,8 @@ from memory.embeddings.core.interfaces import (
 )
 from memory.embeddings.core.async_encoder import AsyncEmbedder
 
+pytestmark = pytest.mark.integration
+
 @pytest.fixture
 def mock_sentence_transformer():
   """
