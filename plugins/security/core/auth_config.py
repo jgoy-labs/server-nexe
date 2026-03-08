@@ -112,11 +112,6 @@ def is_dev_mode() -> bool:
 
   return dev_mode_requested
 
-# WARNING: These constants are always empty/False. Use the functions below instead:
-#   get_admin_api_key()  →  returns the actual API key from env/config
-#   is_dev_mode()        →  returns the actual dev mode state
-ADMIN_API_KEY = ""
-DEV_MODE = False
 
 __all__ = [
   'parse_datetime_or_none',
