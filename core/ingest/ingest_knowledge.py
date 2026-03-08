@@ -20,12 +20,15 @@ www.jgoy.net
 """
 
 import asyncio
+import logging
 import sys
 from pathlib import Path
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+logger = logging.getLogger(__name__)
 
 from memory.rag.header_parser import parse_rag_header, RAGHeader, VALID_PRIORITIES
 
@@ -113,7 +116,7 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
 
     def log(msg):
         if not quiet:
-            print(msg)
+            logger.info("%s", msg)
 
     knowledge_path = folder or PROJECT_ROOT / "knowledge"
 
