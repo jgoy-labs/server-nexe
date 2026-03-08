@@ -28,27 +28,25 @@ def mock_sentence_transformer():
   return mock
 
 @pytest.fixture
-async def async_embedder(mock_sentence_transformer):
+async def async_embedder():
   """
-  Fixture: AsyncEmbedder amb SentenceTransformer mockat.
+  Fixture: AsyncEmbedder (sense carregar SentenceTransformer real).
 
   Nota: SentenceTransformer s'importa dinàmicament dins _load_model,
-  per tant mockegem sentence_transformers.SentenceTransformer.
+  per tant NO importem sentence_transformers aquí (per evitar deps pesades als unit tests).
   """
   AsyncEmbedder._instances.clear()
 
-  with patch('sentence_transformers.SentenceTransformer',
-        return_value=mock_sentence_transformer):
-    embedder = AsyncEmbedder(
-      model_name="test-model",
-      max_workers=2,
-      device="cpu"
-    )
+  embedder = AsyncEmbedder(
+    model_name="test-model",
+    max_workers=2,
+    device="cpu"
+  )
 
-    yield embedder
+  yield embedder
 
-    await embedder.shutdown()
-    AsyncEmbedder._instances.clear()
+  await embedder.shutdown()
+  AsyncEmbedder._instances.clear()
 
 @pytest.mark.asyncio
 async def test_singleton_pattern():

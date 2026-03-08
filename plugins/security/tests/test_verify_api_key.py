@@ -198,10 +198,30 @@ def test_verify_api_key_backwards_compatibility():
 
 @pytest.fixture(autouse=True)
 def cleanup_env():
-  """Cleanup automàtic de variables d'entorn després de cada test"""
-  original_key = os.environ.get("NEXE_ADMIN_API_KEY")
+  """
+  Aïlla variables d'API keys per fer els tests deterministes.
+
+  IMPORTANT: A CI/linuxtest s'injecta `NEXE_PRIMARY_API_KEY` globalment.
+  Aquests tests validen `verify_api_key()` en escenaris controlats, així
+  que netegem totes les vars relacionades abans de cada test i les restaurem després.
+  """
+  key_env_vars = (
+    "NEXE_ADMIN_API_KEY",
+    "NEXE_PRIMARY_API_KEY",
+    "NEXE_SECONDARY_API_KEY",
+    "NEXE_PRIMARY_KEY_EXPIRES",
+    "NEXE_SECONDARY_KEY_EXPIRES",
+    "NEXE_PRIMARY_KEY_CREATED",
+    "NEXE_SECONDARY_KEY_CREATED",
+  )
+
+  original = {k: os.environ[k] for k in key_env_vars if k in os.environ}
+  for k in key_env_vars:
+    os.environ.pop(k, None)
+
   yield
-  if original_key:
-    os.environ["NEXE_ADMIN_API_KEY"] = original_key
-  elif "NEXE_ADMIN_API_KEY" in os.environ:
-    del os.environ["NEXE_ADMIN_API_KEY"]
+
+  for k in key_env_vars:
+    os.environ.pop(k, None)
+  for k, v in original.items():
+    os.environ[k] = v

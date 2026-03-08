@@ -63,6 +63,34 @@ class MultiLevelCache:
         
         self._init_l2()
 
+    # Backward-compatible alias used by some tests/legacy code
+    @property
+    def l2_cache_dir(self) -> Path:
+        return self.cache_dir
+
+    @l2_cache_dir.setter
+    def l2_cache_dir(self, value: Any) -> None:
+        """
+        Set L2 cache directory (alias for cache_dir).
+
+        Supports test isolation by redirecting SQLite DB to a temp folder.
+        """
+        new_dir = Path(value)
+        new_dir.mkdir(parents=True, exist_ok=True)
+
+        # Close existing connection to avoid locks on old path
+        if getattr(self, "conn", None):
+            try:
+                self.conn.close()
+            except Exception:
+                pass
+            finally:
+                self.conn = None
+
+        self.cache_dir = new_dir
+        self.db_path = self.cache_dir / "embeddings_l2.db"
+        self._init_l2()
+
     def _init_l2(self):
         """Inicialitza la connexió i esquema de SQLite."""
         try:
@@ -233,4 +261,7 @@ class MultiLevelCache:
     async def shutdown(self):
         """Tanca recursos."""
         if self.conn:
-            self.conn.close()
+            try:
+                self.conn.close()
+            finally:
+                self.conn = None
