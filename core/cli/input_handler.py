@@ -26,12 +26,12 @@ def setup_readline():
   """
   try:
     readline.parse_and_bind('set editing-mode emacs')
-    readline.parse_and_bind('"\e[A": previous-history')
-    readline.parse_and_bind('"\e[B": next-history')
-    readline.parse_and_bind('"\e[C": forward-char')
-    readline.parse_and_bind('"\e[D": backward-char')
-    readline.parse_and_bind('"\e[H": beginning-of-line')
-    readline.parse_and_bind('"\e[F": end-of-line')
+    readline.parse_and_bind(r'"\e[A": previous-history')
+    readline.parse_and_bind(r'"\e[B": next-history')
+    readline.parse_and_bind(r'"\e[C": forward-char')
+    readline.parse_and_bind(r'"\e[D": backward-char')
+    readline.parse_and_bind(r'"\e[H": beginning-of-line')
+    readline.parse_and_bind(r'"\e[F": end-of-line')
   except Exception as e:
     logger.debug("Readline setup failed: %s", e)
 
