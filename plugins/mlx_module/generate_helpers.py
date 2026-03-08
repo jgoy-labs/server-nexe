@@ -328,7 +328,7 @@ def save_cache_post_generation(
     full_tokens_count: int,
 ) -> None:
     """
-    Guarda el cache després de la generació (OPCIÓ D: messages nets).
+    Guarda el cache després de la generació (messages nets, sense context de memòria).
 
     Args:
         cache_manager: Cache manager
@@ -365,7 +365,7 @@ def save_cache_post_generation(
 
         cache_manager.insert_cache(model_key, cache_tokens, cached_kv)
         logger.debug(
-            "MLXChatNode: OPCIÓ D saved cache NET (%d tokens → %d with response)",
+            "MLXChatNode: saved cache (messages nets, %d tokens → %d with response)",
             full_tokens_count, len(cache_tokens)
         )
     except Exception as e:

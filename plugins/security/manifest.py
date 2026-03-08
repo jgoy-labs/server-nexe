@@ -202,7 +202,7 @@ async def serve_security_ui():
 
   if not ui_file.exists():
     return {
-      "message": "Security UI not implemented yet",
+      "message": "Security UI not available. Use the REST API endpoints.",
       "api_endpoints": ["/security/scan", "/security/report"]
     }
 

@@ -70,7 +70,7 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
           )
           server_state.qdrant_process = process
 
-          # Wait for Qdrant to be ready (FIX: use asyncio.sleep to not block event loop)
+          # Wait for Qdrant to be ready (non-blocking)
           for i in range(30):  # 15 seconds max
             await asyncio.sleep(0.5)
             try:
@@ -128,7 +128,7 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
             stderr=subprocess.DEVNULL
           )
           server_state.ollama_process = process
-          # Wait for Ollama to be ready (FIX: use asyncio.sleep to not block event loop)
+          # Wait for Ollama to be ready (non-blocking)
           for _ in range(30):  # 15 seconds max
             await asyncio.sleep(0.5)
             try:

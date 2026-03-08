@@ -4,15 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy
 Location: core/endpoints/tests/test_security_n_series.py
-Description: Tests de seguretat: auditoria final N-1..N-8 (21 febrer 2026).
-  N-1: server.toml debug/reload desactivats
-  N-2: system.py no exposa PID/kill commands
-  N-3: memory/api/v1.py no exposa str(e) al client
-  N-4: path traversal bloquejat a /ui/static/
-  N-5: session cleanup tasca asyncio periòdica
-  N-6: versió llegida de config (no hardcoded)
-  N-7: cap import duplicat a manifest.py
-  N-8: variable _initialized eliminada
+Description: Tests de seguretat: configuració producció, endpoints, path traversal, sessions.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -26,7 +18,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent  # server-nexe/
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# N-1: server.toml — debug/reload desactivats, environment=production
+# server.toml — debug/reload desactivats, environment=production
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestServerTomlProductionConfig:
@@ -62,7 +54,7 @@ class TestServerTomlProductionConfig:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# N-2: system.py — PID i comandos kill no exposats a respostes HTTP
+# system.py — PID i comandos kill no exposats a respostes HTTP
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestSystemEndpointInfoDisclosure:
@@ -115,7 +107,7 @@ class TestSystemEndpointInfoDisclosure:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# N-3: memory/api/v1.py — str(e) no retornat al client HTTP
+# memory/api/v1.py — str(e) no retornat al client HTTP
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestMemoryAPIErrorDisclosure:
@@ -172,7 +164,7 @@ class TestMemoryAPIErrorDisclosure:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# N-4: Path traversal /ui/static/{filename}
+# Path traversal /ui/static/{filename}
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestStaticFilePathTraversal:
@@ -232,7 +224,7 @@ class TestStaticFilePathTraversal:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# N-5: Session cleanup automàtic (tasca asyncio periòdica)
+# Session cleanup automàtic (tasca asyncio periòdica)
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestSessionCleanupTask:
@@ -286,7 +278,7 @@ class TestSessionCleanupTask:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# N-6: Versió llegida de config (no hardcoded)
+# Versió llegida de config (no hardcoded)
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestSystemHealthVersion:
