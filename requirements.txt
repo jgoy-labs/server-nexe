@@ -12,7 +12,7 @@ starlette-csrf==3.0.0
 colorama==0.4.6
 tomli==2.0.1; python_version < "3.11"
 httpx==0.27.2
-qdrant-client>=1.17.0
+qdrant-client==1.16.1
 toml==0.10.2
 structlog==25.5.0
 click==8.1.7
@@ -32,8 +32,8 @@ sentence-transformers==2.7.0
 pypdf==6.7.1  # PDF support for knowledge ingestion
 
 # --- Testing ---
-pytest>=8.0.0
-pytest-asyncio>=1.2.0
+pytest>=8.0.0,<9.0.0
+pytest-asyncio>=0.23.0,<1.0.0
 
 # --- Inference Engines (Apple Silicon / MLX) ---
 # Note: Install only on Mac ARM64
