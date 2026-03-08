@@ -2,7 +2,7 @@
 """
 LlamaCppChatNode - Node llama-cpp-python amb cache.
 
-VERSIÓ 2.2 - Usa ModelPool per gestió de sessions amb LRU.
+Usa ModelPool per gestió de sessions amb LRU.
 llama.cpp té prefix caching automàtic quan el prefix és idèntic.
 
 """
@@ -55,7 +55,6 @@ class LlamaCppChatNode:
         Returns:
             Tuple (instància Llama, cache_hit: bool)
         """
-        # Refinament 1: Session ID explícit
         if not session_id:
             session_id = "default"
 
@@ -68,7 +67,7 @@ class LlamaCppChatNode:
         system = inputs.get("system", "")
         messages = inputs.get("messages", [])
         system_hash = inputs.get("system_hash", "")
-        session_id = inputs.get("session_id", "default") or "default"  # Refinament 1
+        session_id = inputs.get("session_id", "default") or "default"
         stream_callback = inputs.get("stream_callback")
 
         if not system_hash:
@@ -116,7 +115,6 @@ class LlamaCppChatNode:
             # Obtenir timing del resultat
             timing = result.get("timing", {})
 
-            # Refinament 4: Logging mínim (pool ja fa log de session/hash)
             logger.info(
                 "LlamaCppChatNode: %s in %dms (p:%d g:%d), %.1f tok/s, prompt=%d, gen=%d",
                 "HIT" if cache_hit else "MISS",

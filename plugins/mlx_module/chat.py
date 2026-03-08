@@ -2,8 +2,7 @@
 """
 MLXChatNode - Node LLM basat en mlx-lm per Apple Silicon.
 
-VERSIÓ 2.0 - PREFIX MATCHING REAL via MLXPromptCacheManager.
-Split 2026-01-01: Helpers moguts a generate_helpers.py (Lliçó 10)
+PREFIX MATCHING via MLXPromptCacheManager.
 
 Característiques:
 - Model singleton (carregat una vegada, reutilitzat)
@@ -25,7 +24,6 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 
 from .config import MLXConfig
-# Split 2026-01-01: Helpers per _generate_blocking
 from .generate_helpers import (
     prepare_tokens,
     lookup_prefix_cache,
@@ -234,7 +232,6 @@ class MLXChatNode:
         """
         Generació blocking amb MLX i PREFIX MATCHING (executat en thread).
 
-        Refactoritzat 2026-01-01 (Lliçó 10): De ~295 a ~45 línies.
         Helpers a generate_helpers.py.
         """
         from mlx_lm.sample_utils import make_sampler

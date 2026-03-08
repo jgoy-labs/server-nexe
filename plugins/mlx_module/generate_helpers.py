@@ -2,7 +2,6 @@
 """
 MLX Generation Helper Functions.
 
-Split 2026-01-01: Extret de chat.py per mantenir _generate_blocking() < 50 línies.
 Funcions auxiliars per la generació MLX amb prefix caching.
 """
 import logging

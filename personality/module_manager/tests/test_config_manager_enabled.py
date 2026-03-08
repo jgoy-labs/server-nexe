@@ -39,7 +39,7 @@ def test_config_global_enabled_list(mock_module_info):
   """
   Test FORMAT 1: Global enabled list.
 
-  M-2: [plugins.modules] enabled = ["security", "rag"]
+  [plugins.modules] enabled = ["security", "rag"]
   """
   config_data = {
     "plugins": {
@@ -66,7 +66,7 @@ def test_config_per_module_dict(mock_module_info):
   """
   Test FORMAT 2: Per-module dict.
 
-  M-2: [plugins.modules.security] enabled = true
+  [plugins.modules.security] enabled = true
   """
   config_data = {
     "plugins": {
@@ -94,7 +94,7 @@ def test_config_dict_overrides_list(mock_module_info):
   """
   Test prioritat: dict > list.
 
-  M-2: Si hi ha ambdós formats, dict té prioritat (més específic).
+  Si hi ha ambdós formats, dict té prioritat (més específic).
   """
   config_data = {
     "plugins": {
