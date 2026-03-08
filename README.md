@@ -1,6 +1,7 @@
 # Server Nexe
 
 [![CI](https://github.com/jgoy-labs/server-nexe/actions/workflows/ci.yml/badge.svg)](https://github.com/jgoy-labs/server-nexe/actions/workflows/ci.yml)
+![Coverage](.github/badges/coverage.svg)
 [![License](https://img.shields.io/github/license/jgoy-labs/server-nexe)](LICENSE)
 
 **Version:** 0.8 — **Author:** Jordi Goy · [www.jgoy.net](https://www.jgoy.net)

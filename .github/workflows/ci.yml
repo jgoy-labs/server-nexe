@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main, pre-production]
+    paths-ignore:
+      - ".github/badges/**"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - ".github/badges/**"
 
 jobs:
   security-audit:
@@ -29,6 +33,8 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     needs: security-audit
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -81,6 +87,28 @@ jobs:
               f.write("## Coverage\\n\\n")
               f.write(summary + "\\n")
           PY
+
+      - name: Generate coverage badge (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: python .github/scripts/generate_coverage_badge.py coverage.xml .github/badges/coverage.svg
+
+      - name: Commit coverage badge (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- .github/badges/coverage.svg; then
+            echo "Coverage badge unchanged"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add .github/badges/coverage.svg
+          git commit -m "chore: update coverage badge"
+          git push
 
       - name: Upload coverage artifact
         if: always()
