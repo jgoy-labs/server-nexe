@@ -24,6 +24,7 @@ os.environ.setdefault("NEXE_LOG_LEVEL", "WARNING")
 os.environ.setdefault("NEXE_APPROVED_MODULES", "security,rag,memory,ollama_module,mlx_module,llama_cpp_module")
 os.environ.setdefault("NEXE_AUTOSTART_QDRANT", "false")
 os.environ.setdefault("NEXE_AUTOSTART_OLLAMA", "false")
+os.environ.setdefault("NEXE_AUTO_INGEST_KNOWLEDGE", "false")
 os.environ.setdefault("NEXE_QDRANT_HEALTH_TIMEOUT", "0.2")
 os.environ.setdefault("NEXE_OLLAMA_HEALTH_TIMEOUT", "0.2")
 

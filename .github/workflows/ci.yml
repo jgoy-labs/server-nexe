@@ -19,8 +19,8 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install dependencies
-        run: pip install pip-audit -r requirements.txt
+      - name: Install pip-audit
+        run: pip install pip-audit
 
       - name: Run pip-audit (CVE scan)
         run: pip-audit --requirement requirements.txt
@@ -41,9 +41,22 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run tests
+      - name: Run tests (with coverage)
         env:
           NEXE_ENV: testing
           NEXE_PRIMARY_API_KEY: test-key-for-ci
           NEXE_CSRF_SECRET: test-csrf-secret-for-ci
-        run: pytest core memory personality plugins -m "not integration and not e2e and not slow" --tb=short -q
+        run: >
+          pytest core memory personality plugins
+          -m "not integration and not e2e and not slow"
+          --cov=core --cov=memory --cov=personality --cov=plugins
+          --cov-report=term
+          --cov-report=xml:coverage.xml
+          --tb=short -q
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
