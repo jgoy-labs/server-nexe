@@ -22,6 +22,7 @@ expires: null
 **Version:** 0.8.0
 **Default port:** 9119
 **Author:** Jordi Goy
+**Collaboration:** Developed with AI tools assistance
 **License:** Apache 2.0
 
 ## What is NEXE?
@@ -54,7 +55,7 @@ NEXE **does not replace** Ollama, LM Studio or similar tools. In fact, it can us
 - **Persistent memory** system between conversations
 - Unified API to switch backends easily
 - Learning by building a complete system
-- [Future] Experimenting with Claude Code + local RAG integration
+- [Future] Experimenting with AI coding tools + local RAG integration
 
 ## Project status
 
@@ -85,7 +86,7 @@ NEXE **does not replace** Ollama, LM Studio or similar tools. In fact, it can us
 
 ### 🔨 What is in development or pending
 
-- **claude_code_module** (v0.9) - Experimental integration with Claude Code to use local RAG
+- **ai_code_module** (v0.9) - Experimental integration with AI coding tools
 - **LM Studio bridge** - Integration with LM Studio as an alternative backend
 - **Advanced Web UI** - The current UI is very basic
 - **Advanced document management** - Better indexing, metadata, etc.
@@ -229,8 +230,8 @@ Use local models for coding and experimentation without depending on external se
 ### 4. Experimentation with LLMs
 Try different models and backends, compare results, learn how they work.
 
-### 5. [Future experimental] Claude Code with RAG
-Once the claude_code_module is implemented, it will be possible to experiment with Claude Code using local memory.
+### 5. [Future experimental] AI Coding with RAG
+Once the ai_code_module is implemented, it will be possible to experiment with AI coding tools using local memory.
 
 ## Project philosophy
 
@@ -261,7 +262,7 @@ NEXE **does not try to compete** with ChatGPT, Claude, or other professional ass
 
 ### Functional
 - **Very basic Web UI** (not a priority right now)
-- **claude_code_module not yet implemented**
+- **ai_code_module not yet implemented**
 - **No multi-device sync**
 - **Simple document management** (no OCR, no advanced parsing)
 - **No model fine-tuning**
@@ -279,7 +280,7 @@ NEXE **does not try to compete** with ChatGPT, Claude, or other professional ass
 | Version | Goal | Status | Approx. date |
 |--------|----------|-------|-------------|
 | 0.8 | Base + RAG + 3 backends | ✅ | Completed |
-| 0.9 | claude_code_module experimental | 🔨 | February 2026 |
+| 0.9 | ai_code_module experimental | 🔨 | February 2026 |
 | 1.0 | Public demo, complete docs | 📅 | March 2026 |
 | 1.x | LM Studio, RAG improvements | 💡 | TBD |
 
