@@ -36,14 +36,17 @@ def cleanup_api_key_env(monkeypatch):
 
   yield
 
-  if original_admin:
-    os.environ["NEXE_ADMIN_API_KEY"] = original_admin
-  else:
-    os.environ.pop("NEXE_ADMIN_API_KEY", None)
+  def _restore(name: str, value: str | None) -> None:
+    if value is None:
+      os.environ.pop(name, None)
+    else:
+      os.environ[name] = value
 
-  os.environ.pop("NEXE_PRIMARY_API_KEY", None)
+  _restore("NEXE_ADMIN_API_KEY", original_admin)
+  _restore("NEXE_PRIMARY_API_KEY", original_primary)
+  _restore("NEXE_SECONDARY_API_KEY", original_secondary)
+
   os.environ.pop("NEXE_PRIMARY_KEY_EXPIRES", None)
-  os.environ.pop("NEXE_SECONDARY_API_KEY", None)
   os.environ.pop("NEXE_SECONDARY_KEY_EXPIRES", None)
 
 def test_parse_datetime_or_none_valid():

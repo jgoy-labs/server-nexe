@@ -77,7 +77,8 @@ class ModuleDiscovery:
       msg = get_message(self.i18n, 'discovery.starting')
       logger.info(msg, component="module_manager")
 
-    if os.getenv("NEXE_ENV") == "test" or os.getenv("PYTEST_CURRENT_TEST"):
+    nexe_env = (os.getenv("NEXE_ENV") or "").lower()
+    if nexe_env in ("test", "testing") or os.getenv("PYTEST_CURRENT_TEST"):
       force = True
 
     if not force and not self.path_discovery.load_cache():
