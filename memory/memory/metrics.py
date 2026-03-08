@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/metrics.py
-Description: Prometheus metrics for Memory Module (PHASE 13).
+Description: Prometheus metrics for Memory Module.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -21,8 +21,8 @@ class MemoryMetrics:
   """
   Prometheus-style metrics for Memory Module.
 
-  PHASE 13: Simple implementation with dicts
-  PHASE 14: Real integration with prometheus_client
+  Simple implementation with dicts.
+  Planned: Real integration with prometheus_client.
   """
 
   def __init__(self):

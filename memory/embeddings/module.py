@@ -40,7 +40,7 @@ class EmbeddingsModule:
   - Smart document chunking with section_title detection
   - Batch processing optimitzat
 
-  Features (PHASE 1 COMPLETED):
+  Features:
   ✅ AsyncEmbedder amb ThreadPool (P90 <120ms)
   ✅ CachedEmbedder amb MultiLevelCache (hit rate >80%)
   ✅ SmartChunker amb section_title detection

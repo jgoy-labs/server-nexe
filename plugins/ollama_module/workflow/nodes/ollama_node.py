@@ -74,7 +74,7 @@ def validate_ollama_prompt(prompt: str) -> None:
   """
   Validate prompt for injection attempts.
 
-  ✅ PHASE 2 SECURITY: Detects prompt injection patterns
+  Detects prompt injection patterns
 
   Args:
     prompt: User prompt to validate
@@ -99,7 +99,7 @@ def validate_ollama_model(model: str) -> None:
   """
   Validate model is in allowlist.
 
-  ✅ PHASE 2 SECURITY: Only allow approved models
+  Only allow approved models
 
   Args:
     model: Model name to validate
@@ -122,7 +122,7 @@ def sanitize_ollama_response(response: str) -> str:
   """
   Sanitize LLM response to prevent accidental secret leakage.
 
-  ✅ PHASE 2 SECURITY: Redact potential secrets from responses
+  Redact potential secrets from responses
 
   Args:
     response: Raw LLM response

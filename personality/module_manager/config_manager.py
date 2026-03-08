@@ -193,7 +193,7 @@ class ConfigManager:
     """
     Aplica configuració a un ModuleInfo.
 
-    M-2: Suporta dos formats de configuració:
+    Suporta dos formats de configuració:
     - FORMAT 1 (list): [plugins.modules] enabled = ["security", "security"]
     - FORMAT 2 (dict): [plugins.modules.security] enabled = true
 

@@ -98,7 +98,7 @@ def sanitize_log_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
   """
   Sanitize a log entry before writing.
 
-  ✅ PHASE 3 SECURITY: Apply all sanitization rules
+  Apply all sanitization rules
 
   Args:
     entry: Log entry dict

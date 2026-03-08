@@ -96,8 +96,11 @@ def main():
   port = server_config.get('port', 9119)
   workers = server_config.get('workers', 1)
   if workers > 1:
-    logger.warning("Multiple workers detected. Note that bootstrap tokens and rate-limits are currently in-memory and not shared across processes.")
-    # For IoT core, we might want to force 1, but let's just warn for now as requested.
+    logger.warning(
+      "Multiple workers detected. "
+      "Note that rate-limits are in-memory and not shared across processes. "
+      "Bootstrap tokens are shared via SQLite."
+    )
 
   reload = server_config.get('reload', False)
 
