@@ -580,17 +580,17 @@ Info for the Memory module.
 
 ---
 
-### Unimplemented endpoints (PHASE 15)
+### Unimplemented endpoints (coming soon)
 
 These endpoints exist but return **501 Not Implemented**:
 
 **Versioned API (future):**
-- `POST /v1/embeddings/encode` → PHASE 15
-- `GET /v1/embeddings/models` → PHASE 15
-- `GET /v1/documents/` → PHASE 15
-- `POST /v1/rag/search` → PHASE 15
-- `POST /v1/rag/add` → PHASE 15
-- `DELETE /v1/rag/documents/{id}` → PHASE 15
+- `POST /v1/embeddings/encode` → coming soon
+- `GET /v1/embeddings/models` → coming soon
+- `GET /v1/documents/` → coming soon
+- `POST /v1/rag/search` → coming soon
+- `POST /v1/rag/add` → coming soon
+- `DELETE /v1/rag/documents/{id}` → coming soon
 
 **Note:** The `/rag/*` endpoints (without /v1) **ARE functional** (see RAG section).
 
