@@ -45,7 +45,7 @@ class LlamaCppConfig:
     n_batch: int = 512  # IMPORTANT: més alt = més tok/s
     n_gpu_layers: int = -1
     n_threads: int = 8
-    max_sessions: int = 1  # Opció B: conservador, escalable si cal
+    max_sessions: int = 1  # Conservador per defecte; augmentar si hi ha múltiples usuaris
     chat_format: str = "chatml"  # chatml és compatible amb Phi-3.5, Llama 3, Salamandra
     use_mlock: bool = True
     use_mmap: bool = True

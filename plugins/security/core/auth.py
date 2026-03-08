@@ -21,8 +21,6 @@ from .auth_config import (
   load_api_keys,
   get_admin_api_key,
   is_dev_mode,
-  ADMIN_API_KEY,
-  DEV_MODE,
 )
 
 from .auth_dependencies import (
@@ -44,8 +42,6 @@ __all__ = [
   'load_api_keys',
   'get_admin_api_key',
   'is_dev_mode',
-  'ADMIN_API_KEY',
-  'DEV_MODE',
 
   'require_api_key',
   'optional_api_key',
