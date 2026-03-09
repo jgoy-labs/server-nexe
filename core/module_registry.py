@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy
 Location: core/module_registry.py
-Description: Registre simple de mòduls per instància i capacitats.
+Description: Simple module registry for instances and capabilities.
 
 www.jgoy.net
 ────────────────────────────────────
@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class ModuleRecord:
-  """Entrada de registre per a un mòdul carregat."""
+  """Registry entry for a loaded module."""
   name: str
   instance: Any
   module_id: Optional[str] = None
@@ -26,7 +26,7 @@ class ModuleRecord:
 
 class ModuleRegistry:
   """
-  Registre minimalista per accedir a mòduls per nom o capacitat.
+  Minimalist registry to access modules by name or capability.
   """
 
   def __init__(self) -> None:
