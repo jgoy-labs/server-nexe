@@ -19,7 +19,7 @@ Runs entirely on your machine — zero data sent to external services.
 ## Quick start
 
 ```bash
-python3 install_nexe.py   # guided installation
+./setup.sh                # guided installation
 ./nexe go                 # start server (port 9119)
 ./nexe chat               # interactive chat
 ./nexe chat --rag         # chat with RAG memory

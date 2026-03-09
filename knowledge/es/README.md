@@ -103,7 +103,7 @@ NEXE **no sustituye** a Ollama, LM Studio o similares. ¡De hecho, puede usar Ol
 
 ```bash
 cd server-nexe
-python3 install_nexe.py
+./setup.sh
 ```
 
 El instalador interactivo te guiará por:
