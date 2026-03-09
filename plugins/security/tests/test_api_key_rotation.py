@@ -12,6 +12,7 @@ www.jgoy.net
 
 import os
 import pytest
+from typing import Optional
 from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 
@@ -36,7 +37,7 @@ def cleanup_api_key_env(monkeypatch):
 
   yield
 
-  def _restore(name: str, value: str | None) -> None:
+  def _restore(name: str, value: Optional[str]) -> None:
     if value is None:
       os.environ.pop(name, None)
     else:
