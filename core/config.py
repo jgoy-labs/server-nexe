@@ -221,3 +221,10 @@ def get_config_path() -> Optional[Path]:
     if _config_path is None:
         get_config()  # Initialize
     return _config_path
+
+
+def reset_config() -> None:
+    """Reset the config singleton. Use only in tests."""
+    global _config, _config_path
+    _config = None
+    _config_path = None
