@@ -30,7 +30,7 @@ def _show_manual_instructions(model, engine):
         print(f"{t('to_download_ollama')}")
         print(f"  {CYAN}ollama pull {model['id']}{RESET}\n")
     elif engine == "llama_cpp":
-        print(f"Per descarregar el model GGUF:")
+        print(f"{t('download_gguf_instructions')}")
         print(f"  {CYAN}curl -L -o storage/models/{model['id'].split('/')[-1]} {model['id']}{RESET}\n")
     else:
         print(f"{t('to_download_mlx')}")
@@ -105,7 +105,7 @@ def _download_ollama_model(model_config):
     print(f"\n{BOLD}📦 {t('downloading_model')}{RESET}")
     print(f"   Model: {CYAN}{model_config['name']}{RESET}")
     print(f"   Ollama ID: {CYAN}{model_id}{RESET}")
-    print(f"   Motor: Ollama")
+    print(f"   {t('engine_ollama_label')}")
     print()
 
     print(f"{BOLD}{t('download_options')}{RESET}\n")
@@ -126,7 +126,7 @@ def _download_ollama_model(model_config):
                 time.sleep(3)
 
             print(f"\n{CYAN}[2/3]{RESET} {t('downloading_model_progress')}")
-            print(f"      {DIM}Executa: ollama pull {model_id}{RESET}\n")
+            print(f"      {DIM}ollama pull {model_id}{RESET}\n")
 
             process = subprocess.Popen(
                 ["ollama", "pull", model_id],
@@ -142,13 +142,13 @@ def _download_ollama_model(model_config):
             result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
             model_base = model_id.split(":")[0]
             if model_base in result.stdout or model_id in result.stdout:
-                print_success(f"Model {model_id} descarregat correctament!")
+                print_success(t('model_downloaded_ok').format(id=model_id))
             else:
-                print_warn(f"Model no trobat a 'ollama list'. Verifica manualment.")
-                print(f"  {DIM}Executa: ollama list{RESET}")
+                print_warn(t('model_not_in_list'))
+                print(f"  {DIM}{t('run_ollama_list')}{RESET}")
 
             print(f"\n{CYAN}[4/4]{RESET} {t('downloading_embeddings_step')}")
-            print(f"      {DIM}Executa: ollama pull nomic-embed-text{RESET}\n")
+            print(f"      {DIM}ollama pull nomic-embed-text{RESET}\n")
 
             embed_process = subprocess.Popen(
                 ["ollama", "pull", "nomic-embed-text"],
@@ -158,16 +158,16 @@ def _download_ollama_model(model_config):
             embed_return = embed_process.wait()
 
             if embed_return == 0:
-                print_success("Model d'embeddings (nomic-embed-text) descarregat!")
+                print_success(t('embeddings_downloaded'))
             else:
-                print_warn("No s'ha pogut descarregar nomic-embed-text. La memòria pot fallar.")
-                print(f"  {DIM}Executa manualment: ollama pull nomic-embed-text{RESET}")
+                print_warn(t('embeddings_failed'))
+                print(f"  {DIM}{t('embeddings_manual')}{RESET}")
 
         except subprocess.CalledProcessError as e:
             print_warn(f"{t('download_failed')} (code: {e.returncode})")
             _show_manual_instructions(model_config, "ollama")
         except FileNotFoundError:
-            print_warn("Ollama no trobat. Instal·la'l primer.")
+            print_warn(t('ollama_not_found'))
             _show_manual_instructions(model_config, "ollama")
     else:
         _show_manual_instructions(model_config, "ollama")
@@ -183,7 +183,7 @@ def _download_gguf_model(model_config, project_root):
 
     print(f"\n{BOLD}📦 {t('downloading_model')}{RESET}")
     print(f"   Model: {CYAN}{model_config['name']}{RESET}")
-    print(f"   Motor: llama.cpp (GGUF)")
+    print(f"   {t('engine_gguf_label')}")
     print()
 
     print(f"{BOLD}{t('download_options')}{RESET}\n")

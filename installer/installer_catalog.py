@@ -12,7 +12,7 @@ from .installer_display import (
 )
 from .installer_i18n import t, get_lang
 from .installer_hardware import get_recommended_size
-from .installer_catalog_data import MODEL_CATALOG, MODELS  # noqa: F401 (re-exported)
+from .installer_catalog_data import MODEL_CATALOG  # noqa: F401 (re-exported)
 
 
 def select_model(hw):
@@ -27,10 +27,10 @@ def select_model(hw):
     has_metal = hw["has_metal"]
 
     # Didactic explanation
-    print(f"\n{BOLD}🤖 SELECCIÓ DE MODEL D'IA{RESET}\n")
-    print(f"  {CYAN}La teva RAM:{RESET} {ram} GB")
-    print(f"  {CYAN}RAM disponible per IA:{RESET} ~{usable_ram} GB {DIM}(50-60% del total){RESET}")
-    print(f"  {DIM}La resta es reserva per macOS, navegador i altres apps.{RESET}")
+    print(f"\n{BOLD}🤖 {t('model_selection_title')}{RESET}\n")
+    print(f"  {CYAN}{t('your_ram')}:{RESET} {ram} GB")
+    print(f"  {CYAN}{t('ram_for_ai')}:{RESET} ~{usable_ram} GB {DIM}(50-60%){RESET}")
+    print(f"  {DIM}{t('ram_reserved_note')}{RESET}")
 
     # Determine recommended category based on RAM
     if usable_ram < 5:
@@ -84,7 +84,7 @@ def select_model(hw):
 
         # Status based on RAM
         if fits:
-            status = f"{GREEN}✓ Compatible{RESET}"
+            status = f"{GREEN}✓ {t('compatible')}{RESET}"
         else:
             status = f"{RED}{t('fits_tight')}{RESET}"
 
@@ -112,11 +112,11 @@ def select_model(hw):
     # Engine selection - show all available options
     available_engines = []
     if has_metal and selected_model.get("mlx"):
-        available_engines.append(("mlx", "MLX", "Optimitzat per Apple Silicon (GPU Metal)", True))
+        available_engines.append(("mlx", "MLX", t('engine_mlx_desc'), True))
     if selected_model.get("ollama"):
-        available_engines.append(("ollama", "Ollama", "Universal, fàcil d'usar", not has_metal))
+        available_engines.append(("ollama", "Ollama", t('engine_ollama_desc'), not has_metal))
     if selected_model.get("gguf"):
-        available_engines.append(("llama_cpp", "llama.cpp (GGUF)", "Execució local directa, sense dependències", False))
+        available_engines.append(("llama_cpp", "llama.cpp (GGUF)", t('engine_gguf_desc'), False))
 
     engine = "ollama"  # Default fallback
 
@@ -143,7 +143,7 @@ def select_model(hw):
             engine = available_engines[default_idx - 1][0]
     elif len(available_engines) == 1:
         engine = available_engines[0][0]
-        print(f"\n  {DIM}ℹ️  {selected_model['name']} s'executarà amb {available_engines[0][1]}{RESET}")
+        print(f"\n  {DIM}ℹ️  {t('will_run_with').format(name=selected_model['name'], engine=available_engines[0][1])}{RESET}")
 
     # Get model ID based on engine
     if engine == "mlx":

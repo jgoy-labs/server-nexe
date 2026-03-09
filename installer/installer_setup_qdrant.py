@@ -83,6 +83,9 @@ def download_qdrant(project_root, hw):
 
         with tarfile.open(tar_path, "r:gz") as tar:
             for member in tar.getmembers():
+                # Path traversal protection: reject members with '..' components
+                if '..' in member.name or member.name.startswith('/'):
+                    continue
                 if member.name == "qdrant" or member.name.endswith("/qdrant"):
                     member.name = "qdrant"
                     tar.extract(member, project_root)
