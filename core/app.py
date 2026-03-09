@@ -11,6 +11,7 @@ www.jgoy.net
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -63,11 +64,11 @@ def main():
   """
   _main()
 
-import os
-force_reload = os.getenv('NEXE_FORCE_RELOAD', 'false').lower() == 'true'
-app = create_app(force_reload=force_reload)
 
 __all__ = ['create_app', 'main', 'app']
+
+force_reload = os.getenv('NEXE_FORCE_RELOAD', 'false').lower() == 'true'
+app = create_app(force_reload=force_reload)
 
 if __name__ == '__main__':
   main()
