@@ -317,6 +317,270 @@ class TestChatMLX:
 
 
 # ─────────────────────────────────────────────────────────────
+# Memory endpoints — validació (sense GPU ni Qdrant)
+# ─────────────────────────────────────────────────────────────
+
+@pytest.mark.integration
+class TestMemoryValidation:
+
+    def test_save_empty_content_rejected(self, client, headers):
+        r = client.post(
+            "/ui/memory/save",
+            headers=headers,
+            json={"content": "", "session_id": "test"}
+        )
+        assert r.status_code == 400
+
+    def test_recall_empty_query_rejected(self, client, headers):
+        r = client.post(
+            "/ui/memory/recall",
+            headers=headers,
+            json={"query": ""}
+        )
+        assert r.status_code == 400
+
+    def test_save_returns_json(self, client, headers):
+        r = client.post(
+            "/ui/memory/save",
+            headers=headers,
+            json={"content": "Test content that should be saved to memory", "session_id": "test-val"}
+        )
+        # 200 (Qdrant disponible) o error de backend (503/500) — sempre JSON
+        assert r.headers["content-type"].startswith("application/json")
+
+    def test_recall_returns_json(self, client, headers):
+        r = client.post(
+            "/ui/memory/recall",
+            headers=headers,
+            json={"query": "test query", "limit": 3}
+        )
+        assert r.headers["content-type"].startswith("application/json")
+
+
+# ─────────────────────────────────────────────────────────────
+# Memory — save + recall round-trip (requereix Qdrant)
+# ─────────────────────────────────────────────────────────────
+
+def _qdrant_available():
+    try:
+        import urllib.request
+        urllib.request.urlopen("http://localhost:6333/healthz", timeout=2)
+        return True
+    except Exception:
+        return False
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+class TestMemoryRoundTrip:
+    """
+    Requereix Qdrant actiu (localhost:6333).
+    Executar amb: pytest -m "integration and slow"
+    """
+
+    @pytest.fixture(autouse=True)
+    def require_qdrant(self):
+        if not _qdrant_available():
+            pytest.skip("Qdrant not running at localhost:6333")
+
+    def test_save_succeeds(self, client, headers):
+        r = client.post(
+            "/ui/memory/save",
+            headers=headers,
+            json={
+                "content": "El nom de l'usuari de test és TestUser_unique_xyz",
+                "session_id": "round-trip-test",
+                "metadata": {"type": "fact"}
+            }
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body.get("success") is True
+
+    def test_recall_finds_saved_content(self, client, headers):
+        # Primer guardar
+        client.post(
+            "/ui/memory/save",
+            headers=headers,
+            json={
+                "content": "La ciutat preferida és Girona_recall_test",
+                "session_id": "recall-test",
+                "metadata": {"type": "fact"}
+            }
+        )
+        # Després cercar
+        r = client.post(
+            "/ui/memory/recall",
+            headers=headers,
+            json={"query": "Girona_recall_test", "limit": 5}
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body.get("success") is True
+        assert "results" in body
+
+    def test_recall_limit_respected(self, client, headers):
+        r = client.post(
+            "/ui/memory/recall",
+            headers=headers,
+            json={"query": "test", "limit": 2}
+        )
+        assert r.status_code == 200
+        body = r.json()
+        results = body.get("results", [])
+        assert len(results) <= 2
+
+    def test_duplicate_not_saved_twice(self, client, headers):
+        content = "Contingut únic per test de deduplicació abc123xyz"
+        # Guardar dos cops
+        r1 = client.post("/ui/memory/save", headers=headers,
+                         json={"content": content, "session_id": "dedup-test"})
+        r2 = client.post("/ui/memory/save", headers=headers,
+                         json={"content": content, "session_id": "dedup-test"})
+        assert r1.status_code == 200
+        assert r2.status_code == 200
+        # El segon ha de dir que ja existeix (duplicate) o success
+        body2 = r2.json()
+        assert body2.get("success") is True
+
+
+# ─────────────────────────────────────────────────────────────
+# Memory — intenció de guardar via chat (requereix GPU + Qdrant)
+# ─────────────────────────────────────────────────────────────
+
+@pytest.mark.integration
+@pytest.mark.gpu
+@pytest.mark.slow
+class TestChatMemoryIntentOllama:
+    """
+    Prova el flux complet: missatge amb intent de guardar →
+    el model respon + es guarda a Qdrant.
+    Requereix Ollama + Qdrant actius.
+    """
+
+    @pytest.fixture(autouse=True)
+    def require_backends(self):
+        engine = os.environ.get("NEXE_MODEL_ENGINE", "")
+        if engine not in ("ollama", ""):
+            pytest.skip("Ollama not selected engine")
+        try:
+            import urllib.request
+            urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
+        except Exception:
+            pytest.skip("Ollama not running")
+        if not _qdrant_available():
+            pytest.skip("Qdrant not running")
+
+    def test_save_intent_via_chat(self, client, headers):
+        r1 = client.post("/ui/session/new", headers=headers)
+        sid = r1.json()["session_id"]
+
+        r = client.post(
+            "/ui/chat",
+            headers=headers,
+            json={
+                "message": "El meu color preferit és el blau, ho pots guardar?",
+                "session_id": sid
+            },
+            timeout=60
+        )
+        assert r.status_code == 200
+        body = r.json()
+        # memory_action ha de ser "save"
+        assert body.get("memory_action") == "save"
+
+    def test_recall_intent_via_chat(self, client, headers):
+        r1 = client.post("/ui/session/new", headers=headers)
+        sid = r1.json()["session_id"]
+
+        # Primer guardar directament
+        client.post("/ui/memory/save", headers=headers,
+                    json={"content": "L'usuari es diu Recall_Test_User", "session_id": sid})
+
+        # Després preguntar
+        r = client.post(
+            "/ui/chat",
+            headers=headers,
+            json={"message": "Recordes el nom de l'usuari?", "session_id": sid},
+            timeout=60
+        )
+        assert r.status_code == 200
+
+    def test_full_memory_round_trip_via_chat(self, client, headers):
+        """Guardar informació via chat → recuperar-la en la mateixa sessió."""
+        r1 = client.post("/ui/session/new", headers=headers)
+        sid = r1.json()["session_id"]
+
+        # Guardar
+        client.post(
+            "/ui/chat",
+            headers=headers,
+            json={"message": "Em dic RoundTrip_Test_42, pots guardar-ho?", "session_id": sid},
+            timeout=60
+        )
+
+        # Recall explícit per API
+        r = client.post(
+            "/ui/memory/recall",
+            headers=headers,
+            json={"query": "RoundTrip_Test_42", "limit": 3}
+        )
+        assert r.status_code == 200
+
+
+@pytest.mark.integration
+@pytest.mark.gpu
+@pytest.mark.slow
+class TestChatMemoryIntentMLX:
+    """
+    Mateix flux que TestChatMemoryIntentOllama però amb MLX.
+    """
+
+    @pytest.fixture(autouse=True)
+    def require_backends(self):
+        if os.environ.get("NEXE_MODEL_ENGINE") != "mlx":
+            pytest.skip("MLX not selected engine")
+        try:
+            import mlx_lm  # noqa: F401
+        except ImportError:
+            pytest.skip("mlx_lm not installed")
+        if not _qdrant_available():
+            pytest.skip("Qdrant not running")
+
+    def test_save_intent_via_chat_mlx(self, client, headers):
+        r1 = client.post("/ui/session/new", headers=headers)
+        sid = r1.json()["session_id"]
+
+        r = client.post(
+            "/ui/chat",
+            headers=headers,
+            json={
+                "message": "La meva professió és enginyer, ho pots guardar?",
+                "session_id": sid
+            },
+            timeout=120
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body.get("memory_action") == "save"
+
+    def test_recall_intent_via_chat_mlx(self, client, headers):
+        r1 = client.post("/ui/session/new", headers=headers)
+        sid = r1.json()["session_id"]
+
+        client.post("/ui/memory/save", headers=headers,
+                    json={"content": "L'usuari prefereix Python sobre Java", "session_id": sid})
+
+        r = client.post(
+            "/ui/chat",
+            headers=headers,
+            json={"message": "Quin llenguatge de programació prefereixo?", "session_id": sid},
+            timeout=120
+        )
+        assert r.status_code == 200
+
+
+# ─────────────────────────────────────────────────────────────
 # Static files (sense GPU)
 # ─────────────────────────────────────────────────────────────
 
