@@ -45,3 +45,4 @@ personality/.module_cache.json
 plugins/web_ui_module/static/uploads/
 snapshots/
 dev-tools/run_all_day.sh
+dev-tools/logs/
