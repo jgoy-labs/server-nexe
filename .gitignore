@@ -44,3 +44,4 @@ personality/.module_cache.json
 # User-uploaded files (mai al repo — poden contenir dades personals)
 plugins/web_ui_module/static/uploads/
 snapshots/
+dev-tools/run_all_day.sh
