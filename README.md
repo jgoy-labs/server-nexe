@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/jgoy-labs/server-nexe/actions/workflows/ci.yml/badge.svg)](https://github.com/jgoy-labs/server-nexe/actions/workflows/ci.yml)
 ![Coverage](.github/badges/coverage.svg)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.128-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Qdrant](https://img.shields.io/badge/Qdrant-vector--db-dc244c?logo=qdrant&logoColor=white)](https://qdrant.tech)
@@ -52,7 +52,7 @@ Full documentation is in the `knowledge/` directory:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache 2.0 — see [LICENSE](LICENSE).
 
 ## Contributing
 
