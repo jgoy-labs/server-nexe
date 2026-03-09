@@ -2,7 +2,14 @@
 
 [![CI](https://github.com/jgoy-labs/server-nexe/actions/workflows/ci.yml/badge.svg)](https://github.com/jgoy-labs/server-nexe/actions/workflows/ci.yml)
 ![Coverage](.github/badges/coverage.svg)
-[![License](https://img.shields.io/github/license/jgoy-labs/server-nexe)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.128-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Qdrant](https://img.shields.io/badge/Qdrant-vector--db-dc244c?logo=qdrant&logoColor=white)](https://qdrant.tech)
+[![MLX](https://img.shields.io/badge/MLX-Apple%20Silicon-000000?logo=apple&logoColor=white)](https://github.com/ml-explore/mlx)
+[![Ollama](https://img.shields.io/badge/Ollama-compatible-black?logo=ollama&logoColor=white)](https://ollama.com)
+[![llama.cpp](https://img.shields.io/badge/llama.cpp-GGUF-8B5CF6)](https://github.com/ggerganov/llama.cpp)
+[![RAG](https://img.shields.io/badge/RAG-local%20%7C%20private-22c55e)](https://github.com/jgoy-labs/server-nexe)
 
 **Version:** 0.8 — **Author:** Jordi Goy · [www.jgoy.net](https://www.jgoy.net)
 
