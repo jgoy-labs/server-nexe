@@ -7,6 +7,7 @@ Description: Installer orchestrator — coordinates all installation steps.
 """
 
 import os
+import shutil
 import sys
 import subprocess
 import time
@@ -51,15 +52,13 @@ def run_installer():
     # 3.5. Clean existing venv to avoid conflicts
     venv_path = project_root / "venv"
     if venv_path.exists():
-        print(f"\n{YELLOW}[CLEAN]{RESET} Venv existent detectat. Esborrant per instal·lació neta...")
-        import shutil
+        print(f"\n{YELLOW}[CLEAN]{RESET} {t('cleaning_venv')}")
         shutil.rmtree(venv_path)
-        print(f"{GREEN}[OK]{RESET} Venv eliminat correctament.")
+        print(f"{GREEN}[OK]{RESET} {t('venv_removed')}")
 
     storage_path = project_root / "storage"
     if storage_path.exists():
         print(f"\n{YELLOW}[CLEAN]{RESET} {t('cleaning_storage')}")
-        import shutil
         shutil.rmtree(storage_path)
         print(f"{GREEN}[OK]{RESET} {t('storage_removed')}")
 
@@ -204,13 +203,13 @@ def run_installer():
         print(f"     {DIM}{t('symlink_manual')}{RESET}")
         print(f"     {CYAN}export PATH=\"$PATH:{project_root}\"{RESET}\n")
     except Exception as e:
-        print(f"  {DIM}Symlink no creat ({str(e)[:50]}), usa './nexe' des de {project_root}{RESET}")
+        print(f"  {DIM}{t('symlink_not_created').format(error=str(e)[:50], path=project_root)}{RESET}")
 
     # 13. Create knowledge folder and inform user
     print_step(f"{BOLD}{t('knowledge_folder_created')}{RESET}")
     knowledge_dir = project_root / "knowledge"
     knowledge_dir.mkdir(exist_ok=True)
-    print(f"  ✅ Carpeta 'knowledge/' creada")
+    print(f"  ✅ {t('knowledge_dir_created')}")
     print(f"  {DIM}{t('knowledge_explanation')}{RESET}")
 
     # 14. Download embedding model (with explanation and permission)
@@ -292,19 +291,19 @@ def run_installer():
             qdrant_process.wait(timeout=5)
 
         except subprocess.TimeoutExpired:
-            print(f"  {YELLOW}⚠️  Ingesta massa lenta (>5min). Es farà al primer inici.{RESET}")
+            print(f"  {YELLOW}⚠️  {t('ingest_timeout')}{RESET}")
             if 'qdrant_process' in locals():
                 qdrant_process.terminate()
         except Exception as e:
-            print(f"  {YELLOW}⚠️  Error processant documents: {str(e)[:200]}{RESET}")
-            print(f"  {DIM}Es processaran automàticament al primer inici del servidor{RESET}")
+            print(f"  {YELLOW}⚠️  {t('ingest_error').format(error=str(e)[:200])}{RESET}")
+            print(f"  {DIM}{t('ingest_auto_first_start')}{RESET}")
             if 'qdrant_process' in locals():
                 try:
                     qdrant_process.terminate()
                 except Exception:
                     pass
     else:
-        print(f"  {DIM}📝 No hi ha documents a knowledge/ (es poden afegir més tard){RESET}")
+        print(f"  {DIM}📝 {t('no_knowledge_docs')}{RESET}")
 
     # 16. Final summary
     show_final_summary(model_config, project_root, global_symlink_created, lang)
