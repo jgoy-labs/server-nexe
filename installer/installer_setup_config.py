@@ -1,0 +1,169 @@
+"""
+────────────────────────────────────
+Server Nexe
+Location: installer/installer_setup_config.py
+Description: .env file generation and model configuration update.
+────────────────────────────────────
+"""
+
+from .installer_display import (
+    DIM, BOLD, RESET,
+    print_step, print_success,
+)
+from .installer_i18n import t, get_lang
+
+
+def generate_env_file(project_root, model_config):
+    """Generate .env file with security and model config.
+
+    Security: API key is NOT printed to stdout to prevent exposure
+    in CI/CD logs or shared terminal sessions.
+    """
+    print_step(f"{BOLD}{t('generating_security')}{RESET}")
+    print(f"  {DIM}{t('security_explanation')}{RESET}")
+    import secrets
+    import stat
+    secure_key = secrets.token_hex(32)
+    env_file = project_root / ".env"
+
+    if not env_file.exists():
+        csrf_secret = secrets.token_hex(32)
+        lang = get_lang()
+        with open(env_file, "w") as f:
+            f.write(f"NEXE_PRIMARY_API_KEY={secure_key}\n")
+            f.write(f"NEXE_CSRF_SECRET={csrf_secret}\n")
+            f.write(f"NEXE_ENV=production\n")
+            f.write(f"NEXE_LOG_LEVEL=INFO\n")
+            f.write(f"NEXE_APPROVED_MODULES=security,llama_cpp_module,mlx_module,ollama_module,web_ui_module\n")
+            f.write(f"NEXE_LANG={lang}\n")
+            f.write(f"# Model configuration\n")
+            f.write(f"NEXE_DEFAULT_MODEL={model_config['id']}\n")
+            f.write(f"NEXE_MODEL_ENGINE={model_config['engine']}\n")
+            f.write(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
+            # Engine-specific model paths (using relative paths for portability)
+            if model_config['engine'] == 'mlx':
+                model_name = model_config['id'].split('/')[-1]
+                f.write(f"NEXE_MLX_MODEL=storage/models/{model_name}\n")
+            elif model_config['engine'] == 'llama_cpp':
+                # GGUF models are downloaded as single files
+                filename = model_config['id'].split('/')[-1]
+                f.write(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
+                f.write(f"NEXE_LLAMA_CPP_CHAT_FORMAT={model_config.get('chat_format', 'chatml')}\n")
+            elif model_config['engine'] == 'ollama':
+                f.write(f"NEXE_OLLAMA_MODEL={model_config['id']}\n")
+            f.write("NEXE_QDRANT_HOST=localhost\n")
+            f.write("NEXE_QDRANT_PORT=6333\n")
+            f.write("# Configurable timeouts (seconds)\n")
+            f.write("NEXE_QDRANT_TIMEOUT=5.0\n")
+            f.write("NEXE_SQLITE_PRELOAD_TIMEOUT=10.0\n")
+            f.write("NEXE_OLLAMA_HEALTH_TIMEOUT=5.0\n")
+            f.write("NEXE_OLLAMA_UNLOAD_TIMEOUT=10.0\n")
+
+        # Set restrictive permissions (owner read/write only)
+        env_file.chmod(stat.S_IRUSR | stat.S_IWUSR)  # chmod 600
+
+        print_success(t('env_created'))
+        print(f"  🔑 {t('api_key')}: {DIM}[hidden - see .env file]{RESET}")
+        print(f"  🔒 {t('saved_at')} {env_file} (chmod 600)")
+    else:
+        # Update existing .env with model configuration
+        _update_env_model_config(env_file, model_config)
+        print_success(t('env_exists'))
+
+
+def _update_env_model_config(env_file, model_config):
+    """Update model configuration in existing .env file."""
+    import secrets
+
+    # Read existing content
+    with open(env_file, 'r') as f:
+        lines = f.readlines()
+
+    # Track which keys we need to update/add
+    model_id = model_config['id']
+    model_engine = model_config['engine']
+    found_model = False
+    found_engine = False
+    found_csrf = False
+    found_mlx_model = False
+    found_llama_cpp_model = False
+    found_llama_cpp_chat_format = False
+    found_prompt_tier = False
+    found_ollama_model = False
+    new_lines = []
+
+    for line in lines:
+        if line.startswith('NEXE_DEFAULT_MODEL='):
+            new_lines.append(f"NEXE_DEFAULT_MODEL={model_id}\n")
+            found_model = True
+        elif line.startswith('NEXE_MODEL_ENGINE='):
+            new_lines.append(f"NEXE_MODEL_ENGINE={model_engine}\n")
+            found_engine = True
+        elif line.startswith('NEXE_CSRF_SECRET='):
+            found_csrf = True
+            new_lines.append(line)
+        elif line.startswith('NEXE_MLX_MODEL='):
+            found_mlx_model = True
+            if model_engine == 'mlx':
+                model_name = model_id.split('/')[-1]
+                new_lines.append(f"NEXE_MLX_MODEL=storage/models/{model_name}\n")
+            else:
+                new_lines.append(line)
+        elif line.startswith('NEXE_LLAMA_CPP_MODEL='):
+            found_llama_cpp_model = True
+            if model_engine == 'llama_cpp':
+                filename = model_id.split('/')[-1]
+                new_lines.append(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
+            else:
+                new_lines.append(line)
+        elif line.startswith('NEXE_LLAMA_CPP_CHAT_FORMAT='):
+            found_llama_cpp_chat_format = True
+            if model_engine == 'llama_cpp':
+                chat_fmt = model_config.get('chat_format', 'chatml')
+                new_lines.append(f"NEXE_LLAMA_CPP_CHAT_FORMAT={chat_fmt}\n")
+            else:
+                new_lines.append(line)
+        elif line.startswith('NEXE_PROMPT_TIER='):
+            found_prompt_tier = True
+            new_lines.append(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
+        elif line.startswith('NEXE_OLLAMA_MODEL='):
+            found_ollama_model = True
+            if model_engine == 'ollama':
+                new_lines.append(f"NEXE_OLLAMA_MODEL={model_id}\n")
+            else:
+                new_lines.append(line)
+        else:
+            new_lines.append(line)
+
+    # Add missing keys at the end
+    if new_lines and not new_lines[-1].endswith('\n'):
+        new_lines.append('\n')
+
+    if not found_csrf:
+        new_lines.append(f"NEXE_CSRF_SECRET={secrets.token_hex(32)}\n")
+
+    if not any('# Model configuration' in l for l in new_lines):
+        new_lines.append("# Model configuration\n")
+    if not found_model:
+        new_lines.append(f"NEXE_DEFAULT_MODEL={model_id}\n")
+    if not found_engine:
+        new_lines.append(f"NEXE_MODEL_ENGINE={model_engine}\n")
+    if not found_mlx_model and model_engine == 'mlx':
+        model_name = model_id.split('/')[-1]
+        new_lines.append(f"NEXE_MLX_MODEL=storage/models/{model_name}\n")
+    if not found_llama_cpp_model and model_engine == 'llama_cpp':
+        filename = model_id.split('/')[-1]
+        new_lines.append(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
+    if not found_llama_cpp_chat_format and model_engine == 'llama_cpp':
+        chat_fmt = model_config.get('chat_format', 'chatml')
+        new_lines.append(f"NEXE_LLAMA_CPP_CHAT_FORMAT={chat_fmt}\n")
+    if not found_prompt_tier:
+        new_lines.append(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
+    if not found_ollama_model and model_engine == 'ollama':
+        new_lines.append(f"NEXE_OLLAMA_MODEL={model_id}\n")
+
+    # Write back
+    with open(env_file, 'w') as f:
+        f.writelines(new_lines)
+
+    print(f"  📝 {t('model_selected')}: {model_id} ({model_engine})")
