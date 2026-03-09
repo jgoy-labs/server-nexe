@@ -145,7 +145,7 @@ This script:
 
 ```bash
 cd server-nexe
-python3 install_nexe.py
+./setup.sh
 ```
 
 ⚠️ **Note:** If you have a previous installation, use `./setup.sh` to ensure proper cleanup.
@@ -784,7 +784,7 @@ Now that you have NEXE installed:
    - `/metrics` → Prometheus text (JSON at `/metrics/json`)
 
 4. **✅ Updated CLI**
-   - Recommend `./setup.sh` (not `python3 install_nexe.py`)
+   - Recommend `./setup.sh` (not `./setup.sh`)
    - `./nexe memory search` → `./nexe memory recall`
    - REMOVED: `./nexe stop`, `./nexe restart` (do not exist)
 

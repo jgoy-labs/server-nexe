@@ -103,7 +103,7 @@ NEXE **no substitueix** Ollama, LM Studio o similars. De fet, pot usar Ollama co
 
 ```bash
 cd server-nexe
-python3 install_nexe.py
+./setup.sh
 ```
 
 L'instal·lador interactiu et guiarà per:
