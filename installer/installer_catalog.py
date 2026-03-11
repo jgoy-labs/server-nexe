@@ -145,6 +145,14 @@ def select_model(hw):
         engine = available_engines[0][0]
         print(f"\n  {DIM}ℹ️  {t('will_run_with').format(name=selected_model['name'], engine=available_engines[0][1])}{RESET}")
 
+    # Warn about pip dependency conflict for Qwen3.5 + MLX
+    if engine == "mlx" and selected_model.get("mlx") and "Qwen3.5" in selected_model.get("mlx", ""):
+        print(f"\n{YELLOW}{'─'*60}{RESET}")
+        print(f"{YELLOW}{BOLD}{t('mlx_dep_warning_title')}{RESET}")
+        print(f"{DIM}{t('mlx_dep_warning_body')}{RESET}")
+        print(f"{YELLOW}{'─'*60}{RESET}\n")
+        input(f"{DIM}[{t('press_enter')}]{RESET}")
+
     # Get model ID based on engine
     if engine == "mlx":
         model_id = selected_model["mlx"]

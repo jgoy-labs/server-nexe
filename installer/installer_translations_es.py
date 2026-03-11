@@ -172,6 +172,8 @@ ES = {
     "laptop_warning": "Si tienes un portátil:",
     "knowledge_folder_created": "Preparando carpeta de conocimiento (RAG)...",
     "knowledge_explanation": "Aquí puedes poner tus documentos (.txt, .md, .pdf) y la IA los leerá.\nPor defecto, contiene la documentación del propio sistema.\nTambién puedes cambiar el prompt de la IA editando 'personality/server.toml'\n\n⚠️  Los documentos deben tener una cabecera RAG al principio:\n\n    # === METADATA RAG ===\n    abstract: \"Descripción breve del documento\"\n    tags: [etiqueta1, etiqueta2]\n    ---\n\nSin cabecera, el documento NO se indexará en el RAG.",
+    "mlx_dep_warning_title": "ℹ️  Nota sobre dependencias",
+    "mlx_dep_warning_body": "Este modelo requiere mlx-lm 0.30.7+ que utiliza transformers 5.x.\nDurante la instalación verás un aviso de pip (en rojo) sobre un conflicto\nde versiones con sentence-transformers. Es un aviso cosmético: el sistema\nfunciona correctamente con todas las capacidades activas.",
     "model_sizes_title": "📦 TAMAÑO DE MODELOS",
     "model_small_desc": "Modelos pequeños (8GB RAM) - Rápidos, menos calidad",
     "model_medium_desc": "Modelos medianos (16GB RAM) - Equilibrados",
