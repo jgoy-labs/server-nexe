@@ -28,8 +28,6 @@ psutil==5.9.8
 huggingface_hub==0.36.2
 
 # --- Memory & RAG ---
-# Note: pip reports a conflict with transformers>=5 (required by mlx-lm), but
-# sentence-transformers works correctly at runtime with transformers 5.x.
 sentence-transformers==2.7.0
 pypdf==6.7.5  # PDF support for knowledge ingestion (security fixes)
 
