@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexe — Arquitectura</title>
+    <link rel="stylesheet" href="/ui/static/style.css">
+    <style>
+        body {
+            background: var(--bg-primary, #0d1117);
+            color: var(--text-primary, #e6edf3);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        .arch-container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 48px 24px;
+        }
+        .arch-header {
+            margin-bottom: 40px;
+        }
+        .arch-header a {
+            color: var(--accent, #58a6ff);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .arch-header a:hover { text-decoration: underline; }
+        .arch-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 16px 0 8px;
+            color: var(--text-primary, #e6edf3);
+        }
+        .arch-header p {
+            color: var(--text-secondary, #8b949e);
+            font-size: 1rem;
+            margin: 0;
+        }
+        .arch-version {
+            display: inline-block;
+            background: rgba(88, 166, 255, 0.1);
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            color: #58a6ff;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        /* Diagram */
+        .arch-diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            margin: 40px 0;
+        }
+        .arch-layer {
+            width: 100%;
+            max-width: 600px;
+            border: 1.5px solid;
+            border-radius: 10px;
+            padding: 20px 28px;
+            text-align: center;
+            position: relative;
+        }
+        .arch-layer h3 {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin: 0 0 8px;
+        }
+        .arch-layer p {
+            font-size: 0.85rem;
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        /* Layer colors */
+        .layer-interfaces  { border-color: #58a6ff; background: rgba(88,166,255,0.06); }
+        .layer-interfaces h3 { color: #58a6ff; }
+        .layer-interfaces p  { color: #8ab4f8; }
+
+        .layer-core        { border-color: #3fb950; background: rgba(63,185,80,0.06); }
+        .layer-core h3     { color: #3fb950; }
+        .layer-core p      { color: #6dba7a; }
+
+        .layer-plugins     { border-color: #d29922; background: rgba(210,153,34,0.06); }
+        .layer-plugins h3  { color: #d29922; }
+        .layer-plugins p   { color: #c9a227; }
+
+        .layer-services    { border-color: #bc8cff; background: rgba(188,140,255,0.06); }
+        .layer-services h3 { color: #bc8cff; }
+        .layer-services p  { color: #b09ada; }
+
+        .layer-storage     { border-color: #ff7b72; background: rgba(255,123,114,0.06); }
+        .layer-storage h3  { color: #ff7b72; }
+        .layer-storage p   { color: #f47067; }
+
+        /* Arrows */
+        .arch-arrow {
+            width: 2px;
+            height: 32px;
+            background: var(--border, #30363d);
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .arch-arrow::after {
+            content: '▼';
+            font-size: 10px;
+            color: var(--text-secondary, #8b949e);
+            position: absolute;
+            bottom: -2px;
+        }
+
+        /* Sections */
+        .arch-sections {
+            margin-top: 56px;
+        }
+        .arch-sections h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary, #e6edf3);
+            border-bottom: 1px solid var(--border, #30363d);
+            padding-bottom: 10px;
+            margin: 40px 0 16px;
+        }
+        .arch-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 12px;
+        }
+        .arch-card {
+            background: var(--bg-secondary, #161b22);
+            border: 1px solid var(--border, #30363d);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .arch-card h4 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin: 0 0 6px;
+            color: var(--text-primary, #e6edf3);
+        }
+        .arch-card p {
+            font-size: 0.8rem;
+            color: var(--text-secondary, #8b949e);
+            margin: 0;
+            line-height: 1.5;
+        }
+        .tag {
+            display: inline-block;
+            background: rgba(88,166,255,0.12);
+            color: #58a6ff;
+            font-size: 0.72rem;
+            padding: 1px 8px;
+            border-radius: 10px;
+            margin-right: 4px;
+            margin-bottom: 4px;
+        }
+        .tag.green  { background: rgba(63,185,80,0.12); color: #3fb950; }
+        .tag.yellow { background: rgba(210,153,34,0.12); color: #d29922; }
+        .tag.purple { background: rgba(188,140,255,0.12); color: #bc8cff; }
+        .tag.red    { background: rgba(255,123,114,0.12); color: #ff7b72; }
+
+        code {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.82em;
+            background: rgba(255,255,255,0.06);
+            padding: 1px 5px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+<div class="arch-container">
+
+    <div class="arch-header">
+        <a href="/ui/">← Tornar al xat</a>
+        <h1>Arquitectura <span class="arch-version">v0.8</span></h1>
+        <p>Disseny intern de Nexe — 5 capes modulars, API-first, RAG natiu.</p>
+    </div>
+
+    <!-- Diagram -->
+    <div class="arch-diagram">
+
+        <div class="arch-layer layer-interfaces">
+            <h3>Interfícies</h3>
+            <p>CLI <code>./nexe</code> &nbsp;│&nbsp; API REST &nbsp;│&nbsp; Web UI</p>
+        </div>
+
+        <div class="arch-arrow"></div>
+
+        <div class="arch-layer layer-core">
+            <h3>Core</h3>
+            <p>FastAPI &nbsp;│&nbsp; Endpoints &nbsp;│&nbsp; Middleware &nbsp;│&nbsp; Lifespan</p>
+        </div>
+
+        <div class="arch-arrow"></div>
+
+        <div class="arch-layer layer-plugins">
+            <h3>Plugins</h3>
+            <p>MLX &nbsp;│&nbsp; llama.cpp &nbsp;│&nbsp; Ollama &nbsp;│&nbsp; Security &nbsp;│&nbsp; Web UI</p>
+        </div>
+
+        <div class="arch-arrow"></div>
+
+        <div class="arch-layer layer-services">
+            <h3>Serveis Base</h3>
+            <p>Memory (RAG) &nbsp;│&nbsp; Qdrant &nbsp;│&nbsp; Embeddings &nbsp;│&nbsp; SQLite</p>
+        </div>
+
+        <div class="arch-arrow"></div>
+
+        <div class="arch-layer layer-storage">
+            <h3>Storage</h3>
+            <p><code>models/</code> &nbsp;│&nbsp; <code>qdrant/</code> &nbsp;│&nbsp; <code>vectors/</code> &nbsp;│&nbsp; <code>logs/</code> &nbsp;│&nbsp; <code>cache/</code></p>
+        </div>
+
+    </div>
+
+    <!-- Detail sections -->
+    <div class="arch-sections">
+
+        <h2>Capa 1 — Interfícies</h2>
+        <div class="arch-grid">
+            <div class="arch-card">
+                <h4>CLI <code>./nexe</code></h4>
+                <p>Comandes per iniciar, aturar, descarregar models i veure logs. Wrapper sobre uvicorn.</p>
+                <span class="tag">click</span>
+            </div>
+            <div class="arch-card">
+                <h4>API REST</h4>
+                <p>Endpoints OpenAI-compatibles al port 9119. Autenticació via Bearer token.</p>
+                <span class="tag">/v1/chat/completions</span>
+            </div>
+            <div class="arch-card">
+                <h4>Web UI</h4>
+                <p>Interfície de xat al navegador. Streaming, sessions, upload de documents.</p>
+                <span class="tag">/ui/</span>
+            </div>
+        </div>
+
+        <h2>Capa 2 — Core</h2>
+        <div class="arch-grid">
+            <div class="arch-card">
+                <h4>App Factory</h4>
+                <p>Singleton thread-safe. Fases: i18n → FastAPI → state → security → modules → routers.</p>
+                <span class="tag green">core/server/factory.py</span>
+            </div>
+            <div class="arch-card">
+                <h4>Lifespan</h4>
+                <p>Startup/shutdown dels mòduls, Qdrant, ingesta de coneixement.</p>
+                <span class="tag green">core/lifespan.py</span>
+            </div>
+            <div class="arch-card">
+                <h4>Middleware</h4>
+                <p>Rate limiting (slowapi), CSRF, security headers, circuit breakers.</p>
+                <span class="tag green">core/security_headers.py</span>
+            </div>
+        </div>
+
+        <h2>Capa 3 — Plugins</h2>
+        <div class="arch-grid">
+            <div class="arch-card">
+                <h4>mlx_module</h4>
+                <p>Inferència nativa Apple Silicon via mlx-lm. Alta velocitat sense GPU discreta.</p>
+                <span class="tag yellow">macOS M-series</span>
+            </div>
+            <div class="arch-card">
+                <h4>ollama_module</h4>
+                <p>Connector cap a Ollama local. Motor predeterminat multiplataforma.</p>
+                <span class="tag yellow">Ollama</span>
+            </div>
+            <div class="arch-card">
+                <h4>llama_cpp_module</h4>
+                <p>Inferència GGUF via llama-cpp-python. Compatible amb qualsevol CPU/GPU.</p>
+                <span class="tag yellow">GGUF</span>
+            </div>
+            <div class="arch-card">
+                <h4>security</h4>
+                <p>Gestió d'API keys, autenticació, whitelist d'IPs, audit log.</p>
+                <span class="tag yellow">Auth</span>
+            </div>
+        </div>
+
+        <h2>Capa 4 — Serveis Base</h2>
+        <div class="arch-grid">
+            <div class="arch-card">
+                <h4>RAG (Retrieval)</h4>
+                <p>Cerca semàntica al vector store. Alimenta el context del model amb memòria rellevant.</p>
+                <span class="tag purple">memory/rag/</span>
+            </div>
+            <div class="arch-card">
+                <h4>Embeddings</h4>
+                <p>Genera vectors amb <code>all-MiniLM-L6-v2</code>. S'indexen a Qdrant.</p>
+                <span class="tag purple">sentence-transformers</span>
+            </div>
+            <div class="arch-card">
+                <h4>Qdrant</h4>
+                <p>Base de dades vectorial local. Persist a <code>storage/qdrant/</code>.</p>
+                <span class="tag purple">Vector DB</span>
+            </div>
+        </div>
+
+        <h2>Capa 5 — Storage</h2>
+        <div class="arch-grid">
+            <div class="arch-card">
+                <h4><code>storage/models/</code></h4>
+                <p>Models MLX descarregats des de Hugging Face. <strong>Es perden si esborres el directori.</strong></p>
+                <span class="tag red">MLX</span>
+            </div>
+            <div class="arch-card">
+                <h4><code>storage/qdrant/</code></h4>
+                <p>Persistència del vector store. Conté tots els embeddings indexats.</p>
+                <span class="tag red">Vectors</span>
+            </div>
+            <div class="arch-card">
+                <h4><code>storage/logs/</code></h4>
+                <p>Logs del servidor, accés i errors. Rotació automàtica.</p>
+                <span class="tag red">Logs</span>
+            </div>
+            <div class="arch-card">
+                <h4><code>storage/cache/</code></h4>
+                <p>Cache de models i tokens. Accelera les càrregues successives.</p>
+                <span class="tag red">Cache</span>
+            </div>
+        </div>
+
+    </div>
+</div>
+</body>
+</html>
