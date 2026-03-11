@@ -439,9 +439,10 @@ pip install mlx mlx-lm
 
 **Models MLX:**
 - Es descarreguen automàticament de HuggingFace
-- Es guarden a `storage/models/` (NO `~/.cache/huggingface/`)
+- Es guarden a `storage/models/` dins el directori de `server-nexe` (NO a `~/.cache/huggingface/`)
 - Format: Checkpoint natius MLX (no GGUF)
 - L'instal·lador usa `snapshot_download(local_dir=storage/models/...)`
+- ⚠️ **Important:** `storage/` és gitignored però és **dins** `server-nexe`. Si esborres i tornes a clonar el repositori, els models es perden. Conserva la carpeta `storage/` per no haver de tornar a descarregar.
 
 ### Backend llama.cpp
 
