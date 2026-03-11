@@ -171,7 +171,7 @@ EN = {
     "download_failed_resume": "⚠️  Download interrupted. Run the installer again to resume.",
     "laptop_warning": "If you have a laptop:",
     "knowledge_folder_created": "Preparing knowledge folder (RAG)...",
-    "knowledge_explanation": "Here you can put your documents (.txt, .md, .pdf) and the AI will read them.\nBy default, it contains the system's own documentation.\nYou can also change the AI prompt by editing 'personality/server.toml'",
+    "knowledge_explanation": "Here you can put your documents (.txt, .md, .pdf) and the AI will read them.\nBy default, it contains the system's own documentation.\nYou can also change the AI prompt by editing 'personality/server.toml'\n\n⚠️  Documents must include a RAG header at the top:\n\n    # === METADATA RAG ===\n    abstract: \"Brief description of the document\"\n    tags: [tag1, tag2]\n    ---\n\nWithout a header, the document will NOT be indexed in RAG.",
     "model_sizes_title": "📦 MODEL SIZE",
     "model_small_desc": "Small models (8GB RAM) - Fast, less quality",
     "model_medium_desc": "Medium models (16GB RAM) - Balanced",
