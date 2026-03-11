@@ -32,17 +32,17 @@ This documentation explains how NEXE is built internally. It is useful if you wa
 
 ## Overview
 
-NEXE is designed with a **modular three-layer architecture**:
+NEXE is designed with a **modular five-layer architecture**:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    INTERFÍCIES                      │
-│  CLI (./nexe) │ API REST │ Web UI                  │
+│                    INTERFACES                       │
+│  CLI (./nexe) │ REST API │ Web UI                  │
 └─────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────┐
 │                       CORE                          │
-│  Servidor │ Endpoints │ Middleware │ Lifespan      │
+│  Server │ Endpoints │ Middleware │ Lifespan        │
 └─────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────┐
@@ -51,8 +51,13 @@ NEXE is designed with a **modular three-layer architecture**:
 └─────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────┐
-│                   SERVEIS BASE                      │
+│                  BASE SERVICES                      │
 │  Memory (RAG) │ Qdrant │ Embeddings │ SQLite       │
+└─────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────┐
+│                     STORAGE                         │
+│  models/ │ qdrant/ │ vectors/ │ logs/ │ cache/     │
 └─────────────────────────────────────────────────────┘
 ```
 
