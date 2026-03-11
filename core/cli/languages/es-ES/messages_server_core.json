@@ -1,0 +1,44 @@
+{
+  "server_core": {
+    "api": {
+      "title": "Nexe 0.8 API",
+      "description": "Sistema de orquestación de módulos de IA",
+      "server_type": "Servidor de módulos de IA",
+      "welcome": {
+        "description": "Sistema de orquestación de módulos en funcionamiento",
+        "ready": "Sistema preparado y operativo"
+      },
+      "endpoints": {
+        "root_description": "Información general del sistema",
+        "health_description": "Estado de salud del servidor",
+        "info_description": "Información detallada del sistema"
+      },
+      "health": {
+        "status": "operativo",
+        "message": "Sistema en funcionamiento",
+        "uptime": "Tiempo activo"
+      },
+      "responses": {
+        "success": "Operación completada correctamente",
+        "error": "Se ha producido un error"
+      },
+      "errors": {
+        "integrator_not_initialized": "El sistema de integración no se ha inicializado correctamente"
+      }
+    },
+    "startup": {
+      "starting_from": "Iniciando Nexe 0.8 desde: {path}",
+      "starting_server_on": "Iniciando servidor en {host}:{port}",
+      "loading_config": "Cargando configuración...",
+      "config_loaded": "Configuración cargada",
+      "config_not_found": "Archivo de configuración no encontrado",
+      "config_error": "Error al cargar la configuración"
+    },
+    "errors": {
+      "http_error": "Error HTTP",
+      "validation_error": "Error de validación",
+      "internal_error": "Error interno del servidor",
+      "port_in_use": "El puerto {port} ya está en uso"
+    }
+  }
+}
