@@ -51,9 +51,10 @@ def setup_environment(project_root, hw):
 
     if hw['is_apple_silicon']:
         print(f"   {t('detected_apple')} {CYAN}mlx-lm{RESET}...")
-        # Pin to 0.29.x: last version compatible with transformers 4.x (avoids
-        # conflict with sentence-transformers which requires transformers<5.0.0)
-        subprocess.run([str(pip_path), "install", "mlx-lm==0.29.1"], check=True)
+        # Pin to 0.30.7: first version with qwen3_5 architecture support.
+        # Note: requires transformers>=5.0.0 which conflicts with sentence-transformers
+        # metadata, but works correctly at runtime.
+        subprocess.run([str(pip_path), "install", "mlx-lm==0.30.7"], check=True)
 
     print(f"  🏗️ {t('installing_universal')} {CYAN}llama-cpp-python{RESET}...")
     env = os.environ.copy()
