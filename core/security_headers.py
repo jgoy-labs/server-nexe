@@ -44,7 +44,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     # CSP policy:
     # - script-src: NO 'unsafe-inline' (XSS protection)
     # - style-src: 'unsafe-inline' allowed (needed for Web UI, low security risk)
-    response.headers["Content-Security-Policy"] = (
+    # - upgrade-insecure-requests: only on HTTPS (Safari blocks CSS/JS on HTTP if set)
+    is_https = request.url.scheme == "https"
+    csp = (
       "default-src 'self'; "
       "script-src 'self'; "
       "style-src 'self' 'unsafe-inline'; "
@@ -53,11 +55,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
       "connect-src 'self'; "
       "frame-ancestors 'none'; "
       "base-uri 'self'; "
-      "form-action 'self'; "
-      "upgrade-insecure-requests"
+      "form-action 'self'"
     )
+    if is_https:
+      csp += "; upgrade-insecure-requests"
+    response.headers["Content-Security-Policy"] = csp
 
-    if request.url.scheme == "https":
+    if is_https:
       response.headers["Strict-Transport-Security"] = (
         "max-age=31536000; includeSubDomains"
       )
