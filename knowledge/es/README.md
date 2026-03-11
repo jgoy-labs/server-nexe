@@ -46,8 +46,6 @@ NEXE **no sustituye** a Ollama, LM Studio o similares. ¡De hecho, puede usar Ol
 3. **Ollama** - Bridge a Ollama si ya lo tienes instalado
 
 **Backends futuros considerados:**
-- LM Studio bridge
-- vLLM para inferencia optimizada
 - Otros engines según necesidad
 
 **¿Qué aporta NEXE?**
@@ -80,14 +78,11 @@ NEXE **no sustituye** a Ollama, LM Studio o similares. ¡De hecho, puede usar Ol
 
 ### ⚠️ Qué es teórico (código implementado pero NO testado)
 
-- **Raspberry Pi** - El instalador tiene detección pero nunca probado en RPi real
 - **Linux x86_64** - Debería funcionar con llama.cpp, NO testado
 - **Windows** - Teóricamente posible con llama.cpp, NO testado
 
 ### 🔨 Qué está en desarrollo o pendiente
 
-- **ai_code_module** (v0.9) - Integración experimental con herramientas de IA para coding
-- **LM Studio bridge** - Integración con LM Studio como backend alternativo
 - **Web UI avanzada** - La UI actual es muy básica
 - **Gestión avanzada de documentos** - Mejor indexación, metadata, etc.
 
@@ -231,7 +226,7 @@ Usa modelos locales para coding, experimentación, sin depender de servicios ext
 Prueba diferentes modelos y backends, compara resultados, aprende cómo funcionan.
 
 ### 5. [Futuro experimental] IA Coding con RAG
-Cuando se implemente el ai_code_module, se podrá experimentar con herramientas de IA para coding usando memoria local.
+Experimentación con herramientas de IA para coding usando memoria local.
 
 ## Filosofía del proyecto
 
@@ -262,7 +257,6 @@ NEXE **no intenta competir** con ChatGPT, Claude u otros asistentes profesionale
 
 ### Funcionales
 - **Web UI muy básica** (no es prioridad ahora)
-- **ai_code_module no implementado** todavía
 - **No hay sync multi-dispositivo**
 - **Gestión de documentos simple** (sin OCR, sin parsing avanzado)
 - **No hay fine-tuning** de modelos
@@ -280,9 +274,8 @@ NEXE **no intenta competir** con ChatGPT, Claude u otros asistentes profesionale
 | Versión | Objetivo | Estado | Fecha aprox. |
 |--------|----------|-------|-------------|
 | 0.8 | Base + RAG + 3 backends | ✅ | Completado |
-| 0.9 | ai_code_module experimental | 🔨 | Febrero 2026 |
-| 1.0 | Demo pública, docs completas | 📅 | Marzo 2026 |
-| 1.x | LM Studio, mejoras RAG | 💡 | TBD |
+| 0.9 | Mejoras RAG y estabilidad | 🔨 | TBD |
+| 1.0 | Demo pública, docs completas | 📅 | TBD |
 
 **Nota:** Las fechas son orientativas. Es un proyecto personal hecho en tiempo libre.
 
