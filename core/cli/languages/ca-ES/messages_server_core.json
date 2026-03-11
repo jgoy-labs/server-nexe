@@ -1,0 +1,44 @@
+{
+  "server_core": {
+    "api": {
+      "title": "Nexe 0.8 API",
+      "description": "Sistema d'orquestració de mòduls d'IA",
+      "server_type": "Servidor de mòduls d'IA",
+      "welcome": {
+        "description": "Sistema d'orquestració de mòduls en funcionament",
+        "ready": "Sistema preparat i operatiu"
+      },
+      "endpoints": {
+        "root_description": "Informació general del sistema",
+        "health_description": "Estat de salut del servidor",
+        "info_description": "Informació detallada del sistema"
+      },
+      "health": {
+        "status": "operatiu",
+        "message": "Sistema en funcionament",
+        "uptime": "Temps actiu"
+      },
+      "responses": {
+        "success": "Operació completada correctament",
+        "error": "S'ha produït un error"
+      },
+      "errors": {
+        "integrator_not_initialized": "El sistema d'integració no s'ha inicialitzat correctament"
+      }
+    },
+    "startup": {
+      "starting_from": "Iniciant Nexe 0.8 des de: {path}",
+      "starting_server_on": "Iniciant servidor a {host}:{port}",
+      "loading_config": "Carregant configuració...",
+      "config_loaded": "Configuració carregada",
+      "config_not_found": "Fitxer de configuració no trobat",
+      "config_error": "Error carregant la configuració"
+    },
+    "errors": {
+      "http_error": "Error HTTP",
+      "validation_error": "Error de validació",
+      "internal_error": "Error intern del servidor",
+      "port_in_use": "El port {port} ja està en ús"
+    }
+  }
+}

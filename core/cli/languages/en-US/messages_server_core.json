@@ -1,0 +1,44 @@
+{
+  "server_core": {
+    "api": {
+      "title": "Nexe 0.8 API",
+      "description": "AI module orchestration system",
+      "server_type": "AI module server",
+      "welcome": {
+        "description": "Module orchestration system running",
+        "ready": "System ready and operational"
+      },
+      "endpoints": {
+        "root_description": "General system information",
+        "health_description": "Server health status",
+        "info_description": "Detailed system information"
+      },
+      "health": {
+        "status": "operational",
+        "message": "System running",
+        "uptime": "Uptime"
+      },
+      "responses": {
+        "success": "Operation completed successfully",
+        "error": "An error occurred"
+      },
+      "errors": {
+        "integrator_not_initialized": "The integration system has not been initialized correctly"
+      }
+    },
+    "startup": {
+      "starting_from": "Starting Nexe 0.8 from: {path}",
+      "starting_server_on": "Starting server on {host}:{port}",
+      "loading_config": "Loading configuration...",
+      "config_loaded": "Configuration loaded",
+      "config_not_found": "Configuration file not found",
+      "config_error": "Error loading configuration"
+    },
+    "errors": {
+      "http_error": "HTTP error",
+      "validation_error": "Validation error",
+      "internal_error": "Internal server error",
+      "port_in_use": "Port {port} is already in use"
+    }
+  }
+}
