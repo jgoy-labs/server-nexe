@@ -12,7 +12,7 @@ import subprocess
 from pathlib import Path
 
 from .installer_display import (
-    CYAN, BOLD, RESET,
+    CYAN, BOLD, DIM, RESET,
     print_step, print_success, print_warn, print_error,
 )
 from .installer_i18n import t
