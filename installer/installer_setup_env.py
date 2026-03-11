@@ -51,6 +51,7 @@ def setup_environment(project_root, hw):
 
     if hw['is_apple_silicon']:
         print(f"   {t('detected_apple')} {CYAN}mlx-lm{RESET}...")
+        print(f"   {DIM}{t('mlx_dep_warning_title')} {t('mlx_dep_warning_body')}{RESET}")
         # Pin to 0.30.7: first version with qwen3_5 architecture support.
         # Note: requires transformers>=5.0.0 which conflicts with sentence-transformers
         # metadata, but works correctly at runtime.
