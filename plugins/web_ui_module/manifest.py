@@ -54,15 +54,6 @@ async def serve_ui():
     raise HTTPException(status_code=404, detail="UI not found")
 
 
-@router_public.get("/architecture", response_class=HTMLResponse)
-async def serve_architecture():
-    """Pàgina d'arquitectura modular de Nexe"""
-    html_path = _static_dir / "architecture.html"
-    if html_path.exists():
-        return FileResponse(html_path)
-    raise HTTPException(status_code=404, detail="Architecture page not found")
-
-
 @router_public.get("/static/{filename:path}")
 async def serve_static(filename: str):
     """Servir CSS/JS"""
