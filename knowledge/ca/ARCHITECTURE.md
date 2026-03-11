@@ -32,7 +32,7 @@ Aquesta documentació explica com està construït NEXE internament. És útil s
 
 ## Visió general
 
-NEXE està dissenyat amb una **arquitectura modular en tres capes**:
+NEXE està dissenyat amb una **arquitectura modular en cinc capes**:
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -53,6 +53,11 @@ NEXE està dissenyat amb una **arquitectura modular en tres capes**:
 ┌─────────────────────────────────────────────────────┐
 │                   SERVEIS BASE                      │
 │  Memory (RAG) │ Qdrant │ Embeddings │ SQLite       │
+└─────────────────────────────────────────────────────┘
+                        ↓
+┌─────────────────────────────────────────────────────┐
+│                     STORAGE                         │
+│  models/ │ qdrant/ │ vectors/ │ logs/ │ cache/     │
 └─────────────────────────────────────────────────────┘
 ```
 
