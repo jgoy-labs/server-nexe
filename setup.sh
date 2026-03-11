@@ -48,10 +48,49 @@ do
 done
 
 if [ -z "$PYTHON_BIN" ]; then
-    echo -e "${RED}[ERROR]${NC} No s'ha trobat Python 3.10 o superior."
-    echo -e "  ${CYAN}→${NC} brew install python@3.11"
-    echo -e "  ${CYAN}→${NC} Després torna a executar: ./setup.sh"
-    exit 1
+    echo -e "${YELLOW}[WARN]${NC} No s'ha trobat Python 3.10 o superior."
+
+    # Try to install via Homebrew
+    if command -v brew &> /dev/null; then
+        echo -e "${CYAN}→${NC} S'ha trobat Homebrew. Instal·lant Python 3.12 automàticament..."
+        echo -e "${CYAN}Continuar? [Y/n]:${NC} "
+        read -r -n 1 _py_response
+        echo ""
+        if [[ ! $_py_response =~ ^[Nn]$ ]]; then
+            brew install python@3.12
+            for candidate in /opt/homebrew/bin/python3.12 /usr/local/bin/python3.12 python3.12; do
+                if command -v "$candidate" &> /dev/null; then
+                    PYTHON_BIN="$candidate"
+                    break
+                fi
+            done
+        fi
+    else
+        echo -e "${YELLOW}→${NC} Homebrew no trobat. Instal·lant Homebrew + Python 3.12..."
+        echo -e "${CYAN}Continuar? [Y/n]:${NC} "
+        read -r -n 1 _brew_response
+        echo ""
+        if [[ ! $_brew_response =~ ^[Nn]$ ]]; then
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            # Add brew to PATH for this session
+            [ -f /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"
+            [ -f /usr/local/bin/brew ] && eval "$(/usr/local/bin/brew shellenv)"
+            brew install python@3.12
+            for candidate in /opt/homebrew/bin/python3.12 /usr/local/bin/python3.12 python3.12; do
+                if command -v "$candidate" &> /dev/null; then
+                    PYTHON_BIN="$candidate"
+                    break
+                fi
+            done
+        fi
+    fi
+
+    if [ -z "$PYTHON_BIN" ]; then
+        echo -e "${RED}[ERROR]${NC} No s'ha pogut trobar Python 3.10+. Instal·la'l manualment:"
+        echo -e "  ${CYAN}→${NC} brew install python@3.12"
+        echo -e "  ${CYAN}→${NC} Després torna a executar: ./setup.sh"
+        exit 1
+    fi
 fi
 
 PYTHON_VERSION=$("$PYTHON_BIN" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
