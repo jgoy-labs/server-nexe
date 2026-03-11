@@ -61,11 +61,10 @@ This means:
 **Reality:**
 - ✅ **macOS (Apple Silicon + Intel):** Fully tested and functional
 - ⚠️ **Linux x86_64:** Code implemented, **never tested in real**
-- ⚠️ **Raspberry Pi:** Code implemented, **never tested in real**
 - ⚠️ **Windows:** Code implemented, **never tested in real**
 
 **Implications:**
-- If you test NEXE on Linux/RPi/Windows, you are an **early adopter**
+- If you test NEXE on Linux/Windows, you are an **early adopter**
 - It may work perfectly... or it may fail in unexpected ways
 - Please report your experience to help improve the documentation
 
@@ -85,11 +84,8 @@ This means:
 ### 3. CPU architectures
 
 **Supported:**
-- ✅ ARM64 (Apple Silicon, RPi 4/5) - Tested on Apple Silicon
+- ✅ ARM64 (Apple Silicon) - Tested on Apple Silicon
 - ✅ x86_64 (Intel/AMD) - Tested on Intel Mac
-
-**Limited:**
-- ⚠️ ARMv7 (RPi 3 and earlier) - May be too slow, **not tested**
 
 **Not supported:**
 - ❌ ARM 32-bit (64-bit only)
@@ -807,7 +803,7 @@ But:
 - ❌ Limited concurrency - 1 request to the model at a time
 - ❌ Not enterprise-ready - No SLA, no multi-tenancy
 - ❌ Limited testing - Coverage < 50%
-- ❌ Only tested on macOS - Linux/Windows/RPi not tested
+- ❌ Only tested on macOS - Linux/Windows not tested
 
 ### Recognized improvements:
 

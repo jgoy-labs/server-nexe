@@ -80,10 +80,10 @@ plugins/
 
 Añadir nueva funcionalidad = Crear un plugin nuevo
 
-**Ejemplo:** Soporte para LM Studio
+**Ejemplo:** Soporte para un nuevo backend
 ```bash
 # Crear nuevo plugin
-mkdir plugins/lmstudio_module/
+mkdir plugins/custom_module/
 # Implementar interface
 # Registrar en el sistema
 # ✅ Funciona sin tocar core!
@@ -378,66 +378,66 @@ class LLMBackendPlugin(BasePlugin):
 
 ## Crear un plugin nuevo
 
-### Ejemplo: Plugin LM Studio
+### Ejemplo: Plugin para backend externo compatible OpenAI
 
-Paso a paso para crear un plugin que hace bridge a LM Studio.
+Paso a paso para crear un plugin que hace bridge a un servidor local compatible con la API OpenAI.
 
 #### Paso 1: Crear estructura
 
 ```bash
-mkdir -p plugins/lmstudio_module
-touch plugins/lmstudio_module/__init__.py
-touch plugins/lmstudio_module/plugin.py
+mkdir -p plugins/custom_backend_module
+touch plugins/custom_backend_module/__init__.py
+touch plugins/custom_backend_module/plugin.py
 ```
 
 #### Paso 2: Implementar plugin
 
-**`plugins/lmstudio_module/plugin.py`:**
+**`plugins/custom_backend_module/plugin.py`:**
 
 ```python
 import httpx
 from typing import Dict, Any
 from plugins.base import LLMBackendPlugin
 
-class LMStudioPlugin(LLMBackendPlugin):
-    \"\"\"Plugin para usar LM Studio como backend\"\"\"
+class CustomBackendPlugin(LLMBackendPlugin):
+    \"\"\"Plugin para usar un backend local compatible con la API OpenAI\"\"\"
 
-    name = "lmstudio"
+    name = "custom_backend"
     version = "0.1.0"
-    description = "Bridge a LM Studio local server"
+    description = "Bridge a un servidor local compatible OpenAI"
 
     def __init__(self):
-        self.base_url = "http://localhost:1234"  # Puerto por defecto LM Studio
+        self.base_url = "http://localhost:1234"  # Puerto del backend externo
         self.client = None
         self.model = None
 
     async def initialize(self, config: Dict[str, Any]) -> None:
         \"\"\"Inicializar cliente HTTP\"\"\"
-        self.base_url = config.get("lmstudio_url", self.base_url)
+        self.base_url = config.get("custom_backend_url", self.base_url)
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=120.0  # Los LLMs pueden tardar
         )
-        print(f"✓ LMStudio plugin inicializado ({self.base_url})")
+        print(f"✓ CustomBackend plugin inicializado ({self.base_url})")
 
     async def load_model(self, model_id: str, **kwargs) -> None:
         \"\"\"
         'Cargar' modelo (solo guardar el nombre).
-        LM Studio gestiona los modelos.
+        El backend externo gestiona los modelos.
         \"\"\"
-        # Verificar que LM Studio está corriendo
+        # Verificar que el backend externo está corriendo
         try:
             response = await self.client.get("/v1/models")
             response.raise_for_status()
             models = response.json()["data"]
         except Exception as e:
-            raise RuntimeError(f"LM Studio no accesible: {e}")
+            raise RuntimeError(f"Backend externo no accesible: {e}")
 
         # Verificar que el modelo existe
         model_ids = [m["id"] for m in models]
         if model_id not in model_ids:
             raise ValueError(
-                f"Modelo {model_id} no encontrado en LM Studio. "
+                f"Modelo {model_id} no encontrado en el backend. "
                 f"Disponibles: {model_ids}"
             )
 
@@ -451,11 +451,11 @@ class LMStudioPlugin(LLMBackendPlugin):
         max_tokens: int = 512,
         **kwargs
     ) -> str:
-        \"\"\"Generar texto via LM Studio API\"\"\"
+        \"\"\"Generar texto via API compatible OpenAI\"\"\"
         if not self.model:
             raise RuntimeError("Ningún modelo cargado")
 
-        # LM Studio usa API compatible OpenAI
+        # API compatible OpenAI
         response = await self.client.post(
             "/v1/chat/completions",
             json={
@@ -472,7 +472,7 @@ class LMStudioPlugin(LLMBackendPlugin):
         return data["choices"][0]["message"]["content"]
 
     async def unload_model(self) -> None:
-        \"\"\"No es necesario descargar (LM Studio lo gestiona)\"\"\"
+        \"\"\"No es necesario descargar (el backend externo lo gestiona)\"\"\"
         self.model = None
         print("✓ Modelo liberado")
 
@@ -480,10 +480,10 @@ class LMStudioPlugin(LLMBackendPlugin):
         \"\"\"Cerrar cliente HTTP\"\"\"
         if self.client:
             await self.client.aclose()
-        print("✓ LMStudio plugin shutdown")
+        print("✓ CustomBackend plugin shutdown")
 
     async def health_check(self) -> Dict[str, Any]:
-        \"\"\"Verificar que LM Studio está disponible\"\"\"
+        \"\"\"Verificar que el backend externo está disponible\"\"\"
         try:
             response = await self.client.get("/v1/models", timeout=5.0)
             response.raise_for_status()
@@ -492,7 +492,7 @@ class LMStudioPlugin(LLMBackendPlugin):
             return {
                 "status": "error",
                 "error": str(e),
-                "hint": "Verifica que LM Studio está corriendo"
+                "hint": "Verifica que el backend externo está corriendo"
             }
 
     async def get_model_info(self) -> Dict[str, Any]:
@@ -514,13 +514,13 @@ class LMStudioPlugin(LLMBackendPlugin):
 
 #### Paso 3: Registrar plugin
 
-**`plugins/lmstudio_module/__init__.py`:**
+**`plugins/custom_backend_module/__init__.py`:**
 
 ```python
-from .plugin import LMStudioPlugin
+from .plugin import CustomBackendPlugin
 
 # Exportar para descubrimiento automático
-__all__ = ["LMStudioPlugin"]
+__all__ = ["CustomBackendPlugin"]
 ```
 
 #### Paso 4: Configurar
@@ -528,24 +528,24 @@ __all__ = ["LMStudioPlugin"]
 **En el `.env`:**
 
 ```bash
-# Añadir LM Studio a los backends disponibles
-AVAILABLE_BACKENDS=mlx,llama_cpp,ollama,lmstudio
+# Añadir el backend personalizado a los backends disponibles
+AVAILABLE_BACKENDS=mlx,llama_cpp,ollama,custom_backend
 
-# Configuración LM Studio (opcional)
-LMSTUDIO_URL=http://localhost:1234
+# Configuración del backend (opcional)
+CUSTOM_BACKEND_URL=http://localhost:1234
 ```
 
 #### Paso 5: Usar
 
 ```bash
 # Seleccionar backend en el .env
-NEXE_BACKEND=lmstudio
-MODEL_ID=llama-3.1-8b  # Modelo que tienes en LM Studio
+NEXE_BACKEND=custom_backend
+MODEL_ID=nombre-del-modelo
 
 # Iniciar NEXE
 ./nexe go
 
-# ¡Ahora NEXE usa LM Studio!
+# ¡NEXE ahora usa el backend personalizado!
 ```
 
 ---
@@ -1033,11 +1033,9 @@ return response
 
 ### Plugins planificados
 
-1. **LM Studio bridge** (0.9)
-2. **vLLM backend** (para inferencia muy rápida)
-3. **Metrics collector** (formato Prometheus)
-4. **Telemetry** (opcional, opt-in)
-5. **Voice input/output** (STT/TTS)
+1. **Metrics collector** (formato Prometheus)
+2. **Telemetry** (opcional, opt-in)
+3. **Voice input/output** (STT/TTS)
 
 ### Sistema de eventos
 

@@ -32,11 +32,10 @@ Esta guía explica paso a paso cómo instalar NEXE en tu sistema.
   - Intel x86_64
 
 **Teórico (código implementado pero NO probado):**
-- ⚠️ Raspberry Pi 4/5 con Raspberry Pi OS
 - ⚠️ Linux x86_64 (Ubuntu 20.04+, Debian, etc.)
 - ⚠️ Windows 10/11 (con WSL2 recomendado)
 
-**Si pruebas NEXE en RPi, Linux o Windows**, por favor reporta la experiencia. Es código no probado pero debería funcionar.
+**Si pruebas NEXE en Linux o Windows**, por favor reporta la experiencia. Es código no probado pero debería funcionar.
 
 ## Requisitos del sistema
 
@@ -88,17 +87,6 @@ sudo apt install python3.11 python3.11-venv python3-pip git curl -y
 python3.11 --version
 ```
 
-### Raspberry Pi
-
-```bash
-# Actualizar sistema
-sudo apt update && sudo apt upgrade -y
-
-# Instalar dependencias
-sudo apt install python3-pip python3-venv git curl -y
-
-# Nota: Los modelos grandes NO funcionarán en RPi por limitaciones de RAM
-```
 
 ## Descargar NEXE
 
@@ -162,7 +150,7 @@ El instalador te guiará por estas etapas:
 #### 2. Detección de hardware
 
 El instalador analiza:
-- **Plataforma:** macOS, Linux, Raspberry Pi, Windows
+- **Plataforma:** macOS, Linux, Windows
 - **CPU:** Arquitectura (ARM64, x86_64, armv7l)
 - **RAM disponible:** Para recomendar modelos adecuados
 - **Espacio en disco:** Para verificar que hay suficiente espacio
@@ -196,13 +184,9 @@ Según tu hardware, se te propondrán backends:
 - **llama.cpp** (recomendado) - Universal con Metal
 - Ollama - Si ya lo tienes instalado
 
-**Para Linux/RPi:**
+**Para Linux:**
 - **llama.cpp** (única opción probada teóricamente)
 - Ollama - Si ya lo tienes instalado
-
-**Para Raspberry Pi:**
-- **llama.cpp** (única opción viable)
-- ⚠️ Solo modelos pequeños (Phi-3.5, Salamandra 2B)
 
 #### 4. Selección de modelo
 
@@ -606,7 +590,7 @@ ps aux | grep qdrant
 - Elige un modelo más pequeño
 - Cierra otras aplicaciones
 - Si es Mac, comprueba Activity Monitor
-- En RPi, usa solo modelos 2B
+- En sistemas con poca RAM, usa modelos 2B
 
 ### Error: "Model download failed"
 
@@ -810,4 +794,4 @@ Ahora que tienes NEXE instalado:
 
 **Nota:** Si tienes problemas no resueltos aquí, consulta los logs (`./nexe logs`) o revisa **LIMITATIONS.md** para ver si es una limitación conocida.
 
-**Contribuciones:** Si pruebas NEXE en Linux, Windows o RPi, por favor comparte tu experiencia para mejorar esta guía.
+**Contribuciones:** Si pruebas NEXE en Linux o Windows, por favor comparte tu experiencia para mejorar esta guía.

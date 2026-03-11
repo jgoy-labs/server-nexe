@@ -1327,7 +1327,7 @@ class CodeChunker:
 - **Flexibilitat:** Afegir backends sense modificar core
 - **Testabilitat:** Cada plugin es pot testar aïlladament
 - **Mantenibilitat:** Canvis en un plugin no afecten altres
-- **Extensibilitat:** Fàcil afegir funcionalitats (LM Studio, etc.)
+- **Extensibilitat:** Fàcil afegir funcionalitats (nous plugins, backends, etc.)
 
 ### Per què sentence-transformers?
 

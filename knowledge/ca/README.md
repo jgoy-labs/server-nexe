@@ -46,8 +46,6 @@ NEXE **no substitueix** Ollama, LM Studio o similars. De fet, pot usar Ollama co
 3. **Ollama** - Bridge a Ollama si ja el tens instal·lat
 
 **Backends futurs considerats:**
-- LM Studio bridge
-- vLLM per inferència optimitzada
 - Altres engines segons necesitat
 
 **Què aporta NEXE?**
@@ -80,14 +78,11 @@ NEXE **no substitueix** Ollama, LM Studio o similars. De fet, pot usar Ollama co
 
 ### ⚠️ Què és teòric (codi implementat però NO testat)
 
-- **Raspberry Pi** - L'instal·lador té detecció però mai provat en RPi real
 - **Linux x86_64** - Hauria de funcionar amb llama.cpp, NO testat
 - **Windows** - Teòricament possible amb llama.cpp, NO testat
 
 ### 🔨 Què està en desenvolupament o pendent
 
-- **ai_code_module** (v0.9) - Integració experimental amb eines d'IA per coding
-- **LM Studio bridge** - Integració amb LM Studio com a backend alternatiu
 - **Web UI avançada** - La UI actual és molt bàsica
 - **Gestió avançada de documents** - Millor indexació, metadata, etc.
 
@@ -231,7 +226,7 @@ Usa models locals per coding, experimentació, sense dependre de serveis externs
 Prova diferents models i backends, compara resultats, aprèn com funcionen.
 
 ### 5. [Futur experimental] IA Coding amb RAG
-Quan s'implementi l'ai_code_module, es podrà experimentar amb eines d'IA per coding usant memòria local.
+Experimentació amb eines d'IA per coding usant memòria local.
 
 ## Filosofia del projecte
 
@@ -262,7 +257,6 @@ NEXE **no intenta competir** amb ChatGPT, Claude, o altres assistents profession
 
 ### Funcionals
 - **Web UI molt bàsica** (no és prioritat ara)
-- **ai_code_module no implementat** encara
 - **No hi ha sync multi-dispositiu**
 - **Gestió de documents simple** (no OCR, no parsing avançat)
 - **No hi ha fine-tuning** de models
@@ -280,9 +274,8 @@ NEXE **no intenta competir** amb ChatGPT, Claude, o altres assistents profession
 | Versió | Objectiu | Estat | Data aprox. |
 |--------|----------|-------|-------------|
 | 0.8 | Base + RAG + 3 backends | ✅ | Completat |
-| 0.9 | ai_code_module experimental | 🔨 | Febrer 2026 |
-| 1.0 | Demo pública, docs completes | 📅 | Març 2026 |
-| 1.x | LM Studio, millores RAG | 💡 | TBD |
+| 0.9 | Millores RAG i estabilitat | 🔨 | TBD |
+| 1.0 | Demo pública, docs completes | 📅 | TBD |
 
 **Nota:** Les dates són orientatives. És un projecte personal fet en temps lliure.
 

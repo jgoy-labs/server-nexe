@@ -32,11 +32,10 @@ Aquesta guia explica pas a pas com instal·lar NEXE al teu sistema.
   - Intel x86_64
 
 **Teòric (codi implementat però NO testat):**
-- ⚠️ Raspberry Pi 4/5 amb Raspberry Pi OS
 - ⚠️ Linux x86_64 (Ubuntu 20.04+, Debian, etc.)
 - ⚠️ Windows 10/11 (amb WSL2 recomanat)
 
-**Si proves NEXE en RPi, Linux o Windows**, si us plau reporta l'experiència! És codi no testat però hauria de funcionar.
+**Si proves NEXE en Linux o Windows**, si us plau reporta l'experiència! És codi no testat però hauria de funcionar.
 
 ## Requisits del sistema
 
@@ -88,17 +87,6 @@ sudo apt install python3.11 python3.11-venv python3-pip git curl -y
 python3.11 --version
 ```
 
-### Raspberry Pi
-
-```bash
-# Actualitzar sistema
-sudo apt update && sudo apt upgrade -y
-
-# Instal·lar dependències
-sudo apt install python3-pip python3-venv git curl -y
-
-# Nota: Els models grans NO funcionaran en RPi per limitacions de RAM
-```
 
 ## Descarregar NEXE
 
@@ -162,7 +150,7 @@ L'instal·lador et guiarà per aquestes etapes:
 #### 2. Detecció de hardware
 
 L'instal·lador analitza:
-- **Plataforma:** macOS, Linux, Raspberry Pi, Windows
+- **Plataforma:** macOS, Linux, Windows
 - **CPU:** Arquitectura (ARM64, x86_64, armv7l)
 - **RAM disponible:** Per recomanar models adequats
 - **Espai en disc:** Per verificar que hi ha prou espai
@@ -196,13 +184,9 @@ Segons el teu hardware, se't proposaran backends:
 - **llama.cpp** (recomanat) - Universal amb Metal
 - Ollama - Si ja el tens instal·lat
 
-**Per Linux/RPi:**
+**Per Linux:**
 - **llama.cpp** (única opció testejada teòricament)
 - Ollama - Si ja el tens instal·lat
-
-**Per Raspberry Pi:**
-- **llama.cpp** (única opció viable)
-- ⚠️ Només models petits (Phi-3.5, Salamandra 2B)
 
 #### 4. Selecció de model
 
@@ -606,7 +590,7 @@ ps aux | grep qdrant
 - Tria un model més petit
 - Tanca altres aplicacions
 - Si és Mac, comprova Activity Monitor
-- En RPi, usa només models 2B
+- En sistemes amb poca RAM, usa models 2B
 
 ### Error: "Model download failed"
 
@@ -810,4 +794,4 @@ Ara que tens NEXE instal·lat:
 
 **Nota:** Si tens problemes no resolts aquí, consulta els logs (`./nexe logs`) o revisa **LIMITATIONS.md** per veure si és una limitació coneguda.
 
-**Contribucions:** Si proves NEXE en Linux, Windows o RPi, si us plau comparteix la teva experiència per millorar aquesta guia!
+**Contribucions:** Si proves NEXE en Linux o Windows, si us plau comparteix la teva experiència per millorar aquesta guia!

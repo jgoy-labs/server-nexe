@@ -46,8 +46,6 @@ NEXE **does not replace** Ollama, LM Studio or similar tools. In fact, it can us
 3. **Ollama** - Bridge to Ollama if you already have it installed
 
 **Future backends under consideration:**
-- LM Studio bridge
-- vLLM for optimized inference
 - Other engines as needed
 
 **What does NEXE bring?**
@@ -80,14 +78,11 @@ NEXE **does not replace** Ollama, LM Studio or similar tools. In fact, it can us
 
 ### ⚠️ What is theoretical (code implemented but NOT tested)
 
-- **Raspberry Pi** - The installer has detection logic but never tested on a real RPi
 - **Linux x86_64** - Should work with llama.cpp, NOT tested
 - **Windows** - Theoretically possible with llama.cpp, NOT tested
 
 ### 🔨 What is in development or pending
 
-- **ai_code_module** (v0.9) - Experimental integration with AI coding tools
-- **LM Studio bridge** - Integration with LM Studio as an alternative backend
 - **Advanced Web UI** - The current UI is very basic
 - **Advanced document management** - Better indexing, metadata, etc.
 
@@ -231,7 +226,7 @@ Use local models for coding and experimentation without depending on external se
 Try different models and backends, compare results, learn how they work.
 
 ### 5. [Future experimental] AI Coding with RAG
-Once the ai_code_module is implemented, it will be possible to experiment with AI coding tools using local memory.
+Experimenting with AI coding tools using local memory.
 
 ## Project philosophy
 
@@ -262,7 +257,6 @@ NEXE **does not try to compete** with ChatGPT, Claude, or other professional ass
 
 ### Functional
 - **Very basic Web UI** (not a priority right now)
-- **ai_code_module not yet implemented**
 - **No multi-device sync**
 - **Simple document management** (no OCR, no advanced parsing)
 - **No model fine-tuning**
@@ -280,9 +274,8 @@ NEXE **does not try to compete** with ChatGPT, Claude, or other professional ass
 | Version | Goal | Status | Approx. date |
 |--------|----------|-------|-------------|
 | 0.8 | Base + RAG + 3 backends | ✅ | Completed |
-| 0.9 | ai_code_module experimental | 🔨 | February 2026 |
-| 1.0 | Public demo, complete docs | 📅 | March 2026 |
-| 1.x | LM Studio, RAG improvements | 💡 | TBD |
+| 0.9 | RAG improvements and stability | 🔨 | TBD |
+| 1.0 | Public demo, complete docs | 📅 | TBD |
 
 **Note:** Dates are approximate. This is a personal project done in free time.
 
