@@ -171,7 +171,7 @@ CA = {
     "download_failed_resume": "⚠️  Descàrrega interrompuda. Torna a executar l'instal·lador per reprendre.",
     "laptop_warning": "Si tens un portàtil:",
     "knowledge_folder_created": "Preparant carpeta de coneixement (RAG)...",
-    "knowledge_explanation": "Aquí pots posar els teus documents (.txt, .md, .pdf) i la IA els llegirà.\nPer defecte, conté la documentació del propi sistema.\nTambé pots canviar el prompt de la IA editant 'personality/server.toml'",
+    "knowledge_explanation": "Aquí pots posar els teus documents (.txt, .md, .pdf) i la IA els llegirà.\nPer defecte, conté la documentació del propi sistema.\nTambé pots canviar el prompt de la IA editant 'personality/server.toml'\n\n⚠️  Els documents han de tenir una capçalera RAG al principi:\n\n    # === METADATA RAG ===\n    abstract: \"Descripció breu del document\"\n    tags: [etiqueta1, etiqueta2]\n    ---\n\nSense capçalera, el document NO s'indexarà al RAG.",
     "model_sizes_title": "📦 MIDA DE MODELS",
     "model_small_desc": "Models petits (8GB RAM) - Ràpids, menys qualitat",
     "model_medium_desc": "Models mitjans (16GB RAM) - Equilibrats",
