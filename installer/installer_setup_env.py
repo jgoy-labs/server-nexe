@@ -51,7 +51,9 @@ def setup_environment(project_root, hw):
 
     if hw['is_apple_silicon']:
         print(f"   {t('detected_apple')} {CYAN}mlx-lm{RESET}...")
-        subprocess.run([str(pip_path), "install", "mlx-lm"], check=True)
+        # Pin to 0.29.x: last version compatible with transformers 4.x (avoids
+        # conflict with sentence-transformers which requires transformers<5.0.0)
+        subprocess.run([str(pip_path), "install", "mlx-lm==0.29.1"], check=True)
 
     print(f"  🏗️ {t('installing_universal')} {CYAN}llama-cpp-python{RESET}...")
     env = os.environ.copy()
