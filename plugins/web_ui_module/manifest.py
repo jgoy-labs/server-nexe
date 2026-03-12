@@ -433,9 +433,9 @@ Ara respon a la pregunta de l'usuari basant-te EXCLUSIVAMENT en el document ante
                     elif rag_context:
                         system_prompt = f"""{base_system_prompt}
 
-# MEMÒRIA PERSONAL
+[CONTEXT MEMÒRIA]
 {rag_context}
-Usa aquesta informació per respondre de forma natural. No menciones que "ho tens guardat" ni copis aquestes instruccions a la resposta."""
+[FI CONTEXT]"""
                     else:
                         system_prompt = base_system_prompt
 
