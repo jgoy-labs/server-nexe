@@ -370,6 +370,69 @@ class MemoryHelper:
             metadata={"type": "user_message", "source": "auto_save"}
         )
 
+    async def save_document_chunks(
+        self,
+        chunks: List[str],
+        filename: str,
+        session_id: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Save document chunks individually to user_knowledge.
+        Each chunk gets its own embedding — enables semantic search within the document.
+
+        Pattern: NAT UBIK process_chunks — un embed+upsert per chunk, progress cada 25.
+        """
+        import time
+        memory = await self.get_memory_api()
+        if not memory:
+            return {"success": False, "chunks_saved": 0, "message": "Memory API not available"}
+
+        if not await memory.collection_exists("user_knowledge"):
+            await memory.create_collection("user_knowledge", vector_size=384)
+            logger.info("Created user_knowledge collection")
+
+        total = len(chunks)
+        saved = 0
+        doc_id_base = filename.replace(" ", "_")
+        base_meta = {
+            **(metadata or {}),
+            "source_document": filename,
+            "total_chunks": total,
+            "type": "document_chunk",
+            "source": "web_ui_upload",
+            "session_id": session_id,
+        }
+
+        logger.info(f"Ingesting '{filename}': {total} chunks → user_knowledge")
+        t_total = time.time()
+
+        for i, chunk in enumerate(chunks):
+            t0 = time.time()
+            try:
+                meta = {**base_meta, "chunk_index": i, "saved_at": datetime.now(timezone.utc).isoformat()}
+                await memory.store(
+                    text=chunk,
+                    collection="user_knowledge",
+                    metadata=meta,
+                    doc_id=f"{doc_id_base}_c{i}",
+                )
+                saved += 1
+                elapsed_ms = (time.time() - t0) * 1000
+                if i % 25 == 0 or i == total - 1:
+                    logger.info(f"  [{i+1}/{total}] {len(chunk)} chars, {elapsed_ms:.0f}ms")
+            except Exception as e:
+                logger.warning(f"  [{i}/{total}] chunk failed: {e}")
+
+        total_s = time.time() - t_total
+        logger.info(f"Ingestion '{filename}': {saved}/{total} chunks in {total_s:.1f}s")
+        return {
+            "success": True,
+            "document_id": doc_id_base,
+            "chunks_saved": saved,
+            "message": f"✓ {saved}/{total} chunks indexats a user_knowledge",
+        }
+
     def _apply_temporal_decay(self, score: float, metadata: Dict) -> float:
         """Apply temporal decay to score - recent memories get bonus."""
         saved_at = metadata.get("saved_at", "")
