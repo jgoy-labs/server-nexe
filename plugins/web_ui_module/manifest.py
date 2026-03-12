@@ -220,13 +220,11 @@ async def upload_file(
     session = _session_manager.get_or_create_session(session_id)
     session.add_context_file(file.filename)
 
-    # Attach to session: always (small=full, large=first chunk only — resta a Qdrant per RAG)
-    if len(chunks) == 1:
-        session.attach_document(file.filename, body_content, chunks)
-        logger.info(f"Document '{file.filename}' attached to session (1 chunk)")
-    else:
-        session.attach_document(file.filename, body_content, [chunks[0]], total_chunks=len(chunks))
-        logger.info(f"Document '{file.filename}' attached (chunk 1/{len(chunks)}) + {len(chunks)} chunks RAG-ready")
+    # Attach to session: small=full, large=first 20 chunks (cap ~12K tokens, suficient per resumir)
+    MAX_PREVIEW_CHUNKS = 20
+    preview_chunks = chunks[:MAX_PREVIEW_CHUNKS]
+    session.attach_document(file.filename, body_content, preview_chunks, total_chunks=len(chunks))
+    logger.info(f"Document '{file.filename}' attached ({len(preview_chunks)}/{len(chunks)} chunks) + RAG-ready")
 
     _session_manager._save_session_to_disk(session)
 
@@ -373,19 +371,22 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                         total_chunks = attached_doc.get('total_chunks', len(chunks))
                         total_chars = attached_doc.get('total_chars', 0)
 
+                        shown = len(chunks)
+                        doc_content = "\n\n---\n\n".join(chunks)
+
                         if total_chunks == 1:
-                            # Document petit - passar sencer
-                            doc_content = chunks[0][:3500]
                             document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n\n{doc_content}\n"
                         else:
-                            # Document gran - passar primer chunk amb info
-                            doc_content = chunks[0]
                             document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n"
-                            document_context += f"[Document gran: {total_chars} caràcters dividits en {total_chunks} parts. Mostrant part 1/{total_chunks}]\n\n"
+                            if shown < total_chunks:
+                                document_context += f"[Document: {total_chars} caràcters, {total_chunks} parts. Mostrant parts 1-{shown}/{total_chunks}]\n\n"
+                            else:
+                                document_context += f"[Document: {total_chars} caràcters]\n\n"
                             document_context += f"{doc_content}\n"
-                            document_context += f"\n[Fi de la part 1/{total_chunks}. L'usuari pot demanar 'continua' o 'següent part' per veure més.]\n"
+                            if shown < total_chunks:
+                                document_context += f"\n[Fi de les parts visibles ({shown}/{total_chunks}). El document complet és al RAG — l'usuari pot fer preguntes concretes.]\n"
 
-                        logger.info(f"Using attached document: {attached_doc['filename']} (chunk 1/{total_chunks}, {len(doc_content)} chars)")
+                        logger.info(f"Using attached document: {attached_doc['filename']} (parts {shown}/{total_chunks}, {len(doc_content)} chars)")
 
                     # 3. Get Memory Context (RAG) - SEMPRE buscar, no només amb patterns
                     rag_context = ""
