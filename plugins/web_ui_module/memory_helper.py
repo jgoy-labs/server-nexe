@@ -388,9 +388,10 @@ class MemoryHelper:
         if not memory:
             return {"success": False, "chunks_saved": 0, "message": "Memory API not available"}
 
-        if not await memory.collection_exists("user_knowledge"):
-            await memory.create_collection("user_knowledge", vector_size=384)
-            logger.info("Created user_knowledge collection")
+        # Ensure nexe_web_ui exists (same collection used for user messages — same 384-dim model)
+        if not await memory.collection_exists("nexe_web_ui"):
+            await memory.create_collection("nexe_web_ui", vector_size=384)
+            logger.info("Created nexe_web_ui collection")
 
         total = len(chunks)
         saved = 0
@@ -403,7 +404,7 @@ class MemoryHelper:
             "session_id": session_id,
         }
 
-        logger.info(f"Ingesting '{filename}': {total} chunks → user_knowledge")
+        logger.info(f"Ingesting '{filename}': {total} chunks → nexe_web_ui")
         t_total = time.time()
 
         for i, chunk in enumerate(chunks):
@@ -412,7 +413,7 @@ class MemoryHelper:
                 meta = {**base_meta, "chunk_index": i, "saved_at": datetime.now(timezone.utc).isoformat()}
                 await memory.store(
                     text=chunk,
-                    collection="user_knowledge",
+                    collection="nexe_web_ui",
                     metadata=meta,
                 )
                 saved += 1
@@ -428,7 +429,7 @@ class MemoryHelper:
             "success": True,
             "document_id": filename,
             "chunks_saved": saved,
-            "message": f"✓ {saved}/{total} chunks indexats a user_knowledge",
+            "message": f"✓ {saved}/{total} chunks indexats a nexe_web_ui",
         }
 
     def _apply_temporal_decay(self, score: float, metadata: Dict) -> float:
