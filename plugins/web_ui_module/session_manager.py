@@ -45,12 +45,18 @@ class ChatSession:
         if filename not in self.context_files:
             self.context_files.append(filename)
 
-    def attach_document(self, filename: str, content: str, chunks: List[str] = None):
-        """Adjuntar document per al proper missatge (amb chunks si és gran)"""
+    def attach_document(self, filename: str, content: str, chunks: List[str] = None, total_chunks: int = None):
+        """Adjuntar document per al proper missatge.
+
+        Per docs grans: passar chunks[:1] i total_chunks=len(chunks) per no inflar la sessió.
+        Tots els chunks estan a Qdrant per RAG.
+        """
+        all_chunks = chunks or [content]
         self.attached_document = {
             "filename": filename,
-            "content": content[:3000],  # Primer tros per preview
-            "chunks": chunks or [content],  # Tots els chunks
+            "content": content[:3000],  # Preview
+            "chunks": all_chunks,
+            "total_chunks": total_chunks or len(all_chunks),  # Total real (pot diferir de len(chunks))
             "total_chars": len(content),
             "current_chunk": 0
         }

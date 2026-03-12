@@ -220,13 +220,13 @@ async def upload_file(
     session = _session_manager.get_or_create_session(session_id)
     session.add_context_file(file.filename)
 
+    # Attach to session: always (small=full, large=first chunk only — resta a Qdrant per RAG)
     if len(chunks) == 1:
-        # Small doc: attach for direct use in first message
         session.attach_document(file.filename, body_content, chunks)
-        logger.info(f"Document '{file.filename}' attached to session (single chunk)")
+        logger.info(f"Document '{file.filename}' attached to session (1 chunk)")
     else:
-        # Large doc: chunks indexed in nexe_web_ui, RAG finds relevant parts per query
-        logger.info(f"Document '{file.filename}' indexed ({len(chunks)} chunks in nexe_web_ui, RAG-ready)")
+        session.attach_document(file.filename, body_content, [chunks[0]], total_chunks=len(chunks))
+        logger.info(f"Document '{file.filename}' attached (chunk 1/{len(chunks)}) + {len(chunks)} chunks RAG-ready")
 
     _session_manager._save_session_to_disk(session)
 
@@ -370,7 +370,7 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                     document_context = ""
                     if attached_doc:
                         chunks = attached_doc.get('chunks', [attached_doc.get('content', '')])
-                        total_chunks = len(chunks)
+                        total_chunks = attached_doc.get('total_chunks', len(chunks))
                         total_chars = attached_doc.get('total_chars', 0)
 
                         if total_chunks == 1:
