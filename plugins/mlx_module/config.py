@@ -5,7 +5,7 @@ MLXConfig - Configuració centralitzada per mlx-lm.
 Totes les opcions es poden configurar via variables d'entorn:
 - NEXE_MLX_MODEL: Ruta LOCAL al model MLX (obligatori)
 - NEXE_MLX_MAX_TOKENS: Màxim tokens a generar (default: 2048)
-- NEXE_MLX_MAX_KV_SIZE: Mida màxima KV cache (default: 16384)
+- NEXE_MLX_MAX_KV_SIZE: Mida màxima KV cache (default: auto segons RAM disponible)
 - NEXE_MLX_TEMPERATURE: Temperatura de sampling (default: 0.7)
 - NEXE_MLX_TOP_P: Top-p sampling (default: 0.9)
 - NEXE_MLX_MAX_SESSION_CACHES: Màxim caches per sessió (default: 4)
@@ -31,6 +31,29 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def _auto_max_kv_size() -> int:
+    """
+    Calcula max_kv_size òptim segons la RAM disponible.
+
+    Qwen3-32B KV cache: 64 capes × 2 (k+v) × 8 caps × 128 dims × 2 bytes = 256KB/token
+    Reservem 20GB per model + sistema, la resta per KV cache.
+    Cap a 131072 per seguretat (Qwen3 suporta fins a 131072 nativament).
+    """
+    try:
+        import psutil
+        total_gb = psutil.virtual_memory().total / (1024 ** 3)
+        available_for_kv_gb = max(0, total_gb - 20)  # Reservar 20GB per model+sistema
+        kv_bytes_per_token = 256 * 1024  # 256KB/token (Qwen3-32B)
+        max_tokens = int((available_for_kv_gb * 1024 ** 3) / kv_bytes_per_token)
+        # Arrodonir al múltiple de 1024 i limitar a 131072
+        max_tokens = min(131072, (max_tokens // 1024) * 1024)
+        max_tokens = max(16384, max_tokens)  # Mínim 16K
+        logger.info(f"MLXConfig: auto max_kv_size={max_tokens} (RAM={total_gb:.0f}GB)")
+        return max_tokens
+    except Exception:
+        return 65536  # Fallback conservador
+
+
 @dataclass
 class MLXConfig:
     """
@@ -47,7 +70,7 @@ class MLXConfig:
 
     model_path: str = ""
     max_tokens: int = 2048
-    max_kv_size: int = 65536  # 128GB RAM permet context gran (Qwen3 suporta 131K)
+    max_kv_size: int = 65536  # Override per NEXE_MLX_MAX_KV_SIZE; auto-calculat per RAM a from_env()
     temperature: float = 0.7
     top_p: float = 0.9
     max_session_caches: int = 4  # Com ModelPool.max_sessions
@@ -104,7 +127,7 @@ class MLXConfig:
         config = cls(
             model_path=model_path,
             max_tokens=int(os.getenv("NEXE_MLX_MAX_TOKENS", "2048")),
-            max_kv_size=int(os.getenv("NEXE_MLX_MAX_KV_SIZE", "16384")),
+            max_kv_size=int(os.getenv("NEXE_MLX_MAX_KV_SIZE", str(_auto_max_kv_size()))),
             temperature=float(os.getenv("NEXE_MLX_TEMPERATURE", "0.7")),
             top_p=float(os.getenv("NEXE_MLX_TOP_P", "0.9")),
             max_session_caches=int(os.getenv("NEXE_MLX_MAX_SESSION_CACHES", "4")),
