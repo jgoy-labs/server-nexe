@@ -285,7 +285,7 @@ Es un algoritmo aproximado (ANN = Approximate Nearest Neighbors) que encuentra l
 
 **Colecciones:** NEXE utiliza múltiples colecciones especializadas:
 
-1. **`nexe_chat_memory`:** Memoria de conversaciones con el usuario
+1. **`nexe_web_ui`:** Memoria de conversaciones con el usuario
 2. **`nexe_documentation`:** Documentación técnica del sistema
 3. **`user_knowledge`:** Conocimiento específico del usuario
 
@@ -353,7 +353,7 @@ server-nexe/
 └── storage/
     └── qdrant/
         ├── collection/
-        │   ├── nexe_chat_memory/
+        │   ├── nexe_web_ui/
         │   │   ├── segments/
         │   │   └── metadata.json
         │   ├── nexe_documentation/
@@ -514,9 +514,9 @@ knowledge_results = client.search(
     score_threshold=0.35  # Threshold medio
 )
 
-# Búsqueda en nexe_chat_memory
+# Búsqueda en nexe_web_ui
 memory_results = client.search(
-    collection_name="nexe_chat_memory",
+    collection_name="nexe_web_ui",
     query_vector=query_vector,
     limit=2,
     score_threshold=0.3  # Threshold más bajo para conversaciones
@@ -526,7 +526,7 @@ memory_results = client.search(
 **Thresholds por colección:**
 - `nexe_documentation`: 0.4 (información técnica precisa)
 - `user_knowledge`: 0.35 (conocimiento del usuario)
-- `nexe_chat_memory`: 0.3 (contexto conversacional)
+- `nexe_web_ui`: 0.3 (contexto conversacional)
 
 ### 2. MMR (Maximal Marginal Relevance)
 
@@ -808,10 +808,10 @@ Muchos documentos = mucho espacio.
 
 Durante la primera ejecución, NEXE:
 - Carga automáticamente la documentación del sistema en `nexe_documentation`
-- Las colecciones `user_knowledge` y `nexe_chat_memory` empiezan vacías
+- Las colecciones `user_knowledge` y `nexe_web_ui` empiezan vacías
 - Se van llenando progresivamente con el uso del sistema
 
-Las conversaciones con el usuario se almacenan automáticamente en `nexe_chat_memory` cuando RAG está activado.
+Las conversaciones con el usuario se almacenan automáticamente en `nexe_web_ui` cuando RAG está activado.
 
 ---
 
@@ -900,7 +900,7 @@ Results: <imágenes similares>
 ### Componentes clave
 - **Embeddings:** Ollama nomic-embed-text (768 dims) + fallbacks
 - **Base de datos:** Qdrant con algoritmo HNSW
-- **Colecciones:** nexe_chat_memory, nexe_documentation, user_knowledge
+- **Colecciones:** nexe_web_ui, nexe_documentation, user_knowledge
 - **Chunking:** 1500/200 chars (texto), 800/100 chars (RAG endpoint)
 - **Thresholds:** 0.4 (docs), 0.35 (knowledge), 0.3 (memory)
 

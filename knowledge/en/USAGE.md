@@ -253,7 +253,7 @@ Estadístiques de Memòria
 Total entrades: 342
 Mida total: 48.2 MB
 Vectors: 342
-Col·leccions: 3 (nexe_chat_memory, nexe_documentation, user_knowledge)
+Col·leccions: 3 (nexe_web_ui, nexe_documentation, user_knowledge)
 
 Model d'embeddings: nomic-embed-text (Ollama) + fallbacks
 Dimensió vectors: 768

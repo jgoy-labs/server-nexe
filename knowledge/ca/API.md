@@ -372,7 +372,7 @@ curl -X POST http://127.0.0.1:9119/v1/memory/store \
       "category": "projectes",
       "tags": ["nexe", "desenvolupament"]
     },
-    "collection": "nexe_chat_memory"
+    "collection": "nexe_web_ui"
   }'
 ```
 
@@ -398,7 +398,7 @@ curl -X POST http://127.0.0.1:9119/v1/memory/search \
   -d '{
     "query": "projecte favorit",
     "limit": 5,
-    "collection": "nexe_chat_memory"
+    "collection": "nexe_web_ui"
   }'
 ```
 
@@ -782,7 +782,7 @@ class NexeClient:
         response.raise_for_status()
         return response.json()
 
-    def store_memory(self, content, metadata=None, collection="nexe_chat_memory"):
+    def store_memory(self, content, metadata=None, collection="nexe_web_ui"):
         response = requests.post(
             f"{self.base_url}/v1/memory/store",
             headers=self.headers,
@@ -791,7 +791,7 @@ class NexeClient:
         response.raise_for_status()
         return response.json()
 
-    def search_memory(self, query, limit=5, collection="nexe_chat_memory"):
+    def search_memory(self, query, limit=5, collection="nexe_web_ui"):
         response = requests.post(
             f"{self.base_url}/v1/memory/search",
             headers=self.headers,
@@ -827,7 +827,7 @@ class NexeClient {
     return await response.json();
   }
 
-  async storeMemory(content, metadata = null, collection = 'nexe_chat_memory') {
+  async storeMemory(content, metadata = null, collection = 'nexe_web_ui') {
     const response = await fetch(`${this.baseUrl}/v1/memory/store`, {
       method: 'POST',
       headers: this.headers,
@@ -838,7 +838,7 @@ class NexeClient {
     return await response.json();
   }
 
-  async searchMemory(query, limit = 5, collection = 'nexe_chat_memory') {
+  async searchMemory(query, limit = 5, collection = 'nexe_web_ui') {
     const response = await fetch(`${this.baseUrl}/v1/memory/search`, {
       method: 'POST',
       headers: this.headers,

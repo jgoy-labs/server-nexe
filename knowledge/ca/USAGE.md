@@ -268,7 +268,7 @@ Estadístiques de Memòria
 Total entrades: 342
 Mida total: 48.2 MB
 Vectors: 342
-Col·leccions: 3 (nexe_chat_memory, nexe_documentation, user_knowledge)
+Col·leccions: 3 (nexe_web_ui, nexe_documentation, user_knowledge)
 
 Model d'embeddings: nomic-embed-text (Ollama) + fallbacks
 Dimensió vectors: 768
@@ -293,8 +293,8 @@ NEXE pot indexar documents locals per consultar-los amb llenguatge natural.
 
 # Formats suportats:
 # - Markdown (.md)
-# - Text pla (.txt)
-# - Altres formats segons configuració
+# - Text pla (.txt, .text)
+# - PDF (.pdf)
 ```
 
 ### Consultar documents
@@ -484,7 +484,7 @@ curl -s http://localhost:9119/api/info | jq
 
 ## Web UI
 
-NEXE inclou una interfície web bàsica (experimental).
+NEXE inclou una interfície web completa accessible des del navegador.
 
 ### Accedir a la Web UI
 
@@ -504,19 +504,13 @@ La clau es guarda al `localStorage` del navegador: no cal tornar-la a introduir 
 
 ### Funcionalitats de la Web UI
 
-**Disponible:**
-- Chat interactiu
-- Historial de converses
-- Toggle RAG on/off
-- Paràmetres bàsics (temperatura, max_tokens)
-
-**No disponible (encara):**
-- Gestió de documents
-- Visualització de memòria
-- Configuració avançada
-- Estadístiques i gràfics
-
-**Nota:** La Web UI és molt bàsica i no és la prioritat del projecte. El CLI i l'API són més complets.
+- Chat interactiu amb streaming i raonament (`<think>` blocks)
+- Historial de converses persistent entre sessions
+- Memòria automàtica: cada missatge (≥8 chars) es guarda a Qdrant
+- **Icona bookmark verda** quan un missatge s'ha desat a la memòria
+- Puja documents (.txt, .md, .pdf) per consultar-los directament al xat
+- Estadístiques per missatge: tokens, velocitat, model
+- Responsive i accessible des de mòbil (Tailscale)
 
 ---
 

@@ -393,6 +393,11 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                     for item in relevant:
                                         rag_context += f"- {item['content']}\n"
                                     logger.info(f"RAG: {len(relevant)} memories relevants (score >= 0.5)")
+                                    for item in relevant:
+                                        score = item.get('score', 0)
+                                        col = item.get('metadata', {}).get('source_collection', '?')
+                                        preview = item['content'][:80].replace('\n', ' ')
+                                        logger.info(f"  RAG [{col}] score={score:.2f} → {repr(preview)}")
                         except Exception as e:
                             logger.warning(f"RAG lookup failed: {e}")
 
