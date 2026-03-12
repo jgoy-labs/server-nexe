@@ -209,19 +209,34 @@ versió 0.8 i funciona en macOS amb tres backends...
 
 ## Sistema de memòria (RAG)
 
-El sistema RAG permet guardar informació i recuperar-la automàticament.
+NEXE guarda automàticament cada missatge de l'usuari a Qdrant (`nexe_web_ui`). Abans de generar cada resposta, fa una cerca semàntica per recuperar el context rellevant.
 
-### Guardar informació
+### Com funciona l'auto-save
 
-```bash
-# Guardar una frase
-./nexe memory store "El meu color favorit és el blau"
+**Cada missatge que envies** es guarda automàticament si:
+- Té 8 o més caràcters
+- No és una salutació pura ("hola", "gràcies", "ok"...)
+- No és duplicat d'alguna cosa ja guardada (similaritat > 80%)
 
-# Guardar informació estructurada
-./nexe memory store "Projecte: NEXE - Estat: v0.8 - Plataforma: macOS"
+```
+Tu: "Em dic Aran i treballo a NatSystem"
+  → guardat automàticament a Qdrant
+
+Tu (nova sessió): "Saps com em dic?"
+  → cerca semàntica troba "Em dic Aran..."
+  → model respon: "Et dius Aran"
 ```
 
-### Recuperar de la memòria
+La icona **bookmark verd** als stats de cada missatge indica que s'ha guardat.
+
+### Guardar explícitament
+
+Pots forçar un save amb frases com:
+- "Em dic Aran, **pots guardar-ho**?"
+- "Treballo a NatSystem, **guarda-ho**"
+- "Prefereixo Python, **ho pots guardar a la memòria**?"
+
+### Recuperar de la memòria (CLI)
 
 ```bash
 # Cercar/recuperar informació
