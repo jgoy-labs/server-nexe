@@ -232,7 +232,10 @@ class IngestionPipeline:
 
     if not hasattr(self, '_st_model') or self._st_model is None:
       logger.info("Loading SentenceTransformer model: %s", self.embedding_model)
-      self._st_model = SentenceTransformer(self.embedding_model, device="cpu")
+      try:
+        self._st_model = SentenceTransformer(self.embedding_model, device="cpu", local_files_only=True)
+      except Exception:
+        self._st_model = SentenceTransformer(self.embedding_model, device="cpu")
 
     embedding = self._st_model.encode(
       text,

@@ -139,7 +139,10 @@ class MemoryAPI:
 
     def _load_model():
       from sentence_transformers import SentenceTransformer
-      return SentenceTransformer(self.embedding_model)
+      try:
+        return SentenceTransformer(self.embedding_model, local_files_only=True)
+      except Exception:
+        return SentenceTransformer(self.embedding_model)
 
     self._embedder = await loop.run_in_executor(self._executor, _load_model)
     logger.info("Embedder initialized: %s", self.embedding_model)
