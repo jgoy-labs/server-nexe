@@ -378,7 +378,7 @@ class MemoryHelper:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Save document chunks individually to user_knowledge.
+        Save document chunks individually to nexe_web_ui.
         Each chunk gets its own embedding — enables semantic search within the document.
 
         Pattern: NAT UBIK process_chunks — un embed+upsert per chunk, progress cada 25.

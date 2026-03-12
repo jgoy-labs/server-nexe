@@ -225,8 +225,8 @@ async def upload_file(
         session.attach_document(file.filename, body_content, chunks)
         logger.info(f"Document '{file.filename}' attached to session (single chunk)")
     else:
-        # Large doc: chunks indexed in user_knowledge, RAG finds relevant parts per query
-        logger.info(f"Document '{file.filename}' indexed ({len(chunks)} chunks in user_knowledge, RAG-ready)")
+        # Large doc: chunks indexed in nexe_web_ui, RAG finds relevant parts per query
+        logger.info(f"Document '{file.filename}' indexed ({len(chunks)} chunks in nexe_web_ui, RAG-ready)")
 
     _session_manager._save_session_to_disk(session)
 
