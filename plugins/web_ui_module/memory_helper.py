@@ -202,21 +202,26 @@ class MemoryHelper:
             return conversation  # Fallback to raw
 
     async def get_memory_api(self):
-        """Get or initialize Memory API instance."""
-        if self._memory_api is None:
+        """Get or initialize Memory API instance (module-level singleton)."""
+        global _memory_api_instance
+        if _memory_api_instance is None:
             try:
                 from memory.memory.api import MemoryAPI
-                self._memory_api = MemoryAPI()
-                await self._memory_api.initialize()
+                api = MemoryAPI()
+                await api.initialize()
 
                 # Ensure web UI collection exists
-                if not await self._memory_api.collection_exists("nexe_web_ui"):
-                    await self._memory_api.create_collection("nexe_web_ui", vector_size=384)
+                if not await api.collection_exists("nexe_web_ui"):
+                    await api.create_collection("nexe_web_ui", vector_size=384)
                     logger.info("Created web UI memory collection")
+
+                _memory_api_instance = api
+                logger.info("MemoryAPI singleton initialized and cached")
             except Exception as e:
                 logger.error(f"Failed to initialize Memory API: {e}")
-                self._memory_api = None
-        return self._memory_api
+                _memory_api_instance = None
+        self._memory_api = _memory_api_instance
+        return _memory_api_instance
 
     def detect_intent(self, message: str) -> Tuple[str, Optional[str]]:
         """
@@ -659,8 +664,9 @@ class MemoryHelper:
             return {"success": False, "message": str(e)}
 
 
-# Global instance
+# Global instances (module-level singletons)
 _memory_helper = MemoryHelper()
+_memory_api_instance = None  # Singleton per evitar re-crear el model cada petició
 
 def get_memory_helper() -> MemoryHelper:
     """Get global memory helper instance."""
