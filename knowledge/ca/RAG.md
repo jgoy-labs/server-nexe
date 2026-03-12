@@ -285,9 +285,9 @@ Qdrant és una **base de dades vectorial** especialitzada en cerca semàntica.
 
 **Col·leccions:** NEXE utilitza múltiples col·leccions especialitzades:
 
-1. **`nexe_chat_memory`:** Memòria de converses amb l'usuari
+1. **`nexe_web_ui`:** Memòria personal de l'usuari (auto-save de missatges de xat)
 2. **`nexe_documentation`:** Documentació tècnica del sistema
-3. **`user_knowledge`:** Coneixement específic de l'usuari
+3. **`user_knowledge`:** Documents i coneixement indexat manualment
 
 **Cada punt té:**
 
@@ -811,7 +811,7 @@ Durant la primera execució, NEXE:
 - Les col·leccions `user_knowledge` i `nexe_chat_memory` comencen buides
 - Es van omplint progressivament amb l'ús del sistema
 
-Les converses amb l'usuari s'emmagatzemen automàticament a `nexe_chat_memory` quan RAG està activat.
+Cada missatge de l'usuari (≥8 caràcters, no salutació) s'emmagatzema automàticament a `nexe_web_ui` sense passar per cap LLM. La cerca semàntica recupera el context rellevant abans de cada resposta.
 
 ---
 
@@ -900,7 +900,7 @@ Results: <imatges similars>
 ### Components clau
 - **Embeddings:** Ollama nomic-embed-text (768 dims) + fallbacks
 - **Base de dades:** Qdrant amb algorisme HNSW
-- **Col·leccions:** nexe_chat_memory, nexe_documentation, user_knowledge
+- **Col·leccions:** nexe_web_ui (memòria personal), nexe_documentation, user_knowledge
 - **Chunking:** 1500/200 chars (text), 800/100 chars (RAG endpoint)
 - **Thresholds:** 0.4 (docs), 0.35 (knowledge), 0.3 (memory)
 
