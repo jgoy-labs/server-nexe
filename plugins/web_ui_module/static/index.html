@@ -37,6 +37,12 @@
     .login-hint code { color: #888; background: #111; padding: 0.1rem 0.3rem; border-radius: 3px; }
 </style>
 <body>
+    <!-- Marc animat -->
+    <div class="frame-border frame-top"></div>
+    <div class="frame-border frame-bottom"></div>
+    <div class="frame-border frame-left"></div>
+    <div class="frame-border frame-right"></div>
+
     <!-- Login Overlay -->
     <div id="loginOverlay" class="login-overlay">
         <div class="login-box">
@@ -55,6 +61,11 @@
                 <div class="logo">
                     <h1>Nexe</h1>
                     <span class="version">v0.8</span>
+                    <button id="frameToggleBtn" class="btn-frame-toggle" title="Mostrar/ocultar marc">◼</button>
+                </div>
+                <div id="modelInfo" class="model-info">
+                    <div class="model-info-dot"></div>
+                    <span class="model-info-text" id="modelInfoText">Carregant...</span>
                 </div>
             </div>
 
@@ -77,6 +88,12 @@
                 <div class="status-indicator">
                     <div class="status-dot active"></div>
                     <span>Connectat</span>
+                </div>
+                <div id="thinkingBadge" class="thinking-badge">
+                    <div class="thinking-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span>Pensant...</span>
                 </div>
             </div>
         </aside>
@@ -126,6 +143,16 @@
                     </button>
                 </div>
                 <input type="file" id="fileInput" accept=".txt,.md,.markdown,.pdf" style="display: none">
+                <div id="statsBar" class="stats-bar">
+                    <div class="stats-item">
+                        <span class="stats-label">tok</span>
+                        <span class="stats-value" id="statTokens">0</span>
+                    </div>
+                    <div class="stats-item">
+                        <span class="stats-value" id="statSpeed">0</span>
+                        <span class="stats-label">tok/s</span>
+                    </div>
+                </div>
                 <div id="filePreview" class="file-preview"></div>
             </div>
         </main>
