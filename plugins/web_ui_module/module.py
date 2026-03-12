@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Header
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
 from plugins.security.core.auth_config import get_admin_api_key
@@ -92,6 +92,11 @@ class WebUIModule:
         """Crear routers de FastAPI"""
         self._router = APIRouter(prefix="/ui", tags=["ui", "web", "demo"])
 
+        async def _require_ui_auth(x_api_key: Optional[str] = Header(None)):
+            expected = get_admin_api_key()
+            if expected and x_api_key != expected:
+                raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
         # Serve main UI
         @self._router.get("/", response_class=HTMLResponse)
         async def serve_ui():
@@ -110,15 +115,21 @@ class WebUIModule:
                 return FileResponse(file_path)
             raise HTTPException(status_code=404, detail="File not found")
 
+        # Auth verification endpoint
+        @self._router.get("/auth")
+        async def verify_auth(_auth=Depends(_require_ui_auth)):
+            """Verificar API key"""
+            return {"status": "ok"}
+
         # Session management
         @self._router.post("/session/new")
-        async def create_session():
+        async def create_session(_auth=Depends(_require_ui_auth)):
             """Crear nova sessió"""
             session = self.session_manager.create_session()
             return {"session_id": session.id, "created_at": session.created_at.isoformat()}
 
         @self._router.get("/session/{session_id}")
-        async def get_session_info(session_id: str):
+        async def get_session_info(session_id: str, _auth=Depends(_require_ui_auth)):
             """Obtenir info de sessió"""
             session = self.session_manager.get_session(session_id)
             if not session:
@@ -126,7 +137,7 @@ class WebUIModule:
             return session.to_dict()
 
         @self._router.get("/session/{session_id}/history")
-        async def get_session_history(session_id: str):
+        async def get_session_history(session_id: str, _auth=Depends(_require_ui_auth)):
             """Obtenir historial de sessió"""
             session = self.session_manager.get_session(session_id)
             if not session:
@@ -134,7 +145,7 @@ class WebUIModule:
             return {"messages": session.get_history()}
 
         @self._router.delete("/session/{session_id}")
-        async def delete_session(session_id: str):
+        async def delete_session(session_id: str, _auth=Depends(_require_ui_auth)):
             """Eliminar sessió"""
             deleted = self.session_manager.delete_session(session_id)
             if not deleted:
@@ -142,7 +153,7 @@ class WebUIModule:
             return {"status": "deleted"}
 
         @self._router.get("/sessions")
-        async def list_sessions():
+        async def list_sessions(_auth=Depends(_require_ui_auth)):
             """Llistar totes les sessions"""
             return {"sessions": self.session_manager.list_sessions()}
 
@@ -150,7 +161,8 @@ class WebUIModule:
         @self._router.post("/upload")
         async def upload_file(
             file: UploadFile = File(...),
-            session_id: Optional[str] = Form(None)
+            session_id: Optional[str] = Form(None),
+            _auth=Depends(_require_ui_auth)
         ):
             """Pujar fitxer i afegir al context de la sessió"""
             # Validate file
@@ -183,7 +195,7 @@ class WebUIModule:
 
         # Chat endpoint
         @self._router.post("/chat")
-        async def chat(request: Dict[str, Any]):
+        async def chat(body: Dict[str, Any], _auth=Depends(_require_ui_auth)):
             """
             Endpoint de xat amb streaming
 
@@ -197,9 +209,9 @@ class WebUIModule:
             if not self._initialized:
                 raise HTTPException(status_code=503, detail="Module not initialized")
 
-            message = request.get("message", "")
-            session_id = request.get("session_id")
-            stream = request.get("stream", False)
+            message = body.get("message", "")
+            session_id = body.get("session_id")
+            stream = body.get("stream", False)
 
             if not message:
                 raise HTTPException(status_code=400, detail="Message is required")
@@ -212,12 +224,12 @@ class WebUIModule:
 
             if stream:
                 async def generate():
-                    async for chunk in self._stream_chat_response(session, request):
+                    async for chunk in self._stream_chat_response(session, body):
                         yield chunk
 
                 return StreamingResponse(generate(), media_type="text/plain")
             else:
-                response_text = await self._fetch_chat_response(session, request)
+                response_text = await self._fetch_chat_response(session, body)
                 session.add_message("assistant", response_text)
                 return {
                     "response": response_text,
