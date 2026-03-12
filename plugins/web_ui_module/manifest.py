@@ -220,8 +220,8 @@ async def upload_file(
     session = _session_manager.get_or_create_session(session_id)
     session.add_context_file(file.filename)
 
-    # Attach to session: small=full, large=first 20 chunks (cap ~12K tokens, suficient per resumir)
-    MAX_PREVIEW_CHUNKS = 20
+    # Attach to session: small=full, large=first 50 chunks (~30K tokens amb context 65K)
+    MAX_PREVIEW_CHUNKS = 50
     preview_chunks = chunks[:MAX_PREVIEW_CHUNKS]
     session.attach_document(file.filename, body_content, preview_chunks, total_chunks=len(chunks))
     logger.info(f"Document '{file.filename}' attached ({len(preview_chunks)}/{len(chunks)} chunks) + RAG-ready")
@@ -377,14 +377,20 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                         if total_chunks == 1:
                             document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n\n{doc_content}\n"
                         else:
+                            est_pages_total = round(total_chars / 3000)
+                            est_pages_shown = round(len(doc_content) / 3000)
+                            pct = round(shown * 100 / total_chunks)
                             document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n"
                             if shown < total_chunks:
-                                document_context += f"[Document: {total_chars} caràcters, {total_chunks} parts. Mostrant parts 1-{shown}/{total_chunks}]\n\n"
+                                document_context += (
+                                    f"[Mostrant les primeres ~{est_pages_shown} pàgines de ~{est_pages_total} "
+                                    f"({shown}/{total_chunks} parts, {pct}% del document). "
+                                    f"La resta del document està indexada — l'usuari pot fer preguntes "
+                                    f"sobre qualsevol part i el sistema les recuperarà.]\n\n"
+                                )
                             else:
-                                document_context += f"[Document: {total_chars} caràcters]\n\n"
+                                document_context += f"[Document complet: ~{est_pages_total} pàgines]\n\n"
                             document_context += f"{doc_content}\n"
-                            if shown < total_chunks:
-                                document_context += f"\n[Fi de les parts visibles ({shown}/{total_chunks}). El document complet és al RAG — l'usuari pot fer preguntes concretes.]\n"
 
                         logger.info(f"Using attached document: {attached_doc['filename']} (parts {shown}/{total_chunks}, {len(doc_content)} chars)")
 
