@@ -40,7 +40,7 @@ _CSRF_EXEMPT_PATTERNS = [
     re.compile(r"^/v1/audio/transcriptions"),
     re.compile(r"^/health"),
     re.compile(r"^/metrics"),
-    # /ui/ is NOT exempt: the UI sends X-CSRF-Token via fetchWithCsrf()
+    re.compile(r"^/ui/"),  # UI uses X-API-Key auth (works for local + Tailscale)
 ]
 
 def _translate(i18n, key: str, fallback: str, **kwargs) -> str:

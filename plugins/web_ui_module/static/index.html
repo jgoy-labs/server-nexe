@@ -8,7 +8,46 @@
     <!-- Marked.js per renderitzar Markdown (local) -->
     <script src="/ui/static/marked.min.js"></script>
 </head>
+<style>
+    .login-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: #0d0d0d; display: none; align-items: center;
+        justify-content: center; z-index: 9999;
+    }
+    .login-box {
+        background: #1a1a1a; border: 1px solid #333; border-radius: 12px;
+        padding: 2.5rem; text-align: center; min-width: 320px; max-width: 400px; width: 90%;
+    }
+    .login-box h2 { color: #fff; margin: 0 0 0.5rem; font-size: 1.8rem; }
+    .login-box .login-subtitle { color: #666; margin: 0 0 2rem; font-size: 0.9rem; }
+    .login-box input {
+        width: 100%; padding: 0.75rem 1rem; background: #0d0d0d;
+        border: 1px solid #444; border-radius: 6px; color: #fff;
+        font-size: 1rem; margin-bottom: 1rem; box-sizing: border-box;
+        font-family: monospace;
+    }
+    .login-box input:focus { outline: none; border-color: #666; }
+    .login-box button {
+        width: 100%; padding: 0.75rem; background: #c0392b; border: none;
+        border-radius: 6px; color: #fff; font-size: 1rem; cursor: pointer;
+    }
+    .login-box button:hover { background: #e74c3c; }
+    .login-error { color: #e74c3c; font-size: 0.85rem; margin-top: 0.75rem; display: none; }
+    .login-hint { color: #555; font-size: 0.8rem; margin-top: 1rem; }
+    .login-hint code { color: #888; background: #111; padding: 0.1rem 0.3rem; border-radius: 3px; }
+</style>
 <body>
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-box">
+            <h2>Nexe</h2>
+            <p class="login-subtitle">Introdueix la API Key per accedir</p>
+            <input type="password" id="apiKeyInput" placeholder="API Key..." autocomplete="off" spellcheck="false">
+            <button id="loginBtn">Accedir</button>
+            <p id="loginError" class="login-error">Clau incorrecta. Comprova el fitxer <code>.env</code></p>
+            <p class="login-hint">La clau és a <code>.env</code> → <code>NEXE_PRIMARY_API_KEY</code></p>
+        </div>
+    </div>
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">

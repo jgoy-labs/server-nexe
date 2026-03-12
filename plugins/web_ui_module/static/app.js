@@ -6,6 +6,7 @@
 
 class NexeUI {
     constructor() {
+        this.apiKey = localStorage.getItem('nexe_api_key') || null;
         this.currentSessionId = null;
         this.uploadedFile = null;
         this.sessions = [];
@@ -15,25 +16,61 @@ class NexeUI {
         this.init();
     }
 
-    getCsrfToken() {
-        const match = document.cookie.match(/(?:^|; )nexe_csrf_token=([^;]*)/);
-        return match ? decodeURIComponent(match[1]) : null;
-    }
-
     fetchWithCsrf(url, options = {}) {
         const opts = { ...options };
         const method = (opts.method || 'GET').toUpperCase();
         opts.credentials = opts.credentials || 'same-origin';
-        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-            const token = this.getCsrfToken();
-            if (token) {
-                opts.headers = { ...(opts.headers || {}), 'X-CSRF-Token': token };
-            }
+        if (this.apiKey) {
+            opts.headers = { ...(opts.headers || {}), 'X-API-Key': this.apiKey };
         }
         return fetch(url, opts);
     }
 
     init() {
+        if (!this.apiKey) {
+            this.showLoginOverlay();
+            return;
+        }
+        this.initUI();
+    }
+
+    showLoginOverlay() {
+        const overlay = document.getElementById('loginOverlay');
+        overlay.style.display = 'flex';
+        const input = document.getElementById('apiKeyInput');
+        const btn = document.getElementById('loginBtn');
+        const error = document.getElementById('loginError');
+
+        const doLogin = async () => {
+            const key = input.value.trim();
+            if (!key) return;
+            error.style.display = 'none';
+            btn.disabled = true;
+            try {
+                const resp = await fetch('/ui/auth', { headers: { 'X-API-Key': key } });
+                if (resp.ok) {
+                    this.apiKey = key;
+                    localStorage.setItem('nexe_api_key', key);
+                    overlay.style.display = 'none';
+                    this.initUI();
+                } else {
+                    error.style.display = 'block';
+                    input.value = '';
+                    input.focus();
+                }
+            } catch (e) {
+                error.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+            }
+        };
+
+        btn.addEventListener('click', doLogin);
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+        input.focus();
+    }
+
+    initUI() {
         // DOM elements
         this.chatMessages = document.getElementById('chatMessages');
         this.messageInput = document.getElementById('messageInput');
@@ -70,6 +107,12 @@ class NexeUI {
 
         // Setup drag and drop
         this.setupDragAndDrop();
+    }
+
+    _handleUnauthorized() {
+        localStorage.removeItem('nexe_api_key');
+        this.apiKey = null;
+        this.showLoginOverlay();
     }
 
     async createNewSession() {
@@ -231,6 +274,11 @@ class NexeUI {
                 }),
                 signal: this.abortController.signal
             });
+
+            if (response.status === 401) {
+                this._handleUnauthorized();
+                return;
+            }
 
             if (response.ok) {
                 // Create placeholders
