@@ -59,6 +59,24 @@ async def verify_auth(_auth=Depends(_require_ui_auth)):
     return {"status": "ok"}
 
 
+@router_public.get("/info")
+async def get_ui_info(_auth=Depends(_require_ui_auth)):
+    """Info del model i backend actiu"""
+    import os
+    model_name = os.getenv("NEXE_DEFAULT_MODEL", "unknown")
+    backend = os.getenv("NEXE_MODEL_ENGINE", "auto")
+    try:
+        from core.lifespan import get_server_state
+        version = get_server_state().config.get('meta', {}).get('version', '0.8')
+    except Exception:
+        version = "0.8"
+    return {
+        "model": model_name,
+        "backend": backend,
+        "version": version
+    }
+
+
 @router_public.get("/", response_class=HTMLResponse)
 async def serve_ui():
     """Servir la pàgina principal"""

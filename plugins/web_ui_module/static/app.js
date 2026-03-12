@@ -12,8 +12,27 @@ class NexeUI {
         this.sessions = [];
         this.abortController = null;
         this.isGenerating = false;
+        // Stats streaming
+        this._streamStart = 0;
+        this._streamTokens = 0;
+        this._statsInterval = null;
 
         this.init();
+    }
+
+    setAiState(state) {
+        document.documentElement.setAttribute('data-ai-state', state);
+        const badge = document.getElementById('thinkingBadge');
+        if (badge) {
+            badge.classList.toggle('active', state === 'thinking' || state === 'streaming');
+        }
+        // Tornar a idle al cap de 2s si era error
+        if (state === 'error') {
+            clearTimeout(this._errorResetTimer);
+            this._errorResetTimer = setTimeout(() => {
+                document.documentElement.setAttribute('data-ai-state', 'idle');
+            }, 2000);
+        }
     }
 
     fetchWithCsrf(url, options = {}) {
@@ -81,6 +100,7 @@ class NexeUI {
         this.fileInput = document.getElementById('fileInput');
         this.filePreview = document.getElementById('filePreview');
         this.sessionsList = document.getElementById('sessionsList');
+        this.statsBar = document.getElementById('statsBar');
 
         // Event listeners
         this.sendBtn.addEventListener('click', () => this.sendMessage());
@@ -102,11 +122,66 @@ class NexeUI {
             this.messageInput.style.height = this.messageInput.scrollHeight + 'px';
         });
 
-        // Load sessions
+        // Toggle marc
+        const frameBtn = document.getElementById('frameToggleBtn');
+        if (frameBtn) {
+            const frameHidden = localStorage.getItem('nexe_frame_hidden') === '1';
+            if (frameHidden) document.body.classList.add('frame-hidden');
+            frameBtn.addEventListener('click', () => {
+                const hidden = document.body.classList.toggle('frame-hidden');
+                localStorage.setItem('nexe_frame_hidden', hidden ? '1' : '0');
+            });
+        }
+
+        // Load sessions i info model
         this.loadSessions();
+        this.loadServerInfo();
 
         // Setup drag and drop
         this.setupDragAndDrop();
+    }
+
+    async loadServerInfo() {
+        try {
+            const resp = await this.fetchWithCsrf('/ui/info');
+            if (resp.ok) {
+                const data = await resp.json();
+                const el = document.getElementById('modelInfoText');
+                if (el) {
+                    const backend = data.backend === 'auto' ? '' : ` · ${data.backend}`;
+                    el.textContent = data.model + backend;
+                    el.title = `model: ${data.model}\nbackend: ${data.backend}\nversió: ${data.version}`;
+                }
+            }
+        } catch (e) {
+            const el = document.getElementById('modelInfoText');
+            if (el) el.textContent = 'nexe';
+        }
+    }
+
+    _startStreamStats() {
+        this._streamStart = Date.now();
+        this._streamTokens = 0;
+        if (this.statsBar) this.statsBar.classList.add('active');
+        this._statsInterval = setInterval(() => this._updateStreamStats(), 400);
+    }
+
+    _updateStreamStats() {
+        const elapsed = (Date.now() - this._streamStart) / 1000;
+        const tokPerSec = elapsed > 0.5 ? (this._streamTokens / elapsed).toFixed(1) : '—';
+        const tokEl = document.getElementById('statTokens');
+        const spdEl = document.getElementById('statSpeed');
+        if (tokEl) tokEl.textContent = this._streamTokens;
+        if (spdEl) spdEl.textContent = tokPerSec;
+    }
+
+    _stopStreamStats() {
+        clearInterval(this._statsInterval);
+        this._statsInterval = null;
+        // Deixa les stats visibles 3s i desapareix
+        setTimeout(() => {
+            if (this.statsBar) this.statsBar.classList.remove('active');
+        }, 3000);
     }
 
     _handleUnauthorized() {
@@ -254,6 +329,7 @@ class NexeUI {
         this.sendBtn.style.display = 'none';
         this.stopBtn.style.display = 'flex';
         this.isGenerating = true;
+        this.setAiState('thinking');
 
         // Create AbortController for this request
         this.abortController = new AbortController();
@@ -281,7 +357,6 @@ class NexeUI {
             }
 
             if (response.ok) {
-                // Create placeholders
                 let assistantMessageDiv = null;
                 let fullResponse = "";
 
@@ -294,33 +369,43 @@ class NexeUI {
                 assistantMessageDiv = messages[messages.length - 1].querySelector('.message-text');
 
                 try {
+                    let firstChunk = true;
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
 
                         const chunk = decoder.decode(value, { stream: true });
                         fullResponse += chunk;
-                        // During streaming, show plain text for performance
+
+                        // Al primer chunk, canviem a streaming i iniciem stats
+                        if (firstChunk) {
+                            firstChunk = false;
+                            this.setAiState('streaming');
+                            this._startStreamStats();
+                        }
+
+                        // Comptar tokens (aprox 1 tok per 4 chars)
+                        this._streamTokens += Math.ceil(chunk.length / 4);
+
                         assistantMessageDiv.textContent = fullResponse;
                         this.scrollToBottom();
                     }
-                    // After streaming completes, render as Markdown (strip any leaked think tags)
+                    // Streaming acabat — renderitzar Markdown
                     assistantMessageDiv.innerHTML = this.renderMarkdown(this.stripThinkTags(fullResponse));
                 } catch (readError) {
                     if (readError.name === 'AbortError') {
-                        // User stopped generation - render with indicator
                         assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse + '\n\n⏹️ *[Generació aturada]*');
                     } else {
                         throw readError;
                     }
                 }
 
-                // Reload sessions list to catch up updates
                 if (!this.currentSessionId) {
                     this.loadSessions();
                 }
 
             } else {
+                this.setAiState('error');
                 this.addMessageToChat('assistant', '❌ Error: No s\'ha pogut enviar el missatge.');
             }
         } catch (error) {
@@ -328,10 +413,12 @@ class NexeUI {
                 console.log('Generation stopped by user');
             } else {
                 console.error('Error sending message:', error);
+                this.setAiState('error');
                 this.addMessageToChat('assistant', '❌ Error de connexió.');
             }
         } finally {
-            // Re-enable input and show send button
+            this._stopStreamStats();
+            this.setAiState('idle');
             this.messageInput.disabled = false;
             this.sendBtn.style.display = 'flex';
             this.stopBtn.style.display = 'none';
