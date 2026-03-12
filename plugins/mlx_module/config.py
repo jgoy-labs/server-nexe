@@ -47,7 +47,7 @@ class MLXConfig:
 
     model_path: str = ""
     max_tokens: int = 2048
-    max_kv_size: int = 16384  # 128GB RAM permet context gran
+    max_kv_size: int = 65536  # 128GB RAM permet context gran (Qwen3 suporta 131K)
     temperature: float = 0.7
     top_p: float = 0.9
     max_session_caches: int = 4  # Com ModelPool.max_sessions
