@@ -304,8 +304,8 @@ class NexeUI {
                         assistantMessageDiv.textContent = fullResponse;
                         this.scrollToBottom();
                     }
-                    // After streaming completes, render as Markdown
-                    assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse);
+                    // After streaming completes, render as Markdown (strip any leaked think tags)
+                    assistantMessageDiv.innerHTML = this.renderMarkdown(this.stripThinkTags(fullResponse));
                 } catch (readError) {
                     if (readError.name === 'AbortError') {
                         // User stopped generation - render with indicator
@@ -546,6 +546,10 @@ class NexeUI {
         setTimeout(() => {
             this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
         }, 100);
+    }
+
+    stripThinkTags(text) {
+        return text.replace(/<think>[\s\S]*?<\/think>\s*/g, '').trim();
     }
 
     escapeHtml(text) {
