@@ -228,13 +228,14 @@ def run_installer():
             # Don't capture output so user sees download progress from sentence-transformers
             msg_start = t('embeddings_starting').replace("'", "\\'")
             msg_done = t('embeddings_done').replace("'", "\\'")
+            emb_env = {**os.environ, "TRANSFORMERS_VERBOSITY": "error"}
             result = subprocess.run([
                 str(python_path), "-c",
                 f"from sentence_transformers import SentenceTransformer; "
                 f"print('\\n  {msg_start}\\n'); "
                 f"model = SentenceTransformer('all-MiniLM-L6-v2'); "
                 f"print('\\n  {msg_done}')"
-            ], check=True, capture_output=False)
+            ], check=True, capture_output=False, env=emb_env)
             print(f"\n  {t('embeddings_downloaded_ok')}")
         except subprocess.CalledProcessError as e:
             print(f"  {YELLOW}{t('embeddings_download_error')}{RESET}")
@@ -271,7 +272,7 @@ def run_installer():
             time.sleep(3)
 
             # Run ingestion with progress output (quiet=False)
-            ingest_env = {**os.environ, "NEXE_LANG": lang}
+            ingest_env = {**os.environ, "NEXE_LANG": lang, "TRANSFORMERS_VERBOSITY": "error"}
             result = subprocess.run([
                 str(python_path), "-c",
                 f"import sys; sys.path.insert(0, '{project_root}'); "
