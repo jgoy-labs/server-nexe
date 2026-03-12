@@ -1,44 +1,71 @@
 /* ============================================
-   Nexe UI - Estil tipus Ollama Dark Theme
+   Nexe UI — Estil coherent amb server-nexe.org
+   Vermell #e62020 sobre negre #0a0a0a
    ============================================ */
 
-* {
+@font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/ui/static/JetBrainsMono-Regular.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+*, *::before, *::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
 :root {
-    --bg-primary: #0f0f0f;
-    --bg-secondary: #1a1a1a;
-    --bg-tertiary: #262626;
-    --bg-hover: #2a2a2a;
-    --text-primary: #e5e5e5;
-    --text-secondary: #a3a3a3;
-    --text-muted: #737373;
-    --accent: #3b82f6;
-    --accent-hover: #2563eb;
-    --border: #333333;
-    --success: #10b981;
-    --error: #ef4444;
+    /* === Colors — mirall de variables.css === */
+    --primary-color: #e62020;
+    --primary-hover: #cc0000;
+    --nexe-red: #e62020;
+
+    --bg-primary:   #0a0a0a;
+    --bg-secondary: #120808;
+    --bg-tertiary:  #160a0a;
+    --bg-hover:     #1e0808;
+
+    --text-primary:   #ffffff;
+    --text-secondary: #aaaaaa;
+    --text-muted:     #666666;
+
+    --border:  #2a1010;
+    --success: #e62020;
+    --error:   #ff4444;
+
     /* Marc animat NEXE */
-    --nexe-red: #e84545;
-    --frame-color: #e84545;
-    --frame-width: 4px;
+    --frame-color: #cc0000;
+    --frame-width: 8px;
+
+    /* Misc */
+    --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, Consolas, monospace;
+    --radius:    6px;
+    --radius-sm: 4px;
+    --transition: 0.2s ease;
 }
 
 /* Marc animat — canvia color quan IA pensa */
-[data-ai-state="thinking"] { --frame-color: #ff9900; }
-[data-ai-state="streaming"] { --frame-color: #ffcc00; }
-[data-ai-state="error"] { --frame-color: #ff2222; }
+[data-ai-state="thinking"]  { --frame-color: rgba(255,90,0,1); }   /* taronja = glitch-cyan web doc */
+[data-ai-state="streaming"] { --frame-color: rgba(255,160,0,1); }  /* groc = glitch-yellow web doc */
+[data-ai-state="error"]     { --frame-color: #ff2222; }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-mono);
     background: var(--bg-primary);
     color: var(--text-primary);
     overflow: hidden;
     height: 100vh;
     padding: var(--frame-width);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+    background: var(--primary-color);
+    color: var(--bg-primary);
 }
 
 /* ============================================
@@ -108,8 +135,9 @@ body.frame-hidden { padding: 0; }
 
 .logo h1 {
     font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--text-primary);
+    font-weight: 700;
+    color: var(--primary-color);
+    letter-spacing: -0.02em;
 }
 
 .logo .version {
@@ -132,17 +160,23 @@ body.frame-hidden { padding: 0; }
     background: var(--bg-tertiary);
     color: var(--text-primary);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    transition: background 0.2s;
+    transition: all var(--transition);
 }
 
 .btn-new-chat:hover {
     background: var(--bg-hover);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
 }
 
 .btn-new-chat .icon {
@@ -188,7 +222,7 @@ body.frame-hidden { padding: 0; }
 
 .session-item.active {
     background: var(--bg-hover);
-    border-color: var(--accent);
+    border-color: var(--primary-color);
 }
 
 .session-item-content {
@@ -231,9 +265,12 @@ body.frame-hidden { padding: 0; }
     display: none;
     align-items: center;
     gap: 0.4rem;
-    font-size: 0.75rem;
-    color: #ff9900;
+    font-size: 0.72rem;
+    color: rgba(255,90,0,1);
     margin-top: 0.5rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .thinking-badge.active { display: flex; }
@@ -243,7 +280,7 @@ body.frame-hidden { padding: 0; }
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background: #ff9900;
+    background: rgba(255,90,0,1);
     animation: dot-bounce 1s ease-in-out infinite;
 }
 .thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
@@ -303,8 +340,8 @@ body.frame-hidden { padding: 0; }
 }
 
 .status-dot.active {
-    background: var(--success);
-    box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px rgba(16, 185, 129, 0.2);
+    background: var(--primary-color);
+    box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px rgba(230, 32, 32, 0.2);
 }
 
 /* ============================================
@@ -432,7 +469,9 @@ body.frame-hidden { padding: 0; }
 }
 
 .message.user .message-avatar {
-    background: var(--accent);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
 }
 
 .message.assistant .message-avatar {
@@ -472,11 +511,12 @@ body.frame-hidden { padding: 0; }
 
 .message-text code {
     background: var(--bg-tertiary);
+    border: 1px solid var(--border);
     padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
     font-size: 0.875em;
-    color: #f472b6;
+    color: var(--primary-color);
 }
 
 .message-text pre {
@@ -496,7 +536,7 @@ body.frame-hidden { padding: 0; }
 }
 
 .message-text blockquote {
-    border-left: 3px solid var(--accent);
+    border-left: 3px solid var(--primary-color);
     padding-left: 1rem;
     margin: 0.75rem 0;
     color: var(--text-secondary);
@@ -504,7 +544,7 @@ body.frame-hidden { padding: 0; }
 }
 
 .message-text a {
-    color: var(--accent);
+    color: var(--primary-color);
     text-decoration: none;
 }
 
@@ -557,8 +597,13 @@ body.frame-hidden { padding: 0; }
     margin: 0 auto;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 1rem;
+    border-radius: var(--radius);
     padding: 0.75rem 1rem;
+    transition: border-color var(--transition);
+}
+
+.input-container:focus-within {
+    border-color: rgba(230, 32, 32, 0.4);
 }
 
 .btn-upload {
@@ -593,7 +638,7 @@ body.frame-hidden { padding: 0; }
 }
 
 .btn-send {
-    background: var(--nexe-red);
+    background: var(--primary-color);
     border: none;
     color: white;
     width: 2rem;
@@ -609,7 +654,7 @@ body.frame-hidden { padding: 0; }
 }
 
 .btn-send:hover {
-    background: #c0392b;
+    background: var(--primary-hover);
     transform: scale(1.05);
 }
 
@@ -624,8 +669,8 @@ body.frame-hidden { padding: 0; }
 
 .btn-stop {
     background: transparent;
-    border: 1.5px solid #ff9900;
-    color: #ff9900;
+    border: 1.5px solid rgba(255,90,0,1);
+    color: rgba(255,90,0,1);
     width: 2rem;
     height: 2rem;
     border-radius: 0.5rem;
@@ -640,14 +685,14 @@ body.frame-hidden { padding: 0; }
 }
 
 .btn-stop:hover {
-    background: #ff9900;
-    color: #000;
+    background: rgba(255,90,0,1);
+    color: #0a0a0a;
     animation: none;
 }
 
 @keyframes stop-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255,153,0,0); }
-    50%       { box-shadow: 0 0 0 4px rgba(255,153,0,0.25); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,90,0,0); }
+    50%       { box-shadow: 0 0 0 4px rgba(255,90,0,0.25); }
 }
 
 /* Stats bar — tokens/s durant streaming */
@@ -673,7 +718,7 @@ body.frame-hidden { padding: 0; }
 }
 
 .stats-label { color: var(--text-muted); }
-.stats-value { color: #ff9900; font-weight: 600; }
+.stats-value { color: rgba(255,90,0,1); font-weight: 600; }
 
 /* Botó toggle marc */
 .btn-frame-toggle {
@@ -715,7 +760,7 @@ body.frame-hidden { padding: 0; }
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: var(--accent);
+    color: var(--primary-color);
     animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -766,17 +811,20 @@ body.frame-hidden { padding: 0; }
 }
 
 .chat-main.drag-over::after {
-    content: '📁 Deixa anar el fitxer aquí';
+    content: 'Deixa anar el fitxer aquí';
     position: absolute;
     inset: 0;
-    background: rgba(59, 130, 246, 0.1);
-    border: 2px dashed var(--accent);
-    border-radius: 0.5rem;
+    background: rgba(230, 32, 32, 0.05);
+    border: 2px dashed var(--primary-color);
+    border-radius: var(--radius);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
-    color: var(--accent);
+    font-size: 1rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--primary-color);
     pointer-events: none;
     z-index: 100;
 }
@@ -786,18 +834,24 @@ body.frame-hidden { padding: 0; }
    ============================================ */
 
 ::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--bg-primary);
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--bg-tertiary);
-    border-radius: 4px;
+    background: var(--border);
+    border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--bg-hover);
+    background: var(--primary-color);
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
 }
