@@ -109,9 +109,14 @@ class FileHandler:
             try:
                 from pypdf import PdfReader
                 reader = PdfReader(file_path)
+                total_pages = len(reader.pages)
+                logger.info(f"PDF '{file_path.name}': {total_pages} pages, extracting...")
                 text = ""
-                for page in reader.pages:
-                    text += page.extract_text() + "\n"
+                for i, page in enumerate(reader.pages):
+                    text += (page.extract_text() or "") + "\n"
+                    if (i + 1) % 50 == 0:
+                        logger.info(f"  PDF: {i+1}/{total_pages} pages")
+                logger.info(f"PDF '{file_path.name}': {total_pages} pages → {len(text)} chars extracted")
                 return text
             except Exception as e:
                 logger.error(f"Error extracting PDF: {e}")
@@ -159,7 +164,8 @@ class FileHandler:
             # Avançar amb overlap
             start = end - overlap if end < len(text) else len(text)
 
-        logger.info(f"Text divided into {len(chunks)} chunks")
+        avg = sum(len(c) for c in chunks) // len(chunks) if chunks else 0
+        logger.info(f"Chunking: {len(chunks)} chunks (avg {avg} chars, overlap={overlap})")
         return chunks
 
     def delete_file(self, file_path: Path) -> bool:

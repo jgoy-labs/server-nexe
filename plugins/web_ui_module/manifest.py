@@ -202,35 +202,42 @@ async def upload_file(
             })
             logger.info(f"RAG header found: id={rag_header.id}, priority={rag_header.priority}")
 
-    # Ingest document into memory system automatically
+    # Chunk document (compute first — needed for both ingestion and session attach)
+    chunk_size = rag_header.chunk_size if (rag_header and rag_header.is_valid) else 2500
+    chunks = _file_handler.chunk_text(body_content, chunk_size=chunk_size)
+    logger.info(f"Document '{file.filename}': {len(body_content)} chars → {len(chunks)} chunks (chunk_size={chunk_size})")
+
+    # Ingest all chunks individually to user_knowledge (one embedding per chunk)
     memory_helper = get_memory_helper()
-    ingestion_result = await memory_helper.save_to_memory(
-        content=body_content,
+    ingestion_result = await memory_helper.save_document_chunks(
+        chunks=chunks,
+        filename=file.filename,
         session_id=session_id or "web_ui_upload",
-        metadata=doc_metadata
+        metadata=doc_metadata,
     )
 
-    logger.info(f"Document '{file.filename}' ingested: {ingestion_result.get('message', 'OK')}")
-
-    # Attach document to session for immediate use in next chat
+    # Attach to session
     session = _session_manager.get_or_create_session(session_id)
     session.add_context_file(file.filename)
 
-    # Chunk large documents (use header chunk_size if available)
-    chunk_size = rag_header.chunk_size if (rag_header and rag_header.is_valid) else 2500
-    chunks = _file_handler.chunk_text(body_content, chunk_size=chunk_size)
-    session.attach_document(file.filename, body_content, chunks)
-    _session_manager._save_session_to_disk(session)
+    if len(chunks) == 1:
+        # Small doc: attach for direct use in first message
+        session.attach_document(file.filename, body_content, chunks)
+        logger.info(f"Document '{file.filename}' attached to session (single chunk)")
+    else:
+        # Large doc: chunks indexed in user_knowledge, RAG finds relevant parts per query
+        logger.info(f"Document '{file.filename}' indexed ({len(chunks)} chunks in user_knowledge, RAG-ready)")
 
-    logger.info(f"Document '{file.filename}' attached with {len(chunks)} chunks")
+    _session_manager._save_session_to_disk(session)
 
     return {
         "filename": file.filename,
         "size": len(content),
         "text_length": len(text),
+        "chunks": len(chunks),
         "preview": body_content[:500] + "..." if len(body_content) > 500 else body_content,
         "ingested": ingestion_result.get("success", False),
-        "memory_id": ingestion_result.get("entry_id"),
+        "chunks_saved": ingestion_result.get("chunks_saved", 0),
         "session_id": session.id,
         "has_rag_header": rag_header.is_valid if rag_header else False
     }
