@@ -484,11 +484,6 @@ class NexeUI {
                             chunk = chunk.replace('\x00[MEM]\x00', '');
                         }
 
-                        // Al primer chunk qualsevol
-                        if (tMode === 'init' && !this._streamStarted) {
-                            this._streamStarted = true;
-                        }
-
                         processChunk(chunk);
                         this.scrollToBottom();
                     }
@@ -496,9 +491,7 @@ class NexeUI {
                     clearTimeout(this._renderTimer);
                     assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse);
                     if (tMode !== 'responding' && tMode !== 'init') closeThinkBlock();
-                    this._streamStarted = false;
-
-                    // Stats per missatge (NAT pattern)
+                    // Stats per missatge
                     const elapsed = (Date.now() - this._streamStart) / 1000;
                     const finalTok = this._streamTokens;
                     const finalSpd = elapsed > 0.5 ? (finalTok / elapsed).toFixed(1) : null;
@@ -771,10 +764,6 @@ class NexeUI {
             this._renderTimer = null;
             el.innerHTML = this.renderMarkdown(content);
         }, 80);
-    }
-
-    stripThinkTags(text) {
-        return text.replace(/<think>[\s\S]*?<\/think>\s*/g, '').trim();
     }
 
     escapeHtml(text) {

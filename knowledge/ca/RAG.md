@@ -353,7 +353,7 @@ server-nexe/
 └── storage/
     └── qdrant/
         ├── collection/
-        │   ├── nexe_chat_memory/
+        │   ├── nexe_web_ui/
         │   │   ├── segments/
         │   │   └── metadata.json
         │   ├── nexe_documentation/
@@ -514,9 +514,9 @@ knowledge_results = client.search(
     score_threshold=0.35  # Threshold mitjà
 )
 
-# Cerca a nexe_chat_memory
+# Cerca a nexe_web_ui
 memory_results = client.search(
-    collection_name="nexe_chat_memory",
+    collection_name="nexe_web_ui",
     query_vector=query_vector,
     limit=2,
     score_threshold=0.3  # Threshold més baix per converses
@@ -526,7 +526,7 @@ memory_results = client.search(
 **Thresholds per col·lecció:**
 - `nexe_documentation`: 0.4 (informació tècnica precisa)
 - `user_knowledge`: 0.35 (coneixement de l'usuari)
-- `nexe_chat_memory`: 0.3 (context conversacional)
+- `nexe_web_ui`: 0.3 (missatges personals de l'usuari)
 
 ### 2. MMR (Maximal Marginal Relevance)
 
@@ -808,7 +808,7 @@ Molts documents = molt espai.
 
 Durant la primera execució, NEXE:
 - Carrega automàticament la documentació del sistema a `nexe_documentation`
-- Les col·leccions `user_knowledge` i `nexe_chat_memory` comencen buides
+- Les col·leccions `user_knowledge` i `nexe_web_ui` comencen buides
 - Es van omplint progressivament amb l'ús del sistema
 
 Cada missatge de l'usuari (≥8 caràcters, no salutació) s'emmagatzema automàticament a `nexe_web_ui` sense passar per cap LLM. La cerca semàntica recupera el context rellevant abans de cada resposta.

@@ -285,7 +285,7 @@ It is an approximate algorithm (ANN = Approximate Nearest Neighbors) that finds 
 
 **Collections:** NEXE uses multiple specialized collections:
 
-1. **`nexe_chat_memory`:** Memory of conversations with the user
+1. **`nexe_web_ui`:** Memory of conversations with the user
 2. **`nexe_documentation`:** Technical documentation of the system
 3. **`user_knowledge`:** User-specific knowledge
 
@@ -353,7 +353,7 @@ server-nexe/
 └── storage/
     └── qdrant/
         ├── collection/
-        │   ├── nexe_chat_memory/
+        │   ├── nexe_web_ui/
         │   │   ├── segments/
         │   │   └── metadata.json
         │   ├── nexe_documentation/
@@ -514,9 +514,9 @@ knowledge_results = client.search(
     score_threshold=0.35  # Medium threshold
 )
 
-# Search in nexe_chat_memory
+# Search in nexe_web_ui
 memory_results = client.search(
-    collection_name="nexe_chat_memory",
+    collection_name="nexe_web_ui",
     query_vector=query_vector,
     limit=2,
     score_threshold=0.3  # Lower threshold for conversations
@@ -526,7 +526,7 @@ memory_results = client.search(
 **Thresholds per collection:**
 - `nexe_documentation`: 0.4 (precise technical information)
 - `user_knowledge`: 0.35 (user knowledge)
-- `nexe_chat_memory`: 0.3 (conversational context)
+- `nexe_web_ui`: 0.3 (conversational context)
 
 ### 2. MMR (Maximal Marginal Relevance)
 
@@ -808,10 +808,10 @@ Many documents = a lot of storage.
 
 During the first run, NEXE:
 - Automatically loads system documentation into `nexe_documentation`
-- The `user_knowledge` and `nexe_chat_memory` collections start empty
+- The `user_knowledge` and `nexe_web_ui` collections start empty
 - They fill up progressively with system usage
 
-Conversations with the user are automatically stored in `nexe_chat_memory` when RAG is enabled.
+Conversations with the user are automatically stored in `nexe_web_ui` when RAG is enabled.
 
 ---
 
@@ -900,7 +900,7 @@ Results: <similar images>
 ### Key components
 - **Embeddings:** Ollama nomic-embed-text (768 dims) + fallbacks
 - **Database:** Qdrant with HNSW algorithm
-- **Collections:** nexe_chat_memory, nexe_documentation, user_knowledge
+- **Collections:** nexe_web_ui, nexe_documentation, user_knowledge
 - **Chunking:** 1500/200 chars (text), 800/100 chars (RAG endpoint)
 - **Thresholds:** 0.4 (docs), 0.35 (knowledge), 0.3 (memory)
 

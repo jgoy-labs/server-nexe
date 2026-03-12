@@ -34,21 +34,6 @@ MEMORY_TYPES = {
     "conversation": 0.4,   # Logs de conversa purs
 }
 
-# Prompt per extreure fets d'una conversa (Memory Extractor)
-MEMORY_EXTRACTOR_PROMPT = """Extreu NOMÉS informació factual i rellevant d'aquesta conversa.
-
-REGLES:
-- Extreu fets concrets sobre l'usuari (nom, feina, ubicació, preferències)
-- Ignora salutacions, cortesies i xerrameca
-- Ignora respostes genèriques de l'assistent
-- Si no hi ha res rellevant, respon NOMÉS: [BUIT]
-- Format: una línia per fet, sense bullets ni numeració
-
-CONVERSA:
-{conversation}
-
-FETS EXTRETS:"""
-
 # Intent patterns for memory operations (Catalan + Spanish + English)
 # Patterns that indicate user wants to SAVE something
 SAVE_TRIGGERS = [
@@ -107,7 +92,6 @@ class MemoryHelper:
 
     def __init__(self):
         self._memory_api = None
-        self._llm_engine = None
         self.save_triggers = [re.compile(p, re.IGNORECASE) for p in SAVE_TRIGGERS]
         self.recall_regex = [re.compile(p, re.IGNORECASE) for p in RECALL_PATTERNS]
         # Patterns per detectar xerrameca (no guardar)
@@ -116,32 +100,6 @@ class MemoryHelper:
             re.compile(r'^(hi|hello|hey|good morning|bye|goodbye)', re.IGNORECASE),
             re.compile(r'^(gracias|gràcies|thanks|ok|vale|d\'acord|entendido)', re.IGNORECASE),
         ]
-
-    async def _get_llm_for_extraction(self):
-        """Get a lightweight LLM for memory extraction (uses same engines as chat)."""
-        if self._llm_engine is None:
-            try:
-                # Try to get Ollama for extraction (lightweight)
-                from plugins.ollama_module.manifest import OllamaModule
-                ollama = OllamaModule()
-                if ollama.is_available():
-                    self._llm_engine = ("ollama", ollama)
-                    return self._llm_engine
-            except Exception as e:
-                logger.debug("Ollama not available for extraction: %s", e)
-
-            try:
-                # Fallback to MLX
-                from plugins.mlx_module.manifest import MLXModule
-                mlx = MLXModule()
-                if mlx.is_available():
-                    self._llm_engine = ("mlx", mlx)
-                    return self._llm_engine
-            except Exception as e:
-                logger.debug("MLX not available for extraction: %s", e)
-
-            self._llm_engine = (None, None)
-        return self._llm_engine
 
     def _is_trivial_message(self, message: str) -> bool:
         """Check if message is trivial (greeting, thanks, etc.) - don't save."""
@@ -152,65 +110,6 @@ class MemoryHelper:
             if pattern.match(message):
                 return True
         return False
-
-    async def extract_facts(self, conversation: str, model_name: str = None) -> Optional[str]:
-        """
-        Extract factual information from a conversation using LLM.
-
-        Args:
-            conversation: The conversation text to extract facts from
-            model_name: The model to use (should be the active model)
-
-        Returns:
-            Extracted facts as string, or None if nothing relevant.
-        """
-        # Quick check - if conversation is trivial, skip LLM call
-        if len(conversation) < 30:
-            return None
-
-        # If no model specified, skip extraction (don't guess)
-        if not model_name:
-            logger.debug("No model specified for extraction, skipping")
-            return conversation
-
-        engine_type, engine = await self._get_llm_for_extraction()
-        if not engine:
-            logger.debug("No LLM for extraction, using raw conversation")
-            return conversation
-
-        try:
-            prompt = MEMORY_EXTRACTOR_PROMPT.format(conversation=conversation)
-
-            if engine_type == "ollama":
-                result = engine.chat(
-                    model=model_name,
-                    messages=[{"role": "user", "content": prompt}],
-                    stream=False
-                )
-                if isinstance(result, dict):
-                    extracted = result.get("message", {}).get("content", "")
-                else:
-                    extracted = str(result)
-            else:
-                # MLX
-                result = await engine.chat(
-                    messages=[{"role": "user", "content": prompt}],
-                    system="Ets un extractor de fets. Respon concís."
-                )
-                extracted = result if isinstance(result, str) else str(result)
-
-            # Check if extraction found nothing
-            extracted = extracted.strip()
-            if not extracted or "[BUIT]" in extracted.upper() or len(extracted) < 5:
-                logger.debug("Memory extraction: no relevant facts found")
-                return None
-
-            logger.info(f"Memory extraction: {len(conversation)} chars → {len(extracted)} chars")
-            return extracted
-
-        except Exception as e:
-            logger.warning(f"Fact extraction failed: {e}, using raw")
-            return conversation  # Fallback to raw
 
     async def get_memory_api(self):
         """Get or initialize Memory API instance (module-level singleton)."""
@@ -469,69 +368,6 @@ class MemoryHelper:
             content=msg,
             session_id=session_id,
             metadata={"type": "user_message", "source": "auto_save"}
-        )
-
-    async def smart_save(
-        self,
-        user_message: str,
-        assistant_response: str,
-        session_id: str,
-        model_name: str = None
-    ) -> Dict[str, Any]:
-        """
-        Smart save: Extract facts from conversation and save only relevant info.
-
-        Args:
-            user_message: The user's message
-            assistant_response: The assistant's response
-            session_id: Session identifier
-            model_name: The active model to use for extraction
-
-        Returns:
-            Result dict with save status
-        """
-        # 1. Skip trivial messages (greetings, thanks, etc.)
-        if self._is_trivial_message(user_message):
-            logger.debug(f"Skipping trivial message: {user_message[:30]}...")
-            return {
-                "success": True,
-                "document_id": None,
-                "message": "⏭️ Missatge trivial, no guardat"
-            }
-
-        # 2. Combine and extract facts
-        conversation = f"[USUARI]: {user_message}\n[NEXE]: {assistant_response}"
-        extracted = await self.extract_facts(conversation, model_name=model_name)
-
-        if not extracted:
-            logger.debug("No facts extracted, skipping save")
-            return {
-                "success": True,
-                "document_id": None,
-                "message": "⏭️ Cap fet rellevant trobat"
-            }
-
-        # 3. Determine memory type based on content
-        memory_type = "conversation"  # Default
-        extracted_lower = extracted.lower()
-        if any(kw in extracted_lower for kw in ["nom", "name", "dic", "llamo", "treballo", "trabajo", "visc", "vivo"]):
-            memory_type = "fact"
-        elif any(kw in extracted_lower for kw in ["prefereixo", "prefiero", "m'agrada", "me gusta", "prefer"]):
-            memory_type = "preference"
-        elif any(kw in extracted_lower for kw in ["avui", "ara", "hoy", "ahora", "today", "now"]):
-            memory_type = "contextual"
-
-        # 4. Save with proper metadata
-        return await self.save_to_memory(
-            content=extracted,
-            session_id=session_id,
-            metadata={
-                "type": memory_type,
-                "source": "auto_extract",
-                "original_length": len(conversation),
-                "extracted_length": len(extracted),
-                "access_count": 0
-            }
         )
 
     def _apply_temporal_decay(self, score: float, metadata: Dict) -> float:
