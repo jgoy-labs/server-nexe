@@ -407,51 +407,34 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                         base_system_prompt = _get_system_prompt(_state, _lang)
                     except Exception:
                         base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
-                    if document_context:
-                        # MODE ZEN: Prompt restrictiu que FORÇA resposta basada en document
-                        # Evita al·lucinacions forçant el model a cenyir-se al contingut
-                        system_prompt = f"""# MODE DOCUMENT: ASSISTENT DE DOCUMENTS
-
-INSTRUCCIONS CRÍTIQUES - SEGUEIX-LES ESTRICTAMENT:
-
-1. Respon ÚNICA i EXCLUSIVAMENT basant-te en el document proporcionat a continuació
-2. NO invents informació que no sigui al document
-3. NO al·lucinis ni afegeixis dades externes
-4. Si la informació NO apareix al document, digues clarament: "Aquesta informació no apareix al document proporcionat"
-5. Cita fragments textuals del document quan sigui possible
-6. Sigues precís i concís
-7. Respon en el mateix idioma que l'usuari
-
----
-
-DOCUMENT ADJUNTAT:
-{document_context}
-
----
-
-Ara respon a la pregunta de l'usuari basant-te EXCLUSIVAMENT en el document anterior. Si no pots respondre amb la informació del document, indica-ho."""
-                    elif rag_context:
-                        system_prompt = f"""{base_system_prompt}
-
-[CONTEXT MEMÒRIA]
-{rag_context}
-[FI CONTEXT]"""
-                    else:
-                        system_prompt = base_system_prompt
+                    # System prompt SEMPRE estàtic (cachejable per MLX)
+                    # El document o RAG van als messages[], no al system prompt
+                    system_prompt = base_system_prompt
 
                     # 4. Prepare messages payload for engine
-                    # Most engines expect just the new message if they manage history, OR full history.
-                    # MLXChatNode manages its own KV cache but expects 'messages' to be the NEW messages to process
-                    # if we want to rely on its cache for history. HOWEVER, simple stateless engines need full history.
-                    
-                    # For robust history, we send the full conversation history.
-                    # We need to transform session messages to the format expected by engines
                     engine_messages = [
-                        {"role": m["role"], "content": m["content"]} 
+                        {"role": m["role"], "content": m["content"]}
                         for m in context_messages
                     ]
-                    # Add current user message
-                    engine_messages.append({"role": "user", "content": message})
+
+                    # Injectar context als messages (no al system prompt → MLX pot cachear el prefix)
+                    if document_context:
+                        # Document adjuntat: va davant del missatge de l'usuari
+                        doc_block = (
+                            "[DOCUMENT ADJUNTAT]\n"
+                            f"{document_context}\n"
+                            "[FI DOCUMENT]\n\n"
+                            "Respon EXCLUSIVAMENT basant-te en el document anterior. "
+                            "Si la informació no hi és, indica-ho clarament.\n\n"
+                            f"{message}"
+                        )
+                        engine_messages.append({"role": "user", "content": doc_block})
+                    elif rag_context:
+                        # Context RAG: va davant del missatge de l'usuari
+                        rag_block = f"[CONTEXT MEMÒRIA]\n{rag_context}[FI CONTEXT]\n\n{message}"
+                        engine_messages.append({"role": "user", "content": rag_block})
+                    else:
+                        engine_messages.append({"role": "user", "content": message})
 
 
                     messages = engine_messages
