@@ -11,30 +11,38 @@
 <style>
     .login-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: #0d0d0d; display: none; align-items: center;
+        background: #0a0a0a; display: none; align-items: center;
         justify-content: center; z-index: 9999;
     }
     .login-box {
-        background: #1a1a1a; border: 1px solid #333; border-radius: 12px;
-        padding: 2.5rem; text-align: center; min-width: 320px; max-width: 400px; width: 90%;
+        background: #120808; border: 1px solid #3a1010; border-radius: 6px;
+        padding: 2.5rem; text-align: center; min-width: 320px; max-width: 380px; width: 90%;
     }
-    .login-box h2 { color: #fff; margin: 0 0 0.5rem; font-size: 1.8rem; }
-    .login-box .login-subtitle { color: #666; margin: 0 0 2rem; font-size: 0.9rem; }
+    .login-box h2 {
+        color: #e62020; margin: 0 0 0.35rem;
+        font-size: 1.6rem; font-family: 'JetBrains Mono', monospace;
+        font-weight: 700; letter-spacing: -0.02em;
+    }
+    .login-box .login-subtitle { color: #666; margin: 0 0 2rem; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; }
     .login-box input {
-        width: 100%; padding: 0.75rem 1rem; background: #0d0d0d;
-        border: 1px solid #444; border-radius: 6px; color: #fff;
-        font-size: 1rem; margin-bottom: 1rem; box-sizing: border-box;
-        font-family: monospace;
+        width: 100%; padding: 0.75rem 1rem; background: #0a0a0a;
+        border: 1px solid #2a1010; border-radius: 4px; color: #fff;
+        font-size: 0.9rem; margin-bottom: 1rem; box-sizing: border-box;
+        font-family: 'JetBrains Mono', monospace;
+        transition: border-color 0.2s;
     }
-    .login-box input:focus { outline: none; border-color: #666; }
+    .login-box input:focus { outline: none; border-color: #e62020; }
     .login-box button {
-        width: 100%; padding: 0.75rem; background: #c0392b; border: none;
-        border-radius: 6px; color: #fff; font-size: 1rem; cursor: pointer;
+        width: 100%; padding: 0.75rem; background: #e62020; border: none;
+        border-radius: 4px; color: #0a0a0a; font-size: 0.85rem; cursor: pointer;
+        font-family: 'JetBrains Mono', monospace; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.08em;
+        transition: background 0.2s;
     }
-    .login-box button:hover { background: #e74c3c; }
-    .login-error { color: #e74c3c; font-size: 0.85rem; margin-top: 0.75rem; display: none; }
-    .login-hint { color: #555; font-size: 0.8rem; margin-top: 1rem; }
-    .login-hint code { color: #888; background: #111; padding: 0.1rem 0.3rem; border-radius: 3px; }
+    .login-box button:hover { background: #cc0000; }
+    .login-error { color: #ff4444; font-size: 0.8rem; margin-top: 0.75rem; display: none; font-family: 'JetBrains Mono', monospace; }
+    .login-hint { color: #444; font-size: 0.75rem; margin-top: 1rem; font-family: 'JetBrains Mono', monospace; }
+    .login-hint code { color: #666; background: #0a0a0a; padding: 0.1rem 0.3rem; border-radius: 3px; border: 1px solid #2a1010; }
 </style>
 <body>
     <!-- Marc animat -->
