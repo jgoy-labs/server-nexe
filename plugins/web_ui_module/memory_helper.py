@@ -442,6 +442,35 @@ class MemoryHelper:
                 "message": f"Error guardant a memòria: {str(e)}"
             }
 
+    async def auto_save(
+        self,
+        user_message: str,
+        session_id: str,
+    ) -> Dict[str, Any]:
+        """
+        Guarda el missatge d'usuari directament a memòria (sense LLM).
+
+        Estratègia: guardar el missatge cru. La cerca semàntica trobarà
+        'Em dic Aran' quan es pregunti 'com em dic?'.
+
+        Filtra salutacions i missatges trivials (< 8 caràcters o patrons skip).
+        """
+        msg = user_message.strip()
+
+        # Filtrar trivials
+        if len(msg) < 8:
+            return {"success": True, "document_id": None, "message": "⏭️ Massa curt"}
+
+        for pat in self.skip_patterns:
+            if pat.match(msg):
+                return {"success": True, "document_id": None, "message": "⏭️ Salutació"}
+
+        return await self.save_to_memory(
+            content=msg,
+            session_id=session_id,
+            metadata={"type": "user_message", "source": "auto_save"}
+        )
+
     async def smart_save(
         self,
         user_message: str,
