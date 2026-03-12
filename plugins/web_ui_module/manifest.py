@@ -493,6 +493,48 @@ IMPORTANT: El context anterior és informació de fons. NO l'incloguis a la teva
                     if stream:
                         async def response_generator():
                             full_response = ""
+
+                            # Stateful filter for <think>...</think> blocks
+                            _in_think = False
+                            _think_buf = ""
+
+                            def _filter_chunk(chunk):
+                                nonlocal _in_think, _think_buf
+                                visible = ""
+                                buf = _think_buf + chunk
+                                while buf:
+                                    if _in_think:
+                                        end = buf.find("</think>")
+                                        if end >= 0:
+                                            buf = buf[end + 8:]
+                                            _in_think = False
+                                            _think_buf = ""
+                                        else:
+                                            _think_buf = buf
+                                            buf = ""
+                                    else:
+                                        start = buf.find("<think>")
+                                        if start >= 0:
+                                            visible += buf[:start]
+                                            buf = buf[start + 7:]
+                                            _in_think = True
+                                        else:
+                                            # Buffer possible partial tag at end
+                                            partial = min(7, len(buf))
+                                            found_partial = False
+                                            for i in range(partial, 0, -1):
+                                                if "<think>".startswith(buf[-i:]):
+                                                    visible += buf[:-i]
+                                                    _think_buf = buf[-i:]
+                                                    buf = ""
+                                                    found_partial = True
+                                                    break
+                                            if not found_partial:
+                                                visible += buf
+                                                _think_buf = ""
+                                                buf = ""
+                                return visible
+
                             try:
                                 # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)
                                 if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
@@ -507,10 +549,12 @@ IMPORTANT: El context anterior és informació de fons. NO l'incloguis a la teva
                                                 content = chunk["response"]
                                         elif isinstance(chunk, str):
                                             content = chunk
-                                        
+
                                         if content:
                                             full_response += content
-                                            yield content
+                                            visible = _filter_chunk(content)
+                                            if visible:
+                                                yield visible
                                 else:
                                     # Fallback for non-streaming engines
                                     result = await chat_result if inspect.iscoroutine(chat_result) else chat_result
@@ -524,18 +568,22 @@ IMPORTANT: El context anterior és informació de fons. NO l'incloguis a la teva
                                             content = result["response"]
                                     elif isinstance(result, str):
                                         content = result
-                                    
+
                                     if content:
                                         full_response += content
-                                        yield content
+                                        visible = _filter_chunk(content)
+                                        if visible:
+                                            yield visible
 
                             except Exception as e:
                                 logger.error(f"Streaming error: {e}")
                                 yield f"\n[Error: {str(e)}]"
-                            
-                            # Save to session/disk after streaming completes
-                            if full_response:
-                                session.add_message("assistant", full_response)
+
+                            # Save clean response (no think tags) to session/disk
+                            import re as _re
+                            clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", full_response).strip()
+                            if clean_response:
+                                session.add_message("assistant", clean_response)
                                 _session_manager._save_session_to_disk(session)
 
                                 # SMART AUTO-SAVE to RAG (streaming)
