@@ -433,10 +433,12 @@ Ara respon a la pregunta de l'usuari basant-te EXCLUSIVAMENT en el document ante
                     elif rag_context:
                         system_prompt = f"""{base_system_prompt}
 
-CONTEXT INTERN (NO mostrar a l'usuari, només usar per respondre):
+# MEMÒRIA PERSONAL (USA AQUESTA INFORMACIÓ PER RESPONDRE)
 {rag_context}
+⚠️ IMPORTANT: Basa la teva resposta en aquest context quan sigui rellevant. Integra la informació de forma natural, sense mencionar explícitament que "ho tens guardat" o "ho has recordat".
 
-IMPORTANT: El context anterior és informació de fons. NO l'incloguis a la teva resposta. Respon de forma natural usant la informació si és rellevant."""
+---
+**CRÍTIC**: Si la pregunta fa referència a informació de la MEMÒRIA PERSONAL, usa-la per respondre directament."""
                     else:
                         system_prompt = base_system_prompt
 
