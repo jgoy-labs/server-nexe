@@ -475,6 +475,17 @@ NEXE inclou una interfície web bàsica (experimental).
 
 1. Inicia el servidor: `./nexe go`
 2. Obre el navegador a: `http://localhost:9119/ui`
+3. Apareixerà una **pantalla de login** — introdueix la teva API key
+
+La API key és a `.env` → `NEXE_PRIMARY_API_KEY`. Per trobar-la:
+
+```bash
+grep NEXE_PRIMARY_API_KEY .env
+```
+
+La clau es guarda al `localStorage` del navegador: no cal tornar-la a introduir a cada visita. Si vols tancar la sessió o canviar la clau, obre les DevTools del navegador → Application → Local Storage → elimina `nexe_api_key`.
+
+**Accés extern (Tailscale):** usa la mateixa clau, canviant `localhost` per la IP de Tailscale: `http://100.x.x.x:9119/ui`
 
 ### Funcionalitats de la Web UI
 
