@@ -52,22 +52,33 @@ FETS EXTRETS:"""
 # Intent patterns for memory operations (Catalan + Spanish + English)
 # Patterns that indicate user wants to SAVE something
 SAVE_TRIGGERS = [
-    # Catalan
+    # Catalan — al final del missatge
     r',?\s*(ho\s+)?pots\s+guardar\??$',
     r',?\s*(ho\s+)?pots\s+recordar\??$',
     r',?\s*guarda[\-\']?ho\??$',
     r',?\s*desa[\-\']?ho\??$',
-    # Spanish
+    # Catalan — amb "memòria" en qualsevol posició
+    r'\bguardar?\b.*mem[oò]ria',
+    r'\brecordar?\b.*mem[oò]ria',
+    r'\bdesa\b.*mem[oò]ria',
+    r'\bapunta\b.*mem[oò]ria',
+    # Spanish — al final del missatge
     r',?\s*lo\s+puedes\s+guardar\??$',
     r',?\s*puedes\s+guardar(lo)?\??$',
     r',?\s*lo\s+puedes\s+recordar\??$',
     r',?\s*puedes\s+recordar(lo)?\??$',
     r',?\s*gu[aá]rda(lo)?\??$',
     r',?\s*recu[eé]rda(lo)?\??$',
-    # English
+    # Spanish — amb "memoria"
+    r'\bguardar?\b.*memoria',
+    r'\brecordar?\b.*memoria',
+    # English — al final del missatge
     r',?\s*(can\s+you\s+)?(please\s+)?save\s+(it|this|that)\??$',
     r',?\s*(can\s+you\s+)?(please\s+)?remember\s+(it|this|that)\??$',
     r',?\s*save\s+it\??$',
+    # English — amb "memory"
+    r'\bsave\b.*memory',
+    r'\bremember\b.*memory',
 ]
 
 RECALL_PATTERNS = [
