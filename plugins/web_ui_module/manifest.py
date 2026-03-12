@@ -558,14 +558,12 @@ Usa aquesta informació per respondre de forma natural. No menciones que "ho ten
                                 session.add_message("assistant", clean_response)
                                 _session_manager._save_session_to_disk(session)
 
-                                # SMART AUTO-SAVE to RAG (streaming)
+                                # AUTO-SAVE: guarda missatge usuari directament (sense LLM)
                                 if not full_response.startswith("❌"):
                                     try:
-                                        save_result = await memory_helper.smart_save(
+                                        save_result = await memory_helper.auto_save(
                                             user_message=message,
-                                            assistant_response=full_response,
                                             session_id=session.id,
-                                            model_name=model_name
                                         )
                                         if save_result.get("document_id"):
                                             yield "\x00[MEM]\x00"
@@ -614,24 +612,17 @@ Usa aquesta informació per respondre de forma natural. No menciones que "ho ten
     session.add_message("assistant", response_text)
     _session_manager._save_session_to_disk(session)
 
-    # SMART AUTO-SAVE to RAG: Extreure fets rellevants i guardar
-    # Només guardar si no és un error i la resposta té contingut útil
+    # AUTO-SAVE: guarda missatge usuari directament (sense LLM)
     if response_text and not response_text.startswith("❌") and not response_text.startswith("❓"):
         try:
-            # Usar smart_save: extreu fets, no guarda xerrameca
-            # model_name ve del bloc chat (si existeix)
-            save_result = await memory_helper.smart_save(
+            save_result = await memory_helper.auto_save(
                 user_message=message,
-                assistant_response=response_text,
                 session_id=session.id,
-                model_name=locals().get('model_name')
             )
             if save_result.get("document_id"):
-                logger.debug(f"Smart-saved to RAG: {save_result.get('message')}")
-            else:
-                logger.debug(f"No save needed: {save_result.get('message')}")
+                logger.debug(f"Auto-saved to RAG: {message[:40]}")
         except Exception as e:
-            logger.warning(f"Smart auto-save to RAG failed: {e}")
+            logger.warning(f"Auto-save to RAG failed: {e}")
 
     if stream:
         async def generate():
