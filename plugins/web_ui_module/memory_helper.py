@@ -394,7 +394,6 @@ class MemoryHelper:
 
         total = len(chunks)
         saved = 0
-        doc_id_base = filename.replace(" ", "_")
         base_meta = {
             **(metadata or {}),
             "source_document": filename,
@@ -415,7 +414,6 @@ class MemoryHelper:
                     text=chunk,
                     collection="user_knowledge",
                     metadata=meta,
-                    doc_id=f"{doc_id_base}_c{i}",
                 )
                 saved += 1
                 elapsed_ms = (time.time() - t0) * 1000
@@ -428,7 +426,7 @@ class MemoryHelper:
         logger.info(f"Ingestion '{filename}': {saved}/{total} chunks in {total_s:.1f}s")
         return {
             "success": True,
-            "document_id": doc_id_base,
+            "document_id": filename,
             "chunks_saved": saved,
             "message": f"✓ {saved}/{total} chunks indexats a user_knowledge",
         }
