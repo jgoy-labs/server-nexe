@@ -54,7 +54,13 @@ class SimpleEmbedder:
     self.device = device
 
     logger.info(f"Loading model {model_name} on {device}")
-    self.model = SentenceTransformer(model_name, device=device)
+    try:
+      # Primer intent: caché local (sense xarxa — servidor 100% local)
+      self.model = SentenceTransformer(model_name, device=device, local_files_only=True)
+    except Exception:
+      # Fallback: descàrrega (primera instal·lació)
+      logger.info(f"Model {model_name} not in local cache, downloading...")
+      self.model = SentenceTransformer(model_name, device=device)
     self._initialized = True
 
     logger.info(f"SimpleEmbedder initialized: {model_name}")

@@ -38,7 +38,7 @@
 
     /* Marc animat NEXE */
     --frame-color: #cc0000;
-    --frame-width: 8px;
+    --frame-width: 10px;
 
     /* Misc */
     --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, Consolas, monospace;
@@ -179,8 +179,10 @@ body.frame-hidden { padding: 0; }
     color: var(--primary-color);
 }
 
-.btn-new-chat .icon {
-    font-size: 1.25rem;
+.btn-new-chat svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
 }
 
 .sessions-header {
@@ -314,8 +316,9 @@ body.frame-hidden { padding: 0; }
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--nexe-red);
+    background: #22c55e;
     flex-shrink: 0;
+    box-shadow: 0 0 4px rgba(34, 197, 94, 0.5);
 }
 
 .model-info-text {
@@ -340,8 +343,14 @@ body.frame-hidden { padding: 0; }
 }
 
 .status-dot.active {
-    background: var(--primary-color);
-    box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px rgba(230, 32, 32, 0.2);
+    background: #22c55e;
+    box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px rgba(34, 197, 94, 0.25);
+    animation: status-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.6; }
 }
 
 /* ============================================
@@ -369,8 +378,16 @@ body.frame-hidden { padding: 0; }
 }
 
 .welcome-icon {
-    font-size: 4rem;
     margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: center;
+}
+
+.welcome-icon svg {
+    width: 56px;
+    height: 56px;
+    color: var(--primary-color);
+    opacity: 0.85;
 }
 
 .welcome-screen h2 {
@@ -404,7 +421,18 @@ body.frame-hidden { padding: 0; }
 }
 
 .feature-icon {
-    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    flex-shrink: 0;
+}
+
+.feature-icon svg {
+    width: 18px;
+    height: 18px;
+    color: var(--primary-color);
 }
 
 .feature span:last-child {
@@ -477,6 +505,11 @@ body.frame-hidden { padding: 0; }
 .message.assistant .message-avatar {
     background: var(--bg-secondary);
     border: 1px solid var(--border);
+}
+
+.message-avatar svg {
+    width: 16px;
+    height: 16px;
 }
 
 /* Markdown Styles */
@@ -580,6 +613,129 @@ body.frame-hidden { padding: 0; }
 }
 
 /* ============================================
+   Think Block — <details> natiu (patró NAT)
+   ============================================ */
+
+.think-block {
+    border: 1px solid rgba(255, 130, 0, 0.2);
+    border-left: 3px solid rgba(255, 160, 0, 0.5);
+    background: rgba(255, 130, 0, 0.03);
+    border-radius: 4px;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+}
+
+/* Actiu (open + animació) */
+.think-block[open] {
+    border-left-color: rgba(255, 160, 0, 1);
+    animation: think-pulse 1.5s ease-in-out infinite;
+}
+
+/* Quan ja no és open (col·lapsat = fet) */
+.think-block:not([open]) {
+    animation: none;
+    border-left-color: rgba(255, 160, 0, 0.4);
+}
+
+@keyframes think-pulse {
+    0%, 100% { border-left-color: rgba(255, 160, 0, 1); }
+    50%       { border-left-color: rgba(255, 160, 0, 0.25); }
+}
+
+.think-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    user-select: none;
+    list-style: none; /* treu el triangle natiu del <summary> */
+}
+
+.think-header::-webkit-details-marker { display: none; }
+
+.think-header svg {
+    width: 13px;
+    height: 13px;
+    color: rgba(255, 160, 0, 0.8);
+    flex-shrink: 0;
+}
+
+.think-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 160, 0, 0.8);
+    font-weight: 700;
+}
+
+.think-tokens {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-left: auto;
+    font-family: var(--font-mono);
+}
+
+.think-text {
+    padding: 0.1rem 0.75rem 0.6rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    font-family: var(--font-mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 260px;
+    overflow-y: auto;
+    border-top: 1px solid rgba(255, 130, 0, 0.1);
+}
+
+/* ============================================
+   Stats per missatge (patró NAT)
+   ============================================ */
+
+.message-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.4rem;
+    min-height: 18px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+.stat-item svg {
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+
+.stat-model {
+    opacity: 0.5;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.stat-mem {
+    color: #22c55e;
+    opacity: 0.85;
+    gap: 4px;
+}
+
+.stat-mem svg {
+    opacity: 1;
+}
+
+/* ============================================
    Chat Input Area
    ============================================ */
 
@@ -611,9 +767,16 @@ body.frame-hidden { padding: 0; }
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    font-size: 1.25rem;
     padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: color 0.2s;
+}
+
+.btn-upload svg {
+    width: 18px;
+    height: 18px;
 }
 
 .btn-upload:hover {
@@ -648,9 +811,13 @@ body.frame-hidden { padding: 0; }
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
     transition: background 0.2s, transform 0.1s;
     flex-shrink: 0;
+}
+
+.btn-send svg {
+    width: 15px;
+    height: 15px;
 }
 
 .btn-send:hover {
@@ -678,10 +845,14 @@ body.frame-hidden { padding: 0; }
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.875rem;
     transition: all 0.2s;
     flex-shrink: 0;
     animation: stop-pulse 1.5s ease-in-out infinite;
+}
+
+.btn-stop svg {
+    width: 14px;
+    height: 14px;
 }
 
 .btn-stop:hover {
@@ -777,7 +948,14 @@ body.frame-hidden { padding: 0; }
 }
 
 .uploaded-file-icon {
-    font-size: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.uploaded-file-icon svg {
+    width: 14px;
+    height: 14px;
+    color: var(--primary-color);
 }
 
 .uploaded-file-name {
