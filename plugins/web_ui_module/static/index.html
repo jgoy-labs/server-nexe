@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nexe - Local AI</title>
     <link rel="stylesheet" href="/ui/static/style.css">
+    <script>
+        // Lliçó 5 NAT: MutationObserver protection per Lucide (race condition fix)
+        if (typeof MutationObserver !== 'undefined') {
+            const _origObserve = MutationObserver.prototype.observe;
+            MutationObserver.prototype.observe = function(target, options) {
+                if (!(target instanceof Node)) return;
+                return _origObserve.call(this, target, options);
+            };
+        }
+    </script>
+    <script src="/ui/static/lucide.min.js"></script>
     <!-- Marked.js per renderitzar Markdown (local) -->
     <script src="/ui/static/marked.min.js"></script>
 </head>
@@ -79,7 +90,7 @@
 
             <div class="sidebar-content">
                 <button id="newChatBtn" class="btn-new-chat">
-                    <span class="icon">+</span>
+                    <i data-lucide="plus"></i>
                     Nova conversa
                 </button>
 
@@ -110,20 +121,20 @@
         <main class="chat-main">
             <div id="chatMessages" class="chat-messages">
                 <div class="welcome-screen">
-                    <div class="welcome-icon">🤖</div>
+                    <div class="welcome-icon"><i data-lucide="bot"></i></div>
                     <h2>Benvingut a Nexe</h2>
                     <p>IA local amb memòria persistent</p>
                     <div class="features">
                         <div class="feature">
-                            <span class="feature-icon">💬</span>
+                            <span class="feature-icon"><i data-lucide="message-circle"></i></span>
                             <span>Conversa amb memòria contextual</span>
                         </div>
                         <div class="feature">
-                            <span class="feature-icon">📁</span>
+                            <span class="feature-icon"><i data-lucide="folder-open"></i></span>
                             <span>Puja documents (.txt, .md, .pdf)</span>
                         </div>
                         <div class="feature">
-                            <span class="feature-icon">🔒</span>
+                            <span class="feature-icon"><i data-lucide="lock"></i></span>
                             <span>100% local i privat</span>
                         </div>
                     </div>
@@ -134,7 +145,7 @@
             <div class="chat-input-area">
                 <div class="input-container">
                     <button id="uploadBtn" class="btn-upload" title="Pujar document">
-                        📎
+                        <i data-lucide="paperclip"></i>
                     </button>
 
                     <textarea
@@ -144,10 +155,10 @@
                     ></textarea>
 
                     <button id="sendBtn" class="btn-send" title="Enviar">
-                        ➤
+                        <i data-lucide="send"></i>
                     </button>
                     <button id="stopBtn" class="btn-stop" title="Aturar generació" style="display: none;">
-                        ■
+                        <i data-lucide="square"></i>
                     </button>
                 </div>
                 <input type="file" id="fileInput" accept=".txt,.md,.markdown,.pdf" style="display: none">
@@ -167,5 +178,8 @@
     </div>
 
     <script src="/ui/static/app.js"></script>
+    <script>
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    </script>
 </body>
 </html>

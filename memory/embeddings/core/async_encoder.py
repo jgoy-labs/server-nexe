@@ -134,10 +134,12 @@ class AsyncEmbedder:
     """
     from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer(
-      self.model_name,
-      device=self.device
-    )
+    try:
+      # Caché local primer (sense xarxa — servidor 100% local)
+      return SentenceTransformer(self.model_name, device=self.device, local_files_only=True)
+    except Exception:
+      # Fallback: descàrrega (primera instal·lació)
+      return SentenceTransformer(self.model_name, device=self.device)
 
   async def encode_async(
     self,

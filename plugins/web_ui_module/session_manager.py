@@ -198,16 +198,21 @@ class SessionManager:
 
     def list_sessions(self) -> List[dict]:
         """Llistar totes les sessions (metadata només)"""
-        return [
-            {
+        sessions = []
+        for s in self._sessions.values():
+            first_user = next(
+                (m["content"] for m in s.messages if m.get("role") == "user"),
+                None
+            )
+            sessions.append({
                 "id": s.id,
                 "created_at": s.created_at.isoformat(),
                 "last_activity": s.last_activity.isoformat(),
                 "message_count": len(s.messages),
-                "context_files": s.context_files
-            }
-            for s in self._sessions.values()
-        ]
+                "context_files": s.context_files,
+                "first_message": first_user[:60] if first_user else None
+            })
+        return sessions
 
     def cleanup_inactive(self, max_age_hours: int = 24) -> int:
         """

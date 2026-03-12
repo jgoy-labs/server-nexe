@@ -72,6 +72,7 @@ class NexeUI {
                     localStorage.setItem('nexe_api_key', key);
                     overlay.style.display = 'none';
                     this.initUI();
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
                 } else {
                     error.style.display = 'block';
                     input.value = '';
@@ -139,6 +140,9 @@ class NexeUI {
 
         // Setup drag and drop
         this.setupDragAndDrop();
+
+        // Inicialitzar icones Lucide
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     async loadServerInfo() {
@@ -249,7 +253,7 @@ class NexeUI {
             sessionEl.innerHTML = `
                 <div class="session-item-content">
                     <div class="session-item-title">
-                        Conversa ${session.message_count > 0 ? `(${session.message_count})` : ''}
+                        ${session.first_message || 'Nova conversa'}
                     </div>
                     <div class="session-item-meta">${timeStr}</div>
                 </div>
@@ -324,6 +328,22 @@ class NexeUI {
         const message = this.messageInput.value.trim();
         if (!message) return;
 
+        // Auto-crear sessió si no en tenim — el servidor no retorna l'ID per streaming
+        if (!this.currentSessionId) {
+            try {
+                const sr = await this.fetchWithCsrf('/ui/session/new', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                if (sr.ok) {
+                    const sd = await sr.json();
+                    this.currentSessionId = sd.session_id;
+                    this.loadSessions();
+                }
+            } catch (e) { /* continua sense sessió */ }
+        }
+
         // Disable input and show stop button
         this.messageInput.disabled = true;
         this.sendBtn.style.display = 'none';
@@ -359,6 +379,7 @@ class NexeUI {
             if (response.ok) {
                 let assistantMessageDiv = null;
                 let fullResponse = "";
+                let memorySaved = false;
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -366,42 +387,146 @@ class NexeUI {
                 // Add empty message for assistant
                 this.addMessageToChat('assistant', '', true);
                 const messages = this.chatMessages.querySelectorAll('.message.assistant');
-                assistantMessageDiv = messages[messages.length - 1].querySelector('.message-text');
+                const lastMsg = messages[messages.length - 1];
+                assistantMessageDiv = lastMsg.querySelector('.message-text');
+
+                // Think state machine
+                let tMode = 'init';   // 'init' | 'thinking' | 'responding'
+                let tBuf  = '';       // partial tag buffer
+                let tContent = '';    // accumulated think text
+                let tTok = 0;         // think token count
+                let tBlock = null;    // .think-block DOM element
+                let tTextEl = null;   // .think-text inside block
+
+                const startThinkBlock = () => {
+                    lastMsg.querySelector('.message-content').insertAdjacentHTML('afterbegin',
+                        `<details class="think-block" open>
+                            <summary class="think-header">
+                                <i data-lucide="brain"></i>
+                                <span class="think-label">Pensant...</span>
+                                <span class="think-tokens"></span>
+                            </summary>
+                            <div class="think-text"></div>
+                        </details>`
+                    );
+                    tBlock = lastMsg.querySelector('.think-block');
+                    tTextEl = tBlock.querySelector('.think-text');
+                    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [tBlock.querySelector('.think-header')] });
+                };
+
+                const closeThinkBlock = () => {
+                    if (!tBlock) return;
+                    tBlock.querySelector('.think-label').textContent = 'Raonament';
+                    tBlock.querySelector('.think-tokens').textContent = `~${tTok} tok`;
+                    tBlock.removeAttribute('open'); // col·lapsa automàticament
+                };
+
+                const processChunk = (raw) => {
+                    tBuf += raw;
+                    while (tBuf.length > 0) {
+                        if (tMode === 'init') {
+                            const s = tBuf.indexOf('<think>');
+                            if (s >= 0) {
+                                tMode = 'thinking';
+                                tBuf = tBuf.slice(s + 7);
+                                startThinkBlock();
+                            } else if (tBuf.length > 7) {
+                                // No think tag — resposta directa
+                                tMode = 'responding';
+                            } else {
+                                break; // espera més dades
+                            }
+                        } else if (tMode === 'thinking') {
+                            const e = tBuf.indexOf('</think>');
+                            if (e >= 0) {
+                                tContent += tBuf.slice(0, e);
+                                tTok += Math.ceil(tContent.length / 4);
+                                if (tTextEl) tTextEl.textContent = tContent;
+                                tBuf = tBuf.slice(e + 8).replace(/^\n+/, '');
+                                tMode = 'responding';
+                                closeThinkBlock();
+                                this.setAiState('streaming');
+                                this._startStreamStats();
+                            } else {
+                                // Guarda possible tag parcial al final
+                                const partial = Math.min(8, tBuf.length);
+                                let keepFrom = tBuf.length;
+                                for (let i = partial; i > 0; i--) {
+                                    if ('</think>'.startsWith(tBuf.slice(-i))) { keepFrom = tBuf.length - i; break; }
+                                }
+                                tContent += tBuf.slice(0, keepFrom);
+                                if (tTextEl) tTextEl.textContent = tContent;
+                                tTok = Math.ceil(tContent.length / 4);
+                                const tokEl = tBlock?.querySelector('.think-tokens');
+                                if (tokEl) tokEl.textContent = `~${tTok} tok`;
+                                tBuf = tBuf.slice(keepFrom);
+                                break;
+                            }
+                        } else { // responding
+                            fullResponse += tBuf;
+                            this._streamTokens += Math.ceil(tBuf.length / 4);
+                            this._scheduleRender(assistantMessageDiv, fullResponse);
+                            tBuf = '';
+                        }
+                    }
+                };
 
                 try {
-                    let firstChunk = true;
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
 
-                        const chunk = decoder.decode(value, { stream: true });
-                        fullResponse += chunk;
+                        let chunk = decoder.decode(value, { stream: true });
 
-                        // Al primer chunk, canviem a streaming i iniciem stats
-                        if (firstChunk) {
-                            firstChunk = false;
-                            this.setAiState('streaming');
-                            this._startStreamStats();
+                        // Detectar token de memòria guardat
+                        if (chunk.includes('\x00[MEM]\x00')) {
+                            memorySaved = true;
+                            chunk = chunk.replace('\x00[MEM]\x00', '');
                         }
 
-                        // Comptar tokens (aprox 1 tok per 4 chars)
-                        this._streamTokens += Math.ceil(chunk.length / 4);
+                        // Al primer chunk qualsevol
+                        if (tMode === 'init' && !this._streamStarted) {
+                            this._streamStarted = true;
+                        }
 
-                        assistantMessageDiv.textContent = fullResponse;
+                        processChunk(chunk);
                         this.scrollToBottom();
                     }
-                    // Streaming acabat — renderitzar Markdown
-                    assistantMessageDiv.innerHTML = this.renderMarkdown(this.stripThinkTags(fullResponse));
+                    // Streaming acabat — render final definitiu
+                    clearTimeout(this._renderTimer);
+                    assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse);
+                    if (tMode !== 'responding' && tMode !== 'init') closeThinkBlock();
+                    this._streamStarted = false;
+
+                    // Stats per missatge (NAT pattern)
+                    const elapsed = (Date.now() - this._streamStart) / 1000;
+                    const finalTok = this._streamTokens;
+                    const finalSpd = elapsed > 0.5 ? (finalTok / elapsed).toFixed(1) : null;
+                    const modelEl = document.getElementById('modelInfoText');
+                    const modelName = modelEl ? modelEl.textContent.split(' · ')[0] : '';
+                    const statsEl = lastMsg.querySelector('.message-stats');
+                    if (statsEl && finalTok > 0) {
+                        const timeStr = elapsed > 0 ? `${elapsed.toFixed(1)}s` : '';
+                        const spdStr = finalSpd ? ` · ${finalSpd} tok/s` : '';
+                        const modelShort = modelName ? modelName.split('/').pop() : '';
+                        const memBadge = memorySaved
+                            ? `<span class="stat-item stat-mem"><i data-lucide="bookmark-check"></i><span>guardat</span></span>`
+                            : '';
+                        statsEl.innerHTML = `
+                            <span class="stat-item"><i data-lucide="activity"></i><span>${finalTok} tok</span></span>
+                            ${timeStr ? `<span class="stat-item"><i data-lucide="timer"></i><span>${timeStr}${spdStr}</span></span>` : ''}
+                            ${modelShort ? `<span class="stat-item stat-model"><i data-lucide="cpu"></i><span>${modelShort}</span></span>` : ''}
+                            ${memBadge}
+                        `;
+                        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [statsEl] });
+                    }
                 } catch (readError) {
                     if (readError.name === 'AbortError') {
-                        assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse + '\n\n⏹️ *[Generació aturada]*');
+                        if (tMode === 'thinking') closeThinkBlock();
+                        assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse + '\n\n*[Generació aturada]*');
                     } else {
                         throw readError;
                     }
-                }
-
-                if (!this.currentSessionId) {
-                    this.loadSessions();
                 }
 
             } else {
@@ -444,7 +569,7 @@ class NexeUI {
         const messageEl = document.createElement('div');
         messageEl.className = `message ${role}`;
 
-        const avatar = role === 'user' ? '👤' : '🤖';
+        const avatarIcon = role === 'user' ? 'user' : 'bot';
         const roleName = role === 'user' ? 'Tu' : 'Nexe';
 
         // User messages: escape HTML, Assistant messages: render Markdown
@@ -453,14 +578,16 @@ class NexeUI {
             : this.renderMarkdown(content);
 
         messageEl.innerHTML = `
-            <div class="message-avatar">${avatar}</div>
+            <div class="message-avatar"><i data-lucide="${avatarIcon}"></i></div>
             <div class="message-content">
                 <div class="message-role">${roleName}</div>
                 <div class="message-text">${messageContent}</div>
+                ${role === 'assistant' ? '<div class="message-stats"></div>' : ''}
             </div>
         `;
 
         this.chatMessages.appendChild(messageEl);
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [messageEl.querySelector('.message-avatar')] });
 
         if (scroll) {
             this.scrollToBottom();
@@ -499,7 +626,7 @@ class NexeUI {
 
     async uploadFile(file) {
         // Show loading indicator
-        this.filePreview.innerHTML = `<span class="upload-loading">📤 Pujant "${file.name}"...</span>`;
+        this.filePreview.innerHTML = `<span class="upload-loading">Pujant "${file.name}"...</span>`;
         this.filePreview.classList.add('active');
         this.uploadBtn.disabled = true;
 
@@ -554,12 +681,13 @@ class NexeUI {
         const sizeKB = (fileData.size / 1024).toFixed(1);
         this.filePreview.innerHTML = `
             <div class="uploaded-file">
-                <span class="uploaded-file-icon">📄</span>
+                <span class="uploaded-file-icon"><i data-lucide="file-text"></i></span>
                 <span class="uploaded-file-name">${fileData.filename}</span>
                 <span class="uploaded-file-size">(${sizeKB} KB)</span>
                 <button class="uploaded-file-remove" onclick="nexeUI.removeFilePreview()">✕</button>
             </div>
         `;
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [this.filePreview] });
         this.filePreview.classList.add('active');
     }
 
@@ -608,31 +736,41 @@ class NexeUI {
     showWelcome() {
         this.chatMessages.innerHTML = `
             <div class="welcome-screen">
-                <div class="welcome-icon">🤖</div>
+                <div class="welcome-icon"><i data-lucide="bot"></i></div>
                 <h2>Benvingut a Nexe</h2>
                 <p>IA local amb memòria persistent</p>
                 <div class="features">
                     <div class="feature">
-                        <span class="feature-icon">💬</span>
+                        <span class="feature-icon"><i data-lucide="message-circle"></i></span>
                         <span>Conversa amb memòria contextual</span>
                     </div>
                     <div class="feature">
-                        <span class="feature-icon">📁</span>
+                        <span class="feature-icon"><i data-lucide="folder-open"></i></span>
                         <span>Puja documents (.txt, .md, .pdf)</span>
                     </div>
                     <div class="feature">
-                        <span class="feature-icon">🔒</span>
+                        <span class="feature-icon"><i data-lucide="lock"></i></span>
                         <span>100% local i privat</span>
                     </div>
                 </div>
             </div>
         `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     scrollToBottom() {
         setTimeout(() => {
             this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
         }, 100);
+    }
+
+    _scheduleRender(el, content) {
+        // Render markdown màxim cada 80ms per no sobrecarregar el DOM
+        if (this._renderTimer) return;
+        this._renderTimer = setTimeout(() => {
+            this._renderTimer = null;
+            el.innerHTML = this.renderMarkdown(content);
+        }, 80);
     }
 
     stripThinkTags(text) {
