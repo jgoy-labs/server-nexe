@@ -46,7 +46,7 @@ def _auto_max_kv_size() -> int:
         kv_bytes_per_token = 256 * 1024  # 256KB/token (Qwen3-32B)
         max_tokens = int((available_for_kv_gb * 1024 ** 3) / kv_bytes_per_token)
         # Arrodonir al múltiple de 1024 i limitar a 131072
-        max_tokens = min(131072, (max_tokens // 1024) * 1024)
+        max_tokens = min(65536, (max_tokens // 1024) * 1024)
         max_tokens = max(16384, max_tokens)  # Mínim 16K
         logger.info(f"MLXConfig: auto max_kv_size={max_tokens} (RAM={total_gb:.0f}GB)")
         return max_tokens
