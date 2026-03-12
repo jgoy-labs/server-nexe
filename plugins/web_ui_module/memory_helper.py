@@ -122,7 +122,7 @@ class MemoryHelper:
 
                 # Ensure web UI collection exists
                 if not await api.collection_exists("nexe_web_ui"):
-                    await api.create_collection("nexe_web_ui", vector_size=384)
+                    await api.create_collection("nexe_web_ui", vector_size=768)
                     logger.info("Created web UI memory collection")
 
                 _memory_api_instance = api
@@ -388,9 +388,9 @@ class MemoryHelper:
         if not memory:
             return {"success": False, "chunks_saved": 0, "message": "Memory API not available"}
 
-        # Ensure nexe_web_ui exists (same collection used for user messages — same 384-dim model)
+        # Ensure nexe_web_ui exists (same collection used for user messages — 768 dims)
         if not await memory.collection_exists("nexe_web_ui"):
-            await memory.create_collection("nexe_web_ui", vector_size=384)
+            await memory.create_collection("nexe_web_ui", vector_size=768)
             logger.info("Created nexe_web_ui collection")
 
         total = len(chunks)
@@ -590,7 +590,7 @@ class MemoryHelper:
             if await memory.collection_exists("nexe_web_ui"):
                 # Delete and recreate collection
                 await memory.delete_collection("nexe_web_ui")
-                await memory.create_collection("nexe_web_ui", vector_size=384)
+                await memory.create_collection("nexe_web_ui", vector_size=768)
                 logger.info("Memory collection cleared and recreated")
 
             return {
