@@ -207,7 +207,7 @@ async def upload_file(
     chunks = _file_handler.chunk_text(body_content, chunk_size=chunk_size)
     logger.info(f"Document '{file.filename}': {len(body_content)} chars → {len(chunks)} chunks (chunk_size={chunk_size})")
 
-    # Ingest all chunks individually to user_knowledge (one embedding per chunk)
+    # Ingest all chunks individually to nexe_web_ui (one embedding per chunk)
     memory_helper = get_memory_helper()
     ingestion_result = await memory_helper.save_document_chunks(
         chunks=chunks,
