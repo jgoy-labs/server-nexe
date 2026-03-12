@@ -14,13 +14,14 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import asyncio
 import logging
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Header
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .session_manager import SessionManager
 from .file_handler import FileHandler
 from .memory_helper import get_memory_helper
+from plugins.security.core.auth_config import get_admin_api_key
 
 # Import RAG header parser
 try:
@@ -44,7 +45,20 @@ _file_handler = FileHandler(_static_dir / "uploads")
 router_public = APIRouter(prefix="/ui", tags=["ui", "web", "demo"])
 
 
+async def _require_ui_auth(x_api_key: Optional[str] = Header(None)):
+    """Valida API key per a endpoints de la Web UI"""
+    expected = get_admin_api_key()
+    if expected and x_api_key != expected:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+
 # Endpoints
+@router_public.get("/auth")
+async def verify_auth(_auth=Depends(_require_ui_auth)):
+    """Verificar API key"""
+    return {"status": "ok"}
+
+
 @router_public.get("/", response_class=HTMLResponse)
 async def serve_ui():
     """Servir la pàgina principal"""
@@ -86,7 +100,7 @@ async def serve_static(filename: str):
 
 
 @router_public.post("/session/new")
-async def create_session(request: Optional[Dict[str, Any]] = None):
+async def create_session(request: Optional[Dict[str, Any]] = None, _auth=Depends(_require_ui_auth)):
     """Crear nova sessió"""
     session = _session_manager.create_session()
     return {
@@ -96,7 +110,7 @@ async def create_session(request: Optional[Dict[str, Any]] = None):
 
 
 @router_public.get("/session/{session_id}")
-async def get_session_info(session_id: str):
+async def get_session_info(session_id: str, _auth=Depends(_require_ui_auth)):
     """Obtenir info de sessió"""
     session = _session_manager.get_session(session_id)
     if not session:
@@ -105,7 +119,7 @@ async def get_session_info(session_id: str):
 
 
 @router_public.get("/session/{session_id}/history")
-async def get_session_history(session_id: str):
+async def get_session_history(session_id: str, _auth=Depends(_require_ui_auth)):
     """Obtenir historial de sessió"""
     session = _session_manager.get_session(session_id)
     if not session:
@@ -114,7 +128,7 @@ async def get_session_history(session_id: str):
 
 
 @router_public.delete("/session/{session_id}")
-async def delete_session(session_id: str):
+async def delete_session(session_id: str, _auth=Depends(_require_ui_auth)):
     """Eliminar sessió"""
     deleted = _session_manager.delete_session(session_id)
     if not deleted:
@@ -123,7 +137,7 @@ async def delete_session(session_id: str):
 
 
 @router_public.get("/sessions")
-async def list_sessions():
+async def list_sessions(_auth=Depends(_require_ui_auth)):
     """Llistar totes les sessions"""
     return {"sessions": _session_manager.list_sessions()}
 
@@ -131,7 +145,8 @@ async def list_sessions():
 @router_public.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
-    session_id: Optional[str] = Form(None)
+    session_id: Optional[str] = Form(None),
+    _auth=Depends(_require_ui_auth)
 ):
     """Pujar fitxer i afegir al context de la sessió + ingesta automàtica a memòria"""
     content = await file.read()
@@ -218,7 +233,7 @@ async def cleanup_files(max_age_hours: int = 24):
 
 
 @router_public.post("/chat")
-async def chat(request: Dict[str, Any]):
+async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
     """Endpoint de xat amb streaming i detecció d'intencions de memòria"""
     message = request.get("message", "")
     session_id = request.get("session_id")
@@ -611,7 +626,7 @@ IMPORTANT: El context anterior és informació de fons. NO l'incloguis a la teva
 
 
 @router_public.post("/memory/save")
-async def memory_save(request: Dict[str, Any]):
+async def memory_save(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
     """Guardar contingut explícitament a la memòria"""
     content = request.get("content", "")
     session_id = request.get("session_id", "unknown")
@@ -631,7 +646,7 @@ async def memory_save(request: Dict[str, Any]):
 
 
 @router_public.post("/memory/recall")
-async def memory_recall(request: Dict[str, Any]):
+async def memory_recall(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
     """Cercar a la memòria"""
     query = request.get("query", "")
     limit = request.get("limit", 5)
