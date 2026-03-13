@@ -201,9 +201,40 @@ async def upload_file(
                 "collection": rag_header.collection
             })
             logger.info(f"RAG header found: id={rag_header.id}, priority={rag_header.priority}")
+        else:
+            # Autogenerar metadades bàsiques per millorar la cerca semàntica
+            import os as _upos
+            stem = Path(file.filename).stem.replace("_", " ").replace("-", " ")
+            _lang = _upos.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+            # Abstract: primer paràgraf substantiu (màx 400 chars)
+            _abstract = " ".join(body_content.split())[:400]
+            doc_metadata.update({
+                "abstract": _abstract,
+                "tags": [stem],
+                "priority": "P2",
+                "type": "docs",
+                "lang": _lang,
+            })
+            logger.info(f"No RAG header — metadades autogenerades per '{file.filename}'")
 
-    # Chunk document (compute first — needed for both ingestion and session attach)
-    chunk_size = rag_header.chunk_size if (rag_header and rag_header.is_valid) else 2500
+    # Chunk size adaptat a la mida del document per equilibrar precisió i cobertura:
+    #   < 20K chars  (~7 pàg)   → 800   (màxima precisió)
+    #   < 100K chars (~33 pàg)  → 1000
+    #   < 300K chars (~100 pàg) → 1200
+    #   >= 300K chars (>100 pàg)→ 1500  (docs molt grans: manté coherència per chunk)
+    if rag_header and rag_header.is_valid:
+        chunk_size = rag_header.chunk_size
+    else:
+        _doc_len = len(body_content)
+        if _doc_len < 20_000:
+            chunk_size = 800
+        elif _doc_len < 100_000:
+            chunk_size = 1000
+        elif _doc_len < 300_000:
+            chunk_size = 1200
+        else:
+            chunk_size = 1500
+        logger.info(f"chunk_size auto={chunk_size} per {_doc_len} chars ({file.filename})")
     chunks = _file_handler.chunk_text(body_content, chunk_size=chunk_size)
     logger.info(f"Document '{file.filename}': {len(body_content)} chars → {len(chunks)} chunks (chunk_size={chunk_size})")
 

@@ -112,6 +112,71 @@ class NexeAPIClient:
             except httpx.ConnectError:
                 yield "❌ Error: No s'ha pogut connectar al servidor Nexe. Assegura't que './nexe go' està corrent."
 
+    async def upload_file(self, file_path: str, session_id: str) -> Optional[Dict[str, Any]]:
+        """Puja un fitxer a la sessió via /ui/upload (multipart form)."""
+        url = f"{self.base_url}/ui/upload"
+        # No Content-Type header per multipart (httpx el genera automàticament)
+        headers = {k: v for k, v in self.headers.items() if k.lower() != "content-type"}
+        try:
+            with open(file_path, "rb") as f:
+                content = f.read()
+        except Exception as e:
+            logger.error(f"Cannot read file {file_path}: {e}")
+            return None
+
+        filename = Path(file_path).name
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                response = await client.post(
+                    url,
+                    data={"session_id": session_id},
+                    files={"file": (filename, content)},
+                    headers=headers,
+                )
+                if response.status_code == 200:
+                    return response.json()
+                logger.error(f"Upload error {response.status_code}: {response.text}")
+                return None
+            except Exception as e:
+                logger.error(f"Upload request error: {e}")
+                return None
+
+    async def create_ui_session(self) -> Optional[str]:
+        """Crea una nova sessió al pipeline UI del servidor."""
+        url = f"{self.base_url}/ui/session/new"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                response = await client.post(url, json={}, headers=self.headers)
+                if response.status_code == 200:
+                    return response.json().get("session_id")
+            except Exception as e:
+                logger.error(f"Create session error: {e}")
+        return None
+
+    async def chat_ui_stream(self, message: str, session_id: str) -> AsyncGenerator[str, None]:
+        """
+        Fa request a /ui/chat (mateix pipeline que el UI web) amb streaming.
+        Usa sessions servidor, RAG nexe_chat_memory, detecció d'intencions.
+        """
+        url = f"{self.base_url}/ui/chat"
+        payload = {"message": message, "session_id": session_id, "stream": True}
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                async with client.stream("POST", url, json=payload, headers=self.headers) as response:
+                    if response.status_code != 200:
+                        error_msg = await response.aread()
+                        yield f"Error del servidor ({response.status_code}): {error_msg.decode()}"
+                        return
+                    async for chunk in response.aiter_bytes():
+                        text = chunk.decode("utf-8", errors="replace")
+                        # Filtrar marcadors interns de memòria
+                        text = text.replace("\x00[MEM]\x00", "")
+                        if text:
+                            yield text
+            except httpx.ConnectError:
+                yield "❌ Error: No s'ha pogut connectar al servidor Nexe. Assegura't que './nexe go' està corrent."
+
     async def chat_offline(self, messages: list, engine: str) -> str:
         """Simulació offline si el server no hi és (no recomanat per CLI interactiu complex)."""
         return "❌ Offline mode not supported yet. Please run './nexe go' first."
