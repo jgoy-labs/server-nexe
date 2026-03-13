@@ -118,8 +118,10 @@ body.frame-hidden { padding: 0; }
 
 .app-container {
     display: flex;
-    height: calc(100vh - 36px - var(--frame-width));
-    width: 100vw;
+    height: calc(100vh - 36px - var(--frame-width) * 2);
+    width: calc(100vw - var(--frame-width) * 2);
+    margin-top: var(--frame-width);
+    margin-left: var(--frame-width);
 }
 
 /* ============================================
