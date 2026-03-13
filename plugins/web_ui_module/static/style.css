@@ -327,11 +327,29 @@ body.frame-hidden { padding: 0; }
     gap: 0.5rem;
 }
 
-.footer-links {
+.footer-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.footer-left,
+.footer-center,
+.footer-right {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    flex-wrap: wrap;
+}
+
+.footer-text {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+
+.footer-separator {
+    color: var(--text-muted);
+    opacity: 0.4;
+    font-size: 0.6rem;
 }
 
 .footer-link {
