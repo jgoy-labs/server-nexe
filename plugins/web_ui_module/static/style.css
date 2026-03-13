@@ -144,6 +144,7 @@ body.frame-hidden { padding: 0; }
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    overflow: hidden;
 }
 
 .logo h1 {
@@ -154,8 +155,11 @@ body.frame-hidden { padding: 0; }
 }
 
 .logo-img {
-    width: 120px;
+    width: 160px;
     height: auto;
+    max-width: 160px;
+    object-fit: contain;
+    flex-shrink: 0;
 }
 
 .welcome-logo {
@@ -163,8 +167,10 @@ body.frame-hidden { padding: 0; }
 }
 
 .welcome-logo img {
-    width: 450px;
+    width: 550px;
+    max-width: 90%;
     height: auto;
+    object-fit: contain;
 }
 
 .logo .version {
