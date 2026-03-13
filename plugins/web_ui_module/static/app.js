@@ -135,6 +135,21 @@ class NexeUI {
             });
         }
 
+        // Toggle tema clar/fosc
+        const themeBtn = document.getElementById('themeToggleBtn');
+        if (themeBtn) {
+            const applyTheme = (light) => {
+                document.body.classList.toggle('light', light);
+                themeBtn.textContent = light ? '☀️' : '🌙';
+            };
+            applyTheme(localStorage.getItem('nexe_theme') === 'light');
+            themeBtn.addEventListener('click', () => {
+                const isLight = document.body.classList.toggle('light');
+                localStorage.setItem('nexe_theme', isLight ? 'light' : 'dark');
+                themeBtn.textContent = isLight ? '☀️' : '🌙';
+            });
+        }
+
         // Toggle marc
         const frameBtn = document.getElementById('frameToggleBtn');
         if (frameBtn) {
