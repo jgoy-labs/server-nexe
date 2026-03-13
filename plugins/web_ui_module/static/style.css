@@ -71,7 +71,8 @@ body {
     color: var(--text-primary);
     overflow: hidden;
     height: 100vh;
-    padding: var(--frame-width);
+    margin: 0;
+    padding: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
