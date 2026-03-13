@@ -117,7 +117,7 @@ body.frame-hidden { padding: 0; }
 
 .app-container {
     display: flex;
-    height: 100vh;
+    height: calc(100vh - 28px);
     width: 100vw;
 }
 
@@ -327,12 +327,27 @@ body.frame-hidden { padding: 0; }
     gap: 0.5rem;
 }
 
-.footer-bar {
+.site-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 28px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
     display: flex;
     align-items: center;
-    gap: 0.3rem;
-    flex-wrap: wrap;
-    row-gap: 0.1rem;
+    justify-content: space-between;
+    padding: 0 1.25rem;
+    z-index: 50;
+}
+
+.footer-left,
+.footer-center,
+.footer-right {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
 }
 
 .footer-text {
