@@ -135,14 +135,20 @@ class NexeUI {
             });
         }
 
-        // Toggle tema clar/fosc
+        // Toggle tema clar/fosc (detecta preferència del SO si no hi ha preferència guardada)
         const themeBtn = document.getElementById('themeToggleBtn');
         if (themeBtn) {
             const applyTheme = (light) => {
                 document.body.classList.toggle('light', light);
                 document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark');
             };
-            applyTheme(localStorage.getItem('nexe_theme') === 'light');
+            const saved = localStorage.getItem('nexe_theme');
+            const preferLight = saved ? saved === 'light' : window.matchMedia('(prefers-color-scheme: light)').matches;
+            applyTheme(preferLight);
+            // Seguir canvis del SO si l'usuari no ha triat manualment
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+                if (!localStorage.getItem('nexe_theme')) applyTheme(e.matches);
+            });
             themeBtn.addEventListener('click', () => {
                 const isLight = document.body.classList.toggle('light');
                 document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
