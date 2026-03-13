@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "1.0"
-data: 2026-02-23
+data: 2026-03-13
 id: nexe-usage-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Practical usage guide for NEXE. Starting and stopping the server, CLI commands, interactive chat, memory system, RAG document management, API usage, and practical use cases such as personal assistant or knowledge base."
-tags: [usage, cli, chat, memory, rag, api, web-ui, use-cases]
+abstract: "Practical usage guide for NEXE. Starting and stopping the server, CLI commands, interactive chat with unified CLI+UI pipeline, memory system, document upload via /upload command, adaptive RAG chunk size by document size, RAG headers for optimal indexing, API usage and practical use cases."
+tags: [usage, cli, chat, memory, rag, api, web-ui, upload, rag-header, unified-pipeline]
 chunk_size: 900
 priority: P1
 
@@ -26,12 +26,14 @@ This guide teaches you how to use NEXE with practical examples. It assumes you a
 1. [Starting and stopping the server](#starting-and-stopping-the-server)
 2. [Basic CLI](#basic-cli)
 3. [Interactive chat](#interactive-chat)
-4. [Memory system (RAG)](#memory-system-rag)
-5. [Document management](#document-management)
-6. [Using the API](#using-the-api)
-7. [Web UI](#web-ui)
-8. [Practical use cases](#practical-use-cases)
-9. [Tips and best practices](#tips-and-best-practices)
+4. [Uploading documents to chat](#uploading-documents-to-chat)
+5. [Memory system (RAG)](#memory-system-rag)
+6. [RAG headers for documents](#rag-headers-for-documents)
+7. [Document management](#document-management)
+8. [Using the API](#using-the-api)
+9. [Web UI](#web-ui)
+10. [Practical use cases](#practical-use-cases)
+11. [Tips and best practices](#tips-and-best-practices)
 
 ---
 
@@ -123,7 +125,9 @@ If running in the foreground: `Ctrl+C`
 
 ## Interactive chat
 
-### Simple chat (no memory)
+The CLI uses exactly the **same pipeline as the Web UI**: server sessions, automatic memory and semantic search always active. No `--rag` flag needed.
+
+### Start the chat
 
 ```bash
 ./nexe chat
@@ -131,79 +135,94 @@ If running in the foreground: `Ctrl+C`
 
 **Session example:**
 ```
-╭──────────────────────────────────────────╮
-│  NEXE Chat - Phi-3.5 Mini               │
-│  Escriu 'exit' per sortir               │
-╰──────────────────────────────────────────╯
+  🚀 Nexe Chat
+  Engine: mlx  |  Model: Qwen3-32B-4bit  |  Memory: ✅ Active
+  ─────────────────────────────────────────
+  Commands: /upload <path> · /save <text> · /recall <query> · /help
+  Type "exit" or Ctrl+C to quit
 
-Tu: Hola, qui ets?
+Tu: Hello, who are you?
+  ⠹ 1.2s
+Nexe: Hi! I'm Nexe, the expert assistant for Server Nexe.
+How can I help you?
 
-NEXE: Hola! Sóc NEXE, un assistent d'IA que funciona
-completament en local al teu ordinador. Estic basat
-en el model Phi-3.5 Mini. En què et puc ajudar?
-
-Tu: Explica'm què és Python en 2 línies
-
-NEXE: Python és un llenguatge de programació
-interpretat, d'alt nivell i de propòsit general,
-conegut per la seva sintaxi clara i llegible. És
-molt popular per scripting, ciència de dades,
-desenvolupament web i automatització.
-
-Tu: exit
-
-Adéu! 👋
+Tu: What projects do I have active?
+  ⠸ 2.8s
+Nexe: Based on my memory, you're working on NEXE 0.8 and NAT7...
 ```
 
-### Chat with RAG memory
+The **spinner with timer** (`⠹ 2.8s`) shows the system is searching RAG and loading the model. It disappears when the first token arrives.
+
+### Chat commands
+
+| Command | Description |
+|---------|-------------|
+| `/upload <path>` | Upload a document to analyse |
+| `/save <text>` | Save information to persistent memory |
+| `/recall <query>` | Direct memory search |
+| `/help` | Show all commands |
+| `clear` | Reset session (fresh context, RAG intact) |
+| `exit` / `quit` | Exit the chat |
+
+### Session context
+
+Within a session, the model **remembers everything you said**. Context persists until you `clear` or close the chat.
+
+- `clear` → new session, history reset. **RAG is not cleared**: previously uploaded documents remain accessible via semantic search.
+- Closing and reopening chat → new session, but RAG memory persists across sessions.
+
+### Command options
 
 ```bash
-./nexe chat --rag
-```
-
-With `--rag` enabled, NEXE:
-- Queries persistent memory before responding
-- Uses context from indexed documents
-- Remembers information from previous conversations
-
-**Example:**
-```
-Tu: Quins són els meus projectes actuals?
-
-NEXE: [Consultant memòria...]
-
-Segons la informació que tinc guardada, estàs
-treballant en:
-- NEXE 0.8: Servidor IA local amb RAG
-- JGOY Quest: Sistema de tracking gamificat
-
-Vols que et doni més detalls d'algun?
-
-Tu: Sí, explica'm més sobre NEXE
-
-NEXE: [Consultant documentació...]
-
-NEXE és un projecte personal d'aprenentatge (learning
-by doing) que explora com construir un servidor d'IA
-local amb memòria persistent. Actualment està en
-versió 0.8 i funciona en macOS amb tres backends...
-```
-
-### Chat options
-
-```bash
-# Chat with RAG enabled
-./nexe chat --rag
-
-# Chat with custom system prompt
-./nexe chat --system "Ets un expert en Python"
-
-# Chat with specific engine (if you have multiple backends)
+# Specific engine
 ./nexe chat --engine mlx
 
-# Note: model, temperatura i max_tokens es configuren via .env
-# (NEXE_DEFAULT_MODEL, temperatura a server.toml)
+# Note: --rag and --system are ignored (UI pipeline always manages them)
 ```
+
+---
+
+## Uploading documents to chat
+
+You can upload documents directly in the CLI chat and ask questions about them. Works the same as dragging a file into the Web UI.
+
+### /upload command
+
+```bash
+# Inside the chat:
+Tu: /upload /path/to/report.pdf
+📎 Uploading report.pdf...
+✅ report.pdf indexed (24 parts). You can now ask questions about the document.
+
+Tu: give me an executive summary
+Nexe: The document covers...
+```
+
+**Paths with spaces:** use `\ ` to escape spaces:
+```
+/upload /Users/jordi/Documents/My\ Project/report.md
+```
+
+### Supported formats
+
+`.pdf`, `.txt`, `.md`, `.markdown` and other text formats.
+
+### How upload works
+
+1. **Session slot**: the document is attached to the current session. The first message receives it as full context (up to 50 parts).
+2. **RAG indexing**: all chunks are saved to `nexe_web_ui`. They persist across sessions and are retrieved by semantic search.
+
+### Multiple documents
+
+```
+/upload doc1.pdf          → indexed + attached to session
+You: summarise doc1?      → receives doc1 as full context
+/upload doc2.pdf          → indexed + overwrites session slot
+You: summarise doc2?      → receives doc2 as full context
+You: compare doc1 and doc2 → both accessible via semantic RAG
+```
+
+**Recommendation:** ask the main question **right after each `/upload`** to get full context. Later questions access via RAG.
 
 ---
 
@@ -259,6 +278,93 @@ Model d'embeddings: nomic-embed-text (Ollama) + fallbacks
 Dimensió vectors: 768
 
 Última actualització: fa 2 hores
+```
+
+---
+
+## RAG headers for documents
+
+The **RAG header** is the key to high-quality semantic search. When a document has a header, the system uses `chunk_size`, `abstract` and `tags` to index it optimally. Without a header, the system auto-generates one.
+
+### Adaptive chunk size (no header)
+
+When uploading a document without a header (via `/upload` or Web UI), the system automatically picks `chunk_size` based on size:
+
+| Document size | Chunk size | Equivalent |
+|---------------|-----------|------------|
+| < 20,000 chars | 800 | ~7 pages |
+| < 100,000 chars | 1,000 | ~33 pages |
+| < 300,000 chars | 1,200 | ~100 pages |
+| ≥ 300,000 chars | 1,500 | > 100 pages |
+
+A 170-page document (~510,000 chars) will use `chunk_size: 1500` automatically.
+
+### RAG header format
+
+For best quality, add a header to your `.md` or `.txt` document:
+
+```markdown
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-03-13
+id: unique-document-name
+
+# === CONTINGUT RAG (OBLIGATORI) ===
+abstract: "Concise description of the content. Max 500 chars. The model uses this to understand what the document is about."
+tags: [tag1, tag2, tag3]
+chunk_size: 1200
+priority: P1
+
+# === OPCIONAL ===
+lang: en
+type: docs
+collection: user_knowledge
+author: "Author"
+expires: null
+---
+
+[Document content here...]
+```
+
+### Header fields
+
+| Field | Required | Values | Description |
+|-------|----------|--------|-------------|
+| `id` | Yes | unique text | Document identifier |
+| `abstract` | Yes | text (max 500) | Summary for the model |
+| `tags` | Yes | [list] | Search keywords |
+| `chunk_size` | Yes | 400–2000 | Fragment size (800 = normal doc, 1500 = large doc) |
+| `priority` | Yes | P0–P3 | P0 = highest priority, P3 = low |
+| `lang` | No | ca/es/en/multi | Document language |
+| `type` | No | docs/tutorial/api/faq/notes | Type |
+| `collection` | No | user_knowledge | Where it's indexed |
+
+### Recommended priorities
+
+- **P0**: Critical documentation (specs, contracts)
+- **P1**: Important documentation (guides, tutorials)
+- **P2**: General notes (default for uploads without header)
+- **P3**: Secondary reference material
+
+### Example for a 170-page report
+
+```markdown
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-03-13
+id: report-INF-2026-00007
+
+abstract: "Technical report INF-2026-00007. NAT7 system performance analysis for Q1 2026. Includes metrics, conclusions and recommendations."
+tags: [report, NAT7, performance, Q1-2026, analysis]
+chunk_size: 1500
+priority: P1
+
+lang: en
+type: docs
+collection: user_knowledge
+---
+
+[Report content...]
 ```
 
 ---

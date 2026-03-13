@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "1.0"
-data: 2026-02-23
+data: 2026-03-13
 id: nexe-usage-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia pràctica d'ús de NEXE. Inici i parada del servidor, comandes CLI, xat interactiu, sistema de memòria, gestió de documents RAG, ús de l'API i casos d'ús pràctics com assistent personal o base de coneixement."
-tags: [ús, cli, chat, memory, rag, api, web-ui, casos-dús]
+abstract: "Guia pràctica d'ús de NEXE. Inici i parada del servidor, comandes CLI, xat interactiu amb pipeline unificat CLI+UI, sistema de memòria, pujada de documents amb /upload, RAG adaptatiu per mida de document, ús de l'API i casos d'ús pràctics."
+tags: [ús, cli, chat, memory, rag, api, web-ui, upload, capçalera-rag, pipeline-unificat]
 chunk_size: 900
 priority: P1
 
@@ -26,12 +26,14 @@ Aquesta guia t'ensenya a usar NEXE amb exemples pràctics. Assumeix que ja tens 
 1. [Iniciar i aturar el servidor](#iniciar-i-aturar-el-servidor)
 2. [CLI bàsic](#cli-bàsic)
 3. [Chat interactiu](#chat-interactiu)
-4. [Sistema de memòria (RAG)](#sistema-de-memòria-rag)
-5. [Gestió de documents](#gestió-de-documents)
-6. [Ús de l'API](#ús-de-lapi)
-7. [Web UI](#web-ui)
-8. [Casos d'ús pràctics](#casos-dús-pràctics)
-9. [Consells i bones pràctiques](#consells-i-bones-pràctiques)
+4. [Pujar documents al chat](#pujar-documents-al-chat)
+5. [Sistema de memòria (RAG)](#sistema-de-memòria-rag)
+6. [Capçaleres RAG per a documents](#capçaleres-rag-per-a-documents)
+7. [Gestió de documents](#gestió-de-documents)
+8. [Ús de l'API](#ús-de-lapi)
+9. [Web UI](#web-ui)
+10. [Casos d'ús pràctics](#casos-dús-pràctics)
+11. [Consells i bones pràctiques](#consells-i-bones-pràctiques)
 
 ---
 
@@ -123,7 +125,9 @@ Si està en primer pla: `Ctrl+C`
 
 ## Chat interactiu
 
-### Chat simple (sense memòria)
+El CLI usa exactament el **mateix pipeline que el Web UI**: sessions servidor, memòria automàtica i cerca semàntica activa per defecte. No cal cap flag `--rag`.
+
+### Iniciar el chat
 
 ```bash
 ./nexe chat
@@ -131,79 +135,95 @@ Si està en primer pla: `Ctrl+C`
 
 **Exemple de sessió:**
 ```
-╭──────────────────────────────────────────╮
-│  NEXE Chat - Phi-3.5 Mini               │
-│  Escriu 'exit' per sortir               │
-╰──────────────────────────────────────────╯
+  🚀 Nexe Chat
+  Engine: mlx  |  Model: Qwen3-32B-4bit  |  Memòria: ✅ Activa
+  ─────────────────────────────────────────
+  Commands: /upload <ruta> · /save <text> · /recall <query> · /help
+  Type "exit" or Ctrl+C to quit
 
 Tu: Hola, qui ets?
+  ⠹ 1.2s
+Nexe: Hola! Sóc Nexe, l'assistent expert de Server Nexe.
+En què et puc ajudar?
 
-NEXE: Hola! Sóc NEXE, un assistent d'IA que funciona
-completament en local al teu ordinador. Estic basat
-en el model Phi-3.5 Mini. En què et puc ajudar?
-
-Tu: Explica'm què és Python en 2 línies
-
-NEXE: Python és un llenguatge de programació
-interpretat, d'alt nivell i de propòsit general,
-conegut per la seva sintaxi clara i llegible. És
-molt popular per scripting, ciència de dades,
-desenvolupament web i automatització.
-
-Tu: exit
-
-Adéu! 👋
+Tu: Quins projectes tinc actius?
+  ⠸ 2.8s
+Nexe: Segons el que tinc a la memòria, estàs treballant
+en NEXE 0.8 i NAT7...
 ```
 
-### Chat amb memòria RAG
+El **spinner amb temporitzador** (`⠹ 2.8s`) indica que el sistema està buscant al RAG i carregant el model. Desapareix quan arriba el primer token.
+
+### Comandes dins del chat
+
+| Comanda | Descripció |
+|---------|------------|
+| `/upload <ruta>` | Puja un document per analitzar |
+| `/save <text>` | Guarda informació a la memòria persistent |
+| `/recall <query>` | Cerca directa a la memòria |
+| `/help` | Mostra totes les comandes |
+| `clear` | Reinicia la sessió (nou context, RAG intacte) |
+| `exit` / `sortir` | Surt del chat |
+
+### Context de sessió
+
+Dins d'una mateixa sessió de chat, el model **recorda tot el que has dit**. El context es manté fins que fas `clear` o tanques el chat.
+
+- `clear` → nova sessió, historial net. **El RAG no s'esborra**: els documents pujats anteriorment segueixen accessibles per cerca semàntica.
+- Tancar el chat i tornar-lo a obrir → nova sessió, però la memòria RAG persisteix entre sessions.
+
+### Opcions de la comanda
 
 ```bash
-./nexe chat --rag
-```
-
-Amb `--rag` activat, NEXE:
-- Consulta la memòria persistent abans de respondre
-- Usa context dels documents indexats
-- Recorda informació de converses anteriors
-
-**Exemple:**
-```
-Tu: Quins són els meus projectes actuals?
-
-NEXE: [Consultant memòria...]
-
-Segons la informació que tinc guardada, estàs
-treballant en:
-- NEXE 0.8: Servidor IA local amb RAG
-- JGOY Quest: Sistema de tracking gamificat
-
-Vols que et doni més detalls d'algun?
-
-Tu: Sí, explica'm més sobre NEXE
-
-NEXE: [Consultant documentació...]
-
-NEXE és un projecte personal d'aprenentatge (learning
-by doing) que explora com construir un servidor d'IA
-local amb memòria persistent. Actualment està en
-versió 0.8 i funciona en macOS amb tres backends...
-```
-
-### Opcions del chat
-
-```bash
-# Chat amb RAG activat
-./nexe chat --rag
-
-# Chat amb system prompt personalitzat
-./nexe chat --system "Ets un expert en Python"
-
-# Chat amb engine específic (si tens múltiples backends)
+# Engine específic
 ./nexe chat --engine mlx
 
-# Nota: model, temperatura i max_tokens es configuren via .env
-# (NEXE_DEFAULT_MODEL, temperatura a server.toml)
+# Nota: --rag i --system s'ignoren (el pipeline UI els gestiona sempre)
 ```
+
+---
+
+## Pujar documents al chat
+
+Pots pujar documents directament al chat CLI i fer-hi preguntes. Funciona igual que arrossegar un fitxer al Web UI.
+
+### Comanda /upload
+
+```bash
+# Dins del chat:
+Tu: /upload /ruta/al/fitxer.pdf
+📎 Pujant fitxer.pdf...
+✅ fitxer.pdf indexat (24 parts). Ara pots fer preguntes sobre el document.
+
+Tu: fes-me un resum executiu
+Nexe: El document tracta de...
+```
+
+**Rutes amb espais:** usa `\ ` per escapar els espais:
+```
+/upload /Users/jordi/Documents/Que\ es\ NAT/QUE_ES_NAT.md
+```
+
+### Formats suportats
+
+`.pdf`, `.txt`, `.md`, `.markdown` i altres formats de text.
+
+### Com funciona la pujada
+
+1. **Slot de sessió**: el document s'adjunta a la sessió actual. El primer missatge el rep com a context complet (fins a 50 parts).
+2. **Indexació RAG**: tots els chunks es guarden a `nexe_web_ui`. Persisteixen entre sessions i es recuperen per cerca semàntica.
+
+### Múltiples documents
+
+```
+/upload doc1.pdf          → indexat + adjuntat a sessió
+Tu: resum de doc1?        → rep doc1 com a context complet
+/upload doc2.pdf          → indexat + sobreescriu slot de sessió
+Tu: resum de doc2?        → rep doc2 com a context complet
+Tu: compara doc1 i doc2   → ambdós accessibles via RAG semàntic
+```
+
+**Recomanació:** fes la pregunta principal **just després de cada `/upload`** per aprofitar el context complet. Les preguntes posteriors accedeixen via RAG.
 
 ---
 
@@ -274,6 +294,93 @@ Model d'embeddings: nomic-embed-text (Ollama) + fallbacks
 Dimensió vectors: 768
 
 Última actualització: fa 2 hores
+```
+
+---
+
+## Capçaleres RAG per a documents
+
+La **capçalera RAG** és la clau per a una cerca semàntica de qualitat. Quan un document té capçalera, el sistema usa `chunk_size`, `abstract` i `tags` per indexar-lo de manera òptima. Sense capçalera, el sistema en genera una d'automàtica.
+
+### Chunk size adaptatiu (sense capçalera)
+
+Quan puges un document sense capçalera (via `/upload` o Web UI), el sistema tria automàticament el `chunk_size` segons la mida:
+
+| Mida del document | Chunk size | Equivalent |
+|-------------------|-----------|------------|
+| < 20.000 chars | 800 | ~7 pàgines |
+| < 100.000 chars | 1.000 | ~33 pàgines |
+| < 300.000 chars | 1.200 | ~100 pàgines |
+| ≥ 300.000 chars | 1.500 | > 100 pàgines |
+
+Un document de 170 pàgines (~510.000 chars) usarà `chunk_size: 1500` automàticament.
+
+### Format de la capçalera RAG
+
+Per a la millor qualitat possible, afegeix una capçalera al teu document `.md` o `.txt`:
+
+```markdown
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-03-13
+id: nom-unic-del-document
+
+# === CONTINGUT RAG (OBLIGATORI) ===
+abstract: "Descripció concisa del contingut. Màx 500 chars. El model usa això per entendre de quà tracta el document."
+tags: [tag1, tag2, tag3]
+chunk_size: 1200
+priority: P1
+
+# === OPCIONAL ===
+lang: ca
+type: docs
+collection: user_knowledge
+author: "Autor"
+expires: null
+---
+
+[Contingut del document aquí...]
+```
+
+### Camps de la capçalera
+
+| Camp | Obligatori | Valors | Descripció |
+|------|-----------|--------|------------|
+| `id` | Sí | text únic | Identificador del document |
+| `abstract` | Sí | text (màx 500) | Resum per al model |
+| `tags` | Sí | [llista] | Paraules clau de cerca |
+| `chunk_size` | Sí | 400–2000 | Mida dels fragments (800 = doc normal, 1500 = doc gran) |
+| `priority` | Sí | P0–P3 | P0 = màxima prioritat, P3 = baixa |
+| `lang` | No | ca/es/en/multi | Idioma del document |
+| `type` | No | docs/tutorial/api/faq/notes | Tipus |
+| `collection` | No | user_knowledge | On s'indexa |
+
+### Prioritats recomanades
+
+- **P0**: Documentació crítica (especificacions, contractes)
+- **P1**: Documentació important (guies, tutorials)
+- **P2**: Notes generals (per defecte per uploads sense capçalera)
+- **P3**: Material de referència secundari
+
+### Exemple per a un informe de 170 pàgines
+
+```markdown
+# === METADATA RAG ===
+versio: "1.0"
+data: 2026-03-13
+id: informe-INF-2026-00007
+
+abstract: "Informe tècnic INF-2026-00007. Anàlisi de rendiment del sistema NAT7 per al Q1 2026. Inclou mètriques, conclusions i recomanacions."
+tags: [informe, NAT7, rendiment, Q1-2026, anàlisi]
+chunk_size: 1500
+priority: P1
+
+lang: ca
+type: docs
+collection: user_knowledge
+---
+
+[Contingut de l'informe...]
 ```
 
 ---

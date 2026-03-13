@@ -12,11 +12,15 @@ www.jgoy.net
 """
 
 import sys
+import os
+import re
+import time
+import itertools
 import logging
 import asyncio
 import click
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, Dict, AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +92,43 @@ def detect_engine():
     # 4. Fallback final (default)
     return "ollama"
 
-async def get_response_stream(engine: str, prompt: str, system: str, history: List[Dict], use_rag: bool):
+
+async def _stream_with_spinner(gen: AsyncGenerator) -> AsyncGenerator[str, None]:
+    """Mostra spinner animat fins al primer chunk; llavors streaming normal."""
+    frames = itertools.cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+    stop = asyncio.Event()
+    t0 = time.monotonic()
+
+    async def _spin():
+        for f in frames:
+            if stop.is_set():
+                break
+            elapsed = time.monotonic() - t0
+            print(f"\r  {f} {elapsed:.1f}s", end="", flush=True)
+            try:
+                await asyncio.wait_for(asyncio.shield(stop.wait()), timeout=0.1)
+            except asyncio.TimeoutError:
+                pass
+
+    task = asyncio.create_task(_spin())
+    try:
+        async for chunk in gen:
+            if not stop.is_set():
+                stop.set()
+                await task
+                print(f"\r{' ' * 20}\r", end="", flush=True)
+            yield chunk
+    finally:
+        if not stop.is_set():
+            stop.set()
+            try:
+                await task
+            except Exception:
+                pass
+        print(f"\r{' ' * 20}\r", end="", flush=True)
+
+
+async def get_response_stream(engine: str, prompt: str, system: str, history: list, use_rag: bool):
     """Obté resposta en streaming segons el motor."""
     # Nota: Aquí es faria el dispatch real cap als mòduls. 
     # Per simplicitat en CLI, fem una crida a l'API local si el server està up,
@@ -134,17 +174,16 @@ def detect_model():
 async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str]):
     from .utils.api_client import NexeAPIClient
 
-    rag = not no_rag
-
     if not engine:
         engine = detect_engine()
 
-    # Detect model if not specified
     if not model:
         model = detect_model()
 
-    if not system:
-        system = get_default_system_prompt()
+    if no_rag:
+        click.echo(click.style("ℹ️  --no-rag ignorat: el pipeline UI gestiona sempre el context de memòria.", fg="yellow"))
+    if system:
+        click.echo(click.style("ℹ️  --system ignorat: el system prompt el gestiona el servidor.", fg="yellow"))
 
     client = NexeAPIClient()
 
@@ -165,22 +204,22 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                 status = response.json()
                 actual_engine = status.get("engine", engine)
                 if actual_engine != engine:
-                    # Server is using different engine than .env (e.g., fallback to Ollama)
                     engine = f"{actual_engine} (fallback)"
     except Exception:
-        # If status check fails, use .env engine
         pass
 
+    # Create UI session (same pipeline as web UI)
+    session_id = await client.create_ui_session()
+    if not session_id:
+        click.echo(click.style("⚠️  No s'ha pogut crear sessió UI. Comprova que el mòdul web_ui estigui actiu.", fg="yellow"))
+        return
+
     click.echo(f"\n  {click.style('🚀 Nexe Chat', fg='cyan', bold=True)}")
-    click.echo(f"  {click.style('Engine:', fg='yellow')} {engine}  |  {click.style('Model:', fg='yellow')} {model}  |  {click.style('RAG:', fg='yellow')} {'✅ On' if rag else '❌ Off'}")
+    click.echo(f"  {click.style('Engine:', fg='yellow')} {engine}  |  {click.style('Model:', fg='yellow')} {model}  |  {click.style('Memòria:', fg='yellow')} ✅ Activa")
     click.echo(click.style('  ─────────────────────────────────────────', dim=True))
-    click.echo(click.style('  Commands: /save <text> · /recall <query> · /context on|off · /help', dim=True))
+    click.echo(click.style('  Commands: /upload <ruta> · /save <text> · /recall <query> · /help', dim=True))
     click.echo(click.style('  Type "exit" or Ctrl+C to quit', dim=True) + "\n")
 
-    history = []
-    if system:
-        history.append({"role": "system", "content": system})
-    
     while True:
         try:
             user_input = click.prompt(click.style("Tu", fg="green", bold=True))
@@ -189,35 +228,54 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                 break
 
             if user_input.lower() == "clear":
-                history = [h for h in history if h["role"] == "system"]
-                click.echo("🧹 Historial netejat.")
+                session_id = await client.create_ui_session()
+                if session_id:
+                    click.echo("🧹 Historial netejat.")
+                else:
+                    click.echo(click.style("❌ Error reiniciant sessió.", fg="red"))
                 continue
 
-            # Slash commands
-            if user_input.startswith("/"):
+            # Slash commands (only if first token is a known command, not a file path)
+            KNOWN_COMMANDS = {"save", "recall", "help", "upload"}
+            _first_token = user_input[1:].split()[0].lower() if len(user_input) > 1 else ""
+            if user_input.startswith("/") and _first_token in KNOWN_COMMANDS:
                 cmd_parts = user_input[1:].split(" ", 1)
                 cmd = cmd_parts[0].lower()
                 cmd_arg = cmd_parts[1] if len(cmd_parts) > 1 else ""
 
-                if cmd == "save" and cmd_arg:
-                    # Save to memory via API and get AI acknowledgment
+                if cmd == "upload" and cmd_arg:
+                    raw_path = cmd_arg.strip()
+                    # Suportar rutes amb espais escapats (Que\ es\ NAT → Que es NAT)
+                    raw_path = raw_path.replace("\\ ", " ")
+                    file_path = os.path.expanduser(raw_path)
+                    if not os.path.isfile(file_path):
+                        click.echo(click.style(f"❌ Fitxer no trobat: {file_path}", fg="red"))
+                        continue
+                    filename = Path(file_path).name
+                    click.echo(click.style(f"📎 Pujant {filename}...", fg="yellow"))
+                    try:
+                        upload_result = await client.upload_file(file_path, session_id)
+                        if not upload_result:
+                            click.echo(click.style("❌ Error pujant el fitxer. Comprova que el format és compatible.", fg="red"))
+                        else:
+                            chunks = upload_result.get("chunks", "?")
+                            click.echo(click.style(f"✅ {filename} indexat ({chunks} parts). Ara pots fer preguntes sobre el document.", fg="green"))
+                    except Exception as e:
+                        click.echo(click.style(f"❌ Error: {e}", fg="red"))
+                    continue
+
+                elif cmd == "save" and cmd_arg:
                     try:
                         success = await client.memory_store(cmd_arg)
                         if success:
-                            # Ask AI to acknowledge what was saved
                             ack_prompt = f"L'usuari acaba de dir-te que recordis això: \"{cmd_arg}\". Respon breument confirmant que ho recordaràs, sense repetir tota la informació."
-                            history.append({"role": "user", "content": ack_prompt})
-
-                            click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
-                            full_response = ""
-                            async for chunk in client.chat_stream(messages=history, engine=engine, rag=False):
+                            first = True
+                            async for chunk in _stream_with_spinner(client.chat_ui_stream(message=ack_prompt, session_id=session_id)):
+                                if first:
+                                    first = False
+                                    click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
                                 print(chunk, end="", flush=True)
-                                full_response += chunk
                             print()
-
-                            # Replace the ack_prompt with original save content in history
-                            history[-1] = {"role": "user", "content": f"[Guardat a memòria: {cmd_arg}]"}
-                            history.append({"role": "assistant", "content": full_response})
                         else:
                             click.echo(click.style("❌ Error guardant.", fg="red"))
                     except Exception as e:
@@ -225,7 +283,6 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                     continue
 
                 elif cmd == "recall" and cmd_arg:
-                    # Search memory
                     try:
                         results = await client.memory_search(cmd_arg)
                         if results:
@@ -238,22 +295,11 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                         click.echo(click.style(f"❌ Error: {e}", fg="red"))
                     continue
 
-                elif cmd == "context":
-                    if cmd_arg.lower() == "off":
-                        rag = False
-                        click.echo(click.style("🔕 Context RAG desactivat.", fg="yellow"))
-                    elif cmd_arg.lower() == "on":
-                        rag = True
-                        click.echo(click.style("🔔 Context RAG activat.", fg="green"))
-                    else:
-                        click.echo(f"RAG: {'✅ Actiu' if rag else '❌ Inactiu'}")
-                    continue
-
                 elif cmd == "help":
                     click.echo(click.style("\n📖 Comandes disponibles:", fg="cyan", bold=True))
+                    click.echo("  /upload <ruta>  Puja fitxer (PDF, MD, TXT...) per analitzar")
                     click.echo("  /save <text>    Guarda text a memòria")
                     click.echo("  /recall <query> Cerca a memòria")
-                    click.echo("  /context on|off Activa/desactiva RAG")
                     click.echo("  /help           Mostra aquesta ajuda")
                     click.echo("  clear           Neteja historial")
                     click.echo("  sortir          Surt del chat\n")
@@ -264,17 +310,13 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                     click.echo("Escriu /help per veure les comandes disponibles.")
                     continue
 
-            history.append({"role": "user", "content": user_input})
-
-            click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
-            
-            full_response = ""
-            async for chunk in client.chat_stream(messages=history, engine=engine, rag=rag):
+            first = True
+            async for chunk in _stream_with_spinner(client.chat_ui_stream(message=user_input, session_id=session_id)):
+                if first:
+                    first = False
+                    click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
                 print(chunk, end="", flush=True)
-                full_response += chunk
-            
-            print() # Newline final
-            history.append({"role": "assistant", "content": full_response})
+            print()
 
         except KeyboardInterrupt:
             click.echo("\n👋 Adéu!")
