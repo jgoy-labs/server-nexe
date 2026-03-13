@@ -81,7 +81,15 @@
                 <div class="logo">
                     <h1>Nexe</h1>
                     <span class="version">v0.8</span>
-                    <button id="frameToggleBtn" class="btn-frame-toggle" title="Mostrar/ocultar marc">◼</button>
+                    <div class="header-actions">
+                        <button id="themeToggleBtn" class="theme-toggle" title="Canviar tema">
+                            <span class="toggle-track">
+                                <i data-lucide="sun" class="toggle-icon icon-sun"></i>
+                                <i data-lucide="moon" class="toggle-icon icon-moon"></i>
+                            </span>
+                        </button>
+                        <button id="frameToggleBtn" class="btn-frame-toggle" title="Mostrar/ocultar marc">◼</button>
+                    </div>
                 </div>
                 <div id="modelInfo" class="model-info">
                     <div class="model-info-dot"></div>
@@ -201,7 +209,6 @@
                 <div class="status-dot active"></div>
                 <span>Connectat</span>
             </div>
-            <button id="themeToggleBtn" class="btn-theme-toggle" title="Canviar tema">🌙</button>
         </div>
     </footer>
 

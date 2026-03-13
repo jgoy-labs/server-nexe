@@ -140,13 +140,13 @@ class NexeUI {
         if (themeBtn) {
             const applyTheme = (light) => {
                 document.body.classList.toggle('light', light);
-                themeBtn.textContent = light ? '☀️' : '🌙';
+                document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark');
             };
             applyTheme(localStorage.getItem('nexe_theme') === 'light');
             themeBtn.addEventListener('click', () => {
                 const isLight = document.body.classList.toggle('light');
+                document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
                 localStorage.setItem('nexe_theme', isLight ? 'light' : 'dark');
-                themeBtn.textContent = isLight ? '☀️' : '🌙';
             });
         }
 
