@@ -244,24 +244,37 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                 cmd_arg = cmd_parts[1] if len(cmd_parts) > 1 else ""
 
                 if cmd == "upload" and cmd_arg:
-                    raw_path = cmd_arg.strip()
-                    # Suportar rutes amb espais escapats (Que\ es\ NAT → Que es NAT)
-                    raw_path = raw_path.replace("\\ ", " ")
+                    # Separar ruta (espais escapats amb \) del missatge opcional
+                    # Ex: /upload /path/Coments\ IA.md que diu aquest doc?
+                    path_parts = re.split(r'(?<!\\) ', cmd_arg.strip(), maxsplit=1)
+                    raw_path = path_parts[0].replace("\\ ", " ")
+                    follow_up = path_parts[1].strip() if len(path_parts) > 1 else ""
                     file_path = os.path.expanduser(raw_path)
                     if not os.path.isfile(file_path):
                         click.echo(click.style(f"❌ Fitxer no trobat: {file_path}", fg="red"))
                         continue
                     filename = Path(file_path).name
                     click.echo(click.style(f"📎 Pujant {filename}...", fg="yellow"))
+                    upload_ok = False
                     try:
                         upload_result = await client.upload_file(file_path, session_id)
                         if not upload_result:
                             click.echo(click.style("❌ Error pujant el fitxer. Comprova que el format és compatible.", fg="red"))
                         else:
                             chunks = upload_result.get("chunks", "?")
-                            click.echo(click.style(f"✅ {filename} indexat ({chunks} parts). Ara pots fer preguntes sobre el document.", fg="green"))
+                            click.echo(click.style(f"✅ {filename} indexat ({chunks} parts).", fg="green"))
+                            upload_ok = True
                     except Exception as e:
                         click.echo(click.style(f"❌ Error: {e}", fg="red"))
+                    # Si hi ha missatge de seguiment, enviar-lo ara
+                    if upload_ok and follow_up:
+                        first = True
+                        async for chunk in _stream_with_spinner(client.chat_ui_stream(message=follow_up, session_id=session_id)):
+                            if first:
+                                first = False
+                                click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
+                            print(chunk, end="", flush=True)
+                        print()
                     continue
 
                 elif cmd == "save" and cmd_arg:
@@ -311,12 +324,14 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                     continue
 
             first = True
+            t_start = time.monotonic()
             async for chunk in _stream_with_spinner(client.chat_ui_stream(message=user_input, session_id=session_id)):
                 if first:
                     first = False
                     click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
                 print(chunk, end="", flush=True)
-            print()
+            elapsed = time.monotonic() - t_start
+            print(click.style(f"  [{elapsed:.1f}s]", dim=True))
 
         except KeyboardInterrupt:
             click.echo("\n👋 Adéu!")

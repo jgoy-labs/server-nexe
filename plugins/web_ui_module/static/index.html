@@ -104,6 +104,17 @@
             </div>
 
             <div class="sidebar-footer">
+                <div class="rag-threshold-control">
+                    <div class="rag-threshold-label">
+                        <span>Precisió RAG</span>
+                        <span id="ragThresholdValue" class="rag-threshold-badge">0.6</span>
+                    </div>
+                    <input type="range" id="ragThresholdSlider" class="rag-threshold-slider"
+                           min="0.3" max="0.95" step="0.05" value="0.6">
+                    <div class="rag-threshold-hints">
+                        <span>Ampli</span><span>Estricte</span>
+                    </div>
+                </div>
                 <div class="status-indicator">
                     <div class="status-dot active"></div>
                     <span>Connectat</span>

@@ -530,13 +530,14 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                         try:
                             recall_result = await memory_helper.recall_from_memory(message, limit=5)
                             if recall_result["success"] and recall_result["results"]:
-                                # Filtrar per score mínim (0.5) per evitar soroll
-                                relevant = [r for r in recall_result["results"] if r.get("score", 0) >= 0.5]
+                                # Filtrar per score mínim (configurable, default 0.6)
+                                rag_threshold = float(data.get("rag_threshold", 0.6))
+                                relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
                                 if relevant:
                                     rag_context = "\n\n[MEMÒRIA - Informació rellevant guardada anteriorment:]\n"
                                     for item in relevant:
                                         rag_context += f"- {item['content']}\n"
-                                    logger.info(f"RAG: {len(relevant)} memories relevants (score >= 0.5)")
+                                    logger.info(f"RAG: {len(relevant)} memories relevants (score >= {rag_threshold})")
                                     for item in relevant:
                                         score = item.get('score', 0)
                                         col = item.get('metadata', {}).get('source_collection', '?')

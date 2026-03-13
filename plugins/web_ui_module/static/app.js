@@ -123,6 +123,18 @@ class NexeUI {
             this.messageInput.style.height = this.messageInput.scrollHeight + 'px';
         });
 
+        // RAG threshold slider
+        const ragSlider = document.getElementById('ragThresholdSlider');
+        const ragBadge = document.getElementById('ragThresholdValue');
+        if (ragSlider && ragBadge) {
+            const saved = localStorage.getItem('nexe_rag_threshold');
+            if (saved) { ragSlider.value = saved; ragBadge.textContent = saved; }
+            ragSlider.addEventListener('input', () => {
+                ragBadge.textContent = ragSlider.value;
+                localStorage.setItem('nexe_rag_threshold', ragSlider.value);
+            });
+        }
+
         // Toggle marc
         const frameBtn = document.getElementById('frameToggleBtn');
         if (frameBtn) {
@@ -360,13 +372,16 @@ class NexeUI {
         this.messageInput.style.height = 'auto';
 
         try {
+            const ragSlider = document.getElementById('ragThresholdSlider');
+            const ragThreshold = ragSlider ? parseFloat(ragSlider.value) : 0.6;
             const response = await this.fetchWithCsrf('/ui/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: message,
                     session_id: this.currentSessionId,
-                    stream: true
+                    stream: true,
+                    rag_threshold: ragThreshold
                 }),
                 signal: this.abortController.signal
             });
