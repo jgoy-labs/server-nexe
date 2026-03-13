@@ -106,7 +106,10 @@
             <div class="sidebar-footer">
                 <div class="rag-threshold-control">
                     <div class="rag-threshold-label">
-                        <span>Precisió RAG</span>
+                        <span class="rag-threshold-title">
+                            Precisió RAG
+                            <span class="rag-info-icon" title="Controla quant ha de semblar-se un record a la teva pregunta per ser inclòs al context. Valors alts (0.8+) → menys context, molt precís. Valors baixos (0.3) → més context, però pot incloure soroll i causar al·lucinacions.">ⓘ</span>
+                        </span>
                         <span id="ragThresholdValue" class="rag-threshold-badge">0.6</span>
                     </div>
                     <input type="range" id="ragThresholdSlider" class="rag-threshold-slider"

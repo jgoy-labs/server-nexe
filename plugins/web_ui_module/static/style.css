@@ -354,6 +354,45 @@ body.frame-hidden { padding: 0; }
     opacity: 0.6;
 }
 
+.rag-threshold-title {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.rag-info-icon {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    cursor: help;
+    opacity: 0.7;
+    position: relative;
+}
+
+.rag-info-icon:hover {
+    opacity: 1;
+    color: var(--accent);
+}
+
+.rag-info-icon[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    width: 200px;
+    white-space: normal;
+    line-height: 1.4;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 100;
+    pointer-events: none;
+}
+
 /* Model info al sidebar header */
 .model-info {
     margin-top: 0.5rem;
