@@ -47,6 +47,18 @@
     --transition: 0.2s ease;
 }
 
+/* Tema clar */
+body.light {
+    --bg-primary:   #f5f5f5;
+    --bg-secondary: #ececec;
+    --bg-tertiary:  #e2e2e2;
+    --bg-hover:     #d8d8d8;
+    --text-primary:   #111111;
+    --text-secondary: #444444;
+    --text-muted:     #888888;
+    --border:  #cccccc;
+}
+
 /* Marc animat — canvia color quan IA pensa */
 [data-ai-state="thinking"]  { --frame-color: rgba(255,90,0,1); }   /* taronja = glitch-cyan web doc */
 [data-ai-state="streaming"] { --frame-color: rgba(255,160,0,1); }  /* groc = glitch-yellow web doc */
@@ -294,9 +306,51 @@ body.frame-hidden { padding: 0; }
 }
 
 .sidebar-footer {
-    padding: 1rem;
+    padding: 0.65rem 1rem 0.65rem;
     border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
+
+.footer-links {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.footer-link {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    opacity: 0.7;
+    transition: opacity var(--transition), color var(--transition);
+}
+
+.footer-link:hover {
+    opacity: 1;
+    color: var(--text-secondary);
+}
+
+.footer-link-sep {
+    color: var(--text-muted);
+    font-size: 0.6rem;
+    opacity: 0.4;
+}
+
+.btn-theme-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0;
+    line-height: 1;
+    margin-left: auto;
+    opacity: 0.6;
+    transition: opacity var(--transition);
+}
+
+.btn-theme-toggle:hover { opacity: 1; }
 
 .rag-threshold-control {
     display: flex;
