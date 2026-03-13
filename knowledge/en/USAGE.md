@@ -153,6 +153,12 @@ Nexe: Based on my memory, you're working on NEXE 0.8 and NAT7...
 
 The **spinner with timer** (`⠹ 2.8s`) shows the system is searching RAG and loading the model. It disappears when the first token arrives.
 
+At the end of each response, the **total elapsed time** is shown in grey:
+```
+Nexe: The document covers...
+  [34.7s]
+```
+
 ### Chat commands
 
 | Command | Description |
@@ -201,6 +207,14 @@ Nexe: The document covers...
 **Paths with spaces:** use `\ ` to escape spaces:
 ```
 /upload /Users/jordi/Documents/My\ Project/report.md
+```
+
+**Inline question after upload:** add the question directly to the same command:
+```
+Tu: /upload /path/REPORT.md give me an executive summary
+📎 Uploading REPORT.md...
+✅ REPORT.md indexed (28 parts).
+Nexe: The document is a business plan that...
 ```
 
 ### Supported formats
@@ -279,6 +293,25 @@ Dimensió vectors: 768
 
 Última actualització: fa 2 hores
 ```
+
+### RAG precision threshold
+
+When the system searches memory, it filters results by **semantic similarity**. The threshold controls how similar a memory entry must be to your question to be included in the context.
+
+**Default value: 0.6**
+
+| Value | Behaviour |
+|-------|-----------|
+| 0.3–0.5 | Broad — more context, higher hallucination risk |
+| 0.6 | Balanced (recommended) |
+| 0.7–0.8 | Precise — less context, more focused answers |
+| 0.9+ | Very strict — retrieves almost nothing |
+
+**Web UI:** "Precisió RAG" slider in the sidebar (below the model name). Value persists in `localStorage`. Hover `ⓘ` for explanation.
+
+**CLI:** threshold applied automatically at default (0.6). Not configurable in real time from CLI.
+
+> **Tip:** if the model hallucinates or mixes up content from unrelated documents, raise the threshold to 0.7–0.75.
 
 ---
 
