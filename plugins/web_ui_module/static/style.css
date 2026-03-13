@@ -118,7 +118,7 @@ body.frame-hidden { padding: 0; }
 
 .app-container {
     display: flex;
-    height: calc(100vh - 28px - var(--frame-width));
+    height: calc(100vh - 36px - var(--frame-width));
     width: 100vw;
 }
 
@@ -333,7 +333,7 @@ body.frame-hidden { padding: 0; }
     bottom: var(--frame-width);
     left: var(--frame-width);
     right: var(--frame-width);
-    height: 28px;
+    height: 36px;
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
     display: flex;
@@ -352,18 +352,18 @@ body.frame-hidden { padding: 0; }
 }
 
 .footer-text {
-    font-size: 0.875rem;
+    font-size: 0.72rem;
     color: var(--text-muted);
 }
 
 .footer-separator {
     color: var(--text-muted);
     opacity: 0.4;
-    font-size: 0.875rem;
+    font-size: 0.72rem;
 }
 
 .footer-link {
-    font-size: 0.875rem;
+    font-size: 0.72rem;
     color: var(--text-muted);
     text-decoration: none;
     opacity: 0.7;
