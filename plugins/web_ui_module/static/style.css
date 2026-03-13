@@ -137,7 +137,7 @@ body.frame-hidden { padding: 0; }
 }
 
 .sidebar-header {
-    padding: 1.25rem 1rem;
+    padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--border);
 }
 
@@ -156,7 +156,7 @@ body.frame-hidden { padding: 0; }
 }
 
 .logo-img {
-    height: 28px;
+    height: 24px;
     width: auto;
     object-fit: contain;
     flex-shrink: 0;
