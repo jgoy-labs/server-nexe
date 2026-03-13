@@ -128,6 +128,12 @@ en NEXE 0.8 y NAT7...
 
 El **spinner con temporizador** (`⠹ 2.8s`) indica que el sistema está buscando en RAG y cargando el modelo. Desaparece cuando llega el primer token.
 
+Al final de cada respuesta aparece el **tiempo total** en gris:
+```
+Nexe: El documento trata de...
+  [34.7s]
+```
+
 ### Comandos dentro del chat
 
 | Comando | Descripción |
@@ -176,6 +182,14 @@ Nexe: El documento trata de...
 **Rutas con espacios:** usa `\ ` para escapar los espacios:
 ```
 /upload /Users/jordi/Documents/Mi\ Proyecto/informe.md
+```
+
+**Pregunta directa tras el upload:** puedes añadir la pregunta en el mismo comando:
+```
+Tu: /upload /ruta/NEGOCI.md hazme un resumen ejecutivo
+📎 Subiendo NEGOCI.md...
+✅ NEGOCI.md indexado (28 partes).
+Nexe: El documento es un plan de negocio que...
 ```
 
 ### Formatos soportados
@@ -244,6 +258,25 @@ Tu: /recall proyectos activos
 ```bash
 ./nexe memory stats
 ```
+
+### Precisión RAG (threshold)
+
+Cuando el sistema busca en la memoria, filtra los resultados por **similitud semántica**. El umbral de precisión controla cuánto debe parecerse un recuerdo a tu pregunta para ser incluido en el contexto.
+
+**Valor por defecto: 0.6**
+
+| Valor | Comportamiento |
+|-------|----------------|
+| 0.3–0.5 | Amplio — más contexto, mayor riesgo de alucinación |
+| 0.6 | Equilibrado (recomendado) |
+| 0.7–0.8 | Preciso — menos contexto, respuestas más enfocadas |
+| 0.9+ | Muy estricto — recupera casi nada |
+
+**Web UI:** slider "Precisió RAG" en el sidebar (bajo el nombre del modelo). El valor se guarda en `localStorage`. Pasa por encima del `ⓘ` para ver la explicación.
+
+**CLI:** el threshold se aplica automáticamente con el valor por defecto (0.6). No configurable en tiempo real desde la CLI.
+
+> **Consejo:** si el modelo alucina o mezcla información de documentos no relacionados, sube el threshold a 0.7–0.75.
 
 ---
 

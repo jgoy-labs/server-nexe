@@ -296,15 +296,13 @@ body.frame-hidden { padding: 0; }
 .sidebar-footer {
     padding: 1rem;
     border-top: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
 }
 
 .rag-threshold-control {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    margin-top: 0.5rem;
 }
 
 .rag-threshold-label {

@@ -154,6 +154,12 @@ en NEXE 0.8 i NAT7...
 
 El **spinner amb temporitzador** (`⠹ 2.8s`) indica que el sistema està buscant al RAG i carregant el model. Desapareix quan arriba el primer token.
 
+Al final de cada resposta apareix el **temps total** en gris:
+```
+Nexe: El document tracta de...
+  [34.7s]
+```
+
 ### Comandes dins del chat
 
 | Comanda | Descripció |
@@ -202,6 +208,14 @@ Nexe: El document tracta de...
 **Rutes amb espais:** usa `\ ` per escapar els espais:
 ```
 /upload /Users/jordi/Documents/Que\ es\ NAT/QUE_ES_NAT.md
+```
+
+**Pregunta directa després del upload:** pots afegir la pregunta al mateix comando:
+```
+Tu: /upload /ruta/NEGOCI.md fes-me un resum executiu
+📎 Pujant NEGOCI.md...
+✅ NEGOCI.md indexat (28 parts).
+Nexe: El document és un pla de negoci que...
 ```
 
 ### Formats suportats
@@ -295,6 +309,25 @@ Dimensió vectors: 768
 
 Última actualització: fa 2 hores
 ```
+
+### Precisió RAG (threshold)
+
+Quan el sistema busca a la memòria, filtra els resultats per **similitud semàntica**. El llindar de precisió controla quant ha de semblar-se un record a la teva pregunta per ser inclòs al context.
+
+**Valor per defecte: 0.6**
+
+| Valor | Comportament |
+|-------|-------------|
+| 0.3–0.5 | Ampli — inclou més context, risc d'al·lucinació |
+| 0.6 | Equilibrat (recomanat) |
+| 0.7–0.8 | Precís — menys context, respostes més curtes |
+| 0.9+ | Molt estricte — quasi no recupera res |
+
+**Web UI:** slider "Precisió RAG" al sidebar (sota el model). El valor es guarda entre sessions al `localStorage`. Passa `ⓘ` per veure l'explicació.
+
+**CLI:** el threshold s'aplica automàticament amb el valor per defecte (0.6). No configurable en temps real des de la CLI.
+
+> **Consell:** si el model al·lucina o barreja informació de documents no relacionats, puja el threshold a 0.7–0.75.
 
 ---
 
