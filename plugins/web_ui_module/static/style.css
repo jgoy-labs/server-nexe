@@ -154,8 +154,8 @@ body.frame-hidden { padding: 0; }
 }
 
 .logo-img {
-    height: 20px;
-    width: auto;
+    width: 120px;
+    height: auto;
 }
 
 .welcome-logo {
@@ -163,8 +163,8 @@ body.frame-hidden { padding: 0; }
 }
 
 .welcome-logo img {
-    height: 48px;
-    width: auto;
+    width: 450px;
+    height: auto;
 }
 
 .logo .version {
