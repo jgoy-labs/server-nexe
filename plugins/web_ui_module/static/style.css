@@ -119,9 +119,8 @@ body.frame-hidden { padding: 0; }
 .app-container {
     display: flex;
     height: calc(100vh - 36px - var(--frame-width) * 2);
-    width: calc(100vw - var(--frame-width) * 2);
+    width: 100vw;
     margin-top: var(--frame-width);
-    margin-left: var(--frame-width);
 }
 
 /* ============================================
@@ -157,9 +156,8 @@ body.frame-hidden { padding: 0; }
 }
 
 .logo-img {
-    width: 160px;
-    height: auto;
-    max-width: 160px;
+    height: 28px;
+    width: auto;
     object-fit: contain;
     flex-shrink: 0;
 }
