@@ -156,7 +156,7 @@ body.frame-hidden { padding: 0; }
 }
 
 .logo-img {
-    height: 16px;
+    height: 13px;
     width: auto;
     object-fit: contain;
     flex-shrink: 0;
