@@ -329,20 +329,9 @@ body.frame-hidden { padding: 0; }
 
 .footer-links {
     display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-}
-
-.footer-row {
-    display: flex;
     align-items: center;
     gap: 0.4rem;
-}
-
-.footer-copy {
-    font-size: 0.68rem;
-    color: var(--text-muted);
-    opacity: 0.6;
+    flex-wrap: wrap;
 }
 
 .footer-link {
