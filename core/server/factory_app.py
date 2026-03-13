@@ -52,6 +52,17 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
 
   setup_all_middleware(app, config, i18n)
 
+  # Rutes browser estàndard que generen 404 innecessaris als logs
+  from fastapi.responses import JSONResponse, Response
+
+  @app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
+  async def chrome_devtools():
+      return JSONResponse({})
+
+  @app.get("/.well-known/{path:path}", include_in_schema=False)
+  async def well_known(path: str):
+      return Response(status_code=204)
+
   return app
 
 __all__ = ['create_fastapi_instance']
