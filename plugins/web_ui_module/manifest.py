@@ -218,6 +218,7 @@ async def serve_static(filename: str):
         ".woff2": "font/woff2",
         ".woff":  "font/woff",
         ".html":  "text/html; charset=utf-8",
+        ".map":   "application/json",
     }
     media_type = _mime.get(file_path.suffix, "application/octet-stream")
 
