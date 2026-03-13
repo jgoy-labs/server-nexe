@@ -152,6 +152,11 @@ body.frame-hidden { padding: 0; }
     letter-spacing: -0.02em;
 }
 
+.logo-img {
+    height: 28px;
+    width: auto;
+}
+
 .logo .version {
     font-size: 0.75rem;
     color: var(--text-muted);
