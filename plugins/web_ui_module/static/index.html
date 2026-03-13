@@ -79,7 +79,7 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <img src="/ui/static/logo.svg" alt="Nexe" class="logo-img">
+                    <svg class="logo-img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 120" role="img" aria-label="server.nexe"><polyline points="10,10 65,60 10,110" fill="none" stroke="#E62020" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/><text x="88" y="91" font-family="Nunito,'Arial Rounded MT Bold','Trebuchet MS',Arial Black,sans-serif" font-weight="900" font-size="84" fill="#E62020" letter-spacing="-1">server.nexe</text></svg>
                     <span class="version">v0.8</span>
                     <button id="frameToggleBtn" class="btn-frame-toggle" title="Mostrar/ocultar marc">◼</button>
                 </div>
@@ -121,21 +121,17 @@
             <div class="sidebar-footer">
                 <div class="footer-links">
                     <div class="footer-row">
-                        <span class="footer-copy">© 2026 server.nexe</span>
+                        <span class="footer-copy">© 2026 server.nexe · v0.8</span>
                         <button id="themeToggleBtn" class="btn-theme-toggle" title="Canviar tema">🌙</button>
                     </div>
                     <div class="footer-row">
-                        <a href="https://github.com/jgoy-labs/server-nexe/blob/main/LICENSE" target="_blank" class="footer-link">Apache 2.0</a>
+                        <a href="https://server-nexe.org" target="_blank" class="footer-link">Web</a>
                         <span class="footer-link-sep">·</span>
-                        <a href="https://server-nexe.org" target="_blank" class="footer-link">server-nexe.org</a>
-                    </div>
-                    <div class="footer-row">
                         <a href="https://github.com/jgoy-labs/server-nexe" target="_blank" class="footer-link">GitHub</a>
                         <span class="footer-link-sep">·</span>
-                        <a href="https://jgoy.net" target="_blank" class="footer-link">Jordi Goy</a>
-                    </div>
-                    <div class="footer-row">
-                        <span class="footer-copy">v0.8 · Barcelona</span>
+                        <a href="https://jgoy.net" target="_blank" class="footer-link">jgoy.net</a>
+                        <span class="footer-link-sep">·</span>
+                        <a href="https://github.com/jgoy-labs/server-nexe/blob/main/LICENSE" target="_blank" class="footer-link">Apache 2.0</a>
                     </div>
                 </div>
                 <div class="status-indicator">
@@ -155,7 +151,9 @@
         <main class="chat-main">
             <div id="chatMessages" class="chat-messages">
                 <div class="welcome-screen">
-                    <div class="welcome-icon"><i data-lucide="bot"></i></div>
+                    <div class="welcome-logo">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 120" role="img" aria-label="server.nexe"><polyline points="10,10 65,60 10,110" fill="none" stroke="#E62020" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/><text x="88" y="91" font-family="Nunito,'Arial Rounded MT Bold','Trebuchet MS',Arial Black,sans-serif" font-weight="900" font-size="84" fill="#E62020" letter-spacing="-1">server.nexe</text></svg>
+                    </div>
                     <h2>Benvingut a Nexe</h2>
                     <p>IA local amb memòria persistent</p>
                     <div class="features">
