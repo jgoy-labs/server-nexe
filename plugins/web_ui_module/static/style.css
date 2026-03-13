@@ -369,6 +369,7 @@ body.frame-hidden { padding: 0; }
     flex-direction: column;
     gap: 0.25rem;
     margin-top: 0.5rem;
+    padding: 0 0.1rem;
 }
 
 .rag-threshold-label {
@@ -399,6 +400,8 @@ body.frame-hidden { padding: 0; }
     background: var(--border);
     outline: none;
     cursor: pointer;
+    margin: 4px 0;
+    overflow: visible;
 }
 
 .rag-threshold-slider::-webkit-slider-thumb {
@@ -406,8 +409,9 @@ body.frame-hidden { padding: 0; }
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: var(--accent);
+    background: var(--primary-color);
     cursor: pointer;
+    box-shadow: 0 0 4px rgba(230, 32, 32, 0.5);
 }
 
 .rag-threshold-hints {
