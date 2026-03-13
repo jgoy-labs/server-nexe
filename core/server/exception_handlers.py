@@ -51,9 +51,13 @@ def register_exception_handlers(app: FastAPI, i18n) -> None:
   @app.exception_handler(HTTPException)
   async def http_exception_handler(request: Request, exc: HTTPException):
     """HTTP exception handler"""
-    if exc.status_code == 401:
+    _SILENT_404 = (".map", ".well-known", "devtools.json", "favicon.ico")
+    _is_silent = exc.status_code == 401 or (
+        exc.status_code == 404 and any(s in request.url.path for s in _SILENT_404)
+    )
+    if _is_silent:
       logger.debug(
-        "HTTP %s: %s - Path: %s (expected from UI)",
+        "HTTP %s: %s - Path: %s",
         exc.status_code,
         exc.detail,
         request.url.path
