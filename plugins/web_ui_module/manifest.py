@@ -207,12 +207,19 @@ async def serve_static(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     # Determine media type
-    if file_path.suffix == ".css":
-        media_type = "text/css; charset=utf-8"
-    elif file_path.suffix == ".js":
-        media_type = "application/javascript; charset=utf-8"
-    else:
-        media_type = "text/plain"
+    _mime = {
+        ".css":   "text/css; charset=utf-8",
+        ".js":    "application/javascript; charset=utf-8",
+        ".svg":   "image/svg+xml",
+        ".png":   "image/png",
+        ".jpg":   "image/jpeg",
+        ".jpeg":  "image/jpeg",
+        ".ico":   "image/x-icon",
+        ".woff2": "font/woff2",
+        ".woff":  "font/woff",
+        ".html":  "text/html; charset=utf-8",
+    }
+    media_type = _mime.get(file_path.suffix, "application/octet-stream")
 
     # Read file and return as Response with proper headers
     content = file_path.read_bytes()
