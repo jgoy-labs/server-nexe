@@ -117,7 +117,7 @@ body.frame-hidden { padding: 0; }
 
 .app-container {
     display: flex;
-    height: calc(100vh - 28px);
+    height: calc(100vh - 28px - var(--frame-width));
     width: 100vw;
 }
 
@@ -329,9 +329,9 @@ body.frame-hidden { padding: 0; }
 
 .site-footer {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    bottom: var(--frame-width);
+    left: var(--frame-width);
+    right: var(--frame-width);
     height: 28px;
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
