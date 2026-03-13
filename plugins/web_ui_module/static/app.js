@@ -156,6 +156,25 @@ class NexeUI {
             });
         }
 
+        // Status indicator dinàmic
+        const statusDot  = document.querySelector('.status-dot');
+        const statusText = document.querySelector('.status-indicator span');
+        const checkStatus = async () => {
+            try {
+                const r = await fetch('/status', { cache: 'no-store' });
+                const ok = r.ok;
+                statusDot.classList.toggle('active', ok);
+                statusDot.style.background = ok ? '' : '#ff4444';
+                statusText.textContent = ok ? 'Connectat' : 'Desconnectat';
+            } catch {
+                statusDot.classList.remove('active');
+                statusDot.style.background = '#ff4444';
+                statusText.textContent = 'Desconnectat';
+            }
+        };
+        checkStatus();
+        setInterval(checkStatus, 10000);
+
         // Toggle marc
         const frameBtn = document.getElementById('frameToggleBtn');
         if (frameBtn) {
