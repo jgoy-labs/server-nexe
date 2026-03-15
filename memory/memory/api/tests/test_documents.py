@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/api/tests/test_documents.py
 Description: Tests per memory/memory/api/documents.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

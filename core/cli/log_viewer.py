@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/log_viewer.py
 Description: Visualitzador de logs en temps real per a Nexe Server.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

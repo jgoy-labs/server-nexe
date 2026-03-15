@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/api/collections.py
 Description: Operacions de gestió de collections per Memory API.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/sanitizer/__init__.py
 Description: SANITIZER - Mòdul de seguretat TÈCNICA (04.1)
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

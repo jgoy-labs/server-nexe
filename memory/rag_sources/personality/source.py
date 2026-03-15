@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag_sources/personality/source.py
 Description: Implementació de PersonalityRAG.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 import logging

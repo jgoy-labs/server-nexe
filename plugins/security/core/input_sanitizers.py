@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/input_sanitizers.py
 Description: Sanitització d'inputs. Valida strings i dicts contra XSS, SQL injection, etc.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

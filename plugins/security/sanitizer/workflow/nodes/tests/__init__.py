@@ -6,6 +6,6 @@ Author: Jordi Goy
 Location: plugins/security/sanitizer/workflow/nodes/tests/__init__.py
 Description: Tests per als nodes de workflow del sanitizer.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """

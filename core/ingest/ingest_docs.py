@@ -8,7 +8,7 @@ Location: core/ingest/ingest_docs.py
 Description: Ingest documentation into Qdrant for RAG context.
              Run during installation or manually.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

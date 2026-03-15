@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/path_discovery.py
 Description: Descobridor de paths de mòduls Nexe. Escaneja core/tools per cada capa,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

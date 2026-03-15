@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/__main__.py
 Description: Entry point per executar CLI com a mòdul.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

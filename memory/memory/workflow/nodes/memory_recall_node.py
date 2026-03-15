@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/workflow/nodes/memory_recall_node.py
 Description: Node per recuperar memòries de Memory.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

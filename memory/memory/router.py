@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/router.py
 Description: FastAPI router per mòdul Memory.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

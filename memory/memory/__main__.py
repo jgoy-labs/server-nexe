@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/__main__.py
 Description: Entry point per executar Memory module com a CLI.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

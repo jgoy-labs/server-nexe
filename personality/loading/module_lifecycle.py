@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/loading/module_lifecycle.py
 Description: Gestor de cicle de vida de mòduls. Controla inicialització (init, setup,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

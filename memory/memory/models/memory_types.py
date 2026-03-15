@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/models/memory_types.py
 Description: Tipus i enums per Memory Module.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

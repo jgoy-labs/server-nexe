@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/loading/patterns.py
 Description: Patrons de cerca i convencions de noms per Module Loader. Defineix prioritats
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

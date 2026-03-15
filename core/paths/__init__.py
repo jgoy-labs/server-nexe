@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/paths/__init__.py
 Description: Façade públic per mòdul paths - unifica accés a detecció Nexe root,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: tests/test_middleware.py
 Description: Tests per core/middleware.py (CORS, rate limiting, CSRF, etc.)
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/module.py
 Description: Main Embeddings Module - Multilingual embedding and vectorization system.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

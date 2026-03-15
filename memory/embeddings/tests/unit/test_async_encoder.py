@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/tests/unit/test_async_encoder.py
 Description: Tests unitaris per AsyncEmbedder.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

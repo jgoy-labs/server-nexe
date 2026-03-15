@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/discovery.py
 Description: Component de descobriment de mòduls.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/tests/test_path_discovery.py
 Description: Tests per PathDiscovery. Valida descobriment de paths, detecció
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

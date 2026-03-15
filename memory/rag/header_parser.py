@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/header_parser.py
 Description: Parser for standardized RAG document headers
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────────
 """
 

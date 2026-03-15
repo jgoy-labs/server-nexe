@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/tests/test_validators.py
 Description: Tests per validate_safe_path, validate_command, validate_filename, validate_api_endpoint_path.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

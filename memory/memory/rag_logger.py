@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/rag_logger.py
 Description: RAGLogger - Logging detallat per operacions RAG/Memory.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

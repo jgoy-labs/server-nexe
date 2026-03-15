@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/chunkers/text_chunker.py
 Description: No description available.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

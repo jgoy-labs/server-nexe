@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/pipeline/__init__.py
 Description: Pipeline d'ingesta per Memory Module.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

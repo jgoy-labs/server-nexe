@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/factory_i18n.py
 Description: I18n and Configuration Setup for FastAPI Factory.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

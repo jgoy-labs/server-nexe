@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/rate_limiting.py
 Description: Rate limiting avançat per bare metal. Gestió de límits per IP i API key.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

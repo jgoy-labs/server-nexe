@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/api/v1.py
 Description: Memory HTTP API v1 - Endpoints for /save and /recall from chat.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

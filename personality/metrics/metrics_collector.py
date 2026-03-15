@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/metrics/metrics_collector.py
 Description: Col·lector global de mètriques del sistema Nexe. Recull, processa i gestiona
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

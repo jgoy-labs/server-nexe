@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/loading/messages.py
 Description: Diccionari centralitzat de missatges fallback per sistema loading. Defineix
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

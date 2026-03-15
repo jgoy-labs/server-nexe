@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/engines/ram_context.py
 Description: RAMContext - Vista immutable sobre FlashMemory (FIFO, max 100 entries).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

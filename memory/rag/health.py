@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/health.py
 Description: Health checks per mòdul RAG.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/config/tests/test_config_manager_enabled.py
 Description: Tests per ConfigManager amb suport list+dict de mòduls enabled. Valida formats globals, per-module, prioritats i edge cases.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

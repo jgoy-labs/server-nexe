@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/web_ui_module/session_manager.py
 Description: Gestor de sessions de xat per la UI web (memòria en RAM)
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/models/__init__.py
 Description: Models Pydantic per Memory Module.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

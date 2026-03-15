@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/sanitizer/tests/test_sanitizer.py
 Description: Tests per al mòdul SANITIZER.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

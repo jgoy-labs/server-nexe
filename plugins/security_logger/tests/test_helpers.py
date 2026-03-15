@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security_logger/tests/test_helpers.py
 Description: Tests per SecurityLoggerHelpers (tots els mètodes de log).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/tests/test_server.py
 Description: Tests bàsics per servidor Nexe. Valida endpoints root/health/info, CORS config, rate limiting i injeccions d'i18n/limiter/config.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

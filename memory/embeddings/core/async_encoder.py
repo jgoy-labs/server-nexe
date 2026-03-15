@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/core/async_encoder.py
 Description: AsyncEmbedder: Wrapper async per SentenceTransformer que NO bloqueja l'event loop.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

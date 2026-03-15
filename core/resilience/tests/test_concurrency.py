@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/resilience/tests/test_concurrency.py
 Description: No description available.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

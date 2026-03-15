@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/sanitizer/core/__init__.py
 Description: Core del SANITIZER - Detecció de jailbreaks i prompt injections per LLM.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

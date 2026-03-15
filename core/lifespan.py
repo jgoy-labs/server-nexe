@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/lifespan.py
 Description: FastAPI lifespan management (startup/shutdown). Loads config, initializes APIIntegrator,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

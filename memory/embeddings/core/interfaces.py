@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/core/interfaces.py
 Description: Interfaces, protocols i models Pydantic per al mòdul Embeddings.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

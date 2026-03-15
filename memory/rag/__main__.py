@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/__main__.py
 Description: Entry point per executar RAG module com a CLI.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

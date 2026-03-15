@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/bootstrap_tokens.py
 Description: Nexe Server Component
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/api/documents.py
 Description: Operacions CRUD de documents per Memory API.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

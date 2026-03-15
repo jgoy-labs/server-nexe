@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/i18n/modular_i18n.py
 Description: Sistema modular d'internacionalització. Auto-descobreix messages_*.json per
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

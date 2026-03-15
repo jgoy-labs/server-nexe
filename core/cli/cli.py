@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/cli.py
 Description: CLI Central Nexe 0.8 - Aplicació Click principal.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

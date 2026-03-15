@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/ollama_module/workflow/nodes/ollama_node.py
 Description: OllamaNode per Workflow Engine. Node d'integració amb Ollama LLM amb prompt templating, streaming i config management.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

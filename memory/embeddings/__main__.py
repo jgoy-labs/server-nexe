@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/__main__.py
 Description: CLI entry point for Embeddings Module.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

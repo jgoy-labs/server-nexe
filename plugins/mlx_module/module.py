@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/mlx_module/module.py
 Description: Mòdul Nexe per a MLX (Apple Silicon). Adaptació del MLXChatNode original.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

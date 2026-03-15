@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/metrics/endpoint.py
 Description: Endpoint /metrics per exposar mètriques Prometheus.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

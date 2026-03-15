@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/manifest.py
 Description: Router FastAPI del mòdul ModuleManager. Exposa endpoints REST per:
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

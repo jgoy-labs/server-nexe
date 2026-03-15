@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/tests/test_module_allowlist.py
 Description: Tests d'integració per module allowlist enforcement. 
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

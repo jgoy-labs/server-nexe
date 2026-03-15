@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/web_ui_module/tests/test_module.py
 Description: Tests per WebUIModule: inicialització, endpoints i helpers.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/routers/ui.py
 Description: UI endpoints per mòdul RAG.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

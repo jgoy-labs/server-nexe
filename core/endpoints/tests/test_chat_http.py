@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/endpoints/tests/test_chat_http.py
 Description: Tests HTTP per core/endpoints/chat.py (endpoint, engines, streaming, memory).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

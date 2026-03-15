@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/paths/tests/test_paths.py
 Description: Tests per core/paths (detection, helpers, validation).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

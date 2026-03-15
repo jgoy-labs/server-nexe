@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/health.py
 Description: Health checks for Embeddings module.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

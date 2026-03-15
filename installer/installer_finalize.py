@@ -127,7 +127,7 @@ def _write_commands_file(project_root, nexe_cmd, model_config):
 🔧 **Motor / Engine**: {model_config['engine']}
 💾 **Ubicació / Location**: {project_root}
 
-*Personal project by Jordi Goy · www.jgoy.net*
+*Personal project by Jordi Goy · www.jgoy.net · https://server-nexe.org*
 """
     try:
         commands_file = project_root / "COMMANDS.md"

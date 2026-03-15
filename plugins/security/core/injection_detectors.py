@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/injection_detectors.py
 Description: Detectors d'atacs d'injecció. Detecta SQL, XSS, NoSQL, command i path traversal.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

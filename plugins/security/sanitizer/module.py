@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/sanitizer/module.py
 Description: SANITIZER - Mòdul de seguretat TÈCNICA per filtrar jailbreaks i
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

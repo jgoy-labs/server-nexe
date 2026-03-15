@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security_logger/__init__.py
 Description: Façade públic per security_logger - unifica accés a logging de seguretat.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

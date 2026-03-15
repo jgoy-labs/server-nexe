@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/utils/tests/test_api_client.py
 Description: Tests per core/cli/utils/api_client.py (NexeAPIClient).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

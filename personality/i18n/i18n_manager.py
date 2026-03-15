@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/i18n/i18n_manager.py
 Description: Sistema global d'internacionalització (i18n) per Nexe 0.8.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

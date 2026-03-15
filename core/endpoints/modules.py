@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/endpoints/modules.py
 Description: Endpoints FastAPI per module integration. Routes: /modules (list), /modules/{name}/routes.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

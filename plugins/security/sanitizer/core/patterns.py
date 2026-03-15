@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/sanitizer/core/patterns.py
 Description: Patrons precompilats per detecció de jailbreaks i prompt injections.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

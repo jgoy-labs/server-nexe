@@ -7,7 +7,7 @@ Location: personality/module_manager/config_manager.py
 Description: Gestor de configuració i manifests Nexe.
              Uses core/config.py for unified config loading.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

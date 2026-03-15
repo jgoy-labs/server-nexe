@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/request_size_limiter.py
 Description: Middleware per limitar mida de requests. Prevé DoS via large payloads (CWE-400).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

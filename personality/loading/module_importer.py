@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/loading/module_importer.py
 Description: Importador dinàmic de mòduls Python. Carrega fitxers via importlib.util amb
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

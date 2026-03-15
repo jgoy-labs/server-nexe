@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/api/models.py
 Description: Models i exceptions per Memory API.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

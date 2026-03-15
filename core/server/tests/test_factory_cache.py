@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/tests/test_factory_cache.py
 Description: Tests per cache de create_app() singleton. Valida caching, force_reload, thread-safety i millora de performance (0.58s→<0.01s).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

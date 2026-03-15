@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security_logger/enums.py
 Description: Enums per security event logging: tipus d'events i nivells de severitat.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

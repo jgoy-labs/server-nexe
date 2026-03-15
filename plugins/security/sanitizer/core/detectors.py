@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/sanitizer/core/detectors.py
 Description: Funcions de detecció de jailbreaks i prompt injections.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

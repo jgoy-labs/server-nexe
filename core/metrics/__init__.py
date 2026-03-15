@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/metrics/__init__.py
 Description: Prometheus metrics module per Nexe 0.8.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

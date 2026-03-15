@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/metrics.py
 Description: Prometheus metrics for Memory Module.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

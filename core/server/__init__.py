@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/__init__.py
 Description: Package del servidor Nexe. Exposa create_app() (factory FastAPI) i main()
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

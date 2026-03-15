@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/ollama_module/module.py
 Description: Mòdul principal d'integració amb Ollama. Gestiona connexió amb API local,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

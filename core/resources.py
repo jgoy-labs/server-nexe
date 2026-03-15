@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/resources.py
 Description: Centralized resource (asset) path management for Nexe.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

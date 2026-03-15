@@ -7,7 +7,7 @@ Location: core/container.py
 Description: Dependency Injection Container for core services.
 Avoids circular dependencies and centralizes core service access.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

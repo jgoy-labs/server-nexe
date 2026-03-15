@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/__init__.py
 Description: Package marker per ModuleManager (sistema complet de gestió de mòduls). Exporta
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/__init__.py
 Description: Mòdul Memory - Flash Memory, RAM Context i Persistence Manager.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

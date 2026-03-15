@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/health.py
 Description: Health checks for Memory module.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

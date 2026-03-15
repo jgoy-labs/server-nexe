@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/tests/test_models.py
 Description: Tests per als models de dades de Memory (MemoryEntry, MemoryType).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

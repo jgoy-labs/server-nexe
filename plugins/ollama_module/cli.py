@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/ollama_module/cli.py
 Description: CLI per Ollama module - Permet gestionar models LLM locals i fer
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

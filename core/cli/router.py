@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/router.py
 Description: str # Descripció curta
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

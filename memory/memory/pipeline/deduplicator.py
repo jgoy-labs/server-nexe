@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/pipeline/deduplicator.py
 Description: Deduplicator - Detecció de contingut duplicat amb SHA256.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

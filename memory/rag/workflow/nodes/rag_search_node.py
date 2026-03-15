@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/workflow/nodes/rag_search_node.py
 Description: Node de Workflow Engine per cercar documents al RAG.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

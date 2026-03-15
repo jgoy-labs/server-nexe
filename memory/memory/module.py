@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/module.py
 Description: Main Memory Module - Flash Memory + RAM Context + Persistence System.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

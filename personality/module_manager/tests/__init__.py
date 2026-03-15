@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/tests/__init__.py
 Description: Nexe Server Component
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

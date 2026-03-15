@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/endpoints/bootstrap.py
 Description: Sistema d'autenticació bootstrap per inicialització de sessions
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

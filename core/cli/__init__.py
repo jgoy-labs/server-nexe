@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/__init__.py
 Description: CLI Central Nexe 0.8 - Orquestrador de CLIs de mòduls.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/tests/test_dependencies_registry.py
 Description: Tests per core/dependencies.py i core/module_registry.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

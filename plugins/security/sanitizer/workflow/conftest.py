@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/sanitizer/workflow/conftest.py
 Description: Conftest per mockejar nexe_flow (no instal·lat) a nivell de workflow.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

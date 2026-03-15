@@ -7,7 +7,7 @@ Location: core/config.py
 Description: Unified configuration management for Nexe server.
              Single source of truth for all config loading.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

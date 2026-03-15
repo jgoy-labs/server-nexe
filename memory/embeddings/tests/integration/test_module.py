@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/tests/integration/test_module.py
 Description: Tests d'integració per EmbeddingsModule.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

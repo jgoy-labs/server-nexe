@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/messages.py
 Description: Missatges fallback i18n per security core.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

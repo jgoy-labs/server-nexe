@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/module_lifecycle.py
 Description: Gestor de cicle de vida de mòduls individuals. Controla load, start, stop amb
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

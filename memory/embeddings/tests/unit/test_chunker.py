@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/tests/unit/test_chunker.py
 Description: Tests unitaris per SmartChunker.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

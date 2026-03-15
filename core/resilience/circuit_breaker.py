@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/resilience/circuit_breaker.py
 Description: Circuit Breaker amb retry exponencial per protegir serveis externs (Ollama, Qdrant, HTTP).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

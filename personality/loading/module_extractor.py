@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/loading/module_extractor.py
 Description: Extractor d'instàncies principals de mòduls. Cerca en ordre: factory functions
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

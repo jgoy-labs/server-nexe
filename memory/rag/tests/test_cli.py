@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/tests/test_cli.py
 Description: Tests per RAG CLI (cli.py).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

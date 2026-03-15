@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/loading/module_validator.py
 Description: Validador de mòduls carregats. Comprova instància vàlida, existència d'API
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

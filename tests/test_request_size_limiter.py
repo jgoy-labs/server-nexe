@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: tests/test_request_size_limiter.py
 Description: Tests per core/request_size_limiter.py (middleware mida requests).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

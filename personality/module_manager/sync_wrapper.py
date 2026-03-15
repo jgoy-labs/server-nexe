@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/sync_wrapper.py
 Description: Wrappers síncrons per operacions async del ModuleManager.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

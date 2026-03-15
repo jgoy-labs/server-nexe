@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/manifest.py
 Description: Manifest FastAPI del CLI Central Nexe. Defineix router públic /cli amb endpoints
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

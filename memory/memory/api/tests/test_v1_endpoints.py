@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/api/tests/test_v1_endpoints.py
 Description: Tests HTTP per memory/memory/api/v1.py (endpoints /memory).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

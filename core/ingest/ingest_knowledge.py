@@ -15,7 +15,7 @@ Usage:
 
 Supported formats: .txt, .md, .pdf (requires pypdf)
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

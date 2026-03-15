@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/events/event_system.py
 Description: Sistema global de gestió d'esdeveniments asíncrons per Nexe 0.8.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

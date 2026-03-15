@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/input_validators.py
 Description: Façade de validadors. Re-exporta funcions de detecció i sanitització.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/factory_app.py
 Description: FastAPI Instance Creation for Nexe Server.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

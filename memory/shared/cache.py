@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/shared/cache.py
 Description: Implementació de MultiLevelCache (L1 Memory + L2 SQLite).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

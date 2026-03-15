@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/ollama_module/tests/unit/test_health.py
 Description: Tests per plugins/ollama_module/health.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

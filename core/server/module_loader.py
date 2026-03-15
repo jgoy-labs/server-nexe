@@ -18,7 +18,7 @@ ARCHITECTURE:
 
   See: docs/NEXE_ARCHITECTURAL_DECISIONS.md (ADR-001)
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

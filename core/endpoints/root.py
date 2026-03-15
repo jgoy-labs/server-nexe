@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/endpoints/root.py
 Description: Endpoints FastAPI bàsics del servidor. Routes: / (system info), /health (health check),
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

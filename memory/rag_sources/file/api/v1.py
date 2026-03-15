@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag_sources/file/api/v1.py
 Description: API v1 per gestió de fitxers documentals (not yet available).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
