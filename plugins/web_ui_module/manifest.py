@@ -644,9 +644,18 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                 relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
                                 if relevant:
                                     rag_count = len(relevant)
-                                    rag_context = "\n\n[MEMÒRIA - Informació rellevant guardada anteriorment:]\n"
-                                    for item in relevant:
-                                        rag_context += f"- {item['content']}\n"
+                                    # Separar knowledge (docs) de memòria (converses)
+                                    knowledge_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'user_knowledge']
+                                    memory_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') != 'user_knowledge']
+                                    rag_context = ""
+                                    if knowledge_items:
+                                        rag_context += "\n\n[DOCUMENTACIÓ TÈCNICA]\n"
+                                        for item in knowledge_items:
+                                            rag_context += f"- {item['content']}\n"
+                                    if memory_items:
+                                        rag_context += "\n\n[MEMÒRIA DE L'USUARI]\n"
+                                        for item in memory_items:
+                                            rag_context += f"- {item['content']}\n"
                                     logger.info(f"RAG: {len(relevant)} memories relevants (score >= {rag_threshold})")
                                     for item in relevant:
                                         score = item.get('score', 0)
@@ -690,8 +699,8 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                         )
                         engine_messages.append({"role": "user", "content": doc_block})
                     elif rag_context:
-                        # Context RAG: va davant del missatge de l'usuari
-                        rag_block = f"[CONTEXT MEMÒRIA]\n{rag_context}[FI CONTEXT]\n\n{message}"
+                        # Context RAG: separat en documentació i memòria
+                        rag_block = f"[CONTEXT]\n{rag_context}[FI CONTEXT]\n\n{message}"
                         engine_messages.append({"role": "user", "content": rag_block})
                     else:
                         engine_messages.append({"role": "user", "content": message})
