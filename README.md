@@ -11,23 +11,46 @@
 [![llama.cpp](https://img.shields.io/badge/llama.cpp-GGUF-8B5CF6)](https://github.com/ggerganov/llama.cpp)
 [![RAG](https://img.shields.io/badge/RAG-local%20%7C%20private-22c55e)](https://github.com/jgoy-labs/server-nexe)
 
-**Version:** 0.8 — **Documentation · [https://server-nexe.org](https://server-nexe.org)
+**Version:** 0.8 — **Documentation:** [server-nexe.org](https://server-nexe.org)
 
 **Author:** Jordi Goy · [www.jgoy.net](https://www.jgoy.net)
 
 Local AI server with persistent memory, RAG, and multi-backend inference (MLX / llama.cpp / Ollama).
 Runs entirely on your machine — zero data sent to external services.
 
-## Quick start
+## ✨ Features
+
+- 🔒 **Local & Private** — Every conversation, document, and embedding stays on your device. Nothing leaves your machine.
+- 🧠 **Persistent RAG Memory** — Remembers context across sessions using Qdrant vector search and 768-dim embeddings.
+- ⚡ **Multi-Backend Inference** — Switch between MLX (Apple Silicon), llama.cpp (GGUF), or Ollama with a single config change.
+- 🧩 **Modular Plugin System** — Auto-discovered plugins with independent manifests. Add capabilities without touching the core.
+
+## 🚀 Quick Start
 
 ```bash
+git clone https://github.com/jgoy-labs/server-nexe.git
+cd server-nexe
 ./setup.sh                # guided installation
 ./nexe go                 # start server (port 9119)
 ./nexe chat               # interactive chat
 ./nexe chat --rag         # chat with RAG memory
 ```
 
-## Testing (Linux)
+## 🔧 Backends
+
+| Backend | Platform | Notes |
+|---------|----------|-------|
+| **MLX** | macOS (Apple Silicon) | Recommended for Mac — native GPU acceleration |
+| **llama.cpp** | macOS / Linux | Universal, GGUF format |
+| **Ollama** | macOS / Linux | Bridge to existing Ollama installations |
+
+## 📋 Requirements
+
+- Python 3.11+
+- macOS (Apple Silicon recommended) or Linux
+- 8 GB RAM minimum, 16 GB recommended
+
+## 🧪 Testing
 
 CI runs on Ubuntu and executes the unit suite with coverage.
 
@@ -44,7 +67,7 @@ To run the same suite on Linux via Docker:
 ./dev-tools/run_linux_ci.sh
 ```
 
-## Documentation
+## 📖 Documentation
 
 Full documentation is in the `knowledge/` directory:
 
@@ -52,14 +75,8 @@ Full documentation is in the `knowledge/` directory:
 - [Català](knowledge/ca/README.md)
 - [Español](knowledge/es/README.md)
 
-## License
+Or visit [server-nexe.org](https://server-nexe.org) for the full docs site.
 
-Apache 2.0 — see [LICENSE](LICENSE).
+---
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Security
-
-See [SECURITY.md](SECURITY.md).
+**License:** Apache 2.0 — see [LICENSE](LICENSE) · **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) · **Security:** [SECURITY.md](SECURITY.md)
