@@ -598,16 +598,19 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                         elif engine_name == "llama_cpp_module" and local_path.exists():
                             os.environ["NEXE_LLAMA_CPP_MODEL"] = str(local_path)
                             from plugins.llama_cpp_module.config import LlamaCppConfig
+                            from plugins.llama_cpp_module.chat import LlamaCppChatNode
+                            from plugins.llama_cpp_module.model_pool import ModelPool
                             new_config = LlamaCppConfig.from_env()
                             if hasattr(engine, '_node') and engine._node:
-                                if engine._node.config.model_path != str(local_path):
+                                old_path = engine._node.config.model_path
+                                if old_path != new_config.model_path:
+                                    # Destruir pool antic i recrear amb nou config
+                                    if LlamaCppChatNode._pool is not None:
+                                        LlamaCppChatNode._pool.destroy_all()
                                     engine._node.config = new_config
-                                    engine._node.__class__._config = new_config
-                                    engine._node.__class__._model = None
-                                    # Alliberar pool per forçar reload
-                                    if hasattr(engine, '_pool') and engine._pool:
-                                        engine._pool._instances.clear()
-                                    logger.info(f"Llama.cpp model switched to: {local_path}")
+                                    LlamaCppChatNode._config = new_config
+                                    LlamaCppChatNode._pool = ModelPool(new_config)
+                                    logger.info(f"Llama.cpp model switched to: {new_config.model_path}")
 
                     logger.info(f"Calling {engine_name}.chat with model={model_name}")
                     
