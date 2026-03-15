@@ -200,6 +200,10 @@ class NexeUI {
     async loadServerInfo() {
         try {
             const resp = await this.fetchWithCsrf('/ui/info');
+            if (resp.status === 401) {
+                this._handleUnauthorized();
+                return;
+            }
             if (resp.ok) {
                 const data = await resp.json();
                 const el = document.getElementById('modelInfoText');
