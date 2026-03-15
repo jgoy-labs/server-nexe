@@ -232,3 +232,127 @@ class TestSessionManagerCleanup:
 
     def test_cleanup_empty_manager(self, sm):
         assert sm.cleanup_inactive(max_age_hours=24) == 0
+
+
+# ═══════════════════════════════════════════════════════════════
+# ChatSession — Compacting
+# ═══════════════════════════════════════════════════════════════
+
+class TestChatSessionCompacting:
+
+    def _fill_session(self, s, n):
+        """Omple sessió amb n missatges user/assistant alternats."""
+        for i in range(n):
+            role = "user" if i % 2 == 0 else "assistant"
+            s.add_message(role, f"msg-{i}")
+
+    def test_needs_compaction_false_when_few_messages(self):
+        s = ChatSession()
+        self._fill_session(s, 4)
+        assert s.needs_compaction() is False
+
+    def test_needs_compaction_true_at_threshold(self):
+        s = ChatSession()
+        self._fill_session(s, ChatSession.COMPACT_EVERY)
+        assert s.needs_compaction() is True
+
+    def test_needs_compaction_true_above_threshold(self):
+        s = ChatSession()
+        self._fill_session(s, ChatSession.COMPACT_EVERY + 4)
+        assert s.needs_compaction() is True
+
+    def test_get_messages_to_compact_empty_when_few(self):
+        s = ChatSession()
+        self._fill_session(s, 4)
+        assert s.get_messages_to_compact() == []
+
+    def test_get_messages_to_compact_returns_old_messages(self):
+        s = ChatSession()
+        self._fill_session(s, 12)
+        to_compact = s.get_messages_to_compact()
+        # 12 - COMPACT_KEEP(6) = 6 missatges a compactar
+        assert len(to_compact) == 12 - ChatSession.COMPACT_KEEP
+        assert to_compact[0]["content"] == "msg-0"
+
+    def test_apply_compaction_keeps_recent(self):
+        s = ChatSession()
+        self._fill_session(s, 12)
+        s.apply_compaction("Resum de la conversa sobre tests.")
+        assert len(s.messages) == ChatSession.COMPACT_KEEP
+        # Últim missatge hauria de ser msg-11
+        assert s.messages[-1]["content"] == "msg-11"
+
+    def test_apply_compaction_stores_summary(self):
+        s = ChatSession()
+        self._fill_session(s, 12)
+        s.apply_compaction("Resum: parlàvem de testing.")
+        assert s.context_summary == "Resum: parlàvem de testing."
+
+    def test_apply_compaction_increments_count(self):
+        s = ChatSession()
+        self._fill_session(s, 12)
+        assert s.compaction_count == 0
+        s.apply_compaction("resum 1")
+        assert s.compaction_count == 1
+        # Afegir més missatges i compactar de nou
+        self._fill_session(s, 10)
+        s.apply_compaction("resum 2")
+        assert s.compaction_count == 2
+
+    def test_get_context_messages_without_summary(self):
+        s = ChatSession()
+        s.add_message("user", "hola")
+        ctx = s.get_context_messages()
+        assert len(ctx) == 1
+        assert ctx[0]["content"] == "hola"
+
+    def test_get_context_messages_with_summary(self):
+        s = ChatSession()
+        self._fill_session(s, 12)
+        s.apply_compaction("Conversa sobre IA i models locals.")
+        ctx = s.get_context_messages()
+        # 2 missatges de resum + COMPACT_KEEP missatges recents
+        assert len(ctx) == 2 + ChatSession.COMPACT_KEEP
+        assert "[Resum de la conversa anterior]" in ctx[0]["content"]
+        assert "Conversa sobre IA i models locals." in ctx[0]["content"]
+        assert ctx[1]["role"] == "assistant"
+
+    def test_compaction_survives_serialization(self, tmp_path):
+        sm = SessionManager(storage_path=str(tmp_path))
+        s = sm.create_session(session_id="compact-persist")
+        self._fill_session(s, 12)
+        s.apply_compaction("Resum persistent.")
+        sm._save_session_to_disk(s)
+
+        sm2 = SessionManager(storage_path=str(tmp_path))
+        loaded = sm2.get_session("compact-persist")
+        assert loaded.context_summary == "Resum persistent."
+        assert loaded.compaction_count == 1
+        assert len(loaded.messages) == ChatSession.COMPACT_KEEP
+
+    def test_to_dict_includes_summary_when_present(self):
+        s = ChatSession()
+        self._fill_session(s, 12)
+        s.apply_compaction("test summary")
+        d = s.to_dict()
+        assert d["context_summary"] == "test summary"
+        assert d["compaction_count"] == 1
+
+    def test_to_dict_excludes_summary_when_none(self):
+        s = ChatSession()
+        s.add_message("user", "hi")
+        d = s.to_dict()
+        assert "context_summary" not in d
+
+    def test_multiple_compactions_accumulate(self):
+        s = ChatSession()
+        # Primera ronda
+        self._fill_session(s, 12)
+        s.apply_compaction("Resum 1: IA local")
+        assert len(s.messages) == ChatSession.COMPACT_KEEP
+        # Segona ronda
+        self._fill_session(s, 10)
+        s.apply_compaction("Resum 2: IA local + streaming")
+        assert s.compaction_count == 2
+        assert s.context_summary == "Resum 2: IA local + streaming"
+        assert len(s.messages) == ChatSession.COMPACT_KEEP
