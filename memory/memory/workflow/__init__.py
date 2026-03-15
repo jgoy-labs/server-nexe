@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/workflow/__init__.py
 Description: Workflow integration per Memory Module.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

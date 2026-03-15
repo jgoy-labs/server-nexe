@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/messages.py
 Description: Diccionari centralitzat de missatges fallback per module_manager. Defineix
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

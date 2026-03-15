@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/tests/test_simple_embedder.py
 Description: Tests per memory/embeddings/simple_embedder.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

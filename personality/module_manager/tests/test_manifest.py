@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/tests/test_manifest.py
 Description: Tests per personality/module_manager/manifest.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

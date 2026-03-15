@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/engines/persistence.py
 Description: PersistenceManager - SQLite (metadata) + Qdrant (vectors) with rollback.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

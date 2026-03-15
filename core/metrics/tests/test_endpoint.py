@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/metrics/tests/test_endpoint.py
 Description: Tests per Prometheus metrics endpoint.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/tests/test_metrics.py
 Description: Tests per memory/memory/metrics.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

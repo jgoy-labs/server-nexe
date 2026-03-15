@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/endpoints/__init__.py
 Description: Package d'endpoints FastAPI. Exposa root_router (/, /health, /api/info) i
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

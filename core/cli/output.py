@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/output.py
 Description: Output formatting per CLI Central Nexe.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

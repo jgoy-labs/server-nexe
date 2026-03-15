@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/tests/test_manifest_router.py
 Description: Tests per memory/rag/manifest.py i memory/rag/router.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

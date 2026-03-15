@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security_logger/sanitizers.py
 Description: Funcions de sanitització per security logs (GDPR compliance).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

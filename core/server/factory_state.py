@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/factory_state.py
 Description: App State Management for FastAPI Dependency Injection.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/ollama_module/tests/unit/test_ollama_node.py
 Description: Tests unitaris per OllamaNode. Valida integració amb Ollama API, prompt handling, response parsing i error cases.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

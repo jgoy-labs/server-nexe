@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security_logger/helpers.py
 Description: Convenience methods per logging d'events de seguretat específics.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

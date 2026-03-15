@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/auth_dependencies.py
 Description: FastAPI Dependencies per autenticació Nexe amb suport dual-key.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

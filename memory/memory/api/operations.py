@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/api/operations.py
 Description: Façana per operacions Memory API.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

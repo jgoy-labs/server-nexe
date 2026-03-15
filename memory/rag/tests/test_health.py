@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/tests/test_health.py
 Description: Tests per RAG health checks (health.py).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

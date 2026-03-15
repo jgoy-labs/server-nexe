@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/tests/__init__.py
 Description: No description available.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

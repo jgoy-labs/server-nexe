@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/workflow/nodes/memory_store_node.py
 Description: Node per emmagatzemar contingut a Memory (FlashMemory + Persistence).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

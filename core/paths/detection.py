@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/paths/detection.py
 Description: Core detection logic per Nexe root.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

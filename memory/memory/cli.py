@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/cli.py
 Description: CLI executable per Memory Module.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

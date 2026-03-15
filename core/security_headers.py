@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/security_headers.py
 Description: Middleware per security headers OWASP-compliant. Afegeix CSP, HSTS, X-Frame-Options,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

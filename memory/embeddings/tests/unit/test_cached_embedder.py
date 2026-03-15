@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/tests/unit/test_cached_embedder.py
 Description: Tests unitaris per CachedEmbedder.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

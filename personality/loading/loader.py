@@ -15,7 +15,7 @@ DEPRECATION NOTICE:
 
   Migration: from core.loader import ModuleLoader, bootstrap
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

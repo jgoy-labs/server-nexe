@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/client.py
 Description: Client HTTP per comunicar-se amb el servidor Nexe.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

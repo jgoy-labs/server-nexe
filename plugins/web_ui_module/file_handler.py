@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/web_ui_module/file_handler.py
 Description: Gestió de fitxers pujats (upload) per la UI web
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

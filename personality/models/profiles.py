@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/models/profiles.py
 Description: Perfils de maquinari i models recomanats.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 from enum import Enum

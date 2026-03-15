@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/core_modules.py
 Description: Defineix el conjunt de mòduls interns que formen part del nucli de Nexe.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

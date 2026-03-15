@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/web_ui_module/manifest.py
 Description: Router FastAPI per mòdul Web UI.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

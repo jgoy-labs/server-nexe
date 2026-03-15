@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/__init__.py
 Description: Mòdul RAG - Sistema multi-source amb circuit breaker i vector search.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

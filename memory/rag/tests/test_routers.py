@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/tests/test_routers.py
 Description: Tests per memory/rag/routers/endpoints.py i ui.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

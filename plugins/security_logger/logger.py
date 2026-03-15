@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security_logger/logger.py
 Description: SecurityEventLogger - Classe principal per logging d'events de seguretat.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

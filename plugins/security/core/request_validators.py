@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/request_validators.py
 Description: Validadors de requests FastAPI. Valida headers, params i paths contra injeccions.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

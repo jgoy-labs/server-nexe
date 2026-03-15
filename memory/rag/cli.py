@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/cli.py
 Description: %s", info.get("description", "N/A"))
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

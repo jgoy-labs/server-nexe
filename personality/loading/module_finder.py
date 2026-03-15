@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/loading/module_finder.py
 Description: Cercador de fitxers API per mòduls Nexe. Busca fitxers segons patrons prioritaris
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

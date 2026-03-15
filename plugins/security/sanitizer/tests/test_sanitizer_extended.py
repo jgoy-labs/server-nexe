@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/sanitizer/tests/test_sanitizer_extended.py
 Description: Tests extesos per detectors, module i health del sanitizer.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

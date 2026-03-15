@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/ollama_module/workflow/__init__.py
 Description: Paquet de nodes del Workflow Engine per al mòdul Ollama.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

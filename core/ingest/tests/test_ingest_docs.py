@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/ingest/tests/test_ingest_docs.py
 Description: Tests per ingest_docs.py (chunk_text, ingest_documentation mockejat).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

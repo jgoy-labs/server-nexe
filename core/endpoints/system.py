@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/endpoints/system.py
 Description: Endpoints d'administració del sistema: reinici del servidor,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

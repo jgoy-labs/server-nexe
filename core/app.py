@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/app.py
 Description: Main entry point and facade for Nexe 0.8 FastAPI server.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

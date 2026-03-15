@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/module_registry.py
 Description: Simple module registry for instances and capabilities.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

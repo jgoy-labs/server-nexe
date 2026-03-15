@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/utils/api_client.py
 Description: Client HTTP simple per comunicar CLI amb Server Nexe.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

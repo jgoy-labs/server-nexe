@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/integration/api_integrator.py
 Description: Integrador automàtic d'APIs de mòduls al servidor FastAPI. Detecta routers,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

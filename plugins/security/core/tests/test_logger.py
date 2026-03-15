@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/tests/test_logger.py
 Description: Tests per plugins/security/core/logger.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

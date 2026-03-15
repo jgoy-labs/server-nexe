@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/workflow/nodes/__init__.py
 Description: Exporta nodes de workflow del mòdul RAG.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

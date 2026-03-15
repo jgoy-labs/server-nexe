@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/integration/__init__.py
 Description: Package marker per sistema d'integració automàtica d'APIs. Agrupa components
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/middleware.py
 Description: FastAPI middleware configuration: CORS, rate limiting, security headers, request
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

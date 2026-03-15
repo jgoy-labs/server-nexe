@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/registry.py
 Description: Registry central de mòduls carregats. Indexa mòduls, endpoints, metadata i
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

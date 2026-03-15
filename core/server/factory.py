@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/factory.py
 Description: Application Factory pattern per creació i configuració de FastAPI app Nexe 0.8.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

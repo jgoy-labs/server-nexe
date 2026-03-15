@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/loader/protocol.py
 Description: str = ""
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

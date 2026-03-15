@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/factory_routers.py
 Description: Router Registration for Nexe Server Factory.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

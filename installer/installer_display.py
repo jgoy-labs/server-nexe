@@ -33,7 +33,7 @@ APP_LOGO = f"""{RED}
    .#.
 {RESET}
       {DIM}Projecte personal de Jordi Goy, aprenent fent-ho
-           assistit per IA · www.jgoy.net{RESET}
+           assistit per IA · www.jgoy.net · https://server-nexe.org{RESET}
 """
 
 

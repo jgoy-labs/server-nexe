@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/manifest.py
 Description: Manifest FastAPI del mòdul Security que exposa endpoints REST per escaneig de seguretat.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

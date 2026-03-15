@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/ollama_module/__init__.py
 Description: Mòdul d'integració amb Ollama (opció local per models LLM).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

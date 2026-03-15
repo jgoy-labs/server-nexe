@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/tests/test_optional_api_key.py
 Description: Tests per optional_api_key() amb clau primaria i secundaria.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

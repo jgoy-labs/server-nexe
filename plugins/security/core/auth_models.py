@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/auth_models.py
 Description: Models de dades per al sistema d'autenticació Nexe.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

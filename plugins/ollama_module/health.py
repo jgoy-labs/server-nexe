@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/ollama_module/health.py
 Description: Health check per mòdul Ollama (opció local per LLM). Verifica
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

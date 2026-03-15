@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: tests/test_container.py
 Description: Tests per core/container.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

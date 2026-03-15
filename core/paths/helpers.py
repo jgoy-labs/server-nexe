@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/paths/helpers.py
 Description: Path helpers i convenience functions per accés ràpid a directoris Nexe.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

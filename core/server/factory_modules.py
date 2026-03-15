@@ -9,7 +9,7 @@ Description: Module Discovery and Loading for Nexe Server Factory.
 Uses ModuleManager as SINGLE SOURCE OF TRUTH for all module operations.
 See: docs/NEXE_ARCHITECTURAL_DECISIONS.md (ADR-001)
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

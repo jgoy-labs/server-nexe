@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/config_validator.py
 Description: Validador de configuració server.toml. Comprova sections obligatòries,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/sanitizer/workflow/nodes/resistencia_node.py
 Description: Node de Intervenció - Resposta predefinida quan es detecta jailbreak.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

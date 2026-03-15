@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/paths.py
 Description: FAÇADE per al mòdul paths - Re-export de core.paths/
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

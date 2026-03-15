@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/auth.py
 Description: Sistema d'autenticació centralitzat Nexe amb suport per API keys.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

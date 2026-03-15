@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/i18n/tests/test_i18n_manager.py
 Description: Tests per I18nManager. Valida càrrega de traduccions, fallbacks,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/core/cached_embedder.py
 Description: CachedEmbedder: Integra AsyncEmbedder amb MultiLevelCache per optimitzar latència.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

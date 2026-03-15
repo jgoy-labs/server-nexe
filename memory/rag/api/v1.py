@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/api/v1.py
 Description: RAG API v1 - Endpoints per cerca semàntica i gestió documents RAG.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

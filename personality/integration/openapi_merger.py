@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/integration/openapi_merger.py
 Description: Fusionador d'especificacions OpenAPI de mòduls. Combina schemas de múltiples
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

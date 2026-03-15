@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: conftest.py
 Description: Global Pytest fixtures for all tests.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

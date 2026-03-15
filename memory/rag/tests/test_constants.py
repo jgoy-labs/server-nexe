@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/tests/test_constants.py
 Description: Tests per RAG constants.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

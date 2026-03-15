@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/loading/__init__.py
 Description: Package marker per sistema de càrrega dinàmica de mòduls. Agrupa components
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

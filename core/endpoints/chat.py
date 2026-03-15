@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/endpoints/chat.py
 Description: Unified Chat Endpoint with RAG support & Streaming.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/__init__.py
 Description: Mòdul Embeddings - Sistema d'embeddings i vectorització multilingüe amb cache multi-nivell.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

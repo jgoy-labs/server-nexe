@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/tests/test_vectorstore_protocol.py
 Description: No description available.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/tests/test_manifest.py
 Description: Tests per security manifest (endpoints REST, SecurityModule, init_security_module).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: tests/test_resources.py
 Description: Tests per core/resources.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag_sources/personality/__init__.py
 Description: Font RAG basada en la personalitat/identitat.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

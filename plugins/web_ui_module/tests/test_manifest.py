@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/web_ui_module/tests/test_manifest.py
 Description: Tests per router_public del manifest.py (endpoints UI, session, upload, chat, memory).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

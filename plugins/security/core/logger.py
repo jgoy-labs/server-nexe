@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/logger.py
 Description: Logger d'esdeveniments de seguretat. Registra events en format JSONL.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

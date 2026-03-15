@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/tests/test_verify_api_key.py
 Description: Tests per verify_api_key() refactoritzat. Valida que llença HTTPException(401) correctament i usa timing-safe comparison.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

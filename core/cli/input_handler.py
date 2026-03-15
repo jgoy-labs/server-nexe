@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/input_handler.py
 Description: No description available.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

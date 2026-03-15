@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/tests/unit/test_workflow_nodes.py
 Description: Tests unitaris per workflow nodes (embedding_node, chunking_node).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -14,7 +14,7 @@ Variables d'entorn:
   NEXE_TEST_URL      URL base del servidor (default: http://localhost:9119)
   NEXE_TEST_API_KEY  Clau API per als endpoints autenticats
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

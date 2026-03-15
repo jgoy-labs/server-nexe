@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/api/tests/test_memory_api.py
 Description: Tests per memory/memory/api/__init__.py (MemoryAPI).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

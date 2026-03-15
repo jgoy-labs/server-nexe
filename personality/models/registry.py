@@ -7,7 +7,7 @@ Location: personality/models/registry.py
 Description: Registre curat de models suportats (MLX & Ollama).
              Mapeja noms curts (e.g. "llama3") a IDs reals (HF o Ollama library).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

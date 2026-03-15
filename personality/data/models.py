@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/data/models.py
 Description: Data models compartits de Nexe Core. Defineix Enums (ModuleState, SystemStatus,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

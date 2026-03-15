@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/__init__.py
 Description: Package marker del mòdul Security Nexe 0.8. Exposa versió i nom per auto-descobriment per system_testing.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

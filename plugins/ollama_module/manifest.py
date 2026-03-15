@@ -7,7 +7,7 @@ Location: plugins/ollama_module/manifest.py
 Description: Router FastAPI per mòdul Ollama. Exposa endpoints REST per gestió.
              Lazy initialization to avoid side effects at import.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

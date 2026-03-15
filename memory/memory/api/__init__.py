@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/api/__init__.py
 Description: Memory API Façade - API genèrica per mòduls externs.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

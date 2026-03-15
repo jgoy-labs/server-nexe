@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/engines/__init__.py
 Description: Storage engines per Memory Module.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

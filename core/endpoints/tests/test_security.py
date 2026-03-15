@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/endpoints/tests/test_security.py
 Description: Tests de seguretat: path traversal, upload validation, health endpoint, session TTL.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

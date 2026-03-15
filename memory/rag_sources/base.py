@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag_sources/base.py
 Description: Base models for RAG sources (requests and hits).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

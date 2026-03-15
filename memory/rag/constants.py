@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/constants.py
 Description: Constants for the RAG module. Separated from manifest.py to avoid circular imports.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

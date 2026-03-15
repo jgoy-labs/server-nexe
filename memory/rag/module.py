@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/module.py
 Description: Main RAG Module - Multi-source Retrieval-Augmented Generation system.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

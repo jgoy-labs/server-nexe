@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/metrics/tests/test_registry.py
 Description: Tests per Prometheus metrics registry.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

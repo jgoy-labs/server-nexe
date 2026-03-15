@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/ollama_module/tests/integration/test_ollama_integration.py
 Description: Tests d'integració per mòdul Ollama. Valida workflow complet amb Ollama server, streaming, retries i timeouts.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/metrics/tests/test_middleware.py
 Description: Tests per Prometheus middleware.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

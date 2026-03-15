@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/tests/test_endpoints.py
 Description: Tests unitaris dels endpoints RAG (upload, search, add_document).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

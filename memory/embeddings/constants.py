@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/constants.py
 Description: Constants for the Embeddings module. Separated from manifest.py to avoid circular imports.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

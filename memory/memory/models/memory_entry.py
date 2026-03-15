@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/models/memory_entry.py
 Description: Model principal MemoryEntry.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

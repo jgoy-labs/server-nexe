@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/tests/test_rate_limiting.py
 Description: Tests per RateLimitTracker, identificadors de rate limiting i helpers.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

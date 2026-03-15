@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag_sources/__init__.py
 Description: Mòdul base per a fonts de RAG.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

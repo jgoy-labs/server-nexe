@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/tests/test_module_integration.py
 Description: No description available.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

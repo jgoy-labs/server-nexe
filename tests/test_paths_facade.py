@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: tests/test_paths_facade.py
 Description: Tests per core/paths.py (facade) i gaps de core/paths/detection.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

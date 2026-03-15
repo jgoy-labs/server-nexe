@@ -8,7 +8,7 @@ Location: install_nexe.py
 Description: Façade entry point — delegates to installer/install.py.
              (Patró façade del projecte, com core/app.py → core/server/factory.py)
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/metrics/tests/test_metrics_collector.py
 Description: Tests per MetricsCollector. Valida recol·lecció de mètriques,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

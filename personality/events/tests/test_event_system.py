@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/events/tests/test_event_system.py
 Description: Tests per EventSystem. Valida publish-subscribe, emissió d'events,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

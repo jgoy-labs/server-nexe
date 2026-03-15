@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/module.py
 Description: Classe principal del mòdul CLI Central Nexe. Gestiona la descoberta
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

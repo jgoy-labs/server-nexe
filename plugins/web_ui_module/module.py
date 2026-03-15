@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/web_ui_module/module.py
 Description: Plugin UI web estil Ollama per demostrar el sistema modular de Nexe
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

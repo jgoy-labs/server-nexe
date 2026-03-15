@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/runner.py
 Description: Server runner i main entry point. Funció main() carrega config, valida port
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

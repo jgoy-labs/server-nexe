@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/models/__init__.py
 Description: Gestió i recomanació de models LLM segons maquinari.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

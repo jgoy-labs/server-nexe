@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/loader/registry.py
 Description: Central module registry (singleton, thread-safe).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

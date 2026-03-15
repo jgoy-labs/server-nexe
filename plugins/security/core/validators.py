@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/core/validators.py
 Description: Validadors de seguretat. Prevé path traversal, RCE i validació de comandes.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

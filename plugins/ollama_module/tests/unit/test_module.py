@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/ollama_module/tests/unit/test_module.py
 Description: Tests per plugins/ollama_module/module.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

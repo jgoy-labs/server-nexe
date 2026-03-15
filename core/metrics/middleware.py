@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/metrics/middleware.py
 Description: Prometheus middleware per tracking HTTP requests.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

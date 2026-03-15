@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/health.py
 Description: Health check interface per CLI Central Nexe. Facade que prevé imports
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security_logger/tests/test_enums.py
 Description: Nexe Server Component
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/llama_cpp_module/module.py
 Description: Mòdul Nexe per a Llama.cpp. Adaptació del LlamaCppChatNode original.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

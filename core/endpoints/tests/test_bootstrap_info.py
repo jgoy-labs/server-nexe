@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/endpoints/tests/test_bootstrap_info.py
 Description: Tests per /api/bootstrap/info (timezone + estat token).
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

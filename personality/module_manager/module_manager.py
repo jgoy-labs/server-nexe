@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/module_manager/module_manager.py
 Description: Façade central del sistema de gestió de mòduls Nexe 0.8.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

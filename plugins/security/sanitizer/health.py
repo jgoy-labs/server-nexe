@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/sanitizer/health.py
 Description: Health checks per al mòdul SANITIZER.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

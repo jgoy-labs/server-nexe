@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/memory/pipeline/ingestion.py
 Description: IngestionPipeline - 7 ingestion stages with backpressure and embedding.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

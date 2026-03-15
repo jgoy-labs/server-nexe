@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/core/chunker.py
 Description: SmartChunker: Intelligent chunking with section and title detection.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

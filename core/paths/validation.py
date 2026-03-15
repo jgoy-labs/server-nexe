@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/paths/validation.py
 Description: Robust Nexe root validation + detection logging.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

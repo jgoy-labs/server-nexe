@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/embeddings/workflow/nodes/embedding_node.py
 Description: Workflow node per generar embeddings.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

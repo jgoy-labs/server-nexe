@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: memory/rag/workflow/registry.py
 Description: Auto-registre de nodes RAG al NodeRegistry global del Workflow Engine.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

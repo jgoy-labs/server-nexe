@@ -7,7 +7,7 @@ Location: plugins/mlx_module/manifest.py
 Description: Router FastAPI per mòdul MLX (Apple Silicon).
              Lazy initialization to avoid side effects at import.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

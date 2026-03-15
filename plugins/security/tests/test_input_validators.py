@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/security/tests/test_input_validators.py
 Description: Tests per validadors d'entrada. Detecta XSS, SQL injection, NoSQL injection, command injection, path traversal i LDAP injection.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

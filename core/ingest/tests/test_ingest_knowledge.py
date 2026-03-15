@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/ingest/tests/test_ingest_knowledge.py
 Description: Tests per core/ingest/ingest_knowledge.py.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

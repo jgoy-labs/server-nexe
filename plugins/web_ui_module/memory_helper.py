@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: plugins/web_ui_module/memory_helper.py
 Description: Memory integration with intent detection for contextual memory storage.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

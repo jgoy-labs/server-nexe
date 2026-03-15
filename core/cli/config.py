@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/cli/config.py
 Description: Configuració del CLI Central Nexe.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

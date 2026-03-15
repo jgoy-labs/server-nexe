@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/endpoints/v1.py
 Description: API v1 Router - Base router for versioned API endpoints.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

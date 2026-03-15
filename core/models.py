@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/models.py
 Description: str = Field(..., description="System description")
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

@@ -7,7 +7,7 @@ Location: core/cli/chat_cli.py
 Description: CLI de Chat unificat. Detecta motor disponible (MLX, Llama.cpp, Ollama)
              i proporciona una interfície interactiva simple.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

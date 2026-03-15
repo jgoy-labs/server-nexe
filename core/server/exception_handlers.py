@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/exception_handlers.py
 Description: Exception handlers globals per FastAPI. Gestiona RateLimitExceeded, HTTPException,
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

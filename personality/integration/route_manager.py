@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/integration/route_manager.py
 Description: Gestor dinàmic de rutes FastAPI per mòduls. Registra i elimina routers/apps
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

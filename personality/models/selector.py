@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: personality/models/selector.py
 Description: Lògica de detecció de maquinari i selecció de perfil.
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 

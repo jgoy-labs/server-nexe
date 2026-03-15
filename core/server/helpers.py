@@ -6,7 +6,7 @@ Author: Jordi Goy
 Location: core/server/helpers.py
 Description: Utilitats pel servidor. Funcions: is_port_in_use() (socket check), setup_signal_handlers()
 
-www.jgoy.net
+www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
