@@ -24,7 +24,7 @@ echo "     =####        :##+     ##. =###+  =##    :###-###=   *###=  +##   "
 echo "   ####=          :##+     ##.   =######-   *###   -###    +######.   "
 echo "   .#.                                                                 "
 echo -e "${NC}"
-echo -e "${BLUE}[STEP]${NC} Verifying environment..."
+echo -e "${BLUE}[STEP]${NC} Verificant entorn..."
 
 # Find Python >= 3.10 (checks python3.11, python3.12, python3.10, brew paths, then python3)
 PYTHON_BIN=""
@@ -98,42 +98,42 @@ echo -e "  ${GREEN}✓${NC} Python ${PYTHON_VERSION} detectat ($PYTHON_BIN)"
 
 # AUTOMATIC PYTHON CACHE CLEANUP (always, no prompt)
 # Necessary when copying directory between locations
-echo -e "${BLUE}[CLEAN]${NC} Cleaning Python cache..."
+echo -e "${BLUE}[CLEAN]${NC} Netejant cache Python..."
 find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
 find . -type f -name "*.pyc" -delete 2>/dev/null
 find . -type f -name "*.pyo" -delete 2>/dev/null
-echo -e "  ${GREEN}✓${NC} Python cache cleaned"
+echo -e "  ${GREEN}✓${NC} Cache Python netejat"
 
 # Automatic cleanup: Remove generated files to avoid conflicts
 echo ""
 if [ -d "venv" ] || [ -f ".env" ] || [ -d "storage" ]; then
-    echo -e "${YELLOW}[CLEAN]${NC} Previous installation detected."
-    echo -e "${CYAN}Do you want to perform a full cleanup before installing? (recommended) [Y/n]:${NC} "
+    echo -e "${YELLOW}[CLEAN]${NC} Instal·lació anterior detectada."
+    echo -e "${CYAN}Vols fer una neteja completa abans d'instal·lar? (recomanat) [S/n]:${NC} "
     read -r -n 1 response
     echo ""
     if [[ ! $response =~ ^[Nn]$ ]]; then
-        echo -e "${YELLOW}[CLEAN]${NC} Cleaning previous installation..."
+        echo -e "${YELLOW}[CLEAN]${NC} Netejant instal·lació anterior..."
 
-        # Stop processes
-        pkill -f "qdrant.*disable-telemetry" 2>/dev/null && echo "  ✓ Qdrant stopped" || true
-        pkill -f "ollama serve" 2>/dev/null && echo "  ✓ Ollama stopped" || true
-        pkill -f "uvicorn.*nexe" 2>/dev/null && echo "  ✓ Nexe Server stopped" || true
+        # Aturar processos
+        pkill -f "qdrant.*disable-telemetry" 2>/dev/null && echo "  ✓ Qdrant aturat" || true
+        pkill -f "ollama serve" 2>/dev/null && echo "  ✓ Ollama aturat" || true
+        pkill -f "uvicorn.*nexe" 2>/dev/null && echo "  ✓ Nexe Server aturat" || true
         sleep 1
 
         # Delete generated files
-        [ -d "venv" ] && rm -rf venv && echo "  ✓ venv/ deleted"
-        [ -f ".env" ] && rm -f .env && echo "  ✓ .env deleted"
-        [ -d "storage" ] && rm -rf storage && echo "  ✓ storage/ deleted"
+        [ -d "venv" ] && rm -rf venv && echo "  ✓ venv/ eliminat"
+        [ -f ".env" ] && rm -f .env && echo "  ✓ .env eliminat"
+        [ -d "storage" ] && rm -rf storage && echo "  ✓ storage/ eliminat"
         rm -f .qdrant-initialized 2>/dev/null
         rm -f COMMANDS.md 2>/dev/null
 
-        echo -e "${GREEN}[OK]${NC} Cleanup complete."
+        echo -e "${GREEN}[OK]${NC} Neteja completada."
     else
-        echo -e "${CYAN}[INFO]${NC} Cleanup skipped. Continuing installation..."
-        # Minimum required: venv must always be deleted
+        echo -e "${CYAN}[INFO]${NC} Neteja omesa. Continuant instal·lació..."
+        # Mínim requerit: venv sempre s'ha d'eliminar
         if [ -d "venv" ]; then
             rm -rf venv
-            echo -e "${YELLOW}[CLEAN]${NC} Venv deleted (required for installation)."
+            echo -e "${YELLOW}[CLEAN]${NC} venv eliminat (requerit per la instal·lació)."
         fi
     fi
 fi
