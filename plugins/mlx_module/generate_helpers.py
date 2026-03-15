@@ -240,11 +240,12 @@ def run_streaming_generation(
     # Stop tokens comuns per diferents models
     # Post-processarem la resposta per tallar quan apareguin
     STOP_SEQUENCES = [
-        "<|end|>", "<|endoftext|>", "<|assistant|>",  # Phi-3.5, GPT
+        "<|end|>", "<|endoftext|>",  # Phi-3.5, GPT
         "</s>",  # Llama 2
         "<|eot_id|>",  # Llama 3.x
         "<end_of_turn>",  # Gemma
         "<|im_end|>",  # ChatML format
+        # NO <|assistant|> — GPT-OSS l'usa com a tag de canal intern
     ]
 
     # MLX relies on tokenizer.eos_token_ids for stopping

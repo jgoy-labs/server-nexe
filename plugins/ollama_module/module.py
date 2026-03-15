@@ -255,7 +255,7 @@ class OllamaModule:
     try:
       # Stop sequences per diferents models
       stop_sequences = [
-        "<|end|>", "<|endoftext|>", "<|assistant|>",  # Phi-3.5, GPT
+        "<|end|>", "<|endoftext|>",  # Phi-3.5, GPT
         "</s>",  # Llama 2
         "<|eot_id|>",  # Llama 3.x
         "<end_of_turn>",  # Gemma
