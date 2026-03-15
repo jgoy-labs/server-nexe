@@ -7,7 +7,7 @@ Description: .env file generation and model configuration update.
 """
 
 from .installer_display import (
-    CYAN, DIM, BOLD, RESET,
+    CYAN, DIM, BOLD, YELLOW, RESET,
     print_step, print_success,
 )
 from .installer_i18n import t, get_lang
@@ -64,7 +64,10 @@ def generate_env_file(project_root, model_config):
 
         print_success(t('env_created'))
         print(f"  🔑 {t('api_key')}:")
+        print()
         print(f"  {CYAN}{secure_key}{RESET}")
+        print()
+        print(f"  {YELLOW}{t('copy_api_key')}{RESET}")
         print(f"  {DIM}({t('saved_at')} {env_file} · chmod 600){RESET}")
     else:
         # Update existing .env with model configuration
