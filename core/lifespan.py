@@ -579,9 +579,20 @@ async def lifespan(app: FastAPI):
     # Final message: Server ready
     _srv_cfg = server_state.config.get("core", {}).get("server", {})
     _nexe_url = os.environ.get("NEXE_API_BASE_URL", f"http://{_srv_cfg.get('host', '127.0.0.1')}:{_srv_cfg.get('port', 9119)}")
+    _api_key = os.environ.get("NEXE_PRIMARY_API_KEY", "")
+    _key_hint = f"{_api_key[:8]}...{_api_key[-4:]}" if len(_api_key) > 12 else "(not set)"
+    _lang = os.environ.get("NEXE_LANG", "ca")
+
     logger.info("=" * 70)
     logger.info("✅  SERVER.NEXE READY · Listening on %s", _nexe_url)
     logger.info("📱 Web UI: %s/ui/", _nexe_url)
+    logger.info("🔑 API Key: %s", _key_hint)
+    if _lang == "ca":
+      logger.info("   Per veure la clau completa: cat .env | grep API_KEY")
+    elif _lang == "es":
+      logger.info("   Para ver la clave completa: cat .env | grep API_KEY")
+    else:
+      logger.info("   To see the full key: cat .env | grep API_KEY")
     logger.info("=" * 70)
 
     yield
