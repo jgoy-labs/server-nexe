@@ -274,7 +274,8 @@ class MLXChatNode:
         text, last_response, _ = run_streaming_generation(
             model, tokenizer, tokens_to_process, self.config.max_tokens,
             sampler, cached_kv, stream_callback,
-            cache_manager, model_key, cache_lookup_tokens
+            cache_manager, model_key, cache_lookup_tokens,
+            model_path=self.config.model_path
         )
 
         # 6. Guardar cache post-generació (messages nets, sense context de memòria)

@@ -808,12 +808,17 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                             content = chunk
 
                                         if content:
-                                            # Normalitzar thinking tags de diferents models
-                                            content = content.replace('<|thinking|>', '<think>')
-                                            content = content.replace('<|/thinking|>', '</think>')
-                                            # Netejar tags GPT-OSS (<|channel|>, ◁...▷) server-side
-                                            content = _re.sub(r'<\|[^|]+\|>', '', content)
-                                            content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
+                                            # GPT-OSS: NO netejar tags server-side
+                                            # El client (_parseThinkingChannels) necessita
+                                            # l'estructura analysis/assistant/final intacta
+                                            _is_gpt_oss = "gpt-oss" in model_name.lower()
+                                            if not _is_gpt_oss:
+                                                # Models normals: normalitzar thinking tags
+                                                content = content.replace('<|thinking|>', '<think>')
+                                                content = content.replace('<|/thinking|>', '</think>')
+                                                # Netejar tags (<|channel|>, ◁...▷) server-side
+                                                content = _re.sub(r'<\|[^|]+\|>', '', content)
+                                                content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
                                             full_response += content
                                             if content:
                                                 yield content
@@ -840,9 +845,17 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                 yield f"\n[Error: {str(e)}]"
 
                             # Save clean response (no think/GPT-OSS tags) to session/disk
-                            clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", full_response)
+                            clean_response = full_response
+                            clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", clean_response)
                             clean_response = _re.sub(r'<\|[^|]+\|>', '', clean_response)
-                            clean_response = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', clean_response).strip()
+                            clean_response = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', clean_response)
+                            # GPT-OSS: extreure només la part "final" (resposta real)
+                            _m = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', clean_response, _re.IGNORECASE)
+                            if _m:
+                                clean_response = _m.group(1).strip()
+                            else:
+                                # Fallback: treure prefix "analysis..." si hi és
+                                clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
                             if clean_response:
                                 session.add_message("assistant", clean_response)
                                 _session_manager._save_session_to_disk(session)

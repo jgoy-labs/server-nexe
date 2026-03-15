@@ -212,6 +212,7 @@ def run_streaming_generation(
     cache_manager: Any,
     model_key: str,
     cache_lookup_tokens: List[int],
+    model_path: str = "",
 ) -> Tuple[str, Any, List[int]]:
     """
     Executa la generació amb streaming.
@@ -239,14 +240,18 @@ def run_streaming_generation(
 
     # Stop tokens comuns per diferents models
     # Post-processarem la resposta per tallar quan apareguin
-    STOP_SEQUENCES = [
-        "<|end|>", "<|endoftext|>",  # Phi-3.5, GPT
-        "</s>",  # Llama 2
-        "<|eot_id|>",  # Llama 3.x
-        "<end_of_turn>",  # Gemma
-        "<|im_end|>",  # ChatML format
-        # NO <|assistant|> — GPT-OSS l'usa com a tag de canal intern
-    ]
+    _is_gpt_oss = "gpt-oss" in model_path.lower()
+    if _is_gpt_oss:
+        # GPT-OSS: només EOS real — els tags <|...|> són canals interns
+        STOP_SEQUENCES = ["<|endoftext|>"]
+    else:
+        STOP_SEQUENCES = [
+            "<|end|>", "<|endoftext|>",  # Phi-3.5, GPT
+            "</s>",  # Llama 2
+            "<|eot_id|>",  # Llama 3.x
+            "<end_of_turn>",  # Gemma
+            "<|im_end|>",  # ChatML format
+        ]
 
     # MLX relies on tokenizer.eos_token_ids for stopping
     # No need for explicit stop_words parameter
