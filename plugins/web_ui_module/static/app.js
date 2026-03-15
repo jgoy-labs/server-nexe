@@ -213,6 +213,85 @@ class NexeUI {
             const el = document.getElementById('modelInfoText');
             if (el) el.textContent = 'nexe';
         }
+        this.loadBackends();
+    }
+
+    async loadBackends() {
+        const backendSel = document.getElementById('backendSelect');
+        const modelSel = document.getElementById('modelSelect');
+        if (!backendSel || !modelSel) return;
+
+        try {
+            const resp = await this.fetchWithCsrf('/ui/backends');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            this._backends = data.backends;
+            this._currentModel = data.current_model || '';
+
+            backendSel.innerHTML = '';
+            for (const b of data.backends) {
+                const opt = document.createElement('option');
+                opt.value = b.id;
+                opt.textContent = b.name;
+                if (b.active) opt.selected = true;
+                backendSel.appendChild(opt);
+            }
+
+            this._updateModelSelect(backendSel.value, this._currentModel);
+
+            backendSel.addEventListener('change', () => {
+                this._updateModelSelect(backendSel.value);
+                this._applyBackendChange();
+            });
+            modelSel.addEventListener('change', () => {
+                this._applyBackendChange();
+            });
+        } catch (e) {
+            console.error('Failed to load backends:', e);
+        }
+    }
+
+    _updateModelSelect(backendId, currentModel) {
+        const modelSel = document.getElementById('modelSelect');
+        if (!modelSel || !this._backends) return;
+
+        const backend = this._backends.find(b => b.id === backendId);
+        modelSel.innerHTML = '';
+        if (backend) {
+            for (const m of backend.models) {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                // Pre-seleccionar si coincideix amb el model actiu (nom parcial o complet)
+                if (currentModel && (currentModel.includes(m) || m.includes(currentModel))) {
+                    opt.selected = true;
+                }
+                modelSel.appendChild(opt);
+            }
+        }
+    }
+
+    async _applyBackendChange() {
+        const backendSel = document.getElementById('backendSelect');
+        const modelSel = document.getElementById('modelSelect');
+        if (!backendSel || !modelSel) return;
+
+        const backend = backendSel.value;
+        const model = modelSel.value;
+
+        try {
+            const resp = await this.fetchWithCsrf('/ui/backend', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ backend, model })
+            });
+            if (resp.ok) {
+                const el = document.getElementById('modelInfoText');
+                if (el) el.textContent = `${model} · ${backend}`;
+            }
+        } catch (e) {
+            console.error('Failed to set backend:', e);
+        }
     }
 
     _startStreamStats() {
@@ -414,6 +493,8 @@ class NexeUI {
         try {
             const ragSlider = document.getElementById('ragThresholdSlider');
             const ragThreshold = ragSlider ? parseFloat(ragSlider.value) : 0.6;
+            const backendSel = document.getElementById('backendSelect');
+            const modelSel = document.getElementById('modelSelect');
             const response = await this.fetchWithCsrf('/ui/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -421,7 +502,9 @@ class NexeUI {
                     message: message,
                     session_id: this.currentSessionId,
                     stream: true,
-                    rag_threshold: ragThreshold
+                    rag_threshold: ragThreshold,
+                    backend: backendSel ? backendSel.value : undefined,
+                    model: modelSel ? modelSel.value : undefined
                 }),
                 signal: this.abortController.signal
             });
@@ -435,6 +518,8 @@ class NexeUI {
                 let assistantMessageDiv = null;
                 let fullResponse = "";
                 let memorySaved = false;
+                let ragCount = 0;
+                let usedModel = '';
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -533,6 +618,20 @@ class NexeUI {
 
                         let chunk = decoder.decode(value, { stream: true });
 
+                        // Detectar token MODEL (model realment usat)
+                        const modelMatch = chunk.match(/\x00\[MODEL:([^\]]+)\]\x00/);
+                        if (modelMatch) {
+                            usedModel = modelMatch[1];
+                            chunk = chunk.replace(/\x00\[MODEL:[^\]]+\]\x00/, '');
+                        }
+
+                        // Detectar token RAG (memòries recuperades)
+                        const ragMatch = chunk.match(/\x00\[RAG:(\d+)\]\x00/);
+                        if (ragMatch) {
+                            ragCount = parseInt(ragMatch[1], 10);
+                            chunk = chunk.replace(/\x00\[RAG:\d+\]\x00/, '');
+                        }
+
                         // Detectar token de memòria guardat
                         if (chunk.includes('\x00[MEM]\x00')) {
                             memorySaved = true;
@@ -550,20 +649,22 @@ class NexeUI {
                     const elapsed = (Date.now() - this._streamStart) / 1000;
                     const finalTok = this._streamTokens;
                     const finalSpd = elapsed > 0.5 ? (finalTok / elapsed).toFixed(1) : null;
-                    const modelEl = document.getElementById('modelInfoText');
-                    const modelName = modelEl ? modelEl.textContent.split(' · ')[0] : '';
                     const statsEl = lastMsg.querySelector('.message-stats');
                     if (statsEl && finalTok > 0) {
                         const timeStr = elapsed > 0 ? `${elapsed.toFixed(1)}s` : '';
                         const spdStr = finalSpd ? ` · ${finalSpd} tok/s` : '';
-                        const modelShort = modelName ? modelName.split('/').pop() : '';
+                        const modelShort = usedModel ? usedModel.split('/').pop() : '';
                         const memBadge = memorySaved
                             ? `<span class="stat-item stat-mem"><i data-lucide="bookmark-check"></i><span>guardat</span></span>`
+                            : '';
+                        const ragBadge = ragCount > 0
+                            ? `<span class="stat-item stat-rag"><i data-lucide="brain"></i><span>RAG ${ragCount}</span></span>`
                             : '';
                         statsEl.innerHTML = `
                             <span class="stat-item"><i data-lucide="activity"></i><span>${finalTok} tok</span></span>
                             ${timeStr ? `<span class="stat-item"><i data-lucide="timer"></i><span>${timeStr}${spdStr}</span></span>` : ''}
                             ${modelShort ? `<span class="stat-item stat-model"><i data-lucide="cpu"></i><span>${modelShort}</span></span>` : ''}
+                            ${ragBadge}
                             ${memBadge}
                         `;
                         if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [statsEl] });
