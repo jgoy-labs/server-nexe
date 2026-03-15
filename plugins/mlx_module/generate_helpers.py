@@ -5,6 +5,7 @@ MLX Generation Helper Functions.
 Funcions auxiliars per la generació MLX amb prefix caching.
 """
 import logging
+import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -341,6 +342,10 @@ def save_cache_post_generation(
     """
     if not text.strip():
         return
+
+    # Netejar tags especials de GPT-OSS (<|channel|>, ◁...▷) abans de cache
+    text = re.sub(r'<\|[^|]+\|>', '', text)
+    text = re.sub(r'[◁◀][^▷▶]*[▷▶]', '', text)
 
     try:
         # Verificar si ja acaba amb assistant (pels placeholders)

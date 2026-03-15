@@ -63,6 +63,10 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
   async def well_known(path: str):
       return Response(status_code=204)
 
+  @app.get("/apple-touch-icon{rest:path}", include_in_schema=False)
+  async def apple_touch_icon(rest: str):
+      return Response(status_code=204)
+
   return app
 
 __all__ = ['create_fastapi_instance']

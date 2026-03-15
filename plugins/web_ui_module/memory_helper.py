@@ -120,10 +120,23 @@ class MemoryHelper:
                 api = MemoryAPI()
                 await api.initialize()
 
-                # Ensure web UI collection exists
-                if not await api.collection_exists("nexe_web_ui"):
-                    await api.create_collection("nexe_web_ui", vector_size=768)
-                    logger.info("Created web UI memory collection")
+                # Ensure collections exist with correct dimensions (768)
+                for coll_name in ("nexe_web_ui", "user_knowledge"):
+                    if await api.collection_exists(coll_name):
+                        try:
+                            info = api._qdrant.get_collection(coll_name)
+                            vec_cfg = info.config.params.vectors
+                            dim = vec_cfg.size if hasattr(vec_cfg, 'size') else None
+                            if dim and dim != 768:
+                                logger.warning("Collection %s has %d dims, expected 768 — recreating", coll_name, dim)
+                                await api.delete_collection(coll_name)
+                                await api.create_collection(coll_name, vector_size=768)
+                                logger.info("Recreated %s with 768 dims", coll_name)
+                        except Exception as dim_err:
+                            logger.debug("Could not verify dims for %s: %s", coll_name, dim_err)
+                    else:
+                        await api.create_collection(coll_name, vector_size=768)
+                        logger.info("Created memory collection %s", coll_name)
 
                 _memory_api_instance = api
                 logger.info("MemoryAPI singleton initialized and cached")
