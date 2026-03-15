@@ -24,11 +24,11 @@ esac
 # ── i18n strings ──────────────────────────────────────────────
 if [ "$_L" = "ca" ]; then
     _VERIFYING="Verificant entorn..."
-    _NO_PYTHON="No s'ha trobat Python 3.10 o superior."
+    _NO_PYTHON="No s'ha trobat Python 3.11 o superior."
     _BREW_FOUND="S'ha trobat Homebrew. Instal·lant Python 3.12 automàticament..."
     _CONTINUE="Continuar? [S/n]:"
     _NO_BREW="Homebrew no trobat. Instal·lant Homebrew + Python 3.12..."
-    _ERROR_PYTHON="No s'ha pogut trobar Python 3.10+. Instal·la'l manualment:"
+    _ERROR_PYTHON="No s'ha pogut trobar Python 3.11+. Instal·la'l manualment:"
     _THEN_RUN="Després torna a executar: ./setup.sh"
     _DETECTED="detectat"
     _CLEANING_CACHE="Netejant cache Python..."
@@ -43,11 +43,11 @@ if [ "$_L" = "ca" ]; then
     _VENV_REQUIRED="venv eliminat (requerit per la instal·lació)."
 elif [ "$_L" = "es" ]; then
     _VERIFYING="Verificando entorno..."
-    _NO_PYTHON="No se ha encontrado Python 3.10 o superior."
+    _NO_PYTHON="No se ha encontrado Python 3.11 o superior."
     _BREW_FOUND="Se ha encontrado Homebrew. Instalando Python 3.12 automáticamente..."
     _CONTINUE="¿Continuar? [S/n]:"
     _NO_BREW="Homebrew no encontrado. Instalando Homebrew + Python 3.12..."
-    _ERROR_PYTHON="No se ha podido encontrar Python 3.10+. Instálalo manualmente:"
+    _ERROR_PYTHON="No se ha podido encontrar Python 3.11+. Instálalo manualmente:"
     _THEN_RUN="Después vuelve a ejecutar: ./setup.sh"
     _DETECTED="detectado"
     _CLEANING_CACHE="Limpiando caché Python..."
@@ -62,11 +62,11 @@ elif [ "$_L" = "es" ]; then
     _VENV_REQUIRED="venv eliminado (requerido para la instalación)."
 else
     _VERIFYING="Verifying environment..."
-    _NO_PYTHON="Python 3.10 or higher not found."
+    _NO_PYTHON="Python 3.11 or higher not found."
     _BREW_FOUND="Homebrew found. Installing Python 3.12 automatically..."
     _CONTINUE="Continue? [Y/n]:"
     _NO_BREW="Homebrew not found. Installing Homebrew + Python 3.12..."
-    _ERROR_PYTHON="Could not find Python 3.10+. Install it manually:"
+    _ERROR_PYTHON="Could not find Python 3.11+. Install it manually:"
     _THEN_RUN="Then run again: ./setup.sh"
     _DETECTED="detected"
     _CLEANING_CACHE="Cleaning Python cache..."
@@ -94,21 +94,21 @@ echo "   .#.                                                                 "
 echo -e "${NC}"
 echo -e "${BLUE}[STEP]${NC} $_VERIFYING"
 
-# Find Python >= 3.10
+# Find Python >= 3.11
 PYTHON_BIN=""
 for candidate in \
-    python3.12 python3.11 python3.10 \
+    python3.12 python3.11 python3.11 \
     /opt/homebrew/bin/python3.12 \
     /opt/homebrew/bin/python3.11 \
-    /opt/homebrew/bin/python3.10 \
+    /opt/homebrew/bin/python3.11 \
     /usr/local/bin/python3.11 \
-    /usr/local/bin/python3.10 \
+    /usr/local/bin/python3.11 \
     python3
 do
     if command -v "$candidate" &> /dev/null; then
         _MAJOR=$("$candidate" -c "import sys; print(sys.version_info.major)" 2>/dev/null)
         _MINOR=$("$candidate" -c "import sys; print(sys.version_info.minor)" 2>/dev/null)
-        if [ "$_MAJOR" -eq 3 ] && [ "$_MINOR" -ge 10 ]; then
+        if [ "$_MAJOR" -eq 3 ] && [ "$_MINOR" -ge 11 ]; then
             PYTHON_BIN="$candidate"
             break
         fi
