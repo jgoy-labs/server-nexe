@@ -28,7 +28,7 @@ psutil==5.9.8
 huggingface_hub==0.36.2
 
 # --- Memory & RAG ---
-sentence-transformers==2.7.0
+sentence-transformers>=4.0.0,<6.0.0
 pypdf==6.7.5  # PDF support for knowledge ingestion (security fixes)
 
 # --- Testing ---
