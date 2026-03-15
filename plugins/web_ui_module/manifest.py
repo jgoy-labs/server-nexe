@@ -742,7 +742,7 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                         chat_result = engine.chat(model=model_name, messages=full_messages, stream=stream)
                     else:
                         # MLX/LlamaCpp-style: chat(messages, system=...)
-                        if engine_name == "mlx_module" and stream:
+                        if engine_name in ("mlx_module", "llama_cpp_module") and stream:
                             # MLX module requires a callback for streaming
                             queue = asyncio.Queue()
                             
