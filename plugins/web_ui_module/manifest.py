@@ -186,6 +186,86 @@ async def get_ui_info(_auth=Depends(_require_ui_auth)):
     }
 
 
+@router_public.get("/backends")
+async def list_backends(_auth=Depends(_require_ui_auth)):
+    """Llista backends disponibles amb els seus models"""
+    import os
+    from core.lifespan import get_server_state
+
+    module_manager = get_server_state().module_manager
+    backends = []
+
+    # Directori de models local
+    models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
+    if not models_dir.is_absolute():
+        from core.lifespan import get_server_state
+        root = Path(get_server_state().project_root)
+        models_dir = root / models_dir
+
+    # Ollama
+    try:
+        reg = module_manager.registry.get_module("ollama_module")
+        if reg and reg.instance:
+            engine = reg.instance
+            if hasattr(engine, "get_module_instance"):
+                engine = engine.get_module_instance()
+            if hasattr(engine, "list_models"):
+                models = await engine.list_models()
+                model_names = [m.get("name", m.get("model", "?")) for m in models]
+                backends.append({"id": "ollama", "name": "Ollama", "models": model_names, "active": False})
+    except Exception as e:
+        logger.debug(f"Ollama backend scan failed: {e}")
+
+    # MLX
+    try:
+        if models_dir.exists():
+            mlx_models = [d.name for d in models_dir.iterdir() if d.is_dir()]
+            if mlx_models:
+                backends.append({"id": "mlx", "name": "MLX", "models": mlx_models, "active": False})
+    except Exception as e:
+        logger.debug(f"MLX backend scan failed: {e}")
+
+    # Llama.cpp - llistar fitxers .gguf del directori de models
+    try:
+        reg = module_manager.registry.get_module("llama_cpp_module")
+        if reg and reg.instance:
+            gguf_models = []
+            if models_dir.exists():
+                gguf_models = [f.name for f in models_dir.iterdir() if f.suffix == ".gguf"]
+            if not gguf_models:
+                gguf_models = ["default"]
+            backends.append({"id": "llamacpp", "name": "Llama.cpp", "models": gguf_models, "active": False})
+    except Exception as e:
+        logger.debug(f"Llama.cpp backend scan failed: {e}")
+
+    # Marcar actiu
+    current_backend = os.getenv("NEXE_MODEL_ENGINE", "auto").lower()
+    current_model = os.getenv("NEXE_DEFAULT_MODEL", "")
+    for b in backends:
+        if current_backend == b["id"] or (current_backend == "auto" and b == backends[0]):
+            b["active"] = True
+            break
+
+    return {"backends": backends, "current_backend": current_backend, "current_model": current_model}
+
+
+@router_public.post("/backend")
+async def set_backend(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
+    """Canvia el backend i/o model actiu en runtime"""
+    import os
+    backend = request.get("backend", "").lower()
+    model = request.get("model", "")
+
+    if backend:
+        os.environ["NEXE_MODEL_ENGINE"] = backend
+        logger.info(f"Backend canviat a: {backend}")
+    if model:
+        os.environ["NEXE_DEFAULT_MODEL"] = model
+        logger.info(f"Model canviat a: {model}")
+
+    return {"status": "ok", "backend": os.getenv("NEXE_MODEL_ENGINE", "auto"), "model": os.getenv("NEXE_DEFAULT_MODEL", "")}
+
+
 @router_public.get("/", response_class=HTMLResponse)
 async def serve_ui():
     """Servir la pàgina principal"""
@@ -447,8 +527,9 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
             import os
 
             module_manager = get_server_state().module_manager
-            model_name = os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
-            preferred_engine = os.getenv("NEXE_MODEL_ENGINE", "auto").lower()
+            # Prioritzar model/backend del request (selector UI) sobre env vars
+            model_name = request.get("model") or os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
+            preferred_engine = (request.get("backend") or os.getenv("NEXE_MODEL_ENGINE", "auto")).lower()
 
             # Log available modules
             available_modules = [m.name for m in module_manager.registry.list_modules()]
@@ -491,6 +572,25 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                     continue
 
                 try:
+                    # Si MLX i el model ve del selector UI, resoldre ruta local
+                    if engine_name == "mlx_module" and request.get("model"):
+                        from core.lifespan import get_server_state as _gss
+                        models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
+                        if not models_dir.is_absolute():
+                            models_dir = Path(_gss().project_root) / models_dir
+                        local_path = models_dir / model_name
+                        if local_path.exists():
+                            os.environ["NEXE_MLX_MODEL"] = str(local_path)
+                            # Forçar reload del model si ha canviat
+                            from plugins.mlx_module.config import MLXConfig
+                            new_config = MLXConfig.from_env()
+                            if hasattr(engine, '_node') and engine._node:
+                                if engine._node.config.model_path != new_config.model_path:
+                                    engine._node.config = new_config
+                                    engine._node.__class__._config = new_config
+                                    engine._node.__class__._model = None
+                                    logger.info(f"MLX model switched to: {local_path}")
+
                     logger.info(f"Calling {engine_name}.chat with model={model_name}")
                     
                     # --- Build Context ---
@@ -534,6 +634,7 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
 
                     # 3. Get Memory Context (RAG) - SEMPRE buscar, no només amb patterns
                     rag_context = ""
+                    rag_count = 0
                     if not attached_doc:
                         try:
                             recall_result = await memory_helper.recall_from_memory(message, limit=5)
@@ -542,6 +643,7 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                 rag_threshold = float(request.get("rag_threshold", 0.6))
                                 relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
                                 if relevant:
+                                    rag_count = len(relevant)
                                     rag_context = "\n\n[MEMÒRIA - Informació rellevant guardada anteriorment:]\n"
                                     for item in relevant:
                                         rag_context += f"- {item['content']}\n"
@@ -651,6 +753,9 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                     if stream:
                         async def response_generator():
                             full_response = ""
+                            yield f"\x00[MODEL:{model_name}]\x00"
+                            if rag_count > 0:
+                                yield f"\x00[RAG:{rag_count}]\x00"
 
                             try:
                                 # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)

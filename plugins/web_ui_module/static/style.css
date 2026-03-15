@@ -432,6 +432,43 @@ body.light .icon-sun,
 body.light .icon-moon,
 [data-theme="light"] .icon-moon { display: block; }
 
+.backend-selector-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+    padding: 0 0.1rem;
+}
+
+.backend-selector-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.backend-selector-title {
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.backend-select {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    font-family: inherit;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    appearance: auto;
+}
+
+.backend-select:focus {
+    outline: none;
+    border-color: var(--accent-color, #818cf8);
+}
+
 .rag-threshold-control {
     display: flex;
     flex-direction: column;
@@ -954,6 +991,16 @@ body.light .icon-moon,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.stat-rag {
+    color: #a78bfa;
+    opacity: 0.85;
+    gap: 4px;
+}
+
+.stat-rag svg {
+    opacity: 1;
 }
 
 .stat-mem {
