@@ -725,17 +725,26 @@ class NexeUI {
 
                 // Netejar tags especials de models (GPT-OSS, etc.)
                 const _cleanModelTags = (buf) => {
-                    // GPT-OSS: eliminar tags de canal (no fan thinking net)
-                    buf = buf.replace(/◁channel▷analysis/g, '');
-                    buf = buf.replace(/◁message▷/g, '');
-                    buf = buf.replace(/<\|channel\|>analysis/g, '');
-                    buf = buf.replace(/<\|message\|>/g, '');
+                    buf = buf.replace(/<\|[^|]+\|>/g, '');
+                    buf = buf.replace(/[◁◀][^▷▶]*[▷▶]/g, '');
                     return buf;
+                };
+
+                // Parseja thinking/content de GPT-OSS (post-streaming)
+                const _parseThinkingChannels = (text) => {
+                    if (!text) return { thinking: null, content: '' };
+                    let cleaned = text.replace(/<\|[^|]+\|>/g, '').replace(/[◁◀][^▷▶]*[▷▶]/g, '');
+                    // Pattern 1: "analysisXXX...assistantfinalYYY" (gpt-oss)
+                    const m1 = cleaned.match(/^(?:assistant)?analysis([\s\S]+?)\.?assistant\s*final([\s\S]+)$/i);
+                    if (m1) return { thinking: m1[1].trim(), content: m1[2].trim() };
+                    // Pattern 2: "analysisXXX...finalYYY"
+                    const m2 = cleaned.match(/^analysis([\s\S]+?)final([\s\S]+)$/i);
+                    if (m2 && m2[1].trim().length > 10) return { thinking: m2[1].trim(), content: m2[2].trim() };
+                    return { thinking: null, content: cleaned.trim() };
                 };
 
                 const processChunk = (raw) => {
                     tBuf += raw;
-                    tBuf = _cleanModelTags(tBuf);
                     while (tBuf.length > 0) {
                         if (tMode === 'init') {
                             const s = tBuf.indexOf('<think>');
@@ -816,6 +825,21 @@ class NexeUI {
                     }
                     // Streaming acabat — render final definitiu
                     clearTimeout(this._renderTimer);
+                    // Si no s'ha detectat thinking via <think>, provar parsing GPT-OSS
+                    if (tMode !== 'thinking' && !tContent) {
+                        const parsed = _parseThinkingChannels(fullResponse);
+                        if (parsed.thinking) {
+                            // Mostrar thinking block retroactivament
+                            startThinkBlock();
+                            if (tTextEl) tTextEl.textContent = parsed.thinking;
+                            const tokEl = tBlock?.querySelector('.think-tokens');
+                            if (tokEl) tokEl.textContent = `~${Math.ceil(parsed.thinking.length / 4)} tok`;
+                            closeThinkBlock();
+                            fullResponse = parsed.content;
+                        } else {
+                            fullResponse = _cleanModelTags(fullResponse);
+                        }
+                    }
                     assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse);
                     if (tMode !== 'responding' && tMode !== 'init') closeThinkBlock();
                     // Stats per missatge
