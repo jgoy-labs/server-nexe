@@ -723,19 +723,19 @@ class NexeUI {
                     tBlock.removeAttribute('open'); // col·lapsa automàticament
                 };
 
-                // Normalitzar thinking tags de GPT-OSS i altres models
-                const _normalizeThinkTags = (buf) => {
-                    // GPT-OSS: ◁channel▷analysis...◁message▷  o  <|channel|>analysis...<|message|>
-                    buf = buf.replace(/◁channel▷analysis/g, '<think>');
-                    buf = buf.replace(/◁message▷/g, '</think>');
-                    buf = buf.replace(/<\|channel\|>analysis/g, '<think>');
-                    buf = buf.replace(/<\|message\|>/g, '</think>');
+                // Netejar tags especials de models (GPT-OSS, etc.)
+                const _cleanModelTags = (buf) => {
+                    // GPT-OSS: eliminar tags de canal (no fan thinking net)
+                    buf = buf.replace(/◁channel▷analysis/g, '');
+                    buf = buf.replace(/◁message▷/g, '');
+                    buf = buf.replace(/<\|channel\|>analysis/g, '');
+                    buf = buf.replace(/<\|message\|>/g, '');
                     return buf;
                 };
 
                 const processChunk = (raw) => {
                     tBuf += raw;
-                    tBuf = _normalizeThinkTags(tBuf);
+                    tBuf = _cleanModelTags(tBuf);
                     while (tBuf.length > 0) {
                         if (tMode === 'init') {
                             const s = tBuf.indexOf('<think>');
@@ -743,8 +743,8 @@ class NexeUI {
                                 tMode = 'thinking';
                                 tBuf = tBuf.slice(s + 7);
                                 startThinkBlock();
-                            } else if (tBuf.length > 20) {
-                                // No think tag — resposta directa (buffer prou gran)
+                            } else if (tBuf.length > 7) {
+                                // No think tag — resposta directa
                                 tMode = 'responding';
                             } else {
                                 break; // espera més dades (pot ser tag parcial GPT-OSS)
@@ -762,13 +762,10 @@ class NexeUI {
                                 this._startStreamStats();
                             } else {
                                 // Guarda possible tag parcial al final
-                                const partial = Math.min(12, tBuf.length);
+                                const partial = Math.min(8, tBuf.length);
                                 let keepFrom = tBuf.length;
-                                const endTags = ['</think>', '◁message▷', '<|message|>'];
-                                for (const tag of endTags) {
-                                    for (let i = Math.min(tag.length, tBuf.length); i > 0; i--) {
-                                        if (tag.startsWith(tBuf.slice(-i))) { keepFrom = Math.min(keepFrom, tBuf.length - i); break; }
-                                    }
+                                for (let i = partial; i > 0; i--) {
+                                    if ('</think>'.startsWith(tBuf.slice(-i))) { keepFrom = tBuf.length - i; break; }
                                 }
                                 tContent += tBuf.slice(0, keepFrom);
                                 if (tTextEl) tTextEl.textContent = tContent;
