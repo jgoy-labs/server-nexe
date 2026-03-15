@@ -577,16 +577,16 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                     continue
 
                 try:
-                    # Si MLX i el model ve del selector UI, resoldre ruta local
-                    if engine_name == "mlx_module" and request.get("model"):
+                    # Resoldre ruta local del model si ve del selector UI
+                    if request.get("model"):
                         from core.lifespan import get_server_state as _gss
                         models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
                         if not models_dir.is_absolute():
                             models_dir = Path(_gss().project_root) / models_dir
                         local_path = models_dir / model_name
-                        if local_path.exists():
+
+                        if engine_name == "mlx_module" and local_path.exists():
                             os.environ["NEXE_MLX_MODEL"] = str(local_path)
-                            # Forçar reload del model si ha canviat
                             from plugins.mlx_module.config import MLXConfig
                             new_config = MLXConfig.from_env()
                             if hasattr(engine, '_node') and engine._node:
@@ -595,6 +595,20 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                     engine._node.__class__._config = new_config
                                     engine._node.__class__._model = None
                                     logger.info(f"MLX model switched to: {local_path}")
+
+                        elif engine_name == "llama_cpp_module" and local_path.exists():
+                            os.environ["NEXE_LLAMA_CPP_MODEL"] = str(local_path)
+                            from plugins.llama_cpp_module.config import LlamaCppConfig
+                            new_config = LlamaCppConfig.from_env()
+                            if hasattr(engine, '_node') and engine._node:
+                                if engine._node.config.model_path != str(local_path):
+                                    engine._node.config = new_config
+                                    engine._node.__class__._config = new_config
+                                    engine._node.__class__._model = None
+                                    # Alliberar pool per forçar reload
+                                    if hasattr(engine, '_pool') and engine._pool:
+                                        engine._pool._instances.clear()
+                                    logger.info(f"Llama.cpp model switched to: {local_path}")
 
                     logger.info(f"Calling {engine_name}.chat with model={model_name}")
                     
