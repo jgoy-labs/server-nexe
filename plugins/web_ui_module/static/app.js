@@ -755,6 +755,8 @@ class NexeUI {
                             } else if (tBuf.length > 7) {
                                 // No think tag — resposta directa
                                 tMode = 'responding';
+                                this.setAiState('streaming');
+                                this._startStreamStats();
                             } else {
                                 break; // espera més dades (pot ser tag parcial GPT-OSS)
                             }
@@ -785,6 +787,7 @@ class NexeUI {
                                 break;
                             }
                         } else { // responding
+                            tBuf = _cleanModelTags(tBuf);
                             fullResponse += tBuf;
                             this._streamTokens += Math.ceil(tBuf.length / 4);
                             this._scheduleRender(assistantMessageDiv, fullResponse);
