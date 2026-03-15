@@ -11,7 +11,9 @@
 [![llama.cpp](https://img.shields.io/badge/llama.cpp-GGUF-8B5CF6)](https://github.com/ggerganov/llama.cpp)
 [![RAG](https://img.shields.io/badge/RAG-local%20%7C%20private-22c55e)](https://github.com/jgoy-labs/server-nexe)
 
-**Version:** 0.8 — **Author:** Jordi Goy · [www.jgoy.net](https://www.jgoy.net)
+**Version:** 0.8 — **Documentation · [https://server-nexe.org](https://server-nexe.org)
+
+**Author:** Jordi Goy · [www.jgoy.net](https://www.jgoy.net)
 
 Local AI server with persistent memory, RAG, and multi-backend inference (MLX / llama.cpp / Ollama).
 Runs entirely on your machine — zero data sent to external services.
