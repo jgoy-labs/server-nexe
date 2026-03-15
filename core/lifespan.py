@@ -588,11 +588,11 @@ async def lifespan(app: FastAPI):
     logger.info("📱 Web UI: %s/ui/", _nexe_url)
     logger.info("🔑 API Key: %s", _key_hint)
     if _lang == "ca":
-      logger.info("   Per veure la clau completa: cat .env | grep API_KEY")
+      logger.info("   Obre un altre terminal i escriu:  cat .env | grep API_KEY")
     elif _lang == "es":
-      logger.info("   Para ver la clave completa: cat .env | grep API_KEY")
+      logger.info("   Abre otro terminal y escribe:  cat .env | grep API_KEY")
     else:
-      logger.info("   To see the full key: cat .env | grep API_KEY")
+      logger.info("   Open another terminal and run:  cat .env | grep API_KEY")
     logger.info("=" * 70)
 
     yield
