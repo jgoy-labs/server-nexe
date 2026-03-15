@@ -35,7 +35,7 @@ async def temp_pipeline():
     db_path=db_path,
     qdrant_path=qdrant_path,
     collection_name="test_collection",
-    vector_size=768  # paraphrase-multilingual-mpnet-base-v2 produces 384-dim vectors
+    vector_size=768  # paraphrase-multilingual-mpnet-base-v2 produces 768-dim vectors
   )
 
   pipeline = IngestionPipeline(

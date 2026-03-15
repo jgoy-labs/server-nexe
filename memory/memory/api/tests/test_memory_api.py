@@ -139,7 +139,7 @@ class TestCreateCollection:
             result = asyncio.run(api.create_collection("test_col", vector_size=768))
 
         assert result is True
-        mock_cc.assert_called_once_with(api._qdrant, api._executor, "test_col", 384, "cosine")
+        mock_cc.assert_called_once_with(api._qdrant, api._executor, "test_col", 768, "cosine")
 
     def test_raises_if_not_initialized(self):
         from memory.memory.api import MemoryAPI

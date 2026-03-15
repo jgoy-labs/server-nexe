@@ -87,9 +87,12 @@ Memòria RAG:
 
 ### Stop the server
 
-If running in the foreground: `Ctrl+C`
+```bash
+./nexe stop              # stops Nexe Server + Qdrant
+./nexe stop --force      # skip confirmation
+```
 
-**Note:** There is no dedicated `./nexe stop` command. To stop a background server, use `Ctrl+C` or locate the process and kill it manually.
+If running in the foreground, you can also use `Ctrl+C`.
 
 ---
 

@@ -43,7 +43,7 @@ Aquesta guia explica pas a pas com instal·lar NEXE al teu sistema.
 - **CPU:** Qualsevol CPU modern (2+ cores)
 - **RAM:** 8 GB
 - **Disc:** 10 GB lliures
-- **Python:** 3.9+
+- **Python:** 3.11+
 - **Internet:** Per descarregar models i dependències
 
 ### Recomanats (models mitjans)
@@ -311,7 +311,7 @@ NEXE_ENV=development  # "production" o "development"
 NEXE_PRIMARY_API_KEY=your-primary-key-here
 NEXE_PRIMARY_KEY_EXPIRES=2026-06-30T00:00:00Z  # ISO 8601 format
 NEXE_SECONDARY_API_KEY=your-secondary-key-here  # Grace period rotation
-NEXE_SECONDARY_KEY_EXPIRES=2026-01-31T00:00:00Z
+NEXE_SECONDARY_KEY_EXPIRES=2027-01-31T00:00:00Z
 
 # Retrocompatibilitat (clau única)
 # NEXE_ADMIN_API_KEY=single-key-here
@@ -320,7 +320,7 @@ NEXE_SECONDARY_KEY_EXPIRES=2026-01-31T00:00:00Z
 NEXE_CSRF_SECRET=auto-generated-secret-32-chars
 
 # ─── BOOTSTRAP (DEV MODE) ───
-BOOTSTRAP_TTL=30  # Minutes
+NEXE_BOOTSTRAP_TTL=30  # Minutes
 NEXE_BOOTSTRAP_DISPLAY=true  # Show token on startup
 
 # ─── AUTOSTART SERVICES ───
@@ -558,7 +558,7 @@ tail -f storage/logs/nexe.log
 # Verifica la versió
 python3 --version
 
-# Ha de ser 3.9+, recomanat 3.11+
+# Ha de ser 3.11+
 # Si és més antiga, instal·la Python més nou
 ```
 
@@ -618,9 +618,10 @@ pkill -f "ollama serve"
 ./nexe go
 ```
 
-**Nota:** No existeixen comandes `./nexe stop` ni `./nexe restart`. Usa:
-- **Aturar:** Ctrl+C o `pkill`
-- **Reiniciar:** API endpoint `/admin/system/restart` (requereix API key)
+**Aturar el servidor:**
+- `./nexe stop` — atura Nexe Server i Qdrant
+- `Ctrl+C` — si el servidor corre en primer pla
+- **Reiniciar:** `./nexe stop && ./nexe go`
 
 ### Performance molt lenta
 
@@ -771,7 +772,7 @@ Ara que tens NEXE instal·lat:
 4. **✅ CLI actualitzat**
    - Recomanar `./setup.sh` (no `./setup.sh`)
    - `./nexe memory search` → `./nexe memory recall`
-   - ELIMINATS: `./nexe stop`, `./nexe restart` (no existeixen)
+   - `./nexe stop` disponible per aturar serveis
 
 5. **✅ Qdrant auto-start**
    - NO cal executar `./qdrant &` manualment

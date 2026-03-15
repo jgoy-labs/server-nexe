@@ -86,6 +86,7 @@ def app(ctx: click.Context, version: bool, no_banner: bool):
   \b
   Core commands:
    go       Start complete system (Qdrant + Server)
+   stop     Stop all Nexe services
    status   System status
    modules  List available CLI modules
 
@@ -167,6 +168,58 @@ def go(ctx: click.Context):
 def go_bang(ctx: click.Context):
   """Arrencar el sistema Nexe complet (Qdrant + Servidor). Alias de 'go'."""
   _start_nexe(ctx)
+
+@app.command()
+@click.option('--force', '-f', is_flag=True, help='Skip confirmation')
+@click.pass_context
+def stop(ctx: click.Context, force: bool):
+  """Aturar tots els serveis Nexe (servidor + Qdrant)."""
+  import os
+  import signal
+
+  services = [
+    ("Nexe Server", "uvicorn.*nexe"),
+    ("Qdrant", "qdrant.*disable-telemetry"),
+  ]
+
+  found = []
+  for name, pattern in services:
+    try:
+      import subprocess
+      result = subprocess.run(
+        ["pgrep", "-f", pattern],
+        capture_output=True, text=True
+      )
+      pids = [int(p) for p in result.stdout.strip().split('\n') if p.strip()]
+      if pids:
+        found.append((name, pattern, pids))
+    except Exception:
+      pass
+
+  if not found:
+    click.echo("ℹ️  No hi ha serveis Nexe en execució.")
+    return
+
+  click.echo("Serveis detectats:")
+  for name, _, pids in found:
+    click.echo(f"  - {name} (PID: {', '.join(str(p) for p in pids)})")
+
+  if not force:
+    if not click.confirm("\nAturar tots els serveis?", default=True):
+      click.echo("Cancelled.")
+      return
+
+  for name, _, pids in found:
+    for pid in pids:
+      try:
+        os.kill(pid, signal.SIGTERM)
+        click.echo(f"  ✓ {name} aturat (PID {pid})")
+      except ProcessLookupError:
+        click.echo(f"  - {name} ja no existeix (PID {pid})")
+      except PermissionError:
+        click.echo(f"  ✗ {name} — sense permisos (PID {pid})")
+
+  click.echo("\n✅ Serveis aturats.")
 
 @app.command()
 @click.option('--json', 'as_json', is_flag=True, help='Output JSON')

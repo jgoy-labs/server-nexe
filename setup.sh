@@ -97,11 +97,10 @@ echo -e "${BLUE}[STEP]${NC} $_VERIFYING"
 # Find Python >= 3.11
 PYTHON_BIN=""
 for candidate in \
-    python3.12 python3.11 python3.11 \
+    python3.12 python3.11 \
     /opt/homebrew/bin/python3.12 \
     /opt/homebrew/bin/python3.11 \
-    /opt/homebrew/bin/python3.11 \
-    /usr/local/bin/python3.11 \
+    /usr/local/bin/python3.12 \
     /usr/local/bin/python3.11 \
     python3
 do

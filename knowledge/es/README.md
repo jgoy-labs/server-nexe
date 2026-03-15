@@ -90,7 +90,7 @@ NEXE **no sustituye** a Ollama, LM Studio o similares. ¡De hecho, puede usar Ol
 
 **Requisitos mínimos:**
 - macOS 12+ (recomendado: macOS 14+ con Apple Silicon)
-- Python 3.9+ (recomendado: 3.11+)
+- Python 3.11+
 - 8 GB RAM (recomendado: 16+ GB)
 - 10 GB espacio libre en disco
 
@@ -201,8 +201,8 @@ El instalador ofrece varios modelos según tu RAM disponible:
 
 | Componente | Tecnología | Versión |
 |-----------|------------|--------|
-| Backend | FastAPI | 0.104+ |
-| Python | CPython | 3.9+ |
+| Backend | FastAPI | 0.128+ |
+| Python | CPython | 3.11+ |
 | Servidor LLM | MLX / llama.cpp / Ollama | - |
 | Base de datos vectorial | Qdrant | Latest |
 | Base de datos relacional | SQLite | 3 |

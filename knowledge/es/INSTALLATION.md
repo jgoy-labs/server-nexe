@@ -43,7 +43,7 @@ Esta guía explica paso a paso cómo instalar NEXE en tu sistema.
 - **CPU:** Cualquier CPU moderno (2+ cores)
 - **RAM:** 8 GB
 - **Disco:** 10 GB libres
-- **Python:** 3.9+
+- **Python:** 3.11+
 - **Internet:** Para descargar modelos y dependencias
 
 ### Recomendados (modelos medianos)
@@ -311,7 +311,7 @@ NEXE_ENV=development  # "production" o "development"
 NEXE_PRIMARY_API_KEY=your-primary-key-here
 NEXE_PRIMARY_KEY_EXPIRES=2026-06-30T00:00:00Z  # ISO 8601 format
 NEXE_SECONDARY_API_KEY=your-secondary-key-here  # Grace period rotation
-NEXE_SECONDARY_KEY_EXPIRES=2026-01-31T00:00:00Z
+NEXE_SECONDARY_KEY_EXPIRES=2027-01-31T00:00:00Z
 
 # Retrocompatibilidad (clave única)
 # NEXE_ADMIN_API_KEY=single-key-here
@@ -320,7 +320,7 @@ NEXE_SECONDARY_KEY_EXPIRES=2026-01-31T00:00:00Z
 NEXE_CSRF_SECRET=auto-generated-secret-32-chars
 
 # ─── BOOTSTRAP (DEV MODE) ───
-BOOTSTRAP_TTL=30  # Minutes
+NEXE_BOOTSTRAP_TTL=30  # Minutes
 NEXE_BOOTSTRAP_DISPLAY=true  # Show token on startup
 
 # ─── AUTOSTART SERVICES ───
@@ -558,7 +558,7 @@ tail -f storage/logs/nexe.log
 # Verifica la versión
 python3 --version
 
-# Debe ser 3.9+, recomendado 3.11+
+# Debe ser 3.11+
 # Si es más antigua, instala una versión más nueva de Python
 ```
 
@@ -618,9 +618,10 @@ pkill -f "ollama serve"
 ./nexe go
 ```
 
-**Nota:** No existen los comandos `./nexe stop` ni `./nexe restart`. Usa:
-- **Detener:** Ctrl+C o `pkill`
-- **Reiniciar:** API endpoint `/admin/system/restart` (requiere API key)
+**Detener el servidor:**
+- `./nexe stop` — detiene Nexe Server y Qdrant
+- `Ctrl+C` — si el servidor corre en primer plano
+- **Reiniciar:** `./nexe stop && ./nexe go`
 
 ### Rendimiento muy lento
 
@@ -771,7 +772,7 @@ Ahora que tienes NEXE instalado:
 4. **✅ CLI actualizado**
    - Recomendar `./setup.sh` (no `./setup.sh`)
    - `./nexe memory search` → `./nexe memory recall`
-   - ELIMINADOS: `./nexe stop`, `./nexe restart` (no existen)
+   - `./nexe stop` disponible para detener servicios
 
 5. **✅ Qdrant auto-start**
    - NO es necesario ejecutar `./qdrant &` manualmente

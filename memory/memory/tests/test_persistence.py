@@ -86,7 +86,7 @@ class TestPersistenceManager:
       source="test"
     )
 
-    embedding = [0.1] * 384
+    embedding = [0.1] * 768
 
     entry_id = await pm.store(entry, embedding=embedding)
 
@@ -205,10 +205,10 @@ class TestPersistenceManager:
         content=f"Entry {i}",
         source="test"
       )
-      embedding = [0.1 * (i + 1)] * 384
+      embedding = [0.1 * (i + 1)] * 768
       await pm.store(entry, embedding=embedding)
 
-    query_vector = [0.15] * 384
+    query_vector = [0.15] * 768
     results = await pm.search(query_vector, limit=2)
 
     assert len(results) <= 2
@@ -292,7 +292,7 @@ class TestPersistenceManagerAdditional:
         # Make _store_qdrant fail
         with patch.object(pm, '_store_qdrant', side_effect=Exception("Qdrant error")):
             with pytest.raises(StorageError, match="Rollback performed"):
-                await pm.store(entry, embedding=[0.1] * 384, strict=True)
+                await pm.store(entry, embedding=[0.1] * 768, strict=True)
 
         # Entry should have been rolled back from SQLite
         result = await pm.get(entry.id)
@@ -320,7 +320,7 @@ class TestPersistenceManagerAdditional:
         )
 
         with patch.object(pm, '_store_qdrant', side_effect=Exception("Qdrant error")):
-            entry_id = await pm.store(entry, embedding=[0.1] * 384, strict=False)
+            entry_id = await pm.store(entry, embedding=[0.1] * 768, strict=False)
 
         # Entry should still be in SQLite
         result = await pm.get(entry_id)
@@ -347,7 +347,7 @@ class TestPersistenceManagerAdditional:
             source="test"
         )
 
-        entry_id = await pm.store(entry, embedding=[0.1] * 384)
+        entry_id = await pm.store(entry, embedding=[0.1] * 768)
         assert entry_id == entry.id
         pm.close()
 
@@ -375,7 +375,7 @@ class TestPersistenceManagerAdditional:
             source="test"
         )
 
-        await pm._store_qdrant(entry.id, [0.1] * 384, {"content": "test"})
+        await pm._store_qdrant(entry.id, [0.1] * 768, {"content": "test"})
         pm.qdrant.upsert.assert_called_once()
         pm.close()
 

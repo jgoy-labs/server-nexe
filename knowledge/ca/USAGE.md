@@ -87,9 +87,12 @@ Memòria RAG:
 
 ### Aturar el servidor
 
-Si està en primer pla: `Ctrl+C`
+```bash
+./nexe stop              # atura Nexe Server + Qdrant
+./nexe stop --force      # sense confirmació
+```
 
-**Nota:** No hi ha comanda `./nexe stop` dedicada. Per aturar el servidor en segon pla, usa `Ctrl+C` o localitza el procés i mata'l manualment.
+Si està en primer pla, també pots usar `Ctrl+C`.
 
 ---
 

@@ -138,7 +138,7 @@ def get_embedder(model_name: str, device: str = "cpu") -> SimpleEmbedder:
     >>> embedder = get_embedder("paraphrase-multilingual-mpnet-base-v2")
     >>> embedding = embedder.encode("hello world")
     >>> len(embedding)
-    384
+    768
   """
   return SimpleEmbedder(model_name=model_name, device=device)
 

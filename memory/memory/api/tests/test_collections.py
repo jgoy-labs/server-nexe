@@ -35,7 +35,7 @@ def make_qdrant(collection_names=None):
 
     # Default get_collection info
     mock_info = MagicMock()
-    mock_info.config.params.vectors.size = 384
+    mock_info.config.params.vectors.size = 768
     mock_info.points_count = 0
     q.get_collection.return_value = mock_info
 

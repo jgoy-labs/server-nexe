@@ -33,7 +33,7 @@ def make_qdrant():
 
 
 async def fake_embedding(text: str):
-    return [0.1] * 384
+    return [0.1] * 768
 
 
 # ─── TestHexToUuid ────────────────────────────────────────────────────────────

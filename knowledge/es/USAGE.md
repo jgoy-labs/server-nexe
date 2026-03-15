@@ -69,9 +69,12 @@ Prem Ctrl+C per aturar
 
 ### Detener el servidor
 
-Si está en primer plano: `Ctrl+C`
+```bash
+./nexe stop              # detiene Nexe Server + Qdrant
+./nexe stop --force      # sin confirmación
+```
 
-**Nota:** No existe un comando `./nexe stop` dedicado. Para detener el servidor en segundo plano, localiza el proceso y mátalo manualmente.
+Si está en primer plano, también puedes usar `Ctrl+C`.
 
 ---
 

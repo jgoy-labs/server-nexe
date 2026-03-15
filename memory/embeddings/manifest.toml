@@ -45,7 +45,7 @@ features = [
 # Model d'embeddings per defecte
 default_model = "paraphrase-multilingual-mpnet-base-v2"
 provider = "sentence-transformers"
-dimension = 384
+dimension = 768
 max_sequence_length = 512
 
 # Detecció automàtica de device

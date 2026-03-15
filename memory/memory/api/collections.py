@@ -26,7 +26,7 @@ async def create_collection(
   qdrant: QdrantClient,
   executor: ThreadPoolExecutor,
   name: str,
-  vector_size: int = 384,
+  vector_size: int = 768,
   distance: str = "cosine",
 ) -> bool:
   """
@@ -36,7 +36,7 @@ async def create_collection(
     qdrant: Client Qdrant
     executor: ThreadPoolExecutor per operacions sync
     name: Nom de la collection seguint naming convention {modul}_{tipus}
-    vector_size: Dimensió dels vectors (default: 384)
+    vector_size: Dimensió dels vectors (default: 768)
     distance: Mètrica de distància ("cosine", "euclid", "dot")
 
   Returns:

@@ -88,7 +88,7 @@ class TestGetMemoryApi:
         with patch("memory.memory.api.MemoryAPI", return_value=mem):
             asyncio.run(helper.get_memory_api())
 
-        mem.create_collection.assert_called_once()
+        assert mem.create_collection.call_count == 2  # nexe_web_ui + user_knowledge
 
     def test_reuses_existing_singleton(self):
         mem = make_memory_mock()

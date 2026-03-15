@@ -30,7 +30,7 @@ class TestSimpleEmbedderInit:
         from memory.embeddings.simple_embedder import SimpleEmbedder
 
         mock_model = MagicMock()
-        mock_model.get_sentence_embedding_dimension.return_value = 384
+        mock_model.get_sentence_embedding_dimension.return_value = 768
 
         with patch("memory.embeddings.simple_embedder.SentenceTransformer", return_value=mock_model):
             embedder = SimpleEmbedder("test-model")

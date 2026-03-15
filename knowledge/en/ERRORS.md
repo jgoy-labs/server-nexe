@@ -25,7 +25,7 @@ A reference guide for the most common errors users encounter with NEXE, includin
 
 ## Installation Errors
 
-### `No s'ha pogut trobar Python 3.10+`
+### `No s'ha pogut trobar Python 3.11+`
 **Cause:** Python not installed or version too old.
 **Solution:** `brew install python@3.12` and re-run `./setup.sh`
 
@@ -41,7 +41,7 @@ A reference guide for the most common errors users encounter with NEXE, includin
 **Cause:** Bug in `installer/installer_setup_env.py` in an old version — the ANSI constant `DIM` was missing from the import.
 **Solution:** `git pull` to get the fixed version and re-run `./setup.sh`.
 
-### `Python version error` / `requires Python 3.10+`
+### `Python version error` / `requires Python 3.11+`
 **Cause:** Python 3.9 or earlier installed on the system.
 **Solution:** `brew install python@3.11` or `brew install python@3.12`.
 
@@ -60,7 +60,7 @@ lsof -ti:9119 | xargs kill
 
 ### `Qdrant connection refused`
 **Cause:** Qdrant service is not running.
-**Solution:** `./nexe go` starts it automatically if `NEXE_AUTOSTART_QDRANT=true` is in `.env`. If the problem persists: `./nexe stop` and `./nexe go` again.
+**Solution:** `./nexe go` starts it automatically if `NEXE_AUTOSTART_QDRANT=true` is in `.env`. If the problem persists: stop the server with Ctrl+C or `pkill -f "uvicorn.*nexe"` and run `./nexe go` again.
 
 ### `MLX not found` / `No module named 'mlx'`
 **Cause:** MLX not installed or processor is not Apple Silicon.

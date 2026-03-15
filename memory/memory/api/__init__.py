@@ -181,14 +181,14 @@ class MemoryAPI:
     await self.close()
 
   async def create_collection(
-    self, name: str, vector_size: int = 384, distance: str = "cosine"
+    self, name: str, vector_size: int = 768, distance: str = "cosine"
   ) -> bool:
     """
     Crea una nova collection.
 
     Args:
       name: Nom seguint naming convention {modul}_{tipus}
-      vector_size: Dimensió dels vectors (default: 384)
+      vector_size: Dimensió dels vectors (default: 768)
       distance: Mètrica ("cosine", "euclid", "dot")
 
     Returns:

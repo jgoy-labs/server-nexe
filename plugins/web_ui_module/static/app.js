@@ -894,7 +894,7 @@ class NexeUI {
             }
         } catch (error) {
             if (error.name === 'AbortError') {
-                console.log('Generation stopped by user');
+                // User cancelled generation (AbortError)
             } else {
                 console.error('Error sending message:', error);
                 this.setAiState('error');

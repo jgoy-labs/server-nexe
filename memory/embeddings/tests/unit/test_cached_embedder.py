@@ -38,8 +38,8 @@ async def mock_async_embedder():
   mock.device = "cpu"
 
   async def mock_encode(text, normalize=True):
-    hash_val = hash(text) % 384
-    return [float(hash_val + i) for i in range(384)]
+    hash_val = hash(text) % 768
+    return [float(hash_val + i) for i in range(768)]
 
   mock.encode_async = mock_encode
 
@@ -228,7 +228,7 @@ async def test_response_metadata(cached_embedder):
 
   response = await cached_embedder.encode(request)
 
-  assert response.dimensions == 768, "Dimensions hauria de ser 384"
+  assert response.dimensions == 768, "Dimensions hauria de ser 768"
   assert response.model == "test-model"
   assert response.normalized == True
   assert response.latency_ms > 0, "Latency hauria de ser > 0"

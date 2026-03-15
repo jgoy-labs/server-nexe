@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="/ui/static/favicon.svg">
     <link rel="stylesheet" href="/ui/static/style.css">
     <script>
-        // Lliçó 5 NAT: MutationObserver protection per Lucide (race condition fix)
+        // MutationObserver protection per Lucide (race condition fix)
         if (typeof MutationObserver !== 'undefined') {
             const _origObserve = MutationObserver.prototype.observe;
             MutationObserver.prototype.observe = function(target, options) {

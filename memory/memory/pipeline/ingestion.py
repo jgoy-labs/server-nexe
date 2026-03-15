@@ -247,7 +247,7 @@ class IngestionPipeline:
     return embedding.astype(np.float32).tolist()
 
   @staticmethod
-  def _generate_test_embedding(text: str, size: int = 384) -> List[float]:
+  def _generate_test_embedding(text: str, size: int = 768) -> List[float]:
     """Generate deterministic embeddings for tests without external models."""
     import hashlib
     import random

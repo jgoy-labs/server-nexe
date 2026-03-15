@@ -43,7 +43,7 @@ This guide explains step by step how to install NEXE on your system.
 - **CPU:** Any modern CPU (2+ cores)
 - **RAM:** 8 GB
 - **Disk:** 10 GB free
-- **Python:** 3.9+
+- **Python:** 3.11+
 - **Internet:** To download models and dependencies
 
 ### Recommended (medium models)
@@ -311,7 +311,7 @@ NEXE_ENV=development  # "production" o "development"
 NEXE_PRIMARY_API_KEY=your-primary-key-here
 NEXE_PRIMARY_KEY_EXPIRES=2026-06-30T00:00:00Z  # ISO 8601 format
 NEXE_SECONDARY_API_KEY=your-secondary-key-here  # Grace period rotation
-NEXE_SECONDARY_KEY_EXPIRES=2026-01-31T00:00:00Z
+NEXE_SECONDARY_KEY_EXPIRES=2027-01-31T00:00:00Z
 
 # Backward compatibility (single key)
 # NEXE_ADMIN_API_KEY=single-key-here
@@ -320,7 +320,7 @@ NEXE_SECONDARY_KEY_EXPIRES=2026-01-31T00:00:00Z
 NEXE_CSRF_SECRET=auto-generated-secret-32-chars
 
 # ─── BOOTSTRAP (DEV MODE) ───
-BOOTSTRAP_TTL=30  # Minutes
+NEXE_BOOTSTRAP_TTL=30  # Minutes
 NEXE_BOOTSTRAP_DISPLAY=true  # Show token on startup
 
 # ─── AUTOSTART SERVICES ───
@@ -558,7 +558,7 @@ tail -f storage/logs/nexe.log
 # Check the version
 python3 --version
 
-# Must be 3.9+, recommended 3.11+
+# Must be 3.11+
 # If it is older, install a newer Python version
 ```
 
@@ -618,9 +618,10 @@ pkill -f "ollama serve"
 ./nexe go
 ```
 
-**Note:** The commands `./nexe stop` and `./nexe restart` do not exist. Use:
-- **Stop:** Ctrl+C or `pkill`
-- **Restart:** API endpoint `/admin/system/restart` (requires API key)
+**Stopping the server:**
+- `./nexe stop` — stops Nexe Server and Qdrant
+- `Ctrl+C` — if the server runs in the foreground
+- **Restart:** `./nexe stop && ./nexe go`
 
 ### Very slow performance
 
@@ -771,7 +772,7 @@ Now that you have NEXE installed:
 4. **✅ Updated CLI**
    - Recommend `./setup.sh` (not `./setup.sh`)
    - `./nexe memory search` → `./nexe memory recall`
-   - REMOVED: `./nexe stop`, `./nexe restart` (do not exist)
+   - `./nexe stop` available to stop services
 
 5. **✅ Qdrant auto-start**
    - No need to run `./qdrant &` manually
