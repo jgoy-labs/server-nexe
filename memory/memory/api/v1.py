@@ -62,7 +62,7 @@ async def get_memory_api():
         # Ensure default collection exists
         try:
             if not await _memory_api.collection_exists("nexe_chat_memory"):
-                await _memory_api.create_collection("nexe_chat_memory", vector_size=384)
+                await _memory_api.create_collection("nexe_chat_memory", vector_size=768)
                 logger.info("Created default collection: nexe_chat_memory")
         except Exception as e:
             logger.warning("Could not create default collection: %s", e)
@@ -86,7 +86,7 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
 
         # Ensure collection exists
         if not await memory.collection_exists(body.collection):
-            await memory.create_collection(body.collection, vector_size=384)
+            await memory.create_collection(body.collection, vector_size=768)
             logger.info("Created collection on demand: %s", body.collection)
 
         # Store the content

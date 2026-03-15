@@ -154,7 +154,7 @@ class AsyncEmbedder:
       normalize: Si normalitzar embedding (L2 norm)
 
     Returns:
-      Vector d'embedding (384 dimensions per defecte)
+      Vector d'embedding (768 dimensions per defecte)
 
     Raises:
       ValueError: Si text buit

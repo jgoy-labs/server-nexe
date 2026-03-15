@@ -23,7 +23,7 @@ def mock_sentence_transformer():
   """
   mock = Mock()
 
-  mock.encode.return_value = np.random.rand(384).astype(np.float32)
+  mock.encode.return_value = np.random.rand(768).astype(np.float32)
 
   return mock
 
@@ -116,7 +116,7 @@ async def test_encode_async_single_text(async_embedder, mock_sentence_transforme
     result = await async_embedder.encode_async("hello world", normalize=True)
 
   assert isinstance(result, list), "Result hauria de ser llista"
-  assert len(result) == 384, "Embedding hauria de tenir 384 dimensions"
+  assert len(result) == 768, "Embedding hauria de tenir 768 dimensions"
   assert all(isinstance(x, float) for x in result), "Tots els elements haurien de ser floats"
 
 @pytest.mark.asyncio
@@ -140,7 +140,7 @@ async def test_encode_batch_async(async_embedder, mock_sentence_transformer):
   - Mateix ordre que input
   - Format correcte
   """
-  mock_sentence_transformer.encode.return_value = np.random.rand(3, 384).astype(np.float32)
+  mock_sentence_transformer.encode.return_value = np.random.rand(3, 768).astype(np.float32)
 
   texts = ["hello", "world", "test"]
 
@@ -149,7 +149,7 @@ async def test_encode_batch_async(async_embedder, mock_sentence_transformer):
 
   assert isinstance(results, list), "Results haurien de ser llista"
   assert len(results) == 3, "Hauria de retornar 3 embeddings"
-  assert all(len(emb) == 384 for emb in results), "Cada embedding hauria de tenir 384 dims"
+  assert all(len(emb) == 768 for emb in results), "Cada embedding hauria de tenir 768 dims"
 
 @pytest.mark.asyncio
 async def test_encode_batch_empty_list(async_embedder):
@@ -194,7 +194,7 @@ async def test_concurrent_encode(async_embedder, mock_sentence_transformer):
     results = await asyncio.gather(*tasks)
 
   assert len(results) == 10, "Haurien de completar tots els 10 encodes"
-  assert all(len(r) == 384 for r in results), "Tots haurien de tenir 384 dims"
+  assert all(len(r) == 768 for r in results), "Tots haurien de tenir 768 dims"
 
 @pytest.mark.asyncio
 async def test_get_info(async_embedder):

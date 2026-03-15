@@ -145,7 +145,7 @@ ES = {
   Los embeddings son representaciones matemáticas del texto que permiten
   a la IA entender el significado de las palabras y encontrar información similar.
 
-  {bold}📦 Modelo: all-MiniLM-L6-v2{reset}
+  {bold}📦 Modelo: paraphrase-multilingual-mpnet-base-v2{reset}
   Es un modelo pequeño (~90MB) de código abierto creado por Microsoft Research.
   Se utiliza para dar memoria a tu IA (sistema RAG).
 

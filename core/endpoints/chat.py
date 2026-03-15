@@ -409,7 +409,7 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
 
         # Ensure collection exists
         if not await memory.collection_exists("nexe_chat_memory"):
-            await memory.create_collection("nexe_chat_memory", vector_size=384)
+            await memory.create_collection("nexe_chat_memory", vector_size=768)
             logger.info("Created nexe_chat_memory collection")
 
         # Store the conversation

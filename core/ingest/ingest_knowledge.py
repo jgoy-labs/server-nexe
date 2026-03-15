@@ -175,7 +175,7 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
     try:
         if await memory.collection_exists(USER_KNOWLEDGE_COLLECTION):
             await memory.delete_collection(USER_KNOWLEDGE_COLLECTION)
-        await memory.create_collection(USER_KNOWLEDGE_COLLECTION, vector_size=384)
+        await memory.create_collection(USER_KNOWLEDGE_COLLECTION, vector_size=768)
         log(_t("col_ready", c=USER_KNOWLEDGE_COLLECTION))
     except Exception as e:
         log(_t("col_error", e=e))

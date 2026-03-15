@@ -228,11 +228,11 @@ async def test_response_metadata(cached_embedder):
 
   response = await cached_embedder.encode(request)
 
-  assert response.dimensions == 384, "Dimensions hauria de ser 384"
+  assert response.dimensions == 768, "Dimensions hauria de ser 384"
   assert response.model == "test-model"
   assert response.normalized == True
   assert response.latency_ms > 0, "Latency hauria de ser > 0"
-  assert len(response.embedding) == 384
+  assert len(response.embedding) == 768
 
 @pytest.mark.asyncio
 async def test_batch_response_stats(cached_embedder):

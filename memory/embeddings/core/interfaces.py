@@ -43,7 +43,7 @@ class EmbeddingResponse(BaseModel):
   Response amb embedding generat i metadata.
 
   Attributes:
-    embedding: Vector d'embedding (384 dimensions per defecte)
+    embedding: Vector d'embedding (768 dimensions per defecte)
     dimensions: Nombre de dimensions del vector
     model: Model utilitzat
     normalized: Si l'embedding està normalitzat

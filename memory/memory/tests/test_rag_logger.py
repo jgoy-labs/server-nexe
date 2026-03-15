@@ -374,13 +374,13 @@ class TestRAGLogger:
     def test_embedding_generate(self):
         logger = self._make_logger()
         with patch.object(logger, "_write") as mock_write:
-            logger.embedding_generate(text_preview="Sample text for embedding", model="all-MiniLM-L6-v2", dimensions=384, timing_ms=50.0)
+            logger.embedding_generate(text_preview="Sample text for embedding", model="paraphrase-multilingual-mpnet-base-v2", dimensions=768, timing_ms=50.0)
             assert mock_write.call_count > 0
 
     def test_embedding_error(self):
         logger = self._make_logger()
         with patch.object(logger, "_write") as mock_write:
-            logger.embedding_error("Model loading failed", model="all-MiniLM-L6-v2")
+            logger.embedding_error("Model loading failed", model="paraphrase-multilingual-mpnet-base-v2")
             assert mock_write.call_count > 0
 
     def test_embedding_error_no_model(self):

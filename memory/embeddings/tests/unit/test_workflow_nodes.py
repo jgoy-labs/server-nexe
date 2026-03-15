@@ -22,7 +22,7 @@ from memory.embeddings.core.async_encoder import AsyncEmbedder
 def mock_sentence_transformer():
   """Mock SentenceTransformer"""
   mock = Mock()
-  mock.encode.return_value = np.random.rand(384).astype(np.float32)
+  mock.encode.return_value = np.random.rand(768).astype(np.float32)
   return mock
 
 @pytest.fixture
@@ -68,7 +68,7 @@ async def test_embedding_node(setup_module):
   assert "model" in result
 
   assert isinstance(result["embedding"], list)
-  assert result["dimensions"] == 384
+  assert result["dimensions"] == 768
   assert isinstance(result["cache_hit"], bool)
   assert result["latency_ms"] >= 0
 

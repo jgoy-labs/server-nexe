@@ -31,7 +31,7 @@ async def temp_persistence():
     db_path=db_path,
     qdrant_path=qdrant_path,
     collection_name="test_collection",
-    vector_size=384
+    vector_size=768
   )
 
   yield pm
@@ -261,7 +261,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=None,
             collection_name="test_col",
-            vector_size=384,
+            vector_size=768,
             qdrant_url="http://127.0.0.1:19999"  # unlikely to have Qdrant
         )
         # Should not crash, just mark qdrant unavailable
@@ -280,7 +280,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=qdrant_path,
             collection_name="test_col",
-            vector_size=384
+            vector_size=768
         )
 
         entry = MemoryEntry(
@@ -310,7 +310,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=qdrant_path,
             collection_name="test_col",
-            vector_size=384
+            vector_size=768
         )
 
         entry = MemoryEntry(
@@ -336,7 +336,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=None,
             collection_name="test_col",
-            vector_size=384,
+            vector_size=768,
             qdrant_url="http://127.0.0.1:19999"
         )
         pm._qdrant_available = False
@@ -361,7 +361,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=None,
             collection_name="test_col",
-            vector_size=384,
+            vector_size=768,
             qdrant_url="http://127.0.0.1:19999"
         )
         # Fake qdrant available
@@ -388,7 +388,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=qdrant_path,
             collection_name="test_col",
-            vector_size=384
+            vector_size=768
         )
 
         entry = MemoryEntry(
@@ -415,7 +415,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=qdrant_path,
             collection_name="test_col",
-            vector_size=384
+            vector_size=768
         )
 
         # Store entry without TTL
@@ -457,7 +457,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=qdrant_path,
             collection_name="test_col",
-            vector_size=384
+            vector_size=768
         )
 
         with patch("memory.memory.engines.persistence.SQLITE_PRELOAD_TIMEOUT", 0.001):
@@ -496,7 +496,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=qdrant_path,
             collection_name="test_col",
-            vector_size=384
+            vector_size=768
         )
 
         # Make the executor raise
@@ -517,7 +517,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=qdrant_path,
             collection_name="test_col",
-            vector_size=384
+            vector_size=768
         )
 
         # Make qdrant.close() fail
@@ -534,7 +534,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=qdrant_path,
             collection_name="test_col",
-            vector_size=384
+            vector_size=768
         )
         pm1.close()
 
@@ -543,7 +543,7 @@ class TestPersistenceManagerAdditional:
             db_path=db_path,
             qdrant_path=qdrant_path,
             collection_name="test_col",
-            vector_size=384
+            vector_size=768
         )
         assert pm2._qdrant_available is True
         pm2.close()

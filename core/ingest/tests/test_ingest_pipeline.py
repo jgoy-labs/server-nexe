@@ -488,7 +488,7 @@ class TestRAGChatMLX:
             # Clear nexe_web_ui to avoid contamination from previous test classes
             if await mem.collection_exists("nexe_web_ui"):
                 await mem.delete_collection("nexe_web_ui")
-                await mem.create_collection("nexe_web_ui", vector_size=384)
+                await mem.create_collection("nexe_web_ui", vector_size=768)
             await mem.close()
             # Reset memory_helper singleton so it picks up fresh collection
             mh._memory_api_instance = None

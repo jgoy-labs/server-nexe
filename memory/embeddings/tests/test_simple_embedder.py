@@ -85,7 +85,7 @@ class TestSimpleEmbedderInit:
 
 class TestSimpleEmbedderEncode:
 
-    def _make_embedder(self, dim=384):
+    def _make_embedder(self, dim=768):
         from memory.embeddings.simple_embedder import SimpleEmbedder
         mock_model = MagicMock()
         mock_model.encode.return_value = np.array([0.1] * dim)
@@ -100,9 +100,9 @@ class TestSimpleEmbedderEncode:
         assert isinstance(result, list)
 
     def test_encode_has_correct_dimension(self):
-        embedder, _ = self._make_embedder(dim=384)
+        embedder, _ = self._make_embedder(dim=768)
         result = embedder.encode("test")
-        assert len(result) == 384
+        assert len(result) == 768
 
     def test_encode_converts_ndarray_to_list(self):
         embedder, mock_model = self._make_embedder()
@@ -127,7 +127,7 @@ class TestSimpleEmbedderEncode:
 
 class TestSimpleEmbedderEncodeBatch:
 
-    def _make_embedder(self, dim=384):
+    def _make_embedder(self, dim=768):
         from memory.embeddings.simple_embedder import SimpleEmbedder
         mock_model = MagicMock()
         mock_model.encode.return_value = np.array([[0.1] * dim, [0.2] * dim])

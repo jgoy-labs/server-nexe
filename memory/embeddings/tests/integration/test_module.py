@@ -29,16 +29,16 @@ def mock_sentence_transformer():
   Mock SentenceTransformer per tests.
 
   IMPORTANT: encode() ha de retornar:
-  - Single text: 1D array (384,)
-  - Batch: 2D array (N, 384)
+  - Single text: 1D array (768,)
+  - Batch: 2D array (N, 768)
   """
   mock = Mock()
 
   def mock_encode(text_or_texts, **kwargs):
     if isinstance(text_or_texts, list):
-      return np.random.rand(len(text_or_texts), 384).astype(np.float32)
+      return np.random.rand(len(text_or_texts), 768).astype(np.float32)
     else:
-      return np.random.rand(384).astype(np.float32)
+      return np.random.rand(768).astype(np.float32)
 
   mock.encode.side_effect = mock_encode
   return mock
@@ -119,8 +119,8 @@ async def test_encode_single(embeddings_module):
 
   response = await embeddings_module.encode(request)
 
-  assert len(response.embedding) == 384, "Embedding hauria de tenir 384 dims"
-  assert response.dimensions == 384
+  assert len(response.embedding) == 768, "Embedding hauria de tenir 768 dims"
+  assert response.dimensions == 768
   assert response.model in ["test-model", "paraphrase-multilingual-MiniLM-L12-v2"]
   assert response.latency_ms >= 0
 
@@ -144,7 +144,7 @@ async def test_encode_batch(embeddings_module):
 
   assert response.count == 3, "Hauria de retornar 3 embeddings"
   assert len(response.embeddings) == 3
-  assert all(len(emb) == 384 for emb in response.embeddings)
+  assert all(len(emb) == 768 for emb in response.embeddings)
 
 @pytest.mark.asyncio
 async def test_chunk_document(embeddings_module):

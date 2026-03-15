@@ -239,7 +239,7 @@ class TestIngestionCoverage:
         with patch.dict("os.environ", {"PYTEST_CURRENT_TEST": "yes"}):
             result = pipeline._generate_embedding_sync("test text")
             assert isinstance(result, list)
-            assert len(result) == 384
+            assert len(result) == 768
 
     def test_generate_test_embedding_empty(self):
         from memory.memory.pipeline.ingestion import IngestionPipeline

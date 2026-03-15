@@ -222,7 +222,7 @@ def run_installer():
     if confirm == 'n':
         print(f"  {DIM}{t('embeddings_skipped')}{RESET}")
     else:
-        print_step(f"{BOLD}{t('downloading_embeddings_step')} (all-MiniLM-L6-v2)...{RESET}")
+        print_step(f"{BOLD}{t('downloading_embeddings_step')} (paraphrase-multilingual-mpnet-base-v2)...{RESET}")
         print(f"  {DIM}{t('downloading_model_progress')}{RESET}\n")
         try:
             # Don't capture output so user sees download progress from sentence-transformers
@@ -233,7 +233,7 @@ def run_installer():
                 str(python_path), "-c",
                 f"from sentence_transformers import SentenceTransformer; "
                 f"print('\\n  {msg_start}\\n'); "
-                f"model = SentenceTransformer('all-MiniLM-L6-v2'); "
+                f"model = SentenceTransformer('paraphrase-multilingual-mpnet-base-v2'); "
                 f"print('\\n  {msg_done}')"
             ], check=True, capture_output=False, env=emb_env)
             print(f"\n  {t('embeddings_downloaded_ok')}")

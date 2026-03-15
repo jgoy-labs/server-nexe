@@ -206,11 +206,11 @@ class TestCollectionInfoModel:
     """Test CollectionInfo bàsic."""
     info = CollectionInfo(
       name="test_data",
-      vector_size=384,
+      vector_size=768,
       points_count=100,
     )
     assert info.name == "test_data"
-    assert info.vector_size == 384
+    assert info.vector_size == 768
     assert info.points_count == 100
     assert info.created_at is None
 
@@ -220,7 +220,7 @@ class TestMemoryAPIInit:
   def test_init_default_values(self):
     """Test inicialització amb valors per defecte."""
     api = MemoryAPI()
-    assert api.embedding_model == "all-MiniLM-L6-v2"
+    assert api.embedding_model == "paraphrase-multilingual-mpnet-base-v2"
     assert api.vector_size == 768  # DEFAULT_VECTOR_SIZE
     assert not api._initialized
 

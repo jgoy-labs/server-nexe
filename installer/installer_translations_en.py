@@ -145,7 +145,7 @@ EN = {
   Embeddings are mathematical representations of text that allow
   the AI to understand word meanings and find similar information.
 
-  {bold}📦 Model: all-MiniLM-L6-v2{reset}
+  {bold}📦 Model: paraphrase-multilingual-mpnet-base-v2{reset}
   A small (~90MB) open-source model created by Microsoft Research.
   Used to give your AI memory (RAG system).
 

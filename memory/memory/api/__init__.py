@@ -77,7 +77,7 @@ class MemoryAPI:
     self,
     qdrant_url: Optional[str] = None,
     qdrant_path: Optional[Path] = None,
-    embedding_model: str = "all-MiniLM-L6-v2",
+    embedding_model: str = "paraphrase-multilingual-mpnet-base-v2",
   ):
     """
     Inicialitza Memory API.
@@ -85,7 +85,7 @@ class MemoryAPI:
     Args:
       qdrant_url: URL del servidor Qdrant (default: http://localhost:6333)
       qdrant_path: Path local per mode fitxer/test (prioritat sobre qdrant_url)
-      embedding_model: Model d'embeddings (default: all-MiniLM-L6-v2)
+      embedding_model: Model d'embeddings (default: paraphrase-multilingual-mpnet-base-v2)
     """
     self.qdrant_url = qdrant_url or self.DEFAULT_QDRANT_URL
     self.qdrant_path = qdrant_path

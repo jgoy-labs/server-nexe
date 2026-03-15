@@ -25,7 +25,7 @@ def make_mock_api():
     api._initialized = True
     api.qdrant_url = "http://localhost:6333"
     api.qdrant_path = None
-    api.embedding_model = "all-MiniLM-L6-v2"
+    api.embedding_model = "paraphrase-multilingual-mpnet-base-v2"
     api.vector_size = 768
     return api
 
@@ -136,7 +136,7 @@ class TestCreateCollection:
         api = make_mock_api()
 
         with patch("memory.memory.api.create_collection", AsyncMock(return_value=True)) as mock_cc:
-            result = asyncio.run(api.create_collection("test_col", vector_size=384))
+            result = asyncio.run(api.create_collection("test_col", vector_size=768))
 
         assert result is True
         mock_cc.assert_called_once_with(api._qdrant, api._executor, "test_col", 384, "cosine")
@@ -169,7 +169,7 @@ class TestListCollections:
     def test_returns_list(self):
         from memory.memory.api.models import CollectionInfo
         api = make_mock_api()
-        mock_cols = [CollectionInfo(name="col1", vector_size=384, points_count=0)]
+        mock_cols = [CollectionInfo(name="col1", vector_size=768, points_count=0)]
 
         with patch("memory.memory.api.list_collections", AsyncMock(return_value=mock_cols)):
             result = asyncio.run(api.list_collections())
@@ -348,8 +348,8 @@ class TestCleanupAllExpired:
         api = make_mock_api()
 
         mock_cols = [
-            CollectionInfo(name="col1", vector_size=384, points_count=0),
-            CollectionInfo(name="col2", vector_size=384, points_count=0),
+            CollectionInfo(name="col1", vector_size=768, points_count=0),
+            CollectionInfo(name="col2", vector_size=768, points_count=0),
         ]
 
         with patch("memory.memory.api.list_collections", AsyncMock(return_value=mock_cols)), \
@@ -362,7 +362,7 @@ class TestCleanupAllExpired:
         from memory.memory.api.models import CollectionInfo
         api = make_mock_api()
 
-        mock_cols = [CollectionInfo(name="col1", vector_size=384, points_count=0)]
+        mock_cols = [CollectionInfo(name="col1", vector_size=768, points_count=0)]
 
         with patch("memory.memory.api.list_collections", AsyncMock(return_value=mock_cols)), \
              patch.object(api, "cleanup_expired", AsyncMock(return_value=0)):

@@ -19,7 +19,7 @@ class VectorSearchRequest(BaseModel):
   Petició de cerca semàntica en un vector store.
 
   Attributes:
-    query_vector: Vector d'embedding per cercar (e.g. 384 dimensions)
+    query_vector: Vector d'embedding per cercar (e.g. 768 dimensions)
     top_k: Nombre màxim de resultats a retornar (default: 10)
     filters: Filtres opcionals sobre metadades (e.g. {"source": "pdf"})
     metric: Mètrica de distància a utilitzar (default: "cosine")

@@ -145,7 +145,7 @@ CA = {
   Els embeddings són representacions matemàtiques del text que permeten
   a la IA entendre el significat de les paraules i trobar informació similar.
 
-  {bold}📦 Model: all-MiniLM-L6-v2{reset}
+  {bold}📦 Model: paraphrase-multilingual-mpnet-base-v2{reset}
   És un model petit (~90MB) de codi obert creat per Microsoft Research.
   S'utilitza per donar memòria a la teva IA (sistema RAG).
 

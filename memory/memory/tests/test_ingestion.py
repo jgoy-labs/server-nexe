@@ -35,13 +35,13 @@ async def temp_pipeline():
     db_path=db_path,
     qdrant_path=qdrant_path,
     collection_name="test_collection",
-    vector_size=384  # all-MiniLM-L6-v2 produces 384-dim vectors
+    vector_size=768  # paraphrase-multilingual-mpnet-base-v2 produces 384-dim vectors
   )
 
   pipeline = IngestionPipeline(
     flash_memory=flash,
     persistence=persistence,
-    embedding_model="all-MiniLM-L6-v2"
+    embedding_model="paraphrase-multilingual-mpnet-base-v2"
   )
 
   yield pipeline
@@ -60,7 +60,7 @@ class TestIngestionPipeline:
 
     assert pipeline.flash is not None
     assert pipeline.persistence is not None
-    assert pipeline.embedding_model == "all-MiniLM-L6-v2"
+    assert pipeline.embedding_model == "paraphrase-multilingual-mpnet-base-v2"
     assert pipeline.deduplicator is not None
     assert pipeline.stats["total_ingested"] == 0
 
@@ -118,7 +118,7 @@ class TestIngestionPipeline:
     embedding = await pipeline._generate_embedding(text)
 
     assert isinstance(embedding, list)
-    assert len(embedding) == 384
+    assert len(embedding) == 768
     assert all(isinstance(x, float) for x in embedding)
 
   async def test_embedding_deterministic(self, temp_pipeline):
@@ -329,7 +329,7 @@ class TestIngestionAdditional:
         pipeline = temp_pipeline
         result = pipeline._generate_embedding_sync("test text")
         assert isinstance(result, list)
-        assert len(result) == 384
+        assert len(result) == 768
 
     async def test_generate_embedding_sync_empty_text(self, temp_pipeline):
         """Lines 230-231: empty text raises ValueError (test mode)."""
@@ -343,5 +343,5 @@ class TestIngestionAdditional:
         assert pipeline.embedding_model is not None
         result = await pipeline._generate_embedding("test text for executor")
         assert isinstance(result, list)
-        assert len(result) == 384
+        assert len(result) == 768
 
