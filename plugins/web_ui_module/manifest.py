@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import asyncio
 import logging
+import re as _re
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Header
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -106,7 +107,6 @@ async def _generate_rag_metadata(body_content: str, filename: str) -> dict:
                     response_text = str(chat_result)
 
                 # Filtrar tags <think>...</think> si el model en genera
-                import re as _re
                 response_text = _re.sub(r"<think>[\s\S]*?</think>\s*", "", response_text).strip()
 
                 # Parsejar abstract i tags
@@ -804,11 +804,14 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
 
                                         if content:
                                             # Normalitzar thinking tags de diferents models
-                                            # (tags curts que poden arribar en un sol chunk)
                                             content = content.replace('<|thinking|>', '<think>')
                                             content = content.replace('<|/thinking|>', '</think>')
+                                            # Netejar tags GPT-OSS (<|channel|>, ◁...▷) server-side
+                                            content = _re.sub(r'<\|[^|]+\|>', '', content)
+                                            content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
                                             full_response += content
-                                            yield content
+                                            if content:
+                                                yield content
                                 else:
                                     # Fallback for non-streaming engines
                                     result = await chat_result if inspect.iscoroutine(chat_result) else chat_result
@@ -831,9 +834,10 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                 logger.error(f"Streaming error: {e}")
                                 yield f"\n[Error: {str(e)}]"
 
-                            # Save clean response (no think tags) to session/disk
-                            import re as _re
-                            clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", full_response).strip()
+                            # Save clean response (no think/GPT-OSS tags) to session/disk
+                            clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", full_response)
+                            clean_response = _re.sub(r'<\|[^|]+\|>', '', clean_response)
+                            clean_response = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', clean_response).strip()
                             if clean_response:
                                 session.add_message("assistant", clean_response)
                                 _session_manager._save_session_to_disk(session)
@@ -850,7 +854,14 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                     except Exception as e:
                                         logger.debug("RAG auto-save failed: %s", e)
                                 
-                        return StreamingResponse(response_generator(), media_type="text/plain")
+                        return StreamingResponse(
+                            response_generator(),
+                            media_type="text/event-stream",
+                            headers={
+                                "Cache-Control": "no-cache",
+                                "X-Accel-Buffering": "no",
+                            }
+                        )
 
                     # Handle non-streaming response accumulation
                     if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
