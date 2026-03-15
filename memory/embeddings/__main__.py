@@ -51,7 +51,7 @@ async def cmd_encode(text: str, model: str = None):
       config["model_name"] = model
     await module.initialize(config=config)
   
-  request = EmbeddingRequest(text=text, model=model or "paraphrase-multilingual-MiniLM-L12-v2")
+  request = EmbeddingRequest(text=text, model=model or "paraphrase-multilingual-mpnet-base-v2")
   response = await module.encode(request)
   
   print(json.dumps({

@@ -1173,10 +1173,10 @@ class CachedEmbedder:
     Features:
     - LRU cache (evita re-encode mateix text)
     - Async batch encoding
-    - Multiple models (paraphrase-multilingual, all-MiniLM)
+    - Multiple models (paraphrase-multilingual-mpnet-base-v2)
     """
 
-    def __init__(self, model_name: str = "paraphrase-multilingual-MiniLM-L12-v2"):
+    def __init__(self, model_name: str = "paraphrase-multilingual-mpnet-base-v2"):
         self.model = SentenceTransformer(model_name)
         self.model_name = model_name
 
@@ -1339,7 +1339,7 @@ class CodeChunker:
 - **Mida:** Models petits (~90MB)
 - **Qualitat:** Bons embeddings per cerca semàntica
 - **Offline:** No requereix API externa
-- **Multilingüe:** Funciona bé en català amb all-MiniLM-L6-v2
+- **Multilingüe:** Funciona bé en català amb paraphrase-multilingual-mpnet-base-v2
 
 **Alternativa futura:**
 - Usar embeddings del mateix LLM (si és possible)

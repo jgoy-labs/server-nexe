@@ -16,7 +16,7 @@ from memory.embeddings.core.interfaces import EmbeddingRequest
 
 async def embedding_node(
   text: str,
-  model: str = "paraphrase-multilingual-MiniLM-L12-v2",
+  model: str = "paraphrase-multilingual-mpnet-base-v2",
   use_cache: bool = True,
   normalize: bool = True,
   cache_version: str = "v1"

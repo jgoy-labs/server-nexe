@@ -43,7 +43,7 @@ features = [
 
 [model]
 # Model d'embeddings per defecte
-default_model = "paraphrase-multilingual-MiniLM-L12-v2"
+default_model = "paraphrase-multilingual-mpnet-base-v2"
 provider = "sentence-transformers"
 dimension = 384
 max_sequence_length = 512
@@ -134,7 +134,7 @@ log_performance = true
 
 [config.default_config]
 # Configuració per defecte del mòdul
-model = "paraphrase-multilingual-MiniLM-L12-v2"
+model = "paraphrase-multilingual-mpnet-base-v2"
 device = "cpu"
 max_workers = 2
 cache_l1_size = 1000

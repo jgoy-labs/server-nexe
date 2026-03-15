@@ -59,8 +59,8 @@ class TestMemoryAPIInit:
 
     def test_embedding_model_set(self):
         from memory.memory.api import MemoryAPI
-        api = MemoryAPI(embedding_model="paraphrase-MiniLM-L3-v2")
-        assert api.embedding_model == "paraphrase-MiniLM-L3-v2"
+        api = MemoryAPI(embedding_model="paraphrase-multilingual-mpnet-base-v2")
+        assert api.embedding_model == "paraphrase-multilingual-mpnet-base-v2"
 
 
 # ─── TestEnsureInitialized ─────────────────────────────────────────────────────

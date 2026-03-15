@@ -121,7 +121,7 @@ async def test_encode_single(embeddings_module):
 
   assert len(response.embedding) == 768, "Embedding hauria de tenir 768 dims"
   assert response.dimensions == 768
-  assert response.model in ["test-model", "paraphrase-multilingual-MiniLM-L12-v2"]
+  assert response.model in ["test-model", "paraphrase-multilingual-mpnet-base-v2"]
   assert response.latency_ms >= 0
 
 @pytest.mark.asyncio

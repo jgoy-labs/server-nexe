@@ -46,7 +46,7 @@ MANIFEST: Dict[str, Any] = {
   "languages": ["ca-ES", "en-US", "es-ES"],
 
   "default_config": {
-    "model": "paraphrase-multilingual-MiniLM-L12-v2",
+    "model": "paraphrase-multilingual-mpnet-base-v2",
     "device": "cpu",
     "max_workers": 2,
     "cache_l1_size": 1000,

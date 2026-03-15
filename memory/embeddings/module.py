@@ -114,7 +114,7 @@ class EmbeddingsModule:
 
     Args:
       config: Optional configuration
-        - model_name: str (default: paraphrase-multilingual-MiniLM-L12-v2)
+        - model_name: str (default: paraphrase-multilingual-mpnet-base-v2)
         - device: str (default: cpu)
         - max_workers: int (default: 2)
         - cache_enabled: bool (default: True)
@@ -136,7 +136,7 @@ class EmbeddingsModule:
 
     try:
       default_config = {
-        "model_name": "paraphrase-multilingual-MiniLM-L12-v2",
+        "model_name": "paraphrase-multilingual-mpnet-base-v2",
         "device": "cpu",
         "max_workers": 2,
         "cache_enabled": True,

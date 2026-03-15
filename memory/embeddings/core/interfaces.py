@@ -26,7 +26,7 @@ class EmbeddingRequest(BaseModel):
     cache_version: Versió del cache (per invalidació)
   """
   text: str = Field(..., min_length=1, max_length=10000)
-  model: str = Field(default="paraphrase-multilingual-MiniLM-L12-v2")
+  model: str = Field(default="paraphrase-multilingual-mpnet-base-v2")
   normalize: bool = True
   use_cache: bool = True
   cache_version: str = "v1"
@@ -83,7 +83,7 @@ class BatchEmbeddingRequest(BaseModel):
     batch_size: Mida del batch intern (per SentenceTransformer)
   """
   texts: List[str] = Field(..., min_length=1, max_length=100)
-  model: str = Field(default="paraphrase-multilingual-MiniLM-L12-v2")
+  model: str = Field(default="paraphrase-multilingual-mpnet-base-v2")
   normalize: bool = True
   use_cache: bool = True
   batch_size: int = Field(default=32, ge=1, le=128)

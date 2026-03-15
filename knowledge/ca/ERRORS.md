@@ -176,10 +176,10 @@ Actualitza `NEXE_PRIMARY_API_KEY` al `.env` i reinicia.
 ```
 
 ### `Embedding model not loaded`
-**Causa:** El model d'embeddings (`all-MiniLM-L6-v2`) no s'ha descarregat.
+**Causa:** El model d'embeddings (`paraphrase-multilingual-mpnet-base-v2`) no s'ha descarregat.
 **Solució:** Durant el `./setup.sh` hauries d'haver confirmat la descàrrega. Si no:
 ```bash
-python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-multilingual-mpnet-base-v2')"
 ```
 
 ---

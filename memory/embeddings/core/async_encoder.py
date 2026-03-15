@@ -70,7 +70,7 @@ class AsyncEmbedder:
     Init AsyncEmbedder.
 
     Args:
-      model_name: Model sentence-transformers (ex: paraphrase-multilingual-MiniLM-L12-v2)
+      model_name: Model sentence-transformers (ex: paraphrase-multilingual-mpnet-base-v2)
       max_workers: Threads al pool (2 per Mac, 4 per servers)
       device: cpu, mps, o cuda
     """

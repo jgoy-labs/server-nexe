@@ -216,7 +216,7 @@ class IngestionPipeline:
       text: Text to process
 
     Returns:
-      List[float]: Embedding vector (768 dims with MiniLM)
+      List[float]: Embedding vector (768 dims with mpnet)
 
     Raises:
       ValueError: If text empty

@@ -221,7 +221,7 @@ Local models are **competitive in speed** with Apple Silicon + Metal, but **much
 
 ### 1. Embedding quality
 
-**Current model:** `paraphrase-multilingual-MiniLM-L12-v2` (768 dimensions)
+**Current model:** `paraphrase-multilingual-mpnet-base-v2` (768 dimensions)
 
 **Why this model:**
 - ✅ Multilingual (better for Catalan/Spanish)
@@ -757,8 +757,8 @@ But:
 ### Main corrections vs previous version:
 
 1. **✅ Embeddings model updated**
-   - Before: `all-MiniLM-L6-v2` (384 dims)
-   - Now: `paraphrase-multilingual-MiniLM-L12-v2` (768 dims)
+   - Before: `paraphrase-multilingual-mpnet-base-v2` (384 dims)
+   - Now: `paraphrase-multilingual-mpnet-base-v2` (768 dims)
    - Better for Catalan/multilingual
 
 2. **✅ Chunking recognized as intelligent**

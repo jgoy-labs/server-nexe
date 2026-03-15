@@ -188,7 +188,7 @@ NEXE utiliza un sistema híbrido de embeddings con varios modelos:
 - Definido en `server.toml` como modelo por defecto
 - Dimensiones compatibles con el sistema
 
-**Modelo fallback (sentence-transformers):** `paraphrase-multilingual-MiniLM-L12-v2`
+**Modelo fallback (sentence-transformers):** `paraphrase-multilingual-mpnet-base-v2`
 - **Dimensiones:** Configurable (DEFAULT_VECTOR_SIZE=768)
 - **Multilingüe:** Excelente soporte para español
 - **Offline:** No requiere API externa
@@ -218,7 +218,7 @@ print(len(embedding))  # 768
 # Opción 2: Vía sentence-transformers (fallback)
 from sentence_transformers import SentenceTransformer
 
-model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+model = SentenceTransformer('paraphrase-multilingual-mpnet-base-v2')
 text = "El meu projecte és NEXE"
 embedding = model.encode(text)
 
