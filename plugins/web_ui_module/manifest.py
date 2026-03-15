@@ -230,16 +230,15 @@ async def list_backends(_auth=Depends(_require_ui_auth)):
     except Exception as e:
         logger.debug(f"MLX backend scan failed: {e}")
 
-    # Llama.cpp - llistar fitxers .gguf del directori de models
+    # Llama.cpp - només mostrar si hi ha fitxers .gguf disponibles
     try:
         reg = module_manager.registry.get_module("llama_cpp_module")
         if reg and reg.instance:
             gguf_models = []
             if models_dir.exists():
                 gguf_models = [f.name for f in models_dir.iterdir() if f.suffix == ".gguf"]
-            if not gguf_models:
-                gguf_models = ["default"]
-            backends.append({"id": "llamacpp", "name": "Llama.cpp", "models": gguf_models, "active": False})
+            if gguf_models:
+                backends.append({"id": "llamacpp", "name": "Llama.cpp", "models": gguf_models, "active": False})
     except Exception as e:
         logger.debug(f"Llama.cpp backend scan failed: {e}")
 
