@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="plugins/web_ui_module/static/logo.svg" alt="server.nexe" width="400">
+  <img src=".github/logo.svg" alt="server.nexe" width="400">
 </p>
 
 <p align="center">
