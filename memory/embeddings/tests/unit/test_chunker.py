@@ -183,6 +183,70 @@ def test_chunked_document_metadata(chunker):
   assert result.chunk_count == len(result.chunks)
   assert result.created_at is not None
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Additional tests for uncovered lines: 176-178, 213-249, 318
+# ═══════════════════════════════════════════════════════════════════════════
+
+def test_long_paragraph_in_paragraphs_mode():
+    """Lines 175-178: paragraph longer than max_chunk_size triggers _split_long_paragraph."""
+    chunker = SmartChunker(max_chunk_size=50, chunk_overlap=10, min_chunk_size=5)
+    # Two paragraphs separated by \n\n, one of them longer than max_chunk_size
+    long_para = "This is a sentence. " * 10  # ~200 chars
+    short_para = "Short paragraph here."
+    content = f"{short_para}\n\n{long_para}"
+
+    result = chunker.chunk_document(content, document_id="doc_long_para")
+    assert result.chunk_count > 2, "Long paragraph should be split into multiple chunks"
+
+
+def test_split_long_paragraph_multiple_sentences():
+    """Lines 213-249: _split_long_paragraph splits by sentences correctly."""
+    chunker = SmartChunker(max_chunk_size=40, chunk_overlap=5, min_chunk_size=5)
+    # Long paragraph with multiple sentences
+    para = "First sentence here. Second sentence here. Third sentence here. Fourth sentence here."
+    chunks = chunker._split_long_paragraph(para, 0, "doc1", "TestSection")
+
+    assert len(chunks) >= 2, "Should produce multiple chunks"
+    assert all(c.section_title == "TestSection" for c in chunks)
+    assert all(c.document_id == "doc1" for c in chunks)
+
+
+def test_split_long_paragraph_single_huge_sentence():
+    """Lines 213-249: single sentence exceeding max_chunk_size."""
+    chunker = SmartChunker(max_chunk_size=20, chunk_overlap=5, min_chunk_size=5)
+    para = "Thisisaverylongsentencewithoutspaces that cannot be split."
+    chunks = chunker._split_long_paragraph(para, 0, "doc2", None)
+    assert len(chunks) >= 1
+
+
+def test_merge_small_chunk_with_next():
+    """Line 318 + merge logic: small chunk merged with next chunk."""
+    chunker = SmartChunker(max_chunk_size=1000, chunk_overlap=10, min_chunk_size=50)
+    # "Hi" is short but will be detected as a title (short, uppercase start, no dot)
+    # so it won't become a chunk. Use a non-title short text instead.
+    content = "ok.\n\nThis is a normal paragraph that is longer than the minimum chunk size threshold for testing."
+    result = chunker.chunk_document(content, document_id="doc_merge2")
+    # The "ok." chunk (3 chars < 50 min) should be merged with next
+    merged = [c for c in result.chunks if c.chunk_type == "merged"]
+    assert len(merged) >= 1 or result.chunk_count == 1, "Small chunk should be merged or single chunk"
+
+
+def test_chunk_by_sentences_multiple_chunks():
+    """Lines 266-301: sentence-based chunking produces multiple chunks."""
+    chunker = SmartChunker(max_chunk_size=50, chunk_overlap=5, min_chunk_size=5)
+    # No \n\n -> falls back to sentence chunking
+    content = "First sentence here. Second sentence here. Third sentence here. Fourth one."
+    result = chunker.chunk_document(content, document_id="doc_sent")
+    assert result.chunk_count >= 2, "Should produce multiple sentence-based chunks"
+
+
+def test_title_ending_with_dot_not_title():
+    """Line 144: text ending with dot is not a title unless numbered."""
+    chunker = SmartChunker()
+    assert not chunker._is_title("This is a sentence.")
+    assert chunker._is_title("1. Introduction")  # Numbered list IS a title even with dot
+
+
 """
 Test Coverage SmartChunker:
 ✅ test_empty_document - Document buit

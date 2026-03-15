@@ -38,6 +38,9 @@ _CSRF_EXEMPT_PATTERNS = [
     re.compile(r"^/v1/chat/completions"),
     re.compile(r"^/v1/memory/"),  # Memory API (CLI calls)
     re.compile(r"^/v1/audio/transcriptions"),
+    re.compile(r"^/v1/"),        # All v1 API endpoints (API key auth)
+    re.compile(r"^/rag/"),       # RAG API (API key auth, not session-based)
+    re.compile(r"^/chat"),       # Chat endpoint (API key auth)
     re.compile(r"^/health"),
     re.compile(r"^/metrics"),
     re.compile(r"^/ui/"),  # UI uses X-API-Key auth (works for local + Tailscale)

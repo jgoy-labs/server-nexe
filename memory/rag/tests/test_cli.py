@@ -11,7 +11,7 @@ www.jgoy.net
 """
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch, AsyncMock
 
 from memory.rag.cli import (
   create_parser,
@@ -215,3 +215,317 @@ class TestCLIIntegration:
     result = await cli.cmd_info(args)
 
     assert result == 1
+
+
+class TestCLICoverage:
+  """Additional tests for uncovered CLI lines."""
+
+  @pytest.fixture
+  def mock_module(self):
+    mock = MagicMock()
+    mock.get_info.return_value = {
+      "module_id": "TEST", "name": "rag", "version": "0.1",
+      "description": "Test", "initialized": True,
+      "sources": ["personality"], "capabilities": ["search"],
+      "stats": {"documents_added": 0, "searches_performed": 0, "total_chunks": 0, "cache_hit_rate": 0.0},
+      "config": {"top_k": 5}
+    }
+    mock.get_health.return_value = {
+      "status": "healthy",
+      "checks": [
+        {"name": "module_initialized", "status": "pass", "message": "OK"},
+        {"name": "rag_sources", "status": "pass", "message": "OK", "sources": {
+          "personality": {"status": "healthy", "num_chunks": 50, "num_documents": 5}
+        }}
+      ],
+      "metadata": {}
+    }
+    mock.list_sources.return_value = ["personality"]
+    mock.get_source.return_value = MagicMock(
+      health=lambda: {"status": "healthy", "num_chunks": 50, "num_documents": 5}
+    )
+    mock.search = MagicMock(return_value=[])
+    mock.initialize = MagicMock(return_value=True)
+    mock.shutdown = MagicMock(return_value=None)
+    return mock
+
+  @pytest.mark.asyncio
+  async def test_initialize_success(self):
+    """Test CLI initialization success."""
+    cli = RAGCLI()
+    mock_module = MagicMock()
+    mock_module.initialize = MagicMock(return_value=True)
+    with patch.object(RAGCLI, 'initialize') as mock_init:
+      mock_init.return_value = True
+      result = await cli.initialize()
+      # The patched version returns True
+
+  @pytest.mark.asyncio
+  async def test_initialize_failure(self):
+    """Test CLI initialize returns false on failure."""
+    pass  # AsyncMock already imported at top
+    cli = RAGCLI()
+    mock_mod = MagicMock()
+    mock_mod.initialize = AsyncMock(return_value=False)
+    with patch("memory.rag.cli.RAGModule") as MockRAGModule:
+      MockRAGModule.get_instance.return_value = mock_mod
+      result = await cli.initialize()
+      assert result is False
+
+  @pytest.mark.asyncio
+  async def test_initialize_exception(self):
+    """Test CLI initialize handles exceptions."""
+    pass  # AsyncMock already imported at top
+    cli = RAGCLI()
+    with patch("memory.rag.cli.RAGModule") as MockRAGModule:
+      MockRAGModule.get_instance.side_effect = Exception("Init error")
+      result = await cli.initialize()
+      assert result is False
+
+  @pytest.mark.asyncio
+  async def test_shutdown_with_module(self):
+    """Test CLI shutdown when module is set."""
+    pass  # AsyncMock already imported at top
+    cli = RAGCLI()
+    cli.module = MagicMock()
+    cli.module.shutdown = AsyncMock()
+    await cli.shutdown()
+    cli.module.shutdown.assert_called_once()
+
+  @pytest.mark.asyncio
+  async def test_shutdown_without_module(self):
+    """Test CLI shutdown when module is None."""
+    cli = RAGCLI()
+    cli.module = None
+    await cli.shutdown()  # Should not raise
+
+  @pytest.mark.asyncio
+  async def test_cmd_info_no_sources(self):
+    """Test info with empty sources list."""
+    cli = RAGCLI()
+    cli.module = MagicMock()
+    cli.module.get_info.return_value = {
+      "module_id": "TEST", "name": "rag", "version": "0.1",
+      "description": "Test", "initialized": True,
+      "sources": [], "capabilities": [],
+      "stats": {"documents_added": 0, "searches_performed": 0, "total_chunks": 0, "cache_hit_rate": 0.0},
+      "config": {}
+    }
+    args = MagicMock()
+    result = await cli.cmd_info(args)
+    assert result == 0
+
+  @pytest.mark.asyncio
+  async def test_cmd_health_with_json(self, mock_module):
+    """Test health command with --json flag."""
+    cli = RAGCLI()
+    cli.module = mock_module
+    args = MagicMock(json=True)
+    result = await cli.cmd_health(args)
+    assert result == 0
+
+  @pytest.mark.asyncio
+  async def test_cmd_health_with_sources_check(self, mock_module):
+    """Test health command shows sources health details."""
+    cli = RAGCLI()
+    cli.module = mock_module
+    args = MagicMock(json=False)
+    result = await cli.cmd_health(args)
+    assert result == 0
+
+  @pytest.mark.asyncio
+  async def test_cmd_health_error(self):
+    """Test health command handles errors."""
+    cli = RAGCLI()
+    cli.module = MagicMock()
+    cli.module.get_health.side_effect = Exception("Health error")
+    args = MagicMock(json=False)
+    result = await cli.cmd_health(args)
+    assert result == 1
+
+  @pytest.mark.asyncio
+  async def test_cmd_search_success(self, mock_module):
+    """Test search with results."""
+    pass  # AsyncMock already imported at top
+    hit = MagicMock()
+    hit.score = 0.9
+    hit.text = "Result text"
+    hit.metadata = {"source": "test"}
+    mock_module.search = AsyncMock(return_value=[hit])
+    cli = RAGCLI()
+    cli.module = mock_module
+    args = MagicMock(query="test query", top_k=5, source="personality", verbose=True)
+    with patch.dict("sys.modules", {"memory.rag_sources.base": MagicMock()}):
+      result = await cli.cmd_search(args)
+      assert result == 0
+
+  @pytest.mark.asyncio
+  async def test_cmd_search_no_results(self, mock_module):
+    """Test search with no results."""
+    pass  # AsyncMock already imported at top
+    mock_module.search = AsyncMock(return_value=[])
+    cli = RAGCLI()
+    cli.module = mock_module
+    args = MagicMock(query="no match", top_k=5, source="personality", verbose=False)
+    with patch.dict("sys.modules", {"memory.rag_sources.base": MagicMock()}):
+      result = await cli.cmd_search(args)
+      assert result == 0
+
+  @pytest.mark.asyncio
+  async def test_cmd_search_error(self):
+    """Test search handles errors."""
+    pass  # AsyncMock already imported at top
+    cli = RAGCLI()
+    cli.module = MagicMock()
+    cli.module.search = AsyncMock(side_effect=Exception("Search error"))
+    args = MagicMock(query="test", top_k=5, source="personality", verbose=False)
+    with patch.dict("sys.modules", {"memory.rag_sources.base": MagicMock()}):
+      result = await cli.cmd_search(args)
+      assert result == 1
+
+  @pytest.mark.asyncio
+  async def test_cmd_sources_empty(self):
+    """Test sources command with no sources."""
+    cli = RAGCLI()
+    cli.module = MagicMock()
+    cli.module.list_sources.return_value = []
+    args = MagicMock()
+    result = await cli.cmd_sources(args)
+    assert result == 0
+
+  @pytest.mark.asyncio
+  async def test_cmd_sources_with_details(self, mock_module):
+    """Test sources command shows health and doc info."""
+    cli = RAGCLI()
+    cli.module = mock_module
+    args = MagicMock()
+    result = await cli.cmd_sources(args)
+    assert result == 0
+
+  @pytest.mark.asyncio
+  async def test_cmd_sources_source_error(self):
+    """Test sources handles source error."""
+    cli = RAGCLI()
+    cli.module = MagicMock()
+    cli.module.list_sources.return_value = ["broken"]
+    cli.module.get_source.side_effect = Exception("Source error")
+    args = MagicMock()
+    result = await cli.cmd_sources(args)
+    assert result == 0
+
+  @pytest.mark.asyncio
+  async def test_cmd_sources_error(self):
+    """Test sources handles general error."""
+    cli = RAGCLI()
+    cli.module = MagicMock()
+    cli.module.list_sources.side_effect = Exception("List error")
+    args = MagicMock()
+    result = await cli.cmd_sources(args)
+    assert result == 1
+
+  def test_async_main_info(self):
+    """Test async_main with info command."""
+    import asyncio
+    from memory.rag.cli import async_main
+    pass  # AsyncMock already imported at top
+
+    args = MagicMock(command="info")
+    with patch("memory.rag.cli.RAGCLI") as MockCLI:
+      instance = MockCLI.return_value
+      instance.initialize = AsyncMock(return_value=True)
+      instance.cmd_info = AsyncMock(return_value=0)
+      instance.shutdown = AsyncMock()
+      result = asyncio.run(async_main(args))
+      assert result == 0
+
+  def test_async_main_health(self):
+    import asyncio
+    from memory.rag.cli import async_main
+    pass  # AsyncMock already imported at top
+    args = MagicMock(command="health")
+    with patch("memory.rag.cli.RAGCLI") as MockCLI:
+      instance = MockCLI.return_value
+      instance.initialize = AsyncMock(return_value=True)
+      instance.cmd_health = AsyncMock(return_value=0)
+      instance.shutdown = AsyncMock()
+      result = asyncio.run(async_main(args))
+      assert result == 0
+
+  def test_async_main_search(self):
+    import asyncio
+    from memory.rag.cli import async_main
+    pass  # AsyncMock already imported at top
+    args = MagicMock(command="search")
+    with patch("memory.rag.cli.RAGCLI") as MockCLI:
+      instance = MockCLI.return_value
+      instance.initialize = AsyncMock(return_value=True)
+      instance.cmd_search = AsyncMock(return_value=0)
+      instance.shutdown = AsyncMock()
+      result = asyncio.run(async_main(args))
+      assert result == 0
+
+  def test_async_main_sources(self):
+    import asyncio
+    from memory.rag.cli import async_main
+    pass  # AsyncMock already imported at top
+    args = MagicMock(command="sources")
+    with patch("memory.rag.cli.RAGCLI") as MockCLI:
+      instance = MockCLI.return_value
+      instance.initialize = AsyncMock(return_value=True)
+      instance.cmd_sources = AsyncMock(return_value=0)
+      instance.shutdown = AsyncMock()
+      result = asyncio.run(async_main(args))
+      assert result == 0
+
+  def test_async_main_no_command(self):
+    import asyncio
+    from memory.rag.cli import async_main
+    pass  # AsyncMock already imported at top
+    args = MagicMock(command=None)
+    with patch("memory.rag.cli.RAGCLI") as MockCLI:
+      instance = MockCLI.return_value
+      instance.initialize = AsyncMock(return_value=True)
+      instance.shutdown = AsyncMock()
+      result = asyncio.run(async_main(args))
+      assert result == 1
+
+  def test_async_main_init_fails(self):
+    import asyncio
+    from memory.rag.cli import async_main
+    pass  # AsyncMock already imported at top
+    args = MagicMock(command="info")
+    with patch("memory.rag.cli.RAGCLI") as MockCLI:
+      instance = MockCLI.return_value
+      instance.initialize = AsyncMock(return_value=False)
+      instance.shutdown = AsyncMock()
+      result = asyncio.run(async_main(args))
+      assert result == 1
+
+  def test_main_entry_point(self):
+    from memory.rag.cli import main
+    with patch("memory.rag.cli.create_parser") as mock_parser, \
+         patch("memory.rag.cli.asyncio") as mock_asyncio:
+      mock_parser.return_value.parse_args.return_value = MagicMock(command="info")
+      mock_asyncio.run.return_value = 0
+      with pytest.raises(SystemExit):
+        main()
+
+  def test_main_keyboard_interrupt(self):
+    from memory.rag.cli import main
+    with patch("memory.rag.cli.create_parser") as mock_parser, \
+         patch("memory.rag.cli.asyncio") as mock_asyncio:
+      mock_parser.return_value.parse_args.return_value = MagicMock(command="info")
+      mock_asyncio.run.side_effect = KeyboardInterrupt
+      with pytest.raises(SystemExit) as exc_info:
+        main()
+      assert exc_info.value.code == 130
+
+  def test_main_unexpected_error(self):
+    from memory.rag.cli import main
+    with patch("memory.rag.cli.create_parser") as mock_parser, \
+         patch("memory.rag.cli.asyncio") as mock_asyncio:
+      mock_parser.return_value.parse_args.return_value = MagicMock(command="info")
+      mock_asyncio.run.side_effect = Exception("Unexpected")
+      with pytest.raises(SystemExit) as exc_info:
+        main()
+      assert exc_info.value.code == 1

@@ -34,6 +34,7 @@ def cleanup_api_key_env(monkeypatch):
   original_admin = os.getenv("NEXE_ADMIN_API_KEY")
   original_primary = os.getenv("NEXE_PRIMARY_API_KEY")
   original_secondary = os.getenv("NEXE_SECONDARY_API_KEY")
+  original_dev_mode = os.getenv("NEXE_DEV_MODE")
 
   yield
 
@@ -46,6 +47,7 @@ def cleanup_api_key_env(monkeypatch):
   _restore("NEXE_ADMIN_API_KEY", original_admin)
   _restore("NEXE_PRIMARY_API_KEY", original_primary)
   _restore("NEXE_SECONDARY_API_KEY", original_secondary)
+  _restore("NEXE_DEV_MODE", original_dev_mode)
 
   os.environ.pop("NEXE_PRIMARY_KEY_EXPIRES", None)
   os.environ.pop("NEXE_SECONDARY_KEY_EXPIRES", None)
@@ -257,6 +259,7 @@ def test_require_api_key_with_expired_key(client, monkeypatch):
   """Test that expired key is rejected."""
   past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
 
+  monkeypatch.delenv("NEXE_DEV_MODE", raising=False)
   monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "expired-key")
   monkeypatch.setenv("NEXE_PRIMARY_KEY_EXPIRES", past)
 

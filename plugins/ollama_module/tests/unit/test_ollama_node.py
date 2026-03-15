@@ -177,10 +177,10 @@ class TestOllamaNodeErrors:
   @pytest.mark.asyncio
   async def test_empty_prompt_error(self, ollama_node):
     """Test error on empty prompt."""
-    with pytest.raises(ValueError, match="'prompt' cannot be empty"):
+    with pytest.raises(ValueError, match="Prompt cannot be empty"):
       await ollama_node.execute({"prompt": ""})
 
-    with pytest.raises(ValueError, match="'prompt' cannot be empty"):
+    with pytest.raises(ValueError, match="Prompt cannot be empty"):
       await ollama_node.execute({"prompt": "  "})
 
   @pytest.mark.asyncio
