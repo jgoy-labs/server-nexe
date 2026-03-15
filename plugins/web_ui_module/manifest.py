@@ -806,6 +806,8 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                             # Normalitzar thinking tags de diferents models
                                             content = content.replace('◁channel▷analysis', '<think>')
                                             content = content.replace('◁message▷', '</think>')
+                                            content = content.replace('<|channel|>analysis', '<think>')
+                                            content = content.replace('<|message|>', '</think>')
                                             content = content.replace('<|thinking|>', '<think>')
                                             content = content.replace('<|/thinking|>', '</think>')
                                             full_response += content
