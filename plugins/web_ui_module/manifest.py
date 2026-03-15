@@ -179,10 +179,15 @@ async def get_ui_info(_auth=Depends(_require_ui_auth)):
         version = get_server_state().config.get('meta', {}).get('version', '0.8')
     except Exception:
         version = "0.8"
+    try:
+        lang = get_server_state().config.get('personality', {}).get('i18n', {}).get('default_language', 'en-US')
+    except Exception:
+        lang = "en-US"
     return {
         "model": model_name,
         "backend": backend,
-        "version": version
+        "version": version,
+        "lang": lang.split('-')[0]
     }
 
 

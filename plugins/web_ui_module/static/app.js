@@ -4,9 +4,99 @@
  * ============================================
  */
 
+const UI_STRINGS = {
+    ca: {
+        login_subtitle: "Introdueix la API Key per accedir",
+        login_btn: "Accedir",
+        login_error: 'Clau incorrecta. Comprova el fitxer <code>.env</code>',
+        login_hint: 'La clau és a <code>.env</code> → <code>NEXE_PRIMARY_API_KEY</code>',
+        loading: "Carregant...",
+        welcome_title: "Benvingut a Nexe",
+        welcome_subtitle: "IA local amb memòria persistent",
+        feature_chat: "Conversa amb memòria contextual",
+        feature_upload: "Puja documents (.txt, .md, .pdf)",
+        feature_local: "100% local i privat",
+        new_chat: "Nova conversa",
+        sessions: "Sessions",
+        placeholder: "Escriu un missatge...",
+        rag_title: "Precisió RAG",
+        rag_info: "Controla quant ha de semblar-se un record a la teva pregunta per ser inclòs al context. Valors alts (0.8+) → menys context, molt precís. Valors baixos (0.3) → més context, però pot incloure soroll i causar al·lucinacions.",
+        rag_wide: "Ampli",
+        rag_strict: "Estricte",
+        thinking: "Pensant...",
+        connected: "Connectat",
+        disconnected: "Desconnectat",
+        toggle_theme: "Canviar tema",
+        toggle_frame: "Mostrar/ocultar marc",
+        upload_doc: "Pujar document",
+        send: "Enviar",
+        stop: "Aturar generació",
+        saved: "guardat",
+    },
+    en: {
+        login_subtitle: "Enter your API Key to access",
+        login_btn: "Login",
+        login_error: 'Invalid key. Check the <code>.env</code> file',
+        login_hint: 'The key is in <code>.env</code> → <code>NEXE_PRIMARY_API_KEY</code>',
+        loading: "Loading...",
+        welcome_title: "Welcome to Nexe",
+        welcome_subtitle: "Local AI with persistent memory",
+        feature_chat: "Chat with contextual memory",
+        feature_upload: "Upload documents (.txt, .md, .pdf)",
+        feature_local: "100% local and private",
+        new_chat: "New conversation",
+        sessions: "Sessions",
+        placeholder: "Type a message...",
+        rag_title: "RAG Precision",
+        rag_info: "Controls how closely a memory must match your question to be included in context. High values (0.8+) → less context, very precise. Low values (0.3) → more context, but may include noise and cause hallucinations.",
+        rag_wide: "Wide",
+        rag_strict: "Strict",
+        thinking: "Thinking...",
+        connected: "Connected",
+        disconnected: "Disconnected",
+        toggle_theme: "Toggle theme",
+        toggle_frame: "Show/hide frame",
+        upload_doc: "Upload document",
+        send: "Send",
+        stop: "Stop generation",
+        saved: "saved",
+    },
+    es: {
+        login_subtitle: "Introduce la API Key para acceder",
+        login_btn: "Acceder",
+        login_error: 'Clave incorrecta. Comprueba el fichero <code>.env</code>',
+        login_hint: 'La clave está en <code>.env</code> → <code>NEXE_PRIMARY_API_KEY</code>',
+        loading: "Cargando...",
+        welcome_title: "Bienvenido a Nexe",
+        welcome_subtitle: "IA local con memoria persistente",
+        feature_chat: "Conversa con memoria contextual",
+        feature_upload: "Sube documentos (.txt, .md, .pdf)",
+        feature_local: "100% local y privado",
+        new_chat: "Nueva conversación",
+        sessions: "Sesiones",
+        placeholder: "Escribe un mensaje...",
+        rag_title: "Precisión RAG",
+        rag_info: "Controla cuánto debe parecerse un recuerdo a tu pregunta para ser incluido en el contexto. Valores altos (0.8+) → menos contexto, muy preciso. Valores bajos (0.3) → más contexto, pero puede incluir ruido y causar alucinaciones.",
+        rag_wide: "Amplio",
+        rag_strict: "Estricto",
+        thinking: "Pensando...",
+        connected: "Conectado",
+        disconnected: "Desconectado",
+        toggle_theme: "Cambiar tema",
+        toggle_frame: "Mostrar/ocultar marco",
+        upload_doc: "Subir documento",
+        send: "Enviar",
+        stop: "Detener generación",
+        saved: "guardado",
+    }
+};
+
 class NexeUI {
     constructor() {
         this.apiKey = localStorage.getItem('nexe_api_key') || null;
+        // Detectar idioma del navegador com a default
+        const browserLang = (navigator.language || 'en').split('-')[0];
+        this.lang = UI_STRINGS[browserLang] ? browserLang : 'en';
         this.currentSessionId = null;
         this.uploadedFile = null;
         this.sessions = [];
@@ -18,6 +108,68 @@ class NexeUI {
         this._statsInterval = null;
 
         this.init();
+    }
+
+    t(key) {
+        return (UI_STRINGS[this.lang] || UI_STRINGS.en)[key] || UI_STRINGS.en[key] || key;
+    }
+
+    applyI18n() {
+        const s = (sel, key, attr) => {
+            const el = document.querySelector(sel);
+            if (!el) return;
+            if (attr === 'placeholder') el.placeholder = this.t(key);
+            else if (attr === 'title') el.title = this.t(key);
+            else if (attr === 'html') el.innerHTML = this.t(key);
+            else el.textContent = this.t(key);
+        };
+        // Login
+        s('.login-subtitle', 'login_subtitle');
+        s('#loginBtn', 'login_btn');
+        s('#loginError', 'login_error', 'html');
+        s('.login-hint', 'login_hint', 'html');
+        // Welcome
+        s('.welcome-screen h2', 'welcome_title');
+        s('.welcome-screen p', 'welcome_subtitle');
+        const features = document.querySelectorAll('.feature span:last-child');
+        if (features[0]) features[0].textContent = this.t('feature_chat');
+        if (features[1]) features[1].textContent = this.t('feature_upload');
+        if (features[2]) features[2].textContent = this.t('feature_local');
+        // Sidebar
+        s('#newChatBtn', 'new_chat');
+        const newBtn = document.getElementById('newChatBtn');
+        if (newBtn) { newBtn.innerHTML = `<i data-lucide="plus"></i> ${this.t('new_chat')}`; }
+        s('.sessions-header h3', 'sessions');
+        s('#modelInfoText', 'loading');
+        // Selectors
+        const bSel = document.getElementById('backendSelect');
+        if (bSel && bSel.options[0]) bSel.options[0].textContent = this.t('loading');
+        const mSel = document.getElementById('modelSelect');
+        if (mSel && mSel.options[0]) mSel.options[0].textContent = this.t('loading');
+        // RAG
+        s('.rag-threshold-title', 'rag_title');
+        const ragInfo = document.querySelector('.rag-info-icon');
+        if (ragInfo) ragInfo.title = this.t('rag_info');
+        const hints = document.querySelectorAll('.rag-threshold-hints span');
+        if (hints[0]) hints[0].textContent = this.t('rag_wide');
+        if (hints[1]) hints[1].textContent = this.t('rag_strict');
+        // Input
+        s('#messageInput', 'placeholder', 'placeholder');
+        // Buttons
+        s('#themeToggleBtn', 'toggle_theme', 'title');
+        s('#frameToggleBtn', 'toggle_frame', 'title');
+        s('#uploadBtn', 'upload_doc', 'title');
+        s('#sendBtn', 'send', 'title');
+        s('#stopBtn', 'stop', 'title');
+        // Footer
+        const thinkText = document.querySelector('.thinking-badge span:last-child');
+        if (thinkText) thinkText.textContent = this.t('thinking');
+        const statusText = document.querySelector('.status-indicator span');
+        if (statusText) statusText.textContent = this.t('connected');
+        // HTML lang
+        document.documentElement.lang = this.lang;
+        // Re-render Lucide icons
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     setAiState(state) {
@@ -46,6 +198,7 @@ class NexeUI {
     }
 
     init() {
+        this.applyI18n();
         if (!this.apiKey) {
             this.showLoginOverlay();
             return;
@@ -206,11 +359,16 @@ class NexeUI {
             }
             if (resp.ok) {
                 const data = await resp.json();
+                // Aplicar idioma del servidor
+                if (data.lang && UI_STRINGS[data.lang]) {
+                    this.lang = data.lang;
+                    this.applyI18n();
+                }
                 const el = document.getElementById('modelInfoText');
                 if (el) {
                     const backend = data.backend === 'auto' ? '' : ` · ${data.backend}`;
                     el.textContent = data.model + backend;
-                    el.title = `model: ${data.model}\nbackend: ${data.backend}\nversió: ${data.version}`;
+                    el.title = `model: ${data.model}\nbackend: ${data.backend}\nversion: ${data.version}`;
                 }
             }
         } catch (e) {
@@ -659,7 +817,7 @@ class NexeUI {
                         const spdStr = finalSpd ? ` · ${finalSpd} tok/s` : '';
                         const modelShort = usedModel ? usedModel.split('/').pop() : '';
                         const memBadge = memorySaved
-                            ? `<span class="stat-item stat-mem"><i data-lucide="bookmark-check"></i><span>guardat</span></span>`
+                            ? `<span class="stat-item stat-mem"><i data-lucide="bookmark-check"></i><span>${this.t('saved')}</span></span>`
                             : '';
                         const ragBadge = ragCount > 0
                             ? `<span class="stat-item stat-rag"><i data-lucide="brain"></i><span>RAG ${ragCount}</span></span>`
