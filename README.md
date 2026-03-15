@@ -181,6 +181,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and guidelines.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
+## ⚠️ Disclaimer
+
+This software is provided **"as is"**, without warranty of any kind. Use it at your own risk. The author is not responsible for any damage, data loss, security incidents, or misuse arising from the use of this software. By using Server Nexe, you accept full responsibility for how you deploy and operate it.
+
+See [LICENSE](LICENSE) for details.
+
 ---
 
 <p align="center">
