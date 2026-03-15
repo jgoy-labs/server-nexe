@@ -614,11 +614,45 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
 
                     logger.info(f"Calling {engine_name}.chat with model={model_name}")
                     
+                    # --- Context Compacting ---
+                    # Si la sessió té massa missatges, compactar amb resum LLM
+                    if session.needs_compaction():
+                        to_compact = session.get_messages_to_compact()
+                        if to_compact:
+                            try:
+                                compact_text = "\n".join(
+                                    f"{m['role']}: {m['content'][:200]}"
+                                    for m in to_compact
+                                )
+                                prev_summary = f"Resum anterior: {session.context_summary}\n\n" if session.context_summary else ""
+                                compact_prompt = (
+                                    f"{prev_summary}"
+                                    f"Resumeix aquesta conversa en 2-3 frases curtes. "
+                                    f"Inclou: tema principal, decisions preses, i informació clau. "
+                                    f"Respon NOMÉS amb el resum, res més.\n\n{compact_text}"
+                                )
+                                # Usar el mateix engine per resumir
+                                summary_result = await engine.chat(
+                                    messages=[{"role": "user", "content": compact_prompt}],
+                                    system="Ets un assistent que fa resums breus i precisos de converses."
+                                )
+                                summary = ""
+                                if isinstance(summary_result, dict):
+                                    summary = summary_result.get("response", summary_result.get("content", ""))
+                                elif isinstance(summary_result, str):
+                                    summary = summary_result
+                                if summary:
+                                    session.apply_compaction(summary)
+                                    _session_manager._save_session_to_disk(session)
+                                    logger.info("Session %s: compaction done (%d chars summary)", session.id[:8], len(summary))
+                            except Exception as e:
+                                logger.warning("Compaction failed: %s", e)
+
                     # --- Build Context ---
-                    # 1. Get recent conversation history from session
-                    history_messages = session.get_history() # [{"role": "user", ...}, ...]
-                    # Exclude the very last message we just added to avoid duplication if engine adds it
-                    context_messages = history_messages[:-1]
+                    # 1. Get recent conversation history with summary context
+                    context_messages_full = session.get_context_messages()
+                    # Exclude the very last message (just added) to avoid duplication
+                    context_messages = context_messages_full[:-1] if context_messages_full else []
 
                     # 2. Check for attached document (takes priority over RAG)
                     attached_doc = session.get_and_clear_attached_document()
@@ -785,12 +819,17 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                         else:
                              chat_result = engine.chat(messages=messages, system=system_prompt)
                     
+                    # Flag si s'ha compactat per avisar al client
+                    _compacted = session.compaction_count > 0 and session.context_summary is not None
+
                     if stream:
                         async def response_generator():
                             full_response = ""
                             yield f"\x00[MODEL:{model_name}]\x00"
                             if rag_count > 0:
                                 yield f"\x00[RAG:{rag_count}]\x00"
+                            if _compacted:
+                                yield f"\x00[COMPACT:{session.compaction_count}]\x00"
 
                             try:
                                 # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)

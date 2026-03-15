@@ -817,6 +817,12 @@ class NexeUI {
                             chunk = chunk.replace(/\x00\[RAG:\d+\]\x00/, '');
                         }
 
+                        // Detectar token COMPACT (context compactat)
+                        const compactMatch = chunk.match(/\x00\[COMPACT:(\d+)\]\x00/);
+                        if (compactMatch) {
+                            chunk = chunk.replace(/\x00\[COMPACT:\d+\]\x00/, '');
+                        }
+
                         // Detectar token de memòria guardat
                         if (chunk.includes('\x00[MEM]\x00')) {
                             memorySaved = true;
@@ -860,11 +866,15 @@ class NexeUI {
                         const ragBadge = ragCount > 0
                             ? `<span class="stat-item stat-rag"><i data-lucide="brain"></i><span>RAG ${ragCount}</span></span>`
                             : '';
+                        const compactBadge = compactMatch
+                            ? `<span class="stat-item stat-compact"><i data-lucide="archive"></i><span>ctx ${compactMatch[1]}x</span></span>`
+                            : '';
                         statsEl.innerHTML = `
                             <span class="stat-item"><i data-lucide="activity"></i><span>${finalTok} tok</span></span>
                             ${timeStr ? `<span class="stat-item"><i data-lucide="timer"></i><span>${timeStr}${spdStr}</span></span>` : ''}
                             ${modelShort ? `<span class="stat-item stat-model"><i data-lucide="cpu"></i><span>${modelShort}</span></span>` : ''}
                             ${ragBadge}
+                            ${compactBadge}
                             ${memBadge}
                         `;
                         if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [statsEl] });

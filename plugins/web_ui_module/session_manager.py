@@ -21,7 +21,11 @@ logger = logging.getLogger(__name__)
 
 
 class ChatSession:
-    """Sessió de xat individual amb historial"""
+    """Sessió de xat individual amb historial i compacting automàtic"""
+
+    # Compacting: cada COMPACT_EVERY missatges, resumeix els antics
+    COMPACT_EVERY = 10       # Cada 10 missatges (5 intercanvis user/assistant)
+    COMPACT_KEEP = 6         # Mantenir els últims 6 missatges (3 intercanvis)
 
     def __init__(self, session_id: str = None):
         self.id = session_id or str(uuid.uuid4())
@@ -30,6 +34,8 @@ class ChatSession:
         self.messages: List[Dict[str, str]] = []
         self.context_files: List[str] = []
         self.attached_document: Optional[Dict[str, str]] = None  # {"filename": "...", "content": "..."}
+        self.context_summary: Optional[str] = None  # Resum dels missatges compactats
+        self.compaction_count: int = 0  # Quantes vegades s'ha compactat
 
     def add_message(self, role: str, content: str):
         """Afegir missatge a l'historial"""
@@ -97,21 +103,62 @@ class ChatSession:
         self.context_files.clear()
         self.attached_document = None
 
+    def needs_compaction(self) -> bool:
+        """Retorna True si la sessió necessita compacting"""
+        return len(self.messages) >= self.COMPACT_EVERY
+
+    def get_messages_to_compact(self) -> List[Dict[str, str]]:
+        """Retorna missatges antics que s'han de resumir (tots menys els últims COMPACT_KEEP)"""
+        if len(self.messages) <= self.COMPACT_KEEP:
+            return []
+        return self.messages[:-self.COMPACT_KEEP]
+
+    def apply_compaction(self, summary: str):
+        """Aplica compacting: guarda resum i elimina missatges antics"""
+        keep = self.messages[-self.COMPACT_KEEP:]
+        old_count = len(self.messages) - len(keep)
+        self.context_summary = summary
+        self.messages = keep
+        self.compaction_count += 1
+        logger.info(
+            "Session %s: compacted %d messages (kept %d, compaction #%d)",
+            self.id[:8], old_count, len(keep), self.compaction_count
+        )
+
+    def get_context_messages(self) -> List[Dict[str, str]]:
+        """Obtenir missatges per enviar al model (amb resum si existeix)"""
+        msgs = []
+        if self.context_summary:
+            msgs.append({
+                "role": "user",
+                "content": f"[Resum de la conversa anterior]\n{self.context_summary}"
+            })
+            msgs.append({
+                "role": "assistant",
+                "content": "Entès, tinc el context de la conversa anterior."
+            })
+        msgs.extend(self.messages)
+        return msgs
+
     def get_history(self) -> List[Dict[str, str]]:
-        """Obtenir historial complet de missatges"""
+        """Obtenir historial complet de missatges (per UI)"""
         return self.messages.copy()
 
     def to_dict(self) -> dict:
         """Serialitzar sessió a dict"""
-        return {
+        d = {
             "id": self.id,
             "created_at": self.created_at.isoformat(),
             "last_activity": self.last_activity.isoformat(),
             "message_count": len(self.messages),
             "context_files": self.context_files,
             "messages": self.messages,
-            "attached_document": self.attached_document
+            "attached_document": self.attached_document,
         }
+        if self.context_summary:
+            d["context_summary"] = self.context_summary
+            d["compaction_count"] = self.compaction_count
+        return d
 
     @classmethod
     def from_dict(cls, data: dict) -> 'ChatSession':
@@ -122,6 +169,8 @@ class ChatSession:
         session.messages = data.get("messages", [])
         session.context_files = data.get("context_files", [])
         session.attached_document = data.get("attached_document")
+        session.context_summary = data.get("context_summary")
+        session.compaction_count = data.get("compaction_count", 0)
         return session
 
 
