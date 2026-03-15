@@ -209,3 +209,121 @@ class TestMemoryModule:
     await module.shutdown()
 
     MemoryModule._instance = None
+
+
+@pytest.mark.asyncio
+class TestMemoryModuleAdditional:
+  """Additional tests for uncovered lines."""
+
+  async def test_initialize_project_root_none_fallback(self):
+    """Lines 117-119: project_root is None, falls back to cwd."""
+    from unittest.mock import patch, MagicMock
+
+    MemoryModule._instance = None
+    module = MemoryModule.get_instance()
+
+    mock_state = MagicMock()
+    mock_state.project_root = None
+    mock_state.config = {}
+
+    with patch("memory.memory.module.get_server_state", return_value=mock_state):
+      result = await module.initialize(config={"flash_ttl_seconds": 3600})
+      assert result is True
+
+    await module.shutdown()
+    MemoryModule._instance = None
+
+  async def test_initialize_custom_config_merge(self):
+    """Line 111: custom config merged."""
+    from unittest.mock import patch, MagicMock
+
+    MemoryModule._instance = None
+    module = MemoryModule.get_instance()
+
+    with patch("memory.memory.module.get_server_state") as mock_gs:
+      mock_gs.return_value.project_root = Path.cwd()
+      mock_gs.return_value.config = {}
+      result = await module.initialize(config={"ram_max_entries": 50})
+      assert result is True
+
+    await module.shutdown()
+    MemoryModule._instance = None
+
+  async def test_initialize_exception_raises(self):
+    """Lines 172-174: exception raised during init."""
+    from unittest.mock import patch, MagicMock
+
+    MemoryModule._instance = None
+    module = MemoryModule.get_instance()
+
+    with patch("memory.memory.module.get_server_state") as mock_gs:
+      mock_gs.return_value.project_root = Path.cwd()
+      mock_gs.return_value.config = {}
+      with patch("memory.memory.module.FlashMemory", side_effect=Exception("flash error")):
+        with pytest.raises(Exception, match="flash error"):
+          await module.initialize()
+
+    module._initialized = False
+    MemoryModule._instance = None
+
+  async def test_shutdown_failure_returns_false(self):
+    """Lines 208-210: shutdown exception returns False."""
+    from unittest.mock import patch, MagicMock, AsyncMock
+
+    MemoryModule._instance = None
+    module = MemoryModule.get_instance()
+
+    with patch("memory.memory.module.get_server_state") as mock_gs:
+      mock_gs.return_value.project_root = Path.cwd()
+      mock_gs.return_value.config = {}
+      await module.initialize()
+
+    module._flash_memory.cleanup_expired = AsyncMock(side_effect=Exception("cleanup err"))
+    result = await module.shutdown()
+    assert result is False
+
+    module._initialized = False
+    module._flash_memory = None
+    module._ram_context = None
+    module._persistence = None
+    module._pipeline = None
+    MemoryModule._instance = None
+
+  async def test_ingest_not_initialized_raises(self):
+    """Lines 250-253: ingest before init."""
+    MemoryModule._instance = None
+    module = MemoryModule.get_instance()
+
+    entry = MemoryEntry(entry_type=MemoryType.EPISODIC, content="test", source="t")
+    with pytest.raises(RuntimeError, match="not initialized"):
+      await module.ingest(entry)
+
+    MemoryModule._instance = None
+
+  async def test_ingest_batch_not_initialized_raises(self):
+    """Lines 265-268: ingest_batch before init."""
+    MemoryModule._instance = None
+    module = MemoryModule.get_instance()
+
+    with pytest.raises(RuntimeError, match="not initialized"):
+      await module.ingest_batch([])
+
+    MemoryModule._instance = None
+
+  async def test_get_metrics_coverage(self):
+    """Lines 277-283: get_metrics."""
+    from unittest.mock import patch, MagicMock
+
+    MemoryModule._instance = None
+    module = MemoryModule.get_instance()
+
+    mock_metrics_obj = MagicMock()
+    mock_metrics_obj.get_metrics.return_value = {"counter": 1}
+    mock_metrics_obj.update_from_module = MagicMock()
+
+    with patch("memory.memory.health.check_health", return_value={"status": "healthy"}):
+      with patch("memory.memory.metrics.get_metrics", return_value=mock_metrics_obj):
+        result = module.get_metrics()
+        assert isinstance(result, dict)
+
+    MemoryModule._instance = None

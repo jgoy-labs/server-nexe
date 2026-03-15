@@ -341,6 +341,10 @@ async def lifespan(app: FastAPI):
 
     try:
       # Use ModuleManager directly (SINGLE SOURCE OF TRUTH)
+      if not server_state.module_manager:
+        logger.warning("ModuleManager not available - skipping memory module loading")
+        raise RuntimeError("ModuleManager not available")
+
       msg = _translate(server_state.i18n, "core.server.loading_memory",
         "Loading Memory modules (Memory, RAG, Embeddings)...")
       logger.info(msg)
@@ -645,13 +649,12 @@ async def lifespan(app: FastAPI):
         logger.debug("Closing APIIntegrator...")
         server_state.api_integrator = None
 
+      # NOTE: Do NOT set module_manager or registry to None here.
+      # They are stateless in-memory registries and must persist between
+      # TestClient contexts (multiple lifespan cycles in the same process).
+      # Setting them to None causes "ModuleManager not available" on next startup.
       if server_state.module_manager:
-        logger.debug("Closing ModuleManager...")
-        server_state.module_manager = None
-
-      if server_state.registry:
-        logger.debug("Cleaning Registry...")
-        server_state.registry = None
+        logger.debug("ModuleManager kept alive (stateless registry)")
 
     except Exception as e:
       msg = _translate(server_state.i18n, "core.server.cleanup_error",

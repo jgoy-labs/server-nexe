@@ -32,7 +32,8 @@ def client(api_key):
     os.environ.setdefault("NEXE_PRIMARY_API_KEY", api_key)
     os.environ.setdefault("NEXE_ENV", "testing")
     os.environ.setdefault("NEXE_DEV_MODE", "true")
-    return TestClient(app, base_url="http://localhost")
+    with TestClient(app, base_url="http://localhost") as c:
+        yield c
 
 
 @pytest.fixture(scope="module")
@@ -370,6 +371,17 @@ def _qdrant_available():
         return False
 
 
+def _memory_api_available():
+    """Verifica que la Memory API es pot inicialitzar (Qdrant + dependències OK)."""
+    if not _qdrant_available():
+        return False
+    try:
+        from sentence_transformers import SentenceTransformer  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
 @pytest.mark.integration
 @pytest.mark.slow
 class TestMemoryRoundTrip:
@@ -380,8 +392,8 @@ class TestMemoryRoundTrip:
 
     @pytest.fixture(autouse=True)
     def require_qdrant(self):
-        if not _qdrant_available():
-            pytest.skip("Qdrant not running at localhost:6333")
+        if not _memory_api_available():
+            pytest.skip("Memory API not available (Qdrant or dependencies not ready)")
 
     def test_save_succeeds(self, client, headers):
         r = client.post(

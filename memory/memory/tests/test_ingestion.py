@@ -218,3 +218,130 @@ class TestIngestionPipeline:
 
     pipeline.close()
 
+
+@pytest.mark.asyncio
+class TestIngestionAdditional:
+    """Additional tests for uncovered lines in ingestion.py."""
+
+    async def test_generate_embedding_ollama_empty_text(self, temp_pipeline):
+        """Line 177: empty text raises ValueError."""
+        pipeline = temp_pipeline
+        pipeline.embedding_model = None  # use Ollama path
+
+        with pytest.raises(ValueError, match="buit"):
+            await pipeline._generate_embedding_ollama("   ")
+
+    async def test_generate_embedding_ollama_success(self, temp_pipeline):
+        """Lines 174-196: successful Ollama embedding."""
+        from unittest.mock import patch, AsyncMock, MagicMock
+
+        pipeline = temp_pipeline
+        pipeline.embedding_model = None
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"embedding": [0.1] * 768}
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await pipeline._generate_embedding_ollama("test text")
+            assert len(result) == 768
+
+    async def test_generate_embedding_ollama_missing_embedding(self, temp_pipeline):
+        """Lines 197-198: Ollama returns 200 but no embedding field."""
+        from unittest.mock import patch, AsyncMock, MagicMock
+
+        pipeline = temp_pipeline
+        pipeline.embedding_model = None
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"no_embedding": True}
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            with pytest.raises(ValueError, match="missing 'embedding'"):
+                await pipeline._generate_embedding_ollama("test text")
+
+    async def test_generate_embedding_ollama_error_status(self, temp_pipeline):
+        """Lines 199-200: Ollama returns non-200."""
+        from unittest.mock import patch, AsyncMock, MagicMock
+
+        pipeline = temp_pipeline
+        pipeline.embedding_model = None
+
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            with pytest.raises(ValueError, match="Ollama error 500"):
+                await pipeline._generate_embedding_ollama("test text")
+
+    async def test_generate_embedding_ollama_timeout(self, temp_pipeline):
+        """Lines 202-204: Ollama timeout."""
+        from unittest.mock import patch, AsyncMock
+        import httpx
+
+        pipeline = temp_pipeline
+        pipeline.embedding_model = None
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            with pytest.raises(ValueError, match="timeout"):
+                await pipeline._generate_embedding_ollama("test text")
+
+    async def test_generate_embedding_ollama_generic_error(self, temp_pipeline):
+        """Lines 205-207: generic error in Ollama path."""
+        from unittest.mock import patch, AsyncMock
+
+        pipeline = temp_pipeline
+        pipeline.embedding_model = None
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(side_effect=ConnectionError("connection refused"))
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            with pytest.raises(ConnectionError):
+                await pipeline._generate_embedding_ollama("test text")
+
+    async def test_generate_embedding_sync_test_mode(self, temp_pipeline):
+        """Lines 224-225, 227-247: _generate_embedding_sync in test mode."""
+        pipeline = temp_pipeline
+        result = pipeline._generate_embedding_sync("test text")
+        assert isinstance(result, list)
+        assert len(result) == 384
+
+    async def test_generate_embedding_sync_empty_text(self, temp_pipeline):
+        """Lines 230-231: empty text raises ValueError (test mode)."""
+        pipeline = temp_pipeline
+        with pytest.raises(ValueError, match="buit"):
+            pipeline._generate_test_embedding("   ")
+
+    async def test_generate_embedding_via_executor(self, temp_pipeline):
+        """Lines 149-156: _generate_embedding with embedding_model set uses executor."""
+        pipeline = temp_pipeline
+        assert pipeline.embedding_model is not None
+        result = await pipeline._generate_embedding("test text for executor")
+        assert isinstance(result, list)
+        assert len(result) == 384
+

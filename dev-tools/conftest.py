@@ -21,7 +21,7 @@ from typing import Generator
 # Configure environment for tests
 os.environ.setdefault("NEXE_ENV", "test")
 os.environ.setdefault("NEXE_LOG_LEVEL", "WARNING")
-os.environ.setdefault("NEXE_APPROVED_MODULES", "security,rag,memory,ollama_module,mlx_module,llama_cpp_module")
+os.environ.setdefault("NEXE_APPROVED_MODULES", "security,rag,memory,ollama_module,mlx_module,llama_cpp_module,web_ui_module")
 os.environ.setdefault("NEXE_AUTOSTART_QDRANT", "false")
 os.environ.setdefault("NEXE_AUTOSTART_OLLAMA", "false")
 os.environ.setdefault("NEXE_AUTO_INGEST_KNOWLEDGE", "false")

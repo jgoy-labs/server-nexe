@@ -539,7 +539,7 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                             recall_result = await memory_helper.recall_from_memory(message, limit=5)
                             if recall_result["success"] and recall_result["results"]:
                                 # Filtrar per score mínim (configurable, default 0.6)
-                                rag_threshold = float(data.get("rag_threshold", 0.6))
+                                rag_threshold = float(request.get("rag_threshold", 0.6))
                                 relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
                                 if relevant:
                                     rag_context = "\n\n[MEMÒRIA - Informació rellevant guardada anteriorment:]\n"
