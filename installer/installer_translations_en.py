@@ -31,7 +31,7 @@ EN = {
     "security_explanation": "Access keys to protect your AI. Stored in the .env file",
     "env_created": ".env created with secure API Key.",
     "api_key": "Master API Key",
-    "copy_api_key": "⚠  Copy this key and save it somewhere safe. You will need it to access the Web UI.",
+    "copy_api_key": "⚠  Copy this key. You will need it the first time you access the Web UI.",
     "saved_at": "Saved at",
     "env_exists": ".env already exists. Not overwritten.",
     "preparing_data": "Preparing data structures...",

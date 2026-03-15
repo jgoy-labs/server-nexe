@@ -31,7 +31,7 @@ ES = {
     "security_explanation": "Claves de acceso para proteger tu IA. Se guardan en el archivo .env",
     "env_created": ".env creado con Clave API segura.",
     "api_key": "Clave API Maestra",
-    "copy_api_key": "⚠  Copia esta clave en un lugar seguro. La necesitarás para acceder a la Web UI.",
+    "copy_api_key": "⚠  Copia esta clave. La necesitarás la primera vez que accedas a la Web UI.",
     "saved_at": "Guardada en",
     "env_exists": ".env ya existe. No se ha sobrescrito.",
     "preparing_data": "Preparando estructuras de datos...",

@@ -31,7 +31,7 @@ CA = {
     "security_explanation": "Claus d'accés per protegir la teva IA. Es guarden al fitxer .env",
     "env_created": ".env creat amb Clau API segura.",
     "api_key": "Clau API Mestra",
-    "copy_api_key": "⚠  Copia aquesta clau en un lloc segur. La necessitaràs per accedir a la Web UI.",
+    "copy_api_key": "⚠  Copia aquesta clau. La necessitaràs el primer cop que accedeixis a la Web UI.",
     "saved_at": "Guardada a",
     "env_exists": ".env ja existeix. No s'ha sobreescrit.",
     "preparing_data": "Preparant estructures de dades...",
