@@ -517,7 +517,7 @@ async def _forward_to_ollama(
             headers["X-Nexe-Fallback-Reason"] = fallback_reason or "fallback"
         return StreamingResponse(
             _ollama_stream_generator(url, payload, app_state, user_msg),
-            media_type="text/event-stream",
+            media_type="text/plain",
             headers=headers,
         )
     else:
@@ -768,7 +768,7 @@ async def _forward_to_mlx(messages: List[Dict], request: ChatCompletionRequest, 
                     user_msg=last_user_msg,
                     session_id=session_id,
                 ),
-                media_type="text/event-stream",
+                media_type="text/plain",
                 headers={
                     "Cache-Control": "no-cache",
                     "Connection": "keep-alive",
@@ -867,7 +867,7 @@ async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionReq
                     user_msg=last_user_msg,
                     session_id=session_id,
                 ),
-                media_type="text/event-stream",
+                media_type="text/plain",
                 headers={
                     "Cache-Control": "no-cache",
                     "Connection": "keep-alive",

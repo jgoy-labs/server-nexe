@@ -746,8 +746,13 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                             # MLX module requires a callback for streaming
                             queue = asyncio.Queue()
                             
+                            _stream_chunk_count = [0]
+
                             def stream_cb(token):
                                 # MLXChatNode already marshals this to the main loop, so we can just put in queue
+                                _stream_chunk_count[0] += 1
+                                if _stream_chunk_count[0] <= 3 or _stream_chunk_count[0] % 50 == 0:
+                                    logger.debug("stream_cb: chunk #%d (%d chars)", _stream_chunk_count[0], len(token))
                                 queue.put_nowait(token)
 
                             # Launch chat in background task
@@ -856,10 +861,11 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                 
                         return StreamingResponse(
                             response_generator(),
-                            media_type="text/event-stream",
+                            media_type="text/plain",
                             headers={
-                                "Cache-Control": "no-cache",
+                                "Cache-Control": "no-cache, no-store",
                                 "X-Accel-Buffering": "no",
+                                "X-Content-Type-Options": "nosniff",
                             }
                         )
 
