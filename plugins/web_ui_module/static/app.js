@@ -682,6 +682,7 @@ class NexeUI {
                 let memorySaved = false;
                 let ragCount = 0;
                 let usedModel = '';
+                let compactMatch = null;
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -818,7 +819,7 @@ class NexeUI {
                         }
 
                         // Detectar token COMPACT (context compactat)
-                        const compactMatch = chunk.match(/\x00\[COMPACT:(\d+)\]\x00/);
+                        compactMatch = chunk.match(/\x00\[COMPACT:(\d+)\]\x00/);
                         if (compactMatch) {
                             chunk = chunk.replace(/\x00\[COMPACT:\d+\]\x00/, '');
                         }
