@@ -898,7 +898,7 @@ class NexeUI {
             } else {
                 console.error('Error sending message:', error);
                 this.setAiState('error');
-                this.addMessageToChat('assistant', '❌ Error de connexió.');
+                this.addMessageToChat('assistant', `❌ Error de connexió: ${error.message || error}`);
             }
         } finally {
             this._stopStreamStats();
