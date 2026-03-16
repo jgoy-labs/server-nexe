@@ -38,67 +38,58 @@ class TestSingleton:
         assert inst1 is inst2
 
 
+@pytest.mark.asyncio
 class TestInitialize:
-    def test_initialize_success(self):
+    async def test_initialize_success(self):
         """Lines 137-188: successful initialization."""
         module = EmbeddingsModule.get_instance()
         with patch("memory.embeddings.module.AsyncEmbedder"), \
              patch("memory.embeddings.module.CachedEmbedder"), \
              patch("memory.embeddings.module.SmartChunker"):
-            result = asyncio.get_event_loop().run_until_complete(
-                module.initialize()
-            )
+            result = await module.initialize()
         assert result is True
         assert module._initialized is True
 
-    def test_initialize_already_initialized(self):
+    async def test_initialize_already_initialized(self):
         """Line 133-135: already initialized returns True."""
         module = EmbeddingsModule.get_instance()
         module._initialized = True
-        result = asyncio.get_event_loop().run_until_complete(
-            module.initialize()
-        )
+        result = await module.initialize()
         assert result is True
 
-    def test_initialize_failure_raises(self):
+    async def test_initialize_failure_raises(self):
         """Lines 190-196: initialization failure raises."""
         module = EmbeddingsModule.get_instance()
         with patch("memory.embeddings.module.AsyncEmbedder",
                    side_effect=RuntimeError("model not found")):
             with pytest.raises(RuntimeError, match="model not found"):
-                asyncio.get_event_loop().run_until_complete(
-                    module.initialize()
-                )
+                await module.initialize()
 
 
+@pytest.mark.asyncio
 class TestEncodeNotInitialized:
-    def test_encode_not_initialized_raises(self):
+    async def test_encode_not_initialized_raises(self):
         """Line 212: encode without initialization raises RuntimeError."""
         module = EmbeddingsModule.get_instance()
         request = MagicMock()
         with pytest.raises(RuntimeError):
-            asyncio.get_event_loop().run_until_complete(
-                module.encode(request)
-            )
+            await module.encode(request)
 
-    def test_encode_batch_not_initialized_raises(self):
+    async def test_encode_batch_not_initialized_raises(self):
         """Lines 234-240: encode_batch without initialization raises."""
         module = EmbeddingsModule.get_instance()
         request = MagicMock()
         with pytest.raises(RuntimeError):
-            asyncio.get_event_loop().run_until_complete(
-                module.encode_batch(request)
-            )
+            await module.encode_batch(request)
 
 
+@pytest.mark.asyncio
 class TestChunkDocumentNotInitialized:
-    def test_chunk_document_not_initialized_raises(self):
+    async def test_chunk_document_not_initialized_raises(self):
         """Lines 262-268: chunk_document without initialization raises."""
         module = EmbeddingsModule.get_instance()
         with pytest.raises(RuntimeError):
-            asyncio.get_event_loop().run_until_complete(
-                module.chunk_document("test", "doc1")
-            )
+            await module.chunk_document("test", "doc1")
 
 
 class TestGetStatsNotInitialized:
@@ -109,26 +100,24 @@ class TestGetStatsNotInitialized:
             module.get_stats()
 
 
+@pytest.mark.asyncio
 class TestClearCacheNotInitialized:
-    def test_clear_cache_not_initialized_raises(self):
+    async def test_clear_cache_not_initialized_raises(self):
         """Lines 299-305: clear_cache without initialization raises."""
         module = EmbeddingsModule.get_instance()
         with pytest.raises(RuntimeError):
-            asyncio.get_event_loop().run_until_complete(
-                module.clear_cache()
-            )
+            await module.clear_cache()
 
 
+@pytest.mark.asyncio
 class TestShutdown:
-    def test_shutdown_not_initialized(self):
+    async def test_shutdown_not_initialized(self):
         """Lines 321-323: shutdown when not initialized returns True."""
         module = EmbeddingsModule.get_instance()
-        result = asyncio.get_event_loop().run_until_complete(
-            module.shutdown()
-        )
+        result = await module.shutdown()
         assert result is True
 
-    def test_shutdown_success(self):
+    async def test_shutdown_success(self):
         """Lines 325-337: successful shutdown."""
         module = EmbeddingsModule.get_instance()
         module._initialized = True
@@ -136,15 +125,13 @@ class TestShutdown:
         module._chunker = MagicMock()
         module._config = {"test": "value"}
 
-        result = asyncio.get_event_loop().run_until_complete(
-            module.shutdown()
-        )
+        result = await module.shutdown()
         assert result is True
         assert module._initialized is False
         assert module._cached_embedder is None
         assert module._chunker is None
 
-    def test_shutdown_failure_returns_false(self):
+    async def test_shutdown_failure_returns_false(self):
         """Lines 339-345: shutdown failure returns False."""
         module = EmbeddingsModule.get_instance()
         module._initialized = True
@@ -152,9 +139,7 @@ class TestShutdown:
         mock_embedder.shutdown.side_effect = RuntimeError("fail")
         module._cached_embedder = mock_embedder
 
-        result = asyncio.get_event_loop().run_until_complete(
-            module.shutdown()
-        )
+        result = await module.shutdown()
         assert result is False
 
 
