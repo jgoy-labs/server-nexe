@@ -25,6 +25,10 @@ import os
 from personality.integration import APIIntegrator
 from .config import load_config
 
+# Force offline mode for HuggingFace — server must work without internet
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
 logger = logging.getLogger(__name__)
 
 # Configurable timeouts via environment variables
