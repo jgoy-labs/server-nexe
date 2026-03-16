@@ -391,7 +391,7 @@ def get_file_rag():
 
   with _file_rag_lock:
     if _file_rag_instance is None:
-      from memory.rag_sources.file.source import FileRAGSource
+      from memory.rag_sources.file import FileRAGSource
       _qdrant_url = (
         os.environ.get("NEXE_QDRANT_URL")
         or f"http://{os.environ.get('NEXE_QDRANT_HOST', 'localhost')}:{os.environ.get('NEXE_QDRANT_PORT', '6333')}"

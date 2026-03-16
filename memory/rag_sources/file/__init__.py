@@ -9,3 +9,7 @@ Description: Font RAG basada en fitxers locals.
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
+
+from .source import FileRAGSource
+
+__all__ = ['FileRAGSource']
