@@ -1,0 +1,19 @@
+{
+ "memory": {
+  "singleton_error": "MemoryModule es Singleton. Usar get_instance()",
+  "health": {
+   "initialized_ok": "Módulo inicializado correctamente",
+   "not_initialized": "Módulo no inicializado",
+   "init_check_error": "Error comprobando inicialización: {error}",
+   "flash_storage_writable": "Almacenamiento flash accesible: {path}",
+   "flash_storage_not_writable": "Almacenamiento flash no accesible: {path}",
+   "flash_storage_error": "Error comprobando almacenamiento flash: {error}",
+   "ram_ok": "{available}GB disponible (>={required}GB requerido)",
+   "ram_warn": "{available}GB disponible (<{required}GB requerido, puede ser lento)",
+   "ram_critical": "{available}GB disponible (crítico: <{critical}GB)",
+   "ram_error": "Error comprobando memoria RAM: {error}",
+   "cleanup_ok": "Políticas de limpieza configuradas correctamente",
+   "cleanup_error": "Error comprobando políticas de limpieza: {error}"
+  }
+ }
+}

@@ -1,0 +1,45 @@
+{
+ "personality": {
+  "module_manager": {
+   "init": {
+    "started": "Module Manager inicialitzat",
+    "config_loaded": "Configuració carregada des de: {path}",
+    "manifests_path": "Manifests: {path}"
+   },
+   "discovery": {
+    "starting": "Iniciant descobriment de mòduls...",
+    "completed": "Descobriment completat: {new_count} nous, {total_count} totals",
+    "cycles_detected": "⚠️ Cicle de dependències detectat: {cycles}"
+   },
+   "loading": {
+    "not_found": "Mòdul {module} no trobat"
+   },
+   "api": {
+    "integrator": {
+     "set": "API Integrator configurat correctament"
+    }
+   },
+   "path_discovery": {
+    "scanning": "Cercant paths per mòduls...",
+    "path_added": "Path afegit: {path}",
+    "module_found": "Mòdul trobat: '{name}' a {path}",
+    "auto_discovered": "Auto-descobert: {path}",
+    "cache_saved": "Cache de paths desat a {file}",
+    "cache_loaded": "Cache de paths carregat des de {file}",
+    "permission_denied": "Permís denegat cercant: {path}",
+    "max_dirs_reached": "Límit màxim de directoris assolit: {max}",
+    "paths_discovered": "Descoberts {count} paths de mòduls",
+    "debug": {
+     "path_item": " - {path}"
+    },
+    "info": {
+     "modules_found": "Trobats {count} mòduls"
+    },
+    "errors": {
+     "cache_save_failed": "Error desant cache: {error}",
+     "cache_load_failed": "Error carregant cache: {error}"
+    }
+   }
+  }
+ }
+}

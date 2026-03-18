@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexe - Local AI</title>
+    <link rel="icon" type="image/svg+xml" href="/ui/static/favicon.svg">
+    <link rel="apple-touch-icon" href="/ui/static/favicon.svg">
+    <link rel="stylesheet" href="/ui/static/style.css">
+    <script src="/ui/static/app-init.js"></script>
+    <script src="/ui/static/lucide.min.js"></script>
+    <!-- Marked.js per renderitzar Markdown (local) -->
+    <script src="/ui/static/marked.min.js"></script>
+</head>
+<style>
+    .login-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: #0a0a0a; display: none; align-items: center;
+        justify-content: center; z-index: 9999;
+    }
+    .login-box {
+        background: #120808; border: 1px solid #3a1010; border-radius: 6px;
+        padding: 2.5rem; text-align: center; min-width: 320px; max-width: 380px; width: 90%;
+    }
+    .login-box h2 {
+        color: #e62020; margin: 0 0 0.35rem;
+        font-size: 1.6rem; font-family: 'JetBrains Mono', monospace;
+        font-weight: 700; letter-spacing: -0.02em;
+    }
+    .login-box .login-subtitle { color: #666; margin: 0 0 2rem; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; }
+    .login-box input {
+        width: 100%; padding: 0.75rem 1rem; background: #0a0a0a;
+        border: 1px solid #2a1010; border-radius: 4px; color: #fff;
+        font-size: 0.9rem; margin-bottom: 1rem; box-sizing: border-box;
+        font-family: 'JetBrains Mono', monospace;
+        transition: border-color 0.2s;
+    }
+    .login-box input:focus { outline: none; border-color: #e62020; }
+    .login-box button {
+        width: 100%; padding: 0.75rem; background: #e62020; border: none;
+        border-radius: 4px; color: #0a0a0a; font-size: 0.85rem; cursor: pointer;
+        font-family: 'JetBrains Mono', monospace; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.08em;
+        transition: background 0.2s;
+    }
+    .login-box button:hover { background: #cc0000; }
+    .login-error { color: #ff4444; font-size: 0.8rem; margin-top: 0.75rem; display: none; font-family: 'JetBrains Mono', monospace; }
+    .login-hint { color: #444; font-size: 0.75rem; margin-top: 1rem; font-family: 'JetBrains Mono', monospace; }
+    .login-hint code { color: #666; background: #0a0a0a; padding: 0.1rem 0.3rem; border-radius: 3px; border: 1px solid #2a1010; }
+</style>
+<body>
+    <!-- Marc animat -->
+    <div class="frame-border frame-top"></div>
+    <div class="frame-border frame-bottom"></div>
+    <div class="frame-border frame-left"></div>
+    <div class="frame-border frame-right"></div>
+
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-box">
+            <h2>Nexe</h2>
+            <p class="login-subtitle">Introdueix la API Key per accedir</p>
+            <input type="password" id="apiKeyInput" placeholder="API Key..." autocomplete="off" spellcheck="false">
+            <button id="loginBtn">Accedir</button>
+            <p id="loginError" class="login-error">Clau incorrecta. Comprova el fitxer <code>.env</code></p>
+            <p class="login-hint">La clau és a <code>.env</code> → <code>NEXE_PRIMARY_API_KEY</code></p>
+        </div>
+    </div>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <img src="/ui/static/logo.png" alt="server.nexe" class="logo-img">
+                    <div class="header-actions">
+                        <button id="themeToggleBtn" class="theme-toggle" title="Canviar tema">
+                            <span class="toggle-track">
+                                <i data-lucide="sun" class="toggle-icon icon-sun"></i>
+                                <i data-lucide="moon" class="toggle-icon icon-moon"></i>
+                            </span>
+                        </button>
+                        <button id="frameToggleBtn" class="btn-frame-toggle" title="Mostrar/ocultar marc">◼</button>
+                    </div>
+                </div>
+                <div id="modelInfo" class="model-info">
+                    <div class="model-info-dot"></div>
+                    <span class="model-info-text" id="modelInfoText">Carregant...</span>
+                </div>
+                <div class="backend-selector-control">
+                    <div class="backend-selector-label">
+                        <span class="backend-selector-title">Backend</span>
+                    </div>
+                    <select id="backendSelect" class="backend-select">
+                        <option value="">Carregant...</option>
+                    </select>
+                    <div class="backend-selector-label" style="margin-top: 6px;">
+                        <span class="backend-selector-title">Model</span>
+                    </div>
+                    <select id="modelSelect" class="backend-select">
+                        <option value="">Carregant...</option>
+                    </select>
+                </div>
+                <div class="rag-threshold-control">
+                    <div class="rag-threshold-label">
+                        <span class="rag-threshold-title">
+                            Precisió RAG
+                            <span class="rag-info-icon" title="Controla quant ha de semblar-se un record a la teva pregunta per ser inclòs al context. Valors alts (0.8+) → menys context, molt precís. Valors baixos (0.3) → més context, però pot incloure soroll i causar al·lucinacions.">ⓘ</span>
+                        </span>
+                        <span id="ragThresholdValue" class="rag-threshold-badge">0.6</span>
+                    </div>
+                    <input type="range" id="ragThresholdSlider" class="rag-threshold-slider"
+                           min="0.3" max="0.95" step="0.05" value="0.6">
+                    <div class="rag-threshold-hints">
+                        <span>Ampli</span><span>Estricte</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-content">
+                <button id="newChatBtn" class="btn-new-chat">
+                    <i data-lucide="plus"></i>
+                    Nova conversa
+                </button>
+
+                <div class="sessions-header">
+                    <h3>Sessions</h3>
+                </div>
+
+                <div id="sessionsList" class="sessions-list">
+                    <!-- Sessions populated dynamically -->
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-main">
+            <div id="chatMessages" class="chat-messages">
+                <div class="welcome-screen">
+                    <div class="welcome-logo">
+                        <img src="/ui/static/logo.png" alt="server.nexe">
+                    </div>
+                    <h2>Benvingut a Nexe</h2>
+                    <p>IA local amb memòria persistent</p>
+                    <div class="features">
+                        <div class="feature">
+                            <span class="feature-icon"><i data-lucide="message-circle"></i></span>
+                            <span>Conversa amb memòria contextual</span>
+                        </div>
+                        <div class="feature">
+                            <span class="feature-icon"><i data-lucide="folder-open"></i></span>
+                            <span>Puja documents (.txt, .md, .pdf)</span>
+                        </div>
+                        <div class="feature">
+                            <span class="feature-icon"><i data-lucide="lock"></i></span>
+                            <span>100% local i privat</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="chat-input-area">
+                <div class="input-container">
+                    <button id="uploadBtn" class="btn-upload" title="Pujar document">
+                        <i data-lucide="paperclip"></i>
+                    </button>
+
+                    <textarea
+                        id="messageInput"
+                        placeholder="Escriu un missatge..."
+                        rows="1"
+                    ></textarea>
+
+                    <button id="sendBtn" class="btn-send" title="Enviar">
+                        <i data-lucide="send"></i>
+                    </button>
+                    <button id="stopBtn" class="btn-stop" title="Aturar generació" style="display: none;">
+                        <i data-lucide="square"></i>
+                    </button>
+                </div>
+                <input type="file" id="fileInput" accept=".txt,.md,.markdown,.pdf" style="display: none">
+                <div id="statsBar" class="stats-bar">
+                    <div class="stats-item">
+                        <span class="stats-label">tok</span>
+                        <span class="stats-value" id="statTokens">0</span>
+                    </div>
+                    <div class="stats-item">
+                        <span class="stats-value" id="statSpeed">0</span>
+                        <span class="stats-label">tok/s</span>
+                    </div>
+                </div>
+                <div id="filePreview" class="file-preview"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Footer global 100% ample -->
+    <footer class="site-footer">
+        <div class="footer-left">
+            <span class="footer-text">© 2026 Barcelona v0.8</span>
+        </div>
+        <div class="footer-center">
+            <a href="https://server-nexe.org" target="_blank" class="footer-link">server-nexe.org</a>
+            <span class="footer-separator">·</span>
+            <a href="https://github.com/jgoy-labs/server-nexe" target="_blank" class="footer-link">GitHub</a>
+            <span class="footer-separator">·</span>
+            <a href="https://jgoy.net" target="_blank" class="footer-link">jgoy.net</a>
+        </div>
+        <div class="footer-right">
+            <div id="thinkingBadge" class="thinking-badge">
+                <div class="thinking-dots"><span></span><span></span><span></span></div>
+                <span>Pensant...</span>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot active"></div>
+                <span>Connectat</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/ui/static/app.js"></script>
+</body>
+</html>

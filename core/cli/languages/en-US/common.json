@@ -1,0 +1,85 @@
+{
+ "cli": {
+  "name": "CLI Central Nexe",
+  "description": "Nexe 0.8 Module CLI Orchestrator",
+  "greetings": {
+   "hello": "Hello",
+   "welcome": "Welcome to CLI Central Nexe 0.8",
+   "goodbye": "Goodbye!"
+  },
+  "features": {
+   "cli_discovery": "CLI Discovery",
+   "subprocess_execution": "Subprocess Execution",
+   "offline_support": "Offline Support",
+   "http_client": "Integrated HTTP Client"
+  },
+  "health_checks": {
+   "module_structure": {
+    "name": "Module Structure",
+    "all_folders_exist": "All folders exist",
+    "all_files_exist": "All files exist",
+    "missing_folders": "Missing folders",
+    "missing_files": "Missing files"
+   },
+   "cli_discovery": {
+    "name": "CLI Discovery",
+    "clis_found": "CLIs discovered",
+    "no_clis": "No CLIs discovered",
+    "missing_entry": "CLIs without entry_point",
+    "quadrants": "Covered quadrants"
+   },
+   "config_valid": {
+    "name": "Valid Configuration",
+    "config_ok": "Configuration OK",
+    "no_server_url": "No server URL configured",
+    "invalid_timeout": "Invalid timeout"
+   },
+   "basic_functionality": {
+    "name": "Basic Functionality",
+    "module_ok": "CLIModule works correctly",
+    "methods_ok": "All methods respond"
+   }
+  },
+  "check": {
+   "error": "Error executing check",
+   "missing_files": "Missing files",
+   "missing_folders": "Missing folders",
+   "structure_ok": "Structure OK",
+   "no_clis": "No CLIs discovered",
+   "missing_entry": "CLIs without entry_point",
+   "clis_found": "CLIs discovered",
+   "quadrants": "Quadrants",
+   "no_server_url": "No server URL configured",
+   "invalid_timeout": "Invalid timeout",
+   "config_ok": "Configuration OK",
+   "config_error": "Configuration error",
+   "module_ok": "CLIModule works correctly",
+   "methods_ok": "All methods respond",
+   "assertion_failed": "Test failed",
+   "func_error": "Functionality error",
+   "discovery_error": "Discovery error"
+  },
+  "commands": {
+   "list": "List all available CLIs",
+   "run": "Run a specific CLI",
+   "help": "Show help",
+   "version": "Show version"
+  },
+  "status": {
+   "healthy": "HEALTHY",
+   "degraded": "DEGRADED",
+   "unhealthy": "UNHEALTHY",
+   "error": "ERROR"
+  },
+  "messages": {
+   "location": "Location",
+   "usage": "Usage",
+   "available_clis": "Available CLIs",
+   "no_clis_found": "No CLIs found",
+   "cli_not_found": "CLI not found",
+   "executing": "Executing",
+   "success": "Success",
+   "failed": "Failed"
+  }
+ }
+}

@@ -1,0 +1,31 @@
+[run]
+source = core, memory, personality, plugins
+omit =
+    */tests/*
+    */venv/*
+    */dev-tools/*
+    */__pycache__/*
+    */conftest.py
+    */install_nexe.py
+    core/app.py
+    core/lifespan.py
+    core/server/*.py
+    core/loader/*.py
+    core/cli/*.py
+    core/ingest/tests/*.py
+    */__main__.py
+    plugins/mlx_module/generate_helpers.py
+    plugins/llama_cpp_module/model_pool.py
+    plugins/web_ui_module/tests/integration/*.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    \.\.\.
+    pass
+show_missing = True
+
+[html]
+directory = htmlcov

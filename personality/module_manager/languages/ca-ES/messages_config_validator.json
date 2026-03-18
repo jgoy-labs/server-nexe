@@ -1,0 +1,117 @@
+{
+ "_meta": {
+  "component": "config_validator",
+  "description": "Traduccions per validador de configuració",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ 
+ "validation": {
+  "starting": "Iniciant validació de configuració...",
+  "completed": "Validació de configuració completada",
+  "passed": "Validació superada sense errors",
+  "failed": "Validació fallida amb {error_count} errors",
+  "warnings_found": "{warning_count} avisos trobats",
+  "file_not_found": "Fitxer de configuració no trobat: {path}",
+  "parse_error": "Error analitzant TOML: {error}"
+ },
+ 
+ "sections": {
+  "checking": "Validant secció: [{section}]",
+  "missing_required": "Secció obligatòria no trobada: [{section}]",
+  "section_valid": "Secció [{section}] vàlida",
+  "section_invalid": "Secció [{section}] conté errors",
+  "meta": "Metadades del sistema",
+  "nexe": "Configuració del servidor",
+  "personality": "Configuració del nucli",
+  "core": "Configuració de mòduls",
+  "memory": "Configuració de processament",
+  "storage": "Configuració de persistència"
+ },
+ 
+ "keys": {
+  "required_missing": "Clau obligatòria no trobada: {key}",
+  "type_mismatch": "Tipus incorrecte per '{key}': esperat {expected}, trobat {actual}",
+  "value_out_of_range": "Valor fora de rang per '{key}': {value} (rang: {min}-{max})",
+  "invalid_format": "Format invàlid per {field}",
+  "key_valid": "Clau {key} vàlida"
+ },
+ 
+ "nexe": {
+  "server_config": "Validant configuració del servidor...",
+  "host_valid": "Host vàlid: {host}",
+  "host_invalid": "Host invàlid: {host}",
+  "port_valid": "Port vàlid: {port}",
+  "port_invalid": "Port invàlid: {port} (rang: 1-65535)",
+  "cors_valid": "Configuració CORS vàlida",
+  "cors_invalid": "Configuració CORS invàlida",
+  "workers_valid": "Nombre de workers vàlid: {workers}",
+  "workers_invalid": "Nombre de workers ha de ser un enter positiu",
+  "timeout_valid": "Timeout vàlid: {timeout}s",
+  "timeout_invalid": "Timeout ha de ser un número positiu"
+ },
+ 
+ "core": {
+  "models_config": "Validant configuració de models...",
+  "temperature_valid": "Temperatura vàlida: {temperature}",
+  "temperature_invalid": "Temperatura fora de rang: {temperature} (rang: 0.0-2.0)",
+  "max_tokens_valid": "Max tokens vàlid: {tokens}",
+  "max_tokens_invalid": "Max tokens ha de ser un enter positiu"
+ },
+ 
+ "storage": {
+  "logging_config": "Validant configuració de registres...",
+  "log_level_valid": "Nivell de registre vàlid: {level}",
+  "log_level_invalid": "Nivell de registre invàlid: {level}. Vàlids: {valid_levels}",
+  "retention_valid": "Dies de retenció vàlids: {days}",
+  "retention_invalid": "Dies de retenció ha de ser un enter positiu",
+  "storage_config": "Validant configuració d'emmagatzematge...",
+  "max_file_size_valid": "Mida màxima de fitxer vàlida: {size}",
+  "max_file_size_invalid": "Mida màxima de fitxer ha de ser un enter positiu",
+  "extensions_valid": "Extensions permeses vàlides",
+  "extensions_invalid": "Totes les extensions han de ser strings que comencin amb '.'"
+ },
+ 
+ "paths": {
+  "checking_paths": "Verificant existència de paths...",
+  "path_exists": "Path vàlid: {path}",
+  "path_missing": "Path no existeix: {path} (de {config_key})",
+  "directory_valid": "Directori vàlid: {path}",
+  "file_valid": "Fitxer vàlid: {path}",
+  "parent_directory_missing": "Directori pare no existeix per: {path}"
+ },
+ 
+ "urls": {
+  "checking_url": "Validant URL: {url}",
+  "url_valid": "URL vàlida: {url}",
+  "url_invalid": "URL invàlida: {url}",
+  "url_pattern_invalid": "Format d'URL no vàlid per: {url}"
+ },
+ 
+ "environment": {
+  "checking_environment": "Validant entorn: {env}",
+  "environment_valid": "Entorn vàlid: {env}",
+  "environment_invalid": "Entorn invàlid: {env}. Vàlids: {valid_envs}"
+ },
+ 
+ "dependencies": {
+  "checking_dependencies": "Verificant dependències...",
+  "dependency_available": "Dependència disponible: {dep}",
+  "dependency_missing": "Dependència no disponible: {dep}",
+  "all_dependencies_met": "Totes les dependències satisfetes",
+  "some_dependencies_missing": "{count} dependències no disponibles"
+ },
+ 
+ "summary": {
+  "validation_summary": "Resum de validació:",
+  "total_errors": "Total errors: {count}",
+  "total_warnings": "Total avisos: {count}",
+  "sections_checked": "Seccions verificades: {count}",
+  "keys_validated": "Claus validades: {count}",
+  "paths_checked": "Paths verificats: {count}",
+  "config_healthy": "Configuració saludable",
+  "config_has_issues": "Configuració té problemes",
+  "critical_errors": "Errors crítics que impedeixen l'execució",
+  "minor_warnings": "Avisos menors que no afecten l'execució"
+ }
+}

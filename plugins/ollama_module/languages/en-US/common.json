@@ -1,0 +1,76 @@
+{
+ "module": {
+  "name": "Ollama",
+  "description": "Local option for LLM models (one of many options)"
+ },
+ "ui": {
+  "title": "Ollama Chat",
+  "subtitle": "Local LLM models - Real-time streaming",
+  "model_selector": "Model",
+  "pull_model": "Download Model",
+  "status": {
+   "connected": "Connected",
+   "disconnected": "Disconnected",
+   "loading": "Loading...",
+   "models_count": "models available"
+  },
+  "placeholder": "Type your message...",
+  "send": "Send",
+  "streaming_hint": "Enter to send • Real-time streaming"
+ },
+ "pull_modal": {
+  "title": "Download Model",
+  "model_name_label": "Model name",
+  "model_name_placeholder": "mistral:7b",
+  "examples": "Examples: mistral:7b, llama3.2, qwen2.5-coder",
+  "cancel": "Cancel",
+  "download": "Download",
+  "downloading": "Downloading...",
+  "success": "Downloaded successfully!",
+  "error": "Download error"
+ },
+ "chat": {
+  "welcome": "Select a model and start chatting",
+  "thinking": "Thinking...",
+  "no_response": "No response",
+  "error": "Error"
+ },
+ "health": {
+  "connection_ok": "Ollama connection OK",
+  "connection_failed": "Cannot connect to Ollama",
+  "models_found": "Local models found",
+  "no_models": "No models installed",
+  "mistral_found": "Mistral model available (recommended)",
+  "mistral_missing": "Mistral model not found"
+ },
+ "logs": {
+  "connection_check_failed": "Ollama connection check failed: {error}",
+  "models_found": "Found {count} Ollama models",
+  "list_models_failed": "Failed to list Ollama models: {error}",
+  "invalid_json_pull": "Invalid JSON in pull response: {line}",
+  "pull_failed": "Failed to pull model {model}: {error}",
+  "get_info_failed": "Failed to get info for model {model}: {error}",
+  "invalid_json_chat": "Invalid JSON in chat response: {line}",
+  "chat_failed": "Chat request failed with model {model}: {error}",
+  "model_deleted": "Model {model} deleted successfully",
+  "delete_failed": "Failed to delete model {model}: {error}"
+ },
+ "info": {
+  "description": "Ollama integration for local LLM model management"
+ },
+ "cli": {
+  "checking_connection": "🔌 Checking connection to Ollama...",
+  "not_available": "❌ Ollama is not available at {url}",
+  "ensure_running": "  Make sure Ollama is running: ollama serve",
+  "connected": "✅ Connected to Ollama!",
+  "available_models": "\n📦 Available models:",
+  "no_models": "  → No models installed",
+  "download_hint": "  → Download a model: ollama pull mistral",
+  "error": "  ❌ Error: {error}",
+  "total_models": "\n📊 Total: {count} models",
+  "web_chat_info": "\nTo use the web chatbot:",
+  "start_server": " → Start Nexe server",
+  "visit_url": " → Visit: http://localhost:9119/ui-control/ollama/",
+  "model_item": "  • {name} ({size:.2f} GB)"
+ }
+}

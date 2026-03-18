@@ -1,0 +1,67 @@
+{
+ "_meta": {
+  "component": "registry",
+  "description": "Traduccions per registre central de mòduls",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ 
+ "registration": {
+  "module_registered": "Mòdul '{name}' registrat al sistema",
+  "module_unregistered": "Mòdul '{name}' desregistrat del sistema",
+  "already_registered": "Mòdul '{name}' ja està registrat",
+  "registration_failed": "Error registrant mòdul '{name}': {error}",
+  "metadata_extracted": "Metadades extretes del manifest per {module}"
+ },
+ 
+ "endpoints": {
+  "discovered": "Endpoint descobert: {method} {path} ({module})",
+  "indexed": "{count} endpoints indexats per {module}",
+  "router_found": "Router FastAPI trobat per {module}",
+  "no_router": "Cap router trobat per {module}",
+  "endpoint_registered": "Endpoint registrat: {method} {path}",
+  "endpoint_removed": "Endpoint eliminat: {method} {path}"
+ },
+ 
+ "manifest": {
+  "processing": "Processant manifest per {module}",
+  "api_config_found": "Configuració d'API trobada: prefix {prefix}",
+  "ui_config_found": "Configuració d'UI trobada: ruta {route}",
+  "dependencies_found": "Dependències trobades: {deps}",
+  "provides_found": "Capacitats proporcionades: {provides}",
+  "invalid_manifest": "Manifest invàlid per {module}: {errors}"
+ },
+ 
+ "queries": {
+  "module_found": "Mòdul trobat: {name}",
+  "module_not_found": "Mòdul no trobat: {name}",
+  "endpoint_found": "Endpoint trobat: {method} {path}",
+  "endpoint_not_found": "Endpoint no trobat: {method} {path}",
+  "category_search": "Cercant mòduls de categoria: {category}",
+  "capability_search": "Cercant mòduls que proporcionen: {capability}"
+ },
+ 
+ "dependencies": {
+  "checking": "Verificant dependències per {module}",
+  "resolved": "Dependències resoltes per {module}: {deps}",
+  "missing": "Dependències que falten per {module}: {missing}",
+  "circular": "Dependència circular detectada: {cycle}",
+  "satisfied": "Totes les dependències satisfetes per {module}"
+ },
+ 
+ "export": {
+  "openapi_generated": "Especificació OpenAPI generada amb {endpoints} endpoints",
+  "dependency_tree": "Arbre de dependències generat per {modules} mòduls",
+  "stats_generated": "Estadístiques del registre generades",
+  "export_failed": "Error exportant dades: {error}"
+ },
+ 
+ "stats": {
+  "total_modules": "Total mòduls registrats: {count}",
+  "total_endpoints": "Total endpoints: {count}",
+  "modules_with_api": "Mòduls amb API: {count}",
+  "modules_with_ui": "Mòduls amb UI: {count}",
+  "categories": "Categories disponibles: {categories}",
+  "capabilities": "Capacitats disponibles: {capabilities}"
+ }
+}

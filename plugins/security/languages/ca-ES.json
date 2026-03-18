@@ -1,0 +1,42 @@
+{
+ "module": {
+  "name": "Seguretat",
+  "description": "Mòdul de seguretat i validació per Nexe 0.8"
+ },
+ "checks": {
+  "web_security": "Seguretat Web",
+  "auth": "Autenticació",
+  "rate_limit": "Límits de Taxa"
+ },
+ "severity": {
+  "CRITICAL": "CRÍTIC",
+  "HIGH": "ALT",
+  "MEDIUM": "MITJÀ",
+  "LOW": "BAIX"
+ },
+ "findings": {
+  "path_traversal": "Path Traversal Detectat",
+  "rce": "Execució Remota de Comandaments",
+  "file_disclosure": "Divulgació de Fitxers",
+  "missing_authentication": "Autenticació Mancant",
+  "missing_rate_limit": "Rate Limiting Mancant",
+  "unbounded_resource": "Recurs sense Límits"
+ },
+ "messages": {
+  "scan_started": "Escaneig de seguretat iniciat",
+  "scan_completed": "Escaneig completat: {total} troballes",
+  "no_vulnerabilities": "No s'han detectat vulnerabilitats",
+  "critical_found": "⚠️ {count} vulnerabilitats crítiques detectades",
+  "auth_failed": "Autenticació fallida",
+  "auth_required": "Autenticació requerida per aquest endpoint",
+  "path_blocked": "Path bloquejat: path traversal detectat",
+  "command_blocked": "Comandament bloquejat: no està a la whitelist"
+ },
+ "suggestions": {
+  "use_validate_safe_path": "Utilitzar validate_safe_path() de security.core.validators",
+  "use_require_api_key": "Afegir Depends(require_api_key) als paràmetres de la funció",
+  "use_validate_command": "Validar comandament amb validate_command() abans d'executar",
+  "add_rate_limit": "Afegir @limiter.limit('10/minute') al decorador",
+  "use_deque_maxlen": "Utilitzar collections.deque(maxlen=N) per limitar creixement"
+ }
+}

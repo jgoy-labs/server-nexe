@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────────────────────
+# ModuleID: llama_cpp_module
+# Nexe v0.8.0 | Antigravity | 2026-01-02
+# server-nexe/plugins/llama_cpp_module/manifest.toml
+# ─────────────────────────────────────────────────────────────
+
+[module]
+name = "llama_cpp_module"
+version = "0.8.0"
+type = "local_llm_option"
+description = "Integració directa amb Llama.cpp (via llama-cpp-python) per a execució de models GGUF amb suport de GPU (Metal/CUDA) i CPU. Inclou gestió de sessions amb ModelPool i prefix caching."
+location = "plugins/llama_cpp_module/"
+permanent = true
+external_tool = "llama-cpp-python"
+note = "Motor d'inferència universal per a hardware divers"
+
+[module.metadata]
+author = "Jordi Goy"
+created = "2026-01-02"
+last_updated = "2026-01-02"
+status = "active"
+
+[module.capabilities]
+has_api = true
+has_ui = false
+has_specialist = true
+has_tests = true
+streaming = true
+real_time = true
+prefix_caching = true
+
+[module.dependencies]
+modules = []
+specialists = []
+external_services = []
+
+[module.endpoints]
+router_prefix = "/llama-cpp"
+public_routes = ["/health", "/info"]
+protected_routes = ["/chat"]
+
+[module.entry]
+module = "plugins.llama_cpp_module.module"
+class = "LlamaCppModule"
+
+[module.router]
+prefix = "/llama-cpp"

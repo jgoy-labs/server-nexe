@@ -1,0 +1,85 @@
+# ─────────────────────────────────────────────────────────────
+# ModuleID: cli
+# Nexe v0.8 | Jordi Goy | 2025-12-01
+# server-nexe/core/cli/manifest.toml
+#
+# Descripció:
+# Manifest operatiu del CLI Central Nexe. Utilitzat pel ModuleManager
+# per identificar metadades, dependències i integracions.
+# Orquestrador de CLIs de tots els mòduls Nexe 0.8.
+# ─────────────────────────────────────────────────────────────
+
+[module]
+name = "cli"
+version = "1.0.0"
+type = "core"
+description = "CLI Central Nexe - Orquestrador que unifica l'accés a tots els CLIs dels mòduls Nexe 0.8 sota la comanda 'nexe'. Descobreix CLIs dinàmicament via manifest.toml, executa via subprocess per aïllament, i suporta mode offline"
+location = "core/cli/"
+permanent = true
+author = "Nexe Team (Jordi Goy 0.8)"
+created = "2025-12-01"
+last_updated = "2025-12-01"
+example = false
+note = "Punt d'entrada únic per tots els CLIs del sistema Nexe"
+
+[module.metadata]
+status = "active"
+critical = true
+milestone = "1.0"
+
+[module.capabilities]
+has_api = true
+has_ui = true
+has_specialist = false
+has_tests = true
+has_workflow = false
+has_cli_scripts = true
+streaming = false
+real_time = false
+
+[module.dependencies]
+modules = []
+specialists = []
+external_services = []
+
+[module.endpoints]
+router_prefix = "/ui-control"
+ui_path = "/ui-control/clis"
+public_routes = [
+  "/api/clis"
+]
+protected_routes = []
+
+[module.integration]
+workflow_engine = false
+ui_control_center = true
+
+[module.security]
+uses_api_key = false
+path_validation = false
+rate_limiting = false
+
+[module.cli]
+command_name = "nexe"
+alias = "nexe"
+entry_point = "nexe.cli.cli"
+description = "CLI Central Nexe - Orquestrador de mòduls"
+commands = ["list", "status", "<module> <args>"]
+framework = "click"
+offline = true
+
+[module.ui]
+framework = "vanilla-js"
+theme_support = true
+responsive = true
+dark_mode = true
+
+[module.i18n]
+default_locale = "ca-ES"
+supported_locales = ["ca-ES", "es-ES", "en-US"]
+translation_format = "json"
+cli_output = true
+
+[module.documentation]
+readme = "README.md"
+api_docs = "Auto-generated via FastAPI"

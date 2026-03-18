@@ -1,0 +1,56 @@
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+
+# Test/coverage artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Environment secrets
+.env
+.env.local
+
+# Runtime storage & logs (installer/runtime output)
+storage/
+*.db
+*.sqlite
+*.log
+logs/
+
+# OS
+.DS_Store
+
+# Installer/runtime markers & binaries
+.qdrant-initialized
+storage/.knowledge_ingested
+qdrant
+nexe
+
+# IDE / editor
+*.code-workspace
+
+COMMANDS.md
+TESTING_REPORT.md
+personality/.module_cache.json
+
+# User-uploaded files (mai al repo — poden contenir dades personals)
+plugins/web_ui_module/static/uploads/
+snapshots/
+dev-tools/run_all_day.sh
+dev-tools/logs/
+
+# Bundled app resources (dev-tools/build-python-bundle.sh)
+Install Nexe.app/Contents/Resources/python/
+Install Nexe.app/Contents/Resources/tcl-tk/
+Install Nexe.app/Contents/Resources/python-tk-libexec/
+Install Nexe.app/Contents/Resources/installer
+Install Nexe.app/Contents/Resources/personality
+Install Nexe.app/Contents/Frameworks/

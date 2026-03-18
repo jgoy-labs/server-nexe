@@ -1,0 +1,44 @@
+{
+ "personality": {
+  "route_manager": {
+   "debug": {
+    "routes_registered": "Registered {count} routes for {module}"
+   },
+   "errors": {
+    "failed_to_register": "Error registering routes for {module}: {error}",
+    "error_registering_router": "Error registering router for {module}: {error}",
+    "error_mounting_app": "Error mounting app for {module}: {error}",
+    "error_removing_routes": "Error removing routes for {module}: {error}"
+   },
+   "warnings": {
+    "route_conflict": "Route conflict: {path} already registered by {existing_module}, skipping for {module}"
+   },
+   "info": {
+    "routes_removed": "Removed {count} routes for {module}"
+   }
+  },
+  "api_integrator": {
+   "info": {
+    "integration_success": "Module {module} API integrated successfully",
+    "removal_success": "Module {module} API removed successfully"
+   },
+   "debug": {
+    "no_api_components": "Module {module} has no API components"
+   },
+   "errors": {
+    "integration_failed": "Error integrating API for {module}: {error}",
+    "removal_failed": "Error removing API for {module}: {error}"
+   }
+  },
+  "openapi_merger": {
+   "debug": {
+    "spec_merged": "OpenAPI specification merged for {module}",
+    "spec_removed": "OpenAPI specification removed for {module}"
+   },
+   "errors": {
+    "merge_failed": "Error merging OpenAPI for {module}: {error}",
+    "removal_failed": "Error removing OpenAPI for {module}: {error}"
+   }
+  }
+ }
+}

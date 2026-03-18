@@ -1,0 +1,113 @@
+{
+ "_meta": {
+  "component": "core_loader",
+  "description": "Traduccions per carregador dinàmic de mòduls",
+  "version": "1.0.0",
+  "language": "ca-ES"
+ },
+ 
+ "loading": {
+  "starting": "Carregant mòdul {module}...",
+  "api_file_search": "Buscant fitxer d'API per {module}",
+  "api_file_found": "Fitxer d'API trobat: {file}",
+  "api_file_not_found": "Fitxer d'API no trobat per {module}. Patrons provats: {patterns}",
+  "importing": "Important mòdul {module} des de {file}",
+  "extracting_instance": "Extraient instància principal del mòdul {module}",
+  "factory_found": "Factory function trobada: {factory}",
+  "factory_failed": "Factory function {factory} ha fallat: {error}",
+  "validating": "Validant mòdul {module}",
+  "initializing": "Inicialitzant mòdul {module}",
+  "success": "Mòdul {module} carregat correctament",
+  "error": "Error carregant mòdul {module}: {error}",
+  "cleanup": "Netejant recursos per {module}"
+ },
+ 
+ "validation": {
+  "instance_missing": "Instància del mòdul no vàlida",
+  "api_router_missing": "Router/app d'API requerit però no trobat",
+  "ui_file_missing": "Fitxer d'UI requerit: {file}",
+  "dependency_missing": "Dependència externa no disponible: {dep}",
+  "validation_passed": "Validació del mòdul superada",
+  "validation_failed": "Validació del mòdul fallida: {errors}"
+ },
+ 
+ "unloading": {
+  "starting": "Descarregant mòdul {module}...",
+  "cleanup_method": "Executant mètode de neteja: {method}",
+  "cleanup_error": "Error en mètode de neteja {method}: {error}",
+  "sys_modules_removed": "{count} mòduls eliminats de sys.modules",
+  "success": "Mòdul {module} descarregat correctament",
+  "error": "Error descarregant mòdul {module}: {error}"
+ },
+ 
+ "initialization": {
+  "method_found": "Mètode d'inicialització trobat: {method}",
+  "method_called": "Mètode {method} executat per {module}",
+  "method_error": "Error executant {method}: {error}",
+  "no_init_method": "Cap mètode d'inicialització trobat per {module}"
+ },
+ 
+ "loader": {
+  "patterns": {
+   "api_module": "api_{module_name}.py",
+   "api_generic": "api.py",
+   "main": "main.py",
+   "init": "__init__.py",
+   "module_name": "{module_name}.py",
+   "module_generic": "module.py",
+   "app": "app.py"
+  },
+  "file_extensions": {
+   "python": ".py"
+  },
+  "ignore_prefixes": {
+   "test": "test_",
+   "underscore": "_",
+   "dot": "."
+  },
+  "ignore_files": {
+   "setup": "setup"
+  },
+  "debug": {
+   "tried_patterns": "Provats: {patterns}",
+   "found_api_file": "Fitxer d'API trobat: {file}",
+   "fallback_api_file": "Usant fitxer d'API alternatiu: {file}",
+   "using_module_as_instance": "Usant el mòdul mateix com a instància per {module}",
+   "cannot_create_spec": "No es pot crear especificació per {file}",
+   "called_method": "Mètode {method} cridat per {module}",
+   "cleanup_completed": "Neteja de recursos completada per {module}",
+   "error_calling_method": "Error cridant {method}: {error}",
+   "error_calling_method_unload": "Error cridant {method} durant la descàrrega: {error}",
+   "reloading_module": "Recarregant mòdul {module}"
+  },
+  "module_name_prefix": "module_{module_name}_{id}",
+  "init_methods": {
+   "init": "init",
+   "initialize": "initialize",
+   "setup": "setup",
+   "start_up": "start_up",
+   "on_load": "on_load"
+  },
+  "cleanup_methods": {
+   "cleanup": "cleanup",
+   "shutdown": "shutdown",
+   "teardown": "teardown",
+   "dispose": "dispose",
+   "on_unload": "on_unload"
+  },
+  "common_attributes": {
+   "app": "app",
+   "router": "router",
+   "api": "api",
+   "module": "module",
+   "instance": "instance",
+   "main": "main"
+  },
+  "factory_functions": {
+   "create_module": "create_module",
+   "create_app": "create_app",
+   "create": "create",
+   "init": "init"
+  }
+ }
+}

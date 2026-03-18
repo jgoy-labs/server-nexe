@@ -1,0 +1,58 @@
+{
+ "_meta": {
+  "component": "core_models",
+  "description": "Traducciones para estructuras de datos centrales",
+  "version": "1.0.0",
+  "language": "es-ES"
+ },
+
+ "core_models": {
+  "module_states": {
+   "unknown": "Desconocido",
+   "discovered": "Descubierto",
+   "loading": "Cargando",
+   "loaded": "Cargado",
+   "starting": "Iniciando",
+   "running": "Ejecutándose",
+   "stopping": "Deteniendo",
+   "stopped": "Detenido",
+   "error": "Error",
+   "disabled": "Desactivado"
+  },
+
+  "system_status": {
+   "starting": "Iniciando",
+   "running": "En funcionamiento",
+   "degraded": "Degradado",
+   "stopping": "Deteniendo",
+   "stopped": "Detenido",
+   "error": "Error"
+  },
+
+  "health_status": {
+   "healthy": "Saludable",
+   "degraded": "Degradado",
+   "unhealthy": "No saludable",
+   "unknown": "Desconocido"
+  },
+
+  "files": {
+   "manifest_toml": "manifest.toml"
+  },
+
+  "event_levels": {
+   "info": "info",
+   "warning": "warning",
+   "error": "error",
+   "critical": "critical"
+  },
+
+  "validation": {
+   "dependency_cycle_detected": "Ciclo de dependencias detectado: {cycle}",
+   "module_uptime_calculated": "Tiempo de funcionamiento calculado: {seconds}s",
+   "invalid_module_state": "Estado de módulo no válido: {state}",
+   "dependency_cycle_found": "Ciclo encontrado - retorna ruta desde el inicio del ciclo",
+   "uptime_calculation_comment": "Tiempo de funcionamiento en segundos o None si no está ejecutándose"
+  }
+ }
+}

@@ -1,0 +1,33 @@
+{
+ "security": {
+  "manifest": {
+   "name": "Seguretat",
+   "description": "Mòdul de seguretat de Nexe 0.8",
+   "errors": {
+    "not_ready": "El mòdul de seguretat no està llest"
+   }
+  },
+  "checks": {
+   "auth_running": "Executant check d'autenticació...",
+   "auth_completed": "Check d'autenticació completat: {count} findings",
+   "no_vulnerabilities": "No s'han detectat vulnerabilitats crítiques",
+   "completed": "Checks de seguretat completats: {count} findings",
+   "critical_found": "CRITICAL: {count} vulnerabilitats crítiques detectades",
+   "web_security": "Web Security Check",
+   "auth_check": "Authentication Check",
+   "rate_limit_check": "Rate Limit Check"
+  },
+  "status": {
+   "healthy": "SA",
+   "degraded": "DEGRADAT",
+   "unhealthy": "NO SA",
+   "critical": "CRÍTIC"
+  },
+  "messages": {
+   "scanning": "Escanejant seguretat...",
+   "scan_complete": "Escaneig de seguretat completat",
+   "vulnerabilities_found": "Vulnerabilitats trobades: {count}",
+   "no_issues": "No s'han detectat problemes de seguretat"
+  }
+ }
+}

@@ -1,0 +1,325 @@
+"""
+────────────────────────────────────
+Server Nexe
+Version: 0.8
+Author: Jordi Goy
+Location: plugins/web_ui_module/session_manager.py
+Description: Gestor de sessions de xat per la UI web (memòria en RAM)
+
+www.jgoy.net · https://server-nexe.org
+────────────────────────────────────
+"""
+
+import re
+import uuid
+import json
+import logging
+from pathlib import Path
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class ChatSession:
+    """Sessió de xat individual amb historial i compacting automàtic"""
+
+    # Compacting: cada COMPACT_EVERY missatges, resumeix els antics
+    COMPACT_EVERY = 10          # Fallback: per nombre de missatges
+    COMPACT_KEEP = 6
+    MAX_CONTEXT_CHARS = 12000   # ~3000 tokens, safe per 4K-8K context models
+
+    def __init__(self, session_id: str = None):
+        self.id = session_id or str(uuid.uuid4())
+        self.created_at = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(timezone.utc)
+        self.messages: List[Dict[str, str]] = []
+        self.context_files: List[str] = []
+        self.attached_document: Optional[Dict[str, str]] = None  # {"filename": "...", "content": "..."}
+        self.context_summary: Optional[str] = None  # Resum dels missatges compactats
+        self.compaction_count: int = 0  # Quantes vegades s'ha compactat
+
+    def add_message(self, role: str, content: str):
+        """Afegir missatge a l'historial"""
+        self.messages.append({
+            "role": role,
+            "content": content,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        self.last_activity = datetime.now(timezone.utc)
+
+    def add_context_file(self, filename: str):
+        """Afegir fitxer al context de la sessió"""
+        if filename not in self.context_files:
+            self.context_files.append(filename)
+
+    def attach_document(self, filename: str, content: str, chunks: List[str] = None, total_chunks: int = None):
+        """Adjuntar document per al proper missatge.
+
+        Per docs grans: passar chunks[:1] i total_chunks=len(chunks) per no inflar la sessió.
+        Tots els chunks estan a Qdrant per RAG.
+        """
+        all_chunks = chunks or [content]
+        self.attached_document = {
+            "filename": filename,
+            "content": content[:3000],  # Preview
+            "chunks": all_chunks,
+            "total_chunks": total_chunks or len(all_chunks),  # Total real (pot diferir de len(chunks))
+            "total_chars": len(content),
+            "current_chunk": 0
+        }
+        self.last_activity = datetime.now(timezone.utc)
+
+    def get_next_chunk(self) -> Optional[Dict[str, any]]:
+        """Obtenir el següent chunk del document adjuntat"""
+        if not self.attached_document:
+            return None
+
+        chunks = self.attached_document.get("chunks", [])
+        current = self.attached_document.get("current_chunk", 0)
+
+        if current >= len(chunks):
+            return None
+
+        self.attached_document["current_chunk"] = current + 1
+        return {
+            "filename": self.attached_document["filename"],
+            "chunk": chunks[current],
+            "chunk_num": current + 1,
+            "total_chunks": len(chunks),
+            "is_last": current + 1 >= len(chunks)
+        }
+
+    def get_and_clear_attached_document(self) -> Optional[Dict[str, str]]:
+        """Obtenir i netejar document adjuntat"""
+        doc = self.attached_document
+        self.attached_document = None
+        return doc
+
+    def has_attached_document(self) -> bool:
+        """Comprovar si hi ha document adjuntat"""
+        return self.attached_document is not None
+
+    def clear_context_files(self):
+        """Netejar tots els fitxers del context"""
+        self.context_files.clear()
+        self.attached_document = None
+
+    def _estimate_context_chars(self) -> int:
+        """Estimate total chars in context (rough proxy for tokens)."""
+        total = len(self.context_summary or "")
+        total += sum(len(m.get("content") or "") for m in self.messages)
+        return total
+
+    def needs_compaction(self) -> bool:
+        """Retorna True si la sessió necessita compacting (per tokens o per missatges)."""
+        if self._estimate_context_chars() > self.MAX_CONTEXT_CHARS:
+            return True
+        return len(self.messages) >= self.COMPACT_EVERY
+
+    def get_messages_to_compact(self) -> List[Dict[str, str]]:
+        """Retorna missatges antics que s'han de resumir (tots menys els últims COMPACT_KEEP)"""
+        if len(self.messages) <= self.COMPACT_KEEP:
+            return []
+        return self.messages[:-self.COMPACT_KEEP]
+
+    def apply_compaction(self, summary: str):
+        """Aplica compacting: guarda resum i elimina missatges antics"""
+        keep = self.messages[-self.COMPACT_KEEP:]
+        old_count = len(self.messages) - len(keep)
+        self.context_summary = summary
+        self.messages = keep
+        self.compaction_count += 1
+        logger.info(
+            "Session %s: compacted %d messages (kept %d, compaction #%d)",
+            self.id[:8], old_count, len(keep), self.compaction_count
+        )
+
+    def get_context_messages(self) -> List[Dict[str, str]]:
+        """Obtenir missatges per enviar al model (amb resum si existeix)"""
+        msgs = []
+        if self.context_summary:
+            msgs.append({
+                "role": "user",
+                "content": f"[Resum de la conversa anterior]\n{self.context_summary}"
+            })
+            msgs.append({
+                "role": "assistant",
+                "content": "Entès, tinc el context de la conversa anterior."
+            })
+        msgs.extend(self.messages)
+        return msgs
+
+    def get_history(self) -> List[Dict[str, str]]:
+        """Obtenir historial complet de missatges (per UI)"""
+        return self.messages.copy()
+
+    def to_dict(self) -> dict:
+        """Serialitzar sessió a dict"""
+        d = {
+            "id": self.id,
+            "created_at": self.created_at.isoformat(),
+            "last_activity": self.last_activity.isoformat(),
+            "message_count": len(self.messages),
+            "context_files": self.context_files,
+            "messages": self.messages,
+            "attached_document": self.attached_document,
+        }
+        if self.context_summary:
+            d["context_summary"] = self.context_summary
+            d["compaction_count"] = self.compaction_count
+        return d
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'ChatSession':
+        """Crear sessió des de dict"""
+        session = cls(session_id=data.get("id"))
+        session.created_at = datetime.fromisoformat(data.get("created_at"))
+        session.last_activity = datetime.fromisoformat(data.get("last_activity"))
+        session.messages = data.get("messages", [])
+        session.context_files = data.get("context_files", [])
+        session.attached_document = data.get("attached_document")
+        session.context_summary = data.get("context_summary")
+        session.compaction_count = data.get("compaction_count", 0)
+        return session
+
+
+class SessionManager:
+    """
+    Gestor de sessions de xat.
+
+    Característiques:
+    - Múltiples sessions simultànies (memòria RAM)
+    - Historial per sessió
+    - Context de fitxers per sessió
+    - Cleanup automàtic de sessions inactives (futur)
+    """
+
+    _SAFE_ID = re.compile(r'^[a-zA-Z0-9_-]+$')
+
+    @staticmethod
+    def _validate_session_id(session_id: str) -> str:
+        """Validate session_id to prevent path traversal."""
+        if not session_id or not SessionManager._SAFE_ID.match(session_id):
+            raise ValueError(f"Invalid session_id: {session_id!r}")
+        return session_id
+
+    def __init__(self, storage_path: str = "storage/sessions"):
+        self._storage_path = Path(storage_path)
+        self._storage_path.mkdir(parents=True, exist_ok=True)
+        self._sessions: Dict[str, ChatSession] = {}
+        self._load_sessions()
+
+    def _load_sessions(self):
+        """Carregar sessions del disc"""
+        try:
+            count = 0
+            for file_path in self._storage_path.glob("*.json"):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        session = ChatSession.from_dict(data)
+                        self._sessions[session.id] = session
+                        count += 1
+                except Exception as e:
+                    logger.warning(f"Error loading session {file_path}: {e}")
+            logger.info(f"Loaded {count} sessions from disk")
+        except Exception as e:
+            logger.error(f"Failed to load sessions: {e}")
+
+    def _save_session_to_disk(self, session: ChatSession):
+        """Guardar sessió a disc"""
+        self._validate_session_id(session.id)
+        try:
+            file_path = self._storage_path / f"{session.id}.json"
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(session.to_dict(), f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"Failed to save session {session.id}: {e}")
+
+    def _delete_session_from_disk(self, session_id: str):
+        """Eliminar sessió del disc"""
+        self._validate_session_id(session_id)
+        try:
+            file_path = self._storage_path / f"{session_id}.json"
+            if file_path.exists():
+                file_path.unlink()
+        except Exception as e:
+            logger.error(f"Failed to delete session file {session_id}: {e}")
+
+    def create_session(self, session_id: str = None) -> ChatSession:
+        """Crear nova sessió de xat"""
+        if session_id:
+            self._validate_session_id(session_id)
+        session = ChatSession(session_id)
+        self._sessions[session.id] = session
+        self._save_session_to_disk(session)
+        return session
+
+    def get_session(self, session_id: str) -> Optional[ChatSession]:
+        """Obtenir sessió existent"""
+        self._validate_session_id(session_id)
+        return self._sessions.get(session_id)
+
+    def get_or_create_session(self, session_id: str = None) -> ChatSession:
+        """Obtenir sessió o crear-ne una de nova"""
+        if session_id:
+            self._validate_session_id(session_id)
+        if session_id and session_id in self._sessions:
+            return self._sessions[session_id]
+        return self.create_session(session_id)
+
+    def delete_session(self, session_id: str) -> bool:
+        """Eliminar sessió"""
+        self._validate_session_id(session_id)
+        if session_id in self._sessions:
+            del self._sessions[session_id]
+            self._delete_session_from_disk(session_id)
+            return True
+        return False
+
+    def list_sessions(self) -> List[dict]:
+        """Llistar totes les sessions (metadata només)"""
+        sessions = []
+        for s in self._sessions.values():
+            first_user = next(
+                (m["content"] for m in s.messages if m.get("role") == "user"),
+                None
+            )
+            sessions.append({
+                "id": s.id,
+                "created_at": s.created_at.isoformat(),
+                "last_activity": s.last_activity.isoformat(),
+                "message_count": len(s.messages),
+                "context_files": s.context_files,
+                "first_message": first_user[:60] if first_user else None
+            })
+        return sessions
+
+    def cleanup_inactive(self, max_age_hours: int = 24) -> int:
+        """
+        Netejar sessions inactives.
+
+        Args:
+            max_age_hours: Màxim temps d'inactivitat en hores
+
+        Returns:
+            Nombre de sessions eliminades
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        expired_ids = [
+            sid for sid, session in self._sessions.items()
+            if session.last_activity < cutoff
+        ]
+        for sid in expired_ids:
+            del self._sessions[sid]
+            self._delete_session_from_disk(sid)
+        if expired_ids:
+            logger.info(
+                "Cleaned %d inactive session(s) older than %dh",
+                len(expired_ids), max_age_hours
+            )
+        return len(expired_ids)
+
+
+__all__ = ["SessionManager", "ChatSession"]

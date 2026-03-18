@@ -1,0 +1,56 @@
+# ─────────────────────────────────────────────────────────────
+# ModuleID: module_manager
+# Nexe v0.8 | J.Goy | 2025-12-01
+# server-nexe/personality/module_manager/manifest.toml
+#
+# Descripció:
+# Manifest del ModuleManager - sistema de gestió centralitzada de mòduls.
+# Descobreix, registra i gestiona el cicle de vida dels mòduls Nexe.
+# ─────────────────────────────────────────────────────────────
+
+[module]
+module_id = "module_manager"
+name = "module_manager"
+version = "0.8.0"
+type = "core"
+description = "Sistema de gestió centralitzada de mòduls Nexe 0.8. Auto-descoberta, registre i gestió de cicle de vida"
+location = "personality/module_manager/"
+permanent = true
+author = "Nexe Team (Jordi Goy)"
+created = "2025-10-01"
+last_updated = "2025-12-01"
+category = "personality.core"
+
+[module.status]
+enabled = true
+priority = 1
+auto_start = true
+
+[module.capabilities]
+has_api = true
+has_ui = true
+has_specialist = false
+has_tests = true
+has_workflow = false
+has_cli_scripts = false
+
+[module.endpoints]
+router_prefix = "/modules"
+ui_path = "/modules/ui"
+public_routes = [
+  "/health",
+  "/info",
+  "/list"
+]
+protected_routes = []
+
+[module.i18n]
+default_locale = "ca-ES"
+supported_locales = ["ca-ES", "es-ES", "en-US"]
+translations_path = "languages/"
+
+[paths]
+module_root = "personality/module_manager"
+ui = "ui"
+languages = "languages"
+tests = "tests"

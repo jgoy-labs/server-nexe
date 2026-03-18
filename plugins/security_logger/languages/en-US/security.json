@@ -1,0 +1,31 @@
+{
+ "security_logger": {
+  "auth": {
+   "failure": "Authentication failed: {reason}"
+  },
+  "path_traversal": {
+   "attempt": "Path traversal attempt: {attempted_path}"
+  },
+  "rate_limit": {
+   "exceeded": "Rate limit exceeded for {source}",
+   "exceeded_unknown": "Rate limit exceeded for unknown source"
+  },
+  "module": {
+   "rejected": "Module '{module_name}' rejected: {reason}"
+  },
+  "config": {
+   "validation_failed": "Configuration validation failed for '{config_key}': {reason}"
+  },
+  "attacks": {
+   "xss_detected": "XSS attempt detected: {preview}",
+   "sql_injection_detected": "SQL injection attempt detected: {preview}",
+   "command_injection_detected": "Command injection attempt detected: {preview}"
+  },
+  "content": {
+   "invalid_type": "Invalid Content-Type: {content_type}"
+  },
+  "request": {
+   "too_large": "Request too large: {size} bytes (max: {max_size})"
+  }
+ }
+}

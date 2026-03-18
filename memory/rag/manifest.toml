@@ -1,0 +1,192 @@
+# ─────────────────────────────────────────────────────────────
+# Nexe RAG Module - Manifest TOML
+# ─────────────────────────────────────────────────────────────
+# ModuleID: rag
+# Versió: 0.8.0
+# Autoria: Nexe Team (Jordi Goy)
+# Data creació: 2025-10-27
+# Última actualització: 2025-10-27
+# ─────────────────────────────────────────────────────────────
+
+[module]
+module_id = "rag"
+name = "rag"
+version = "0.1"
+description = "Sistema RAG (Retrieval-Augmented Generation) amb cerca vectorial, multi-source i circuit breaker per resiliència. top_k=5, threshold=0.7, gestió intel·ligent de fonts de coneixement per augmentar respostes LLM"
+author = "Nexe Team (Jordi Goy)"
+category = "memory"
+created = "2025-10-27"
+last_updated = "2025-10-27"
+
+[module.status]
+enabled = true
+priority = 10
+auto_start = true
+
+[module.capabilities]
+has_api = true
+has_ui = true
+has_specialist = true
+has_tests = true
+has_workflow = true
+
+[module.integration]
+workflow_engine = true
+ui_control_center = false
+
+[module.endpoints]
+router_prefix = "/rag"
+ui_path = "/rag/ui"
+public_routes = ["/", "/health"]
+protected_routes = []
+
+# ─────────────────────────────────────────────────────────────
+# DEPENDENCIES
+# ─────────────────────────────────────────────────────────────
+
+[dependencies]
+required = [
+  "embeddings"
+]
+
+# ─────────────────────────────────────────────────────────────
+# CAPABILITIES
+# ─────────────────────────────────────────────────────────────
+
+[capabilities]
+exposed = [
+  "vector_search",
+  "multi_rag_management",
+  "personality_rag",
+  "temp_upload_rag",
+  "catalog_rag",
+  "circuit_breaker"
+]
+
+# ─────────────────────────────────────────────────────────────
+# HEALTH & MONITORING
+# ─────────────────────────────────────────────────────────────
+
+[health]
+check_endpoint = "memory.rag.health:check"
+check_interval_seconds = 60
+
+# ─────────────────────────────────────────────────────────────
+# WORKFLOW INTEGRATION
+# ─────────────────────────────────────────────────────────────
+
+[workflow]
+nodes = [
+  "memory.rag.workflow.nodes.search_node",
+  "memory.rag.workflow.nodes.create_rag_node"
+]
+
+# ─────────────────────────────────────────────────────────────
+# SYSTEM SPECIALISTS
+# ─────────────────────────────────────────────────────────────
+
+[specialists]
+handlers = [
+  "memory.rag.specialists.rag_specialist"
+]
+
+# ─────────────────────────────────────────────────────────────
+# I18N CONFIGURATION
+# ─────────────────────────────────────────────────────────────
+
+[i18n]
+supported_languages = ["ca-ES", "en-US", "es-ES"]
+default_language = "ca-ES"
+languages_path = "memory/rag/languages"
+
+# ─────────────────────────────────────────────────────────────
+# API & UI CONFIGURATION
+# ─────────────────────────────────────────────────────────────
+
+[api]
+router = "memory.rag.manifest:router_public"
+prefix = "/ui-control/rag"
+tags = ["rag", "vector-search", "embeddings"]
+
+[api.endpoints]
+add_document = "POST /ui-control/rag/document"
+search = "POST /ui-control/rag/search"
+health = "GET /ui-control/rag/health"
+info = "GET /ui-control/rag/info"
+
+[ui]
+enabled = true
+ui_path = "/ui-control/rag/"
+assets_path = "memory/rag/ui"
+
+# ─────────────────────────────────────────────────────────────
+# DEFAULT CONFIGURATION
+# ─────────────────────────────────────────────────────────────
+
+[config]
+top_k = 5
+similarity_threshold = 0.7
+circuit_breaker_threshold = 5
+circuit_breaker_timeout = 60
+max_concurrent_searches = 3
+
+[config.vector_search]
+default_top_k = 5
+min_similarity = 0.7
+max_results = 50
+
+[config.circuit_breaker]
+failure_threshold = 5
+timeout_seconds = 60
+recovery_timeout = 120
+
+[config.sources]
+personality = true
+temp_upload = true
+catalog = true
+
+# ─────────────────────────────────────────────────────────────
+# PATHS & RESOURCES
+# ─────────────────────────────────────────────────────────────
+
+[paths]
+module_root = "memory/rag"
+docs = "memory/rag/docs"
+tests = "memory/rag/tests"
+ui = "memory/rag/ui"
+
+# ─────────────────────────────────────────────────────────────
+# STORAGE DECLARATIONS (Auto-Clean)
+# Cada path que RAG escriu a storage/ ha d'estar declarat aquí.
+# El sistema Auto-Clean només gestiona paths declarats.
+# ─────────────────────────────────────────────────────────────
+
+[module.storage]
+
+[[module.storage.paths]]
+path = "storage/documents"
+type = "document_store"
+format = "mixed"
+action = "PERMANENT"
+description = "Documents i coneixement del sistema - MAI esborrar"
+auto_clean = false
+
+[[module.storage.paths]]
+path = "storage/rag/vectors"
+type = "vector_store"
+format = "binary"
+action = "PERMANENT"
+description = "Vector stores FAISS - MAI esborrar automàticament"
+auto_clean = false
+
+[[module.storage.paths]]
+path = "storage/rag/indexes"
+type = "index_metadata"
+format = "json"
+action = "PERMANENT"
+description = "Metadades dels índexs vectorials - MAI esborrar"
+auto_clean = false
+
+[module.storage.protection]
+# Fitxers que MAI s'han de tocar - TOT és crític per RAG
+protected_patterns = ["*.faiss", "*.index", "*.db", "*.json", "*.bin"]

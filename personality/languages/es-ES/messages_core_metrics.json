@@ -1,0 +1,53 @@
+{
+ "_meta": {
+  "component": "core_metrics",
+  "description": "Traducciones para colector de métricas",
+  "version": "1.0.0",
+  "language": "es-ES"
+ },
+
+ "collection": {
+  "updated": "Métricas actualizadas para {module}",
+  "snapshot_created": "Instantánea de métricas creada",
+  "history_full": "Historial de métricas lleno, eliminando entradas antiguas",
+  "custom_metric_set": "Métrica personalizada establecida: {key} = {value}",
+  "custom_metric_removed": "Métrica personalizada eliminada: {key}"
+ },
+
+ "system": {
+  "memory_usage": "Uso de memoria: {usage}MB",
+  "cpu_usage": "Uso de CPU: {usage}%",
+  "uptime": "Tiempo en funcionamiento: {seconds}s",
+  "api_calls": "Llamadas de API: {count}",
+  "error_rate": "Tasa de errores: {rate}%",
+  "load_time": "Tiempo de carga: {time}ms",
+  "modules_total": "Total módulos: {count}",
+  "modules_running": "Módulos en ejecución: {count}",
+  "modules_with_errors": "Módulos con errores: {count}"
+ },
+
+ "performance": {
+  "summary_generated": "Resumen de rendimiento generado",
+  "no_running_modules": "Ningún módulo en ejecución para analizar",
+  "avg_load_time": "Tiempo medio de carga: {time}ms",
+  "max_load_time": "Tiempo máximo de carga: {time}ms",
+  "min_load_time": "Tiempo mínimo de carga: {time}ms",
+  "avg_memory": "Memoria media: {memory}MB",
+  "max_memory": "Memoria máxima: {memory}MB",
+  "total_memory": "Memoria total: {memory}MB"
+ },
+
+ "history": {
+  "cleared": "Historial de métricas limpiado: {count} entradas",
+  "size_set": "Tamaño máximo del historial establecido a {size}",
+  "trimmed": "Historial recortado a {size} entradas",
+  "exported": "Historial de métricas exportado: {count} entradas"
+ },
+
+ "alerts": {
+  "high_memory": "Aviso: Uso de memoria elevado para {module}: {usage}MB",
+  "high_cpu": "Aviso: Uso de CPU elevado para {module}: {usage}%",
+  "slow_load": "Aviso: Carga lenta para {module}: {time}ms",
+  "many_errors": "Aviso: Muchos errores para {module}: {count} errores"
+ }
+}

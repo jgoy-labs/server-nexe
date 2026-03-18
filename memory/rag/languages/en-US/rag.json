@@ -1,0 +1,44 @@
+{
+ "rag": {
+  "singleton_error": "RAGModule is Singleton. Use get_instance()",
+  "health": {
+   "initialized_ok": "Module initialized correctly",
+   "not_initialized": "Module not initialized",
+   "init_check_error": "Error checking initialization: {error}",
+   "qdrant_available": "qdrant-client {version} available",
+   "qdrant_not_installed": "qdrant-client not installed (pip install qdrant-client)",
+   "qdrant_check_error": "Error checking qdrant-client: {error}",
+   "storage_paths_writable": "Storage paths writable: {path}",
+   "storage_paths_not_writable": "Storage paths not writable: {path}",
+   "storage_paths_error": "Error checking storage paths: {error}",
+   "ledger_importable": "TransactionLedger importable",
+   "ledger_not_importable": "TransactionLedger not importable: {error}",
+   "ledger_check_error": "Error checking TransactionLedger: {error}",
+   "write_coordinator_importable": "WriteCoordinator importable",
+   "write_coordinator_not_importable": "WriteCoordinator not importable: {error}",
+   "write_coordinator_check_error": "Error checking WriteCoordinator: {error}",
+   "module_not_initialized_no_sources": "Module not initialized - no sources loaded",
+   "no_sources_registered": "No RAG sources registered",
+   "sources_healthy": "{count} sources healthy",
+   "sources_unhealthy": "Some sources unhealthy ({count} total)",
+   "sources_check_error": "Error checking sources: {error}",
+   "disk_space_ok": "{free}GB available (>={required}GB required)",
+   "disk_space_warn": "{free}GB available (<{required}GB required, may run out)",
+   "disk_space_critical": "{free}GB available (critical: <{critical}GB)",
+   "disk_space_error": "Error checking disk space: {error}"
+  },
+  "workflow": {
+   "nodes_auto_discovery": "RAG nodes will be auto-discovered by WorkflowEngine",
+   "rag_not_available": "RAGSearchNode will not be registered. Install qdrant-client to enable RAG functionality.",
+   "rag_functionality_not_available": "RAG functionality not available. Install qdrant-client: pip install qdrant-client",
+   "failed_to_init_rag_source": "Failed to initialize RAG source: {error}",
+   "missing_query": "Missing required input: 'query'",
+   "no_relevant_documents": "No relevant documents found.",
+   "rag_search_failed": "RAG search failed: {error}",
+   "top_k_validation": "top_k must be >= 1",
+   "score_threshold_validation": "score_threshold must be between 0.0 and 1.0",
+   "prompt_template_context_missing": "prompt_template must contain {context} placeholder",
+   "prompt_template_query_missing": "prompt_template must contain {query} placeholder"
+  }
+ }
+}

@@ -1,0 +1,47 @@
+{
+ "sanitizer": {
+  "info": {
+   "description": "Sistema de sanitizacion de entrada. Detecta y neutraliza amenazas.",
+   "type": "Modulo de seguridad"
+  },
+  "threats": {
+   "injection_detected": "Intento de inyeccion detectado",
+   "xss_detected": "Intento de XSS detectado",
+   "path_traversal": "Intento de path traversal detectado",
+   "prompt_injection": "Intento de prompt injection detectado",
+   "sql_injection": "Intento de SQL injection detectado",
+   "command_injection": "Intento de command injection detectado"
+  },
+  "patterns": {
+   "jailbreak": "Patron de jailbreak detectado",
+   "role_manipulation": "Intento de manipulacion de rol detectado",
+   "system_override": "Intento de sobreescribir sistema detectado",
+   "encoding_attack": "Ataque por encoding detectado"
+  },
+  "actions": {
+   "blocked": "Entrada bloqueada",
+   "sanitized": "Entrada sanitizada",
+   "flagged": "Entrada marcada para revision",
+   "allowed": "Entrada permitida"
+  },
+  "severity": {
+   "critical": "Amenaza critica",
+   "high": "Amenaza alta",
+   "medium": "Amenaza media",
+   "low": "Amenaza baja"
+  },
+  "health": {
+   "healthy": "Sistema de sanitizacion activo",
+   "degraded": "Sistema con problemas menores",
+   "unhealthy": "Sistema no disponible",
+   "check_patterns": "Patrones cargados",
+   "check_rules": "Reglas de sanitizacion",
+   "check_encoding": "Detector de encoding"
+  },
+  "log": {
+   "threat_logged": "Amenaza registrada",
+   "pattern_matched": "Patron coincidido: {pattern}",
+   "action_taken": "Accion ejecutada: {action}"
+  }
+ }
+}

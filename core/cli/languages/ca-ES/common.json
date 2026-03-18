@@ -1,0 +1,85 @@
+{
+ "cli": {
+  "name": "CLI Central Nexe",
+  "description": "Orquestrador de CLIs de mòduls Nexe 0.8",
+  "greetings": {
+   "hello": "Hola",
+   "welcome": "Benvingut al CLI Central Nexe 0.8",
+   "goodbye": "Adéu!"
+  },
+  "features": {
+   "cli_discovery": "Descoberta de CLIs",
+   "subprocess_execution": "Execució de subprocessos",
+   "offline_support": "Suport offline",
+   "http_client": "Client HTTP integrat"
+  },
+  "health_checks": {
+   "module_structure": {
+    "name": "Estructura del mòdul",
+    "all_folders_exist": "Totes les carpetes existeixen",
+    "all_files_exist": "Tots els fitxers existeixen",
+    "missing_folders": "Carpetes faltants",
+    "missing_files": "Fitxers faltants"
+   },
+   "cli_discovery": {
+    "name": "Descoberta de CLIs",
+    "clis_found": "CLIs descoberts",
+    "no_clis": "No s'han descobert CLIs",
+    "missing_entry": "CLIs sense entry_point",
+    "quadrants": "Quadrants coberts"
+   },
+   "config_valid": {
+    "name": "Configuració vàlida",
+    "config_ok": "Configuració correcta",
+    "no_server_url": "No hi ha URL de servidor configurada",
+    "invalid_timeout": "Timeout invàlid"
+   },
+   "basic_functionality": {
+    "name": "Funcionalitat bàsica",
+    "module_ok": "Mòdul CLIModule funciona correctament",
+    "methods_ok": "Tots els mètodes responen"
+   }
+  },
+  "check": {
+   "error": "Error executant check",
+   "missing_files": "Fitxers faltants",
+   "missing_folders": "Carpetes faltants",
+   "structure_ok": "Estructura correcta",
+   "no_clis": "No s'han descobert CLIs",
+   "missing_entry": "CLIs sense entry_point",
+   "clis_found": "CLIs descoberts",
+   "quadrants": "Quadrants",
+   "no_server_url": "No hi ha URL de servidor configurada",
+   "invalid_timeout": "Timeout invàlid",
+   "config_ok": "Configuració correcta",
+   "config_error": "Error de configuració",
+   "module_ok": "Mòdul CLIModule funciona correctament",
+   "methods_ok": "Tots els mètodes responen",
+   "assertion_failed": "Test fallit",
+   "func_error": "Error de funcionalitat",
+   "discovery_error": "Error de descoberta"
+  },
+  "commands": {
+   "list": "Llista tots els CLIs disponibles",
+   "run": "Executa un CLI específic",
+   "help": "Mostra ajuda",
+   "version": "Mostra la versió"
+  },
+  "status": {
+   "healthy": "SA",
+   "degraded": "DEGRADAT",
+   "unhealthy": "NO SA",
+   "error": "ERROR"
+  },
+  "messages": {
+   "location": "Ubicació",
+   "usage": "Ús",
+   "available_clis": "CLIs disponibles",
+   "no_clis_found": "No s'han trobat CLIs",
+   "cli_not_found": "CLI no trobat",
+   "executing": "Executant",
+   "success": "Èxit",
+   "failed": "Fallat"
+  }
+ }
+}
