@@ -294,7 +294,7 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                         seen_hashes = set()
                         unique_results = []
                         for r in all_results:
-                            content_hash = hash(r.text[:200])
+                            content_hash = hashlib.sha256(r.text[:200].encode()).hexdigest()
                             if content_hash not in seen_hashes:
                                 seen_hashes.add(content_hash)
                                 unique_results.append(r)

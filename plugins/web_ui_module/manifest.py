@@ -516,7 +516,8 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                 metadata={"original_message": message, "type": "user_fact"}
             )
             if result["success"]:
-                response_text = f"✅ Guardat a la memòria: \"{content_to_save}\"\n\nHo recordaré per a futures converses.\x00[MEM]\x00"
+                _safe_content = str(content_to_save).replace("\x00", "").replace("]", "")[:200]
+                response_text = f"✅ Guardat a la memòria: \"{_safe_content}\"\n\nHo recordaré per a futures converses.\x00[MEM]\x00"
             else:
                 response_text = f"❌ No s'ha pogut guardar: {result.get('message', 'Error desconegut')}"
         else:

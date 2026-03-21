@@ -57,7 +57,7 @@ def setup_environment(project_root, hw, engine="auto"):
         # metadata, but works correctly at runtime.
         subprocess.run([str(pip_path), "install", "mlx-lm==0.30.7"], check=True)
 
-    if engine in ("llama_cpp", "all", "auto"):
+    if engine in ("llama_cpp", "all"):
         print(f"  🏗️ {t('installing_universal')} {CYAN}llama-cpp-python{RESET}...")
         env = os.environ.copy()
         if hw['is_apple_silicon']:

@@ -253,13 +253,18 @@ class MemoryHelper:
             if not await memory.collection_exists("nexe_web_ui"):
                 return 0
 
-            # Get all entries
-            # WARNING: Empty query search behavior is undefined in Qdrant.
-            # Using " " (space) instead of "" as workaround — slightly better behavior.
+            # Check count first to avoid unnecessary search
+            current_count = await memory.count("nexe_web_ui")
+            if current_count <= MAX_MEMORY_ENTRIES:
+                return 0
+
+            # Retrieve entries for scoring — search with broad query
+            # (Qdrant has no scroll/list API via this wrapper, so we use
+            # a minimal query to retrieve all entries by vector similarity)
             all_entries = await memory.search(
                 query=" ",
                 collection="nexe_web_ui",
-                top_k=MAX_MEMORY_ENTRIES + PRUNE_BATCH_SIZE + 50
+                top_k=current_count
             )
 
             current_count = len(all_entries)
@@ -562,14 +567,7 @@ class MemoryHelper:
 
             count = 0
             if await memory.collection_exists("nexe_web_ui"):
-                # Count entries — using " " (space) instead of "" to avoid
-                # undefined behavior with empty query in Qdrant
-                results = await memory.search(
-                    query=" ",
-                    collection="nexe_web_ui",
-                    top_k=MAX_MEMORY_ENTRIES + 100
-                )
-                count = len(results)
+                count = await memory.count("nexe_web_ui")
 
             return {
                 "collection": "nexe_web_ui",
