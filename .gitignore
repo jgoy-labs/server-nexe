@@ -1,3 +1,12 @@
+# ===========================================
+# Entorn de desenvolupament — NO és un repo git
+#
+# Repo OSS net: AI/gitoss/server-nexe/
+# Remote: https://github.com/jgoy-labs/server-nexe
+#
+# Flux: treballar aqui → copiar canvis nets a gitoss → push des de gitoss
+# ===========================================
+
 # Python runtime artifacts
 __pycache__/
 *.py[cod]
@@ -34,8 +43,13 @@ storage/.knowledge_ingested
 qdrant
 nexe
 
-# IDE / editor
+# IDE / editor / dev tools
 *.code-workspace
+.claude/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
 
 COMMANDS.md
 TESTING_REPORT.md
@@ -54,3 +68,8 @@ Install Nexe.app/Contents/Resources/python-tk-libexec/
 Install Nexe.app/Contents/Resources/installer
 Install Nexe.app/Contents/Resources/personality
 Install Nexe.app/Contents/Frameworks/
+
+# Releases (binaris, DMGs — es pugen com a GitHub Releases, no al repo)
+releases/
+*.dmg
+*.pkg

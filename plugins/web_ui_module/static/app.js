@@ -93,10 +93,12 @@ const UI_STRINGS = {
 
 class NexeUI {
     constructor() {
-        this.apiKey = sessionStorage.getItem('nexe_api_key') || null;
-        // Detectar idioma del navegador com a default
+        this.apiKey = localStorage.getItem('nexe_api_key') || null;
+        // Idioma: servidor (injectat) > navegador > anglès
+        const serverLang = window.NEXE_LANG;
         const browserLang = (navigator.language || 'en').split('-')[0];
-        this.lang = UI_STRINGS[browserLang] ? browserLang : 'en';
+        const preferredLang = serverLang || browserLang;
+        this.lang = UI_STRINGS[preferredLang] ? preferredLang : 'en';
         this.currentSessionId = null;
         this.uploadedFile = null;
         this.sessions = [];
@@ -222,7 +224,7 @@ class NexeUI {
                 const resp = await fetch('/ui/auth', { headers: { 'X-API-Key': key } });
                 if (resp.ok) {
                     this.apiKey = key;
-                    sessionStorage.setItem('nexe_api_key', key);
+                    localStorage.setItem('nexe_api_key', key);
                     overlay.style.display = 'none';
                     this.initUI();
                     if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -482,7 +484,7 @@ class NexeUI {
     }
 
     _handleUnauthorized() {
-        sessionStorage.removeItem('nexe_api_key');
+        localStorage.removeItem('nexe_api_key');
         this.apiKey = null;
         this.showLoginOverlay();
     }

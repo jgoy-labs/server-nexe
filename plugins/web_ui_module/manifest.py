@@ -273,11 +273,15 @@ async def set_backend(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
 
 @router_public.get("/", response_class=HTMLResponse)
 async def serve_ui():
-    """Servir la pàgina principal"""
+    """Servir la pàgina principal amb l'idioma del servidor injectat"""
     html_path = _static_dir / "index.html"
-    if html_path.exists():
-        return FileResponse(html_path)
-    raise HTTPException(status_code=404, detail="UI not found")
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="UI not found")
+    html = html_path.read_text(encoding="utf-8")
+    lang = _os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+    html = html.replace('lang="ca"', f'lang="{lang}"')
+    html = html.replace("</head>", f'<script>window.NEXE_LANG="{lang}";</script>\n</head>')
+    return HTMLResponse(content=html)
 
 
 @router_public.get("/static/{filename:path}")
