@@ -15,7 +15,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class SystemLifecycleManager:
   """Gestiona cicle de vida del sistema complet"""
@@ -49,9 +48,8 @@ class SystemLifecycleManager:
     try:
       self._running = True
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'system.startup.initializing')
-        logger.info(msg, component="system_lifecycle")
+      msg = get_message(self.i18n, 'system.startup.initializing')
+      logger.info(msg, component="system_lifecycle")
 
       discovered = await self.discovery_func(force=True)
 
@@ -66,26 +64,23 @@ class SystemLifecycleManager:
             ):
               started += 1
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'system.startup.ready')
-        logger.info(msg, component="system_lifecycle",
-             discovered=len(discovered), started=started)
+      msg = get_message(self.i18n, 'system.startup.ready')
+      logger.info(msg, component="system_lifecycle",
+           discovered=len(discovered), started=started)
 
       return True
 
     except Exception as e:
       self._running = False
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'system.errors.critical',
-                error=str(e))
-        logger.error(msg, component="system_lifecycle", exc_info=True)
+      msg = get_message(self.i18n, 'system.errors.critical',
+              error=str(e))
+      logger.error(msg, component="system_lifecycle", exc_info=True)
       return False
 
   async def shutdown_system(self) -> None:
     """Atura el sistema complet"""
-    if LOGGER_AVAILABLE:
-      msg = get_message(self.i18n, 'system.shutdown.initiated')
-      logger.info(msg, component="system_lifecycle")
+    msg = get_message(self.i18n, 'system.shutdown.initiated')
+    logger.info(msg, component="system_lifecycle")
 
     self._running = False
 
@@ -95,9 +90,8 @@ class SystemLifecycleManager:
         module_info.name, self._get_lock()
       )
 
-    if LOGGER_AVAILABLE:
-      msg = get_message(self.i18n, 'system.shutdown.completed')
-      logger.info(msg, component="system_lifecycle")
+    msg = get_message(self.i18n, 'system.shutdown.completed')
+    logger.info(msg, component="system_lifecycle")
 
   def is_running(self) -> bool:
     """Retorna si el sistema està en execució"""

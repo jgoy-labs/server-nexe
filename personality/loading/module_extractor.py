@@ -18,7 +18,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class ModuleExtractor:
   """Extreu instància principal d'un mòdul"""
@@ -63,10 +62,9 @@ class ModuleExtractor:
     if instance is not None:
       return instance
 
-    if LOGGER_AVAILABLE:
-      msg = get_message(self.i18n, 'loader.debug.using_module_as_instance',
-              module=module_name)
-      logger.debug(msg, component="loader")
+    msg = get_message(self.i18n, 'loader.debug.using_module_as_instance',
+            module=module_name)
+    logger.debug(msg, component="loader")
     return module
 
   def _try_factory_functions(self, module: Any, module_name: str,
@@ -85,10 +83,9 @@ class ModuleExtractor:
             else:
               return factory()
           except Exception as e:
-            if LOGGER_AVAILABLE:
-              msg = get_message(self.i18n, 'loading.factory_failed',
-                      factory=factory_name, error=str(e))
-              logger.debug(msg, component="loader", module=module_name)
+            msg = get_message(self.i18n, 'loading.factory_failed',
+                    factory=factory_name, error=str(e))
+            logger.debug(msg, component="loader", module=module_name)
             continue
 
     return None

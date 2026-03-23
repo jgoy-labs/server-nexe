@@ -17,7 +17,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class OpenAPIMerger:
   """
@@ -65,25 +64,23 @@ class OpenAPIMerger:
           
           self._regenerate_unified_openapi()
 
-          if LOGGER_AVAILABLE:
-            msg = get_message(
-              self.i18n,
-              'openapi_merger.debug.spec_merged',
-              module=module_name
-            )
-            logger.debug(msg, component="openapi_merger")
+          msg = get_message(
+            self.i18n,
+            'openapi_merger.debug.spec_merged',
+            module=module_name
+          )
+          logger.debug(msg, component="openapi_merger")
 
           return True
         
       except Exception as e:
-        if LOGGER_AVAILABLE:
-          msg = get_message(
-            self.i18n,
-            'openapi_merger.errors.merge_failed',
-            module=module_name,
-            error=str(e)
-          )
-          logger.error(msg, component="openapi_merger", exc_info=True)
+        msg = get_message(
+          self.i18n,
+          'openapi_merger.errors.merge_failed',
+          module=module_name,
+          error=str(e)
+        )
+        logger.error(msg, component="openapi_merger", exc_info=True)
 
       return False
   
@@ -104,25 +101,23 @@ class OpenAPIMerger:
           
           self._regenerate_unified_openapi()
 
-          if LOGGER_AVAILABLE:
-            msg = get_message(
-              self.i18n,
-              'openapi_merger.debug.spec_removed',
-              module=module_name
-            )
-            logger.debug(msg, component="openapi_merger")
+          msg = get_message(
+            self.i18n,
+            'openapi_merger.debug.spec_removed',
+            module=module_name
+          )
+          logger.debug(msg, component="openapi_merger")
         
         return True
         
       except Exception as e:
-        if LOGGER_AVAILABLE:
-          msg = get_message(
-            self.i18n,
-            'openapi_merger.errors.removal_failed',
-            module=module_name,
-            error=str(e)
-          )
-          logger.error(msg, component="openapi_merger")
+        msg = get_message(
+          self.i18n,
+          'openapi_merger.errors.removal_failed',
+          module=module_name,
+          error=str(e)
+        )
+        logger.error(msg, component="openapi_merger")
         return False
   
   def _extract_module_openapi(self, api_components: Dict[str, Any], 

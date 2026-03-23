@@ -22,7 +22,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class ModuleDiscovery:
   """
@@ -73,9 +72,8 @@ class ModuleDiscovery:
     Returns:
       Llista de noms de mòduls descoberts
     """
-    if LOGGER_AVAILABLE:
-      msg = get_message(self.i18n, 'discovery.starting')
-      logger.info(msg, component="module_manager")
+    msg = get_message(self.i18n, 'discovery.starting')
+    logger.info(msg, component="module_manager")
 
     nexe_env = (os.getenv("NEXE_ENV") or "").lower()
     if nexe_env in ("test", "testing") or os.getenv("PYTEST_CURRENT_TEST"):
@@ -120,20 +118,18 @@ class ModuleDiscovery:
     cycles = detect_dependency_cycles(modules_dict)
     if cycles:
       cycle_str = ' -> '.join(cycles)
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'discovery.cycles_detected',
-                cycles=cycle_str)
-        logger.error(msg, component="module_manager")
+      msg = get_message(self.i18n, 'discovery.cycles_detected',
+              cycles=cycle_str)
+      logger.error(msg, component="module_manager")
       for module_name in cycles:
         if module_name in modules_dict:
           modules_dict[module_name].enabled = False
           modules_dict[module_name].state = ModuleState.ERROR
           modules_dict[module_name].last_error = f"Circular dependency detected: {cycle_str}"
-          if LOGGER_AVAILABLE:
-            logger.warning(
-              "Module '%s' disabled due to circular dependency",
-              module_name, component="module_manager"
-            )
+          logger.warning(
+            "Module '%s' disabled due to circular dependency",
+            module_name, component="module_manager"
+          )
 
     await self.events.emit_event(SystemEvent(
       timestamp=datetime.now(timezone.utc),
@@ -145,7 +141,6 @@ class ModuleDiscovery:
     msg = get_message(self.i18n, 'discovery.completed',
              new_count=len(discovered),
              total_count=len(modules_dict))
-    if LOGGER_AVAILABLE:
-      logger.info(msg, component="module_manager")
+    logger.info(msg, component="module_manager")
 
     return discovered

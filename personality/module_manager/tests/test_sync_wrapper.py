@@ -120,17 +120,16 @@ class TestSyncWrapper:
         asyncio.run(run_test())
 
     def test_log_error_with_i18n(self):
-        """Lines 142-148: _log_error with LOGGER_AVAILABLE=True and i18n"""
-        wrapper = SyncWrapper(i18n=MagicMock())
-        # _log_error doesn't raise, just logs when LOGGER_AVAILABLE
-        # Since LOGGER_AVAILABLE is False by default, this is a no-op
-        wrapper._log_error("test_key", RuntimeError("err"))
-
-    @patch("personality.module_manager.sync_wrapper.LOGGER_AVAILABLE", True)
-    def test_log_error_with_logger_and_i18n(self):
-        """Lines 142-148: LOGGER_AVAILABLE=True"""
+        """_log_error with i18n logs the error."""
         mock_i18n = MagicMock()
         wrapper = SyncWrapper(i18n=mock_i18n)
         with patch("personality.module_manager.sync_wrapper.logger") as mock_logger:
             wrapper._log_error("test_key", RuntimeError("err"))
             mock_logger.error.assert_called_once()
+
+    def test_log_error_without_i18n(self):
+        """_log_error without i18n does nothing."""
+        wrapper = SyncWrapper(i18n=None)
+        with patch("personality.module_manager.sync_wrapper.logger") as mock_logger:
+            wrapper._log_error("test_key", RuntimeError("err"))
+            mock_logger.error.assert_not_called()

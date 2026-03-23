@@ -18,7 +18,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class ModuleLifecycle:
   """Gestiona cicle de vida dels mòduls"""
@@ -47,10 +46,9 @@ class ModuleLifecycle:
             else:
               method()
 
-            if LOGGER_AVAILABLE:
-              msg = get_message(self.i18n, 'loader.debug.called_method',
-                      method=method_name, module=module_name)
-              logger.debug(msg, component="loader")
+            msg = get_message(self.i18n, 'loader.debug.called_method',
+                    method=method_name, module=module_name)
+            logger.debug(msg, component="loader")
             break
 
           except Exception as e:
@@ -59,9 +57,8 @@ class ModuleLifecycle:
               method=method_name, error=str(e)
             )
             warnings.warn(warning_msg)
-            if LOGGER_AVAILABLE:
-              logger.warning(warning_msg, component="loader",
-                     module=module_name, method=method_name)
+            logger.warning(warning_msg, component="loader",
+                   module=module_name, method=method_name)
             continue
 
   async def cleanup_module(self, instance: Any, module_name: str) -> None:
@@ -84,10 +81,9 @@ class ModuleLifecycle:
             else:
               method()
 
-            if LOGGER_AVAILABLE:
-              msg = get_message(self.i18n, 'loader.debug.called_method',
-                      method=method_name, module=module_name)
-              logger.debug(msg, component="loader")
+            msg = get_message(self.i18n, 'loader.debug.called_method',
+                    method=method_name, module=module_name)
+            logger.debug(msg, component="loader")
             break
 
           except Exception as e:
@@ -96,6 +92,5 @@ class ModuleLifecycle:
               method=method_name, error=str(e)
             )
             warnings.warn(warning_msg)
-            if LOGGER_AVAILABLE:
-              logger.warning(warning_msg, component="loader",
-                     module=module_name)
+            logger.warning(warning_msg, component="loader",
+                   module=module_name)

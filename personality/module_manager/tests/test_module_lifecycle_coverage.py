@@ -37,7 +37,7 @@ class TestModuleLifecycleManager:
     def test_load_module_not_in_modules(self, lm):
         """Line 64-65: module not in modules dict."""
         lock = threading.RLock()
-        result = asyncio.run(lm.load_module("nonexistent", lock))
+        result = asyncio.run(lm.load_module("nonexistent"))
         assert result is False
 
     def test_load_module_already_loaded(self, lm):
@@ -45,7 +45,7 @@ class TestModuleLifecycleManager:
         lock = threading.RLock()
         mod = _make_module_info("test", state=ModuleState.LOADED)
         lm.modules["test"] = mod
-        result = asyncio.run(lm.load_module("test", lock))
+        result = asyncio.run(lm.load_module("test"))
         assert result is True
 
     def test_load_module_disabled(self, lm):
@@ -53,7 +53,7 @@ class TestModuleLifecycleManager:
         lock = threading.RLock()
         mod = _make_module_info("test", enabled=False)
         lm.modules["test"] = mod
-        result = asyncio.run(lm.load_module("test", lock))
+        result = asyncio.run(lm.load_module("test"))
         assert result is False
 
     def test_load_module_loading_state(self, lm):
@@ -61,7 +61,7 @@ class TestModuleLifecycleManager:
         lock = threading.RLock()
         mod = _make_module_info("test", state=ModuleState.LOADING)
         lm.modules["test"] = mod
-        result = asyncio.run(lm.load_module("test", lock))
+        result = asyncio.run(lm.load_module("test"))
         assert result is False
 
     def test_load_module_dependency_failed(self, lm):
@@ -69,7 +69,7 @@ class TestModuleLifecycleManager:
         lock = threading.RLock()
         mod = _make_module_info("test", deps=["missing_dep"])
         lm.modules["test"] = mod
-        result = asyncio.run(lm.load_module("test", lock))
+        result = asyncio.run(lm.load_module("test"))
         assert result is False
 
     def test_load_module_with_api_integrator(self, lm):
@@ -80,7 +80,7 @@ class TestModuleLifecycleManager:
         mock_integrator = MagicMock()
         lm.api_integrator = mock_integrator
 
-        result = asyncio.run(lm.load_module("test", lock))
+        result = asyncio.run(lm.load_module("test"))
         assert result is True
         mock_integrator.integrate_module_api.assert_called_once()
 
@@ -93,7 +93,7 @@ class TestModuleLifecycleManager:
         mock_integrator.integrate_module_api.side_effect = Exception("fail")
         lm.api_integrator = mock_integrator
 
-        result = asyncio.run(lm.load_module("test", lock))
+        result = asyncio.run(lm.load_module("test"))
         assert result is True  # Module still loads despite API error
 
     def test_load_module_error(self, lm):
@@ -103,7 +103,7 @@ class TestModuleLifecycleManager:
         lm.modules["test"] = mod
         lm.loader.load_module = AsyncMock(side_effect=Exception("load error"))
 
-        result = asyncio.run(lm.load_module("test", lock))
+        result = asyncio.run(lm.load_module("test"))
         assert result is False
         assert mod.state == ModuleState.ERROR
         assert mod.error_count == 1
@@ -111,7 +111,7 @@ class TestModuleLifecycleManager:
     def test_start_module_not_found(self, lm):
         """Lines 172-173: start module not in modules."""
         lock = threading.RLock()
-        result = asyncio.run(lm.start_module("nonexistent", lock))
+        result = asyncio.run(lm.start_module("nonexistent"))
         assert result is False
 
     def test_start_module_already_running(self, lm):
@@ -119,7 +119,7 @@ class TestModuleLifecycleManager:
         lock = threading.RLock()
         mod = _make_module_info("test", state=ModuleState.RUNNING)
         lm.modules["test"] = mod
-        result = asyncio.run(lm.start_module("test", lock))
+        result = asyncio.run(lm.start_module("test"))
         assert result is True
 
     def test_start_module_sync_start(self, lm):
@@ -131,7 +131,7 @@ class TestModuleLifecycleManager:
         mod.instance = mock_instance
         lm.modules["test"] = mod
 
-        result = asyncio.run(lm.start_module("test", lock))
+        result = asyncio.run(lm.start_module("test"))
         assert result is True
         mock_instance.start.assert_called_once()
 
@@ -144,14 +144,14 @@ class TestModuleLifecycleManager:
         mod.instance = mock_instance
         lm.modules["test"] = mod
 
-        result = asyncio.run(lm.start_module("test", lock))
+        result = asyncio.run(lm.start_module("test"))
         assert result is False
         assert mod.state == ModuleState.ERROR
 
     def test_stop_module_not_found(self, lm):
         """Lines 247-248: stop non-existent module."""
         lock = threading.RLock()
-        result = asyncio.run(lm.stop_module("nonexistent", lock))
+        result = asyncio.run(lm.stop_module("nonexistent"))
         assert result is True
 
     def test_stop_module_not_running(self, lm):
@@ -159,7 +159,7 @@ class TestModuleLifecycleManager:
         lock = threading.RLock()
         mod = _make_module_info("test", state=ModuleState.STOPPED)
         lm.modules["test"] = mod
-        result = asyncio.run(lm.stop_module("test", lock))
+        result = asyncio.run(lm.stop_module("test"))
         assert result is True
 
     def test_stop_module_sync_stop(self, lm):
@@ -171,7 +171,7 @@ class TestModuleLifecycleManager:
         mod.instance = mock_instance
         lm.modules["test"] = mod
 
-        result = asyncio.run(lm.stop_module("test", lock))
+        result = asyncio.run(lm.stop_module("test"))
         assert result is True
         mock_instance.stop.assert_called_once()
 
@@ -185,7 +185,7 @@ class TestModuleLifecycleManager:
         mock_integrator = MagicMock()
         lm.api_integrator = mock_integrator
 
-        result = asyncio.run(lm.stop_module("test", lock))
+        result = asyncio.run(lm.stop_module("test"))
         assert result is True
         mock_integrator.remove_module_api.assert_called_once()
 
@@ -197,7 +197,7 @@ class TestModuleLifecycleManager:
         lm.modules["test"] = mod
         lm.loader.unload_module = AsyncMock(side_effect=Exception("stop error"))
 
-        result = asyncio.run(lm.stop_module("test", lock))
+        result = asyncio.run(lm.stop_module("test"))
         assert result is False
 
     def test_set_api_integrator(self, lm):
@@ -213,7 +213,7 @@ class TestModuleLifecycleManager:
         lm.modules["dep_mod"] = dep_mod
         lm.modules["main_mod"] = main_mod
 
-        result = asyncio.run(lm.load_module("main_mod", lock))
+        result = asyncio.run(lm.load_module("main_mod"))
         assert result is True
         # dep_mod should track main_mod as dependent
         assert "main_mod" in dep_mod.dependents
@@ -225,7 +225,7 @@ class TestModuleLifecycleManager:
         lock = threading.RLock()
         mod = _make_module_info("test", enabled=False)
         lm.modules["test"] = mod
-        result = asyncio.run(lm.load_module("test", lock))
+        result = asyncio.run(lm.load_module("test"))
         assert result is False
 
     def test_start_module_needs_load_first(self, lm):
@@ -234,7 +234,7 @@ class TestModuleLifecycleManager:
         mod = _make_module_info("test", state=ModuleState.DISCOVERED)
         lm.modules["test"] = mod
 
-        result = asyncio.run(lm.start_module("test", lock))
+        result = asyncio.run(lm.start_module("test"))
         assert result is True
         assert mod.state == ModuleState.RUNNING
 
@@ -247,7 +247,7 @@ class TestModuleLifecycleManager:
         mod.instance = mock_instance
         lm.modules["test"] = mod
 
-        result = asyncio.run(lm.start_module("test", lock))
+        result = asyncio.run(lm.start_module("test"))
         assert result is True
         mock_instance.start.assert_called_once()
 
@@ -260,7 +260,7 @@ class TestModuleLifecycleManager:
         mod.instance = mock_instance
         lm.modules["test"] = mod
 
-        result = asyncio.run(lm.stop_module("test", lock))
+        result = asyncio.run(lm.stop_module("test"))
         assert result is True
         mock_instance.stop.assert_called_once()
 
@@ -275,5 +275,5 @@ class TestModuleLifecycleManager:
         mock_integrator.remove_module_api.side_effect = Exception("removal error")
         lm.api_integrator = mock_integrator
 
-        result = asyncio.run(lm.stop_module("test", lock))
+        result = asyncio.run(lm.stop_module("test"))
         assert result is True  # Still succeeds

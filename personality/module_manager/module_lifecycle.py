@@ -20,7 +20,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class ModuleLifecycleManager:
   """Gestiona cicle de vida de mòduls individuals"""
@@ -44,7 +43,23 @@ class ModuleLifecycleManager:
     self.metrics = metrics
     self.i18n = i18n
     self.api_integrator = None
-    self._async_lock = asyncio.Lock()
+    self.__async_lock = None
+    self.__async_lock_loop_id = None
+
+  @property
+  def _async_lock(self):
+    """Lazy init: asyncio.Lock() bound to the current running event loop.
+    Recreates if the event loop changed (e.g. between asyncio.run() calls in tests)."""
+    try:
+      current_loop = asyncio.get_running_loop()
+      loop_id = id(current_loop)
+    except RuntimeError:
+      loop_id = None
+
+    if self.__async_lock is None or (loop_id is not None and loop_id != self.__async_lock_loop_id):
+      self.__async_lock = asyncio.Lock()
+      self.__async_lock_loop_id = loop_id
+    return self.__async_lock
 
   def set_api_integrator(self, api_integrator):
     """Estableix API integrator"""
@@ -71,10 +86,9 @@ class ModuleLifecycleManager:
         return True
 
       if not module_info.enabled:
-        if LOGGER_AVAILABLE:
-          msg = get_message(self.i18n, 'loading.disabled',
-                  module=module_name)
-          logger.warning(msg, component="module_lifecycle")
+        msg = get_message(self.i18n, 'loading.disabled',
+                module=module_name)
+        logger.warning(msg, component="module_lifecycle")
         return False
 
       if module_info.state == ModuleState.LOADING:
@@ -82,20 +96,18 @@ class ModuleLifecycleManager:
 
     for dep in module_info.dependencies:
       if not await self.load_module(dep):
-        if LOGGER_AVAILABLE:
-          msg = get_message(self.i18n, 'loading.dependency_failed',
-                  dep=dep, module=module_name)
-          logger.error(msg, component="module_lifecycle")
+        msg = get_message(self.i18n, 'loading.dependency_failed',
+                dep=dep, module=module_name)
+        logger.error(msg, component="module_lifecycle")
         return False
 
     try:
       async with self._async_lock:
         module_info.state = ModuleState.LOADING
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'loading.loading',
-                module=module_name)
-        logger.info(msg, component="module_lifecycle")
+      msg = get_message(self.i18n, 'loading.loading',
+              module=module_name)
+      logger.info(msg, component="module_lifecycle")
 
       start_time = time.time()
       instance = await self.loader.load_module(module_info)
@@ -122,10 +134,9 @@ class ModuleLifecycleManager:
             module_name, instance, module_info
           )
         except Exception as e:
-          if LOGGER_AVAILABLE:
-            msg = get_message(self.i18n, 'api.integration.failed',
-                    module=module_name, error=str(e))
-            logger.warning(msg)
+          msg = get_message(self.i18n, 'api.integration.failed',
+                  module=module_name, error=str(e))
+          logger.warning(msg)
 
       await self.events.emit_event(SystemEvent(
         timestamp=datetime.now(timezone.utc),
@@ -137,11 +148,10 @@ class ModuleLifecycleManager:
       self.metrics.update_module_metrics(self.modules, module_name,
                        load_duration_ms=load_duration)
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'loading.loaded',
-                module=module_name)
-        logger.info(msg, component="module_lifecycle",
-             duration_ms=load_duration)
+      msg = get_message(self.i18n, 'loading.loaded',
+              module=module_name)
+      logger.info(msg, component="module_lifecycle",
+           duration_ms=load_duration)
 
       return True
 
@@ -151,10 +161,9 @@ class ModuleLifecycleManager:
         module_info.error_count += 1
         module_info.last_error = str(e)
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'loading.error',
-                module=module_name, error=str(e))
-        logger.error(msg, component="module_lifecycle", exc_info=True)
+      msg = get_message(self.i18n, 'loading.error',
+              module=module_name, error=str(e))
+      logger.error(msg, component="module_lifecycle", exc_info=True)
 
       return False
 
@@ -178,19 +187,21 @@ class ModuleLifecycleManager:
       if module_info.state == ModuleState.RUNNING:
         return True
 
-      if module_info.state != ModuleState.LOADED:
-        if not await self.load_module(module_name):
-          return False
-        module_info = self.modules[module_name]
+      needs_load = module_info.state != ModuleState.LOADED
+
+    # Load outside the lock to avoid deadlock (load_module acquires its own lock)
+    if needs_load:
+      if not await self.load_module(module_name):
+        return False
+      module_info = self.modules[module_name]
 
     try:
       async with self._async_lock:
         module_info.state = ModuleState.STARTING
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'starting.starting',
-                module=module_name)
-        logger.info(msg, component="module_lifecycle")
+      msg = get_message(self.i18n, 'starting.starting',
+              module=module_name)
+      logger.info(msg, component="module_lifecycle")
 
       start_time = time.time()
       if hasattr(module_info.instance, 'start'):
@@ -213,10 +224,9 @@ class ModuleLifecycleManager:
         details={"module": module_name, "duration_ms": start_duration}
       ))
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'starting.started',
-                module=module_name)
-        logger.info(msg, component="module_lifecycle")
+      msg = get_message(self.i18n, 'starting.started',
+              module=module_name)
+      logger.info(msg, component="module_lifecycle")
 
       return True
 
@@ -226,10 +236,9 @@ class ModuleLifecycleManager:
         module_info.error_count += 1
         module_info.last_error = str(e)
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'starting.error',
-                module=module_name, error=str(e))
-        logger.error(msg, component="module_lifecycle", exc_info=True)
+      msg = get_message(self.i18n, 'starting.error',
+              module=module_name, error=str(e))
+      logger.error(msg, component="module_lifecycle", exc_info=True)
 
       return False
 
@@ -257,10 +266,9 @@ class ModuleLifecycleManager:
       async with self._async_lock:
         module_info.state = ModuleState.STOPPING
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'stopping.stopping',
-                module=module_name)
-        logger.info(msg, component="module_lifecycle")
+      msg = get_message(self.i18n, 'stopping.stopping',
+              module=module_name)
+      logger.info(msg, component="module_lifecycle")
 
       if hasattr(module_info.instance, 'stop'):
         if asyncio.iscoroutinefunction(module_info.instance.stop):
@@ -274,10 +282,9 @@ class ModuleLifecycleManager:
         try:
           self.api_integrator.remove_module_api(module_name)
         except Exception as e:
-          if LOGGER_AVAILABLE:
-            msg = get_message(self.i18n, 'api.removal.failed',
-                    module=module_name, error=str(e))
-            logger.warning(msg)
+          msg = get_message(self.i18n, 'api.removal.failed',
+                  module=module_name, error=str(e))
+          logger.warning(msg)
 
       self.registry.unregister_module(module_name)
 
@@ -293,17 +300,15 @@ class ModuleLifecycleManager:
         details={"module": module_name}
       ))
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'stopping.stopped',
-                module=module_name)
-        logger.info(msg, component="module_lifecycle")
+      msg = get_message(self.i18n, 'stopping.stopped',
+              module=module_name)
+      logger.info(msg, component="module_lifecycle")
 
       return True
 
     except Exception as e:
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'stopping.error',
-                module=module_name, error=str(e))
-        logger.error(msg, component="module_lifecycle", exc_info=True)
+      msg = get_message(self.i18n, 'stopping.error',
+              module=module_name, error=str(e))
+      logger.error(msg, component="module_lifecycle", exc_info=True)
 
       return False

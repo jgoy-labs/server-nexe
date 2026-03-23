@@ -18,7 +18,6 @@ from personality.data.models import EndpointInfo, ModuleRegistration
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class ModuleRegistry:
   """
@@ -91,14 +90,13 @@ class ModuleRegistry:
         endpoint_key = f"{endpoint.method}:{endpoint.path}"
         self._endpoints[endpoint_key] = endpoint
       
-      if LOGGER_AVAILABLE:
-        msg = self._get_message('registry.module_registered', name=name)
-        logger.info(msg, component="registry", module=name)
+      msg = self._get_message('registry.module_registered', name=name)
+      logger.info(msg, component="registry", module=name)
         
-        if registration.endpoints:
-          msg = self._get_message('registry.endpoints_indexed', 
-                     count=len(registration.endpoints), module=name)
-          logger.debug(msg, component="registry")
+      if registration.endpoints:
+        msg = self._get_message('registry.endpoints_indexed', 
+                   count=len(registration.endpoints), module=name)
+        logger.debug(msg, component="registry")
       
       return True
   
@@ -124,9 +122,8 @@ class ModuleRegistry:
       
       del self._modules[name]
       
-      if LOGGER_AVAILABLE:
-        msg = self._get_message('registry.module_unregistered', name=name)
-        logger.info(msg, component="registry", module=name)
+      msg = self._get_message('registry.module_unregistered', name=name)
+      logger.info(msg, component="registry", module=name)
       
       return True
   
@@ -163,9 +160,8 @@ class ModuleRegistry:
     registration.dependencies = set(deps_section.get('internal', []))
     registration.provides = set(deps_section.get('provides', []))
     
-    if LOGGER_AVAILABLE:
-      msg = self._get_message('registry.metadata_extracted', module=registration.name)
-      logger.debug(msg, component="registry")
+    msg = self._get_message('registry.metadata_extracted', module=registration.name)
+    logger.debug(msg, component="registry")
   
   def _discover_endpoints(self, registration: ModuleRegistration) -> None:
     """Discover API endpoints from module"""
@@ -198,11 +194,10 @@ class ModuleRegistry:
               )
               registration.endpoints.append(endpoint)
 
-              if LOGGER_AVAILABLE:
-                msg = self._get_message('registry.endpoint_discovered',
-                           method=method, path=endpoint.path,
-                           module=registration.name)
-                logger.debug(msg, component="registry")
+              msg = self._get_message('registry.endpoint_discovered',
+                         method=method, path=endpoint.path,
+                         module=registration.name)
+              logger.debug(msg, component="registry")
   
   def get_module(self, name: str) -> Optional[ModuleRegistration]:
     """Get module registration"""
@@ -284,7 +279,7 @@ class ModuleRegistry:
       'openapi': '3.0.0',
       'info': {
         'title': 'Nexe 0.8 Modular API',
-        'version': '0.8.0',
+        'version': '0.8.2',
         'description': 'Auto-generated API from Nexe modular system'
       },
       'paths': {}
@@ -302,9 +297,8 @@ class ModuleRegistry:
           'responses': endpoint.responses or {'200': {'description': 'Success'}}
         }
       
-      if LOGGER_AVAILABLE:
-        msg = self._get_message('registry.openapi_exported', endpoints=len(self._endpoints))
-        logger.info(msg, component="registry")
+      msg = self._get_message('registry.openapi_exported', endpoints=len(self._endpoints))
+      logger.info(msg, component="registry")
     
     return spec
   

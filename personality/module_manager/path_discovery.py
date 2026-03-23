@@ -17,7 +17,6 @@ import json
 import logging
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class PathDiscovery:
   """
@@ -131,12 +130,11 @@ class PathDiscovery:
       str(p)
     ))
     
-    if LOGGER_AVAILABLE:
-      msg = self._get_message('path_discovery.paths_discovered', count=len(paths))
-      logger.info(msg, component="path_discovery", count=len(paths))
-      for path in paths:
-        msg = self._get_message('path_discovery.debug.path_item', path=str(path))
-        logger.debug(msg, component="path_discovery")
+    msg = self._get_message('path_discovery.paths_discovered', count=len(paths))
+    logger.info(msg, component="path_discovery", count=len(paths))
+    for path in paths:
+      msg = self._get_message('path_discovery.debug.path_item', path=str(path))
+      logger.debug(msg, component="path_discovery")
     
     return paths
   
@@ -146,9 +144,8 @@ class PathDiscovery:
       path = self.base_path / path_str
       if path.exists() and path.is_dir():
         self._discovered_paths.add(path.resolve())
-        if LOGGER_AVAILABLE:
-          msg = self._get_message('path_discovery.path_added', path=str(path))
-          logger.debug(msg, component="path_discovery")
+        msg = self._get_message('path_discovery.path_added', path=str(path))
+        logger.debug(msg, component="path_discovery")
   
   def _auto_discover_paths(self) -> None:
     """Auto-discovery in first-level folders"""
@@ -163,9 +160,8 @@ class PathDiscovery:
           continue
         
         if dir_count >= MAX_DIRS:
-          if LOGGER_AVAILABLE:
-            msg = self._get_message('path_discovery.max_dirs_reached', max=MAX_DIRS)
-            logger.warning(msg, component="path_discovery")
+          msg = self._get_message('path_discovery.max_dirs_reached', max=MAX_DIRS)
+          logger.warning(msg, component="path_discovery")
           break
         dir_count += 1
         
@@ -181,13 +177,11 @@ class PathDiscovery:
             resolved = subdir.resolve()
             if resolved not in self._discovered_paths:
               self._discovered_paths.add(resolved)
-              if LOGGER_AVAILABLE:
-                msg = self._get_message('path_discovery.auto_discovered', path=str(subdir))
-                logger.debug(msg, component="path_discovery")
+              msg = self._get_message('path_discovery.auto_discovered', path=str(subdir))
+              logger.debug(msg, component="path_discovery")
     except PermissionError as e:
-      if LOGGER_AVAILABLE:
-        msg = self._get_message('path_discovery.permission_denied', path=str(e))
-        logger.warning(msg, component="path_discovery")
+      msg = self._get_message('path_discovery.permission_denied', path=str(e))
+      logger.warning(msg, component="path_discovery")
   
   def _add_configured_paths(self) -> None:
     """Add paths from configuration"""
@@ -203,9 +197,8 @@ class PathDiscovery:
       path = self.base_path / modules_path
       if path.exists() and path.is_dir():
         self._discovered_paths.add(path.resolve())
-        if LOGGER_AVAILABLE:
-          msg = self._get_message('path_discovery.path_added', path=str(path))
-          logger.debug(msg, component="path_discovery")
+        msg = self._get_message('path_discovery.path_added', path=str(path))
+        logger.debug(msg, component="path_discovery")
 
     add_paths_cfg = orchestrator_config.get('additional_paths', {})
     if not isinstance(add_paths_cfg, dict):
@@ -219,9 +212,8 @@ class PathDiscovery:
       path = self.base_path / path_str
       if path.exists() and path.is_dir():
         self._discovered_paths.add(path.resolve())
-        if LOGGER_AVAILABLE:
-          msg = self._get_message('path_discovery.path_added', path=str(path))
-          logger.debug(msg, component="path_discovery")
+        msg = self._get_message('path_discovery.path_added', path=str(path))
+        logger.debug(msg, component="path_discovery")
   
   def scan_for_modules(self, module_paths: List[Path]) -> Dict[str, Path]:
     """
@@ -242,10 +234,9 @@ class PathDiscovery:
       modules = self._scan_single_path(path)
       self._module_locations.update(modules)
     
-    if LOGGER_AVAILABLE:
-      msg = self._get_message('path_discovery.info.modules_found',
-                  count=len(self._module_locations))
-      logger.info(msg, component="path_discovery")
+    msg = self._get_message('path_discovery.info.modules_found',
+                count=len(self._module_locations))
+    logger.info(msg, component="path_discovery")
     
     return self._module_locations.copy()
   
@@ -272,15 +263,13 @@ class PathDiscovery:
         if self._is_module_directory(item):
           module_name = item.name
           modules[module_name] = item.resolve()
-          if LOGGER_AVAILABLE:
-            msg = self._get_message('path_discovery.module_found', 
-                       name=module_name, path=str(item))
-            logger.debug(msg, component="path_discovery")
+          msg = self._get_message('path_discovery.module_found', 
+                     name=module_name, path=str(item))
+          logger.debug(msg, component="path_discovery")
             
     except PermissionError as e:
-      if LOGGER_AVAILABLE:
-        msg = self._get_message('path_discovery.permission_denied', path=str(path))
-        logger.warning(msg, component="path_discovery")
+      msg = self._get_message('path_discovery.permission_denied', path=str(path))
+      logger.warning(msg, component="path_discovery")
     
     return modules
   
@@ -367,13 +356,11 @@ class PathDiscovery:
       with open(cache_file, 'w') as f:
         json.dump(cache_data, f, indent=2)
       
-      if LOGGER_AVAILABLE:
-        msg = self._get_message('path_discovery.cache_saved', file=str(cache_file))
-        logger.debug(msg, component="path_discovery")
+      msg = self._get_message('path_discovery.cache_saved', file=str(cache_file))
+      logger.debug(msg, component="path_discovery")
     except Exception as e:
-      if LOGGER_AVAILABLE:
-        msg = self._get_message('path_discovery.errors.cache_save_failed', error=str(e))
-        logger.warning(msg, component="path_discovery")
+      msg = self._get_message('path_discovery.errors.cache_save_failed', error=str(e))
+      logger.warning(msg, component="path_discovery")
   
   def load_cache(self, cache_file: Path = None) -> bool:
     """
@@ -400,14 +387,12 @@ class PathDiscovery:
         k: Path(v) for k, v in cache_data.get('modules', {}).items()
       }
       
-      if LOGGER_AVAILABLE:
-        msg = self._get_message('path_discovery.cache_loaded', file=str(cache_file))
-        logger.debug(msg, component="path_discovery")
+      msg = self._get_message('path_discovery.cache_loaded', file=str(cache_file))
+      logger.debug(msg, component="path_discovery")
       
       return True
       
     except Exception as e:
-      if LOGGER_AVAILABLE:
-        msg = self._get_message('path_discovery.errors.cache_load_failed', error=str(e))
-        logger.warning(msg, component="path_discovery")
+      msg = self._get_message('path_discovery.errors.cache_load_failed', error=str(e))
+      logger.warning(msg, component="path_discovery")
       return False

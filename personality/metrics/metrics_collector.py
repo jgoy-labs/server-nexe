@@ -18,7 +18,6 @@ from ..data.models import ModuleInfo, ModuleState, SystemMetrics
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 __all__ = ['MetricsCollector']
 
@@ -73,12 +72,11 @@ class MetricsCollector:
         
         module_info.last_activity = datetime.now(timezone.utc)
       
-      if LOGGER_AVAILABLE:
-        msg = self._get_message('metrics.updated', module=module_name)
-        logger.debug(msg, 
-              component="metrics", 
-              module=module_name, 
-              **{k: v for k, v in metrics.items() if isinstance(v, (int, float, str))})
+      msg = self._get_message('metrics.updated', module=module_name)
+      logger.debug(msg, 
+            component="metrics", 
+            module=module_name, 
+            **{k: v for k, v in metrics.items() if isinstance(v, (int, float, str))})
   
   def get_system_metrics(self, modules: Dict[str, ModuleInfo]) -> SystemMetrics:
     """
@@ -240,9 +238,8 @@ class MetricsCollector:
       count = len(self._metrics_history)
       self._metrics_history.clear()
       
-      if LOGGER_AVAILABLE:
-        msg = self._get_message('metrics.history_cleared', count=count)
-        logger.info(msg, component="metrics")
+      msg = self._get_message('metrics.history_cleared', count=count)
+      logger.info(msg, component="metrics")
       
       return count
   

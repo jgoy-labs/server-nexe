@@ -38,7 +38,6 @@ except ImportError:
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 if not SECURITY_VALIDATION_AVAILABLE:
   logger.warning("Security validation not available - validate_safe_path not found")
@@ -155,9 +154,8 @@ class ModuleManager:
 
   def _log_init(self) -> None:
     """Log d'inicialització."""
-    if LOGGER_AVAILABLE:
-      logger.info(get_message(self.i18n, 'init.started'), component="module_manager")
-      logger.info(get_message(self.i18n, 'init.config_loaded', path=str(self.config_path)))
+    logger.info(get_message(self.i18n, 'init.started'), component="module_manager")
+    logger.info(get_message(self.i18n, 'init.config_loaded', path=str(self.config_path)))
 
   async def discover_modules(self, force: bool = False) -> List[str]:
     """Descobreix mòduls disponibles."""
@@ -176,9 +174,8 @@ class ModuleManager:
       if module_name not in self._modules:
         await self.discover_modules()
         if module_name not in self._modules:
-          if LOGGER_AVAILABLE:
-            msg = get_message(self.i18n, 'loading.not_found', module=module_name)
-            logger.error(msg, component="module_manager")
+          msg = get_message(self.i18n, 'loading.not_found', module=module_name)
+          logger.error(msg, component="module_manager")
           return False
     return await self.module_lifecycle.load_module(module_name)
 
@@ -218,8 +215,7 @@ class ModuleManager:
       return False
 
     if '/core/' in str(module.path) and not enabled:
-      if LOGGER_AVAILABLE:
-        logger.warning(f"Cannot disable core module: {module_name}")
+      logger.warning(f"Cannot disable core module: {module_name}")
       return False
 
     success = self.config_manager.update_module_enabled(module_name, enabled, module.path)
@@ -272,8 +268,7 @@ class ModuleManager:
     """Estableix l'API integrator."""
     self.api_integrator = api_integrator
     self.module_lifecycle.set_api_integrator(api_integrator)
-    if LOGGER_AVAILABLE:
-      logger.info(get_message(self.i18n, 'api.integrator.set'))
+    logger.info(get_message(self.i18n, 'api.integrator.set'))
 
   async def load_memory_modules(self, config: dict = None) -> Dict[str, Any]:
     """

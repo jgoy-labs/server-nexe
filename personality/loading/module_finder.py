@@ -17,7 +17,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class ModuleFinder:
   """Cerca fitxers API per a mòduls"""
@@ -54,10 +53,9 @@ class ModuleFinder:
 
       if candidate.exists() and candidate.is_file():
         if candidate.suffix == python_ext:
-          if LOGGER_AVAILABLE:
-            msg = get_message(self.i18n, 'loader.debug.found_api_file',
-                    file=str(candidate))
-            logger.debug(msg, component="loader", module=module_name)
+          msg = get_message(self.i18n, 'loader.debug.found_api_file',
+                  file=str(candidate))
+          logger.debug(msg, component="loader", module=module_name)
           return candidate
 
     return None
@@ -73,10 +71,9 @@ class ModuleFinder:
     for py_file in py_files:
       name = py_file.stem
       if not name.startswith(ignore_prefixes) and name != ignore_setup:
-        if LOGGER_AVAILABLE:
-          msg = get_message(self.i18n, 'loader.debug.fallback_api_file',
-                  file=str(py_file))
-          logger.debug(msg, component="loader", module=module_name)
+        msg = get_message(self.i18n, 'loader.debug.fallback_api_file',
+                file=str(py_file))
+        logger.debug(msg, component="loader", module=module_name)
         return py_file
 
     return None

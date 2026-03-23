@@ -26,7 +26,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 
 class ConfigManager:
@@ -113,9 +112,8 @@ class ConfigManager:
         i18n=self.i18n
       )
     except Exception as e:
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'init.config_error', error=str(e))
-        logger.error(msg, component="config_manager")
+      msg = get_message(self.i18n, 'init.config_error', error=str(e))
+      logger.error(msg, component="config_manager")
       self._config = {}
 
   def get_config(self) -> Dict[str, Any]:

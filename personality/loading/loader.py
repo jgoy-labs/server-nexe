@@ -34,7 +34,6 @@ from .module_lifecycle import ModuleLifecycle
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 
 class ModuleLoader:
@@ -94,9 +93,8 @@ class ModuleLoader:
     module_name = module_info.name
     module_path = module_info.path
 
-    if LOGGER_AVAILABLE:
-      msg = get_message(self.i18n, 'loading.starting', module=module_name)
-      logger.info(msg, component="loader", module=module_name)
+    msg = get_message(self.i18n, 'loading.starting', module=module_name)
+    logger.info(msg, component="loader", module=module_name)
 
     api_file = self.finder.find_api_file(module_path, module_name)
 
@@ -115,9 +113,8 @@ class ModuleLoader:
         module=module_name, patterns=error_details
       )
 
-      if LOGGER_AVAILABLE:
-        logger.error(error_msg, component="loader", module=module_name,
-              patterns=tried_patterns)
+      logger.error(error_msg, component="loader", module=module_name,
+            patterns=tried_patterns)
 
       raise ImportError(error_msg)
 
@@ -134,9 +131,8 @@ class ModuleLoader:
 
       self._loaded_modules[module_name] = module_instance
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'loading.success', module=module_name)
-        logger.info(msg, component="loader", module=module_name)
+      msg = get_message(self.i18n, 'loading.success', module=module_name)
+      logger.info(msg, component="loader", module=module_name)
 
       return module_instance
 
@@ -147,9 +143,8 @@ class ModuleLoader:
       error_msg = get_message(self.i18n, 'loading.error',
                   module=module_name, error=str(e))
 
-      if LOGGER_AVAILABLE:
-        logger.error(error_msg, component="loader", module=module_name,
-              exc_info=True, stack_trace=traceback.format_exc())
+      logger.error(error_msg, component="loader", module=module_name,
+            exc_info=True, stack_trace=traceback.format_exc())
 
       raise ImportError(error_msg) from e
 
@@ -164,10 +159,9 @@ class ModuleLoader:
 
     modules_removed = self.importer.cleanup_module(module_name)
 
-    if LOGGER_AVAILABLE:
-      msg = get_message(self.i18n, 'loader.debug.cleanup_completed',
-              module=module_name)
-      logger.debug(msg, component="loader", modules_removed=modules_removed)
+    msg = get_message(self.i18n, 'loader.debug.cleanup_completed',
+            module=module_name)
+    logger.debug(msg, component="loader", modules_removed=modules_removed)
 
   async def unload_module(self, module_name: str) -> bool:
     """
@@ -188,18 +182,16 @@ class ModuleLoader:
 
       modules_removed = self.importer.cleanup_module(module_name)
 
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'unloading.success', module=module_name)
-        logger.info(msg, component="loader", module=module_name,
-             sys_modules_removed=modules_removed)
+      msg = get_message(self.i18n, 'unloading.success', module=module_name)
+      logger.info(msg, component="loader", module=module_name,
+           sys_modules_removed=modules_removed)
 
       return True
 
     except (ImportError, AttributeError, ValueError, TypeError, IOError) as e:
-      if LOGGER_AVAILABLE:
-        msg = get_message(self.i18n, 'unloading.error',
-                module=module_name, error=str(e))
-        logger.error(msg, component="loader", module=module_name, exc_info=True)
+      msg = get_message(self.i18n, 'unloading.error',
+              module=module_name, error=str(e))
+      logger.error(msg, component="loader", module=module_name, exc_info=True)
       return False
 
   def get_loaded_modules(self) -> List[str]:
@@ -226,10 +218,9 @@ class ModuleLoader:
     """
     module_name = module_info.name
 
-    if LOGGER_AVAILABLE:
-      msg = get_message(self.i18n, 'loader.debug.reloading_module',
-              module=module_name)
-      logger.info(msg, component="loader", module=module_name)
+    msg = get_message(self.i18n, 'loader.debug.reloading_module',
+            module=module_name)
+    logger.info(msg, component="loader", module=module_name)
 
     if self.is_module_loaded(module_name):
       await self.unload_module(module_name)

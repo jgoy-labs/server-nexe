@@ -20,7 +20,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 try:
   from personality.auto_clean.core.registry import IntegrityChecker
@@ -181,6 +180,5 @@ class ModuleValidator:
       )
 
       warnings.warn(warning_msg)
-      if LOGGER_AVAILABLE:
-        logger.warning(warning_msg, component="loader",
-               module=module_info.name, missing_deps=missing_deps)
+      logger.warning(warning_msg, component="loader",
+             module=module_info.name, missing_deps=missing_deps)

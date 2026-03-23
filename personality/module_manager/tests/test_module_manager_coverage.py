@@ -9,6 +9,17 @@ from unittest.mock import MagicMock, AsyncMock, patch
 from personality.data.models import ModuleInfo, ModuleState
 
 
+@pytest.fixture(autouse=True)
+def ensure_event_loop():
+    """Ensure an event loop exists for ModuleManager which uses async internals."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    yield
+
+
 class TestModuleManagerInit:
     """Test initialization paths."""
 

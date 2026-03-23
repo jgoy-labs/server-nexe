@@ -104,7 +104,7 @@ class TestModuleLifecycleManagerLoad:
   @pytest.mark.asyncio
   async def test_load_nonexistent_module(self, lifecycle_manager, mock_lock):
     """Should return False for non-existent module."""
-    result = await lifecycle_manager.load_module("nonexistent", mock_lock)
+    result = await lifecycle_manager.load_module("nonexistent")
 
     assert result is False
 
@@ -114,7 +114,7 @@ class TestModuleLifecycleManagerLoad:
     mock_module_info.state = ModuleState.LOADED
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.load_module("test", mock_lock)
+    result = await lifecycle_manager.load_module("test")
 
     assert result is True
 
@@ -124,7 +124,7 @@ class TestModuleLifecycleManagerLoad:
     mock_module_info.state = ModuleState.RUNNING
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.load_module("test", mock_lock)
+    result = await lifecycle_manager.load_module("test")
 
     assert result is True
 
@@ -134,7 +134,7 @@ class TestModuleLifecycleManagerLoad:
     mock_module_info.enabled = False
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.load_module("test", mock_lock)
+    result = await lifecycle_manager.load_module("test")
 
     assert result is False
 
@@ -144,7 +144,7 @@ class TestModuleLifecycleManagerLoad:
     mock_module_info.state = ModuleState.LOADING
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.load_module("test", mock_lock)
+    result = await lifecycle_manager.load_module("test")
 
     assert result is False
 
@@ -153,7 +153,7 @@ class TestModuleLifecycleManagerLoad:
     """Should load module successfully."""
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.load_module("test", mock_lock)
+    result = await lifecycle_manager.load_module("test")
 
     assert result is True
     assert mock_module_info.state == ModuleState.LOADED
@@ -169,7 +169,7 @@ class TestModuleLifecycleManagerLoad:
     lifecycle_manager.set_api_integrator(mock_integrator)
     lifecycle_manager.modules["test"] = mock_module_info
 
-    await lifecycle_manager.load_module("test", mock_lock)
+    await lifecycle_manager.load_module("test")
 
     mock_integrator.integrate_module_api.assert_called_once()
 
@@ -179,7 +179,7 @@ class TestModuleLifecycleManagerLoad:
     lifecycle_manager.loader.load_module = AsyncMock(side_effect=Exception("Load failed"))
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.load_module("test", mock_lock)
+    result = await lifecycle_manager.load_module("test")
 
     assert result is False
     assert mock_module_info.state == ModuleState.ERROR
@@ -208,7 +208,7 @@ class TestModuleLifecycleManagerLoad:
     lifecycle_manager.modules["dependency"] = dep_module
     lifecycle_manager.modules["main"] = main_module
 
-    result = await lifecycle_manager.load_module("main", mock_lock)
+    result = await lifecycle_manager.load_module("main")
 
     assert result is True
     assert dep_module.state == ModuleState.LOADED
@@ -232,7 +232,7 @@ class TestModuleLifecycleManagerLoad:
     lifecycle_manager.modules["dependency"] = dep_module
     lifecycle_manager.modules["main"] = main_module
 
-    result = await lifecycle_manager.load_module("main", mock_lock)
+    result = await lifecycle_manager.load_module("main")
 
     assert result is False
 
@@ -242,7 +242,7 @@ class TestModuleLifecycleManagerStart:
   @pytest.mark.asyncio
   async def test_start_nonexistent(self, lifecycle_manager, mock_lock):
     """Should return False for non-existent module."""
-    result = await lifecycle_manager.start_module("nonexistent", mock_lock)
+    result = await lifecycle_manager.start_module("nonexistent")
 
     assert result is False
 
@@ -252,7 +252,7 @@ class TestModuleLifecycleManagerStart:
     mock_module_info.state = ModuleState.RUNNING
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.start_module("test", mock_lock)
+    result = await lifecycle_manager.start_module("test")
 
     assert result is True
 
@@ -262,7 +262,7 @@ class TestModuleLifecycleManagerStart:
     mock_module_info.state = ModuleState.DISCOVERED
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.start_module("test", mock_lock)
+    result = await lifecycle_manager.start_module("test")
 
     assert result is True
     lifecycle_manager.loader.load_module.assert_called()
@@ -276,7 +276,7 @@ class TestModuleLifecycleManagerStart:
     mock_module_info.instance = mock_instance
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.start_module("test", mock_lock)
+    result = await lifecycle_manager.start_module("test")
 
     assert result is True
     mock_instance.start.assert_called_once()
@@ -291,7 +291,7 @@ class TestModuleLifecycleManagerStart:
     mock_module_info.instance = mock_instance
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.start_module("test", mock_lock)
+    result = await lifecycle_manager.start_module("test")
 
     assert result is True
     mock_instance.start.assert_called_once()
@@ -305,7 +305,7 @@ class TestModuleLifecycleManagerStart:
     mock_module_info.instance = mock_instance
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.start_module("test", mock_lock)
+    result = await lifecycle_manager.start_module("test")
 
     assert result is False
     assert mock_module_info.state == ModuleState.ERROR
@@ -318,7 +318,7 @@ class TestModuleLifecycleManagerStart:
     mock_module_info.instance = MagicMock()
     lifecycle_manager.modules["test"] = mock_module_info
 
-    await lifecycle_manager.start_module("test", mock_lock)
+    await lifecycle_manager.start_module("test")
 
     lifecycle_manager.events.emit_event.assert_called()
 
@@ -328,7 +328,7 @@ class TestModuleLifecycleManagerStop:
   @pytest.mark.asyncio
   async def test_stop_nonexistent(self, lifecycle_manager, mock_lock):
     """Should return True for non-existent module."""
-    result = await lifecycle_manager.stop_module("nonexistent", mock_lock)
+    result = await lifecycle_manager.stop_module("nonexistent")
 
     assert result is True
 
@@ -338,7 +338,7 @@ class TestModuleLifecycleManagerStop:
     mock_module_info.state = ModuleState.STOPPED
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.stop_module("test", mock_lock)
+    result = await lifecycle_manager.stop_module("test")
 
     assert result is True
 
@@ -351,7 +351,7 @@ class TestModuleLifecycleManagerStop:
     mock_module_info.instance = mock_instance
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.stop_module("test", mock_lock)
+    result = await lifecycle_manager.stop_module("test")
 
     assert result is True
     mock_instance.stop.assert_called_once()
@@ -367,7 +367,7 @@ class TestModuleLifecycleManagerStop:
     mock_module_info.instance = mock_instance
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.stop_module("test", mock_lock)
+    result = await lifecycle_manager.stop_module("test")
 
     assert result is True
     mock_instance.stop.assert_called_once()
@@ -379,7 +379,7 @@ class TestModuleLifecycleManagerStop:
     mock_module_info.instance = MagicMock()
     lifecycle_manager.modules["test"] = mock_module_info
 
-    await lifecycle_manager.stop_module("test", mock_lock)
+    await lifecycle_manager.stop_module("test")
 
     lifecycle_manager.loader.unload_module.assert_called_once_with("test")
 
@@ -390,7 +390,7 @@ class TestModuleLifecycleManagerStop:
     mock_module_info.instance = MagicMock()
     lifecycle_manager.modules["test"] = mock_module_info
 
-    await lifecycle_manager.stop_module("test", mock_lock)
+    await lifecycle_manager.stop_module("test")
 
     lifecycle_manager.registry.unregister_module.assert_called_once_with("test")
 
@@ -403,7 +403,7 @@ class TestModuleLifecycleManagerStop:
     mock_module_info.instance = MagicMock()
     lifecycle_manager.modules["test"] = mock_module_info
 
-    await lifecycle_manager.stop_module("test", mock_lock)
+    await lifecycle_manager.stop_module("test")
 
     mock_integrator.remove_module_api.assert_called_once_with("test")
 
@@ -414,7 +414,7 @@ class TestModuleLifecycleManagerStop:
     mock_module_info.instance = MagicMock()
     lifecycle_manager.modules["test"] = mock_module_info
 
-    await lifecycle_manager.stop_module("test", mock_lock)
+    await lifecycle_manager.stop_module("test")
 
     lifecycle_manager.events.emit_event.assert_called()
 
@@ -427,6 +427,6 @@ class TestModuleLifecycleManagerStop:
     mock_module_info.instance = mock_instance
     lifecycle_manager.modules["test"] = mock_module_info
 
-    result = await lifecycle_manager.stop_module("test", mock_lock)
+    result = await lifecycle_manager.stop_module("test")
 
     assert result is False

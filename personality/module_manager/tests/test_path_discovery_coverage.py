@@ -303,39 +303,30 @@ class TestPathDiscoveryLoggerAvailable:
         """Lines 134-138: LOGGER_AVAILABLE True branch."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             pd = PathDiscovery(strict=True)
             pd.base_path = tmp_path
             paths = pd.discover_all_paths()
             assert isinstance(paths, list)
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_add_known_paths_with_logger(self, tmp_path):
         """Lines 149-150: LOGGER_AVAILABLE True for _add_known_paths."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             (tmp_path / "plugins" / "core").mkdir(parents=True)
             pd = PathDiscovery(strict=True)
             pd.base_path = tmp_path
             pd._add_known_paths()
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_auto_discover_with_logger_max_dirs(self, tmp_path):
         """Lines 166-167: max dirs with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             for i in range(105):
                 (tmp_path / f"dir_{i:03d}").mkdir()
@@ -343,15 +334,12 @@ class TestPathDiscoveryLoggerAvailable:
             pd.base_path = tmp_path
             pd._auto_discover_paths()
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_auto_discover_with_logger_module_found(self, tmp_path):
         """Lines 184-185: auto-discovered path with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             parent = tmp_path / "plugins"
             parent.mkdir()
@@ -361,30 +349,24 @@ class TestPathDiscoveryLoggerAvailable:
             pd.base_path = tmp_path
             pd._auto_discover_paths()
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_auto_discover_permission_with_logger(self, tmp_path):
         """Lines 188-189: permission error with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             pd = PathDiscovery(strict=False)
             pd.base_path = tmp_path
             with patch.object(Path, "iterdir", side_effect=PermissionError("denied")):
                 pd._auto_discover_paths()
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_add_configured_paths_with_logger(self, tmp_path):
         """Lines 206-207: configured path added with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             modules_dir = tmp_path / "custom_modules"
             modules_dir.mkdir()
@@ -393,15 +375,12 @@ class TestPathDiscoveryLoggerAvailable:
             pd.base_path = tmp_path
             pd._add_configured_paths()
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_add_configured_additional_paths_with_logger(self, tmp_path):
         """Lines 222-223: additional paths with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             extra = tmp_path / "extra"
             extra.mkdir()
@@ -412,15 +391,12 @@ class TestPathDiscoveryLoggerAvailable:
             pd.base_path = tmp_path
             pd._add_configured_paths()
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_scan_for_modules_with_logger(self, tmp_path):
         """Lines 245-247: modules found with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             mod_dir = tmp_path / "test_module"
             mod_dir.mkdir()
@@ -430,15 +406,12 @@ class TestPathDiscoveryLoggerAvailable:
             result = pd.scan_for_modules([tmp_path])
             assert "test_module" in result
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_scan_single_path_module_found_with_logger(self, tmp_path):
         """Lines 275-277: module found in scan with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             mod = tmp_path / "mymod"
             mod.mkdir()
@@ -447,30 +420,24 @@ class TestPathDiscoveryLoggerAvailable:
             result = pd._scan_single_path(tmp_path)
             assert "mymod" in result
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_scan_single_path_permission_with_logger(self, tmp_path):
         """Lines 281-282: permission error in scan with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             pd = PathDiscovery()
             with patch.object(Path, "iterdir", side_effect=PermissionError("denied")):
                 result = pd._scan_single_path(tmp_path)
             assert result == {}
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_save_cache_with_logger(self, tmp_path):
         """Lines 370-371: cache saved with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             pd = PathDiscovery()
             pd._discovered_paths = {tmp_path / "a"}
@@ -479,29 +446,23 @@ class TestPathDiscoveryLoggerAvailable:
             pd.save_cache(cache_file)
             assert cache_file.exists()
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_save_cache_error_with_logger(self, tmp_path):
         """Lines 374-375: cache save failed with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             pd = PathDiscovery()
             with patch("builtins.open", side_effect=OSError("write error")):
                 pd.save_cache(tmp_path / "cache.json")
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_load_cache_with_logger(self, tmp_path):
         """Lines 403-404: cache loaded with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             pd = PathDiscovery()
             pd._discovered_paths = {tmp_path / "a"}
@@ -513,15 +474,12 @@ class TestPathDiscoveryLoggerAvailable:
             result = pd2.load_cache(cache_file)
             assert result is True
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
     def test_load_cache_error_with_logger(self, tmp_path):
         """Lines 410-411: cache load error with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
         import personality.module_manager.path_discovery as pdm
-
-        orig = pdm.LOGGER_AVAILABLE
-        pdm.LOGGER_AVAILABLE = True
         try:
             cache_file = tmp_path / "bad.json"
             cache_file.write_text("not json")
@@ -529,7 +487,7 @@ class TestPathDiscoveryLoggerAvailable:
             result = pd.load_cache(cache_file)
             assert result is False
         finally:
-            pdm.LOGGER_AVAILABLE = orig
+            pass
 
 
 class TestGetStats:

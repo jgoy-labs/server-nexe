@@ -18,7 +18,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 T = TypeVar('T')
 
@@ -139,7 +138,7 @@ class SyncWrapper:
 
   def _log_error(self, msg_key: str, error: Exception) -> None:
     """Log d'error amb i18n."""
-    if LOGGER_AVAILABLE and self.i18n:
+    if self.i18n:
       msg = get_message(
         self.i18n,
         f'discovery.{msg_key}',

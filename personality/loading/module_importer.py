@@ -19,7 +19,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class ModuleImporter:
   """Importa mòduls Python dinàmicament"""
@@ -51,8 +50,7 @@ class ModuleImporter:
     if spec is None or spec.loader is None:
       error_msg = get_message(self.i18n, 'loader.debug.cannot_create_spec',
                   file=str(api_file))
-      if LOGGER_AVAILABLE:
-        logger.error(error_msg, component="loader", module=module_name)
+      logger.error(error_msg, component="loader", module=module_name)
       raise ImportError(error_msg)
 
     module = importlib.util.module_from_spec(spec)

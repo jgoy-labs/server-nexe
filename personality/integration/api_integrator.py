@@ -22,7 +22,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class APIIntegrator:
   """
@@ -87,15 +86,14 @@ class APIIntegrator:
           api_prefix, registered_routes
         )
 
-        if LOGGER_AVAILABLE:
-          msg = get_message(
-            self.i18n,
-            'api_integrator.info.integration_success',
-            module=module_name
-          )
-          logger.info(msg, component="api_integrator",
-               routes_count=len(registered_routes),
-               prefix=api_prefix)
+        msg = get_message(
+          self.i18n,
+          'api_integrator.info.integration_success',
+          module=module_name
+        )
+        logger.info(msg, component="api_integrator",
+             routes_count=len(registered_routes),
+             prefix=api_prefix)
 
         return True
 
@@ -107,13 +105,12 @@ class APIIntegrator:
     api_components = self._detect_api_components(module_instance)
 
     if not api_components:
-      if LOGGER_AVAILABLE:
-        msg = get_message(
-          self.i18n,
-          'api_integrator.debug.no_api_components',
-          module=module_name
-        )
-        logger.debug(msg, component="api_integrator")
+      msg = get_message(
+        self.i18n,
+        'api_integrator.debug.no_api_components',
+        module=module_name
+      )
+      logger.debug(msg, component="api_integrator")
       return None
 
     return api_components
@@ -147,14 +144,13 @@ class APIIntegrator:
 
   def _handle_integration_error(self, module_name: str, error: Exception) -> bool:
     """Gestiona errors d'integració."""
-    if LOGGER_AVAILABLE:
-      msg = get_message(
-        self.i18n,
-        'api_integrator.errors.integration_failed',
-        module=module_name,
-        error=str(error)
-      )
-      logger.error(msg, component="api_integrator", exc_info=True)
+    msg = get_message(
+      self.i18n,
+      'api_integrator.errors.integration_failed',
+      module=module_name,
+      error=str(error)
+    )
+    logger.error(msg, component="api_integrator", exc_info=True)
     return False
 
   def remove_module_api(self, module_name: str) -> bool:
@@ -183,26 +179,24 @@ class APIIntegrator:
         self._total_routes_registered -= removed_count
         self._total_modules_integrated -= 1
         
-        if LOGGER_AVAILABLE:
-          msg = get_message(
-            self.i18n,
-            'api_integrator.info.removal_success',
-            module=module_name
-          )
-          logger.info(msg, component="api_integrator",
-               routes_removed=removed_count)
+        msg = get_message(
+          self.i18n,
+          'api_integrator.info.removal_success',
+          module=module_name
+        )
+        logger.info(msg, component="api_integrator",
+             routes_removed=removed_count)
         
         return True
         
       except Exception as e:
-        if LOGGER_AVAILABLE:
-          msg = get_message(
-            self.i18n,
-            'api_integrator.errors.removal_failed',
-            module=module_name,
-            error=str(e)
-          )
-          logger.error(msg, component="api_integrator", exc_info=True)
+        msg = get_message(
+          self.i18n,
+          'api_integrator.errors.removal_failed',
+          module=module_name,
+          error=str(e)
+        )
+        logger.error(msg, component="api_integrator", exc_info=True)
         return False
   
   def _detect_api_components(self, module_instance: Any) -> Dict[str, Any]:

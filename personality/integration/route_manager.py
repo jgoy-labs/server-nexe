@@ -19,7 +19,6 @@ from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 class RouteManager:
   """
@@ -82,24 +81,22 @@ class RouteManager:
           self._module_routes[module_name] = []
         self._module_routes[module_name].extend(registered_routes)
 
-        if LOGGER_AVAILABLE:
-          msg = get_message(
-            self.i18n,
-            'route_manager.debug.routes_registered',
-            count=len(registered_routes),
-            module=module_name
-          )
-          logger.debug(msg, component="route_manager")
+        msg = get_message(
+          self.i18n,
+          'route_manager.debug.routes_registered',
+          count=len(registered_routes),
+          module=module_name
+        )
+        logger.debug(msg, component="route_manager")
         
       except Exception as e:
-        if LOGGER_AVAILABLE:
-          msg = get_message(
-            self.i18n,
-            'route_manager.errors.failed_to_register',
-            module=module_name,
-            error=str(e)
-          )
-          logger.error(msg, component="route_manager", exc_info=True)
+        msg = get_message(
+          self.i18n,
+          'route_manager.errors.failed_to_register',
+          module=module_name,
+          error=str(e)
+        )
+        logger.error(msg, component="route_manager", exc_info=True)
       
       return registered_routes
   
@@ -132,14 +129,13 @@ class RouteManager:
       self.main_app.include_router(prefixed_router)
 
     except Exception as e:
-      if LOGGER_AVAILABLE:
-        msg = get_message(
-          self.i18n,
-          'route_manager.errors.error_registering_router',
-          module=module_name,
-          error=str(e)
-        )
-        logger.error(msg, component="route_manager")
+      msg = get_message(
+        self.i18n,
+        'route_manager.errors.error_registering_router',
+        module=module_name,
+        error=str(e)
+      )
+      logger.error(msg, component="route_manager")
     
     return registered_routes
   
@@ -165,14 +161,13 @@ class RouteManager:
           self._route_conflicts[full_path] = module_name
 
     except Exception as e:
-      if LOGGER_AVAILABLE:
-        msg = get_message(
-          self.i18n,
-          'route_manager.errors.error_mounting_app',
-          module=module_name,
-          error=str(e)
-        )
-        logger.error(msg, component="route_manager")
+      msg = get_message(
+        self.i18n,
+        'route_manager.errors.error_mounting_app',
+        module=module_name,
+        error=str(e)
+      )
+      logger.error(msg, component="route_manager")
     
     return registered_routes
   
@@ -196,15 +191,14 @@ class RouteManager:
     """
     if path in self._route_conflicts:
       existing_module = self._route_conflicts[path]
-      if LOGGER_AVAILABLE:
-        msg = get_message(
-          self.i18n,
-          'route_manager.warnings.route_conflict',
-          path=path,
-          existing_module=existing_module,
-          module=module_name
-        )
-        logger.warning(msg, component="route_manager")
+      msg = get_message(
+        self.i18n,
+        'route_manager.warnings.route_conflict',
+        path=path,
+        existing_module=existing_module,
+        module=module_name
+      )
+      logger.warning(msg, component="route_manager")
       return True
     return False
   
@@ -234,24 +228,22 @@ class RouteManager:
         
         del self._module_routes[module_name]
         
-        if LOGGER_AVAILABLE:
-          msg = get_message(
-            self.i18n,
-            'route_manager.info.routes_removed',
-            count=removed_count,
-            module=module_name
-          )
-          logger.info(msg, component="route_manager")
+        msg = get_message(
+          self.i18n,
+          'route_manager.info.routes_removed',
+          count=removed_count,
+          module=module_name
+        )
+        logger.info(msg, component="route_manager")
         
       except Exception as e:
-        if LOGGER_AVAILABLE:
-          msg = get_message(
-            self.i18n,
-            'route_manager.errors.error_removing_routes',
-            module=module_name,
-            error=str(e)
-          )
-          logger.error(msg, component="route_manager")
+        msg = get_message(
+          self.i18n,
+          'route_manager.errors.error_removing_routes',
+          module=module_name,
+          error=str(e)
+        )
+        logger.error(msg, component="route_manager")
       
       return removed_count
   

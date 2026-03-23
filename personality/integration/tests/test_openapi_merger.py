@@ -33,11 +33,10 @@ class TestMergeModuleOpenapi:
         assert "test_module" in merger._module_specs
 
     def test_merge_with_logger_available(self, merger_with_i18n):
-        """Lines 68-74: merge with LOGGER_AVAILABLE=True."""
-        with patch("personality.integration.openapi_merger.LOGGER_AVAILABLE", True):
-            result = merger_with_i18n.merge_module_openapi(
-                "mod1", {"ep": {}}, "/api/mod1"
-            )
+        """Lines 68-74: merge with logger (LOGGER_AVAILABLE guard removed)."""
+        result = merger_with_i18n.merge_module_openapi(
+            "mod1", {"ep": {}}, "/api/mod1"
+        )
         assert result is True
 
     def test_merge_exception_returns_false(self, merger):
@@ -48,9 +47,8 @@ class TestMergeModuleOpenapi:
         assert result is False
 
     def test_merge_exception_with_logger(self, merger_with_i18n):
-        """Lines 79-86: exception with logger available."""
-        with patch("personality.integration.openapi_merger.LOGGER_AVAILABLE", True), \
-             patch("personality.integration.openapi_merger.logger") as mock_logger, \
+        """Lines 79-86: exception with logger (LOGGER_AVAILABLE guard removed)."""
+        with patch("personality.integration.openapi_merger.logger") as mock_logger, \
              patch.object(merger_with_i18n, '_extract_module_openapi',
                           side_effect=RuntimeError("fail")):
             result = merger_with_i18n.merge_module_openapi("bad_mod", {}, "/api/bad")
@@ -78,10 +76,9 @@ class TestRemoveModuleOpenapi:
         assert result is True
 
     def test_remove_with_logger(self, merger_with_i18n):
-        """Lines 107-113: remove with LOGGER_AVAILABLE=True."""
+        """Lines 107-113: remove with logger (LOGGER_AVAILABLE guard removed)."""
         merger_with_i18n._module_specs["mod1"] = {"prefix": "/api"}
-        with patch("personality.integration.openapi_merger.LOGGER_AVAILABLE", True):
-            result = merger_with_i18n.remove_module_openapi("mod1")
+        result = merger_with_i18n.remove_module_openapi("mod1")
         assert result is True
 
     def test_remove_exception_returns_false(self, merger):
@@ -93,10 +90,9 @@ class TestRemoveModuleOpenapi:
         assert result is False
 
     def test_remove_exception_with_logger(self, merger_with_i18n):
-        """Lines 118-125: exception with logger available."""
+        """Lines 118-125: exception with logger (LOGGER_AVAILABLE guard removed)."""
         merger_with_i18n._module_specs["mod"] = {"prefix": "/api"}
-        with patch("personality.integration.openapi_merger.LOGGER_AVAILABLE", True), \
-             patch("personality.integration.openapi_merger.logger") as mock_logger, \
+        with patch("personality.integration.openapi_merger.logger") as mock_logger, \
              patch.object(merger_with_i18n, '_regenerate_unified_openapi',
                           side_effect=RuntimeError("fail")):
             result = merger_with_i18n.remove_module_openapi("mod")

@@ -19,7 +19,6 @@ from ..data.models import SystemEvent
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-LOGGER_AVAILABLE = True
 
 __all__ = ['EventSystem']
 
@@ -91,9 +90,8 @@ class EventSystem:
 
     try:
       loop = asyncio.get_running_loop()
-      if LOGGER_AVAILABLE:
-        msg = self.i18n.t('sync.called_from_active_loop') if self.i18n else "emit_event_sync() called from active event loop"
-        logger.warning(msg, component="event_system")
+      msg = self.i18n.t('sync.called_from_active_loop') if self.i18n else "emit_event_sync() called from active event loop"
+      logger.warning(msg, component="event_system")
       self._add_to_history(event)
       msg = self.i18n.t('sync.added_to_history_only', event_type=event.event_type) if self.i18n else f"Event {event.event_type} added to history but not emitted (in active loop)"
       logger.info(msg, component="event_system")
@@ -104,13 +102,12 @@ class EventSystem:
     try:
       asyncio.run(self.emit_event(event))
     except Exception as e:
-      if LOGGER_AVAILABLE:
-        logger.error(
-          "Failed to emit event sync: %s",
-          e,
-          component="event_system",
-          exc_info=True
-        )
+      logger.error(
+        "Failed to emit event sync: %s",
+        e,
+        component="event_system",
+        exc_info=True
+      )
       raise
 
   async def _emit_to_callbacks(self, callbacks: List[Callable], event: SystemEvent) -> None:
@@ -130,14 +127,13 @@ class EventSystem:
         if self.i18n:
           error_msg = self.i18n.t('module_manager.events.callback_error', error=str(e))
         
-        if LOGGER_AVAILABLE:
-          logger.warning(error_msg, 
-                 component="event_system", 
-                 event_type=event.event_type,
-                 source=event.source,
-                 callback_name=getattr(callback, '__name__', 'anonymous'),
-                 exc_info=True, 
-                 stack_trace=traceback.format_exc())
+        logger.warning(error_msg, 
+               component="event_system", 
+               event_type=event.event_type,
+               source=event.source,
+               callback_name=getattr(callback, '__name__', 'anonymous'),
+               exc_info=True, 
+               stack_trace=traceback.format_exc())
   
   def _add_to_history(self, event: SystemEvent) -> None:
     """Add event to history with size management"""
@@ -162,16 +158,15 @@ class EventSystem:
     else:
       self._event_callbacks.append(callback)
     
-    if LOGGER_AVAILABLE:
-      callback_name = getattr(callback, '__name__', 'anonymous')
-      logger.debug(
-        self.i18n.t('module_manager.events.callback_registered', callback_name=callback_name) 
-        if self.i18n else f"Event callback registered: {callback_name}",
-        component="event_system", 
-        callback_name=callback_name,
-        event_type=event_type or "all",
-        total_callbacks=len(self._event_callbacks) + sum(len(cb_list) for cb_list in self._typed_callbacks.values())
-      )
+    callback_name = getattr(callback, '__name__', 'anonymous')
+    logger.debug(
+      self.i18n.t('module_manager.events.callback_registered', callback_name=callback_name) 
+      if self.i18n else f"Event callback registered: {callback_name}",
+      component="event_system", 
+      callback_name=callback_name,
+      event_type=event_type or "all",
+      total_callbacks=len(self._event_callbacks) + sum(len(cb_list) for cb_list in self._typed_callbacks.values())
+    )
   
   def remove_event_listener(self, callback: Callable[[SystemEvent], None], 
               event_type: str = None) -> bool:
@@ -193,15 +188,14 @@ class EventSystem:
       else:
         self._event_callbacks.remove(callback)
       
-      if LOGGER_AVAILABLE:
-        callback_name = getattr(callback, '__name__', 'anonymous')
-        logger.debug(
-          self.i18n.t('module_manager.events.callback_removed', callback_name=callback_name)
-          if self.i18n else f"Event callback removed: {callback_name}",
-          component="event_system",
-          callback_name=callback_name,
-          event_type=event_type or "all"
-        )
+      callback_name = getattr(callback, '__name__', 'anonymous')
+      logger.debug(
+        self.i18n.t('module_manager.events.callback_removed', callback_name=callback_name)
+        if self.i18n else f"Event callback removed: {callback_name}",
+        component="event_system",
+        callback_name=callback_name,
+        event_type=event_type or "all"
+      )
       return True
       
     except ValueError:
@@ -228,9 +222,8 @@ class EventSystem:
       self._event_callbacks.clear()
       self._typed_callbacks.clear()
     
-    if LOGGER_AVAILABLE:
-      msg = self.i18n.t('module_manager.events.callbacks_cleared', count=count) if self.i18n else f"Cleared {count} event callbacks"
-      logger.info(msg, component="event_system", cleared=count, event_type=event_type or "all")
+    msg = self.i18n.t('module_manager.events.callbacks_cleared', count=count) if self.i18n else f"Cleared {count} event callbacks"
+    logger.info(msg, component="event_system", cleared=count, event_type=event_type or "all")
     
     return count
   
@@ -275,8 +268,7 @@ class EventSystem:
     count = len(self._event_history)
     self._event_history.clear()
     
-    if LOGGER_AVAILABLE:
-      logger.info("Event history cleared: %s events", count, component="event_system")
+    logger.info("Event history cleared: %s events", count, component="event_system")
 
     return count
   
