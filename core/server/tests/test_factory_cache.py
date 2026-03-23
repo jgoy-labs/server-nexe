@@ -10,6 +10,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import asyncio
 import pytest
 import time
 import os
@@ -25,8 +26,16 @@ def cleanup_app_cache(monkeypatch):
 
   Essencial per evitar estat compartit entre tests.
   """
+  # Ensure event loop exists for create_app (uses async internals)
+  try:
+    asyncio.get_running_loop()
+  except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
   monkeypatch.setenv("NEXE_ENV", "development")
   monkeypatch.setenv("NEXE_ADMIN_API_KEY", "test-key-" + os.urandom(16).hex())
+  monkeypatch.setenv("NEXE_APPROVED_MODULES", "security")
 
   yield
 

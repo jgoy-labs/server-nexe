@@ -89,36 +89,35 @@ class PersistenceManager:
     """Initialize SQLite database with WAL mode"""
     self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    conn = self._connect_sqlite()
-    cursor = conn.cursor()
+    with self._connect_sqlite() as conn:
+      cursor = conn.cursor()
 
-    cursor.execute("PRAGMA journal_mode=WAL")
+      cursor.execute("PRAGMA journal_mode=WAL")
 
-    cursor.execute("""
-      CREATE TABLE IF NOT EXISTS memory_entries (
-        id TEXT PRIMARY KEY,
-        entry_type TEXT NOT NULL,
-        content TEXT NOT NULL,
-        source TEXT NOT NULL,
-        timestamp REAL NOT NULL,
-        ttl_seconds INTEGER,
-        metadata_json TEXT,
-        created_at REAL DEFAULT (julianday('now'))
-      )
-    """)
+      cursor.execute("""
+        CREATE TABLE IF NOT EXISTS memory_entries (
+          id TEXT PRIMARY KEY,
+          entry_type TEXT NOT NULL,
+          content TEXT NOT NULL,
+          source TEXT NOT NULL,
+          timestamp REAL NOT NULL,
+          ttl_seconds INTEGER,
+          metadata_json TEXT,
+          created_at REAL DEFAULT (julianday('now'))
+        )
+      """)
 
-    cursor.execute("""
-      CREATE INDEX IF NOT EXISTS idx_entry_type
-      ON memory_entries(entry_type)
-    """)
+      cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_entry_type
+        ON memory_entries(entry_type)
+      """)
 
-    cursor.execute("""
-      CREATE INDEX IF NOT EXISTS idx_timestamp
-      ON memory_entries(timestamp DESC)
-    """)
+      cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_timestamp
+        ON memory_entries(timestamp DESC)
+      """)
 
-    conn.commit()
-    conn.close()
+      conn.commit()
 
     logger.info("SQLite initialized with WAL mode")
 
@@ -239,31 +238,29 @@ class PersistenceManager:
     loop = asyncio.get_running_loop()
 
     def _sync_store():
-      conn = self._connect_sqlite()
-      cursor = conn.cursor()
+      with self._connect_sqlite() as conn:
+        cursor = conn.cursor()
 
+        metadata_json = json.dumps(entry.metadata) if entry.metadata else None
 
-      metadata_json = json.dumps(entry.metadata) if entry.metadata else None
+        # Use UNIX timestamp (seconds since epoch) - industry standard
+        unix_timestamp = entry.timestamp.timestamp()
 
-      # Use UNIX timestamp (seconds since epoch) - industry standard
-      unix_timestamp = entry.timestamp.timestamp()
+        cursor.execute("""
+          INSERT OR REPLACE INTO memory_entries
+          (id, entry_type, content, source, timestamp, ttl_seconds, metadata_json)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+          entry.id,
+          entry.entry_type,
+          entry.content,
+          entry.source,
+          unix_timestamp,
+          entry.ttl_seconds,
+          metadata_json
+        ))
 
-      cursor.execute("""
-        INSERT OR REPLACE INTO memory_entries
-        (id, entry_type, content, source, timestamp, ttl_seconds, metadata_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      """, (
-        entry.id,
-        entry.entry_type,
-        entry.content,
-        entry.source,
-        unix_timestamp,
-        entry.ttl_seconds,
-        metadata_json
-      ))
-
-      conn.commit()
-      conn.close()
+        conn.commit()
 
     await loop.run_in_executor(self.executor, _sync_store)
     logger.debug("Stored entry %s to SQLite", entry.id)
@@ -316,11 +313,10 @@ class PersistenceManager:
     loop = asyncio.get_running_loop()
 
     def _sync_delete():
-      conn = self._connect_sqlite()
-      cursor = conn.cursor()
-      cursor.execute("DELETE FROM memory_entries WHERE id = ?", (entry_id,))
-      conn.commit()
-      conn.close()
+      with self._connect_sqlite() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM memory_entries WHERE id = ?", (entry_id,))
+        conn.commit()
 
     await loop.run_in_executor(self.executor, _sync_delete)
     logger.debug("Deleted entry %s from SQLite (rollback)", entry_id)
@@ -330,17 +326,16 @@ class PersistenceManager:
     loop = asyncio.get_running_loop()
 
     def _sync_get():
-      conn = self._connect_sqlite()
-      cursor = conn.cursor()
+      with self._connect_sqlite() as conn:
+        cursor = conn.cursor()
 
-      cursor.execute("""
-        SELECT id, entry_type, content, source, timestamp, ttl_seconds, metadata_json
-        FROM memory_entries
-        WHERE id = ?
-      """, (entry_id,))
+        cursor.execute("""
+          SELECT id, entry_type, content, source, timestamp, ttl_seconds, metadata_json
+          FROM memory_entries
+          WHERE id = ?
+        """, (entry_id,))
 
-      row = cursor.fetchone()
-      conn.close()
+        row = cursor.fetchone()
 
       if not row:
         return None

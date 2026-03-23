@@ -220,7 +220,7 @@ class TestPreConfiguredBreakers:
     """Qdrant breaker està configurat"""
     assert qdrant_breaker is not None
     assert qdrant_breaker.name == "qdrant"
-    assert qdrant_breaker.config.failure_threshold == 5
+    assert qdrant_breaker.config.failure_threshold == 3
     assert qdrant_breaker.config.timeout_seconds == 30
 
   def test_http_breaker_exists(self):

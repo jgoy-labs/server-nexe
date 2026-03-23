@@ -89,7 +89,10 @@ async def store_document(
     content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
     doc_id = content_hash[:16]
 
-  embedding = await generate_embedding(text)
+  try:
+    embedding = await asyncio.wait_for(generate_embedding(text), timeout=30.0)
+  except asyncio.TimeoutError:
+    raise RuntimeError(f"Embedding generation timed out for text (length={len(text)})")
 
   now = datetime.now(timezone.utc)
   expires_at = None

@@ -45,13 +45,40 @@ _OLLAMA_STREAM_TIMEOUT = float(os.environ.get("NEXE_OLLAMA_STREAM_TIMEOUT", "300
 # Tracked background save tasks — prevents "Task was destroyed" warnings on shutdown
 _background_tasks: set = set()
 
+# RAG thresholds — configurable via env vars
+RAG_DOCS_THRESHOLD = float(os.environ.get('NEXE_RAG_DOCS_THRESHOLD', '0.4'))
+RAG_KNOWLEDGE_THRESHOLD = float(os.environ.get('NEXE_RAG_KNOWLEDGE_THRESHOLD', '0.35'))
+RAG_MEMORY_THRESHOLD = float(os.environ.get('NEXE_RAG_MEMORY_THRESHOLD', '0.3'))
+
 # ═══════════════════════════════════════════════════════════════════════════
 # RAG CONTEXT SANITIZATION - Prevent prompt injection via retrieved content
 # ═══════════════════════════════════════════════════════════════════════════
 import re
 
+# ═══════════════════════════════════════════════════════════════════════════
+# SSE TOKEN SANITIZATION - Strip null bytes and control chars from streaming
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Control chars to strip (except \n and \t which are valid in text)
+_CONTROL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+
+def _sanitize_sse_token(token: str) -> str:
+    """Remove null bytes and control characters from SSE token content."""
+    if not token:
+        return token
+    return _CONTROL_CHAR_RE.sub('', token)
+
 # Maximum characters for RAG context injection
 MAX_RAG_CONTEXT_LENGTH = 4000
+
+# RAG context window control — prevent RAG from overflowing the model's context
+MAX_CONTEXT_RATIO = float(os.environ.get('NEXE_MAX_CONTEXT_RATIO', '0.3'))
+DEFAULT_CONTEXT_WINDOW = int(os.environ.get('NEXE_DEFAULT_CONTEXT_WINDOW', '8192'))
+CHARS_PER_TOKEN_ESTIMATE = 4  # Conservative estimate (~4 chars per token)
+
+def _estimate_tokens(text: str) -> int:
+    """Rough token estimation based on character count."""
+    return len(text) // CHARS_PER_TOKEN_ESTIMATE
 
 # Patterns that could indicate prompt injection attempts in retrieved content
 _RAG_INJECTION_PATTERNS = [
@@ -250,7 +277,7 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                                 query=last_user_msg,
                                 collection="nexe_documentation",
                                 top_k=3,
-                                threshold=0.4
+                                threshold=RAG_DOCS_THRESHOLD
                             )
                             if doc_results:
                                 all_results.extend(doc_results)
@@ -265,7 +292,7 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                                 query=last_user_msg,
                                 collection="user_knowledge",
                                 top_k=3,
-                                threshold=0.35,
+                                threshold=RAG_KNOWLEDGE_THRESHOLD,
                                 filter_metadata={"lang": _server_lang}
                             )
                             if knowledge_results:
@@ -281,7 +308,7 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                                 query=last_user_msg,
                                 collection="nexe_chat_memory",
                                 top_k=2,
-                                threshold=0.3
+                                threshold=RAG_MEMORY_THRESHOLD
                             )
                             if mem_results:
                                 all_results.extend(mem_results)
@@ -294,7 +321,7 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                         seen_hashes = set()
                         unique_results = []
                         for r in all_results:
-                            content_hash = hashlib.sha256(r.text[:200].encode()).hexdigest()
+                            content_hash = hashlib.sha256(r.text[:500].encode()).hexdigest()
                             if content_hash not in seen_hashes:
                                 seen_hashes.add(content_hash)
                                 unique_results.append(r)
@@ -344,6 +371,23 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
     if context_text and messages:
         # SECURITY: Sanitize RAG context before injection
         safe_context = _sanitize_rag_context(context_text)
+
+        # CONTEXT WINDOW CONTROL: Ensure RAG doesn't overflow model context
+        total_messages_text = "".join(m.get('content', '') for m in messages)
+        used_tokens = _estimate_tokens(total_messages_text)
+        max_rag_tokens = int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO)
+        rag_tokens = _estimate_tokens(safe_context)
+
+        if rag_tokens > max_rag_tokens:
+            max_chars = max_rag_tokens * CHARS_PER_TOKEN_ESTIMATE
+            safe_context = safe_context[:max_chars]
+            logger.info(f"RAG context trimmed to fit context window: {rag_tokens} -> {max_rag_tokens} est. tokens")
+
+        remaining_budget = DEFAULT_CONTEXT_WINDOW - used_tokens - _estimate_tokens(safe_context)
+        if remaining_budget < 256:
+            # Not enough room for model response — reduce RAG further
+            safe_context = safe_context[:1000]
+            logger.warning(f"RAG context aggressively trimmed — only {remaining_budget} tokens remaining for response")
 
         # Inject RAG context into the last user message (NOT system prompt)
         # This preserves prefix caching for the system prompt
@@ -413,11 +457,13 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
     if isinstance(response, StreamingResponse):
         if "X-Nexe-Engine" not in response.headers:
             response.headers["X-Nexe-Engine"] = engine
+        response.headers["X-Nexe-RAG-Status"] = "active" if context_text else "inactive"
         if preferred_fallback and "X-Nexe-Fallback-From" not in response.headers:
             response.headers["X-Nexe-Fallback-From"] = preferred_fallback
             response.headers["X-Nexe-Fallback-Reason"] = "preferred_unavailable"
     elif isinstance(response, dict):
         response.setdefault("nexe_engine", engine)
+        response.setdefault("nexe_rag_status", "active" if context_text else "inactive")
         if preferred_fallback:
             response.setdefault(
                 "nexe_fallback",
@@ -549,7 +595,7 @@ async def _forward_to_ollama(
         "stream": request.stream,
         "options": {
             "temperature": request.temperature,
-            "num_predict": request.max_tokens or 2048
+            "num_predict": request.max_tokens or 4096
         }
     }
 
@@ -567,7 +613,7 @@ async def _forward_to_ollama(
         # Blocking call
         try:
             async with httpx.AsyncClient() as client:
-                resp = await client.post(url, json=payload, timeout=60.0)
+                resp = await client.post(url, json=payload, timeout=_OLLAMA_STREAM_TIMEOUT)
                 if resp.status_code != 200:
                     try:
                         error_detail = resp.json().get("error", "Unknown Ollama error")
@@ -590,7 +636,7 @@ async def _forward_to_ollama(
 
 async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user_msg: str = None):
     """Generator compatible amb OpenAI format (més o menys) a partir d'Ollama + Auto-Save."""
-    full_response_text = ""
+    response_parts = []
 
     try:
         async with httpx.AsyncClient(timeout=_OLLAMA_STREAM_TIMEOUT) as client:
@@ -605,11 +651,11 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
                     try:
                         # Ollama retorna JSON lines
                         data = json.loads(line)
-                        content = data.get("message", {}).get("content", "")
+                        content = _sanitize_sse_token(data.get("message", {}).get("content", ""))
                         done = data.get("done", False)
 
                         if content:
-                            full_response_text += content # Accumulate
+                            response_parts.append(content)
                             # Wrap in OpenAI-like SSe format for our client convenience
                             chunk = {
                                 "choices": [{"delta": {"content": content}}]
@@ -619,6 +665,7 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
                         if done:
                             yield "data: [DONE]\n\n"
                             # --- TRIGGER AUTO-SAVE (fire-and-forget) ---
+                            full_response_text = "".join(response_parts)
                             if app_state and user_msg and full_response_text.strip():
                                 async def _background_save_ollama():
                                     for attempt in range(2):
@@ -664,16 +711,15 @@ async def _mlx_stream_generator(
     Usa asyncio.Queue per fer pont entre el callback síncron de MLX
     i l'async generator que necessita FastAPI.
     """
-    tokens_queue: asyncio.Queue = asyncio.Queue(maxsize=512)
+    tokens_queue: asyncio.Queue = asyncio.Queue(maxsize=2048)
     loop = asyncio.get_running_loop()
     generation_done = asyncio.Event()
     result_holder = {"result": None, "error": None}
-    full_response_text = ""
+    response_parts_mlx = []
 
     def on_token(token: str):
         """Callback cridat per cada token generat (des de thread MLX)."""
-        nonlocal full_response_text
-        full_response_text += token
+        response_parts_mlx.append(token)
         try:
             # Thread-safe: posar token a la queue
             loop.call_soon_threadsafe(
@@ -720,7 +766,7 @@ async def _mlx_stream_generator(
                     "model": model_name,
                     "choices": [{
                         "index": 0,
-                        "delta": {"content": token},
+                        "delta": {"content": _sanitize_sse_token(token)},
                         "finish_reason": None
                     }]
                 }
@@ -748,6 +794,7 @@ async def _mlx_stream_generator(
         yield "data: [DONE]\n\n"
 
         # Auto-save a memòria (fire-and-forget com Ollama)
+        full_response_text = "".join(response_parts_mlx)
         if app_state and user_msg and full_response_text.strip():
             async def _background_save_mlx():
                 for attempt in range(2):
@@ -1008,16 +1055,15 @@ async def _llama_cpp_stream_generator(
     Usa asyncio.Queue per fer pont entre el callback de llama.cpp
     i l'async generator que necessita FastAPI.
     """
-    tokens_queue: asyncio.Queue = asyncio.Queue(maxsize=512)
+    tokens_queue: asyncio.Queue = asyncio.Queue(maxsize=2048)
     loop = asyncio.get_running_loop()
     generation_done = asyncio.Event()
     result_holder = {"result": None, "error": None}
-    full_response_text = ""
+    response_parts_llama = []
 
     def on_token(token: str):
         """Callback cridat per cada token generat (des de thread)."""
-        nonlocal full_response_text
-        full_response_text += token
+        response_parts_llama.append(token)
         try:
             loop.call_soon_threadsafe(
                 tokens_queue.put_nowait,
@@ -1060,7 +1106,7 @@ async def _llama_cpp_stream_generator(
                     "model": model_name,
                     "choices": [{
                         "index": 0,
-                        "delta": {"content": token},
+                        "delta": {"content": _sanitize_sse_token(token)},
                         "finish_reason": None
                     }]
                 }
@@ -1085,6 +1131,7 @@ async def _llama_cpp_stream_generator(
         yield f"data: {json.dumps(final_chunk)}\n\n"
         yield "data: [DONE]\n\n"
 
+        full_response_text = "".join(response_parts_llama)
         if app_state and user_msg and full_response_text.strip():
             async def _background_save_llama():
                 for attempt in range(2):

@@ -224,14 +224,17 @@ class TextChunker(BaseChunker):
     if not text:
       return False
 
-    if len(text) > 80:
+    if len(text) > 60:
       return False
 
     word_count = len(text.split())
-    if word_count > 10:
+    if word_count > 8:
       return False
 
     if text.endswith(".") and not re.match(r"^\d+\.", text):
+      return False
+
+    if any(c in text for c in ['?', '!', ',', ';']):
       return False
 
     if not (text[0].isupper() or text[0].isdigit()):

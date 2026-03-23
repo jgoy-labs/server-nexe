@@ -270,7 +270,7 @@ ollama_breaker = CircuitBreaker(
 qdrant_breaker = CircuitBreaker(
   "qdrant",
   CircuitBreakerConfig(
-    failure_threshold=5,
+    failure_threshold=3,
     success_threshold=2,
     timeout_seconds=30,
     max_retries=3,

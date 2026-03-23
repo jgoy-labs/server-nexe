@@ -47,6 +47,12 @@ def make_app(modules=None, config=None):
 def set_api_key(monkeypatch):
     monkeypatch.setenv("NEXE_PRIMARY_API_KEY", API_KEY)
     monkeypatch.delenv("NEXE_MODEL_ENGINE", raising=False)
+    monkeypatch.delenv("NEXE_OLLAMA_MODEL", raising=False)
+    monkeypatch.delenv("NEXE_DEFAULT_MODEL", raising=False)
+    # Reset module-level caches between tests
+    from core.endpoints import chat
+    chat._ollama_tags_cache["models"] = None
+    chat._ollama_tags_cache["ts"] = 0.0
 
 
 # ─── TestChatCompletionsEndpoint ─────────────────────────────────────────────
@@ -1206,14 +1212,20 @@ class TestMLXStreamGenerator:
     def test_yields_tokens_as_sse(self):
         """MLX stream generator yields tokens in SSE format."""
         from core.endpoints.chat import _mlx_stream_generator
+        import threading
 
-        call_count = [0]
-        token_callback = [None]
-
-        async def fake_chat(messages, system, session_id, stream_callback=None):
+        async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
+            # Simulate MLX calling stream_callback from a separate thread
             if stream_callback:
-                stream_callback("Hola ")
-                stream_callback("món")
+                def _emit():
+                    import time
+                    time.sleep(0.05)
+                    stream_callback("Hola ")
+                    time.sleep(0.05)
+                    stream_callback("món")
+                t = threading.Thread(target=_emit)
+                t.start()
+                t.join()
             return {"tokens": 2, "tokens_per_second": 20.0}
 
         mlx_module = AsyncMock()
@@ -1292,11 +1304,20 @@ class TestLlamaCppStreamGenerator:
     def test_yields_tokens_as_sse(self):
         """Llama.cpp stream generator yields tokens in SSE format."""
         from core.endpoints.chat import _llama_cpp_stream_generator
+        import threading
 
-        async def fake_chat(messages, system, session_id, stream_callback=None):
+        async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
+            # Simulate llama.cpp calling stream_callback from a separate thread
             if stream_callback:
-                stream_callback("Hello ")
-                stream_callback("world")
+                def _emit():
+                    import time
+                    time.sleep(0.05)
+                    stream_callback("Hello ")
+                    time.sleep(0.05)
+                    stream_callback("world")
+                t = threading.Thread(target=_emit)
+                t.start()
+                t.join()
             return {"tokens": 2, "tokens_per_second": 15.0}
 
         llama_module = AsyncMock()

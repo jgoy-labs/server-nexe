@@ -53,6 +53,7 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
     try:
       await client.get(f"{qdrant_url}/health", timeout=QDRANT_HEALTH_TIMEOUT)
       logger.info("Qdrant: OK (already running)")
+      server_state.qdrant_available = True
     except Exception:
       if not auto_start_qdrant:
         logger.info("Qdrant: Auto-start disabled (NEXE_AUTOSTART_QDRANT=false)")
@@ -80,6 +81,7 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> No
             try:
               await client.get(f"{qdrant_url}/health", timeout=QDRANT_HEALTH_TIMEOUT)
               logger.info(f"Qdrant: OK (started on port {qdrant_port})")
+              server_state.qdrant_available = True
               break
             except Exception:
               # Check if process died
@@ -189,6 +191,7 @@ class ServerState:
     self.registry = None
     self.qdrant_process = None
     self.ollama_process = None
+    self.qdrant_available: bool = False
 
 server_state = ServerState()
 
@@ -531,7 +534,7 @@ async def lifespan(app: FastAPI):
 
     if hasattr(app.state, 'start_rate_limit_cleanup'):
       import asyncio
-      asyncio.create_task(app.state.start_rate_limit_cleanup())
+      server_state._cleanup_task = asyncio.create_task(app.state.start_rate_limit_cleanup())
       msg = _translate(server_state.i18n, "core.server.rate_limit_cleanup_started",
         "Rate limit cleanup task started")
       logger.info(msg)
@@ -589,7 +592,7 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 70)
     logger.info("✅  SERVER.NEXE READY · Listening on %s", _nexe_url)
     logger.info("📱 Web UI: %s/ui/", _nexe_url)
-    logger.info("🔑 API Key: %s", (_api_key[:8] + "…" if _api_key and len(_api_key) > 8 else "(set)" if _api_key else "(not set)"))
+    logger.info("🔑 API Key: %s", (_api_key[:4] + "…" if _api_key and len(_api_key) > 4 else "(set)" if _api_key else "(not set)"))
     logger.info("=" * 70)
 
     yield

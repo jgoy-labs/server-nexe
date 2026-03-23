@@ -181,7 +181,7 @@ class TestRootEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert data["system"] == "Nexe 0.8"
-        assert data["version"] == "0.8.0"
+        assert data["version"] == "0.8.2"
         assert "description" in data
         assert "status" in data
 
@@ -300,7 +300,7 @@ class TestApiInfoEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert data["name"] == "Nexe 0.8"
-        assert data["version"] == "0.8.0"
+        assert data["version"] == "0.8.2"
         assert isinstance(data["endpoints"], list)
         assert len(data["endpoints"]) == 3
 

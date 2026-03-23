@@ -1,7 +1,7 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
+Version: 0.8.2
 Author: Jordi Goy 
 Location: core/endpoints/root.py
 Description: Endpoints FastAPI bàsics del servidor. Routes: / (system info), /health (health check),
@@ -30,6 +30,14 @@ from core.models import (
 )
 
 router = APIRouter(tags=["system"])
+
+def _get_qdrant_status() -> bool:
+  """Fallback: check qdrant status from server_state."""
+  try:
+    from core.lifespan import server_state
+    return getattr(server_state, 'qdrant_available', False)
+  except Exception:
+    return False
 
 def get_i18n(request: Request):
   """Get i18n from app state"""
@@ -84,12 +92,12 @@ async def _module_health_status(instance) -> str:
 async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
   """Root endpoint with system information"""
   return SystemResponse(
-    system="Nexe 0.8",
+    system="Nexe 0.8.2",
     description=i18n.t('server_core.api.welcome.description') if i18n else
           "Sistema d'orquestració de mòduls en funcionament",
     status=i18n.t('server_core.api.welcome.ready') if i18n else
         "Sistema preparat i operatiu",
-    version="0.8.0",
+    version="0.8.2",
     type=i18n.t('server_core.api.server_type') if i18n else "servidor_bàsic"
   )
 
@@ -101,7 +109,7 @@ async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthRespon
     status=i18n.t('server_core.api.health.status') if i18n else "operatiu",
     message=i18n.t('server_core.api.health.message') if i18n else
         "Servidor bàsic operatiu",
-    version="0.8.0",
+    version="0.8.2",
     uptime=i18n.t('server_core.api.health.uptime') if i18n else "operacional"
   )
 
@@ -178,8 +186,8 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
   ]
 
   return ApiInfoResponse(
-    name="Nexe 0.8",
-    version="0.8.0",
+    name="Nexe 0.8.2",
+    version="0.8.2",
     description=i18n.t('server_core.api.welcome.description') if i18n else
           "Sistema d'orquestració de mòduls en funcionament",
     endpoints=endpoints
@@ -238,6 +246,7 @@ async def server_status(request: Request) -> dict:
       "llama_cpp": llama_cpp_available,
       "ollama": ollama_available
     },
+    "qdrant_available": getattr(request.app.state, "qdrant_available", False) if hasattr(request.app.state, "qdrant_available") else _get_qdrant_status(),
     "timestamp": datetime.now(timezone.utc).isoformat(),
   }
 
