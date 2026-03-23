@@ -191,5 +191,5 @@ See [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Version 0.8</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a>
+  <strong>Version 0.8.2</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a>
 </p>

@@ -57,6 +57,12 @@ T = {
         "uninstall_storage": "Espai que s'alliberarà: {size}",
         "uninstall_removed": "Esborrat:",
         "uninstall_failed": "No s'ha pogut esborrar:",
+        "uninstall_data_title": "Dades de Nexe",
+        "uninstall_data_message": "Vols conservar les teves dades?\n\n• Converses i memòria\n• Base de coneixement\n• Configuració\n\nEs guardaran a ~/nexe-backup-[data]",
+        "uninstall_keep_data": "Sí, conservar dades",
+        "uninstall_delete_all": "No, esborrar tot",
+        "uninstall_backup_ok": "Dades guardades a {path}",
+        "uninstall_backup_failed": "No s'han pogut guardar les dades",
     },
     "es": {
         "start": "▶ Iniciar servidor",
@@ -81,6 +87,12 @@ T = {
         "uninstall_storage": "Espacio que se liberará: {size}",
         "uninstall_removed": "Borrado:",
         "uninstall_failed": "No se pudo borrar:",
+        "uninstall_data_title": "Datos de Nexe",
+        "uninstall_data_message": "¿Quieres conservar tus datos?\n\n• Conversaciones y memoria\n• Base de conocimiento\n• Configuración\n\nSe guardarán en ~/nexe-backup-[fecha]",
+        "uninstall_keep_data": "Sí, conservar datos",
+        "uninstall_delete_all": "No, borrar todo",
+        "uninstall_backup_ok": "Datos guardados en {path}",
+        "uninstall_backup_failed": "No se pudieron guardar los datos",
     },
     "en": {
         "start": "▶ Start Server",
@@ -105,6 +117,12 @@ T = {
         "uninstall_storage": "Space to be freed: {size}",
         "uninstall_removed": "Removed:",
         "uninstall_failed": "Could not remove:",
+        "uninstall_data_title": "Nexe Data",
+        "uninstall_data_message": "Do you want to keep your data?\n\n• Conversations and memory\n• Knowledge base\n• Configuration\n\nIt will be saved to ~/nexe-backup-[date]",
+        "uninstall_keep_data": "Yes, keep data",
+        "uninstall_delete_all": "No, delete all",
+        "uninstall_backup_ok": "Data saved to {path}",
+        "uninstall_backup_failed": "Could not save data",
     },
 }
 
@@ -500,11 +518,42 @@ if len(pl['persistent-apps']) < before:
         if not self._show_final_confirm():
             return
 
+        # Third window: ask about data backup
+        keep_data = False
+        storage_dir = PROJECT_ROOT / "storage"
+        if storage_dir.exists():
+            data_response = rumps.alert(
+                title=self.t("uninstall_data_title"),
+                message=self.t("uninstall_data_message"),
+                ok=self.t("uninstall_keep_data"),
+                cancel=self.t("uninstall_delete_all"),
+            )
+            # rumps.alert: 1=OK (keep data = safe default), 0=Cancel (delete all)
+            keep_data = (data_response == 1)
+
+        # Backup storage/ if requested
+        backup_path = None
+        if keep_data and storage_dir.exists():
+            from datetime import datetime
+            backup_name = f"nexe-backup-{datetime.now().strftime('%Y%m%d')}"
+            backup_path = Path.home() / backup_name
+            try:
+                shutil.copytree(storage_dir, backup_path)
+            except Exception:
+                backup_path = None
+
         # Stop server
         self._stop_server()
 
         removed = []
         failed = []
+
+        # Report backup result
+        if keep_data:
+            if backup_path:
+                removed.append(self.t("uninstall_backup_ok", path=str(backup_path)))
+            else:
+                failed.append(self.t("uninstall_backup_failed"))
 
         # Remove from Login Items
         try:
@@ -547,7 +596,7 @@ if len(pl['persistent-apps']) < before:
         install_dir = PROJECT_ROOT
         cleanup_script = f"""#!/bin/bash
 sleep 2
-rm -rf "{install_dir}"
+rm -rf "{install_dir}" && touch /tmp/nexe_uninstall_ok || touch /tmp/nexe_uninstall_failed
 """
         try:
             subprocess.Popen(
@@ -586,6 +635,12 @@ rm -rf "{install_dir}"
     def _quit(self, _sender):
         """Stop server and quit the tray app."""
         self._stop_server()
+        if self._server_log_fh:
+            try:
+                self._server_log_fh.close()
+            except Exception:
+                pass
+            self._server_log_fh = None
         rumps.quit_application()
 
 

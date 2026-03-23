@@ -74,6 +74,7 @@ def generate_env_file(project_root, model_config):
         print(f"  {CYAN}{secure_key}{RESET}")
         print()
         print(f"  {YELLOW}{t('copy_api_key')}{RESET}")
+        print(f"  {DIM}⚠️  No comparteixis aquesta clau (screenshots, logs, xats){RESET}")
         print(f"  {DIM}({t('saved_at')} {env_file} · chmod 600){RESET}")
     else:
         # Update existing .env with model configuration

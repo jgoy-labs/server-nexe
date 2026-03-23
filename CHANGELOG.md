@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.2] - 2026-03-23
+
+### Fixed
+- RAG document deduplication on ingestion
+- WebSocket control frame handling (ping/pong)
+- Web UI sessionStorage race condition
+- Memory `.count` endpoint consistency
+- Llama.cpp conditional import (avoid crash when not installed)
+- Circuit breaker resilience pattern hardened
+- Chat endpoint streaming timeout for thinking models (300s configurable via NEXE_OLLAMA_STREAM_TIMEOUT)
+- `num_predict` increased to 4096 for thinking models
+- Security: injection detectors, input sanitizers, request validators improved
+- Sanitizer pattern matching edge cases
+- Module manager: discovery, lifecycle, registry, sync wrapper, path discovery refactored
+- Plugin loading pipeline: extractor, finder, importer, lifecycle, validator hardened
+- Memory persistence engine and text chunker edge cases
+- OpenAPI merger and route manager stability
+- Ollama health check reliability
+- Llama.cpp config validation
+- Event system and metrics collector robustness
+- 35 test fixes across core, plugins, personality, and memory
+- Web UI module tests (manifest, memory helper async, module)
+- Security test coverage gaps and module allowlist tests
+
 ## [0.8.1] - 2026-03-21
 
 ### Added
