@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import asyncio
 import logging
+import os as _os
 import re as _re
 import secrets
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Header
@@ -626,8 +627,13 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                         to_compact = session.get_messages_to_compact()
                         if to_compact:
                             try:
+                                import re as _re_compact
+                                def _clean_for_compact(txt):
+                                    txt = _re_compact.sub(r'<think>.*?</think>', '', txt, flags=_re_compact.DOTALL)
+                                    txt = _re_compact.sub(r'<\|thinking\|>.*?<\|/thinking\|>', '', txt, flags=_re_compact.DOTALL)
+                                    return txt.strip()
                                 compact_text = "\n".join(
-                                    f"{m['role']}: {m['content'][:800]}"
+                                    f"{m['role']}: {_clean_for_compact(m['content'][:1500])}"
                                     for m in to_compact
                                 )
                                 prev_summary = f"Resum anterior: {session.context_summary}\n\n" if session.context_summary else ""
@@ -660,6 +666,8 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                     session.apply_compaction(summary)
                                     _session_manager._save_session_to_disk(session)
                                     logger.info("Session %s: compaction done (%d chars summary)", session.id[:8], len(summary))
+                                else:
+                                    logger.warning("Session %s: compaction returned empty summary", session.id[:8])
                             except Exception as e:
                                 logger.warning("Compaction failed: %s", e)
 

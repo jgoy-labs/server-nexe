@@ -58,6 +58,7 @@ def validate_string_input(
   check_path_traversal: bool = True,
   check_ldap: bool = False,
   i18n=None,
+  context: str = "param",
 ) -> str:
   """
   Comprehensive string input validation with i18n support.
@@ -74,6 +75,9 @@ def validate_string_input(
     check_path_traversal: Check for path traversal
     check_ldap: Check for LDAP injection
     i18n: I18n manager for translated error messages (optional)
+    context: Validation context — "param" (default), "path", or "chat".
+             In "chat" context, command injection and LDAP detectors are
+             skipped to avoid false positives when users discuss code.
 
   Returns:
     Validated (and possibly sanitized) string
@@ -81,6 +85,10 @@ def validate_string_input(
   Raises:
     HTTPException: If validation fails
   """
+  # In chat context, skip detectors prone to false positives with code snippets
+  if context == "chat":
+    check_command = False
+    check_ldap = False
   if not isinstance(text, str):
     raise HTTPException(
       400,

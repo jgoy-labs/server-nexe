@@ -244,7 +244,7 @@ async def validate_request_path(request: Request) -> bool:
 
   if detect_path_traversal(path):
     logger.warning(
-      f"🚫 Path traversal attempt: {path} from {request.client.host}"
+      f"🚫 Path traversal attempt: {path} from {request.client.host if request.client else 'unknown'}"
     )
     raise HTTPException(
       400,

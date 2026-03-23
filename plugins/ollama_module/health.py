@@ -30,6 +30,9 @@ def get_health() -> Dict[str, Any]:
   """
   Comprova la salut del mòdul Ollama.
 
+  NOTE: Synchronous function — blocks the event loop up to OLLAMA_HEALTH_TIMEOUT.
+  Call via asyncio.to_thread(get_health) from async contexts if possible.
+
   Returns:
     Dict amb status, connected, models_count
   """
@@ -42,7 +45,7 @@ def get_health() -> Dict[str, Any]:
     }
 
   try:
-    with httpx.Client(timeout=OLLAMA_HEALTH_TIMEOUT) as client:
+    with httpx.Client(timeout=min(OLLAMA_HEALTH_TIMEOUT, 3.0)) as client:
       response = client.get(f"{OLLAMA_BASE_URL}/api/tags")
       response.raise_for_status()
 

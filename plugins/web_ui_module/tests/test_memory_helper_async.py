@@ -42,6 +42,7 @@ def make_memory_mock(
     collection_exists=True,
     search_results=None,
     store_return="doc-id-123",
+    count=None,
 ):
     """Crea un mock complet de MemoryAPI."""
     mem = MagicMock()
@@ -51,7 +52,9 @@ def make_memory_mock(
     mem.delete_collection = AsyncMock()
     mem.store = AsyncMock(return_value=store_return)
     mem.delete = AsyncMock()
-    mem.search = AsyncMock(return_value=search_results if search_results is not None else [])
+    results = search_results if search_results is not None else []
+    mem.search = AsyncMock(return_value=results)
+    mem.count = AsyncMock(return_value=count if count is not None else len(results))
     return mem
 
 

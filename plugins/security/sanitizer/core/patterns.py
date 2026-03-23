@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 
 import re
 
-MAX_SCAN_LENGTH = 2000
+MAX_SCAN_LENGTH = 5000
 
 MAX_INPUT_LENGTH = 10000
 

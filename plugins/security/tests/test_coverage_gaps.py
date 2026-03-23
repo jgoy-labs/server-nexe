@@ -80,14 +80,20 @@ class TestInjectionDetectorsGaps:
         assert detect_sql_injection("") is False
 
     def test_nosql_injection_string_with_function(self):
-        """Line 113: string with function() pattern."""
+        """Generic function() is no longer detected (MongoDB-specific patterns only)."""
         from plugins.security.core.injection_detectors import detect_nosql_injection
-        assert detect_nosql_injection("function() { return true }") is True
+        assert detect_nosql_injection("function() { return true }") is False
 
-    def test_nosql_injection_string_with_return(self):
-        """Lines 114-115: string with return pattern."""
+    def test_nosql_injection_string_with_db_call(self):
+        """MongoDB db.collection.method() pattern detected."""
         from plugins.security.core.injection_detectors import detect_nosql_injection
-        assert detect_nosql_injection("return db.users.find()") is True
+        assert detect_nosql_injection("db.users.find()") is True
+
+    def test_nosql_injection_string_with_operators(self):
+        """MongoDB operators ($where, $regex, $ne) detected."""
+        from plugins.security.core.injection_detectors import detect_nosql_injection
+        assert detect_nosql_injection("$where: function()") is True
+        assert detect_nosql_injection("$regex: /admin/") is True
 
     def test_nosql_injection_list_with_malicious_items(self):
         """Lines 117-120: list containing malicious items."""

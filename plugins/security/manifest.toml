@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════
-# Nexe 0.8.0 - Security Module Manifest
+# Nexe 0.8.2 - Security Module Manifest
 # ═══════════════════════════════════════════════════════════════
 # Ubicació: server-nexe/plugins/security/manifest.toml
 # Descripció: Mòdul de seguretat amb scanning, autenticació i rate limiting

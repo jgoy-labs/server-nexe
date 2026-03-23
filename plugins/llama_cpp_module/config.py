@@ -45,7 +45,7 @@ class LlamaCppConfig:
     n_batch: int = 512  # IMPORTANT: més alt = més tok/s
     n_gpu_layers: int = -1
     n_threads: int = 0  # 0 = auto (llama.cpp usarà tots els cores)
-    max_sessions: int = 1  # Conservador per defecte; augmentar si hi ha múltiples usuaris
+    max_sessions: int = 2  # 2 per defecte: permet canvi de system_hash sense reload
     chat_format: str = "chatml"  # chatml és compatible amb Phi-3.5, Llama 3, Salamandra
     use_mlock: bool = True
     use_mmap: bool = True
@@ -81,7 +81,7 @@ class LlamaCppConfig:
             n_batch=int(os.getenv("NEXE_LLAMA_CPP_N_BATCH", "512")),
             n_gpu_layers=int(os.getenv("NEXE_LLAMA_CPP_GPU_LAYERS", "-1")),
             n_threads=int(os.getenv("NEXE_LLAMA_CPP_THREADS", str(os.cpu_count() or 8))),
-            max_sessions=int(os.getenv("NEXE_LLAMA_CPP_MAX_SESSIONS", "1")),
+            max_sessions=int(os.getenv("NEXE_LLAMA_CPP_MAX_SESSIONS", "2")),
             chat_format=os.getenv("NEXE_LLAMA_CPP_CHAT_FORMAT", "chatml"),
             use_mlock=os.getenv("NEXE_LLAMA_CPP_USE_MLOCK", "true").lower() == "true",
             use_mmap=os.getenv("NEXE_LLAMA_CPP_USE_MMAP", "true").lower() == "true",

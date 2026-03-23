@@ -243,15 +243,15 @@ class TestHealthEndpoint:
 
 class TestFilesEndpoints:
 
-    def test_list_files_returns_200(self, client):
-        r = client.get("/ui/files")
+    def test_list_files_returns_200(self, client, auth):
+        r = client.get("/ui/files", headers=auth)
         assert r.status_code == 200
         data = r.json()
         assert "files" in data
         assert "total" in data
 
-    def test_cleanup_files_returns_200(self, client):
-        r = client.post("/ui/files/cleanup?max_age_hours=1")
+    def test_cleanup_files_returns_200(self, client, auth):
+        r = client.post("/ui/files/cleanup?max_age_hours=1", headers=auth)
         assert r.status_code == 200
         data = r.json()
         assert "deleted" in data

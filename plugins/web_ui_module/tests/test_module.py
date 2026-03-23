@@ -21,6 +21,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from plugins.web_ui_module.module import WebUIModule
+from plugins.web_ui_module.manifest import router_public
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ def client(initialized_module, monkeypatch):
     monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
     app = FastAPI()
     app.include_router(initialized_module.get_router())
+    app.include_router(router_public)
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -69,7 +71,7 @@ class TestWebUIModuleInit:
         assert module.metadata.name == "web_ui_module"
 
     def test_metadata_version(self, module):
-        assert module.metadata.version == "0.8.0"
+        assert module.metadata.version == "0.8.2"
 
     def test_initialize_returns_true(self, tmp_path, monkeypatch):
         monkeypatch.setenv("NEXE_API_BASE_URL", "http://127.0.0.1:9119")

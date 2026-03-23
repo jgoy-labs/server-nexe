@@ -109,10 +109,17 @@ def detect_nosql_injection(data: Any) -> bool:
         return True
 
   elif isinstance(data, str):
-    if re.search(r'\bfunction\s*\(', data, re.IGNORECASE):
-      return True
-    if re.search(r'\breturn\s+', data, re.IGNORECASE):
-      return True
+    nosql_patterns = [
+      r'\$where\b',
+      r'\$regex\b',
+      r'\$ne\s*:',
+      r'\$gt\s*:',
+      r'\$lt\s*:',
+      r'\bdb\.\w+\.\w+\(',
+    ]
+    for pattern in nosql_patterns:
+      if re.search(pattern, data, re.IGNORECASE):
+        return True
 
   elif isinstance(data, list):
     for item in data:
@@ -147,6 +154,8 @@ def detect_command_injection(text: str) -> bool:
     '$(',
     '\n',
     '\r',
+    '>',
+    '<',
   ]
 
   for char in dangerous_chars:
