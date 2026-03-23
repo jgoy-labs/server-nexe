@@ -24,53 +24,78 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jgoy-labs/server-nexe"><strong>📖 Documentation</strong></a> ·
-  <a href="https://github.com/jgoy-labs/server-nexe#-quick-start"><strong>⬇️ Install</strong></a> ·
-  <a href="https://github.com/jgoy-labs/server-nexe#-architecture"><strong>🔌 API Reference</strong></a>
+  <a href="https://server-nexe.org"><strong>Documentation</strong></a> ·
+  <a href="#-quick-start"><strong>Install</strong></a> ·
+  <a href="#-architecture"><strong>Architecture</strong></a> ·
+  <a href="https://github.com/jgoy-labs/server-nexe/releases"><strong>Releases</strong></a>
 </p>
 
 ---
 
-## ✨ Why Server Nexe?
+## The Story
 
-Server Nexe is a local AI server that keeps **everything on your machine** — conversations, documents, embeddings, and model weights. It combines LLM inference with a **persistent RAG memory system**, so your AI remembers context across sessions without ever sending data to the cloud.
+Server Nexe started as a learning-by-doing experiment: *"What would it take to run a fully local AI server with persistent memory?"* One question led to another — inference backends, RAG pipelines, vector search, plugin systems, security layers, a web UI, an installer with hardware detection.
 
-> **Note:** This is a personal learning project exploring local AI infrastructure. It does not aim to replace mature tools like ChatGPT, Claude, or LM Studio — but it can use [Ollama](https://ollama.com) as one of its backends.
+What began as a weekend prototype has grown into a real, working system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
 
-## 🔑 Key Features
+This is not trying to compete with ChatGPT or Claude. It's an open-source tool for people who want to own their AI infrastructure. Built by one person in Barcelona, with code, music, and stubbornness.
+
+## Why Server Nexe?
+
+Your conversations, documents, embeddings, and model weights stay on your machine. Always. Server Nexe combines LLM inference with a **persistent RAG memory system** — your AI remembers context across sessions, indexes your documents, and never phones home.
 
 <table>
 <tr>
 <td width="50%">
 
-### 🔒 Local & Private
-Every conversation, document, and embedding stays on your device. No telemetry, no external calls, no data leaves your machine.
+### Local & Private
+Every conversation, document, and embedding stays on your device. No telemetry, no external calls, no cloud dependency. Not even a server to spy on you.
 
 </td>
 <td width="50%">
 
-### 🧠 Persistent RAG Memory
-Remembers context across sessions using Qdrant vector search with 768-dimensional embeddings across 3 specialized collections.
+### Persistent RAG Memory
+Remembers context across sessions using Qdrant vector search with 768-dimensional embeddings across 3 specialized collections. Ingest documents, recall knowledge.
 
 </td>
 </tr>
 <tr>
 <td width="50%">
 
-### ⚡ Multi-Backend Inference
-Switch between MLX (Apple Silicon native), llama.cpp (GGUF, universal), or Ollama — one config change, same API.
+### Multi-Backend Inference
+Switch between MLX (Apple Silicon native), llama.cpp (GGUF, universal), or Ollama — one config change, same OpenAI-compatible API.
 
 </td>
 <td width="50%">
 
-### 🧩 Modular Plugin System
-Auto-discovered plugins with independent manifests. Add RAG, security, web UI, or custom capabilities without touching the core.
+### Modular Plugin System
+Auto-discovered plugins with independent manifests. Security, web UI, RAG, backends — everything is a plugin. Add capabilities without touching the core.
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### macOS Installer
+DMG with guided wizard that detects your hardware, picks the right backend, recommends models for your RAM, and gets you running in minutes.
+
+</td>
+<td width="50%">
+
+### Built to Grow
+245 tests, security audit, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
 
 </td>
 </tr>
 </table>
 
-## 🚀 Quick Start
+## Quick Start
+
+### Option A: DMG Installer (macOS)
+
+Download the latest **[Install Nexe.dmg](https://github.com/jgoy-labs/server-nexe/releases/latest)** from Releases. The wizard handles everything: hardware detection, backend selection, model download, and configuration.
+
+### Option B: Command Line
 
 ```bash
 git clone https://github.com/jgoy-labs/server-nexe.git
@@ -79,9 +104,7 @@ cd server-nexe
 python -m core.cli go     # start server on port 9119
 ```
 
-The interactive installer will detect your hardware, select the appropriate backend, and choose an LLM model based on your available RAM.
-
-Once the server is running:
+Once running:
 
 ```bash
 python -m core.cli chat               # interactive chat
@@ -91,105 +114,132 @@ python -m core.cli memory recall "capital Catalonia"
 python -m core.cli status             # system status
 ```
 
-**Endpoints available at `http://localhost:9119`:**
+### Option C: Headless (servers, scripts, CI)
+
+```bash
+python -m installer.install_headless --backend ollama --model qwen3.5:latest
+python -m core.cli go
+```
+
+**Endpoints at `http://localhost:9119`:**
 
 | Endpoint | Description |
 |----------|-------------|
 | `/v1/chat/completions` | OpenAI-compatible chat API |
-| `/ui` | Web UI |
+| `/ui` | Web UI (chat, file upload, sessions) |
 | `/health` | Health check |
-| `/docs` | Interactive API documentation |
+| `/docs` | Interactive API documentation (Swagger) |
 
-> Authentication required via `X-API-Key` header (configured in `.env`).
+> Authentication via `X-API-Key` header. Key is generated during installation and stored in `.env`.
 
-## 🔧 Backends
+## Backends
 
 | Backend | Platform | Best for |
 |---------|----------|----------|
-| **MLX** | macOS (Apple Silicon) | ⭐ Recommended for Mac — native GPU acceleration via Metal |
-| **llama.cpp** | macOS / Linux | Universal — GGUF format, Metal acceleration on Mac |
-| **Ollama** | macOS / Linux | Bridge to existing Ollama installations |
+| **MLX** | macOS (Apple Silicon) | Recommended for Mac — native Metal GPU acceleration, fastest on M-series |
+| **llama.cpp** | macOS / Linux | Universal — GGUF format, Metal on Mac, CPU/CUDA on Linux |
+| **Ollama** | macOS / Linux | Bridge to existing Ollama installations, easiest model management |
 
-Configure your backend in `personality/server.toml` or during `./setup.sh`.
+The installer auto-detects your hardware and recommends the best backend. You can switch anytime in `personality/server.toml`.
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 server-nexe/
-├── core/                 # FastAPI server, endpoints, CLI, config, metrics
-│   ├── endpoints/        # REST API (v1, chat, health, status)
-│   └── cli/              # CLI commands & i18n (ca/es/en)
-├── personality/          # Personality system, module manager, server.toml
-├── memory/               # Embeddings, RAG engine, vector memory
+├── core/                 # FastAPI server, endpoints, CLI, config, metrics, resilience
+│   ├── endpoints/        # REST API (v1 chat, health, status, system)
+│   ├── cli/              # CLI commands & i18n (ca/es/en)
+│   └── resilience/       # Circuit breaker, rate limiting
+├── personality/          # Module manager, plugin discovery, server.toml
+│   ├── loading/          # Plugin loading pipeline (find, validate, import, lifecycle)
+│   └── module_manager/   # Discovery, registry, config, sync
+├── memory/               # Embeddings, RAG engine, vector memory, document ingestion
+│   ├── embeddings/       # Chunking, embedding generation
+│   ├── rag/              # Retrieval-augmented generation pipeline
+│   └── memory/           # Persistent vector store (Qdrant)
 ├── plugins/              # Auto-discovered plugin modules
 │   ├── mlx_module/       # MLX backend (Apple Silicon)
 │   ├── llama_cpp_module/ # llama.cpp backend (GGUF)
 │   ├── ollama_module/    # Ollama bridge
-│   ├── security/         # Auth, rate limiting, CSRF
-│   └── web_ui_module/    # Browser-based chat UI
-└── knowledge/            # Indexed documentation for RAG (ca/es/en)
+│   ├── security/         # Auth, injection detection, CSRF, rate limiting, input sanitization
+│   └── web_ui_module/    # Browser-based chat UI with file upload
+├── installer/            # Guided installer, headless mode, hardware detection, model catalog
+├── knowledge/            # Indexed documentation for RAG (ca/es/en)
+└── tests/                # Integration & e2e test suites
 ```
 
-## 📋 Requirements
+## Security
+
+Server Nexe includes a security module enabled by default:
+
+- **API key authentication** on all endpoints
+- **CSP headers** (script-src 'self', no unsafe-inline)
+- **CSRF protection** with token validation
+- **Rate limiting** per IP
+- **Input sanitization** — jailbreak and injection detection
+- **Trusted host middleware**
+
+The project has passed a full technical audit (73 findings reviewed, 40 fixes implemented). See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+
+## Requirements
 
 | | Minimum | Recommended |
 |---|---------|-------------|
-| **OS** | macOS 12+ | macOS 14+ (Apple Silicon) |
-| **Python** | 3.11+ | 3.11+ |
-| **RAM** | 8 GB | 16 GB+ |
+| **OS** | macOS 13+ | macOS 14+ (Apple Silicon) |
+| **Python** | 3.11+ | 3.12+ |
+| **RAM** | 8 GB | 16 GB+ (for larger models) |
 | **Disk** | 10 GB free | 20 GB+ free |
 
-Linux x86_64 should work with llama.cpp but is not actively tested.
+> **Linux**: Works with llama.cpp and Ollama backends. Docker support and full Linux compatibility are on the roadmap.
 
-## 🧪 Testing
+## Testing
 
-CI runs on Ubuntu with the full unit suite and coverage reporting.
+245 tests with coverage reporting. CI runs the full suite on every push.
 
 ```bash
+# Unit tests
 pytest core memory personality plugins -m "not integration and not e2e and not slow" \
   --cov=core --cov=memory --cov=personality --cov=plugins \
-  --cov-report=term --cov-report=xml:coverage.xml --tb=short -q
-```
+  --cov-report=term --tb=short -q
 
-Integration tests require local services:
-
-```bash
+# Integration tests (requires Ollama running)
 NEXE_AUTOSTART_OLLAMA=true pytest -m "integration" -q
 ```
 
-Run the same suite on Linux via Docker:
+## Documentation
 
-```bash
-./dev-tools/run_linux_ci.sh
-```
+| Language | Link |
+|----------|------|
+| English | [knowledge/en/README.md](knowledge/en/README.md) |
+| Catalan | [knowledge/ca/README.md](knowledge/ca/README.md) |
+| Spanish | [knowledge/es/README.md](knowledge/es/README.md) |
 
-## 📖 Documentation
+## Roadmap
 
-Full documentation is available in three languages:
+Server Nexe is actively developed. Here's what's coming:
 
-| | Link |
-|---|------|
-| 🇬🇧 English | [knowledge/en/README.md](knowledge/en/README.md) |
-| 🏴 Català | [knowledge/ca/README.md](knowledge/ca/README.md) |
-| 🇪🇸 Español | [knowledge/es/README.md](knowledge/es/README.md) |
-| 🌐 Web | [GitHub](https://github.com/jgoy-labs/server-nexe) |
+- [ ] Docker container for Linux deployment
+- [ ] Full Linux compatibility audit
+- [ ] Updated knowledge base for v0.8.2
+- [ ] Website updates (server-nexe.org / server-nexe.com)
+- [ ] macOS code signing & notarization
+- [ ] Configurable inference parameters via UI
+- [ ] Community forum
 
-## 🤝 Contributing
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
+## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and guidelines.
 
-## 🔐 Security
+## Disclaimer
 
-See [SECURITY.md](SECURITY.md) for vulnerability reporting.
-
-## ⚠️ Disclaimer
-
-This software is provided **"as is"**, without warranty of any kind. Use it at your own risk. The author is not responsible for any damage, data loss, security incidents, or misuse arising from the use of this software. By using Server Nexe, you accept full responsibility for how you deploy and operate it.
+This software is provided **"as is"**, without warranty of any kind. Use it at your own risk. The author is not responsible for any damage, data loss, security incidents, or misuse arising from the use of this software.
 
 See [LICENSE](LICENSE) for details.
 
 ---
 
 <p align="center">
-  <strong>Version 0.8.2</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a>
+  <strong>Version 0.8.2</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
 </p>
