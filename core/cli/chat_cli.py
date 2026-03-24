@@ -93,8 +93,43 @@ def detect_engine():
     return "ollama"
 
 
-async def _stream_with_spinner(gen: AsyncGenerator) -> AsyncGenerator[str, None]:
-    """Mostra spinner animat fins al primer chunk; llavors streaming normal."""
+def _format_rag_bar(score: float, width: int = 8) -> str:
+    """Genera barra Unicode proporcional al score (0.0-1.0)."""
+    filled = int(score * width)
+    return "█" * filled + "░" * (width - filled)
+
+
+def _format_stats_line(elapsed: float, char_count: int, model_name: str = None,
+                       rag_count: int = 0, rag_avg: float = 0.0, mem_saved: bool = False,
+                       compact_count: int = 0) -> str:
+    """Genera línia d'stats post-resposta."""
+    tokens_est = char_count // 4
+    tok_per_sec = tokens_est / elapsed if elapsed > 0.5 else 0
+    parts = [f"{elapsed:.1f}s"]
+    if tokens_est > 0:
+        parts.append(f"~{tokens_est}tok")
+    if tok_per_sec > 0:
+        parts.append(f"{tok_per_sec:.0f}t/s")
+    if model_name:
+        # Shorten model name for display
+        short = model_name.split("/")[-1] if "/" in model_name else model_name
+        if len(short) > 25:
+            short = short[:22] + "..."
+        parts.append(short)
+    if rag_count > 0:
+        bar = _format_rag_bar(rag_avg) if rag_avg > 0 else ""
+        pct = f" {rag_avg:.0%}" if rag_avg > 0 else ""
+        parts.append(f"RAG:{rag_count} {bar}{pct}")
+    if compact_count > 0:
+        parts.append(f"COMPACT:{compact_count}")
+    if mem_saved:
+        parts.append("MEM")
+    return " | ".join(parts)
+
+
+async def _stream_with_spinner(gen: AsyncGenerator) -> AsyncGenerator:
+    """Mostra spinner animat fins al primer chunk de text; llavors streaming normal.
+    Passa metadata dicts transparentment (sense spinner)."""
     frames = itertools.cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
     stop = asyncio.Event()
     t0 = time.monotonic()
@@ -113,6 +148,10 @@ async def _stream_with_spinner(gen: AsyncGenerator) -> AsyncGenerator[str, None]
     task = asyncio.create_task(_spin())
     try:
         async for chunk in gen:
+            # Pass metadata dicts through without affecting spinner
+            if isinstance(chunk, dict):
+                yield chunk
+                continue
             if not stop.is_set():
                 stop.set()
                 await task
@@ -142,12 +181,13 @@ async def get_response_stream(engine: str, prompt: str, system: str, history: li
 @click.option('--system', '-s', default=None, help='System prompt / Identitat')
 @click.option('--no-rag', is_flag=True, help='Desactivar context de memòria (RAG)')
 @click.option('--model', '-m', help='Nom del model (per Ollama)')
-def chat(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str]):
+@click.option('--verbose', '-v', is_flag=True, help='Mostra detall RAG per font')
+def chat(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool):
     """
     Inicia un xat interactiu amb Nexe.
     Detecta automàticament el motor configurat si no s'especifica.
     """
-    asyncio.run(_chat_async(engine, system, no_rag, model))
+    asyncio.run(_chat_async(engine, system, no_rag, model, verbose))
 
 def detect_model():
     """Detecta quin model està configurat."""
@@ -171,7 +211,7 @@ def detect_model():
     return "auto"
 
 
-async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str]):
+async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool = False):
     from .utils.api_client import NexeAPIClient
 
     if not engine:
@@ -325,13 +365,54 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
 
             first = True
             t_start = time.monotonic()
+            char_count = 0
+            _model_name = None
+            _rag_count = 0
+            _rag_avg = 0.0
+            _rag_items = []
+            _mem_saved = False
+            _compact_count = 0
+
             async for chunk in _stream_with_spinner(client.chat_ui_stream(message=user_input, session_id=session_id)):
+                if isinstance(chunk, dict):
+                    # Metadata from server
+                    if "MODEL" in chunk:
+                        _model_name = chunk["MODEL"]
+                    if "RAG" in chunk:
+                        try: _rag_count = int(chunk["RAG"])
+                        except (ValueError, TypeError): pass
+                    if "RAG_AVG" in chunk:
+                        try: _rag_avg = float(chunk["RAG_AVG"])
+                        except (ValueError, TypeError): pass
+                    if "RAG_ITEM" in chunk:
+                        # Format: "collection|score"
+                        parts = chunk["RAG_ITEM"].split("|", 1)
+                        if len(parts) == 2:
+                            try: _rag_items.append((parts[0], float(parts[1])))
+                            except (ValueError, TypeError): pass
+                    if "MEM" in chunk:
+                        _mem_saved = True
+                    if "COMPACT" in chunk:
+                        try: _compact_count = int(chunk["COMPACT"])
+                        except (ValueError, TypeError): pass
+                    continue
+
                 if first:
                     first = False
                     click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
+                char_count += len(chunk)
                 print(chunk, end="", flush=True)
+
             elapsed = time.monotonic() - t_start
-            print(click.style(f"  [{elapsed:.1f}s]", dim=True))
+            stats = _format_stats_line(elapsed, char_count, _model_name, _rag_count, _rag_avg, _mem_saved, _compact_count)
+            print(click.style(f"  [{stats}]", dim=True))
+
+            # Verbose RAG detail
+            if verbose and _rag_items:
+                for col, score in _rag_items:
+                    bar = _format_rag_bar(score, 10)
+                    color = "green" if score >= 0.8 else "yellow" if score >= 0.6 else "red"
+                    click.echo(click.style(f"    {col:<15} {bar} {score:.0%}", fg=color))
 
         except KeyboardInterrupt:
             click.echo("\n👋 Adéu!")

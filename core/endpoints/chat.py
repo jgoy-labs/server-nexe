@@ -595,7 +595,7 @@ async def _forward_to_ollama(
         "stream": request.stream,
         "options": {
             "temperature": request.temperature,
-            "num_predict": request.max_tokens or 4096
+            "num_predict": request.max_tokens or int(os.getenv("NEXE_DEFAULT_MAX_TOKENS", "4096"))
         }
     }
 

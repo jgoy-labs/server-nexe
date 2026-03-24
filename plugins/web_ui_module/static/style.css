@@ -1003,6 +1003,63 @@ body.light .icon-moon,
     opacity: 1;
 }
 
+.stat-rag {
+    position: relative;
+    flex-wrap: wrap;
+}
+
+.rag-bar {
+    font-family: monospace;
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    opacity: 0.8;
+}
+
+.rag-toggle {
+    cursor: pointer;
+    font-size: 0.65rem;
+    margin-left: 4px;
+    opacity: 0.6;
+}
+
+.rag-toggle:hover {
+    opacity: 1;
+}
+
+.rag-detail {
+    width: 100%;
+    margin-top: 4px;
+    padding: 4px 0;
+    font-family: monospace;
+    font-size: 0.7rem;
+    line-height: 1.4;
+}
+
+.rag-detail-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.rag-col {
+    min-width: 100px;
+    opacity: 0.7;
+}
+
+.rag-detail-bar {
+    letter-spacing: 1px;
+}
+
+.rag-score {
+    min-width: 30px;
+    text-align: right;
+    opacity: 0.8;
+}
+
+.rag-high { color: #22c55e; }
+.rag-mid { color: #eab308; }
+.rag-low { color: #f97316; }
+
 .stat-mem {
     color: #22c55e;
     opacity: 0.85;

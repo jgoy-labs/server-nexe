@@ -683,6 +683,8 @@ class NexeUI {
                 let fullResponse = "";
                 let memorySaved = false;
                 let ragCount = 0;
+                let ragAvg = 0;
+                let ragItems = [];  // [{col, score}]
                 let usedModel = '';
                 let compactMatch = null;
 
@@ -820,6 +822,21 @@ class NexeUI {
                             chunk = chunk.replace(/\x00\[RAG:\d+\]\x00/, '');
                         }
 
+                        // Detectar RAG average score
+                        const ragAvgMatch = chunk.match(/\x00\[RAG_AVG:([\d.]+)\]\x00/);
+                        if (ragAvgMatch) {
+                            ragAvg = parseFloat(ragAvgMatch[1]);
+                            chunk = chunk.replace(/\x00\[RAG_AVG:[\d.]+\]\x00/, '');
+                        }
+
+                        // Detectar RAG items (per-font scores)
+                        let ragItemMatch;
+                        const ragItemRe = /\x00\[RAG_ITEM:([^|]+)\|([\d.]+)\]\x00/g;
+                        while ((ragItemMatch = ragItemRe.exec(chunk)) !== null) {
+                            ragItems.push({ col: ragItemMatch[1], score: parseFloat(ragItemMatch[2]) });
+                        }
+                        chunk = chunk.replace(/\x00\[RAG_ITEM:[^\]]+\]\x00/g, '');
+
                         // Detectar token COMPACT (context compactat)
                         compactMatch = chunk.match(/\x00\[COMPACT:(\d+)\]\x00/);
                         if (compactMatch) {
@@ -866,9 +883,29 @@ class NexeUI {
                         const memBadge = memorySaved
                             ? `<span class="stat-item stat-mem"><i data-lucide="bookmark-check"></i><span>${this.t('saved')}</span></span>`
                             : '';
-                        const ragBadge = ragCount > 0
-                            ? `<span class="stat-item stat-rag"><i data-lucide="brain"></i><span>RAG ${ragCount}</span></span>`
-                            : '';
+                        let ragBadge = '';
+                        if (ragCount > 0) {
+                            const pct = ragAvg > 0 ? Math.round(ragAvg * 100) : 0;
+                            const barWidth = 8;
+                            const filled = Math.round(ragAvg * barWidth);
+                            const ragBar = ragAvg > 0
+                                ? `<span class="rag-bar">${'▓'.repeat(filled)}${'░'.repeat(barWidth - filled)}</span> ${pct}%`
+                                : '';
+                            let ragDetail = '';
+                            if (ragItems.length > 0) {
+                                const detailRows = ragItems.map(item => {
+                                    const f = Math.round(item.score * 10);
+                                    const bar = '▓'.repeat(f) + '░'.repeat(10 - f);
+                                    const color = item.score >= 0.8 ? 'rag-high' : item.score >= 0.6 ? 'rag-mid' : 'rag-low';
+                                    return `<div class="rag-detail-row ${color}"><span class="rag-col">${item.col}</span><span class="rag-detail-bar">${bar}</span><span class="rag-score">${(item.score * 100).toFixed(0)}%</span></div>`;
+                                }).join('');
+                                ragDetail = `<div class="rag-detail" style="display:none">${detailRows}</div>`;
+                            }
+                            const toggleBtn = ragItems.length > 0
+                                ? `<span class="rag-toggle" onclick="this.parentElement.querySelector('.rag-detail').style.display=this.parentElement.querySelector('.rag-detail').style.display==='none'?'block':'none';this.textContent=this.textContent==='▼'?'▲':'▼'">▼</span>`
+                                : '';
+                            ragBadge = `<span class="stat-item stat-rag"><i data-lucide="brain"></i><span>RAG ${ragCount} ${ragBar}</span>${toggleBtn}${ragDetail}</span>`;
+                        }
                         const compactBadge = compactMatch
                             ? `<span class="stat-item stat-compact"><i data-lucide="archive"></i><span>ctx ${compactMatch[1]}x</span></span>`
                             : '';

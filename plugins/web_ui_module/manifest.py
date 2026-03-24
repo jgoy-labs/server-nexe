@@ -715,6 +715,7 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                     # 3. Get Memory Context (RAG) - SEMPRE buscar, no només amb patterns
                     rag_context = ""
                     rag_count = 0
+                    _rag_items = []  # (collection, score) tuples for weight display
                     if not attached_doc:
                         try:
                             recall_result = await memory_helper.recall_from_memory(message, limit=5)
@@ -744,6 +745,7 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                                     for item in relevant:
                                         score = item.get('score', 0)
                                         col = item.get('metadata', {}).get('source_collection', '?')
+                                        _rag_items.append((col, score))
                                         preview = item['content'][:80].replace('\n', ' ')
                                         logger.info(f"  RAG [{col}] score={score:.2f} → {repr(preview)}")
                         except Exception as e:
@@ -867,6 +869,13 @@ async def chat(request: Dict[str, Any], _auth=Depends(_require_ui_auth)):
                             yield f"\x00[MODEL:{_safe_model}]\x00"
                             if rag_count > 0:
                                 yield f"\x00[RAG:{int(rag_count)}]\x00"
+                                # RAG weight details for UI/CLI display
+                                if _rag_items:
+                                    avg_score = sum(s for _, s in _rag_items) / len(_rag_items)
+                                    yield f"\x00[RAG_AVG:{avg_score:.2f}]\x00"
+                                    for _col, _score in _rag_items:
+                                        _safe_col = str(_col).replace("\x00", "").replace("|", "_")[:30]
+                                        yield f"\x00[RAG_ITEM:{_safe_col}|{_score:.2f}]\x00"
                             if _compacted:
                                 yield f"\x00[COMPACT:{int(session.compaction_count)}]\x00"
 

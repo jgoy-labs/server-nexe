@@ -13,8 +13,9 @@ www.jgoy.net · https://server-nexe.org
 import os
 import json
 import logging
+import re
 import httpx
-from typing import Dict, Any, AsyncGenerator, Optional
+from typing import Dict, Any, AsyncGenerator, Optional, Union
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -153,10 +154,18 @@ class NexeAPIClient:
                 logger.error(f"Create session error: {e}")
         return None
 
-    async def chat_ui_stream(self, message: str, session_id: str) -> AsyncGenerator[str, None]:
+    # Regex for inline metadata markers: \x00[KEY:VALUE]\x00
+    _MARKER_RE = re.compile(r'\x00\[(\w+):([^\]]*)\]\x00')
+    _MEM_MARKER = "\x00[MEM]\x00"
+
+    async def chat_ui_stream(self, message: str, session_id: str) -> AsyncGenerator[Union[str, dict], None]:
         """
         Fa request a /ui/chat (mateix pipeline que el UI web) amb streaming.
         Usa sessions servidor, RAG nexe_chat_memory, detecció d'intencions.
+
+        Yields:
+            str: text chunks
+            dict: metadata markers (e.g. {"type": "metadata", "MODEL": "qwen3.5:2b"})
         """
         url = f"{self.base_url}/ui/chat"
         payload = {"message": message, "session_id": session_id, "stream": True}
@@ -170,8 +179,20 @@ class NexeAPIClient:
                         return
                     async for chunk in response.aiter_bytes():
                         text = chunk.decode("utf-8", errors="replace")
-                        # Filtrar marcadors interns de memòria
-                        text = text.replace("\x00[MEM]\x00", "")
+
+                        # Parse inline metadata markers
+                        metadata = {}
+                        for match in self._MARKER_RE.finditer(text):
+                            metadata[match.group(1)] = match.group(2)
+                        text = self._MARKER_RE.sub("", text)
+
+                        # Parse MEM marker (no value)
+                        if self._MEM_MARKER in text:
+                            metadata["MEM"] = "1"
+                            text = text.replace(self._MEM_MARKER, "")
+
+                        if metadata:
+                            yield {"type": "metadata", **metadata}
                         if text:
                             yield text
             except httpx.ConnectError:

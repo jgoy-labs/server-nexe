@@ -533,9 +533,14 @@ class TestChatUIStream:
             client = NexeAPIClient()
             chunks = self._collect(client.chat_ui_stream("Hello", "session-123"))
 
-        text = "".join(chunks)
+        # Separate text chunks from metadata dicts
+        text_chunks = [c for c in chunks if isinstance(c, str)]
+        meta_chunks = [c for c in chunks if isinstance(c, dict)]
+        text = "".join(text_chunks)
         assert "\x00[MEM]\x00" not in text
         assert "Hello" in text
+        # MEM marker should be parsed as metadata
+        assert any(m.get("MEM") for m in meta_chunks)
 
 
 class TestChatOffline:
