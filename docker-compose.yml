@@ -1,0 +1,40 @@
+# ────────────────────────────────────────────────────────
+# Server Nexe — Docker Compose
+# Nexe (with embedded Qdrant) + Ollama
+#
+# Usage:
+#   cp .env.example .env   # Edit with your values
+#   docker compose up -d
+#   curl http://localhost:9119/health
+# ────────────────────────────────────────────────────────
+
+services:
+  nexe:
+    build: .
+    container_name: nexe-server
+    ports:
+      - "9119:9119"
+    env_file: .env
+    environment:
+      - NEXE_OLLAMA_HOST=http://ollama:11434
+      - NEXE_MODEL_ENGINE=ollama
+    volumes:
+      - nexe-storage:/app/storage
+      - nexe-knowledge:/app/knowledge
+    restart: unless-stopped
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nexe-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  nexe-storage:
+  nexe-knowledge:
+  ollama-models:

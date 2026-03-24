@@ -7,6 +7,7 @@ Description: Virtual environment setup and inference engine installation.
 """
 
 import os
+import platform
 import sys
 import subprocess
 from pathlib import Path
@@ -45,6 +46,12 @@ def setup_environment(project_root, hw, engine="auto"):
     else:
         print_error(t('requirements_not_found'))
         sys.exit(1)
+
+    # 2b. Install macOS-only deps (rumps/tray) on Darwin
+    if platform.system() == "Darwin":
+        req_macos = project_root / "requirements-macos.txt"
+        if req_macos.exists():
+            subprocess.run([str(pip_path), "install", "-r", str(req_macos)], check=True)
 
     # 3. Hardware-Specific Inference Engines
     print_step(f"{BOLD}{t('installing_inference')}{RESET}")

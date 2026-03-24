@@ -152,9 +152,24 @@ if [ -z "$PYTHON_BIN" ]; then
         fi
     fi
 
+    elif [[ "$(uname -s)" == "Linux" ]]; then
+        echo -e "${YELLOW}→${NC} Linux detected. Install Python 3.12+ with your package manager:"
+        if command -v apt &> /dev/null; then
+            echo -e "  ${CYAN}→${NC} sudo apt update && sudo apt install python3.12 python3.12-venv"
+        elif command -v dnf &> /dev/null; then
+            echo -e "  ${CYAN}→${NC} sudo dnf install python3.12"
+        else
+            echo -e "  ${CYAN}→${NC} Install python3.12 from your distribution's packages"
+        fi
+    fi
+
     if [ -z "$PYTHON_BIN" ]; then
         echo -e "${RED}[ERROR]${NC} $_ERROR_PYTHON"
-        echo -e "  ${CYAN}→${NC} brew install python@3.12"
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            echo -e "  ${CYAN}→${NC} brew install python@3.12"
+        else
+            echo -e "  ${CYAN}→${NC} Install python3.12 from your distribution's packages"
+        fi
         echo -e "  ${CYAN}→${NC} $_THEN_RUN"
         exit 1
     fi

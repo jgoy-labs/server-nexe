@@ -1,0 +1,6 @@
+# ─────────────────────────────────────────────────────────────
+# Nexe Server 0.8 - macOS-only Dependencies
+# Installed automatically on macOS by setup.sh / installer
+# ─────────────────────────────────────────────────────────────
+
+rumps==0.4.0  # macOS menu bar tray app (requires PyObjC)

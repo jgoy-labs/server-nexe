@@ -1,5 +1,3 @@
-# Dockerfile planned for future release. This file prepares the ignore list.
-
 # Secrets — NEVER include in Docker image
 .env
 
@@ -7,11 +5,12 @@
 venv/
 .venv/
 
-# Storage (runtime data, models)
+# Storage (runtime data, models, snapshots)
 storage/
-qdrant/
 snapshots/
-knowledge/
+
+# Qdrant binary (downloaded at build time for correct platform)
+qdrant
 
 # Git history
 .git/
@@ -31,10 +30,31 @@ build/
 tests/
 .pytest_cache/
 pytest.ini
-conftest.py
+pytest-full.ini
 dev-tools/
+.coverage
+.coveragerc
+.ruff_cache/
 
 # IDE / editor
 .vscode/
 .idea/
+.claude/
 *.code-workspace
+
+# macOS artifacts
+*.dmg
+*.pkg
+*.app
+Install Nexe.app/
+Nexe.app/
+.DS_Store
+
+# Documentation (not needed in container)
+diari/
+*.md
+!knowledge/**/*.md
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+LICENSE

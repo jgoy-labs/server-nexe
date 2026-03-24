@@ -12,6 +12,7 @@ import builtins
 import json
 import logging
 import os
+import platform
 import subprocess
 import sys
 import time
@@ -419,37 +420,40 @@ def _run_headless_inner(config):
     # Write COMMANDS.md
     _write_commands_file(project_root, nexe_cmd, model_config)
 
-    # Copy Nexe.app to /Applications (so the user has an icon to launch)
-    nexe_app_src = project_root / "Nexe.app"
-    nexe_app_dest = Path("/Applications/Nexe.app")
-    nexe_app_ready = False
-    if nexe_app_src.exists():
-        try:
-            import shutil
-            if nexe_app_dest.exists():
-                shutil.rmtree(nexe_app_dest)
-            shutil.copytree(nexe_app_src, nexe_app_dest)
-            _write_project_marker(nexe_app_dest, project_root)
-            nexe_app_ready = True
-            _log.info(f"Nexe.app copied to /Applications")
-        except PermissionError:
-            _log.warning("Could not copy Nexe.app to /Applications (permission denied)")
-        except Exception as e:
-            _log.warning(f"Could not copy Nexe.app to /Applications: {e}")
+    # Copy Nexe.app to /Applications and add to Login Items (macOS only)
+    if platform.system() == "Darwin":
+        nexe_app_src = project_root / "Nexe.app"
+        nexe_app_dest = Path("/Applications/Nexe.app")
+        nexe_app_ready = False
+        if nexe_app_src.exists():
+            try:
+                import shutil
+                if nexe_app_dest.exists():
+                    shutil.rmtree(nexe_app_dest)
+                shutil.copytree(nexe_app_src, nexe_app_dest)
+                _write_project_marker(nexe_app_dest, project_root)
+                nexe_app_ready = True
+                _log.info(f"Nexe.app copied to /Applications")
+            except PermissionError:
+                _log.warning("Could not copy Nexe.app to /Applications (permission denied)")
+            except Exception as e:
+                _log.warning(f"Could not copy Nexe.app to /Applications: {e}")
 
-    # Add to Login Items (auto-start on boot)
-    if nexe_app_ready:
-        try:
-            subprocess.run([
-                "osascript", "-e",
-                'tell application "System Events" to make login item at end '
-                'with properties {path:"/Applications/Nexe.app", hidden:true}'
-            ], capture_output=True, timeout=10)
-            _log.info("Nexe added to Login Items")
-        except Exception as e:
-            _log.warning(f"Could not add to Login Items: {e}")
+        # Add to Login Items (auto-start on boot)
+        if nexe_app_ready:
+            try:
+                subprocess.run([
+                    "osascript", "-e",
+                    'tell application "System Events" to make login item at end '
+                    'with properties {path:"/Applications/Nexe.app", hidden:true}'
+                ], capture_output=True, timeout=10)
+                _log.info("Nexe added to Login Items")
+            except Exception as e:
+                _log.warning(f"Could not add to Login Items: {e}")
+        else:
+            _log.warning("Skipping Login Items setup: /Applications/Nexe.app unavailable")
     else:
-        _log.warning("Skipping Login Items setup: /Applications/Nexe.app unavailable")
+        _log.info("Non-macOS platform: skipping .app copy and Login Items")
 
     print(f"[LOG] {LOG_FILE}", flush=True)
     if _model_ok:

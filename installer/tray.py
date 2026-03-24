@@ -16,7 +16,27 @@ import time
 import webbrowser
 from pathlib import Path
 
-import rumps
+import platform as _platform
+
+try:
+    import rumps
+    _HAS_RUMPS = True
+except ImportError:
+    _HAS_RUMPS = False
+    # Stub so class definition doesn't fail on Linux
+    class _RumpsStub:
+        class App:
+            def __init__(self, *a, **kw): pass
+            def run(self): pass
+        @staticmethod
+        def clicked(*a, **kw):
+            def decorator(f): return f
+            return decorator
+        @staticmethod
+        def timer(interval):
+            def decorator(f): return f
+            return decorator
+    rumps = _RumpsStub()
 
 # ═══════════════════════════════════════════════════════════════════════════
 # PATHS
@@ -681,4 +701,7 @@ def main():
 
 
 if __name__ == "__main__":
+    if not _HAS_RUMPS:
+        print("Nexe tray app requires macOS (rumps). Skipping on this platform.")
+        sys.exit(0)
     main()
