@@ -512,10 +512,10 @@ if len(pl['persistent-apps']) < before:
         response = rumps.alert(
             title=self.t("uninstall_title"),
             message=self.t("uninstall_confirm"),
-            ok=self.t("uninstall_title"),
-            cancel="No",
+            ok="No",
+            cancel=self.t("uninstall_title"),
         )
-        return response == 1
+        return response == 0  # cancel (desinstal·lar) retorna 0
 
     def _uninstall(self, _sender):
         """Uninstall Nexe with two-step confirmation and full cleanup."""
@@ -528,10 +528,10 @@ if len(pl['persistent-apps']) < before:
         response = rumps.alert(
             title=self.t("uninstall_title"),
             message=self.t("uninstall_warning", storage=storage_text),
-            ok=self.t("uninstall_title"),
-            cancel="No",
+            ok="No",
+            cancel=self.t("uninstall_title"),
         )
-        if response != 1:
+        if response != 0:  # cancel (desinstal·lar) retorna 0
             return
 
         # Second window: final confirmation

@@ -232,6 +232,39 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and guidelines.
 
+## Acknowledgments
+
+server-nexe is built on the shoulders of these amazing open-source projects:
+
+**AI & Inference**
+- [MLX](https://github.com/ml-explore/mlx) — Apple Silicon native ML framework
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) — Efficient GGUF model inference
+- [Ollama](https://ollama.ai) — Local model management and serving
+- [sentence-transformers](https://www.sbert.net) — Text embedding models
+- [Hugging Face](https://huggingface.co) — Model hub and transformers library
+
+**Infrastructure**
+- [Qdrant](https://qdrant.tech) — Vector search engine powering RAG memory
+- [FastAPI](https://fastapi.tiangolo.com) — High-performance async web framework
+- [Uvicorn](https://www.uvicorn.org) — Lightning-fast ASGI server
+- [Pydantic](https://docs.pydantic.dev) — Data validation
+
+**Tools & Libraries**
+- [Rich](https://github.com/Textualize/rich) — Beautiful terminal formatting
+- [marked.js](https://marked.js.org) — Markdown rendering in web UI
+- [PyPDF](https://github.com/py-pdf/pypdf) — PDF text extraction for RAG
+- [rumps](https://github.com/jaredks/rumps) — macOS menu bar integration
+
+**Security & Monitoring**
+- [Prometheus](https://prometheus.io) — Metrics and monitoring
+- [SlowAPI](https://github.com/laurentS/slowapi) — Rate limiting
+
+Also built with: Python, NumPy, httpx, tenacity, Click, Typer, Colorama, python-dotenv, PyYAML, toml, structlog, starlette-csrf, python-multipart, psutil, PyObjC, and Linux.
+
+20% of Enterprise sponsorships go directly to supporting these projects.
+
+Built with AI collaboration · Barcelona
+
 ## Disclaimer
 
 This software is provided **"as is"**, without warranty of any kind. Use it at your own risk. The author is not responsible for any damage, data loss, security incidents, or misuse arising from the use of this software.

@@ -19,21 +19,60 @@ from .installer_display import (
 from .installer_i18n import t
 
 
+def _make_venv_standalone(venv_path):
+    """Fer el venv autònom del DMG/app bundle.
+
+    Quan el venv es crea amb --copies des del Python bundled:
+    1. Copia libpython3.12.dylib perque @executable_path el trobi
+    2. Re-signa ad-hoc el Python del venv (treu hardened runtime)
+       perque pugui carregar .so instal·lats per pip (PyObjC, etc.)
+    """
+    import shutil
+
+    # Copiar libpython al venv perque el binari copiat la trobi
+    bundled_lib = Path(sys.executable).parent.parent / "lib" / "libpython3.12.dylib"
+    venv_lib_dir = venv_path / "lib"
+    venv_lib = venv_lib_dir / "libpython3.12.dylib"
+    if bundled_lib.exists() and not venv_lib.exists():
+        shutil.copy2(str(bundled_lib), str(venv_lib))
+
+    # Re-signar ad-hoc (sense hardened runtime) perque pip .so funcioni
+    for name in ("python3.12", "python3", "python"):
+        venv_bin = venv_path / "bin" / name
+        if venv_bin.exists() and not venv_bin.is_symlink():
+            subprocess.run(
+                ["codesign", "--force", "--sign", "-", str(venv_bin)],
+                capture_output=True,
+            )
+
+
 def setup_environment(project_root, hw, engine="auto"):
     print_step(f"{BOLD}{t('setting_up_env')}{RESET}")
 
     venv_path = project_root / "venv"
     if not venv_path.exists():
         print(f"  📦 {t('creating_venv')}")
-        subprocess.run([sys.executable, "-m", "venv", "venv"], check=True)
+        if platform.system() == "Darwin":
+            # macOS: --copies --without-pip per evitar SIGABRT del binari copiat
+            # (necessita libpython copiada ABANS de poder executar ensurepip)
+            subprocess.run(
+                [sys.executable, "-m", "venv", "--copies", "--without-pip", "venv"],
+                check=True,
+            )
+            _make_venv_standalone(venv_path)
+            # Ara el Python del venv funciona — instal·lar pip
+            venv_python = str(venv_path / "bin" / "python3")
+            subprocess.run([venv_python, "-m", "ensurepip", "--upgrade"], check=True)
+        else:
+            subprocess.run([sys.executable, "-m", "venv", "venv"], check=True)
 
     # Path to pip/python based on OS
     if os.name == 'nt':
         pip_path = venv_path / "Scripts" / "pip.exe"
         python_path = venv_path / "Scripts" / "python.exe"
     else:
-        pip_path = venv_path / "bin" / "pip"
-        python_path = venv_path / "bin" / "python"
+        pip_path = venv_path / "bin" / "pip3"
+        python_path = venv_path / "bin" / "python3"
 
     # 1. Upgrade pip
     subprocess.run([str(pip_path), "install", "--upgrade", "pip"], capture_output=True)
