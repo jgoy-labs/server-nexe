@@ -140,7 +140,7 @@ class ModuleValidator:
       logger.error(error_msg)
 
       try:
-        from plugins.security_logger import (
+        from plugins.security.security_logger import (
           get_security_logger,
           SecurityEventType,
           SecuritySeverity,

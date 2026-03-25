@@ -16,14 +16,14 @@ class TestAutoMaxKvSize:
     """Test lines 53-54: fallback when psutil fails."""
 
     def test_auto_max_kv_returns_int(self):
-        from plugins.mlx_module.config import _auto_max_kv_size
+        from plugins.mlx_module.core.config import _auto_max_kv_size
         result = _auto_max_kv_size()
         assert isinstance(result, int)
         assert result >= 16384
 
     def test_auto_max_kv_exception_fallback(self):
         """Line 53-54: exception in psutil returns 65536."""
-        from plugins.mlx_module.config import _auto_max_kv_size
+        from plugins.mlx_module.core.config import _auto_max_kv_size
         import sys
         # Temporarily remove psutil to trigger exception path
         orig = sys.modules.get('psutil')
@@ -48,20 +48,20 @@ class TestMLXConfigPostInit:
 
     def test_tilde_expansion(self):
         """Line 87: expand ~ to home directory."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         config = MLXConfig(model_path="~/models/test")
         assert not config.model_path.startswith("~")
         assert os.path.expanduser("~") in config.model_path
 
     def test_relative_path_resolution(self):
         """Lines 89-92: relative path resolved to project root."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         config = MLXConfig(model_path="models/test-model")
         assert os.path.isabs(config.model_path)
 
     def test_empty_path_resolves_to_project_root(self):
         """Lines 80-84 + 89-92: empty model_path logs warning but resolves relative."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         config = MLXConfig(model_path="")
         # Empty string is not abs, not ~, so it gets resolved relative to project root
         # The warning is still logged
@@ -75,7 +75,7 @@ class TestMLXConfigFromEnv:
         """Direct env var path."""
         monkeypatch.setenv("NEXE_MLX_MODEL", "/path/to/model")
         monkeypatch.setenv("NEXE_MLX_MAX_TOKENS", "4096")
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         config = MLXConfig.from_env()
         assert config.model_path == "/path/to/model"
         assert config.max_tokens == 4096
@@ -93,7 +93,7 @@ primary = "/path/to/mlx/model"
         toml_file.parent.mkdir(parents=True)
         toml_file.write_text(toml_content)
 
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
 
         with patch("plugins.mlx_module.config.Path") as mock_path_cls:
             # Make both config paths not exist (relative and absolute)
@@ -121,7 +121,7 @@ primary = "/path/to/mlx/model"
         """Lines 106-125: no env var, toml fallback path."""
         monkeypatch.delenv("NEXE_MLX_MODEL", raising=False)
 
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         config = MLXConfig.from_env()
         assert isinstance(config, MLXConfig)
 
@@ -129,7 +129,7 @@ primary = "/path/to/mlx/model"
         """Line 124: exception reading toml logged as warning."""
         monkeypatch.delenv("NEXE_MLX_MODEL", raising=False)
 
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         config = MLXConfig.from_env()
         assert isinstance(config, MLXConfig)
 
@@ -139,7 +139,7 @@ class TestMLXConfigValidate:
 
     def test_validate_empty_path(self):
         """Line 162-163: empty model_path returns False."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         # Use __new__ to skip __post_init__ which resolves empty path
         config = MLXConfig.__new__(MLXConfig)
         config.model_path = ""
@@ -152,13 +152,13 @@ class TestMLXConfigValidate:
 
     def test_validate_nonexistent_path(self, tmp_path):
         """Lines 168-172: path doesn't exist returns False."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         config = MLXConfig(model_path=str(tmp_path / "nonexistent"))
         assert config.validate() is False
 
     def test_validate_path_is_file_not_dir(self, tmp_path):
         """Lines 176-180: path is a file, not a directory."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         model_file = tmp_path / "model.bin"
         model_file.write_text("data")
         config = MLXConfig(model_path=str(model_file))
@@ -166,7 +166,7 @@ class TestMLXConfigValidate:
 
     def test_validate_no_config_json_warning(self, tmp_path):
         """Line 185: model dir exists but no config.json -> warning, not error."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         model_dir = tmp_path / "my_model"
         model_dir.mkdir()
         config = MLXConfig(model_path=str(model_dir))
@@ -175,7 +175,7 @@ class TestMLXConfigValidate:
 
     def test_validate_max_tokens_zero(self, tmp_path):
         """Lines 192-193: max_tokens < 1 returns False."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         model_dir = tmp_path / "model_dir"
         model_dir.mkdir()
         config = MLXConfig(model_path=str(model_dir), max_tokens=0)
@@ -183,7 +183,7 @@ class TestMLXConfigValidate:
 
     def test_validate_max_kv_size_too_small(self, tmp_path):
         """Lines 196-197: max_kv_size < 512 returns False."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         model_dir = tmp_path / "model_dir"
         model_dir.mkdir()
         config = MLXConfig(model_path=str(model_dir), max_kv_size=256)
@@ -191,7 +191,7 @@ class TestMLXConfigValidate:
 
     def test_validate_temperature_out_of_range(self, tmp_path):
         """Line 200: temperature out of range logs warning but doesn't fail."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         model_dir = tmp_path / "model_dir"
         model_dir.mkdir()
         config = MLXConfig(model_path=str(model_dir), temperature=3.0)
@@ -200,7 +200,7 @@ class TestMLXConfigValidate:
 
     def test_validate_top_p_out_of_range(self, tmp_path):
         """Lines 206-207: top_p > 1 returns False."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         model_dir = tmp_path / "model_dir"
         model_dir.mkdir()
         config = MLXConfig(model_path=str(model_dir), top_p=1.5)
@@ -208,7 +208,7 @@ class TestMLXConfigValidate:
 
     def test_validate_all_valid(self, tmp_path):
         """Full valid config returns True."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         model_dir = tmp_path / "model_dir"
         model_dir.mkdir()
         (model_dir / "config.json").write_text("{}")
@@ -221,7 +221,7 @@ class TestIsMetalAvailable:
 
     def test_metal_not_available_import_error(self):
         """Lines 222-224: ImportError returns False."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         # Save original import
         import builtins
         original_import = builtins.__import__
@@ -237,7 +237,7 @@ class TestIsMetalAvailable:
 
     def test_metal_generic_exception(self):
         """Lines 225-227: generic exception returns False."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
 
         mock_mx = MagicMock()
         mock_mx.metal.is_available.side_effect = RuntimeError("Metal error")

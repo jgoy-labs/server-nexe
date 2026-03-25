@@ -27,7 +27,7 @@ has_specialist = true
 has_tests = true
 streaming = true
 real_time = true
-prefix_matching = true
+prefix_caching = true
 
 [module.dependencies]
 modules = []

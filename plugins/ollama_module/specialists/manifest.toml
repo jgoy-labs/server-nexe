@@ -1,0 +1,16 @@
+# Specialists del modul ollama_module — Stubs fins Part 2
+
+[specialist.plugin]
+name = "ollama_plugin_specialist"
+manager = "doctor_manager"
+status = "stub"
+
+[specialist.trasher]
+name = "ollama_trasher_specialist"
+manager = "trasher_manager"
+status = "stub"
+
+[specialist.test]
+name = "ollama_test_specialist"
+manager = "test_manager"
+status = "stub"

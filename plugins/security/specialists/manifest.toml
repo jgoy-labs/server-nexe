@@ -1,0 +1,25 @@
+# ─────────────────────────────────────────────────────────────
+# Specialists del modul security
+# Nexe v0.8.2 | 2026-03-25
+# ─────────────────────────────────────────────────────────────
+# Cada specialist respon a un manager del sistema.
+# Buids fins Part 2 (quan arribin els managers de NAT7).
+# ─────────────────────────────────────────────────────────────
+
+[specialist.plugin]
+name = "security_plugin_specialist"
+manager = "doctor_manager"
+description = "Reporta health i diagnostics del modul security"
+status = "stub"
+
+[specialist.trasher]
+name = "security_trasher_specialist"
+manager = "trasher_manager"
+description = "Reporta storage i neteja de logs de seguretat"
+status = "stub"
+
+[specialist.test]
+name = "security_test_specialist"
+manager = "test_manager"
+description = "Reporta tests del modul security"
+status = "stub"

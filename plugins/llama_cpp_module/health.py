@@ -1,0 +1,37 @@
+"""
+────────────────────────────────────
+Server Nexe
+Version: 0.8
+Author: Jordi Goy
+Location: plugins/llama_cpp_module/health.py
+Description: Facade get_health() per al modul llama_cpp.
+
+www.jgoy.net · https://server-nexe.org
+────────────────────────────────────
+"""
+
+import asyncio
+from typing import Dict, Any
+
+
+def get_health() -> Dict[str, Any]:
+    """Facade sincrona per obtenir health del modul llama_cpp."""
+    from .manifest import get_module_instance
+
+    module = get_module_instance()
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        return {
+            "status": "healthy" if module._initialized else "unknown",
+            "module": module.metadata.name,
+            "version": module.metadata.version,
+            "initialized": module._initialized,
+        }
+
+    result = asyncio.run(module.health_check())
+    return result.to_dict()

@@ -16,8 +16,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
-from .chat import LlamaCppChatNode
-from .config import LlamaCppConfig
+from .core.chat import LlamaCppChatNode
+from .core.config import LlamaCppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class LlamaCppModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="llama_cpp_module",
-            version="1.0.0",
+            version="0.8.2",
             description="Motor d'inferència universal Llama.cpp (GGUF)",
             author="Jordi Goy",
             module_type="local_llm_option",

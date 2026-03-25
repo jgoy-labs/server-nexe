@@ -4,7 +4,7 @@ Tests for plugins/mlx_module/prompt_cache_manager.py.
 
 import pytest
 from unittest.mock import patch, MagicMock
-from plugins.mlx_module.prompt_cache_manager import (
+from plugins.mlx_module.core.prompt_cache_manager import (
     MLXPromptCacheManager,
     CacheEntry,
     SearchResult,

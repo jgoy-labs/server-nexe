@@ -30,7 +30,7 @@ file_upload = true
 session_management = true
 
 [module.dependencies]
-modules = []
+modules = ["security"]
 specialists = []
 external_services = []
 

@@ -1,0 +1,16 @@
+# Specialists del modul web_ui_module — Stubs fins Part 2
+
+[specialist.plugin]
+name = "web_ui_plugin_specialist"
+manager = "doctor_manager"
+status = "stub"
+
+[specialist.trasher]
+name = "web_ui_trasher_specialist"
+manager = "trasher_manager"
+status = "stub"
+
+[specialist.test]
+name = "web_ui_test_specialist"
+manager = "test_manager"
+status = "stub"

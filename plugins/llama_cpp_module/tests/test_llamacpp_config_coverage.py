@@ -13,20 +13,20 @@ class TestLlamaCppConfigPostInit:
 
     def test_tilde_expansion(self):
         """Line 63: expand ~ to home directory."""
-        from plugins.llama_cpp_module.config import LlamaCppConfig
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
         config = LlamaCppConfig(model_path="~/models/test.gguf")
         assert not config.model_path.startswith("~")
         assert os.path.expanduser("~") in config.model_path
 
     def test_relative_path_resolution(self):
         """Lines 65-68: relative path resolved to project root."""
-        from plugins.llama_cpp_module.config import LlamaCppConfig
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
         config = LlamaCppConfig(model_path="models/test.gguf")
         assert os.path.isabs(config.model_path)
 
     def test_absolute_path_unchanged(self):
         """Absolute path stays unchanged."""
-        from plugins.llama_cpp_module.config import LlamaCppConfig
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
         config = LlamaCppConfig(model_path="/absolute/path/model.gguf")
         assert config.model_path == "/absolute/path/model.gguf"
 
@@ -35,7 +35,7 @@ class TestLlamaCppConfigValidate:
 
     def test_validate_empty_path(self):
         """Lines 113-115: empty model_path returns False."""
-        from plugins.llama_cpp_module.config import LlamaCppConfig
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
         config = LlamaCppConfig.__new__(LlamaCppConfig)
         config.model_path = ""
         config.n_ctx = 8192
@@ -51,13 +51,13 @@ class TestLlamaCppConfigValidate:
 
     def test_validate_nonexistent_path(self, tmp_path):
         """Lines 117-122: path doesn't exist returns False."""
-        from plugins.llama_cpp_module.config import LlamaCppConfig
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
         config = LlamaCppConfig(model_path=str(tmp_path / "nonexistent.gguf"))
         assert config.validate() is False
 
     def test_validate_n_ctx_too_small(self, tmp_path):
         """Lines 124-126: n_ctx < 512 returns False."""
-        from plugins.llama_cpp_module.config import LlamaCppConfig
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
         model_file = tmp_path / "model.gguf"
         model_file.write_text("data")
         config = LlamaCppConfig(model_path=str(model_file), n_ctx=256)
@@ -65,7 +65,7 @@ class TestLlamaCppConfigValidate:
 
     def test_validate_max_sessions_zero(self, tmp_path):
         """Lines 128-130: max_sessions < 1 returns False."""
-        from plugins.llama_cpp_module.config import LlamaCppConfig
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
         model_file = tmp_path / "model.gguf"
         model_file.write_text("data")
         config = LlamaCppConfig(model_path=str(model_file), max_sessions=0)
@@ -73,7 +73,7 @@ class TestLlamaCppConfigValidate:
 
     def test_validate_unknown_chat_format_warning(self, tmp_path):
         """Lines 132-139: unknown chat_format logs warning but returns True."""
-        from plugins.llama_cpp_module.config import LlamaCppConfig
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
         model_file = tmp_path / "model.gguf"
         model_file.write_text("data")
         config = LlamaCppConfig(model_path=str(model_file), chat_format="unknown_format")
@@ -82,7 +82,7 @@ class TestLlamaCppConfigValidate:
 
     def test_validate_valid_config(self, tmp_path):
         """Valid config returns True."""
-        from plugins.llama_cpp_module.config import LlamaCppConfig
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
         model_file = tmp_path / "model.gguf"
         model_file.write_text("data")
         config = LlamaCppConfig(model_path=str(model_file))
@@ -93,7 +93,7 @@ class TestLlamaCppConfigFromEnv:
 
     def test_from_env_reads_all_vars(self, monkeypatch):
         """Lines 78-89: from_env reads all env vars."""
-        from plugins.llama_cpp_module.config import LlamaCppConfig
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
 
         monkeypatch.setenv("NEXE_LLAMA_CPP_MODEL", "/path/to/model.gguf")
         monkeypatch.setenv("NEXE_LLAMA_CPP_N_CTX", "16384")

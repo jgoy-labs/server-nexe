@@ -5,7 +5,7 @@ Sense GPU — tota la lògica és en memòria + disc (tmp_path).
 import pytest
 from datetime import datetime, timezone, timedelta
 
-from plugins.web_ui_module.session_manager import ChatSession, SessionManager
+from plugins.web_ui_module.core.session_manager import ChatSession, SessionManager
 
 
 # ═══════════════════════════════════════════════════════════════

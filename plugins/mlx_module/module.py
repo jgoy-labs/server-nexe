@@ -16,8 +16,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
-from .chat import MLXChatNode
-from .config import MLXConfig
+from .core.chat import MLXChatNode
+from .core.config import MLXConfig
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class MLXModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="mlx_module",
-            version="1.0.0",
+            version="0.8.2",
             description="Motor d'inferència ultra-optimitzat per a Apple Silicon (MLX)",
             author="Jordi Goy",
             module_type="local_llm_option",

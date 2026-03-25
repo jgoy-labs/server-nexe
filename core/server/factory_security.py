@@ -29,7 +29,7 @@ def setup_security_logger(app: FastAPI, project_root: Path, i18n: Any) -> None:
     project_root: Project root path
     i18n: I18n manager
   """
-  from plugins.security_logger import SecurityEventLogger
+  from plugins.security.security_logger import SecurityEventLogger
 
   logs_base = project_root / "storage" / "system-logs" / "security"
   app.state.security_logger = SecurityEventLogger(log_dir=logs_base)

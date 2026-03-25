@@ -1,61 +1,108 @@
-# ═══════════════════════════════════════════════════════════════
-# Nexe 0.8.2 - Security Module Manifest
-# ═══════════════════════════════════════════════════════════════
-# Ubicació: server-nexe/plugins/security/manifest.toml
-# Descripció: Mòdul de seguretat amb scanning, autenticació i rate limiting
-# ═══════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────
+# ModuleID: security
+# Nexe v0.8.2 | Antigravity | 2026-03-25
+# server-nexe/plugins/security/manifest.toml
+# ─────────────────────────────────────────────────────────────
+
+# ───────────────────────────────────────────
+# [module] — Metadades principals
+# ───────────────────────────────────────────
 
 [module]
-module_id = "security"
 name = "security"
-version = "0.2"
+version = "0.8.2"
 type = "core"
-description = "Sistema de seguretat integral amb scanning, detecció de vulnerabilitats, autenticació API key, rate limiting i checks automatitzats per validar la seguretat del sistema Nexe"
+description = "Security core: auth dual-key, rate limiting, injection detection (XSS/SQL/NoSQL/command/path/LDAP), scanning, sanitizer"
 location = "plugins/security/"
 permanent = true
-author = "Nexe Team (Jordi Goy)"
+note = "Modul de seguretat integral amb submoduls sanitizer i security_logger"
+
+# ───────────────────────────────────────────
+# [module.metadata] — Autoria i dates
+# ───────────────────────────────────────────
+
+[module.metadata]
+author = "Jordi Goy"
 created = "2025-10-27"
-last_updated = "2025-10-27"
-category = "core"
+last_updated = "2026-03-25"
+status = "active"
+
+# ───────────────────────────────────────────
+# [module.capabilities] — Que pot fer
+# ───────────────────────────────────────────
 
 [module.capabilities]
 has_api = true
 has_ui = true
 has_specialist = true
 has_tests = true
-has_workflow = false
-has_cli_scripts = false
-security_scanning = true
-vulnerability_detection = true
-authentication = true
-api_key_management = true
-rate_limiting = true
-automated_checks = true
-security_reporting = true
+streaming = false
+real_time = false
+
+# ───────────────────────────────────────────
+# [module.dependencies] — De que depen
+# ───────────────────────────────────────────
+
+[module.dependencies]
+modules = []
+specialists = []
+external_services = []
+
+# ───────────────────────────────────────────
+# [module.endpoints] — Rutes HTTP
+# ───────────────────────────────────────────
 
 [module.endpoints]
 router_prefix = "/security"
-ui_path = "/security/ui"
-public_routes = [
-  "/",
-  "/health",
-  "/info",
-  "/ui",
-  "/ui/assets/{path:path}",
-  "/ui/js/{path:path}"
-]
-protected_routes = [
-  "/scan",
-  "/report"
-]
+public_routes = ["/health", "/info", "/ui", "/ui/assets/{path:path}"]
+protected_routes = ["/scan", "/report"]
+
+# ───────────────────────────────────────────
+# [module.entry] — Com es carrega el plugin
+# ───────────────────────────────────────────
+
+[module.entry]
+module = "plugins.security.module"
+class = "SecurityModule"
+
+# ───────────────────────────────────────────
+# [module.router] — Router FastAPI
+# ───────────────────────────────────────────
+
+[module.router]
+prefix = "/security"
+
+# ───────────────────────────────────────────
+# [module.integration] — Workflow, UI control center
+# ───────────────────────────────────────────
 
 [module.integration]
 workflow_engine = false
 ui_control_center = true
 
-[module.dependencies]
-core_modules = ["personality", "paths"]
-optional_modules = ["observability"]
+# ───────────────────────────────────────────
+# [module.i18n] — Internacionalitzacio
+# ───────────────────────────────────────────
+
+[module.i18n]
+default_locale = "ca-ES"
+supported_locales = ["ca-ES", "es-ES", "en-US"]
+translations_path = "languages/"
+
+# ───────────────────────────────────────────
+# [module.ui] — Interficie web
+# ───────────────────────────────────────────
+
+[module.ui]
+framework = "vanilla-js"
+theme_support = true
+responsive = true
+dark_mode = true
+main_entry = "ui/index.html"
+
+# ───────────────────────────────────────────
+# [module.security] — Config seguretat propia
+# ───────────────────────────────────────────
 
 [module.security]
 uses_api_key = true
@@ -65,108 +112,9 @@ auth_dependency = "plugins.security.core.auth.require_api_key"
 scan_limit = "2/minute"
 report_limit = "10/minute"
 
-[module.ui]
-framework = "vanilla-js"
-theme_support = true
-responsive = true
-dark_mode = true
-main_entry = "ui/index.html"
-
-[module.i18n]
-default_locale = "ca-ES"
-supported_locales = ["ca-ES", "es-ES", "en-US"]
-translations_path = "languages/"
-
-[paths]
-root = "server-nexe/plugins/security"
-manifest = "manifest.py"
-ui = "ui"
-checks = "checks"
-specialists = "specialists"
-languages = "languages"
-core = "core"
-
-[authentication]
-enabled = true
-method = "api_key"
-header = "X-API-Key"
-auth_module = "core.security.core.auth"
-function = "require_api_key"
-
-[rate_limiting]
-enabled = true
-scan_limit = "2/minute"
-report_limit = "10/minute"
-provider = "nexe.core.dependencies.limiter"
-
-[dependencies]
-# Mòduls Nexe requerits
-modules = []
-
-# Mòduls externs (Python packages)
-python = [
-  "fastapi",
-  "slowapi"
-]
-
-[components]
-# Specialist per security checks
-specialist = "specialists/security_specialist.py"
-specialist_class = "SecuritySpecialist"
-
-# Checks automàtics
-checks_dir = "checks"
-check_categories = [
-  "api_security",
-  "config_validation",
-  "dependency_scan",
-  "file_permissions"
-]
-
-[discovery]
-# Auto-discovery via MODULE_METADATA
-auto_discover = true
-routers = ["router_public"]
-specialist_path = "specialists/security_specialist.py"
-
-[logging]
-enabled = true
-log_dir = "server-nexe/storage/logs/security"
-level = "INFO"
-
-[i18n]
-# Internacionalització
-default_language = "ca-ES"
-supported_languages = ["ca-ES", "en-US", "es-ES"]
-translations_dir = "languages"
-
-[monitoring]
-# Integració amb observability
-metrics_enabled = true
-health_check = true
-prometheus_metrics = [
-  "security_scan_total",
-  "security_findings_by_severity",
-  "security_check_duration_seconds"
-]
-
-[config]
-# Configuració per defecte
-default_severity_threshold = "MEDIUM"
-max_concurrent_checks = 5
-check_timeout_seconds = 30
-report_retention_days = 90
-
-[severity_levels]
-# Classificació de severitat
-levels = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
-alert_on = ["CRITICAL", "HIGH"]
-
-# ═══════════════════════════════════════════════════════════════
-# STORAGE DECLARATIONS (Auto-Clean)
-# Cada path que Security escriu a storage/ ha d'estar declarat aquí.
-# El sistema Auto-Clean només gestiona paths declarats.
-# ═══════════════════════════════════════════════════════════════
+# ───────────────────────────────────────────
+# [module.storage] — Paths a disc
+# ───────────────────────────────────────────
 
 [module.storage]
 
@@ -177,10 +125,8 @@ format = "json"
 retention_days = 90
 action = "ARCHIVE"
 archive_to = "storage/archives/security/{year}-{month}/"
-description = "Security logs - compliance 90 dies"
-# Auto-clean conservador per logs de seguretat
 auto_clean = false
+description = "Security logs - compliance 90 dies"
 
 [module.storage.protection]
-# Fitxers que MAI s'han de tocar
 protected_patterns = ["*.db", "api_keys.json", "*.key"]

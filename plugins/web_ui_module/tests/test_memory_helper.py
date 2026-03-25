@@ -5,7 +5,7 @@ Sense GPU ni Qdrant — cobreix tota la lògica en memòria.
 import pytest
 from datetime import datetime, timezone, timedelta
 
-from plugins.web_ui_module.memory_helper import (
+from plugins.web_ui_module.core.memory_helper import (
     MemoryHelper,
     SAVE_TRIGGERS,
     RECALL_PATTERNS,

@@ -107,7 +107,7 @@ async def require_api_key(
           detail="DEV mode bypass only allowed from localhost"
         )
       try:
-        from plugins.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
+        from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
         security_logger = get_security_logger()
         security_logger.log_event(
           event_type=SecurityEventType.AUTH_SUCCESS,
@@ -139,7 +139,7 @@ async def require_api_key(
       record_auth_attempt('success', 'primary', request.url.path)
 
       try:
-        from plugins.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
+        from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
         security_logger = get_security_logger()
         security_logger.log_event(
           event_type=SecurityEventType.AUTH_SUCCESS,
@@ -159,7 +159,7 @@ async def require_api_key(
       record_auth_attempt('success', 'secondary', request.url.path)
 
       try:
-        from plugins.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
+        from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
         security_logger = get_security_logger()
         security_logger.log_event(
           event_type=SecurityEventType.AUTH_SUCCESS,
@@ -184,7 +184,7 @@ async def require_api_key(
   record_auth_failure(failure_reason)
 
   try:
-    from plugins.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
+    from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
     security_logger = get_security_logger()
     security_logger.log_auth_failure(
       reason=failure_reason,

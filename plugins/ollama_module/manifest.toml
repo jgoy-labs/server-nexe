@@ -1,28 +1,36 @@
 # ─────────────────────────────────────────────────────────────
 # ModuleID: ollama_module
-# Nexe v0.8 | J.Goy | 2025-10-23
+# Nexe v0.8.2 | Antigravity | 2026-03-25
 # server-nexe/plugins/ollama_module/manifest.toml
-#
-# Descripció:
-# Manifest operatiu del mòdul Ollama. Utilitzat pel ModuleManager
-# per identificar metadades, dependències i integracions.
 # ─────────────────────────────────────────────────────────────
+
+# ───────────────────────────────────────────
+# [module] — Metadades principals
+# ───────────────────────────────────────────
 
 [module]
 name = "ollama_module"
-version = "0.5.0"
+version = "0.8.2"
 type = "local_llm_option"
-description = "Integració amb Ollama per executar models LLM locals sense dependències de cloud. Gestió de models, streaming de respostes, embeddings locals i interfície d'administració completa"
+description = "Integracio amb Ollama per executar models LLM locals sense dependencies de cloud. Gestio de models, streaming, embeddings locals."
 location = "plugins/ollama_module/"
 permanent = true
 external_tool = "Ollama"
-note = "Una de les moltes opcions de LLM que Nexe suportarà"
+note = "Una de les moltes opcions de LLM que Nexe suportara"
+
+# ───────────────────────────────────────────
+# [module.metadata] — Autoria i dates
+# ───────────────────────────────────────────
 
 [module.metadata]
-author = "Nexe Team (Jordi Goy)"
+author = "Jordi Goy"
 created = "2025-10-22"
-last_updated = "2025-10-23"
+last_updated = "2026-03-25"
 status = "active"
+
+# ───────────────────────────────────────────
+# [module.capabilities]
+# ───────────────────────────────────────────
 
 [module.capabilities]
 has_api = true
@@ -32,29 +40,65 @@ has_tests = true
 streaming = true
 real_time = true
 
+# ───────────────────────────────────────────
+# [module.dependencies]
+# ───────────────────────────────────────────
+
 [module.dependencies]
-modules = []
-specialists = ["ollama_specialist"]
+modules = ["security"]
+specialists = []
 external_services = ["Ollama (configurable host)"]
+
+# ───────────────────────────────────────────
+# [module.endpoints]
+# ───────────────────────────────────────────
 
 [module.endpoints]
 router_prefix = "/ollama"
-ui_path = "/ollama/ui"
-public_routes = ["/", "/assets/{path:path}", "/js/{path:path}", "/api/models", "/health", "/info"]
+public_routes = ["/health", "/info", "/api/models", "/ui"]
 protected_routes = ["/api/pull", "/api/chat", "/api/models/{name}"]
+
+# ───────────────────────────────────────────
+# [module.entry]
+# ───────────────────────────────────────────
+
+[module.entry]
+module = "plugins.ollama_module.module"
+class = "OllamaModule"
+
+# ───────────────────────────────────────────
+# [module.router]
+# ───────────────────────────────────────────
+
+[module.router]
+prefix = "/ollama"
+
+# ───────────────────────────────────────────
+# [module.cli]
+# ───────────────────────────────────────────
 
 [module.cli]
 command_name = "ollama"
 alias = "ollama"
-entry_point = "nexe.tools.ollama_module.cli"
-description = "Gestió de models LLM locals amb Ollama"
+entry_point = "plugins.ollama_module.cli.main"
+description = "Gestio de models LLM locals amb Ollama"
 commands = ["status", "models", "pull", "info", "delete", "chat", "ask"]
 framework = "typer"
-offline = false
-quadrant = "nexe"
+
+# ───────────────────────────────────────────
+# [module.integration]
+# ───────────────────────────────────────────
 
 [module.integration]
 workflow_engine = true
-workflow_node = "nexe.tools.ollama_module.workflow.nodes.ollama_node.OllamaNode"
+workflow_node = "plugins.ollama_module.workflow.nodes.ollama_node.OllamaNode"
 ui_control_center = true
 
+# ───────────────────────────────────────────
+# [module.i18n]
+# ───────────────────────────────────────────
+
+[module.i18n]
+default_locale = "ca-ES"
+supported_locales = ["ca-ES", "es-ES", "en-US"]
+translations_path = "languages/"

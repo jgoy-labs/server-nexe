@@ -7,7 +7,7 @@ import time
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
-from plugins.llama_cpp_module.chat import LlamaCppChatNode
+from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
 
 
 @pytest.fixture(autouse=True)

@@ -2,80 +2,94 @@
 ────────────────────────────────────
 Server Nexe
 Version: 0.8
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: plugins/ollama_module/health.py
-Description: Health check per mòdul Ollama (opció local per LLM). Verifica
+Description: Facade get_health() per al modul Ollama.
+             F7 FIX: Async health check (no bloqueja event loop).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import asyncio
 import logging
 import os
 from typing import Dict, Any
 
 try:
-  import httpx
+    import httpx
 except ImportError:
-  httpx = None
+    httpx = None
 
 logger = logging.getLogger(__name__)
 
 OLLAMA_BASE_URL = os.getenv("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-
-# Configurable timeout via environment variable
 OLLAMA_HEALTH_TIMEOUT = float(os.getenv('NEXE_OLLAMA_HEALTH_TIMEOUT', '5.0'))
 
+
+async def get_health_async() -> Dict[str, Any]:
+    """
+    Health check ASYNC del modul Ollama (F7 fix).
+    No bloqueja l'event loop.
+    """
+    if httpx is None:
+        return {
+            "name": "ollama_module",
+            "status": "DEGRADED",
+            "connected": False,
+            "error": "httpx not installed (pip install httpx)"
+        }
+
+    try:
+        async with httpx.AsyncClient(timeout=min(OLLAMA_HEALTH_TIMEOUT, 3.0)) as client:
+            response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
+            response.raise_for_status()
+            data = response.json()
+            models = data.get("models", [])
+            return {
+                "name": "ollama_module",
+                "status": "HEALTHY",
+                "connected": True,
+                "models_count": len(models),
+                "base_url": OLLAMA_BASE_URL
+            }
+    except httpx.ConnectError:
+        logger.warning("Ollama not reachable at %s", OLLAMA_BASE_URL)
+        return {
+            "name": "ollama_module",
+            "status": "UNHEALTHY",
+            "connected": False,
+            "error": "Cannot connect to Ollama (not running?)",
+            "base_url": OLLAMA_BASE_URL
+        }
+    except Exception as e:
+        logger.error(f"Ollama health check failed: {e}")
+        return {
+            "name": "ollama_module",
+            "status": "ERROR",
+            "connected": False,
+            "error": str(e),
+            "base_url": OLLAMA_BASE_URL
+        }
+
+
 def get_health() -> Dict[str, Any]:
-  """
-  Comprova la salut del mòdul Ollama.
+    """
+    Facade sincrona — delega a get_health_async.
+    Si ja dins event loop, retorna resultat basic.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
 
-  NOTE: Synchronous function — blocks the event loop up to OLLAMA_HEALTH_TIMEOUT.
-  Call via asyncio.to_thread(get_health) from async contexts if possible.
+    if loop and loop.is_running():
+        # Dins event loop — retornem basic sense bloquejar
+        return {
+            "name": "ollama_module",
+            "status": "unknown",
+            "connected": None,
+            "note": "Use get_health_async() from async context"
+        }
 
-  Returns:
-    Dict amb status, connected, models_count
-  """
-  if httpx is None:
-    return {
-      "name": "ollama_module",
-      "status": "DEGRADED",
-      "connected": False,
-      "error": "httpx not installed (pip install httpx)"
-    }
-
-  try:
-    with httpx.Client(timeout=min(OLLAMA_HEALTH_TIMEOUT, 3.0)) as client:
-      response = client.get(f"{OLLAMA_BASE_URL}/api/tags")
-      response.raise_for_status()
-
-      data = response.json()
-      models = data.get("models", [])
-
-      return {
-        "name": "ollama_module",
-        "status": "HEALTHY",
-        "connected": True,
-        "models_count": len(models),
-        "base_url": OLLAMA_BASE_URL
-      }
-
-  except httpx.ConnectError:
-    logger.warning("Ollama not reachable at %s", OLLAMA_BASE_URL)
-    return {
-      "name": "ollama_module",
-      "status": "UNHEALTHY",
-      "connected": False,
-      "error": "Cannot connect to Ollama (not running?)",
-      "base_url": OLLAMA_BASE_URL
-    }
-
-  except Exception as e:
-    logger.error(f"Ollama health check failed: {e}")
-    return {
-      "name": "ollama_module",
-      "status": "ERROR",
-      "connected": False,
-      "error": str(e),
-      "base_url": OLLAMA_BASE_URL
-    }
+    return asyncio.run(get_health_async())

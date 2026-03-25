@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import plugins.web_ui_module.memory_helper as mh_module
-from plugins.web_ui_module.memory_helper import (
+from plugins.web_ui_module.core.memory_helper import (
     MemoryHelper,
     SIMILARITY_THRESHOLD,
     MAX_MEMORY_ENTRIES,

@@ -7,7 +7,7 @@ import gc
 import pytest
 from unittest.mock import MagicMock, patch
 
-from plugins.mlx_module.chat import MLXChatNode
+from plugins.mlx_module.core.chat import MLXChatNode
 
 
 @pytest.fixture(autouse=True)

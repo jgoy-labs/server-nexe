@@ -1,0 +1,16 @@
+# Specialists del modul llama_cpp_module — Stubs fins Part 2
+
+[specialist.plugin]
+name = "llama_cpp_plugin_specialist"
+manager = "doctor_manager"
+status = "stub"
+
+[specialist.trasher]
+name = "llama_cpp_trasher_specialist"
+manager = "trasher_manager"
+status = "stub"
+
+[specialist.test]
+name = "llama_cpp_test_specialist"
+manager = "test_manager"
+status = "stub"

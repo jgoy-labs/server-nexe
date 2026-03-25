@@ -1,0 +1,16 @@
+# Specialists del modul mlx_module — Stubs fins Part 2
+
+[specialist.plugin]
+name = "mlx_plugin_specialist"
+manager = "doctor_manager"
+status = "stub"
+
+[specialist.trasher]
+name = "mlx_trasher_specialist"
+manager = "trasher_manager"
+status = "stub"
+
+[specialist.test]
+name = "mlx_test_specialist"
+manager = "test_manager"
+status = "stub"

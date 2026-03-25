@@ -23,7 +23,7 @@ class TestMLXConfigGaps:
     def test_dotenv_import_error(self):
         """Line 28: dotenv ImportError path."""
         # This is triggered at import time. Just verify module imports.
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         assert MLXConfig is not None
 
     def test_from_env_toml_fallback(self, monkeypatch, tmp_path):
@@ -40,7 +40,7 @@ preferred_engine = "mlx"
 primary = "/some/model/path"
 """)
 
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
 
         # Patch to use our tmp config
         with patch("plugins.mlx_module.config.Path") as mock_path_cls:
@@ -66,7 +66,7 @@ primary = "/some/model/path"
         """Line 124-125: exception reading server.toml."""
         monkeypatch.delenv("NEXE_MLX_MODEL", raising=False)
 
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
 
         with patch("builtins.__import__", side_effect=ImportError("no toml")):
             # Should not crash, just log warning
@@ -78,14 +78,14 @@ primary = "/some/model/path"
 
     def test_config_post_init_tilde_expansion(self):
         """Line 87: expanduser for ~ paths."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         config = MLXConfig(model_path="~/models/test")
         assert "~" not in config.model_path
         assert config.model_path.startswith("/")
 
     def test_config_post_init_relative_path(self):
         """Lines 89-92: relative path resolved."""
-        from plugins.mlx_module.config import MLXConfig
+        from plugins.mlx_module.core.config import MLXConfig
         config = MLXConfig(model_path="models/test")
         # Should be resolved to absolute path
         assert os.path.isabs(config.model_path)
@@ -108,7 +108,7 @@ class TestMLXChatNodeGaps:
 
     def test_reset_model_clears_cache_exception(self):
         """Lines 319-320: exception during mx.clear_cache()."""
-        from plugins.mlx_module.chat import MLXChatNode
+        from plugins.mlx_module.core.chat import MLXChatNode
 
         # Reset the class-level model (if any)
         MLXChatNode._model = None
@@ -129,7 +129,7 @@ class TestPromptCacheManagerGaps:
 
     def test_delete_cleans_empty_nodes(self):
         """Line 145: delete removes empty nodes from trie."""
-        from plugins.mlx_module.prompt_cache_manager import MLXPromptCacheManager
+        from plugins.mlx_module.core.prompt_cache_manager import MLXPromptCacheManager
 
         manager = MLXPromptCacheManager(max_size=10)
         model = "test_model"
@@ -153,7 +153,7 @@ class TestPromptCacheManagerGaps:
 
     def test_insert_existing_entry_increments_count(self):
         """Line 275: inserting same tokens updates count (ValueError on remove)."""
-        from plugins.mlx_module.prompt_cache_manager import MLXPromptCacheManager
+        from plugins.mlx_module.core.prompt_cache_manager import MLXPromptCacheManager
 
         manager = MLXPromptCacheManager(max_size=10)
         model = "test_model"
