@@ -31,7 +31,7 @@ class TestAutoMaxKvSize:
         try:
             # Force reimport to pick up the None
             import importlib
-            import plugins.mlx_module.config as cfg
+            import plugins.mlx_module.core.config as cfg
             # Directly test: when import fails inside the function
             result = _auto_max_kv_size()
             # Either returns calculated value or fallback
@@ -95,7 +95,7 @@ primary = "/path/to/mlx/model"
 
         from plugins.mlx_module.core.config import MLXConfig
 
-        with patch("plugins.mlx_module.config.Path") as mock_path_cls:
+        with patch("plugins.mlx_module.core.config.Path") as mock_path_cls:
             # Make both config paths not exist (relative and absolute)
             mock_rel = MagicMock()
             mock_rel.exists.return_value = False

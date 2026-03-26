@@ -377,6 +377,7 @@ class TestModuleManagerApiIntegrator:
 
       mock_lifecycle = MagicMock()
       manager.module_lifecycle = mock_lifecycle
+      manager.i18n = None
 
       mock_integrator = MagicMock()
       manager.set_api_integrator(mock_integrator)

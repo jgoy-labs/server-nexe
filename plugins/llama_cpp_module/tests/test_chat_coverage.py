@@ -85,9 +85,9 @@ class TestExecute:
 
         with patch.object(LlamaCppChatNode, '_pool', mock_pool), \
              patch.object(LlamaCppChatNode, '_config', config), \
-             patch("plugins.llama_cpp_module.chat.compute_system_hash", return_value="hash123"), \
-             patch("plugins.llama_cpp_module.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.llama_cpp_module.chat.asyncio.get_running_loop", return_value=MagicMock()):
+             patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="hash123"), \
+             patch("plugins.llama_cpp_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
+             patch("plugins.llama_cpp_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
             result = await node.execute({
                 "system": "You are helpful",
                 "messages": [{"role": "user", "content": "hi"}],
@@ -121,9 +121,9 @@ class TestExecute:
 
         with patch.object(LlamaCppChatNode, '_pool', mock_pool), \
              patch.object(LlamaCppChatNode, '_config', config), \
-             patch("plugins.llama_cpp_module.chat.compute_system_hash", return_value="h"), \
-             patch("plugins.llama_cpp_module.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.llama_cpp_module.chat.asyncio.get_running_loop", return_value=MagicMock()):
+             patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="h"), \
+             patch("plugins.llama_cpp_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
+             patch("plugins.llama_cpp_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
             result = await node.execute({
                 "system": "sys",
                 "messages": [],
@@ -148,9 +148,9 @@ class TestExecute:
 
         with patch.object(LlamaCppChatNode, '_pool', mock_pool), \
              patch.object(LlamaCppChatNode, '_config', config), \
-             patch("plugins.llama_cpp_module.chat.compute_system_hash", return_value="h"), \
-             patch("plugins.llama_cpp_module.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.llama_cpp_module.chat.asyncio.get_running_loop", return_value=MagicMock()):
+             patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="h"), \
+             patch("plugins.llama_cpp_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
+             patch("plugins.llama_cpp_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
             with pytest.raises(RuntimeError, match="gen error"):
                 await node.execute({"system": "", "messages": []})
 

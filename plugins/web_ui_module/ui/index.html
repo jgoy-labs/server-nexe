@@ -103,16 +103,26 @@
                 <div class="rag-threshold-control">
                     <div class="rag-threshold-label">
                         <span class="rag-threshold-title">
-                            Precisió RAG
-                            <span class="rag-info-icon" title="Controla quant ha de semblar-se un record a la teva pregunta per ser inclòs al context. Valors alts (0.8+) → menys context, molt precís. Valors baixos (0.3) → més context, però pot incloure soroll i causar al·lucinacions.">ⓘ</span>
+                            Filtre RAG
+                            <span class="rag-info-toggle" id="ragInfoToggle">ⓘ</span>
                         </span>
-                        <span id="ragThresholdValue" class="rag-threshold-badge">0.6</span>
+                        <span id="ragThresholdValue" class="rag-threshold-badge">0.40</span>
+                    </div>
+                    <div id="ragInfoPanel" class="rag-info-panel" style="display:none">
+                        <p><strong>Filtre de documents RAG</strong></p>
+                        <p>Controla quants documents de la memòria s'inclouen al context del model.</p>
+                        <ul>
+                            <li><strong>← Baix (0.20–0.35):</strong> Inclou més documents. El model té més info per respondre, però pot incloure algun document poc rellevant.</li>
+                            <li><strong>→ Alt (0.50–0.70):</strong> Filtre estricte. Descarta quasi tots els documents. <em>El model no té context i inventa les respostes.</em></li>
+                            <li><strong>Recomanat: 0.35–0.45</strong> — el model rep prou context sense soroll.</li>
+                        </ul>
                     </div>
                     <input type="range" id="ragThresholdSlider" class="rag-threshold-slider"
-                           min="0.3" max="0.95" step="0.05" value="0.6">
+                           min="0.20" max="0.70" step="0.05" value="0.40">
                     <div class="rag-threshold-hints">
-                        <span>Ampli</span><span>Estricte</span>
+                        <span>Més info</span><span>Filtre alt</span>
                     </div>
+                    <div id="ragCollections" class="rag-collections"></div>
                 </div>
             </div>
 
@@ -208,6 +218,11 @@
             <a href="https://jgoy.net" target="_blank" class="footer-link">jgoy.net</a>
         </div>
         <div class="footer-right">
+            <select id="langSelect" class="lang-select" title="Idioma">
+                <option value="ca">CA</option>
+                <option value="es">ES</option>
+                <option value="en">EN</option>
+            </select>
             <div id="thinkingBadge" class="thinking-badge">
                 <div class="thinking-dots"><span></span><span></span><span></span></div>
                 <span>Pensant...</span>

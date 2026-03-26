@@ -272,7 +272,7 @@ class TestGetPromptCacheManager:
 
     def test_get_prompt_cache_manager(self):
         """Test singleton creation."""
-        import plugins.mlx_module.prompt_cache_manager as pcm
+        import plugins.mlx_module.core.prompt_cache_manager as pcm
 
         # Reset the singleton
         pcm._prompt_cache_manager = None

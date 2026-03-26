@@ -7,13 +7,13 @@ from core.loader.protocol import HealthStatus
 async def test_llamacpp_module_metadata():
     module = LlamaCppModule()
     assert module.metadata.name == "llama_cpp_module"
-    assert module.metadata.version == "1.0.0"
+    assert module.metadata.version == "0.8.2"
     assert module.metadata.module_type == "local_llm_option"
 
 @pytest.mark.asyncio
 async def test_llamacpp_module_initialize_failure():
     # Test initialize with invalid config (model file not exists)
-    with patch("plugins.llama_cpp_module.config.os.path.exists", return_value=False):
+    with patch("plugins.llama_cpp_module.core.config.os.path.exists", return_value=False):
         module = LlamaCppModule()
         # Should start even with warning (degraded mode concept)
         # But wait, looking at my module.py, it returns True and logs warning

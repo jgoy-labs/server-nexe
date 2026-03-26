@@ -283,105 +283,50 @@ class TestDeleteModel:
 
 
 class TestGetInfo:
-    """Tests for get_info (line 333)"""
+    """Tests for get_info"""
 
     def test_get_info(self):
-        """Lines 331-348: returns module info dict"""
+        """Returns module info dict"""
         module = OllamaModule()
         info = module.get_info()
         assert info["name"] == "ollama_module"
-        assert "features" in info
+        assert "version" in info
+        assert "initialized" in info
 
 
-class TestLoadI18nForCli:
-    """Tests for _load_i18n_for_cli (lines 352-358)"""
+class TestInitialize:
+    """Tests for initialize (async context setup)"""
 
-    def test_load_i18n_success(self):
-        """Lines 352-356: successful i18n load"""
-        from plugins.ollama_module.module import _load_i18n_for_cli
+    @pytest.mark.asyncio
+    async def test_initialize_success(self):
+        """Initialize sets _initialized and loads i18n if available."""
+        module = OllamaModule()
+        result = await module.initialize({"services": {}})
+        assert result is True
+        assert module._initialized is True
+
+    @pytest.mark.asyncio
+    async def test_initialize_with_i18n(self):
+        """Initialize loads i18n service from context."""
         mock_i18n = MagicMock()
-        with patch("plugins.ollama_module.module.I18nService", return_value=mock_i18n, create=True):
-            with patch.dict("sys.modules", {"personality.i18n": MagicMock(I18nService=MagicMock(return_value=mock_i18n))}):
-                result = _load_i18n_for_cli()
-        # May return None if import fails in test env; that's fine
-        # The test exercises the code path
-
-    def test_load_i18n_failure(self):
-        """Lines 357-358: i18n import fails"""
-        from plugins.ollama_module.module import _load_i18n_for_cli
-        with patch.dict("sys.modules", {"personality.i18n": None}):
-            result = _load_i18n_for_cli()
-        assert result is None
-
-
-class TestMain:
-    """Tests for main (lines 362-419)"""
+        module = OllamaModule()
+        result = await module.initialize({"services": {"i18n": mock_i18n}})
+        assert result is True
+        assert module.i18n is mock_i18n
 
     @pytest.mark.asyncio
-    async def test_main_connected_with_models(self):
-        """Lines 362-419: main with connection and models"""
-        from plugins.ollama_module.module import main
-
-        mock_module = MagicMock()
-        mock_module.base_url = "http://localhost:11434"
-        mock_module.check_connection = AsyncMock(return_value=True)
-        mock_module.list_models = AsyncMock(return_value=[
-            {"name": "llama3", "size": 4 * 1024**3}
-        ])
-
-        with patch("plugins.ollama_module.module._load_i18n_for_cli", return_value=None), \
-             patch("plugins.ollama_module.module.OllamaModule", return_value=mock_module), \
-             patch("builtins.print"):
-            result = await main()
-
-        assert result == 0
+    async def test_initialize_idempotent(self):
+        """Initialize returns True on second call (already initialized)."""
+        module = OllamaModule()
+        await module.initialize({"services": {}})
+        result = await module.initialize({"services": {}})
+        assert result is True
 
     @pytest.mark.asyncio
-    async def test_main_not_connected(self):
-        """Lines 391-394: not connected"""
-        from plugins.ollama_module.module import main
-
-        mock_module = MagicMock()
-        mock_module.base_url = "http://localhost:11434"
-        mock_module.check_connection = AsyncMock(return_value=False)
-
-        with patch("plugins.ollama_module.module._load_i18n_for_cli", return_value=None), \
-             patch("plugins.ollama_module.module.OllamaModule", return_value=mock_module), \
-             patch("builtins.print"):
-            result = await main()
-
-        assert result == 1
-
-    @pytest.mark.asyncio
-    async def test_main_no_models(self):
-        """Lines 401-403: connected but no models"""
-        from plugins.ollama_module.module import main
-
-        mock_module = MagicMock()
-        mock_module.base_url = "http://localhost:11434"
-        mock_module.check_connection = AsyncMock(return_value=True)
-        mock_module.list_models = AsyncMock(return_value=[])
-
-        with patch("plugins.ollama_module.module._load_i18n_for_cli", return_value=None), \
-             patch("plugins.ollama_module.module.OllamaModule", return_value=mock_module), \
-             patch("builtins.print"):
-            result = await main()
-
-        assert result == 0
-
-    @pytest.mark.asyncio
-    async def test_main_list_models_error(self):
-        """Lines 409-411: error listing models"""
-        from plugins.ollama_module.module import main
-
-        mock_module = MagicMock()
-        mock_module.base_url = "http://localhost:11434"
-        mock_module.check_connection = AsyncMock(return_value=True)
-        mock_module.list_models = AsyncMock(side_effect=Exception("API error"))
-
-        with patch("plugins.ollama_module.module._load_i18n_for_cli", return_value=None), \
-             patch("plugins.ollama_module.module.OllamaModule", return_value=mock_module), \
-             patch("builtins.print"):
-            result = await main()
-
-        assert result == 1
+    async def test_shutdown(self):
+        """Shutdown resets _initialized."""
+        module = OllamaModule()
+        await module.initialize({"services": {}})
+        assert module._initialized is True
+        await module.shutdown()
+        assert module._initialized is False

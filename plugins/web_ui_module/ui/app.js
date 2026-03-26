@@ -19,10 +19,15 @@ const UI_STRINGS = {
         new_chat: "Nova conversa",
         sessions: "Sessions",
         placeholder: "Escriu un missatge...",
-        rag_title: "Precisió RAG",
-        rag_info: "Controla quant ha de semblar-se un record a la teva pregunta per ser inclòs al context. Valors alts (0.8+) → menys context, molt precís. Valors baixos (0.3) → més context, però pot incloure soroll i causar al·lucinacions.",
-        rag_wide: "Ampli",
-        rag_strict: "Estricte",
+        rag_title: "Filtre RAG",
+        rag_info: "Controla quants documents s'inclouen al context. Baix → més info, millors respostes. Alt → descarta documents, el model pot inventar.",
+        rag_wide: "Més info",
+        rag_strict: "Filtre alt",
+        rag_panel_title: "Filtre de documents RAG",
+        rag_panel_desc: "Controla quants documents de la memòria s'inclouen al context del model.",
+        rag_panel_low: "<strong>← Baix (0.20–0.35):</strong> Inclou més documents. El model té més info per respondre.",
+        rag_panel_high: "<strong>→ Alt (0.50–0.70):</strong> Filtre estricte. Descarta documents. <em>El model pot inventar.</em>",
+        rag_panel_rec: "<strong>Recomanat: 0.35–0.45</strong> — el model rep prou context sense soroll.",
         thinking: "Pensant...",
         connected: "Connectat",
         disconnected: "Desconnectat",
@@ -48,10 +53,15 @@ const UI_STRINGS = {
         new_chat: "New conversation",
         sessions: "Sessions",
         placeholder: "Type a message...",
-        rag_title: "RAG Precision",
-        rag_info: "Controls how closely a memory must match your question to be included in context. High values (0.8+) → less context, very precise. Low values (0.3) → more context, but may include noise and cause hallucinations.",
-        rag_wide: "Wide",
-        rag_strict: "Strict",
+        rag_title: "RAG Filter",
+        rag_info: "Controls how many documents are included in context. Low → more info, better answers. High → discards documents, model may hallucinate.",
+        rag_wide: "More info",
+        rag_strict: "High filter",
+        rag_panel_title: "RAG Document Filter",
+        rag_panel_desc: "Controls how many memory documents are included in the model's context.",
+        rag_panel_low: "<strong>← Low (0.20–0.35):</strong> Includes more documents. The model has more info to answer.",
+        rag_panel_high: "<strong>→ High (0.50–0.70):</strong> Strict filter. Discards documents. <em>The model may hallucinate.</em>",
+        rag_panel_rec: "<strong>Recommended: 0.35–0.45</strong> — the model gets enough context without noise.",
         thinking: "Thinking...",
         connected: "Connected",
         disconnected: "Disconnected",
@@ -77,10 +87,15 @@ const UI_STRINGS = {
         new_chat: "Nueva conversación",
         sessions: "Sesiones",
         placeholder: "Escribe un mensaje...",
-        rag_title: "Precisión RAG",
-        rag_info: "Controla cuánto debe parecerse un recuerdo a tu pregunta para ser incluido en el contexto. Valores altos (0.8+) → menos contexto, muy preciso. Valores bajos (0.3) → más contexto, pero puede incluir ruido y causar alucinaciones.",
-        rag_wide: "Amplio",
-        rag_strict: "Estricto",
+        rag_title: "Filtro RAG",
+        rag_info: "Controla cuántos documentos se incluyen en el contexto. Bajo → más info, mejores respuestas. Alto → descarta documentos, el modelo puede inventar.",
+        rag_wide: "Más info",
+        rag_strict: "Filtro alto",
+        rag_panel_title: "Filtro de documentos RAG",
+        rag_panel_desc: "Controla cuántos documentos de la memoria se incluyen en el contexto del modelo.",
+        rag_panel_low: "<strong>← Bajo (0.20–0.35):</strong> Incluye más documentos. El modelo tiene más info para responder.",
+        rag_panel_high: "<strong>→ Alto (0.50–0.70):</strong> Filtro estricto. Descarta documentos. <em>El modelo puede inventar.</em>",
+        rag_panel_rec: "<strong>Recomendado: 0.35–0.45</strong> — el modelo recibe contexto suficiente sin ruido.",
         thinking: "Pensando...",
         connected: "Conectado",
         disconnected: "Desconectado",
@@ -97,8 +112,8 @@ const UI_STRINGS = {
 class NexeUI {
     constructor() {
         this.apiKey = localStorage.getItem('nexe_api_key') || null;
-        // Idioma: servidor (injectat) > navegador > anglès
-        const serverLang = window.NEXE_LANG;
+        // Idioma: servidor (data-attr injectat) > html lang > navegador > anglès
+        const serverLang = document.documentElement.dataset.nexeLang || document.documentElement.lang;
         const browserLang = (navigator.language || 'en').split('-')[0];
         const preferredLang = serverLang || browserLang;
         this.lang = UI_STRINGS[preferredLang] ? preferredLang : 'en';
@@ -151,13 +166,26 @@ class NexeUI {
         if (bSel && bSel.options[0]) bSel.options[0].textContent = this.t('loading');
         const mSel = document.getElementById('modelSelect');
         if (mSel && mSel.options[0]) mSel.options[0].textContent = this.t('loading');
-        // RAG
-        s('.rag-threshold-title', 'rag_title');
-        const ragInfo = document.querySelector('.rag-info-icon');
-        if (ragInfo) ragInfo.title = this.t('rag_info');
+        // RAG — preservar el botó ⓘ dins del títol
+        const ragTitle = document.querySelector('.rag-threshold-title');
+        if (ragTitle) {
+            const infoBtn = ragTitle.querySelector('.rag-info-toggle');
+            ragTitle.textContent = '';
+            ragTitle.append(this.t('rag_title') + ' ');
+            if (infoBtn) { infoBtn.title = this.t('rag_info'); ragTitle.appendChild(infoBtn); }
+        }
         const hints = document.querySelectorAll('.rag-threshold-hints span');
         if (hints[0]) hints[0].textContent = this.t('rag_wide');
         if (hints[1]) hints[1].textContent = this.t('rag_strict');
+        // RAG info panel
+        const ragPanel = document.getElementById('ragInfoPanel');
+        if (ragPanel) {
+            ragPanel.innerHTML = `<p><strong>${this.t('rag_panel_title')}</strong></p>` +
+                `<p>${this.t('rag_panel_desc')}</p>` +
+                `<ul><li>${this.t('rag_panel_low')}</li>` +
+                `<li>${this.t('rag_panel_high')}</li>` +
+                `<li>${this.t('rag_panel_rec')}</li></ul>`;
+        }
         // Input
         s('#messageInput', 'placeholder', 'placeholder');
         // Buttons
@@ -204,11 +232,32 @@ class NexeUI {
 
     init() {
         this.applyI18n();
+        this._initLangSelector();
         if (!this.apiKey) {
             this.showLoginOverlay();
             return;
         }
         this.initUI();
+    }
+
+    _initLangSelector() {
+        const langSelect = document.getElementById('langSelect');
+        if (!langSelect) return;
+        langSelect.value = this.lang;
+        langSelect.addEventListener('change', async () => {
+            this.lang = langSelect.value;
+            this.applyI18n();
+            // Persistir al servidor
+            try {
+                await this.fetchWithCsrf('/ui/lang', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lang: langSelect.value })
+                });
+            } catch (e) {
+                console.warn('Could not save language to server:', e);
+            }
+        });
     }
 
     showLoginOverlay() {
@@ -292,10 +341,26 @@ class NexeUI {
         const ragBadge = document.getElementById('ragThresholdValue');
         if (ragSlider && ragBadge) {
             const saved = localStorage.getItem('nexe_rag_threshold');
-            if (saved) { ragSlider.value = saved; ragBadge.textContent = saved; }
+            if (saved) {
+                const clamped = Math.min(parseFloat(saved), parseFloat(ragSlider.max));
+                ragSlider.value = clamped;
+                ragBadge.textContent = clamped;
+                if (clamped !== parseFloat(saved)) localStorage.setItem('nexe_rag_threshold', clamped);
+            }
             ragSlider.addEventListener('input', () => {
                 ragBadge.textContent = ragSlider.value;
                 localStorage.setItem('nexe_rag_threshold', ragSlider.value);
+            });
+        }
+
+        // RAG info toggle
+        const ragInfoBtn = document.getElementById('ragInfoToggle');
+        const ragInfoPanel = document.getElementById('ragInfoPanel');
+        if (ragInfoBtn && ragInfoPanel) {
+            ragInfoBtn.addEventListener('click', () => {
+                const open = ragInfoPanel.style.display !== 'none';
+                ragInfoPanel.style.display = open ? 'none' : 'block';
+                ragInfoBtn.classList.toggle('active', !open);
             });
         }
 
@@ -381,6 +446,30 @@ class NexeUI {
                     el.textContent = data.model + backend;
                     el.title = `model: ${data.model}\nbackend: ${data.backend}\nversion: ${data.version}`;
                 }
+                // RAG collections display with toggles
+                const ragCollEl = document.getElementById('ragCollections');
+                if (ragCollEl && data.rag_collections && data.rag_collections.length > 0) {
+                    const _collLabels = {
+                        'nexe_documentation': 'docs sistema',
+                        'user_knowledge': 'docs usuari',
+                        'nexe_web_ui': 'memòria xat'
+                    };
+                    const savedColls = JSON.parse(localStorage.getItem('nexe_rag_collections') || 'null');
+                    ragCollEl.innerHTML = data.rag_collections.map(c => {
+                        const status = c.count < 0 ? 'missing' : c.count === 0 ? 'empty' : 'active';
+                        const label = _collLabels[c.name] || c.name;
+                        const countText = c.count < 0 ? '—' : `${c.count} frag.`;
+                        const enabled = savedColls ? savedColls.includes(c.name) : c.count > 0;
+                        const disabled = c.count <= 0 ? 'disabled' : '';
+                        return `<label class="rag-coll-row"><input type="checkbox" class="rag-coll-toggle" data-coll="${c.name}" ${enabled ? 'checked' : ''} ${disabled}><span class="rag-coll-name">${label}</span><span class="rag-coll-count">${countText}</span></label>`;
+                    }).join('');
+                    ragCollEl.querySelectorAll('.rag-coll-toggle').forEach(cb => {
+                        cb.addEventListener('change', () => {
+                            const active = [...ragCollEl.querySelectorAll('.rag-coll-toggle:checked')].map(el => el.dataset.coll);
+                            localStorage.setItem('nexe_rag_collections', JSON.stringify(active));
+                        });
+                    });
+                }
             }
         } catch (e) {
             const el = document.getElementById('modelInfoText');
@@ -405,7 +494,9 @@ class NexeUI {
             for (const b of data.backends) {
                 const opt = document.createElement('option');
                 opt.value = b.id;
-                opt.textContent = b.name;
+                const disconnected = b.connected === false;
+                opt.textContent = disconnected ? `${b.name} (desconnectat)` : b.name;
+                opt.dataset.connected = disconnected ? '0' : '1';
                 if (b.active) opt.selected = true;
                 backendSel.appendChild(opt);
             }
@@ -453,6 +544,13 @@ class NexeUI {
 
         const backend = backendSel.value;
         const model = modelSel.value;
+        const selectedOpt = backendSel.selectedOptions[0];
+        const wasDisconnected = selectedOpt && selectedOpt.dataset.connected === '0';
+
+        const el = document.getElementById('modelInfoText');
+        if (wasDisconnected && el) {
+            el.textContent = `Arrencant Ollama...`;
+        }
 
         try {
             const resp = await this.fetchWithCsrf('/ui/backend', {
@@ -461,8 +559,35 @@ class NexeUI {
                 body: JSON.stringify({ backend, model })
             });
             if (resp.ok) {
-                const el = document.getElementById('modelInfoText');
-                if (el) el.textContent = `${model} · ${backend}`;
+                const data = await resp.json();
+                if (data.ollama_started) {
+                    if (el) el.textContent = `Arrencant Ollama...`;
+                    // Retry fins que Ollama estigui connectat (max 30s)
+                    let ready = false;
+                    for (let i = 0; i < 10 && !ready; i++) {
+                        await new Promise(r => setTimeout(r, 3000));
+                        if (el) el.textContent = `Arrencant Ollama... (${(i + 1) * 3}s)`;
+                        try {
+                            const r2 = await this.fetchWithCsrf('/ui/backends');
+                            if (r2.ok) {
+                                const d2 = await r2.json();
+                                const ollama = d2.backends.find(b => b.id === 'ollama');
+                                if (ollama && ollama.connected) {
+                                    ready = true;
+                                    this._backends = d2.backends;
+                                    this._updateModelSelect('ollama');
+                                    if (el) el.textContent = `Ollama connectat`;
+                                    // Actualitzar el dropdown (treure "desconnectat")
+                                    const opt = backendSel.querySelector('[value="ollama"]');
+                                    if (opt) opt.textContent = 'Ollama';
+                                }
+                            }
+                        } catch (_) {}
+                    }
+                    if (!ready && el) el.textContent = `Ollama no respon — comprova que està instal·lat`;
+                } else {
+                    if (el) el.textContent = `${model} · ${backend}`;
+                }
             }
         } catch (e) {
             console.error('Failed to set backend:', e);
@@ -669,7 +794,8 @@ class NexeUI {
 
         try {
             const ragSlider = document.getElementById('ragThresholdSlider');
-            const ragThreshold = ragSlider ? parseFloat(ragSlider.value) : 0.6;
+            const ragThreshold = ragSlider ? parseFloat(ragSlider.value) : 0.40;
+            const ragColls = JSON.parse(localStorage.getItem('nexe_rag_collections') || 'null');
             const backendSel = document.getElementById('backendSelect');
             const modelSel = document.getElementById('modelSelect');
             const response = await this.fetchWithCsrf('/ui/chat', {
@@ -680,6 +806,7 @@ class NexeUI {
                     session_id: this.currentSessionId,
                     stream: true,
                     rag_threshold: ragThreshold,
+                    rag_collections: ragColls,
                     backend: backendSel ? backendSel.value : undefined,
                     model: modelSel ? modelSel.value : undefined
                 }),
@@ -749,10 +876,16 @@ class NexeUI {
                     return buf;
                 };
 
-                // Parseja thinking/content de GPT-OSS (post-streaming)
+                // Parseja thinking/content post-streaming (DeepSeek, GPT-OSS, etc.)
                 const _parseThinkingChannels = (text) => {
                     if (!text) return { thinking: null, content: '' };
                     let cleaned = text.replace(/<\|[^|]+\|>/g, '').replace(/[◁◀][^▷▶]*[▷▶]/g, '');
+                    // Pattern 0: <think>...</think>... (tag complet)
+                    const m0 = cleaned.match(/<think>([\s\S]*?)<\/think>\s*([\s\S]*)/);
+                    if (m0) return { thinking: m0[1].trim(), content: m0[2].trim() };
+                    // Pattern 0b: ...text...</think>... (sense tag d'obertura — DeepSeek R1)
+                    const m0b = cleaned.match(/^([\s\S]+?)<\/think>\s*([\s\S]*)/);
+                    if (m0b && m0b[1].trim().length > 10) return { thinking: m0b[1].trim(), content: m0b[2].trim() };
                     // Pattern 1: "analysisXXX...assistantfinalYYY" (gpt-oss)
                     const m1 = cleaned.match(/^(?:assistant)?analysis([\s\S]+?)\.?assistant\s*final([\s\S]+)$/i);
                     if (m1) return { thinking: m1[1].trim(), content: m1[2].trim() };
@@ -814,6 +947,23 @@ class NexeUI {
                                 break;
                             }
                         } else { // responding
+                            // Detectar </think> retroactiu (DeepSeek sense <think> d'obertura)
+                            const closIdx = tBuf.indexOf('</think>');
+                            if (closIdx >= 0 && !tContent) {
+                                // Tot el que hi ha al fullResponse + buf fins </think> és thinking
+                                const thinkPart = fullResponse + tBuf.slice(0, closIdx);
+                                if (thinkPart.trim().length > 10) {
+                                    tContent = thinkPart.trim();
+                                    tTok = Math.ceil(tContent.length / 4);
+                                    startThinkBlock();
+                                    if (tTextEl) tTextEl.textContent = tContent;
+                                    closeThinkBlock();
+                                    fullResponse = '';
+                                    this._streamTokens = 0;
+                                    tBuf = tBuf.slice(closIdx + 8).replace(/^\n+/, '');
+                                    continue;
+                                }
+                            }
                             tBuf = _cleanModelTags(tBuf);
                             fullResponse += tBuf;
                             this._streamTokens += Math.ceil(tBuf.length / 4);
@@ -916,11 +1066,14 @@ class NexeUI {
                     if (loadingEl) {
                         const elapsed = Math.round((Date.now() - (this._loadStartTime || Date.now())) / 1000);
                         loadingEl.className = 'model-loading-indicator loaded';
-                        loadingEl.innerHTML = `<span>✓ Model carregat (${elapsed}s)</span>`;
+                        const _be = loadingEl.querySelector('.loading-backend');
+                        const _beText = _be ? ` ${_be.outerHTML}` : '';
+                        loadingEl.innerHTML = `<span>✓ Model carregat (${elapsed}s)${_beText}</span>`;
                         loadingEl = null;
                     }
                     // Render final definitiu
                     clearTimeout(this._renderTimer);
+                    this._renderTimer = null;
                     // Si no s'ha detectat thinking via <think>, provar parsing GPT-OSS
                     if (tMode !== 'thinking' && !tContent) {
                         const parsed = _parseThinkingChannels(fullResponse);

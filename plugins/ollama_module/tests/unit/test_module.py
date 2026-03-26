@@ -24,14 +24,16 @@ class TestOllamaModuleInit:
         m = OllamaModule()
         assert "localhost:11434" in m.base_url
 
-    def test_custom_base_url(self):
+    def test_custom_base_url(self, monkeypatch):
+        monkeypatch.setenv("NEXE_OLLAMA_HOST", "http://custom:12345")
         from plugins.ollama_module.module import OllamaModule
-        m = OllamaModule(base_url="http://custom:12345")
+        m = OllamaModule()
         assert m.base_url == "http://custom:12345"
 
-    def test_strips_trailing_slash(self):
+    def test_strips_trailing_slash(self, monkeypatch):
+        monkeypatch.setenv("NEXE_OLLAMA_HOST", "http://localhost:11434/")
         from plugins.ollama_module.module import OllamaModule
-        m = OllamaModule(base_url="http://localhost:11434/")
+        m = OllamaModule()
         assert not m.base_url.endswith("/")
 
     def test_env_base_url(self, monkeypatch):
@@ -43,8 +45,8 @@ class TestOllamaModuleInit:
     def test_has_name_and_version(self):
         from plugins.ollama_module.module import OllamaModule
         m = OllamaModule()
-        assert m.name == "ollama_module"
-        assert m.version is not None
+        assert m.metadata.name == "ollama_module"
+        assert m.metadata.version is not None
 
 
 class TestTranslationHelper:
@@ -65,7 +67,8 @@ class TestTranslationHelper:
         from plugins.ollama_module.module import OllamaModule
         mock_i18n = MagicMock()
         mock_i18n.t.return_value = "Translated text"
-        m = OllamaModule(i18n=mock_i18n)
+        m = OllamaModule()
+        m.i18n = mock_i18n
         result = m._t("some.key", "Fallback")
         assert result == "Translated text"
 
@@ -73,7 +76,8 @@ class TestTranslationHelper:
         from plugins.ollama_module.module import OllamaModule
         mock_i18n = MagicMock()
         mock_i18n.t.return_value = "some.key"  # Same as input = not translated
-        m = OllamaModule(i18n=mock_i18n)
+        m = OllamaModule()
+        m.i18n = mock_i18n
         result = m._t("some.key", "Fallback")
         assert result == "Fallback"
 
@@ -81,7 +85,8 @@ class TestTranslationHelper:
         from plugins.ollama_module.module import OllamaModule
         mock_i18n = MagicMock()
         mock_i18n.t.side_effect = Exception("i18n error")
-        m = OllamaModule(i18n=mock_i18n)
+        m = OllamaModule()
+        m.i18n = mock_i18n
         result = m._t("some.key", "Fallback")
         assert result == "Fallback"
 
