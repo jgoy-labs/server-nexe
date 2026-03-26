@@ -2,9 +2,9 @@
 ────────────────────────────────────
 Server Nexe
 Version: 0.8
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: core/lifespan.py
-Description: FastAPI lifespan management (startup/shutdown). Loads config, initializes APIIntegrator,
+Description: FastAPI lifespan management (startup/shutdown). Orchestrator — delegates to submodules.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -12,18 +12,22 @@ www.jgoy.net · https://server-nexe.org
 
 import asyncio
 import logging
-import shutil
-import subprocess
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Any
 from fastapi import FastAPI
-import secrets
-from datetime import datetime, timedelta, timezone
-import os
 
 from personality.integration import APIIntegrator
 from .config import load_config
+from .lifespan_services import (
+    _auto_start_services,
+    OLLAMA_HEALTH_TIMEOUT,
+    OLLAMA_UNLOAD_TIMEOUT,
+    QDRANT_HEALTH_TIMEOUT,
+)
+from .lifespan_tokens import generate_bootstrap_token, setup_bootstrap_tokens
+from .lifespan_ollama import cleanup_ollama_startup, cleanup_ollama_shutdown
 
 # Force offline mode for HuggingFace — server must work without internet
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -31,122 +35,6 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 logger = logging.getLogger(__name__)
 
-# Configurable timeouts via environment variables
-OLLAMA_HEALTH_TIMEOUT = float(os.getenv('NEXE_OLLAMA_HEALTH_TIMEOUT', '5.0'))
-OLLAMA_UNLOAD_TIMEOUT = float(os.getenv('NEXE_OLLAMA_UNLOAD_TIMEOUT', '10.0'))
-QDRANT_HEALTH_TIMEOUT = float(os.getenv('NEXE_QDRANT_HEALTH_TIMEOUT', '2.0'))
-
-
-async def _auto_start_services(config: Dict[str, Any], project_root: Path) -> None:
-  """Auto-start required services (Qdrant, Ollama) if not running."""
-  import httpx
-  async with httpx.AsyncClient() as client:
-
-    # === QDRANT (local binary, no Docker!) ===
-    auto_start_qdrant = os.getenv("NEXE_AUTOSTART_QDRANT", "true").lower() == "true"
-    qdrant_host = os.getenv('NEXE_QDRANT_HOST', os.getenv('QDRANT_HOST', 'localhost'))
-    qdrant_port = os.getenv('NEXE_QDRANT_PORT', os.getenv('QDRANT_PORT', '6333'))
-    qdrant_url = f"http://{qdrant_host}:{qdrant_port}"
-    qdrant_bin = Path(os.getenv("NEXE_QDRANT_BIN", str(project_root / "qdrant")))
-    qdrant_storage = project_root / "storage" / "qdrant"
-
-    try:
-      await client.get(f"{qdrant_url}/health", timeout=QDRANT_HEALTH_TIMEOUT)
-      logger.info("Qdrant: OK (already running)")
-      server_state.qdrant_available = True
-    except Exception:
-      if not auto_start_qdrant:
-        logger.info("Qdrant: Auto-start disabled (NEXE_AUTOSTART_QDRANT=false)")
-      elif qdrant_bin.exists():
-        logger.info(f"Qdrant: Starting from {qdrant_bin}...")
-        try:
-          qdrant_storage.mkdir(parents=True, exist_ok=True)
-          env = os.environ.copy()
-          env["QDRANT__STORAGE__STORAGE_PATH"] = str(qdrant_storage)
-          env["QDRANT__SERVICE__HTTP_PORT"] = str(qdrant_port)
-          env["QDRANT__SERVICE__DISABLE_TELEMETRY"] = "true"
-
-          # Start Qdrant process
-          process = subprocess.Popen(
-            [str(qdrant_bin), "--disable-telemetry"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            env=env
-          )
-          server_state.qdrant_process = process
-
-          # Wait for Qdrant to be ready (non-blocking)
-          for i in range(30):  # 15 seconds max
-            await asyncio.sleep(0.5)
-            try:
-              await client.get(f"{qdrant_url}/health", timeout=QDRANT_HEALTH_TIMEOUT)
-              logger.info(f"Qdrant: OK (started on port {qdrant_port})")
-              server_state.qdrant_available = True
-              break
-            except Exception:
-              # Check if process died
-              if process.poll() is not None:
-                logger.error("Qdrant: Process died. Run './qdrant' manually to see logs.")
-                break
-          else:
-            logger.warning("Qdrant: Failed to start (timeout 15s)")
-        except Exception as e:
-          logger.error(f"Qdrant: Failed to start: {e}")
-      else:
-        logger.warning(f"Qdrant: Binary not found at {qdrant_bin}")
-        logger.info("  Run ./setup.sh to download Qdrant automatically")
-        logger.info("  Or set NEXE_QDRANT_BIN=/path/to/qdrant in .env to use a custom location")
-
-    # === OLLAMA (fallback engine) ===
-    auto_start_ollama = os.getenv("NEXE_AUTOSTART_OLLAMA", "true").lower() == "true"
-    _nexe_ollama = os.getenv("NEXE_OLLAMA_HOST")
-    if _nexe_ollama:
-      ollama_url = _nexe_ollama.rstrip("/")
-    else:
-      ollama_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-
-    # Check if Ollama is running
-    ollama_running = False
-    try:
-      await client.get(f"{ollama_url}/api/tags", timeout=OLLAMA_HEALTH_TIMEOUT)
-      logger.info("Ollama: OK (already running)")
-      ollama_running = True
-    except Exception as e:
-      logger.debug("Ollama health check failed during startup: %s", e)
-
-    if not ollama_running and not auto_start_ollama:
-      logger.info("Ollama: Auto-start disabled (NEXE_AUTOSTART_OLLAMA=false)")
-    if not ollama_running and auto_start_ollama:
-      # Check if Ollama is installed
-      ollama_path = shutil.which("ollama")
-
-      if not ollama_path:
-        logger.warning("Ollama: Not installed. Install manually from https://ollama.com/download")
-        logger.info("  Or run: curl -fsSL https://ollama.com/install.sh | sh")
-
-      # Start Ollama if installed
-      if ollama_path or shutil.which("ollama"):
-        logger.info("Ollama: Starting...")
-        try:
-          process = subprocess.Popen(
-            ["ollama", "serve"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-          )
-          server_state.ollama_process = process
-          # Wait for Ollama to be ready (non-blocking)
-          for _ in range(30):  # 15 seconds max
-            await asyncio.sleep(0.5)
-            try:
-              await client.get(f"{ollama_url}/api/tags", timeout=OLLAMA_HEALTH_TIMEOUT)
-              logger.info("Ollama: OK (started)")
-              break
-            except Exception as e:
-              logger.debug("Ollama not ready yet during startup wait: %s", e)
-          else:
-            logger.warning("Ollama: Failed to start (timeout 15s)")
-        except Exception as e:
-          logger.warning(f"Ollama: Failed to start: {e}")
 
 def _translate(i18n, key: str, fallback: str, **kwargs) -> str:
   """Helper to translate with fallback (for lifespan)"""
@@ -160,25 +48,6 @@ def _translate(i18n, key: str, fallback: str, **kwargs) -> str:
   except Exception:
     return fallback.format(**kwargs) if kwargs else fallback
 
-def generate_bootstrap_token() -> str:
-  """
-  Generates high entropy bootstrap token.
-
-  Format: Nexe-XXXXXXXXXXXXXXXXXXXX (24 alphanumeric chars)
-  Entropy: 128 bits (computationally infeasible to brute force)
-
-  SECURITY CHANGE (2025-11-28):
-  - BEFORE: WORD-WORD-NNNNNN (28.5 bits, brute force <1h)
-  - NOW: Nexe-{hex(16)} (128 bits, infeasible)
-
-  The token remains relatively easy to copy manually
-  but is now cryptographically secure.
-
-  Returns:
-    Token en format Nexe-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX (35 chars total)
-  """
-  random_part = secrets.token_hex(16)
-  return f"Nexe-{random_part.upper()}"
 
 class ServerState:
   """Holds server global state"""
@@ -231,7 +100,7 @@ async def lifespan(app: FastAPI):
     app.state.config = server_state.config  # Sync: elimina el desync entre server_state i app.state
 
     # Auto-start services (Qdrant, Ollama) if not running
-    await _auto_start_services(server_state.config, server_state.project_root)
+    await _auto_start_services(server_state.config, server_state.project_root, server_state)
 
     server_config = server_state.config.get('core', {}).get('server', {})
     host = server_config.get('host', '127.0.0.1')
@@ -252,58 +121,8 @@ async def lifespan(app: FastAPI):
       "API Integrator ready")
     logger.info(msg)
 
-    try:
-      import httpx
-      ollama_url = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-
-      async with httpx.AsyncClient() as client:
-        try:
-          health_response = await client.get(f"{ollama_url}/api/ps", timeout=OLLAMA_HEALTH_TIMEOUT)
-          if health_response.status_code == 200:
-            loaded_models = health_response.json().get("models", [])
-
-            if loaded_models:
-              logger.info("Cleaning Ollama: %s model(s) loaded from previous sessions...", len(loaded_models))
-
-              for model_info in loaded_models:
-                model_name = model_info.get("name") or model_info.get("model")
-                if model_name:
-                  try:
-                    await client.post(
-                      f"{ollama_url}/api/generate",
-                      json={"model": model_name, "keep_alive": 0},
-                      timeout=OLLAMA_UNLOAD_TIMEOUT
-                    )
-                    logger.debug("  - Unloaded: %s", model_name)
-                  except Exception as e:
-                    msg = _translate(server_state.i18n, "core.server.ollama_unload_error",
-                      "Error unloading {model}: {error}",
-                      model=model_name, error=str(e))
-                    logger.warning("  %s", msg)
-
-              logger.info("Ollama cleaned successfully")
-            else:
-              logger.debug("Ollama is clean (no models loaded)")
-          else:
-            msg = _translate(server_state.i18n, "core.server.ollama_health_check_failed",
-              "Ollama health check failed: HTTP {status_code}",
-              status_code=health_response.status_code)
-            logger.warning(msg)
-
-        except httpx.ConnectError:
-          msg = _translate(server_state.i18n, "core.server.ollama_not_available",
-            "Ollama not available ({url}). If using Ollama, start it manually.",
-            url=ollama_url)
-          logger.warning(msg)
-        except httpx.TimeoutException:
-          msg = _translate(server_state.i18n, "core.server.ollama_timeout",
-            "Ollama timeout. May be busy.")
-          logger.warning(msg)
-
-    except Exception as e:
-      msg = _translate(server_state.i18n, "core.server.ollama_cleanup_error",
-        "Error checking/cleaning Ollama: {error}", error=str(e))
-      logger.warning(msg)
+    # Cleanup Ollama models from previous sessions
+    await cleanup_ollama_startup(server_state, _translate, OLLAMA_HEALTH_TIMEOUT, OLLAMA_UNLOAD_TIMEOUT)
 
     try:
       if server_state.module_manager:
@@ -414,21 +233,15 @@ async def lifespan(app: FastAPI):
             context = {"config": server_state.config, "project_root": server_state.project_root}
             success = await instance.initialize(context)
             if success:
-              logger.info(f"✅ {module_name} initialized successfully")
+              logger.info(f"  {module_name} initialized successfully")
             else:
-              logger.warning(f"⚠️  {module_name} initialization returned False")
+              logger.warning(f"  {module_name} initialization returned False")
           except Exception as e:
             logger.error(f"Failed to initialize {module_name}: {e}", exc_info=True)
     except Exception as e:
       logger.error(f"Error during plugin initialization: {e}", exc_info=True)
 
     # === AUTO-INGEST KNOWLEDGE FOLDER (FIRST RUN ONLY) ===
-    # Auto-ingest happens in two scenarios:
-    # 1. During installation (install_nexe.py) - preferred method
-    # 2. First server startup if installation failed - fallback only
-    #
-    # After first ingestion, the marker file prevents re-ingestion on every startup.
-    # To manually re-ingest: ./nexe knowledge ingest
     try:
       nexe_env = os.getenv("NEXE_ENV", "production").lower()
       auto_ingest_enabled = os.getenv("NEXE_AUTO_INGEST_KNOWLEDGE", "true").lower() == "true"
@@ -477,63 +290,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
       logger.warning("Knowledge: Auto-ingest failed: %s", str(e))
 
-    bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
-    
-    # Use persistent DB to share token across workers without overwriting a valid existing one.
-    from core.bootstrap_tokens import set_bootstrap_token, get_bootstrap_token
-    
-    existing_bootstrap = get_bootstrap_token()
-    token_to_display = None
-    
-    # If it doesn't exist or has expired, generate a new one
-    if not existing_bootstrap or (datetime.now(timezone.utc).timestamp() > existing_bootstrap["expires"]):
-      token_to_display = generate_bootstrap_token()
-      set_bootstrap_token(token_to_display, ttl_minutes=bootstrap_ttl)
-      logger.info("New master bootstrap token generated and persisted")
-    else:
-      token_to_display = existing_bootstrap["token"]
-      logger.info("Using existing master bootstrap token from DB")
-
-    nexe_env = os.getenv('NEXE_ENV', 'production').lower()
-    # Bootstrap logic is only relevant in development mode
-    bootstrap_display = os.getenv('NEXE_BOOTSTRAP_DISPLAY', 'true').lower() == 'true'
-
-    if nexe_env == "development" and bootstrap_display:
-      title = _translate(server_state.i18n, "core.server.bootstrap_token_title",
-        "NEXE FRAMEWORK INITIALIZATION CODE")
-      _srv = server_state.config.get("core", {}).get("server", {})
-      _nexe_url = os.environ.get("NEXE_API_BASE_URL", f"http://{_srv.get('host', '127.0.0.1')}:{_srv.get('port', 9119)}")
-      url_msg = _translate(server_state.i18n, "core.server.bootstrap_token_url",
-        "URL: {url}", url=_nexe_url)
-      expiry_msg = _translate(server_state.i18n, "core.server.bootstrap_token_expiry",
-        "Expires in: {minutes} minutes", minutes=bootstrap_ttl)
-      copy_msg = _translate(server_state.i18n, "core.server.bootstrap_token_copy_instruction",
-        "COPY this code to the browser when prompted")
-      single_use_msg = _translate(server_state.i18n, "core.server.bootstrap_token_single_use",
-        "This code only works ONCE")
-
-      print(f"""
-+==================================================================+
-|                                  |
-| {title:<62}|
-|                                  |
-|   {token_to_display:<58}|
-|                                  |
-| {expiry_msg:<62}|
-| {url_msg:<62}|
-|                                  |
-| {copy_msg:<62}|
-| {single_use_msg:<62}|
-|                                  |
-+==================================================================+
-    """)
-
-    msg = _translate(server_state.i18n, "core.server.bootstrap_token_generated",
-      "Bootstrap token persisted to DB (expires in {minutes} min)", minutes=bootstrap_ttl)
-    logger.info(msg)
+    # Bootstrap tokens
+    setup_bootstrap_tokens(server_state, _translate)
 
     if hasattr(app.state, 'start_rate_limit_cleanup'):
-      import asyncio
       server_state._cleanup_task = asyncio.create_task(app.state.start_rate_limit_cleanup())
       msg = _translate(server_state.i18n, "core.server.rate_limit_cleanup_started",
         "Rate limit cleanup task started")
@@ -590,9 +350,9 @@ async def lifespan(app: FastAPI):
     _lang = os.environ.get("NEXE_LANG", "ca")
 
     logger.info("=" * 70)
-    logger.info("✅  SERVER.NEXE READY · Listening on %s", _nexe_url)
-    logger.info("📱 Web UI: %s/ui/", _nexe_url)
-    logger.info("🔑 API Key: %s", (_api_key[:4] + "…" if _api_key and len(_api_key) > 4 else "(set)" if _api_key else "(not set)"))
+    logger.info("  SERVER.NEXE READY - Listening on %s", _nexe_url)
+    logger.info("  Web UI: %s/ui/", _nexe_url)
+    logger.info("  API Key: %s", (_api_key[:4] + "..." if _api_key and len(_api_key) > 4 else "(set)" if _api_key else "(not set)"))
     logger.info("=" * 70)
 
     yield
@@ -610,33 +370,8 @@ async def lifespan(app: FastAPI):
     logger.info(msg)
 
     try:
-      try:
-        import httpx
-        ollama_url = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-
-        async with httpx.AsyncClient() as client:
-          ps_response = await client.get(f"{ollama_url}/api/ps", timeout=OLLAMA_HEALTH_TIMEOUT)
-          if ps_response.status_code == 200:
-            loaded_models = ps_response.json().get("models", [])
-
-            if loaded_models:
-              logger.info("Unloading %s Ollama model(s) from RAM...", len(loaded_models))
-
-              for model_info in loaded_models:
-                model_name = model_info.get("name") or model_info.get("model")
-                if model_name:
-                  await client.post(
-                    f"{ollama_url}/api/generate",
-                    json={"model": model_name, "keep_alive": 0},
-                    timeout=OLLAMA_UNLOAD_TIMEOUT
-                  )
-                  logger.debug("  - Unloaded: %s", model_name)
-
-              logger.info("Ollama models unloaded successfully")
-            else:
-              logger.debug("No Ollama models loaded")
-      except Exception as e:
-        logger.debug("Could not unload Ollama models: %s", e)
+      # Cleanup Ollama models on shutdown
+      await cleanup_ollama_shutdown(OLLAMA_HEALTH_TIMEOUT, OLLAMA_UNLOAD_TIMEOUT)
 
       def _stop_process(process, name: str):
         if not process:
