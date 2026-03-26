@@ -54,10 +54,10 @@ class ChatSession:
             self.context_files.append(filename)
 
     def attach_document(self, filename: str, content: str, chunks: List[str] = None, total_chunks: int = None):
-        """Adjuntar document per al proper missatge.
+        """Adjuntar document a la sessió.
 
-        Per docs grans: passar chunks[:1] i total_chunks=len(chunks) per no inflar la sessió.
-        Tots els chunks estan a Qdrant per RAG.
+        El document persisteix durant tota la sessió per a preguntes de seguiment.
+        No s'indexa a cap col·lecció — només disponible en aquest chat.
         """
         all_chunks = chunks or [content]
         self.attached_document = {
@@ -91,10 +91,8 @@ class ChatSession:
         }
 
     def get_and_clear_attached_document(self) -> Optional[Dict[str, str]]:
-        """Obtenir i netejar document adjuntat"""
-        doc = self.attached_document
-        self.attached_document = None
-        return doc
+        """Obtenir document adjuntat (persisteix a la sessió per preguntes de seguiment)."""
+        return self.attached_document
 
     def has_attached_document(self) -> bool:
         """Comprovar si hi ha document adjuntat"""

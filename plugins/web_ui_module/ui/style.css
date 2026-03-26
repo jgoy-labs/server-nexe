@@ -527,30 +527,6 @@ body.light .icon-moon,
     opacity: 0.6;
 }
 
-.rag-collections {
-    margin-top: 6px;
-    font-size: 0.7rem;
-    color: var(--text-muted);
-}
-.rag-collections .rag-coll-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 2px 0;
-    cursor: pointer;
-}
-.rag-collections .rag-coll-toggle {
-    width: 13px;
-    height: 13px;
-    accent-color: var(--accent, #a78bfa);
-    flex-shrink: 0;
-    margin: 0;
-}
-.rag-collections .rag-coll-name { flex: 1; }
-.rag-collections .rag-coll-count {
-    opacity: 0.7;
-    font-variant-numeric: tabular-nums;
-}
 
 .rag-threshold-title {
     display: flex;
@@ -1387,12 +1363,78 @@ body.light .icon-moon,
     align-items: center;
     gap: 0.5rem;
     color: var(--primary-color);
-    animation: pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+.upload-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Upload overlay (bloqueig pantalla) */
+.upload-overlay {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-primary, #0a0a0a);
+    opacity: 0.95;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 0.95; }
+}
+
+.upload-overlay-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.upload-spinner-lg {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--frame-color, var(--primary-color));
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.upload-overlay-text {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.upload-overlay-file {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upload-overlay-timer {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
 }
 
 /* Uploaded file display */
@@ -1436,6 +1478,14 @@ body.light .icon-moon,
 
 .uploaded-file-remove:hover {
     color: var(--error);
+}
+
+.uploaded-file-notice {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    padding: 2px 8px 4px;
+    font-style: italic;
 }
 
 /* Drag and drop zone */
