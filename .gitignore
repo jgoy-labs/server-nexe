@@ -61,6 +61,9 @@ snapshots/
 dev-tools/run_all_day.sh
 dev-tools/logs/
 
+# Dev tray app (no va al repo — es genera localment)
+Nexe.app/
+
 # Bundled app resources (dev-tools/build-python-bundle.sh)
 Install Nexe.app/Contents/Resources/python/
 Install Nexe.app/Contents/Resources/tcl-tk/

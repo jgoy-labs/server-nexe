@@ -884,6 +884,63 @@ body.light .icon-moon,
    Think Block — <details> natiu
    ============================================ */
 
+/* Model loading indicator */
+.model-loading-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    border-left: 3px solid var(--accent, #3b82f6);
+    background: rgba(59, 130, 246, 0.06);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    animation: loading-fade 1.5s ease-in-out infinite;
+}
+
+.model-loading-indicator strong {
+    color: var(--text-primary);
+}
+
+.loading-timer {
+    font-variant-numeric: tabular-nums;
+    font-style: normal;
+    opacity: 0.8;
+}
+
+.loading-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(59, 130, 246, 0.2);
+    border-top-color: var(--accent, #3b82f6);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes loading-fade {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.model-loading-indicator.loaded {
+    border-left-color: #22c55e;
+    background: rgba(34, 197, 94, 0.06);
+    color: #22c55e;
+    animation: none;
+}
+
+.model-loading-indicator.error {
+    border-left-color: #ef4444;
+    background: rgba(239, 68, 68, 0.06);
+    color: #ef4444;
+    animation: none;
+}
+
 .think-block {
     border: 1px solid rgba(255, 130, 0, 0.2);
     border-left: 3px solid rgba(255, 160, 0, 0.5);
