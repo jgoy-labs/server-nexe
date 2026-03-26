@@ -392,17 +392,35 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 try:
                                     # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)
                                     if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
+                                        _in_thinking = False
                                         async for chunk in chat_result:
                                             content = ""
+                                            thinking = ""
                                             if isinstance(chunk, dict):
-                                                if "message" in chunk and "content" in chunk["message"]:
-                                                    content = chunk["message"]["content"]
+                                                # Ollama: thinking in separate field (qwen3.5, etc.)
+                                                if "message" in chunk:
+                                                    thinking = chunk["message"].get("thinking", "")
+                                                    content = chunk["message"].get("content", "")
                                                 elif "content" in chunk:
                                                     content = chunk["content"]
                                                 elif "response" in chunk:
                                                     content = chunk["response"]
                                             elif isinstance(chunk, str):
                                                 content = chunk
+
+                                            # Stream thinking tokens wrapped in <think> tags
+                                            if thinking:
+                                                if not _in_thinking:
+                                                    _in_thinking = True
+                                                    yield "<think>"
+                                                    full_response += "<think>"
+                                                yield thinking
+                                                full_response += thinking
+                                            elif _in_thinking:
+                                                # Transition: thinking done, close tag
+                                                _in_thinking = False
+                                                yield "</think>"
+                                                full_response += "</think>"
 
                                             if content:
                                                 # GPT-OSS: NO netejar tags server-side
