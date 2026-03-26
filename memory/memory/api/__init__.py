@@ -19,6 +19,8 @@ from typing import Any, Dict, List, Optional
 
 from qdrant_client import QdrantClient
 
+from ..constants import DEFAULT_VECTOR_SIZE
+
 from .models import (
   CollectionInfo,
   CollectionNotFoundError,
@@ -71,7 +73,7 @@ class MemoryAPI:
     "NEXE_QDRANT_URL",
     f"http://{os.getenv('NEXE_QDRANT_HOST', 'localhost')}:{os.getenv('NEXE_QDRANT_PORT', '6333')}"
   )
-  DEFAULT_VECTOR_SIZE = 768
+  DEFAULT_VECTOR_SIZE = DEFAULT_VECTOR_SIZE
 
   def __init__(
     self,
@@ -181,7 +183,7 @@ class MemoryAPI:
     await self.close()
 
   async def create_collection(
-    self, name: str, vector_size: int = 768, distance: str = "cosine"
+    self, name: str, vector_size: int = DEFAULT_VECTOR_SIZE, distance: str = "cosine"
   ) -> bool:
     """
     Crea una nova collection.

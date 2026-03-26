@@ -23,6 +23,8 @@ from typing import List, Optional, Dict, Any
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
+from ..constants import DEFAULT_VECTOR_SIZE
+
 from ..models.memory_entry import MemoryEntry
 
 logger = logging.getLogger(__name__)
@@ -68,7 +70,7 @@ class PersistenceManager:
     db_path: Path,
     qdrant_path: Path = None,
     collection_name: str = "nexe_memory",
-    vector_size: int = 768,
+    vector_size: int = DEFAULT_VECTOR_SIZE,
     qdrant_url: str = None
   ):
     self.db_path = db_path

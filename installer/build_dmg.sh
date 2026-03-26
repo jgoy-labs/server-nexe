@@ -211,7 +211,7 @@ if [ ! -d "$RESOURCES/python" ]; then
 fi
 
 # ── Step 6: Code sign app bundle ──────────────────────────────────
-IDENTITY="Developer ID Application: Jordi Goy (NHG3THR2AF)"
+IDENTITY="${NEXE_SIGNING_IDENTITY:-Developer ID Application: Jordi Goy (NHG3THR2AF)}"
 ENTITLEMENTS="$SWIFT_WIZARD_DIR/InstallNexe.entitlements"
 
 if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then

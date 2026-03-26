@@ -15,6 +15,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple, List
 
+from memory.memory.constants import DEFAULT_VECTOR_SIZE
+
 logger = logging.getLogger(__name__)
 
 # ============================================
@@ -127,15 +129,15 @@ class MemoryHelper:
                             info = api._qdrant.get_collection(coll_name)
                             vec_cfg = info.config.params.vectors
                             dim = vec_cfg.size if hasattr(vec_cfg, 'size') else None
-                            if dim and dim != 768:
-                                logger.warning("Collection %s has %d dims, expected 768 — recreating", coll_name, dim)
+                            if dim and dim != DEFAULT_VECTOR_SIZE:
+                                logger.warning("Collection %s has %d dims, expected %d — recreating", coll_name, dim, DEFAULT_VECTOR_SIZE)
                                 await api.delete_collection(coll_name)
-                                await api.create_collection(coll_name, vector_size=768)
-                                logger.info("Recreated %s with 768 dims", coll_name)
+                                await api.create_collection(coll_name, vector_size=DEFAULT_VECTOR_SIZE)
+                                logger.info("Recreated %s with %d dims", coll_name, DEFAULT_VECTOR_SIZE)
                         except Exception as dim_err:
                             logger.debug("Could not verify dims for %s: %s", coll_name, dim_err)
                     else:
-                        await api.create_collection(coll_name, vector_size=768)
+                        await api.create_collection(coll_name, vector_size=DEFAULT_VECTOR_SIZE)
                         logger.info("Created memory collection %s", coll_name)
 
                 _memory_api_instance = api
@@ -410,7 +412,7 @@ class MemoryHelper:
 
         # Ensure nexe_web_ui exists (same collection used for user messages — 768 dims)
         if not await memory.collection_exists("nexe_web_ui"):
-            await memory.create_collection("nexe_web_ui", vector_size=768)
+            await memory.create_collection("nexe_web_ui", vector_size=DEFAULT_VECTOR_SIZE)
             logger.info("Created nexe_web_ui collection")
 
         total = len(chunks)
@@ -604,7 +606,7 @@ class MemoryHelper:
             if await memory.collection_exists("nexe_web_ui"):
                 # Delete and recreate collection
                 await memory.delete_collection("nexe_web_ui")
-                await memory.create_collection("nexe_web_ui", vector_size=768)
+                await memory.create_collection("nexe_web_ui", vector_size=DEFAULT_VECTOR_SIZE)
                 logger.info("Memory collection cleared and recreated")
 
             return {

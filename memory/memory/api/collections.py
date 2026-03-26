@@ -18,6 +18,7 @@ from typing import List
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
+from ..constants import DEFAULT_VECTOR_SIZE
 from .models import CollectionInfo, validate_collection_name
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ async def create_collection(
   qdrant: QdrantClient,
   executor: ThreadPoolExecutor,
   name: str,
-  vector_size: int = 768,
+  vector_size: int = DEFAULT_VECTOR_SIZE,
   distance: str = "cosine",
 ) -> bool:
   """

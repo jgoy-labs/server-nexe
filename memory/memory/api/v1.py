@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import logging
 from plugins.security.core.auth_dependencies import require_api_key
+from ..constants import DEFAULT_VECTOR_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ async def get_memory_api():
         # Ensure default collection exists
         try:
             if not await _memory_api.collection_exists("nexe_chat_memory"):
-                await _memory_api.create_collection("nexe_chat_memory", vector_size=768)
+                await _memory_api.create_collection("nexe_chat_memory", vector_size=DEFAULT_VECTOR_SIZE)
                 logger.info("Created default collection: nexe_chat_memory")
         except Exception as e:
             logger.warning("Could not create default collection: %s", e)
@@ -86,7 +87,7 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
 
         # Ensure collection exists
         if not await memory.collection_exists(body.collection):
-            await memory.create_collection(body.collection, vector_size=768)
+            await memory.create_collection(body.collection, vector_size=DEFAULT_VECTOR_SIZE)
             logger.info("Created collection on demand: %s", body.collection)
 
         # Store the content
