@@ -37,6 +37,10 @@ RUN QDRANT_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64-unknown-linux-gnu
 # Storage directories
 RUN mkdir -p /app/storage/qdrant /app/storage/logs /app/storage/sessions
 
+# Non-root user
+RUN useradd -m -s /bin/bash nexe && chown -R nexe:nexe /app
+USER nexe
+
 # Ports: Nexe API (9119) + Qdrant (6333)
 EXPOSE 9119 6333
 

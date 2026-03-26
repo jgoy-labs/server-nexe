@@ -188,7 +188,7 @@ async def require_api_key(
     security_logger = get_security_logger()
     security_logger.log_auth_failure(
       reason=failure_reason,
-      ip_address="unknown"
+      ip_address=request.client.host if request.client else "unknown"
     )
   except ImportError:
     pass

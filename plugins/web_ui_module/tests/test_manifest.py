@@ -101,17 +101,17 @@ class TestServeUI:
         assert r.status_code in (200, 404)
 
     def test_with_existing_html(self, client, tmp_path):
-        """Simula existència de index.html patchejant _static_dir."""
-        import plugins.web_ui_module.manifest as m
+        """Simula existència de index.html patchejant ui_dir del module."""
+        module = get_module_instance()
         fake_html = tmp_path / "index.html"
-        fake_html.write_text("<html>Test</html>")
-        orig = m._static_dir
-        m._static_dir = tmp_path
+        fake_html.write_text('<html lang="ca"><head></head></html>')
+        orig = module.ui_dir
+        module.ui_dir = tmp_path
         try:
             r = client.get("/ui/")
             assert r.status_code == 200
         finally:
-            m._static_dir = orig
+            module.ui_dir = orig
 
 
 # ─── TestServeStatic ──────────────────────────────────────────────────────────
@@ -127,42 +127,42 @@ class TestServeStatic:
         assert r.status_code in (400, 403, 404)
 
     def test_existing_css_file(self, client, tmp_path):
-        import plugins.web_ui_module.manifest as m
+        module = get_module_instance()
         css = tmp_path / "style.css"
         css.write_bytes(b"body { color: red; }")
-        orig = m._static_dir
-        m._static_dir = tmp_path
+        orig = module.ui_dir
+        module.ui_dir = tmp_path
         try:
             r = client.get("/ui/static/style.css")
             assert r.status_code == 200
             assert "text/css" in r.headers.get("content-type", "")
         finally:
-            m._static_dir = orig
+            module.ui_dir = orig
 
     def test_existing_js_file(self, client, tmp_path):
-        import plugins.web_ui_module.manifest as m
+        module = get_module_instance()
         js = tmp_path / "app.js"
         js.write_bytes(b"console.log('test');")
-        orig = m._static_dir
-        m._static_dir = tmp_path
+        orig = module.ui_dir
+        module.ui_dir = tmp_path
         try:
             r = client.get("/ui/static/app.js")
             assert r.status_code == 200
         finally:
-            m._static_dir = orig
+            module.ui_dir = orig
 
     def test_unknown_extension_octet_stream(self, client, tmp_path):
-        import plugins.web_ui_module.manifest as m
+        module = get_module_instance()
         f = tmp_path / "data.bin"
         f.write_bytes(b"\x00\x01\x02")
-        orig = m._static_dir
-        m._static_dir = tmp_path
+        orig = module.ui_dir
+        module.ui_dir = tmp_path
         try:
             r = client.get("/ui/static/data.bin")
             assert r.status_code == 200
             assert "octet-stream" in r.headers.get("content-type", "")
         finally:
-            m._static_dir = orig
+            module.ui_dir = orig
 
 
 # ─── TestSessionEndpoints ─────────────────────────────────────────────────────
@@ -265,7 +265,7 @@ class TestUploadEndpoint:
         content = b"Hello, this is a test document with enough content for processing."
         mock_save_result = {"success": True, "chunks_saved": 1, "document_id": "test.txt", "message": "ok"}
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh:
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
             mh = MagicMock()
             mh.save_document_chunks = AsyncMock(return_value=mock_save_result)
             mock_mh.return_value = mh
@@ -277,7 +277,7 @@ class TestUploadEndpoint:
         assert r.status_code in (200, 400, 422)
 
     def test_upload_invalid_extension(self, client, auth):
-        with patch("plugins.web_ui_module.manifest.get_memory_helper"):
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper"):
             r = client.post(
                 "/ui/upload",
                 headers=auth,
@@ -333,7 +333,7 @@ class TestChatEndpoint:
         sid = r1.json()["session_id"]
 
         mock_save = {"success": True, "document_id": "doc-1", "message": "✓"}
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh:
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
             mh = MagicMock()
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("save", "El meu nom és Jordi"))
@@ -355,7 +355,7 @@ class TestChatEndpoint:
         sid = r1.json()["session_id"]
 
         mock_save = {"success": True, "document_id": None, "message": "⏭️ Similar already exists"}
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh:
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("save", ""))
             hh.save_to_memory = AsyncMock(return_value=mock_save)
@@ -372,7 +372,7 @@ class TestChatEndpoint:
         sid = r1.json()["session_id"]
         mm = self._make_mock_module_manager()
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("recall", "Recordes el meu nom?"))
@@ -398,7 +398,7 @@ class TestChatEndpoint:
         mm = MagicMock()
         mm.registry = registry
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -424,7 +424,7 @@ class TestChatEndpoint:
         engine.chat = MagicMock(return_value="Direct string response")
         mm = self._make_mock_module_manager(engine=engine)
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -448,7 +448,7 @@ class TestChatEndpoint:
         engine.chat = MagicMock(side_effect=Exception("Engine crashed"))
         mm = self._make_mock_module_manager(engine=engine)
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -482,7 +482,7 @@ class TestChatEndpoint:
 
         rag_results = [{"content": "El meu nom és Jordi", "score": 0.9, "metadata": {}}]
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -505,7 +505,7 @@ class TestChatEndpoint:
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -525,7 +525,7 @@ class TestChatEndpoint:
 
     def test_chat_without_session_creates_one(self, client, auth):
         """Chat sense session_id crea sessió automàticament."""
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("save", "some content here"))
@@ -550,7 +550,7 @@ class TestMemoryEndpoints:
 
     def test_save_with_content(self, client, auth):
         mock_result = {"success": True, "document_id": "doc-1", "message": "✓"}
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh:
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
             hh = MagicMock()
             hh.save_to_memory = AsyncMock(return_value=mock_result)
             mock_mh.return_value = hh
@@ -567,7 +567,7 @@ class TestMemoryEndpoints:
 
     def test_recall_with_query(self, client, auth):
         mock_result = {"success": True, "results": [], "total": 0, "message": ""}
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh:
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
             hh = MagicMock()
             hh.recall_from_memory = AsyncMock(return_value=mock_result)
             mock_mh.return_value = hh
@@ -593,11 +593,11 @@ class TestStartSessionCleanup:
 
     def test_start_cleanup_task(self):
         """start_session_cleanup_task crea un asyncio.Task."""
-        from plugins.web_ui_module.manifest import start_session_cleanup_task
+        from plugins.web_ui_module.api.routes import start_session_cleanup_task
 
         async def run():
             with patch("asyncio.create_task") as mock_ct:
-                start_session_cleanup_task()
+                start_session_cleanup_task(MagicMock())
                 assert mock_ct.called
 
         asyncio.run(run())
@@ -619,28 +619,28 @@ class TestGenerateRagMetadata:
     """Tests per _generate_rag_metadata (fallback path)."""
 
     def test_fallback_when_no_module_manager(self):
-        from plugins.web_ui_module.manifest import _generate_rag_metadata
+        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
         with patch("core.lifespan.get_server_state", side_effect=Exception("no state")):
             result = asyncio.run(_generate_rag_metadata("This is test content", "test.txt"))
         assert "abstract" in result
         assert "tags" in result
 
     def test_fallback_abstract_truncated(self):
-        from plugins.web_ui_module.manifest import _generate_rag_metadata
+        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
         long_content = "word " * 200
         with patch("core.lifespan.get_server_state", side_effect=Exception("no state")):
             result = asyncio.run(_generate_rag_metadata(long_content, "doc.txt"))
         assert len(result["abstract"]) <= 305  # 300 + possible space
 
     def test_fallback_includes_filename_stem_as_tag(self):
-        from plugins.web_ui_module.manifest import _generate_rag_metadata
+        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
         with patch("core.lifespan.get_server_state", side_effect=Exception("no state")):
             result = asyncio.run(_generate_rag_metadata("content", "my_document.txt"))
         assert any("my document" in t.lower() or "my_document" in t.lower()
                    for t in result["tags"])
 
     def test_fallback_has_required_fields(self):
-        from plugins.web_ui_module.manifest import _generate_rag_metadata
+        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
         with patch("core.lifespan.get_server_state", side_effect=Exception("no state")):
             result = asyncio.run(_generate_rag_metadata("content", "file.pdf"))
         assert "priority" in result

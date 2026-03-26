@@ -42,7 +42,7 @@ class TestParseRagHeaderFallback:
 
     def test_parse_rag_header_none_when_import_fails(self):
         """When memory.rag.header_parser import fails, parse_rag_header is None."""
-        import plugins.web_ui_module.manifest as m
+        import plugins.web_ui_module.api.routes as m
         # Just check it's either callable or None
         assert m.parse_rag_header is None or callable(m.parse_rag_header)
 
@@ -52,7 +52,7 @@ class TestGenerateRagMetadataLLM:
 
     def test_llm_generates_metadata_ollama_style(self):
         """Lines 78-131: LLM engine with 'model' param generates metadata."""
-        from plugins.web_ui_module.manifest import _generate_rag_metadata
+        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
 
         mock_engine = MagicMock()
         # Simulate ollama-style chat that returns a coroutine
@@ -79,7 +79,7 @@ class TestGenerateRagMetadataLLM:
 
     def test_llm_engine_not_found_uses_fallback(self):
         """Lines 72-73: no engine found falls back."""
-        from plugins.web_ui_module.manifest import _generate_rag_metadata
+        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
 
         mock_registry = MagicMock()
         mock_registry.get_module.return_value = None
@@ -94,7 +94,7 @@ class TestGenerateRagMetadataLLM:
 
     def test_llm_engine_no_chat_method(self):
         """Lines 75-76: engine without chat method skipped."""
-        from plugins.web_ui_module.manifest import _generate_rag_metadata
+        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
 
         mock_engine = MagicMock(spec=[])  # no chat attribute
 
@@ -115,7 +115,7 @@ class TestGenerateRagMetadataLLM:
 
     def test_llm_chat_exception_continues(self):
         """Lines 132-134: engine.chat raises exception, continues to next."""
-        from plugins.web_ui_module.manifest import _generate_rag_metadata
+        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
 
         mock_engine = MagicMock()
         mock_engine.chat.side_effect = Exception("Engine error")
@@ -168,7 +168,7 @@ class TestChatEngineBranches:
 
         mm = self._make_mock_mm(has_get_module=False)
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -188,7 +188,7 @@ class TestChatEngineBranches:
 
         mm = self._make_mock_mm(has_chat=False)
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -211,7 +211,7 @@ class TestChatEngineBranches:
         engine.chat = MagicMock(return_value={"content": "mlx response"})
         mm = self._make_mock_mm(engine=engine)
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -234,7 +234,7 @@ class TestChatEngineBranches:
         engine.chat = MagicMock(return_value={"content": "llamacpp response"})
         mm = self._make_mock_mm(engine=engine)
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -279,7 +279,7 @@ class TestChatStreamEngineIntegration:
         engine.chat = mock_chat
         mm = self._make_mock_mm(engine)
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -304,7 +304,7 @@ class TestChatStreamEngineIntegration:
         engine.chat = MagicMock(return_value={"content": "Direct content response"})
         mm = self._make_mock_mm(engine)
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -326,32 +326,32 @@ class TestSessionCleanupLoop:
 
     def test_cleanup_loop_handles_exception(self):
         """Lines 837-839: cleanup_inactive raises exception."""
-        from plugins.web_ui_module.manifest import _session_cleanup_loop
+        from plugins.web_ui_module.api.routes import _session_cleanup_loop
 
         async def run():
-            with patch("plugins.web_ui_module.manifest._session_manager") as mock_sm:
-                mock_sm.cleanup_inactive.side_effect = Exception("cleanup error")
-                with patch("asyncio.sleep", side_effect=[None, asyncio.CancelledError]):
-                    try:
-                        await _session_cleanup_loop()
-                    except asyncio.CancelledError:
-                        pass
+            mock_sm = MagicMock()
+            mock_sm.cleanup_inactive.side_effect = Exception("cleanup error")
+            with patch("asyncio.sleep", side_effect=[None, asyncio.CancelledError]):
+                try:
+                    await _session_cleanup_loop(mock_sm)
+                except asyncio.CancelledError:
+                    pass
 
         asyncio.run(run())
 
     def test_cleanup_loop_removes_sessions(self):
         """Lines 835-837: successful cleanup removes sessions."""
-        from plugins.web_ui_module.manifest import _session_cleanup_loop
+        from plugins.web_ui_module.api.routes import _session_cleanup_loop
 
         async def run():
-            with patch("plugins.web_ui_module.manifest._session_manager") as mock_sm:
-                mock_sm.cleanup_inactive.return_value = 3
-                with patch("asyncio.sleep", side_effect=[None, asyncio.CancelledError]):
-                    try:
-                        await _session_cleanup_loop()
-                    except asyncio.CancelledError:
-                        pass
-                mock_sm.cleanup_inactive.assert_called_once_with(max_age_hours=24)
+            mock_sm = MagicMock()
+            mock_sm.cleanup_inactive.return_value = 3
+            with patch("asyncio.sleep", side_effect=[None, asyncio.CancelledError]):
+                try:
+                    await _session_cleanup_loop(mock_sm)
+                except asyncio.CancelledError:
+                    pass
+            mock_sm.cleanup_inactive.assert_called_once_with(max_age_hours=24)
 
         asyncio.run(run())
 
@@ -364,7 +364,7 @@ class TestChatSaveFailure:
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh:
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("save", "some content"))
             hh.save_to_memory = AsyncMock(return_value={"success": False, "message": "Storage full"})
@@ -381,7 +381,7 @@ class TestChatSaveFailure:
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh:
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
             hh = MagicMock()
             # extracted_content is empty whitespace only
             hh.detect_intent = MagicMock(return_value=("save", "   "))
@@ -418,7 +418,7 @@ class TestChatAutoSaveRAG:
         mm = MagicMock()
         mm.registry = registry
 
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -457,7 +457,7 @@ class TestChatRecallIntent:
         engine = MagicMock()
         engine.chat = MagicMock(return_value={"response": "recalled"})
         mm = self._make_mm(engine)
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("recall", None))
@@ -485,7 +485,7 @@ class TestChatNoEngineAvailable:
         registry.list_modules = MagicMock(return_value=[])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -515,7 +515,7 @@ class TestChatEngineNoChat:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -546,7 +546,7 @@ class TestChatRagContext:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -578,7 +578,7 @@ class TestChatRagContext:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -616,7 +616,7 @@ class TestChatNonStreamingAsyncGen:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -652,7 +652,7 @@ class TestChatCoroutineResult:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -684,7 +684,7 @@ class TestChatAutoSaveWithDocId:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -716,7 +716,7 @@ class TestChatEngineException:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.manifest.get_memory_helper") as mock_mh, \
+        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -735,7 +735,7 @@ class TestGenerateRagMetadataAsyncGen:
 
     def test_llm_async_gen_response(self):
         """Lines 90-96: async gen chunks from LLM."""
-        from plugins.web_ui_module.manifest import _generate_rag_metadata
+        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
 
         async def mock_chat(**kwargs):
             async def gen():
@@ -762,7 +762,7 @@ class TestGenerateRagMetadataAsyncGen:
 
     def test_llm_string_response(self):
         """Line 106: engine returns plain string."""
-        from plugins.web_ui_module.manifest import _generate_rag_metadata
+        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
 
         mock_engine = MagicMock()
         mock_engine.chat.return_value = "abstract: Plain text abstract\ntags: [t1, t2]"
@@ -782,7 +782,7 @@ class TestGenerateRagMetadataAsyncGen:
 
     def test_llm_server_state_exception(self):
         """Lines 136-137: get_server_state fails."""
-        from plugins.web_ui_module.manifest import _generate_rag_metadata
+        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
 
         with patch("core.lifespan.get_server_state", side_effect=Exception("no state")):
             result = asyncio.run(_generate_rag_metadata("Content", "file.txt"))

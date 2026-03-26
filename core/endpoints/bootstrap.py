@@ -19,6 +19,8 @@ from typing import Dict, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from core.messages import get_message
+
 from core.bootstrap_tokens import create_session_token
 
 logger = logging.getLogger(__name__)
@@ -121,7 +123,7 @@ async def bootstrap_session(
 
   try:
     if client_ip == "unknown":
-      raise HTTPException(status_code=400, detail="Invalid IP address")
+      raise HTTPException(status_code=400, detail=get_message(None, "core.bootstrap.invalid_ip"))
     ip_obj = ipaddress.ip_address(client_ip)
     is_local = ip_obj.is_loopback
     is_private = ip_obj.is_private
@@ -135,7 +137,7 @@ async def bootstrap_session(
       )
   except ValueError:
     logger.error("Invalid IP received: %s", client_ip)
-    raise HTTPException(status_code=400, detail="Invalid IP address")
+    raise HTTPException(status_code=400, detail=get_message(None, "core.bootstrap.invalid_ip"))
 
   check_rate_limit(client_ip, request)
   

@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import pytest
-from plugins.security_logger.enums import SecurityEventType, SecuritySeverity
+from plugins.security.security_logger.enums import SecurityEventType, SecuritySeverity
 
 class TestSecurityEventType:
   """Tests for SecurityEventType enum."""

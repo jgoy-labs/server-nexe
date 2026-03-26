@@ -25,7 +25,7 @@ except ImportError:
   RICH_AVAILABLE = False
   typer = None
 
-from .module import OllamaModule
+from ..module import OllamaModule
 
 if typer:
   app = typer.Typer(

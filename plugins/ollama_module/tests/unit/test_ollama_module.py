@@ -10,12 +10,13 @@ from plugins.ollama_module.module import OllamaModule, OLLAMA_CONNECTION_TIMEOUT
 class TestOllamaModuleInit:
     def test_default_creation(self):
         module = OllamaModule()
-        assert module.name == "ollama_module"
-        assert module.version == "1.0.0"
+        assert module.metadata.name == "ollama_module"
+        assert module.metadata.version is not None
         assert "localhost" in module.base_url or module.base_url.startswith("http")
 
     def test_custom_base_url(self):
-        module = OllamaModule(base_url="http://custom:11434/")
+        with patch.dict("os.environ", {"NEXE_OLLAMA_HOST": "http://custom:11434/"}):
+            module = OllamaModule()
         assert module.base_url == "http://custom:11434"  # sense trailing /
 
     def test_from_env_variable(self):
@@ -23,9 +24,10 @@ class TestOllamaModuleInit:
             module = OllamaModule()
         assert module.base_url == "http://envhost:11434"
 
-    def test_with_i18n(self):
+    def test_with_i18n_set_after_init(self):
         mock_i18n = MagicMock()
-        module = OllamaModule(i18n=mock_i18n)
+        module = OllamaModule()
+        module.i18n = mock_i18n
         assert module.i18n is mock_i18n
 
     def test_timeout_from_env(self):

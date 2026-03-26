@@ -150,7 +150,7 @@ class TestSessionCleanup:
 
     def test_cleanup_removes_old_sessions(self, tmp_path):
         """Verifica que sessions inactives s'eliminen."""
-        from plugins.web_ui_module.session_manager import SessionManager, ChatSession
+        from plugins.web_ui_module.core.session_manager import SessionManager, ChatSession
 
         manager = SessionManager(storage_path=str(tmp_path))
 
@@ -164,7 +164,7 @@ class TestSessionCleanup:
 
     def test_cleanup_keeps_recent_sessions(self, tmp_path):
         """Verifica que sessions recents NO s'eliminen."""
-        from plugins.web_ui_module.session_manager import SessionManager
+        from plugins.web_ui_module.core.session_manager import SessionManager
 
         manager = SessionManager(storage_path=str(tmp_path))
 

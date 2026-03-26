@@ -121,8 +121,8 @@ class TestExecute:
         async def fake_to_thread(fn, *args, **kwargs):
             return generate_result
 
-        with patch("plugins.mlx_module.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.mlx_module.chat.asyncio.get_running_loop", return_value=MagicMock()):
+        with patch("plugins.mlx_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
+             patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
             result = await node.execute({
                 "system": "You are a helper",
                 "messages": [{"role": "user", "content": "hello"}],
@@ -159,8 +159,8 @@ class TestExecute:
         async def fake_to_thread(fn, *args, **kwargs):
             return generate_result
 
-        with patch("plugins.mlx_module.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.mlx_module.chat.asyncio.get_running_loop", return_value=MagicMock()):
+        with patch("plugins.mlx_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
+             patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
             result = await node.execute({
                 "system": "sys",
                 "messages": [],
@@ -193,8 +193,8 @@ class TestExecute:
         async def fake_to_thread(fn, *args, **kwargs):
             return generate_result
 
-        with patch("plugins.mlx_module.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.mlx_module.chat.asyncio.get_running_loop", return_value=MagicMock()):
+        with patch("plugins.mlx_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
+             patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
             result = await node.execute({
                 "system": "s",
                 "messages": [],
@@ -214,8 +214,8 @@ class TestExecute:
         async def fake_to_thread(fn, *args, **kwargs):
             raise RuntimeError("mlx error")
 
-        with patch("plugins.mlx_module.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.mlx_module.chat.asyncio.get_running_loop", return_value=MagicMock()):
+        with patch("plugins.mlx_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
+             patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
             with pytest.raises(RuntimeError, match="mlx error"):
                 await node.execute({"system": "", "messages": []})
 
@@ -241,15 +241,15 @@ class TestGenerateBlocking:
         mock_mlx_lm = MagicMock()
         mock_mlx_lm.sample_utils.make_sampler.return_value = mock_sampler
 
-        with patch("plugins.mlx_module.chat.compute_system_hash", return_value="hash1"), \
-             patch("plugins.mlx_module.chat.prepare_tokens", return_value=([1, 2, 3], [1, 2], [], [])), \
-             patch("plugins.mlx_module.chat.lookup_prefix_cache", return_value=(MagicMock(), 1, True)), \
-             patch("plugins.mlx_module.chat.determine_tokens_to_process", return_value=([3], 1)), \
-             patch("plugins.mlx_module.chat.run_streaming_generation", return_value=("output", MagicMock(), None)), \
-             patch("plugins.mlx_module.chat.save_cache_post_generation"), \
-             patch("plugins.mlx_module.chat.extract_metrics", return_value={"text": "output", "tokens": 5}), \
+        with patch("plugins.mlx_module.core.chat.compute_system_hash", return_value="hash1"), \
+             patch("plugins.mlx_module.core.chat.prepare_tokens", return_value=([1, 2, 3], [1, 2], [], [])), \
+             patch("plugins.mlx_module.core.chat.lookup_prefix_cache", return_value=(MagicMock(), 1, True)), \
+             patch("plugins.mlx_module.core.chat.determine_tokens_to_process", return_value=([3], 1)), \
+             patch("plugins.mlx_module.core.chat.run_streaming_generation", return_value=("output", MagicMock(), None)), \
+             patch("plugins.mlx_module.core.chat.save_cache_post_generation"), \
+             patch("plugins.mlx_module.core.chat.extract_metrics", return_value={"text": "output", "tokens": 5}), \
              patch.dict(sys.modules, {"mlx_lm": mock_mlx_lm, "mlx_lm.sample_utils": mock_mlx_lm.sample_utils}), \
-             patch("plugins.mlx_module.prompt_cache_manager.get_prompt_cache_manager", return_value=mock_cache_mgr, create=True):
+             patch("plugins.mlx_module.core.prompt_cache_manager.get_prompt_cache_manager", return_value=mock_cache_mgr, create=True):
             result = node._generate_blocking("sys", [{"role": "user", "content": "hi"}], [], None, "sess")
 
         assert result["text"] == "output"
@@ -273,7 +273,7 @@ class TestResetModel:
         mock_pcm_mod.get_prompt_cache_manager.return_value = mock_cache_mgr
 
         with patch.dict(sys.modules, {
-            "plugins.mlx_module.prompt_cache_manager": mock_pcm_mod,
+            "plugins.mlx_module.core.prompt_cache_manager": mock_pcm_mod,
             "mlx": MagicMock(), "mlx.core": mock_mx
         }):
             MLXChatNode.reset_model()
@@ -295,7 +295,7 @@ class TestResetModel:
         mock_pcm.get_prompt_cache_manager.side_effect = Exception("cache err")
 
         with patch.dict(sys.modules, {
-            "plugins.mlx_module.prompt_cache_manager": mock_pcm,
+            "plugins.mlx_module.core.prompt_cache_manager": mock_pcm,
             "mlx": MagicMock(), "mlx.core": mock_mx
         }):
             MLXChatNode.reset_model()
@@ -314,7 +314,7 @@ class TestResetModel:
         mock_mx.clear_cache.side_effect = Exception("mlx err")
 
         with patch.dict(sys.modules, {
-            "plugins.mlx_module.prompt_cache_manager": mock_pcm,
+            "plugins.mlx_module.core.prompt_cache_manager": mock_pcm,
             "mlx": MagicMock(), "mlx.core": mock_mx
         }):
             MLXChatNode.reset_model()
@@ -333,7 +333,7 @@ class TestGetPoolStats:
         mock_pcm = MagicMock()
         mock_pcm.get_prompt_cache_manager.return_value = MagicMock(get_stats=MagicMock(return_value={}))
 
-        with patch.dict(sys.modules, {"plugins.mlx_module.prompt_cache_manager": mock_pcm}):
+        with patch.dict(sys.modules, {"plugins.mlx_module.core.prompt_cache_manager": mock_pcm}):
             stats = MLXChatNode.get_pool_stats()
 
         assert stats["model_loaded"] is False
@@ -349,7 +349,7 @@ class TestGetPoolStats:
         mock_pcm = MagicMock()
         mock_pcm.get_prompt_cache_manager.return_value = mock_cache_mgr
 
-        with patch.dict(sys.modules, {"plugins.mlx_module.prompt_cache_manager": mock_pcm}):
+        with patch.dict(sys.modules, {"plugins.mlx_module.core.prompt_cache_manager": mock_pcm}):
             stats = MLXChatNode.get_pool_stats()
 
         assert stats["model_loaded"] is True
@@ -364,7 +364,7 @@ class TestGetPoolStats:
         mock_pcm = MagicMock()
         mock_pcm.get_prompt_cache_manager.side_effect = Exception("stats err")
 
-        with patch.dict(sys.modules, {"plugins.mlx_module.prompt_cache_manager": mock_pcm}):
+        with patch.dict(sys.modules, {"plugins.mlx_module.core.prompt_cache_manager": mock_pcm}):
             stats = MLXChatNode.get_pool_stats()
 
         assert stats["model_loaded"] is False

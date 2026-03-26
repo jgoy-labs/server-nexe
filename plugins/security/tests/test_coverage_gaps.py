@@ -34,32 +34,24 @@ class TestSecurityManifestNoOpLimiter:
 
     def test_noop_limiter_limit_returns_decorator(self):
         """Line 25-28: NoOpLimiter.limit() returns identity decorator."""
-        # Import directly to test the class
-        import importlib
-        import sys
-
-        # We can't easily re-trigger the import fallback, but we can test
-        # the NoOpLimiter class if it was created. Instead, let's test the
-        # module's functionality that depends on it.
         from plugins.security.manifest import (
-            router_public, MODULE_METADATA, MODULE_NAME,
-            SecurityModule, module_instance, get_module_instance,
+            router_public, get_module_instance,
         )
-        assert MODULE_NAME == "security"
-        assert MODULE_METADATA["version"] == "1.0.0"
+        instance = get_module_instance()
+        assert instance.metadata.name == "security"
+        assert instance.metadata.version == "0.8.2"
 
-    def test_security_module_get_health(self):
-        from plugins.security.manifest import SecurityModule, MODULE_METADATA
-        sm = SecurityModule(MODULE_METADATA)
-        health = sm.get_health()
-        assert health["status"] == "healthy"
-        assert health["module"] == "security"
+    def test_security_module_get_info(self):
+        from plugins.security.module import SecurityModule
+        sm = SecurityModule()
+        info = sm.get_info()
+        assert info["name"] == "security"
 
     def test_get_module_instance(self):
         from plugins.security.manifest import get_module_instance
         instance = get_module_instance()
         assert instance is not None
-        assert instance.name == "security"
+        assert instance.metadata.name == "security"
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -376,6 +368,7 @@ class TestAuthDependenciesGaps:
         from plugins.security.core.auth_dependencies import require_api_key
 
         mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
         mock_request.url.path = "/test"
 
         with pytest.raises(HTTPException) as exc_info:

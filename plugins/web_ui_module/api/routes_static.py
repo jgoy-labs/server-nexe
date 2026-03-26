@@ -10,9 +10,13 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import os as _os
+import time as _time
 import logging
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse, Response
+
+# Cache-bust: canvia cada cop que el servidor reinicia
+_BOOT_TS = str(int(_time.time()))
 
 from plugins.web_ui_module.messages import get_message
 
@@ -31,9 +35,14 @@ def register_static_routes(router: APIRouter, *, module_ref):
         if not html_path.exists():
             raise HTTPException(status_code=404, detail=get_message(None, "webui.static.ui_not_found"))
         html = html_path.read_text(encoding="utf-8")
-        lang = _os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+        from plugins.web_ui_module.api.routes_auth import get_server_lang
+        lang = get_server_lang()
         html = html.replace('lang="ca"', f'lang="{lang}"')
-        html = html.replace("</head>", f'<script>window.NEXE_LANG="{lang}";</script>\n</head>')
+        # data-nexe-lang: llegit per app.js per aplicar i18n (CSP-safe, no inline script)
+        html = html.replace('<html ', f'<html data-nexe-lang="{lang}" ')
+        # Cache-bust: afegir ?v=timestamp a CSS i JS perquè el browser recarregui
+        html = html.replace('.css"', f'.css?v={_BOOT_TS}"')
+        html = html.replace('.js"', f'.js?v={_BOOT_TS}"')
         return HTMLResponse(content=html)
 
     # -- GET /static/{filename:path} --

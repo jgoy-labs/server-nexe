@@ -54,40 +54,35 @@ class TestOllamaModuleGaps:
         """Lines 21-22: httpx is available (testing that the import works)."""
         from plugins.ollama_module.module import OllamaModule
         mod = OllamaModule()
-        assert mod.name == "ollama_module"
+        assert mod.metadata.name == "ollama_module"
 
-    def test_main_function_exists(self):
-        """Lines 380-386: main() function exists and returns int."""
-        from plugins.ollama_module.module import main
-        import inspect
-        assert inspect.iscoroutinefunction(main)
-
-    @pytest.mark.asyncio
-    async def test_main_function_no_connection(self):
-        """Lines 380-386: main() when Ollama is not available."""
-        from plugins.ollama_module.module import main
-
-        with patch("plugins.ollama_module.module.OllamaModule.check_connection",
-                   new_callable=AsyncMock, return_value=False):
-            result = await main()
-            assert result == 1
-
-    def test_load_i18n_for_cli_fallback(self):
-        """Lines 350-358: _load_i18n_for_cli returns None on failure."""
-        from plugins.ollama_module.module import _load_i18n_for_cli
-        # This may return None or an i18n instance depending on setup
-        result = _load_i18n_for_cli()
-        # Either None (no translations dir) or i18n service
-        assert result is None or hasattr(result, 't')
+    def test_metadata_property(self):
+        """metadata property returns ModuleMetadata."""
+        from plugins.ollama_module.module import OllamaModule
+        mod = OllamaModule()
+        meta = mod.metadata
+        assert meta.name == "ollama_module"
+        assert meta.version is not None
 
     def test_get_info(self):
-        """Lines 331-348: get_info returns module info."""
+        """get_info returns module info dict."""
         from plugins.ollama_module.module import OllamaModule
         mod = OllamaModule()
         info = mod.get_info()
         assert info["name"] == "ollama_module"
-        assert info["version"] == "1.0.0"
-        assert "features" in info
+        assert "version" in info
+        assert "initialized" in info
+
+    @pytest.mark.asyncio
+    async def test_initialize_and_shutdown(self):
+        """initialize and shutdown lifecycle."""
+        from plugins.ollama_module.module import OllamaModule
+        mod = OllamaModule()
+        result = await mod.initialize({"services": {}})
+        assert result is True
+        assert mod._initialized is True
+        await mod.shutdown()
+        assert mod._initialized is False
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -43,7 +43,7 @@ primary = "/some/model/path"
         from plugins.mlx_module.core.config import MLXConfig
 
         # Patch to use our tmp config
-        with patch("plugins.mlx_module.config.Path") as mock_path_cls:
+        with patch("plugins.mlx_module.core.config.Path") as mock_path_cls:
             # Make Path("personality/server.toml").exists() return False
             # and parents[3] / ... return our test file
             mock_rel = MagicMock()
@@ -116,7 +116,7 @@ class TestMLXChatNodeGaps:
         MLXChatNode._config = None
 
         # Calling reset_model when no model is loaded
-        with patch("plugins.mlx_module.chat.gc.collect"):
+        with patch("plugins.mlx_module.core.chat.gc.collect"):
             MLXChatNode.reset_model()
         # Should not crash
 

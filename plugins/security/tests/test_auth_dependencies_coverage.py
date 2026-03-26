@@ -201,7 +201,7 @@ class TestExpiredKeyReasons:
         config = ApiKeyConfig(primary=primary, secondary=secondary)
 
         mock_request = MagicMock()
-        mock_request.client = MagicMock()
+        mock_request.client.host = "127.0.0.1"
         mock_request.url.path = "/test"
 
         with patch("plugins.security.core.auth_dependencies.load_api_keys", return_value=config), \
@@ -226,7 +226,7 @@ class TestExpiredKeyReasons:
         config = ApiKeyConfig(primary=primary, secondary=secondary)
 
         mock_request = MagicMock()
-        mock_request.client = MagicMock()
+        mock_request.client.host = "127.0.0.1"
         mock_request.url.path = "/test"
 
         with patch("plugins.security.core.auth_dependencies.load_api_keys", return_value=config), \

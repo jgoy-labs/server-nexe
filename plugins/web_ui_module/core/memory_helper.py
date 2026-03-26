@@ -481,18 +481,16 @@ class MemoryHelper:
     async def recall_from_memory(
         self,
         query: str,
-        limit: int = 5
+        limit: int = 5,
+        collections: list = None
     ) -> Dict[str, Any]:
         """
         Search memory with temporal decay and access tracking.
 
-        Searches in:
-        - nexe_web_ui (User saves from UI)
-        - user_knowledge (Ingested documents)
-
         Args:
             query: Search query
             limit: Max results to return per collection
+            collections: Optional list of collection names to search (default: all 3)
 
         Returns:
             Result dict with search results (scores adjusted for recency)
@@ -506,7 +504,8 @@ class MemoryHelper:
                     "message": "Memory API not available"
                 }
 
-            collections_to_search = ["nexe_web_ui", "user_knowledge"]
+            _all_collections = ["nexe_documentation", "nexe_web_ui", "user_knowledge"]
+            collections_to_search = [c for c in _all_collections if c in collections] if collections else _all_collections
             all_results = []
 
             for collection in collections_to_search:
