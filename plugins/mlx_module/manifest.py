@@ -39,7 +39,6 @@ def get_router():
     if _router is None:
         module = _get_module()
         _router = module.get_router()
-        _router.prefix = "/mlx"
         _router.tags = ["mlx", "apple_silicon", "llm"]
     return _router
 

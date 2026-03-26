@@ -48,7 +48,7 @@ ICON_STOPPED = str(ICON_DIR / "icon_stopped.png") if (ICON_DIR / "icon_stopped.p
 
 # Server config
 SERVER_PORT = 9119
-WEB_UI_URL = f"http://localhost:{SERVER_PORT}/ui"
+WEB_UI_URL = f"http://127.0.0.1:{SERVER_PORT}/ui"
 
 
 def _format_bytes(b):

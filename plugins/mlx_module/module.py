@@ -74,7 +74,7 @@ class MLXModule:
             return False
 
     def _init_router(self):
-        self._router = APIRouter()
+        self._router = APIRouter(prefix="/mlx")
         
         @self._router.get("/info")
         async def get_info():

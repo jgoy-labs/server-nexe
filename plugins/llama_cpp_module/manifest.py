@@ -34,7 +34,6 @@ def get_router():
     if _router is None:
         module = _get_module()
         _router = module.get_router()
-        _router.prefix = "/llama-cpp"
         _router.tags = ["llama-cpp", "gguf", "llm"]
     return _router
 
