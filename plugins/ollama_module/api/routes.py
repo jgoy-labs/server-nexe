@@ -51,7 +51,7 @@ def create_router(module_instance) -> APIRouter:
     Args:
         module_instance: OllamaModule instance
     """
-    router = APIRouter()
+    router = APIRouter(prefix="/ollama")
     ui_path = Path(__file__).parent.parent / "ui"
 
     def _get_module():

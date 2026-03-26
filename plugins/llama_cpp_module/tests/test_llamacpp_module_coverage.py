@@ -147,7 +147,7 @@ def test_chat_endpoint_not_initialized():
     module._init_router()
 
     app = FastAPI()
-    app.include_router(module.get_router(), prefix="/llama-cpp")
+    app.include_router(module.get_router())
 
     client = TestClient(app, raise_server_exceptions=False)
     r = client.post("/llama-cpp/chat", json={"messages": [{"role": "user", "content": "hi"}]})
@@ -167,7 +167,7 @@ def test_chat_endpoint_success():
     module._init_router()
 
     app = FastAPI()
-    app.include_router(module.get_router(), prefix="/llama-cpp")
+    app.include_router(module.get_router())
 
     client = TestClient(app, raise_server_exceptions=False)
     r = client.post("/llama-cpp/chat", json={"messages": [{"role": "user", "content": "hi"}]})
@@ -187,7 +187,7 @@ def test_chat_endpoint_exception():
     module._init_router()
 
     app = FastAPI()
-    app.include_router(module.get_router(), prefix="/llama-cpp")
+    app.include_router(module.get_router())
 
     client = TestClient(app, raise_server_exceptions=False)
     r = client.post("/llama-cpp/chat", json={"messages": [{"role": "user", "content": "hi"}]})
@@ -203,7 +203,7 @@ def test_info_endpoint():
     module._init_router()
 
     app = FastAPI()
-    app.include_router(module.get_router(), prefix="/llama-cpp")
+    app.include_router(module.get_router())
 
     client = TestClient(app, raise_server_exceptions=False)
     r = client.get("/llama-cpp/info")

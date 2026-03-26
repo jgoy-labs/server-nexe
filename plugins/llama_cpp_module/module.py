@@ -73,7 +73,7 @@ class LlamaCppModule:
             return False
 
     def _init_router(self):
-        self._router = APIRouter()
+        self._router = APIRouter(prefix="/llama-cpp")
         
         @self._router.get("/info")
         async def get_info():

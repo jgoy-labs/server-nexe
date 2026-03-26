@@ -34,7 +34,6 @@ def get_router():
     if _router is None:
         module = _get_module()
         _router = module.get_router()
-        _router.prefix = "/ui"
         _router.tags = ["ui", "web", "demo"]
     return _router
 

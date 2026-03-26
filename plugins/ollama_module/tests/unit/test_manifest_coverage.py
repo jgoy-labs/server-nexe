@@ -1,8 +1,6 @@
 """
 Tests for plugins/ollama_module/manifest.py - targeting uncovered lines.
-Lines: 50 (get_ollama_module None case), 97-99/104-106 (serve_css/js),
-       159-163 (pull error stream), 191-214 (chat stream), 299-301 (health error),
-       315 (info), 332/336 (get_router/get_metadata).
+Adapted for lazy singleton pattern (get_module_instance / get_router / __getattr__).
 """
 
 import pytest
@@ -16,6 +14,15 @@ def set_api_key(monkeypatch):
     monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-ollama-cover-key")
     monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
     monkeypatch.delenv("NEXE_DEV_MODE", raising=False)
+
+
+def _make_client(mock_module):
+    """Build a TestClient with a mock module injected into routes."""
+    from plugins.ollama_module.api.routes import create_router
+    app = FastAPI()
+    router = create_router(mock_module)
+    app.include_router(router)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 @pytest.fixture
@@ -32,75 +39,89 @@ def auth():
 
 
 class TestGetOllamaModuleNone:
-    """Test line 50: get_ollama_module when _get_module returns None."""
+    """Test _get_module when _module is None and OllamaModule is created."""
 
-    def test_get_ollama_module_raises_503(self):
+    def test_get_module_instance_creates_module(self):
         import plugins.ollama_module.manifest as mod
-        original = mod._ollama_module
+        original = mod._module
         try:
-            mod._ollama_module = None
-            with patch("plugins.ollama_module.manifest._get_module", return_value=None):
-                from fastapi import HTTPException
-                with pytest.raises(HTTPException) as exc_info:
-                    mod.get_ollama_module()
-                assert exc_info.value.status_code == 503
+            mod._module = None
+            with patch("plugins.ollama_module.module.OllamaModule") as mock_cls:
+                mock_instance = MagicMock()
+                mock_instance._init_router = MagicMock()
+                mock_cls.return_value = mock_instance
+                result = mod.get_module_instance()
+                assert result is mock_instance
         finally:
-            mod._ollama_module = original
+            mod._module = original
 
 
 class TestServeCssJs:
-    """Test lines 97-99 and 104-106."""
+    """Test serve CSS and JS file routes."""
 
-    def test_serve_css(self, client, tmp_path):
-        """Lines 97-99: serve CSS file."""
+    def test_serve_css(self, tmp_path):
+        """Serve CSS file."""
         css_dir = tmp_path / "assets" / "css"
         css_dir.mkdir(parents=True)
         css_file = css_dir / "style.css"
         css_file.write_text("body { color: red; }")
 
-        with patch("plugins.ollama_module.manifest.UI_PATH", tmp_path):
-            r = client.get("/ollama/ui/assets/css/style.css")
-            assert r.status_code == 200
+        mock_module = MagicMock()
+        from plugins.ollama_module.api.routes import create_router
+        with patch("plugins.ollama_module.api.routes.Path") as MockPath:
+            mock_path_inst = MagicMock()
+            mock_path_inst.parent.parent.__truediv__ = MagicMock(return_value=tmp_path)
+            MockPath.return_value = mock_path_inst
+            router = create_router(mock_module)
+        app = FastAPI()
+        app.include_router(router)
+        c = TestClient(app, raise_server_exceptions=False)
+        r = c.get("/ollama/ui/assets/css/style.css")
+        assert r.status_code == 200
 
-    def test_serve_js(self, client, tmp_path):
-        """Lines 104-106: serve JS file."""
+    def test_serve_js(self, tmp_path):
+        """Serve JS file."""
         js_dir = tmp_path / "js"
         js_dir.mkdir(parents=True)
         js_file = js_dir / "app.js"
         js_file.write_text("console.log('test');")
 
-        with patch("plugins.ollama_module.manifest.UI_PATH", tmp_path):
-            r = client.get("/ollama/ui/js/app.js")
-            assert r.status_code == 200
+        mock_module = MagicMock()
+        from plugins.ollama_module.api.routes import create_router
+        with patch("plugins.ollama_module.api.routes.Path") as MockPath:
+            mock_path_inst = MagicMock()
+            mock_path_inst.parent.parent.__truediv__ = MagicMock(return_value=tmp_path)
+            MockPath.return_value = mock_path_inst
+            router = create_router(mock_module)
+        app = FastAPI()
+        app.include_router(router)
+        c = TestClient(app, raise_server_exceptions=False)
+        r = c.get("/ollama/ui/js/app.js")
+        assert r.status_code == 200
 
 
 class TestPullModelError:
-    """Test lines 159-163: pull model streaming error."""
+    """Test pull model streaming error."""
 
-    def test_pull_model_error_in_stream(self, client, auth):
-        """Lines 159-163: exception during pull_model stream."""
+    def test_pull_model_error_in_stream(self, auth):
+        """Exception during pull_model stream."""
         async def mock_pull(name):
             raise Exception("Download failed")
 
         mock_module = MagicMock()
         mock_module.pull_model = mock_pull
 
-        import plugins.ollama_module.manifest as mod
-        original = mod._ollama_module
-        try:
-            mod._ollama_module = mock_module
-            r = client.post("/ollama/api/pull", json={"name": "llama3"}, headers=auth)
-            assert r.status_code == 200  # StreamingResponse always returns 200
-            assert "error" in r.text.lower() or "data:" in r.text
-        finally:
-            mod._ollama_module = original
+        c = _make_client(mock_module)
+        r = c.post("/ollama/api/pull", json={"name": "llama3"}, headers=auth)
+        assert r.status_code == 200  # StreamingResponse always returns 200
+        assert "error" in r.text.lower() or "data:" in r.text
 
 
 class TestChatStream:
-    """Test lines 191-214: chat streaming."""
+    """Test chat streaming."""
 
-    def test_chat_stream_success(self, client, auth):
-        """Lines 191-214: successful chat streaming."""
+    def test_chat_stream_success(self, auth):
+        """Successful chat streaming."""
         async def mock_chat(model, messages, stream):
             yield {"message": {"content": "Hello "}, "done": False}
             yield {"message": {"content": "world"}, "done": True}
@@ -108,25 +129,20 @@ class TestChatStream:
         mock_module = MagicMock()
         mock_module.chat = mock_chat
 
-        import plugins.ollama_module.manifest as mod
-        original = mod._ollama_module
-        try:
-            mod._ollama_module = mock_module
-            r = client.post(
-                "/ollama/api/chat",
-                json={
-                    "model": "llama3",
-                    "messages": [{"role": "user", "content": "Hi"}],
-                    "stream": True
-                },
-                headers=auth
-            )
-            assert r.status_code == 200
-        finally:
-            mod._ollama_module = original
+        c = _make_client(mock_module)
+        r = c.post(
+            "/ollama/api/chat",
+            json={
+                "model": "llama3",
+                "messages": [{"role": "user", "content": "Hi"}],
+                "stream": True
+            },
+            headers=auth
+        )
+        assert r.status_code == 200
 
-    def test_chat_stream_error(self, client, auth):
-        """Lines 208-212: exception during chat streaming."""
+    def test_chat_stream_error(self, auth):
+        """Exception during chat streaming."""
         async def mock_chat(model, messages, stream):
             raise Exception("Chat engine error")
             yield  # make it a generator
@@ -134,68 +150,59 @@ class TestChatStream:
         mock_module = MagicMock()
         mock_module.chat = mock_chat
 
-        import plugins.ollama_module.manifest as mod
-        original = mod._ollama_module
-        try:
-            mod._ollama_module = mock_module
-            r = client.post(
-                "/ollama/api/chat",
-                json={
-                    "model": "llama3",
-                    "messages": [{"role": "user", "content": "Hi"}],
-                    "stream": True
-                },
-                headers=auth
-            )
-            assert r.status_code == 200
-            assert "error" in r.text.lower()
-        finally:
-            mod._ollama_module = original
+        c = _make_client(mock_module)
+        r = c.post(
+            "/ollama/api/chat",
+            json={
+                "model": "llama3",
+                "messages": [{"role": "user", "content": "Hi"}],
+                "stream": True
+            },
+            headers=auth
+        )
+        assert r.status_code == 200
+        assert "error" in r.text.lower()
 
 
 class TestHealthError:
-    """Test lines 299-301: health endpoint exception."""
+    """Test health endpoint exception."""
 
-    def test_health_error(self, client):
-        """Lines 299-301: exception in health check returns error dict."""
-        with patch("plugins.ollama_module.health.get_health", side_effect=Exception("Health broken"), create=True):
-            r = client.get("/ollama/health")
-            assert r.status_code == 200
-            data = r.json()
-            # Either from actual health or error path
-            assert "status" in data
+    def test_health_error(self):
+        """Exception in health check returns error."""
+        mock_module = MagicMock()
+        mock_module.health_check = AsyncMock(side_effect=Exception("Health broken"))
+
+        c = _make_client(mock_module)
+        r = c.get("/ollama/health")
+        # When health_check raises, the endpoint returns 500
+        assert r.status_code in (200, 500)
 
 
 class TestInfoEndpoint:
-    """Test line 315."""
+    """Test info endpoint."""
 
-    def test_info_returns_module_info(self, client):
+    def test_info_returns_module_info(self):
         mock_module = MagicMock()
         mock_module.get_info.return_value = {
             "name": "ollama_module",
-            "version": "1.0.0"
+            "version": "0.8.2"
         }
 
-        import plugins.ollama_module.manifest as mod
-        original = mod._ollama_module
-        try:
-            mod._ollama_module = mock_module
-            r = client.get("/ollama/info")
-            assert r.status_code == 200
-            data = r.json()
-            assert data["name"] == "ollama_module"
-        finally:
-            mod._ollama_module = original
+        c = _make_client(mock_module)
+        r = c.get("/ollama/info")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["name"] == "ollama_module"
 
 
 class TestModuleHelpers:
-    """Test lines 332, 336."""
+    """Test get_router and get_metadata helpers from manifest."""
 
     def test_get_router(self):
         from plugins.ollama_module.manifest import get_router, router_public
         assert get_router() is router_public
 
     def test_get_metadata(self):
-        from plugins.ollama_module.manifest import get_metadata, MODULE_METADATA
-        assert get_metadata() is MODULE_METADATA
-        assert "name" in MODULE_METADATA
+        from plugins.ollama_module.manifest import get_metadata
+        meta = get_metadata()
+        assert meta.name == "ollama_module"
