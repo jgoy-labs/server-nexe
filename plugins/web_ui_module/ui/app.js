@@ -866,15 +866,17 @@ class NexeUI {
                         }
 
                         // Detectar MODEL_LOADING (model carregant-se a VRAM)
-                        const loadingMatch = chunk.match(/\x00\[MODEL_LOADING:([^\]]+)\]\x00/);
+                        const loadingMatch = chunk.match(/\x00\[MODEL_LOADING:([^\]|]+)\|?([^\]]*)\]\x00/);
                         if (loadingMatch) {
                             chunk = chunk.replace(/\x00\[MODEL_LOADING:[^\]]+\]\x00/, '');
                             const loadingModel = loadingMatch[1];
+                            const loadingBackend = loadingMatch[2] || '';
+                            const backendLabel = loadingBackend.replace('_module', '').toUpperCase();
                             loadingEl = document.createElement('div');
                             loadingEl.className = 'model-loading-indicator';
                             loadingEl.innerHTML = `
                                 <div class="loading-spinner"></div>
-                                <span>${this.t('model_loading')}… <strong>${loadingModel}</strong> — <em class="loading-timer">0s</em></span>
+                                <span>${this.t('model_loading')}… <strong>${loadingModel}</strong>${backendLabel ? ` <em class="loading-backend">[${backendLabel}]</em>` : ''} — <em class="loading-timer">0s</em></span>
                             `;
                             lastMsg.querySelector('.message-content').insertBefore(loadingEl, assistantMessageDiv);
                             this.scrollToBottom();
@@ -893,7 +895,9 @@ class NexeUI {
                             if (loadingEl) {
                                 const elapsed = Math.round((Date.now() - (this._loadStartTime || Date.now())) / 1000);
                                 loadingEl.className = 'model-loading-indicator loaded';
-                                loadingEl.innerHTML = `<span>✓ Model carregat (${elapsed}s)</span>`;
+                                const _be = loadingEl.querySelector('.loading-backend');
+                                const _beText = _be ? ` ${_be.outerHTML}` : '';
+                                loadingEl.innerHTML = `<span>✓ Model carregat (${elapsed}s)${_beText}</span>`;
                                 loadingEl = null;
                             }
                         }
