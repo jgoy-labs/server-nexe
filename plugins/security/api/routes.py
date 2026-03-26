@@ -48,7 +48,7 @@ def create_router(module_instance) -> APIRouter:
     Returns:
         APIRouter configurat
     """
-    router = APIRouter()
+    router = APIRouter(prefix="/security")
 
     @router.get("/health")
     async def health():

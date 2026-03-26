@@ -222,7 +222,7 @@ def test_require_api_key_with_valid_primary(client, monkeypatch):
   monkeypatch.delenv("NEXE_SECONDARY_API_KEY", raising=False)
 
   response = client.get(
-    "/health",
+    "/security/health",
     headers={"X-API-Key": "test-primary-key"}
   )
 
@@ -237,7 +237,7 @@ def test_require_api_key_with_valid_secondary(client, monkeypatch):
   monkeypatch.setenv("NEXE_SECONDARY_KEY_EXPIRES", future)
 
   response = client.get(
-    "/health",
+    "/security/health",
     headers={"X-API-Key": "old-key"}
   )
 
@@ -249,7 +249,7 @@ def test_require_api_key_primary_priority_over_secondary(client, monkeypatch):
   monkeypatch.setenv("NEXE_SECONDARY_API_KEY", "old-key")
 
   response = client.get(
-    "/health",
+    "/security/health",
     headers={"X-API-Key": "new-key"}
   )
 
@@ -276,7 +276,7 @@ def test_require_api_key_backward_compat_phase1(client, monkeypatch):
   monkeypatch.setenv("NEXE_ADMIN_API_KEY", "legacy-key")
 
   response = client.get(
-    "/health",
+    "/security/health",
     headers={"X-API-Key": "legacy-key"}
   )
 
@@ -323,7 +323,7 @@ def test_require_api_key_dev_mode_bypass(client, monkeypatch):
   monkeypatch.setenv("NEXE_DEV_MODE", "true")
 
   response = client.get(
-    "/health"
+    "/security/health"
   )
 
   assert response.status_code == 200

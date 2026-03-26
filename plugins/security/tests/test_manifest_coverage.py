@@ -214,7 +214,7 @@ class TestServeSecurityUI:
 
     def test_serve_ui_with_existing_html(self, client, tmp_path):
         """Line 209: return FileResponse when index.html exists."""
-        import plugins.security.manifest as m
+        import plugins.security.api.routes as m
         orig_ui_path = m.UI_PATH
 
         html_file = tmp_path / "index.html"
@@ -229,7 +229,7 @@ class TestServeSecurityUI:
 
     def test_serve_ui_without_html(self, client):
         """When no index.html, should return JSON with api_endpoints."""
-        import plugins.security.manifest as m
+        import plugins.security.api.routes as m
         orig_ui_path = m.UI_PATH
         m.UI_PATH = Path("/nonexistent/path/12345")
         try:
@@ -242,7 +242,7 @@ class TestServeSecurityUI:
 
     def test_serve_assets_valid_file(self, client, tmp_path):
         """Line 196: FileResponse for valid asset."""
-        import plugins.security.manifest as m
+        import plugins.security.api.routes as m
         orig_ui_path = m.UI_PATH
 
         assets_dir = tmp_path / "assets"
@@ -268,17 +268,17 @@ class TestNoOpLimiterImportBranch:
 
         # Save originals
         orig_limiter_mod = sys.modules.get("core.dependencies")
-        orig_security_manifest = sys.modules.get("plugins.security.manifest")
+        orig_security_routes = sys.modules.get("plugins.security.api.routes")
 
         # Remove core.dependencies to force ImportError
         sys.modules["core.dependencies"] = None  # will cause ImportError
 
-        # Remove cached security manifest
-        if orig_security_manifest:
-            del sys.modules["plugins.security.manifest"]
+        # Remove cached security routes
+        if orig_security_routes:
+            del sys.modules["plugins.security.api.routes"]
 
         try:
-            mod = importlib.import_module("plugins.security.manifest")
+            mod = importlib.import_module("plugins.security.api.routes")
             assert mod.RATE_LIMITING_AVAILABLE is False
             # Verify the NoOpLimiter works
             dec = mod.limiter.limit("5/minute")
@@ -291,10 +291,10 @@ class TestNoOpLimiterImportBranch:
                 sys.modules["core.dependencies"] = orig_limiter_mod
             else:
                 sys.modules.pop("core.dependencies", None)
-            if orig_security_manifest:
-                sys.modules["plugins.security.manifest"] = orig_security_manifest
+            if orig_security_routes:
+                sys.modules["plugins.security.api.routes"] = orig_security_routes
             else:
-                sys.modules.pop("plugins.security.manifest", None)
+                sys.modules.pop("plugins.security.api.routes", None)
 
 
 class TestSecurityScanAsyncChecks:
