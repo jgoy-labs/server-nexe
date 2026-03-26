@@ -56,7 +56,7 @@ class OllamaModule:
         )
         self.base_url = base_url.rstrip("/")
         self.i18n = None
-        self.timeout = float(os.getenv("NEXE_OLLAMA_CHAT_TIMEOUT", "30.0"))
+        self.timeout = float(os.getenv("NEXE_OLLAMA_CHAT_TIMEOUT", "120.0"))
         self.pull_timeout = float(os.getenv("NEXE_OLLAMA_PULL_TIMEOUT", "600.0"))
         self._initialized = False
         self._router = None
