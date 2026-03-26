@@ -15,8 +15,8 @@ import pytest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from plugins.security_logger.logger import SecurityEventLogger
-from plugins.security_logger.enums import SecurityEventType, SecuritySeverity
+from plugins.security.security_logger.logger import SecurityEventLogger
+from plugins.security.security_logger.enums import SecurityEventType, SecuritySeverity
 
 @pytest.fixture
 def temp_log_dir():

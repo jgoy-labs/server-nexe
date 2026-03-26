@@ -40,13 +40,13 @@ class TestStatusCommand:
         """Test status when connected."""
         from plugins.ollama_module.cli import status
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.base_url = "http://localhost:11434"
             mock_ollama.check_connection = AsyncMock(return_value=True)
             mock_ollama.list_models = AsyncMock(return_value=[{"name": "test"}])
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 status()
@@ -55,12 +55,12 @@ class TestStatusCommand:
         """Test status when disconnected."""
         from plugins.ollama_module.cli import status
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.base_url = "http://localhost:11434"
             mock_ollama.check_connection = AsyncMock(return_value=False)
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 status()
@@ -69,13 +69,13 @@ class TestStatusCommand:
         """Test status when listing models fails."""
         from plugins.ollama_module.cli import status
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.base_url = "http://localhost:11434"
             mock_ollama.check_connection = AsyncMock(return_value=True)
             mock_ollama.list_models = AsyncMock(side_effect=RuntimeError("fail"))
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 status()
@@ -88,17 +88,17 @@ class TestModelsCommand:
         """Test listing models."""
         from plugins.ollama_module.cli import models
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.list_models = AsyncMock(return_value=[
                 {"name": "mistral", "size": 4 * 1024**3, "modified_at": "2026-01-01T00:00:00"},
                 {"name": "llama3", "size": 8 * 1024**3},
             ])
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
-                with patch("plugins.ollama_module.cli.Table") as MockTable:
+                with patch("plugins.ollama_module.cli.main.Table") as MockTable:
                     MockTable.return_value = MagicMock()
                     models()
 
@@ -106,11 +106,11 @@ class TestModelsCommand:
         """Test when no models installed."""
         from plugins.ollama_module.cli import models
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.list_models = AsyncMock(return_value=[])
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 models()
@@ -120,11 +120,11 @@ class TestModelsCommand:
         from plugins.ollama_module.cli import models
         import typer
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.list_models = AsyncMock(side_effect=RuntimeError("fail"))
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with pytest.raises(typer.Exit):
@@ -143,12 +143,12 @@ class TestPullCommand:
             yield {"status": "downloading", "completed": 50, "total": 100}
             yield {"status": "success"}
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.pull_model = mock_pull_gen
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
-                with patch("plugins.ollama_module.cli.Progress") as MockProgress:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
+                with patch("plugins.ollama_module.cli.main.Progress") as MockProgress:
                     mock_progress = MagicMock()
                     MockProgress.return_value.__enter__ = MagicMock(return_value=mock_progress)
                     MockProgress.return_value.__exit__ = MagicMock()
@@ -160,11 +160,11 @@ class TestPullCommand:
         from plugins.ollama_module.cli import pull
         import typer
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
-                with patch("plugins.ollama_module.cli._run_async", side_effect=RuntimeError("download failed")):
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
+                with patch("plugins.ollama_module.cli.main._run_async", side_effect=RuntimeError("download failed")):
                     with pytest.raises(typer.Exit):
                         pull(model="nonexistent")
 
@@ -176,7 +176,7 @@ class TestInfoCommand:
         """Test getting model info."""
         from plugins.ollama_module.cli import info
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.get_model_info = AsyncMock(return_value={
                 "parameters": "num_params 7B",
@@ -184,27 +184,27 @@ class TestInfoCommand:
                 "details": {"format": "gguf", "family": "llama"},
             })
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
-                with patch("plugins.ollama_module.cli.Panel"):
+                with patch("plugins.ollama_module.cli.main.Panel"):
                     info(model="mistral")
 
     def test_info_long_params(self):
         """Test info with long parameters string."""
         from plugins.ollama_module.cli import info
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.get_model_info = AsyncMock(return_value={
                 "parameters": "x" * 600,
                 "template": "y" * 400,
             })
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
-                with patch("plugins.ollama_module.cli.Panel"):
+                with patch("plugins.ollama_module.cli.main.Panel"):
                     info(model="mistral")
 
     def test_info_error(self):
@@ -212,11 +212,11 @@ class TestInfoCommand:
         from plugins.ollama_module.cli import info
         import typer
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.get_model_info = AsyncMock(side_effect=RuntimeError("fail"))
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with pytest.raises(typer.Exit):
@@ -230,11 +230,11 @@ class TestDeleteCommand:
         """Test force delete."""
         from plugins.ollama_module.cli import delete
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.delete_model = AsyncMock()
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 delete(model="mistral", force=True)
@@ -244,11 +244,11 @@ class TestDeleteCommand:
         from plugins.ollama_module.cli import delete
         import typer
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.delete_model = AsyncMock()
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with patch.object(typer, "confirm", return_value=True):
@@ -259,8 +259,8 @@ class TestDeleteCommand:
         from plugins.ollama_module.cli import delete
         import typer
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 with patch.object(typer, "confirm", return_value=False):
                     with pytest.raises(typer.Exit):
                         delete(model="mistral", force=False)
@@ -270,11 +270,11 @@ class TestDeleteCommand:
         from plugins.ollama_module.cli import delete
         import typer
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.delete_model = AsyncMock(side_effect=RuntimeError("fail"))
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with pytest.raises(typer.Exit):
@@ -289,11 +289,11 @@ class TestChatCommand:
         from plugins.ollama_module.cli import chat
         import typer
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.check_connection = AsyncMock(return_value=False)
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with pytest.raises(typer.Exit):
@@ -303,75 +303,75 @@ class TestChatCommand:
         """Test chat with exit command."""
         from plugins.ollama_module.cli import chat
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.check_connection = AsyncMock(return_value=True)
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 mock_console.input.return_value = "exit"
-                with patch("plugins.ollama_module.cli.Panel"):
+                with patch("plugins.ollama_module.cli.main.Panel"):
                     chat(model="mistral", system=None)
 
     def test_chat_with_system_prompt(self):
         """Test chat with system prompt."""
         from plugins.ollama_module.cli import chat
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.check_connection = AsyncMock(return_value=True)
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 mock_console.input.return_value = "quit"
-                with patch("plugins.ollama_module.cli.Panel"):
+                with patch("plugins.ollama_module.cli.main.Panel"):
                     chat(model="mistral", system="Be helpful")
 
     def test_chat_clear_command(self):
         """Test chat clear command."""
         from plugins.ollama_module.cli import chat
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.check_connection = AsyncMock(return_value=True)
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 mock_console.input.side_effect = ["clear", "exit"]
-                with patch("plugins.ollama_module.cli.Panel"):
+                with patch("plugins.ollama_module.cli.main.Panel"):
                     chat(model="mistral", system="sys")
 
     def test_chat_empty_input(self):
         """Test chat with empty input."""
         from plugins.ollama_module.cli import chat
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.check_connection = AsyncMock(return_value=True)
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 mock_console.input.side_effect = ["", "q"]
-                with patch("plugins.ollama_module.cli.Panel"):
+                with patch("plugins.ollama_module.cli.main.Panel"):
                     chat(model="mistral", system=None)
 
     def test_chat_keyboard_interrupt(self):
         """Test chat with KeyboardInterrupt."""
         from plugins.ollama_module.cli import chat
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.check_connection = AsyncMock(return_value=True)
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 mock_console.input.side_effect = KeyboardInterrupt
-                with patch("plugins.ollama_module.cli.Panel"):
+                with patch("plugins.ollama_module.cli.main.Panel"):
                     chat(model="mistral", system=None)
 
     def test_chat_error_during_response(self):
@@ -386,16 +386,16 @@ class TestChatCommand:
                 return True  # check_connection
             raise RuntimeError("api error")  # get_response
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 mock_console.input.side_effect = ["hello", "exit"]
 
-                with patch("plugins.ollama_module.cli._run_async", side_effect=mock_run_async):
-                    with patch("plugins.ollama_module.cli.Panel"):
+                with patch("plugins.ollama_module.cli.main._run_async", side_effect=mock_run_async):
+                    with patch("plugins.ollama_module.cli.main.Panel"):
                         with patch("builtins.print"):
                             chat(model="mistral", system=None)
 
@@ -410,12 +410,12 @@ class TestAskCommand:
         async def mock_chat_gen(model, messages, stream=True):
             yield {"message": {"content": "The answer"}}
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.check_connection = AsyncMock(return_value=True)
             mock_ollama.chat = mock_chat_gen
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with patch("builtins.print"):
@@ -428,12 +428,12 @@ class TestAskCommand:
         async def mock_chat_gen(model, messages, stream=True):
             yield {"message": {"content": "4"}}
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.check_connection = AsyncMock(return_value=True)
             mock_ollama.chat = mock_chat_gen
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with patch("builtins.print"):
@@ -444,11 +444,11 @@ class TestAskCommand:
         from plugins.ollama_module.cli import ask
         import typer
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.check_connection = AsyncMock(return_value=False)
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with pytest.raises(typer.Exit):
@@ -459,14 +459,14 @@ class TestAskCommand:
         from plugins.ollama_module.cli import ask
         import typer
 
-        with patch("plugins.ollama_module.cli.OllamaModule") as MockOllama:
+        with patch("plugins.ollama_module.cli.main.OllamaModule") as MockOllama:
             mock_ollama = MockOllama.return_value
             mock_ollama.check_connection = AsyncMock(return_value=True)
 
-            with patch("plugins.ollama_module.cli.console") as mock_console:
+            with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
-                with patch("plugins.ollama_module.cli._run_async", side_effect=[True, RuntimeError("fail")]):
+                with patch("plugins.ollama_module.cli.main._run_async", side_effect=[True, RuntimeError("fail")]):
                     with pytest.raises(typer.Exit):
                         ask(prompt="test", model="mistral", system=None)
 
@@ -476,21 +476,21 @@ class TestMainEntryPoint:
 
     def test_main_with_dependencies(self):
         """Test main when dependencies are available."""
-        from plugins.ollama_module.cli import main
+        from plugins.ollama_module.cli.main import main as main_fn
 
-        with patch("plugins.ollama_module.cli.RICH_AVAILABLE", True):
-            with patch("plugins.ollama_module.cli.typer", MagicMock()):
-                with patch("plugins.ollama_module.cli.app") as mock_app:
-                    main()
+        with patch("plugins.ollama_module.cli.main.RICH_AVAILABLE", True):
+            with patch("plugins.ollama_module.cli.main.typer", MagicMock()):
+                with patch("plugins.ollama_module.cli.main.app") as mock_app:
+                    main_fn()
                     mock_app.assert_called_once()
 
     def test_main_without_dependencies(self):
         """Test main when dependencies are not available."""
-        from plugins.ollama_module.cli import main
+        from plugins.ollama_module.cli.main import main as main_fn
 
-        with patch("plugins.ollama_module.cli.RICH_AVAILABLE", False):
-            with patch("plugins.ollama_module.cli.typer", None):
+        with patch("plugins.ollama_module.cli.main.RICH_AVAILABLE", False):
+            with patch("plugins.ollama_module.cli.main.typer", None):
                 with patch("builtins.print"):
                     with pytest.raises(SystemExit) as exc_info:
-                        main()
+                        main_fn()
                     assert exc_info.value.code == 1

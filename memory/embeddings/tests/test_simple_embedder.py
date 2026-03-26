@@ -64,23 +64,15 @@ class TestSimpleEmbedderInit:
         assert e1 is not e2
 
     def test_fallback_when_no_local_cache(self):
-        """Si no hi ha cache local, fa download."""
+        """Si no hi ha cache local, llanca RuntimeError (offline-only mode)."""
         from memory.embeddings.simple_embedder import SimpleEmbedder
 
-        mock_model = MagicMock()
-        call_count = [0]
-
         def mock_st(name, device=None, local_files_only=False):
-            if local_files_only:
-                raise OSError("Not cached")
-            call_count[0] += 1
-            return mock_model
+            raise OSError("Not cached")
 
         with patch("memory.embeddings.simple_embedder.SentenceTransformer", side_effect=mock_st):
-            embedder = SimpleEmbedder("test-model", device="cpu")
-
-        assert call_count[0] == 1  # Fallback called
-        assert embedder._initialized is True
+            with pytest.raises(RuntimeError, match="not available locally"):
+                SimpleEmbedder("test-model-nocache", device="cpu")
 
 
 class TestSimpleEmbedderEncode:

@@ -230,17 +230,24 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         _rag_items = []  # (collection, score) tuples for weight display
                         if not attached_doc:
                             try:
-                                recall_result = await memory_helper.recall_from_memory(message, limit=5)
+                                _active_colls = request.get("rag_collections")
+                                recall_result = await memory_helper.recall_from_memory(message, limit=5, collections=_active_colls)
                                 if recall_result["success"] and recall_result["results"]:
-                                    # Filtrar per score minim (configurable, default 0.6)
-                                    rag_threshold = float(request.get("rag_threshold", 0.6))
+                                    # Filtrar per score minim (configurable, default 0.55)
+                                    rag_threshold = float(request.get("rag_threshold", 0.40))
+                                    all_scores = [(r.get('metadata', {}).get('source_collection', '?'), r.get('score', 0)) for r in recall_result["results"]]
+                                    logger.info(f"RAG pre-filtre: {len(recall_result['results'])} resultats, threshold={rag_threshold}, scores={all_scores}")
                                     relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
                                     if relevant:
                                         rag_count = len(relevant)
-                                        # Separar knowledge (docs) de memoria (converses)
+                                        # Separar per col·leccio: docs sistema, docs tecnics, memoria
+                                        doc_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'nexe_documentation']
                                         knowledge_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'user_knowledge']
-                                        memory_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') != 'user_knowledge']
-                                        rag_context = ""
+                                        memory_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') not in ('user_knowledge', 'nexe_documentation')]
+                                        if doc_items:
+                                            rag_context += "\n\n[DOCUMENTACIO DEL SISTEMA]\n"
+                                            for item in doc_items:
+                                                rag_context += f"- {item['content']}\n"
                                         if knowledge_items:
                                             rag_context += "\n\n[DOCUMENTACIO TECNICA]\n"
                                             for item in knowledge_items:
@@ -306,7 +313,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             engine_messages.append({"role": "user", "content": doc_block})
                         elif rag_context and available_chars > 0:
                             rag_context = rag_context[:available_chars]
-                            # Context RAG: separat en documentacio i memoria
+                            # Context RAG: docs sistema, docs tecnics, memoria
                             rag_block = f"[CONTEXT]\n{rag_context}[FI CONTEXT]\n\n{message}"
                             engine_messages.append({"role": "user", "content": rag_block})
                         else:
@@ -404,6 +411,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
                                         _in_thinking = False
                                         _first_chunk = True
+                                        _first_content_after_think = None
+                                        _has_any_thinking = False
                                         async for chunk in chat_result:
                                             content = ""
                                             thinking = ""
@@ -428,6 +437,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             if thinking:
                                                 if not _in_thinking:
                                                     _in_thinking = True
+                                                    _has_any_thinking = True
                                                     yield "<think>"
                                                     full_response += "<think>"
                                                 yield thinking
@@ -476,6 +486,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     err_msg = repr(e) if not str(e) else str(e)
                                     logger.error("Streaming error: %s", err_msg)
                                     yield f"\n[Error: {err_msg}]"
+
+                                if not _has_any_thinking:
+                                    logger.info("Model did not produce thinking tokens (model decides when to think)")
 
                                 # Save clean response (no think/GPT-OSS tags) to session/disk
                                 clean_response = full_response

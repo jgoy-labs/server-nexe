@@ -89,6 +89,9 @@ class OllamaModule:
             if services and "i18n" in services:
                 self.i18n = services["i18n"]
 
+            # Auto-start Ollama si instal·lat però no corre
+            await self._ensure_ollama_running()
+
             self._initialized = True
             logger.info("OllamaModule initialized - base_url=%s", self.base_url)
             return True
@@ -96,8 +99,81 @@ class OllamaModule:
             logger.error(f"Failed to initialize OllamaModule: {e}")
             return False
 
+    async def _ensure_ollama_running(self):
+        """Arrenca Ollama si està instal·lat però no corre. macOS + Linux."""
+        import shutil
+        import subprocess
+        import platform
+
+        if httpx is None:
+            return
+
+        # Comprovar si ja corre
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(f"{self.base_url}/api/tags")
+                if resp.status_code == 200:
+                    logger.info("Ollama already running at %s", self.base_url)
+                    return
+        except Exception:
+            pass
+
+        # No corre — intentar arrencar
+        is_macos = platform.system() == "Darwin"
+
+        if is_macos and os.path.exists("/Applications/Ollama.app"):
+            try:
+                subprocess.Popen(["open", "-g", "-a", "Ollama"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                logger.info("Ollama.app started automatically (macOS)")
+            except Exception as e:
+                logger.warning("Could not start Ollama.app: %s", e)
+        elif shutil.which("ollama"):
+            try:
+                subprocess.Popen(
+                    ["ollama", "serve"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    start_new_session=True  # No morir amb el parent process
+                )
+                logger.info("ollama serve started automatically")
+            except Exception as e:
+                logger.warning("Could not start ollama serve: %s", e)
+        else:
+            logger.info("Ollama not installed — skipping auto-start")
+            return
+
+        # Esperar que estigui llest (max 15s)
+        import asyncio
+        for i in range(15):
+            await asyncio.sleep(1)
+            try:
+                async with httpx.AsyncClient(timeout=2.0) as client:
+                    resp = await client.get(f"{self.base_url}/api/tags")
+                    if resp.status_code == 200:
+                        logger.info("Ollama ready after %ds", i + 1)
+                        return
+            except Exception:
+                pass
+        logger.warning("Ollama started but not responding after 15s")
+
     async def shutdown(self) -> None:
-        """Cleanup — idempotent"""
+        """Cleanup — descarrega models d'Ollama i allibera VRAM."""
+        if self._initialized and httpx is not None:
+            try:
+                async with httpx.AsyncClient(timeout=OLLAMA_CONNECTION_TIMEOUT) as client:
+                    # Obtenir models carregats a VRAM
+                    resp = await client.get(f"{self.base_url}/api/ps")
+                    if resp.status_code == 200:
+                        loaded = resp.json().get("models", [])
+                        for m in loaded:
+                            name = m.get("name", "")
+                            if name:
+                                await client.post(
+                                    f"{self.base_url}/api/generate",
+                                    json={"model": name, "keep_alive": 0}
+                                )
+                                logger.info("Model %s descarregat de VRAM (shutdown)", name)
+            except Exception as e:
+                logger.debug("Could not unload Ollama models on shutdown: %s", e)
         self._initialized = False
 
     async def health_check(self) -> HealthResult:
@@ -260,7 +336,8 @@ class OllamaModule:
             ]
             payload = {
                 "model": model, "messages": messages,
-                "stream": stream, "stop": stop_sequences
+                "stream": stream, "stop": stop_sequences,
+                "think": True
             }
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
