@@ -389,10 +389,21 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 if _compacted:
                                     yield f"\x00[COMPACT:{int(session.compaction_count)}]\x00"
 
+                                # Comprovar si el model esta carregat (Ollama, MLX, llama.cpp)
+                                if hasattr(engine, 'is_model_loaded'):
+                                    try:
+                                        loaded = await engine.is_model_loaded(model_name)
+                                        if not loaded:
+                                            logger.info("Model %s no carregat — carregant... [%s]", model_name, engine_name)
+                                            yield f"\x00[MODEL_LOADING:{_safe_model}]\x00"
+                                    except Exception:
+                                        pass  # Si falla la comprovacio, continuem normal
+
                                 try:
                                     # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)
                                     if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
                                         _in_thinking = False
+                                        _first_chunk = True
                                         async for chunk in chat_result:
                                             content = ""
                                             thinking = ""
@@ -407,6 +418,11 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                     content = chunk["response"]
                                             elif isinstance(chunk, str):
                                                 content = chunk
+
+                                            # Model carregat — qualsevol chunk = model respon
+                                            if _first_chunk:
+                                                _first_chunk = False
+                                                yield "\x00[MODEL_READY]\x00"
 
                                             # Stream thinking tokens wrapped in <think> tags
                                             if thinking:
@@ -439,6 +455,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                     yield content
                                     else:
                                         # Fallback for non-streaming engines
+                                        yield "\x00[MODEL_READY]\x00"
                                         result = await chat_result if inspect.iscoroutine(chat_result) else chat_result
                                         content = ""
                                         if isinstance(result, dict):
@@ -456,8 +473,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             yield content
 
                                 except Exception as e:
-                                    logger.error(f"Streaming error: {e}")
-                                    yield f"\n[Error: {str(e)}]"
+                                    err_msg = repr(e) if not str(e) else str(e)
+                                    logger.error("Streaming error: %s", err_msg)
+                                    yield f"\n[Error: {err_msg}]"
 
                                 # Save clean response (no think/GPT-OSS tags) to session/disk
                                 clean_response = full_response

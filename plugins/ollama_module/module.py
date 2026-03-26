@@ -56,7 +56,7 @@ class OllamaModule:
         )
         self.base_url = base_url.rstrip("/")
         self.i18n = None
-        self.timeout = float(os.getenv("NEXE_OLLAMA_CHAT_TIMEOUT", "120.0"))
+        self.timeout = float(os.getenv("NEXE_OLLAMA_CHAT_TIMEOUT", "600.0"))
         self.pull_timeout = float(os.getenv("NEXE_OLLAMA_PULL_TIMEOUT", "600.0"))
         self._initialized = False
         self._router = None
@@ -166,6 +166,26 @@ class OllamaModule:
         except Exception:
             return fallback.format(**kwargs) if kwargs else fallback
 
+    async def is_model_loaded(self, model_name: str) -> bool:
+        """Comprova si un model esta carregat a VRAM via /api/ps."""
+        try:
+            async with httpx.AsyncClient(timeout=OLLAMA_CONNECTION_TIMEOUT) as client:
+                response = await client.get(f"{self.base_url}/api/ps")
+                if response.status_code == 200:
+                    data = response.json()
+                    loaded = data.get("models", [])
+                    # Match exacte: "qwen3.5:9b" != "qwen3.5:2b"
+                    # Ollama retorna noms amb tag (e.g. "qwen3.5:9b")
+                    # Si l'usuari no posa tag, Ollama usa ":latest"
+                    target = model_name if ":" in model_name else f"{model_name}:latest"
+                    for m in loaded:
+                        name = m.get("name", "")
+                        if name == target:
+                            return True
+                return False
+        except Exception:
+            return False
+
     async def check_connection(self) -> bool:
         """Verifica si Ollama esta accessible."""
         try:
@@ -211,7 +231,7 @@ class OllamaModule:
                                 logger.warning("JSON invalid a pull: %s", line)
         except (httpx.HTTPError, ConnectionError, TimeoutError) as e:
             await ollama_breaker.record_failure(e)
-            logger.error("Error descarregant model %s: %s", model_name, e)
+            logger.error("Error descarregant model %s: %s", model_name, repr(e))
             raise
 
     @ollama_breaker.protect
@@ -267,7 +287,7 @@ class OllamaModule:
 
         except (httpx.HTTPError, ConnectionError, TimeoutError) as e:
             await ollama_breaker.record_failure(e)
-            logger.error("Chat fallida amb model %s: %s", model, e)
+            logger.error("Chat fallida amb model %s: %s", model, repr(e))
             raise
 
     @ollama_breaker.protect

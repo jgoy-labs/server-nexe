@@ -101,6 +101,16 @@ class MLXModule:
     def get_router_prefix(self) -> str:
         return "/mlx"
 
+    async def is_model_loaded(self, model_name: str = "") -> bool:
+        """Comprova si el model MLX esta carregat a memoria."""
+        if not self._node:
+            return False
+        try:
+            stats = self._node.get_pool_stats()
+            return stats.get("model_loaded", False)
+        except Exception:
+            return False
+
     async def chat(
         self, messages: List[Dict[str, str]], system: str = "",
         session_id: str = "default", stream_callback=None, **kwargs,

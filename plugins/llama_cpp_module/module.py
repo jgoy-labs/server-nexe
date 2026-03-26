@@ -100,6 +100,16 @@ class LlamaCppModule:
     def get_router_prefix(self) -> str:
         return "/llama-cpp"
 
+    async def is_model_loaded(self, model_name: str = "") -> bool:
+        """Comprova si el model llama.cpp esta carregat al pool."""
+        if not self._node:
+            return False
+        try:
+            stats = self._node.get_pool_stats()
+            return stats.get("pool_initialized", False) and stats.get("active_sessions", 0) > 0
+        except Exception:
+            return False
+
     async def chat(
         self, messages: List[Dict[str, str]], system: str = "",
         session_id: str = "default", stream_callback=None, **kwargs,

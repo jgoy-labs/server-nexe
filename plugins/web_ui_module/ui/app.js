@@ -32,6 +32,7 @@ const UI_STRINGS = {
         send: "Enviar",
         stop: "Aturar generació",
         saved: "guardat",
+        model_loading: "Carregant model a VRAM",
     },
     en: {
         login_subtitle: "Enter your API Key to access",
@@ -60,6 +61,7 @@ const UI_STRINGS = {
         send: "Send",
         stop: "Stop generation",
         saved: "saved",
+        model_loading: "Loading model into VRAM",
     },
     es: {
         login_subtitle: "Introduce la API Key para acceder",
@@ -88,6 +90,7 @@ const UI_STRINGS = {
         send: "Enviar",
         stop: "Detener generación",
         saved: "guardado",
+        model_loading: "Cargando modelo en VRAM",
     }
 };
 
@@ -214,6 +217,12 @@ class NexeUI {
         const input = document.getElementById('apiKeyInput');
         const btn = document.getElementById('loginBtn');
         const error = document.getElementById('loginError');
+
+        // Pre-omplir amb la key guardada (si existeix)
+        const savedKey = localStorage.getItem('nexe_api_key');
+        if (savedKey && !input.value) {
+            input.value = savedKey;
+        }
 
         const doLogin = async () => {
             const key = input.value.trim();
@@ -424,10 +433,12 @@ class NexeUI {
         if (backend) {
             for (const m of backend.models) {
                 const opt = document.createElement('option');
-                opt.value = m;
-                opt.textContent = m;
-                // Pre-seleccionar si coincideix amb el model actiu (nom parcial o complet)
-                if (currentModel && (currentModel.includes(m) || m.includes(currentModel))) {
+                // Suport objecte {name, size_gb} o string legacy
+                const name = typeof m === 'object' ? m.name : m;
+                const sizeGb = typeof m === 'object' ? m.size_gb : 0;
+                opt.value = name;
+                opt.textContent = sizeGb > 0 ? `${name} (${sizeGb}GB)` : name;
+                if (currentModel && (currentModel.includes(name) || name.includes(currentModel))) {
                     opt.selected = true;
                 }
                 modelSel.appendChild(opt);
@@ -484,7 +495,9 @@ class NexeUI {
     }
 
     _handleUnauthorized() {
-        localStorage.removeItem('nexe_api_key');
+        // No esborrem localStorage — Safari amb ITP pot netejar-lo
+        // entre sessions. Si la key era valida, l'usuari simplement
+        // la torna a enviar sense haver de recordar-la.
         this.apiKey = null;
         this.showLoginOverlay();
     }
@@ -696,6 +709,7 @@ class NexeUI {
                 const messages = this.chatMessages.querySelectorAll('.message.assistant');
                 const lastMsg = messages[messages.length - 1];
                 assistantMessageDiv = lastMsg.querySelector('.message-text');
+                let loadingEl = null;
 
                 // Think state machine
                 let tMode = 'init';   // 'init' | 'thinking' | 'responding'
@@ -757,13 +771,18 @@ class NexeUI {
                                 tMode = 'thinking';
                                 tBuf = tBuf.slice(s + 7);
                                 startThinkBlock();
+                            } else if (tBuf.trimStart().length > 0 && !tBuf.trimStart().startsWith('<')) {
+                                // Primer char no es tag — resposta directa
+                                tMode = 'responding';
+                                this.setAiState('streaming');
+                                this._startStreamStats();
                             } else if (tBuf.length > 7) {
-                                // No think tag — resposta directa
+                                // Buffer gran sense <think> — resposta directa
                                 tMode = 'responding';
                                 this.setAiState('streaming');
                                 this._startStreamStats();
                             } else {
-                                break; // espera més dades (pot ser tag parcial GPT-OSS)
+                                break; // espera més dades
                             }
                         } else if (tMode === 'thinking') {
                             const e = tBuf.indexOf('</think>');
@@ -784,7 +803,10 @@ class NexeUI {
                                     if ('</think>'.startsWith(tBuf.slice(-i))) { keepFrom = tBuf.length - i; break; }
                                 }
                                 tContent += tBuf.slice(0, keepFrom);
-                                if (tTextEl) tTextEl.textContent = tContent;
+                                if (tTextEl) {
+                                    tTextEl.textContent = tContent;
+                                    tTextEl.scrollTop = tTextEl.scrollHeight;
+                                }
                                 tTok = Math.ceil(tContent.length / 4);
                                 const tokEl = tBlock?.querySelector('.think-tokens');
                                 if (tokEl) tokEl.textContent = `~${tTok} tok`;
@@ -843,6 +865,39 @@ class NexeUI {
                             chunk = chunk.replace(/\x00\[COMPACT:\d+\]\x00/, '');
                         }
 
+                        // Detectar MODEL_LOADING (model carregant-se a VRAM)
+                        const loadingMatch = chunk.match(/\x00\[MODEL_LOADING:([^\]]+)\]\x00/);
+                        if (loadingMatch) {
+                            chunk = chunk.replace(/\x00\[MODEL_LOADING:[^\]]+\]\x00/, '');
+                            const loadingModel = loadingMatch[1];
+                            loadingEl = document.createElement('div');
+                            loadingEl.className = 'model-loading-indicator';
+                            loadingEl.innerHTML = `
+                                <div class="loading-spinner"></div>
+                                <span>${this.t('model_loading')}… <strong>${loadingModel}</strong> — <em class="loading-timer">0s</em></span>
+                            `;
+                            lastMsg.querySelector('.message-content').insertBefore(loadingEl, assistantMessageDiv);
+                            this.scrollToBottom();
+                            // Cronòmetre en temps real
+                            this._loadStartTime = Date.now();
+                            const _timerEl = loadingEl.querySelector('.loading-timer');
+                            this._loadingTimer = setInterval(() => {
+                                if (_timerEl) _timerEl.textContent = `${Math.round((Date.now() - this._loadStartTime) / 1000)}s`;
+                            }, 1000);
+                        }
+
+                        // Detectar MODEL_READY (model carregat, comença a respondre)
+                        if (chunk.includes('\x00[MODEL_READY]\x00')) {
+                            chunk = chunk.replace('\x00[MODEL_READY]\x00', '');
+                            if (this._loadingTimer) { clearInterval(this._loadingTimer); this._loadingTimer = null; }
+                            if (loadingEl) {
+                                const elapsed = Math.round((Date.now() - (this._loadStartTime || Date.now())) / 1000);
+                                loadingEl.className = 'model-loading-indicator loaded';
+                                loadingEl.innerHTML = `<span>✓ Model carregat (${elapsed}s)</span>`;
+                                loadingEl = null;
+                            }
+                        }
+
                         // Detectar token de memòria guardat
                         if (chunk.includes('\x00[MEM]\x00')) {
                             memorySaved = true;
@@ -852,7 +907,15 @@ class NexeUI {
                         processChunk(chunk);
                         this.scrollToBottom();
                     }
-                    // Streaming acabat — render final definitiu
+                    // Streaming acabat — si loading indicator queda, marcar com carregat
+                    if (this._loadingTimer) { clearInterval(this._loadingTimer); this._loadingTimer = null; }
+                    if (loadingEl) {
+                        const elapsed = Math.round((Date.now() - (this._loadStartTime || Date.now())) / 1000);
+                        loadingEl.className = 'model-loading-indicator loaded';
+                        loadingEl.innerHTML = `<span>✓ Model carregat (${elapsed}s)</span>`;
+                        loadingEl = null;
+                    }
+                    // Render final definitiu
                     clearTimeout(this._renderTimer);
                     // Si no s'ha detectat thinking via <think>, provar parsing GPT-OSS
                     if (tMode !== 'thinking' && !tContent) {
@@ -920,6 +983,12 @@ class NexeUI {
                         if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [statsEl] });
                     }
                 } catch (readError) {
+                    if (this._loadingTimer) { clearInterval(this._loadingTimer); this._loadingTimer = null; }
+                    if (loadingEl) {
+                        loadingEl.className = 'model-loading-indicator error';
+                        loadingEl.innerHTML = `<span>✗ Error carregant model</span>`;
+                        loadingEl = null;
+                    }
                     if (readError.name === 'AbortError') {
                         if (tMode === 'thinking') closeThinkBlock();
                         assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse + '\n\n*[Generació aturada]*');

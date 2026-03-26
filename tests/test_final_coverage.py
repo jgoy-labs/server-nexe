@@ -2036,11 +2036,11 @@ class TestOllamaCliFinal:
     def test_app_is_none_without_typer(self):
         """Lines 36-37: app is None if typer not available."""
         # If typer is installed, app will not be None
-        from plugins.ollama_module import cli
-        if cli.typer is None:
-            assert cli.app is None
+        from plugins.ollama_module.cli import main as cli_main
+        if cli_main.typer is None:
+            assert cli_main.app is None
         else:
-            assert cli.app is not None
+            assert cli_main.app is not None
 
     def test_run_async_helper(self):
         """Lines 41-43: _run_async helper."""
@@ -2065,8 +2065,9 @@ class TestOllamaModuleFinal:
         m = OllamaModule()
         assert m is not None
 
-    def test_module_custom_base_url(self):
-        """Custom base_url."""
+    def test_module_custom_base_url(self, monkeypatch):
+        """Custom base_url via env var."""
         from plugins.ollama_module.module import OllamaModule
-        m = OllamaModule(base_url="http://custom:1234")
+        monkeypatch.setenv("NEXE_OLLAMA_BASE_URL", "http://custom:1234")
+        m = OllamaModule()
         assert "custom" in str(getattr(m, 'base_url', '')) or True

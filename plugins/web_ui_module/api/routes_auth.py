@@ -93,17 +93,27 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                     engine = engine.get_module_instance()
                 if hasattr(engine, "list_models"):
                     models = await engine.list_models()
-                    model_names = [m.get("name", m.get("model", "?")) for m in models]
-                    backends.append({"id": "ollama", "name": "Ollama", "models": model_names, "active": False})
+                    model_list = []
+                    for m in models:
+                        name = m.get("name", m.get("model", "?"))
+                        size_bytes = m.get("size", 0)
+                        size_gb = round(size_bytes / (1024**3), 1) if size_bytes else 0
+                        model_list.append({"name": name, "size_gb": size_gb})
+                    backends.append({"id": "ollama", "name": "Ollama", "models": model_list, "active": False})
         except Exception as e:
             logger.debug(f"Ollama backend scan failed: {e}")
 
         # MLX
         try:
             if models_dir.exists():
-                mlx_models = [d.name for d in models_dir.iterdir() if d.is_dir()]
-                if mlx_models:
-                    backends.append({"id": "mlx", "name": "MLX", "models": mlx_models, "active": False})
+                mlx_list = []
+                for d in models_dir.iterdir():
+                    if d.is_dir():
+                        # Sumar fitxers .safetensors per estimar mida
+                        size = sum(f.stat().st_size for f in d.rglob("*.safetensors") if f.is_file())
+                        mlx_list.append({"name": d.name, "size_gb": round(size / (1024**3), 1) if size else 0})
+                if mlx_list:
+                    backends.append({"id": "mlx", "name": "MLX", "models": mlx_list, "active": False})
         except Exception as e:
             logger.debug(f"MLX backend scan failed: {e}")
 
@@ -111,11 +121,14 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         try:
             reg = module_manager.registry.get_module("llama_cpp_module")
             if reg and reg.instance:
-                gguf_models = []
+                gguf_list = []
                 if models_dir.exists():
-                    gguf_models = [f.name for f in models_dir.iterdir() if f.suffix == ".gguf"]
-                if gguf_models:
-                    backends.append({"id": "llamacpp", "name": "Llama.cpp", "models": gguf_models, "active": False})
+                    for f in models_dir.iterdir():
+                        if f.suffix == ".gguf":
+                            size = f.stat().st_size
+                            gguf_list.append({"name": f.name, "size_gb": round(size / (1024**3), 1) if size else 0})
+                if gguf_list:
+                    backends.append({"id": "llamacpp", "name": "Llama.cpp", "models": gguf_list, "active": False})
         except Exception as e:
             logger.debug(f"Llama.cpp backend scan failed: {e}")
 
