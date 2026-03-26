@@ -83,6 +83,21 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 response_text = "Que vols que guardi? Escriu el que vols recordar."
             memory_action = "save"
 
+        elif intent == "delete":
+            # Delete from memory
+            content_to_delete = extracted_content.strip() if extracted_content else ""
+            if content_to_delete:
+                result = await memory_helper.delete_from_memory(content_to_delete)
+                if result["success"] and result.get("deleted", 0) > 0:
+                    response_text = f"Esborrat de la memoria: {result['deleted']} entrada(es) relacionades amb \"{content_to_delete[:100]}\""
+                elif result["success"]:
+                    response_text = f"No he trobat res a la memoria sobre \"{content_to_delete[:100]}\""
+                else:
+                    response_text = f"Error: {result.get('message', 'Error desconegut')}"
+            else:
+                response_text = "Que vols que esborri? Escriu el que vols oblidar."
+            memory_action = "delete"
+
         elif intent == "recall":
             # Recall intent: DON'T show raw results, use LLM with memory context
             # Falls through to normal chat processing with memory search
@@ -231,10 +246,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         if not attached_doc:
                             try:
                                 _active_colls = request.get("rag_collections")
-                                recall_result = await memory_helper.recall_from_memory(message, limit=5, collections=_active_colls)
+                                recall_result = await memory_helper.recall_from_memory(message, limit=5, collections=_active_colls, session_id=session.id)
                                 if recall_result["success"] and recall_result["results"]:
-                                    # Filtrar per score minim (configurable, default 0.55)
-                                    rag_threshold = float(request.get("rag_threshold", 0.40))
+                                    # Filtrar per score minim (configurable, default 0.30)
+                                    rag_threshold = float(request.get("rag_threshold", 0.30))
                                     all_scores = [(r.get('metadata', {}).get('source_collection', '?'), r.get('score', 0)) for r in recall_result["results"]]
                                     logger.info(f"RAG pre-filtre: {len(recall_result['results'])} resultats, threshold={rag_threshold}, scores={all_scores}")
                                     relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
@@ -461,8 +476,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                     content = _re.sub(r'<\|[^|]+\|>', '', content)
                                                     content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
                                                 full_response += content
-                                                if content:
-                                                    yield content
+                                                # Strip [MEM_SAVE: ...] from visible stream
+                                                visible = _re.sub(r'\[MEM_SAVE:\s*.+?\]\s*', '', content)
+                                                if visible:
+                                                    yield visible
                                     else:
                                         # Fallback for non-streaming engines
                                         yield "\x00[MODEL_READY]\x00"
@@ -502,21 +519,48 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 else:
                                     # Fallback: treure prefix "analysis..." si hi es
                                     clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
+                                # Extract [MEM_SAVE: ...] facts from LLM response
+                                _mem_saves = _re.findall(r'\[MEM_SAVE:\s*(.+?)\]', clean_response)
+                                clean_response = _re.sub(r'\[MEM_SAVE:\s*.+?\]\s*', '', clean_response).strip()
+
                                 if clean_response:
                                     session.add_message("assistant", clean_response)
                                     session_mgr._save_session_to_disk(session)
 
-                                    # AUTO-SAVE: guarda missatge usuari directament (sense LLM)
-                                    if not full_response.startswith(""):
+                                    # Save LLM-extracted facts to memory
+                                    _mem_saved_count = 0
+                                    # Patrons de fets brossa que el model pot inventar
+                                    _junk_patterns = _re.compile(
+                                        r'(?i)(no\s+(coneix|s.han|tinc|té|hi ha)|'
+                                        r'no\s+s.han\s+detectat|'
+                                        r'busco\s+ajuda|necessit[oa]|'
+                                        r'primera\s+interacci|'
+                                        r'no\s+personal|sense\s+dades)',
+                                    )
+                                    for fact in _mem_saves:
+                                        fact = fact.strip()
+                                        if not fact or len(fact) < 5:
+                                            continue
+                                        # Filtrar fets negatius/brossa
+                                        if _junk_patterns.search(fact):
+                                            logger.debug("MEM_SAVE skip (junk): '%s'", fact[:80])
+                                            continue
                                         try:
-                                            save_result = await memory_helper.auto_save(
-                                                user_message=message,
+                                            result = await memory_helper.save_to_memory(
+                                                content=fact,
                                                 session_id=session.id,
+                                                metadata={"type": "user_fact", "source": "llm_extract"}
                                             )
-                                            if save_result.get("document_id"):
-                                                yield "\x00[MEM]\x00"
+                                            # Comptar nomes si realment s'ha guardat (no duplicat)
+                                            if result.get("document_id"):
+                                                _mem_saved_count += 1
+                                                logger.info("MEM_SAVE: '%s'", fact[:80])
+                                            else:
+                                                logger.debug("MEM_SAVE skip (dedup): '%s'", fact[:80])
                                         except Exception as e:
-                                            logger.debug("RAG auto-save failed: %s", e)
+                                            logger.debug("MEM_SAVE failed: %s", e)
+                                    if _mem_saved_count > 0:
+                                        yield f"\x00[MEM:{_mem_saved_count}]\x00"
 
                             return StreamingResponse(
                                 response_generator(),

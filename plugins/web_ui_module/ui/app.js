@@ -38,6 +38,8 @@ const UI_STRINGS = {
         stop: "Aturar generació",
         saved: "guardat",
         model_loading: "Carregant model a VRAM",
+        doc_chat_only: "Aquest document només estarà disponible en aquest chat.",
+        doc_uploading: "Processant document",
     },
     en: {
         login_subtitle: "Enter your API Key to access",
@@ -72,6 +74,8 @@ const UI_STRINGS = {
         stop: "Stop generation",
         saved: "saved",
         model_loading: "Loading model into VRAM",
+        doc_chat_only: "This document will only be available in this chat.",
+        doc_uploading: "Processing document",
     },
     es: {
         login_subtitle: "Introduce la API Key para acceder",
@@ -106,6 +110,8 @@ const UI_STRINGS = {
         stop: "Detener generación",
         saved: "guardado",
         model_loading: "Cargando modelo en VRAM",
+        doc_chat_only: "Este documento solo estará disponible en este chat.",
+        doc_uploading: "Procesando documento",
     }
 };
 
@@ -446,30 +452,6 @@ class NexeUI {
                     el.textContent = data.model + backend;
                     el.title = `model: ${data.model}\nbackend: ${data.backend}\nversion: ${data.version}`;
                 }
-                // RAG collections display with toggles
-                const ragCollEl = document.getElementById('ragCollections');
-                if (ragCollEl && data.rag_collections && data.rag_collections.length > 0) {
-                    const _collLabels = {
-                        'nexe_documentation': 'docs sistema',
-                        'user_knowledge': 'docs usuari',
-                        'nexe_web_ui': 'memòria xat'
-                    };
-                    const savedColls = JSON.parse(localStorage.getItem('nexe_rag_collections') || 'null');
-                    ragCollEl.innerHTML = data.rag_collections.map(c => {
-                        const status = c.count < 0 ? 'missing' : c.count === 0 ? 'empty' : 'active';
-                        const label = _collLabels[c.name] || c.name;
-                        const countText = c.count < 0 ? '—' : `${c.count} frag.`;
-                        const enabled = savedColls ? savedColls.includes(c.name) : c.count > 0;
-                        const disabled = c.count <= 0 ? 'disabled' : '';
-                        return `<label class="rag-coll-row"><input type="checkbox" class="rag-coll-toggle" data-coll="${c.name}" ${enabled ? 'checked' : ''} ${disabled}><span class="rag-coll-name">${label}</span><span class="rag-coll-count">${countText}</span></label>`;
-                    }).join('');
-                    ragCollEl.querySelectorAll('.rag-coll-toggle').forEach(cb => {
-                        cb.addEventListener('change', () => {
-                            const active = [...ragCollEl.querySelectorAll('.rag-coll-toggle:checked')].map(el => el.dataset.coll);
-                            localStorage.setItem('nexe_rag_collections', JSON.stringify(active));
-                        });
-                    });
-                }
             }
         } catch (e) {
             const el = document.getElementById('modelInfoText');
@@ -795,7 +777,6 @@ class NexeUI {
         try {
             const ragSlider = document.getElementById('ragThresholdSlider');
             const ragThreshold = ragSlider ? parseFloat(ragSlider.value) : 0.40;
-            const ragColls = JSON.parse(localStorage.getItem('nexe_rag_collections') || 'null');
             const backendSel = document.getElementById('backendSelect');
             const modelSel = document.getElementById('modelSelect');
             const response = await this.fetchWithCsrf('/ui/chat', {
@@ -806,7 +787,6 @@ class NexeUI {
                     session_id: this.currentSessionId,
                     stream: true,
                     rag_threshold: ragThreshold,
-                    rag_collections: ragColls,
                     backend: backendSel ? backendSel.value : undefined,
                     model: modelSel ? modelSel.value : undefined
                 }),
@@ -1250,10 +1230,31 @@ class NexeUI {
     }
 
     async uploadFile(file) {
-        // Show loading indicator
-        this.filePreview.innerHTML = `<span class="upload-loading">Pujant "${file.name}"...</span>`;
-        this.filePreview.classList.add('active');
+        // Overlay bloqueig amb spinner i timer
         this.uploadBtn.disabled = true;
+        this.messageInput.disabled = true;
+        this.setAiState('thinking');
+
+        const sizeMB = file.size / (1024 * 1024);
+        const estSec = Math.max(3, Math.round(sizeMB * 4));
+        const t0 = Date.now();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'upload-overlay';
+        overlay.innerHTML = `
+            <div class="upload-overlay-content">
+                <span class="upload-spinner-lg"></span>
+                <div class="upload-overlay-text">${this.t('doc_uploading')}</div>
+                <div class="upload-overlay-file">${file.name}</div>
+                <div class="upload-overlay-timer"><span id="uploadElapsed">0</span>s / ~${estSec}s</div>
+            </div>
+        `;
+        document.querySelector('.chat-main').appendChild(overlay);
+
+        const timerInterval = setInterval(() => {
+            const el = document.getElementById('uploadElapsed');
+            if (el) el.textContent = Math.round((Date.now() - t0) / 1000);
+        }, 500);
 
         const formData = new FormData();
         formData.append('file', file);
@@ -1270,20 +1271,17 @@ class NexeUI {
             if (response.ok) {
                 const data = await response.json();
 
-                // Use the session_id from upload response
                 if (data.session_id && !this.currentSessionId) {
                     this.currentSessionId = data.session_id;
                     this.loadSessions();
                 }
 
-                // Add to uploaded files list
                 this.addUploadedFile(data);
 
-                // Show success message (without preview)
-                const ingestedMsg = data.ingested ? '✅ Indexat a memòria RAG' : '⚠️ No indexat';
-                this.addMessageToChat('assistant', `✅ Document "${data.filename}" carregat correctament.\n${ingestedMsg}`);
+                const elapsed = Math.round((Date.now() - t0) / 1000);
+                const chunkMsg = data.chunks_saved ? ` (${data.chunks_saved} fragments)` : '';
+                this.addMessageToChat('assistant', `✅ Document "${data.filename}" carregat${chunkMsg} en ${elapsed}s.\nℹ️ ${this.t('doc_chat_only')}`);
 
-                // Focus input with suggested prompt
                 this.messageInput.value = `Resumeix aquest document`;
                 this.messageInput.focus();
                 this.messageInput.select();
@@ -1297,7 +1295,11 @@ class NexeUI {
             this.filePreview.classList.remove('active');
             this.addMessageToChat('assistant', '❌ Error pujant el document.');
         } finally {
+            clearInterval(timerInterval);
+            overlay.remove();
             this.uploadBtn.disabled = false;
+            this.messageInput.disabled = false;
+            this.setAiState('idle');
         }
     }
 
@@ -1311,6 +1313,7 @@ class NexeUI {
                 <span class="uploaded-file-size">(${sizeKB} KB)</span>
                 <button class="uploaded-file-remove" onclick="nexeUI.removeFilePreview()">✕</button>
             </div>
+            <div class="uploaded-file-notice">${this.t('doc_chat_only')}</div>
         `;
         if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [this.filePreview] });
         this.filePreview.classList.add('active');

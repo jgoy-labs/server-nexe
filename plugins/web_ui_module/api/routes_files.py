@@ -11,6 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import Optional
 import logging
+import os as _os
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
 
 from plugins.web_ui_module.messages import get_message
@@ -81,10 +82,17 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
                 })
                 logger.info(f"RAG header found: id={rag_header.id}, priority={rag_header.priority}")
             else:
-                # Generar metadades via LLM per maxima consistencia amb el contingut
-                auto_meta = await _generate_rag_metadata(body_content, file.filename)
-                doc_metadata.update(auto_meta)
-                logger.info(f"No RAG header — metadades LLM per '{file.filename}'")
+                # Metadata simple (sense LLM — evita bloqueig per MLX/Ollama)
+                _lang = _os.getenv("NEXE_LANG", "ca").split("-")[0]
+                _stem = file.filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ")
+                doc_metadata.update({
+                    "abstract": " ".join(body_content.split())[:300],
+                    "tags": [_stem],
+                    "priority": "P2",
+                    "type": "docs",
+                    "lang": _lang,
+                })
+                logger.info(f"No RAG header — metadata simple per '{file.filename}'")
 
         # Chunk size adaptat a la mida del document per equilibrar precisio i cobertura:
         #   < 20K chars  (~7 pag)   -> 800   (maxima precisio)
@@ -107,7 +115,7 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         chunks = file_handler.chunk_text(body_content, chunk_size=chunk_size)
         logger.info(f"Document '{file.filename}': {len(body_content)} chars -> {len(chunks)} chunks (chunk_size={chunk_size})")
 
-        # Ingest all chunks individually to nexe_web_ui (one embedding per chunk)
+        # Indexar chunks a user_knowledge amb session_id per aïllament cross-sessio
         memory_helper = _get_memory_helper()
         ingestion_result = await memory_helper.save_document_chunks(
             chunks=chunks,

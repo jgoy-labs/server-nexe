@@ -44,6 +44,10 @@ SAVE_TRIGGERS = [
     r',?\s*(ho\s+)?pots\s+recordar\??$',
     r',?\s*guarda[\-\']?ho\??$',
     r',?\s*desa[\-\']?ho\??$',
+    # Catalan — al principi del missatge ("Recorda que X")
+    r'^recorda\s+que\s+',
+    r'^guarda\s+que\s+',
+    r'^apunta\s+que\s+',
     # Catalan — amb "memòria" en qualsevol posició
     r'\bguardar?\b.*mem[oò]ria',
     r'\brecordar?\b.*mem[oò]ria',
@@ -56,6 +60,10 @@ SAVE_TRIGGERS = [
     r',?\s*puedes\s+recordar(lo)?\??$',
     r',?\s*gu[aá]rda(lo)?\??$',
     r',?\s*recu[eé]rda(lo)?\??$',
+    # Spanish — al principi del missatge ("Recuerda que X")
+    r'^recuerda\s+que\s+',
+    r'^guarda\s+que\s+',
+    r'^apunta\s+que\s+',
     # Spanish — amb "memoria"
     r'\bguardar?\b.*memoria',
     r'\brecordar?\b.*memoria',
@@ -63,6 +71,9 @@ SAVE_TRIGGERS = [
     r',?\s*(can\s+you\s+)?(please\s+)?save\s+(it|this|that)\??$',
     r',?\s*(can\s+you\s+)?(please\s+)?remember\s+(it|this|that)\??$',
     r',?\s*save\s+it\??$',
+    # English — al principi del missatge ("Remember that X")
+    r'^remember\s+that\s+',
+    r'^save\s+that\s+',
     # English — amb "memory"
     r'\bsave\b.*memory',
     r'\bremember\b.*memory',
@@ -89,6 +100,47 @@ RECALL_PATTERNS = [
     r'\bwhat\s*(is|\'s)\s+my\s+name\b',
 ]
 
+# Patterns that indicate user wants to DELETE/FORGET something
+DELETE_TRIGGERS = [
+    # Catalan — al principi ("Oblida que X", "Esborra que X")
+    r'^oblida\s+(que\s+)?',
+    r'^esborra\s+(que\s+)?',
+    r'^elimina\s+(que\s+)?',
+    # Catalan — al final ("..., oblida-ho", "..., esborra-ho")
+    r',?\s*(ho\s+)?pots\s+oblidar\??$',
+    r',?\s*(ho\s+)?pots\s+esborrar\??$',
+    r',?\s*oblida[\-\']?ho\??$',
+    r',?\s*esborra[\-\']?ho\??$',
+    # Catalan — amb "memòria"
+    r'\boblidar?\b.*mem[oò]ria',
+    r'\besborrar?\b.*mem[oò]ria',
+    r'\beliminar?\b.*mem[oò]ria',
+    # Spanish — al principi
+    r'^olvida\s+(que\s+)?',
+    r'^borra\s+(que\s+)?',
+    r'^elimina\s+(que\s+)?',
+    # Spanish — al final
+    r',?\s*(lo\s+)?puedes\s+olvidar\??$',
+    r',?\s*(lo\s+)?puedes\s+borrar\??$',
+    r',?\s*olv[ií]da(lo)?\??$',
+    r',?\s*b[oó]rra(lo)?\??$',
+    # Spanish — amb "memoria"
+    r'\bolvidar?\b.*memoria',
+    r'\bborrar?\b.*memoria',
+    # English — al principi
+    r'^forget\s+(that\s+)?',
+    r'^delete\s+(that\s+)?',
+    r'^erase\s+(that\s+)?',
+    # English — al final
+    r',?\s*(can\s+you\s+)?(please\s+)?forget\s+(it|this|that)\??$',
+    r',?\s*(can\s+you\s+)?(please\s+)?delete\s+(it|this|that)\??$',
+    r',?\s*forget\s+it\??$',
+    # English — amb "memory"
+    r'\bforget\b.*memory',
+    r'\bdelete\b.*memory',
+    r'\berase\b.*memory',
+]
+
 class MemoryHelper:
     """Helper class for memory operations with intent detection and smart extraction."""
 
@@ -96,6 +148,7 @@ class MemoryHelper:
         self._memory_api = None
         self.save_triggers = [re.compile(p, re.IGNORECASE) for p in SAVE_TRIGGERS]
         self.recall_regex = [re.compile(p, re.IGNORECASE) for p in RECALL_PATTERNS]
+        self.delete_triggers = [re.compile(p, re.IGNORECASE) for p in DELETE_TRIGGERS]
         # Patterns per detectar xerrameca (no guardar)
         self.skip_patterns = [
             re.compile(r'^(hola|hey|ei|bon dia|bona tarda|bones|adéu|fins aviat)', re.IGNORECASE),
@@ -159,17 +212,32 @@ class MemoryHelper:
             Tuple of (intent, extracted_content)
             intent can be: 'save', 'recall', 'chat'
         """
-        # Check for save intent (triggers at END of message)
-        # Example: "El nombre del usuario es Naka, lo puedes guardar?"
-        #          -> save intent, content = "El nombre del usuario es Naka"
+        # Check for save intent
+        # Triggers at END: "Em dic Claude, guarda-ho" → content = before trigger
+        # Triggers at START: "Recorda que em dic Claude" → content = after trigger
         for pattern in self.save_triggers:
             match = pattern.search(message)
             if match:
-                # Content is everything BEFORE the trigger
-                content = message[:match.start()].strip()
-                content = content.rstrip(',').strip()  # Remove trailing comma
+                if match.start() == 0:
+                    content = message[match.end():].strip()
+                else:
+                    content = message[:match.start()].strip()
+                    content = content.rstrip(',').strip()
                 if content:
                     return ('save', content)
+
+        # Check for delete intent
+        # "Oblida que em dic Claude" → delete, content = "em dic Claude"
+        for pattern in self.delete_triggers:
+            match = pattern.search(message)
+            if match:
+                if match.start() == 0:
+                    content = message[match.end():].strip()
+                else:
+                    content = message[:match.start()].strip()
+                    content = content.rstrip(',').strip()
+                if content:
+                    return ('delete', content)
 
         # Check for recall intent
         for pattern in self.recall_regex:
@@ -363,6 +431,47 @@ class MemoryHelper:
                 "message": f"Error guardant a memòria: {str(e)}"
             }
 
+    async def delete_from_memory(self, content: str) -> Dict[str, Any]:
+        """
+        Search for similar content in memory and delete matching entries.
+
+        Args:
+            content: Text to search for and delete
+
+        Returns:
+            Result dict with success status and count of deleted entries
+        """
+        try:
+            memory = await self.get_memory_api()
+            if not memory:
+                return {"success": False, "message": "Memory API not available"}
+
+            deleted = 0
+            for collection in ["nexe_web_ui", "user_knowledge"]:
+                try:
+                    if not await memory.collection_exists(collection):
+                        continue
+                    results = await memory.search(
+                        query=content, collection=collection, top_k=5, threshold=0.6
+                    )
+                    for r in results:
+                        try:
+                            await memory.delete(r.id, collection)
+                            deleted += 1
+                            logger.info("Deleted memory entry %s from %s (score=%.2f)", r.id, collection, r.score)
+                        except Exception as e:
+                            logger.warning("Failed to delete %s from %s: %s", r.id, collection, e)
+                except Exception as e:
+                    logger.debug("Delete search in %s failed: %s", collection, e)
+
+            if deleted > 0:
+                return {"success": True, "deleted": deleted, "message": f"Esborrat {deleted} entrada(es) de la memoria"}
+            else:
+                return {"success": True, "deleted": 0, "message": "No s'ha trobat res similar a la memoria"}
+        except Exception as e:
+            logger.error("Memory delete error: %s", e)
+            return {"success": False, "message": f"Error esborrant: {str(e)}"}
+
     async def auto_save(
         self,
         user_message: str,
@@ -374,17 +483,28 @@ class MemoryHelper:
         Estratègia: guardar el missatge cru. La cerca semàntica trobarà
         'Em dic Aran' quan es pregunti 'com em dic?'.
 
-        Filtra salutacions i missatges trivials (< 8 caràcters o patrons skip).
+        Filtra: salutacions, preguntes, comandes de memòria i missatges trivials.
+        Només guarda afirmacions/fets de l'usuari.
         """
         msg = user_message.strip()
 
-        # Filtrar trivials
-        if len(msg) < 8:
+        # Filtrar massa curt
+        if len(msg) < 10:
             return {"success": True, "document_id": None, "message": "⏭️ Massa curt"}
 
+        # Filtrar salutacions
         for pat in self.skip_patterns:
             if pat.match(msg):
                 return {"success": True, "document_id": None, "message": "⏭️ Salutació"}
+
+        # Filtrar preguntes (no són fets, contaminen la memòria)
+        if msg.rstrip('?').strip() != msg.rstrip() and '?' in msg:
+            return {"success": True, "document_id": None, "message": "⏭️ Pregunta"}
+
+        # Filtrar comandes de memòria (save/delete/recall ja es gestionen amb intent)
+        intent, _ = self.detect_intent(msg)
+        if intent in ('save', 'delete'):
+            return {"success": True, "document_id": None, "message": "⏭️ Comanda memòria"}
 
         return await self.save_to_memory(
             content=msg,
@@ -400,7 +520,7 @@ class MemoryHelper:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Save document chunks individually to nexe_web_ui.
+        Save document chunks individually to user_knowledge.
         Each chunk gets its own embedding — enables semantic search within the document.
 
         Pattern: NAT UBIK process_chunks — un embed+upsert per chunk, progress cada 25.
@@ -410,10 +530,11 @@ class MemoryHelper:
         if not memory:
             return {"success": False, "chunks_saved": 0, "message": "Memory API not available"}
 
-        # Ensure nexe_web_ui exists (same collection used for user messages — 768 dims)
-        if not await memory.collection_exists("nexe_web_ui"):
-            await memory.create_collection("nexe_web_ui", vector_size=DEFAULT_VECTOR_SIZE)
-            logger.info("Created nexe_web_ui collection")
+        # Documents van a user_knowledge (separat de nexe_web_ui que es per memoria personal)
+        DOC_COLLECTION = "user_knowledge"
+        if not await memory.collection_exists(DOC_COLLECTION):
+            await memory.create_collection(DOC_COLLECTION, vector_size=DEFAULT_VECTOR_SIZE)
+            logger.info(f"Created {DOC_COLLECTION} collection")
 
         total = len(chunks)
         saved = 0
@@ -426,7 +547,7 @@ class MemoryHelper:
             "session_id": session_id,
         }
 
-        logger.info(f"Ingesting '{filename}': {total} chunks → nexe_web_ui")
+        logger.info(f"Ingesting '{filename}': {total} chunks → {DOC_COLLECTION}")
         t_total = time.time()
 
         for i, chunk in enumerate(chunks):
@@ -435,7 +556,7 @@ class MemoryHelper:
                 meta = {**base_meta, "chunk_index": i, "saved_at": datetime.now(timezone.utc).isoformat()}
                 await memory.store(
                     text=chunk,
-                    collection="nexe_web_ui",
+                    collection=DOC_COLLECTION,
                     metadata=meta,
                 )
                 saved += 1
@@ -451,7 +572,7 @@ class MemoryHelper:
             "success": True,
             "document_id": filename,
             "chunks_saved": saved,
-            "message": f"✓ {saved}/{total} chunks indexats a nexe_web_ui",
+            "message": f"✓ {saved}/{total} chunks indexats a {DOC_COLLECTION}",
         }
 
     def _apply_temporal_decay(self, score: float, metadata: Dict) -> float:
@@ -482,7 +603,8 @@ class MemoryHelper:
         self,
         query: str,
         limit: int = 5,
-        collections: list = None
+        collections: list = None,
+        session_id: str = None
     ) -> Dict[str, Any]:
         """
         Search memory with temporal decay and access tracking.
@@ -491,6 +613,7 @@ class MemoryHelper:
             query: Search query
             limit: Max results to return per collection
             collections: Optional list of collection names to search (default: all 3)
+            session_id: If set, document_chunks from other sessions are filtered out
 
         Returns:
             Result dict with search results (scores adjusted for recency)
@@ -519,6 +642,11 @@ class MemoryHelper:
                         for r in results:
                             meta = r.metadata or {}
                             meta["source_collection"] = collection
+
+                            # Document chunks: nomes mostrar si son de la sessio actual
+                            if meta.get("type") == "document_chunk" and session_id:
+                                if meta.get("session_id") != session_id:
+                                    continue
 
                             # Apply temporal decay to score
                             adjusted_score = self._apply_temporal_decay(r.score, meta)
