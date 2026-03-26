@@ -1,0 +1,545 @@
+"""
+------------------------------------
+Server Nexe
+Location: plugins/web_ui_module/api/routes_chat.py
+Description: Endpoint POST /chat (~500 lines).
+             Intent detection, RAG, compaction, multi-engine, streaming.
+             Extret de routes.py durant refactoring de tech debt.
+
+www.jgoy.net · https://server-nexe.org
+------------------------------------
+"""
+
+from pathlib import Path
+from typing import Dict, Any
+import asyncio
+import logging
+import os as _os
+import re as _re
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
+
+from plugins.web_ui_module.messages import get_message
+
+def _get_memory_helper():
+    """Lazy resolve via routes module so test patches work."""
+    import plugins.web_ui_module.api.routes as _r
+    return _r.get_memory_helper()
+
+def _compact_session(session, engine, session_mgr):
+    """Lazy resolve via routes module so test patches work."""
+    import plugins.web_ui_module.api.routes as _r
+    return _r.compact_session(session, engine, session_mgr)
+
+logger = logging.getLogger(__name__)
+
+
+def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
+    """Registra endpoint: POST /chat"""
+
+    # -- POST /chat --
+    #    ~550 lines: intent detection, RAG, compaction,
+    #    multi-engine, streaming
+
+    @router.post("/chat")
+    async def chat(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
+        """Endpoint de xat amb streaming i deteccio d'intencions de memoria"""
+        message = request.get("message", "")
+        session_id = request.get("session_id")
+        stream = request.get("stream", False)
+
+        if not message:
+            raise HTTPException(status_code=400, detail=get_message(None, "webui.chat.message_required"))
+
+        session = session_mgr.get_or_create_session(session_id)
+        session.add_message("user", message)
+        session_mgr._save_session_to_disk(session)
+
+        # Detect intent (save, recall, or chat)
+        memory_helper = _get_memory_helper()
+        intent, extracted_content = memory_helper.detect_intent(message)
+
+        response_text = ""
+        memory_action = None
+
+        if intent == "save":
+            # Save to memory
+            content_to_save = extracted_content.strip() if extracted_content else message
+            # Clean up content (remove trailing punctuation from save request)
+            content_to_save = content_to_save.rstrip('?!').strip()
+
+            if content_to_save:
+                result = await memory_helper.save_to_memory(
+                    content=content_to_save,
+                    session_id=session.id,
+                    metadata={"original_message": message, "type": "user_fact"}
+                )
+                if result["success"]:
+                    _safe_content = str(content_to_save).replace("\x00", "").replace("]", "")[:200]
+                    response_text = f"Guardat a la memoria: \"{_safe_content}\"\n\nHo recordare per a futures converses.\x00[MEM]\x00"
+                else:
+                    response_text = f"No s'ha pogut guardar: {result.get('message', 'Error desconegut')}"
+            else:
+                response_text = "Que vols que guardi? Escriu el que vols recordar."
+            memory_action = "save"
+
+        elif intent == "recall":
+            # Recall intent: DON'T show raw results, use LLM with memory context
+            # Falls through to normal chat processing with memory search
+            memory_action = "recall"
+            intent = "chat"  # Treat as chat so LLM responds naturally
+
+        if intent == "chat":
+            # Normal chat - Auto-detect and use available LLM engine
+            try:
+                from core.lifespan import get_server_state
+                import os
+
+                module_manager = get_server_state().module_manager
+                # Prioritzar model/backend del request (selector UI) sobre env vars
+                model_name = request.get("model") or os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
+                preferred_engine = (request.get("backend") or os.getenv("NEXE_MODEL_ENGINE", "auto")).lower()
+
+                # Log available modules
+                available_modules = [m.name for m in module_manager.registry.list_modules()]
+                logger.info(f"Available modules: {available_modules}")
+
+                # Engine priority based on config
+                engines_to_try = []
+                if preferred_engine == "auto":
+                    engines_to_try = ["ollama_module", "mlx_module", "llama_cpp_module"]
+                elif preferred_engine == "ollama":
+                    engines_to_try = ["ollama_module", "mlx_module", "llama_cpp_module"]
+                elif preferred_engine == "mlx":
+                    engines_to_try = ["mlx_module", "ollama_module", "llama_cpp_module"]
+                elif preferred_engine == "llamacpp":
+                    engines_to_try = ["llama_cpp_module", "ollama_module", "mlx_module"]
+
+                response_text = None
+                for engine_name in engines_to_try:
+                    logger.info(f"Trying engine: {engine_name}")
+                    registration = module_manager.registry.get_module(engine_name)
+                    if not registration:
+                        logger.warning(f"{engine_name} not registered")
+                        continue
+                    if not registration.instance:
+                        logger.warning(f"{engine_name} has no instance")
+                        continue
+
+                    manifest_module = registration.instance
+                    # Get actual module instance via get_module_instance() function
+                    if not hasattr(manifest_module, 'get_module_instance'):
+                        logger.warning(f"{engine_name} has no get_module_instance()")
+                        continue
+
+                    engine = manifest_module.get_module_instance()
+                    if not engine:
+                        logger.warning(f"{engine_name} get_module_instance() returned None")
+                        continue
+                    if not hasattr(engine, 'chat'):
+                        logger.warning(f"{engine_name} has no chat method")
+                        continue
+
+                    try:
+                        # Resoldre ruta local del model si ve del selector UI
+                        if request.get("model"):
+                            from core.lifespan import get_server_state as _gss
+                            models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
+                            if not models_dir.is_absolute():
+                                models_dir = Path(_gss().project_root) / models_dir
+                            local_path = models_dir / model_name
+
+                            if engine_name == "mlx_module" and local_path.exists():
+                                os.environ["NEXE_MLX_MODEL"] = str(local_path)
+                                from plugins.mlx_module.core.config import MLXConfig
+                                new_config = MLXConfig.from_env()
+                                if hasattr(engine, '_node') and engine._node:
+                                    if engine._node.config.model_path != new_config.model_path:
+                                        engine._node.config = new_config
+                                        engine._node.__class__._config = new_config
+                                        engine._node.__class__._model = None
+                                        logger.info(f"MLX model switched to: {local_path}")
+
+                            elif engine_name == "llama_cpp_module" and local_path.exists():
+                                os.environ["NEXE_LLAMA_CPP_MODEL"] = str(local_path)
+                                from plugins.llama_cpp_module.core.config import LlamaCppConfig
+                                from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
+                                from plugins.llama_cpp_module.core.model_pool import ModelPool
+                                new_config = LlamaCppConfig.from_env()
+                                if hasattr(engine, '_node') and engine._node:
+                                    old_path = engine._node.config.model_path
+                                    if old_path != new_config.model_path:
+                                        # Destruir pool antic i recrear amb nou config
+                                        if LlamaCppChatNode._pool is not None:
+                                            LlamaCppChatNode._pool.destroy_all()
+                                        engine._node.config = new_config
+                                        LlamaCppChatNode._config = new_config
+                                        LlamaCppChatNode._pool = ModelPool(new_config)
+                                        logger.info(f"Llama.cpp model switched to: {new_config.model_path}")
+
+                        logger.info(f"Calling {engine_name}.chat with model={model_name}")
+
+                        # --- Context Compacting ---
+                        # Si la sessio te massa missatges, compactar amb resum LLM
+                        await _compact_session(session, engine, session_mgr)
+
+                        # --- Build Context ---
+                        # 1. Get recent conversation history with summary context
+                        context_messages_full = session.get_context_messages()
+                        # Exclude the very last message (just added) to avoid duplication
+                        context_messages = context_messages_full[:-1] if context_messages_full else []
+
+                        # 2. Check for attached document (takes priority over RAG)
+                        attached_doc = session.get_and_clear_attached_document()
+                        session_mgr._save_session_to_disk(session)
+
+                        document_context = ""
+                        if attached_doc:
+                            chunks = attached_doc.get('chunks', [attached_doc.get('content', '')])
+                            total_chunks = attached_doc.get('total_chunks', len(chunks))
+                            total_chars = attached_doc.get('total_chars', 0)
+
+                            shown = len(chunks)
+                            doc_content = "\n\n---\n\n".join(chunks)
+
+                            if total_chunks == 1:
+                                document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n\n{doc_content}\n"
+                            else:
+                                est_pages_total = round(total_chars / 3000)
+                                est_pages_shown = round(len(doc_content) / 3000)
+                                pct = round(shown * 100 / total_chunks)
+                                document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n"
+                                if shown < total_chunks:
+                                    document_context += (
+                                        f"[Mostrant les primeres ~{est_pages_shown} pagines de ~{est_pages_total} "
+                                        f"({shown}/{total_chunks} parts, {pct}% del document). "
+                                        f"La resta del document esta indexada — l'usuari pot fer preguntes "
+                                        f"sobre qualsevol part i el sistema les recuperara.]\n\n"
+                                    )
+                                else:
+                                    document_context += f"[Document complet: ~{est_pages_total} pagines]\n\n"
+                                document_context += f"{doc_content}\n"
+
+                            # Sanitize document context (same as RAG context)
+                            document_context = _re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', document_context)
+                            logger.info(f"Using attached document: {attached_doc['filename']} (parts {shown}/{total_chunks}, {len(doc_content)} chars)")
+
+                        # 3. Get Memory Context (RAG) - SEMPRE buscar, no nomes amb patterns
+                        rag_context = ""
+                        rag_count = 0
+                        _rag_items = []  # (collection, score) tuples for weight display
+                        if not attached_doc:
+                            try:
+                                recall_result = await memory_helper.recall_from_memory(message, limit=5)
+                                if recall_result["success"] and recall_result["results"]:
+                                    # Filtrar per score minim (configurable, default 0.6)
+                                    rag_threshold = float(request.get("rag_threshold", 0.6))
+                                    relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
+                                    if relevant:
+                                        rag_count = len(relevant)
+                                        # Separar knowledge (docs) de memoria (converses)
+                                        knowledge_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'user_knowledge']
+                                        memory_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') != 'user_knowledge']
+                                        rag_context = ""
+                                        if knowledge_items:
+                                            rag_context += "\n\n[DOCUMENTACIO TECNICA]\n"
+                                            for item in knowledge_items:
+                                                rag_context += f"- {item['content']}\n"
+                                        if memory_items:
+                                            rag_context += "\n\n[MEMORIA DE L'USUARI]\n"
+                                            for item in memory_items:
+                                                rag_context += f"- {item['content']}\n"
+                                        # Sanitize RAG context: remove control chars and truncate
+                                        rag_context = _re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', rag_context)
+                                        if len(rag_context) > 8000:
+                                            rag_context = rag_context[:8000]
+                                        logger.info(f"RAG: {len(relevant)} memories relevants (score >= {rag_threshold})")
+                                        for item in relevant:
+                                            score = item.get('score', 0)
+                                            col = item.get('metadata', {}).get('source_collection', '?')
+                                            _rag_items.append((col, score))
+                                            preview = item['content'][:80].replace('\n', ' ')
+                                            logger.info(f"  RAG [{col}] score={score:.2f} -> {repr(preview)}")
+                            except Exception as e:
+                                logger.warning(f"RAG lookup failed: {e}")
+
+                        # 4. Construct Final System Prompt
+                        # Llegir el prompt de server.toml via app_state (llengua + tier)
+                        try:
+                            from core.lifespan import get_server_state
+                            from core.endpoints.chat import _get_system_prompt
+                            import os as _os_inner
+                            _state = get_server_state()
+                            _lang = _os_inner.getenv("NEXE_LANG", "ca")
+                            base_system_prompt = _get_system_prompt(_state, _lang)
+                        except Exception:
+                            base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
+                        # System prompt SEMPRE estatic (cachejable per MLX)
+                        # El document o RAG van als messages[], no al system prompt
+                        system_prompt = base_system_prompt
+
+                        # 4. Prepare messages payload for engine
+                        engine_messages = [
+                            {"role": m["role"], "content": m["content"]}
+                            for m in context_messages
+                        ]
+
+                        # Token budget: estimate total context and truncate if needed
+                        MAX_CONTEXT_CHARS = int(_os.environ.get("NEXE_MAX_CONTEXT_CHARS", "24000"))
+                        system_chars = len(system_prompt)
+                        history_chars = sum(len(m.get("content", "")) for m in context_messages)
+                        message_chars = len(message)
+                        available_chars = MAX_CONTEXT_CHARS - system_chars - history_chars - message_chars - 500
+
+                        # Injectar context als messages (no al system prompt -> MLX pot cachear el prefix)
+                        if document_context and available_chars > 0:
+                            document_context = document_context[:available_chars]
+                            # Document adjuntat: va davant del missatge de l'usuari
+                            doc_block = (
+                                "[DOCUMENT ADJUNTAT]\n"
+                                f"{document_context}\n"
+                                "[FI DOCUMENT]\n\n"
+                                "Respon EXCLUSIVAMENT basant-te en el document anterior. "
+                                "Si la informacio no hi es, indica-ho clarament.\n\n"
+                                f"{message}"
+                            )
+                            engine_messages.append({"role": "user", "content": doc_block})
+                        elif rag_context and available_chars > 0:
+                            rag_context = rag_context[:available_chars]
+                            # Context RAG: separat en documentacio i memoria
+                            rag_block = f"[CONTEXT]\n{rag_context}[FI CONTEXT]\n\n{message}"
+                            engine_messages.append({"role": "user", "content": rag_block})
+                        else:
+                            engine_messages.append({"role": "user", "content": message})
+
+                        messages = engine_messages
+                        response_chunks = []
+
+                        # Adapt to different chat signatures
+                        import inspect
+                        sig = inspect.signature(engine.chat)
+
+                        if 'model' in sig.parameters:
+                            # Ollama-style: chat(model, messages, stream=...)
+                            # We inject system prompt as first message for Ollama
+                            full_messages = [{"role": "system", "content": system_prompt}] + messages
+                            chat_result = engine.chat(model=model_name, messages=full_messages, stream=stream)
+                        else:
+                            # MLX/LlamaCpp-style: chat(messages, system=...)
+                            if engine_name in ("mlx_module", "llama_cpp_module") and stream:
+                                # MLX module requires a callback for streaming
+                                queue = asyncio.Queue()
+
+                                _stream_chunk_count = [0]
+
+                                def stream_cb(token):
+                                    # MLXChatNode already marshals this to the main loop, so we can just put in queue
+                                    _stream_chunk_count[0] += 1
+                                    if _stream_chunk_count[0] <= 3 or _stream_chunk_count[0] % 50 == 0:
+                                        logger.debug("stream_cb: chunk #%d (%d chars)", _stream_chunk_count[0], len(token))
+                                    queue.put_nowait(token)
+
+                                # Launch chat in background task
+                                ml_task = asyncio.create_task(engine.chat(messages=messages, system=system_prompt, stream_callback=stream_cb))
+
+                                # Async generator that yields from queue until task is done
+                                async def queue_generator():
+                                    while True:
+                                        # Check if queue has items first
+                                        if not queue.empty():
+                                            yield await queue.get()
+                                            continue
+
+                                        # If queue is empty, check if task is done
+                                        if ml_task.done():
+                                            # If task failed, re-raise exception
+                                            if ml_task.exception():
+                                                raise ml_task.exception()
+                                            break
+
+                                        # Wait for new tokens with short timeout
+                                        try:
+                                            token = await asyncio.wait_for(queue.get(), timeout=0.05)
+                                            yield token
+                                        except asyncio.TimeoutError:
+                                            continue
+
+                                chat_result = queue_generator()
+
+                            else:
+                                chat_result = engine.chat(messages=messages, system=system_prompt)
+
+                        # Flag si s'ha compactat per avisar al client
+                        _compacted = session.compaction_count > 0 and session.context_summary is not None
+
+                        if stream:
+                            async def response_generator():
+                                full_response = ""
+                                _safe_model = str(model_name).replace("\x00", "").replace("]", "")[:100]
+                                yield f"\x00[MODEL:{_safe_model}]\x00"
+                                if rag_count > 0:
+                                    yield f"\x00[RAG:{int(rag_count)}]\x00"
+                                    # RAG weight details for UI/CLI display
+                                    if _rag_items:
+                                        avg_score = sum(s for _, s in _rag_items) / len(_rag_items)
+                                        yield f"\x00[RAG_AVG:{avg_score:.2f}]\x00"
+                                        for _col, _score in _rag_items:
+                                            _safe_col = str(_col).replace("\x00", "").replace("|", "_")[:30]
+                                            yield f"\x00[RAG_ITEM:{_safe_col}|{_score:.2f}]\x00"
+                                if _compacted:
+                                    yield f"\x00[COMPACT:{int(session.compaction_count)}]\x00"
+
+                                try:
+                                    # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)
+                                    if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
+                                        async for chunk in chat_result:
+                                            content = ""
+                                            if isinstance(chunk, dict):
+                                                if "message" in chunk and "content" in chunk["message"]:
+                                                    content = chunk["message"]["content"]
+                                                elif "content" in chunk:
+                                                    content = chunk["content"]
+                                                elif "response" in chunk:
+                                                    content = chunk["response"]
+                                            elif isinstance(chunk, str):
+                                                content = chunk
+
+                                            if content:
+                                                # GPT-OSS: NO netejar tags server-side
+                                                # El client (_parseThinkingChannels) necessita
+                                                # l'estructura analysis/assistant/final intacta
+                                                _is_gpt_oss = "gpt-oss" in model_name.lower()
+                                                if not _is_gpt_oss:
+                                                    # Models normals: normalitzar thinking tags
+                                                    content = content.replace('<|thinking|>', '<think>')
+                                                    content = content.replace('<|/thinking|>', '</think>')
+                                                    # Netejar tags (<|channel|>, ....) server-side
+                                                    content = _re.sub(r'<\|[^|]+\|>', '', content)
+                                                    content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
+                                                full_response += content
+                                                if content:
+                                                    yield content
+                                    else:
+                                        # Fallback for non-streaming engines
+                                        result = await chat_result if inspect.iscoroutine(chat_result) else chat_result
+                                        content = ""
+                                        if isinstance(result, dict):
+                                            if "message" in result and "content" in result["message"]:
+                                                content = result["message"]["content"]
+                                            elif "content" in result:
+                                                content = result["content"]
+                                            elif "response" in result:
+                                                content = result["response"]
+                                        elif isinstance(result, str):
+                                            content = result
+
+                                        if content:
+                                            full_response += content
+                                            yield content
+
+                                except Exception as e:
+                                    logger.error(f"Streaming error: {e}")
+                                    yield f"\n[Error: {str(e)}]"
+
+                                # Save clean response (no think/GPT-OSS tags) to session/disk
+                                clean_response = full_response
+                                clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", clean_response)
+                                clean_response = _re.sub(r'<\|[^|]+\|>', '', clean_response)
+                                clean_response = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', clean_response)
+                                # GPT-OSS: extreure nomes la part "final" (resposta real)
+                                _m = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', clean_response, _re.IGNORECASE)
+                                if _m:
+                                    clean_response = _m.group(1).strip()
+                                else:
+                                    # Fallback: treure prefix "analysis..." si hi es
+                                    clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
+                                if clean_response:
+                                    session.add_message("assistant", clean_response)
+                                    session_mgr._save_session_to_disk(session)
+
+                                    # AUTO-SAVE: guarda missatge usuari directament (sense LLM)
+                                    if not full_response.startswith(""):
+                                        try:
+                                            save_result = await memory_helper.auto_save(
+                                                user_message=message,
+                                                session_id=session.id,
+                                            )
+                                            if save_result.get("document_id"):
+                                                yield "\x00[MEM]\x00"
+                                        except Exception as e:
+                                            logger.debug("RAG auto-save failed: %s", e)
+
+                            return StreamingResponse(
+                                response_generator(),
+                                media_type="text/plain",
+                                headers={
+                                    "Cache-Control": "no-cache, no-store",
+                                    "X-Accel-Buffering": "no",
+                                    "X-Content-Type-Options": "nosniff",
+                                }
+                            )
+
+                        # Handle non-streaming response accumulation
+                        if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
+                            async for chunk in chat_result:
+                                if isinstance(chunk, dict) and "message" in chunk and "content" in chunk["message"]:
+                                    response_chunks.append(chunk["message"]["content"])
+                                elif isinstance(chunk, dict) and "content" in chunk:
+                                    response_chunks.append(chunk["content"])
+                                elif isinstance(chunk, str):
+                                    response_chunks.append(chunk)
+                        else:
+                            # Await if it's a coroutine (direct result)
+                            result = await chat_result if inspect.iscoroutine(chat_result) else chat_result
+                            if isinstance(result, dict):
+                                if "message" in result and "content" in result["message"]:
+                                    response_chunks.append(result["message"]["content"])
+                                elif "content" in result:
+                                    response_chunks.append(result["content"])
+                                elif "response" in result:
+                                    response_chunks.append(result["response"])
+                            elif isinstance(result, str):
+                                response_chunks.append(result)
+
+                        response_text = "".join(response_chunks)
+                        if response_text:
+                            logger.info(f"{engine_name} succeeded!")
+                            break
+                    except Exception as e:
+                        logger.warning(f"{engine_name} failed: {e}")
+                        logger.debug("Engine error details:", exc_info=True)
+                        continue
+
+                if not response_text:
+                    response_text = "Error: Cap motor d'IA disponible (prova iniciar Ollama amb 'ollama serve')"
+            except Exception as e:
+                logger.error(f"Error calling LLM: {e}")
+                response_text = f"Error: {str(e)}"
+
+        session.add_message("assistant", response_text)
+        session_mgr._save_session_to_disk(session)
+
+        # AUTO-SAVE: guarda missatge usuari directament (sense LLM)
+        if response_text and not response_text.startswith("Error:") and not response_text.startswith("Que vols"):
+            try:
+                save_result = await memory_helper.auto_save(
+                    user_message=message,
+                    session_id=session.id,
+                )
+                if save_result.get("document_id"):
+                    logger.debug(f"Auto-saved to RAG: {message[:40]}")
+            except Exception as e:
+                logger.warning(f"Auto-save to RAG failed: {e}")
+
+        if stream:
+            async def generate():
+                for char in response_text:
+                    yield char
+            return StreamingResponse(generate(), media_type="text/plain")
+        else:
+            return {
+                "response": response_text,
+                "session_id": session.id,
+                "intent": intent,
+                "memory_action": memory_action
+            }
