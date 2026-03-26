@@ -395,7 +395,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         loaded = await engine.is_model_loaded(model_name)
                                         if not loaded:
                                             logger.info("Model %s no carregat — carregant... [%s]", model_name, engine_name)
-                                            yield f"\x00[MODEL_LOADING:{_safe_model}]\x00"
+                                            yield f"\x00[MODEL_LOADING:{_safe_model}|{engine_name}]\x00"
                                     except Exception:
                                         pass  # Si falla la comprovacio, continuem normal
 
