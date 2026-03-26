@@ -30,6 +30,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 logger = logging.getLogger(__name__)
 
+from memory.memory.constants import DEFAULT_VECTOR_SIZE
 from memory.rag.header_parser import parse_rag_header, RAGHeader, VALID_PRIORITIES
 
 import os as _os
@@ -175,7 +176,7 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
     try:
         if await memory.collection_exists(USER_KNOWLEDGE_COLLECTION):
             await memory.delete_collection(USER_KNOWLEDGE_COLLECTION)
-        await memory.create_collection(USER_KNOWLEDGE_COLLECTION, vector_size=768)
+        await memory.create_collection(USER_KNOWLEDGE_COLLECTION, vector_size=DEFAULT_VECTOR_SIZE)
         log(_t("col_ready", c=USER_KNOWLEDGE_COLLECTION))
     except Exception as e:
         log(_t("col_error", e=e))

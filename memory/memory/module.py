@@ -20,6 +20,7 @@ from core.lifespan import get_server_state
 
 from .engines.flash_memory import FlashMemory
 from .engines.ram_context import RAMContext
+from .constants import DEFAULT_VECTOR_SIZE
 from .engines.persistence import PersistenceManager
 from .pipeline.ingestion import IngestionPipeline
 
@@ -135,7 +136,7 @@ class MemoryModule:
         db_path=db_path,
         qdrant_path=qdrant_path,
         collection_name="nexe_memory",
-        vector_size=768
+        vector_size=DEFAULT_VECTOR_SIZE
       )
 
       self._pipeline = IngestionPipeline(

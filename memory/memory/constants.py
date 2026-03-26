@@ -12,6 +12,11 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import Dict, Any
 
+# Dimensio dels vectors d'embeddings.
+# Correspon al model paraphrase-multilingual-mpnet-base-v2 (768 dims).
+# Si canvies el model d'embeddings, canvia nomes aquest valor.
+DEFAULT_VECTOR_SIZE = 768
+
 MODULE_ID = "memory"
 
 MANIFEST: Dict[str, Any] = {
