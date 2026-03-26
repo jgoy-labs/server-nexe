@@ -21,6 +21,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from memory.memory.constants import DEFAULT_VECTOR_SIZE
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,12 +67,12 @@ async def ingest_documentation():
     logger.info("[2/4] Creating collection '%s'...", DOCS_COLLECTION)
     try:
         if not await memory.collection_exists(DOCS_COLLECTION):
-            await memory.create_collection(DOCS_COLLECTION, vector_size=768)
+            await memory.create_collection(DOCS_COLLECTION, vector_size=DEFAULT_VECTOR_SIZE)
             logger.info("       Collection '%s' created.", DOCS_COLLECTION)
         else:
             # Clear existing docs for fresh ingestion
             await memory.delete_collection(DOCS_COLLECTION)
-            await memory.create_collection(DOCS_COLLECTION, vector_size=768)
+            await memory.create_collection(DOCS_COLLECTION, vector_size=DEFAULT_VECTOR_SIZE)
             logger.info("       Collection '%s' recreated (fresh ingestion).", DOCS_COLLECTION)
     except Exception as e:
         logger.error("[ERROR] Failed to create collection: %s", e)
