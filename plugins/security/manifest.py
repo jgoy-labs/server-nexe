@@ -11,48 +11,22 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from typing import Optional
+from core.loader.manifest_base import create_lazy_manifest, install_lazy_manifest
 
-# Lazy singleton — no side effects at import
-_module: Optional["SecurityModule"] = None
-_router = None
-
-
-def _get_module():
-    """Lazy initialization of module instance."""
-    global _module
-    if _module is None:
-        from .module import SecurityModule
-        _module = SecurityModule()
-        _module._init_router()
-    return _module
-
-
-def get_router():
-    """Get router with lazy initialization."""
-    global _router
-    if _router is None:
-        module = _get_module()
-        _router = module.get_router()
-        _router.tags = ["security"]
-    return _router
-
-
-def get_metadata():
-    """Get module metadata."""
-    return _get_module().metadata
-
-
-def get_module_instance():
-    """Get module instance (lazy)."""
-    return _get_module()
-
+_m = create_lazy_manifest(
+    module_path="plugins.security.module",
+    module_class="SecurityModule",
+    tags=["security"],
+    compat_aliases={
+        "module_instance": "instance",
+    },
+)
 
 # ─── Retrocompatibilitat amb codi i tests existents ───
 # El manifest.py antic exportava aquests noms directament.
 # Els mantenim com a facades lazy per no trencar imports existents.
 
-from .module import SecurityModule  # noqa: E402
+from .module import SecurityModule  # noqa: E402,F401
 
 MODULE_NAME = "security"
 
@@ -75,32 +49,17 @@ def init_security_module():
     """Retrocompat: inicialitza el modul security."""
     import logging
     from pathlib import Path
-    logger = logging.getLogger(__name__)
-    logger.info("Security module initialized: %s v%s", MODULE_NAME, MODULE_METADATA['version'])
+    _logger = logging.getLogger(__name__)
+    _logger.info("Security module initialized: %s v%s", MODULE_NAME, MODULE_METADATA['version'])
     log_path = Path(__file__).parent.parent.parent / "storage" / "system-logs" / MODULE_NAME
     log_path.mkdir(parents=True, exist_ok=True)
     return MODULE_METADATA
 
 
-class _LazyRouterPublic:
-    """Descriptor que retorna el router lazy quan s'accedeix com a atribut del modul."""
-
-    def __get__(self, obj, objtype=None):
-        return get_router()
-
-
-class _LazyModuleInstance:
-    """Descriptor que retorna la instancia lazy."""
-
-    def __get__(self, obj, objtype=None):
-        return get_module_instance()
-
-
-# Per accedir com a atributs de modul (ex: `from plugins.security.manifest import router_public`)
-# Usem __getattr__ del modul Python (PEP 562)
-def __getattr__(name):
-    if name == "router_public":
-        return get_router()
-    if name == "module_instance":
-        return get_module_instance()
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+install_lazy_manifest(__name__, _m, extra_attrs={
+    "SecurityModule": SecurityModule,
+    "MODULE_NAME": MODULE_NAME,
+    "MODULE_METADATA": MODULE_METADATA,
+    "RATE_LIMITING_AVAILABLE": RATE_LIMITING_AVAILABLE,
+    "init_security_module": init_security_module,
+})

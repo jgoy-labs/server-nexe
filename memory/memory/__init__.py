@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/__init__.py
-Description: Mòdul Memory - Flash Memory, RAM Context i Persistence Manager.
+Description: Memory module - Flash Memory, RAM Context and Persistence Manager.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

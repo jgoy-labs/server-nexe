@@ -77,7 +77,7 @@ async def _mlx_stream_generator(
             result_holder["result"] = result
         except Exception as e:
             result_holder["error"] = str(e)
-            logger.error(f"MLX streaming error: {e}")
+            logger.error("MLX streaming error: %s", e)
         finally:
             generation_done.set()
 
@@ -127,7 +127,7 @@ async def _mlx_stream_generator(
         yield f"data: {json.dumps(final_chunk)}\n\n"
         yield "data: [DONE]\n\n"
 
-        # Auto-save a memòria (fire-and-forget com Ollama)
+        # Auto-save to memory (fire-and-forget like Ollama)
         full_response_text = "".join(response_parts_mlx)
         if app_state and user_msg and full_response_text.strip():
             async def _background_save_mlx():
@@ -144,7 +144,7 @@ async def _mlx_stream_generator(
             _pending_save_tasks.add(task)
             task.add_done_callback(_pending_save_tasks.discard)
 
-        # Log mètriques si tenim resultat
+        # Log metrics if we have a result
         if result_holder["result"]:
             result = result_holder["result"]
             logger.info(

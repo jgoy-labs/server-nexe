@@ -57,7 +57,7 @@ class Container:
       warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
       logger.warning("Container.register('%s') — %s", name, _DEPRECATION_MSG)
     cls._services[name] = service
-    logger.debug(f"Service registered: {name}")
+    logger.debug("Service registered: %s", name)
 
   @classmethod
   def register_factory(cls, name: str, factory: Any) -> None:
@@ -66,7 +66,7 @@ class Container:
       warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
       logger.warning("Container.register_factory('%s') — %s", name, _DEPRECATION_MSG)
     cls._factories[name] = factory
-    logger.debug(f"Service factory registered: {name}")
+    logger.debug("Service factory registered: %s", name)
 
   @classmethod
   def get(cls, name: str, default: Any = None) -> Any:
@@ -78,7 +78,7 @@ class Container:
       return cls._services[name]
 
     if name in cls._factories:
-      logger.debug(f"Initializing service from factory: {name}")
+      logger.debug("Initializing service from factory: %s", name)
       service = cls._factories[name]()
       cls._services[name] = service
       return service

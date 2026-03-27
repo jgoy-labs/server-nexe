@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/integration/api_integrator.py
-Description: Integrador automàtic d'APIs de mòduls al servidor FastAPI. Detecta routers,
+Description: Automatic module API integrator into the FastAPI server. Detects routers,
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -130,7 +130,7 @@ class APIIntegrator:
   def _save_integration_info(self, module_name: str, module_instance: Any,
                api_components: Dict[str, Any], api_prefix: str,
                registered_routes: List[Dict[str, Any]]) -> None:
-    """Guarda informació d'integració i actualitza estadístiques."""
+    """Save integration info and update statistics."""
     self._integrated_modules[module_name] = {
       'instance': module_instance,
       'api_components': api_components,
@@ -143,7 +143,7 @@ class APIIntegrator:
     self._total_modules_integrated += 1
 
   def _handle_integration_error(self, module_name: str, error: Exception) -> bool:
-    """Gestiona errors d'integració."""
+    """Handle integration errors."""
     msg = get_message(
       self.i18n,
       'api_integrator.errors.integration_failed',
@@ -257,7 +257,7 @@ class APIIntegrator:
     return f"/api/{module_name}"
   
   def get_integration_stats(self) -> Dict[str, Any]:
-    """Retorna estadístiques d'integració"""
+    """Return integration statistics."""
     with self._lock:
       return {
         'total_modules_integrated': self._total_modules_integrated,
@@ -274,12 +274,12 @@ class APIIntegrator:
       }
   
   def is_module_integrated(self, module_name: str) -> bool:
-    """Comprova si un mòdul està integrat"""
+    """Check if a module is integrated."""
     with self._lock:
       return module_name in self._integrated_modules
   
   def get_module_routes(self, module_name: str) -> List[str]:
-    """Retorna les rutes d'un mòdul integrat"""
+    """Return the routes of an integrated module."""
     with self._lock:
       if module_name in self._integrated_modules:
         return [route['path'] for route in 

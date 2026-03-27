@@ -56,7 +56,7 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
             }
         )
 
-        logger.info(f"Conversation saved to nexe_chat_memory (id={doc_id})")
+        logger.info("Conversation saved to nexe_chat_memory (id=%s)", doc_id)
 
         try:
             from core.metrics.registry import MEMORY_OPERATIONS
@@ -65,4 +65,4 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
             logger.debug("Autosave metrics update failed: %s", e)
 
     except Exception as e:
-        logger.error(f"Error saving conversation to memory: {e}")
+        logger.error("Error saving conversation to memory: %s", e)

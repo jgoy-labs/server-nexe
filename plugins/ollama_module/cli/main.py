@@ -44,7 +44,7 @@ def _run_async(coro):
 
 @app.command()
 def status():
-  """Mostra l'estat de connexió amb Ollama"""
+  """Show Ollama connection status."""
   ollama = OllamaModule()
 
   console.print("\n[bold cyan]Ollama Status[/bold cyan]")
@@ -76,20 +76,20 @@ def models():
       model_list = _run_async(ollama.list_models())
     except Exception as e:
       console.print(f"[red]Error: {e}[/red]")
-      console.print("[yellow]Assegura't que Ollama està en marxa: ollama serve[/yellow]")
+      console.print("[yellow]Make sure Ollama is running: ollama serve[/yellow]")
       raise typer.Exit(1)
 
   if not model_list:
-    console.print("[yellow]Cap model instal·lat[/yellow]")
+    console.print("[yellow]No models installed[/yellow]")
     console.print("\nPer descarregar un model:")
     console.print(" nexe ollama pull mistral")
     console.print(" nexe ollama pull llama3.2")
     return
 
-  table = Table(title="Models Ollama Locals")
+  table = Table(title="Local Ollama Models")
   table.add_column("Model", style="cyan")
-  table.add_column("Mida", justify="right", style="green")
-  table.add_column("Modificat", style="dim")
+  table.add_column("Size", justify="right", style="green")
+  table.add_column("Modified", style="dim")
 
   for model in model_list:
     name = model.get("name", "unknown")
@@ -104,12 +104,12 @@ def models():
 
 @app.command()
 def pull(
-  model: str = typer.Argument(..., help="Nom del model a descarregar (ex: mistral, llama3.2)")
+  model: str = typer.Argument(..., help="Model name to download (e.g.: mistral, llama3.2)")
 ):
-  """Descarrega un model d'Ollama"""
+  """Download a model from Ollama"""
   ollama = OllamaModule()
 
-  console.print(f"\n[bold cyan]Descarregant model: {model}[/bold cyan]")
+  console.print(f"\n[bold cyan]Downloading model: {model}[/bold cyan]")
 
   async def do_pull():
     last_status = ""
@@ -118,7 +118,7 @@ def pull(
       TextColumn("[progress.description]{task.description}"),
       console=console
     ) as progress:
-      task = progress.add_task(f"Descarregant {model}...", total=None)
+      task = progress.add_task(f"Downloading {model}...", total=None)
 
       async for chunk in ollama.pull_model(model):
         status = chunk.get("status", "")
@@ -134,19 +134,19 @@ def pull(
 
   try:
     _run_async(do_pull())
-    console.print(f"[green]Model {model} descarregat correctament![/green]")
+    console.print(f"[green]Model {model} downloaded successfully![/green]")
   except Exception as e:
     console.print(f"[red]Error: {e}[/red]")
     raise typer.Exit(1)
 
 @app.command()
 def info(
-  model: str = typer.Argument(..., help="Nom del model")
+  model: str = typer.Argument(..., help="Model name")
 ):
-  """Mostra informació detallada d'un model"""
+  """Show detailed information about a model."""
   ollama = OllamaModule()
 
-  with console.status(f"[bold green]Obtenint info de {model}..."):
+  with console.status(f"[bold green]Getting info for {model}..."):
     try:
       model_info = _run_async(ollama.get_model_info(model))
     except Exception as e:
@@ -156,7 +156,7 @@ def info(
   console.print(Panel(f"[bold cyan]{model}[/bold cyan]", title="Model Info"))
 
   if "parameters" in model_info:
-    console.print("\n[bold]Paràmetres:[/bold]")
+    console.print("\n[bold]Parameters:[/bold]")
     console.print(model_info["parameters"][:500] + "..." if len(model_info.get("parameters", "")) > 500 else model_info.get("parameters", "N/A"))
 
   if "template" in model_info:
@@ -168,50 +168,50 @@ def info(
 
   details = model_info.get("details", {})
   if details:
-    console.print("\n[bold]Detalls:[/bold]")
+    console.print("\n[bold]Details:[/bold]")
     for key, value in details.items():
       console.print(f" {key}: {value}")
 
 @app.command()
 def delete(
-  model: str = typer.Argument(..., help="Nom del model a eliminar"),
-  force: bool = typer.Option(False, "--force", "-f", help="No demanar confirmació")
+  model: str = typer.Argument(..., help="Model name to delete"),
+  force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation")
 ):
-  """Elimina un model local"""
+  """Delete a local model"""
   ollama = OllamaModule()
 
   if not force:
-    confirm = typer.confirm(f"Segur que vols eliminar el model '{model}'?")
+    confirm = typer.confirm(f"Are you sure you want to delete model '{model}'?")
     if not confirm:
-      console.print("[yellow]Operació cancel·lada[/yellow]")
+      console.print("[yellow]Operation cancelled[/yellow]")
       raise typer.Exit(0)
 
-  with console.status(f"[bold red]Eliminant {model}..."):
+  with console.status(f"[bold red]Deleting {model}..."):
     try:
       _run_async(ollama.delete_model(model))
-      console.print(f"[green]Model {model} eliminat correctament[/green]")
+      console.print(f"[green]Model {model} deleted successfully[/green]")
     except Exception as e:
       console.print(f"[red]Error: {e}[/red]")
       raise typer.Exit(1)
 
 @app.command()
 def chat(
-  model: str = typer.Argument("mistral", help="Model a usar per al chat"),
-  system: Optional[str] = typer.Option(None, "--system", "-s", help="Missatge de sistema inicial")
+  model: str = typer.Argument("mistral", help="Model to use for chat"),
+  system: Optional[str] = typer.Option(None, "--system", "-s", help="Initial system message")
 ):
-  """Inicia un chat interactiu amb un model LLM"""
+  """Start an interactive chat with an LLM model"""
   ollama = OllamaModule()
 
   with console.status("[bold green]Connectant amb Ollama..."):
     if not _run_async(ollama.check_connection()):
-      console.print("[red]Error: Ollama no està disponible[/red]")
-      console.print("[yellow]Inicia Ollama amb: ollama serve[/yellow]")
+      console.print("[red]Error: Ollama is not available[/red]")
+      console.print("[yellow]Start Ollama with: ollama serve[/yellow]")
       raise typer.Exit(1)
 
   console.print(Panel(
-    f"[bold cyan]Chat amb {model}[/bold cyan]\n"
-    "[dim]Escriu 'exit' o 'quit' per sortir\n"
-    "Escriu 'clear' per netejar historial[/dim]",
+    f"[bold cyan]Chat with {model}[/bold cyan]\n"
+    "[dim]Type 'exit' or 'quit' to leave\n"
+    "Type 'clear' to reset history[/dim]",
     title="Nexe Ollama Chat"
   ))
 
@@ -229,14 +229,14 @@ def chat(
         continue
 
       if user_input.lower() in ("exit", "quit", "q"):
-        console.print("[dim]Adéu![/dim]")
+        console.print("[dim]Goodbye![/dim]")
         break
 
       if user_input.lower() == "clear":
         messages = []
         if system:
           messages.append({"role": "system", "content": system})
-        console.print("[dim]Historial netejat[/dim]\n")
+        console.print("[dim]History cleared[/dim]\n")
         continue
 
       messages.append({"role": "user", "content": user_input})
@@ -260,23 +260,23 @@ def chat(
       print()
 
     except KeyboardInterrupt:
-      console.print("\n[dim]Interromput. Adéu![/dim]")
+      console.print("\n[dim]Interrupted. Goodbye![/dim]")
       break
     except Exception as e:
       console.print(f"\n[red]Error: {e}[/red]")
 
 @app.command()
 def ask(
-  prompt: str = typer.Argument(..., help="Pregunta a fer al model"),
-  model: str = typer.Option("mistral", "--model", "-m", help="Model a usar"),
-  system: Optional[str] = typer.Option(None, "--system", "-s", help="Missatge de sistema")
+  prompt: str = typer.Argument(..., help="Question to ask the model"),
+  model: str = typer.Option("mistral", "--model", "-m", help="Model to use"),
+  system: Optional[str] = typer.Option(None, "--system", "-s", help="System message")
 ):
-  """Fa una pregunta ràpida al model (sense chat interactiu)"""
+  """Ask the model a quick one-shot question (no interactive chat)."""
   ollama = OllamaModule()
 
-  with console.status("[bold green]Connectant..."):
+  with console.status("[bold green]Connecting..."):
     if not _run_async(ollama.check_connection()):
-      console.print("[red]Error: Ollama no està disponible[/red]")
+      console.print("[red]Error: Ollama is not available[/red]")
       raise typer.Exit(1)
 
   messages = []
@@ -284,8 +284,8 @@ def ask(
     messages.append({"role": "system", "content": system})
   messages.append({"role": "user", "content": prompt})
 
-  console.print(f"\n[bold green]Pregunta:[/bold green] {prompt}")
-  console.print(f"\n[bold cyan]Resposta ({model}):[/bold cyan]")
+  console.print(f"\n[bold green]Question:[/bold green] {prompt}")
+  console.print(f"\n[bold cyan]Answer ({model}):[/bold cyan]")
 
   async def get_response():
     async for chunk in ollama.chat(model, messages, stream=True):

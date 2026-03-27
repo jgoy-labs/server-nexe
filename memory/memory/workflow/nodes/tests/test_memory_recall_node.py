@@ -368,7 +368,7 @@ class TestMemoryRecallNodeHelpers:
         entry.content = "short content"
 
         result = node._format_context([entry])
-        assert "[Memòries recents]" in result
+        assert "[Recent memories]" in result
         assert "short content" in result
 
     def test_format_context_long_content_truncated(self):

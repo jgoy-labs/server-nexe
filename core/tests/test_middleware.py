@@ -205,13 +205,14 @@ class TestSetupCsrfProtection:
                 pass
 
     def test_csrf_import_error(self):
-        """Lines 263-265: starlette-csrf not installed."""
+        """starlette-csrf is mandatory — missing module raises ImportError."""
         from core.middleware import setup_csrf_protection
         app = FastAPI()
         config = {"core": {"server": {}}}
         with patch.dict('os.environ', {'NEXE_CSRF_SECRET': 'test'}, clear=False), \
              patch.dict('sys.modules', {'starlette_csrf': None}):
-            setup_csrf_protection(app, config)
+            with pytest.raises((ImportError, ModuleNotFoundError)):
+                setup_csrf_protection(app, config)
 
     def test_csrf_non_local_prod_sets_secure(self):
         """Lines 241-244: non-local host in prod -> cookie_secure=True."""

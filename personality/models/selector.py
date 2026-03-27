@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/models/selector.py
-Description: Lògica de detecció de maquinari i selecció de perfil.
+Description: Hardware detection logic and profile selection.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -75,7 +75,7 @@ class ModelSelector:
         return shutil.which("ollama") is not None
 
     def apply_to_config(self, config: dict, profile: ModelProfile) -> dict:
-        """Aplica el perfil a la configuració carregada (server.toml object)."""
+        """Apply the profile to the loaded configuration (server.toml object)."""
         if "plugins" not in config:
             config["plugins"] = {}
         if "models" not in config["plugins"]:

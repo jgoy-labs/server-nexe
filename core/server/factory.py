@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/server/factory.py
-Description: Application Factory pattern per creació i configuració de FastAPI app Nexe 0.8.
+Description: Application Factory pattern for creating and configuring the Nexe 0.8 FastAPI app.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -66,7 +66,7 @@ def create_app(project_root: Optional[Path] = None, force_reload: bool = False) 
       logger.debug("Returning cached app instance (fast path <10ms)")
       return _app_instance
     else:
-      logger.warning(f"project_root changed ({_cache_project_root} → {project_root}), rebuilding app")
+      logger.warning("project_root changed (%s → %s), rebuilding app", _cache_project_root, project_root)
       force_reload = True
 
   with _app_lock:
@@ -80,7 +80,7 @@ def create_app(project_root: Optional[Path] = None, force_reload: bool = False) 
       _cache_project_root = None
 
     logger.info("Building FastAPI app...")
-    logger.info(f"  force_reload={force_reload}")
+    logger.info("  force_reload=%s", force_reload)
     start_time = time.time()
 
     i18n, config, module_manager = setup_i18n_and_config(project_root)

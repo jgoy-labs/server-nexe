@@ -134,7 +134,7 @@ def _track_cwd_fallback_usage():
   for frame in reversed(stack[:-3]):
     if 'get_repo_root' not in frame.name:
       caller = f"{frame.filename}:{frame.lineno} ({frame.name})"
-      logger.warning(f"[METRIC] CWD fallback used from: {caller}")
+      logger.warning("[METRIC] CWD fallback used from: %s", caller)
       break
 
 __all__ = [

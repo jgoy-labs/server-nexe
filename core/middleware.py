@@ -221,42 +221,38 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
       csrf_secret = secrets.token_hex(32)
       logger.warning("CSRF_SECRET not configured. Using temporary secret (dev mode only)")
 
-  try:
-    from starlette_csrf import CSRFMiddleware
+  from starlette_csrf import CSRFMiddleware
 
-    # SECURITY FIX: cookie_secure only if HTTPS is actually used.
-    # Avoids issues in development environments or local tests without SSL.
-    # Note: is_prod already defined above
-    server_config = config.get('core', {}).get('server', {})
-    
-    # Default True in prod, False in dev, but disabled if known local host
-    # unless explicitly forced in config.
-    host = server_config.get('host', '127.0.0.1')
-    is_local = host in ("localhost", "127.0.0.1", "::1")
-    # 0.0.0.0 binds ALL interfaces including public — treat as non-local
+  # SECURITY FIX: cookie_secure only if HTTPS is actually used.
+  # Avoids issues in development environments or local tests without SSL.
+  # Note: is_prod already defined above
+  server_config = config.get('core', {}).get('server', {})
 
-    cookie_secure = is_prod and not is_local
-    
-    # Allow manual override if user has SSL locally or not in prod
-    if "csrf_cookie_secure" in server_config:
-      cookie_secure = server_config["csrf_cookie_secure"]
-      logger.info(f"  CSRF cookie_secure manual override: {cookie_secure}")
+  # Default True in prod, False in dev, but disabled if known local host
+  # unless explicitly forced in config.
+  host = server_config.get('host', '127.0.0.1')
+  is_local = host in ("localhost", "127.0.0.1", "::1")
+  # 0.0.0.0 binds ALL interfaces including public — treat as non-local
 
-    # Use pre-compiled patterns from module level (more efficient)
-    # header_name must match the JS fetchWithCsrf() which sends 'X-CSRF-Token'
-    app.add_middleware(
-      CSRFMiddleware,
-      secret=csrf_secret,
-      cookie_name="nexe_csrf_token",
-      header_name="X-CSRF-Token",
-      cookie_secure=cookie_secure,
-      cookie_samesite="strict",
-      exempt_urls=_CSRF_EXEMPT_PATTERNS,  # Pre-compiled at module load
-    )
-    logger.info("CSRF protection enabled")
-  except ImportError:
-    logger.warning("starlette-csrf not installed. CSRF protection disabled.")
-    logger.warning("  Install with: pip install starlette-csrf")
+  cookie_secure = is_prod and not is_local
+
+  # Allow manual override if user has SSL locally or not in prod
+  if "csrf_cookie_secure" in server_config:
+    cookie_secure = server_config["csrf_cookie_secure"]
+    logger.info(f"  CSRF cookie_secure manual override: {cookie_secure}")
+
+  # Use pre-compiled patterns from module level (more efficient)
+  # header_name must match the JS fetchWithCsrf() which sends 'X-CSRF-Token'
+  app.add_middleware(
+    CSRFMiddleware,
+    secret=csrf_secret,
+    cookie_name="nexe_csrf_token",
+    header_name="X-CSRF-Token",
+    cookie_secure=cookie_secure,
+    cookie_samesite="strict",
+    exempt_urls=_CSRF_EXEMPT_PATTERNS,  # Pre-compiled at module load
+  )
+  logger.info("CSRF protection enabled")
 
 def setup_trusted_hosts(app: FastAPI, config: Dict[str, Any]) -> None:
   """

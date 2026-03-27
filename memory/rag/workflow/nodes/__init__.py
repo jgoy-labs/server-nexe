@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/workflow/nodes/__init__.py
-Description: Exporta nodes de workflow del mòdul RAG.
+Description: Exports RAG module workflow nodes.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

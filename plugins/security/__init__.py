@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/__init__.py
-Description: Package marker del mòdul Security Nexe 0.8. Exposa versió i nom per auto-descobriment per system_testing.
+Description: Package marker for the Security Nexe 0.8 module. Exposes version and name for auto-discovery by system_testing.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

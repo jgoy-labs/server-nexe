@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/cli.py
-Description: CLI Central Nexe 0.8 - Aplicació Click principal.
+Description: Central Nexe CLI 0.8 - Main Click application.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

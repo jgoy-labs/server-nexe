@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy
 Location: personality/loading/loader.py
-Description: Façade global per càrrega dinàmica de mòduls Nexe.
+Description: Global facade for dynamic Nexe module loading.
 
 DEPRECATION NOTICE:
   This loader is maintained for backwards compatibility.
@@ -195,15 +195,15 @@ class ModuleLoader:
       return False
 
   def get_loaded_modules(self) -> List[str]:
-    """Retorna llista de mòduls carregats"""
+    """Return list of loaded modules."""
     return list(self._loaded_modules.keys())
 
   def is_module_loaded(self, module_name: str) -> bool:
-    """Comprova si un mòdul està carregat"""
+    """Check if a module is loaded."""
     return module_name in self._loaded_modules
 
   def get_module_instance(self, module_name: str) -> Optional[Any]:
-    """Obté instància d'un mòdul carregat"""
+    """Get the instance of a loaded module."""
     return self._loaded_modules.get(module_name)
 
   async def reload_module(self, module_info: ModuleInfo) -> Any:
@@ -228,7 +228,7 @@ class ModuleLoader:
     return await self.load_module(module_info)
 
   def get_loader_stats(self) -> Dict[str, Any]:
-    """Obté estadístiques del loader"""
+    """Get loader statistics."""
     import sys
 
     return {

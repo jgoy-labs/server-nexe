@@ -31,7 +31,7 @@ class LoaderPatterns:
     ]
 
   def get_init_methods(self) -> list:
-    """Retorna llista de mètodes d'inicialització possibles"""
+    """Return list of possible initialization method names."""
     return [
       get_message(self.i18n, 'loader.init_methods.init'),
       get_message(self.i18n, 'loader.init_methods.initialize'),
@@ -41,7 +41,7 @@ class LoaderPatterns:
     ]
 
   def get_cleanup_methods(self) -> list:
-    """Retorna llista de mètodes de neteja possibles"""
+    """Return list of possible cleanup method names."""
     return [
       get_message(self.i18n, 'loader.cleanup_methods.cleanup'),
       get_message(self.i18n, 'loader.cleanup_methods.shutdown'),
@@ -60,7 +60,7 @@ class LoaderPatterns:
     ]
 
   def get_common_attributes(self) -> list:
-    """Retorna llista d'atributs comuns per buscar instàncies"""
+    """Return list of common attributes to search for instances."""
     return [
       get_message(self.i18n, 'loader.common_attributes.app'),
       get_message(self.i18n, 'loader.common_attributes.router'),
@@ -88,10 +88,10 @@ class LoaderPatterns:
     )
 
   def get_python_extension(self) -> str:
-    """Retorna extensió de fitxers Python"""
+    """Return the Python file extension."""
     return get_message(self.i18n, 'loader.file_extensions.python')
 
   def get_module_name_prefix(self, module_name: str, file_id: int) -> str:
-    """Genera prefix únic per nom de mòdul"""
+    """Generate a unique prefix for a module name."""
     return get_message(self.i18n, 'loader.module_name_prefix',
              module_name=module_name, id=file_id)

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/client.py
-Description: Client HTTP per comunicar-se amb el servidor Nexe.
+Description: HTTP client for communicating with the Nexe server.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -24,10 +24,10 @@ ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
 
 class NexeClient:
   """
-  Client HTTP per comunicar-se amb el servidor Nexe.
+  HTTP client for communicating with the Nexe server.
 
-  Usa urllib per evitar dependències externes.
-  Suporta HTTPS amb certificats self-signed.
+  Uses urllib to avoid external dependencies.
+  Supports HTTPS with self-signed certificates.
   """
 
   def __init__(self, config: Optional[NexeConfig] = None):

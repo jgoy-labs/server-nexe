@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/i18n/__init__.py
-Description: Package marker per sistema d'internacionalització. Exporta I18nManager (base)
+Description: Package marker for the internationalization system. Exports I18nManager (base)
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

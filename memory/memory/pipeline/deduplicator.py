@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/pipeline/deduplicator.py
-Description: Deduplicator - Detecció de contingut duplicat amb SHA256.
+Description: Deduplicator - Duplicate content detection using SHA256.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -66,7 +66,7 @@ class Deduplicator:
     logger.info("Deduplicator cache cleared")
 
   def get_stats(self) -> dict:
-    """Obtenir estadístiques del deduplicator"""
+    """Get deduplicator statistics."""
     return {
       "seen_ids_count": len(self._seen_ids)
     }

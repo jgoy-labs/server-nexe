@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_extractor.py
-Description: Extractor d'instàncies principals de mòduls. Cerca en ordre: factory functions
+Description: Module main instance extractor. Searches in order: factory functions
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -20,7 +20,7 @@ from personality._logger import get_logger
 logger = get_logger(__name__)
 
 class ModuleExtractor:
-  """Extreu instància principal d'un mòdul"""
+  """Extract the main instance from a module."""
 
   def __init__(self, i18n=None):
     self.i18n = i18n
@@ -29,22 +29,22 @@ class ModuleExtractor:
   def extract_module_instance(self, module: Any, module_name: str,
                 module_info: ModuleInfo) -> Any:
     """
-    Extreu instància principal d'un mòdul carregat.
+    Extract the main instance from a loaded module.
 
-    Cerca en aquest ordre:
+    Search order:
     1. Factory functions (create_module, create_app, etc.)
-    2. Atribut amb nom del mòdul
-    3. Atributs comuns (app, router, api, module)
-    4. Classe principal
-    5. El mòdul mateix com a fallback
+    2. Attribute with the module name
+    3. Common attributes (app, router, api, module)
+    4. Main class
+    5. The module itself as fallback
 
     Args:
-      module: Mòdul carregat
-      module_name: Nom del mòdul
-      module_info: Informació del mòdul
+      module: Loaded module
+      module_name: Module name
+      module_info: Module information
 
     Returns:
-      Instància del mòdul
+      Module instance
     """
     instance = self._try_factory_functions(module, module_name, module_info)
     if instance is not None:
@@ -91,7 +91,7 @@ class ModuleExtractor:
     return None
 
   def _try_module_name_attribute(self, module: Any, module_name: str) -> Any:
-    """Cerca atribut amb nom del mòdul"""
+    """Search for an attribute matching the module name."""
     if hasattr(module, module_name):
       attr = getattr(module, module_name)
       if attr is not None:
@@ -122,7 +122,7 @@ class ModuleExtractor:
     return None
 
   def _try_main_class(self, module: Any, module_name: str) -> Any:
-    """Cerca classe principal del mòdul"""
+    """Search for the main class of the module."""
     module_classes = []
     for name in dir(module):
       if name.startswith('_'):

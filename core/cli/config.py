@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/config.py
-Description: Configuració del CLI Central Nexe.
+Description: Configuration for Central Nexe CLI.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -30,11 +30,11 @@ DEFAULT_VERIFY_SSL = False
 @dataclass
 class NexeConfig:
   """
-  Configuració del CLI Nexe.
+  Nexe CLI configuration.
 
-  Cerca config a:
+  Looks for config at:
   1. ~/.nexe/config.yaml
-  2. Variables d'entorn NEXE_*
+  2. NEXE_* environment variables
   3. Defaults
   """
 

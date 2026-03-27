@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/manifest.py
-Description: Manifest FastAPI del CLI Central Nexe. Defineix router públic /cli amb endpoints
+Description: FastAPI manifest for Central Nexe CLI. Defines public /cli router with endpoints
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -41,7 +41,7 @@ async def cli_health():
       }
     })
   except Exception as e:
-    logger.error(f"Error checking CLI health: {e}")
+    logger.error("Error checking CLI health: %s", e)
     return JSONResponse(
       content={
         "name": "cli",
@@ -79,7 +79,7 @@ async def cli_info():
       "api_path": "/ui-control/api/clis"
     })
   except Exception as e:
-    logger.error(f"Error getting CLI info: {e}")
+    logger.error("Error getting CLI info: %s", e)
     return JSONResponse(
       content={"error": str(e)},
       status_code=500
@@ -95,7 +95,7 @@ async def cli_list():
     router = CLIRouter()
     return JSONResponse(content=router.get_all_clis_dict())
   except Exception as e:
-    logger.error(f"Error listing CLIs: {e}")
+    logger.error("Error listing CLIs: %s", e)
     return JSONResponse(
       content={"error": str(e)},
       status_code=500

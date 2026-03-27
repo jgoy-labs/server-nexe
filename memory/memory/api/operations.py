@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/api/operations.py
-Description: Façana per operacions Memory API.
+Description: Facade for Memory API operations.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

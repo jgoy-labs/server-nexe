@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/api/__init__.py
-Description: Memory API Façade - API genèrica per mòduls externs.
+Description: Memory API Facade - Generic API for external modules.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -119,7 +119,7 @@ class MemoryAPI:
       return True
 
     try:
-      # Usar mode local si qdrant_path està definit, sinó connectar a URL
+      # Use local mode if qdrant_path is set, otherwise connect to URL
       if self.qdrant_path:
         self._qdrant = QdrantClient(path=str(self.qdrant_path))
         logger.info("MemoryAPI initialized (path=%s)", self.qdrant_path)
@@ -150,7 +150,7 @@ class MemoryAPI:
     logger.info("Embedder initialized: %s", self.embedding_model)
 
   def _ensure_initialized(self):
-    """Verificar que l'API està inicialitzada."""
+    """Verify that the API is initialized."""
     if not self._initialized:
       raise RuntimeError("MemoryAPI not initialized. Call initialize() first.")
 
@@ -296,7 +296,7 @@ class MemoryAPI:
     )
 
   async def get(self, doc_id: str, collection: str) -> Optional[Document]:
-    """Obté un document per ID."""
+    """Get a document by ID."""
     self._ensure_initialized()
 
     if not await self.collection_exists(collection):

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/ollama_module/workflow/nodes/ollama_node.py
-Description: OllamaNode per Workflow Engine. Node d'integració amb Ollama LLM amb prompt templating, streaming i config management.
+Description: OllamaNode for Workflow Engine. Ollama LLM integration node with prompt templating, streaming and config management.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -218,7 +218,7 @@ class OllamaNode(Node):
           type="number",
           required=False,
           default=None,
-          description="Màxim tokens a generar (None = il·limitat)"
+          description="Maximum tokens to generate (None = unlimited)"
         ),
         NodeInput(
           name="system",

@@ -93,24 +93,24 @@ try:
   from memory.rag.api.v1 import router as rag_v1_router
   router_v1.include_router(rag_v1_router)
 except ImportError as e:
-  logger.warning(f"Could not import RAG API v1: {e}")
+  logger.warning("Could not import RAG API v1: %s", e)
 
 try:
   from memory.embeddings.api.v1 import router as embeddings_v1_router
   router_v1.include_router(embeddings_v1_router)
 except ImportError as e:
-  logger.warning(f"Could not import Embeddings API v1: {e}")
+  logger.warning("Could not import Embeddings API v1: %s", e)
 
 try:
   from memory.rag_sources.file.api.v1 import router as documents_v1_router
   router_v1.include_router(documents_v1_router)
 except ImportError as e:
-  logger.warning(f"Could not import Documents API v1: {e}")
+  logger.warning("Could not import Documents API v1: %s", e)
 
 try:
   from memory.memory.api.v1 import router as memory_v1_router
   router_v1.include_router(memory_v1_router)
 except ImportError as e:
-  logger.warning(f"Could not import Memory API v1: {e}")
+  logger.warning("Could not import Memory API v1: %s", e)
 
 __all__ = ['router_v1']

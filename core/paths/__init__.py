@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/paths/__init__.py
-Description: Façade públic per mòdul paths - unifica accés a detecció Nexe root,
+Description: Public facade for the paths module - unifies access to Nexe root detection,
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

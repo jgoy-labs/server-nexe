@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/workflow/__init__.py
-Description: Submòdul workflow del mòdul RAG.
+Description: Workflow submodule of the RAG module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

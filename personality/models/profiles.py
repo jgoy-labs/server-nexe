@@ -38,7 +38,7 @@ class ModelProfile(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-# Definició de perfils
+# Profile definitions
 PROFILES = {
     HardwareTier.MICRO: ModelProfile(
         tier=HardwareTier.MICRO,
@@ -53,7 +53,7 @@ PROFILES = {
     ),
     HardwareTier.CONSUMER: ModelProfile(
         tier=HardwareTier.CONSUMER,
-        primary_model="phi3.5",         # Phi-3.5 Mini 3.8B — ràpid, bo seguint instruccions
+        primary_model="phi3.5",         # Phi-3.5 Mini 3.8B — fast, good at following instructions
         secondary_model="llama3.2:3b",
         embedding_model="paraphrase-multilingual-mpnet-base-v2",
         preferred_engine=EngineType.MLX,
@@ -64,24 +64,24 @@ PROFILES = {
     ),
     HardwareTier.PRO: ModelProfile(
         tier=HardwareTier.PRO,
-        primary_model="llama3.1:8b",    # Llama 3.1 8B — millor qualitat per 16-32GB
+        primary_model="llama3.1:8b",    # Llama 3.1 8B — better quality for 16-32GB
         secondary_model="mistral:7b",
         embedding_model="paraphrase-multilingual-mpnet-base-v2",
         preferred_engine=EngineType.MLX,
         max_tokens=4096,
         context_window=32768,
-        description="Potència per desenvolupadors i creatius (16-32GB).",
+        description="Power for developers and creatives (16-32GB).",
         mlx_model_id="mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
     ),
     HardwareTier.ULTRA: ModelProfile(
         tier=HardwareTier.ULTRA,
-        primary_model="llama3.1:70b",   # Llama 3.1 70B — qualitat màxima per >32GB
+        primary_model="llama3.1:70b",   # Llama 3.1 70B — maximum quality for >32GB
         secondary_model="mixtral:8x7b",
         embedding_model="paraphrase-multilingual-mpnet-base-v2",
         preferred_engine=EngineType.MLX,
         max_tokens=8192,
         context_window=65536,
-        description="Màxima capacitat per models grans (>32GB).",
+        description="Maximum capacity for large models (>32GB).",
         mlx_model_id="mlx-community/Meta-Llama-3.1-70B-Instruct-4bit"
     )
 }

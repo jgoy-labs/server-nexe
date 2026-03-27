@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/discovery.py
-Description: Component de descobriment de mòduls.
+Description: Module discovery component.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

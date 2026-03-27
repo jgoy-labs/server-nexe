@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/auth_dependencies.py
-Description: FastAPI Dependencies per autenticació Nexe amb suport dual-key.
+Description: FastAPI dependencies for Nexe authentication with dual-key support.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -144,7 +144,7 @@ async def require_api_key(
         security_logger.log_event(
           event_type=SecurityEventType.AUTH_SUCCESS,
           severity=SecuritySeverity.INFO,
-          message="Autenticació amb clau API primària",
+          message="Authentication with primary API key",
           details={
             "key_type": "primary",
             "expires_at": keys_config.primary.expires_at.isoformat() if keys_config.primary.expires_at else None
@@ -164,10 +164,10 @@ async def require_api_key(
         security_logger.log_event(
           event_type=SecurityEventType.AUTH_SUCCESS,
           severity=SecuritySeverity.WARNING,
-          message="Autenticació amb clau API secundària (deprecated)",
+          message="Authentication with secondary API key (deprecated)",
           details={
             "key_type": "secondary",
-            "action_required": "MIGRAR A CLAU PRIMÀRIA",
+            "action_required": "MIGRATE TO PRIMARY KEY",
             "expires_at": keys_config.secondary.expires_at.isoformat() if keys_config.secondary.expires_at else None
           }
         )

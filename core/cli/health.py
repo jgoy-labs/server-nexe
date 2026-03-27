@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/health.py
-Description: Health check interface per CLI Central Nexe. Facade que prevé imports
+Description: Health check interface for Central Nexe CLI. Facade that prevents imports
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

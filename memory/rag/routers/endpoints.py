@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/routers/endpoints.py
-Description: API endpoints per mòdul RAG.
+Description: API endpoints for the RAG module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -129,7 +129,7 @@ async def search_endpoint(request: Dict[str, Any]):
 ALLOWED_UPLOAD_EXTENSIONS = {".txt", ".md", ".pdf", ".csv", ".json", ".rst"}
 
 async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}"):
-  """Pujar fitxer al RAG amb auto-detecció de format."""
+  """Upload a file to the RAG with auto-format detection."""
   try:
     try:
       meta_dict = json.loads(metadata)
@@ -208,7 +208,7 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
     raise HTTPException(status_code=500, detail="Internal server error processing file.")
 
 async def health_endpoint():
-  """Health check del mòdul RAG."""
+  """Health check for the RAG module."""
   from ..module import RAGModule
 
   try:
@@ -222,7 +222,7 @@ async def health_endpoint():
     return JSONResponse(content={"status": "error", "error": str(e)}, status_code=500)
 
 async def info_endpoint():
-  """Informació del mòdul RAG."""
+  """Information about the RAG module."""
   from ..module import RAGModule
 
   try:
@@ -234,7 +234,7 @@ async def info_endpoint():
     raise HTTPException(status_code=500, detail="Internal server error.")
 
 async def files_stats_endpoint():
-  """Obtenir estadístiques dels fitxers pujats."""
+  """Get statistics for uploaded files."""
   try:
     file_rag = _get_file_rag()
     metrics = file_rag.get_metrics()

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy
 Location: personality/module_manager/config_manager.py
-Description: Gestor de configuració i manifests Nexe.
+Description: Nexe configuration and manifest manager.
              Uses core/config.py for unified config loading.
 
 www.jgoy.net · https://server-nexe.org
@@ -79,7 +79,7 @@ class ConfigManager:
       return fallback.format(**kwargs) if kwargs else fallback
 
   def _find_config_path(self, config_path: Optional[Path]) -> Path:
-    """Cerca fitxer de configuració"""
+    """Search for the configuration file."""
     if config_path:
       try:
         return Path(config_path).resolve(strict=True)
@@ -104,7 +104,7 @@ class ConfigManager:
     return Path("personality/server.toml")
 
   def _load_config(self) -> None:
-    """Carrega configuració des del fitxer TOML usant core/config."""
+    """Load configuration from the TOML file using core/config."""
     try:
       # Use unified config loading from core/config.py
       self._config = core_load_config(
@@ -117,7 +117,7 @@ class ConfigManager:
       self._config = {}
 
   def get_config(self) -> Dict[str, Any]:
-    """Retorna la configuració completa"""
+    """Return the full configuration."""
     return self._config
 
   def find_manifest(self, module_name: str, module_path: Path) -> Path:
@@ -249,7 +249,7 @@ class ConfigManager:
     if module_path and '/core/' in str(module_path):
       module_info.enabled = True
       msg = self._t("module_manager.core_module_always_enabled",
-             "Mòdul {name} és CORE, sempre habilitat",
+             "Module {name} is CORE, always enabled",
              name=module_info.name)
       logger.info(msg)
     elif isinstance(module_config, dict) and 'enabled' in module_config:

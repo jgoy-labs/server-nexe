@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/integration/route_manager.py
-Description: Gestor dinàmic de rutes FastAPI per mòduls. Registra i elimina routers/apps
+Description: Dynamic FastAPI route manager for modules. Registers and removes routers/apps
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -248,7 +248,7 @@ class RouteManager:
       return removed_count
   
   def get_all_registered_routes(self) -> Dict[str, List[Dict[str, Any]]]:
-    """Retorna totes les rutes registrades per mòdul"""
+    """Return all registered routes grouped by module."""
     with self._lock:
       return self._module_routes.copy()
   

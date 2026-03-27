@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/utils/api_client.py
-Description: Client HTTP simple per comunicar CLI amb Server Nexe.
+Description: Simple HTTP client for CLI communication with Server Nexe.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 CLI_HEALTH_TIMEOUT = float(os.getenv('NEXE_CLI_HEALTH_TIMEOUT', '5.0'))
 
 class NexeAPIClient:
-    """Client per interactuar amb la API de Nexe Server."""
+    """Client to interact with the Nexe Server API."""
     
     
     def __init__(self, base_url: str = None):
@@ -52,7 +52,7 @@ class NexeAPIClient:
             self.headers["x-api-key"] = self.api_key
         
     async def is_server_running(self) -> bool:
-        """Comprova si el servidor està actiu."""
+        """Check whether the server is running."""
         try:
             async with httpx.AsyncClient(timeout=CLI_HEALTH_TIMEOUT) as client:
                 resp = await client.get(f"{self.base_url}/health")
@@ -67,10 +67,10 @@ class NexeAPIClient:
         rag: bool = False
     ) -> AsyncGenerator[str, None]:
         """
-        Fa request a /chat/completions amb streaming.
-        
-        Nota: Normalment OpenAI format usa /v1/chat/completions.
-        Aquí assumim que Nexe exposa un endpoint similar o el router de xat unificat.
+        Send a streaming request to /v1/chat/completions.
+
+        Note: Standard OpenAI format uses /v1/chat/completions.
+        Assumes Nexe exposes a compatible endpoint or unified chat router.
         """
         
         # OpenAI-compatible chat completions endpoint
@@ -89,7 +89,7 @@ class NexeAPIClient:
                 async with client.stream("POST", url, json=payload, headers=self.headers) as response:
                     if response.status_code != 200:
                         error_msg = await response.aread()
-                        yield f"Error del servidor ({response.status_code}): {error_msg.decode()}"
+                        yield f"Server error ({response.status_code}): {error_msg.decode()}"
                         return
 
                     async for line in response.aiter_lines():
@@ -104,25 +104,25 @@ class NexeAPIClient:
                             
                             try:
                                 data = json.loads(data_str)
-                                # Extreure content delta (compatible OpenAI)
+                                # Extract content delta (OpenAI-compatible)
                                 delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
                                 if delta:
                                     yield delta
                             except json.JSONDecodeError:
                                 pass
             except httpx.ConnectError:
-                yield "❌ Error: No s'ha pogut connectar al servidor Nexe. Assegura't que './nexe go' està corrent."
+                yield "❌ Error: Could not connect to Nexe server. Make sure './nexe go' is running."
 
     async def upload_file(self, file_path: str, session_id: str) -> Optional[Dict[str, Any]]:
-        """Puja un fitxer a la sessió via /ui/upload (multipart form)."""
+        """Upload a file to the session via /ui/upload (multipart form)."""
         url = f"{self.base_url}/ui/upload"
-        # No Content-Type header per multipart (httpx el genera automàticament)
+        # No Content-Type header for multipart (httpx generates it automatically)
         headers = {k: v for k, v in self.headers.items() if k.lower() != "content-type"}
         try:
             with open(file_path, "rb") as f:
                 content = f.read()
         except Exception as e:
-            logger.error(f"Cannot read file {file_path}: {e}")
+            logger.error("Cannot read file %s: %s", file_path, e)
             return None
 
         filename = Path(file_path).name
@@ -136,14 +136,14 @@ class NexeAPIClient:
                 )
                 if response.status_code == 200:
                     return response.json()
-                logger.error(f"Upload error {response.status_code}: {response.text}")
+                logger.error("Upload error %s: %s", response.status_code, response.text)
                 return None
             except Exception as e:
-                logger.error(f"Upload request error: {e}")
+                logger.error("Upload request error: %s", e)
                 return None
 
     async def create_ui_session(self) -> Optional[str]:
-        """Crea una nova sessió al pipeline UI del servidor."""
+        """Create a new session in the server UI pipeline."""
         url = f"{self.base_url}/ui/session/new"
         async with httpx.AsyncClient(timeout=10.0) as client:
             try:
@@ -151,7 +151,7 @@ class NexeAPIClient:
                 if response.status_code == 200:
                     return response.json().get("session_id")
             except Exception as e:
-                logger.error(f"Create session error: {e}")
+                logger.error("Create session error: %s", e)
         return None
 
     # Regex for inline metadata markers: \x00[KEY:VALUE]\x00
@@ -160,8 +160,8 @@ class NexeAPIClient:
 
     async def chat_ui_stream(self, message: str, session_id: str) -> AsyncGenerator[Union[str, dict], None]:
         """
-        Fa request a /ui/chat (mateix pipeline que el UI web) amb streaming.
-        Usa sessions servidor, RAG nexe_chat_memory, detecció d'intencions.
+        Send a streaming request to /ui/chat (same pipeline as the web UI).
+        Uses server sessions, nexe_chat_memory RAG, and intent detection.
 
         Yields:
             str: text chunks
@@ -175,7 +175,7 @@ class NexeAPIClient:
                 async with client.stream("POST", url, json=payload, headers=self.headers) as response:
                     if response.status_code != 200:
                         error_msg = await response.aread()
-                        yield f"Error del servidor ({response.status_code}): {error_msg.decode()}"
+                        yield f"Server error ({response.status_code}): {error_msg.decode()}"
                         return
                     async for chunk in response.aiter_bytes():
                         text = chunk.decode("utf-8", errors="replace")
@@ -196,14 +196,14 @@ class NexeAPIClient:
                         if text:
                             yield text
             except httpx.ConnectError:
-                yield "❌ Error: No s'ha pogut connectar al servidor Nexe. Assegura't que './nexe go' està corrent."
+                yield "❌ Error: Could not connect to Nexe server. Make sure './nexe go' is running."
 
     async def chat_offline(self, messages: list, engine: str) -> str:
-        """Simulació offline si el server no hi és (no recomanat per CLI interactiu complex)."""
+        """Offline fallback when the server is unavailable (not recommended for interactive CLI)."""
         return "❌ Offline mode not supported yet. Please run './nexe go' first."
 
     async def memory_store(self, content: str, metadata: Optional[Dict] = None) -> bool:
-        """Guarda contingut a la memòria (RAG)."""
+        """Store content in RAG memory."""
         url = f"{self.base_url}/v1/memory/store"
         payload = {
             "content": content,
@@ -214,11 +214,11 @@ class NexeAPIClient:
                 response = await client.post(url, json=payload, headers=self.headers)
                 return response.status_code in (200, 201)
             except Exception as e:
-                logger.error(f"Memory store error: {e}")
+                logger.error("Memory store error: %s", e)
                 return False
 
     async def memory_search(self, query: str, limit: int = 3) -> list:
-        """Cerca a la memòria (RAG)."""
+        """Search RAG memory."""
         url = f"{self.base_url}/v1/memory/search"
         payload = {
             "query": query,
@@ -232,5 +232,5 @@ class NexeAPIClient:
                     return data.get("results", [])
                 return []
             except Exception as e:
-                logger.error(f"Memory search error: {e}")
+                logger.error("Memory search error: %s", e)
                 return []

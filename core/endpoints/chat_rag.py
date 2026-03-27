@@ -94,7 +94,7 @@ async def build_rag_context(
                     )
                     if doc_results:
                         all_results.extend(doc_results)
-                        logger.info(f"RAG: Found {len(doc_results)} docs from documentation")
+                        logger.info("RAG: Found %d docs from documentation", len(doc_results))
             except Exception as e:
                 logger.debug("RAG docs search failed: %s", e)
 
@@ -110,7 +110,7 @@ async def build_rag_context(
                     )
                     if knowledge_results:
                         all_results.extend(knowledge_results)
-                        logger.info(f"RAG: Found {len(knowledge_results)} docs from user knowledge")
+                        logger.info("RAG: Found %d docs from user knowledge", len(knowledge_results))
             except Exception as e:
                 logger.debug("RAG knowledge search failed: %s", e)
 
@@ -125,7 +125,7 @@ async def build_rag_context(
                     )
                     if mem_results:
                         all_results.extend(mem_results)
-                        logger.info(f"RAG: Found {len(mem_results)} docs from chat memory")
+                        logger.info("RAG: Found %d docs from chat memory", len(mem_results))
             except Exception as e:
                 logger.debug("RAG chat memory search failed: %s", e)
 
@@ -144,9 +144,9 @@ async def build_rag_context(
                     source = getattr(r, 'metadata', {}).get('source', 'unknown') if hasattr(r, 'metadata') else 'unknown'
                     context_parts.append(f"[Font: {source}]\n{r.text}")
                 context_text = "\n\n".join(context_parts)
-                logger.info(f"RAG Context found (MemoryAPI): {len(context_text)} chars, {len(all_results)} results")
+                logger.info("RAG Context found (MemoryAPI): %d chars, %d results", len(context_text), len(all_results))
         except Exception as mem_err:
-            logger.debug(f"MemoryAPI not available: {mem_err}")
+            logger.debug("MemoryAPI not available: %s", mem_err)
 
             # Fallback to RAG module if MemoryAPI fails
             rag_module = None
@@ -162,14 +162,14 @@ async def build_rag_context(
                         context_text = "\n".join([_rag_result_to_text(r) for r in results])
                     else:
                         context_text = str(results)
-                    logger.info(f"RAG Context found (RAG module): {len(context_text)} chars")
+                    logger.info("RAG Context found (RAG module): %d chars", len(context_text))
                 else:
                     logger.info("RAG Search returned no results")
             else:
                 logger.debug("No RAG source available")
 
     except Exception as e:
-        logger.error(f"RAG Error: {e}")
+        logger.error("RAG Error: %s", e)
         # Continue without context rather than failing
 
     return context_text

@@ -22,18 +22,18 @@ logger = logging.getLogger(__name__)
 # ============================================
 # MEMORY MANAGEMENT CONFIG
 # ============================================
-MAX_MEMORY_ENTRIES = 500          # Màxim d'entrades a nexe_web_ui
+MAX_MEMORY_ENTRIES = 500          # Maximum entries in nexe_web_ui
 SIMILARITY_THRESHOLD = 0.80       # No guardar si similaritat > 80% (baixat de 0.85)
-PRUNE_BATCH_SIZE = 30             # Quantes entrades eliminar quan es supera el límit
+PRUNE_BATCH_SIZE = 30             # How many entries to remove when the limit is exceeded
 TEMPORAL_DECAY_DAYS = 7           # Dies per aplicar decay temporal (recent = bonus)
-MIN_IMPORTANCE_SCORE = 0.3        # Mínim per guardar (filtra xerrameca)
+MIN_IMPORTANCE_SCORE = 0.3        # Minimum to save (filters out chatter)
 
 # Memory types for structured storage
 MEMORY_TYPES = {
-    "fact": 1.0,           # Dades estables (nom, feina) - màxima retenció
-    "preference": 0.9,     # Preferències de l'usuari
-    "contextual": 0.6,     # Info situacional ("avui estic cansat")
-    "conversation": 0.4,   # Logs de conversa purs
+    "fact": 1.0,           # Stable data (name, job) - maximum retention
+    "preference": 0.9,     # User preferences
+    "contextual": 0.6,     # Situational info ("I'm tired today")
+    "conversation": 0.4,   # Pure conversation logs
 }
 
 # Intent patterns for memory operations (Catalan + Spanish + English)
@@ -48,7 +48,7 @@ SAVE_TRIGGERS = [
     r'^recorda\s+que\s+',
     r'^guarda\s+que\s+',
     r'^apunta\s+que\s+',
-    # Catalan — amb "memòria" en qualsevol posició
+    # Catalan — with "memòria" anywhere in the message
     r'\bguardar?\b.*mem[oò]ria',
     r'\brecordar?\b.*mem[oò]ria',
     r'\bdesa\b.*mem[oò]ria',
@@ -111,7 +111,7 @@ DELETE_TRIGGERS = [
     r',?\s*(ho\s+)?pots\s+esborrar\??$',
     r',?\s*oblida[\-\']?ho\??$',
     r',?\s*esborra[\-\']?ho\??$',
-    # Catalan — amb "memòria"
+    # Catalan — with "memòria"
     r'\boblidar?\b.*mem[oò]ria',
     r'\besborrar?\b.*mem[oò]ria',
     r'\beliminar?\b.*mem[oò]ria',
@@ -260,7 +260,7 @@ class MemoryHelper:
                 top_k=1
             )
             if results and len(results) > 0:
-                # Si similaritat > threshold, és duplicat
+                # If similarity > threshold, it is a duplicate
                 if results[0].score >= SIMILARITY_THRESHOLD:
                     logger.debug(f"Duplicate detected (score={results[0].score:.2f}), skipping save")
                     return True
@@ -497,11 +497,11 @@ class MemoryHelper:
             if pat.match(msg):
                 return {"success": True, "document_id": None, "message": "⏭️ Salutació"}
 
-        # Filtrar preguntes (no són fets, contaminen la memòria)
+        # Filter out questions (not facts, they pollute memory)
         if msg.rstrip('?').strip() != msg.rstrip() and '?' in msg:
             return {"success": True, "document_id": None, "message": "⏭️ Pregunta"}
 
-        # Filtrar comandes de memòria (save/delete/recall ja es gestionen amb intent)
+        # Filter out memory commands (save/delete/recall are handled via intent)
         intent, _ = self.detect_intent(msg)
         if intent in ('save', 'delete'):
             return {"success": True, "document_id": None, "message": "⏭️ Comanda memòria"}
@@ -747,7 +747,7 @@ class MemoryHelper:
 
 # Global instances (module-level singletons)
 _memory_helper = MemoryHelper()
-_memory_api_instance = None  # Singleton per evitar re-crear el model cada petició
+_memory_api_instance = None  # Singleton to avoid re-creating the model on each request
 
 def get_memory_helper() -> MemoryHelper:
     """Get global memory helper instance."""

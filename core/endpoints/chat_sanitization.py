@@ -78,7 +78,7 @@ def _sanitize_rag_context(context: str) -> str:
     sanitized = context[:MAX_RAG_CONTEXT_LENGTH]
     if len(context) > MAX_RAG_CONTEXT_LENGTH:
         sanitized += "\n[...truncat]"
-        logger.warning(f"RAG context truncated from {len(context)} to {MAX_RAG_CONTEXT_LENGTH} chars")
+        logger.warning("RAG context truncated from %d to %d chars", len(context), MAX_RAG_CONTEXT_LENGTH)
 
     # 2. Remove prompt injection patterns
     for pattern in _RAG_INJECTION_PATTERNS:

@@ -42,7 +42,7 @@ def setup_signal_handlers():
   """
   def signal_handler(signum, frame):
     signame = signal.Signals(signum).name
-    logger.info(f"Received signal {signame}, shutting down server...")
+    logger.info("Received signal %s, shutting down server...", signame)
     sys.exit(0)
 
   signal.signal(signal.SIGINT, signal_handler)

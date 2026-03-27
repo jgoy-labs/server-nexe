@@ -100,7 +100,7 @@ def load_config(
         if i18n:
             logger.info(i18n.t("server_core.startup.loading_config", path=str(found_path)))
         else:
-            logger.info(f"Loading config from: {found_path}")
+            logger.info("Loading config from: %s", found_path)
 
         with open(found_path, 'rb') as f:
             config = tomllib.load(f)
@@ -120,7 +120,7 @@ def load_config(
             logger.error(i18n.t("server_core.startup.config_error",
                                 path=str(found_path), error=str(e)))
         else:
-            logger.error(f"Error loading config from {found_path}: {e}")
+            logger.error("Error loading config from %s: %s", found_path, e)
         return copy.deepcopy(DEFAULT_CONFIG)
 
 
@@ -138,10 +138,10 @@ def save_config(config: Dict[str, Any], config_path: Path) -> bool:
     try:
         with open(config_path, 'w', encoding='utf-8') as f:
             toml.dump(config, f)
-        logger.info(f"Config saved to {config_path}")
+        logger.info("Config saved to %s", config_path)
         return True
     except Exception as e:
-        logger.error(f"Error saving config to {config_path}: {e}")
+        logger.error("Error saving config to %s: %s", config_path, e)
         return False
 
 

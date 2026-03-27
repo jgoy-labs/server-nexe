@@ -48,12 +48,12 @@ def sanitize_messages_for_alternation(messages: List[Dict]) -> List[Dict]:
         else:
             merged.append({"role": role, "content": content})
 
-    # Assegurar que comença amb "user"
+    # Ensure it starts with "user"
     if merged and merged[0]["role"] != "user":
-        # Si comença amb assistant, afegir un user placeholder
+        # If it starts with assistant, insert a user placeholder
         merged.insert(0, {"role": "user", "content": "(continua)"})
 
-    # Verificar alternança i corregir si cal
+    # Verify alternation and correct if needed
     sanitized = []
     expected_role = "user"
 
@@ -67,8 +67,8 @@ def sanitize_messages_for_alternation(messages: List[Dict]) -> List[Dict]:
             sanitized.append(msg)
             expected_role = "user"
         elif msg["role"] == "user" and expected_role == "assistant":
-            # Falta un assistant, inserir placeholder
-            sanitized.append({"role": "assistant", "content": "(entès)"})
+            # Missing assistant turn, insert placeholder
+            sanitized.append({"role": "assistant", "content": "(understood)"})
             sanitized.append(msg)
             expected_role = "assistant"
 
@@ -93,7 +93,7 @@ def prepare_tokens(
     Returns:
         Tuple: (full_tokens, cache_lookup_tokens, all_messages, all_cache_messages)
     """
-    # Sanititzar missatges per alternança estricta (Gemma, etc.)
+    # Sanitize messages for strict role alternation (Gemma, etc.)
     sanitized_messages = sanitize_messages_for_alternation(messages)
     sanitized_cache_messages = sanitize_messages_for_alternation(messages_for_cache)
 
@@ -101,7 +101,7 @@ def prepare_tokens(
     all_messages = [{"role": "system", "content": system}] + sanitized_messages
     all_cache_messages = [{"role": "system", "content": system}] + sanitized_cache_messages
 
-    # Tokenitzar per generació (amb memòria)
+    # Tokenize for generation (with memory context)
     prompt_text = tokenizer.apply_chat_template(
         all_messages,
         add_generation_prompt=True,
@@ -112,7 +112,7 @@ def prepare_tokens(
     else:
         full_tokens = list(prompt_text)
 
-    # Tokenitzar per cache lookup (nets, sense memòria)
+    # Tokenize for cache lookup (clean, without memory context)
     cache_prompt_text = tokenizer.apply_chat_template(
         all_cache_messages,
         add_generation_prompt=True,
@@ -184,11 +184,11 @@ def determine_tokens_to_process(
     new_tokens = full_tokens[cached_token_count:] if cached_token_count > 0 else full_tokens
 
     if prefix_reused and len(new_tokens) == 0:
-        # Exact match (rar): processar mínim 1 token per estabilitat
+        # Exact match (rare): process at least 1 token for stability
         tokens_to_process = mx.array([full_tokens[0]])
         logger.debug("MLXChatNode: exact match, processing BOS token (~10ms overhead)")
     elif prefix_reused:
-        # Prefix match: processar només tokens nous (AMB memòria)
+        # Prefix match: process only new tokens (WITH memory context)
         tokens_to_process = mx.array(new_tokens)
         logger.debug(
             "MLXChatNode: prefix match, processing %d new tokens (with memory)",
@@ -242,7 +242,7 @@ def run_streaming_generation(
     # Post-processarem la resposta per tallar quan apareguin
     _is_gpt_oss = "gpt-oss" in model_path.lower()
     if _is_gpt_oss:
-        # GPT-OSS: només EOS real — els tags <|...|> són canals interns
+        # GPT-OSS: only real EOS — <|...|> tags are internal channels
         STOP_SEQUENCES = ["<|endoftext|>"]
     else:
         STOP_SEQUENCES = [
@@ -264,7 +264,7 @@ def run_streaming_generation(
         prompt_cache=cached_kv
     )
 
-    # Primera iteració: prefill + primer token
+    # First iteration: prefill + first token
     stop_detected = False
     try:
         first_response = next(generator)
@@ -296,7 +296,7 @@ def run_streaming_generation(
     except StopIteration:
         logger.warning("MLXChatNode: generator empty, no prefill cache saved")
 
-    # Continuar amb la resta de la generació
+    # Continue with the rest of generation
     if not stop_detected:
         for response in generator:
             if response.text:
@@ -357,7 +357,7 @@ def save_cache_post_generation(
     try:
         # Verificar si ja acaba amb assistant (pels placeholders)
         if all_cache_messages and all_cache_messages[-1].get("role") == "assistant":
-            # Fusionar amb l'últim assistant
+            # Merge with the last assistant message
             cache_messages_with_response = all_cache_messages[:-1] + [{
                 "role": "assistant",
                 "content": all_cache_messages[-1]["content"] + "\n\n" + text
@@ -367,7 +367,7 @@ def save_cache_post_generation(
             # Afegir normalment
             cache_messages_with_response = all_cache_messages + [{"role": "assistant", "content": text}]
 
-        # Tokenitzar SENSE generation_prompt (el proper torn el tindrà)
+        # Tokenize WITHOUT generation_prompt (the next turn will have it)
         cache_text = tokenizer.apply_chat_template(
             cache_messages_with_response,
             add_generation_prompt=False,
@@ -415,7 +415,7 @@ def extract_metrics(
     if last_response:
         # actual_prefill = tokens realment processats (no cached)
         if prefix_reused and len(new_tokens) == 0:
-            actual_prefill_tokens = 1  # Exact match: només BOS token
+            actual_prefill_tokens = 1  # Exact match: BOS token only
         elif prefix_reused:
             actual_prefill_tokens = len(new_tokens)
         else:

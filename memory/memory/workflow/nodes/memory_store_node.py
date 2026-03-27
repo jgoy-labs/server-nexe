@@ -71,14 +71,14 @@ class MemoryStoreNode(Node):
           name="source",
           type="string",
           required=False,
-          description="Font de la memòria",
+          description="Memory source",
           default="workflow"
         ),
         NodeInput(
           name="ttl_seconds",
           type="number",
           required=False,
-          description="Time-to-live en segons (default: 1800)",
+          description="Time-to-live in seconds (default: 1800)",
           default=1800
         )
       ],

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy
 Location: plugins/web_ui_module/file_handler.py
-Description: Gestió de fitxers pujats (upload) per la UI web
+Description: Uploaded file handling (upload) for the web UI
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -53,11 +53,11 @@ class FileHandler:
 
         if ext not in SUPPORTED_EXTENSIONS:
             supported = ", ".join(SUPPORTED_EXTENSIONS)
-            return False, f"Format no suportat. Formats vàlids: {supported}"
+            return False, f"Unsupported format. Valid formats: {supported}"
 
         if file_size > MAX_FILE_SIZE:
             max_mb = MAX_FILE_SIZE / (1024 * 1024)
-            return False, f"Fitxer massa gran. Màxim: {max_mb}MB"
+            return False, f"File too large. Maximum: {max_mb}MB"
 
         return True, ""
 
@@ -167,14 +167,14 @@ class FileHandler:
         while start < len(text):
             end = start + chunk_size
 
-            # Intentar tallar en un salt de línia o punt
+            # Try to cut at a newline or period
             if end < len(text):
-                # Buscar últim salt de línia dins del chunk
+                # Find last newline within the chunk
                 last_newline = text.rfind('\n', start, end)
                 if last_newline > start + chunk_size // 2:
                     end = last_newline + 1
                 else:
-                    # Buscar últim punt
+                    # Find last period
                     last_period = text.rfind('. ', start, end)
                     if last_period > start + chunk_size // 2:
                         end = last_period + 2
@@ -183,7 +183,7 @@ class FileHandler:
             if chunk:
                 chunks.append(chunk)
 
-            # Avançar amb overlap
+            # Advance with overlap
             start = end - overlap if end < len(text) else len(text)
 
         avg = sum(len(c) for c in chunks) // len(chunks) if chunks else 0

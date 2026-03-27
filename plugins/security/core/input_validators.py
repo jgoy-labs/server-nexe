@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/input_validators.py
-Description: Façade de validadors. Re-exporta funcions de detecció i sanitització.
+Description: Validator facade. Re-exports detection and sanitisation functions.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/registry.py
-Description: Registry central de mòduls carregats. Indexa mòduls, endpoints, metadata i
+Description: Central registry of loaded modules. Indexes modules, endpoints, metadata and
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

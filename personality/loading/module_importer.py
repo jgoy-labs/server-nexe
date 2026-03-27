@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_importer.py
-Description: Importador dinàmic de mòduls Python. Carrega fitxers via importlib.util amb
+Description: Dynamic Python module importer. Loads files via importlib.util with
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -21,7 +21,7 @@ from personality._logger import get_logger
 logger = get_logger(__name__)
 
 class ModuleImporter:
-  """Importa mòduls Python dinàmicament"""
+  """Import Python modules dynamically."""
 
   def __init__(self, i18n=None):
     self.i18n = i18n

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/paths.py
-Description: FAÇADE per al mòdul paths - Re-export de core.paths/
+Description: FACADE for the paths module - Re-export from core.paths/
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

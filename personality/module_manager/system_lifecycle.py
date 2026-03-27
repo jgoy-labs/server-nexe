@@ -94,9 +94,9 @@ class SystemLifecycleManager:
     logger.info(msg, component="system_lifecycle")
 
   def is_running(self) -> bool:
-    """Retorna si el sistema està en execució"""
+    """Return whether the system is running."""
     return self._running
 
   def _get_lock(self):
-    """Obté el lock del context (serà injectat)"""
+    """Get the context lock (will be injected)."""
     return None

@@ -70,7 +70,7 @@ class ModelPool:
             reused=True si s'ha reutilitzat instància existent (cache hit)
         """
         with self._lock:
-            # Cas 1: Sessió existent amb mateix hash → reutilitzar
+            # Case 1: Existing session with same hash → reuse
             if session_id in self._instances:
                 if self._hashes[session_id] == system_hash:
                     logger.debug(
@@ -80,14 +80,14 @@ class ModelPool:
                     self._touch_lru(session_id)
                     return self._instances[session_id], True  # Cache HIT
                 else:
-                    # Hash canviat → reset sessió
+                    # Hash changed → reset session
                     logger.info(
                         "ModelPool: hash changed for session %s, resetting",
                         session_id[:8]
                     )
                     self._destroy(session_id)
 
-            # Cas 2: Eviction LRU si massa sessions
+            # Case 2: LRU eviction if too many sessions
             while len(self._instances) >= self.config.max_sessions:
                 if not self._lru:
                     break
@@ -98,7 +98,7 @@ class ModelPool:
                 )
                 self._destroy(oldest)
 
-            # Cas 3: Crear nova instància
+            # Case 3: Create new instance
             logger.info(
                 "ModelPool: creating new instance for session %s",
                 session_id[:8]
@@ -141,12 +141,12 @@ class ModelPool:
         instance = Llama(
             model_path=self.config.model_path,
             n_ctx=self.config.n_ctx,
-            n_batch=self.config.n_batch,          # IMPORTANT: més alt = més tok/s
+            n_batch=self.config.n_batch,          # IMPORTANT: higher = more tok/s
             n_gpu_layers=self.config.n_gpu_layers,
             n_threads=self.config.n_threads,
             chat_format=self.config.chat_format,
-            use_mlock=self.config.use_mlock,      # Mantenir a RAM
-            use_mmap=self.config.use_mmap,        # Memory-map eficient
+            use_mlock=self.config.use_mlock,      # Keep in RAM
+            use_mmap=self.config.use_mmap,        # Efficient memory-map
             flash_attn=self.config.flash_attn,    # Flash attention
             verbose=False,  # Silenciar output de llama.cpp
         )
@@ -175,7 +175,7 @@ class ModelPool:
         if session_id in self._instances:
             instance = self._instances[session_id]
 
-            # Tancar instància si suporta close()
+            # Close instance if it supports close()
             if hasattr(instance, "close"):
                 try:
                     instance.close()
@@ -190,7 +190,7 @@ class ModelPool:
             if session_id in self._lru:
                 self._lru.remove(session_id)
 
-            # Forçar garbage collection per alliberar VRAM
+            # Force garbage collection to free VRAM
             gc.collect()
 
             logger.debug(
@@ -199,7 +199,7 @@ class ModelPool:
             )
 
     def destroy_all(self) -> None:
-        """Destrueix totes les instàncies (cleanup)."""
+        """Destroy all instances (cleanup)."""
         with self._lock:
             session_ids = list(self._instances.keys())
             for session_id in session_ids:
@@ -212,7 +212,7 @@ class ModelPool:
         return len(self._instances)
 
     def get_stats(self) -> Dict:
-        """Retorna estadístiques del pool."""
+        """Return pool statistics."""
         return {
             "active_sessions": len(self._instances),
             "max_sessions": self.config.max_sessions,

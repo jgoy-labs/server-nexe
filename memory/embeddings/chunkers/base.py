@@ -131,7 +131,7 @@ class ChunkingResult:
     }
 
   def get_texts(self) -> List[str]:
-    """Retorna només els textos dels chunks."""
+    """Return only the text content of the chunks."""
     return [c.text for c in self.chunks]
 
 class BaseChunker(ABC):
@@ -225,11 +225,11 @@ class BaseChunker(ABC):
     pass
 
   def get_config(self) -> Dict[str, Any]:
-    """Retorna configuració actual."""
+    """Return the current configuration."""
     return self.config.copy()
 
   def set_config(self, **config: Any) -> None:
-    """Actualitza configuració."""
+    """Update configuration values."""
     for key, value in config.items():
       if key in self.config:
         self.config[key] = value

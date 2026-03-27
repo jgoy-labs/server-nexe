@@ -49,7 +49,7 @@ from .chat_engines.ollama import (
     _forward_to_ollama,
     _ollama_stream_generator,
     _ollama_tags_cache,
-    _TAGS_CACHE_TTL,
+    TAGS_CACHE_TTL,
     _OLLAMA_STREAM_TIMEOUT,
     _OLLAMA_ERRORS,
 )
@@ -82,7 +82,7 @@ def _get_system_prompt(app_state: Any, lang: str = None) -> str:
     tier = os.getenv("NEXE_PROMPT_TIER", "full")
     lang_short = lang.split("-")[0].lower()  # "ca-ES" → "ca"
 
-    # Busca prompt específic → fallback full → fallback en → mínim
+    # Look up specific prompt → fallback to full → fallback to en → minimum
     for key in [f"{lang_short}_{tier}", f"{lang_short}_full", "en_full"]:
         prompt = prompts.get(key, "")
         if prompt:
@@ -93,8 +93,8 @@ def _get_system_prompt(app_state: Any, lang: str = None) -> str:
 
 # --- Main Endpoint ---
 
-@router.post("/chat/completions", dependencies=[Depends(require_api_key)], summary="Chat completion amb suport RAG i auto-routing d'engines")
-async def chat_completions(request: ChatCompletionRequest, req: Request, background_tasks: BackgroundTasks):
+@router.post("/chat/completions", dependencies=[Depends(require_api_key)], summary="Chat completion with RAG support and engine auto-routing")
+async def chat_completions(request: ChatCompletionRequest, req: Request, background_tasks: BackgroundTasks) -> Any:
     """
     Unified Chat Completion endpoint.
     Supports:

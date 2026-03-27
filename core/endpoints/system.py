@@ -143,7 +143,7 @@ async def send_restart_signal():
 
   try:
     supervisor_pid = get_supervisor_pid()
-    logger.info(f"Sending SIGHUP to supervisor PID {supervisor_pid}")
+    logger.info("Sending SIGHUP to supervisor PID %d", supervisor_pid)
 
     os.kill(supervisor_pid, signal.SIGHUP)
 
@@ -182,7 +182,7 @@ async def restart_server(
 
     background_tasks.add_task(send_restart_signal)
 
-    logger.info(f"Restart initiated by authenticated user (supervisor PID: {supervisor_pid})")
+    logger.info("Restart initiated by authenticated user (supervisor PID: %d)", supervisor_pid)
 
     return {
       "status": "restart_initiated",

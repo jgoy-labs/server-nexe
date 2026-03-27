@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/routers/ui.py
-Description: UI endpoints per mòdul RAG.
+Description: UI endpoints for the RAG module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -50,7 +50,7 @@ async def serve_ui():
   return HTMLResponse(content=content)
 
 async def serve_assets(path: str):
-  """Serveix els assets estàtics (CSS)."""
+  """Serve static assets (CSS)."""
   from plugins.security.core.validators import validate_safe_path
 
   assets_base = UI_PATH / "assets"

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/workflow/nodes/memory_recall_node.py
-Description: Node per recuperar memòries de Memory.
+Description: Node for retrieving memories from Memory.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -42,11 +42,11 @@ class MemoryRecallNode(Node):
   """
 
   def get_metadata(self) -> NodeMetadata:
-    """Metadata del node."""
+    """Node metadata."""
     return NodeMetadata(
       id="memory.recall",
       name="Memory Recall",
-      description="Recupera memòries (FlashMemory → SQLite → Qdrant)",
+      description="Retrieve memories (FlashMemory → SQLite → Qdrant)",
       category="nexe_native",
       version="1.1.0",
       inputs=[
@@ -54,36 +54,36 @@ class MemoryRecallNode(Node):
           name="limit",
           type="number",
           required=False,
-          description="Nombre màxim d'entrades",
+          description="Maximum number of entries",
           default=10
         ),
         NodeInput(
           name="entry_type",
           type="string",
           required=False,
-          description="Tipus: episodic, semantic, o null per tots",
+          description="Type: episodic, semantic, or null for all",
           default="episodic"
         ),
         NodeInput(
           name="query",
           type="string",
           required=False,
-          description="Query per cerca semàntica a Qdrant",
+          description="Query for semantic search in Qdrant",
           default=None
         ),
         NodeInput(
           name="person_id",
           type="string",
           required=False,
-          description="ID de la persona",
+          description="Person ID",
           default="default"
         )
       ],
       outputs=[
-        NodeOutput(name="context", type="string", description="Context per LLM"),
-        NodeOutput(name="entries", type="array", description="Entrades trobades"),
-        NodeOutput(name="entry_count", type="number", description="Nombre d'entrades"),
-        NodeOutput(name="source", type="string", description="Font: flash/sqlite/qdrant")
+        NodeOutput(name="context", type="string", description="Context for LLM"),
+        NodeOutput(name="entries", type="array", description="Found entries"),
+        NodeOutput(name="entry_count", type="number", description="Number of entries"),
+        NodeOutput(name="source", type="string", description="Source: flash/sqlite/qdrant")
       ]
     )
 
@@ -253,11 +253,11 @@ class MemoryRecallNode(Node):
     return None
 
   def _format_context(self, entries: List[MemoryEntry]) -> str:
-    """Formata entries com a context per LLM."""
+    """Format entries as context for LLM."""
     if not entries:
       return ""
 
-    parts = ["[Memòries recents]"]
+    parts = ["[Recent memories]"]
     for entry in entries[:10]:
       timestamp = entry.timestamp.strftime("%Y-%m-%d %H:%M") if entry.timestamp else "?"
       content = entry.content[:300] + "..." if len(entry.content) > 300 else entry.content

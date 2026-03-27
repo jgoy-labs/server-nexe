@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/module.py
-Description: Classe principal del mòdul CLI Central Nexe. Gestiona la descoberta
+Description: Main class of the Central Nexe CLI module. Handles discovery
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

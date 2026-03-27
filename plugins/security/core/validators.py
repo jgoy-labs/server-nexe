@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/validators.py
-Description: Validadors de seguretat. Prevé path traversal, RCE i validació de comandes.
+Description: Security validators. Prevents path traversal, RCE and command validation.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

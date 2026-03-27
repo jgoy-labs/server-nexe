@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/shared/cache.py
-Description: Implementació de MultiLevelCache (L1 Memory + L2 SQLite).
+Description: MultiLevelCache implementation (L1 Memory + L2 SQLite).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -52,8 +52,8 @@ class MultiLevelCache:
         self.l2_ttl_seconds = l2_ttl_hours * 3600
         self._lock = asyncio.Lock()
         
-        # L1 Cache (Diccionari Python amb LRU simple via OrderedDict seria millor, 
-        # però usarem dict + neteja simple per simplicitat)
+        # L1 Cache (Python dict; OrderedDict with LRU would be better,
+        # but using plain dict + simple eviction for simplicity)
         self.l1_cache: Dict[str, Any] = {}
         
         # L2 Cache Configuration
@@ -92,7 +92,7 @@ class MultiLevelCache:
         self._init_l2()
 
     def _init_l2(self):
-        """Inicialitza la connexió i esquema de SQLite."""
+        """Initialize the SQLite connection and schema."""
         try:
             self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
             self.conn.execute("PRAGMA busy_timeout = 5000")
@@ -107,7 +107,7 @@ class MultiLevelCache:
                 )
             """)
             
-            # Índex per neteja eficient
+            # Index for efficient cleanup
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_last_accessed ON cache(last_accessed)
             """)
@@ -132,7 +132,7 @@ class MultiLevelCache:
         return json.loads(raw)
 
     def _generate_key(self, text: str, model: str, version: str) -> str:
-        """Genera una clau única hash del contingut."""
+        """Generate a unique hash key from the content."""
         content = f"{text}|{model}|{version}"
         return hashlib.sha256(content.encode()).hexdigest()
 
@@ -180,7 +180,7 @@ class MultiLevelCache:
                         # Promocionar a L1
                         self._add_to_l1(key, data)
 
-                        # Actualitzar last_accessed async (o sync ràpid)
+                        # Update last_accessed (async or fast sync)
                         cursor.execute(
                             "UPDATE cache SET last_accessed = ? WHERE key = ?",
                             (time.time(), key)
@@ -222,8 +222,8 @@ class MultiLevelCache:
                     )
                     self.conn.commit()
 
-                    # Check cleanup (probabilitat baixa o per size)
-                    # Implementació simplificada: No fem cleanup a cada write per rendiment
+                    # Check cleanup (low probability or by size)
+                    # Simplified: skip cleanup on every write for performance
 
                 except Exception as e:
                     logger.warning(f"L2 cache write error: {e}")
@@ -233,8 +233,8 @@ class MultiLevelCache:
     def _add_to_l1(self, key: str, data: Any):
         """Afegeix a L1 gestionant capacitat."""
         if len(self.l1_cache) >= self.l1_max_size:
-            # Eliminar el primer (FIFO simple per ara)
-            # En Python 3.7+ diccionaris són ordenats per inserció
+            # Remove the first entry (simple FIFO for now)
+            # In Python 3.7+ dicts are ordered by insertion
             try:
                 first_key = next(iter(self.l1_cache))
                 del self.l1_cache[first_key]

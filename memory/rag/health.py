@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/health.py
-Description: Health checks per mòdul RAG.
+Description: Health checks for the RAG module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -16,37 +16,19 @@ import psutil
 import structlog
 
 from personality.i18n import get_i18n
+from memory.shared.health_helpers import (
+  check_module_initialized as _shared_check_module_initialized,
+  aggregate_health_checks
+)
 
 logger = structlog.get_logger()
 
-def check_module_initialized(module) -> Dict[str, Any]:
-  """Check 1: Verifica que el mòdul està inicialitzat."""
-  i18n = get_i18n()
-  try:
-    is_init = module._initialized
-    message = (
-      i18n.t("rag.health.initialized_ok", "Module initialized correctly")
-      if is_init
-      else i18n.t("rag.health.not_initialized", "Module not initialized")
-    )
-    return {
-      "name": "module_initialized",
-      "status": "pass" if is_init else "fail",
-      "message": message
-    }
-  except Exception as e:
-    return {
-      "name": "module_initialized",
-      "status": "fail",
-      "message": i18n.t(
-        "rag.health.init_check_error",
-        "Error checking initialization: {error}",
-        error=str(e)
-      )
-    }
+def check_module_initialized(module: Any) -> Dict[str, Any]:
+  """Check 1: Verify that the module is initialized."""
+  return _shared_check_module_initialized(module, "rag")
 
 def check_qdrant_available() -> Dict[str, Any]:
-  """Check 2: Verifica Qdrant disponible."""
+  """Check 2: Verify Qdrant is available."""
   i18n = get_i18n()
   try:
     pass
@@ -75,7 +57,7 @@ def check_qdrant_available() -> Dict[str, Any]:
     }
 
 def check_storage_paths() -> Dict[str, Any]:
-  """Check 3: Verifica storage paths existeixen (storage/vectors/)."""
+  """Check 3: Verify storage paths exist (storage/vectors/)."""
   i18n = get_i18n()
   try:
     from core.paths import get_repo_root
@@ -114,7 +96,7 @@ def check_storage_paths() -> Dict[str, Any]:
     }
 
 def check_transaction_ledger() -> Dict[str, Any]:
-  """Check 4: Verifica TransactionLedger accessible."""
+  """Check 4: Verify TransactionLedger is accessible."""
   i18n = get_i18n()
   try:
     pass
@@ -137,7 +119,7 @@ def check_transaction_ledger() -> Dict[str, Any]:
     }
 
 def check_write_coordinator() -> Dict[str, Any]:
-  """Check 5: Verifica WriteCoordinator functional."""
+  """Check 5: Verify WriteCoordinator is functional."""
   i18n = get_i18n()
   try:
     pass
@@ -160,7 +142,7 @@ def check_write_coordinator() -> Dict[str, Any]:
     }
 
 def check_rag_sources(module) -> Dict[str, Any]:
-  """Check: Verifica health de cada RAG source."""
+  """Check: Verify health of each RAG source."""
   i18n = get_i18n()
   try:
     if not module._initialized:
@@ -215,7 +197,7 @@ def check_rag_sources(module) -> Dict[str, Any]:
     }
 
 def check_disk_space(min_gb: float = 10.0) -> Dict[str, Any]:
-  """Check 6: Verifica disk space disponible (>10GB)."""
+  """Check 6: Verify available disk space (>10GB)."""
   i18n = get_i18n()
   try:
     disk = psutil.disk_usage(".")
@@ -286,16 +268,6 @@ def check_health(module) -> Dict[str, Any]:
     checks.append(check_write_coordinator())
     checks.append(check_disk_space(min_gb=10.0))
 
-    has_fail = any(c["status"] == "fail" for c in checks)
-    has_warn = any(c["status"] == "warn" for c in checks)
-
-    if has_fail:
-      overall_status = "unhealthy"
-    elif has_warn:
-      overall_status = "degraded"
-    else:
-      overall_status = "healthy"
-
     metadata = {
       "module_id": module.module_id,
       "name": module.name,
@@ -305,22 +277,7 @@ def check_health(module) -> Dict[str, Any]:
       "stats": module._stats if module._initialized else {}
     }
 
-    result = {
-      "status": overall_status,
-      "checks": checks,
-      "metadata": metadata
-    }
-
-    logger.info(
-      "rag_health_check_complete",
-      status=overall_status,
-      checks_total=len(checks),
-      checks_pass=sum(1 for c in checks if c["status"] == "pass"),
-      checks_warn=sum(1 for c in checks if c["status"] == "warn"),
-      checks_fail=sum(1 for c in checks if c["status"] == "fail")
-    )
-
-    return result
+    return aggregate_health_checks(checks, "rag", metadata)
 
   except Exception as e:
     logger.error(

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_finder.py
-Description: Cercador de fitxers API per mòduls Nexe. Busca fitxers segons patrons prioritaris
+Description: API file finder for Nexe modules. Searches files by priority patterns
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -19,7 +19,7 @@ from personality._logger import get_logger
 logger = get_logger(__name__)
 
 class ModuleFinder:
-  """Cerca fitxers API per a mòduls"""
+  """Find API files for modules."""
 
   def __init__(self, i18n=None):
     self.i18n = i18n

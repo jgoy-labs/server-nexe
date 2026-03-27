@@ -113,16 +113,16 @@ class TestCheckCacheDirectories:
 
     def test_not_writable_cache(self, tmp_path):
         """Lines 169-170, 183-191: cache not writable."""
-        mock_path = MagicMock()
-        mock_path.mkdir = MagicMock()
-        mock_test_file = MagicMock()
-        mock_test_file.write_text.side_effect = PermissionError("denied")
-        mock_path.__truediv__ = MagicMock(return_value=mock_test_file)
-        mock_path.__str__ = MagicMock(return_value="/fake/path")
-
-        with patch("memory.embeddings.health.Path", return_value=mock_path):
-            result = check_cache_directories()
-        assert result["status"] == "fail"
+        import os
+        cache_dir = tmp_path / "storage" / "vectors" / "embeddings" / "cache" / "l2"
+        cache_dir.mkdir(parents=True)
+        os.chmod(cache_dir, 0o444)
+        try:
+            with patch("core.paths.get_repo_root", return_value=tmp_path):
+                result = check_cache_directories()
+            assert result["status"] == "fail"
+        finally:
+            os.chmod(cache_dir, 0o755)
 
     def test_cache_exception(self):
         """Lines 193-201: exception during cache check."""

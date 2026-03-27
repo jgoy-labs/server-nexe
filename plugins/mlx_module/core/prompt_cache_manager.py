@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CacheEntry:
-    """Entrada de cache amb comptador de referències."""
+    """Cache entry with a reference counter."""
     prompt_cache: List[Any]
     count: int
 
@@ -87,23 +87,23 @@ class MLXPromptCacheManager:
         last_cache_index = -1
         index = 0
 
-        # Recórrer el trie seguint els tokens
+        # Traverse the trie following the tokens
         while index < len(tokens) and tokens[index] in current:
             current = current[tokens[index]]
             if "cache" in current:
                 last_cache_index = index
             index += 1
 
-        # Coincidència exacta
+        # Exact match
         if last_cache_index == len(tokens) - 1:
             return SearchResult(model, tokens, None, None, 0)
 
-        # Cerca cache més curt (prefix vàlid)
+        # Search for shorter cache (valid prefix)
         shorter = None
         if last_cache_index >= 0:
             shorter = tokens[:last_cache_index + 1]
 
-        # Cerca cache més llarg (si hi ha continuació)
+        # Search for longer cache (if there is a continuation)
         longer = None
         common_prefix = index
         if index > 0 and last_cache_index < 0:
@@ -194,7 +194,7 @@ class MLXPromptCacheManager:
         with self._lock:
             result = self._search(model, tokens)
 
-            # Coincidència exacta
+            # Exact match
             if result.exact is not None:
                 cache_entry = self._extract(result.model, result.exact)
                 logger.debug(
@@ -203,7 +203,7 @@ class MLXPromptCacheManager:
                 )
                 return cache_entry.prompt_cache, []
 
-            # Prefix més curt
+            # Shorter prefix
             if result.shorter is not None:
                 cache_entry = self._extract(result.model, result.shorter)
                 prefix_len = len(result.shorter)
@@ -214,7 +214,7 @@ class MLXPromptCacheManager:
                 )
                 return cache_entry.prompt_cache, rest
 
-            # Prefix més llarg (cal trim)
+            # Longer prefix (trim required)
             if result.longer is not None:
                 try:
                     from mlx_lm.models.cache import (
@@ -237,7 +237,7 @@ class MLXPromptCacheManager:
                 except Exception as e:
                     logger.warning("MLXPromptCacheManager: trim failed: %s", e)
 
-            # Cap coincidència
+            # No match
             logger.debug("MLXPromptCacheManager: no match, %d tokens", len(tokens))
             return None, tokens
 
@@ -312,7 +312,7 @@ class MLXPromptCacheManager:
             logger.info("MLXPromptCacheManager: cleared all caches")
 
     def get_stats(self) -> Dict[str, Any]:
-        """Retorna estadístiques del cache."""
+        """Return cache statistics."""
         with self._lock:
             return {
                 "models": list(self._cache.keys()),
