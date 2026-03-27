@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 class ModuleStatus(Enum):
-  """Estat d'un mòdul"""
+  """Module status."""
   DISCOVERED = "discovered"
   LOADING = "loading"
   INITIALIZED = "initialized"
@@ -25,7 +25,7 @@ class ModuleStatus(Enum):
   STOPPED = "stopped"
 
 class HealthStatus(Enum):
-  """Estat de salut d'un mòdul"""
+  """Module health status."""
   HEALTHY = "healthy"
   DEGRADED = "degraded"
   UNHEALTHY = "unhealthy"
@@ -34,10 +34,10 @@ class HealthStatus(Enum):
 @dataclass
 class ModuleMetadata:
   """
-  Metadades d'un mòdul - llegides del manifest.toml
+  Module metadata - read from manifest.toml.
 
-  El kernel només necessita aquestes dades per gestionar el mòdul.
-  No sap què fa el mòdul internament.
+  The kernel only needs this data to manage the module.
+  It has no knowledge of the module's internal workings.
   """
   name: str
   version: str
@@ -59,7 +59,7 @@ class ModuleMetadata:
 
 @dataclass
 class HealthResult:
-  """Resultat d'un health check"""
+  """Health check result."""
   status: HealthStatus
   message: str = ""
   details: Dict[str, Any] = field(default_factory=dict)
@@ -76,10 +76,10 @@ class HealthResult:
 @dataclass
 class SpecialistInfo:
   """
-  Informació d'un specialist que el mòdul exposa o consumeix.
+  Information about a specialist that the module exposes or consumes.
 
-  Els specialists són components especialitzats que poden ser
-  "enviats" a altres mòduls o "rebuts" d'altres mòduls.
+  Specialists are specialized components that can be
+  "sent" to other modules or "received" from other modules.
   """
   name: str
   specialist_type: str
@@ -89,12 +89,12 @@ class SpecialistInfo:
 @runtime_checkable
 class NexeModule(Protocol):
   """
-  Protocol que defineix la interfície mínima d'un mòdul Nexe.
+  Protocol defining the minimum interface for a Nexe module.
 
-  El kernel carrega mòduls que implementen aquest protocol.
-  És "runtime_checkable" per permetre isinstance() checks.
+  The kernel loads modules that implement this protocol.
+  It is "runtime_checkable" to allow isinstance() checks.
 
-  Exemple d'implementació:
+  Implementation example:
 
   ```python
   class MyModule:
@@ -103,7 +103,7 @@ class NexeModule(Protocol):
       return ModuleMetadata(
         name="my_module",
         version="1.0.0",
-        description="El meu mòdul"
+        description="My module"
       )
 
     async def initialize(self, context: Dict[str, Any]) -> bool:
@@ -115,7 +115,7 @@ class NexeModule(Protocol):
     async def health_check(self) -> HealthResult:
       return HealthResult(
         status=HealthStatus.HEALTHY,
-        message="Tot bé"
+        message="All good"
       )
   ```
   """
@@ -123,127 +123,127 @@ class NexeModule(Protocol):
   @property
   def metadata(self) -> ModuleMetadata:
     """
-    Retorna les metadades del mòdul.
+    Return the module's metadata.
 
-    Aquestes dades s'utilitzen per:
-    - Registrar el mòdul al sistema
-    - Comprovar dependències
-    - Mostrar informació a l'usuari
+    This data is used to:
+    - Register the module in the system
+    - Check dependencies
+    - Display information to the user
     """
     ...
 
   async def initialize(self, context: Dict[str, Any]) -> bool:
     """
-    Inicialitza el mòdul amb el context proporcionat.
+    Initialize the module with the provided context.
 
     Args:
-      context: Diccionari amb serveis i configuració:
-        - config: Configuració global
-        - services: Serveis compartits (logger, i18n, etc.)
-        - modules: Referència al registry de mòduls
+      context: Dictionary with services and configuration:
+        - config: Global configuration
+        - services: Shared services (logger, i18n, etc.)
+        - modules: Reference to the module registry
 
     Returns:
-      True si la inicialització és correcta, False si falla
+      True if initialization succeeds, False if it fails
     """
     ...
 
   async def shutdown(self) -> None:
     """
-    Atura el mòdul i allibera recursos.
+    Shut down the module and release resources.
 
-    S'executa quan el servidor s'atura o el mòdul es descarrega.
-    Ha de ser idempotent (es pot cridar múltiples vegades).
+    Called when the server stops or the module is unloaded.
+    Must be idempotent (can be called multiple times).
     """
     ...
 
   async def health_check(self) -> HealthResult:
     """
-    Retorna l'estat de salut del mòdul.
+    Return the module's health status.
 
-    S'executa periòdicament pel sistema de monitoring.
-    Ha de ser ràpid (< 1 segon).
+    Called periodically by the monitoring system.
+    Must be fast (< 1 second).
 
     Returns:
-      HealthResult amb l'estat actual
+      HealthResult with the current status
     """
     ...
 
 @runtime_checkable
 class NexeModuleWithRouter(NexeModule, Protocol):
   """
-  Extensió de NexeModule per mòduls que exposen endpoints HTTP.
+  Extension of NexeModule for modules that expose HTTP endpoints.
 
-  Els mòduls amb router es registren automàticament a FastAPI.
+  Modules with a router are automatically registered in FastAPI.
   """
 
   def get_router(self) -> Any:
     """
-    Retorna el router FastAPI del mòdul.
+    Return the module's FastAPI router.
 
     Returns:
-      fastapi.APIRouter amb els endpoints del mòdul
+      fastapi.APIRouter with the module's endpoints
     """
     ...
 
   def get_router_prefix(self) -> str:
     """
-    Retorna el prefix URL pel router.
+    Return the URL prefix for the router.
 
-    Exemple: "/security" -> endpoints a /security/*
+    Example: "/security" -> endpoints at /security/*
 
     Returns:
-      String amb el prefix (ha de començar amb /)
+      String with the prefix (must start with /)
     """
     ...
 
 @runtime_checkable
 class NexeModuleWithSpecialists(NexeModule, Protocol):
   """
-  Extensió de NexeModule per mòduls que gestionen specialists.
+  Extension of NexeModule for modules that manage specialists.
 
-  Els specialists són components que poden ser enviats a altres
-  mòduls o rebuts d'altres mòduls per fer checks o accions.
+  Specialists are components that can be sent to other
+  modules or received from other modules to perform checks or actions.
   """
 
   def get_outgoing_specialists(self) -> List[SpecialistInfo]:
     """
-    Retorna la llista de specialists que aquest mòdul envia.
+    Return the list of specialists that this module sends.
 
-    Exemple: El mòdul Security pot enviar un SecuritySpecialist
-    Mòduls que ofereixen capacitats de seguretat.
+    Example: The Security module can send a SecuritySpecialist
+    to modules that offer security capabilities.
     """
     ...
 
   def get_incoming_specialist_types(self) -> List[str]:
     """
-    Retorna els tipus de specialists que aquest mòdul accepta.
+    Return the specialist types that this module accepts.
 
-    Exemple: El mòdul de seguretat accepta specialists de tipus
+    Example: The security module accepts specialists of type
     "security", "memory", "performance", etc.
     """
     ...
 
   async def register_specialist(self, specialist: Any) -> bool:
     """
-    Registra un specialist entrant al mòdul.
+    Register an incoming specialist with the module.
 
     Args:
-      specialist: Instància del specialist a registrar
+      specialist: Specialist instance to register
 
     Returns:
-      True si el registre és correcte
+      True if registration succeeds
     """
     ...
 
 def validate_module(module: Any) -> bool:
   """
-  Valida que un objecte implementa el protocol NexeModule.
+  Validate that an object implements the NexeModule protocol.
 
   Args:
-    module: Objecte a validar
+    module: Object to validate
 
   Returns:
-    True si implementa el protocol correctament
+    True if it correctly implements the protocol
   """
   if not isinstance(module, NexeModule):
     return False
@@ -258,9 +258,9 @@ def validate_module(module: Any) -> bool:
   return True
 
 def module_has_router(module: Any) -> bool:
-  """Comprova si el mòdul té router HTTP"""
+  """Check whether the module has an HTTP router."""
   return isinstance(module, NexeModuleWithRouter)
 
 def module_has_specialists(module: Any) -> bool:
-  """Comprova si el mòdul gestiona specialists"""
+  """Check whether the module manages specialists."""
   return isinstance(module, NexeModuleWithSpecialists)

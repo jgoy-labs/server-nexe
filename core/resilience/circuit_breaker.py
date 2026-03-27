@@ -32,14 +32,14 @@ from tenacity import (
 logger = logging.getLogger(__name__)
 
 class CircuitState(Enum):
-  """Estats del circuit breaker"""
+  """Circuit breaker states"""
   CLOSED = "closed"
   OPEN = "open"
   HALF_OPEN = "half_open"
 
 @dataclass
 class CircuitBreakerConfig:
-  """Configuració del circuit breaker"""
+  """Circuit breaker configuration"""
   failure_threshold: int = 5
   success_threshold: int = 2
   timeout_seconds: int = 30
@@ -50,7 +50,7 @@ class CircuitBreakerConfig:
 
 @dataclass
 class CircuitBreakerState:
-  """Estat actual del circuit breaker"""
+  """Current circuit breaker state"""
   state: CircuitState = CircuitState.CLOSED
   failure_count: int = 0
   success_count: int = 0
@@ -59,9 +59,9 @@ class CircuitBreakerState:
 
 class CircuitBreaker:
   """
-  Circuit Breaker per protegir serveis externs
+  Circuit Breaker to protect external services
 
-  Ús:
+  Usage:
     cb = CircuitBreaker("ollama", config)
 
     @cb.protect
@@ -78,7 +78,7 @@ class CircuitBreaker:
 
   @property
   def _lock(self) -> asyncio.Lock:
-    """Lazy initialization del lock per evitar problemes amb event loops."""
+    """Lazy lock initialization to avoid event loop issues."""
     loop = asyncio.get_running_loop()
     if self.__lock is None or self.__lock_loop is not loop:
       self.__lock = asyncio.Lock()
@@ -98,7 +98,7 @@ class CircuitBreaker:
     return self._state.state == CircuitState.OPEN
 
   async def _check_timeout(self) -> bool:
-    """Comprova si ha passat el timeout per passar a HALF_OPEN"""
+    """Checks if the timeout has elapsed to transition to HALF_OPEN"""
     if self._state.last_failure_time is None:
       return False
 
@@ -106,7 +106,7 @@ class CircuitBreaker:
     return elapsed.total_seconds() >= self.config.timeout_seconds
 
   async def _record_success(self):
-    """Registra un èxit"""
+    """Records a success"""
     async with self._lock:
       self._state.success_count += 1
       self._state.failure_count = 0
@@ -117,7 +117,7 @@ class CircuitBreaker:
           logger.info(f"CircuitBreaker [{self.name}]: CLOSED (recovered)")
 
   async def _record_failure(self, error: Exception):
-    """Registra una fallada"""
+    """Records a failure"""
     async with self._lock:
       self._state.failure_count += 1
       self._state.success_count = 0
@@ -135,14 +135,14 @@ class CircuitBreaker:
         logger.warning(f"CircuitBreaker [{self.name}]: OPEN (half-open failed)")
 
   def _transition_to(self, new_state: CircuitState):
-    """Canvia d'estat"""
+    """Transitions to a new state"""
     self._state.state = new_state
     self._state.last_state_change = datetime.now(timezone.utc)
     self._state.success_count = 0
     self._state.failure_count = 0
 
   async def _can_execute(self) -> bool:
-    """Determina si es pot executar"""
+    """Determines whether execution is allowed"""
     async with self._lock:
       if self._state.state == CircuitState.CLOSED:
         return True
@@ -158,9 +158,9 @@ class CircuitBreaker:
 
   def protect(self, func: Callable) -> Callable:
     """
-    Decorador per protegir funcions amb circuit breaker
+    Decorator to protect functions with the circuit breaker
 
-    Ús:
+    Usage:
       @circuit_breaker.protect
       async def my_function():
         ...
@@ -198,7 +198,7 @@ class CircuitBreaker:
     return wrapper
 
   def get_status(self) -> dict:
-    """Retorna estat actual per monitorització"""
+    """Returns current state for monitoring"""
     return {
       "name": self.name,
       "state": self._state.state.value,
@@ -211,16 +211,16 @@ class CircuitBreaker:
   @asynccontextmanager
   async def guard_streaming(self):
     """
-    Context manager public per protegir async generators/streaming.
+    Public context manager to protect async generators/streaming.
 
-    Us:
+    Usage:
       async def my_streaming_function():
         async with breaker.guard_streaming():
           async for chunk in stream:
             yield chunk
 
     Raises:
-      CircuitOpenError: Si el circuit esta obert
+      CircuitOpenError: If the circuit is open
     """
     if not await self._can_execute():
       raise CircuitOpenError(
@@ -237,24 +237,24 @@ class CircuitBreaker:
 
   async def check_circuit(self) -> bool:
     """
-    Metode public per comprovar si el circuit permet execucio.
-    Alternatiu a guard_streaming per casos on no es pot usar context manager.
+    Public method to check whether the circuit allows execution.
+    Alternative to guard_streaming for cases where a context manager cannot be used.
 
     Returns:
-      True si es pot executar, False si el circuit esta obert
+      True if execution is allowed, False if the circuit is open
     """
     return await self._can_execute()
 
   async def record_success(self):
-    """Metode public per registrar exit (per async generators)"""
+    """Public method to record a success (for async generators)"""
     await self._record_success()
 
   async def record_failure(self, error: Exception):
-    """Metode public per registrar fallada (per async generators)"""
+    """Public method to record a failure (for async generators)"""
     await self._record_failure(error)
 
 class CircuitOpenError(Exception):
-  """Excepció quan el circuit està obert"""
+  """Exception raised when the circuit is open"""
   pass
 
 ollama_breaker = CircuitBreaker(

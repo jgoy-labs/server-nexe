@@ -10,7 +10,6 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import asyncio
 import importlib
 import logging
 from pathlib import Path

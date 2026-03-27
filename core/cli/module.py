@@ -18,15 +18,15 @@ from .config import NexeConfig
 
 class CLIModule:
   """
-  Classe principal del CLI Central Nexe.
+  Main class for the Nexe Central CLI.
 
-  Proporciona una interfície orientada a objectes per gestionar
-  el descobriment i execució de CLIs dels mòduls Nexe.
+  Provides an object-oriented interface for managing
+  the discovery and execution of Nexe module CLIs.
   """
 
   name = "cli"
   version = "1.0.0"
-  description = "CLI Central Nexe - Orquestrador de CLIs de mòduls"
+  description = "Nexe Central CLI - Module CLI orchestrator"
 
   def __init__(self, config: Optional[NexeConfig] = None):
     """
@@ -112,7 +112,7 @@ class CLIModule:
 | |\\ |/ ___ \\| | / /\\ \\  / /
 |_| \\_/_/  \\_\\_|/_/ \\_\\ /_/
 
-CLI Central - Orquestrador de Mòduls
+CLI Central - Module Orchestrator
 """
 
   def greet(self, name: str = "Nexe") -> str:
@@ -125,4 +125,4 @@ CLI Central - Orquestrador de Mòduls
     Returns:
       str: Greeting message with ASCII art
     """
-    return f"{self.get_ascii_art()}\nHola {name}! Benvingut al CLI Central Nexe 0.8."
+    return f"{self.get_ascii_art()}\nHello {name}! Welcome to the Nexe Central CLI 0.8."

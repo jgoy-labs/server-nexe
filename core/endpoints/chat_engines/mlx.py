@@ -21,7 +21,7 @@ from typing import Dict, List, Optional
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 
-from ..chat_memory import _background_tasks, _save_conversation_to_memory
+from ..chat_memory import _pending_save_tasks, _save_conversation_to_memory
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
 
@@ -141,8 +141,8 @@ async def _mlx_stream_generator(
                         else:
                             logger.error("MLX Stream Auto-Save failed after retry: %s", e)
             task = asyncio.create_task(_background_save_mlx())
-            _background_tasks.add(task)
-            task.add_done_callback(_background_tasks.discard)
+            _pending_save_tasks.add(task)
+            task.add_done_callback(_pending_save_tasks.discard)
 
         # Log mètriques si tenim resultat
         if result_holder["result"]:

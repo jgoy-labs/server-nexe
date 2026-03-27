@@ -36,17 +36,7 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 logger = logging.getLogger(__name__)
 
 
-def _translate(i18n, key: str, fallback: str, **kwargs) -> str:
-  """Helper to translate with fallback (for lifespan)"""
-  if not i18n:
-    return fallback.format(**kwargs) if kwargs else fallback
-  try:
-    value = i18n.t(key, **kwargs)
-    if value == key:
-      return fallback.format(**kwargs) if kwargs else fallback
-    return value
-  except Exception:
-    return fallback.format(**kwargs) if kwargs else fallback
+from core.server.helpers import translate as _translate
 
 
 class ServerState:
@@ -379,14 +369,21 @@ async def lifespan(app: FastAPI):
         if process.poll() is not None:
           return
         try:
+          import signal
           logger.info("Stopping %s process...", name)
-          process.terminate()
-          process.wait(timeout=5)
-        except Exception:
+          process.send_signal(signal.SIGINT)
+          process.wait(timeout=10)
+        except Exception as e:
+          logger.debug("SIGINT failed for %s: %s", name, e)
           try:
-            process.kill()
-          except Exception:
-            logger.debug("Failed to force-stop %s process", name)
+            process.terminate()
+            process.wait(timeout=3)
+          except Exception as e:
+            logger.debug("Terminate failed for %s: %s", name, e)
+            try:
+              process.kill()
+            except Exception:
+              logger.debug("Failed to force-stop %s process", name)
 
       _stop_process(server_state.qdrant_process, "Qdrant")
       _stop_process(server_state.ollama_process, "Ollama")

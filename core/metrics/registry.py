@@ -11,8 +11,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-import threading
-from typing import Optional
 
 from prometheus_client import (
   CollectorRegistry,
@@ -23,9 +21,6 @@ from prometheus_client import (
 )
 
 logger = logging.getLogger(__name__)
-
-_registry_lock = threading.Lock()
-_registry: Optional[CollectorRegistry] = None
 
 HTTP_REQUESTS_TOTAL = Counter(
   "core_http_requests_total",
@@ -134,10 +129,10 @@ EMBEDDING_CACHE_MISSES = Counter(
 
 def get_metrics_registry() -> CollectorRegistry:
   """
-  Retorna el registry global de Prometheus.
+  Returns the global Prometheus registry.
 
   Returns:
-    CollectorRegistry: Registry amb totes les mètriques
+    CollectorRegistry: Registry with all metrics
   """
   return REGISTRY
 
@@ -151,13 +146,13 @@ def reset_metrics() -> None:
 
 def normalize_path(path: str) -> str:
   """
-  Normalitza path per mètriques (evita alta cardinalitat).
+  Normalizes path for metrics (avoids high cardinality).
 
   Args:
-    path: Path original
+    path: Original path
 
   Returns:
-    Path normalitzat
+    Normalized path
   """
   if "?" in path:
     path = path.split("?")[0]
@@ -187,10 +182,10 @@ def _looks_like_id(part: str) -> bool:
 
 def set_module_health(module: str, status: str) -> None:
   """
-  Actualitza l'estat de salut d'un mòdul.
+  Updates a module's health status.
 
   Args:
-    module: Nom del mòdul
+    module: Module name
     status: healthy, degraded, unhealthy
   """
   status_map = {
@@ -203,10 +198,10 @@ def set_module_health(module: str, status: str) -> None:
 
 def increment_rate_limit(limit_type: str, path: str) -> None:
   """
-  Incrementa el comptador de rate limit hits.
+  Increments the rate limit hits counter.
 
   Args:
-    limit_type: Tipus de limit (ip, api_key, composite)
-    path: Path afectat
+    limit_type: Type of limit (ip, api_key, composite)
+    path: Affected path
   """
   RATE_LIMIT_HITS.labels(limit_type=limit_type, path=normalize_path(path)).inc()

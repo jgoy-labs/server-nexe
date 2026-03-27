@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/request_size_limiter.py
-Description: Middleware per limitar mida de requests. Prevé DoS via large payloads (CWE-400).
+Description: Middleware to limit request size. Prevents DoS via large payloads (CWE-400).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -48,7 +48,7 @@ class RequestSizeLimiterMiddleware(BaseHTTPMiddleware):
     """
     Check request size and reject if too large.
 
-    SEGURETAT: Controla tant Content-Length com chunked/streaming.
+    SECURITY: Validates both Content-Length and chunked/streaming bodies.
 
     Args:
       request: Incoming HTTP request

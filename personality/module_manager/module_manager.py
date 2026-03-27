@@ -620,7 +620,6 @@ class ModuleManager:
           logger.info(f"{module_name}.{attr}() returned: {instance}")
         except Exception as e:
           logger.error(f"Error calling {module_name}.{attr}(): {e}", exc_info=True)
-          pass
       elif hasattr(manifest_module, attr):
         logger.info(f"Getting {module_name}.{attr} (attribute)...")
         instance = getattr(manifest_module, attr)

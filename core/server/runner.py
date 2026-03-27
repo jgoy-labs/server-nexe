@@ -197,8 +197,6 @@ def main():
   print(f"{YELLOW}Server running at: {host}:{port}{RESET}\n")
 
   try:
-    # Use core.app:app instead of core.server_nexe:app to avoid watchfiles bug
-    # that creates unwanted "server.nexe-install" directory
     uvicorn.run(
       "core.app:app",
       host=host,

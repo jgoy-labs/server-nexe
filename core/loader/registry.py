@@ -23,8 +23,6 @@ from .protocol import (
   HealthResult,
   ModuleMetadata,
   NexeModule,
-  NexeModuleWithRouter,
-  NexeModuleWithSpecialists,
   module_has_router,
   module_has_specialists
 )

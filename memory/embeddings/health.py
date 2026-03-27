@@ -157,7 +157,8 @@ def check_cache_directories() -> Dict[str, Any]:
     Dict: {"name": str, "status": "pass"|"fail", "message": str}
   """
   try:
-    cache_dir = Path("storage/vectors/embeddings/cache/l2")
+    from core.paths import get_repo_root
+    cache_dir = get_repo_root() / "storage" / "vectors" / "embeddings" / "cache" / "l2"
 
     cache_dir.mkdir(parents=True, exist_ok=True)
 

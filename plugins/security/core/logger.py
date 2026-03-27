@@ -17,8 +17,8 @@ from typing import Dict, Any, Optional
 import logging
 from .messages import get_message
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
-SECURITY_LOG_PATH = PROJECT_ROOT / "storage" / "system-logs" / "security"
+from core.paths import get_repo_root
+SECURITY_LOG_PATH = get_repo_root() / "storage" / "system-logs" / "security"
 
 SECURITY_LOG_PATH.mkdir(parents=True, exist_ok=True)
 

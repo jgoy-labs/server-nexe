@@ -18,7 +18,8 @@ import sys
 from pathlib import Path
 
 # Add project root to path
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+from core.paths import get_repo_root
+PROJECT_ROOT = get_repo_root()
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from memory.memory.constants import DEFAULT_VECTOR_SIZE
@@ -26,22 +27,11 @@ from memory.memory.constants import DEFAULT_VECTOR_SIZE
 logger = logging.getLogger(__name__)
 
 
+from core.ingest.chunking import chunk_text
+
 DOCS_COLLECTION = "nexe_documentation"
 CHUNK_SIZE = 500  # characters per chunk
 CHUNK_OVERLAP = 50
-
-
-def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list:
-    """Split text into overlapping chunks."""
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + chunk_size
-        chunk = text[start:end]
-        if chunk.strip():
-            chunks.append(chunk.strip())
-        start = end - overlap
-    return chunks
 
 
 async def ingest_documentation():

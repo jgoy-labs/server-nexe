@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/endpoints/bootstrap.py
-Description: Sistema d'autenticació bootstrap per inicialització de sessions
+Description: Bootstrap authentication system for session initialization
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["bootstrap"])
 
 def _t(request: Request, key: str, fallback: str, **kwargs) -> str:
-  """Helper per traduir amb fallback des de request.app.state"""
+  """Translate helper with fallback from request.app.state"""
   try:
     i18n = getattr(request.app.state, 'i18n', None)
     if not i18n:
@@ -45,11 +45,11 @@ VPN_ALLOWED_IPS = set(
 )
 
 class BootstrapRequest(BaseModel):
-  """Request per inicialitzar sessió amb token bootstrap"""
+  """Request to initialize session with bootstrap token"""
   token: str
 
 class BootstrapResponse(BaseModel):
-  """Response amb session token despres d'inicialitzacio exitosa"""
+  """Response with session token after successful initialization"""
   session_token: str
   expires_in: int
   status: str
@@ -57,7 +57,7 @@ class BootstrapResponse(BaseModel):
   next_steps: list
 
 class BootstrapInfoResponse(BaseModel):
-  """Response amb informació sobre l'estat del bootstrap"""
+  """Response with information about bootstrap status"""
   bootstrap_enabled: bool
   mode: str
   token_active: bool
@@ -66,14 +66,14 @@ class BootstrapInfoResponse(BaseModel):
 
 def check_rate_limit(client_ip: str, request: Request) -> None:
   """
-  Valida rate limiting global i per IP.
+  Validate global and per-IP rate limiting.
 
-  Límits:
-  - Global: màxim 10 intents de QUALSEVOL IP en 5 minuts
-  - Per IP: màxim 3 intents d'UNA IP en 5 minuts
+  Limits:
+  - Global: max 10 attempts from ANY IP in 5 minutes
+  - Per IP: max 3 attempts from ONE IP in 5 minutes
 
   Raises:
-    HTTPException 429 si s'excedeix el límit
+    HTTPException 429 if limit is exceeded
   """
   from core.bootstrap_tokens import check_bootstrap_rate_limit
 
@@ -81,41 +81,41 @@ def check_rate_limit(client_ip: str, request: Request) -> None:
 
   if result == "global":
     msg = _t(request, "core.server.bootstrap_system_blocked",
-      "🚨 Sistema bloquejat: massa intents globals de bootstrap")
+      "System blocked: too many global bootstrap attempts")
     logger.error(msg)
     raise HTTPException(
       status_code=429,
-      detail="Sistema temporalment bloquejat. Espera 5 minuts."
+      detail="System temporarily blocked. Wait 5 minutes."
     )
 
   if result == "ip":
-    logger.warning("IP %s bloquejada: massa intents", client_ip)
+    logger.warning("IP %s blocked: too many attempts", client_ip)
     raise HTTPException(
       status_code=429,
-      detail="Massa intents des de la teva IP. Espera 5 minuts."
+      detail="Too many attempts from your IP. Wait 5 minutes."
     )
 
-@router.post("/api/bootstrap", response_model=BootstrapResponse, summary="Inicialitza sessió amb token bootstrap (només development)")
+@router.post("/api/bootstrap", response_model=BootstrapResponse, summary="Initialize session with bootstrap token (development only)")
 async def bootstrap_session(
   bootstrap_data: BootstrapRequest,
   request: Request
 ) -> BootstrapResponse:
   """
-  Inicialitza sessió amb token bootstrap.
+  Initialize session with bootstrap token.
 
   Security:
-  - Token d'un sol ús generat al startup
-  - Validació d'IP (localhost + xarxes privades + whitelist VPN)
-  - Rate limiting: 3 intents/IP + 10 globals per 5 min
-  - TTL configurable del token
-  - Auditoria completa amb logs estructurats
+  - One-time use token generated at startup
+  - IP validation (localhost + private networks + VPN whitelist)
+  - Rate limiting: 3 attempts/IP + 10 global per 5 min
+  - Configurable token TTL
+  - Full audit logging
   """
   client_ip = request.client.host if request.client else "unknown"
   token = bootstrap_data.token.strip().upper()
 
   core_env = os.getenv('NEXE_ENV', 'production').lower()
   if core_env != 'development':
-    logger.error("Intent de bootstrap en entorn no-development (NEXE_ENV=%s)", core_env)
+    logger.error("Bootstrap attempt in non-development environment (NEXE_ENV=%s)", core_env)
     raise HTTPException(
       status_code=503,
       detail="Bootstrap not available in this environment"
@@ -144,7 +144,7 @@ async def bootstrap_session(
   from core.bootstrap_tokens import validate_master_bootstrap
 
   if not validate_master_bootstrap(token):
-    # Intentem loguejar la raó de la fallada (expirat vs invàlid vs usat)
+    # Log the failure reason (expired vs invalid vs used)
     from core.bootstrap_tokens import get_bootstrap_token
     info = get_bootstrap_token()
     
@@ -205,12 +205,12 @@ async def bootstrap_session(
     ]
   )
 
-@router.post("/api/regenerate-bootstrap", summary="Regenera token bootstrap expirat o usat (localhost only)")
+@router.post("/api/regenerate-bootstrap", summary="Regenerate expired or used bootstrap token (localhost only)")
 async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   """
-  Regenera token bootstrap si l'anterior ja s'ha utilitzat.
+  Regenerate bootstrap token if the previous one has been used.
 
-  Security: NOMÉS accessible des de localhost (127.0.0.1, ::1)
+  Security: ONLY accessible from localhost (127.0.0.1, ::1)
   """
   client_ip = request.client.host if request.client else "unknown"
 
@@ -236,8 +236,8 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   
   set_bootstrap_token(new_token, ttl_minutes=bootstrap_ttl)
 
-  title = _t(request, "core.server.bootstrap_token_regenerated_title", "🔄 NOU TOKEN D'INICIALITZACIÓ GENERAT")
-  expiry = _t(request, "core.server.bootstrap_token_expiry", "⏰ Expira en: {minutes} minuts", minutes=bootstrap_ttl)
+  title = _t(request, "core.server.bootstrap_token_regenerated_title", "NEW INITIALIZATION TOKEN GENERATED")
+  expiry = _t(request, "core.server.bootstrap_token_expiry", "Expires in: {minutes} minutes", minutes=bootstrap_ttl)
 
   print(f"""
 ╔════════════════════════════════════════════════════════╗
@@ -250,7 +250,7 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
 ╚════════════════════════════════════════════════════════╝
   """)
 
-  log_msg = _t(request, "core.server.bootstrap_token_regenerated_log", "🔄 Token regenerat des de {ip}", ip=client_ip)
+  log_msg = _t(request, "core.server.bootstrap_token_regenerated_log", "Token regenerated from {ip}", ip=client_ip)
   logger.info(log_msg)
 
   return {
@@ -258,16 +258,16 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
     "message": "New token generated. Check terminal."
   }
 
-@router.get("/api/bootstrap/info", response_model=BootstrapInfoResponse, summary="Estat del sistema de bootstrap (públic, sense auth)")
+@router.get("/api/bootstrap/info", response_model=BootstrapInfoResponse, summary="Bootstrap system status (public, no auth)")
 async def bootstrap_info(request: Request) -> BootstrapInfoResponse:
   """
-  Retorna informació sobre l'estat del bootstrap.
+  Return information about bootstrap status.
 
-  Aquest endpoint és públic (no requereix autenticació) i permet
-  al frontend prendre decisions intel·ligents sobre com mostrar la UI.
+  This endpoint is public (no authentication required) and allows
+  the frontend to make informed decisions about UI display.
 
   Returns:
-    BootstrapInfoResponse amb estat complet del sistema bootstrap
+    BootstrapInfoResponse with complete bootstrap system status
   """
   from core.bootstrap_tokens import get_bootstrap_token
   from datetime import datetime

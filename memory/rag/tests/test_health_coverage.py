@@ -49,7 +49,7 @@ class TestCheckStoragePathsCoverage:
 
     def test_storage_paths_exception(self):
         """When path creation raises exception."""
-        with patch("memory.rag.health.Path", side_effect=Exception("filesystem error")):
+        with patch("core.paths.get_repo_root", side_effect=Exception("filesystem error")):
             result = check_storage_paths()
             assert result["status"] == "fail"
 

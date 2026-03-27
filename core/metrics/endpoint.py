@@ -29,21 +29,21 @@ metrics_router = APIRouter(tags=["metrics"])
 @metrics_router.get(
   "/metrics",
   summary="Prometheus metrics",
-  description="Exposa mètriques en format Prometheus per scraping",
+  description="Exposes metrics in Prometheus format for scraping",
   response_class=Response,
   responses={
     200: {
-      "description": "Mètriques Prometheus",
+      "description": "Prometheus metrics",
       "content": {"text/plain": {}},
     }
   },
 )
 async def get_metrics() -> Response:
   """
-  Retorna mètriques en format Prometheus.
+  Returns metrics in Prometheus format.
 
   Returns:
-    Response amb mètriques text/plain
+    Response with text/plain metrics
   """
   await _update_module_health()
 
@@ -57,14 +57,14 @@ async def get_metrics() -> Response:
 @metrics_router.get(
   "/metrics/health",
   summary="Metrics health check",
-  description="Verifica que el sistema de mètriques funciona",
+  description="Verifies that the metrics system is working",
 )
 async def metrics_health() -> Dict[str, Any]:
   """
-  Health check del sistema de mètriques.
+  Metrics system health check.
 
   Returns:
-    Dict amb estat del sistema
+    Dict with system status
   """
   try:
     metrics_output = generate_latest(REGISTRY)
@@ -85,14 +85,14 @@ async def metrics_health() -> Dict[str, Any]:
 @metrics_router.get(
   "/metrics/json",
   summary="Metrics summary (JSON)",
-  description="Resum de mètriques principals en format JSON",
+  description="Summary of key metrics in JSON format",
 )
 async def get_metrics_json() -> Dict[str, Any]:
   """
-  Retorna resum de mètriques en JSON (per debugging).
+  Returns metrics summary in JSON (for debugging).
 
   Returns:
-    Dict amb resum de mètriques
+    Dict with metrics summary
   """
   from .registry import ACTIVE_CONNECTIONS
 
@@ -110,7 +110,7 @@ async def get_metrics_json() -> Dict[str, Any]:
 
 async def _update_module_health() -> None:
   """
-  Actualitza l'estat de salut dels mòduls abans d'exposar mètriques.
+  Updates module health status before exposing metrics.
   """
   try:
     from personality.module_manager.module_manager import ModuleManager

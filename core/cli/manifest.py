@@ -24,7 +24,7 @@ MODULE_PATH = Path(__file__).parent
 @router_public.get("/health")
 async def cli_health():
   """
-  Retorna l'estat de salut del CLI Central Nexe.
+  Return the health status of the Nexe Central CLI.
   """
   try:
     from .router import CLIRouter
@@ -54,7 +54,7 @@ async def cli_health():
 @router_public.get("/info")
 async def cli_info():
   """
-  Retorna informació del CLI Central Nexe.
+  Return information about the Nexe Central CLI.
   """
   try:
     from .router import CLIRouter
@@ -64,13 +64,13 @@ async def cli_info():
     return JSONResponse(content={
       "name": "cli",
       "version": "1.0.0",
-      "description": "CLI Central Nexe - Orquestrador de CLIs de mòduls",
+      "description": "Nexe Central CLI - Module CLI orchestrator",
       "features": [
-        "Descobriment dinàmic de CLIs via manifest.toml",
-        "Execució via subprocess per aïllament",
-        "Suport mode offline",
-        "UI web a /ui-control/clis",
-        "API a /ui-control/api/clis"
+        "Dynamic CLI discovery via manifest.toml",
+        "Subprocess execution for isolation",
+        "Offline mode support",
+        "Web UI at /ui-control/clis",
+        "API at /ui-control/api/clis"
       ],
       "path": str(MODULE_PATH),
       "clis_available": len(clis),
@@ -88,7 +88,7 @@ async def cli_info():
 @router_public.get("/list")
 async def cli_list():
   """
-  Retorna la llista de CLIs disponibles (redirect a /ui-control/api/clis).
+  Return the list of available CLIs (redirects to /ui-control/api/clis).
   """
   try:
     from .router import CLIRouter
@@ -104,7 +104,7 @@ async def cli_list():
 MODULE_METADATA = {
   "name": "cli",
   "version": "1.0.0",
-  "description": "CLI Central Nexe - Orquestrador de CLIs de mòduls Nexe 0.8",
+  "description": "Nexe Central CLI - Nexe 0.8 module CLI orchestrator",
   "router": router_public,
   "prefix": "/cli",
   "tags": ["cli", "terminal", "commands"],
@@ -115,11 +115,11 @@ MODULE_METADATA = {
 }
 
 def get_router():
-  """Retorna el router públic del mòdul"""
+  """Return the module's public router."""
   return router_public
 
 def get_metadata():
-  """Retorna la metadata del mòdul"""
+  """Return the module's metadata."""
   return MODULE_METADATA
 
 __all__ = [

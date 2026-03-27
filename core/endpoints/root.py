@@ -43,9 +43,6 @@ def get_i18n(request: Request):
   """Get i18n from app state"""
   return getattr(request.app.state, 'i18n', None)
 
-def configure_i18n(i18n_manager):
-  """Legacy compatibility - i18n is now injected via app.state"""
-
 def _normalize_engine(engine: str) -> str:
   if not engine:
     return ""
@@ -87,39 +84,39 @@ async def _module_health_status(instance) -> str:
       return "unhealthy"
   return "unknown"
 
-@router.get("/", response_model=SystemResponse, summary="Informació general del sistema")
+@router.get("/", response_model=SystemResponse, summary="General system information")
 @limiter.limit("30/minute")
 async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
   """Root endpoint with system information"""
   return SystemResponse(
     system="Nexe 0.8.2",
     description=i18n.t('server_core.api.welcome.description') if i18n else
-          "Sistema d'orquestració de mòduls en funcionament",
+          "Module orchestration system running",
     status=i18n.t('server_core.api.welcome.ready') if i18n else
-        "Sistema preparat i operatiu",
+        "System ready and operational",
     version="0.8.2",
-    type=i18n.t('server_core.api.server_type') if i18n else "servidor_bàsic"
+    type=i18n.t('server_core.api.server_type') if i18n else "basic_server"
   )
 
-@router.get("/health", response_model=HealthResponse, summary="Health check bàsic del servidor")
+@router.get("/health", response_model=HealthResponse, summary="Basic server health check")
 @limiter.limit("60/minute")
 async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthResponse:
   """System health check"""
   return HealthResponse(
-    status=i18n.t('server_core.api.health.status') if i18n else "operatiu",
+    status=i18n.t('server_core.api.health.status') if i18n else "operational",
     message=i18n.t('server_core.api.health.message') if i18n else
-        "Servidor bàsic operatiu",
+        "Basic server operational",
     version="0.8.2",
-    uptime=i18n.t('server_core.api.health.uptime') if i18n else "operacional"
+    uptime=i18n.t('server_core.api.health.uptime') if i18n else "operational"
   )
 
-@router.get("/health/ready", summary="Readiness check — verifica mòduls requerits")
+@router.get("/health/ready", summary="Readiness check — verifies required modules")
 @limiter.limit("30/minute")
 async def readiness_check(request: Request) -> dict:
   """
   Readiness check.
 
-  Verifica que els mòduls requerits estiguin carregats i saludables.
+  Verifies that the required modules are loaded and healthy.
   """
   config = getattr(request.app.state, "config", {}) or {}
   modules = getattr(request.app.state, "modules", {}) or {}
@@ -159,7 +156,7 @@ async def readiness_check(request: Request) -> dict:
     "timestamp": datetime.now(timezone.utc).isoformat(),
   }
 
-@router.get("/api/info", response_model=ApiInfoResponse, summary="Informació API i llista d'endpoints disponibles")
+@router.get("/api/info", response_model=ApiInfoResponse, summary="API information and list of available endpoints")
 @limiter.limit("30/minute")
 async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoResponse:
   """Basic system information"""
@@ -169,19 +166,19 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
       path="/",
       method="GET",
       description=i18n.t('server_core.api.endpoints.root_description') if i18n else
-            "Endpoint arrel del sistema"
+            "System root endpoint"
     ),
     EndpointInfo(
       path="/health",
       method="GET",
       description=i18n.t('server_core.api.endpoints.health_description') if i18n else
-            "Verificació de salut del sistema"
+            "System health check"
     ),
     EndpointInfo(
       path="/api/info",
       method="GET",
       description=i18n.t('server_core.api.endpoints.info_description') if i18n else
-            "Informació bàsica del sistema"
+            "Basic system information"
     )
   ]
 
@@ -189,11 +186,11 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
     name="Nexe 0.8.2",
     version="0.8.2",
     description=i18n.t('server_core.api.welcome.description') if i18n else
-          "Sistema d'orquestració de mòduls en funcionament",
+          "Module orchestration system running",
     endpoints=endpoints
   )
 
-@router.get("/status", summary="Estat en temps real: engine actiu, model i mòduls carregats")
+@router.get("/status", summary="Real-time status: active engine, model, and loaded modules")
 @limiter.limit("60/minute")
 async def server_status(request: Request) -> dict:
   """
@@ -250,7 +247,7 @@ async def server_status(request: Request) -> dict:
     "timestamp": datetime.now(timezone.utc).isoformat(),
   }
 
-@router.get("/health/circuits", summary="Estat dels circuit breakers (Ollama, Qdrant, HTTP extern)")
+@router.get("/health/circuits", summary="Circuit breaker status (Ollama, Qdrant, external HTTP)")
 @limiter.limit("30/minute")
 async def circuit_status(request: Request) -> dict:
   """

@@ -20,20 +20,20 @@ import click
 from typing import Optional
 
 def tail_file(filepath: Path, last: int = 50):
-    """Simula un tail -f en un fitxer."""
+    """Simulate a tail -f on a file."""
     if not filepath.exists():
-        click.echo(click.style(f"⚠️ Fitxer de log no trobat: {filepath}", fg="yellow"))
+        click.echo(click.style(f"⚠️ Log file not found: {filepath}", fg="yellow"))
         return
 
-    click.echo(click.style(f"👀 Seguint logs de: {filepath} (últimes {last} línies)", fg="cyan", bold=True))
-    click.echo(click.style("--- Prem Ctrl+C per sortir ---\n", dim=True))
+    click.echo(click.style(f"👀 Following logs from: {filepath} (last {last} lines)", fg="cyan", bold=True))
+    click.echo(click.style("--- Press Ctrl+C to exit ---\n", dim=True))
 
     try:
-        # Intentem usar tail si està disponible (més eficient)
+        # Try to use tail if available (more efficient)
         if shutil.which("tail"):
             subprocess.run(["tail", "-n", str(last), "-f", str(filepath)])
         else:
-            # Fallback manual en python
+            # Manual fallback in Python
             with open(filepath, "r") as f:
                 f.seek(0, os.SEEK_END)
                 while True:
@@ -43,33 +43,33 @@ def tail_file(filepath: Path, last: int = 50):
                         continue
                     print(line, end="")
     except KeyboardInterrupt:
-        click.echo("\n👋 Aturant visualitzador de logs.")
+        click.echo("\n👋 Stopping log viewer.")
 
 @click.command()
-@click.option('--module', '-m', help='Filtrar per mòdul (nom del log)')
-@click.option('--last', '-n', default=50, help='Nombre de línies inicials a mostrar')
+@click.option('--module', '-m', help='Filter by module (log name)')
+@click.option('--last', '-n', default=50, help='Number of initial lines to show')
 def logs(module: Optional[str], last: int):
     """
-    Mostra els logs de Nexe en temps real.
+    Show Nexe logs in real time.
     """
     project_root = Path(__file__).parent.parent.parent
     logs_dir = project_root / "storage" / "logs"
     
     if not logs_dir.exists():
-        click.echo(click.style(f"❌ Directori de logs no trobat: {logs_dir}", fg="red"))
+        click.echo(click.style(f"❌ Logs directory not found: {logs_dir}", fg="red"))
         return
 
-    # Si s'especifica mòdul, busquem el seu log
+    # If a module is specified, look for its log
     if module:
         log_file = logs_dir / f"{module}.log"
     else:
-        # Per defecte busquem el log principal del sistema
+        # Default to the main system log
         log_file = logs_dir / "nexe.log"
         if not log_file.exists():
-            # Si no existeix nexe.log, mirem què hi ha
+            # If nexe.log doesn't exist, see what's available
             all_logs = list(logs_dir.glob("*.log"))
             if not all_logs:
-                click.echo(click.style("📭 No s'han trobat fitxers de log a storage/logs/", fg="yellow"))
+                click.echo(click.style("📭 No log files found in storage/logs/", fg="yellow"))
                 return
             log_file = all_logs[0]
             
@@ -80,5 +80,4 @@ def logs(module: Optional[str], last: int):
     tail_file(log_file, last)
 
 if __name__ == "__main__":
-    import shutil
     logs()

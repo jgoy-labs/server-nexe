@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/endpoints/system.py
-Description: Endpoints d'administració del sistema: reinici del servidor,
+Description: System administration endpoints: server restart, supervisor status.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -44,7 +44,8 @@ def _t(key: str, fallback: str, **kwargs) -> str:
   except Exception:
     return fallback.format(**kwargs) if kwargs else fallback
 
-_logs_dir = Path(os.environ.get("NEXE_LOGS_DIR", str(Path.home() / "Nexe-Logs")))
+from core.paths import get_logs_dir
+_logs_dir = get_logs_dir()
 SUPERVISOR_PID_FILE = _logs_dir / 'core_supervisor.pid'
 
 def get_supervisor_pid() -> int:
@@ -52,10 +53,10 @@ def get_supervisor_pid() -> int:
   Read supervisor PID from file.
 
   Returns:
-    int: PID del supervisor
+    int: Supervisor PID
 
   Raises:
-    HTTPException: Si el fitxer no existeix o no es pot llegir
+    HTTPException: If the file doesn't exist or cannot be read
   """
   if not SUPERVISOR_PID_FILE.exists():
     raise HTTPException(
@@ -64,7 +65,7 @@ def get_supervisor_pid() -> int:
         "error": "supervisor_not_found",
         "message": _t(
           "system.supervisor_not_found",
-          "Supervisor no detectat. Executa: ./nexe go"
+          "Supervisor not found. Run: ./nexe go"
         ),
         "pid_file": str(SUPERVISOR_PID_FILE)
       }
@@ -84,7 +85,7 @@ def get_supervisor_pid() -> int:
         "error": "invalid_pid",
         "message": _t(
           "system.supervisor_pid_invalid",
-          "Supervisor PID invàlid: {error}",
+          "Supervisor PID invalid: {error}",
           error=str(e)
         ),
         "pid_file": str(SUPERVISOR_PID_FILE)
@@ -97,12 +98,12 @@ def get_supervisor_pid() -> int:
         "error": "supervisor_dead",
         "message": _t(
           "system.supervisor_dead",
-          "Supervisor PID trobat però procés no existeix (zombie)"
+          "Supervisor PID found but process does not exist (zombie)"
         ),
         "pid_file": str(SUPERVISOR_PID_FILE),
         "suggestion": _t(
           "system.supervisor_dead_suggestion",
-          "Elimina el fitxer PID i reinicia el supervisor"
+          "Delete the PID file and restart the supervisor"
         )
       }
     )
@@ -113,7 +114,7 @@ def get_supervisor_pid() -> int:
         "error": "permission_denied",
         "message": _t(
           "system.supervisor_permission_denied",
-          "No tens permisos per accedir al procés supervisor: {error}",
+          "Permission denied accessing supervisor process: {error}",
           error=str(e)
         )
       }
@@ -125,7 +126,7 @@ def get_supervisor_pid() -> int:
         "error": "unknown_error",
         "message": _t(
           "system.supervisor_read_error",
-          "Error llegint supervisor PID: {error}",
+          "Error reading supervisor PID: {error}",
           error=str(e)
         )
       }
@@ -135,8 +136,8 @@ async def send_restart_signal():
   """
   Send SIGHUP to supervisor after brief delay.
 
-  El delay permet que la resposta HTTP es retorni abans del reinici,
-  evitant errors de connexió al client.
+  The delay allows the HTTP response to be sent before restart,
+  avoiding connection errors on the client side.
   """
   await asyncio.sleep(0.5)
 
@@ -153,28 +154,28 @@ async def send_restart_signal():
   except Exception as e:
     logger.error(_t("core.endpoints.system.restart_signal_unexpected", "Unexpected error sending restart signal: {error}", error=str(e)))
 
-@router_admin.post("/restart", summary="Reinicia el servidor via supervisor (🔒 API key)")
+@router_admin.post("/restart", summary="Restart server via supervisor (API key required)")
 async def restart_server(
   background_tasks: BackgroundTasks,
   _: str = Depends(require_api_key)
 ) -> Dict[str, Any]:
   """
-  Reinicia el servidor Nexe via supervisor.
+  Restart Nexe server via supervisor.
 
-  🔒 Requereix autenticació amb API key (X-API-Key header).
+  Requires API key authentication (X-API-Key header).
 
-  Funcionament:
-  1. Endpoint retorna resposta immediatament
-  2. Background task envia SIGHUP al supervisor (0.5s delay)
-  3. Supervisor fa graceful shutdown del worker
-  4. Supervisor reinicia worker amb configuració nova
-  5. Downtime esperat: 3-6 segons
+  Flow:
+  1. Endpoint returns response immediately
+  2. Background task sends SIGHUP to supervisor (0.5s delay)
+  3. Supervisor performs graceful shutdown of worker
+  4. Supervisor restarts worker with new configuration
+  5. Expected downtime: 3-6 seconds
 
   Returns:
-    dict: Estat del reinici i temps estimat
+    dict: Restart status and estimated time
 
   Raises:
-    HTTPException: Si el supervisor no està disponible
+    HTTPException: If supervisor is not available
   """
   try:
     supervisor_pid = get_supervisor_pid()
@@ -187,12 +188,12 @@ async def restart_server(
       "status": "restart_initiated",
       "message": _t(
         "system.restart_initiated_message",
-        "Servidor reiniciant en ~1 segon"
+        "Server restarting in ~1 second"
       ),
       "expected_downtime_seconds": 5,
       "instructions": _t(
         "system.restart_instructions",
-        "La UI es reconnectarà automàticament"
+        "The UI will reconnect automatically"
       )
     }
 
@@ -206,21 +207,21 @@ async def restart_server(
         "error": "restart_failed",
         "message": _t(
           "system.restart_failed",
-          "Error reiniciant servidor: {error}",
+          "Error restarting server: {error}",
           error=str(e)
         )
       }
     )
 
-@router_admin.get("/status", summary="Estat del supervisor i disponibilitat de restart (🔒 API key)")
+@router_admin.get("/status", summary="Supervisor status and restart availability (API key required)")
 async def supervisor_status(_: str = Depends(require_api_key)) -> Dict[str, Any]:
   """
   Check supervisor status.
 
-  🔒 Requereix autenticació amb API key (X-API-Key header).
+  Requires API key authentication (X-API-Key header).
 
   Returns:
-    dict: Informació sobre l'estat del supervisor
+    dict: Information about supervisor status
 
   Example Response:
     {
@@ -243,16 +244,15 @@ async def supervisor_status(_: str = Depends(require_api_key)) -> Dict[str, Any]
       "error": e.detail
     }
 
-@router_admin.get("/health", summary="Health check admin (públic, usat per la UI post-restart)")
+@router_admin.get("/health", summary="Admin health check (public, used by UI post-restart)")
 async def system_health() -> Dict[str, Any]:
   """
-  Health check simple (NO requereix auth).
+  Simple health check (NO auth required).
 
-  Aquest endpoint es fa servir per la UI per comprovar si el servidor
-  està disponible després d'un reinici.
+  Used by the UI to check if the server is available after a restart.
 
   Returns:
-    dict: Estat bàsic del sistema
+    dict: Basic system status
 
   Example Response:
     {
@@ -275,9 +275,9 @@ async def system_health() -> Dict[str, Any]:
 
 def get_router() -> APIRouter:
   """
-  Retorna el router admin del sistema.
+  Return the system admin router.
 
-  Aquest router s'ha d'incloure a server_core.py:
+  Include in server_core.py:
     from core.endpoints import system
     app.include_router(system.get_router())
   """

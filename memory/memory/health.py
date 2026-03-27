@@ -49,9 +49,11 @@ def check_flash_storage_paths() -> Dict[str, Any]:
   """Check 2: Verify flash storage paths exist."""
   i18n = get_i18n()
   try:
-    flash_dir = Path("storage/memory/flash")
-    storage_dir = Path("storage/memory/storage")
-    cache_dir = Path("storage/memory/cache")
+    from core.paths import get_repo_root
+    _root = get_repo_root()
+    flash_dir = _root / "storage" / "memory" / "flash"
+    storage_dir = _root / "storage" / "memory" / "storage"
+    cache_dir = _root / "storage" / "memory" / "cache"
 
     flash_dir.mkdir(parents=True, exist_ok=True)
     storage_dir.mkdir(parents=True, exist_ok=True)

@@ -126,7 +126,7 @@ class TestCheckCacheDirectories:
 
     def test_cache_exception(self):
         """Lines 193-201: exception during cache check."""
-        with patch("memory.embeddings.health.Path", side_effect=RuntimeError("bad")):
+        with patch("core.paths.get_repo_root", side_effect=RuntimeError("bad")):
             result = check_cache_directories()
         assert result["status"] == "fail"
         assert result["message"]  # Has some message

@@ -96,7 +96,7 @@ class OllamaModule:
             logger.info("OllamaModule initialized - base_url=%s", self.base_url)
             return True
         except Exception as e:
-            logger.error(f"Failed to initialize OllamaModule: {e}")
+            logger.error("Failed to initialize OllamaModule: %s", e)
             return False
 
     async def _ensure_ollama_running(self):

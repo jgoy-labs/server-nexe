@@ -54,6 +54,7 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path, serve
           env["QDRANT__STORAGE__STORAGE_PATH"] = str(qdrant_storage)
           env["QDRANT__SERVICE__HTTP_PORT"] = str(qdrant_port)
           env["QDRANT__SERVICE__DISABLE_TELEMETRY"] = "true"
+          env["QDRANT__STORAGE__OPTIMIZERS__FLUSH_INTERVAL_SEC"] = "1"
 
           # Start Qdrant process
           process = subprocess.Popen(
