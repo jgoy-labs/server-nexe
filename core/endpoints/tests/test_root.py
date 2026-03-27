@@ -47,13 +47,6 @@ class TestGetI18n:
         assert result is mock_i18n
 
 
-class TestConfigureI18n:
-    def test_configure_i18n_noop(self):
-        from core.endpoints.root import configure_i18n
-        # No ha de llençar excepcions, és un no-op
-        configure_i18n(MagicMock())
-
-
 class TestNormalizeEngine:
     def test_normalize_engine_empty_string(self):
         from core.endpoints.root import _normalize_engine

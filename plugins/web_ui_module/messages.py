@@ -10,6 +10,10 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 FALLBACK_MESSAGES = {
     "webui.auth.invalid_key": "Invalid or missing API key",
     "webui.static.ui_not_found": "UI not found",
@@ -34,8 +38,8 @@ def get_message(i18n, key: str, **kwargs) -> str:
             result = i18n.t(key, **kwargs)
             if result and result != key:
                 return result
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("i18n translation failed for %s: %s", key, e)
     template = FALLBACK_MESSAGES.get(key, key)
     try:
         return template.format(**kwargs)

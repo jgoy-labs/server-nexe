@@ -30,13 +30,13 @@ logger = logging.getLogger(__name__)
 
 class PrometheusMiddleware(BaseHTTPMiddleware):
   """
-  Middleware per recollir mètriques Prometheus de requests HTTP.
+  Middleware for collecting Prometheus metrics from HTTP requests.
 
-  Mètriques recollides:
-  - core_http_requests_total: Total requests per method/path/status
-  - core_http_request_duration_seconds: Latència per method/path
-  - core_http_errors_total: Errors per method/path/error_type
-  - core_active_connections: Connexions actives
+  Collected metrics:
+  - core_http_requests_total: Total requests by method/path/status
+  - core_http_request_duration_seconds: Latency by method/path
+  - core_http_errors_total: Errors by method/path/error_type
+  - core_active_connections: Active connections
   """
 
   EXCLUDED_PATHS = {
@@ -52,14 +52,14 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
     self, request: Request, call_next: Callable
   ) -> Response:
     """
-    Processa request i recull mètriques.
+    Processes request and collects metrics.
 
     Args:
-      request: Request HTTP
-      call_next: Handler següent
+      request: HTTP request
+      call_next: Next handler
 
     Returns:
-      Response HTTP
+      HTTP response
     """
     path = request.url.path
 
@@ -127,13 +127,13 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
   def _categorize_error(self, status_code: int) -> str:
     """
-    Categoritza error per status code.
+    Categorizes error by status code.
 
     Args:
       status_code: HTTP status code
 
     Returns:
-      Categoria d'error
+      Error category
     """
     if status_code == 400:
       return "bad_request"
@@ -154,7 +154,7 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
 def setup_prometheus_middleware(app) -> None:
   """
-  Configura el middleware de Prometheus a l'aplicació.
+  Configures the Prometheus middleware on the application.
 
   Args:
     app: FastAPI application

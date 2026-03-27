@@ -430,13 +430,14 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         if not loaded:
                                             logger.info("Model %s no carregat — carregant... [%s]", model_name, engine_name)
                                             yield f"\x00[MODEL_LOADING:{_safe_model}|{engine_name}]\x00"
-                                    except Exception:
-                                        pass  # Si falla la comprovacio, continuem normal
+                                    except Exception as e:
+                                        logger.debug("Model loaded check failed for %s: %s", model_name, e)
 
                                 try:
                                     # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)
                                     if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
                                         _in_thinking = False
+                                        _in_content_think = False
                                         _first_chunk = True
                                         _first_content_after_think = None
                                         _has_any_thinking = False
@@ -488,8 +489,34 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                     content = _re.sub(r'<\|[^|]+\|>', '', content)
                                                     content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
                                                 full_response += content
+                                                # Separar <think> blocks incrustats al content (qwq:32b, etc.)
+                                                if '<think>' in content or '</think>' in content or _in_content_think:
+                                                    _vis_parts = []
+                                                    _sc = 0
+                                                    while _sc < len(content):
+                                                        if _in_content_think:
+                                                            _te = content.find('</think>', _sc)
+                                                            if _te >= 0:
+                                                                _in_content_think = False
+                                                                _sc = _te + 8
+                                                            else:
+                                                                break
+                                                        else:
+                                                            _ts = content.find('<think>', _sc)
+                                                            if _ts >= 0:
+                                                                if _ts > _sc:
+                                                                    _vis_parts.append(content[_sc:_ts])
+                                                                _in_content_think = True
+                                                                _has_any_thinking = True
+                                                                _sc = _ts + 7
+                                                            else:
+                                                                _vis_parts.append(content[_sc:])
+                                                                break
+                                                    visible = ''.join(_vis_parts)
+                                                else:
+                                                    visible = content
                                                 # Strip [MEM_SAVE: ...] from visible stream
-                                                visible = _re.sub(r'\[MEM_SAVE:\s*.+?\]\s*', '', content)
+                                                visible = _re.sub(r'\[MEM_SAVE:\s*.+?\]\s*', '', visible)
                                                 if visible:
                                                     yield visible
                                     else:

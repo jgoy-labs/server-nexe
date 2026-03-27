@@ -99,8 +99,8 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                         rag_collections.append({"name": coll_name, "count": -1})
                 except Exception:
                     rag_collections.append({"name": coll_name, "count": -1})
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Could not fetch RAG collections: %s", e)
 
         return {
             "model": model_name,

@@ -18,7 +18,7 @@ from memory.memory.constants import DEFAULT_VECTOR_SIZE
 logger = logging.getLogger(__name__)
 
 # Tracked background save tasks — prevents "Task was destroyed" warnings on shutdown
-_background_tasks: set = set()
+_pending_save_tasks: set = set()
 
 
 async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: str):

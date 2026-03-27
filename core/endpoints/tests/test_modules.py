@@ -51,7 +51,7 @@ class TestListIntegratedModules:
         resp = client.get("/modules")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "correcte"
+        assert data["status"] == "ok"
         assert data["data"]["total_modules"] == 2
 
     def test_without_api_integrator(self):
@@ -61,7 +61,7 @@ class TestListIntegratedModules:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "error"
-        assert "Integrador" in data.get("message", "")
+        assert "integrator" in data.get("message", "")
 
     def test_with_i18n_and_integrator(self):
         mock_integrator = MagicMock()
@@ -95,7 +95,7 @@ class TestGetModuleRoutes:
         resp = client.get("/modules/security/routes")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "correcte"
+        assert data["status"] == "ok"
         assert data["module"] == "security"
         assert "/module/route1" in data["routes"]
 
@@ -106,4 +106,4 @@ class TestGetModuleRoutes:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "error"
-        assert "Integrador" in data.get("message", "")
+        assert "integrator" in data.get("message", "")

@@ -34,17 +34,17 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
     description=translate(
       i18n,
       "server_core.api.description",
-      "**Nexe 0.8** — Servidor IA local amb memòria persistent.\n\n"
-      "## Autenticació\n"
-      "La majoria d'endpoints requereixen `X-API-Key` header.\n\n"
-      "## Grups d'endpoints\n"
-      "- **system** — Health checks, status i circuit breakers\n"
-      "- **v1 / chat** — Chat completion amb RAG opcional (OpenAI-compatible)\n"
-      "- **memory-v1** — Memòria semàntica persistent (store/search)\n"
-      "- **modules** — Mòduls i plugins carregats\n"
-      "- **bootstrap** — Inicialització de sessió (mode development)\n"
-      "- **system-admin** — Restart i supervisió del servidor\n"
-      "- **rag-v1 / embeddings-v1 / documents-v1** — Endpoints en desenvolupament (retornen 501)"
+      "**Nexe 0.8** — Local AI server with persistent memory.\n\n"
+      "## Authentication\n"
+      "Most endpoints require the `X-API-Key` header.\n\n"
+      "## Endpoint groups\n"
+      "- **system** — Health checks, status, and circuit breakers\n"
+      "- **v1 / chat** — Chat completion with optional RAG (OpenAI-compatible)\n"
+      "- **memory-v1** — Persistent semantic memory (store/search)\n"
+      "- **modules** — Loaded modules and plugins\n"
+      "- **bootstrap** — Session initialization (development mode)\n"
+      "- **system-admin** — Server restart and supervision\n"
+      "- **rag-v1 / embeddings-v1 / documents-v1** — Endpoints under development (return 501)"
     ),
     version="0.8.2",
     lifespan=lifespan
@@ -52,7 +52,7 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
 
   setup_all_middleware(app, config, i18n)
 
-  # Rutes browser estàndard que generen 404 innecessaris als logs
+  # Standard browser routes that generate unnecessary 404s in logs
   from fastapi.responses import JSONResponse, Response
 
   @app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)

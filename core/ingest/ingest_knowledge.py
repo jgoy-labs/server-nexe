@@ -25,7 +25,8 @@ import sys
 from pathlib import Path
 
 # Add project root to path
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+from core.paths import get_repo_root
+PROJECT_ROOT = get_repo_root()
 sys.path.insert(0, str(PROJECT_ROOT))
 
 logger = logging.getLogger(__name__)
@@ -75,17 +76,7 @@ CHUNK_OVERLAP = 200
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".markdown", ".text"}
 
 
-def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list:
-    """Split text into overlapping chunks."""
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + chunk_size
-        chunk = text[start:end]
-        if chunk.strip():
-            chunks.append(chunk.strip())
-        start = end - overlap
-    return chunks
+from core.ingest.chunking import chunk_text
 
 
 def read_file(file_path: Path) -> str:

@@ -46,14 +46,7 @@ _CSRF_EXEMPT_PATTERNS = [
     re.compile(r"^/ui/"),  # UI uses X-API-Key auth (works for local + Tailscale)
 ]
 
-def _translate(i18n, key: str, fallback: str, **kwargs) -> str:
-  """Helper to translate with fallback (for non-endpoint functions)"""
-  if not i18n:
-    return fallback.format(**kwargs) if kwargs else fallback
-  value = i18n.t(key, **kwargs)
-  if value == key:
-    return fallback.format(**kwargs) if kwargs else fallback
-  return value
+from core.server.helpers import translate as _translate
 
 def setup_rate_limiting(app: FastAPI, i18n = None) -> None:
   """
@@ -229,7 +222,6 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
       logger.warning("CSRF_SECRET not configured. Using temporary secret (dev mode only)")
 
   try:
-    from starlette.middleware import Middleware
     from starlette_csrf import CSRFMiddleware
 
     # SECURITY FIX: cookie_secure only if HTTPS is actually used.

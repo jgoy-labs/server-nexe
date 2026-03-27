@@ -14,6 +14,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 import os
 import time
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
@@ -37,7 +38,7 @@ from .chat_rag import (
     RAG_KNOWLEDGE_THRESHOLD,
     RAG_MEMORY_THRESHOLD,
 )
-from .chat_memory import _save_conversation_to_memory, _background_tasks
+from .chat_memory import _save_conversation_to_memory, _pending_save_tasks
 from .chat_engines.routing import (
     _normalize_engine,
     _get_preferred_engine,
@@ -62,7 +63,7 @@ router = APIRouter(tags=["chat"])
 
 # --- System Prompt ---
 
-def _get_system_prompt(app_state, lang: str = None) -> str:
+def _get_system_prompt(app_state: Any, lang: str = None) -> str:
     """
     Selecciona el system prompt per idioma i tier de model.
 
@@ -112,7 +113,7 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
     if request.use_rag:
         last_user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), None)
         if last_user_msg:
-            logger.info(f"RAG Search for: '{last_user_msg}'")
+            logger.info("RAG Search for: '%s'", last_user_msg)
             context_text = await build_rag_context(last_user_msg, req.app.state, _server_lang)
 
     # 3. Augment System Prompt (Nexe persona + sanitized RAG context)
@@ -137,13 +138,13 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
         if rag_tokens > max_rag_tokens:
             max_chars = max_rag_tokens * CHARS_PER_TOKEN_ESTIMATE
             safe_context = safe_context[:max_chars]
-            logger.info(f"RAG context trimmed to fit context window: {rag_tokens} -> {max_rag_tokens} est. tokens")
+            logger.info("RAG context trimmed to fit context window: %s -> %s est. tokens", rag_tokens, max_rag_tokens)
 
         remaining_budget = DEFAULT_CONTEXT_WINDOW - used_tokens - _estimate_tokens(safe_context)
         if remaining_budget < 256:
             # Not enough room for model response — reduce RAG further
             safe_context = safe_context[:1000]
-            logger.warning(f"RAG context aggressively trimmed — only {remaining_budget} tokens remaining for response")
+            logger.warning("RAG context aggressively trimmed — only %s tokens remaining for response", remaining_budget)
 
         # Inject RAG context into the last user message (NOT system prompt)
         # This preserves prefix caching for the system prompt
@@ -211,7 +212,7 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                     content
                 )
         except Exception as e:
-            logger.error(f"Failed to schedule memory save: {e}")
+            logger.error("Failed to schedule memory save: %s", e)
     if isinstance(response, StreamingResponse):
         if "X-Nexe-Engine" not in response.headers:
             response.headers["X-Nexe-Engine"] = engine

@@ -34,9 +34,6 @@ from .helpers import (
   get_core_root,
 )
 
-# compat.py mogut a _legacy/ - find_project_root() ja no disponible
-# Usar get_repo_root() en el seu lloc
-
 from .validation import (
   _is_valid_core_root,
   _log_detection_success,

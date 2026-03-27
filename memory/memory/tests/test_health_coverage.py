@@ -44,7 +44,7 @@ class TestCheckFlashStoragePathsCoverage:
             assert result["name"] == "storage_paths"
 
     def test_paths_exception(self):
-        with patch("memory.memory.health.Path", side_effect=Exception("fs error")):
+        with patch("core.paths.get_repo_root", side_effect=Exception("fs error")):
             result = check_flash_storage_paths()
             assert result["status"] == "fail"
 

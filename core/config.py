@@ -13,7 +13,8 @@ www.jgoy.net · https://server-nexe.org
 
 import copy
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
+import tomllib
 import toml
 import logging
 import os
@@ -101,8 +102,8 @@ def load_config(
         else:
             logger.info(f"Loading config from: {found_path}")
 
-        with open(found_path, 'r', encoding='utf-8') as f:
-            config = toml.load(f)
+        with open(found_path, 'rb') as f:
+            config = tomllib.load(f)
 
         # Merge with defaults (config overrides defaults)
         merged = _deep_merge(copy.deepcopy(DEFAULT_CONFIG), config)

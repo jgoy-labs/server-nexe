@@ -82,8 +82,8 @@ class MultiLevelCache:
         if getattr(self, "conn", None):
             try:
                 self.conn.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Cache close failed: %s", e)
             finally:
                 self.conn = None
 

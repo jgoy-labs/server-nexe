@@ -28,7 +28,6 @@ def setup_app_state(app: FastAPI, i18n: Any, config: dict, project_root: Path, m
   from core.bootstrap_tokens import initialize_tokens
   from core.lifespan import get_server_state
   from core.endpoints.modules import configure_dependencies as configure_modules_deps
-  from core.endpoints.root import configure_i18n as configure_root_i18n
 
   from core.module_registry import ModuleRegistry
   app.state.module_registry = ModuleRegistry()
@@ -40,8 +39,6 @@ def setup_app_state(app: FastAPI, i18n: Any, config: dict, project_root: Path, m
   server_state.config = config
   server_state.module_manager = module_manager
   server_state.configure_modules_callback = configure_modules_deps
-
-  configure_root_i18n(i18n)
 
   initialize_tokens(project_root)
 

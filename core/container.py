@@ -11,35 +11,35 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-# DEPRECATED: Container no s'usa en producció des de v0.8.2
-# Els serveis s'obtenen via app.state (FastAPI DI) o get_server_state().
-# Mantingut per compatibilitat amb tests. Planificat per eliminar en v0.9.
+# DEPRECATED: Container has not been used in production since v0.8.2.
+# Services are accessed via app.state (FastAPI DI) or get_server_state().
+# Kept for test compatibility. Scheduled for removal in v0.9.
 
 import logging
 import os
 import warnings
-from typing import Any, Dict, Optional, Type, TypeVar
+from typing import Any, Dict, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar('T')
 
-# Detecta si estem en context de tests (pytest) per silenciar el warning
+# Detect if running in a test context (pytest) to suppress the warning
 _IN_TESTS = "PYTEST_CURRENT_TEST" in os.environ
 
 _DEPRECATION_MSG = (
-  "Container està DEPRECATED des de v0.8.2 i s'eliminarà a v0.9. "
-  "Per als plugins: usa 'from core.lifespan import get_server_state' per accedir "
-  "als serveis (rag, memory, modules...). Per als endpoints FastAPI: usa 'request.app.state'."
+  "Container is DEPRECATED since v0.8.2 and will be removed in v0.9. "
+  "For plugins: use 'from core.lifespan import get_server_state' to access "
+  "services (rag, memory, modules...). For FastAPI endpoints: use 'request.app.state'."
 )
 
 class Container:
   """
   Central registry for dependency injection.
 
-  DEPRECATED des de v0.8.2 — només per a tests.
-  Patró nou per a plugins: get_server_state().rag / get_server_state().memory_engine
-  Patró nou per a endpoints: request.app.state.rag / request.app.state.memory_engine
+  DEPRECATED since v0.8.2 — only used for tests.
+  New pattern for plugins: get_server_state().rag / get_server_state().memory_engine
+  New pattern for endpoints: request.app.state.rag / request.app.state.memory_engine
   """
   _instance: Optional['Container'] = None
   _services: Dict[str, Any] = {}
@@ -52,7 +52,7 @@ class Container:
 
   @classmethod
   def register(cls, name: str, service: Any) -> None:
-    """[DEPRECATED] Registra una instància de servei."""
+    """[DEPRECATED] Register a service instance."""
     if not _IN_TESTS:
       warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
       logger.warning("Container.register('%s') — %s", name, _DEPRECATION_MSG)
@@ -61,7 +61,7 @@ class Container:
 
   @classmethod
   def register_factory(cls, name: str, factory: Any) -> None:
-    """[DEPRECATED] Registra una factory de servei."""
+    """[DEPRECATED] Register a service factory."""
     if not _IN_TESTS:
       warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
       logger.warning("Container.register_factory('%s') — %s", name, _DEPRECATION_MSG)
@@ -70,7 +70,7 @@ class Container:
 
   @classmethod
   def get(cls, name: str, default: Any = None) -> Any:
-    """[DEPRECATED] Obté un servei pel nom."""
+    """[DEPRECATED] Retrieve a service by name."""
     if not _IN_TESTS:
       warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
       logger.warning("Container.get('%s') — %s", name, _DEPRECATION_MSG)
@@ -87,12 +87,12 @@ class Container:
 
   @classmethod
   def clear(cls):
-    """Buida el container (útil per a tests)."""
+    """Clear the container (useful for tests)."""
     cls._services.clear()
     cls._factories.clear()
     logger.info("DI Container cleared")
 
-# Shortcut functions — DEPRECATED, mantingudes per compatibilitat
+# Shortcut functions — DEPRECATED, kept for backward compatibility
 def get_service(name: str, default: Any = None) -> Any:
   return Container.get(name, default)
 

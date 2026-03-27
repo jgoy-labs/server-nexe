@@ -27,7 +27,7 @@ except ImportError:
 
 @dataclass
 class CLIInfo:
-  """Informació d'un CLI de mòdul."""
+  """Information about a module CLI."""
   alias: str
   module_name: str
   entry_point: str
@@ -56,7 +56,7 @@ DEFAULT_CLIS: Dict[str, CLIInfo] = {
     alias="chat",
     module_name="cli",
     entry_point="core.cli.chat_cli",
-    description="Chat interactiu unificat (Automàtic: MLX, Llama.cpp o Ollama)",
+    description="Unified interactive chat (Auto-selects: MLX, Llama.cpp or Ollama)",
     commands=["--system", "--rag", "--engine"],
     framework="click",
     offline=False,
@@ -66,7 +66,7 @@ DEFAULT_CLIS: Dict[str, CLIInfo] = {
     alias="logs",
     module_name="cli",
     entry_point="core.cli.log_viewer",
-    description="Veure els logs del sistema en temps real (tail -f)",
+    description="View system logs in real time (tail -f)",
     commands=["--module", "--last"],
     framework="click",
     offline=True,
@@ -76,7 +76,7 @@ DEFAULT_CLIS: Dict[str, CLIInfo] = {
     alias="memory",
     module_name="memory",
     entry_point="memory.memory.cli",
-    description="Gestió de memòria plana i ingesta de dades",
+    description="Flat memory management and data ingestion",
     commands=["store", "recall", "stats", "cleanup"],
     framework="argparse",
     offline=True,
@@ -86,7 +86,7 @@ DEFAULT_CLIS: Dict[str, CLIInfo] = {
     alias="rag",
     module_name="rag",
     entry_point="memory.rag.cli",
-    description="Gestió del motor RAG i vectors",
+    description="RAG engine and vector management",
     commands=["search", "index", "status"],
     framework="argparse",
     offline=True,
@@ -96,12 +96,12 @@ DEFAULT_CLIS: Dict[str, CLIInfo] = {
 
 class CLIRouter:
   """
-  Router que descobreix i executa CLIs de mòduls Nexe.
+  Router that discovers and executes Nexe module CLIs.
 
-  Estratègia:
-  1. Primer intenta descobrir via manifest.toml
-  2. Si no troba, usa el registre hardcoded
-  3. Executa via subprocess per aïllament
+  Strategy:
+  1. First attempts discovery via manifest.toml
+  2. Falls back to the hardcoded registry
+  3. Executes via subprocess for isolation
   """
 
   def __init__(self, project_root: Optional[Path] = None):
@@ -109,14 +109,14 @@ class CLIRouter:
     Initialize router.
 
     Args:
-      project_root: Arrel del projecte Nexe (default: detecta automàticament)
+      project_root: Nexe project root (default: auto-detected)
     """
     self._project_root = project_root or self._detect_project_root()
     self._cache: Dict[str, CLIInfo] = {}
     self._discovered = False
 
   def _detect_project_root(self) -> Path:
-    """Detecta l'arrel del projecte Nexe."""
+    """Detect the Nexe project root."""
     current = Path(__file__).resolve()
 
     for parent in current.parents:
@@ -129,10 +129,10 @@ class CLIRouter:
 
   def discover_all(self) -> List[CLIInfo]:
     """
-    Descobreix tots els CLIs disponibles.
+    Discover all available CLIs.
 
     Returns:
-      Llista de CLIInfo per cada CLI descobert
+      List of CLIInfo for each discovered CLI
     """
     if not self._discovered:
       self._discover_from_manifests()
@@ -141,7 +141,7 @@ class CLIRouter:
     return list(self._cache.values())
 
   def _discover_from_manifests(self) -> None:
-    """Descobreix CLIs des dels manifest.toml dels mòduls."""
+    """Discover CLIs from module manifest.toml files."""
     self._cache = DEFAULT_CLIS.copy()
 
     quadrants = ["memory", "plugins", "personality", "core"]
@@ -162,14 +162,14 @@ class CLIRouter:
 
   def _parse_manifest(self, manifest_path: Path, quadrant: str) -> Optional[CLIInfo]:
     """
-    Parseja un manifest.toml i extreu info del CLI.
+    Parse a manifest.toml and extract CLI info.
 
     Args:
-      manifest_path: Path al manifest.toml
-      quadrant: Quadrant Nexe (plugins, memory, etc.)
+      manifest_path: Path to the manifest.toml
+      quadrant: Nexe quadrant (plugins, memory, etc.)
 
     Returns:
-      CLIInfo si el manifest defineix un CLI, None altrament
+      CLIInfo if the manifest defines a CLI, None otherwise
     """
     with open(manifest_path, "rb") as f:
       data = tomllib.load(f)
@@ -206,13 +206,13 @@ class CLIRouter:
 
   def get_cli(self, alias: str) -> Optional[CLIInfo]:
     """
-    Obté informació d'un CLI per alias.
+    Get CLI information by alias.
 
     Args:
-      alias: Nom curt del CLI (memory, rag, etc.)
+      alias: Short CLI name (memory, rag, etc.)
 
     Returns:
-      CLIInfo si existeix, None altrament
+      CLIInfo if it exists, None otherwise
     """
     if not self._discovered:
       self._discover_from_manifests()
@@ -222,14 +222,14 @@ class CLIRouter:
 
   def execute(self, alias: str, args: List[str]) -> int:
     """
-    Executa un CLI de mòdul via subprocess.
+    Execute a module CLI via subprocess.
 
     Args:
-      alias: Nom del CLI (memory, rag, etc.)
-      args: Arguments a passar al CLI
+      alias: CLI name (memory, rag, etc.)
+      args: Arguments to pass to the CLI
 
     Returns:
-      Exit code del subprocess
+      Subprocess exit code
     """
     cli_info = self.get_cli(alias)
     if cli_info is None:
@@ -266,10 +266,10 @@ class CLIRouter:
 
   def get_all_clis_dict(self) -> dict:
     """
-    Retorna tots els CLIs com a diccionari (per API).
+    Return all CLIs as a dictionary (for API use).
 
     Returns:
-      Dict amb total i llista de CLIs
+      Dict with total count and list of CLIs
     """
     clis = self.discover_all()
     return {

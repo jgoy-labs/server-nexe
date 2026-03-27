@@ -17,7 +17,8 @@ from typing import Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# RAG thresholds — configurable via env vars
+# Cosine similarity thresholds (0-1, higher = more restrictive)
+# Configurable via env vars
 RAG_DOCS_THRESHOLD = float(os.environ.get('NEXE_RAG_DOCS_THRESHOLD', '0.4'))
 RAG_KNOWLEDGE_THRESHOLD = float(os.environ.get('NEXE_RAG_KNOWLEDGE_THRESHOLD', '0.35'))
 RAG_MEMORY_THRESHOLD = float(os.environ.get('NEXE_RAG_MEMORY_THRESHOLD', '0.3'))
@@ -56,7 +57,7 @@ def _rag_result_to_text(result: Any) -> str:
 
 async def build_rag_context(
     last_user_msg: str,
-    app_state,
+    app_state: Any,
     server_lang: str,
 ) -> str:
     """

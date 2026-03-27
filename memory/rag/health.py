@@ -78,8 +78,9 @@ def check_storage_paths() -> Dict[str, Any]:
   """Check 3: Verifica storage paths existeixen (storage/vectors/)."""
   i18n = get_i18n()
   try:
-    vector_dir = Path("storage/vectors")
-    catalog_dir = Path("storage/vectors/catalog")
+    from core.paths import get_repo_root
+    vector_dir = get_repo_root() / "storage" / "vectors"
+    catalog_dir = get_repo_root() / "storage" / "vectors" / "catalog"
 
     vector_dir.mkdir(parents=True, exist_ok=True)
     catalog_dir.mkdir(parents=True, exist_ok=True)
