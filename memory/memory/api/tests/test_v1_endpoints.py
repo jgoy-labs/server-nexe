@@ -286,7 +286,7 @@ class TestMemorySearchEndpoint:
 
         assert resp.status_code == 200
         data = resp.json()
-        assert data["results"][0]["metadata"] == {}
+        assert data["results"][0]["metadata"]["source_collection"] == "nexe_documentation"
 
 
 class TestMemoryHealthEndpoint:

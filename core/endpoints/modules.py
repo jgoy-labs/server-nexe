@@ -44,6 +44,9 @@ async def list_integrated_modules(
   """List integrated modules and their APIs"""
   if api_integrator:
     stats = api_integrator.get_integration_stats()
+    all_modules = getattr(request.app.state, 'modules', {})
+    stats['modules_loaded'] = list(all_modules.keys())
+    stats['total_modules_loaded'] = len(all_modules)
     return ModulesListResponse(
       status=i18n.t('server_core.api.responses.success') if i18n else "correcte",
       data=stats

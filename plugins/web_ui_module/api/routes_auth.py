@@ -69,10 +69,19 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         """Info del model i backend actiu"""
         import os
         model_name = os.getenv("NEXE_DEFAULT_MODEL", "unknown")
-        backend = os.getenv("NEXE_MODEL_ENGINE", "auto")
+        configured_backend = os.getenv("NEXE_MODEL_ENGINE", "auto")
+        backend = configured_backend
         try:
             from core.lifespan import get_server_state
-            version = get_server_state().config.get('meta', {}).get('version', '0.8')
+            state = get_server_state()
+            version = state.config.get('meta', {}).get('version', '0.8')
+            # Detectar backend real (com /status)
+            modules = getattr(state, 'modules', {}) or {}
+            if configured_backend in ("mlx", "auto"):
+                mlx_mod = modules.get("mlx_module")
+                mlx_ok = mlx_mod and hasattr(mlx_mod, '_node') and mlx_mod._node is not None
+                if configured_backend == "mlx" and not mlx_ok:
+                    backend = "ollama"
         except Exception:
             version = "0.8"
         lang = get_server_lang()
@@ -96,6 +105,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         return {
             "model": model_name,
             "backend": backend,
+            "configured_backend": configured_backend,
             "version": version,
             "lang": lang,
             "rag_collections": rag_collections

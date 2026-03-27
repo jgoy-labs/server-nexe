@@ -1,12 +1,12 @@
 # === METADATA RAG ===
-versio: "1.0"
-data: 2026-02-23
+versio: "1.1"
+data: 2026-03-27
 id: nexe-overview
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "General overview of NEXE 0.8, a local AI server with persistent memory. Covers backends (MLX, llama.cpp, Ollama), features, architecture, available models, use cases and roadmap. Educational project by Jordi Goy."
-tags: [overview, nexe, backends, rag, memory, arquitectura, roadmap, models, instal·lació]
-chunk_size: 1000
+abstract: "General overview of server-nexe 0.8.2, a local AI server with persistent RAG memory. Covers what it is, backends (MLX, llama.cpp, Ollama), features (MEM_SAVE, i18n, Docker, session isolation), architecture, 17 available models, technology stack, installation methods (SwiftUI wizard, CLI, Docker), and current platform support."
+tags: [overview, nexe, server-nexe, backends, rag, memory, mem_save, i18n, docker, models, installation, architecture, features, ollama, mlx, llama-cpp]
+chunk_size: 800
 priority: P1
 
 # === OPCIONAL ===
@@ -17,297 +17,184 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# NEXE 0.8 - Local AI Server with Memory
+# server-nexe 0.8.2 — Local AI Server with Persistent Memory
 
-**Version:** 0.8.0
+**Version:** 0.8.2
 **Default port:** 9119
-**Author:** Jordi Goy
-**Collaboration:** Developed with AI tools assistance
+**Author:** Jordi Goy (Barcelona)
 **License:** Apache 2.0
+**Platforms:** macOS (tested), Linux (partial), Docker (supported)
+**Website:** https://server-nexe.org | https://server-nexe.com
 
-## What is NEXE?
+## What is server-nexe
 
-NEXE is a **personal learning project** (learning by doing) that explores how to build an Artificial Intelligence server that runs entirely locally, with one key differentiating feature: **integrated persistent memory** via RAG (Retrieval-Augmented Generation).
+server-nexe is a local AI server with persistent memory via RAG (Retrieval-Augmented Generation). It runs entirely on the user's machine. No cloud, no telemetry, no external API calls. Conversations, documents and embeddings never leave the device.
 
-**Important:** It is not a finished product and does not attempt to compete with mature tools like ChatGPT, Claude, Ollama or LM Studio. It is an experiment to learn about:
-- RAG systems and vector memory
-- Integration of different LLM backends
-- Modular architecture with plugins
-- REST APIs and servers with FastAPI
-- Embeddings management and semantic search
+It is NOT npm nexe (a Node.js compiler). It is NOT a Windows server product. It is NOT a replacement for Ollama — it can use Ollama as one of its backends.
 
-## Why NEXE if Ollama/LM Studio already exist?
+## Core capabilities
 
-NEXE **does not replace** Ollama, LM Studio or similar tools. In fact, it can use Ollama as a backend!
-
-**Available backends:**
-1. **MLX** - Native for Apple Silicon (mlx-community)
-2. **llama.cpp** - Universal, with Metal acceleration on Mac
-3. **Ollama** - Bridge to Ollama if you already have it installed
-
-**Future backends under consideration:**
-- Other engines as needed
-
-**What does NEXE bring?**
-- An **experimental RAG layer** on top of these backends
-- **Persistent memory** system between conversations
-- Unified API to switch backends easily
-- Learning by building a complete system
-- [Future] Experimenting with AI coding tools + local RAG integration
-
-## Project status
-
-### ✅ What works (tested)
-
-**Platform:**
-- macOS (Apple Silicon and Intel) - Only tested platform
-
-**LLM backends:**
-- MLX backend for Apple Silicon
-- llama.cpp with Metal
-- Bridge to Ollama
-
-**Features:**
-- RAG system with Qdrant (3 specialized collections)
-- REST API partially compatible with OpenAI (/v1/chat/completions)
-- Interactive CLI (`./nexe`) with subcommands
-- Basic experimental Web UI
-- Security system (dual-key auth, rate limiting, sanitization)
-- Document indexing (knowledge ingest)
-- Persistent memory (768-dim embeddings)
-
-### ⚠️ What is theoretical (code implemented but NOT tested)
-
-- **Linux x86_64** - Should work with llama.cpp, NOT tested
-- **Windows** - Theoretically possible with llama.cpp, NOT tested
-
-### 🔨 What is in development or pending
-
-- **Advanced Web UI** - The current UI is very basic
-- **Advanced document management** - Better indexing, metadata, etc.
-
-## Quick installation
-
-**Minimum requirements:**
-- macOS 12+ (recommended: macOS 14+ with Apple Silicon)
-- Python 3.11+
-- 8 GB RAM (recommended: 16+ GB)
-- 10 GB free disk space
-
-**Guided installation:**
-
-```bash
-cd server-nexe
-./setup.sh
-```
-
-The interactive installer will guide you through:
-1. Detecting your hardware (CPU, RAM, GPU)
-2. Selecting the appropriate backend (MLX, llama.cpp or Ollama)
-3. Choosing an LLM model based on your available RAM
-4. Configuring the system
-5. Starting the server automatically
-
-## Quick start
-
-### Start the server
-
-```bash
-./nexe go
-```
-
-The server will start on port 9119:
-- API: `http://localhost:9119`
-- Web UI: `http://localhost:9119/ui`
-- Health check: `http://localhost:9119/health`
-- API documentation: `http://localhost:9119/docs`
-
-**Note:** The API requires authentication with the `X-API-Key` header (configured in `.env` as `NEXE_PRIMARY_API_KEY`).
-
-### Interactive chat
-
-```bash
-# Simple chat
-./nexe chat
-
-# Chat with RAG memory enabled
-./nexe chat --rag
-```
-
-### Memory management
-
-```bash
-# Save information to memory
-./nexe memory store "La capital de Catalunya és Barcelona"
-
-# Retrieve from memory
-./nexe memory recall "capital Catalunya"
-
-# System status
-./nexe status
-
-# Memory statistics
-./nexe memory stats
-```
-
-## Basic architecture
-
-```
-server-nexe/
-├── core/              # Servidor FastAPI + endpoints + CLI
-│   ├── endpoints/     # API REST
-│   ├── cli/           # Comandes CLI
-│   ├── server/        # Factory, lifespan
-│   └── loader/        # Càrrega de models
-├── plugins/           # Sistema de plugins (backends modulars)
-│   ├── mlx_module/
-│   ├── llama_cpp_module/
-│   ├── ollama_module/
-│   ├── security/
-│   └── web_ui_module/
-├── memory/            # Sistema RAG (Qdrant + SQLite + embeddings)
-├── knowledge/         # Documents auto-ingestats (aquesta carpeta!)
-├── personality/       # Personalitat i comportament de l'IA
-└── nexe               # Executable CLI principal
-```
-
-**Basic flow:**
-```
-User → CLI/API → Core → Plugin (MLX/llama.cpp/Ollama) → LLM Model
-                   ↓
-                 Memory (RAG) → Qdrant → Augmented context
-```
-
-## Available models
-
-The installer offers several models depending on your available RAM:
-
-### Small models (8GB RAM)
-- **Phi-3.5 Mini** (2.4 GB) - Microsoft, fast, multilingual
-- **Salamandra 2B** (1.5 GB) - BSC/AINA, optimized for Catalan and Iberian languages
-
-### Medium models (12-16GB RAM)
-- **Mistral 7B** (4.1 GB) - Mistral AI, good quality/speed balance
-- **Salamandra 7B** (4.9 GB) - BSC/AINA, excellent for Catalan
-- **Llama 3.1 8B** (4.7 GB) - Meta, very popular, high quality
-
-### Large models (32GB+ RAM)
-- **Mixtral 8x7B** (26 GB) - Mistral AI, MoE model (Mixture of Experts)
-- **Llama 3.1 70B** (40 GB) - Meta, professional quality
-
-**Note:** The Catalan models (Salamandra) are especially interesting for this project built in Catalonia.
+1. **100% Local and Private** — All inference, memory and storage happen on-device. Zero cloud dependency.
+2. **Persistent RAG Memory** — Remembers context across sessions using Qdrant vector search with 768-dimensional embeddings. Three collections: nexe_documentation (system docs), user_knowledge (uploaded documents), nexe_web_ui (conversation memory).
+3. **Automatic Memory (MEM_SAVE)** — The model extracts facts from conversations automatically (name, job, preferences) and saves them to memory. Zero extra latency (same LLM call). Supports save, delete and recall intents in 3 languages.
+4. **Multi-Backend Inference** — MLX (Apple Silicon native), llama.cpp (GGUF, universal with Metal), Ollama (bridge). Same OpenAI-compatible API, switchable backends.
+5. **Modular Plugin System** — Security, web UI, RAG, each backend — everything is a plugin with independent manifests. Auto-discovered at startup.
+6. **Multilingual (ca/es/en)** — Full i18n: UI, system prompts, RAG context labels, error messages, installer. Server is source of truth for language selection.
+7. **Document Upload with Session Isolation** — Upload documents via Web UI. Indexed into user_knowledge with session_id metadata. Documents only visible within the session they were uploaded to.
+8. **Model Loading Indicator** — Real-time spinner with chronometer when switching models. Works with all 3 backends. Shows model size in GB in the dropdown.
+9. **Ollama Auto-start and Fallback** — Ollama starts automatically on boot (background). If the configured backend is disconnected, auto-selects the first available backend with loaded models.
+10. **Docker Support** — Dockerfile + docker-compose.yml with embedded Qdrant. Python 3.12-slim, non-root user, Linux amd64/arm64.
 
 ## Technology stack
 
-| Component | Technology | Version |
-|-----------|------------|--------|
-| Backend | FastAPI | 0.128+ |
-| Python | CPython | 3.11+ |
-| LLM Server | MLX / llama.cpp / Ollama | - |
-| Vector database | Qdrant | Latest |
-| Relational database | SQLite | 3 |
-| Embeddings | Ollama (nomic-embed-text) + sentence-transformers | Latest |
-| CLI | Click + Rich | - |
-| API | Partially compatible OpenAI | v1 |
-| Authentication | X-API-Key (dual-key rotation) | - |
+| Component | Technology |
+|-----------|-----------|
+| Language | Python 3.11+ (bundled 3.12 in installer) |
+| Web framework | FastAPI 0.128+ |
+| Vector database | Qdrant (embedded binary) |
+| LLM backends | MLX, llama.cpp (llama-cpp-python), Ollama |
+| Embeddings | nomic-embed-text (Ollama) / paraphrase-multilingual-mpnet-base-v2 (offline fallback) |
+| Embedding dimensions | 768 |
+| CLI | Click + Rich |
+| API | OpenAI-compatible (/v1/chat/completions) |
+| Authentication | X-API-Key (dual-key with rotation) |
+| Security | 6 injection detectors, 69 jailbreak patterns, rate limiting, CSP headers |
+| Containerization | Docker + docker-compose (Nexe + Ollama) |
 
-## Experimental use cases
+## Architecture
 
-### 1. Personal assistant with memory
-NEXE can remember information between sessions: projects, preferences, personal context.
+```
+server-nexe/
+├── core/                  # FastAPI server, endpoints, CLI
+│   ├── endpoints/         # REST API (chat split into 8 submodules)
+│   ├── cli/               # CLI commands
+│   ├── server/            # Factory pattern, lifespan
+│   ├── ingest/            # Document ingestion (docs + knowledge)
+│   └── lifespan*.py       # Startup/shutdown (split into 3 submodules)
+├── plugins/               # Modular plugin system
+│   ├── mlx_module/        # Apple Silicon backend
+│   ├── llama_cpp_module/  # GGUF universal backend
+│   ├── ollama_module/     # Ollama bridge + auto-start + VRAM cleanup
+│   ├── security/          # Auth, rate limiting, injection detection
+│   └── web_ui_module/     # Web interface (routes split into 6 submodules)
+├── memory/                # RAG system (Qdrant + embeddings + persistence)
+├── knowledge/             # Documentation for RAG ingestion (ca/es/en)
+├── personality/           # System prompts, module manager, i18n, server.toml
+├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer
+├── storage/               # Runtime data (models, logs, qdrant vectors)
+├── tests/                 # Test suite (3901 tests, 0 failures)
+└── nexe                   # Main CLI executable
+```
 
-### 2. Private knowledge base
-Index local documents (MD, PDF, TXT) and query them in natural language without sending them to the cloud.
+**Data flow:**
+```
+User -> CLI/API/Web UI -> Core -> Plugin (MLX/llama.cpp/Ollama) -> LLM Model
+                           |                                          |
+                           v                                          v
+                    Memory (RAG) -> Qdrant -> Augmented context    MEM_SAVE -> Qdrant
+```
 
-### 3. AI-assisted development
-Use local models for coding and experimentation without depending on external services.
+## Available models (17 in installer catalog)
 
-### 4. Experimentation with LLMs
-Try different models and backends, compare results, learn how they work.
+### Small (8 GB RAM)
+- Qwen3 1.7B (1.1 GB) — Alibaba, 2025
+- Qwen3.5 2B (1.5 GB) — Alibaba, 2025 (Ollama only, multimodal incompatible with MLX)
+- Phi-3.5 Mini (2.4 GB) — Microsoft, 2024
+- Salamandra 2B (1.5 GB) — BSC/AINA, 2024, optimized for Catalan
+- Qwen3 4B (2.5 GB) — Alibaba, 2025
 
-### 5. [Future experimental] AI Coding with RAG
-Experimenting with AI coding tools using local memory.
+### Medium (12-16 GB RAM)
+- Mistral 7B (4.1 GB) — Mistral AI, 2023
+- Salamandra 7B (4.9 GB) — BSC/AINA, 2024, best for Catalan
+- Llama 3.1 8B (4.7 GB) — Meta, 2024
+- Qwen3 8B (5.0 GB) — Alibaba, 2025
+- Gemma 3 12B (7.6 GB) — Google DeepMind, 2025
 
-## Project philosophy
+### Large (32+ GB RAM)
+- Qwen3.5 27B (17 GB) — Alibaba, 2025 (Ollama only)
+- Qwen3 32B (20 GB) — Alibaba, 2025, hybrid reasoning
+- Gemma 3 27B (17 GB) — Google DeepMind, 2025
+- DeepSeek R1 32B (20 GB) — DeepSeek, 2025, advanced reasoning
+- Llama 3.1 70B (40 GB) — Meta, 2024
 
-NEXE **does not try to compete** with ChatGPT, Claude, or other professional assistants.
+Custom models also supported via Ollama (name) or Hugging Face (GGUF repo).
 
-**The goal is to learn and demonstrate that:**
+## Installation methods
 
-1. A useful AI with persistent memory is possible locally
-2. Total privacy is achievable (zero data leaves your Mac)
-3. Local models can cover many everyday use cases
-4. Modular architecture allows experimenting with different backends
-5. Open source code allows understanding how everything works
+### 1. macOS DMG Installer (recommended)
+SwiftUI native wizard with 6 screens: welcome, destination folder, model selection (17 models with hardware detection), confirmation, progress, completion. Bundles Python 3.12. 8-30 minutes depending on model download.
 
-**It is an educational project** that can be useful for:
-- Learning about RAG and AI systems
-- Having a local assistant for basic tasks
-- Experimenting with models without API costs
-- Maintaining absolute privacy of conversations
+### 2. CLI headless
+```bash
+git clone https://github.com/jgoy-labs/server-nexe
+cd server-nexe
+./setup.sh
+./nexe go
+```
+
+### 3. Docker
+```bash
+docker-compose up
+```
+Includes Nexe + Ollama as separate services. Qdrant embedded.
+
+## Quick start
+
+```bash
+./nexe go                    # Start server -> http://127.0.0.1:9119
+./nexe chat                  # Interactive CLI chat
+./nexe chat --rag            # Chat with RAG memory
+./nexe memory store "text"   # Save to memory
+./nexe memory recall "query" # Recall from memory
+./nexe status                # System status
+./nexe knowledge ingest      # Index documents
+```
+
+Web UI: `http://127.0.0.1:9119/ui`
+API docs: `http://127.0.0.1:9119/docs`
+Health check: `http://127.0.0.1:9119/health`
+
+Authentication required: `X-API-Key` header with value from `.env` (`NEXE_PRIMARY_API_KEY`).
+
+## Platform support
+
+| Platform | Status |
+|----------|--------|
+| macOS Apple Silicon | Tested (all 3 backends) |
+| macOS Intel | Tested (llama.cpp + Ollama) |
+| Linux x86_64 | Partial (unit tests pass, CI green, not production-tested) |
+| Linux ARM64 | Docker supported |
+| Windows | Not yet supported |
 
 ## Current limitations
 
-### Technical
-- **Only tested on macOS** (despite having cross-platform code)
-- **Local models are less capable** than GPT-4, Claude Opus, etc.
-- **RAG requires time** for indexing large volumes of data
-- **Variable quality** depending on the selected model
-- **Significant RAM consumption** with large models
+- Local models are less capable than GPT-4, Claude, etc. — the trade-off is privacy.
+- RAG requires initial indexing time. Empty memory = no RAG context.
+- No multi-device sync.
+- No model fine-tuning.
+- API is partially compatible with OpenAI (missing /v1/embeddings, /v1/models).
+- Ollama keep_alive:0 does not always release VRAM (known Ollama bug).
+- No OCR or advanced document parsing.
 
-### Functional
-- **Very basic Web UI** (not a priority right now)
-- **No multi-device sync**
-- **Simple document management** (no OCR, no advanced parsing)
-- **No model fine-tuning**
-- **API partially compatible with OpenAI** (missing /v1/embeddings, /v1/models)
-- **Limited CLI** (basic commands: go, status, chat, memory, knowledge)
+## Related documentation
 
-### Experience
-- It is an **experimental and evolving** project
-- It may have bugs and unexpected behavior
-- No professional support or SLA
-- Documentation is under construction
+Other knowledge documents in this folder:
+- IDENTITY.md — What server-nexe is and is NOT (disambiguation)
+- INSTALLATION.md — Detailed installation guide
+- USAGE.md — Usage examples and practical cases
+- ARCHITECTURE.md — Technical architecture in detail
+- RAG.md — How the memory system works
+- PLUGINS.md — Plugin system
+- API.md — REST API reference
+- SECURITY.md — Security and authentication
+- LIMITATIONS.md — Technical limitations
+- ERRORS.md — Common errors and solutions
+- TESTING.md — Test strategy and coverage
 
-## Roadmap (flexible)
+## Links
 
-| Version | Goal | Status | Approx. date |
-|--------|----------|-------|-------------|
-| 0.8 | Base + RAG + 3 backends | ✅ | Completed |
-| 0.9 | RAG improvements and stability | 🔨 | TBD |
-| 1.0 | Public demo, complete docs | 📅 | TBD |
-
-**Note:** Dates are approximate. This is a personal project done in free time.
-
-## Resources and documentation
-
-**In this folder (knowledge/):**
-- **INSTALLATION.md** - Detailed installation guide
-- **USAGE.md** - Usage examples and practical cases
-- **ARCHITECTURE.md** - Detailed technical architecture
-- **RAG.md** - How the memory system works
-- **PLUGINS.md** - Plugin system and how to create them
-- **API.md** - Complete REST API reference
-- **SECURITY.md** - Security system and authentication
-- **LIMITATIONS.md** - Technical limitations and unsupported cases
-
-**Web:**
-- **Author:** Jordi Goy - [jgoy.net](https://jgoy.net)
-
-## Start exploring
-
-After reading this README, the recommended flow is:
-
-1. **INSTALLATION.md** - Install the system
-2. **USAGE.md** - Try the basic features
-3. **RAG.md** - Understand how the memory works
-4. **ARCHITECTURE.md** - Dive deeper into the architecture
-5. **SECURITY.md** - Understand the security and authentication system
-6. **API.md** - If you want to integrate it with other tools
-7. **LIMITATIONS.md** - To know what it CANNOT do
-
----
-
-**Important note:** This documentation is auto-ingested into the NEXE RAG system during installation. If you ask NEXE about itself, its capabilities or limitations, it will use this information to respond honestly.
-
-**Learning by doing** - This project is a continuous learning experiment. Bugs, improvements and evolution are part of the process.
+- Source code: https://github.com/jgoy-labs/server-nexe
+- Documentation: https://server-nexe.org
+- Commercial site: https://server-nexe.com
+- Author: https://jgoy.net
+- Support: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/jgoylabs

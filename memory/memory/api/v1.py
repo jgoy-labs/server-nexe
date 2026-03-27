@@ -37,7 +37,8 @@ class MemorySearchRequest(BaseModel):
     """Request body for searching memory."""
     query: str
     limit: int = 5
-    collection: str = "nexe_chat_memory"
+    collection: Optional[str] = None
+    collections: Optional[List[str]] = None
 
 class MemorySearchResult(BaseModel):
     """Single search result."""
@@ -131,28 +132,52 @@ async def memory_search(request: Request, body: MemorySearchRequest):
     try:
         memory = await get_memory_api()
 
-        # Check if collection exists
-        if not await memory.collection_exists(body.collection):
-            return MemorySearchResponse(results=[], total=0)
+        # Determinar col·leccions a cercar
+        if body.collections:
+            cols = body.collections
+        elif body.collection:
+            cols = [body.collection]
+        else:
+            cols = ["nexe_documentation", "nexe_web_ui", "user_knowledge", "nexe_chat_memory"]
 
-        # Search
-        results = await memory.search(
-            query=body.query,
-            collection=body.collection,
-            top_k=body.limit,
-            threshold=0.3
-        )
+        formatted_results = []
+        search_errors = 0
+        cols_searched = 0
+        last_error = None
+        for col in cols:
+            try:
+                if not await memory.collection_exists(col):
+                    continue
+                cols_searched += 1
+                results = await memory.search(
+                    query=body.query,
+                    collection=col,
+                    top_k=body.limit,
+                    threshold=0.3
+                )
+                for r in results:
+                    meta = r.metadata or {} if hasattr(r, 'metadata') else {}
+                    if isinstance(meta, dict):
+                        meta["source_collection"] = col
+                    formatted_results.append(MemorySearchResult(
+                        content=r.text if hasattr(r, 'text') else str(r),
+                        score=r.score,
+                        metadata=meta
+                    ))
+            except Exception as e:
+                search_errors += 1
+                last_error = e
+                logger.warning("Search failed for collection %s: %s", col, e)
+                continue
 
-        formatted_results = [
-            MemorySearchResult(
-                content=r.text,
-                score=r.score,
-                metadata=r.metadata or {}
-            )
-            for r in results
-        ]
+        # Si totes les cerques van fallar, propagar l'error
+        if cols_searched > 0 and search_errors == cols_searched and last_error:
+            raise last_error
 
-        logger.debug("Memory search for '%s' returned %d results", body.query[:50], len(formatted_results))
+        formatted_results.sort(key=lambda x: x.score, reverse=True)
+        formatted_results = formatted_results[:body.limit]
+
+        logger.debug("Memory search for '%s' returned %d results from %d collections", body.query[:50], len(formatted_results), len(cols))
 
         return MemorySearchResponse(
             results=formatted_results,

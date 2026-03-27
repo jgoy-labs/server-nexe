@@ -38,7 +38,7 @@ def discover_and_load_modules(app: Any, module_manager: Any, project_root: Path,
   """
   logger.info(translate(i18n, "core.server.auto_discovering",
              "Auto-discovering modules from: {path}",
-             path=str(project_root / 'plugins' / 'tools')))
+             path=str(project_root / 'plugins')))
 
   discovered = module_manager.discover_modules_sync(force=False)
 

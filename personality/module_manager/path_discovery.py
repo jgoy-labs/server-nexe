@@ -61,8 +61,10 @@ class PathDiscovery:
       logger.warning("PathDiscovery in DEV MODE - auto-discovery enabled")
     
     self.known_paths = [
+      "plugins",
       "plugins/core",
       "plugins/tools",
+      "storage",
       "storage/core",
       "storage/tools",
       "memory/core",
@@ -200,11 +202,13 @@ class PathDiscovery:
         msg = self._get_message('path_discovery.path_added', path=str(path))
         logger.debug(msg, component="path_discovery")
 
-    add_paths_cfg = orchestrator_config.get('additional_paths', {})
-    if not isinstance(add_paths_cfg, dict):
-      add_paths_cfg = {}
-      
-    additional_paths = add_paths_cfg.get('paths', [])
+    add_paths_cfg = orchestrator_config.get('additional_paths', [])
+    if isinstance(add_paths_cfg, list):
+      additional_paths = add_paths_cfg
+    elif isinstance(add_paths_cfg, dict):
+      additional_paths = add_paths_cfg.get('paths', [])
+    else:
+      additional_paths = []
     if not isinstance(additional_paths, list):
       additional_paths = []
       
@@ -386,10 +390,14 @@ class PathDiscovery:
       self._module_locations = {
         k: Path(v) for k, v in cache_data.get('modules', {}).items()
       }
-      
+
+      if not self._module_locations:
+        logger.warning("Module cache is empty, forcing re-discovery")
+        return False
+
       msg = self._get_message('path_discovery.cache_loaded', file=str(cache_file))
       logger.debug(msg, component="path_discovery")
-      
+
       return True
       
     except Exception as e:

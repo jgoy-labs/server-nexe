@@ -164,20 +164,21 @@ class TestMLXConfigValidate:
         config = MLXConfig(model_path=str(model_file))
         assert config.validate() is False
 
-    def test_validate_no_config_json_warning(self, tmp_path):
-        """Line 185: model dir exists but no config.json -> warning, not error."""
+    def test_validate_no_config_json_error(self, tmp_path):
+        """Line 185: model dir exists but no config.json -> error, returns False."""
         from plugins.mlx_module.core.config import MLXConfig
         model_dir = tmp_path / "my_model"
         model_dir.mkdir()
         config = MLXConfig(model_path=str(model_dir))
-        # Should still return True (not fatal)
-        assert config.validate() is True
+        # config.json is required for mlx-lm
+        assert config.validate() is False
 
     def test_validate_max_tokens_zero(self, tmp_path):
         """Lines 192-193: max_tokens < 1 returns False."""
         from plugins.mlx_module.core.config import MLXConfig
         model_dir = tmp_path / "model_dir"
         model_dir.mkdir()
+        (model_dir / "config.json").write_text("{}")
         config = MLXConfig(model_path=str(model_dir), max_tokens=0)
         assert config.validate() is False
 
@@ -186,6 +187,7 @@ class TestMLXConfigValidate:
         from plugins.mlx_module.core.config import MLXConfig
         model_dir = tmp_path / "model_dir"
         model_dir.mkdir()
+        (model_dir / "config.json").write_text("{}")
         config = MLXConfig(model_path=str(model_dir), max_kv_size=256)
         assert config.validate() is False
 
@@ -194,6 +196,7 @@ class TestMLXConfigValidate:
         from plugins.mlx_module.core.config import MLXConfig
         model_dir = tmp_path / "model_dir"
         model_dir.mkdir()
+        (model_dir / "config.json").write_text("{}")
         config = MLXConfig(model_path=str(model_dir), temperature=3.0)
         # temperature warning is not fatal
         assert config.validate() is True
@@ -203,6 +206,7 @@ class TestMLXConfigValidate:
         from plugins.mlx_module.core.config import MLXConfig
         model_dir = tmp_path / "model_dir"
         model_dir.mkdir()
+        (model_dir / "config.json").write_text("{}")
         config = MLXConfig(model_path=str(model_dir), top_p=1.5)
         assert config.validate() is False
 
