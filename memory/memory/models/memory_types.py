@@ -25,9 +25,9 @@ class MemoryType(str, Enum):
   """
 
   EPISODIC = "episodic"
-  """Interaccions directes amb l'usuari (converses, decisions)"""
+  """Direct interactions with the user (conversations, decisions)."""
 
   SEMANTIC = "semantic"
-  """Documents tècnics, facts, coneixement estructurat"""
+  """Technical documents, facts, structured knowledge."""
 
 __all__ = ["MemoryType"]

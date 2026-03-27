@@ -16,8 +16,8 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-# Carregar .env automàticament quan s'importa aquest mòdul
-# (Consistència amb llm_router/config.py - redundant però harmless)
+# Load .env automatically when this module is imported
+# (Consistency with llm_router/config.py - redundant but harmless)
 try:
     from dotenv import load_dotenv
     _env_path = Path(__file__).parents[3] / ".env"  # root directory .env
@@ -45,9 +45,9 @@ def _auto_max_kv_size() -> int:
         available_for_kv_gb = max(0, total_gb - 20)  # Reservar 20GB per model+sistema
         kv_bytes_per_token = 256 * 1024  # 256KB/token (Qwen3-32B)
         max_tokens = int((available_for_kv_gb * 1024 ** 3) / kv_bytes_per_token)
-        # Arrodonir al múltiple de 1024 i limitar a 131072
+        # Round to nearest multiple of 1024 and cap at 131072
         max_tokens = min(65536, (max_tokens // 1024) * 1024)
-        max_tokens = max(16384, max_tokens)  # Mínim 16K
+        max_tokens = max(16384, max_tokens)  # Minimum 16K
         logger.info(f"MLXConfig: auto max_kv_size={max_tokens} (RAM={total_gb:.0f}GB)")
         return max_tokens
     except Exception:
@@ -76,7 +76,7 @@ class MLXConfig:
     max_session_caches: int = 4  # Com ModelPool.max_sessions
 
     def __post_init__(self):
-        """Valida la configuració després de crear-la."""
+        """Validate configuration after creation."""
         if not self.model_path:
             logger.warning(
                 "MLXConfig: model_path buit. "
@@ -171,7 +171,7 @@ class MLXConfig:
             )
             return False
 
-        # Verificar que és un directori (models MLX són directoris)
+        # Verify it is a directory (MLX models are directories)
         if not model_path.is_dir():
             logger.error(
                 "MLXConfig: model_path ha de ser un directori: %s",
@@ -179,7 +179,7 @@ class MLXConfig:
             )
             return False
 
-        # Verificar que conté config.json (requerit per mlx-lm)
+        # Verify it contains config.json (required by mlx-lm)
         config_file = model_path / "config.json"
         if not config_file.exists():
             logger.error(

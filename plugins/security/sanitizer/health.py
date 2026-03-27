@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/sanitizer/health.py
-Description: Health checks per al mòdul SANITIZER.
+Description: Health checks for the SANITIZER module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

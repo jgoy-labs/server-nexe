@@ -95,12 +95,12 @@ def create_router(module_instance) -> APIRouter:
             models = await module.list_models()
             return {"status": "ok", "total": len(models), "models": models}
         except Exception as e:
-            logger.error(f"Failed to list Ollama models: {e}")
+            logger.error("Failed to list Ollama models: %s", e)
             raise HTTPException(status_code=503, detail=f"Ollama connection failed: {str(e)}")
 
     @router.post("/api/pull")
     async def pull_model(request: PullModelRequest, _: str = Depends(require_api_key)):
-        """Descarrega model d'Ollama amb streaming de progres. Requires API key."""
+        """Download Ollama model with streaming progress. Requires API key."""
         module = _get_module()
 
         async def progress_stream():
@@ -109,7 +109,7 @@ def create_router(module_instance) -> APIRouter:
                     data = json.dumps(progress)
                     yield f"data: {data}\n\n"
             except Exception as e:
-                logger.error(f"Pull model failed: {e}")
+                logger.error("Pull model failed: %s", e)
                 yield f"data: {json.dumps({'error': str(e), 'status': 'error'})}\n\n"
 
         return StreamingResponse(
@@ -120,7 +120,7 @@ def create_router(module_instance) -> APIRouter:
 
     @router.post("/api/chat")
     async def chat(request: ChatRequest, _: str = Depends(require_api_key)):
-        """Chat amb model Ollama (streaming). Requires API key."""
+        """Chat with Ollama model (streaming). Requires API key."""
         module = _get_module()
         messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
@@ -132,7 +132,7 @@ def create_router(module_instance) -> APIRouter:
                     if chunk.get("done", False):
                         break
             except Exception as e:
-                logger.error(f"Chat failed: {e}")
+                logger.error("Chat failed: %s", e)
                 yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
 
         return StreamingResponse(
@@ -143,24 +143,24 @@ def create_router(module_instance) -> APIRouter:
 
     @router.get("/api/models/{model_name}/info")
     async def get_model_info(model_name: str):
-        """Obte informacio detallada d'un model."""
+        """Get detailed information about a model."""
         module = _get_module()
         try:
             info = await module.get_model_info(model_name)
             return {"status": "ok", "model": model_name, "info": info}
         except Exception as e:
-            logger.error(f"Failed to get model info: {e}")
+            logger.error("Failed to get model info: %s", e)
             raise HTTPException(status_code=404, detail=f"Model not found or error: {str(e)}")
 
     @router.delete("/api/models/{model_name}")
     async def delete_model(model_name: str, _: str = Depends(require_api_key)):
-        """Elimina un model local. Requires API key."""
+        """Delete a local model. Requires API key."""
         module = _get_module()
         try:
             await module.delete_model(model_name)
             return {"status": "ok", "message": f"Model {model_name} deleted successfully"}
         except Exception as e:
-            logger.error(f"Failed to delete model: {e}")
+            logger.error("Failed to delete model: %s", e)
             raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
 
     # --- Health & Info ---

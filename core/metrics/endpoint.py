@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: core/metrics/endpoint.py
-Description: Endpoint /metrics per exposar mètriques Prometheus.
+Description: /metrics endpoint to expose Prometheus metrics.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

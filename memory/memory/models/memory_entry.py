@@ -22,29 +22,29 @@ class MemoryEntry(BaseModel):
 
   id: Optional[str] = Field(
     default=None,
-    description="ID únic determinista (SHA256(content)[:16]) - auto-generat"
+    description="Deterministic unique ID (SHA256(content)[:16]) - auto-generated"
   )
 
   entry_type: MemoryType = Field(
     ...,
-    description="Tipus de memòria: episodic o semantic"
+    description="Memory type: episodic or semantic"
   )
 
   content: str = Field(
     ...,
     min_length=1,
     max_length=100_000,
-    description="Contingut de la memòria (max 100KB)"
+    description="Memory content (max 100KB)"
   )
 
   source: str = Field(
     default="unknown",
-    description="Font de la memòria (e.g., 'chat', 'pdf', 'api')"
+    description="Memory source (e.g., 'chat', 'pdf', 'api')"
   )
 
   timestamp: datetime = Field(
     default_factory=lambda: datetime.now(timezone.utc),
-    description="Timestamp UTC de creació"
+    description="UTC creation timestamp"
   )
 
   ttl_seconds: Optional[int] = Field(
@@ -63,7 +63,7 @@ class MemoryEntry(BaseModel):
   @field_validator('content')
   @classmethod
   def validate_content_not_empty(cls, v: str) -> str:
-    """Validar que el contingut no sigui només espais"""
+    """Validate that the content is not only whitespace."""
     if not v.strip():
       raise ValueError("Content cannot be empty or whitespace only")
     return v

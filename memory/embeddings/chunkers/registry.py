@@ -270,7 +270,7 @@ class ChunkerRegistry:
     return chunker_id in self._chunkers
 
   def has_format_support(self, file_extension: str) -> bool:
-    """Comprova si hi ha suport per una extensió."""
+    """Check if a file extension is supported."""
     ext = file_extension.lower().lstrip(".")
     return ext in self._format_map
 

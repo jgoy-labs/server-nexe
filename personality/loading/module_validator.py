@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_validator.py
-Description: Validador de mòduls carregats. Comprova instància vàlida, existència d'API
+Description: Loaded module validator. Checks valid instance, presence of API
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -29,11 +29,11 @@ except ImportError:
   IntegrityChecker = None
 
 class ModuleValidationError(Exception):
-  """Error de validació de mòdul"""
+  """Module validation error."""
   pass
 
 class ModuleValidator:
-  """Valida mòduls carregats"""
+  """Validate loaded modules."""
 
   def __init__(self, i18n=None, core_root: Optional[Path] = None):
     self.i18n = i18n
@@ -56,14 +56,14 @@ class ModuleValidator:
 
   def validate_module(self, instance: Any, module_info: ModuleInfo) -> None:
     """
-    Valida que un mòdul compleixi els requisits mínims.
+    Validate that a module meets minimum requirements.
 
     Args:
-      instance: Instància del mòdul
-      module_info: Informació del mòdul
+      instance: Module instance
+      module_info: Module information
 
     Raises:
-      ModuleValidationError: Si la validació falla
+      ModuleValidationError: If validation fails
     """
     validations = []
 
@@ -88,7 +88,7 @@ class ModuleValidator:
 
   def _validate_api(self, instance: Any, manifest: dict,
            validations: List[str]) -> None:
-    """Valida API si està especificat al manifest"""
+    """Validate the API if specified in the manifest."""
     api_section = manifest.get('api', {})
 
     if api_section.get('endpoints_auto_discovery', False):
@@ -104,7 +104,7 @@ class ModuleValidator:
 
   def _validate_ui(self, instance: Any, module_info: ModuleInfo,
           validations: List[str]) -> None:
-    """Valida UI si està especificat al manifest"""
+    """Validate the UI if specified in the manifest."""
     ui_section = module_info.manifest.get('ui', {})
 
     if ui_section.get('enabled', False):
@@ -121,10 +121,10 @@ class ModuleValidator:
     self, module_info: ModuleInfo, validations: List[str]
   ) -> None:
     """
-    SECURITY: Valida integritat del manifest (TOFU - Trust On First Use).
+    SECURITY: Validate manifest integrity (TOFU - Trust On First Use).
 
-    Si el manifest no està al lock, l'afegeix automàticament (TOFU).
-    Si està al lock però el checksum no coincideix, rebutja el mòdul.
+    If the manifest is not in the lock, add it automatically (TOFU).
+    If it is in the lock but the checksum does not match, reject the module.
     """
     if not self._integrity_checker:
       return
@@ -161,7 +161,7 @@ class ModuleValidator:
       logger.info(f"TOFU: Trusted new manifest for module '{module_info.name}'")
 
   def _validate_dependencies(self, module_info: ModuleInfo) -> None:
-    """Valida dependències externes (només warning)"""
+    """Validate external dependencies (warning only)."""
     deps = module_info.manifest.get('dependencies', {})
     external_deps = deps.get('external', [])
     missing_deps = []

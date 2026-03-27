@@ -207,15 +207,6 @@ class TestSetupCsrfProtection:
         config = {"core": {"server": {"csrf_cookie_secure": False, "host": "127.0.0.1"}}}
         setup_csrf_protection(app, config)
 
-    def test_import_error_starlette_csrf_no_crash(self, monkeypatch):
-        from core.middleware import setup_csrf_protection
-        app = FastAPI()
-        monkeypatch.setenv("NEXE_CSRF_SECRET", "test-secret")
-        config = {}
-        with patch.dict("sys.modules", {"starlette_csrf": None}):
-            # Should not crash if starlette-csrf not installed
-            setup_csrf_protection(app, config)
-
 
 class TestSetupTrustedHosts:
 

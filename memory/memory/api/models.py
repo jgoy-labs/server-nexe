@@ -27,7 +27,7 @@ class CollectionNotFoundError(MemoryAPIError):
   """Collection no existeix."""
 
 class InvalidCollectionNameError(MemoryAPIError):
-  """Nom de collection invàlid (no segueix naming convention)."""
+  """Invalid collection name (does not follow naming convention)."""
 
 class DocumentNotFoundError(MemoryAPIError):
   """Document no trobat."""
@@ -94,7 +94,7 @@ class Document:
 
   @property
   def ttl_remaining(self) -> Optional[int]:
-    """Retorna segons restants fins expiració, o None si permanent."""
+    """Return seconds remaining until expiry, or None if permanent."""
     if self.expires_at is None:
       return None
     now = datetime.now(timezone.utc)

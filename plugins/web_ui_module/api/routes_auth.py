@@ -129,7 +129,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
             root = Path(get_server_state().project_root)
             models_dir = root / models_dir
 
-        # Ollama (mostrar sempre si el mòdul existeix, marcar si desconnectat)
+        # Ollama (always show if the module exists, mark as disconnected if unreachable)
         try:
             reg = module_manager.registry.get_module("ollama_module")
             if reg and reg.instance:
@@ -185,7 +185,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         except Exception as e:
             logger.debug(f"Llama.cpp backend scan failed: {e}")
 
-        # Marcar actiu — si el backend configurat està desconnectat, fallback al primer connectat
+        # Mark active — if the configured backend is disconnected, fall back to the first connected one
         current_backend = os.getenv("NEXE_MODEL_ENGINE", "auto").lower()
         current_model = os.getenv("NEXE_DEFAULT_MODEL", "")
         active_set = False

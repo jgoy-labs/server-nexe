@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/auth_utils.py
-Description: Utilitats per al sistema d'autenticació Nexe.
+Description: Utilities for the Nexe authentication system.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

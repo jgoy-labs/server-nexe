@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy
 Location: plugins/llama_cpp_module/manifest.py
-Description: Router FastAPI per mòdul Llama.cpp (Universal).
+Description: FastAPI router for the Llama.cpp module (Universal).
              Lazy initialization to avoid side effects at import.
 
 www.jgoy.net · https://server-nexe.org

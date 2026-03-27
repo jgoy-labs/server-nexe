@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security_logger/sanitizers.py
-Description: Funcions de sanitització per security logs (GDPR compliance).
+Description: Sanitization functions for security logs (GDPR compliance).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

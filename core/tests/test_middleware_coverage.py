@@ -82,14 +82,15 @@ class TestSetupCsrfProtectionFullCoverage:
                 pass
 
     def test_csrf_starlette_not_installed(self):
-        """Lines 263-265: starlette-csrf ImportError."""
+        """starlette-csrf is mandatory — missing module raises ImportError."""
         from core.middleware import setup_csrf_protection
         app = FastAPI()
         config = {"core": {"server": {}}}
 
         with patch.dict("os.environ", {"NEXE_CSRF_SECRET": "test"}), \
              patch.dict("sys.modules", {"starlette_csrf": None}):
-            setup_csrf_protection(app, config)
+            with pytest.raises((ImportError, ModuleNotFoundError)):
+                setup_csrf_protection(app, config)
 
     def test_csrf_uses_exempt_patterns(self):
         """Lines 251-261: CSRF uses pre-compiled exempt patterns."""

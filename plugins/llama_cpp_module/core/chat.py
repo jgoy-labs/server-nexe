@@ -27,14 +27,14 @@ class LlamaCppChatNode:
     El prefix caching de llama.cpp s'aprofita quan system_hash és idèntic.
     """
 
-    # Pool singleton compartit per totes les instàncies del node
+    # Singleton pool shared across all node instances
     _pool: Optional[ModelPool] = None
     _config: Optional[LlamaCppConfig] = None
 
     def __init__(self, config: Optional[LlamaCppConfig] = None):
         self.config = config or LlamaCppConfig.from_env()
 
-        # Inicialitzar pool singleton (lazy)
+        # Initialize singleton pool (lazy)
         if (LlamaCppChatNode._pool is None or
                 LlamaCppChatNode._config != self.config):
             LlamaCppChatNode._config = self.config
@@ -90,7 +90,7 @@ class LlamaCppChatNode:
                 loop.call_soon_threadsafe(stream_callback, piece)
 
         try:
-            # Obtenir model del pool (gestiona cache/reset automàticament)
+            # Get model from pool (handles cache/reset automatically)
             model, cache_hit = self._get_model(session_id, system_hash)
 
             # Executar amb create_chat_completion
@@ -114,7 +114,7 @@ class LlamaCppChatNode:
                 tokens_per_second = result["tokens"] / (elapsed_ms / 1000)
 
             context_used = result["prompt_tokens"] + result["tokens"]
-            system_tokens = len(system) // 4  # Estimació
+            system_tokens = len(system) // 4  # Estimate
 
             # Obtenir timing del resultat
             timing = result.get("timing", {})
@@ -158,7 +158,7 @@ class LlamaCppChatNode:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Generació sense streaming."""
+        """Generate a response without streaming."""
         all_messages = [{"role": "system", "content": system}] + messages
 
         # Stop sequences per diferents models
@@ -180,7 +180,7 @@ class LlamaCppChatNode:
         )
         end_time = time.time()
 
-        # Sense streaming no podem distingir prefill de generació
+        # Without streaming we cannot distinguish prefill from generation
         total_ms = int((end_time - start_time) * 1000)
 
         return {
@@ -204,7 +204,7 @@ class LlamaCppChatNode:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Generació amb streaming."""
+        """Generate a response with streaming."""
         all_messages = [{"role": "system", "content": system}] + messages
 
         # Stop sequences per diferents models
@@ -271,21 +271,21 @@ class LlamaCppChatNode:
             "timing": {
                 "prefill_ms": prefill_ms,      # TTFT - Time To First Token
                 "prefill_available": True,     # TTFT available via streaming
-                "generation_ms": generation_ms, # Temps generació
+                "generation_ms": generation_ms, # Generation time
                 "overhead_ms": 0,
             },
         }
 
     @classmethod
     def reset_model(cls) -> None:
-        """Destruir totes les sessions del pool i alliberar memòria."""
+        """Destroy all pool sessions and free memory."""
         if cls._pool is not None:
             cls._pool.destroy_all()
             logger.info("LlamaCppChatNode: all sessions destroyed via pool")
 
     @classmethod
     def get_pool_stats(cls) -> Optional[Dict]:
-        """Estadístiques del pool de models."""
+        """Return model pool statistics."""
         if cls._pool is None:
             return {
                 "pool_initialized": False,

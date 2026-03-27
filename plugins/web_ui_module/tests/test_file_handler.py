@@ -54,7 +54,7 @@ class TestValidateFile:
     def test_invalid_extension_jpg(self, fh):
         ok, msg = fh.validate_file("image.jpg", 100)
         assert ok is False
-        assert "Format no suportat" in msg
+        assert "Unsupported format" in msg
 
     def test_invalid_extension_exe(self, fh):
         ok, msg = fh.validate_file("malware.exe", 100)
@@ -68,7 +68,7 @@ class TestValidateFile:
     def test_file_too_large(self, fh):
         ok, msg = fh.validate_file("big.txt", MAX_FILE_SIZE + 1)
         assert ok is False
-        assert "massa gran" in msg
+        assert "too large" in msg
 
     def test_file_exact_max_size(self, fh):
         ok, _ = fh.validate_file("edge.txt", MAX_FILE_SIZE)

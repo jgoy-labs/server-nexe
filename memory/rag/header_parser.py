@@ -12,12 +12,12 @@ www.jgoy.net · https://server-nexe.org
 
 import os
 import re
-import logging
+import structlog
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple, List
 from dataclasses import dataclass, field
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # === CONSTANTS ===
 HEADER_VERSION = "1.0"
@@ -122,7 +122,7 @@ class RAGHeaderParser:
         self.errors = []
         header = RAGHeader()
 
-        # Buscar capçalera
+        # Search for header
         header_text, body = self._extract_header(content)
 
         if not header_text:
@@ -163,9 +163,9 @@ class RAGHeaderParser:
         header.is_valid = len(header.validation_errors) == 0
 
         if header.validation_errors:
-            logger.warning(f"Capçalera RAG amb errors: {header.validation_errors}")
+            logger.warning("RAG header with errors: %s", header.validation_errors)
         else:
-            logger.info(f"Capçalera RAG vàlida: id={header.id}, priority={header.priority}")
+            logger.info("Valid RAG header: id=%s, priority=%s", header.id, header.priority)
 
         return header, body
 
@@ -179,19 +179,19 @@ class RAGHeaderParser:
         for i, line in enumerate(lines):
             stripped = line.strip()
 
-            # Detectar inici de capçalera
+            # Detect header start
             if "METADATA RAG" in stripped or stripped.startswith("versio:"):
                 in_header = True
                 if "METADATA RAG" not in stripped:
                     header_lines.append(line)
                 continue
 
-            # Detectar fi de capçalera
+            # Detect header end
             if in_header and (stripped == "---" or stripped == ""):
                 if stripped == "---":
                     body_start = i + 1
                 else:
-                    # Línia buida - comprovar si ve més capçalera (camp o comentari de secció)
+                    # Empty line - check if more header follows (field or section comment)
                     if i + 1 < len(lines) and (
                         ":" in lines[i + 1] or lines[i + 1].strip().startswith('#')
                     ):
@@ -217,7 +217,7 @@ class RAGHeaderParser:
         for line in text.split('\n'):
             line = line.strip()
 
-            # Ignorar comentaris i línies buides
+            # Skip comments and empty lines
             if not line or line.startswith('#'):
                 continue
 
@@ -267,24 +267,24 @@ class RAGHeaderParser:
             errors.append("Camp 'id' obligatori")
 
         if not header.abstract:
-            errors.append("Camp 'abstract' obligatori")
+            errors.append("Field 'abstract' is required")
         elif len(header.abstract) > 500:
-            errors.append(f"'abstract' massa llarg ({len(header.abstract)}/500 chars)")
+            errors.append(f"'abstract' too long ({len(header.abstract)}/500 chars)")
 
         if len(header.tags) < MIN_TAGS:
-            errors.append(f"Mínim {MIN_TAGS} tags requerits")
+            errors.append(f"Minimum {MIN_TAGS} tags required")
         elif len(header.tags) > MAX_TAGS:
-            errors.append(f"Màxim {MAX_TAGS} tags permesos")
+            errors.append(f"Maximum {MAX_TAGS} tags allowed")
 
-        # Validar chunk_size
+        # Validate chunk_size
         if header.chunk_size < MIN_CHUNK_SIZE:
-            errors.append(f"chunk_size mínim: {MIN_CHUNK_SIZE}")
+            errors.append(f"chunk_size minimum: {MIN_CHUNK_SIZE}")
         elif header.chunk_size > MAX_CHUNK_SIZE:
-            errors.append(f"chunk_size màxim: {MAX_CHUNK_SIZE}")
+            errors.append(f"chunk_size maximum: {MAX_CHUNK_SIZE}")
 
-        # Validar priority
+        # Validate priority
         if header.priority not in VALID_PRIORITIES:
-            errors.append(f"priority ha de ser: {', '.join(VALID_PRIORITIES)}")
+            errors.append(f"priority must be: {', '.join(VALID_PRIORITIES)}")
 
         # Validar lang
         if header.lang not in VALID_LANGS:
@@ -382,7 +382,7 @@ priority: {priority.upper()}
         return header
 
 
-# Instància global
+# Global instance
 _parser = RAGHeaderParser()
 
 

@@ -16,34 +16,16 @@ import psutil
 import structlog
 
 from personality.i18n import get_i18n
+from memory.shared.health_helpers import (
+  check_module_initialized as _shared_check_module_initialized,
+  aggregate_health_checks
+)
 
 logger = structlog.get_logger()
 
-def check_module_initialized(module) -> Dict[str, Any]:
+def check_module_initialized(module: Any) -> Dict[str, Any]:
   """Check 1: Verify that the module is initialized."""
-  i18n = get_i18n()
-  try:
-    is_init = module._initialized
-    message = (
-      i18n.t("memory.health.initialized_ok", "Module initialized correctly")
-      if is_init
-      else i18n.t("memory.health.not_initialized", "Module not initialized")
-    )
-    return {
-      "name": "module_initialized",
-      "status": "pass" if is_init else "fail",
-      "message": message
-    }
-  except Exception as e:
-    return {
-      "name": "module_initialized",
-      "status": "fail",
-      "message": i18n.t(
-        "memory.health.init_check_error",
-        "Error checking initialization: {error}",
-        error=str(e)
-      )
-    }
+  return _shared_check_module_initialized(module, "memory")
 
 def check_flash_storage_paths() -> Dict[str, Any]:
   """Check 2: Verify flash storage paths exist."""
@@ -345,16 +327,6 @@ def check_health(module) -> Dict[str, Any]:
     checks.append(check_persistence_connectivity(module))
     checks.append(check_pipeline_stats(module))
 
-    has_fail = any(c["status"] == "fail" for c in checks)
-    has_warn = any(c["status"] == "warn" for c in checks)
-
-    if has_fail:
-      overall_status = "unhealthy"
-    elif has_warn:
-      overall_status = "degraded"
-    else:
-      overall_status = "healthy"
-
     metadata = {
       "module_id": module.module_id,
       "name": module.name,
@@ -362,22 +334,7 @@ def check_health(module) -> Dict[str, Any]:
       "initialized": module._initialized
     }
 
-    result = {
-      "status": overall_status,
-      "checks": checks,
-      "metadata": metadata
-    }
-
-    logger.info(
-      "memory_health_check_complete",
-      status=overall_status,
-      checks_total=len(checks),
-      checks_pass=sum(1 for c in checks if c["status"] == "pass"),
-      checks_warn=sum(1 for c in checks if c["status"] == "warn"),
-      checks_fail=sum(1 for c in checks if c["status"] == "fail")
-    )
-
-    return result
+    return aggregate_health_checks(checks, "memory", metadata)
 
   except Exception as e:
     logger.error(

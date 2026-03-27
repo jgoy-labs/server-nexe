@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/router.py
-Description: FastAPI router per mòdul Memory.
+Description: FastAPI router for the Memory module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

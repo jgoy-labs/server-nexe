@@ -40,7 +40,7 @@ def register_static_routes(router: APIRouter, *, module_ref):
         html = html.replace('lang="ca"', f'lang="{lang}"')
         # data-nexe-lang: llegit per app.js per aplicar i18n (CSP-safe, no inline script)
         html = html.replace('<html ', f'<html data-nexe-lang="{lang}" ')
-        # Cache-bust: afegir ?v=timestamp a CSS i JS perquè el browser recarregui
+        # Cache-bust: append ?v=timestamp to CSS and JS so the browser reloads them
         html = html.replace('.css"', f'.css?v={_BOOT_TS}"')
         html = html.replace('.js"', f'.js?v={_BOOT_TS}"')
         return HTMLResponse(content=html)

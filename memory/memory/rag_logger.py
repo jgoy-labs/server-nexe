@@ -170,7 +170,7 @@ class RAGLogger:
     return text
 
   def recall_start(self, query: Optional[str], limit: int, entry_type: Optional[str], person_id: str = "default"):
-    """Log inici d'una operació de recall"""
+    """Log the start of a recall operation."""
     self._write("")
     self._write(f"{Colors.BRIGHT_CYAN}{'═' * 70}{Colors.RESET}")
     self._write(f"{RAGEmojis.RECALL} {Colors.BOLD}{Colors.BRIGHT_CYAN}MEMORY RECALL{Colors.RESET} [{self._timestamp()}]")
@@ -207,7 +207,7 @@ class RAGLogger:
     self._write("")
 
   def recall_step_qdrant(self, found: int, timing_ms: float, results: Optional[List[Dict]] = None):
-    """Log cerca semàntica a Qdrant"""
+    """Log a semantic search step in Qdrant."""
     self._write(f" {RAGEmojis.QDRANT} {Colors.MAGENTA}STEP 3: Qdrant (semantic search){Colors.RESET}")
     if found > 0:
       self._write(f"   {RAGEmojis.FOUND} {Colors.GREEN}TROBAT:{Colors.RESET} {found} resultats")
@@ -239,7 +239,7 @@ class RAGLogger:
     self._write("")
 
   def store_start(self, content_type: str, content_preview: str, person_id: str = "default"):
-    """Log inici d'una operació de store"""
+    """Log the start of a store operation."""
     self._write("")
     self._write(f"{Colors.BRIGHT_BLUE}{'═' * 70}{Colors.RESET}")
     self._write(f"{RAGEmojis.STORE} {Colors.BOLD}{Colors.BRIGHT_BLUE}MEMORY STORE{Colors.RESET} [{self._timestamp()}]")
@@ -251,7 +251,7 @@ class RAGLogger:
     self._write("")
 
   def store_embedding(self, model: str, dimensions: int, timing_ms: float, text_chars: int):
-    """Log generació d'embedding"""
+    """Log embedding generation."""
     tokens_approx = text_chars // 4
     self._write(f" {RAGEmojis.EMBEDDING} {Colors.YELLOW}EMBEDDING{Colors.RESET}")
     self._write(f"   Model: {model}")
@@ -276,14 +276,14 @@ class RAGLogger:
     self._write("")
 
   def store_flash(self, timing_ms: float):
-    """Log cached a FlashMemory"""
+    """Log cached to FlashMemory"""
     self._write(f" {RAGEmojis.FLASH} {Colors.YELLOW}FlashMemory{Colors.RESET}")
-    self._write(f"   {RAGEmojis.CHECK} Cached per accés ràpid")
+    self._write(f"   {RAGEmojis.CHECK} Cached for fast access")
     self._write(f"   {RAGEmojis.CLOCK} {self._timing(timing_ms)}")
     self._write("")
 
   def store_complete(self, entry_id: str, total_ms: float, destinations: List[str]):
-    """Log final del store"""
+    """Log store completion"""
     self._write(f"{Colors.DIM}{'─' * 70}{Colors.RESET}")
     self._write(f" {RAGEmojis.CHECK} {Colors.BOLD}{Colors.GREEN}STORE COMPLETE{Colors.RESET}")
     self._write(f"   Entry ID: {entry_id}")
@@ -319,7 +319,7 @@ class RAGLogger:
     self._write("")
 
   def memory_collection_search(self, collection: str, results: int, timing_ms: float, top_results: Optional[List[Dict]] = None):
-    """Log cerca a una col·lecció específica"""
+    """Log a search in a specific collection."""
     self._write(f" {RAGEmojis.QDRANT} {Colors.CYAN}{collection}{Colors.RESET}")
     self._write(f"   {RAGEmojis.FOUND} Resultats: {results}")
     if top_results:
@@ -352,7 +352,7 @@ class RAGLogger:
     self._write("")
 
   def embedding_generate(self, text_preview: str, model: str, dimensions: int, timing_ms: float):
-    """Log generació d'embedding independent"""
+    """Log a standalone embedding generation."""
     self._write(f" {RAGEmojis.EMBEDDING} {Colors.YELLOW}EMBEDDING{Colors.RESET}")
     self._write(f"   Text: \"{self._truncate(text_preview, 50)}\"")
     self._write(f"   Model: {model}")
@@ -361,12 +361,12 @@ class RAGLogger:
     self._write("")
 
   def embedding_error(self, error: str, model: str = ""):
-    """Log error en generació d'embedding"""
+    """Log an error during embedding generation."""
     model_info = f" ({model})" if model else ""
     self._write(f" {RAGEmojis.ERROR} {Colors.RED}EMBEDDING ERROR{model_info}:{Colors.RESET} {error}")
 
   def qdrant_search(self, collection: str, vector_size: int, limit: int, score_threshold: float):
-    """Log cerca semàntica a Qdrant"""
+    """Log a semantic search in Qdrant."""
     self._write(f" {RAGEmojis.QDRANT} {Colors.MAGENTA}QDRANT SEARCH{Colors.RESET}")
     self._write(f"   Collection: {collection}")
     self._write(f"   Vector: {vector_size}d")
@@ -389,7 +389,7 @@ class RAGLogger:
     self._write(f"   {RAGEmojis.CLOCK} {self._timing(timing_ms)}")
 
   def stats_summary(self, stats: Dict[str, Any]):
-    """Log resum d'estadístiques"""
+    """Log a summary of statistics."""
     self._write("")
     self._write(f"{Colors.BRIGHT_GREEN}{'═' * 70}{Colors.RESET}")
     self._write(f"{RAGEmojis.VECTOR} {Colors.BOLD}{Colors.BRIGHT_GREEN}RAG STATS{Colors.RESET} [{self._timestamp()}]")
@@ -422,7 +422,7 @@ class RAGLogger:
 _rag_logger: Optional[RAGLogger] = None
 
 def get_rag_logger(enabled: bool = True) -> RAGLogger:
-  """Obtenir instància singleton del RAG logger"""
+  """Get the singleton instance of the RAG logger."""
   global _rag_logger
   if _rag_logger is None:
     _rag_logger = RAGLogger(enabled=enabled)

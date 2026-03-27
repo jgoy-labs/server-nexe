@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8.2
 Author: Jordi Goy 
 Location: core/endpoints/root.py
-Description: Endpoints FastAPI bàsics del servidor. Routes: / (system info), /health (health check),
+Description: Basic FastAPI server endpoints. Routes: / (system info), /health (health check),
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # CS4: Cache for Ollama /api/tags — avoid HTTP call on every chat request
 _ollama_tags_cache: dict = {"models": None, "ts": 0.0}
-_TAGS_CACHE_TTL = 30  # seconds
+TAGS_CACHE_TTL = 30  # seconds
 
 # CS7: Configurable stream timeout via env var (default 300s for thinking models)
 _OLLAMA_STREAM_TIMEOUT = float(os.environ.get("NEXE_OLLAMA_STREAM_TIMEOUT", "300"))
@@ -65,7 +65,7 @@ async def _forward_to_ollama(
     _ollama_host = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
     url = f"{_ollama_host}/api/chat"
 
-    # Get model from: request > NEXE_OLLAMA_MODEL > NEXE_DEFAULT_MODEL (si no és URL) > config > fallback
+    # Get model from: request > NEXE_OLLAMA_MODEL > NEXE_DEFAULT_MODEL (if not a URL) > config > fallback
     model_name = request.model
     if not model_name:
         model_name = os.environ.get("NEXE_OLLAMA_MODEL")
@@ -83,7 +83,7 @@ async def _forward_to_ollama(
     # Check if Ollama is available before trying to connect
     try:
         _now = time.time()
-        if _ollama_tags_cache["models"] is not None and (_now - _ollama_tags_cache["ts"]) < _TAGS_CACHE_TTL:
+        if _ollama_tags_cache["models"] is not None and (_now - _ollama_tags_cache["ts"]) < TAGS_CACHE_TTL:
             available_models = _ollama_tags_cache["models"]
         else:
             async with httpx.AsyncClient(timeout=3.0) as client:
@@ -105,11 +105,11 @@ async def _forward_to_ollama(
             matching = [m for m in chat_models if model_name.split(":")[0] in m]
             if matching:
                 model_name = matching[0]
-                logger.info(f"Using available model: {model_name}")
+                logger.info("Using available model: %s", model_name)
             elif chat_models:
                 # Use first available chat model as fallback
                 model_name = chat_models[0]
-                logger.warning(f"Requested model not found. Using available model: {model_name}")
+                logger.warning("Requested model not found. Using available model: %s", model_name)
             else:
                 _lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
                 raise HTTPException(
@@ -165,11 +165,11 @@ async def _forward_to_ollama(
         except httpx.ConnectError:
             raise HTTPException(
                 status_code=503,
-                detail="Ollama no respon. Verifica que està corrent: ollama serve"
+                detail="Ollama not responding. Verify it is running: ollama serve"
             )
 
 async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user_msg: str = None):
-    """Generator compatible amb OpenAI format (més o menys) a partir d'Ollama + Auto-Save."""
+    """OpenAI-compatible streaming generator from Ollama with Auto-Save support."""
     response_parts = []
 
     try:

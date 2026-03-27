@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/__init__.py
-Description: Mòdul Embeddings - Sistema d'embeddings i vectorització multilingüe amb cache multi-nivell.
+Description: Embeddings module - Multilingual embeddings and vectorisation system with multi-level cache.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

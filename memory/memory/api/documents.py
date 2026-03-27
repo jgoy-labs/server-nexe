@@ -223,7 +223,7 @@ async def get_document(
   doc_id: str,
   collection: str,
 ) -> Optional[Document]:
-  """Obté un document per ID."""
+  """Get a document by ID."""
   loop = asyncio.get_running_loop()
 
   def _get():

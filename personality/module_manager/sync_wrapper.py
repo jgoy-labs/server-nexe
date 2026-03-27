@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/sync_wrapper.py
-Description: Wrappers síncrons per operacions async del ModuleManager.
+Description: Synchronous wrappers for async ModuleManager operations.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

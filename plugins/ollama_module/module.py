@@ -89,7 +89,7 @@ class OllamaModule:
             if services and "i18n" in services:
                 self.i18n = services["i18n"]
 
-            # Auto-start Ollama si instal·lat però no corre
+            # Auto-start Ollama if installed but not running
             await self._ensure_ollama_running()
 
             self._initialized = True
@@ -100,7 +100,7 @@ class OllamaModule:
             return False
 
     async def _ensure_ollama_running(self):
-        """Arrenca Ollama si està instal·lat però no corre. macOS + Linux."""
+        """Start Ollama if it is installed but not running. macOS + Linux."""
         import shutil
         import subprocess
         import platform
@@ -164,14 +164,14 @@ class OllamaModule:
                     resp = await client.get(f"{self.base_url}/api/ps")
                     if resp.status_code == 200:
                         loaded = resp.json().get("models", [])
-                        for m in loaded:
-                            name = m.get("name", "")
+                        for loaded_model in loaded:
+                            name = loaded_model.get("name", "")
                             if name:
                                 await client.post(
                                     f"{self.base_url}/api/generate",
                                     json={"model": name, "keep_alive": 0}
                                 )
-                                logger.info("Model %s descarregat de VRAM (shutdown)", name)
+                                logger.info("Model %s unloaded from VRAM (shutdown)", name)
             except Exception as e:
                 logger.debug("Could not unload Ollama models on shutdown: %s", e)
         self._initialized = False

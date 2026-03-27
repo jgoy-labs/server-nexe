@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/ollama_module/languages/__init__.py
-Description: Package de traduccions i18n per mòdul Ollama.
+Description: i18n translations package for the Ollama module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

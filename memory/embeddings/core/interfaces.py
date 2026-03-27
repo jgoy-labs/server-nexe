@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/core/interfaces.py
-Description: Interfaces, protocols i models Pydantic per al mòdul Embeddings.
+Description: Interfaces, protocols and Pydantic models for the Embeddings module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -207,22 +207,22 @@ class CacheProvider(Protocol):
     ...
 
   def get_stats(self) -> Dict[str, Any]:
-    """Get estadístiques del cache"""
+    """Get cache statistics."""
     ...
 
 class ChunkMetadata(BaseModel):
   """
-  Metadata d'un chunk de document.
+  Metadata for a document chunk.
 
   Attributes:
-    chunk_id: ID únic del chunk (UUID)
-    document_id: ID del document pare
-    chunk_index: Índex del chunk dins el document (0-based)
-    char_start: Posició inici al document original
-    char_end: Posició fi al document original
-    section_title: Títol de secció detectat (opcional)
-    chunk_type: Tipus de chunk (paragraph, header, code, list)
-    token_count: Nombre aproximat de tokens
+    chunk_id: Unique chunk ID (UUID)
+    document_id: Parent document ID
+    chunk_index: Chunk index within the document (0-based)
+    char_start: Start position in the original document
+    char_end: End position in the original document
+    section_title: Detected section title (optional)
+    chunk_type: Chunk type (paragraph, header, code, list)
+    token_count: Approximate token count
   """
   chunk_id: str
   document_id: str
@@ -237,7 +237,7 @@ class ChunkMetadata(BaseModel):
   @classmethod
   def non_negative(cls, v):
     if v < 0:
-      raise ValueError("Els índexs no poden ser negatius")
+      raise ValueError("Indexes cannot be negative")
     return v
 
   @field_validator('char_end')

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy
 Location: plugins/web_ui_module/session_manager.py
-Description: Gestor de sessions de xat per la UI web (memòria en RAM)
+Description: Chat session manager for the web UI (RAM memory)
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class ChatSession:
-    """Sessió de xat individual amb historial i compacting automàtic"""
+    """Individual chat session with message history and automatic compaction."""
 
     # Compacting: cada COMPACT_EVERY missatges, resumeix els antics
     COMPACT_EVERY = 10          # Fallback: per nombre de missatges
@@ -49,15 +49,15 @@ class ChatSession:
         self.last_activity = datetime.now(timezone.utc)
 
     def add_context_file(self, filename: str):
-        """Afegir fitxer al context de la sessió"""
+        """Add a file to the session context."""
         if filename not in self.context_files:
             self.context_files.append(filename)
 
     def attach_document(self, filename: str, content: str, chunks: List[str] = None, total_chunks: int = None):
-        """Adjuntar document a la sessió.
+        """Attach a document to the session.
 
-        El document persisteix durant tota la sessió per a preguntes de seguiment.
-        No s'indexa a cap col·lecció — només disponible en aquest chat.
+        The document persists for the entire session for follow-up questions.
+        Not indexed in any collection — available only within this chat.
         """
         all_chunks = chunks or [content]
         self.attached_document = {
@@ -91,7 +91,7 @@ class ChatSession:
         }
 
     def get_and_clear_attached_document(self) -> Optional[Dict[str, str]]:
-        """Obtenir document adjuntat (persisteix a la sessió per preguntes de seguiment)."""
+        """Get the attached document (persists in the session for follow-up questions)."""
         return self.attached_document
 
     def has_attached_document(self) -> bool:
@@ -110,13 +110,13 @@ class ChatSession:
         return total
 
     def needs_compaction(self) -> bool:
-        """Retorna True si la sessió necessita compacting (per tokens o per missatges)."""
+        """Return True if the session needs compaction (by token count or message count)."""
         if self._estimate_context_chars() > self.MAX_CONTEXT_CHARS:
             return True
         return len(self.messages) >= self.COMPACT_EVERY
 
     def get_messages_to_compact(self) -> List[Dict[str, str]]:
-        """Retorna missatges antics que s'han de resumir (tots menys els últims COMPACT_KEEP)"""
+        """Return the older messages to be summarised (all except the last COMPACT_KEEP)."""
         if len(self.messages) <= self.COMPACT_KEEP:
             return []
         return self.messages[:-self.COMPACT_KEEP]
@@ -139,11 +139,11 @@ class ChatSession:
         if self.context_summary:
             msgs.append({
                 "role": "user",
-                "content": f"[Resum de la conversa anterior]\n{self.context_summary}"
+                "content": f"[Summary of previous conversation]\n{self.context_summary}"
             })
             msgs.append({
                 "role": "assistant",
-                "content": "Entès, tinc el context de la conversa anterior."
+                "content": "Understood, I have the context from the previous conversation."
             })
         msgs.extend(self.messages)
         return msgs
@@ -153,7 +153,7 @@ class ChatSession:
         return self.messages.copy()
 
     def to_dict(self) -> dict:
-        """Serialitzar sessió a dict"""
+        """Serialise session to a dict."""
         d = {
             "id": self.id,
             "created_at": self.created_at.isoformat(),
@@ -170,7 +170,7 @@ class ChatSession:
 
     @classmethod
     def from_dict(cls, data: dict) -> 'ChatSession':
-        """Crear sessió des de dict"""
+        """Create a session from a dict."""
         session = cls(session_id=data.get("id"))
         session.created_at = datetime.fromisoformat(data.get("created_at"))
         session.last_activity = datetime.fromisoformat(data.get("last_activity"))
@@ -226,7 +226,7 @@ class SessionManager:
             logger.error(f"Failed to load sessions: {e}")
 
     def _save_session_to_disk(self, session: ChatSession):
-        """Guardar sessió a disc"""
+        """Save session to disk."""
         self._validate_session_id(session.id)
         try:
             file_path = self._storage_path / f"{session.id}.json"
@@ -236,7 +236,7 @@ class SessionManager:
             logger.error(f"Failed to save session {session.id}: {e}")
 
     def _delete_session_from_disk(self, session_id: str):
-        """Eliminar sessió del disc"""
+        """Delete session file from disk."""
         self._validate_session_id(session_id)
         try:
             file_path = self._storage_path / f"{session_id}.json"
@@ -246,7 +246,7 @@ class SessionManager:
             logger.error(f"Failed to delete session file {session_id}: {e}")
 
     def create_session(self, session_id: str = None) -> ChatSession:
-        """Crear nova sessió de xat"""
+        """Create a new chat session."""
         if session_id:
             self._validate_session_id(session_id)
         session = ChatSession(session_id)
@@ -255,12 +255,12 @@ class SessionManager:
         return session
 
     def get_session(self, session_id: str) -> Optional[ChatSession]:
-        """Obtenir sessió existent"""
+        """Get an existing session."""
         self._validate_session_id(session_id)
         return self._sessions.get(session_id)
 
     def get_or_create_session(self, session_id: str = None) -> ChatSession:
-        """Obtenir sessió o crear-ne una de nova"""
+        """Get an existing session or create a new one."""
         if session_id:
             self._validate_session_id(session_id)
         if session_id and session_id in self._sessions:
@@ -268,7 +268,7 @@ class SessionManager:
         return self.create_session(session_id)
 
     def delete_session(self, session_id: str) -> bool:
-        """Eliminar sessió"""
+        """Delete a session."""
         self._validate_session_id(session_id)
         if session_id in self._sessions:
             del self._sessions[session_id]
@@ -277,7 +277,7 @@ class SessionManager:
         return False
 
     def list_sessions(self) -> List[dict]:
-        """Llistar totes les sessions (metadata només)"""
+        """List all sessions (metadata only)."""
         sessions = []
         for s in self._sessions.values():
             first_user = next(

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/sanitizer/workflow/nodes/resistencia_node.py
-Description: Node de Intervenció - Resposta predefinida quan es detecta jailbreak.
+Description: Intervention Node - Predefined response when a jailbreak is detected.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -42,43 +42,43 @@ class InterventionNode(Node):
     return NodeMetadata(
       node_type="intervention.respond",
       version="1.0.0",
-      description="Genera resposta de resistència quan es detecten amenaces",
+      description="Generate resistance response when threats are detected",
       inputs={
         "threats": {
           "type": "array",
-          "description": "Llista d'amenaces detectades",
+          "description": "List of detected threats",
           "required": False,
           "default": [],
         },
         "severity": {
           "type": "string",
-          "description": "Nivell de severitat",
+          "description": "Severity level",
           "required": False,
           "default": "medium",
         },
       },
       outputs={
-        "response": {"type": "string", "description": "Resposta de resistència"},
-        "activated": {"type": "boolean", "description": "Si s'ha activat"},
-        "threat_type": {"type": "string", "description": "Tipus d'amenaça principal"},
+        "response": {"type": "string", "description": "Resistance response"},
+        "activated": {"type": "boolean", "description": "Whether activated"},
+        "threat_type": {"type": "string", "description": "Primary threat type"},
       },
     )
 
   async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Genera resposta de resistència basada en les amenaces.
+    Generate resistance response based on detected threats.
 
     Args:
-      inputs: Dict amb threats i severity
+      inputs: Dict with threats and severity
 
     Returns:
-      Dict amb response, activated, threat_type
+      Dict with response, activated, threat_type
     """
     threats: List[str] = inputs.get("threats", [])
     severity: str = inputs.get("severity", "medium")
 
     logger.warning(
-      "RESISTÈNCIA ACTIVADA - Threats: %s, Severity: %s",
+      "RESISTANCE ACTIVATED - Threats: %s, Severity: %s",
       threats, severity
     )
 

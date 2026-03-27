@@ -163,7 +163,7 @@ def _detect_via_markers() -> Optional[Path]:
       break
     current = parent
 
-  logger.debug(f"Markers not found walking up from {Path(__file__)}")
+  logger.debug("Markers not found walking up from %s", Path(__file__))
   return None
 
 def _detect_via_site_packages() -> Optional[Path]:

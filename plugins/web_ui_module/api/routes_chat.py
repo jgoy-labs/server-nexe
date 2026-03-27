@@ -89,17 +89,17 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             if content_to_delete:
                 result = await memory_helper.delete_from_memory(content_to_delete)
                 if result["success"] and result.get("deleted", 0) > 0:
-                    # Sanititzar missatge a l'historial per evitar re-save loop
-                    # (el model veuria el fet a l'historial i el re-guardaria via MEM_SAVE)
+                    # Sanitize message in history to avoid re-save loop
+                    # (the model would see the fact in history and re-save it via MEM_SAVE)
                     if session.messages and session.messages[-1]["role"] == "user":
-                        session.messages[-1]["content"] = f"[Comanda memòria: esborrar «{content_to_delete[:50]}»]"
-                    response_text = f"Esborrat de la memoria: {result['deleted']} entrada(es) relacionades amb \"{content_to_delete[:100]}\""
+                        session.messages[-1]["content"] = f"[Memory command: delete '{content_to_delete[:50]}']"
+                    response_text = f"Deleted from memory: {result['deleted']} entry(ies) related to \"{content_to_delete[:100]}\""
                 elif result["success"]:
-                    response_text = f"No he trobat res a la memoria sobre \"{content_to_delete[:100]}\""
+                    response_text = f"Nothing found in memory about \"{content_to_delete[:100]}\""
                 else:
-                    response_text = f"Error: {result.get('message', 'Error desconegut')}"
+                    response_text = f"Error: {result.get('message', 'Unknown error')}"
             else:
-                response_text = "Que vols que esborri? Escriu el que vols oblidar."
+                response_text = "What do you want me to forget? Write what you want to delete."
             memory_action = "delete"
 
         elif intent == "recall":
@@ -662,7 +662,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             # Extreure [MEM_SAVE: ...] fets abans de strip
             _mem_saves_ns = _re.findall(r'\[MEM_SAVE:\s*(.+?)\]', response_text)
             response_text = _re.sub(r'\[MEM_SAVE:\s*.+?\]\s*', '', response_text).strip()
-            # Guardar fets extrets a memòria
+            # Save extracted facts to memory
             if _mem_saves_ns:
                 _junk_re = _re.compile(
                     r'(?i)(no\s+(coneix|s.han|tinc|té|hi ha)|'

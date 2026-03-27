@@ -107,7 +107,7 @@ class RAGSearchNode(Node):
         NodeOutput(
           name="num_results",
           type="number",
-          description="Número de resultats trobats",
+          description="Number of results found",
           json_schema={"type": "integer"}
         )
       ],
@@ -117,31 +117,31 @@ class RAGSearchNode(Node):
         "source": {
           "type": "string",
           "default": "my-docs",
-          "description": "ID de la RAG source a utilitzar",
+          "description": "ID of the RAG source to use",
           "ui_widget": "text"
         },
         "top_k": {
           "type": "integer",
           "default": 5,
-          "description": "Número de resultats a retornar",
+          "description": "Number of results to return",
           "ui_widget": "number"
         },
         "score_threshold": {
           "type": "number",
           "default": 0.7,
-          "description": "Threshold mínim de similaritat (0.0-1.0)",
+          "description": "Minimum similarity threshold (0.0-1.0)",
           "ui_widget": "number"
         },
         "prompt_template": {
           "type": "string",
           "default": "Context:\\n{context}\\n\\nQuestion: {query}",
-          "description": "Template del prompt amb {context} i {query}",
+          "description": "Prompt template with {context} and {query}",
           "ui_widget": "textarea"
         },
         "index_name": {
           "type": "string",
           "default": "documents",
-          "description": "Nom de l'índex Qdrant/LanceDB",
+          "description": "Qdrant/LanceDB index name",
           "ui_widget": "text"
         }
       }

@@ -152,7 +152,7 @@ class CodeChunker(BaseChunker):
     return False
 
   def _detect_language(self, file_path: str) -> str:
-    """Detecta llenguatge per extensió de fitxer."""
+    """Detect programming language by file extension."""
     if not file_path or "." not in file_path:
       return "unknown"
 

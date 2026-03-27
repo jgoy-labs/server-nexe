@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/llama_cpp_module/module.py
-Description: Mòdul Nexe per a Llama.cpp. Adaptació del LlamaCppChatNode original.
+Description: Nexe module for Llama.cpp. Adaptation of the original LlamaCppChatNode.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -37,29 +37,29 @@ class LlamaCppModule:
         return ModuleMetadata(
             name="llama_cpp_module",
             version="0.8.2",
-            description="Motor d'inferència universal Llama.cpp (GGUF)",
+            description="Universal Llama.cpp inference engine (GGUF)",
             author="Jordi Goy",
             module_type="local_llm_option",
             quadrant="core"
         )
 
     async def initialize(self, context: Dict[str, Any]) -> bool:
-        """Inicialització via Nexe Launcher"""
+        """Initialize via Nexe Launcher."""
         if self._initialized:
             return True
 
-        # Inicialitzar router sempre per permetre diagnòstics
+        # Always initialize router to allow diagnostics
         self._init_router()
 
         try:
-            # Carregar config des d'env o context
+            # Load config from env or context
             llama_config = LlamaCppConfig.from_env()
             
             # Intentar validar si el model existeix abans d'arrancar
             if not llama_config.validate():
                 logger.warning("LlamaCppModule: Configuration validation failed. Module started in degraded mode.")
                 self._initialized = True
-                return True # Permetem arrancar per diagnòstic
+                return True # Allow startup for diagnostics
 
             self._node = LlamaCppChatNode(config=llama_config)
             self._initialized = True
@@ -68,8 +68,8 @@ class LlamaCppModule:
             return True
         except Exception as e:
             logger.error(f"Failed to initialize LlamaCppModule: {e}")
-            # En cas d'error catastròfic, mantenim initialized=False 
-            # però el router ja s'hauria d'haver creat si no ha fallat abans
+            # On catastrophic error, keep initialized=False
+            # but the router should already have been created if it didn't fail earlier
             return False
 
     def _init_router(self):
@@ -114,7 +114,7 @@ class LlamaCppModule:
         self, messages: List[Dict[str, str]], system: str = "",
         session_id: str = "default", stream_callback=None, **kwargs,
     ):
-        """Mètode principal de xat"""
+        """Main chat method."""
         if not self._initialized or not self._node:
             raise RuntimeError("LlamaCppModule not initialized")
 

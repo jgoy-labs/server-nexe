@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/input_sanitizers.py
-Description: Sanitització d'inputs. Valida strings i dicts contra XSS, SQL injection, etc.
+Description: Input sanitisation. Validates strings and dicts against XSS, SQL injection, etc.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

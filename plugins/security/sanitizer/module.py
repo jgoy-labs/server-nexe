@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/sanitizer/module.py
-Description: SANITIZER - Mòdul de seguretat TÈCNICA per filtrar jailbreaks i
+Description: SANITIZER - TECHNICAL security module for filtering jailbreaks and
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -155,11 +155,11 @@ class SanitizerModule:
     return True
 
   def get_patterns_version(self) -> str:
-    """Retorna la versió dels patrons."""
+    """Return the patterns version."""
     return self.PATTERNS_VERSION
 
   def get_stats(self) -> dict:
-    """Retorna estadístiques del mòdul."""
+    """Return module statistics."""
     return {
       "patterns_version": self.PATTERNS_VERSION,
       "max_scan_length": MAX_SCAN_LENGTH,
@@ -170,7 +170,7 @@ class SanitizerModule:
 _sanitizer_instance: Optional[SanitizerModule] = None
 
 def get_sanitizer() -> SanitizerModule:
-  """Obté la instància singleton del Sanitizer."""
+  """Return the singleton Sanitizer instance."""
   global _sanitizer_instance
   if _sanitizer_instance is None:
     _sanitizer_instance = SanitizerModule()

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/mlx_module/module.py
-Description: Mòdul Nexe per a MLX (Apple Silicon). Adaptació del MLXChatNode original.
+Description: Nexe module for MLX (Apple Silicon). Adaptation of the original MLXChatNode.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -37,14 +37,14 @@ class MLXModule:
         return ModuleMetadata(
             name="mlx_module",
             version="0.8.2",
-            description="Motor d'inferència ultra-optimitzat per a Apple Silicon (MLX)",
+            description="Ultra-optimized inference engine for Apple Silicon (MLX)",
             author="Jordi Goy",
             module_type="local_llm_option",
             quadrant="core"
         )
 
     async def initialize(self, context: Dict[str, Any]) -> bool:
-        """Inicialització via Nexe Launcher"""
+        """Initialize via Nexe Launcher."""
         if self._initialized:
             return True
 
@@ -115,7 +115,7 @@ class MLXModule:
         self, messages: List[Dict[str, str]], system: str = "",
         session_id: str = "default", stream_callback=None, **kwargs,
     ):
-        """Mètode de xat amb MLX"""
+        """Main chat method using MLX."""
         if not self._initialized or not self._node:
             raise RuntimeError("MLXModule not initialized")
 

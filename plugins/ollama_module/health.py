@@ -63,7 +63,7 @@ async def get_health_async() -> Dict[str, Any]:
             "base_url": OLLAMA_BASE_URL
         }
     except Exception as e:
-        logger.error(f"Ollama health check failed: {e}")
+        logger.error("Ollama health check failed: %s", e)
         return {
             "name": "ollama_module",
             "status": "ERROR",

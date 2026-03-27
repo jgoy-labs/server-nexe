@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/path_discovery.py
-Description: Descobridor de paths de mòduls Nexe. Escaneja core/tools per cada capa,
+Description: Nexe module path discoverer. Scans core/tools per layer,
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

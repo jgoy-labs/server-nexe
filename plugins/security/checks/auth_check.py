@@ -63,7 +63,7 @@ class AuthCheck:
                 "recommendation": "Disable NEXE_DEV_MODE in production"
             })
 
-        # Check 3: Remote dev bypass permès?
+        # Check 3: Remote dev bypass allowed?
         allow_remote = os.getenv("NEXE_DEV_MODE_ALLOW_REMOTE", "false").lower() == "true"
         if dev_mode and allow_remote:
             findings.append({

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/api/collections.py
-Description: Operacions de gestió de collections per Memory API.
+Description: Collection management operations for Memory API.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

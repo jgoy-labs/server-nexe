@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_lifecycle.py
-Description: Gestor de cicle de vida de mòduls. Controla inicialització (init, setup,
+Description: Module lifecycle manager. Controls initialisation (init, setup,
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -20,7 +20,7 @@ from personality._logger import get_logger
 logger = get_logger(__name__)
 
 class ModuleLifecycle:
-  """Gestiona cicle de vida dels mòduls"""
+  """Manages the lifecycle of modules."""
 
   def __init__(self, i18n=None):
     self.i18n = i18n

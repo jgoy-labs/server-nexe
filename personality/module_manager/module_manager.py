@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/module_manager.py
-Description: Façade central del sistema de gestió de mòduls Nexe 0.8.
+Description: Central facade of the Nexe 0.8 module management system.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -153,23 +153,23 @@ class ModuleManager:
     return Path("personality/server.toml")
 
   def _log_init(self) -> None:
-    """Log d'inicialització."""
+    """Log initialization."""
     logger.info(get_message(self.i18n, 'init.started'), component="module_manager")
     logger.info(get_message(self.i18n, 'init.config_loaded', path=str(self.config_path)))
 
   async def discover_modules(self, force: bool = False) -> List[str]:
-    """Descobreix mòduls disponibles."""
+    """Discover available modules."""
     return await self.discovery.discover(self._modules, self._lock, force)
 
   def discover_modules_sync(self, force: bool = False) -> List[str]:
-    """Wrapper síncron per a discover_modules()."""
+    """Synchronous wrapper for discover_modules()."""
     return self.sync_wrapper.run_sync(
       self.discover_modules(force),
       error_msg_key='sync_wrapper_failed'
     )
 
   async def load_module(self, module_name: str) -> bool:
-    """Carrega un mòdul."""
+    """Load a module."""
     with self._lock:
       if module_name not in self._modules:
         await self.discover_modules()
@@ -180,11 +180,11 @@ class ModuleManager:
     return await self.module_lifecycle.load_module(module_name)
 
   async def start_module(self, module_name: str) -> bool:
-    """Inicia un mòdul carregat."""
+    """Start a loaded module."""
     return await self.module_lifecycle.start_module(module_name)
 
   async def stop_module(self, module_name: str) -> bool:
-    """Atura un mòdul en execució."""
+    """Stop a running module."""
     return await self.module_lifecycle.stop_module(module_name)
 
   async def start_system(self) -> bool:
@@ -205,11 +205,11 @@ class ModuleManager:
     self.system_lifecycle._get_lock = original_get_lock
 
   def get_module_info(self, module_name: str) -> Optional[ModuleInfo]:
-    """Obté informació sobre un mòdul."""
+    """Get information about a module."""
     return self._modules.get(module_name)
 
   def update_module_enabled(self, module_name: str, enabled: bool) -> bool:
-    """Actualitza l'estat enabled d'un mòdul i persisteix al config."""
+    """Update the enabled state of a module and persist to config."""
     module = self._modules.get(module_name)
     if not module:
       return False
@@ -229,7 +229,7 @@ class ModuleManager:
     return success
 
   def list_modules(self, state_filter: Optional[ModuleState] = None) -> List[ModuleInfo]:
-    """Llista mòduls, opcionalment filtrats per estat."""
+    """List modules, optionally filtered by state."""
     with self._lock:
       modules = list(self._modules.values())
       if state_filter:
@@ -237,7 +237,7 @@ class ModuleManager:
       return sorted(modules, key=lambda m: m.priority)
 
   def get_system_status(self) -> Dict[str, Any]:
-    """Obté estat del sistema."""
+    """Get system status."""
     return {
       "running": self._running,
       "total_modules": len(self._modules),
@@ -255,13 +255,13 @@ class ModuleManager:
     self.events.add_event_listener(callback, event_type)
 
   def get_module_metrics(self, module_name: str) -> Dict[str, Any]:
-    """Obté mètriques per un mòdul."""
+    """Get metrics for a module."""
     if module_name in self._modules:
       return self.metrics.get_module_metrics(self._modules[module_name])
     return {}
 
   def get_registry_info(self) -> Dict[str, Any]:
-    """Obté informació del registre."""
+    """Get registry information."""
     return self.registry.get_registry_stats()
 
   def set_api_integrator(self, api_integrator):

@@ -317,7 +317,7 @@ class TestChatSessionCompacting:
         ctx = s.get_context_messages()
         # 2 missatges de resum + COMPACT_KEEP missatges recents
         assert len(ctx) == 2 + ChatSession.COMPACT_KEEP
-        assert "[Resum de la conversa anterior]" in ctx[0]["content"]
+        assert "[Summary of previous conversation]" in ctx[0]["content"]
         assert "Conversa sobre IA i models locals." in ctx[0]["content"]
         assert ctx[1]["role"] == "assistant"
 

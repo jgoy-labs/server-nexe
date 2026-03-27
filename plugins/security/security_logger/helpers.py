@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security_logger/helpers.py
-Description: Convenience methods per logging d'events de seguretat específics.
+Description: Convenience methods for logging specific security events.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -20,12 +20,12 @@ if TYPE_CHECKING:
 
 class SecurityLoggerHelpers:
   """
-  Mixin amb convenience methods per SecurityEventLogger.
+  Mixin with convenience methods for SecurityEventLogger.
 
-  Aquesta classe està dissenyada per ser heretada per SecurityEventLogger,
-  proporcionant mètodes d'alt nivell per logging d'events específics.
+  This class is designed to be inherited by SecurityEventLogger,
+  providing high-level methods for logging specific events.
 
-  NOTA: Els mètodes assumeixen que la subclasse té el mètode log_event()
+  NOTE: Methods assume the subclass has the log_event() method.
   """
 
   def log_auth_failure(

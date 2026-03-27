@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag_sources/personality/source.py
-Description: Implementació de PersonalityRAG.
+Description: PersonalityRAG implementation.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -34,7 +34,7 @@ class PersonalityRAG:
         return doc_id
 
     async def search(self, request, limit: int = 5):
-        """Cerca simple basada en coincidència de tokens."""
+        """Simple token-matching search."""
         from memory.rag_sources.base import SearchRequest, SearchHit
 
         if isinstance(request, SearchRequest):
@@ -68,7 +68,7 @@ class PersonalityRAG:
         return hits[:top_k]
 
     def health(self) -> Dict[str, Any]:
-        """Health bàsic de la font."""
+        """Basic health check for the source."""
         return {
             "status": "healthy",
             "num_documents": len(self._documents),

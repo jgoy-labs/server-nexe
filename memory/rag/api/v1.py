@@ -4,20 +4,20 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/api/v1.py
-Description: RAG API v1 - Endpoints per cerca semàntica i gestió documents RAG.
+Description: RAG API v1 - Endpoints for semantic search and RAG document management.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
 from fastapi import APIRouter, HTTPException
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/rag", tags=["rag-v1", "future"])
 
-@router.post("/search", summary="Cerca semàntica al vector store RAG")
+@router.post("/search", summary="Semantic search in RAG vector store")
 async def rag_search_v1():
   """
   Cerca semàntica RAG (API v1).

@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/manifest.py
-Description: Router FastAPI del mòdul ModuleManager. Exposa endpoints REST per:
+Description: FastAPI router for the ModuleManager module. Exposes REST endpoints for:
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -91,13 +91,13 @@ async def module_manager_info():
     return JSONResponse(content={
       "name": "module_manager",
       "version": __version__,
-      "description": "Sistema de gestió centralitzada de mòduls Nexe 0.8",
+      "description": "Centralized module management system for Nexe 0.8",
       "features": [
-        "Auto-descoberta de mòduls",
-        "Gestió de cicle de vida",
-        "Registre centralitzat",
-        "Validació de configuració",
-        "UI web de gestió"
+        "Auto-discovery of modules",
+        "Lifecycle management",
+        "Centralized registry",
+        "Configuration validation",
+        "Management web UI"
       ],
       "path": str(MODULE_PATH),
       "ui_available": UI_PATH.exists()
@@ -139,7 +139,7 @@ async def list_registered_modules():
     })
 
   except Exception as e:
-    logger.error(f"Error listing modules: {e}")
+    logger.error("Error listing modules: %s", e)
     return JSONResponse(
       content={"error": str(e), "modules": [], "total": 0},
       status_code=500
@@ -148,7 +148,7 @@ async def list_registered_modules():
 MODULE_METADATA = {
   "name": "module_manager",
   "version": "0.8.2",
-  "description": "Sistema de gestió centralitzada de mòduls Nexe 0.8",
+  "description": "Centralized module management system for Nexe 0.8",
   "router": router_public,
   "prefix": "/modules",
   "tags": ["modules", "management", "core"],
@@ -159,11 +159,11 @@ MODULE_METADATA = {
 }
 
 def get_router():
-  """Retorna el router públic del mòdul"""
+  """Return the public router for the module."""
   return router_public
 
 def get_metadata():
-  """Retorna la metadata del mòdul"""
+  """Return the module metadata."""
   return MODULE_METADATA
 
 __all__ = [

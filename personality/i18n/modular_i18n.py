@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/i18n/modular_i18n.py
-Description: Sistema modular d'internacionalització. Auto-descobreix messages_*.json per
+Description: Modular internationalization system. Auto-discovers messages_*.json per
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 __all__ = ['ModularI18nManager']
 
 class ModularI18nManager:
-  """Gestor d'internacionalització modular per Nexe 0.8"""
+  """Modular internationalisation manager for Nexe 0.8."""
   
   def __init__(self, config_path: Path = None, base_path: Path = None):
     """

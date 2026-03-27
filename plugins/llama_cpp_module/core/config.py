@@ -42,17 +42,17 @@ class LlamaCppConfig:
 
     model_path: str = ""
     n_ctx: int = 8192
-    n_batch: int = 512  # IMPORTANT: més alt = més tok/s
+    n_batch: int = 512  # IMPORTANT: higher = more tok/s
     n_gpu_layers: int = -1
-    n_threads: int = 0  # 0 = auto (llama.cpp usarà tots els cores)
-    max_sessions: int = 2  # 2 per defecte: permet canvi de system_hash sense reload
-    chat_format: str = "chatml"  # chatml és compatible amb Phi-3.5, Llama 3, Salamandra
+    n_threads: int = 0  # 0 = auto (llama.cpp will use all cores)
+    max_sessions: int = 2  # 2 by default: allows system_hash change without reload
+    chat_format: str = "chatml"  # chatml is compatible with Phi-3.5, Llama 3, Salamandra
     use_mlock: bool = True
     use_mmap: bool = True
     flash_attn: bool = True
 
     def __post_init__(self):
-        """Valida la configuració després de crear-la."""
+        """Validate configuration after creation."""
         if not self.model_path:
             logger.warning(
                 "LlamaCppConfig: model_path buit. "
@@ -132,8 +132,8 @@ class LlamaCppConfig:
         valid_formats = {"gemma", "llama-2", "llama-3", "chatml", "mistral", "alpaca", "phi-3"}
         if self.chat_format not in valid_formats:
             logger.warning(
-                "LlamaCppConfig: chat_format '%s' no reconegut. "
-                "Formats vàlids: %s",
+                "LlamaCppConfig: chat_format '%s' not recognized. "
+                "Valid formats: %s",
                 self.chat_format,
                 valid_formats
             )

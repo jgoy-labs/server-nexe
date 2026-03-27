@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/sanitizer/core/detectors.py
-Description: Funcions de detecció de jailbreaks i prompt injections.
+Description: Jailbreak and prompt injection detection functions.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

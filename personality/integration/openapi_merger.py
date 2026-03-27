@@ -4,7 +4,7 @@ Server Nexe
 Version: 0.8
 Author: Jordi Goy 
 Location: personality/integration/openapi_merger.py
-Description: Fusionador d'especificacions OpenAPI de mòduls. Combina schemas de múltiples
+Description: Module OpenAPI specification merger. Combines schemas from multiple
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -122,18 +122,18 @@ class OpenAPIMerger:
   
   def _extract_module_openapi(self, api_components: Dict[str, Any], 
                prefix: str) -> Optional[Dict[str, Any]]:
-    """Extreu especificació OpenAPI dels components del mòdul"""
+    """Extract the OpenAPI specification from the module components."""
     return {
       "prefix": prefix,
       "components": list(api_components.keys()),
     }
   
   def _regenerate_unified_openapi(self) -> None:
-    """Regenera l'especificació OpenAPI unificada"""
+    """Regenerate the unified OpenAPI specification."""
     pass
   
   def get_unified_spec(self) -> Dict[str, Any]:
-    """Retorna l'especificació OpenAPI unificada"""
+    """Return the unified OpenAPI specification."""
     with self._lock:
       return {
         "modules": list(self._module_specs.keys()),

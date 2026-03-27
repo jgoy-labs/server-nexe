@@ -41,7 +41,7 @@ def find_log_path() -> Path:
   return RAG_LOG_PATH
 
 def show_stats():
-  """Mostra estadístiques del RAG."""
+  """Display RAG statistics."""
   import asyncio
 
   async def _get_stats():
@@ -130,22 +130,22 @@ def main():
     "--lines", "-n",
     type=int,
     default=30,
-    help="Nombre de línies a mostrar inicialment (default: 30)"
+    help="Number of lines to show initially (default: 30)"
   )
   parser.add_argument(
     "--clear", "-c",
     action="store_true",
-    help="Netejar el log abans de seguir"
+    help="Clear the log before following"
   )
   parser.add_argument(
     "--path", "-p",
     action="store_true",
-    help="Mostrar path del log i sortir"
+    help="Show log path and exit"
   )
   parser.add_argument(
     "--stats", "-s",
     action="store_true",
-    help="Mostrar estadístiques RAG i sortir"
+    help="Show RAG statistics and exit"
   )
   args = parser.parse_args()
 
