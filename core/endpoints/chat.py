@@ -147,11 +147,12 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
 
         # Inject RAG context into the last user message (NOT system prompt)
         # This preserves prefix caching for the system prompt
-        _label, _instruction = _RAG_CONTEXT_LABELS.get(_server_lang, _RAG_CONTEXT_LABELS["en"])
+        _labels = _RAG_CONTEXT_LABELS.get(_server_lang, _RAG_CONTEXT_LABELS["en"])
+        _instruction = _labels["intro"]
         for i in range(len(messages) - 1, -1, -1):
             if messages[i]['role'] == 'user':
                 messages[i]['content'] = (
-                    f"[{_label}]\n"
+                    f"[{_labels['docs']}]\n"
                     f"{_instruction}\n"
                     f"{safe_context}\n"
                     f"[/CONTEXT]\n\n"

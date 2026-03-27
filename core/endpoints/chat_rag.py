@@ -22,11 +22,26 @@ RAG_DOCS_THRESHOLD = float(os.environ.get('NEXE_RAG_DOCS_THRESHOLD', '0.4'))
 RAG_KNOWLEDGE_THRESHOLD = float(os.environ.get('NEXE_RAG_KNOWLEDGE_THRESHOLD', '0.35'))
 RAG_MEMORY_THRESHOLD = float(os.environ.get('NEXE_RAG_MEMORY_THRESHOLD', '0.3'))
 
-# RAG context labels per language
+# RAG context labels per language (must match system prompt references)
 _RAG_CONTEXT_LABELS = {
-    "ca": ("CONTEXT MEMÒRIA", "Usa aquesta informació recuperada per respondre si és rellevant:"),
-    "es": ("CONTEXTO MEMORIA", "Usa esta información recuperada para responder si es relevante:"),
-    "en": ("MEMORY CONTEXT", "Use this retrieved information to answer if relevant:"),
+    "ca": {
+        "docs": "DOCUMENTACIO DEL SISTEMA",
+        "knowledge": "DOCUMENTACIO TECNICA",
+        "memory": "MEMORIA DE L'USUARI",
+        "intro": "Usa aquesta informació recuperada per respondre si és rellevant:",
+    },
+    "es": {
+        "docs": "DOCUMENTACION DEL SISTEMA",
+        "knowledge": "DOCUMENTACION TECNICA",
+        "memory": "MEMORIA DEL USUARIO",
+        "intro": "Usa esta información recuperada para responder si es relevante:",
+    },
+    "en": {
+        "docs": "SYSTEM DOCUMENTATION",
+        "knowledge": "TECHNICAL DOCUMENTATION",
+        "memory": "USER MEMORY",
+        "intro": "Use this retrieved information to answer if relevant:",
+    },
 }
 
 

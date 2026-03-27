@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.0"
-data: 2026-03-12
-id: nexe-errors
+versio: "1.1"
+data: 2026-03-27
+id: nexe-errors-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia d'errors comuns de NEXE 0.8: missatges d'error, causes i solucions. Cobreix errors d'instal·lació, arrencada, Web UI, autenticació, model, memòria i API."
-tags: [errors, troubleshooting, solucions, debug, 401, 403, 404, qdrant, mlx, model, web-ui, instal·lació]
+abstract: "Errors comuns i solucions per a server-nexe 0.8.2. Cobreix errors d'instal·lació, arrencada del servidor, Web UI, autenticació API, càrrega de models, memòria/RAG, Docker i problemes de streaming."
+tags: [errors, resolució-problemes, depuració, instal·lació, arrencada, web-ui, api, models, memòria, docker, streaming]
 chunk_size: 800
 priority: P1
 
@@ -17,194 +17,69 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# NEXE 0.8 — Errors comuns i solucions
-
-Recull dels errors més habituals que pot trobar un usuari de NEXE, amb les causes probables i les solucions recomanades.
-
----
+# Errors comuns — server-nexe 0.8.2
 
 ## Errors d'instal·lació
 
-### `No s'ha pogut trobar Python 3.11+`
-**Causa:** Python no instal·lat o versió massa antiga.
-**Solució:** `brew install python@3.12` i torna a executar `./setup.sh`
-
-### `Permission denied: ./setup.sh` o `./nexe`
-**Causa:** L'script no té permisos d'execució.
-**Solució:** `chmod +x setup.sh nexe`
-
-### `ModuleNotFoundError`
-**Causa:** L'entorn virtual no s'ha creat correctament o no s'han instal·lat les dependències.
-**Solució:** Torna a executar `./setup.sh` — reinstal·la l'entorn de zero.
-
-### `NameError: name 'DIM' is not defined`
-**Causa:** Bug a `installer/installer_setup_env.py` en una versió antiga — la constant ANSI `DIM` no estava importada.
-**Solució:** `git pull` per obtenir la versió corregida i torna a executar `./setup.sh`.
-
-### `Python version error` / `requires Python 3.11+`
-**Causa:** Python 3.9 o anterior instal·lat al sistema.
-**Solució:** `brew install python@3.11` o `brew install python@3.12`.
-
----
+| Error | Causa | Solució |
+|-------|-------|---------|
+| Python 3.11+ not found | Python del sistema massa antic | Instal·la Python 3.11+ via Homebrew, o usa l'instal·lador DMG (inclou 3.12) |
+| Permission denied on setup.sh | Falta permís d'execució | `chmod +x setup.sh` |
+| ModuleNotFoundError | Dependències no instal·lades | Activa el venv: `source venv/bin/activate`, després `pip install -r requirements.txt` |
+| rumps import error on Linux | Dependència exclusiva de macOS | Normal a Linux — rumps està a requirements-macos.txt, no a requirements.txt |
+| Qdrant binary not found | No descarregat | Torna a executar l'instal·lador, o descarrega manualment per a la teva plataforma |
 
 ## Errors d'arrencada del servidor
 
-### `Port 9119 already in use`
-**Causa:** Ja hi ha una instància de NEXE (o un altre procés) usant el port 9119.
-**Solució:**
-```bash
-./nexe status          # comprova l'estat
-lsof -ti:9119 | xargs kill   # força aturada del procés
-./nexe go
-```
+| Error | Causa | Solució |
+|-------|-------|---------|
+| Port 9119 already in use | Un altre procés en aquell port | `lsof -i :9119` i mata'l, o canvia el port a server.toml |
+| Qdrant connection refused | Qdrant no s'executa o port incorrecte | Comprova el port 6333, reinicia el servidor amb `./nexe go` |
+| Ollama not available | Ollama no instal·lat o no en execució | Instal·la des de ollama.com. El servidor iniciarà Ollama automàticament a l'arrencada. |
+| asyncio.Lock deadlock | Problema del bucle d'events de Python 3.12 | Corregit a v0.8.2 via inicialització lazy a module_lifecycle.py. Actualitza a la darrera versió. |
 
-### `Qdrant connection refused`
-**Causa:** El servei Qdrant no està en execució.
-**Solució:** `./nexe go` l'inicia automàticament si `NEXE_AUTOSTART_QDRANT=true` al `.env`. Si el problema persisteix, atura el servidor amb Ctrl+C o `pkill -f "uvicorn.*nexe"` i torna a executar `./nexe go`.
+## Errors de la Web UI
 
-### `MLX not found` / `No module named 'mlx'`
-**Causa:** MLX no instal·lat o el processador no és Apple Silicon.
-**Solució:** MLX requereix Apple Silicon (M1/M2/M3/M4). Si tens un Mac Intel o Linux, canvia a `llama_cpp` o `ollama` al `.env`:
-```
-NEXE_MODEL_ENGINE=llama_cpp
-```
+| Error | Causa | Solució |
+|-------|-------|---------|
+| 401 Unauthorized | API key incorrecta o absent | Comprova que la clau a localStorage coincideixi amb `NEXE_PRIMARY_API_KEY` al `.env` |
+| 403 CSRF | Discordança de token CSRF | Esborra la cache del navegador i recarrega |
+| El xat no respon | Càrrega del model (primer missatge) | Espera l'indicador de càrrega. Pot trigar 10-60s a la primera càrrega. |
+| L'streaming s'atura al 2n missatge | Bug _renderTimer (pre-v0.8.2) | Corregit a v0.8.2. Actualitza a la darrera versió. |
+| JS/CSS antic en cache | Cache agressiva del navegador | Corregit a v0.8.2 amb cache-busting (?v=timestamp). Recàrrega forçada: Cmd+Shift+R |
+| La caixa de pensament no fa scroll | Bug d'auto-scroll (pre-v0.8.2) | Corregit a v0.8.2. Actualitza a la darrera versió. |
 
-### El servidor arrenca però no respon
-**Causa:** El model s'està carregant (pot trigar 10–30 s) o hi ha un error silenciós.
-**Solució:** Espera fins que el model estigui carregat. Comprova amb:
-```bash
-curl http://localhost:9119/health
-./nexe logs
-```
+## Errors d'API
 
-### `OOM killed` / `Killed` (procés mort)
-**Causa:** El model és massa gran per la RAM disponible.
-**Solució:** Tria un model més petit al `.env`. Referència orientativa:
-- 8 GB RAM → Qwen3 1.7B o Qwen3 4B
-- 16 GB RAM → Qwen3 8B o Mistral 7B
-- 32 GB+ RAM → Qwen3 32B o Llama 3.1 70B
-
----
-
-## Errors de Web UI
-
-### Pantalla de login apareix però la clau no funciona (`Clau incorrecta`)
-**Causa 1:** La clau introduïda és incorrecta.
-**Solució:** Troba la clau correcta amb:
-```bash
-grep NEXE_PRIMARY_API_KEY .env
-```
-Copia-la exactament, sense espais ni salts de línia.
-
-**Causa 2:** El servidor està corrent una versió antiga (sense el sistema de login).
-**Solució:**
-```bash
-git pull
-lsof -ti:9119 | xargs kill
-./nexe go
-```
-
-### `GET /ui/auth 404 Not Found` als logs
-**Causa:** El servidor no té l'endpoint `/ui/auth` — versió antiga del codi.
-**Solució:** `git pull` i reinicia el servidor.
-
-### `POST /ui/chat 403 Forbidden` als logs
-**Causa:** Error CSRF — la cookie de sessió no coincideix o és de versió anterior.
-**Solució:** Obre la Web UI en mode incògnit o esborra les cookies per `localhost:9119`. Amb la versió actual (login amb API key) aquest error ja no hauria d'aparèixer.
-
-### La Web UI carrega però el xat no respon
-**Causa:** El model encara s'està carregant, o Qdrant no està actiu.
-**Solució:** Espera 10–30 s i comprova:
-```bash
-curl http://localhost:9119/health
-```
-
----
-
-## Errors d'autenticació API
-
-### `401 Unauthorized` a les peticions API
-**Causa:** La API key no s'ha enviat o és incorrecta.
-**Solució:** Afegeix la capçalera correcta:
-```bash
-curl -H "X-API-Key: $(grep NEXE_PRIMARY_API_KEY .env | cut -d= -f2)" \
-  http://localhost:9119/v1/chat/completions
-```
-
-### `403 Forbidden` a les peticions API
-**Causa habitual:** Error CSRF (sessions web antigues) o intent d'accés des d'un origen no permès.
-**Solució:** Per a l'API REST (`/v1/`), no s'usa CSRF — comprova que estàs usant `X-API-Key` correctament.
-
-### La clau API ha expirat
-**Causa:** `NEXE_PRIMARY_KEY_EXPIRES` al `.env` és una data passada.
-**Solució:** Genera una nova clau i actualitza el `.env`:
-```bash
-python3 -c "import secrets; print(secrets.token_hex(32))"
-```
-Actualitza `NEXE_PRIMARY_API_KEY` al `.env` i reinicia.
-
----
+| Error | Causa | Solució |
+|-------|-------|---------|
+| 401 Missing X-API-Key | Falta capçalera d'autenticació | Afegeix `-H "X-API-Key: YOUR_KEY"` a la petició |
+| 429 Rate Limited | Massa peticions | Espera i reintenta. Comprova els límits de rate al `.env` |
+| 408 Timeout | Inferència del model massa lenta | Augmenta el timeout de NEXE_DEFAULT_MAX_TOKENS (per defecte 4096). Models grans necessiten 600s. |
+| Missatge d'error buit | httpx.ReadTimeout té str() buit | Corregit a v0.8.2 amb repr(e). Comprova els logs del servidor. |
 
 ## Errors de model
 
-### `Model download very slow` / descàrrega molt lenta
-**Causa:** Connexió lenta o model molt gran (models 7B+ ocupen 4–20 GB).
-**Solució:** Espera o tria un model més petit. La descàrrega es pot reprendre si s'interromp.
+| Error | Causa | Solució |
+|-------|-------|---------|
+| OOM Killed | Model massa gran per a la RAM | Usa un model més petit. 8 GB RAM → models 2B com a màxim. |
+| Càrrega de model molt lenta | Model gran o GPU freda | Normal per a models 32B+. L'indicador de càrrega mostra el progrés. |
+| MLX not available | Mac Intel o Linux | MLX és exclusiu d'Apple Silicon. Usa llama.cpp o Ollama. |
+| Qwen3.5 falla amb MLX | Model multimodal incompatible | Usa el backend Ollama per als models Qwen3.5. |
 
-### El model respon molt lentament
-**Causa:** Model massa gran per la RAM/GPU disponibles, o context molt llarg.
-**Solució:** Considera un model més petit. En Apple Silicon M1 de 8 GB, Qwen3 4B és el màxim recomanat.
+## Errors de memòria/RAG
 
-### `ValueError: Unsupported model architecture`
-**Causa:** El model GGUF o MLX no és compatible amb la versió actual de llama.cpp o mlx-lm.
-**Solució:** Actualitza les dependències: `pip install --upgrade mlx-lm llama-cpp-python`
+| Error | Causa | Solució |
+|-------|-------|---------|
+| El RAG no retorna res | Memòria buida (cold start) | Puja documents, usa `nexe knowledge ingest`, o xateja per omplir MEM_SAVE. |
+| Resultats RAG incorrectes | Llindar massa alt | Abaixa el llindar via el slider de la UI o les variables d'entorn NEXE_RAG_*_THRESHOLD. |
+| Memòries duplicades | Problema de llindar de deduplicació | La deduplicació comprova similitud > 0.80. Entrades molt similars però diferents es poden desar ambdues. |
+| Documents no visibles | Sessió incorrecta | Els documents estan aïllats per sessió. Puja'ls a la mateixa sessió on estàs xatejant. |
 
----
+## Errors de Docker
 
-## Errors de memòria / RAG
-
-### `Qdrant collection not found`
-**Causa:** Les col·leccions de Qdrant no s'han inicialitzat.
-**Solució:** Reinicia el servidor — s'inicialitzen automàticament a l'arrencada.
-
-### La memòria no recorda informació guardada
-**Causa:** La informació es va guardar en una sessió diferent, o Qdrant va reiniciar i va perdre l'índex.
-**Solució:** Comprova l'estat de la memòria:
-```bash
-./nexe memory stats
-./nexe memory recall "paraula clau de la info guardada"
-```
-
-### `Embedding model not loaded`
-**Causa:** El model d'embeddings (`paraphrase-multilingual-mpnet-base-v2`) no s'ha descarregat.
-**Solució:** Durant el `./setup.sh` hauries d'haver confirmat la descàrrega. Si no:
-```bash
-python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-multilingual-mpnet-base-v2')"
-```
-
----
-
-## Errors generals
-
-### `NEXE_CSRF_SECRET not configured in production mode`
-**Causa:** El fitxer `.env` no té `NEXE_CSRF_SECRET` i el servidor corre en mode producció.
-**Solució:** Afegeix al `.env`:
-```bash
-echo "NEXE_CSRF_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')" >> .env
-```
-
-### El servidor no arrenca després d'un `git pull`
-**Causa:** Canvis incompatibles en la configuració o dependències noves.
-**Solució:**
-```bash
-./setup.sh   # actualitza dependències
-./nexe go
-```
-
-### Els canvis al codi no es reflecteixen al servidor
-**Causa:** El servidor corrent usa el codi antic (no s'ha reiniciat).
-**Solució:** Mata el procés i reinicia:
-```bash
-lsof -ti:9119 | xargs kill
-./nexe go
-```
+| Error | Causa | Solució |
+|-------|-------|---------|
+| Qdrant no arrenca | Discordança d'arquitectura del binari | Docker auto-detecta amd64/arm64. Comprova la plataforma al Dockerfile. |
+| No es pot connectar a Ollama | Aïllament de xarxa | Ollama s'executa com a servei separat de docker-compose. Comprova el nom del servei a la configuració. |
+| L'emmagatzematge no persisteix | Volum no muntat | Munta `storage/` com a volum Docker. |

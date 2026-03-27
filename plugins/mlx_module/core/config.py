@@ -179,14 +179,14 @@ class MLXConfig:
             )
             return False
 
-        # Verificar que conté config.json (format MLX)
+        # Verificar que conté config.json (requerit per mlx-lm)
         config_file = model_path / "config.json"
         if not config_file.exists():
-            logger.warning(
-                "MLXConfig: model_path no conté config.json: %s",
+            logger.error(
+                "MLXConfig: model_path no conté config.json (requerit per mlx-lm): %s",
                 self.model_path
             )
-            # No és error fatal, potser és format diferent
+            return False
 
         if self.max_tokens < 1:
             logger.error("MLXConfig: max_tokens minimum is 1")

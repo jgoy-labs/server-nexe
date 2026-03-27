@@ -91,11 +91,15 @@ class TestChatSession:
         assert doc is not None
         assert doc["filename"] == "doc.txt"
 
-    def test_get_and_clear_removes_document(self):
+    def test_get_and_clear_persists_document(self):
+        """Document persists for follow-up questions (no longer clears)."""
         s = ChatSession()
         s.attach_document("f.txt", "content")
-        s.get_and_clear_attached_document()
-        assert s.get_and_clear_attached_document() is None
+        doc1 = s.get_and_clear_attached_document()
+        assert doc1 is not None
+        doc2 = s.get_and_clear_attached_document()
+        assert doc2 is not None
+        assert doc1["filename"] == doc2["filename"]
 
     def test_add_context_file(self):
         s = ChatSession()

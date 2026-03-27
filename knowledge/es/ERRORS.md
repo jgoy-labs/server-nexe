@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.0"
-data: 2026-03-12
-id: nexe-errors
+versio: "1.1"
+data: 2026-03-27
+id: nexe-errors-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guía de errores comunes de NEXE 0.8: mensajes de error, causas y soluciones. Cubre errores de instalación, arranque, Web UI, autenticación, modelo, memoria y API."
-tags: [errores, troubleshooting, soluciones, debug, 401, 403, 404, qdrant, mlx, model, web-ui, instalación]
+abstract: "Errores comunes y soluciones para server-nexe 0.8.2. Cubre errores de instalacion, arranque del servidor, Web UI, autenticacion API, carga de modelos, memoria/RAG, Docker y problemas de streaming."
+tags: [errores, troubleshooting, depuracion, instalacion, arranque, web-ui, api, modelos, memoria, docker, streaming]
 chunk_size: 800
 priority: P1
 
@@ -17,159 +17,69 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# NEXE 0.8 — Errores comunes y soluciones
+# Errores comunes — server-nexe 0.8.2
 
-Recopilación de los errores más habituales de NEXE, con las causas probables y las soluciones recomendadas.
+## Errores de instalacion
 
----
-
-## Errores de instalación
-
-### `No s'ha pogut trobar Python 3.11+`
-**Causa:** Python no instalado o versión demasiado antigua.
-**Solución:** `brew install python@3.12` y vuelve a ejecutar `./setup.sh`
-
-### `Permission denied: ./setup.sh` o `./nexe`
-**Causa:** El script no tiene permisos de ejecución.
-**Solución:** `chmod +x setup.sh nexe`
-
-### `ModuleNotFoundError`
-**Causa:** El entorno virtual no se creó correctamente o no se instalaron las dependencias.
-**Solución:** Vuelve a ejecutar `./setup.sh` — reinstala el entorno desde cero.
-
-### `NameError: name 'DIM' is not defined`
-**Causa:** Bug en `installer/installer_setup_env.py` en una versión antigua — la constante ANSI `DIM` no estaba importada.
-**Solución:** `git pull` para obtener la versión corregida y vuelve a ejecutar `./setup.sh`.
-
-### `Python version error` / `requires Python 3.11+`
-**Causa:** Python 3.9 o anterior instalado en el sistema.
-**Solución:** `brew install python@3.11` o `brew install python@3.12`.
-
----
+| Error | Causa | Solucion |
+|-------|-------|----------|
+| Python 3.11+ not found | Python del sistema demasiado antiguo | Instalar Python 3.11+ via Homebrew, o usar el instalador DMG (incluye 3.12) |
+| Permission denied on setup.sh | Falta permiso de ejecucion | `chmod +x setup.sh` |
+| ModuleNotFoundError | Dependencias no instaladas | Activar venv: `source venv/bin/activate`, luego `pip install -r requirements.txt` |
+| rumps import error on Linux | Dependencia exclusiva de macOS | Normal en Linux — rumps esta en requirements-macos.txt, no en requirements.txt |
+| Qdrant binary not found | No descargado | Ejecutar el instalador de nuevo, o descargar manualmente para tu plataforma |
 
 ## Errores de arranque del servidor
 
-### `Port 9119 already in use`
-**Causa:** Ya hay una instancia de NEXE (u otro proceso) usando el puerto 9119.
-**Solución:**
-```bash
-./nexe status
-lsof -ti:9119 | xargs kill
-./nexe go
-```
-
-### `Qdrant connection refused`
-**Causa:** El servicio Qdrant no está en ejecución.
-**Solución:** `./nexe go` lo inicia automáticamente si `NEXE_AUTOSTART_QDRANT=true` en `.env`. Si el problema persiste: detén el servidor con Ctrl+C o `pkill -f "uvicorn.*nexe"` y ejecuta `./nexe go` de nuevo.
-
-### `MLX not found` / `No module named 'mlx'`
-**Causa:** MLX no instalado o el procesador no es Apple Silicon.
-**Solución:** MLX requiere Apple Silicon (M1/M2/M3/M4). Si tienes Mac Intel o Linux, cambia a `llama_cpp` o `ollama` en `.env`:
-```
-NEXE_MODEL_ENGINE=llama_cpp
-```
-
-### El servidor arranca pero no responde
-**Causa:** El modelo se está cargando (puede tardar 10–30 s) o hay un error silencioso.
-**Solución:** Espera hasta que el modelo esté cargado. Comprueba con:
-```bash
-curl http://localhost:9119/health
-./nexe logs
-```
-
-### `OOM killed` / `Killed` (proceso muerto)
-**Causa:** El modelo es demasiado grande para la RAM disponible.
-**Solución:** Elige un modelo más pequeño en `.env`. Referencia orientativa:
-- 8 GB RAM → Qwen3 1.7B o Qwen3 4B
-- 16 GB RAM → Qwen3 8B o Mistral 7B
-- 32 GB+ RAM → Qwen3 32B o Llama 3.1 70B
-
----
+| Error | Causa | Solucion |
+|-------|-------|----------|
+| Port 9119 already in use | Otro proceso en ese puerto | `lsof -i :9119` y matar, o cambiar puerto en server.toml |
+| Qdrant connection refused | Qdrant no esta ejecutandose o puerto incorrecto | Comprobar puerto 6333, reiniciar servidor con `./nexe go` |
+| Ollama not available | Ollama no instalado o no ejecutandose | Instalar desde ollama.com. El servidor auto-arrancara Ollama al iniciar. |
+| asyncio.Lock deadlock | Problema de event loop en Python 3.12 | Corregido en v0.8.2 via inicializacion lazy en module_lifecycle.py. Actualizar a la ultima version. |
 
 ## Errores de Web UI
 
-### Pantalla de login aparece pero la clave no funciona (`Clau incorrecta`)
-**Causa 1:** La clave introducida es incorrecta.
-**Solución:** Encuentra la clave correcta con:
-```bash
-grep NEXE_PRIMARY_API_KEY .env
-```
-Cópiala exactamente, sin espacios ni saltos de línea.
+| Error | Causa | Solucion |
+|-------|-------|----------|
+| 401 Unauthorized | API key incorrecta o ausente | Comprobar que la clave en localStorage coincide con `.env` NEXE_PRIMARY_API_KEY |
+| 403 CSRF | Discrepancia de token CSRF | Limpiar cache del navegador y recargar |
+| Chat not responding | Modelo cargandose (primer mensaje) | Esperar al indicador de carga. Puede tardar 10-60s en la primera carga. |
+| Streaming stops at 2nd message | Bug de _renderTimer (pre-v0.8.2) | Corregido en v0.8.2. Actualizar a la ultima version. |
+| Old JS/CSS cached | Cache agresiva del navegador | Corregido en v0.8.2 con cache-busting (?v=timestamp). Recarga forzada: Cmd+Shift+R |
+| Thinking box not scrolling | Bug de auto-scroll (pre-v0.8.2) | Corregido en v0.8.2. Actualizar a la ultima version. |
 
-**Causa 2:** El servidor está corriendo una versión antigua (sin el sistema de login).
-**Solución:**
-```bash
-git pull
-lsof -ti:9119 | xargs kill
-./nexe go
-```
+## Errores de API
 
-### `GET /ui/auth 404 Not Found` en los logs
-**Causa:** El servidor no tiene el endpoint `/ui/auth` — versión antigua del código.
-**Solución:** `git pull` y reinicia el servidor.
-
-### `POST /ui/chat 403 Forbidden` en los logs
-**Causa:** Error CSRF — la cookie de sesión no coincide o es de versión anterior.
-**Solución:** Abre la Web UI en modo incógnito o borra las cookies para `localhost:9119`. Con la versión actual (login con API key) este error ya no debería aparecer.
-
-### La Web UI carga pero el chat no responde
-**Causa:** El modelo todavía se está cargando, o Qdrant no está activo.
-**Solución:** Espera 10–30 s y comprueba:
-```bash
-curl http://localhost:9119/health
-```
-
----
-
-## Errores de autenticación API
-
-### `401 Unauthorized` en las peticiones API
-**Causa:** La API key no se ha enviado o es incorrecta.
-**Solución:**
-```bash
-curl -H "X-API-Key: $(grep NEXE_PRIMARY_API_KEY .env | cut -d= -f2)" \
-  http://localhost:9119/v1/chat/completions
-```
-
-### La clave API ha expirado
-**Causa:** `NEXE_PRIMARY_KEY_EXPIRES` en `.env` es una fecha pasada.
-**Solución:** Genera una nueva clave y actualiza `.env`:
-```bash
-python3 -c "import secrets; print(secrets.token_hex(32))"
-```
-
----
+| Error | Causa | Solucion |
+|-------|-------|----------|
+| 401 Missing X-API-Key | Sin cabecera de autenticacion | Anadir `-H "X-API-Key: YOUR_KEY"` a la peticion |
+| 429 Rate Limited | Demasiadas peticiones | Esperar y reintentar. Comprobar limites de rate en `.env` |
+| 408 Timeout | Inferencia del modelo demasiado lenta | Aumentar timeout de NEXE_DEFAULT_MAX_TOKENS (por defecto 4096). Los modelos grandes necesitan 600s. |
+| Empty error message | httpx.ReadTimeout tiene str() vacio | Corregido en v0.8.2 con repr(e). Comprobar logs del servidor. |
 
 ## Errores de modelo
 
-### Descarga muy lenta
-**Causa:** Conexión lenta o modelo muy grande (modelos 7B+ ocupan 4–20 GB).
-**Solución:** Espera o elige un modelo más pequeño.
+| Error | Causa | Solucion |
+|-------|-------|----------|
+| OOM Killed | Modelo demasiado grande para la RAM | Usar modelo mas pequeno. 8GB RAM → modelos 2B maximo. |
+| Model loading very slow | Modelo grande o GPU fria | Normal para modelos 32B+. El indicador de carga muestra el progreso. |
+| MLX not available | Mac Intel o Linux | MLX es solo para Apple Silicon. Usar llama.cpp u Ollama. |
+| Qwen3.5 fails on MLX | Modelo multimodal incompatible | Usar backend Ollama para modelos Qwen3.5. |
 
-### El modelo responde muy lentamente
-**Causa:** Modelo demasiado grande para la RAM/GPU disponibles.
-**Solución:** En Apple Silicon M1 de 8 GB, Qwen3 4B es el máximo recomendado.
+## Errores de memoria/RAG
 
----
+| Error | Causa | Solucion |
+|-------|-------|----------|
+| RAG returns nothing | Memoria vacia (arranque en frio) | Subir documentos, usar `nexe knowledge ingest`, o chatear para poblar MEM_SAVE. |
+| Wrong RAG results | Umbral demasiado alto | Bajar umbral via el slider de la UI o variables de entorno NEXE_RAG_*_THRESHOLD. |
+| Duplicate memories | Problema de umbral de deduplicacion | La deduplicacion comprueba similitud > 0.80. Entradas muy similares pero diferentes pueden guardarse ambas. |
+| Documents not visible | Sesion incorrecta | Los documentos estan aislados por sesion. Subir en la misma sesion donde estas chateando. |
 
-## Errores de memoria / RAG
+## Errores de Docker
 
-### La memoria no recuerda información guardada
-**Causa:** La información se guardó en una sesión diferente, o Qdrant reinició y perdió el índice.
-**Solución:**
-```bash
-./nexe memory stats
-./nexe memory recall "palabra clave de la info guardada"
-```
-
----
-
-## Errores generales
-
-### Los cambios en el código no se reflejan en el servidor
-**Causa:** El servidor en ejecución usa el código antiguo (no se ha reiniciado).
-**Solución:**
-```bash
-lsof -ti:9119 | xargs kill
-./nexe go
-```
+| Error | Causa | Solucion |
+|-------|-------|----------|
+| Qdrant not starting | Discrepancia de arquitectura del binario | Docker auto-detecta amd64/arm64. Comprobar plataforma en Dockerfile. |
+| Cannot connect to Ollama | Aislamiento de red | Ollama se ejecuta como servicio separado de docker-compose. Comprobar nombre del servicio en la configuracion. |
+| Storage not persisting | Volumen no montado | Montar `storage/` como volumen de Docker. |

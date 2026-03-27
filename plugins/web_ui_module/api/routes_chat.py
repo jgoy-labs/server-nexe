@@ -89,6 +89,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             if content_to_delete:
                 result = await memory_helper.delete_from_memory(content_to_delete)
                 if result["success"] and result.get("deleted", 0) > 0:
+                    # Sanititzar missatge a l'historial per evitar re-save loop
+                    # (el model veuria el fet a l'historial i el re-guardaria via MEM_SAVE)
+                    if session.messages and session.messages[-1]["role"] == "user":
+                        session.messages[-1]["content"] = f"[Comanda memòria: esborrar «{content_to_delete[:50]}»]"
                     response_text = f"Esborrat de la memoria: {result['deleted']} entrada(es) relacionades amb \"{content_to_delete[:100]}\""
                 elif result["success"]:
                     response_text = f"No he trobat res a la memoria sobre \"{content_to_delete[:100]}\""
@@ -259,16 +263,24 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         doc_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'nexe_documentation']
                                         knowledge_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'user_knowledge']
                                         memory_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') not in ('user_knowledge', 'nexe_documentation')]
+                                        # RAG context labels per idioma (coincideixen amb system prompt)
+                                        _rag_labels = {
+                                            "ca": ("DOCUMENTACIO DEL SISTEMA", "DOCUMENTACIO TECNICA", "MEMORIA DE L'USUARI"),
+                                            "es": ("DOCUMENTACION DEL SISTEMA", "DOCUMENTACION TECNICA", "MEMORIA DEL USUARIO"),
+                                            "en": ("SYSTEM DOCUMENTATION", "TECHNICAL DOCUMENTATION", "USER MEMORY"),
+                                        }
+                                        _lang_key = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
+                                        _labels = _rag_labels.get(_lang_key, _rag_labels["en"])
                                         if doc_items:
-                                            rag_context += "\n\n[DOCUMENTACIO DEL SISTEMA]\n"
+                                            rag_context += f"\n\n[{_labels[0]}]\n"
                                             for item in doc_items:
                                                 rag_context += f"- {item['content']}\n"
                                         if knowledge_items:
-                                            rag_context += "\n\n[DOCUMENTACIO TECNICA]\n"
+                                            rag_context += f"\n\n[{_labels[1]}]\n"
                                             for item in knowledge_items:
                                                 rag_context += f"- {item['content']}\n"
                                         if memory_items:
-                                            rag_context += "\n\n[MEMORIA DE L'USUARI]\n"
+                                            rag_context += f"\n\n[{_labels[2]}]\n"
                                             for item in memory_items:
                                                 rag_context += f"- {item['content']}\n"
                                         # Sanitize RAG context: remove control chars and truncate
@@ -348,7 +360,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             chat_result = engine.chat(model=model_name, messages=full_messages, stream=stream)
                         else:
                             # MLX/LlamaCpp-style: chat(messages, system=...)
-                            if engine_name in ("mlx_module", "llama_cpp_module") and stream:
+                            if engine_name in ("mlx_module", "llama_cpp_module"):
                                 # MLX module requires a callback for streaming
                                 queue = asyncio.Queue()
 
@@ -608,6 +620,45 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             except Exception as e:
                 logger.error(f"Error calling LLM: {e}")
                 response_text = f"Error: {str(e)}"
+
+        # Strip MEM_SAVE tags i extreure fets (non-streaming path)
+        if response_text and intent == "chat" and not response_text.startswith("Error:"):
+            # Netejar thinking tags
+            response_text = _re.sub(r"<think>[\s\S]*?</think>\s*", "", response_text)
+            response_text = _re.sub(r'<\|[^|]+\|>', '', response_text)
+            # GPT-OSS: extreure nomes la part "final"
+            _m_ns = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', response_text, _re.IGNORECASE)
+            if _m_ns:
+                response_text = _m_ns.group(1).strip()
+            else:
+                response_text = _re.sub(r'^analysis\s*', '', response_text, flags=_re.IGNORECASE).strip()
+            # Extreure [MEM_SAVE: ...] fets abans de strip
+            _mem_saves_ns = _re.findall(r'\[MEM_SAVE:\s*(.+?)\]', response_text)
+            response_text = _re.sub(r'\[MEM_SAVE:\s*.+?\]\s*', '', response_text).strip()
+            # Guardar fets extrets a memòria
+            if _mem_saves_ns:
+                _junk_re = _re.compile(
+                    r'(?i)(no\s+(coneix|s.han|tinc|té|hi ha)|'
+                    r'no\s+s.han\s+detectat|busco\s+ajuda|necessit[oa]|'
+                    r'primera\s+interacci|no\s+personal|sense\s+dades)',
+                )
+                for _fact in _mem_saves_ns:
+                    _fact = _fact.strip()
+                    if not _fact or len(_fact) < 5:
+                        continue
+                    if _junk_re.search(_fact):
+                        logger.debug("MEM_SAVE skip (junk/no-stream): '%s'", _fact[:80])
+                        continue
+                    try:
+                        _save_r = await memory_helper.save_to_memory(
+                            content=_fact,
+                            session_id=session.id,
+                            metadata={"type": "user_fact", "source": "llm_extract"}
+                        )
+                        if _save_r.get("document_id"):
+                            logger.info("MEM_SAVE (no-stream): '%s'", _fact[:80])
+                    except Exception as e:
+                        logger.debug("MEM_SAVE failed (no-stream): %s", e)
 
         session.add_message("assistant", response_text)
         session_mgr._save_session_to_disk(session)

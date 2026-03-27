@@ -23,7 +23,7 @@ from plugins.security.core.auth import (
   ApiKeyData,
   ApiKeyConfig,
 )
-from core.app import app
+# Mini test app created in _make_auth_test_app() below
 
 @pytest.fixture(autouse=True)
 def cleanup_api_key_env(monkeypatch):
@@ -210,10 +210,20 @@ def test_load_api_keys_no_keys_configured(monkeypatch):
   assert config.secondary is None
   assert config.has_any_valid_key is False
 
+def _make_auth_test_app():
+  """Crea mini-app amb endpoint protegit per testar auth."""
+  from fastapi import FastAPI, Depends
+  from plugins.security.core.auth_dependencies import require_api_key
+  test_app = FastAPI()
+  @test_app.get("/test-auth")
+  async def protected(_: str = Depends(require_api_key)):
+      return {"status": "ok"}
+  return test_app
+
 @pytest.fixture
 def client():
-  """Test client for FastAPI app."""
-  return TestClient(app, base_url="http://localhost")
+  """Test client amb mini-app protegida."""
+  return TestClient(_make_auth_test_app(), base_url="http://localhost")
 
 def test_require_api_key_with_valid_primary(client, monkeypatch):
   """Test authentication succeeds with valid primary key."""
@@ -222,7 +232,7 @@ def test_require_api_key_with_valid_primary(client, monkeypatch):
   monkeypatch.delenv("NEXE_SECONDARY_API_KEY", raising=False)
 
   response = client.get(
-    "/security/health",
+    "/test-auth",
     headers={"X-API-Key": "test-primary-key"}
   )
 
@@ -237,7 +247,7 @@ def test_require_api_key_with_valid_secondary(client, monkeypatch):
   monkeypatch.setenv("NEXE_SECONDARY_KEY_EXPIRES", future)
 
   response = client.get(
-    "/security/health",
+    "/test-auth",
     headers={"X-API-Key": "old-key"}
   )
 
@@ -249,7 +259,7 @@ def test_require_api_key_primary_priority_over_secondary(client, monkeypatch):
   monkeypatch.setenv("NEXE_SECONDARY_API_KEY", "old-key")
 
   response = client.get(
-    "/security/health",
+    "/test-auth",
     headers={"X-API-Key": "new-key"}
   )
 
@@ -264,7 +274,7 @@ def test_require_api_key_with_expired_key(client, monkeypatch):
   monkeypatch.setenv("NEXE_PRIMARY_KEY_EXPIRES", past)
 
   response = client.get(
-    "/security/report",
+    "/test-auth",
     headers={"X-API-Key": "expired-key"}
   )
 
@@ -276,7 +286,7 @@ def test_require_api_key_backward_compat_phase1(client, monkeypatch):
   monkeypatch.setenv("NEXE_ADMIN_API_KEY", "legacy-key")
 
   response = client.get(
-    "/security/health",
+    "/test-auth",
     headers={"X-API-Key": "legacy-key"}
   )
 
@@ -287,7 +297,7 @@ def test_require_api_key_invalid_key(client, monkeypatch):
   monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "correct-key")
 
   response = client.get(
-    "/security/report",
+    "/test-auth",
     headers={"X-API-Key": "wrong-key"}
   )
 
@@ -298,7 +308,7 @@ def test_require_api_key_missing_header(client, monkeypatch):
   monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-key")
 
   response = client.get(
-    "/security/report"
+    "/test-auth"
   )
 
   assert response.status_code in [401, 500]
@@ -310,7 +320,7 @@ def test_require_api_key_fail_closed_no_keys(client, monkeypatch):
   monkeypatch.setenv("NEXE_DEV_MODE", "false")
 
   response = client.get(
-    "/security/report",
+    "/test-auth",
     headers={"X-API-Key": "any-key"}
   )
 
@@ -321,9 +331,10 @@ def test_require_api_key_dev_mode_bypass(client, monkeypatch):
   monkeypatch.delenv("NEXE_PRIMARY_API_KEY", raising=False)
   monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
   monkeypatch.setenv("NEXE_DEV_MODE", "true")
+  monkeypatch.setenv("NEXE_DEV_MODE_ALLOW_REMOTE", "true")  # TestClient IP is "testclient"
 
   response = client.get(
-    "/security/health"
+    "/test-auth"
   )
 
   assert response.status_code == 200

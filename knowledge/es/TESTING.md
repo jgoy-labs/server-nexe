@@ -1,109 +1,101 @@
 # === METADATA RAG ===
-versio: "1.0"
-data: 2026-03-15
-id: nexe-testing
+versio: "1.1"
+data: 2026-03-27
+id: nexe-testing-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia y cobertura de tests de NEXE 0.8. Cobertura unitaria del 95%, +1.483 tests nuevos generados por Claude (Anthropic). Tests dentro de cada módulo siguiendo la estructura modular del proyecto."
-tags: [testing, pytest, cobertura, calidad, ci, tests-unitarios, tests-integración]
-chunk_size: 1500
+abstract: "Estrategia de testing y cobertura de server-nexe 0.8.2. 3901 tests pasados, 0 fallos, 35 omitidos. Tests colocalizados con sus modulos. Cubre estructura de tests, ejecucion de tests, cobertura, correcciones de tests de la auditoria de consultoria (229→0 fallos) e impacto en tests de la refactorizacion del monolito."
+tags: [testing, pytest, cobertura, tests, calidad, ci, consultoria, refactorizacion]
+chunk_size: 800
 priority: P2
 
 # === OPCIONAL ===
 lang: es
 type: docs
 collection: user_knowledge
-author: "Claude (Anthropic) · Jordi Goy"
+author: "Jordi Goy"
 expires: null
 ---
 
-# Testing - NEXE 0.8
+# Testing — server-nexe 0.8.2
 
-> **📝 Documento creado:** 2026-03-15
-> **🤖 Autoría:** Tests generados por **Claude** (Anthropic) bajo la supervisión de Jordi Goy.
+## Resultados de tests
 
-## Resumen
+| Metrica | Valor |
+|---------|-------|
+| Tests totales | 3901 |
+| Pasados | 3901 |
+| Fallidos | 0 |
+| Omitidos | 35 |
+| XFailed | 1 |
 
-NEXE 0.8 dispone de una suite de tests completa con una **cobertura unitaria del 95%**. Los tests fueron generados por Claude (modelo de IA de Anthropic) como parte del proceso de calidad previo a la publicación del proyecto.
+## Estructura de tests
 
-## Cifras clave
-
-| Métrica | Valor |
-|---|---|
-| Cobertura unitaria | 95% |
-| Tests nuevos añadidos | +1.483 |
-| Ficheros de test totales | ~180 |
-| Rama de trabajo | `tests/unit-coverage-95` |
-
-## Estructura de los tests
-
-Los tests siguen una **estructura modular**: cada módulo contiene sus propios tests dentro de una carpeta `tests/` junto al código que testean.
+Los tests estan colocalizados con sus modulos (no en un directorio `tests/` raiz separado):
 
 ```
-core/
-├── endpoints/tests/        # Tests de endpoints REST
-├── ingest/tests/           # Tests del pipeline de ingestión
-├── metrics/tests/          # Tests de métricas Prometheus
-├── paths/tests/            # Tests de resolución de rutas
-├── resilience/tests/       # Tests del circuit breaker
-├── server/tests/           # Tests del servidor FastAPI
-└── tests/                  # Tests generales del core
-
-memory/
-├── embeddings/tests/       # Tests de embeddings y chunking
-├── memory/tests/           # Tests del sistema de memoria
-├── rag/tests/              # Tests del motor RAG
-└── shared/tests/           # Tests de cache compartido
-
-personality/
-├── events/tests/           # Tests del sistema de eventos
-├── i18n/tests/             # Tests de internacionalización
-├── loading/tests/          # Tests del cargador de módulos
-├── models/tests/           # Tests de perfiles de personalidad
-└── module_manager/tests/   # Tests del gestor de módulos
-
-plugins/
-├── llama_cpp_module/tests/ # Tests de Llama.cpp
-├── mlx_module/tests/       # Tests de MLX
-├── ollama_module/tests/    # Tests de Ollama
-├── security/tests/         # Tests de seguridad
-├── security_logger/tests/  # Tests del logger de seguridad
-└── web_ui_module/tests/    # Tests de la interfaz web
-
-tests/                      # Tests de integración globales
+core/endpoints/tests/       # Tests de endpoints
+core/server/tests/          # Tests de factory
+plugins/security/tests/     # Tests del plugin de seguridad
+plugins/web_ui_module/tests/ # Tests de Web UI
+plugins/ollama_module/tests/ # Tests de Ollama
+memory/memory/tests/        # Tests del modulo de memoria
+memory/rag/tests/           # Tests de RAG
+memory/embeddings/tests/    # Tests de embeddings
+personality/module_manager/tests/ # Tests del gestor de modulos
+tests/                      # Tests de integracion raiz
 ```
 
-## Cómo ejecutar los tests
+## Ejecutar tests
 
 ```bash
-# Todos los tests unitarios
+# Todos los tests
 pytest
 
-# Un módulo específico
-pytest plugins/ollama_module/tests/
-
 # Con cobertura
-pytest --cov=. --cov-report=html
+pytest --cov
 
-# Tests completos (incluye integración)
+# Modulo especifico
+pytest plugins/security/tests/
+
+# Suite completa (incluye tests lentos)
 pytest -c pytest-full.ini
+
+# Verbose
+pytest -v
 ```
 
-## Tipos de tests
+El `conftest.py` raiz proporciona fixtures compartidos. Cada modulo puede tener su propio `conftest.py`.
 
-### Tests unitarios
-- Cubren funciones y clases individuales
-- Utilizan mocks para aislar dependencias externas (Qdrant, Ollama, MLX)
-- Se ejecutan rápidamente sin servicios externos
+## Decisiones clave de testing
 
-### Tests de integración
-- Verifican la interacción entre módulos
-- Algunos requieren servicios activos (Qdrant, Ollama)
-- Ubicados en `tests/integration/`
+### Closures → Funciones (refactorizacion de marzo 2026)
 
-## Filosofía
+Durante la division del monolito (chat.py, routes.py, tray.py, lifespan.py), las closures se refactorizaron a funciones independientes con inyeccion de dependencias. Esto fue critico para la testabilidad — las closures no se pueden parchear con `unittest.mock.patch`, pero las funciones a nivel de modulo si.
 
-- **Tests dentro de cada módulo**: si mueves un plugin a otro repositorio, los tests van con él
-- **Mocks por defecto**: los tests unitarios no dependen de servicios externos
-- **Cobertura > 90%**: objetivo mínimo para todos los módulos
-- **CI-ready**: todos los tests se pueden ejecutar en un entorno de integración continua
+**Antes:** 30 ficheros de test rotos tras la refactorizacion por cambios en rutas de import y objetivos de patch.
+**Despues:** Todos los tests actualizados con los objetivos de patch correctos. 229 fallos → 0.
+
+### Impacto de la auditoria de consultoria
+
+- Consultoria v1: 73 hallazgos → 40 correcciones → suite de tests actualizada
+- Consultoria v2: 12 hallazgos → todos resueltos → 229 tests fallidos corregidos (8 causas raiz, 54 tests afectados)
+- Causas raiz: refactorizacion de CLI, cambios de manifest, rutas, versiones, event loops, cambios de import
+
+### Filosofia de testing
+
+- Tests dentro de los modulos (colocalizados, no centralizados)
+- Mocks para servicios externos (Qdrant, Ollama)
+- Rutas de codigo reales para logica interna
+- Listo para CI: todos los tests se ejecutan en GitHub Actions
+- Objetivo: >90% de cobertura por modulo
+
+## CI/CD
+
+Workflow de GitHub Actions (`.github/workflows/ci.yml`):
+- Python 3.12
+- Instalar dependencias (solo requirements.txt, sin especificas de macOS)
+- Ejecutar suite completa de tests
+- Generacion de badge de cobertura
+
+El CI en Linux funciona porque `rumps` (bandeja de macOS) esta en `requirements-macos.txt` (no se instala en Linux) y todos los imports de bandeja son condicionales (flag `_HAS_RUMPS`).

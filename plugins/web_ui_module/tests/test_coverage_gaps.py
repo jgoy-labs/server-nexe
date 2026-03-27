@@ -78,7 +78,8 @@ class TestChatSessionGaps:
         s.attach_document("f.txt", "content")
         assert s.has_attached_document() is True
         s.get_and_clear_attached_document()
-        assert s.has_attached_document() is False
+        # Document persists for follow-up questions (no longer clears)
+        assert s.has_attached_document() is True
 
     def test_add_context_file_no_duplicates(self):
         """Verify no duplicate files in context."""
