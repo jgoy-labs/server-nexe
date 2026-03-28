@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag_sources/__init__.py
 Description: Base module for RAG sources.

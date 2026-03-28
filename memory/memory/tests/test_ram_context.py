@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/tests/test_ram_context.py
 Description: No description available.

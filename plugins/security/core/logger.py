@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/logger.py
 Description: Security event logger. Records events in JSONL format.

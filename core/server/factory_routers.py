@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/server/factory_routers.py
 Description: Router Registration for Nexe Server Factory.

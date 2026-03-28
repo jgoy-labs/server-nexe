@@ -2,7 +2,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/ingest/ingest_knowledge.py
 Description: Ingest user documents into Qdrant for personalized RAG.

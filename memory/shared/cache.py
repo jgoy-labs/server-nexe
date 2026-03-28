@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/shared/cache.py
 Description: MultiLevelCache implementation (L1 Memory + L2 SQLite).

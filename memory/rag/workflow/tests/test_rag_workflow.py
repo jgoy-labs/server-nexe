@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: memory/rag/workflow/tests/test_rag_workflow.py
 Description: Tests per memory/rag/workflow/ (registry i __init__).

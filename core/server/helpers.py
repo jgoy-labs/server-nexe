@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/server/helpers.py
 Description: Utilitats pel servidor. Funcions: is_port_in_use() (socket check), setup_signal_handlers()

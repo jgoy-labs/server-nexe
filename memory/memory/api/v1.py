@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: memory/memory/api/v1.py
 Description: Memory HTTP API v1 - Endpoints for /save and /recall from chat.
@@ -25,7 +24,7 @@ class MemoryStoreRequest(BaseModel):
     """Request body for storing content in memory."""
     content: str
     metadata: Optional[Dict[str, Any]] = None
-    collection: str = "nexe_chat_memory"
+    collection: str = "nexe_web_ui"
 
 class MemoryStoreResponse(BaseModel):
     """Response for store operation."""
@@ -63,9 +62,9 @@ async def get_memory_api():
         await _memory_api.initialize()
         # Ensure default collection exists
         try:
-            if not await _memory_api.collection_exists("nexe_chat_memory"):
-                await _memory_api.create_collection("nexe_chat_memory", vector_size=DEFAULT_VECTOR_SIZE)
-                logger.info("Created default collection: nexe_chat_memory")
+            if not await _memory_api.collection_exists("nexe_web_ui"):
+                await _memory_api.create_collection("nexe_web_ui", vector_size=DEFAULT_VECTOR_SIZE)
+                logger.info("Created default collection: nexe_web_ui")
         except Exception as e:
             logger.warning("Could not create default collection: %s", e)
     return _memory_api
@@ -138,7 +137,7 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         elif body.collection:
             cols = [body.collection]
         else:
-            cols = ["nexe_documentation", "nexe_web_ui", "user_knowledge", "nexe_chat_memory"]
+            cols = ["nexe_documentation", "nexe_web_ui", "user_knowledge", "nexe_web_ui"]
 
         formatted_results = []
         search_errors = 0

@@ -18,7 +18,7 @@ Copy the example environment file and set your API key:
 
 ```bash
 cp .env.example .env
-# Edit .env — set NEXE_API_KEY
+# Edit .env — set NEXE_PRIMARY_API_KEY
 ```
 
 Start the server:
@@ -29,7 +29,7 @@ Start the server:
 
 ## Running tests
 
-The test suite has 3987+ passing tests with 90% code coverage.
+The test suite has 4143+ passing tests with 90% code coverage.
 
 ```bash
 # Fast unit tests (no external services needed)
@@ -80,7 +80,7 @@ prefix = "/my-module"
 ### module.py
 
 ```python
-from personality.module_manager.manifest import ModuleMetadata
+from core.loader.protocol import ModuleMetadata
 
 class Module:
     """Module implementing ModuleInterface."""

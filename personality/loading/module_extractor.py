@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_extractor.py
 Description: Module main instance extractor. Searches in order: factory functions

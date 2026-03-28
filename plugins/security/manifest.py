@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/manifest.py
 Description: Router FastAPI per modul security.

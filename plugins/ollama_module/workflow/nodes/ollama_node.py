@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/ollama_module/workflow/nodes/ollama_node.py
 Description: OllamaNode for Workflow Engine. Ollama LLM integration node with prompt templating, streaming and config management.

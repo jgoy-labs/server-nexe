@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: memory/rag/tests/test_routers.py
 Description: Tests per memory/rag/routers/endpoints.py i ui.py.

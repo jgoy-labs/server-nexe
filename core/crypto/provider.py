@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/crypto/provider.py
 Description: CryptoProvider — AES-256-GCM encryption, HKDF key derivation.

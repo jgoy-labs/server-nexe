@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/api/v1.py
 Description: RAG API v1 - Endpoints for semantic search and RAG document management.

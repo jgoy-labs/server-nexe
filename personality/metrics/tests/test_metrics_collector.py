@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/metrics/tests/test_metrics_collector.py
 Description: Tests per MetricsCollector. Valida recol·lecció de mètriques,

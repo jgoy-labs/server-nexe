@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/ollama_module/module.py
 Description: Modul Ollama — NexeModule + NexeModuleWithRouter Protocol.

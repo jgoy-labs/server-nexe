@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/crypto/__init__.py
 Description: Encryption at rest — key management, AES-256-GCM, key derivation.

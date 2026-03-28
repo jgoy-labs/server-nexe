@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: memory/rag/header_parser.py
 Description: Parser for standardized RAG document headers

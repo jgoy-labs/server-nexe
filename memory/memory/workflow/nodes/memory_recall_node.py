@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/workflow/nodes/memory_recall_node.py
 Description: Node for retrieving memories from Memory.

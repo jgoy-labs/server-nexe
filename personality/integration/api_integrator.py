@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/integration/api_integrator.py
 Description: Automatic module API integrator into the FastAPI server. Detects routers,

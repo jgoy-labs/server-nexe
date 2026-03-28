@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/engines/ram_context.py
 Description: RAMContext - Vista immutable sobre FlashMemory (FIFO, max 100 entries).

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/workflow/nodes/chunking_node.py
 Description: Workflow node per chunking de documents.

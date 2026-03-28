@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-installation-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia d'instal·lacio per a server-nexe 0.8.5 pre-release. Tres metodes: DMG per a macOS amb wizard SwiftUI (6 pantalles, deteccio de maquinari, 17 models, Python 3.12 inclos), CLI headless (setup.sh amb suport Linux) i Docker (docker-compose amb Ollama). Cobreix requisits del sistema, seleccio de backend, cataleg de models per nivell de RAM, verificacio post-instal·lacio, app de safata, desinstal·lador, encriptacio opt-in i resolucio de problemes."
+abstract: "Guia d'instal·lacio per a server-nexe 0.8.5 pre-release. Tres metodes: DMG per a macOS amb wizard SwiftUI (6 pantalles, deteccio de maquinari, 15 models, Python 3.12 inclos), CLI headless (setup.sh amb suport Linux) i Docker (docker-compose amb Ollama). Cobreix requisits del sistema, seleccio de backend, cataleg de models per nivell de RAM, verificacio post-instal·lacio, app de safata, desinstal·lador, encriptacio opt-in i resolucio de problemes."
 tags: [installation, setup, dmg, swiftui, wizard, docker, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption]
 chunk_size: 800
 priority: P1
@@ -38,7 +38,7 @@ Wizard natiu SwiftUI amb 6 pantalles. Inclou Python 3.12 — sense dependencia d
 
 1. **Benvinguda:** Selector d'idioma (ca/es/en), logotip, informacio de versio
 2. **Desti:** Selector de carpeta amb validacio d'espai lliure
-3. **Seleccio de model:** 4 pestanyes (petit/mitja/gran/personalitzat) amb deteccio de maquinari. Mostra 17 models amb requisits de RAM, compatibilitat de motor i any. Recomana models basant-se en la RAM/GPU detectada.
+3. **Seleccio de model:** 4 pestanyes (petit/mitja/gran/personalitzat) amb deteccio de maquinari. Mostra 15 models amb requisits de RAM, compatibilitat de motor i any. Recomana models basant-se en la RAM/GPU detectada.
 4. **Confirmacio:** Resum de les opcions abans d'instal·lar
 5. **Progres:** Barra de progres de 7 passos amb log en temps real. Parser de protocol Python (marcadors [PROGRESS], [LOG], [DONE], [ERROR]). 8-30 minuts depenent de la descarrega del model.
 6. **Finalitzacio:** Visualitzacio de la clau API, opcions per afegir al Dock i als Elements d'inici, compte enrere per al llancament
@@ -100,7 +100,7 @@ docker-compose up
 
 Munta `storage/` per a dades persistents (models, vectors Qdrant, logs).
 
-## Cataleg de models (17 models)
+## Cataleg de models (15 models)
 
 ### Petits (8 GB RAM)
 | Model | Mida | Motor | Any |

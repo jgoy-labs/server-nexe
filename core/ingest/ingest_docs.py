@@ -2,7 +2,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/ingest/ingest_docs.py
 Description: Ingest documentation into Qdrant for RAG context.

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/i18n/__init__.py
 Description: Package marker for the internationalization system. Exports I18nManager (base)

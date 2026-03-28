@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_importer.py
 Description: Dynamic Python module importer. Loads files via importlib.util with

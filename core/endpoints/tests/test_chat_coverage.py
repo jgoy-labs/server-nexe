@@ -38,7 +38,7 @@ class TestSaveConversationToMemory:
         mock_memory.store.assert_awaited_once()
 
     def test_save_creates_collection(self):
-        """Lines 411-412: creates nexe_chat_memory collection."""
+        """Lines 411-412: creates nexe_web_ui collection."""
         from core.endpoints.chat import _save_conversation_to_memory
 
         mock_memory = AsyncMock()

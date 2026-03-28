@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/system_lifecycle.py
 Description: Gestor de cicle de vida del sistema Nexe. Controla start_system (discovery +

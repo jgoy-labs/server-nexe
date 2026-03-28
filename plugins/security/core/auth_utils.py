@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/auth_utils.py
 Description: Utilities for the Nexe authentication system.

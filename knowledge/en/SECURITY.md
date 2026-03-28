@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-security-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Security documentation for server-nexe 0.8.5 pre-release. Covers dual-key API authentication with rotation, rate limiting (all endpoints), 6 injection detectors with Unicode normalization, 69 jailbreak patterns, OWASP security headers, RFC5424 audit logging, input validation (validate_string_input on all UI routes), RAG context sanitization, encryption at-rest (CryptoProvider AES-256-GCM, SQLCipher, encrypted sessions), AI audit results (v1+v2+mega-test), and security checklist."
+abstract: "Security documentation for server-nexe 0.8.5 pre-release. Covers dual-key API authentication with rotation, rate limiting (all endpoints), 6 injection detectors with Unicode normalization, 47 jailbreak patterns, OWASP security headers, RFC5424 audit logging, input validation (validate_string_input on all UI routes), RAG context sanitization, encryption at-rest (CryptoProvider AES-256-GCM, SQLCipher, encrypted sessions), AI audit results (v1+v2+mega-test), and security checklist."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher]
 chunk_size: 800
 priority: P1
@@ -30,7 +30,7 @@ server-nexe is designed for trusted local environments. All data stays on-device
 - Validation: `secrets.compare_digest()` (timing-safe comparison)
 - Header: `X-API-Key`
 
-**Bootstrap token:** One-time setup token generated at startup. 128-bit entropy, SQLite-persistent, 30-minute TTL. Localhost-only regeneration.
+**Bootstrap token:** One-time setup token generated at startup. 256-bit entropy, SQLite-persistent, 30-minute TTL. Localhost-only regeneration.
 
 ## Rate Limiting
 
@@ -72,7 +72,7 @@ Applied via `core/security_headers.py` and middleware:
 - `X-Frame-Options`: DENY
 - `X-XSS-Protection`: 0 (deprecated, CSP used instead)
 - `Referrer-Policy`: strict-origin-when-cross-origin
-- `Permissions-Policy`: restricted
+- `Permissions-Policy`: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()
 
 ## Input Validation
 
@@ -112,11 +112,11 @@ The API endpoint `POST /v1/chat/completions` validates and sanitizes input throu
 
 **Unicode normalization:** All 6 detectors apply `unicodedata.normalize('NFKC', text)` before pattern matching. This prevents bypass via Unicode homoglyphs or encoding variations (e.g., fullwidth characters, composed vs decomposed forms).
 
-**69 jailbreak patterns** in `plugins/security/sanitizer/`: Multilingual pattern matching for prompt injection attempts.
+**47 jailbreak patterns** in `plugins/security/sanitizer/`: Multilingual pattern matching for prompt injection attempts.
 
 **Request size limit:** 100MB maximum request body (DoS protection).
 
-**Log truncation:** User messages are truncated to 80 characters in log output to prevent log injection and reduce log volume.
+**Log truncation:** User messages are truncated to 200 characters in log output to prevent log injection and reduce log volume.
 
 ## Audit Logging
 

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/data/models.py
 Description: Data models compartits de Nexe Core. Defineix Enums (ModuleState, SystemStatus,

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/web_ui_module/tests/test_memory_helper_async.py
 Description: Tests async per MemoryHelper (get_memory_api, save, recall, stats, clear, prune).

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/web_ui_module/core/rag_handler.py
 Description: Funcions RAG per al modul web_ui.

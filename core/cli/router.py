@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/router.py
 Description: CLI router — dispatches commands to registered CLI modules.

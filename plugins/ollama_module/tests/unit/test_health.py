@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/ollama_module/tests/unit/test_health.py
 Description: Tests per plugins/ollama_module/health.py.

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/dependencies.py
 Description: Shared dependencies per dependency injection. Exposa limiters (global, by_key,

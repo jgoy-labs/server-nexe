@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/constants.py
 Description: Constants for the RAG module. Separated from manifest.py to avoid circular imports.

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/events/tests/test_event_system.py
 Description: Tests per EventSystem. Valida publish-subscribe, emissió d'events,

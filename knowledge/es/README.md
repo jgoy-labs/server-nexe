@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-overview
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Vision general de server-nexe 0.8.5 pre-release, un servidor de IA local con memoria RAG persistente. Cubre que es, backends (MLX, llama.cpp, Ollama), funcionalidades (MEM_SAVE, i18n, Docker, aislamiento de sesiones, encriptacion en reposo), arquitectura, 17 modelos disponibles, stack tecnologico, metodos de instalacion, documentacion AI-ready, y soporte de plataformas actual."
+abstract: "Vision general de server-nexe 0.8.5 pre-release, un servidor de IA local con memoria RAG persistente. Cubre que es, backends (MLX, llama.cpp, Ollama), funcionalidades (MEM_SAVE, i18n, Docker, aislamiento de sesiones, encriptacion en reposo), arquitectura, 15 modelos disponibles, stack tecnologico, metodos de instalacion, documentacion AI-ready, y soporte de plataformas actual."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready]
 chunk_size: 800
 priority: P1
@@ -42,7 +42,7 @@ NO es npm nexe (un compilador de Node.js). NO es un producto de servidor Windows
 6. **Multilingue (ca/es/en)** — i18n completo: UI, system prompts, etiquetas de contexto RAG, mensajes de error, instalador. El servidor es la fuente de verdad para la seleccion de idioma.
 7. **Upload de documentos con aislamiento de sesion** — Sube documentos via la Web UI. Indexados en user_knowledge con metadatos session_id. Los documentos solo son visibles dentro de la sesion donde fueron subidos.
 8. **Encriptacion en reposo (opt-in)** — Encriptacion AES-256-GCM para SQLite (via SQLCipher), sesiones de chat (.enc), y texto de documentos RAG (TextStore). Los payloads de Qdrant solo contienen vectores e IDs, sin texto. Gestion de claves via OS Keyring, variable de entorno, o fichero. Anadida recientemente — aun no probada en batalla en produccion.
-9. **Validacion de entrada completa** — Todos los endpoints (API y Web UI) tienen rate limiting, validacion de entrada (`validate_string_input`), y sanitizacion de contexto RAG. 6 detectores de inyeccion con normalizacion Unicode. 69 patrones de jailbreak.
+9. **Validacion de entrada completa** — Todos los endpoints (API y Web UI) tienen rate limiting, validacion de entrada (`validate_string_input`), y sanitizacion de contexto RAG. 6 detectores de inyeccion con normalizacion Unicode. 47 patrones de jailbreak.
 10. **Soporte Docker** — Dockerfile + docker-compose.yml con Qdrant embebido. Python 3.12-slim, usuario non-root, Linux amd64/arm64.
 
 ## Stack tecnologico
@@ -50,7 +50,7 @@ NO es npm nexe (un compilador de Node.js). NO es un producto de servidor Windows
 | Componente | Tecnologia |
 |-----------|-----------|
 | Lenguaje | Python 3.11+ (3.12 bundled en instalador) |
-| Framework web | FastAPI 0.128+ |
+| Framework web | FastAPI 0.115+ |
 | Base de datos vectorial | Qdrant (binario embebido) |
 | Backends LLM | MLX, llama.cpp (llama-cpp-python), Ollama |
 | Embeddings | nomic-embed-text (Ollama) / paraphrase-multilingual-mpnet-base-v2 (fallback offline) |
@@ -59,7 +59,7 @@ NO es npm nexe (un compilador de Node.js). NO es un producto de servidor Windows
 | CLI | Click + Rich |
 | API | Compatible con OpenAI (/v1/chat/completions) |
 | Autenticacion | X-API-Key (dual-key con rotacion) |
-| Seguridad | 6 detectores de inyeccion + normalizacion Unicode, 69 patrones de jailbreak, rate limiting, cabeceras CSP |
+| Seguridad | 6 detectores de inyeccion + normalizacion Unicode, 47 patrones de jailbreak, rate limiting, cabeceras CSP |
 | Contenedores | Docker + docker-compose (Nexe + Ollama) |
 
 ## Arquitectura
@@ -84,7 +84,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # Wizard SwiftUI, constructor DMG, tray app, instalador headless
 ├── storage/               # Datos en tiempo de ejecucion (modelos, logs, vectores qdrant)
-├── tests/                 # Suite de tests (4131 funciones de test)
+├── tests/                 # Suite de tests (4143 funciones de test)
 └── nexe                   # Ejecutable CLI principal
 ```
 
@@ -106,7 +106,7 @@ La base de conocimiento (`knowledge/`) esta disenada tanto para consumo humano c
 - **Disponible en ingles, catalan y espanol**
 - Apunta cualquier asistente de IA a este repositorio y podra entender la arquitectura completa, crear plugins o contribuir codigo
 
-## Modelos disponibles (17 en el catalogo del instalador)
+## Modelos disponibles (15 en el catalogo del instalador)
 
 ### Pequenos (8 GB RAM)
 - Qwen3 1.7B (1.1 GB) — Alibaba, 2025
@@ -134,7 +134,7 @@ Tambien se soportan modelos personalizados via Ollama (nombre) o Hugging Face (r
 ## Metodos de instalacion
 
 ### 1. Instalador DMG macOS (recomendado)
-Wizard nativo SwiftUI con 6 pantallas: bienvenida, carpeta de destino, seleccion de modelo (17 modelos con deteccion de hardware), confirmacion, progreso, finalizacion. Incluye Python 3.12 bundled.
+Wizard nativo SwiftUI con 6 pantallas: bienvenida, carpeta de destino, seleccion de modelo (15 modelos con deteccion de hardware), confirmacion, progreso, finalizacion. Incluye Python 3.12 bundled.
 
 ### 2. CLI headless
 ```bash

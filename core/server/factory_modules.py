@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/server/factory_modules.py
 Description: Module Discovery and Loading for Nexe Server Factory.

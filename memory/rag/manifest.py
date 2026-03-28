@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/manifest.py
 Description: Manifest for the RAG module following Nexe 0.8 pattern.

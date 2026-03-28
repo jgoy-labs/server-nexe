@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/loader/registry.py
 Description: Central module registry (singleton, thread-safe).

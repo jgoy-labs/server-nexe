@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/routers/endpoints.py
 Description: API endpoints for the RAG module.

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/config_validator.py
 Description: server.toml configuration validator. Checks required sections,

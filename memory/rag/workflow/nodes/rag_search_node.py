@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/workflow/nodes/rag_search_node.py
 Description: Node de Workflow Engine per cercar documents al RAG.

@@ -75,7 +75,7 @@ Parcialment compatible amb el format de l'API d'OpenAI:
 
 ## Seguretat
 
-- **Injeccio de prompt:** Els models locals poden seguir instruccions injectades. El sanitizer detecta patrons comuns (69 patrons de jailbreak, 6 detectors d'injeccio amb normalitzacio Unicode) pero no tots.
+- **Injeccio de prompt:** Els models locals poden seguir instruccions injectades. El sanitizer detecta patrons comuns (47 patrons de jailbreak, 6 detectors d'injeccio amb normalitzacio Unicode) pero no tots.
 - **Sense TLS per defecte:** HTTP a localhost. Utilitza un reverse proxy per a HTTPS.
 - **Un sol usuari:** Sense aillament multi-usuari. Una clau API = acces complet.
 - **Auditories IA, no auditories externes:** La seguretat ha estat revisada per sessions autonomes d'IA, no per empreses de seguretat externes. Aixo es exhaustiu pero no complet.

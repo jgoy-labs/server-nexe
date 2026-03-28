@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/request_size_limiter.py
 Description: Middleware to limit request size. Prevents DoS via large payloads (CWE-400).

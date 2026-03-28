@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/endpoints/tests/test_security.py
 Description: Tests de seguretat: path traversal, upload validation, health endpoint, session TTL.

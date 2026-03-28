@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/ollama_module/cli.py
 Description: CLI per Ollama module - Permet gestionar models LLM locals i fer

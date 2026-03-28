@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/security_logger/__init__.py
 Description: Public facade for security_logger - unifies access to security logging.

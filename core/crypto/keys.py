@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/crypto/keys.py
 Description: Master key management with fallback chain: keyring → env var → file.

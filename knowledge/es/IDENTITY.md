@@ -64,7 +64,7 @@ server-nexe combina cinco capacidades:
 - **Linux:** Soporte parcial (tests unitarios pasan, no probado en produccion)
 - **Windows:** Aun no soportado
 - **Puerto por defecto:** 9119
-- **Tests:** 4131 funciones de test, 0 fallos en la ultima ejecucion
+- **Tests:** 4143 funciones de test, 0 fallos en la ultima ejecucion
 
 ## Documentacion AI-Ready
 

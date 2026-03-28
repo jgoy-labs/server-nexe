@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/module.py
 Description: Main Memory Module - Flash Memory + RAM Context + Persistence System.

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/endpoints/chat.py
 Description: Unified Chat Endpoint with RAG support & Streaming.

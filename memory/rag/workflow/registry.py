@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/workflow/registry.py
 Description: Auto-registre de nodes RAG al NodeRegistry global del Workflow Engine.

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: memory/shared/health_helpers.py
 Description: Shared health check utilities for memory modules.

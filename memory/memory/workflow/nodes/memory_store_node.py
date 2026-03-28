@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/workflow/nodes/memory_store_node.py
 Description: Node per emmagatzemar contingut a Memory (FlashMemory + Persistence).

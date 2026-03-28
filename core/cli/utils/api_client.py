@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/utils/api_client.py
 Description: Simple HTTP client for CLI communication with Server Nexe.
@@ -161,7 +160,7 @@ class NexeAPIClient:
     async def chat_ui_stream(self, message: str, session_id: str) -> AsyncGenerator[Union[str, dict], None]:
         """
         Send a streaming request to /ui/chat (same pipeline as the web UI).
-        Uses server sessions, nexe_chat_memory RAG, and intent detection.
+        Uses server sessions, nexe_web_ui RAG, and intent detection.
 
         Yields:
             str: text chunks

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/models/registry.py
 Description: Registre curat de models suportats (MLX & Ollama).

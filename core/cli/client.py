@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/client.py
 Description: HTTP client for communicating with the Nexe server.
@@ -151,6 +150,15 @@ class NexeClient:
       },
       "modules": modules,
     }
+
+  def get_health(self) -> Dict[str, Any]:
+    """
+    Get health check from server.
+
+    Returns:
+      Health data dict
+    """
+    return self._request("GET", "/health")
 
   def get_modules(self) -> Dict[str, Any]:
     """

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/lifespan.py
 Description: FastAPI lifespan management (startup/shutdown). Orchestrator — delegates to submodules.

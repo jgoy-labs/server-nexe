@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/endpoints/tests/test_chat_http.py
 Description: Tests HTTP per core/endpoints/chat.py (endpoint, engines, streaming, memory).
@@ -383,7 +382,7 @@ class TestChatCompletionsEndpoint:
 
 class TestSaveConversationToMemory:
 
-    def test_saves_to_nexe_chat_memory(self):
+    def test_saves_to_nexe_web_ui(self):
         from core.endpoints.chat import _save_conversation_to_memory
 
         mock_memory = AsyncMock()
@@ -397,7 +396,7 @@ class TestSaveConversationToMemory:
 
         mock_memory.store.assert_called_once()
         call_kwargs = mock_memory.store.call_args
-        assert "nexe_chat_memory" in str(call_kwargs)
+        assert "nexe_web_ui" in str(call_kwargs)
 
     def test_creates_collection_if_not_exists(self):
         from core.endpoints.chat import _save_conversation_to_memory

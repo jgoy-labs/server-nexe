@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: tests/integration/test_live_api.py
 Description: Tests d'integració — comprova el 100% dels endpoints REST

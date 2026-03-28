@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/i18n/modular_i18n.py
 Description: Modular internationalization system. Auto-discovers messages_*.json per

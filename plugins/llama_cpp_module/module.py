@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/llama_cpp_module/module.py
 Description: Nexe module for Llama.cpp. Adaptation of the original LlamaCppChatNode.

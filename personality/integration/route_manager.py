@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/integration/route_manager.py
 Description: Dynamic FastAPI route manager for modules. Registers and removes routers/apps

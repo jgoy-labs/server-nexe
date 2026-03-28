@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/tests/test_input_validators.py
 Description: Tests per validadors d'entrada. Detecta XSS, SQL injection, NoSQL injection, command injection, path traversal i LDAP injection.

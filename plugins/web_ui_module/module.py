@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/web_ui_module/module.py
 Description: Modul Web UI — NexeModule + NexeModuleWithRouter Protocol.

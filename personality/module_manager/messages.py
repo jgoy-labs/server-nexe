@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/messages.py
 Description: Diccionari centralitzat de missatges fallback per module_manager. Defineix

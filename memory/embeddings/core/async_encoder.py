@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/core/async_encoder.py
 Description: AsyncEmbedder: Wrapper async per SentenceTransformer que NO bloqueja l'event loop.

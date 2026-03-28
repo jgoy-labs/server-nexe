@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/tests/test_api_key_rotation.py
 Description: Tests per rotació d'API keys amb suport dual-key. Valida expiracions, prioritats, backward compatibility i zero-downtime rotation.

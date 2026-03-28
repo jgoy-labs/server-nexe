@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/paths.py
 Description: FACADE for the paths module - Re-export from core.paths/

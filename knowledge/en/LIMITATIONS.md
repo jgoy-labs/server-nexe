@@ -75,7 +75,7 @@ Partially compatible with OpenAI API format:
 
 ## Security
 
-- **Prompt injection:** Local models may follow injected instructions. Sanitizer catches common patterns (69 jailbreak patterns, 6 injection detectors with Unicode normalization) but not all.
+- **Prompt injection:** Local models may follow injected instructions. Sanitizer catches common patterns (47 jailbreak patterns, 6 injection detectors with Unicode normalization) but not all.
 - **No TLS by default:** HTTP on localhost. Use reverse proxy for HTTPS.
 - **Single-user:** No multi-user isolation. One API key = full access.
 - **AI audits, not external audits:** Security has been reviewed by autonomous AI sessions, not by third-party security firms. This is thorough but not exhaustive.

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/checks/rate_limit_check.py
 Description: Security check per validar la configuracio de rate limiting.

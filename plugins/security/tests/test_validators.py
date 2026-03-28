@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/tests/test_validators.py
 Description: Tests per validate_safe_path, validate_command, validate_filename, validate_api_endpoint_path.

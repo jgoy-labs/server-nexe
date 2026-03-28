@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: memory/memory/tests/test_metrics.py
 Description: Tests per memory/memory/metrics.py.

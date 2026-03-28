@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security_logger/logger.py
 Description: SecurityEventLogger - Main class for security event logging.

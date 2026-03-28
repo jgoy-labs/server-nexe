@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/endpoints/chat_sanitization.py
 Description: SSE token and RAG context sanitization for Chat endpoint.

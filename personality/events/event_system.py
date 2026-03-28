@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/events/event_system.py
 Description: Global asynchronous event management system for Nexe 0.8.

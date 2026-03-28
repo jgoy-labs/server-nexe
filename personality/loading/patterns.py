@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/patterns.py
 Description: Patrons de cerca i convencions de noms per Module Loader. Defineix prioritats

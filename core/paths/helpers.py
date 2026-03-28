@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/paths/helpers.py
 Description: Path helpers and convenience functions for quick access to Nexe directories.

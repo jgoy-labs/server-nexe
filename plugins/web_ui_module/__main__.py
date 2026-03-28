@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/web_ui_module/__main__.py
 Description: Entry point CLI per al modul web_ui.

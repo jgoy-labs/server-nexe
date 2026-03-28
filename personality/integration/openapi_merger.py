@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/integration/openapi_merger.py
 Description: Module OpenAPI specification merger. Combines schemas from multiple

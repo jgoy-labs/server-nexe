@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/endpoints/chat_memory.py
 Description: Conversation memory persistence for Chat endpoint.
@@ -29,25 +28,25 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
         # Create conversation text
         conversation_text = f"User: {user_msg}\nAssistant: {assistant_msg}"
 
-        logger.info("Auto-saving conversation to RAG memory (nexe_chat_memory)...")
+        logger.info("Auto-saving conversation to RAG memory (nexe_web_ui)...")
 
         # Use MemoryAPI to store in Qdrant HTTP (same place RAG searches)
         memory = await get_memory_api()
 
         # Ensure collection exists (idempotent to handle concurrent requests)
         try:
-            if not await memory.collection_exists("nexe_chat_memory"):
-                await memory.create_collection("nexe_chat_memory", vector_size=DEFAULT_VECTOR_SIZE)
-                logger.info("Created nexe_chat_memory collection")
+            if not await memory.collection_exists("nexe_web_ui"):
+                await memory.create_collection("nexe_web_ui", vector_size=DEFAULT_VECTOR_SIZE)
+                logger.info("Created nexe_web_ui collection")
         except Exception:
             # Collection may have been created by concurrent request — verify it exists
-            if not await memory.collection_exists("nexe_chat_memory"):
+            if not await memory.collection_exists("nexe_web_ui"):
                 raise
 
         # Store the conversation
         doc_id = await memory.store(
             text=conversation_text,
-            collection="nexe_chat_memory",
+            collection="nexe_web_ui",
             metadata={
                 "type": "conversation_turn",
                 "auto_saved": True,
@@ -56,7 +55,7 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
             }
         )
 
-        logger.info("Conversation saved to nexe_chat_memory (id=%s)", doc_id)
+        logger.info("Conversation saved to nexe_web_ui (id=%s)", doc_id)
 
         try:
             from core.metrics.registry import MEMORY_OPERATIONS

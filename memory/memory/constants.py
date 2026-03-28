@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/constants.py
 Description: Constants for the Memory module. Separated from manifest.py to avoid circular imports.

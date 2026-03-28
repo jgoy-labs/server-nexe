@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/sanitizer/tests/test_sanitizer_extended.py
 Description: Tests extesos per detectors, module i health del sanitizer.

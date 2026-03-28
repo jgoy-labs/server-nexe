@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_lifecycle.py
 Description: Module lifecycle manager. Controls initialisation (init, setup,

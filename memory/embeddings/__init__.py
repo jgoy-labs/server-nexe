@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/__init__.py
 Description: Embeddings module - Multilingual embeddings and vectorisation system with multi-level cache.

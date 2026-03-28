@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_finder.py
 Description: API file finder for Nexe modules. Searches files by priority patterns

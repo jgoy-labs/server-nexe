@@ -203,7 +203,7 @@ server-nexe/
 │   └── module_manager/           # FUENTE UNICA DE VERDAD para todos los modulos
 │
 ├── installer/                    # Instalador macOS
-│   ├── swift-wizard/             # Wizard SwiftUI (15 ficheros Swift, 6 pantallas)
+│   ├── swift-wizard/             # Wizard SwiftUI (12 ficheros Swift, 6 pantallas)
 │   ├── build_dmg.sh              # Constructor de DMG con firma
 │   ├── tray.py                   # App de bandeja del sistema
 │   ├── tray_uninstaller.py       # Desinstalador con backup
@@ -211,7 +211,7 @@ server-nexe/
 │
 ├── knowledge/                    # Documentacion para ingestion RAG (ca/es/en x 12 ficheros)
 ├── storage/                      # Datos en tiempo de ejecucion (no en git)
-├── tests/                        # 4131 funciones de test
+├── tests/                        # 4143 funciones de test
 ├── Dockerfile                    # Python 3.12-slim + Qdrant embebido
 ├── docker-compose.yml            # Servicios Nexe + Ollama
 └── nexe                          # Ejecutable CLI
@@ -240,7 +240,7 @@ Gestiona el arranque y apagado del servidor. Dividido en 3 submodulos.
 6. Inicializar modulos de plugins (MLX, llama.cpp, Ollama, Security, Web UI)
 7. Inicializar CryptoProvider si `NEXE_ENCRYPTION_ENABLED=true` (opt-in)
 8. Auto-ingestion de knowledge/ (solo en primera ejecucion, fichero marcador)
-9. Generar token bootstrap (128 bits, persistente en SQLite, TTL 30min)
+9. Generar token bootstrap (256 bits, persistente en SQLite, TTL 30min)
 
 **Secuencia de apagado:**
 1. Descargar modelos Ollama (limpieza VRAM via keep_alive:0)
@@ -370,7 +370,7 @@ El system prompt define la personalidad y comportamiento de Nexe. Se encuentra e
 
 ## Arquitectura de tests
 
-- 4131 funciones de test, 3213 pasados en la ultima ejecucion, 0 fallos
+- 4143 funciones de test, 3213 pasados en la ultima ejecucion, 0 fallos
 - Tests colocados junto a los modulos (cada modulo tiene carpeta tests/)
 - conftest.py raiz para fixtures compartidas
 - Closures refactorizadas a funciones para permitir patching (decision clave de refactorizacion)

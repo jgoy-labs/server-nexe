@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/core/chunker.py
 Description: SmartChunker: Intelligent chunking with section and title detection.

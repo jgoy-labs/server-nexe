@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/core/cached_embedder.py
 Description: CachedEmbedder: Integrates AsyncEmbedder with MultiLevelCache to optimise latency.

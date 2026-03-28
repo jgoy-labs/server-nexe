@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: memory/rag_sources/base.py
 Description: Base models for RAG sources (requests and hits).

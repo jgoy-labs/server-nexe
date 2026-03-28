@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/endpoints/tests/test_bootstrap_info.py
 Description: Tests per /api/bootstrap/info (timezone + estat token).

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/sanitizer/module.py
 Description: SANITIZER - TECHNICAL security module for filtering jailbreaks and

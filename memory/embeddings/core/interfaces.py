@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/core/interfaces.py
 Description: Interfaces, protocols and Pydantic models for the Embeddings module.

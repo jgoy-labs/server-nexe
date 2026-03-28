@@ -42,7 +42,7 @@ It is NOT npm nexe (a Node.js compiler). It is NOT a Windows server product. It 
 6. **Multilingual (ca/es/en)** — Full i18n: UI, system prompts, RAG context labels, error messages, installer. Server is source of truth for language selection.
 7. **Document Upload with Session Isolation** — Upload documents via Web UI. Indexed into user_knowledge with session_id metadata. Documents only visible within the session they were uploaded to.
 8. **Encryption at Rest (opt-in)** — AES-256-GCM encryption for SQLite (via SQLCipher), chat sessions (.enc), and RAG document text (TextStore). Qdrant payloads contain only vectors and IDs, no text. Key management via OS Keyring, env var, or file. Recently added — not yet battle-tested in production.
-9. **Comprehensive Input Validation** — All endpoints (API and Web UI) have rate limiting, input validation (`validate_string_input`), and RAG context sanitization. 6 injection detectors with Unicode normalization. 69 jailbreak patterns.
+9. **Comprehensive Input Validation** — All endpoints (API and Web UI) have rate limiting, input validation (`validate_string_input`), and RAG context sanitization. 6 injection detectors with Unicode normalization. 47 jailbreak patterns.
 10. **Docker Support** — Dockerfile + docker-compose.yml with embedded Qdrant. Python 3.12-slim, non-root user, Linux amd64/arm64.
 
 ## Technology stack
@@ -50,7 +50,7 @@ It is NOT npm nexe (a Node.js compiler). It is NOT a Windows server product. It 
 | Component | Technology |
 |-----------|-----------|
 | Language | Python 3.11+ (bundled 3.12 in installer) |
-| Web framework | FastAPI 0.128+ |
+| Web framework | FastAPI 0.115+ |
 | Vector database | Qdrant (embedded binary) |
 | LLM backends | MLX, llama.cpp (llama-cpp-python), Ollama |
 | Embeddings | nomic-embed-text (Ollama) / paraphrase-multilingual-mpnet-base-v2 (offline fallback) |
@@ -59,7 +59,7 @@ It is NOT npm nexe (a Node.js compiler). It is NOT a Windows server product. It 
 | CLI | Click + Rich |
 | API | OpenAI-compatible (/v1/chat/completions) |
 | Authentication | X-API-Key (dual-key with rotation) |
-| Security | 6 injection detectors + Unicode normalization, 69 jailbreak patterns, rate limiting, CSP headers |
+| Security | 6 injection detectors + Unicode normalization, 47 jailbreak patterns, rate limiting, CSP headers |
 | Containerization | Docker + docker-compose (Nexe + Ollama) |
 
 ## Architecture
@@ -84,7 +84,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer
 ├── storage/               # Runtime data (models, logs, qdrant vectors)
-├── tests/                 # Test suite (4131 test functions)
+├── tests/                 # Test suite (4143 test functions)
 └── nexe                   # Main CLI executable
 ```
 
@@ -106,7 +106,7 @@ The knowledge base (`knowledge/`) is designed for both human and AI consumption:
 - **Available in English, Catalan, and Spanish**
 - Point any AI assistant at this repository and it can understand the full architecture, create plugins, or contribute code
 
-## Available models (17 in installer catalog)
+## Available models (15 in installer catalog)
 
 ### Small (8 GB RAM)
 - Qwen3 1.7B (1.1 GB) — Alibaba, 2025
@@ -134,7 +134,7 @@ Custom models also supported via Ollama (name) or Hugging Face (GGUF repo).
 ## Installation methods
 
 ### 1. macOS DMG Installer (recommended)
-SwiftUI native wizard with 6 screens: welcome, destination folder, model selection (17 models with hardware detection), confirmation, progress, completion. Bundles Python 3.12.
+SwiftUI native wizard with 6 screens: welcome, destination folder, model selection (15 models with hardware detection), confirmation, progress, completion. Bundles Python 3.12.
 
 ### 2. CLI headless
 ```bash

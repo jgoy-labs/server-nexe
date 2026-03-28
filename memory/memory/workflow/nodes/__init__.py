@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/workflow/nodes/__init__.py
 Description: Workflow nodes per Memory Module.

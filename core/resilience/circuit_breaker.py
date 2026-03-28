@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/resilience/circuit_breaker.py
 Description: Circuit Breaker amb retry exponencial per protegir serveis externs (Ollama, Qdrant, HTTP).

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/lifespan_services.py
 Description: Auto-start services (Qdrant, Ollama) during server startup.

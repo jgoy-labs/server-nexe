@@ -120,7 +120,7 @@ Los documentos subidos via la Web UI se indexan en la coleccion `user_knowledge`
 - Los metadatos se generan sin LLM (instantaneo, no requiere modelo)
 
 **Formatos soportados:** .txt, .md, .pdf
-**Chunking para uploads:** 1500 caracteres por chunk, 200 caracteres de overlap.
+**Chunking para uploads:** 2500 caracteres por chunk, 150 caracteres de overlap.
 
 ## Ingestion de documentos
 
@@ -132,7 +132,7 @@ Los documentos subidos via la Web UI se indexan en la coleccion `user_knowledge`
 
 ### Conocimiento de usuario (user_knowledge via CLI)
 - Fuente: carpeta `knowledge/` (subcarpetas ca/en/es)
-- Chunking: 1500 caracteres por chunk, 200 caracteres de overlap
+- Chunking: 2500 caracteres por chunk, 150 caracteres de overlap
 - Ingestado via `core/ingest/ingest_knowledge.py`
 - Soporta cabeceras RAG con metadatos (`#!RAG id=..., priority=...`)
 
@@ -213,4 +213,4 @@ storage/qdrant/
 - `POST /v1/chat/completions` — Chat con RAG (use_rag: true por defecto)
 - `POST /v1/memory/store` — Guardar texto en una coleccion
 - `POST /v1/memory/search` — Busqueda semantica directa en una coleccion
-- `DELETE /v1/memory/{id}` — Borrar una entrada especifica
+- `DELETE /v1/rag/documents/{id}` — Borrar una entrada especifica

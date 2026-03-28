@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security_logger/enums.py
 Description: Enums per security event logging: tipus d'events i nivells de severitat.
