@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/tests/test_dependencies_registry.py
 Description: Tests per core/dependencies.py i core/module_registry.py.

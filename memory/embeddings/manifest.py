@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/manifest.py
 Description: Manifest for the Embeddings module following Nexe 0.8 pattern.

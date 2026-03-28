@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/server/exception_handlers.py
 Description: Exception handlers globals per FastAPI. Gestiona RateLimitExceeded, HTTPException,

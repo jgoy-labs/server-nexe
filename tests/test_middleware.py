@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: tests/test_middleware.py
 Description: Tests per core/middleware.py (CORS, rate limiting, CSRF, etc.)

@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-installation-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Installation guide for server-nexe 0.8.5 pre-release. Three methods: macOS DMG with SwiftUI wizard (6 screens, hardware detection, 17 models, bundled Python 3.12), CLI headless (setup.sh with Linux support), and Docker (docker-compose with Ollama). Covers system requirements, backend selection, model catalog by RAM tier, post-install verification, tray app, uninstaller, encryption opt-in, and troubleshooting."
+abstract: "Installation guide for server-nexe 0.8.5 pre-release. Three methods: macOS DMG with SwiftUI wizard (6 screens, hardware detection, 15 models, bundled Python 3.12), CLI headless (setup.sh with Linux support), and Docker (docker-compose with Ollama). Covers system requirements, backend selection, model catalog by RAM tier, post-install verification, tray app, uninstaller, encryption opt-in, and troubleshooting."
 tags: [installation, setup, dmg, swiftui, wizard, docker, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption]
 chunk_size: 800
 priority: P1
@@ -38,7 +38,7 @@ Native SwiftUI wizard with 6 screens. Bundles Python 3.12 — no system Python d
 
 1. **Welcome:** Language selector (ca/es/en), logo, version info
 2. **Destination:** Folder picker with free space validation
-3. **Model Selection:** 4 tabs (small/medium/large/custom) with hardware detection. Shows 17 models with RAM requirements, engine compatibility, and year. Recommends models based on detected RAM/GPU.
+3. **Model Selection:** 4 tabs (small/medium/large/custom) with hardware detection. Shows 15 models with RAM requirements, engine compatibility, and year. Recommends models based on detected RAM/GPU.
 4. **Confirmation:** Summary of choices before install
 5. **Progress:** 7-step progress bar with real-time log. Python protocol parser ([PROGRESS], [LOG], [DONE], [ERROR] markers). 8-30 minutes depending on model download.
 6. **Completion:** API key display, options to add to Dock and Login Items, countdown to launch
@@ -100,7 +100,7 @@ docker-compose up
 
 Mount `storage/` for persistent data (models, Qdrant vectors, logs).
 
-## Model Catalog (17 models)
+## Model Catalog (15 models)
 
 ### Small (8 GB RAM)
 | Model | Size | Engine | Year |

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/tests/test_models.py
 Description: Tests per als models de dades de Memory (MemoryEntry, MemoryType).

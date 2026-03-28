@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/web_ui_module/file_handler.py
 Description: Uploaded file handling (upload) for the web UI

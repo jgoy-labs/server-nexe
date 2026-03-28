@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/__init__.py
 Description: RAG module - Multi-source system with circuit breaker and vector search.

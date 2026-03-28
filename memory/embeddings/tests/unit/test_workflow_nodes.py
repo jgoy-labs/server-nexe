@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/tests/unit/test_workflow_nodes.py
 Description: Tests unitaris per workflow nodes (embedding_node, chunking_node).

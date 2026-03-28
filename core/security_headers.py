@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/security_headers.py
 Description: Middleware per security headers OWASP-compliant. Afegeix CSP, HSTS, X-Frame-Options,
@@ -70,7 +69,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
     response.headers["X-Content-Type-Options"] = "nosniff"
 
-    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["X-XSS-Protection"] = "0"
 
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 

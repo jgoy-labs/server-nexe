@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/tests/integration/test_module.py
 Description: Tests d'integració per EmbeddingsModule.

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/module_manager.py
 Description: Central facade of the Nexe 0.8 module management system.

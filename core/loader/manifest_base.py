@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/loader/manifest_base.py
 Description: Factory per crear lazy-singleton manifests.

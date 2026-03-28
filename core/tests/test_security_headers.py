@@ -49,7 +49,7 @@ class TestSecurityHeadersMiddleware:
         app = make_app()
         client = TestClient(app)
         resp = client.get("/test")
-        assert resp.headers.get("X-XSS-Protection") == "1; mode=block"
+        assert resp.headers.get("X-XSS-Protection") == "0"
 
     def test_referrer_policy(self):
         app = make_app()

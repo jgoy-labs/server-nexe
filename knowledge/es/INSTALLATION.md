@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-installation-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia de instalacion de server-nexe 0.8.5 pre-release. Tres metodos: DMG para macOS con wizard SwiftUI (6 pantallas, deteccion de hardware, 17 modelos, Python 3.12 incluido), CLI headless (setup.sh con soporte Linux) y Docker (docker-compose con Ollama). Cubre requisitos del sistema, seleccion de backend, catalogo de modelos por nivel de RAM, verificacion post-instalacion, app de bandeja, desinstalador, encriptacion opt-in y resolucion de problemas."
+abstract: "Guia de instalacion de server-nexe 0.8.5 pre-release. Tres metodos: DMG para macOS con wizard SwiftUI (6 pantallas, deteccion de hardware, 15 modelos, Python 3.12 incluido), CLI headless (setup.sh con soporte Linux) y Docker (docker-compose con Ollama). Cubre requisitos del sistema, seleccion de backend, catalogo de modelos por nivel de RAM, verificacion post-instalacion, app de bandeja, desinstalador, encriptacion opt-in y resolucion de problemas."
 tags: [installation, setup, dmg, swiftui, wizard, docker, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption]
 chunk_size: 800
 priority: P1
@@ -38,7 +38,7 @@ Wizard nativo SwiftUI con 6 pantallas. Incluye Python 3.12 — sin dependencia d
 
 1. **Bienvenida:** Selector de idioma (ca/es/en), logo, info de version
 2. **Destino:** Selector de carpeta con validacion de espacio libre
-3. **Seleccion de modelo:** 4 pestanas (pequeno/mediano/grande/personalizado) con deteccion de hardware. Muestra 17 modelos con requisitos de RAM, compatibilidad de motor y ano. Recomienda modelos segun la RAM/GPU detectadas.
+3. **Seleccion de modelo:** 4 pestanas (pequeno/mediano/grande/personalizado) con deteccion de hardware. Muestra 15 modelos con requisitos de RAM, compatibilidad de motor y ano. Recomienda modelos segun la RAM/GPU detectadas.
 4. **Confirmacion:** Resumen de las elecciones antes de instalar
 5. **Progreso:** Barra de progreso de 7 pasos con log en tiempo real. Parser de protocolo Python ([PROGRESS], [LOG], [DONE], [ERROR]). 8-30 minutos dependiendo de la descarga del modelo.
 6. **Finalizacion:** Muestra la API key, opciones para anadir al Dock y a Elementos de Inicio, cuenta atras para el lanzamiento
@@ -100,7 +100,7 @@ docker-compose up
 
 Montar `storage/` para datos persistentes (modelos, vectores Qdrant, logs).
 
-## Catalogo de modelos (17 modelos)
+## Catalogo de modelos (15 modelos)
 
 ### Pequenos (8 GB RAM)
 | Modelo | Tamano | Motor | Ano |

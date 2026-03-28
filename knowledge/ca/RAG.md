@@ -120,7 +120,7 @@ Els documents pujats via la Web UI s'indexen a la col·leccio `user_knowledge` a
 - Les metadades es generen sense LLM (instantani, no cal model)
 
 **Formats suportats:** .txt, .md, .pdf
-**Chunking per a pujades:** 1500 caracters per chunk, 200 caracters de solapament.
+**Chunking per a pujades:** 2500 caracters per chunk, 150 caracters de solapament.
 
 ## Ingestio de documents
 
@@ -132,7 +132,7 @@ Els documents pujats via la Web UI s'indexen a la col·leccio `user_knowledge` a
 
 ### Coneixement de l'usuari (user_knowledge via CLI)
 - Font: carpeta `knowledge/` (subcarpetes ca/en/es)
-- Chunking: 1500 caracters per chunk, 200 caracters de solapament
+- Chunking: 2500 caracters per chunk, 150 caracters de solapament
 - Ingerit via `core/ingest/ingest_knowledge.py`
 - Suporta capcaleres RAG amb metadades (`#!RAG id=..., priority=...`)
 
@@ -213,4 +213,4 @@ storage/qdrant/
 - `POST /v1/chat/completions` — Xat amb RAG (use_rag: true per defecte)
 - `POST /v1/memory/store` — Guardar text a una col·leccio
 - `POST /v1/memory/search` — Cerca semantica directa en una col·leccio
-- `DELETE /v1/memory/{id}` — Esborrar una entrada especifica
+- `DELETE /v1/rag/documents/{id}` — Esborrar una entrada especifica

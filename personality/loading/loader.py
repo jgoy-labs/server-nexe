@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: personality/loading/loader.py
 Description: Global facade for dynamic Nexe module loading.

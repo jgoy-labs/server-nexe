@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/metrics/tests/test_endpoint.py
 Description: Tests per Prometheus metrics endpoint.

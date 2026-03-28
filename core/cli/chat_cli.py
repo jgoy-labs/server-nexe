@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/chat_cli.py
 Description: Unified Chat CLI. Detects available engine (MLX, Llama.cpp, Ollama)

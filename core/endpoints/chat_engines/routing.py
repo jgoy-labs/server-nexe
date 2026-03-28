@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/endpoints/chat_engines/routing.py
 Description: Engine resolution and routing logic for Chat endpoint.

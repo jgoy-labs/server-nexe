@@ -227,7 +227,7 @@ Crida `await module.shutdown()` durant l'aturada del servidor. Ha de ser idempot
 | **mlx_module** | local_llm_option | /mlx | Natiu Apple Silicon, prefix caching (trie), GPU Metal, is_model_loaded() |
 | **llama_cpp_module** | local_llm_option | /llama-cpp | GGUF universal, ModelPool LRU, CPU/GPU, is_model_loaded() |
 | **ollama_module** | local_llm_option | /ollama | Bridge HTTP a Ollama, auto-arrencada, neteja VRAM a l'aturada, streaming, is_model_loaded() via /api/ps |
-| **security** | core | /security | Auth dual-key, 6 detectors d'injeccio amb normalitzacio Unicode (NFKC), 69 patrons de jailbreak, rate limiting (tots els endpoints), logging d'auditoria RFC5424, permanent=true |
+| **security** | core | /security | Auth dual-key, 6 detectors d'injeccio amb normalitzacio Unicode (NFKC), 47 patrons de jailbreak, rate limiting (tots els endpoints), logging d'auditoria RFC5424, permanent=true |
 | **web_ui_module** | web_interface | /ui | Chat web UI, gestor de sessions, pujada de documents (aillament per sessio), memory helper (MEM_SAVE), validacio d'input (validate_string_input a totes les rutes), sanititzacio de context RAG, i18n (ca/es/en), 6 fitxers de rutes |
 
 ### Patrons comuns als plugins backend LLM

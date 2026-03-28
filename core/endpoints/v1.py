@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/endpoints/v1.py
 Description: API v1 Router - Base router for versioned API endpoints.
@@ -32,7 +31,7 @@ async def v1_root(request: Request):
   return JSONResponse({
     "api_version": "v1",
     "status": "operational",
-    "description": "Nexe 0.8 Versioned API",
+    "description": "Nexe 0.8.5 Versioned API",
     "endpoints": {
       "workflows": {
         "base": "/v1/workflows",
@@ -46,18 +45,18 @@ async def v1_root(request: Request):
       },
       "rag": {
         "base": "/v1/rag",
-        "status": "future",
-        "description": "RAG search endpoints (coming soon)",
+        "status": "implemented",
+        "description": "RAG search endpoints",
       },
       "embeddings": {
         "base": "/v1/embeddings",
-        "status": "future",
-        "description": "Text embeddings endpoints (coming soon)",
+        "status": "implemented",
+        "description": "Text embeddings endpoints",
       },
       "documents": {
         "base": "/v1/documents",
-        "status": "future",
-        "description": "Document processing endpoints (coming soon)",
+        "status": "implemented",
+        "description": "Document processing endpoints",
       },
       "memory": {
         "base": "/v1/memory",

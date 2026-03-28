@@ -203,7 +203,7 @@ server-nexe/
 │   └── module_manager/           # FONT UNICA DE VERITAT per a tots els moduls
 │
 ├── installer/                    # Instal·lador macOS
-│   ├── swift-wizard/             # Wizard SwiftUI (15 fitxers Swift, 6 pantalles)
+│   ├── swift-wizard/             # Wizard SwiftUI (12 fitxers Swift, 6 pantalles)
 │   ├── build_dmg.sh              # Constructor de DMG amb signatura
 │   ├── tray.py                   # Aplicacio de safata del sistema
 │   ├── tray_uninstaller.py       # Desinstal·lador amb copia de seguretat
@@ -211,7 +211,7 @@ server-nexe/
 │
 ├── knowledge/                    # Docs per a ingestio RAG (ca/es/en x 12 fitxers)
 ├── storage/                      # Dades en temps d'execucio (no a git)
-├── tests/                        # 4131 funcions de test
+├── tests/                        # 4143 funcions de test
 ├── Dockerfile                    # Python 3.12-slim + Qdrant embegut
 ├── docker-compose.yml            # Serveis Nexe + Ollama
 └── nexe                          # Executable CLI
@@ -240,7 +240,7 @@ Gestiona l'arrencada i l'aturada del servidor. Separat en 3 submoduls.
 6. Inicialitzar moduls de plugins (MLX, llama.cpp, Ollama, Security, Web UI)
 7. Inicialitzar CryptoProvider si `NEXE_ENCRYPTION_ENABLED=true` (opt-in)
 8. Auto-ingestio de knowledge/ (nomes la primera execucio, fitxer marcador)
-9. Generar bootstrap token (128 bits, persistent a SQLite, TTL de 30min)
+9. Generar bootstrap token (256 bits, persistent a SQLite, TTL de 30min)
 
 **Sequencia d'aturada:**
 1. Descarregar models d'Ollama (neteja VRAM via keep_alive:0)
@@ -370,7 +370,7 @@ El prompt del sistema defineix la personalitat i el comportament de Nexe. Viu a 
 
 ## Arquitectura de tests
 
-- 4131 funcions de test, 3213 passats a l'ultima execucio, 0 errors
+- 4143 funcions de test, 3213 passats a l'ultima execucio, 0 errors
 - Tests col·locats amb els moduls (cada modul te una carpeta tests/)
 - conftest.py arrel per a fixtures compartides
 - Closures refactoritzades a funcions per a patchabilitat (decisio clau de refactoritzacio)

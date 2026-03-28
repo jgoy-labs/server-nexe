@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/sanitizer/workflow/nodes/sanitizer_node.py
 Description: Nexe Server Component

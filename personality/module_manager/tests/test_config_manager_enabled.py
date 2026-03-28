@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/config/tests/test_config_manager_enabled.py
 Description: Tests per ConfigManager amb suport list+dict de mòduls enabled. Valida formats globals, per-module, prioritats i edge cases.

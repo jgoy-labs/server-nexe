@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/pipeline/deduplicator.py
 Description: Deduplicator - Duplicate content detection using SHA256.

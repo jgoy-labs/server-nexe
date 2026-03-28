@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: memory/memory/api/text_store.py
 Description: SQLite text store for document payloads. Keeps text out of Qdrant.

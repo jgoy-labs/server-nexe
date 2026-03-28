@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/server/factory_app.py
 Description: FastAPI Instance Creation for Nexe Server.

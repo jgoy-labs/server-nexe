@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/endpoints/chat_engines/llama_cpp.py
 Description: Llama.cpp (GGUF) engine integration for Chat endpoint.

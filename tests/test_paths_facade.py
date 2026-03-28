@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: tests/test_paths_facade.py
 Description: Tests per core/paths.py (facade) i gaps de core/paths/detection.py.

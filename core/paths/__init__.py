@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/paths/__init__.py
 Description: Public facade for the paths module - unifies access to Nexe root detection,

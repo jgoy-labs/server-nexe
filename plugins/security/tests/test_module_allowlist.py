@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/tests/test_module_allowlist.py
 Description: Tests per module allowlist fail-fast security. Valida que sistema falla si NEXE_APPROVED_MODULES no està en producció.

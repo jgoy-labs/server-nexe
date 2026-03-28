@@ -203,7 +203,7 @@ server-nexe/
 │   └── module_manager/           # SINGLE SOURCE OF TRUTH for all modules
 │
 ├── installer/                    # macOS installer
-│   ├── swift-wizard/             # SwiftUI wizard (15 Swift files, 6 screens)
+│   ├── swift-wizard/             # SwiftUI wizard (12 Swift files, 6 screens)
 │   ├── build_dmg.sh              # DMG builder with signing
 │   ├── tray.py                   # System tray app
 │   ├── tray_uninstaller.py       # Uninstaller with backup
@@ -211,7 +211,7 @@ server-nexe/
 │
 ├── knowledge/                    # Docs for RAG ingestion (ca/es/en × 12 files)
 ├── storage/                      # Runtime data (not in git)
-├── tests/                        # 4131 test functions
+├── tests/                        # 4143 test functions
 ├── Dockerfile                    # Python 3.12-slim + embedded Qdrant
 ├── docker-compose.yml            # Nexe + Ollama services
 └── nexe                          # CLI executable
@@ -240,7 +240,7 @@ Handles startup and shutdown of the server. Split into 3 submodules.
 6. Initialize plugin modules (MLX, llama.cpp, Ollama, Security, Web UI)
 7. Initialize CryptoProvider if `NEXE_ENCRYPTION_ENABLED=true` (opt-in)
 8. Auto-ingest knowledge/ (first run only, marker file)
-9. Generate bootstrap token (128-bit, SQLite persistent, 30min TTL)
+9. Generate bootstrap token (256-bit, SQLite persistent, 30min TTL)
 
 **Shutdown sequence:**
 1. Unload Ollama models (VRAM cleanup via keep_alive:0)
@@ -370,7 +370,7 @@ The system prompt defines Nexe's personality and behavior. It lives in `personal
 
 ## Test Architecture
 
-- 4131 test functions, 3213 passed in latest run, 0 failures
+- 4143 test functions, 3213 passed in latest run, 0 failures
 - Tests collocated with modules (each module has tests/ folder)
 - Root conftest.py for shared fixtures
 - Closures refactored to functions for patchability (key refactoring decision)

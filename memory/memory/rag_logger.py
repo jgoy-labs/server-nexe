@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/memory/rag_logger.py
 Description: RAGLogger - Logging detallat per operacions RAG/Memory.

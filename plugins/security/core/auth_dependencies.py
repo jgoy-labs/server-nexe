@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/security/core/auth_dependencies.py
 Description: FastAPI dependencies for Nexe authentication with dual-key support.

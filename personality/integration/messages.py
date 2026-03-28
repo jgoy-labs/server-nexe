@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/integration/messages.py
 Description: Diccionari centralitzat de missatges fallback per sistema integration. Defineix

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/sanitizer/workflow/nodes/tests/test_workflow_nodes.py
 Description: Tests per InterventionNode i SanitizerNode (workflow nodes del sanitizer).

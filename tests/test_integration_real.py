@@ -203,7 +203,7 @@ class TestMemoryStore:
             headers=headers,
             json={
                 "content": f"Test d'integració: El cel és blau — {uuid.uuid4().hex[:8]}",
-                "collection": "nexe_chat_memory",
+                "collection": "nexe_web_ui",
                 "metadata": {"source": "integration_test", "type": "fact"},
             },
         )
@@ -217,7 +217,7 @@ class TestMemoryStore:
             headers=headers,
             json={
                 "content": "Barcelona és la capital de Catalunya",
-                "collection": "nexe_chat_memory",
+                "collection": "nexe_web_ui",
                 "metadata": {
                     "source": "integration_test",
                     "type": "geographic_fact",
@@ -251,7 +251,7 @@ class TestMemorySearch:
             headers=headers,
             json={
                 "content": unique,
-                "collection": "nexe_chat_memory",
+                "collection": "nexe_web_ui",
                 "metadata": {"source": "integration_test"},
             },
         )
@@ -614,7 +614,7 @@ class TestChatRAG:
             headers=headers,
             json={
                 "content": unique_fact,
-                "collection": "nexe_chat_memory",
+                "collection": "nexe_web_ui",
                 "metadata": {"source": "rag_test"},
             },
         )
@@ -948,7 +948,7 @@ class TestEndToEndFlow:
             headers=headers,
             json={
                 "content": fact,
-                "collection": "nexe_chat_memory",
+                "collection": "nexe_web_ui",
                 "metadata": {"source": "e2e_test", "type": "geographic_fact"},
             },
         )

@@ -38,7 +38,7 @@ Most endpoints require `X-API-Key` header. Value from `.env` file (`NEXE_PRIMARY
 - `NEXE_SECONDARY_API_KEY` — grace period for rotation
 - Expiry tracking via `NEXE_PRIMARY_KEY_EXPIRES`, `NEXE_SECONDARY_KEY_EXPIRES`
 
-**Bootstrap token:** For initial setup, a one-time token is generated at startup (128-bit, 30min TTL). Shown in console output.
+**Bootstrap token:** For initial setup, a one-time token is generated at startup (256-bit, 30min TTL). Shown in console output.
 
 ## Rate Limiting
 

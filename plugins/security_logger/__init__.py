@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security_logger/__init__.py
 Description: Stub de retrocompatibilitat. El modul real viu a plugins/security/security_logger/.

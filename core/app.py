@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/app.py
 Description: Main entry point and facade for Nexe 0.8 FastAPI server.

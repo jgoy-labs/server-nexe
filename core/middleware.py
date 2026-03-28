@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/middleware.py
 Description: FastAPI middleware configuration: CORS, rate limiting, security headers, request

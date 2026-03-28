@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/mlx_module/manifest.py
 Description: FastAPI router for the MLX module (Apple Silicon).

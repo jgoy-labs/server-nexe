@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/sanitizer/workflow/conftest.py
 Description: Conftest per mockejar nexe_flow (no instal·lat) a nivell de workflow.

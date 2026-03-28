@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/tests/test_module_manager.py
 Description: Tests per ModuleManager facade. Valida coordinació de components,

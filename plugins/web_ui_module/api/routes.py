@@ -1,7 +1,6 @@
 """
 ------------------------------------
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/web_ui_module/api/routes.py
 Description: Orquestrador de rutes FastAPI del modul web_ui.

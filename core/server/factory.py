@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/server/factory.py
 Description: Application Factory pattern for creating and configuring the Nexe 0.8 FastAPI app.

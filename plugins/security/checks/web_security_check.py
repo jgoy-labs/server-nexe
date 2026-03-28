@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/checks/web_security_check.py
 Description: Security check per validar proteccions web (CORS, headers, injeccions).

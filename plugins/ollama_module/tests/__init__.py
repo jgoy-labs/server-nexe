@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/ollama_module/tests/__init__.py
 Description: Test package for the Ollama module (future unit tests

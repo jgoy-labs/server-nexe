@@ -88,7 +88,7 @@ If that option is not available, open a minimal issue that says "security report
 
 | Setting | Purpose | Location |
 |---------|---------|----------|
-| `NEXE_API_KEY` | API authentication | `.env` |
+| `NEXE_PRIMARY_API_KEY` | API authentication | `.env` |
 | `NEXE_ENCRYPTION_ENABLED` | Enable encryption at rest | `.env` or environment |
 | `NEXE_RATE_LIMIT_*` | Rate limiting thresholds | `.env` |
 | `NEXE_TRUSTED_HOSTS` | Allowed host headers | `.env` |

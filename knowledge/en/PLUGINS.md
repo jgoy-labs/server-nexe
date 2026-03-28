@@ -227,7 +227,7 @@ Calls `await module.shutdown()` during server stop. Must be idempotent.
 | **mlx_module** | local_llm_option | /mlx | Apple Silicon native, prefix caching (trie), Metal GPU, is_model_loaded() |
 | **llama_cpp_module** | local_llm_option | /llama-cpp | GGUF universal, ModelPool LRU, CPU/GPU, is_model_loaded() |
 | **ollama_module** | local_llm_option | /ollama | HTTP bridge to Ollama, auto-start, VRAM cleanup on shutdown, streaming, is_model_loaded() via /api/ps |
-| **security** | core | /security | Dual-key auth, 6 injection detectors with Unicode normalization (NFKC), 69 jailbreak patterns, rate limiting (all endpoints), RFC5424 audit logging, permanent=true |
+| **security** | core | /security | Dual-key auth, 6 injection detectors with Unicode normalization (NFKC), 47 jailbreak patterns, rate limiting (all endpoints), RFC5424 audit logging, permanent=true |
 | **web_ui_module** | web_interface | /ui | Web chat UI, session manager, document upload (session-isolated), memory helper (MEM_SAVE), input validation (validate_string_input on all routes), RAG context sanitization, i18n (ca/es/en), 6 route files |
 
 ### Common patterns in LLM backend plugins

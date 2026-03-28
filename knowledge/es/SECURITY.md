@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-security-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentacion de seguridad de server-nexe 0.8.5 pre-release. Cubre autenticacion dual-key con rotacion, rate limiting (todos los endpoints), 6 detectores de inyeccion con normalizacion Unicode, 69 patrones de jailbreak, cabeceras de seguridad OWASP, logging de auditoria RFC5424, validacion de entrada (validate_string_input en todas las rutas UI), sanitizacion de contexto RAG, encriptacion en reposo (CryptoProvider AES-256-GCM, SQLCipher, sesiones encriptadas), resultados de auditoria IA (v1+v2+mega-test), y checklist de seguridad."
+abstract: "Documentacion de seguridad de server-nexe 0.8.5 pre-release. Cubre autenticacion dual-key con rotacion, rate limiting (todos los endpoints), 6 detectores de inyeccion con normalizacion Unicode, 47 patrones de jailbreak, cabeceras de seguridad OWASP, logging de auditoria RFC5424, validacion de entrada (validate_string_input en todas las rutas UI), sanitizacion de contexto RAG, encriptacion en reposo (CryptoProvider AES-256-GCM, SQLCipher, sesiones encriptadas), resultados de auditoria IA (v1+v2+mega-test), y checklist de seguridad."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher]
 chunk_size: 800
 priority: P1
@@ -30,7 +30,7 @@ server-nexe esta disenado para entornos locales de confianza. Todos los datos pe
 - Validacion: `secrets.compare_digest()` (comparacion segura contra timing attacks)
 - Cabecera: `X-API-Key`
 
-**Token bootstrap:** Token de configuracion inicial generado al arrancar. Entropia de 128 bits, persistente en SQLite, TTL de 30 minutos. Regeneracion solo desde localhost.
+**Token bootstrap:** Token de configuracion inicial generado al arrancar. Entropia de 256 bits, persistente en SQLite, TTL de 30 minutos. Regeneracion solo desde localhost.
 
 ## Rate Limiting
 
@@ -72,7 +72,7 @@ Aplicadas via `core/security_headers.py` y middleware:
 - `X-Frame-Options`: DENY
 - `X-XSS-Protection`: 0 (deprecado, se usa CSP en su lugar)
 - `Referrer-Policy`: strict-origin-when-cross-origin
-- `Permissions-Policy`: restringido
+- `Permissions-Policy`: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()
 
 ## Validacion de entrada
 
@@ -112,11 +112,11 @@ El endpoint API `POST /v1/chat/completions` valida y sanitiza la entrada a trave
 
 **Normalizacion Unicode:** Los 6 detectores aplican `unicodedata.normalize('NFKC', text)` antes del pattern matching. Esto previene bypasses mediante homoglifos Unicode o variaciones de codificacion (p. ej., caracteres fullwidth, formas compuestas vs descompuestas).
 
-**69 patrones de jailbreak** en `plugins/security/sanitizer/`: Pattern matching multilingue para intentos de inyeccion de prompt.
+**47 patrones de jailbreak** en `plugins/security/sanitizer/`: Pattern matching multilingue para intentos de inyeccion de prompt.
 
 **Limite de tamano de peticion:** Cuerpo maximo de 100MB (proteccion contra DoS).
 
-**Truncamiento en logs:** Los mensajes de usuario se truncan a 80 caracteres en la salida de logs para prevenir inyeccion de logs y reducir el volumen.
+**Truncamiento en logs:** Los mensajes de usuario se truncan a 200 caracteres en la salida de logs para prevenir inyeccion de logs y reducir el volumen.
 
 ## Logging de auditoria
 

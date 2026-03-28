@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/web_ui_module/tests/test_module.py
 Description: Tests per WebUIModule: inicialització, endpoints i helpers.

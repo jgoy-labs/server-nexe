@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/loading/module_validator.py
 Description: Loaded module validator. Checks valid instance, presence of API

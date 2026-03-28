@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/paths/validation.py
 Description: Robust Nexe root validation + detection logging.

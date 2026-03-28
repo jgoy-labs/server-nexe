@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/specialists/trasher_specialist.py
 Description: Specialist per trasher_manager — reporta storage del modul security.

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/specialists/plugin_specialist.py
 Description: Specialist per doctor_manager — reporta health del modul security.

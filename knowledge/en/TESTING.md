@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-testing-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Testing strategy and coverage for server-nexe 0.8.5 pre-release. 4131 test functions, 3213 passed in latest full run, 0 failures. Tests collocated with modules. Covers test structure, running tests, coverage, AI audit test fixes, crypto tests (68 new), mega-test v1/v2 results, and honest assessment of testing limitations."
+abstract: "Testing strategy and coverage for server-nexe 0.8.5 pre-release. 4143 test functions, 3213 passed in latest full run, 0 failures. Tests collocated with modules. Covers test structure, running tests, coverage, AI audit test fixes, crypto tests (68 new), mega-test v1/v2 results, and honest assessment of testing limitations."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
 chunk_size: 800
 priority: P2
@@ -23,13 +23,13 @@ expires: null
 
 | Metric | Value |
 |--------|-------|
-| Total test functions | 4131 |
+| Total test functions | 4143 |
 | Latest full run passed | 3213 |
 | Failed | 0 |
 | Skipped | 6 |
 | XFailed | 1 |
 
-Note: The difference between total test functions (4131) and passed (3213) is due to deselected tests (integration, e2e, slow markers) that are excluded from the standard run.
+Note: The difference between total test functions (4143) and passed (3213) is due to deselected tests (integration, e2e, slow markers) that are excluded from the standard run.
 
 ## Test Structure
 

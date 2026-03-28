@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/__init__.py
 Description: Central Nexe CLI 0.8 - Orchestrator for module CLIs.

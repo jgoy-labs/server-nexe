@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag_sources/file/api/v1.py
 Description: API v1 for documentary file management (not yet available).

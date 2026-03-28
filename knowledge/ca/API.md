@@ -38,7 +38,7 @@ La majoria d'endpoints requereixen la capcalera `X-API-Key`. Valor del fitxer `.
 - `NEXE_SECONDARY_API_KEY` — periode de gracia per a rotacio
 - Seguiment d'expiracio via `NEXE_PRIMARY_KEY_EXPIRES`, `NEXE_SECONDARY_KEY_EXPIRES`
 
-**Bootstrap token:** Per a la configuracio inicial, es genera un token d'un sol us a l'arrencada (128 bits, TTL de 30min). Es mostra a la sortida de consola.
+**Bootstrap token:** Per a la configuracio inicial, es genera un token d'un sol us a l'arrencada (256 bits, TTL de 30min). Es mostra a la sortida de consola.
 
 ## Rate Limiting
 

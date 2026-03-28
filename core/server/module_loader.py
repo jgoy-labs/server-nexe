@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/server/module_loader.py
 Description: Module Loader - Re-exports from ModuleManager (SINGLE SOURCE OF TRUTH).

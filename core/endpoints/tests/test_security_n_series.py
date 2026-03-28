@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/endpoints/tests/test_security_n_series.py
 Description: Tests de seguretat: configuració producció, endpoints, path traversal, sessions.

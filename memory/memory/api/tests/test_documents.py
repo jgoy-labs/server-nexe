@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: memory/memory/api/tests/test_documents.py
 Description: Tests per memory/memory/api/documents.py.

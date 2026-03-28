@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/manifest.py
 Description: FastAPI manifest for Central Nexe CLI. Defines public /cli router with endpoints

@@ -1,10 +1,9 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/cli.py
-Description: Central Nexe CLI 0.8 - Main Click application.
+Description: Central Nexe CLI 0.8.5 - Main Click application.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -81,7 +80,7 @@ class DynamicGroup(click.Group):
 @click.pass_context
 def app(ctx: click.Context, version: bool, no_banner: bool):
   """
-  Nexe CLI Central - Nexe 0.8 Module Orchestrator
+  Nexe CLI Central - Nexe 0.8.5 Module Orchestrator
 
   \b
   Core commands:
@@ -220,6 +219,29 @@ def stop(ctx: click.Context, force: bool):
         click.echo(f"  ✗ {name} — permission denied (PID {pid})")
 
   click.echo("\n✅ Services stopped.")
+
+@app.command()
+@click.option('--json', 'as_json', is_flag=True, help='Output JSON')
+@click.pass_context
+def health(ctx: click.Context, as_json: bool):
+  """Check server health via GET /health."""
+  from .client import NexeClient
+
+  config: NexeConfig = ctx.obj.get('config', NexeConfig())
+  client = NexeClient(config)
+
+  data = client.get_health()
+
+  if as_json:
+    import json
+    click.echo(json.dumps(data, indent=2, default=str))
+  else:
+    if data.get("error"):
+      click.echo(click.style(f"✗ Server offline: {data.get('message', 'unreachable')}", fg="red"))
+    elif data.get("status") == "healthy":
+      click.echo(click.style("✓ Server is healthy", fg="green"))
+    else:
+      click.echo(click.style(f"⚠ Server status: {data.get('status', 'unknown')}", fg="yellow"))
 
 @app.command()
 @click.option('--json', 'as_json', is_flag=True, help='Output JSON')

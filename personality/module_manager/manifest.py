@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/manifest.py
 Description: FastAPI router for the ModuleManager module. Exposes REST endpoints for:

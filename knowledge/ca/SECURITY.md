@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-security-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentació de seguretat per a server-nexe 0.8.5 pre-release. Cobreix autenticació dual-key amb rotació, rate limiting (tots els endpoints), 6 detectors d'injecció amb normalització Unicode, 69 patrons de jailbreak, capçaleres de seguretat OWASP, logging d'auditoria RFC5424, validació d'input (validate_string_input a totes les rutes UI), sanitització de context RAG, encriptació at-rest (CryptoProvider AES-256-GCM, SQLCipher, sessions encriptades), resultats d'auditoria IA (v1+v2+mega-test), i checklist de seguretat."
+abstract: "Documentació de seguretat per a server-nexe 0.8.5 pre-release. Cobreix autenticació dual-key amb rotació, rate limiting (tots els endpoints), 6 detectors d'injecció amb normalització Unicode, 47 patrons de jailbreak, capçaleres de seguretat OWASP, logging d'auditoria RFC5424, validació d'input (validate_string_input a totes les rutes UI), sanitització de context RAG, encriptació at-rest (CryptoProvider AES-256-GCM, SQLCipher, sessions encriptades), resultats d'auditoria IA (v1+v2+mega-test), i checklist de seguretat."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher]
 chunk_size: 800
 priority: P1
@@ -30,7 +30,7 @@ server-nexe esta dissenyat per a entorns locals de confiança. Totes les dades e
 - Validacio: `secrets.compare_digest()` (comparacio segura contra timing attacks)
 - Capcalera: `X-API-Key`
 
-**Bootstrap token:** Token d'un sol us generat a l'arrencada. Entropia de 128 bits, persistent a SQLite, TTL de 30 minuts. Regeneracio nomes des de localhost.
+**Bootstrap token:** Token d'un sol us generat a l'arrencada. Entropia de 256 bits, persistent a SQLite, TTL de 30 minuts. Regeneracio nomes des de localhost.
 
 ## Rate Limiting
 
@@ -72,7 +72,7 @@ Aplicades via `core/security_headers.py` i middleware:
 - `X-Frame-Options`: DENY
 - `X-XSS-Protection`: 0 (obsolet, s'utilitza CSP)
 - `Referrer-Policy`: strict-origin-when-cross-origin
-- `Permissions-Policy`: restringit
+- `Permissions-Policy`: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()
 
 ## Validacio d'input
 
@@ -112,11 +112,11 @@ L'endpoint `POST /v1/chat/completions` valida i sanititza l'input a traves del s
 
 **Normalitzacio Unicode:** Els 6 detectors apliquen `unicodedata.normalize('NFKC', text)` abans del matching de patrons. Aixo preveu bypasses via homoglifs Unicode o variacions d'encoding (p. ex., caracters fullwidth, formes compostes vs descompostes).
 
-**69 patrons de jailbreak** a `plugins/security/sanitizer/`: Matching de patrons multilingue per a intents d'injeccio de prompts.
+**47 patrons de jailbreak** a `plugins/security/sanitizer/`: Matching de patrons multilingue per a intents d'injeccio de prompts.
 
 **Limit de mida de peticio:** Cos de peticio maxim de 100MB (proteccio contra DoS).
 
-**Truncament de logs:** Els missatges d'usuari es truncen a 80 caracters a la sortida de logs per prevenir injeccio de logs i reduir el volum.
+**Truncament de logs:** Els missatges d'usuari es truncen a 200 caracters a la sortida de logs per prevenir injeccio de logs i reduir el volum.
 
 ## Logging d'auditoria
 

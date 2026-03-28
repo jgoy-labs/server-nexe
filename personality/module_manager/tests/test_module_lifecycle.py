@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/module_manager/tests/test_module_lifecycle.py
 Description: Tests per ModuleLifecycleManager. Valida load, start, stop de mòduls,

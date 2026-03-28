@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/cli/utils/tests/test_api_client.py
 Description: Tests per core/cli/utils/api_client.py (NexeAPIClient).

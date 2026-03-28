@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: personality/i18n/tests/test_i18n_manager.py
 Description: Tests per I18nManager. Valida càrrega de traduccions, fallbacks,

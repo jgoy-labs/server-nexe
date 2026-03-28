@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/endpoints/chat_rag.py
 Description: RAG context building and helpers for Chat endpoint.
@@ -114,12 +113,12 @@ async def build_rag_context(
             except Exception as e:
                 logger.debug("RAG knowledge search failed: %s", e)
 
-            # 3. Search user memory (nexe_chat_memory - conversations)
+            # 3. Search user memory (nexe_web_ui - conversations)
             try:
-                if await memory.collection_exists("nexe_chat_memory"):
+                if await memory.collection_exists("nexe_web_ui"):
                     mem_results = await memory.search(
                         query=last_user_msg,
-                        collection="nexe_chat_memory",
+                        collection="nexe_web_ui",
                         top_k=2,
                         threshold=RAG_MEMORY_THRESHOLD
                     )

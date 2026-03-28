@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/tests/test_rate_limiting.py
 Description: Tests per RateLimitTracker, identificadors de rate limiting i helpers.

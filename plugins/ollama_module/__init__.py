@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/ollama_module/__init__.py
 Description: Ollama integration module (local option for LLM models).

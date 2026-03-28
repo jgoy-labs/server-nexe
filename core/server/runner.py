@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/server/runner.py
 Description: Server runner and main entry point. main() loads config, validates port

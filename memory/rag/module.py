@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/rag/module.py
 Description: Main RAG Module - Multi-source Retrieval-Augmented Generation system.

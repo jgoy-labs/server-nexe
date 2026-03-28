@@ -38,7 +38,7 @@ La mayoria de endpoints requieren cabecera `X-API-Key`. Valor del fichero `.env`
 - `NEXE_SECONDARY_API_KEY` — periodo de gracia para rotacion
 - Seguimiento de expiracion via `NEXE_PRIMARY_KEY_EXPIRES`, `NEXE_SECONDARY_KEY_EXPIRES`
 
-**Token bootstrap:** Para configuracion inicial, se genera un token de un solo uso al arranque (128-bit, TTL 30min). Se muestra en la salida de consola.
+**Token bootstrap:** Para configuracion inicial, se genera un token de un solo uso al arranque (256-bit, TTL 30min). Se muestra en la salida de consola.
 
 ## Rate Limiting
 

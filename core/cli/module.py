@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/module.py
 Description: Main class of the Central Nexe CLI module. Handles discovery

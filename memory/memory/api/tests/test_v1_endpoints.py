@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: memory/memory/api/tests/test_v1_endpoints.py
 Description: Tests HTTP per memory/memory/api/v1.py (endpoints /memory).
@@ -92,7 +91,7 @@ class TestMemoryStoreEndpoint:
         with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_mem)):
             resp = client.post(
                 "/memory/store",
-                json={"content": "Test content", "collection": "nexe_chat_memory"},
+                json={"content": "Test content", "collection": "nexe_web_ui"},
                 headers={"X-Api-Key": API_KEY}
             )
 
@@ -126,7 +125,7 @@ class TestMemoryStoreEndpoint:
                 json={
                     "content": "Content with meta",
                     "metadata": {"source": "cli", "user": "test"},
-                    "collection": "nexe_chat_memory"
+                    "collection": "nexe_web_ui"
                 },
                 headers={"X-Api-Key": API_KEY}
             )
@@ -153,7 +152,7 @@ class TestMemoryStoreEndpoint:
         assert resp.status_code == 401
 
     def test_store_default_collection(self):
-        """Si no s'especifica collection, usa nexe_chat_memory."""
+        """Si no s'especifica collection, usa nexe_web_ui."""
         client = TestClient(make_app())
         mock_mem = make_mock_memory()
 
@@ -167,7 +166,7 @@ class TestMemoryStoreEndpoint:
         assert resp.status_code == 200
         # Check store was called with default collection
         call_kwargs = mock_mem.store.call_args[1]
-        assert call_kwargs["collection"] == "nexe_chat_memory"
+        assert call_kwargs["collection"] == "nexe_web_ui"
 
     def test_store_sets_default_source_metadata(self):
         """Metadata source = 'chat-cli' per defecte."""
@@ -203,7 +202,7 @@ class TestMemorySearchEndpoint:
         with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_mem)):
             resp = client.post(
                 "/memory/search",
-                json={"query": "test query", "collection": "nexe_chat_memory"},
+                json={"query": "test query", "collection": "nexe_web_ui"},
                 headers={"X-Api-Key": API_KEY}
             )
 

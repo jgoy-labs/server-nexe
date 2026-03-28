@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/cli/log_viewer.py
 Description: Visualitzador de logs en temps real per a Nexe Server.

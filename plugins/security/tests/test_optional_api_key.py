@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/tests/test_optional_api_key.py
 Description: Tests per optional_api_key() amb clau primaria i secundaria.

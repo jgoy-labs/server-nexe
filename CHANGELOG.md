@@ -93,7 +93,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Codebase consolidation: 52 quality findings applied
 - `colorama` dependency removed; `pyyaml` bumped; `tomli` removed
 - Requires new dependencies: `cryptography>=44.0.0`, `keyring>=25.0.0`, `sqlcipher3>=0.5.0`
-- Test suite: 3987 passing tests with 0 regressions
+- Test suite: 4143 passing tests with 0 regressions
 
 ## [0.8.2] - 2026-03-23
 

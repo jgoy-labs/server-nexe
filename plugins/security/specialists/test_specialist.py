@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/security/specialists/test_specialist.py
 Description: Specialist per test_manager — reporta tests del modul security.

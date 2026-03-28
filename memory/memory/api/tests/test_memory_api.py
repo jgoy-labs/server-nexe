@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: memory/memory/api/tests/test_memory_api.py
 Description: Tests per memory/memory/api/__init__.py (MemoryAPI).

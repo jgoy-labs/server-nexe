@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/server/__init__.py
 Description: Package del servidor Nexe. Exposa create_app() (factory FastAPI) i main()

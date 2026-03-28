@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/endpoints/__init__.py
 Description: Package d'endpoints FastAPI. Exposa root_router (/, /health, /api/info) i

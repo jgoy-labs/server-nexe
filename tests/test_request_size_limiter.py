@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: tests/test_request_size_limiter.py
 Description: Tests per core/request_size_limiter.py (middleware mida requests).

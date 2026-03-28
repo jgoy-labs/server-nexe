@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/paths/tests/test_paths.py
 Description: Tests per core/paths (detection, helpers, validation).

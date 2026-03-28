@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: memory/embeddings/tests/unit/test_async_encoder.py
 Description: Tests unitaris per AsyncEmbedder.

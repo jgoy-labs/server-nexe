@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: personality/module_manager/tests/test_manifest.py
 Description: Tests per personality/module_manager/manifest.py.

@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: core/server/factory_state.py
 Description: App State Management for FastAPI Dependency Injection.

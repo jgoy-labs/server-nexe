@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: plugins/llama_cpp_module/health.py
 Description: Facade get_health() per al modul llama_cpp.

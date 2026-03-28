@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy 
 Location: plugins/mlx_module/module.py
 Description: Nexe module for MLX (Apple Silicon). Adaptation of the original MLXChatNode.

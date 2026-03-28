@@ -1,7 +1,6 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8
 Author: Jordi Goy
 Location: core/ingest/tests/test_ingest_knowledge.py
 Description: Tests per core/ingest/ingest_knowledge.py.
