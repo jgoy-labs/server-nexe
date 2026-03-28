@@ -137,10 +137,12 @@ class TestChatFinalCoverage:
         )
 
         # Make get_memory_api raise, AND no rag module, but also raise at outer level
+        from core.dependencies import limiter as _limiter
         with patch("memory.memory.api.v1.get_memory_api",
                    new=AsyncMock(side_effect=Exception("total rag failure"))), \
              patch("core.endpoints.chat._forward_to_ollama",
-                   new=AsyncMock(return_value={"choices": [{"message": {"content": "hi"}}]})):
+                   new=AsyncMock(return_value={"choices": [{"message": {"content": "hi"}}]})), \
+             patch.object(_limiter, "enabled", False):
             result = asyncio.run(chat_completions(request, req, bg))
             assert result is not None
 
@@ -166,9 +168,11 @@ class TestChatFinalCoverage:
             use_rag=False, stream=True, engine="auto"
         )
 
+        from core.dependencies import limiter as _limiter
         with patch("core.endpoints.chat._forward_to_ollama",
                    new=AsyncMock(return_value=streaming)), \
-             patch.dict(os.environ, {"NEXE_MODEL_ENGINE": ""}):
+             patch.dict(os.environ, {"NEXE_MODEL_ENGINE": ""}), \
+             patch.object(_limiter, "enabled", False):
             result = asyncio.run(chat_completions(request, req, bg))
             assert isinstance(result, StreamingResponse)
 

@@ -46,6 +46,6 @@ def setup_app_state(app: FastAPI, i18n: Any, config: dict, project_root: Path, m
   app.state.config = config
   app.state.project_root = project_root
   app.state.module_manager = module_manager
-  app.state.container = "0.8.2-DI" # Compatibility flag
+  app.state.container = "0.8.5-DI" # Compatibility flag
 
 __all__ = ['setup_app_state']

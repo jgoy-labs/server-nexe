@@ -55,6 +55,7 @@ from .chat_engines.ollama import (
 )
 from .chat_engines.mlx import _forward_to_mlx, _mlx_stream_generator
 from .chat_engines.llama_cpp import _forward_to_llama_cpp, _llama_cpp_stream_generator
+from core.dependencies import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -94,14 +95,15 @@ def _get_system_prompt(app_state: Any, lang: str = None) -> str:
 # --- Main Endpoint ---
 
 @router.post("/chat/completions", dependencies=[Depends(require_api_key)], summary="Chat completion with RAG support and engine auto-routing")
-async def chat_completions(request: ChatCompletionRequest, req: Request, background_tasks: BackgroundTasks) -> Any:
+@limiter.limit("20/minute")
+async def chat_completions(body: ChatCompletionRequest, request: Request, background_tasks: BackgroundTasks) -> Any:
     """
     Unified Chat Completion endpoint.
     Supports:
     - RAG (Retrieval Augmented Generation)
     - Auto-routing to engines (Ollama, MLX, Llama.cpp)
     """
-    engine, preferred_fallback = _resolve_engine(request.engine, req.app.state)
+    engine, preferred_fallback = _resolve_engine(body.engine, request.app.state)
     start_time = time.time()
     engine_status = "success"
 
@@ -110,19 +112,19 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
 
     # 2. RAG Context Injection
     context_text = ""
-    if request.use_rag:
-        last_user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), None)
+    if body.use_rag:
+        last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
         if last_user_msg:
-            logger.info("RAG Search for: '%s'", last_user_msg)
-            context_text = await build_rag_context(last_user_msg, req.app.state, _server_lang)
+            logger.info("RAG Search for: '%s'", last_user_msg[:80] + "..." if len(last_user_msg) > 80 else last_user_msg)
+            context_text = await build_rag_context(last_user_msg, request.app.state, _server_lang)
 
     # 3. Augment System Prompt (Nexe persona + sanitized RAG context)
-    messages = [m.model_dump() for m in request.messages]
+    messages = [m.model_dump() for m in body.messages]
 
     # Injectar system prompt de Nexe si el client no n'envia cap
     has_system = messages and messages[0]['role'] == 'system'
     if not has_system:
-        nexe_prompt = _get_system_prompt(req.app.state, _server_lang)
+        nexe_prompt = _get_system_prompt(request.app.state, _server_lang)
         messages.insert(0, {"role": "system", "content": nexe_prompt})
 
     if context_text and messages:
@@ -163,20 +165,20 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
 
     # 4. Dispatch to Engine
     # Extract last user message for auto-save logic
-    last_user_msg = next((m.content for m in reversed(request.messages) if m.role == "user"), None)
+    last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
 
     response = None
     try:
         if engine.lower() == "ollama":
             # Pass auto-save args
-            response = await _forward_to_ollama(messages, request, req.app.state, last_user_msg)
+            response = await _forward_to_ollama(messages, body, request.app.state, last_user_msg)
         elif engine.lower() == "mlx":
-            response = await _forward_to_mlx(messages, request, req)
+            response = await _forward_to_mlx(messages, body, request)
         elif engine.lower() in ["llama_cpp", "llama.cpp", "llamacpp"]:
-            response = await _forward_to_llama_cpp(messages, request, req)
+            response = await _forward_to_llama_cpp(messages, body, request)
         else:
             # Default/Fallback
-            response = await _forward_to_ollama(messages, request, req.app.state, last_user_msg)
+            response = await _forward_to_ollama(messages, body, request.app.state, last_user_msg)
     except Exception:
         engine_status = "error"
         raise
@@ -207,7 +209,7 @@ async def chat_completions(request: ChatCompletionRequest, req: Request, backgro
                 # Add storage task
                 background_tasks.add_task(
                     _save_conversation_to_memory,
-                    req.app.state,
+                    request.app.state,
                     last_user_msg,
                     content
                 )

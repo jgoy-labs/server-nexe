@@ -21,7 +21,7 @@ class Message(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 class ChatCompletionRequest(BaseModel):
-    messages: List[Message]
+    messages: List[Message] = Field(..., min_length=1)
     model: Optional[str] = None
     engine: Optional[str] = "auto"
     stream: bool = False

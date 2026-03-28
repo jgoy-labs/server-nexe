@@ -257,15 +257,15 @@ async def system_health() -> Dict[str, Any]:
   Example Response:
     {
       "status": "healthy",
-      "version": "0.8.2",
+      "version": "0.8.5",
       "platform": "Nexe Framework"
     }
   """
   try:
     from core.lifespan import get_server_state
-    version = get_server_state().config.get('meta', {}).get('version', '0.8.2')
+    version = get_server_state().config.get('meta', {}).get('version', '0.8.5')
   except Exception:
-    version = '0.8.2'
+    version = '0.8.5'
   return {
     "status": "healthy",
     "version": version,

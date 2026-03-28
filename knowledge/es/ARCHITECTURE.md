@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-architecture
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Arquitectura interna de server-nexe 0.8.2. Diseño de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan dividido), Plugins (5 módulos con auto-descubrimiento), Servicios Base (memoria RAG 3 capas), Storage. Cubre refactoring modular (4 monolitos divididos en 20+ submódulos), module manager con lazy init, integración i18n y soporte Docker."
-tags: [arquitectura, fastapi, plugins, qdrant, memoria, lifespan, cli, diseno, factory, modulos, refactoring, docker, i18n, module-manager]
+abstract: "Arquitectura interna de server-nexe 0.8.5 pre-release. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, Docker, pipeline de encriptacion, pipeline de sanitizacion de peticiones, y diagramas Mermaid."
+tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, docker, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
 
@@ -17,55 +17,138 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Arquitectura — server-nexe 0.8.2
+# Arquitectura — server-nexe 0.8.5 pre-release
 
-## Arquitectura de Cinco Capas
+## Arquitectura de cinco capas
 
 ```
-INTERFACES        CLI (./nexe) | API REST | Web UI
+INTERFACES        CLI (./nexe) | REST API | Web UI
       |
-CORE              Servidor FastAPI, endpoints, middleware, lifespan
+CORE              Servidor FastAPI, endpoints, middleware, lifespan, crypto
       |
 PLUGINS           MLX | llama.cpp | Ollama | Security | Web UI
       |
-SERVICIOS BASE    Memory (RAG) | Qdrant | Embeddings | SQLite
+SERVICIOS BASE    Memory (RAG) | Qdrant | Embeddings | SQLite/SQLCipher | TextStore
       |
-STORAGE           models/ | qdrant/ | vectors/ | logs/ | cache/
+ALMACENAMIENTO    models/ | qdrant/ | vectors/ | logs/ | cache/ | *.enc
 ```
 
-Principios de diseño: modularidad, backends como plugins, API-first, RAG nativo de primera clase, simplicidad.
+Principios de diseno: modularidad, backends basados en plugins, API-first, RAG nativo como elemento de primera clase, simplicidad, encriptacion opt-in.
 
-## Estructura de Directorios (post-refactoring marzo 2026)
+## Pipeline de procesamiento de peticiones
 
-Cuatro ficheros monolíticos se dividieron en 20+ submódulos durante el refactoring de tech debt de marzo 2026:
-- chat.py (1187 líneas) dividido en 8 submódulos
-- routes.py (974 líneas) dividido en 6 submódulos
-- lifespan.py (681 líneas) dividido en 3 submódulos
-- tray.py (707 líneas) dividido en 2 submódulos
+```mermaid
+flowchart LR
+    A[Peticion] --> B[Auth<br/>X-API-Key]
+    B --> C[Rate Limit<br/>slowapi]
+    C --> D[validate_string_input<br/>param context]
+    D --> E[RAG Recall<br/>3 colecciones]
+    E --> F[_sanitize_rag_context<br/>filtro inyeccion]
+    F --> G[Inferencia LLM<br/>MLX/Ollama/llama.cpp]
+    G --> H[Stream Response<br/>marcadores SSE]
+    H --> I[Parse MEM_SAVE<br/>extraer hechos]
+    I --> J[Respuesta<br/>al cliente]
+```
+
+## Arquitectura de componentes
+
+```mermaid
+graph TB
+    subgraph Interfaces
+        CLI[CLI ./nexe]
+        API[REST API /v1/*]
+        UI[Web UI /ui/*]
+    end
+
+    subgraph Core
+        Factory[FastAPI Factory]
+        Lifespan[Lifespan Manager]
+        Crypto[CryptoProvider]
+        Endpoints[Endpoints]
+    end
+
+    subgraph Plugins
+        MLX[MLX Module]
+        LLAMA[llama.cpp Module]
+        OLLAMA[Ollama Module]
+        SEC[Security Module]
+        WEBUI[Web UI Module]
+    end
+
+    subgraph Memory
+        RAG[Capa RAG]
+        MEM[Capa Memory]
+        EMB[Capa Embeddings]
+        TS[TextStore]
+    end
+
+    subgraph Storage
+        QD[Qdrant<br/>solo vectores]
+        SQL[SQLite/SQLCipher<br/>metadatos + texto]
+        FS[Ficheros<br/>sesiones .enc]
+    end
+
+    CLI --> Factory
+    API --> Factory
+    UI --> Factory
+    Factory --> Lifespan
+    Factory --> Endpoints
+    Endpoints --> MLX & LLAMA & OLLAMA
+    Endpoints --> RAG
+    Crypto --> SQL & FS & TS
+    RAG --> MEM --> EMB --> QD
+    MEM --> SQL
+    TS --> SQL
+```
+
+## Pipeline de encriptacion
+
+```mermaid
+flowchart TB
+    MK[Clave Maestra<br/>Keyring -> ENV -> Fichero] --> CP[CryptoProvider<br/>AES-256-GCM + HKDF]
+    CP -->|derivar 'sqlite'| SC[SQLCipher<br/>memories.db]
+    CP -->|derivar 'sessions'| SE[Session .enc<br/>nonce+ciphertext+tag]
+    CP -->|derivar 'text_store'| TS[TextStore<br/>texto documentos RAG]
+    QD[Qdrant] -.->|solo vectores + IDs<br/>sin texto| QD
+```
+
+## Estructura de directorios (post-refactorizacion marzo 2026)
+
+Cuatro ficheros monoliticos fueron divididos en mas de 20 submodulos durante la refactorizacion de deuda tecnica de marzo 2026:
+- chat.py (1187 lineas) dividido en 8 submodulos
+- routes.py (974 lineas) dividido en 6 submodulos
+- lifespan.py (681 lineas) dividido en 3 submodulos
+- tray.py (707 lineas) dividido en 2 submodulos
 
 ```
 server-nexe/
 ├── core/
-│   ├── app.py                    # Punto de entrada (delega a factory)
-│   ├── config.py                 # Carga configuración TOML + .env
-│   ├── lifespan.py               # Orquestador ciclo de vida (416 líneas)
-│   ├── lifespan_services.py      # Auto-start servicios (Qdrant, Ollama)
-│   ├── lifespan_tokens.py        # Generación bootstrap token
-│   ├── lifespan_ollama.py        # Gestión ciclo de vida Ollama
-│   ├── middleware.py              # CORS, CSRF, logging, cabeceras seguridad
+│   ├── app.py                    # Punto de entrada (delega a la factory)
+│   ├── config.py                 # Carga de configuracion TOML + .env
+│   ├── lifespan.py               # Orquestador del ciclo de vida
+│   ├── lifespan_services.py      # Auto-arranque de servicios (Qdrant, Ollama)
+│   ├── lifespan_tokens.py        # Generacion de token bootstrap
+│   ├── lifespan_ollama.py        # Gestion del ciclo de vida de Ollama
+│   ├── middleware.py              # CORS, CSRF, logging, cabeceras de seguridad
 │   ├── security_headers.py       # Cabeceras OWASP (CSP, HSTS, X-Frame)
-│   ├── messages.py               # Claves i18n para core
-│   ├── bootstrap_tokens.py       # Sistema bootstrap token (persistido DB)
+│   ├── messages.py               # Claves de mensajes i18n para core
+│   ├── bootstrap_tokens.py       # Sistema de tokens bootstrap (persistencia DB)
 │   ├── models.py                 # Modelos Pydantic
 │   │
-│   ├── endpoints/                # API REST
+│   ├── crypto/                   # Encriptacion en reposo (nuevo en v0.8.5)
+│   │   ├── __init__.py           # Paquete + check_encryption_status()
+│   │   ├── provider.py           # CryptoProvider (AES-256-GCM, HKDF-SHA256)
+│   │   ├── keys.py               # Gestion de clave maestra (keyring/env/fichero)
+│   │   └── cli.py                # CLI: encrypt-all, export-key, status
+│   │
+│   ├── endpoints/                # REST API
 │   │   ├── chat.py               # POST /v1/chat/completions (orquestador)
 │   │   ├── chat_schemas.py       # Modelos Pydantic (Message, ChatCompletionRequest)
-│   │   ├── chat_sanitization.py  # Sanitización tokens SSE, truncamiento contexto
-│   │   ├── chat_rag.py           # Constructor contexto RAG (3 colecciones)
-│   │   ├── chat_memory.py        # Guardar conversación en memoria (MEM_SAVE)
+│   │   ├── chat_sanitization.py  # Sanitizacion de tokens SSE, truncamiento de contexto
+│   │   ├── chat_rag.py           # Constructor de contexto RAG (3 colecciones)
+│   │   ├── chat_memory.py        # Guardar conversacion en memoria (MEM_SAVE)
 │   │   ├── chat_engines/         # Generadores por backend
-│   │   │   ├── routing.py        # Lógica selección motor
+│   │   │   ├── routing.py        # Logica de seleccion de engine
 │   │   │   ├── ollama.py         # Generador streaming Ollama
 │   │   │   ├── mlx.py            # Generador streaming MLX
 │   │   │   └── llama_cpp.py      # Generador streaming llama.cpp
@@ -73,230 +156,223 @@ server-nexe/
 │   │   ├── bootstrap.py          # POST /bootstrap/init
 │   │   ├── modules.py            # GET /modules
 │   │   ├── system.py             # POST /admin/system/*
-│   │   └── v1.py                 # Wrapper endpoints v1
+│   │   └── v1.py                 # Wrapper de endpoints v1
 │   │
-│   ├── server/                   # Patrón factory (singleton cached)
+│   ├── server/                   # Patron factory (singleton cacheado)
 │   │   ├── factory.py            # Fachada principal create_app() con double-check locking
 │   │   ├── factory_app.py        # Crear instancia FastAPI
-│   │   ├── factory_state.py      # Setup app.state
-│   │   ├── factory_security.py   # SecurityLogger, validación producción
-│   │   ├── factory_i18n.py       # Setup i18n + config
-│   │   ├── factory_modules.py    # Descubrimiento y carga de módulos
-│   │   ├── factory_routers.py    # Registro routers core
-│   │   ├── runner.py             # Runner Uvicorn
-│   │   └── exception_handlers.py # Patrones gestión de errores
+│   │   ├── factory_state.py      # Configurar app.state
+│   │   ├── factory_security.py   # SecurityLogger, validacion de produccion
+│   │   ├── factory_i18n.py       # Configuracion I18n + config
+│   │   ├── factory_modules.py    # Descubrimiento y carga de modulos
+│   │   ├── factory_routers.py    # Registro de routers de core
+│   │   ├── runner.py             # Ejecutor de servidor Uvicorn
+│   │   └── exception_handlers.py # Patrones de manejo de errores
 │   │
-│   ├── cli/                      # CLI Click con router dinámico
-│   │   ├── cli.py                # DynamicGroup (intercepta CLIs de módulos)
-│   │   ├── router.py             # CLIRouter (descubre CLIs vía manifest.toml)
-│   │   ├── chat_cli.py           # Comando chat interactivo
+│   ├── cli/                      # CLI Click con router dinamico
+│   │   ├── cli.py                # DynamicGroup (intercepta CLIs de modulos)
+│   │   ├── router.py             # CLIRouter (descubre CLIs via manifest.toml)
+│   │   ├── chat_cli.py           # Comando de chat interactivo
 │   │   └── client.py             # Cliente HTTP para API local
 │   │
-│   ├── ingest/                   # Ingesta de documentos
-│   │   ├── ingest_docs.py        # docs/ → nexe_documentation (500/50 chars)
-│   │   └── ingest_knowledge.py   # knowledge/ → user_knowledge (1500/200 chars)
+│   ├── ingest/                   # Ingestion de documentos
+│   │   ├── ingest_docs.py        # docs/ -> nexe_documentation (500/50 chars)
+│   │   └── ingest_knowledge.py   # knowledge/ -> user_knowledge (1500/200 chars)
 │   │
 │   ├── metrics/                  # Prometheus /metrics
 │   ├── resilience/               # Circuit breaker, retry
-│   └── paths/                    # Resolución de rutas
+│   └── paths/                    # Resolucion de rutas
 │
-├── plugins/                      # 5 módulos plugin (auto-descubiertos)
+├── plugins/                      # 5 modulos de plugins (auto-descubiertos)
 │   ├── mlx_module/               # Backend Apple Silicon (MLX)
-│   │   ├── module.py             # MLXModule + is_model_loaded()
-│   │   ├── manifest.toml         # Metadatos del módulo
-│   │   └── manifest.py           # Router FastAPI
-│   │
-│   ├── llama_cpp_module/         # Backend GGUF universal
-│   │   ├── module.py             # LlamaCppModule + is_model_loaded()
-│   │   └── manifest.toml
-│   │
-│   ├── ollama_module/            # Bridge Ollama
-│   │   ├── module.py             # OllamaModule + auto-start + VRAM cleanup
-│   │   ├── cli/                  # Subcomandos CLI Ollama
-│   │   └── manifest.toml
-│   │
-│   ├── security/                 # Auth + detección de inyecciones
-│   │   ├── core/                 # auth.py, rate_limiting.py, injection_detectors.py
-│   │   ├── sanitizer/            # 69 patrones jailbreak
-│   │   ├── security_logger/      # Logging auditoría RFC5424
-│   │   └── manifest.toml
-│   │
-│   └── web_ui_module/            # Interfaz web
-│       ├── api/                  # Routes divididos (6 ficheros)
-│       │   ├── routes_auth.py    # Auth, backends, POST /ui/lang, Ollama auto-start
-│       │   ├── routes_chat.py    # Streaming chat, MEM_SAVE, RAG, thinking tokens
-│       │   ├── routes_files.py   # Subida documentos (aislamiento por sesión)
-│       │   ├── routes_memory.py  # Guardar/recordar memoria
-│       │   ├── routes_sessions.py # Gestión sesiones
-│       │   └── routes_static.py  # Ficheros estáticos, cache-busting, i18n CSP-safe
-│       ├── core/
-│       │   ├── memory_helper.py  # Detección intenciones, auto-save, poda (716 líneas)
-│       │   └── session_manager.py
-│       ├── messages.py           # Claves i18n para web_ui
-│       ├── ui/                   # HTML, CSS, JS
-│       └── manifest.toml
+│   ├── llama_cpp_module/         # Backend universal GGUF
+│   ├── ollama_module/            # Bridge Ollama + auto-arranque + limpieza VRAM
+│   ├── security/                 # Auth, rate limiting, deteccion de inyecciones, normalizacion Unicode
+│   └── web_ui_module/            # Interfaz web (6 ficheros de rutas, session manager, memory helper)
 │
-├── memory/                       # Sistema RAG 3 subcapas
-│   ├── embeddings/               # Generación vectores (Ollama + sentence-transformers)
-│   ├── memory/                   # Gestión memoria (FlashMemory + RAMContext + Persistence)
-│   │   └── constants.py          # DEFAULT_VECTOR_SIZE = 768
-│   └── rag/                      # Orquestación RAG
+├── memory/                       # Sistema RAG de 3 subcapas
+│   ├── embeddings/               # Generacion de vectores (Ollama + sentence-transformers)
+│   ├── memory/                   # Gestion de memoria (persistencia, SQLCipher)
+│   │   └── api/
+│   │       └── text_store.py     # TextStore (almacenamiento SQLite de texto para documentos RAG)
+│   └── rag/                      # Orquestacion RAG
 │
-├── personality/                  # Configuración del sistema
-│   ├── server.toml               # Config principal (prompts, módulos, modelos)
+├── personality/                  # Configuracion del sistema
+│   ├── server.toml               # Config principal (prompts, modulos, modelos)
 │   ├── i18n/                     # Gestor i18n + traducciones (ca/es/en)
-│   └── module_manager/           # FUENTE ÚNICA DE VERDAD para todos los módulos
+│   └── module_manager/           # FUENTE UNICA DE VERDAD para todos los modulos
 │
 ├── installer/                    # Instalador macOS
 │   ├── swift-wizard/             # Wizard SwiftUI (15 ficheros Swift, 6 pantallas)
-│   ├── build_dmg.sh              # Constructor DMG con firma
-│   ├── tray.py                   # App system tray (419 líneas)
-│   ├── tray_translations.py      # i18n tray (ca/es/en)
-│   └── tray_uninstaller.py       # Desinstalador con backup
+│   ├── build_dmg.sh              # Constructor de DMG con firma
+│   ├── tray.py                   # App de bandeja del sistema
+│   ├── tray_uninstaller.py       # Desinstalador con backup
+│   └── install_headless.py       # Instalador headless (compatible con Linux)
 │
-├── knowledge/                    # Docs para ingesta RAG (ca/es/en)
-├── storage/                      # Datos runtime (no en git)
-├── tests/                        # 3901 tests, 0 fallos
+├── knowledge/                    # Documentacion para ingestion RAG (ca/es/en x 12 ficheros)
+├── storage/                      # Datos en tiempo de ejecucion (no en git)
+├── tests/                        # 4131 funciones de test
 ├── Dockerfile                    # Python 3.12-slim + Qdrant embebido
 ├── docker-compose.yml            # Servicios Nexe + Ollama
 └── nexe                          # Ejecutable CLI
 ```
 
-## Patrón Factory
+## Patron Factory
 
-La app se crea vía un singleton factory con double-check locking:
+La app se crea mediante una factory singleton con double-check locking:
 
 - `core/app.py` llama a `create_app()` de `core/server/factory.py`
-- Primera llamada (~0.5s): carga i18n, config, descubre módulos, registra routers
-- Llamadas cached (<10ms): retorna instancia existente
-- Factory dividido en 7 submódulos
+- Primera llamada (~0.5s): carga i18n, config, descubre modulos, registra routers
+- Llamadas cacheadas (<10ms): devuelve la instancia existente
+- La factory esta dividida en 7 submodulos (factory_app, factory_state, factory_security, factory_i18n, factory_modules, factory_routers, helpers)
 - `reset_app_cache()` disponible para tests
 
-## Gestor de Ciclo de Vida (Lifespan)
+## Lifespan Manager
 
-Gestiona el arranque y parada del servidor. Dividido en 3 submódulos:
+Gestiona el arranque y apagado del servidor. Dividido en 3 submodulos.
 
 **Secuencia de arranque:**
-1. Cargar config de server.toml
+1. Cargar configuracion de server.toml
 2. Inicializar APIIntegrator (sistema de personalidad)
-3. Auto-start Qdrant (binario embebido, puerto 6333)
-4. Auto-start Ollama (si disponible, modo segundo plano)
-5. Cargar módulos de memoria (Memory → RAG → Embeddings, orden correcto)
-6. Inicializar módulos plugin (MLX, llama.cpp, Ollama, Security, Web UI)
-7. Auto-ingestar knowledge/ (solo primera ejecución, fichero marcador)
-8. Generar bootstrap token (128-bit, persistente SQLite, TTL 30min)
+3. Auto-arranque de Qdrant (binario embebido, puerto 6333)
+4. Auto-arranque de Ollama (si esta disponible, modo background)
+5. Cargar modulos de memoria (Memory -> RAG -> Embeddings, orden correcto)
+6. Inicializar modulos de plugins (MLX, llama.cpp, Ollama, Security, Web UI)
+7. Inicializar CryptoProvider si `NEXE_ENCRYPTION_ENABLED=true` (opt-in)
+8. Auto-ingestion de knowledge/ (solo en primera ejecucion, fichero marcador)
+9. Generar token bootstrap (128 bits, persistente en SQLite, TTL 30min)
 
-**Secuencia de parada:**
-1. Descargar modelos Ollama (VRAM cleanup vía keep_alive:0)
+**Secuencia de apagado:**
+1. Descargar modelos Ollama (limpieza VRAM via keep_alive:0)
 2. Cerrar conexiones Qdrant
 3. Terminar procesos hijos
 4. Sincronizar estado a disco
 
 ## Module Manager
 
-`personality/module_manager/` es la FUENTE ÚNICA DE VERDAD para todos los módulos. NO existe `plugins/base.py` ni `plugins/registry.py`.
+`personality/module_manager/` es la FUENTE UNICA DE VERDAD para todos los modulos. NO existe `plugins/base.py` ni `plugins/registry.py`.
 
-**Componentes:** ConfigManager, PathDiscovery, ModuleDiscovery (escanea manifest.toml), ModuleLoader, ModuleRegistry, ModuleLifecycleManager (lazy asyncio.Lock para fix deadlock Python 3.12), SystemLifecycleManager.
+**Componentes:**
+- ConfigManager: config + manifests
+- PathDiscovery: resolucion de rutas de modulos
+- ModuleDiscovery: escanea plugins/, memory/, personality/ buscando manifest.toml
+- ModuleLoader: import dinamico de Python
+- ModuleRegistry: registro centralizado
+- ModuleLifecycleManager: ciclo de vida individual con asyncio.Lock() lazy (fix para deadlock de Python 3.12)
+- SystemLifecycleManager: ciclo de vida a nivel de sistema
 
 **Formato manifest.toml** (cada plugin tiene uno):
 ```toml
 [module]
-name = "nombre_modulo"
-version = "0.8.2"
+name = "module_name"
+version = "0.8.5"
 type = "local_llm_option"
+description = "Descripcion del modulo"
+location = "plugins/module_name/"
 
 [module.entry]
-module = "plugins.nombre_modulo.module"
-class = "ClaseModulo"
+module = "plugins.module_name.module"
+class = "ModuleClass"
 
 [module.router]
-prefix = "/modulo"
+prefix = "/module"
+
+[module.cli]
+command_name = "module"
+entry_point = "plugins.module_name.cli"
 ```
 
 ## Arquitectura CLI
 
-CLI basado en Click con router dinámico:
+CLI basado en Click con router dinamico:
 - `DynamicGroup` intercepta comandos no definidos
-- `CLIRouter` descubre CLIs de módulos vía manifest.toml
-- CLIs de módulos se ejecutan en subproceso (aislamiento)
-- Comandos: go, chat, status, modules, memory, knowledge, rag
+- `CLIRouter` descubre CLIs de modulos via manifest.toml
+- Los CLIs de modulos se ejecutan en subproceso (aislamiento)
+- Comandos: go, chat, status, modules, memory, knowledge, rag, encryption
 
-## Arquitectura Memoria (3 subcapas)
+## Arquitectura de memoria (3 subcapas)
 
 ```
-Capa RAG (memory/rag/)                — orquesta búsqueda multi-colección
+Capa RAG (memory/rag/)           — orquesta busqueda multi-coleccion
       |
-Capa Memory (memory/memory/)          — FlashMemory + RAMContext + Persistence
+Capa Memory (memory/memory/)     — FlashMemory + RAMContext + Persistencia (SQLCipher)
       |
-Capa Embeddings (memory/embeddings/)  — generación vectores + interfaz Qdrant
+Capa Embeddings (memory/embeddings/) — generacion de vectores + interfaz Qdrant
 ```
 
-- FlashMemory: caché temporal con TTL (1800s)
-- RAMContext: contexto sesión actual
-- PersistenceManager: metadatos SQLite + vectores Qdrant
+- FlashMemory: cache temporal con TTL (1800s)
+- RAMContext: contexto de sesion actual
+- PersistenceManager: metadatos SQLite/SQLCipher + vectores Qdrant (sin texto en payloads de Qdrant)
+- TextStore: almacenamiento SQLite para texto de documentos RAG (desacoplado de Qdrant)
 - Todos los vectores: 768 dimensiones (DEFAULT_VECTOR_SIZE centralizado)
 
-## Arquitectura Endpoint Chat
+## Arquitectura del endpoint de chat
 
-`POST /v1/chat/completions` dividido en 8 submódulos:
+`POST /v1/chat/completions` es el endpoint principal, dividido en 8 submodulos:
 
-1. **chat_schemas.py** — Modelos Pydantic (use_rag=True por defecto)
-2. **chat_sanitization.py** — Sanitización SSE, truncamiento contexto (MAX_CONTEXT_CHARS=24000)
-3. **chat_rag.py** — Constructor contexto RAG: busca nexe_documentation (0.4), user_knowledge (0.35), nexe_web_ui (0.3)
-4. **chat_memory.py** — Parsing MEM_SAVE, guardar conversación en memoria
-5. **chat_engines/routing.py** — Selección motor (auto, ollama, mlx, llama_cpp)
-6. **chat_engines/ollama.py** — Streaming Ollama con soporte thinking tokens
-7. **chat_engines/mlx.py** — Streaming MLX con gestión CancelledError
+1. **chat_schemas.py** — Modelos Pydantic (Message, ChatCompletionRequest con use_rag=True por defecto)
+2. **chat_sanitization.py** — Sanitizacion de tokens SSE (bytes nulos, caracteres de control), truncamiento de contexto (MAX_CONTEXT_CHARS=24000)
+3. **chat_rag.py** — Constructor de contexto RAG: busca en nexe_documentation (0.4), user_knowledge (0.35), nexe_web_ui (0.3)
+4. **chat_memory.py** — Parsing de MEM_SAVE, guardar conversacion en memoria
+5. **chat_engines/routing.py** — Seleccion de engine (auto, ollama, mlx, llama_cpp)
+6. **chat_engines/ollama.py** — Streaming Ollama con soporte de thinking tokens
+7. **chat_engines/mlx.py** — Streaming MLX con manejo de CancelledError
 8. **chat_engines/llama_cpp.py** — Streaming llama.cpp
 
-**Marcadores streaming inyectados:**
-- `[MODEL:nombre]`, `[MODEL_LOADING]`/`[MODEL_READY]`, `[RAG_AVG:score]`, `[RAG_ITEM:score|colección|fuente]`, `[MEM:N]`, `[COMPACT:N]`
+**Marcadores de streaming inyectados por el endpoint de chat:**
+- `[MODEL:name]` — nombre del modelo activo
+- `[MODEL_LOADING]` / `[MODEL_READY]` — estado de carga del modelo
+- `[RAG_AVG:score]` — media de relevancia RAG
+- `[RAG_ITEM:score|collection|source]` — detalle RAG por fuente
+- `[MEM:N]` — numero de hechos guardados en memoria
+- `[COMPACT:N]` — indicador de compactacion de contexto
 
-## System Prompt
+## Arquitectura del modulo Web UI
 
-El system prompt define la personalidad y comportamiento de Nexe. Vive en `personality/server.toml` bajo `[personality.prompt]`.
+Dividido en 6 ficheros de rutas:
+- **routes_auth.py** — Verificacion de API key, listado de backends con tamanos de modelo, POST /ui/lang, auto-arranque de Ollama al cambiar de backend
+- **routes_chat.py** — Streaming SSE, parsing de MEM_SAVE, busqueda RAG de 3 colecciones, thinking tokens, validacion de entrada, sanitizacion de contexto RAG
+- **routes_files.py** — Upload de documentos con aislamiento por session_id, validacion de nombre de fichero, rate limiting
+- **routes_memory.py** — Guardar/recuperar memoria con validacion de entrada, rate limiting
+- **routes_sessions.py** — CRUD de sesiones con proteccion contra path traversal, rate limiting
+- **routes_static.py** — Servir ficheros estaticos, cache-busting (?v=timestamp), i18n compatible con CSP (atributo data-nexe-lang)
 
-**6 variantes:** 3 idiomas (ca/es/en) × 2 tiers (small para modelos ≤4B, full para 7B+).
+## System prompt
 
-**Lógica de selección** (`core/endpoints/chat.py` → `_get_system_prompt()`):
-1. `{lang}_{tier}` (ej: `ca_full`) — de server.toml
-2. `{lang}_full` — fallback tier
-3. `en_full` — fallback idioma
-4. Prompt mínimo hardcoded — último recurso
+El system prompt define la personalidad y comportamiento de Nexe. Se encuentra en `personality/server.toml` bajo `[personality.prompt]`.
 
-**Tier seleccionado vía:** variable de entorno `NEXE_PROMPT_TIER` (defecto: "full"). Idioma vía `NEXE_LANG`.
+**6 variantes:** 3 idiomas (ca/es/en) x 2 niveles (small para modelos <=4B, full para 7B+).
 
-**Diseño clave:** Nexe es un asistente personal general con memoria persistente, no solo un asistente técnico de Server Nexe. El prompt dice: "Ayudas con cualquier cosa — conversación, proyectos, ideas, problemas técnicos, redacción, análisis." Si preguntan sobre Server Nexe, el contexto RAG proporciona documentación técnica.
+**Logica de seleccion** (`core/endpoints/chat.py` -> `_get_system_prompt()`):
+1. `{lang}_{tier}` (ej., `ca_full`) — de server.toml
+2. `{lang}_full` — fallback de nivel
+3. `en_full` — fallback de idioma
+4. Prompt minimo hardcoded — ultimo recurso
 
-**Inyección contexto RAG:** Se inyecta en el **mensaje del usuario** (no en el system prompt) para preservar el prefix cache de MLX/llama.cpp. El system prompt se mantiene estable entre mensajes.
+**Diseno clave:** Nexe es un asistente personal general con memoria persistente, no solo un asistente tecnico de Server Nexe. El prompt dice: "Ayudas con cualquier cosa — conversacion, proyectos, ideas, problemas tecnicos, escritura, analisis."
 
-**Etiquetas contexto RAG** deben coincidir entre el system prompt y el código que las inyecta:
+**Inyeccion de contexto RAG:** Se inyecta en el **mensaje del usuario** (no en el system prompt) para preservar la prefix cache de MLX/llama.cpp. El system prompt se mantiene estable entre mensajes.
 
-| Colección | Etiqueta CA | Etiqueta ES | Etiqueta EN |
-|-----------|----------|----------|----------|
-| nexe_documentation | DOCUMENTACIO DEL SISTEMA | DOCUMENTACION DEL SISTEMA | SYSTEM DOCUMENTATION |
-| user_knowledge | DOCUMENTACIO TECNICA | DOCUMENTACION TECNICA | TECHNICAL DOCUMENTATION |
-| nexe_web_ui | MEMORIA DE L'USUARI | MEMORIA DEL USUARIO | USER MEMORY |
+## Integracion i18n
 
-**Para cambiar el system prompt:** Editar `personality/server.toml` sección `[personality.prompt]`. No hace falta cambiar código. Reiniciar servidor para aplicar. El primer mensaje post-reinicio invalida el prefix cache (coste único).
-
-## Integración i18n
-
-- Servidor fuente de verdad para idioma (POST /ui/lang)
+- El servidor es la fuente de verdad para el idioma (POST /ui/lang)
 - 3 idiomas: ca, es, en
-- System prompts: 6 versiones (ca/es/en × small/full)
-- HTTPException: claves i18n con fallback (core/messages.py, plugins/*/messages.py)
-- Web UI: applyI18n() con data attributes, CSP-safe (data-nexe-lang)
+- System prompts: 6 versiones (ca/es/en x nivel small/full)
+- Mensajes HTTPException: claves i18n con patron de fallback
+- Web UI: applyI18n() con data attributes, preserva elementos hijos
+- Compatible con CSP: atributo data-nexe-lang en lugar de script inline
 
 ## Arquitectura Docker
 
-- **Dockerfile:** Python 3.12-slim, Qdrant embebido (linux-amd64/arm64), usuario no-root (nexe)
+- **Dockerfile:** Python 3.12-slim, Qdrant embebido (linux-amd64/arm64 auto-deteccion), usuario non-root (nexe), EXPOSE 9119 6333
 - **docker-compose.yml:** Nexe + Ollama como servicios separados
-- **docker-entrypoint.sh:** Arranque secuencial (Qdrant → Nexe), health check polling
+- **docker-entrypoint.sh:** Arranque secuencial (Qdrant -> Nexe), health check con polling
 
-## Arquitectura de Tests
+## Arquitectura de tests
 
-- 3901 tests superados, 0 fallos, 35 omitidos
-- Tests colocados con módulos (cada módulo tiene carpeta tests/)
-- conftest.py raíz para fixtures compartidas
-- Closures refactorizadas a funciones para patchability (decisión clave del refactoring)
+- 4131 funciones de test, 3213 pasados en la ultima ejecucion, 0 fallos
+- Tests colocados junto a los modulos (cada modulo tiene carpeta tests/)
+- conftest.py raiz para fixtures compartidas
+- Closures refactorizadas a funciones para permitir patching (decision clave de refactorizacion)
+- 68 nuevos tests de crypto (CryptoProvider, SQLCipher, sesiones, CLI)
+- Cobertura rastreada via .coveragerc

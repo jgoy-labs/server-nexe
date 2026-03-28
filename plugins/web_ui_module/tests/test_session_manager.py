@@ -360,3 +360,101 @@ class TestChatSessionCompacting:
         assert s.compaction_count == 2
         assert s.context_summary == "Resum 2: IA local + streaming"
         assert len(s.messages) == ChatSession.COMPACT_KEEP
+
+
+# ═══════════════════════════════════════════════════════════════
+# SessionManager — Encrypted sessions
+# ═══════════════════════════════════════════════════════════════
+
+class TestSessionManagerEncrypted:
+
+    @pytest.fixture
+    def crypto(self):
+        import os
+        from core.crypto.provider import CryptoProvider
+        return CryptoProvider(master_key=os.urandom(32))
+
+    def test_encrypted_save_and_load(self, tmp_path, crypto):
+        sm1 = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+        s = sm1.create_session(session_id="enc-test")
+        s.add_message("user", "secret message")
+        sm1._save_session_to_disk(s)
+
+        # Should save as .enc, not .json
+        assert (tmp_path / "enc-test.enc").exists()
+        assert not (tmp_path / "enc-test.json").exists()
+
+        # Reload
+        sm2 = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+        loaded = sm2.get_session("enc-test")
+        assert loaded is not None
+        assert loaded.get_history()[0]["content"] == "secret message"
+
+    def test_encrypted_file_not_readable_as_json(self, tmp_path, crypto):
+        sm = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+        s = sm.create_session(session_id="opaque")
+        s.add_message("user", "sensitive")
+        sm._save_session_to_disk(s)
+
+        enc_file = tmp_path / "opaque.enc"
+        raw = enc_file.read_bytes()
+        with pytest.raises(Exception):
+            json.loads(raw)
+
+    def test_migrate_json_to_enc(self, tmp_path, crypto):
+        sm_plain = SessionManager(storage_path=str(tmp_path))
+        s = sm_plain.create_session(session_id="migrate-me")
+        s.add_message("user", "old data")
+        sm_plain._save_session_to_disk(s)
+        assert (tmp_path / "migrate-me.json").exists()
+
+        sm_enc = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+        loaded = sm_enc.get_session("migrate-me")
+        assert loaded is not None
+        assert loaded.get_history()[0]["content"] == "old data"
+
+        assert not (tmp_path / "migrate-me.json").exists()
+        assert (tmp_path / "migrate-me.enc").exists()
+
+    def test_delete_encrypted_session(self, tmp_path, crypto):
+        sm = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+        sm.create_session(session_id="del-enc")
+        assert (tmp_path / "del-enc.enc").exists()
+        sm.delete_session("del-enc")
+        assert not (tmp_path / "del-enc.enc").exists()
+
+    def test_wrong_key_cannot_read(self, tmp_path, crypto):
+        import os
+        from core.crypto.provider import CryptoProvider
+
+        sm1 = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+        s = sm1.create_session(session_id="locked")
+        s.add_message("user", "private")
+        sm1._save_session_to_disk(s)
+
+        other_crypto = CryptoProvider(master_key=os.urandom(32))
+        sm2 = SessionManager(storage_path=str(tmp_path), crypto_provider=other_crypto)
+        assert sm2.get_session("locked") is None
+
+    def test_no_crypto_keeps_json(self, tmp_path):
+        sm = SessionManager(storage_path=str(tmp_path))
+        s = sm.create_session(session_id="plain-stay")
+        s.add_message("user", "visible")
+        sm._save_session_to_disk(s)
+
+        assert (tmp_path / "plain-stay.json").exists()
+        assert not (tmp_path / "plain-stay.enc").exists()
+
+    def test_compaction_survives_encryption(self, tmp_path, crypto):
+        sm = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+        s = sm.create_session(session_id="compact-enc")
+        for i in range(12):
+            role = "user" if i % 2 == 0 else "assistant"
+            s.add_message(role, f"msg-{i}")
+        s.apply_compaction("Encrypted summary.")
+        sm._save_session_to_disk(s)
+
+        sm2 = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+        loaded = sm2.get_session("compact-enc")
+        assert loaded.context_summary == "Encrypted summary."
+        assert loaded.compaction_count == 1

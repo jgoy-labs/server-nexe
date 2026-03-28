@@ -179,18 +179,18 @@ async def bootstrap_session(
   title = _t(request, "core.server.bootstrap_token_used_title", "TOKEN USED SUCCESSFULLY")
   session_from = _t(request, "core.server.bootstrap_session_from", "Session initialized from: {ip}", ip=client_ip)
 
-  print(f"""
-+========================================================+
-| {title:<52}|
-|                            |
-| {session_from:<52}|
-| {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"):<52}|
-|                            |
-| Session token sent to client (15 min TTL)       |
-| API key NOT exposed                   |
-|                            |
-+========================================================+
-  """)
+  logger.info(
+    f"\n+========================================================+\n"
+    f"| {title:<52}|\n"
+    f"|                            |\n"
+    f"| {session_from:<52}|\n"
+    f"| {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'):<52}|\n"
+    f"|                            |\n"
+    f"| Session token sent to client (15 min TTL)       |\n"
+    f"| API key NOT exposed                   |\n"
+    f"|                            |\n"
+    f"+========================================================+"
+  )
 
   msg = _t(request, "core.server.bootstrap_successful", "Bootstrap successful")
   return BootstrapResponse(
@@ -239,16 +239,16 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   title = _t(request, "core.server.bootstrap_token_regenerated_title", "NEW INITIALIZATION TOKEN GENERATED")
   expiry = _t(request, "core.server.bootstrap_token_expiry", "Expires in: {minutes} minutes", minutes=bootstrap_ttl)
 
-  print(f"""
-╔════════════════════════════════════════════════════════╗
-║ {title:<52}║
-║                            ║
-║   {new_token:<48}║
-║                            ║
-║ {expiry:<52}║
-║                            ║
-╚════════════════════════════════════════════════════════╝
-  """)
+  logger.info(
+    f"\n╔════════════════════════════════════════════════════════╗\n"
+    f"║ {title:<52}║\n"
+    f"║                            ║\n"
+    f"║   {new_token:<48}║\n"
+    f"║                            ║\n"
+    f"║ {expiry:<52}║\n"
+    f"║                            ║\n"
+    f"╚════════════════════════════════════════════════════════╝"
+  )
 
   log_msg = _t(request, "core.server.bootstrap_token_regenerated_log", "Token regenerated from {ip}", ip=client_ip)
   logger.info(log_msg)

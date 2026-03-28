@@ -29,9 +29,9 @@ FALLBACK_MESSAGES = {
 
 def get_message(i18n, key: str, **kwargs) -> str:
     """
-    Obté missatge traduït amb fallback.
+    Get translated message with fallback.
 
-    Patró idèntic a plugins/security/core/messages.py.
+    Same pattern as plugins/security/core/messages.py.
     """
     if i18n:
         try:

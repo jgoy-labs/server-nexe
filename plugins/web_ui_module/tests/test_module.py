@@ -19,12 +19,24 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 
 from plugins.web_ui_module.module import WebUIModule
 from plugins.web_ui_module.manifest import router_public
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
+
+@pytest.fixture(autouse=True)
+def disable_rate_limiter():
+    """Disable rate limiter during tests to avoid 429s."""
+    from core.dependencies import limiter
+    limiter.enabled = False
+    yield
+    limiter.enabled = True
+
 
 @pytest.fixture
 def module():
@@ -47,7 +59,11 @@ def client(initialized_module, monkeypatch):
     """TestClient amb el router inicialitzat."""
     monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-webui-key")
     monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
+    from core.dependencies import limiter
     app = FastAPI()
+    app.state.limiter = limiter
+    app.add_middleware(SlowAPIMiddleware)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.include_router(initialized_module.get_router())
     app.include_router(router_public)
     return TestClient(app, raise_server_exceptions=False)
@@ -71,7 +87,7 @@ class TestWebUIModuleInit:
         assert module.metadata.name == "web_ui_module"
 
     def test_metadata_version(self, module):
-        assert module.metadata.version == "0.8.2"
+        assert module.metadata.version == "0.8.5"
 
     def test_initialize_returns_true(self, tmp_path, monkeypatch):
         monkeypatch.setenv("NEXE_API_BASE_URL", "http://127.0.0.1:9119")

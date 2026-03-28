@@ -528,5 +528,12 @@ def knowledge_status():
 
     asyncio.run(check_status())
 
+# Register encryption subcommands
+try:
+    from core.crypto.cli import encryption
+    app.add_command(encryption)
+except ImportError:
+    pass
+
 if __name__ == "__main__":
   main()

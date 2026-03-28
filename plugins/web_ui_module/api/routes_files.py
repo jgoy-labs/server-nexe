@@ -2,8 +2,8 @@
 ------------------------------------
 Server Nexe
 Location: plugins/web_ui_module/api/routes_files.py
-Description: Endpoints de pujada i gestio de fitxers.
-             Extret de routes.py durant refactoring de tech debt.
+Description: File upload and management endpoints.
+             Extracted from routes.py during tech debt refactoring.
 
 www.jgoy.net · https://server-nexe.org
 ------------------------------------
@@ -12,9 +12,11 @@ www.jgoy.net · https://server-nexe.org
 from typing import Optional
 import logging
 import os as _os
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request
 
 from plugins.web_ui_module.messages import get_message
+from plugins.security.core.input_sanitizers import validate_string_input
+from core.dependencies import limiter
 
 def _get_memory_helper():
     """Lazy resolve via routes module so test patches work."""
@@ -40,18 +42,22 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
     # -- POST /upload --
 
     @router.post("/upload")
+    @limiter.limit("5/minute")
     async def upload_file(
+        request: Request,
         file: UploadFile = File(...),
         session_id: Optional[str] = Form(None),
         _auth=Depends(require_ui_auth)
     ):
-        """Pujar fitxer i afegir al context de la sessio + ingesta automatica a memoria"""
+        """Upload file and add to session context + automatic memory ingestion"""
         content = await file.read()
-        valid, error = file_handler.validate_file(file.filename, len(content))
+        # Security: validate filename (path traversal, injection)
+        filename = validate_string_input(file.filename or "", max_length=255, context="path")
+        valid, error = file_handler.validate_file(filename, len(content))
         if not valid:
             raise HTTPException(status_code=400, detail=error)
 
-        file_path = await file_handler.save_file(file.filename, content)
+        file_path = await file_handler.save_file(filename, content)
         text = await file_handler.extract_text_async(file_path)
         if not text:
             file_handler.delete_file(file_path)
@@ -115,7 +121,7 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         chunks = file_handler.chunk_text(body_content, chunk_size=chunk_size)
         logger.info(f"Document '{file.filename}': {len(body_content)} chars -> {len(chunks)} chunks (chunk_size={chunk_size})")
 
-        # Indexar chunks a user_knowledge amb session_id per aïllament cross-sessio
+        # Index chunks in user_knowledge with session_id for cross-session isolation
         memory_helper = _get_memory_helper()
         ingestion_result = await memory_helper.save_document_chunks(
             chunks=chunks,
@@ -152,14 +158,15 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
 
     @router.get("/files")
     async def list_uploaded_files(_auth=Depends(require_ui_auth)):
-        """Llistar tots els fitxers pujats"""
+        """List all uploaded files"""
         files = file_handler.get_uploaded_files()
         return {"files": files, "total": len(files)}
 
     # -- POST /files/cleanup --
 
     @router.post("/files/cleanup")
-    async def cleanup_files(max_age_hours: int = 24, _auth=Depends(require_ui_auth)):
-        """Netejar fitxers antics (per defecte > 24h)"""
+    @limiter.limit("5/minute")
+    async def cleanup_files(request: Request, max_age_hours: int = 24, _auth=Depends(require_ui_auth)):
+        """Clean up old files (default > 24h)"""
         deleted = file_handler.cleanup_old_files(max_age_hours)
-        return {"deleted": deleted, "message": f"{deleted} fitxers eliminats"}
+        return {"deleted": deleted, "message": f"{deleted} files deleted"}

@@ -73,16 +73,16 @@ class MLXConfig:
     max_kv_size: int = 65536  # Override per NEXE_MLX_MAX_KV_SIZE; auto-calculat per RAM a from_env()
     temperature: float = 0.7
     top_p: float = 0.9
-    max_session_caches: int = 4  # Com ModelPool.max_sessions
+    max_session_caches: int = 4  # Same as ModelPool.max_sessions
 
     def __post_init__(self):
         """Validate configuration after creation."""
         if not self.model_path:
             logger.warning(
-                "MLXConfig: model_path buit. "
-                "Configura NEXE_MLX_MODEL o passa model_path."
+                "MLXConfig: model_path is empty. "
+                "Set NEXE_MLX_MODEL or pass model_path."
             )
-        # Expandir ~ a home directory
+        # Expand ~ to home directory
         if self.model_path.startswith("~"):
             self.model_path = os.path.expanduser(self.model_path)
         # Resolve relative paths based on project root
@@ -183,7 +183,7 @@ class MLXConfig:
         config_file = model_path / "config.json"
         if not config_file.exists():
             logger.error(
-                "MLXConfig: model_path no conté config.json (requerit per mlx-lm): %s",
+                "MLXConfig: model_path does not contain config.json (required by mlx-lm): %s",
                 self.model_path
             )
             return False

@@ -132,11 +132,14 @@ class MemoryModule:
         max_entries=final_config.get("ram_max_entries", 100)
       )
 
+      crypto = get_server_state().crypto_provider
+
       self._persistence = PersistenceManager(
         db_path=db_path,
         qdrant_path=qdrant_path,
         collection_name="nexe_memory",
-        vector_size=DEFAULT_VECTOR_SIZE
+        vector_size=DEFAULT_VECTOR_SIZE,
+        crypto_provider=crypto
       )
 
       self._pipeline = IngestionPipeline(

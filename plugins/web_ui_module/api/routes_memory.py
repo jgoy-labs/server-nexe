@@ -11,9 +11,11 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import Dict, Any
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 
 from plugins.web_ui_module.messages import get_message
+from plugins.security.core.input_sanitizers import validate_string_input
+from core.dependencies import limiter
 
 def _get_memory_helper():
     """Lazy resolve via routes module so test patches work."""
@@ -29,11 +31,16 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
     # -- POST /memory/save --
 
     @router.post("/memory/save")
-    async def memory_save(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
+    @limiter.limit("10/minute")
+    async def memory_save(request: Request, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Guardar contingut explicitament a la memoria"""
-        content = request.get("content", "")
-        session_id = request.get("session_id", "unknown")
-        metadata = request.get("metadata", {})
+        content = body.get("content", "")
+        session_id = body.get("session_id", "unknown")
+        metadata = body.get("metadata", {})
+
+        # Security: validate input (XSS, SQL injection, path traversal)
+        content = validate_string_input(content, max_length=5000, context="chat")
+        session_id = validate_string_input(session_id, max_length=100, context="path")
 
         if not content:
             raise HTTPException(status_code=400, detail=get_message(None, "webui.memory.content_required"))
@@ -50,13 +57,16 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
     # -- POST /memory/recall --
 
     @router.post("/memory/recall")
-    async def memory_recall(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
+    @limiter.limit("30/minute")
+    async def memory_recall(request: Request, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Cercar a la memoria"""
-        query = request.get("query", "")
-        limit = request.get("limit", 5)
+        query = body.get("query", "")
+        limit = body.get("limit", 5)
 
+        # Security: validate input
         if not query:
             raise HTTPException(status_code=400, detail=get_message(None, "webui.memory.query_required"))
+        query = validate_string_input(query, max_length=1000, context="chat")
 
         memory_helper = _get_memory_helper()
         result = await memory_helper.recall_from_memory(

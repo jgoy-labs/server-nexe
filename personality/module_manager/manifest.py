@@ -147,7 +147,7 @@ async def list_registered_modules():
 
 MODULE_METADATA = {
   "name": "module_manager",
-  "version": "0.8.2",
+  "version": "0.8.5",
   "description": "Centralized module management system for Nexe 0.8",
   "router": router_public,
   "prefix": "/modules",

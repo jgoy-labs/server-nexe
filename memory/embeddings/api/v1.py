@@ -10,9 +10,10 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from plugins.security.core.auth_dependencies import require_api_key
 
-router = APIRouter(prefix="/embeddings", tags=["embeddings-v1", "future"])
+router = APIRouter(prefix="/embeddings", tags=["embeddings-v1", "future"], dependencies=[Depends(require_api_key)])
 
 @router.post("/encode", summary="Generar embeddings vectorials per textos")
 async def encode_embeddings_v1():

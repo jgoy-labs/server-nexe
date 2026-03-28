@@ -1,6 +1,6 @@
 /**
  * Security Module — Status Page JS
- * Server Nexe 0.8.2
+ * Server Nexe 0.8.5
  *
  * Fetch /security/info i /security/health per mostrar estat.
  */

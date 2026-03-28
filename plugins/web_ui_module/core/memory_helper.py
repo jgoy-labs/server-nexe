@@ -422,13 +422,13 @@ class MemoryHelper:
             return {
                 "success": True,
                 "document_id": doc_id,
-                "message": "✓ Guardat a la memòria"
+                "message": "✓ Saved to memory"
             }
         except Exception as e:
             logger.error(f"Memory store error: {e}")
             return {
                 "success": False,
-                "message": f"Error guardant a memòria: {str(e)}"
+                "message": f"Error saving to memory: {str(e)}"
             }
 
     async def delete_from_memory(self, content: str) -> Dict[str, Any]:
@@ -478,33 +478,33 @@ class MemoryHelper:
         session_id: str,
     ) -> Dict[str, Any]:
         """
-        Guarda el missatge d'usuari directament a memòria (sense LLM).
+        Save user message directly to memory (without LLM).
 
-        Estratègia: guardar el missatge cru. La cerca semàntica trobarà
-        'Em dic Aran' quan es pregunti 'com em dic?'.
+        Strategy: save the raw message. Semantic search will find
+        'My name is Aran' when asked 'what's my name?'.
 
-        Filtra: salutacions, preguntes, comandes de memòria i missatges trivials.
-        Només guarda afirmacions/fets de l'usuari.
+        Filters: greetings, questions, memory commands and trivial messages.
+        Only saves user assertions/facts.
         """
         msg = user_message.strip()
 
-        # Filtrar massa curt
+        # Filter too short
         if len(msg) < 10:
-            return {"success": True, "document_id": None, "message": "⏭️ Massa curt"}
+            return {"success": True, "document_id": None, "message": "⏭️ Too short"}
 
-        # Filtrar salutacions
+        # Filter greetings
         for pat in self.skip_patterns:
             if pat.match(msg):
-                return {"success": True, "document_id": None, "message": "⏭️ Salutació"}
+                return {"success": True, "document_id": None, "message": "⏭️ Greeting"}
 
         # Filter out questions (not facts, they pollute memory)
         if msg.rstrip('?').strip() != msg.rstrip() and '?' in msg:
-            return {"success": True, "document_id": None, "message": "⏭️ Pregunta"}
+            return {"success": True, "document_id": None, "message": "⏭️ Question"}
 
         # Filter out memory commands (save/delete/recall are handled via intent)
         intent, _ = self.detect_intent(msg)
         if intent in ('save', 'delete'):
-            return {"success": True, "document_id": None, "message": "⏭️ Comanda memòria"}
+            return {"success": True, "document_id": None, "message": "⏭️ Memory command"}
 
         return await self.save_to_memory(
             content=msg,
@@ -672,14 +672,14 @@ class MemoryHelper:
                 "success": True,
                 "results": final_results,
                 "total": len(final_results),
-                "message": f"Trobats {len(final_results)} resultats"
+                "message": f"Found {len(final_results)} results"
             }
         except Exception as e:
             logger.error(f"Memory recall error: {e}")
             return {
                 "success": False,
                 "results": [],
-                "message": f"Error cercant memòria: {str(e)}"
+                "message": f"Error searching memory: {str(e)}"
             }
 
     async def get_memory_stats(self) -> Dict[str, Any]:
@@ -738,7 +738,7 @@ class MemoryHelper:
 
             return {
                 "success": True,
-                "message": "✓ Memòria esborrada completament"
+                "message": "✓ Memory cleared completely"
             }
         except Exception as e:
             logger.error(f"Failed to clear memory: {e}")

@@ -1,5 +1,5 @@
 [meta]
-version = "0.8.2"
+version = "0.8.5"
 build_date = "2026-01-01"
 environment = "production"
 project_name = "Nexe"
@@ -135,3 +135,7 @@ separate_modules = true
 logs_dir = "storage/logs"
 debug_dir = "storage/debug"
 audit_dir = "storage/audit"
+
+[security.encryption]
+enabled = false
+warn_unencrypted = true

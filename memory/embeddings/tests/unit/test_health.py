@@ -175,7 +175,7 @@ class TestCheckHealth:
         module._initialized = initialized
         module.module_id = "embeddings"
         module.name = "embeddings"
-        module.version = "0.8.2"
+        module.version = "0.8.5"
         return module
 
     def test_healthy_module(self):

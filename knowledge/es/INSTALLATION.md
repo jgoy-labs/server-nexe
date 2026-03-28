@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-installation-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia de instalacion de server-nexe 0.8.2. Tres metodos: DMG para macOS con wizard SwiftUI (6 pantallas, deteccion de hardware, 17 modelos, Python 3.12 incluido), CLI headless (setup.sh con soporte Linux) y Docker (docker-compose con Ollama). Cubre requisitos del sistema, seleccion de backend (MLX/llama.cpp/Ollama), catalogo de modelos por nivel de RAM, verificacion post-instalacion, app de bandeja, desinstalador y resolucion de problemas."
-tags: [instalacion, setup, dmg, swiftui, wizard, docker, cli, headless, macos, linux, requisitos, modelos, backends, mlx, ollama, llama-cpp, bandeja, desinstalador]
+abstract: "Guia de instalacion de server-nexe 0.8.5 pre-release. Tres metodos: DMG para macOS con wizard SwiftUI (6 pantallas, deteccion de hardware, 17 modelos, Python 3.12 incluido), CLI headless (setup.sh con soporte Linux) y Docker (docker-compose con Ollama). Cubre requisitos del sistema, seleccion de backend, catalogo de modelos por nivel de RAM, verificacion post-instalacion, app de bandeja, desinstalador, encriptacion opt-in y resolucion de problemas."
+tags: [installation, setup, dmg, swiftui, wizard, docker, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption]
 chunk_size: 800
 priority: P1
 
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Instalacion — server-nexe 0.8.2
+# Instalacion — server-nexe 0.8.5 pre-release
 
 Tres metodos de instalacion disponibles. Elige segun tu plataforma y preferencias.
 
@@ -81,7 +81,7 @@ cd server-nexe
 
 Despues del setup:
 ```bash
-./nexe go    # Iniciar servidor → http://127.0.0.1:9119
+./nexe go    # Iniciar servidor -> http://127.0.0.1:9119
 ```
 
 ## Metodo 3: Docker
@@ -94,9 +94,9 @@ cd server-nexe
 docker-compose up
 ```
 
-- **Dockerfile:** Python 3.12-slim, binario Qdrant embebido (auto-detecta linux-amd64/arm64), usuario no-root (`nexe`), EXPOSE 9119 6333
+- **Dockerfile:** Python 3.12-slim, binario Qdrant embebido (auto-detecta linux-amd64/arm64), usuario non-root (`nexe`), EXPOSE 9119 6333
 - **docker-compose.yml:** Dos servicios — Nexe + Ollama
-- **docker-entrypoint.sh:** Arranque secuencial (Qdrant → esperar health → Nexe), timeout de 15s con aviso
+- **docker-entrypoint.sh:** Arranque secuencial (Qdrant -> esperar health -> Nexe), timeout de 15s con aviso
 
 Montar `storage/` para datos persistentes (modelos, vectores Qdrant, logs).
 
@@ -140,6 +140,23 @@ curl http://127.0.0.1:9119/health    # Health check
 open http://127.0.0.1:9119/ui        # Web UI
 ```
 
+## Encriptacion en reposo (opt-in)
+
+Despues de la instalacion, puedes activar la encriptacion en reposo:
+
+```bash
+# Activar encriptacion
+export NEXE_ENCRYPTION_ENABLED=true
+
+# Comprobar estado actual
+./nexe encryption status
+
+# Migrar datos existentes a formato encriptado
+./nexe encryption encrypt-all
+```
+
+Esto encripta las bases de datos SQLite (via SQLCipher), sesiones de chat (.json -> .enc), y texto de documentos RAG. Consulta SECURITY.md para todos los detalles.
+
 ## App de bandeja (macOS)
 
 App de bandeja del sistema con: inicio/parada del servidor, indicador de estado (pulsante durante el arranque), modo oscuro/claro (automatico por hora + toggle manual), enlaces rapidos a la Web UI, acceso al desinstalador, menu multilingue (ca/es/en), Ollama se abre en segundo plano.
@@ -158,7 +175,7 @@ Accesible desde el menu de la bandeja. Doble confirmacion, calcula espacio, elim
 | Error de version de Python | Requiere 3.11+. El DMG incluye 3.12. |
 | MLX no disponible | Solo Apple Silicon. Usar llama.cpp u Ollama. |
 | Descarga de modelo lenta | Los modelos grandes tardan 30+ min. Timeout 600s. |
-| OOM killed | Elegir modelo mas pequeno. 8GB → modelos 2B. |
+| OOM killed | Elegir modelo mas pequeno. 8GB -> modelos 2B. |
 
 ## Variables de entorno clave
 
@@ -171,3 +188,4 @@ Accesible desde el menu de la bandeja. Doble confirmacion, calcula espacio, elim
 | NEXE_DEFAULT_MAX_TOKENS | Tokens maximos de respuesta | 4096 |
 | NEXE_LANG | Idioma del servidor | ca |
 | NEXE_ENV | Entorno | production |
+| NEXE_ENCRYPTION_ENABLED | Activar encriptacion en reposo | false |

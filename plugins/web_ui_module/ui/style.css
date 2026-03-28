@@ -98,7 +98,7 @@ body {
 .frame-left   { top: 0; bottom: 0; left: 0; width: var(--frame-width); }
 .frame-right  { top: 0; bottom: 0; right: 0; width: var(--frame-width); }
 
-/* Pulsació quan streaming actiu */
+/* Pulse when streaming active */
 [data-ai-state="thinking"] .frame-border,
 [data-ai-state="streaming"] .frame-border {
     animation: frame-pulse 1.2s ease-in-out infinite;
@@ -989,13 +989,13 @@ body.light .icon-moon,
     overflow: hidden;
 }
 
-/* Actiu (open + animació) */
+/* Active (open + animation) */
 .think-block[open] {
     border-left-color: rgba(255, 160, 0, 1);
     animation: think-pulse 1.5s ease-in-out infinite;
 }
 
-/* Quan ja no és open (col·lapsat = fet) */
+/* When no longer open (collapsed = done) */
 .think-block:not([open]) {
     animation: none;
     border-left-color: rgba(255, 160, 0, 0.4);
@@ -1322,7 +1322,7 @@ body.light .icon-moon,
 .stats-label { color: var(--text-muted); }
 .stats-value { color: rgba(255,90,0,1); font-weight: 600; }
 
-/* Botó toggle marc */
+/* Frame toggle button */
 .btn-frame-toggle {
     background: none;
     border: 1px solid transparent;
@@ -1494,7 +1494,7 @@ body.light .icon-moon,
 }
 
 .chat-main.drag-over::after {
-    content: 'Deixa anar el fitxer aquí';
+    content: 'Drop file here';
     position: absolute;
     inset: 0;
     background: rgba(230, 32, 32, 0.05);

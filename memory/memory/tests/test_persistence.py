@@ -547,3 +547,199 @@ class TestPersistenceManagerAdditional:
         )
         assert pm2._qdrant_available is True
         pm2.close()
+
+
+@pytest.mark.asyncio
+class TestPersistenceManagerSQLCipher:
+    """Tests for SQLCipher encryption integration."""
+
+    def _make_crypto(self):
+        import os
+        from core.crypto.provider import CryptoProvider
+        return CryptoProvider(master_key=os.urandom(32))
+
+    async def test_encrypted_store_and_get(self, tmp_path):
+        """Store and retrieve with SQLCipher encryption."""
+        crypto = self._make_crypto()
+        pm = PersistenceManager(
+            db_path=tmp_path / "enc.db",
+            qdrant_path=tmp_path / "qdrant",
+            collection_name="test_enc",
+            vector_size=768,
+            crypto_provider=crypto
+        )
+        assert pm._encrypted is True
+
+        entry = MemoryEntry(
+            entry_type=MemoryType.EPISODIC,
+            content="Encrypted content",
+            source="test"
+        )
+        await pm.store(entry)
+        retrieved = await pm.get(entry.id)
+        assert retrieved is not None
+        assert retrieved.content == "Encrypted content"
+        pm.close()
+
+    async def test_encrypted_db_not_readable_plain(self, tmp_path):
+        """Encrypted DB cannot be read with plain sqlite3."""
+        import sqlite3 as plain_sqlite
+        crypto = self._make_crypto()
+        db_path = tmp_path / "enc.db"
+        pm = PersistenceManager(
+            db_path=db_path,
+            qdrant_path=tmp_path / "qdrant",
+            collection_name="test_enc",
+            vector_size=768,
+            crypto_provider=crypto
+        )
+        entry = MemoryEntry(
+            entry_type=MemoryType.EPISODIC,
+            content="Secret data",
+            source="test"
+        )
+        await pm.store(entry)
+        pm.close()
+
+        # Plain sqlite3 should fail to read
+        with pytest.raises(Exception):
+            conn = plain_sqlite.connect(str(db_path))
+            conn.execute("SELECT * FROM memory_entries")
+
+    async def test_migration_plain_to_encrypted(self, tmp_path):
+        """Existing plain DB gets migrated to SQLCipher."""
+        db_path = tmp_path / "memories.db"
+        qdrant_path = tmp_path / "qdrant"
+
+        # 1. Create plain DB with data
+        pm_plain = PersistenceManager(
+            db_path=db_path,
+            qdrant_path=qdrant_path,
+            collection_name="test_mig",
+            vector_size=768
+        )
+        entry = MemoryEntry(
+            entry_type=MemoryType.EPISODIC,
+            content="Pre-migration data",
+            source="test"
+        )
+        await pm_plain.store(entry)
+        pm_plain.close()
+
+        # Verify plain DB exists
+        assert PersistenceManager._is_plaintext_sqlite(db_path)
+
+        # 2. Re-open with crypto → should migrate
+        crypto = self._make_crypto()
+        pm_enc = PersistenceManager(
+            db_path=db_path,
+            qdrant_path=qdrant_path,
+            collection_name="test_mig",
+            vector_size=768,
+            crypto_provider=crypto
+        )
+        assert pm_enc._encrypted is True
+
+        # Data should be preserved
+        retrieved = await pm_enc.get(entry.id)
+        assert retrieved is not None
+        assert retrieved.content == "Pre-migration data"
+
+        # Backup should exist
+        assert db_path.with_suffix('.db.bak').exists()
+
+        # DB should no longer be plain
+        assert not PersistenceManager._is_plaintext_sqlite(db_path)
+        pm_enc.close()
+
+    async def test_no_crypto_no_encryption(self, tmp_path):
+        """Without crypto_provider, DB stays plain."""
+        db_path = tmp_path / "plain.db"
+        pm = PersistenceManager(
+            db_path=db_path,
+            qdrant_path=tmp_path / "qdrant",
+            collection_name="test_plain",
+            vector_size=768
+        )
+        assert pm._encrypted is False
+        entry = MemoryEntry(
+            entry_type=MemoryType.EPISODIC,
+            content="Plain data",
+            source="test"
+        )
+        await pm.store(entry)
+        assert PersistenceManager._is_plaintext_sqlite(db_path)
+        pm.close()
+
+    async def test_encrypted_search(self, tmp_path):
+        """Semantic search works with encrypted DB."""
+        crypto = self._make_crypto()
+        pm = PersistenceManager(
+            db_path=tmp_path / "enc.db",
+            qdrant_path=tmp_path / "qdrant",
+            collection_name="test_search_enc",
+            vector_size=768,
+            crypto_provider=crypto
+        )
+        for i in range(3):
+            entry = MemoryEntry(
+                entry_type=MemoryType.SEMANTIC,
+                content=f"Entry {i}",
+                source="test"
+            )
+            await pm.store(entry, embedding=[0.1 * (i + 1)] * 768)
+
+        results = await pm.search([0.15] * 768, limit=2)
+        assert len(results) <= 2
+        pm.close()
+
+    async def test_encrypted_get_recent(self, tmp_path):
+        """get_recent works with encrypted DB."""
+        crypto = self._make_crypto()
+        pm = PersistenceManager(
+            db_path=tmp_path / "enc.db",
+            qdrant_path=tmp_path / "qdrant",
+            collection_name="test_recent_enc",
+            vector_size=768,
+            crypto_provider=crypto
+        )
+        for i in range(5):
+            entry = MemoryEntry(
+                entry_type=MemoryType.EPISODIC,
+                content=f"Recent {i}",
+                source="test"
+            )
+            await pm.store(entry)
+
+        recent = await pm.get_recent(limit=3)
+        assert len(recent) == 3
+        pm.close()
+
+    async def test_encrypted_stats(self, tmp_path):
+        """get_stats works with encrypted DB."""
+        crypto = self._make_crypto()
+        pm = PersistenceManager(
+            db_path=tmp_path / "enc.db",
+            qdrant_path=tmp_path / "qdrant",
+            collection_name="test_stats_enc",
+            vector_size=768,
+            crypto_provider=crypto
+        )
+        await pm.store(MemoryEntry(entry_type=MemoryType.EPISODIC, content="E1", source="test"))
+        await pm.store(MemoryEntry(entry_type=MemoryType.SEMANTIC, content="S1", source="test"))
+
+        stats = await pm.get_stats()
+        assert stats["total_entries"] == 2
+        assert stats["episodic_count"] == 1
+        assert stats["semantic_count"] == 1
+        pm.close()
+
+    def test_is_plaintext_sqlite_nonexistent(self, tmp_path):
+        """Non-existent file is not plain SQLite."""
+        assert not PersistenceManager._is_plaintext_sqlite(tmp_path / "nope.db")
+
+    def test_is_plaintext_sqlite_empty(self, tmp_path):
+        """Empty file is not plain SQLite."""
+        f = tmp_path / "empty.db"
+        f.write_bytes(b"")
+        assert not PersistenceManager._is_plaintext_sqlite(f)

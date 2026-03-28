@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-api-reference
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete REST API reference for server-nexe 0.8.2. Covers all endpoints: chat completions (OpenAI-compatible, streaming, RAG), memory (store, search), RAG search, document upload, sessions, bootstrap, health checks, modules, backends, i18n. Includes authentication (X-API-Key dual-key), rate limiting, streaming markers (MODEL_LOADING, RAG_AVG, MEM_SAVE), and configuration."
-tags: [api, rest, endpoints, chat, memory, rag, authentication, rate-limiting, streaming, openai-compatible, upload, sessions, bootstrap, health, backends]
+abstract: "Complete REST API reference for server-nexe 0.8.5 pre-release. Covers all endpoints: chat completions (OpenAI-compatible, streaming, RAG), memory (store, search), RAG search, document upload, sessions, bootstrap, health checks, modules, backends, i18n, encryption CLI. Includes authentication (X-API-Key dual-key), rate limiting per endpoint, streaming markers, and configuration."
+tags: [api, rest, endpoints, chat, memory, rag, authentication, rate-limiting, streaming, openai-compatible, upload, sessions, bootstrap, health, backends, encryption]
 chunk_size: 800
 priority: P1
 
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# REST API Reference — server-nexe 0.8.2
+# REST API Reference — server-nexe 0.8.5 pre-release
 
 ## Base URL
 
@@ -42,7 +42,9 @@ Most endpoints require `X-API-Key` header. Value from `.env` file (`NEXE_PRIMARY
 
 ## Rate Limiting
 
-Configurable per endpoint via `.env`:
+Rate limiting is applied to **all endpoints** — both API and Web UI.
+
+### API endpoints (configurable via `.env`)
 
 | Variable | Default | Applies to |
 |----------|---------|-----------|
@@ -52,11 +54,23 @@ Configurable per endpoint via `.env`:
 | NEXE_RATE_LIMIT_UPLOAD | 10/minute | /ui/upload |
 | NEXE_RATE_LIMIT_DEFAULT | 120/minute | All other endpoints |
 
+### Web UI endpoints (per endpoint)
+
+| Endpoint | Rate limit |
+|----------|-----------|
+| POST /ui/chat | 20/minute |
+| POST /ui/memory/save | 10/minute |
+| POST /ui/memory/recall | 30/minute |
+| POST /ui/upload | 5/minute |
+| POST /ui/files/cleanup | 5/minute |
+| GET /ui/session/{id} | 30/minute |
+| DELETE /ui/session/{id} | 10/minute |
+
 ## Core Endpoints
 
 ### Chat
 
-**POST /v1/chat/completions** (requires API key)
+**POST /v1/chat/completions** (requires API key, rate limit: 60/min)
 
 OpenAI-compatible chat completion with RAG and streaming support.
 
@@ -158,46 +172,56 @@ OpenAI-compatible chat completion with RAG and streaming support.
 
 ## Web UI Endpoints (prefix: /ui)
 
-These endpoints serve the web interface and are used by the JavaScript frontend.
+These endpoints serve the web interface and are used by the JavaScript frontend. All have input validation via `validate_string_input()`.
 
 ### Auth & Config
 
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/ui/auth` | GET | Yes | Verify API key validity |
-| `/ui/info` | GET | Yes | Server info (version, language, features) |
-| `/ui/lang` | POST | Yes | Set server language (ca/es/en) |
-| `/ui/backends` | GET | Yes | List backends with model names and sizes (GB) |
-| `/ui/backend` | POST | Yes | Switch active backend |
-| `/ui/health` | GET | No | Web UI module health |
+| Endpoint | Method | Auth | Rate limit | Description |
+|----------|--------|------|-----------|-------------|
+| `/ui/auth` | GET | Yes | default | Verify API key validity |
+| `/ui/info` | GET | Yes | default | Server info (version, language, features) |
+| `/ui/lang` | POST | Yes | default | Set server language (ca/es/en) |
+| `/ui/backends` | GET | Yes | default | List backends with model names and sizes (GB) |
+| `/ui/backend` | POST | Yes | default | Switch active backend |
+| `/ui/health` | GET | No | default | Web UI module health |
 
 ### Chat & Memory
 
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/ui/chat` | POST | Yes | SSE streaming chat (with MEM_SAVE, RAG, thinking tokens) |
-| `/ui/memory/save` | POST | Yes | Save text to memory |
-| `/ui/memory/recall` | POST | Yes | Recall from memory (filtered by session_id) |
+| Endpoint | Method | Auth | Rate limit | Description |
+|----------|--------|------|-----------|-------------|
+| `/ui/chat` | POST | Yes | 20/min | SSE streaming chat (MEM_SAVE, RAG, thinking tokens) |
+| `/ui/memory/save` | POST | Yes | 10/min | Save text to memory (validates content, session_id) |
+| `/ui/memory/recall` | POST | Yes | 30/min | Recall from memory (validates query, session_id) |
 
 ### Sessions
 
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/ui/session/new` | POST | Yes | Create new session |
-| `/ui/session/{id}` | GET | Yes | Get session data |
-| `/ui/session/{id}/history` | GET | Yes | Get session chat history |
-| `/ui/session/{id}` | DELETE | Yes | Delete session |
-| `/ui/sessions` | GET | Yes | List all sessions |
+| Endpoint | Method | Auth | Rate limit | Description |
+|----------|--------|------|-----------|-------------|
+| `/ui/session/new` | POST | Yes | default | Create new session |
+| `/ui/session/{id}` | GET | Yes | 30/min | Get session data (validates session_id) |
+| `/ui/session/{id}/history` | GET | Yes | 30/min | Get session chat history |
+| `/ui/session/{id}` | DELETE | Yes | 10/min | Delete session |
+| `/ui/sessions` | GET | Yes | default | List all sessions |
 
 ### Files
 
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/ui/upload` | POST | Yes | Upload document (session-isolated, indexed to user_knowledge) |
-| `/ui/files` | GET | Yes | List uploaded files |
-| `/ui/files/cleanup` | POST | Yes | Clean up temporary files |
+| Endpoint | Method | Auth | Rate limit | Description |
+|----------|--------|------|-----------|-------------|
+| `/ui/upload` | POST | Yes | 5/min | Upload document (validates filename, session-isolated) |
+| `/ui/files` | GET | Yes | default | List uploaded files |
+| `/ui/files/cleanup` | POST | Yes | 5/min | Clean up temporary files |
 
 **Upload:** Accepts .txt, .md, .pdf. Chunks at 1500/200 chars. Metadata generated without LLM (instant). Documents isolated to uploading session via session_id.
+
+## Encryption CLI Commands
+
+These are CLI commands (not HTTP endpoints):
+
+| Command | Description |
+|---------|-------------|
+| `./nexe encryption status` | Show encryption status of all storage components |
+| `./nexe encryption encrypt-all` | Migrate all existing data to encrypted format |
+| `./nexe encryption export-key` | Export master key (hex or base64, for backup) |
 
 ## OpenAI Compatibility
 
@@ -218,6 +242,7 @@ Compatible with tools that use OpenAI API format: Cursor, Continue, Zed, custom 
 | Rate limits | .env | NEXE_RATE_LIMIT_* variables |
 | Timeout | .env | NEXE_DEFAULT_MAX_TOKENS (default 4096) |
 | CORS origins | server.toml `[core.server]` | Allowed origins |
+| Encryption | .env | NEXE_ENCRYPTION_ENABLED (default false) |
 
 ## Quick Examples
 

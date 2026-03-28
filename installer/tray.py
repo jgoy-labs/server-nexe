@@ -157,12 +157,23 @@ class NexeTray(rumps.App):
             callback=self._quit,
         )
 
-        # Settings submenu with uninstall
+        # Settings submenu
         self.settings_menu = rumps.MenuItem(self.strings["settings"])
+
+        self.website_item = rumps.MenuItem(
+            self.strings["website"],
+            callback=self._open_website,
+        )
+        self.donate_item = rumps.MenuItem(
+            self.strings["donate"],
+            callback=self._open_donate,
+        )
         self.uninstall_item = rumps.MenuItem(
             self.strings["uninstall"],
             callback=self._uninstall,
         )
+        self.settings_menu[self.strings["website"]] = self.website_item
+        self.settings_menu[self.strings["donate"]] = self.donate_item
         self.settings_menu[self.strings["uninstall"]] = self.uninstall_item
 
         # Build menu
@@ -335,6 +346,12 @@ class NexeTray(rumps.App):
             log_dir = PROJECT_ROOT / "storage" / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
             subprocess.Popen(["open", str(log_dir)])
+
+    def _open_website(self, _sender):
+        webbrowser.open("https://server-nexe.com")
+
+    def _open_donate(self, _sender):
+        webbrowser.open("https://server-nexe.com/donate")
 
     def _uninstall(self, _sender):
         """Uninstall Nexe — delegates to tray_uninstaller."""

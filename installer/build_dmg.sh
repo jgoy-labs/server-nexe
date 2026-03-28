@@ -205,7 +205,8 @@ rm -rf "$PAYLOAD_TMP"
 # ── Step 5: Copy Python runtime (if bundled) ─────────────────────
 # The python/ and tcl-tk/ dirs + libpython3.12.dylib should already
 # exist in the app bundle from a previous build or from
-# dev-tools/build-python-bundle.sh. We don't rebuild them here.
+# installer/build-python-bundle.sh. We don't rebuild them here.
+# See docs/BUILDING.md for the full build flow.
 if [ ! -d "$RESOURCES/python" ]; then
     warn "No bundled Python runtime in app. Users will need system Python."
 fi

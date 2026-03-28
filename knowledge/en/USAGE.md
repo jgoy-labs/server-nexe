@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-usage-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Usage guide for server-nexe 0.8.2. Covers CLI commands (go, chat, memory, knowledge, status), Web UI features (i18n selector, loading indicator, RAG info panel, model sizes, upload overlay, backend fallback), MEM_SAVE automatic memory, document upload with session isolation, API usage examples (curl, Python), and practical use cases."
-tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases]
+abstract: "Usage guide for server-nexe 0.8.5 pre-release. Covers CLI commands (go, chat, memory, knowledge, status, encryption), Web UI features (i18n, loading indicator, RAG info panel, model sizes, upload overlay, backend fallback), MEM_SAVE automatic memory, document upload with session isolation, encryption commands, API usage examples (curl, Python), and practical use cases."
+tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption]
 chunk_size: 800
 priority: P1
 
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Usage Guide — server-nexe 0.8.2
+# Usage Guide — server-nexe 0.8.5 pre-release
 
 ## Starting the Server
 
@@ -42,6 +42,9 @@ On macOS with tray app installed, the server starts automatically at login.
 | `./nexe memory stats` | Memory statistics |
 | `./nexe knowledge ingest` | Index documents from knowledge/ folder |
 | `./nexe health` | Health check |
+| `./nexe encryption status` | Check encryption status |
+| `./nexe encryption encrypt-all` | Migrate data to encrypted format |
+| `./nexe encryption export-key` | Export master key for backup |
 
 ## Web UI
 
@@ -82,6 +85,24 @@ The model automatically extracts and saves facts from conversations:
 
 No extra commands needed. Works in both CLI and Web UI. Indicators: `[MEM:N]` badge shows count of saved facts.
 
+## Encryption
+
+Encryption at rest is opt-in. Enable it to encrypt your stored data:
+
+```bash
+# Check current status
+./nexe encryption status
+
+# Enable and migrate existing data
+export NEXE_ENCRYPTION_ENABLED=true
+./nexe encryption encrypt-all
+
+# Export master key (for backup — store securely!)
+./nexe encryption export-key
+```
+
+What gets encrypted: SQLite databases (memories.db via SQLCipher), chat sessions (.json → .enc), RAG document text (TextStore). Qdrant payloads already contain no text (vectors + IDs only).
+
 ## API Usage
 
 ### Chat (curl)
@@ -119,6 +140,7 @@ curl -X POST http://127.0.0.1:9119/v1/memory/store \
 3. **AI-assisted development:** OpenAI-compatible API works with Cursor, Continue, Zed. Point them to http://127.0.0.1:9119/v1.
 4. **Semantic search:** Use /v1/memory/search for similarity-based document retrieval without exact keyword matching.
 5. **Model experimentation:** Switch between MLX, llama.cpp, and Ollama backends to compare speed and quality.
+6. **Secure local AI:** Enable encryption at rest for sensitive data handling without any cloud dependency.
 
 ## Tips
 
@@ -126,3 +148,4 @@ curl -X POST http://127.0.0.1:9119/v1/memory/store \
 - **Slow first response:** Model loading takes time (10-60s). The loading indicator shows progress.
 - **Backend disconnected:** Server auto-falls back to the first available backend. Check with `./nexe status`.
 - **Large models:** 32B+ models need 32+ GB RAM and may take minutes to load. Timeout is 600s.
+- **Encryption:** Enable encryption early — migrating large datasets later takes time. Export and store the master key securely.

@@ -57,7 +57,7 @@ class WebUIModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="web_ui_module",
-            version="0.8.2",
+            version="0.8.5",
             description="Interficie web estil Ollama per demostrar sistema modular",
             author="Jordi Goy",
             module_type="web_interface",
@@ -70,6 +70,15 @@ class WebUIModule:
             return True
 
         try:
+            # Re-create SessionManager with crypto if available
+            try:
+                from core.lifespan import get_server_state
+                crypto = get_server_state().crypto_provider
+                if crypto:
+                    self.session_manager = SessionManager(crypto_provider=crypto)
+            except Exception:
+                pass  # Keep original SessionManager without crypto
+
             # Resolve API base URL
             self.api_base_url = self._resolve_api_base_url(context)
 

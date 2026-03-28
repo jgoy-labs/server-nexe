@@ -4,6 +4,8 @@ import SwiftUI
 
 struct InstallProgressView: View {
     @EnvironmentObject var engine: InstallerEngine
+    @State private var tick = false
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(spacing: 12) {
@@ -24,13 +26,14 @@ struct InstallProgressView: View {
             }
             .padding(.horizontal, 40)
 
-            // Llista de passos amb temps estimats
+            // Llista de passos amb temps real
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(engine.steps) { step in
-                    StepRow(step: step, lang: engine.lang)
+                    StepRow(step: step, lang: engine.lang, tick: tick)
                 }
             }
             .padding(.horizontal, 40)
+            .onReceive(timer) { _ in tick.toggle() }
 
             // Error
             if let error = engine.installError {
@@ -87,20 +90,7 @@ struct InstallProgressView: View {
 struct StepRow: View {
     let step: InstallStep
     let lang: Lang
-
-    // Temps estimats per cada pas
-    private var timeEstimate: String {
-        switch step.id {
-        case 1: return "~5s"
-        case 2: return "~30s"
-        case 3: return "~1-5 min"
-        case 4: return "~1s"
-        case 5: return "~5s"
-        case 6: return "~30s"
-        case 7: return "~30s"
-        default: return ""
-        }
-    }
+    let tick: Bool  // força re-render cada segon
 
     var body: some View {
         HStack(spacing: 10) {
@@ -127,8 +117,9 @@ struct StepRow: View {
                 .font(.subheadline)
                 .foregroundColor(step.status == .pending ? .secondary : .primary)
 
-            if step.status == .pending || step.status == .running {
-                Text(timeEstimate)
+            // Temps real (running: comptador viu, done: temps final)
+            if let elapsed = step.elapsed {
+                Text(elapsed)
                     .font(.caption2)
                     .foregroundColor(.secondary.opacity(0.6))
             }

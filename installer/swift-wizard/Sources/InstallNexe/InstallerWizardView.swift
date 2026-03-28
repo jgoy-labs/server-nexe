@@ -86,6 +86,17 @@ struct InstallerWizardView: View {
         } message: {
             Text(t("cancel_confirm"))
         }
+        .alert(t("existing_install_title"), isPresented: $engine.showExistingInstallAlert) {
+            Button(t("existing_install_overwrite"), role: .destructive) {
+                engine.confirmOverwrite()
+            }
+            Button(t("existing_install_change"), role: .cancel) {
+                engine.cancelOverwrite()
+                currentStep = .destination
+            }
+        } message: {
+            Text(t("existing_install_msg"))
+        }
     }
 
     private func t(_ key: String) -> String {

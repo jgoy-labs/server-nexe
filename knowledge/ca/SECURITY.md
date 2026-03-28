@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-security-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentació de seguretat de server-nexe 0.8.2. Cobreix autenticació API dual-key amb rotació, rate limiting (6 nivells), 6 detectors d'injecció (XSS, SQL, NoSQL, comandes, path traversal, LDAP), 69 patrons de jailbreak, capçaleres de seguretat OWASP (CSP, HSTS), logging d'auditoria RFC5424, sanitització d'entrada amb paràmetre context, logging d'IP real. Inclou resultats de les auditories consultoria v1+v2 (73+12 troballes, grau A) i checklist de seguretat."
-tags: [seguretat, autenticació, api-key, dual-key, rate-limiting, capçaleres, csp, injecció, jailbreak, sanititzador, auditoria, logging, rfc5424, consultoria]
+abstract: "Documentació de seguretat per a server-nexe 0.8.5 pre-release. Cobreix autenticació dual-key amb rotació, rate limiting (tots els endpoints), 6 detectors d'injecció amb normalització Unicode, 69 patrons de jailbreak, capçaleres de seguretat OWASP, logging d'auditoria RFC5424, validació d'input (validate_string_input a totes les rutes UI), sanitització de context RAG, encriptació at-rest (CryptoProvider AES-256-GCM, SQLCipher, sessions encriptades), resultats d'auditoria IA (v1+v2+mega-test), i checklist de seguretat."
+tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher]
 chunk_size: 800
 priority: P1
 
@@ -17,117 +17,229 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Seguretat — server-nexe 0.8.2
+# Seguretat — server-nexe 0.8.5 pre-release
 
-server-nexe està dissenyat per a entorns locals de confiança. Totes les dades queden al dispositiu. Sense telemetria, sense crides externes.
+server-nexe esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
 
-## Autenticació
+## Autenticacio
 
-**Sistema dual-key** amb suport de rotació:
+**Sistema dual-key** amb suport per a rotacio:
 - `NEXE_PRIMARY_API_KEY` — sempre activa, configurada a `.env`
-- `NEXE_SECONDARY_API_KEY` — clau amb període de gràcia per a rotació
-- Seguiment d'expiració: `NEXE_PRIMARY_KEY_EXPIRES`, `NEXE_SECONDARY_KEY_EXPIRES`
-- Validació: `secrets.compare_digest()` (comparació segura contra timing attacks)
-- Capçalera: `X-API-Key`
+- `NEXE_SECONDARY_API_KEY` — clau de gracia per a rotacio
+- Seguiment d'expiracio: `NEXE_PRIMARY_KEY_EXPIRES`, `NEXE_SECONDARY_KEY_EXPIRES`
+- Validacio: `secrets.compare_digest()` (comparacio segura contra timing attacks)
+- Capcalera: `X-API-Key`
 
-**Bootstrap token:** Token d'ús únic generat a l'arrencada. 128 bits d'entropia, persistent a SQLite, TTL de 30 minuts. Regeneració només des de localhost.
+**Bootstrap token:** Token d'un sol us generat a l'arrencada. Entropia de 128 bits, persistent a SQLite, TTL de 30 minuts. Regeneracio nomes des de localhost.
 
 ## Rate Limiting
 
-6 nivells configurables via `.env`:
+El rate limiting s'aplica a **tots els endpoints** — tant a l'API (`/v1/*`) com a la Web UI (`/ui/*`).
 
-| Nivell | Per defecte | Endpoints |
-|--------|-------------|-----------|
+### Endpoints de l'API (configurables via `.env`)
+
+| Variable | Per defecte | Endpoints |
+|----------|---------|-----------|
 | NEXE_RATE_LIMIT_CHAT | 60/min | /v1/chat/completions |
 | NEXE_RATE_LIMIT_MEMORY | 30/min | /v1/memory/* |
 | NEXE_RATE_LIMIT_RAG | 30/min | /v1/rag/* |
 | NEXE_RATE_LIMIT_UPLOAD | 10/min | /ui/upload |
-| NEXE_RATE_LIMIT_DEFAULT | 120/min | Tots els altres endpoints |
-| NEXE_RATE_LIMIT_GLOBAL | 100/min | Límit global |
+| NEXE_RATE_LIMIT_DEFAULT | 120/min | Resta d'endpoints |
+| NEXE_RATE_LIMIT_GLOBAL | 100/min | Limit global |
 
-Implementació: `RateLimitTracker` a `plugins/security/core/rate_limiting.py`.
+### Endpoints de la Web UI (fixats per endpoint)
 
-## Capçaleres de seguretat (OWASP)
+| Endpoint | Limit |
+|----------|-----------|
+| POST /ui/chat | 20/minut |
+| POST /ui/memory/save | 10/minut |
+| POST /ui/memory/recall | 30/minut |
+| POST /ui/upload | 5/minut |
+| POST /ui/files/cleanup | 5/minut |
+| GET /ui/session/{id} | 30/minut |
+| GET /ui/session/{id}/history | 30/minut |
+| DELETE /ui/session/{id} | 10/minut |
+
+Implementacio: `slowapi` amb decorador `@limiter.limit()` a cada endpoint. `RateLimitTracker` a `plugins/security/core/rate_limiting.py`.
+
+## Capcaleres de seguretat (OWASP)
 
 Aplicades via `core/security_headers.py` i middleware:
 
-- `Content-Security-Policy`: script-src 'self' (sense scripts inline — i18n usa l'atribut `data-nexe-lang` en comptes)
+- `Content-Security-Policy`: script-src 'self' (sense scripts inline — i18n utilitza l'atribut `data-nexe-lang` en lloc d'inline)
 - `Strict-Transport-Security`: max-age=31536000
 - `X-Content-Type-Options`: nosniff
 - `X-Frame-Options`: DENY
-- `X-XSS-Protection`: 0 (obsolet, s'usa CSP en comptes)
+- `X-XSS-Protection`: 0 (obsolet, s'utilitza CSP)
 - `Referrer-Policy`: strict-origin-when-cross-origin
 - `Permissions-Policy`: restringit
 
-## Validació d'entrada i detecció d'injeccions
+## Validacio d'input
 
-**6 detectors d'injecció** a `plugins/security/core/injection_detectors.py`:
-1. Detector XSS
-2. Detector d'injecció SQL
-3. Detector d'injecció NoSQL
-4. Detector d'injecció de comandes
+### Pipeline de l'API (/v1/*)
+
+L'endpoint `POST /v1/chat/completions` valida i sanititza l'input a traves del seu propi pipeline.
+
+### Pipeline de la Web UI (/ui/*)
+
+**Tots els endpoints de la Web UI** utilitzen `validate_string_input()` per a la validacio d'input:
+
+- `/ui/chat` — valida el contingut del missatge
+- `/ui/memory/save` — valida content, session_id
+- `/ui/memory/recall` — valida query, session_id
+- `/ui/session/{id}` (GET/DELETE) — valida session_id (proteccio contra path traversal)
+- `/ui/upload` — valida el nom del fitxer (proteccio contra path traversal)
+
+`validate_string_input()` accepta un parametre `context`:
+- `context="chat"` — desactiva els detectors d'injeccio de comandes i LDAP (massa falsos positius en conversa normal)
+- `context="path"` — validacio estricta per a parametres de ruta (session_id, filename)
+
+### Sanititzacio de context RAG
+
+`_sanitize_rag_context()` s'aplica al context RAG abans d'injectar-lo al prompt del LLM via la Web UI. Aixo filtra patrons d'injeccio dels documents recuperats i les entrades de memoria, evitant que contingut emmagatzemat s'utilitzi com a vector d'atac.
+
+**Consistencia del pipeline:** A partir de la v0.8.5, l'API i la Web UI comparteixen les mateixes capes de seguretat — validacio d'input, sanititzacio RAG i rate limiting s'apliquen de manera consistent a les dues interficies.
+
+## Deteccio d'injeccions
+
+**6 detectors d'injeccio** a `plugins/security/core/injection_detectors.py`:
+1. Detector de XSS
+2. Detector d'injeccio SQL
+3. Detector d'injeccio NoSQL
+4. Detector d'injeccio de comandes
 5. Detector de path traversal
-6. Detector d'injecció LDAP
+6. Detector d'injeccio LDAP
 
-**Sanitització conscient del context:** `validate_string_input()` accepta un paràmetre `context` (p. ex., `context="chat"`) que desactiva els detectors d'injecció de comandes i LDAP per a missatges de xat (massa falsos positius en conversa normal).
+**Normalitzacio Unicode:** Els 6 detectors apliquen `unicodedata.normalize('NFKC', text)` abans del matching de patrons. Aixo preveu bypasses via homoglifs Unicode o variacions d'encoding (p. ex., caracters fullwidth, formes compostes vs descompostes).
 
-**69 patrons de jailbreak** a `plugins/security/sanitizer/`: Coincidència de patrons multilingüe per a intents d'injecció de prompt.
+**69 patrons de jailbreak** a `plugins/security/sanitizer/`: Matching de patrons multilingue per a intents d'injeccio de prompts.
 
-**Límit de mida de petició:** 100 MB de cos de petició màxim (protecció contra DoS).
+**Limit de mida de peticio:** Cos de peticio maxim de 100MB (proteccio contra DoS).
+
+**Truncament de logs:** Els missatges d'usuari es truncen a 80 caracters a la sortida de logs per prevenir injeccio de logs i reduir el volum.
 
 ## Logging d'auditoria
 
-**Conforme a RFC5424** logging d'events de seguretat via `plugins/security/security_logger/`:
-- Ruta de logs: `storage/system-logs/security/`
-- Events: errors d'autenticació, activacions de rate limit, intents d'injecció, accions d'administració
-- Logging d'IP real: `request.client.host` (corregit a la troballa F-013 de la consultoria, abans loguejava un placeholder)
+Logging d'events de seguretat **compatible amb RFC5424** via `plugins/security/security_logger/`:
+- Ruta dels logs: `storage/system-logs/security/`
+- Events: errors d'autenticacio, activacions de rate limit, intents d'injeccio, accions d'administrador
+- Logging d'IP real: `request.client.host`
+- El logging en temps d'execucio utilitza `logger.info()` en lloc de `print()` (migrat a la v0.8.5)
+
+## Encriptacio at-rest (opt-in)
+
+**Afegida a la v0.8.5.** L'encriptacio at-rest es opt-in i recentment afegida. S'ha testejat (68 tests) pero encara no ha passat per us en produccio amb usuaris reals fora del desenvolupament.
+
+### CryptoProvider
+
+- Algorisme: **AES-256-GCM** amb derivacio de claus **HKDF-SHA256**
+- Cadena de gestio de claus: OS Keyring (macOS Keychain) -> variable d'entorn `NEXE_MASTER_KEY` -> fitxer `~/.nexe/master.key` (permisos 600)
+- Claus derivades per proposit: `"sqlite"`, `"sessions"`, `"text_store"`, `"backup"`
+- Implementacio: `core/crypto/provider.py`
+
+### Que s'encripta
+
+| Component | Metode | Detalls |
+|-----------|--------|---------|
+| Base de dades SQLite (memories.db) | SQLCipher | Migracio automatica de text pla a encriptat |
+| Sessions de xat | .json -> .enc | AES-256-GCM, nonce(12) + ciphertext + tag(16) |
+| Text RAG (documents) | TextStore | Text emmagatzemat a SQLite (opcionalment SQLCipher), no a Qdrant |
+| Payloads de Qdrant | Nomes vectors | Els payloads contenen nomes `entry_type` i `original_id` — sense text |
+
+### Com activar-ho
+
+```bash
+# Activar encriptacio
+export NEXE_ENCRYPTION_ENABLED=true
+
+# Comprovar l'estat
+./nexe encryption status
+
+# Migrar dades existents
+./nexe encryption encrypt-all
+
+# Exportar la clau mestra (per a copia de seguretat)
+./nexe encryption export-key
+```
+
+### Compatibilitat enrere
+
+Tot es compatible enrere. Si l'encriptacio no esta activada, el comportament es identic a les versions anteriors. Zero canvis per als usuaris que no l'activin.
 
 ## Privacitat
 
 - Zero telemetria, zero crides a APIs externes
 - Totes les dades (converses, documents, embeddings, models) emmagatzemades localment
-- Vectors de Qdrant emmagatzemats sense encriptar al disc (acceptable per a dispositiu local de confiança)
-- Sense cookies, sense seguiment, sense analítiques
+- Els payloads de Qdrant ja no contenen text (nomes vectors + IDs)
+- Encriptacio at-rest opcional per a SQLite, sessions i text de documents
+- Sense cookies, sense tracking, sense analitiques
 
 ## Auditories de seguretat
 
-### Consultoria v1 (març 2026)
-- 73 troballes en 11 àrees
-- 40 correccions implementades
-- Grau: B+ a A-
+Totes les auditories de seguretat les realitzen sessions autonomes d'IA (Claude) com a part del proces de desenvolupament. El desenvolupador llanca sessions de revisio dedicades que analitzen codi, executen tests i generen informes estructurats amb troballes. No son auditories externes d'empreses de seguretat.
 
-### Consultoria v2 (març 2026)
+### Auditoria IA v1 (marc 2026)
+- 73 troballes en 11 arees
+- 40 correccions implementades
+- Nota: B+ -> A-
+
+### Auditoria IA v2 (marc 2026)
 - 12 troballes addicionals
 - Totes resoltes
-- 229 tests fallant a 0
-- Grau: A
+- 229 tests fallant -> 0
+- Nota: A
+
+### Mega-Test v1 Pre-Release (marc 2026)
+- Auditoria autonoma de 4 fases: baseline (298 tests, 97.4% cobertura), seguretat (23 troballes), funcional (158 tests, 91.1%), GO/NO-GO
+- 23 troballes (1 critica, 6 altes, 7 mitjanes, 7 baixes)
+- Veredicte: **GO WITH CONDITIONS**
+- Correccions aplicades: validacio d'input UI, sanititzacio de context RAG, rate limiting, CVEs de dependencies
+
+### Mega-Test v2 Post-Correccions (marc 2026)
+- Mateixa metodologia de 4 fases, re-executada despres d'aplicar les correccions de la v1
+- 10 troballes (vs 23 a la v1, **57% de reduccio**)
+- 7 correccions addicionals aplicades: validacio d'endpoints de memoria (CRITIC), path traversal de sessions, validacio de noms de fitxer, rate limiting a tots els endpoints UI, normalitzacio Unicode als detectors d'injeccio, migracio print()->logger
+- 3213 tests passats, 0 fallats
+- Veredicte: **GO WITH CONDITIONS** (millorat)
 
 ### Correccions clau de les auditories
-- Prefix del router establert al constructor (era codi mort després del constructor — bug de FastAPI)
-- Logging d'IP real en errors d'autenticació (F-013)
-- Paràmetre context del sanititzador per reduir falsos positius al xat (F-005)
-- `repr(e)` en comptes de `str(e)` per a excepcions httpx (bug de cadena buida)
+- Validacio d'input als endpoints de memoria (NF-001 — CRITIC)
+- Proteccio contra path traversal a sessions (NF-002)
+- Validacio de noms de fitxer a upload (NF-003)
+- Rate limiting a tots els endpoints UI (NF-004)
+- Normalitzacio Unicode als 6 detectors d'injeccio (NF-005/006)
+- Prefix del router establert al constructor (bug de FastAPI)
+- Logging d'IP real en errors d'autenticacio (F-013)
+- Parametre context al sanitizer per reduir falsos positius al xat (F-005)
+- `repr(e)` en lloc de `str(e)` per a excepcions httpx (bug de string buida)
 - Docker USER no-root (F-030)
-- Eliminació de codi mort (F-006, F-007)
+- Migracio print() -> logger.info() per al codi en temps d'execucio
+- CVEs de dependencies corregides (pypdf, starlette)
+
+### Nota d'honestedat
+
+Aquestes auditories IA troben molts problemes pero **no son exhaustives** — hi ha sens dubte vulnerabilitats i bugs que no s'han detectat. La cobertura de tests (97.4% baseline, 91.1% funcional) es bona pero no es del 100%. El sistema d'encriptacio es nou i no ha estat provat en batalla en produccio amb usuaris reals encara. Aixo es un projecte personal de codi obert revisat per IA, no un producte empresarial auditat formalment.
 
 ## Riscos acceptats
 
-- **Qdrant sense encriptar:** Vectors emmagatzemats en text pla al disc. Mitigació: accés només local, encriptació de disc (FileVault/LUKS).
-- **Limitacions dels models locals:** Els models poden seguir instruccions d'injecció de prompt. Mitigació: sanititzador + patrons de jailbreak.
-- **Disseny mono-usuari:** Sense aïllament multi-usuari. Una API key = accés complet.
-- **Sense TLS per defecte:** HTTP a localhost. Usa un reverse proxy (nginx/caddy) per HTTPS si exposes a la xarxa.
+- **Limitacions dels models locals:** Els models poden seguir instruccions d'injeccio de prompts. Mitigacio: sanitizer + patrons de jailbreak + normalitzacio Unicode.
+- **Disseny per a un sol usuari:** Sense aillament multi-usuari. Una clau API = acces complet.
+- **Sense TLS per defecte:** HTTP a localhost. Utilitza un reverse proxy (nginx/caddy) per a HTTPS si exposes a la xarxa.
+- **L'encriptacio es opt-in:** No activada per defecte. Els usuaris han d'activar-la explicitament.
+- **Sistema d'encriptacio nou:** CryptoProvider s'ha afegit recentment i no ha passat per us en produccio amb usuaris externs.
 
 ## Checklist de seguretat
 
-- [ ] Fitxer `.env` amb permisos restringits (chmod 600)
-- [ ] API keys fortes (32+ caràcters hexadecimals)
-- [ ] Port de Qdrant (6333) no exposat a la xarxa
-- [ ] Port del servidor (9119) enllaçat a 127.0.0.1 (no 0.0.0.0)
-- [ ] Encriptació de disc activada (FileVault a macOS, LUKS a Linux)
-- [ ] Rate limiting configurat adequadament
-- [ ] Actualitzacions regulars aplicades
-- [ ] Logs de seguretat revisats periòdicament
+- [ ] El fitxer `.env` te permisos restringits (chmod 600)
+- [ ] Les claus API son fortes (32+ caracters hexadecimals)
+- [ ] El port de Qdrant (6333) no esta exposat a la xarxa
+- [ ] El port del servidor (9119) esta vinculat a 127.0.0.1 (no 0.0.0.0)
+- [ ] L'encriptacio de disc esta activada (FileVault a macOS, LUKS a Linux)
+- [ ] El rate limiting esta configurat adequadament
+- [ ] L'encriptacio at-rest esta activada si es gestionen dades sensibles (`NEXE_ENCRYPTION_ENABLED=true`)
+- [ ] Les actualitzacions regulars s'apliquen
+- [ ] Els logs de seguretat es revisen periodicament
 
-## Reportar vulnerabilitats
+## Informar de vulnerabilitats
 
-Reporta problemes de seguretat via GitHub: https://github.com/jgoy-labs/server-nexe/security/advisories
+Informeu de problemes de seguretat via GitHub: https://github.com/jgoy-labs/server-nexe/security/advisories

@@ -68,6 +68,7 @@ async def store_document(
   metadata: Optional[Dict[str, Any]] = None,
   doc_id: Optional[str] = None,
   ttl_seconds: Optional[int] = None,
+  text_store=None,
 ) -> str:
   """
   Emmagatzema text amb embedding a una collection.
@@ -99,21 +100,40 @@ async def store_document(
   if ttl_seconds is not None:
     expires_at = now + timedelta(seconds=ttl_seconds)
 
-  final_metadata = {
-    "text": text,
-    "created_at": now.isoformat(),
-    "expires_at": expires_at.isoformat() if expires_at else None,
-    **(metadata or {}),
-  }
+  created_at_iso = now.isoformat()
+  expires_at_iso = expires_at.isoformat() if expires_at else None
 
   loop = asyncio.get_running_loop()
+
+  if text_store:
+    # Text goes to SQLite, Qdrant only gets vectors + IDs
+    text_store.put(
+      doc_id=doc_id, collection=collection, text=text,
+      metadata=metadata,
+      created_at=created_at_iso, expires_at=expires_at_iso,
+    )
+    qdrant_payload = {
+      "original_id": doc_id,
+      "created_at": created_at_iso,
+      "expires_at": expires_at_iso,
+      # No text in Qdrant payload
+    }
+  else:
+    # Legacy mode: text in Qdrant payload (backwards compatible)
+    qdrant_payload = {
+      "original_id": doc_id,
+      "text": text,
+      "created_at": created_at_iso,
+      "expires_at": expires_at_iso,
+      **(metadata or {}),
+    }
 
   def _store():
     uuid_id = hex_to_uuid(doc_id)
     point = PointStruct(
       id=uuid_id,
       vector=embedding,
-      payload={"original_id": doc_id, **final_metadata},
+      payload=qdrant_payload,
     )
     qdrant.upsert(collection_name=collection, points=[point])
     logger.debug("Stored document %s in collection %s (ttl=%s)", doc_id, collection, ttl_seconds)
@@ -136,6 +156,7 @@ async def search_documents(
   threshold: float = 0.0,
   filter_metadata: Optional[Dict[str, Any]] = None,
   include_expired: bool = False,
+  text_store=None,
 ) -> List[SearchResult]:
   """
   Cerca per similitud semàntica.
@@ -192,12 +213,13 @@ async def search_documents(
         if expires_at < now_iso:
           continue
 
+      doc_id = r.payload.get("original_id", str(r.id))
       search_results.append(
         SearchResult(
-          id=r.payload.get("original_id", str(r.id)),
+          id=doc_id,
           score=r.score,
           collection=collection,
-          text=r.payload.get("text"),
+          text=r.payload.get("text"),  # May be None if text_store is used
           metadata={
             k: v for k, v in r.payload.items() if k not in ("text", "original_id")
           },
@@ -211,6 +233,15 @@ async def search_documents(
 
   result = await loop.run_in_executor(executor, _search)
 
+  # Fill text from TextStore if available and text is missing from payload
+  if text_store and result:
+    ids_needing_text = [r.id for r in result if not r.text]
+    if ids_needing_text:
+      texts = text_store.get_many(ids_needing_text, collection)
+      for sr in result:
+        if not sr.text and sr.id in texts:
+          sr.text = texts[sr.id]["text"]
+
   ops, _ = _get_metrics()
   if ops:
     ops.labels(operation="recall").inc()
@@ -222,6 +253,7 @@ async def get_document(
   executor: ThreadPoolExecutor,
   doc_id: str,
   collection: str,
+  text_store=None,
 ) -> Optional[Document]:
   """Get a document by ID."""
   loop = asyncio.get_running_loop()
@@ -247,15 +279,25 @@ async def get_document(
       if payload.get("expires_at"):
         expires_at = datetime.fromisoformat(payload["expires_at"])
 
+      # Get text from TextStore if available, fallback to payload
+      text = payload.get("text", "")
+      doc_metadata = {
+        k: v
+        for k, v in payload.items()
+        if k not in ("text", "original_id", "created_at", "expires_at")
+      }
+
+      if text_store and not text:
+        stored = text_store.get(doc_id, collection)
+        if stored:
+          text = stored["text"]
+          doc_metadata = stored.get("metadata", doc_metadata)
+
       return Document(
         id=payload.get("original_id", doc_id),
-        text=payload.get("text", ""),
+        text=text,
         collection=collection,
-        metadata={
-          k: v
-          for k, v in payload.items()
-          if k not in ("text", "original_id", "created_at", "expires_at")
-        },
+        metadata=doc_metadata,
         created_at=created_at,
         expires_at=expires_at,
       )
@@ -271,6 +313,7 @@ async def delete_document(
   executor: ThreadPoolExecutor,
   doc_id: str,
   collection: str,
+  text_store=None,
 ) -> bool:
   """Elimina un document."""
   loop = asyncio.get_running_loop()
@@ -289,6 +332,8 @@ async def delete_document(
   result = await loop.run_in_executor(executor, _delete)
 
   if result:
+    if text_store:
+      text_store.delete(doc_id, collection)
     ops, _ = _get_metrics()
     if ops:
       ops.labels(operation="delete").inc()

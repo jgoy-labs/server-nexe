@@ -16,10 +16,13 @@ import asyncio
 import logging
 import os as _os
 import re as _re
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request as FastAPIRequest
 from fastapi.responses import StreamingResponse
+from core.dependencies import limiter
 
 from plugins.web_ui_module.messages import get_message
+from plugins.security.core.input_sanitizers import validate_string_input
+from core.endpoints.chat_sanitization import _sanitize_rag_context
 
 def _get_memory_helper():
     """Lazy resolve via routes module so test patches work."""
@@ -42,14 +45,18 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     #    multi-engine, streaming
 
     @router.post("/chat")
-    async def chat(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
-        """Endpoint de xat amb streaming i deteccio d'intencions de memoria"""
-        message = request.get("message", "")
-        session_id = request.get("session_id")
-        stream = request.get("stream", False)
+    @limiter.limit("20/minute")
+    async def chat(request: FastAPIRequest, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
+        """Chat endpoint with streaming and memory intent detection"""
+        message = body.get("message", "")
+        session_id = body.get("session_id")
+        stream = body.get("stream", False)
 
         if not message:
             raise HTTPException(status_code=400, detail=get_message(None, "webui.chat.message_required"))
+
+        # Security: validate input (XSS, SQL injection, path traversal)
+        message = validate_string_input(message, max_length=8000, context="chat")
 
         session = session_mgr.get_or_create_session(session_id)
         session.add_message("user", message)
@@ -76,11 +83,11 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 )
                 if result["success"]:
                     _safe_content = str(content_to_save).replace("\x00", "").replace("]", "")[:200]
-                    response_text = f"Guardat a la memoria: \"{_safe_content}\"\n\nHo recordare per a futures converses.\x00[MEM]\x00"
+                    response_text = f"Saved to memory: \"{_safe_content}\"\n\nI'll remember this for future conversations.\x00[MEM]\x00"
                 else:
-                    response_text = f"No s'ha pogut guardar: {result.get('message', 'Error desconegut')}"
+                    response_text = f"Could not save: {result.get('message', 'Unknown error')}"
             else:
-                response_text = "Que vols que guardi? Escriu el que vols recordar."
+                response_text = "What do you want me to remember? Write what you want to save."
             memory_action = "save"
 
         elif intent == "delete":
@@ -116,8 +123,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
                 module_manager = get_server_state().module_manager
                 # Prioritzar model/backend del request (selector UI) sobre env vars
-                model_name = request.get("model") or os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
-                preferred_engine = (request.get("backend") or os.getenv("NEXE_MODEL_ENGINE", "auto")).lower()
+                model_name = body.get("model") or os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
+                preferred_engine = (body.get("backend") or os.getenv("NEXE_MODEL_ENGINE", "auto")).lower()
 
                 # Log available modules
                 available_modules = [m.name for m in module_manager.registry.list_modules()]
@@ -161,7 +168,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
                     try:
                         # Resoldre ruta local del model si ve del selector UI
-                        if request.get("model"):
+                        if body.get("model"):
                             from core.lifespan import get_server_state as _gss
                             models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
                             if not models_dir.is_absolute():
@@ -239,8 +246,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     document_context += f"[Document complet: ~{est_pages_total} pagines]\n\n"
                                 document_context += f"{doc_content}\n"
 
-                            # Sanitize document context (same as RAG context)
-                            document_context = _re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', document_context)
+                            # Sanitize document context (prompt injection + control chars)
+                            document_context = _sanitize_rag_context(document_context)
                             logger.info(f"Using attached document: {attached_doc['filename']} (parts {shown}/{total_chunks}, {len(doc_content)} chars)")
 
                         # 3. Get Memory Context (RAG) - SEMPRE buscar, no nomes amb patterns
@@ -249,17 +256,17 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         _rag_items = []  # (collection, score) tuples for weight display
                         if not attached_doc:
                             try:
-                                _active_colls = request.get("rag_collections")
+                                _active_colls = body.get("rag_collections")
                                 recall_result = await memory_helper.recall_from_memory(message, limit=5, collections=_active_colls, session_id=session.id)
                                 if recall_result["success"] and recall_result["results"]:
-                                    # Filtrar per score minim (configurable, default 0.30)
-                                    rag_threshold = float(request.get("rag_threshold", 0.30))
+                                    # Filter by minimum score (configurable, default 0.30)
+                                    rag_threshold = float(body.get("rag_threshold", 0.30))
                                     all_scores = [(r.get('metadata', {}).get('source_collection', '?'), r.get('score', 0)) for r in recall_result["results"]]
-                                    logger.info(f"RAG pre-filtre: {len(recall_result['results'])} resultats, threshold={rag_threshold}, scores={all_scores}")
+                                    logger.info("RAG pre-filter: %s results, threshold=%s, scores=%s", len(recall_result['results']), rag_threshold, all_scores)
                                     relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
                                     if relevant:
                                         rag_count = len(relevant)
-                                        # Separar per col·leccio: docs sistema, docs tecnics, memoria
+                                        # Separate by collection: system docs, technical docs, memory
                                         doc_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'nexe_documentation']
                                         knowledge_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'user_knowledge']
                                         memory_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') not in ('user_knowledge', 'nexe_documentation')]
@@ -283,11 +290,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             rag_context += f"\n\n[{_labels[2]}]\n"
                                             for item in memory_items:
                                                 rag_context += f"- {item['content']}\n"
-                                        # Sanitize RAG context: remove control chars and truncate
-                                        rag_context = _re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', rag_context)
-                                        if len(rag_context) > 8000:
-                                            rag_context = rag_context[:8000]
-                                        logger.info(f"RAG: {len(relevant)} memories relevants (score >= {rag_threshold})")
+                                        # Sanitize RAG context (prompt injection + control chars + truncate)
+                                        rag_context = _sanitize_rag_context(rag_context)
+                                        logger.info("RAG: %s relevant memories (score >= %s)", len(relevant), rag_threshold)
                                         for item in relevant:
                                             score = item.get('score', 0)
                                             col = item.get('metadata', {}).get('source_collection', '?')
@@ -423,12 +428,12 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 if _compacted:
                                     yield f"\x00[COMPACT:{int(session.compaction_count)}]\x00"
 
-                                # Comprovar si el model esta carregat (Ollama, MLX, llama.cpp)
+                                # Check if model is loaded (Ollama, MLX, llama.cpp)
                                 if hasattr(engine, 'is_model_loaded'):
                                     try:
                                         loaded = await engine.is_model_loaded(model_name)
                                         if not loaded:
-                                            logger.info("Model %s no carregat — carregant... [%s]", model_name, engine_name)
+                                            logger.info("Model %s not loaded — loading... [%s]", model_name, engine_name)
                                             yield f"\x00[MODEL_LOADING:{_safe_model}|{engine_name}]\x00"
                                     except Exception as e:
                                         logger.debug("Model loaded check failed for %s: %s", model_name, e)
@@ -643,7 +648,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         continue
 
                 if not response_text:
-                    response_text = "Error: Cap motor d'IA disponible (prova iniciar Ollama amb 'ollama serve')"
+                    response_text = "Error: No AI engine available (try starting Ollama with 'ollama serve')"
             except Exception as e:
                 logger.error(f"Error calling LLM: {e}")
                 response_text = f"Error: {str(e)}"
@@ -691,7 +696,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         session_mgr._save_session_to_disk(session)
 
         # AUTO-SAVE: guarda missatge usuari directament (sense LLM)
-        if response_text and not response_text.startswith("Error:") and not response_text.startswith("Que vols"):
+        if response_text and not response_text.startswith("Error:") and not response_text.startswith("What do you want"):
             try:
                 save_result = await memory_helper.auto_save(
                     user_message=message,

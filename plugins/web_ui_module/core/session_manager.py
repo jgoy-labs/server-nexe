@@ -71,7 +71,7 @@ class ChatSession:
         self.last_activity = datetime.now(timezone.utc)
 
     def get_next_chunk(self) -> Optional[Dict[str, any]]:
-        """Obtenir el següent chunk del document adjuntat"""
+        """Get the next chunk from the attached document"""
         if not self.attached_document:
             return None
 
@@ -184,13 +184,13 @@ class ChatSession:
 
 class SessionManager:
     """
-    Gestor de sessions de xat.
+    Chat session manager.
 
-    Característiques:
-    - Múltiples sessions simultànies (memòria RAM)
-    - Historial per sessió
-    - Context de fitxers per sessió
-    - Cleanup automàtic de sessions inactives (futur)
+    Features:
+    - Multiple simultaneous sessions (in-memory)
+    - Per-session history
+    - Per-session file context
+    - Automatic cleanup of inactive sessions (future)
     """
 
     _SAFE_ID = re.compile(r'^[a-zA-Z0-9_-]+$')
@@ -202,48 +202,84 @@ class SessionManager:
             raise ValueError(f"Invalid session_id: {session_id!r}")
         return session_id
 
-    def __init__(self, storage_path: str = "storage/sessions"):
+    def __init__(self, storage_path: str = "storage/sessions", crypto_provider=None):
         self._storage_path = Path(storage_path)
         self._storage_path.mkdir(parents=True, exist_ok=True)
+        self._crypto = crypto_provider
         self._sessions: Dict[str, ChatSession] = {}
         self._load_sessions()
 
     def _load_sessions(self):
-        """Carregar sessions del disc"""
+        """Load sessions from disk (encrypted .enc and/or plain .json)."""
         try:
             count = 0
-            for file_path in self._storage_path.glob("*.json"):
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
+
+            # Load encrypted sessions
+            if self._crypto:
+                for file_path in self._storage_path.glob("*.enc"):
+                    try:
+                        data_bytes = self._crypto.decrypt(file_path.read_bytes())
+                        data = json.loads(data_bytes)
                         session = ChatSession.from_dict(data)
                         self._sessions[session.id] = session
                         count += 1
-                except Exception as e:
-                    logger.warning(f"Error loading session {file_path}: {e}")
-            logger.info(f"Loaded {count} sessions from disk")
+                    except Exception as e:
+                        logger.warning("Error loading encrypted session %s: %s", file_path.name, e)
+
+                # Migrate plain .json to .enc
+                for file_path in self._storage_path.glob("*.json"):
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        session = ChatSession.from_dict(data)
+                        self._sessions[session.id] = session
+                        self._save_session_to_disk(session)  # saves as .enc
+                        file_path.unlink()  # remove plain .json
+                        count += 1
+                        logger.info("Migrated session %s from .json to .enc", session.id)
+                    except Exception as e:
+                        logger.warning("Error migrating session %s: %s", file_path.name, e)
+            else:
+                # Plain mode: load .json only
+                for file_path in self._storage_path.glob("*.json"):
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            session = ChatSession.from_dict(data)
+                            self._sessions[session.id] = session
+                            count += 1
+                    except Exception as e:
+                        logger.warning("Error loading session %s: %s", file_path.name, e)
+
+            logger.info("Loaded %d sessions from disk", count)
         except Exception as e:
-            logger.error(f"Failed to load sessions: {e}")
+            logger.error("Failed to load sessions: %s", e)
 
     def _save_session_to_disk(self, session: ChatSession):
-        """Save session to disk."""
+        """Save session to disk (encrypted if crypto available, plain otherwise)."""
         self._validate_session_id(session.id)
         try:
-            file_path = self._storage_path / f"{session.id}.json"
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(session.to_dict(), f, indent=2, ensure_ascii=False)
+            if self._crypto:
+                file_path = self._storage_path / f"{session.id}.enc"
+                plaintext = json.dumps(session.to_dict(), ensure_ascii=False).encode('utf-8')
+                file_path.write_bytes(self._crypto.encrypt(plaintext))
+            else:
+                file_path = self._storage_path / f"{session.id}.json"
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(session.to_dict(), f, indent=2, ensure_ascii=False)
         except Exception as e:
-            logger.error(f"Failed to save session {session.id}: {e}")
+            logger.error("Failed to save session %s: %s", session.id, e)
 
     def _delete_session_from_disk(self, session_id: str):
-        """Delete session file from disk."""
+        """Delete session file from disk (.enc or .json)."""
         self._validate_session_id(session_id)
         try:
-            file_path = self._storage_path / f"{session_id}.json"
-            if file_path.exists():
-                file_path.unlink()
+            for ext in (".enc", ".json"):
+                file_path = self._storage_path / f"{session_id}{ext}"
+                if file_path.exists():
+                    file_path.unlink()
         except Exception as e:
-            logger.error(f"Failed to delete session file {session_id}: {e}")
+            logger.error("Failed to delete session file %s: %s", session_id, e)
 
     def create_session(self, session_id: str = None) -> ChatSession:
         """Create a new chat session."""
@@ -296,13 +332,13 @@ class SessionManager:
 
     def cleanup_inactive(self, max_age_hours: int = 24) -> int:
         """
-        Netejar sessions inactives.
+        Clean up inactive sessions.
 
         Args:
-            max_age_hours: Màxim temps d'inactivitat en hores
+            max_age_hours: Maximum inactivity time in hours
 
         Returns:
-            Nombre de sessions eliminades
+            Number of removed sessions
         """
         cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
         expired_ids = [

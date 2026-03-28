@@ -32,7 +32,7 @@ MODULE_NAME = "security"
 
 MODULE_METADATA = {
     "name": MODULE_NAME,
-    "version": "0.8.2",
+    "version": "0.8.5",
     "description": "Security scanning and validation module",
     "routers": ["router_public"],
     "auto_discover": True

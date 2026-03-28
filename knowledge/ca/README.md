@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-overview
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Visió general de server-nexe 0.8.2, servidor IA local amb memòria persistent RAG. Cobreix què és, backends (MLX, llama.cpp, Ollama), funcionalitats (MEM_SAVE, i18n, Docker, aïllament per sessió), arquitectura, 17 models disponibles, stack tecnològic, mètodes d'instal·lació (wizard SwiftUI, CLI, Docker) i suport actual de plataformes."
-tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, docker, models, installacio, arquitectura, funcionalitats, ollama, mlx, llama-cpp]
+abstract: "Visio general de server-nexe 0.8.5 pre-release, un servidor d'IA local amb memoria RAG persistent. Cobreix que es, backends (MLX, llama.cpp, Ollama), funcionalitats (MEM_SAVE, i18n, Docker, aillament de sessions, encriptacio at-rest), arquitectura, 17 models disponibles, stack tecnologic, metodes d'instal·lacio, documentacio AI-ready i suport de plataformes actual."
+tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready]
 chunk_size: 800
 priority: P1
 
@@ -17,112 +17,124 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# server-nexe 0.8.2 — Servidor IA Local amb Memòria Persistent
+# server-nexe 0.8.5 pre-release — Servidor d'IA local amb memoria persistent
 
-**Versió:** 0.8.2
+**Versio:** 0.8.5 pre-release
 **Port per defecte:** 9119
 **Autor:** Jordi Goy (Barcelona)
-**Llicència:** Apache 2.0
-**Plataformes:** macOS (testat), Linux (parcial), Docker (suportat)
+**Llicencia:** Apache 2.0
+**Plataformes:** macOS (testejat), Linux (parcial), Docker (suportat)
 **Web:** https://server-nexe.org | https://server-nexe.com
 
-## Què és server-nexe
+## Que es server-nexe
 
-server-nexe és un servidor d'IA local amb memòria persistent via RAG (Retrieval-Augmented Generation). Corre completament al dispositiu de l'usuari. Sense cloud, sense telemetria, sense crides a APIs externes. Les converses, documents i embeddings mai surten del dispositiu.
+server-nexe es un servidor d'IA local amb memoria persistent via RAG (Retrieval-Augmented Generation). S'executa completament a la maquina de l'usuari. Sense nuvol, sense telemetria, sense crides a APIs externes. Les converses, documents i embeddings no surten mai del dispositiu.
 
-NO és npm nexe (un compilador de Node.js). NO és un producte de servidor Windows. NO és un substitut d'Ollama — pot usar Ollama com un dels seus backends.
+NO es npm nexe (un compilador de Node.js). NO es un producte de servidor Windows. NO es un substitut d'Ollama — pot utilitzar Ollama com un dels seus backends.
 
 ## Capacitats principals
 
-1. **100% Local i Privat** — Tota la inferència, memòria i emmagatzematge passen al dispositiu. Zero dependència del cloud.
-2. **Memòria RAG Persistent** — Recorda context entre sessions usant cerca vectorial Qdrant amb embeddings de 768 dimensions. Tres col·leccions: nexe_documentation (docs del sistema), user_knowledge (documents pujats), nexe_web_ui (memòria de conversa).
-3. **Memòria Automàtica (MEM_SAVE)** — El model extreu fets de les converses automàticament (nom, feina, preferències) i els guarda a memòria. Zero latència extra (mateixa crida LLM). Suporta intencions de guardar, esborrar i recordar en 3 idiomes.
-4. **Inferència Multi-Backend** — MLX (natiu Apple Silicon), llama.cpp (GGUF, universal amb Metal), Ollama (bridge). Mateixa API compatible OpenAI, backends intercanviables.
-5. **Sistema de Plugins Modular** — Seguretat, UI web, RAG, cada backend — tot és un plugin amb manifests independents. Auto-descoberts a l'arrancar.
-6. **Multilingüe (ca/es/en)** — i18n complet: UI, system prompts, etiquetes context RAG, missatges d'error, instal·lador. El servidor és font de veritat per la selecció d'idioma.
-7. **Pujada Documents amb Aïllament per Sessió** — Puja documents via Web UI. Indexats a user_knowledge amb metadata session_id. Documents només visibles dins la sessió on es van pujar.
-8. **Indicador de Càrrega de Model** — Spinner en temps real amb cronòmetre quan es canvia de model. Funciona amb els 3 backends. Mostra la mida del model en GB al dropdown.
-9. **Ollama Auto-start i Fallback** — Ollama arrenca automàticament al boot (en segon pla). Si el backend configurat està desconnectat, auto-selecciona el primer backend disponible amb models carregats.
-10. **Suport Docker** — Dockerfile + docker-compose.yml amb Qdrant embedit. Python 3.12-slim, usuari no-root, Linux amd64/arm64.
+1. **100% local i privat** — Tota la inferencia, memoria i emmagatzematge passen al dispositiu. Zero dependencia del nuvol.
+2. **Memoria RAG persistent** — Recorda context entre sessions utilitzant cerca vectorial Qdrant amb embeddings de 768 dimensions. Tres col·leccions: nexe_documentation (docs del sistema), user_knowledge (documents pujats), nexe_web_ui (memoria de conversa).
+3. **Memoria automatica (MEM_SAVE)** — El model extreu fets de les converses automaticament (nom, feina, preferencies) i els guarda a memoria. Zero latencia extra (mateixa crida LLM). Suporta intents de guardar, esborrar i recuperar en 3 idiomes.
+4. **Inferencia multi-backend** — MLX (natiu Apple Silicon), llama.cpp (GGUF, universal amb Metal), Ollama (bridge). Mateixa API compatible amb OpenAI, backends intercanviables.
+5. **Sistema modular de plugins** — Seguretat, web UI, RAG, cada backend — tot es un plugin amb manifests independents. Auto-descobriment a l'arrencada.
+6. **Multilingue (ca/es/en)** — i18n complet: UI, prompts del sistema, etiquetes de context RAG, missatges d'error, instal·lador. El servidor es la font de veritat per a la seleccio d'idioma.
+7. **Pujada de documents amb aillament de sessio** — Puja documents via la Web UI. Indexats a user_knowledge amb metadades de session_id. Els documents nomes son visibles dins la sessio on s'han pujat.
+8. **Encriptacio at-rest (opt-in)** — Encriptacio AES-256-GCM per a SQLite (via SQLCipher), sessions de xat (.enc) i text de documents RAG (TextStore). Els payloads de Qdrant contenen nomes vectors i IDs, sense text. Gestio de claus via OS Keyring, variable d'entorn o fitxer. Recentment afegida — encara no provada en batalla en produccio.
+9. **Validacio d'input completa** — Tots els endpoints (API i Web UI) tenen rate limiting, validacio d'input (`validate_string_input`) i sanititzacio de context RAG. 6 detectors d'injeccio amb normalitzacio Unicode. 69 patrons de jailbreak.
+10. **Suport Docker** — Dockerfile + docker-compose.yml amb Qdrant embegut. Python 3.12-slim, usuari no-root, Linux amd64/arm64.
 
-## Stack tecnològic
+## Stack tecnologic
 
 | Component | Tecnologia |
 |-----------|-----------|
-| Llenguatge | Python 3.11+ (bundled 3.12 a l'instal·lador) |
+| Llenguatge | Python 3.11+ (3.12 inclos a l'instal·lador) |
 | Framework web | FastAPI 0.128+ |
-| Base de dades vectorial | Qdrant (binari embedit) |
+| Base de dades vectorial | Qdrant (binari embegut) |
 | Backends LLM | MLX, llama.cpp (llama-cpp-python), Ollama |
 | Embeddings | nomic-embed-text (Ollama) / paraphrase-multilingual-mpnet-base-v2 (fallback offline) |
-| Dimensions embeddings | 768 |
+| Dimensions d'embedding | 768 |
+| Encriptacio | AES-256-GCM, HKDF-SHA256, SQLCipher (opt-in) |
 | CLI | Click + Rich |
-| API | Compatible OpenAI (/v1/chat/completions) |
-| Autenticació | X-API-Key (dual-key amb rotació) |
-| Seguretat | 6 detectors d'injecció, 69 patrons jailbreak, rate limiting, capçaleres CSP |
-| Containerització | Docker + docker-compose (Nexe + Ollama) |
+| API | Compatible amb OpenAI (/v1/chat/completions) |
+| Autenticacio | X-API-Key (dual-key amb rotacio) |
+| Seguretat | 6 detectors d'injeccio + normalitzacio Unicode, 69 patrons de jailbreak, rate limiting, capcaleres CSP |
+| Contenidors | Docker + docker-compose (Nexe + Ollama) |
 
 ## Arquitectura
 
 ```
 server-nexe/
-├── core/                  # Servidor FastAPI, endpoints, CLI
-│   ├── endpoints/         # API REST (chat dividit en 8 submòduls)
+├── core/                  # Servidor FastAPI, endpoints, CLI, crypto
+│   ├── endpoints/         # API REST (chat separat en 8 submoduls)
+│   ├── crypto/            # Encriptacio at-rest (AES-256-GCM, SQLCipher)
 │   ├── cli/               # Comandes CLI
-│   ├── server/            # Patró factory, lifespan
-│   ├── ingest/            # Ingesta documents (docs + knowledge)
-│   └── lifespan*.py       # Startup/shutdown (dividit en 3 submòduls)
-├── plugins/               # Sistema de plugins modular
+│   ├── server/            # Patro factory, lifespan
+│   ├── ingest/            # Ingestio de documents (docs + knowledge)
+│   └── lifespan*.py       # Arrencada/aturada (separat en 3 submoduls)
+├── plugins/               # Sistema modular de plugins
 │   ├── mlx_module/        # Backend Apple Silicon
-│   ├── llama_cpp_module/  # Backend GGUF universal
-│   ├── ollama_module/     # Bridge Ollama + auto-start + VRAM cleanup
-│   ├── security/          # Auth, rate limiting, detecció d'injeccions
-│   └── web_ui_module/     # Interfície web (routes dividit en 6 submòduls)
-├── memory/                # Sistema RAG (Qdrant + embeddings + persistència)
-├── knowledge/             # Documentació per ingesta RAG (ca/es/en)
-├── personality/           # System prompts, module manager, i18n, server.toml
-├── installer/             # Wizard SwiftUI, constructor DMG, tray app, instal·lador headless
-├── storage/               # Dades runtime (models, logs, vectors qdrant)
-├── tests/                 # Suite de tests (3901 tests, 0 fallades)
+│   ├── llama_cpp_module/  # Backend universal GGUF
+│   ├── ollama_module/     # Bridge Ollama + auto-arrencada + neteja VRAM
+│   ├── security/          # Auth, rate limiting, deteccio d'injeccions
+│   └── web_ui_module/     # Interficie web (rutes separades en 6 submoduls)
+├── memory/                # Sistema RAG (Qdrant + embeddings + persistencia + TextStore)
+├── knowledge/             # Documentacio per a ingestio RAG (ca/es/en)
+├── personality/           # Prompts del sistema, module manager, i18n, server.toml
+├── installer/             # Wizard SwiftUI, constructor de DMG, app de safata, instal·lador headless
+├── storage/               # Dades en temps d'execucio (models, logs, vectors Qdrant)
+├── tests/                 # Suite de tests (4131 funcions de test)
 └── nexe                   # Executable CLI principal
 ```
 
 **Flux de dades:**
 ```
-Usuari -> CLI/API/Web UI -> Core -> Plugin (MLX/llama.cpp/Ollama) -> Model LLM
-                             |                                          |
-                             v                                          v
-                      Memory (RAG) -> Qdrant -> Context augmentat    MEM_SAVE -> Qdrant
+Usuari -> CLI/API/Web UI -> Auth -> Rate Limit -> Validar Input -> Core -> Plugin -> LLM
+                                                    |                           |
+                                                    v                           v
+                                             Memoria (RAG) -> Qdrant      MEM_SAVE -> Qdrant
+                                                    |
+                                            _sanitize_rag_context
 ```
 
-## Models disponibles (17 al catàleg de l'instal·lador)
+## Documentacio AI-Ready
+
+La base de coneixement (`knowledge/`) esta dissenyada tant per a consum huma com per a IA:
+- **Frontmatter YAML estructurat** per a ingestio RAG (chunk_size, tags, priority)
+- **12 fitxers tematics** que cobreixen identitat, arquitectura, API, seguretat, testing, etc.
+- **Disponible en angles, catala i castella**
+- Apunta qualsevol assistent d'IA a aquest repositori i podra entendre l'arquitectura completa, crear plugins o contribuir codi
+
+## Models disponibles (17 al cataleg de l'instal·lador)
 
 ### Petits (8 GB RAM)
 - Qwen3 1.7B (1.1 GB) — Alibaba, 2025
-- Qwen3.5 2B (1.5 GB) — Alibaba, 2025 (només Ollama, multimodal incompatible amb MLX)
+- Qwen3.5 2B (1.5 GB) — Alibaba, 2025 (nomes Ollama)
 - Phi-3.5 Mini (2.4 GB) — Microsoft, 2024
-- Salamandra 2B (1.5 GB) — BSC/AINA, 2024, optimitzat per català
+- Salamandra 2B (1.5 GB) — BSC/AINA, 2024, optimitzat per al catala
 - Qwen3 4B (2.5 GB) — Alibaba, 2025
 
 ### Mitjans (12-16 GB RAM)
 - Mistral 7B (4.1 GB) — Mistral AI, 2023
-- Salamandra 7B (4.9 GB) — BSC/AINA, 2024, millor per català
+- Salamandra 7B (4.9 GB) — BSC/AINA, 2024, el millor per al catala
 - Llama 3.1 8B (4.7 GB) — Meta, 2024
 - Qwen3 8B (5.0 GB) — Alibaba, 2025
 - Gemma 3 12B (7.6 GB) — Google DeepMind, 2025
 
 ### Grans (32+ GB RAM)
-- Qwen3.5 27B (17 GB) — Alibaba, 2025 (només Ollama)
-- Qwen3 32B (20 GB) — Alibaba, 2025, raonament híbrid
+- Qwen3.5 27B (17 GB) — Alibaba, 2025 (nomes Ollama)
+- Qwen3 32B (20 GB) — Alibaba, 2025, raonament hibrid
 - Gemma 3 27B (17 GB) — Google DeepMind, 2025
-- DeepSeek R1 32B (20 GB) — DeepSeek, 2025, raonament avançat
+- DeepSeek R1 32B (20 GB) — DeepSeek, 2025, raonament avancat
 - Llama 3.1 70B (40 GB) — Meta, 2024
 
-Models personalitzats suportats via Ollama (nom) o Hugging Face (repo GGUF).
+Tambe es suporten models personalitzats via Ollama (per nom) o Hugging Face (repositori GGUF).
 
-## Mètodes d'instal·lació
+## Metodes d'instal·lacio
 
-### 1. Instal·lador DMG macOS (recomanat)
-Wizard natiu SwiftUI amb 6 pantalles: benvinguda, carpeta destí, selecció model (17 models amb detecció hardware), confirmació, progrés, completat. Inclou Python 3.12 bundled. 8-30 minuts segons descàrrega del model.
+### 1. Instal·lador DMG per a macOS (recomanat)
+Wizard natiu SwiftUI amb 6 pantalles: benvinguda, carpeta de desti, seleccio de model (17 models amb deteccio de maquinari), confirmacio, progres, finalitzacio. Inclou Python 3.12.
 
 ### 2. CLI headless
 ```bash
@@ -136,65 +148,65 @@ cd server-nexe
 ```bash
 docker-compose up
 ```
-Inclou Nexe + Ollama com a serveis separats. Qdrant embedit.
 
-## Inici ràpid
+## Inici rapid
 
 ```bash
-./nexe go                    # Arrenca servidor -> http://127.0.0.1:9119
-./nexe chat                  # Chat interactiu CLI
-./nexe chat --rag            # Chat amb memòria RAG
-./nexe memory store "text"   # Guardar a memòria
-./nexe memory recall "query" # Recordar de memòria
+./nexe go                    # Arrencar servidor -> http://127.0.0.1:9119
+./nexe chat                  # Xat interactiu per CLI
+./nexe chat --rag            # Xat amb memoria RAG
+./nexe memory store "text"   # Guardar a memoria
+./nexe memory recall "query" # Recuperar de memoria
 ./nexe status                # Estat del sistema
 ./nexe knowledge ingest      # Indexar documents
+./nexe encryption status     # Comprovar estat d'encriptacio
 ```
 
 Web UI: `http://127.0.0.1:9119/ui`
-Docs API: `http://127.0.0.1:9119/docs`
+Docs de l'API: `http://127.0.0.1:9119/docs`
 Health check: `http://127.0.0.1:9119/health`
 
-Autenticació requerida: capçalera `X-API-Key` amb valor de `.env` (`NEXE_PRIMARY_API_KEY`).
+Autenticacio requerida: capcalera `X-API-Key` amb el valor de `.env` (`NEXE_PRIMARY_API_KEY`).
 
 ## Suport de plataformes
 
 | Plataforma | Estat |
 |----------|--------|
-| macOS Apple Silicon | Testat (3 backends) |
-| macOS Intel | Testat (llama.cpp + Ollama) |
-| Linux x86_64 | Parcial (tests unitaris passen, CI verd, no testat en producció) |
+| macOS Apple Silicon | Testejat (tots 3 backends) |
+| macOS Intel | Testejat (llama.cpp + Ollama) |
+| Linux x86_64 | Parcial (tests unitaris passen, CI verd, no testejat en produccio) |
 | Linux ARM64 | Docker suportat |
 | Windows | Encara no suportat |
 
 ## Limitacions actuals
 
-- Els models locals són menys capaços que GPT-4, Claude, etc. — el compromís és la privacitat.
-- El RAG requereix temps d'indexació inicial. Memòria buida = sense context RAG.
-- No hi ha sync multi-dispositiu.
-- No hi ha fine-tuning de models.
-- L'API és parcialment compatible amb OpenAI (falta /v1/embeddings, /v1/models).
-- El keep_alive:0 d'Ollama no sempre allibera VRAM (bug conegut d'Ollama).
-- No hi ha OCR ni parsing avançat de documents.
+- Els models locals son menys capacos que GPT-4, Claude, etc. — la contrapartida es la privacitat.
+- RAG requereix temps d'indexacio inicial. Memoria buida = sense context RAG.
+- Sense sincronitzacio multi-dispositiu.
+- Sense fine-tuning de models.
+- L'API es parcialment compatible amb OpenAI (falten /v1/embeddings, /v1/models).
+- L'encriptacio at-rest es opt-in i nova — encara no provada en batalla.
+- Projecte d'un sol desenvolupador amb auditories assistides per IA, sense auditoria formal.
 
-## Documentació relacionada
+## Documentacio relacionada
 
-Altres documents de knowledge en aquesta carpeta:
-- IDENTITY.md — Què és i què NO és server-nexe (desambiguació)
-- INSTALLATION.md — Guia d'instal·lació detallada
-- USAGE.md — Exemples d'ús i casos pràctics
-- ARCHITECTURE.md — Arquitectura tècnica en detall
-- RAG.md — Com funciona el sistema de memòria
+Altres documents de coneixement en aquesta carpeta:
+- IDENTITY.md — Que es server-nexe i que NO es (desambiguacio)
+- INSTALLATION.md — Guia d'instal·lacio detallada
+- USAGE.md — Exemples d'us i casos practics
+- ARCHITECTURE.md — Arquitectura tecnica en detall
+- RAG.md — Com funciona el sistema de memoria
 - PLUGINS.md — Sistema de plugins
-- API.md — Referència API REST
-- SECURITY.md — Seguretat i autenticació
-- LIMITATIONS.md — Limitacions tècniques
+- API.md — Referencia de l'API REST
+- SECURITY.md — Seguretat i autenticacio
+- LIMITATIONS.md — Limitacions tecniques
 - ERRORS.md — Errors comuns i solucions
-- TESTING.md — Estratègia de testing i cobertura
+- TESTING.md — Estrategia de tests i cobertura
 
-## Enllaços
+## Enllacos
 
 - Codi font: https://github.com/jgoy-labs/server-nexe
-- Documentació: https://server-nexe.org
+- Documentacio: https://server-nexe.org
 - Web comercial: https://server-nexe.com
 - Autor: https://jgoy.net
 - Suport: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/jgoylabs

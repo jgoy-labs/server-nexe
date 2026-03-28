@@ -22,7 +22,7 @@ MODULE_ID = "memory"
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
   "name": "memory",
-  "version": "0.8.2",
+  "version": "0.8.5",
   "description": "Memory System - Flash, RAM Context and Persistence with lifecycle management",
   "author": "J.Goy",
   "category": "memory.core",

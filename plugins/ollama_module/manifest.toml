@@ -1,6 +1,6 @@
 # ─────────────────────────────────────────────────────────────
 # ModuleID: ollama_module
-# Nexe v0.8.2 | Antigravity | 2026-03-25
+# Nexe v0.8.5 | Antigravity | 2026-03-25
 # server-nexe/plugins/ollama_module/manifest.toml
 # ─────────────────────────────────────────────────────────────
 
@@ -10,7 +10,7 @@
 
 [module]
 name = "ollama_module"
-version = "0.8.2"
+version = "0.8.5"
 type = "local_llm_option"
 description = "Integracio amb Ollama per executar models LLM locals sense dependencies de cloud. Gestio de models, streaming, embeddings locals."
 location = "plugins/ollama_module/"
