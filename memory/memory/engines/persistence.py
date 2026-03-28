@@ -29,6 +29,14 @@ from ..models.memory_entry import MemoryEntry
 
 logger = logging.getLogger(__name__)
 
+# SQLCipher: try to import, fall back to plain sqlite3
+try:
+    from sqlcipher3 import dbapi2 as sqlcipher
+    SQLCIPHER_AVAILABLE = True
+except ImportError:
+    sqlcipher = None
+    SQLCIPHER_AVAILABLE = False
+
 # Configurable timeouts via environment variables
 # SECURITY: Capped to MAX_TIMEOUT to prevent resource exhaustion
 MAX_TIMEOUT = 60.0  # Maximum allowed timeout in seconds
@@ -71,13 +79,16 @@ class PersistenceManager:
     qdrant_path: Path = None,
     collection_name: str = "nexe_memory",
     vector_size: int = DEFAULT_VECTOR_SIZE,
-    qdrant_url: str = None
+    qdrant_url: str = None,
+    crypto_provider=None
   ):
     self.db_path = db_path
     self.qdrant_path = qdrant_path
     self.qdrant_url = qdrant_url or self.DEFAULT_QDRANT_URL
     self.collection_name = collection_name
     self.vector_size = vector_size
+    self._crypto = crypto_provider
+    self._encrypted = False
 
     self.executor = ThreadPoolExecutor(max_workers=4)
 
@@ -85,11 +96,83 @@ class PersistenceManager:
 
     self._init_qdrant()
 
-    logger.info("PersistenceManager initialized (db=%s, qdrant=%s)", db_path, self.qdrant_url or "Embedded")
+    logger.info(
+      "PersistenceManager initialized (db=%s, encrypted=%s, qdrant=%s)",
+      db_path, self._encrypted, self.qdrant_url or "Embedded"
+    )
+
+  @staticmethod
+  def _is_plaintext_sqlite(path: Path) -> bool:
+    """Check if a file is a plain (unencrypted) SQLite database."""
+    if not path.exists() or path.stat().st_size == 0:
+      return False
+    with open(path, 'rb') as f:
+      header = f.read(16)
+    return header == b'SQLite format 3\x00'
+
+  def _migrate_to_encrypted(self):
+    """Migrate existing plain SQLite DB to SQLCipher."""
+    if not self._crypto or not SQLCIPHER_AVAILABLE:
+      return
+    if not self.db_path.exists():
+      return
+    if not self._is_plaintext_sqlite(self.db_path):
+      return  # Already encrypted or empty
+
+    logger.info("Migrating plain SQLite to SQLCipher: %s", self.db_path)
+    tmp_path = self.db_path.with_suffix('.db.encrypted')
+    try:
+      # Read all data from plain DB
+      plain_conn = sqlite3.connect(str(self.db_path))
+      plain_conn.execute("PRAGMA busy_timeout = 5000")
+
+      # Create encrypted DB
+      enc_conn = sqlcipher.connect(str(tmp_path))
+      dek = self._crypto.derive_key("sqlite")
+      enc_conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")
+      enc_conn.execute("PRAGMA cipher_compatibility = 4")
+      enc_conn.execute("PRAGMA busy_timeout = 5000")
+
+      # Copy schema + data (iterdump yields complete SQL statements)
+      for line in plain_conn.iterdump():
+        if line.strip() in ("BEGIN TRANSACTION;", "COMMIT;"):
+          continue  # Skip transaction control, we manage our own
+        enc_conn.execute(line)
+      enc_conn.commit()
+
+      plain_conn.close()
+      enc_conn.close()
+
+      # Remove stale WAL/SHM from plain DB (would confuse SQLCipher)
+      for suffix in ('.db-wal', '.db-shm'):
+        wal_file = self.db_path.with_suffix(suffix)
+        if wal_file.exists():
+          wal_file.unlink()
+
+      # Backup original, replace with encrypted
+      backup_path = self.db_path.with_suffix('.db.bak')
+      self.db_path.rename(backup_path)
+      tmp_path.rename(self.db_path)
+      logger.info("Migration complete. Backup at %s", backup_path)
+    except Exception as e:
+      logger.error("SQLCipher migration failed: %s. Keeping plain DB.", e)
+      if tmp_path.exists():
+        tmp_path.unlink()
+      return
 
   def _init_sqlite(self):
-    """Initialize SQLite database with WAL mode"""
+    """Initialize SQLite database with WAL mode."""
     self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Determine if we should use encryption
+    if self._crypto and SQLCIPHER_AVAILABLE:
+      self._migrate_to_encrypted()
+      self._encrypted = True
+    elif self._crypto and not SQLCIPHER_AVAILABLE:
+      logger.warning(
+        "CryptoProvider provided but sqlcipher3 not installed. "
+        "Database will NOT be encrypted. Install sqlcipher3 for encryption."
+      )
 
     with self._connect_sqlite() as conn:
       cursor = conn.cursor()
@@ -121,11 +204,17 @@ class PersistenceManager:
 
       conn.commit()
 
-    logger.info("SQLite initialized with WAL mode")
+    logger.info("SQLite initialized (encrypted=%s)", self._encrypted)
 
-  def _connect_sqlite(self) -> sqlite3.Connection:
-    """Open SQLite connection with busy timeout to reduce writer contention."""
-    conn = sqlite3.connect(str(self.db_path))
+  def _connect_sqlite(self):
+    """Open SQLite/SQLCipher connection with busy timeout."""
+    if self._encrypted and SQLCIPHER_AVAILABLE:
+      conn = sqlcipher.connect(str(self.db_path))
+      dek = self._crypto.derive_key("sqlite")
+      conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")
+      conn.execute("PRAGMA cipher_compatibility = 4")
+    else:
+      conn = sqlite3.connect(str(self.db_path))
     conn.execute("PRAGMA busy_timeout = 5000")
     return conn
 
@@ -210,13 +299,13 @@ class PersistenceManager:
 
     if embedding and self._qdrant_available:
       try:
-        payload_with_content = {
-          **(entry.metadata or {}),
-          "content": entry.content,
+        payload_vectors_only = {
           "entry_type": entry.entry_type,
-          "source": entry.source,
+          "original_id": entry.id,
+          # Text (content, source, metadata) lives only in SQLite.
+          # Qdrant stores vectors + minimal identifiers for search.
         }
-        await self._store_qdrant(entry.id, embedding, payload_with_content)
+        await self._store_qdrant(entry.id, embedding, payload_vectors_only)
       except Exception as e:
         if strict:
           logger.error(

@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-rag-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete reference of the server-nexe RAG memory system (v0.8.2). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent, session-isolated document upload, embeddings (768D), chunking parameters, context building with i18n labels, RAG weight visualization, smart pruning, and deduplication."
-tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication]
+abstract: "Complete reference of the server-nexe RAG memory system (v0.8.5 pre-release). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent, session-isolated document upload, embeddings (768D), chunking parameters, context building with i18n labels, RAG weight visualization, RAG context sanitization, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
+tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 800
 priority: P1
 
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# RAG System — server-nexe 0.8.2
+# RAG System — server-nexe 0.8.5 pre-release
 
 RAG (Retrieval-Augmented Generation) is the persistent memory system of server-nexe. It augments the LLM's responses by injecting relevant information retrieved from vector memory into the prompt context.
 
@@ -26,9 +26,10 @@ RAG (Retrieval-Augmented Generation) is the persistent memory system of server-n
 1. User sends a message
 2. Message is converted to a 768-dimensional embedding vector
 3. Qdrant searches 3 collections for similar vectors (cosine similarity)
-4. Matching results are injected into the LLM prompt as context
-5. LLM generates a response using the augmented context
-6. MEM_SAVE: the model also extracts facts from the conversation and saves them to memory (same LLM call)
+4. Matching results are sanitized via `_sanitize_rag_context()` to filter injection patterns
+5. Sanitized results are injected into the LLM prompt as context
+6. LLM generates a response using the augmented context
+7. MEM_SAVE: the model also extracts facts from the conversation and saves them to memory (same LLM call)
 
 ## Qdrant Collections
 
@@ -48,6 +49,23 @@ server-nexe uses 3 specialized Qdrant collections. Each has a different purpose 
 - `NEXE_RAG_MEMORY_THRESHOLD` (default: 0.3)
 
 The Web UI also allows real-time threshold adjustment via a slider (default 0.30, range configurable).
+
+## Qdrant Payloads (no text)
+
+As of v0.8.5, Qdrant payloads **no longer contain text content**. Each payload only stores:
+- `entry_type` — the type of entry
+- `original_id` — link back to SQLite for the full text
+
+All text lives in SQLite (optionally encrypted via SQLCipher). This means even without encryption enabled, Qdrant vectors alone cannot reconstruct the original text content.
+
+## TextStore (new in v0.8.5)
+
+`TextStore` (`memory/memory/api/text_store.py`) is a SQLite-backed storage for RAG document text, decoupled from Qdrant:
+
+- Stores document text with `document_id` for linkback
+- Optionally encrypted via SQLCipher when `crypto_provider` is available
+- Used by `store_document()`, `search_documents()`, `get_document()`, `delete_document()`
+- Backwards compatible: if `text_store` is not provided, legacy behavior (text in Qdrant payload) is used
 
 ## Embeddings
 
@@ -80,11 +98,17 @@ server-nexe has an automatic memory system similar to ChatGPT or Claude. The mod
 - Commands ("nexe", "status", etc.)
 - Greetings ("hola", "hello")
 - Junk (less than 10 characters)
-- Negative patterns (detected via SAVE_TRIGGERS and DELETE_TRIGGERS)
+- Negative/junk patterns (regex filter for non-informative content)
 
 **Deduplication:** Before saving, checks similarity with existing entries. If similarity > 0.80, the entry is considered duplicate and not saved.
 
 **Delete intent:** When user says "forget that X", searches for entries with similarity >= 0.6 and deletes the closest match.
+
+## RAG Context Sanitization
+
+`_sanitize_rag_context()` filters retrieved RAG content before injecting it into the LLM prompt. This prevents stored documents or memory entries from containing injection patterns that could manipulate the model's behavior.
+
+Applied in the Web UI pipeline (`routes_chat.py`) consistently with the API pipeline.
 
 ## Document Upload with Session Isolation
 
@@ -173,6 +197,7 @@ storage/qdrant/
 | NEXE_QDRANT_PORT | 6333 | Qdrant port |
 | NEXE_QDRANT_TIMEOUT | 5.0 | Qdrant connection timeout |
 | NEXE_OLLAMA_EMBED_MODEL | nomic-embed-text | Ollama embedding model |
+| NEXE_ENCRYPTION_ENABLED | false | Enable encryption at rest for TextStore/SQLCipher |
 
 ## Limitations
 
@@ -181,7 +206,6 @@ storage/qdrant/
 - **Cold start:** Empty memory = RAG contributes nothing until populated
 - **Top-K misses:** Relevant chunks may fall outside Top-K results
 - **Contradictory info:** RAG may retrieve conflicting facts from different times
-- **Vectors on disk unencrypted:** Qdrant does not encrypt stored vectors (acceptable for local trusted device)
 - **Ollama keep_alive:0 bug:** Does not always release VRAM on shutdown (known Ollama issue)
 
 ## Main Endpoints for RAG

@@ -225,6 +225,7 @@ class TestMemoryModuleAdditional:
     mock_state = MagicMock()
     mock_state.project_root = None
     mock_state.config = {}
+    mock_state.crypto_provider = None
 
     with patch("memory.memory.module.get_server_state", return_value=mock_state):
       result = await module.initialize(config={"flash_ttl_seconds": 3600})
@@ -243,6 +244,7 @@ class TestMemoryModuleAdditional:
     with patch("memory.memory.module.get_server_state") as mock_gs:
       mock_gs.return_value.project_root = Path.cwd()
       mock_gs.return_value.config = {}
+      mock_gs.return_value.crypto_provider = None
       result = await module.initialize(config={"ram_max_entries": 50})
       assert result is True
 
@@ -259,6 +261,7 @@ class TestMemoryModuleAdditional:
     with patch("memory.memory.module.get_server_state") as mock_gs:
       mock_gs.return_value.project_root = Path.cwd()
       mock_gs.return_value.config = {}
+      mock_gs.return_value.crypto_provider = None
       with patch("memory.memory.module.FlashMemory", side_effect=Exception("flash error")):
         with pytest.raises(Exception, match="flash error"):
           await module.initialize()
@@ -276,6 +279,7 @@ class TestMemoryModuleAdditional:
     with patch("memory.memory.module.get_server_state") as mock_gs:
       mock_gs.return_value.project_root = Path.cwd()
       mock_gs.return_value.config = {}
+      mock_gs.return_value.crypto_provider = None
       await module.initialize()
 
     module._flash_memory.cleanup_expired = AsyncMock(side_effect=Exception("cleanup err"))

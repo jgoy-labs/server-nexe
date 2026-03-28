@@ -35,7 +35,7 @@ class EmbeddingRequest(BaseModel):
   @classmethod
   def text_not_empty(cls, v):
     if not v.strip():
-      raise ValueError("Text no pot estar buit o només espais")
+      raise ValueError("Text cannot be empty or whitespace only")
     return v
 
 class EmbeddingResponse(BaseModel):
@@ -61,14 +61,14 @@ class EmbeddingResponse(BaseModel):
   @classmethod
   def embedding_not_empty(cls, v):
     if not v:
-      raise ValueError("Embedding no pot estar buit")
+      raise ValueError("Embedding cannot be empty")
     return v
 
   @field_validator('dimensions')
   @classmethod
   def dimensions_match(cls, v, info: ValidationInfo):
     if 'embedding' in info.data and len(info.data['embedding']) != v:
-      raise ValueError(f"Dimensions {v} no coincideix amb len(embedding)={len(info.data['embedding'])}")
+      raise ValueError(f"Dimensions {v} does not match len(embedding)={len(info.data['embedding'])}")
     return v
 
 class BatchEmbeddingRequest(BaseModel):
@@ -93,7 +93,7 @@ class BatchEmbeddingRequest(BaseModel):
   def texts_not_empty(cls, v):
     for text in v:
       if not text.strip():
-        raise ValueError("Cap text pot estar buit o només espais")
+        raise ValueError("No text can be empty or whitespace only")
     return v
 
 class BatchEmbeddingResponse(BaseModel):
@@ -117,7 +117,7 @@ class BatchEmbeddingResponse(BaseModel):
   @classmethod
   def count_match(cls, v, info: ValidationInfo):
     if 'embeddings' in info.data and len(info.data['embeddings']) != v:
-      raise ValueError(f"Count {v} no coincideix amb len(embeddings)={len(info.data['embeddings'])}")
+      raise ValueError(f"Count {v} does not match len(embeddings)={len(info.data['embeddings'])}")
     return v
 
 @runtime_checkable
@@ -268,7 +268,7 @@ class ChunkedDocument(BaseModel):
   @classmethod
   def count_match(cls, v, info: ValidationInfo):
     if 'chunks' in info.data and len(info.data['chunks']) != v:
-      raise ValueError(f"chunk_count {v} no coincideix amb len(chunks)={len(info.data['chunks'])}")
+      raise ValueError(f"chunk_count {v} does not match len(chunks)={len(info.data['chunks'])}")
     return v
 
 class EncoderStats(BaseModel):

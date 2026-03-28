@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-api-reference
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa de la API REST de server-nexe 0.8.2. Cubre todos los endpoints: chat completions (compatible OpenAI, streaming, RAG), memoria (store, search), búsqueda RAG, subida documentos, sesiones, bootstrap, health checks, módulos, backends, i18n. Incluye autenticación (X-API-Key dual-key), rate limiting, marcadores streaming (MODEL_LOADING, RAG_AVG, MEM_SAVE) y configuración."
-tags: [api, rest, endpoints, chat, memoria, rag, autenticacion, rate-limiting, streaming, openai-compatible, upload, sesiones, bootstrap, health, backends]
+abstract: "Referencia completa de la REST API de server-nexe 0.8.5 pre-release. Cubre todos los endpoints: chat completions (compatible OpenAI, streaming, RAG), memoria (store, search), busqueda RAG, subida de documentos, sesiones, bootstrap, health checks, modulos, backends, i18n, comandos CLI de encriptacion. Incluye autenticacion (X-API-Key dual-key), rate limiting por endpoint, marcadores de streaming, y configuracion."
+tags: [api, rest, endpoints, chat, memory, rag, authentication, rate-limiting, streaming, openai-compatible, upload, sessions, bootstrap, health, backends, encryption]
 chunk_size: 800
 priority: P1
 
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Referencia API REST — server-nexe 0.8.2
+# Referencia REST API — server-nexe 0.8.5 pre-release
 
 ## URL Base
 
@@ -25,23 +25,26 @@ expires: null
 http://127.0.0.1:9119
 ```
 
-Configurable vía `personality/server.toml` sección `[core.server]` o `.env` (HOST/PORT). Prioridad: server.toml > .env > por defecto.
+Configurable via `personality/server.toml` seccion `[core.server]` o `.env` (HOST/PORT). Prioridad: server.toml > .env > por defecto.
 
 Docs API (Swagger): `http://127.0.0.1:9119/docs`
 
-## Autenticación
+## Autenticacion
 
-La mayoría de endpoints requieren cabecera `X-API-Key`. Valor del fichero `.env` (`NEXE_PRIMARY_API_KEY`).
+La mayoria de endpoints requieren cabecera `X-API-Key`. Valor del fichero `.env` (`NEXE_PRIMARY_API_KEY`).
 
-**Sistema dual-key:** Dos claves pueden estar activas simultáneamente para rotación:
+**Sistema dual-key:** Dos claves pueden estar activas simultaneamente para rotacion:
 - `NEXE_PRIMARY_API_KEY` — siempre activa
-- `NEXE_SECONDARY_API_KEY` — período de gracia para rotación
+- `NEXE_SECONDARY_API_KEY` — periodo de gracia para rotacion
+- Seguimiento de expiracion via `NEXE_PRIMARY_KEY_EXPIRES`, `NEXE_SECONDARY_KEY_EXPIRES`
 
-**Bootstrap token:** Para setup inicial, se genera un token de un solo uso al arranque (128-bit, TTL 30min).
+**Token bootstrap:** Para configuracion inicial, se genera un token de un solo uso al arranque (128-bit, TTL 30min). Se muestra en la salida de consola.
 
 ## Rate Limiting
 
-Configurable por endpoint vía `.env`:
+El rate limiting se aplica a **todos los endpoints** — tanto API como Web UI.
+
+### Endpoints API (configurables via `.env`)
 
 | Variable | Por defecto | Aplica a |
 |----------|---------|-----------|
@@ -49,15 +52,27 @@ Configurable por endpoint vía `.env`:
 | NEXE_RATE_LIMIT_MEMORY | 30/minuto | /v1/memory/* |
 | NEXE_RATE_LIMIT_RAG | 30/minuto | /v1/rag/* |
 | NEXE_RATE_LIMIT_UPLOAD | 10/minuto | /ui/upload |
-| NEXE_RATE_LIMIT_DEFAULT | 120/minuto | Todos los demás |
+| NEXE_RATE_LIMIT_DEFAULT | 120/minuto | Todos los demas endpoints |
 
-## Endpoints Core
+### Endpoints Web UI (por endpoint)
+
+| Endpoint | Rate limit |
+|----------|-----------|
+| POST /ui/chat | 20/minuto |
+| POST /ui/memory/save | 10/minuto |
+| POST /ui/memory/recall | 30/minuto |
+| POST /ui/upload | 5/minuto |
+| POST /ui/files/cleanup | 5/minuto |
+| GET /ui/session/{id} | 30/minuto |
+| DELETE /ui/session/{id} | 10/minuto |
+
+## Endpoints principales
 
 ### Chat
 
-**POST /v1/chat/completions** (requiere API key)
+**POST /v1/chat/completions** (requiere API key, rate limit: 60/min)
 
-Chat completion compatible OpenAI con RAG y streaming.
+Chat completion compatible con OpenAI con soporte de RAG y streaming.
 
 ```json
 {
@@ -74,109 +89,162 @@ Chat completion compatible OpenAI con RAG y streaming.
 - `use_rag`: true por defecto — busca en 3 colecciones Qdrant
 - `engine`: "auto" (defecto), "ollama", "mlx", "llama_cpp"
 - `stream`: true retorna stream SSE con marcadores
-- `max_tokens`: null = defecto del modelo, máx 32000
+- `temperature`: 0.0-2.0 (defecto 0.7)
+- `max_tokens`: null = usar defecto del modelo, maximo 32000
 
-**Marcadores streaming** (inyectados en el stream SSE):
+**Marcadores de streaming** (inyectados en el stream SSE, parseados por la UI):
 - `[MODEL:nombre]` — modelo activo
-- `[MODEL_LOADING]` / `[MODEL_READY]` — estado carga modelo con timing
-- `[RAG_AVG:0.75]` — puntuación RAG media
+- `[MODEL_LOADING]` / `[MODEL_READY]` — estado de carga del modelo con timing
+- `[RAG_AVG:0.75]` — puntuacion media de relevancia RAG
 - `[RAG_ITEM:0.82|nexe_documentation|ARCHITECTURE.md]` — detalle por fuente
-- `[MEM:2]` — hechos auto-guardados vía MEM_SAVE
+- `[MEM:2]` — numero de hechos auto-guardados via MEM_SAVE
+- `[COMPACT:N]` — indicador de compactacion de contexto
 - `[THINKING]` / `[/THINKING]` — tokens de razonamiento (modelos Ollama como qwen3.5)
 
-### Info Sistema
+### Informacion del sistema
 
-| Endpoint | Método | Auth | Descripción |
+| Endpoint | Metodo | Auth | Descripcion |
 |----------|--------|------|-------------|
-| `/` | GET | No | Info sistema (versión, estado, puerto) |
-| `/health` | GET | No | Health check básico |
-| `/health/ready` | GET | No | Readiness check (verifica módulos requeridos) |
-| `/health/circuits` | GET | No | Estado circuit breakers (Ollama, Qdrant) |
-| `/status` | GET | No | Estado tiempo real: motor activo, modelo, módulos |
-| `/api/info` | GET | No | Info API y lista endpoints |
-| `/docs` | GET | No | Documentación Swagger/OpenAPI interactiva |
+| `/` | GET | No | Info del sistema (version, estado, puerto) |
+| `/health` | GET | No | Health check basico |
+| `/health/ready` | GET | No | Readiness check (verifica modulos requeridos) |
+| `/health/circuits` | GET | No | Estado de circuit breakers (Ollama, Qdrant) |
+| `/status` | GET | No | Estado en tiempo real: engine activo, modelo, modulos cargados |
+| `/api/info` | GET | No | Info de la API y lista de endpoints disponibles |
+| `/docs` | GET | No | Documentacion interactiva Swagger/OpenAPI |
 
-### Módulos
+### Modulos
 
-| Endpoint | Método | Auth | Descripción |
+| Endpoint | Metodo | Auth | Descripcion |
 |----------|--------|------|-------------|
-| `/modules` | GET | No | Lista módulos cargados y sus APIs |
-| `/modules/{nombre}/routes` | GET | No | Rutas registradas de un módulo específico |
+| `/modules` | GET | No | Listar modulos cargados y sus APIs |
+| `/modules/{nombre}/routes` | GET | No | Rutas registradas por un modulo especifico |
 
-## Endpoints Memoria (prefijo: /v1/memory)
+### Bootstrap
 
-| Endpoint | Método | Auth | Descripción |
+| Endpoint | Metodo | Auth | Descripcion |
 |----------|--------|------|-------------|
-| `/v1/memory/store` | POST | Sí | Guardar texto en una colección |
-| `/v1/memory/search` | POST | Sí | Búsqueda semántica en una colección |
-| `/v1/memory/health` | GET | No | Salud subsistema memoria + colecciones Qdrant |
+| `/api/bootstrap` | POST | Token | Inicializar sesion con token bootstrap |
+| `/api/regenerate-bootstrap` | POST | localhost | Regenerar token bootstrap expirado |
+| `/api/bootstrap/info` | GET | No | Estado del sistema bootstrap |
+
+## Endpoints de memoria (prefijo: /v1/memory)
+
+| Endpoint | Metodo | Auth | Descripcion |
+|----------|--------|------|-------------|
+| `/v1/memory/store` | POST | Si | Guardar texto en una coleccion |
+| `/v1/memory/search` | POST | Si | Busqueda semantica en una coleccion |
+| `/v1/memory/health` | GET | No | Salud del subsistema de memoria + colecciones Qdrant |
+
+**Peticion de almacenamiento:**
+```json
+{
+  "text": "Informacion a guardar",
+  "collection": "user_knowledge",
+  "metadata": {"source": "api", "tags": ["ejemplo"]}
+}
+```
+
+**Peticion de busqueda:**
+```json
+{
+  "query": "consulta de busqueda",
+  "collection": "user_knowledge",
+  "limit": 5,
+  "threshold": 0.35
+}
+```
 
 ## Endpoints RAG (prefijo: /v1/rag)
 
-| Endpoint | Método | Auth | Descripción |
+| Endpoint | Metodo | Auth | Descripcion |
 |----------|--------|------|-------------|
-| `/v1/rag/search` | POST | Sí | Búsqueda semántica en vector store RAG |
-| `/v1/rag/add` | POST | Sí | Añadir documentos al vector store RAG |
-| `/v1/rag/documents/{id}` | DELETE | Sí | Borrar documento del RAG |
+| `/v1/rag/search` | POST | Si | Busqueda semantica en el vector store RAG |
+| `/v1/rag/add` | POST | Si | Anadir documentos al vector store RAG |
+| `/v1/rag/documents/{id}` | DELETE | Si | Borrar documento del RAG |
 
-## Endpoints Embeddings (prefijo: /v1/embeddings)
+## Endpoints de embeddings (prefijo: /v1/embeddings)
 
-| Endpoint | Método | Auth | Descripción |
+| Endpoint | Metodo | Auth | Descripcion |
 |----------|--------|------|-------------|
-| `/v1/embeddings/encode` | POST | Sí | Generar vectores embedding para textos |
+| `/v1/embeddings/encode` | POST | Si | Generar vectores de embedding para textos |
 | `/v1/embeddings/models` | GET | No | Listar modelos de embeddings disponibles |
 
 ## Endpoints Web UI (prefijo: /ui)
 
-### Auth y Config
+Estos endpoints sirven la interfaz web y son usados por el frontend JavaScript. Todos tienen validacion de entrada via `validate_string_input()`.
 
-| Endpoint | Método | Auth | Descripción |
-|----------|--------|------|-------------|
-| `/ui/auth` | GET | Sí | Verificar validez API key |
-| `/ui/info` | GET | Sí | Info servidor (versión, idioma, features) |
-| `/ui/lang` | POST | Sí | Establecer idioma servidor (ca/es/en) |
-| `/ui/backends` | GET | Sí | Listar backends con nombres y tamaños modelos (GB) |
-| `/ui/backend` | POST | Sí | Cambiar backend activo |
+### Auth y configuracion
 
-### Chat y Memoria
+| Endpoint | Metodo | Auth | Rate limit | Descripcion |
+|----------|--------|------|-----------|-------------|
+| `/ui/auth` | GET | Si | default | Verificar validez de API key |
+| `/ui/info` | GET | Si | default | Info del servidor (version, idioma, funcionalidades) |
+| `/ui/lang` | POST | Si | default | Establecer idioma del servidor (ca/es/en) |
+| `/ui/backends` | GET | Si | default | Listar backends con nombres de modelo y tamanos (GB) |
+| `/ui/backend` | POST | Si | default | Cambiar backend activo |
+| `/ui/health` | GET | No | default | Salud del modulo Web UI |
 
-| Endpoint | Método | Auth | Descripción |
-|----------|--------|------|-------------|
-| `/ui/chat` | POST | Sí | Streaming SSE chat (con MEM_SAVE, RAG, thinking tokens) |
-| `/ui/memory/save` | POST | Sí | Guardar texto en memoria |
-| `/ui/memory/recall` | POST | Sí | Recordar de memoria (filtrado por session_id) |
+### Chat y memoria
+
+| Endpoint | Metodo | Auth | Rate limit | Descripcion |
+|----------|--------|------|-----------|-------------|
+| `/ui/chat` | POST | Si | 20/min | Streaming SSE chat (MEM_SAVE, RAG, thinking tokens) |
+| `/ui/memory/save` | POST | Si | 10/min | Guardar texto en memoria (valida content, session_id) |
+| `/ui/memory/recall` | POST | Si | 30/min | Recuperar de memoria (valida query, session_id) |
 
 ### Sesiones
 
-| Endpoint | Método | Auth | Descripción |
-|----------|--------|------|-------------|
-| `/ui/session/new` | POST | Sí | Crear nueva sesión |
-| `/ui/session/{id}` | GET | Sí | Obtener datos sesión |
-| `/ui/session/{id}/history` | GET | Sí | Obtener historial chat sesión |
-| `/ui/session/{id}` | DELETE | Sí | Borrar sesión |
-| `/ui/sessions` | GET | Sí | Listar todas las sesiones |
+| Endpoint | Metodo | Auth | Rate limit | Descripcion |
+|----------|--------|------|-----------|-------------|
+| `/ui/session/new` | POST | Si | default | Crear nueva sesion |
+| `/ui/session/{id}` | GET | Si | 30/min | Obtener datos de sesion (valida session_id) |
+| `/ui/session/{id}/history` | GET | Si | 30/min | Obtener historial de chat de la sesion |
+| `/ui/session/{id}` | DELETE | Si | 10/min | Borrar sesion |
+| `/ui/sessions` | GET | Si | default | Listar todas las sesiones |
 
 ### Ficheros
 
-| Endpoint | Método | Auth | Descripción |
-|----------|--------|------|-------------|
-| `/ui/upload` | POST | Sí | Subir documento (aislado por sesión, indexado a user_knowledge) |
-| `/ui/files` | GET | Sí | Listar ficheros subidos |
-| `/ui/files/cleanup` | POST | Sí | Limpiar ficheros temporales |
+| Endpoint | Metodo | Auth | Rate limit | Descripcion |
+|----------|--------|------|-----------|-------------|
+| `/ui/upload` | POST | Si | 5/min | Subir documento (valida filename, aislado por sesion) |
+| `/ui/files` | GET | Si | default | Listar ficheros subidos |
+| `/ui/files/cleanup` | POST | Si | 5/min | Limpiar ficheros temporales |
 
-**Upload:** Acepta .txt, .md, .pdf. Chunks 1500/200 chars. Metadatos sin LLM (instantáneo). Documentos aislados a la sesión vía session_id.
+**Upload:** Acepta .txt, .md, .pdf. Chunks de 1500/200 caracteres. Metadatos generados sin LLM (instantaneo). Documentos aislados a la sesion de subida via session_id.
+
+## Comandos CLI de encriptacion
+
+Estos son comandos CLI (no endpoints HTTP):
+
+| Comando | Descripcion |
+|---------|-------------|
+| `./nexe encryption status` | Mostrar estado de encriptacion de todos los componentes de almacenamiento |
+| `./nexe encryption encrypt-all` | Migrar todos los datos existentes a formato encriptado |
+| `./nexe encryption export-key` | Exportar clave maestra (hex o base64, para backup) |
 
 ## Compatibilidad OpenAI
 
-`/v1/chat/completions` es parcialmente compatible con el formato API de OpenAI:
+`/v1/chat/completions` es parcialmente compatible con el formato de API OpenAI:
 
-**Soportado:** messages array, model, temperature, max_tokens, stream, top_p
+**Soportado:** array de messages, model, temperature, max_tokens, stream, top_p
 **Campos extra:** use_rag (boolean), engine (string)
-**No implementado:** /v1/embeddings estándar (usar /v1/embeddings/encode), /v1/models, /v1/completions (legacy)
+**No implementado:** /v1/embeddings (usar /v1/embeddings/encode en su lugar), /v1/models, /v1/completions (legacy)
 
-Compatible con herramientas que usan formato API OpenAI: Cursor, Continue, Zed, scripts custom.
+Compatible con herramientas que usan formato de API OpenAI: Cursor, Continue, Zed, scripts personalizados.
 
-## Ejemplos Rápidos
+## Configuracion
+
+| Ajuste | Ubicacion | Proposito |
+|--------|----------|---------|
+| Host/Puerto | server.toml `[core.server]` | Direccion de enlace del servidor |
+| API keys | .env | NEXE_PRIMARY_API_KEY, NEXE_SECONDARY_API_KEY |
+| Rate limits | .env | Variables NEXE_RATE_LIMIT_* |
+| Timeout | .env | NEXE_DEFAULT_MAX_TOKENS (defecto 4096) |
+| Origenes CORS | server.toml `[core.server]` | Origenes permitidos |
+| Encriptacion | .env | NEXE_ENCRYPTION_ENABLED (defecto false) |
+
+## Ejemplos rapidos
 
 ```bash
 # Health check
@@ -198,5 +266,5 @@ curl -X POST http://127.0.0.1:9119/v1/memory/store \
 curl -X POST http://127.0.0.1:9119/v1/memory/search \
   -H "X-API-Key: TU_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"query": "cómo me llamo", "collection": "user_knowledge", "limit": 3}'
+  -d '{"query": "como me llamo", "collection": "user_knowledge", "limit": 3}'
 ```

@@ -1,78 +1,117 @@
 # ===========================================
-# Entorn de desenvolupament — NO és un repo git
+# Git privat de desenvolupament
 #
-# Repo OSS net: AI/gitoss/server-nexe/
-# Remote: https://github.com/jgoy-labs/server-nexe
+# Aquest repo és PRIVAT — mai connectat a GitHub directament.
+# Flux publicació: dev/ → (revisió /gitoss) → gitoss/ → GitHub
+# Remote futur: Nostromo (NAS, backup privat)
 #
-# Flux: treballar aqui → copiar canvis nets a gitoss → push des de gitoss
+# ⚠️ PARANOIC MODE: tot el que pugui contenir secrets,
+# binaris, o dades personals està exclòs.
 # ===========================================
 
-# Python runtime artifacts
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-venv/
-.venv/
-ENV/
-
-# Test/coverage artifacts
-.pytest_cache/
-.coverage
-coverage.xml
-htmlcov/
-
-# Environment secrets
+# =====================
+# SECRETS — ZONA ZERO
+# =====================
 .env
-.env.local
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.cer
+*.crt
+*secret*
+*credential*
+*token*
+!**/token*.py
+!**/secret*.py
+.nat_secrets
 
-# Runtime storage & logs (installer/runtime output)
+# =====================
+# BINARIS I BUILDS
+# =====================
+
+# Binaris del projecte
+qdrant
+nexe
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+Install Nexe.app/
+installer/swift-wizard/.build/
+
+# Releases (DMGs, PKGs — van a GitHub Releases, no al repo)
+releases/
+*.dmg
+*.pkg
+
+# Dev tray app (compilat local)
+Nexe.app/
+
+# =====================
+# RUNTIME I DADES
+# =====================
+
+# Storage (124 GB! — Qdrant vectors, DBs, logs de producció)
 storage/
 *.db
 *.sqlite
 *.log
 logs/
 
-# OS
-.DS_Store
-
-# Installer/runtime markers & binaries
+# Markers runtime
 .qdrant-initialized
-storage/.knowledge_ingested
-qdrant
-nexe
 
-# IDE / editor / dev tools
-*.code-workspace
-.claude/
-.ruff_cache/
-*.egg-info/
-dist/
-build/
+# Snapshots Qdrant
+snapshots/
 
-COMMANDS.md
-TESTING_REPORT.md
+# User uploads (poden contenir dades personals)
+plugins/web_ui_module/static/uploads/
+
+# Cache personalitat
 personality/.module_cache.json
 
-# User-uploaded files (mai al repo — poden contenir dades personals)
-plugins/web_ui_module/static/uploads/
-snapshots/
+# =====================
+# PYTHON
+# =====================
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+ENV/
+
+# Test/coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# =====================
+# DEV TOOLS I IDE
+# =====================
+.claude/
+.ruff_cache/
+*.code-workspace
 dev-tools/run_all_day.sh
 dev-tools/logs/
 
-# Dev tray app (no va al repo — es genera localment)
-Nexe.app/
+# Fitxers generats/temporals
+COMMANDS.md
+TESTING_REPORT.md
 
-# Bundled app resources (dev-tools/build-python-bundle.sh)
-Install Nexe.app/Contents/Resources/python/
-Install Nexe.app/Contents/Resources/tcl-tk/
-Install Nexe.app/Contents/Resources/python-tk-libexec/
-Install Nexe.app/Contents/Resources/installer
-Install Nexe.app/Contents/Resources/personality
-Install Nexe.app/Contents/Frameworks/
+# =====================
+# OS
+# =====================
+.DS_Store
+Thumbs.db
 
-# Releases (binaris, DMGs — es pugen com a GitHub Releases, no al repo)
-releases/
-*.dmg
-*.pkg
+# =====================
+# FITXERS ACCIDENTALS
+# =====================
+# (generats per errors de CLI: --output, --help)
+--output
+--help

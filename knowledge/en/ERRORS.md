@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-errors-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Common errors and solutions for server-nexe 0.8.2. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, Docker, and streaming issues."
-tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, docker, streaming]
+abstract: "Common errors and solutions for server-nexe 0.8.5 pre-release. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, Docker, streaming, and encryption errors."
+tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, docker, streaming, encryption]
 chunk_size: 800
 priority: P1
 
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Common Errors — server-nexe 0.8.2
+# Common Errors — server-nexe 0.8.5 pre-release
 
 ## Installation Errors
 
@@ -46,8 +46,8 @@ expires: null
 | 403 CSRF | CSRF token mismatch | Clear browser cache and reload |
 | Chat not responding | Model loading (first message) | Wait for loading indicator. Can take 10-60s for first load. |
 | Streaming stops at 2nd message | _renderTimer bug (pre-v0.8.2) | Fixed in v0.8.2. Update to latest. |
-| Old JS/CSS cached | Browser aggressive caching | Fixed in v0.8.2 with cache-busting (?v=timestamp). Hard refresh: Cmd+Shift+R |
-| Thinking box not scrolling | Auto-scroll bug (pre-v0.8.2) | Fixed in v0.8.2. Update to latest. |
+| Old JS/CSS cached | Browser aggressive caching | Fixed with cache-busting (?v=timestamp). Hard refresh: Cmd+Shift+R |
+| 429 Too Many Requests | Rate limit exceeded | Wait and retry. Limits per endpoint (5-30/min for UI). |
 
 ## API Errors
 
@@ -55,8 +55,8 @@ expires: null
 |-------|-------|----------|
 | 401 Missing X-API-Key | No auth header | Add `-H "X-API-Key: YOUR_KEY"` to request |
 | 429 Rate Limited | Too many requests | Wait and retry. Check rate limits in `.env` |
-| 408 Timeout | Model inference too slow | Increase NEXE_DEFAULT_MAX_TOKENS timeout (default 4096). Large models need 600s. |
-| Empty error message | httpx.ReadTimeout has empty str() | Fixed in v0.8.2 with repr(e). Check server logs. |
+| 408 Timeout | Model inference too slow | Increase NEXE_DEFAULT_MAX_TOKENS timeout. Large models need 600s. |
+| Empty error message | httpx.ReadTimeout has empty str() | Fixed with repr(e). Check server logs. |
 
 ## Model Errors
 
@@ -75,6 +75,16 @@ expires: null
 | Wrong RAG results | Threshold too high | Lower threshold via UI slider or NEXE_RAG_*_THRESHOLD env vars. |
 | Duplicate memories | Dedup threshold issue | Dedup checks similarity > 0.80. Very similar but different entries may both save. |
 | Documents not visible | Wrong session | Documents are session-isolated. Upload in the same session you're chatting in. |
+
+## Encryption Errors
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| Keyring not available | OS keyring not configured (Linux without Secret Service) | Set `NEXE_MASTER_KEY` env var or create `~/.nexe/master.key` file (chmod 600) |
+| sqlcipher3 not installed | Missing dependency | `pip install sqlcipher3`. Falls back to plaintext SQLite with warning. |
+| Cannot decrypt data | Wrong master key | Ensure the same key is used. Export with `./nexe encryption export-key`. |
+| Migration failed | Corrupted database or interrupted migration | Backup .bak file is preserved. Restore from backup and retry. |
+| Encryption status: disabled | Feature not enabled | Set `NEXE_ENCRYPTION_ENABLED=true` in .env or environment |
 
 ## Docker Errors
 

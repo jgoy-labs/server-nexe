@@ -12,6 +12,16 @@ struct InstallStep: Identifiable {
     let key: String
     var status: StepStatus = .pending
     var message: String = ""
+    var startTime: Date?
+    var endTime: Date?
+
+    var elapsed: String? {
+        guard let start = startTime else { return nil }
+        let end = endTime ?? Date()
+        let secs = Int(end.timeIntervalSince(start))
+        if secs < 60 { return "\(secs)s" }
+        return "\(secs / 60)m \(secs % 60)s"
+    }
 }
 
 @MainActor
@@ -46,6 +56,10 @@ class InstallerEngine: ObservableObject {
     @Published var logFilePath: String = ""
     @Published var totalTime: String = ""
 
+    // Detecció instal·lació existent
+    @Published var showExistingInstallAlert: Bool = false
+    private var pendingInstallContinuation: (() -> Void)?
+
     private var installStartTime: Date?
 
     // Hardware
@@ -75,6 +89,35 @@ class InstallerEngine: ObservableObject {
     // MARK: - Instal·lació
 
     func startInstall() {
+        // Detectar instal·lació existent
+        let markers = ["core", "venv", ".env"]
+        let hasExisting = markers.contains { name in
+            FileManager.default.fileExists(atPath: installPath + "/" + name)
+        }
+
+        if hasExisting {
+            pendingInstallContinuation = { [weak self] in
+                self?.doStartInstall()
+            }
+            showExistingInstallAlert = true
+            return
+        }
+
+        doStartInstall()
+    }
+
+    func confirmOverwrite() {
+        showExistingInstallAlert = false
+        pendingInstallContinuation?()
+        pendingInstallContinuation = nil
+    }
+
+    func cancelOverwrite() {
+        showExistingInstallAlert = false
+        pendingInstallContinuation = nil
+    }
+
+    private func doStartInstall() {
         guard let model = selectedModel else { return }
 
         // Determinar engine
@@ -408,7 +451,15 @@ class InstallerEngine: ObservableObject {
 
         if stepNum > 0, stepNum <= steps.count {
             let idx = stepNum - 1
-            steps[idx].status = StepStatus(rawValue: status) ?? .running
+            let newStatus = StepStatus(rawValue: status) ?? .running
+            // Registrar temps d'inici i fi
+            if newStatus == .running && steps[idx].startTime == nil {
+                steps[idx].startTime = Date()
+            }
+            if newStatus == .done || newStatus == .error {
+                steps[idx].endTime = Date()
+            }
+            steps[idx].status = newStatus
             if !msg.isEmpty {
                 steps[idx].message = msg
             }

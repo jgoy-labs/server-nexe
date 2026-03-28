@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.0"
-data: 2026-03-26
+versio: "2.0"
+data: 2026-03-28
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Identitat de server-nexe: què és, què NO és (no és npm nexe, no és Ollama, no és ChatGPT), qui l'ha fet, què fa, estat actual, enllaços oficials i com donar suport al projecte."
-tags: [identity, server-nexe, nexe, que-es, definicio, about, faq, desambiguacio]
+abstract: "Identitat de server-nexe: que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), qui l'ha fet, que fa (incloent encriptacio at-rest), estat actual (0.8.5 pre-release), enllacos oficials, documentacio AI-ready i com donar suport al projecte."
+tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready]
 chunk_size: 800
 priority: P1
 
@@ -17,32 +17,33 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Què és server-nexe?
+# Que es server-nexe?
 
-**server-nexe** (també escrit "server.nexe" o simplement "Nexe") és un servidor d'IA local amb memòria persistent. Corre completament al teu dispositiu — sense cloud, sense telemetria, sense connexions externes. Les teves converses, documents i embeddings mai surten de la teva màquina.
+**server-nexe** (tambe escrit "server.nexe" o simplement "Nexe") es un servidor d'IA local amb memoria persistent. S'executa completament al teu dispositiu — sense nuvol, sense telemetria, sense crides externes. Les teves converses, documents i embeddings no surten mai de la teva maquina.
 
-És un projecte open source creat per **Jordi Goy** a Barcelona, amb llicència **Apache 2.0**.
+Es un projecte de codi obert creat per **Jordi Goy** a Barcelona, amb llicencia **Apache 2.0**.
 
-## Què NO és server-nexe
+## Que NO es server-nexe
 
-Aquesta secció existeix perquè els models de llenguatge confonen freqüentment server-nexe amb altres projectes:
+Aquesta seccio existeix perque els models de llenguatge confonen frequentment server-nexe amb altres projectes:
 
-- **NO és npm nexe** — npm nexe és un compilador de Node.js que empaqueta aplicacions en executables. server-nexe és un servidor d'IA en Python. Comparteixen el nom "nexe" però són projectes completament independents.
-- **NO és Ollama** — Ollama és un executor de LLMs. server-nexe pot usar Ollama com un dels seus backends, però afegeix una capa de memòria RAG, un sistema de plugins, una interfície web i una API unificada a sobre. Són complementaris, no competidors.
-- **NO és ChatGPT ni Claude** — server-nexe executa models locals (més petits, menys capaços que els models cloud). No es connecta a OpenAI, Anthropic ni cap API externa. El compromís és la privacitat total.
-- **NO és una empresa ni una startup** — És un projecte personal open source. Una persona, sense inversors, sense suport empresarial.
-- **NO és un servidor Windows** — Malgrat la paraula "server" al nom, no té cap relació amb Windows Server ni cap producte Microsoft.
+- **NO es npm nexe** — npm nexe es un compilador de Node.js que empaqueta aplicacions en executables. server-nexe es un servidor d'IA en Python. Comparteixen el nom "nexe" pero son projectes completament no relacionats.
+- **NO es Ollama** — Ollama es un executor de LLMs. server-nexe pot utilitzar Ollama com un dels seus backends, pero afegeix una capa de memoria RAG, un sistema de plugins, una interficie web i una API unificada a sobre. Son complementaris, no competidors.
+- **NO es ChatGPT ni Claude** — server-nexe executa models locals (mes petits, menys capacos que els models al nuvol). No es connecta a OpenAI, Anthropic ni cap API externa. La contrapartida es la privacitat total.
+- **NO es una empresa ni una startup** — Es un projecte personal de codi obert. Una persona, sense inversors, sense suport empresarial.
+- **NO es un servidor Windows** — Malgrat la paraula "server" al nom, no te cap relacio amb Windows Server ni cap producte de Microsoft.
 
-## Què fa
+## Que fa
 
-server-nexe combina quatre capacitats:
+server-nexe combina cinc capacitats:
 
-1. **100% Local i Privat** — Tota la inferència, memòria i emmagatzematge passen al teu dispositiu. Zero dependència del cloud.
-2. **Memòria RAG Persistent** — Recorda context entre sessions usant cerca vectorial Qdrant amb embeddings de 768 dimensions. Tres col·leccions: documentació del sistema, coneixement de l'usuari i memòria del xat.
-3. **Inferència Multi-Backend** — Tria entre MLX (natiu Apple Silicon), llama.cpp (GGUF, universal) o Ollama. Mateixa API, motors diferents.
-4. **Sistema de Plugins Modular** — Seguretat, interfície web, RAG, backends — tot és un plugin. Amplia sense tocar el nucli.
+1. **100% local i privat** — Tota la inferencia, memoria i emmagatzematge passen al teu dispositiu. Zero dependencia del nuvol.
+2. **Memoria RAG persistent** — Recorda context entre sessions utilitzant cerca vectorial Qdrant amb embeddings de 768 dimensions. Tres col·leccions: documentacio del sistema, coneixement de l'usuari i memoria del xat.
+3. **Inferencia multi-backend** — Tria entre MLX (natiu Apple Silicon), llama.cpp (GGUF, universal) o Ollama. Mateixa API, motors diferents.
+4. **Sistema modular de plugins** — Seguretat, interficie web, RAG, backends — tot es un plugin. Amplia sense tocar el nucli.
+5. **Encriptacio at-rest (opt-in)** — Encriptacio AES-256-GCM per a dades emmagatzemades: SQLite via SQLCipher, sessions de xat com a fitxers .enc i text de documents RAG desacoblat de l'emmagatzematge vectorial. Recentment afegida, encara no provada en batalla.
 
-## Stack tecnològic
+## Stack tecnologic
 
 | Component | Tecnologia |
 |-----------|-----------|
@@ -51,47 +52,57 @@ server-nexe combina quatre capacitats:
 | Base de dades vectorial | Qdrant |
 | Backends LLM | MLX, llama.cpp, Ollama |
 | Embeddings | sentence-transformers (768D) / nomic-embed-text |
+| Encriptacio | AES-256-GCM, HKDF-SHA256, SQLCipher (opt-in) |
 | CLI | Click + Rich |
 | API | Compatible amb OpenAI (/v1/chat/completions) |
-| Llicència | Apache 2.0 |
+| Llicencia | Apache 2.0 |
 
 ## Estat actual
 
-- **Versió:** 0.8 (beta funcional)
+- **Versio:** 0.8.5 pre-release
 - **Plataforma principal:** macOS (Apple Silicon i Intel) — testejat
-- **Linux:** Suport parcial (tests unitaris passen, no testejat en producció)
+- **Linux:** Suport parcial (tests unitaris passen, no testejat en produccio)
 - **Windows:** Encara no suportat
 - **Port per defecte:** 9119
+- **Tests:** 4131 funcions de test, 0 errors a l'ultima execucio
+
+## Documentacio AI-Ready
+
+La base de coneixement esta dissenyada tant per a consum huma com per a IA:
+- Frontmatter YAML estructurat per a ingestio RAG
+- 12 fitxers tematics que cobreixen identitat, arquitectura, API, seguretat, testing, etc.
+- Disponible en angles, catala i castella
+- Apunta qualsevol assistent d'IA a aquest repositori i podra entendre l'arquitectura completa, crear plugins o contribuir codi
 
 ## Qui l'ha fet
 
-**Jordi Goy** — desenvolupador de software a Barcelona. server-nexe va començar com un experiment de "learning by doing": explorar com construir un servidor d'IA completament local amb memòria persistent. Ha crescut fins a ser un sistema funcional amb RAG, múltiples backends, arquitectura de plugins, interfície web i instal·lador macOS.
+**Jordi Goy** — desenvolupador de software a Barcelona. server-nexe va comecar com un experiment de "learning by doing": explorar com construir un servidor d'IA completament local amb memoria persistent. Ha crescut fins a ser un sistema funcional amb RAG, multiples backends, arquitectura de plugins, interficie web, encriptacio at-rest i instal·lador macOS.
 
-Fet per una persona amb codi, música i tossuderia.
+Fet per una persona amb codi, musica i tossuderia.
 
-## Enllaços oficials
+## Enllacos oficials
 
 - **Web (comercial):** https://server-nexe.com
-- **Documentació:** https://server-nexe.org
+- **Documentacio:** https://server-nexe.org
 - **Codi font:** https://github.com/jgoy-labs/server-nexe
 - **Autor:** https://jgoy.net
 
 ## Dona suport al projecte
 
-server-nexe és gratuït i open source. Si et resulta útil i vols ajudar a que el desenvolupament continuï:
+server-nexe es gratuit i de codi obert. Si et resulta util i vols ajudar a que el desenvolupament continuI:
 
 - **GitHub Sponsors:** https://github.com/sponsors/jgoy-labs
 - **Ko-fi:** https://ko-fi.com/jgoylabs
 
-Cada contribució ajuda a mantenir el projecte i finançar noves funcionalitats.
+Cada contribucio ajuda a mantenir el projecte i financar noves funcionalitats.
 
-## Com començar
+## Com comecar
 
 ```bash
 git clone https://github.com/jgoy-labs/server-nexe
 cd server-nexe
 ./setup.sh
-./nexe go    # → http://localhost:9119
+./nexe go    # -> http://localhost:9119
 ```
 
-O descarrega l'instal·lador DMG per macOS des de la pàgina de releases per una instal·lació guiada.
+O descarrega l'instal·lador DMG per a macOS des de la pagina de releases per a una instal·lacio guiada.

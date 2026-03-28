@@ -76,21 +76,21 @@ def setup_bootstrap_tokens(server_state, _translate) -> None:
     single_use_msg = _translate(server_state.i18n, "core.server.bootstrap_token_single_use",
       "This code only works ONCE")
 
-    print(f"""
-+==================================================================+
-|                                  |
-| {title:<62}|
-|                                  |
-|   {token_to_display:<58}|
-|                                  |
-| {expiry_msg:<62}|
-| {url_msg:<62}|
-|                                  |
-| {copy_msg:<62}|
-| {single_use_msg:<62}|
-|                                  |
-+==================================================================+
-    """)
+    logger.info(
+      f"\n+==================================================================+\n"
+      f"|                                  |\n"
+      f"| {title:<62}|\n"
+      f"|                                  |\n"
+      f"|   {token_to_display:<58}|\n"
+      f"|                                  |\n"
+      f"| {expiry_msg:<62}|\n"
+      f"| {url_msg:<62}|\n"
+      f"|                                  |\n"
+      f"| {copy_msg:<62}|\n"
+      f"| {single_use_msg:<62}|\n"
+      f"|                                  |\n"
+      f"+==================================================================+"
+    )
 
   msg = _translate(server_state.i18n, "core.server.bootstrap_token_generated",
     "Bootstrap token persisted to DB (expires in {minutes} min)", minutes=bootstrap_ttl)

@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-api-reference
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referència completa de l'API REST de server-nexe 0.8.2. Cobreix tots els endpoints: chat completions (compatible OpenAI, streaming, RAG), memòria (store, search), cerca RAG, pujada documents, sessions, bootstrap, health checks, mòduls, backends, i18n. Inclou autenticació (X-API-Key dual-key), rate limiting, marcadors streaming (MODEL_LOADING, RAG_AVG, MEM_SAVE) i configuració."
-tags: [api, rest, endpoints, chat, memoria, rag, autenticacio, rate-limiting, streaming, openai-compatible, upload, sessions, bootstrap, health, backends]
+abstract: "Referencia completa de l'API REST per a server-nexe 0.8.5 pre-release. Cobreix tots els endpoints: chat completions (compatible amb OpenAI, streaming, RAG), memoria (store, search), cerca RAG, pujada de documents, sessions, bootstrap, health checks, moduls, backends, i18n, CLI d'encriptacio. Inclou autenticacio (X-API-Key dual-key), rate limiting per endpoint, marcadors de streaming i configuracio."
+tags: [api, rest, endpoints, chat, memory, rag, authentication, rate-limiting, streaming, openai-compatible, upload, sessions, bootstrap, health, backends, encryption]
 chunk_size: 800
 priority: P1
 
@@ -17,52 +17,66 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Referència API REST — server-nexe 0.8.2
+# Referencia de l'API REST — server-nexe 0.8.5 pre-release
 
-## URL Base
+## URL base
 
 ```
 http://127.0.0.1:9119
 ```
 
-Configurable via `personality/server.toml` secció `[core.server]` o `.env` (HOST/PORT). Prioritat: server.toml > .env > per defecte.
+Configurable via `personality/server.toml` seccio `[core.server]` o `.env` (HOST/PORT). Prioritat: server.toml > .env > valors per defecte.
 
-Docs API (Swagger): `http://127.0.0.1:9119/docs`
+Docs de l'API (Swagger): `http://127.0.0.1:9119/docs`
 
-## Autenticació
+## Autenticacio
 
-La majoria d'endpoints requereixen capçalera `X-API-Key`. Valor del fitxer `.env` (`NEXE_PRIMARY_API_KEY`).
+La majoria d'endpoints requereixen la capcalera `X-API-Key`. Valor del fitxer `.env` (`NEXE_PRIMARY_API_KEY`).
 
-**Sistema dual-key:** Dues claus poden estar actives simultàniament per rotació:
+**Sistema dual-key:** Dues claus poden estar actives simultaneament per a rotacio:
 - `NEXE_PRIMARY_API_KEY` — sempre activa
-- `NEXE_SECONDARY_API_KEY` — període de gràcia per rotació
-- Control d'expiració via `NEXE_PRIMARY_KEY_EXPIRES`, `NEXE_SECONDARY_KEY_EXPIRES`
+- `NEXE_SECONDARY_API_KEY` — periode de gracia per a rotacio
+- Seguiment d'expiracio via `NEXE_PRIMARY_KEY_EXPIRES`, `NEXE_SECONDARY_KEY_EXPIRES`
 
-**Bootstrap token:** Per setup inicial, es genera un token d'un sol ús a l'arrencada (128-bit, TTL 30min). Mostrat a la sortida de consola.
+**Bootstrap token:** Per a la configuracio inicial, es genera un token d'un sol us a l'arrencada (128 bits, TTL de 30min). Es mostra a la sortida de consola.
 
 ## Rate Limiting
 
-Configurable per endpoint via `.env`:
+El rate limiting s'aplica a **tots els endpoints** — tant API com Web UI.
 
-| Variable | Per defecte | Aplica a |
+### Endpoints de l'API (configurables via `.env`)
+
+| Variable | Per defecte | S'aplica a |
 |----------|---------|-----------|
 | NEXE_RATE_LIMIT_CHAT | 60/minut | /v1/chat/completions |
 | NEXE_RATE_LIMIT_MEMORY | 30/minut | /v1/memory/* |
 | NEXE_RATE_LIMIT_RAG | 30/minut | /v1/rag/* |
 | NEXE_RATE_LIMIT_UPLOAD | 10/minut | /ui/upload |
-| NEXE_RATE_LIMIT_DEFAULT | 120/minut | Tots els altres |
+| NEXE_RATE_LIMIT_DEFAULT | 120/minut | Resta d'endpoints |
 
-## Endpoints Core
+### Endpoints de la Web UI (per endpoint)
 
-### Chat
+| Endpoint | Limit |
+|----------|-----------|
+| POST /ui/chat | 20/minut |
+| POST /ui/memory/save | 10/minut |
+| POST /ui/memory/recall | 30/minut |
+| POST /ui/upload | 5/minut |
+| POST /ui/files/cleanup | 5/minut |
+| GET /ui/session/{id} | 30/minut |
+| DELETE /ui/session/{id} | 10/minut |
 
-**POST /v1/chat/completions** (requereix API key)
+## Endpoints principals
 
-Chat completion compatible OpenAI amb RAG i streaming.
+### Xat
+
+**POST /v1/chat/completions** (requereix clau API, rate limit: 60/min)
+
+Chat completion compatible amb OpenAI amb suport RAG i streaming.
 
 ```json
 {
-  "messages": [{"role": "user", "content": "Hola"}],
+  "messages": [{"role": "user", "content": "Hello"}],
   "model": "auto",
   "engine": "auto",
   "use_rag": true,
@@ -72,132 +86,185 @@ Chat completion compatible OpenAI amb RAG i streaming.
 }
 ```
 
-- `use_rag`: true per defecte — cerca a 3 col·leccions Qdrant
-- `engine`: "auto" (defecte), "ollama", "mlx", "llama_cpp"
-- `stream`: true retorna stream SSE amb marcadors
-- `max_tokens`: null = defecte del model, màx 32000
+- `use_rag`: true per defecte — cerca en 3 col·leccions Qdrant
+- `engine`: "auto" (per defecte), "ollama", "mlx", "llama_cpp"
+- `stream`: true retorna flux SSE amb marcadors
+- `temperature`: 0.0-2.0 (per defecte 0.7)
+- `max_tokens`: null = utilitza el per defecte del model, maxim 32000
 
-**Marcadors streaming** (injectats al stream SSE):
-- `[MODEL:nom]` — model actiu
-- `[MODEL_LOADING]` / `[MODEL_READY]` — estat càrrega model amb timing
-- `[RAG_AVG:0.75]` — puntuació RAG mitjana
+**Marcadors de streaming** (injectats al flux SSE, parsejats per la UI):
+- `[MODEL:name]` — model actiu
+- `[MODEL_LOADING]` / `[MODEL_READY]` — estat de carrega del model amb temporitzacio
+- `[RAG_AVG:0.75]` — puntuacio mitjana de rellevancia RAG
 - `[RAG_ITEM:0.82|nexe_documentation|ARCHITECTURE.md]` — detall per font
-- `[MEM:2]` — fets auto-guardats via MEM_SAVE
-- `[THINKING]` / `[/THINKING]` — tokens de raonament (models Ollama com qwen3.5)
+- `[MEM:2]` — nombre de fets auto-guardats via MEM_SAVE
+- `[COMPACT:N]` — indicador de compactacio de context
+- `[THINKING]` / `[/THINKING]` — thinking tokens (models Ollama com qwen3.5)
 
-### Info Sistema
+### Informacio del sistema
 
-| Endpoint | Mètode | Auth | Descripció |
+| Endpoint | Metode | Auth | Descripcio |
 |----------|--------|------|-------------|
-| `/` | GET | No | Info sistema (versió, estat, port) |
-| `/health` | GET | No | Health check bàsic |
-| `/health/ready` | GET | No | Readiness check (verifica mòduls requerits) |
-| `/health/circuits` | GET | No | Estat circuit breakers (Ollama, Qdrant) |
-| `/status` | GET | No | Estat temps real: motor actiu, model, mòduls |
-| `/api/info` | GET | No | Info API i llista endpoints |
-| `/docs` | GET | No | Documentació Swagger/OpenAPI interactiva |
+| `/` | GET | No | Informacio del sistema (versio, estat, port) |
+| `/health` | GET | No | Health check basic |
+| `/health/ready` | GET | No | Comprovacio de disponibilitat (verifica moduls requerits) |
+| `/health/circuits` | GET | No | Estat dels circuit breakers (Ollama, Qdrant) |
+| `/status` | GET | No | Estat en temps real: motor actiu, model, moduls carregats |
+| `/api/info` | GET | No | Informacio de l'API i llista d'endpoints disponibles |
+| `/docs` | GET | No | Documentacio interactiva Swagger/OpenAPI |
 
-### Mòduls
+### Moduls
 
-| Endpoint | Mètode | Auth | Descripció |
+| Endpoint | Metode | Auth | Descripcio |
 |----------|--------|------|-------------|
-| `/modules` | GET | No | Llista mòduls carregats i les seves APIs |
-| `/modules/{nom}/routes` | GET | No | Rutes registrades d'un mòdul específic |
+| `/modules` | GET | No | Llista de moduls carregats i les seves APIs |
+| `/modules/{name}/routes` | GET | No | Rutes registrades per un modul especific |
 
-## Endpoints Memòria (prefix: /v1/memory)
+### Bootstrap
 
-| Endpoint | Mètode | Auth | Descripció |
+| Endpoint | Metode | Auth | Descripcio |
 |----------|--------|------|-------------|
-| `/v1/memory/store` | POST | Sí | Guardar text a una col·lecció |
-| `/v1/memory/search` | POST | Sí | Cerca semàntica en una col·lecció |
-| `/v1/memory/health` | GET | No | Salut subsistema memòria + col·leccions Qdrant |
+| `/api/bootstrap` | POST | Token | Inicialitzar sessio amb bootstrap token |
+| `/api/regenerate-bootstrap` | POST | localhost | Regenerar bootstrap token expirat |
+| `/api/bootstrap/info` | GET | No | Estat del sistema de bootstrap |
+
+## Endpoints de memoria (prefix: /v1/memory)
+
+| Endpoint | Metode | Auth | Descripcio |
+|----------|--------|------|-------------|
+| `/v1/memory/store` | POST | Si | Guardar text a una col·leccio |
+| `/v1/memory/search` | POST | Si | Cerca semantica en una col·leccio |
+| `/v1/memory/health` | GET | No | Salut del subsistema de memoria + col·leccions Qdrant |
+
+**Peticio de guardat:**
+```json
+{
+  "text": "Information to store",
+  "collection": "user_knowledge",
+  "metadata": {"source": "api", "tags": ["example"]}
+}
+```
+
+**Peticio de cerca:**
+```json
+{
+  "query": "search query",
+  "collection": "user_knowledge",
+  "limit": 5,
+  "threshold": 0.35
+}
+```
 
 ## Endpoints RAG (prefix: /v1/rag)
 
-| Endpoint | Mètode | Auth | Descripció |
+| Endpoint | Metode | Auth | Descripcio |
 |----------|--------|------|-------------|
-| `/v1/rag/search` | POST | Sí | Cerca semàntica al vector store RAG |
-| `/v1/rag/add` | POST | Sí | Afegir documents al vector store RAG |
-| `/v1/rag/documents/{id}` | DELETE | Sí | Esborrar document del RAG |
+| `/v1/rag/search` | POST | Si | Cerca semantica al magatzem de vectors RAG |
+| `/v1/rag/add` | POST | Si | Afegir documents al magatzem de vectors RAG |
+| `/v1/rag/documents/{id}` | DELETE | Si | Esborrar document del RAG |
 
-## Endpoints Embeddings (prefix: /v1/embeddings)
+## Endpoints d'embeddings (prefix: /v1/embeddings)
 
-| Endpoint | Mètode | Auth | Descripció |
+| Endpoint | Metode | Auth | Descripcio |
 |----------|--------|------|-------------|
-| `/v1/embeddings/encode` | POST | Sí | Generar vectors embedding per textos |
-| `/v1/embeddings/models` | GET | No | Llistar models d'embeddings disponibles |
+| `/v1/embeddings/encode` | POST | Si | Generar vectors d'embedding per a textos |
+| `/v1/embeddings/models` | GET | No | Llistar models d'embedding disponibles |
 
-## Endpoints Web UI (prefix: /ui)
+## Endpoints de la Web UI (prefix: /ui)
 
-### Auth i Config
+Aquests endpoints serveixen la interficie web i els utilitza el frontend JavaScript. Tots tenen validacio d'input via `validate_string_input()`.
 
-| Endpoint | Mètode | Auth | Descripció |
-|----------|--------|------|-------------|
-| `/ui/auth` | GET | Sí | Verificar validesa API key |
-| `/ui/info` | GET | Sí | Info servidor (versió, idioma, features) |
-| `/ui/lang` | POST | Sí | Establir idioma servidor (ca/es/en) |
-| `/ui/backends` | GET | Sí | Llistar backends amb noms i mides models (GB) |
-| `/ui/backend` | POST | Sí | Canviar backend actiu |
+### Autenticacio i configuracio
 
-### Chat i Memòria
+| Endpoint | Metode | Auth | Rate limit | Descripcio |
+|----------|--------|------|-----------|-------------|
+| `/ui/auth` | GET | Si | per defecte | Verificar validesa de la clau API |
+| `/ui/info` | GET | Si | per defecte | Informacio del servidor (versio, idioma, funcionalitats) |
+| `/ui/lang` | POST | Si | per defecte | Establir idioma del servidor (ca/es/en) |
+| `/ui/backends` | GET | Si | per defecte | Llistar backends amb noms i mides de models (GB) |
+| `/ui/backend` | POST | Si | per defecte | Canviar backend actiu |
+| `/ui/health` | GET | No | per defecte | Salut del modul Web UI |
 
-| Endpoint | Mètode | Auth | Descripció |
-|----------|--------|------|-------------|
-| `/ui/chat` | POST | Sí | Streaming SSE chat (amb MEM_SAVE, RAG, thinking tokens) |
-| `/ui/memory/save` | POST | Sí | Guardar text a memòria |
-| `/ui/memory/recall` | POST | Sí | Recordar de memòria (filtrat per session_id) |
+### Xat i memoria
+
+| Endpoint | Metode | Auth | Rate limit | Descripcio |
+|----------|--------|------|-----------|-------------|
+| `/ui/chat` | POST | Si | 20/min | Xat amb streaming SSE (MEM_SAVE, RAG, thinking tokens) |
+| `/ui/memory/save` | POST | Si | 10/min | Guardar text a memoria (valida contingut, session_id) |
+| `/ui/memory/recall` | POST | Si | 30/min | Recuperar de memoria (valida query, session_id) |
 
 ### Sessions
 
-| Endpoint | Mètode | Auth | Descripció |
-|----------|--------|------|-------------|
-| `/ui/session/new` | POST | Sí | Crear nova sessió |
-| `/ui/session/{id}` | GET | Sí | Obtenir dades sessió |
-| `/ui/session/{id}/history` | GET | Sí | Obtenir historial xat sessió |
-| `/ui/session/{id}` | DELETE | Sí | Esborrar sessió |
-| `/ui/sessions` | GET | Sí | Llistar totes les sessions |
+| Endpoint | Metode | Auth | Rate limit | Descripcio |
+|----------|--------|------|-----------|-------------|
+| `/ui/session/new` | POST | Si | per defecte | Crear nova sessio |
+| `/ui/session/{id}` | GET | Si | 30/min | Obtenir dades de la sessio (valida session_id) |
+| `/ui/session/{id}/history` | GET | Si | 30/min | Obtenir historial de xat de la sessio |
+| `/ui/session/{id}` | DELETE | Si | 10/min | Esborrar sessio |
+| `/ui/sessions` | GET | Si | per defecte | Llistar totes les sessions |
 
 ### Fitxers
 
-| Endpoint | Mètode | Auth | Descripció |
-|----------|--------|------|-------------|
-| `/ui/upload` | POST | Sí | Pujar document (aïllat per sessió, indexat a user_knowledge) |
-| `/ui/files` | GET | Sí | Llistar fitxers pujats |
-| `/ui/files/cleanup` | POST | Sí | Netejar fitxers temporals |
+| Endpoint | Metode | Auth | Rate limit | Descripcio |
+|----------|--------|------|-----------|-------------|
+| `/ui/upload` | POST | Si | 5/min | Pujar document (valida nom de fitxer, aillat per sessio) |
+| `/ui/files` | GET | Si | per defecte | Llistar fitxers pujats |
+| `/ui/files/cleanup` | POST | Si | 5/min | Netejar fitxers temporals |
 
-**Upload:** Accepta .txt, .md, .pdf. Chunks 1500/200 chars. Metadades sense LLM (instantani). Documents aïllats a la sessió via session_id.
+**Pujada:** Accepta .txt, .md, .pdf. Chunks de 1500/200 caracters. Metadades generades sense LLM (instantani). Documents aillats a la sessio de pujada via session_id.
 
-## Compatibilitat OpenAI
+## Comandes CLI d'encriptacio
 
-`/v1/chat/completions` és parcialment compatible amb el format API d'OpenAI:
+Aquestes son comandes CLI (no endpoints HTTP):
 
-**Suportat:** messages array, model, temperature, max_tokens, stream, top_p
+| Comanda | Descripcio |
+|---------|-------------|
+| `./nexe encryption status` | Mostrar estat d'encriptacio de tots els components d'emmagatzematge |
+| `./nexe encryption encrypt-all` | Migrar totes les dades existents a format encriptat |
+| `./nexe encryption export-key` | Exportar clau mestra (hex o base64, per a copia de seguretat) |
+
+## Compatibilitat amb OpenAI
+
+`/v1/chat/completions` es parcialment compatible amb el format de l'API d'OpenAI:
+
+**Suportat:** array de messages, model, temperature, max_tokens, stream, top_p
 **Camps extra:** use_rag (boolean), engine (string)
-**No implementat:** /v1/embeddings estàndard (usar /v1/embeddings/encode), /v1/models, /v1/completions (legacy)
+**No implementat:** /v1/embeddings (utilitza /v1/embeddings/encode en el seu lloc), /v1/models, /v1/completions (legacy)
 
-Compatible amb eines que usen format API OpenAI: Cursor, Continue, Zed, scripts custom.
+Compatible amb eines que utilitzen el format de l'API d'OpenAI: Cursor, Continue, Zed, scripts personalitzats.
 
-## Exemples Ràpids
+## Configuracio
+
+| Parametre | Ubicacio | Proposit |
+|---------|----------|---------|
+| Host/Port | server.toml `[core.server]` | Adreca de vinculacio del servidor |
+| Claus API | .env | NEXE_PRIMARY_API_KEY, NEXE_SECONDARY_API_KEY |
+| Rate limits | .env | Variables NEXE_RATE_LIMIT_* |
+| Timeout | .env | NEXE_DEFAULT_MAX_TOKENS (per defecte 4096) |
+| Origens CORS | server.toml `[core.server]` | Origens permesos |
+| Encriptacio | .env | NEXE_ENCRYPTION_ENABLED (per defecte false) |
+
+## Exemples rapids
 
 ```bash
 # Health check
 curl http://127.0.0.1:9119/health
 
-# Chat (sense streaming)
+# Xat (sense streaming)
 curl -X POST http://127.0.0.1:9119/v1/chat/completions \
-  -H "X-API-Key: LA_TEVA_KEY" \
+  -H "X-API-Key: YOUR_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"messages": [{"role": "user", "content": "Hola"}]}'
+  -d '{"messages": [{"role": "user", "content": "Hello"}]}'
 
-# Guardar a memòria
+# Guardar a memoria
 curl -X POST http://127.0.0.1:9119/v1/memory/store \
-  -H "X-API-Key: LA_TEVA_KEY" \
+  -H "X-API-Key: YOUR_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"text": "Em dic Jordi", "collection": "user_knowledge"}'
+  -d '{"text": "My name is Jordi", "collection": "user_knowledge"}'
 
-# Cercar a memòria
+# Cercar a memoria
 curl -X POST http://127.0.0.1:9119/v1/memory/search \
-  -H "X-API-Key: LA_TEVA_KEY" \
+  -H "X-API-Key: YOUR_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"query": "com em dic", "collection": "user_knowledge", "limit": 3}'
+  -d '{"query": "what is my name", "collection": "user_knowledge", "limit": 3}'
 ```

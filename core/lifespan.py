@@ -51,6 +51,7 @@ class ServerState:
     self.qdrant_process = None
     self.ollama_process = None
     self.qdrant_available: bool = False
+    self.crypto_provider = None
 
 server_state = ServerState()
 
@@ -88,6 +89,36 @@ async def lifespan(app: FastAPI):
 
     server_state.config = load_config(server_state.project_root, server_state.i18n)
     app.state.config = server_state.config  # Sync: elimina el desync entre server_state i app.state
+
+    # === ENCRYPTION AT REST (opt-in) ===
+    try:
+      from core.crypto import CryptoProvider, check_encryption_status
+
+      encryption_config = server_state.config.get('security', {}).get('encryption', {})
+      crypto_enabled = encryption_config.get('enabled', False)
+
+      # Env var override (NEXE_ENCRYPTION_ENABLED=true)
+      env_crypto = os.environ.get('NEXE_ENCRYPTION_ENABLED', '').lower()
+      if env_crypto == 'true':
+        crypto_enabled = True
+      elif env_crypto == 'false':
+        crypto_enabled = False
+
+      if crypto_enabled:
+        server_state.crypto_provider = CryptoProvider()
+        logger.info("Encryption at rest: ENABLED (AES-256-GCM)")
+      else:
+        logger.info("Encryption at rest: disabled")
+
+      # Always check for unencrypted data
+      warn_unencrypted = encryption_config.get('warn_unencrypted', True)
+      if warn_unencrypted:
+        storage_path = server_state.project_root / "storage" if server_state.project_root else None
+        check_encryption_status(storage_path)
+
+    except Exception as e:
+      logger.warning("Encryption init failed (non-fatal): %s", e)
+      server_state.crypto_provider = None
 
     # Auto-start services (Qdrant, Ollama) if not running
     await _auto_start_services(server_state.config, server_state.project_root, server_state)
@@ -339,10 +370,13 @@ async def lifespan(app: FastAPI):
     _api_key = os.environ.get("NEXE_PRIMARY_API_KEY", "")
     _lang = os.environ.get("NEXE_LANG", "ca")
 
+    _crypto_status = "ENABLED" if server_state.crypto_provider else "disabled"
+
     logger.info("=" * 70)
     logger.info("  SERVER.NEXE READY - Listening on %s", _nexe_url)
     logger.info("  Web UI: %s/ui/", _nexe_url)
     logger.info("  API Key: %s", (_api_key[:4] + "..." if _api_key and len(_api_key) > 4 else "(set)" if _api_key else "(not set)"))
+    logger.info("  Encryption: %s", _crypto_status)
     logger.info("=" * 70)
 
     yield

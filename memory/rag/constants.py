@@ -17,7 +17,7 @@ MODULE_ID = "rag"
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
   "name": "rag",
-  "version": "0.8.2",
+  "version": "0.8.5",
   "description": "RAG System (Retrieval-Augmented Generation) with multi-source and circuit breaker",
   "author": "J.Goy",
   "category": "memory.core",

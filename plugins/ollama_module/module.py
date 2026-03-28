@@ -67,7 +67,7 @@ class OllamaModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="ollama_module",
-            version="0.8.2",
+            version="0.8.5",
             description="Integracio amb Ollama per executar models LLM locals",
             author="Jordi Goy",
             module_type="local_llm_option",
@@ -274,18 +274,18 @@ class OllamaModule:
 
     @ollama_breaker.protect
     async def list_models(self) -> List[Dict[str, Any]]:
-        """Llista tots els models locals disponibles. Protected by Circuit Breaker."""
+        """List all available local models. Protected by Circuit Breaker."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(f"{self.base_url}/api/tags")
             response.raise_for_status()
             data = response.json()
             models = data.get("models", [])
-            msg = self._t("logs.models_found", "Trobats {count} models d'Ollama", count=len(models))
+            msg = self._t("logs.models_found", "Found {count} Ollama models", count=len(models))
             logger.info(msg)
             return models
 
     async def pull_model(self, model_name: str) -> AsyncIterator[Dict[str, Any]]:
-        """Descarrega un model d'Ollama (streaming de progres)."""
+        """Download an Ollama model (streaming progress)."""
         if not await ollama_breaker.check_circuit():
             raise CircuitOpenError(
                 f"Circuit [ollama] is OPEN. Will retry in {ollama_breaker.config.timeout_seconds}s"

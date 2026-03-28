@@ -11,9 +11,11 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import Dict, Any, Optional
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 
 from plugins.web_ui_module.messages import get_message
+from plugins.security.core.input_sanitizers import validate_string_input
+from core.dependencies import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +38,10 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     # -- GET /session/{session_id} --
 
     @router.get("/session/{session_id}")
-    async def get_session_info(session_id: str, _auth=Depends(require_ui_auth)):
+    @limiter.limit("30/minute")
+    async def get_session_info(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
         """Obtenir info de sessio"""
+        session_id = validate_string_input(session_id, max_length=100, context="path")
         session = session_mgr.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail=get_message(None, "webui.session.not_found"))
@@ -46,8 +50,10 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     # -- GET /session/{session_id}/history --
 
     @router.get("/session/{session_id}/history")
-    async def get_session_history(session_id: str, _auth=Depends(require_ui_auth)):
+    @limiter.limit("30/minute")
+    async def get_session_history(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
         """Obtenir historial de sessio"""
+        session_id = validate_string_input(session_id, max_length=100, context="path")
         session = session_mgr.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail=get_message(None, "webui.session.not_found"))
@@ -56,8 +62,10 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     # -- DELETE /session/{session_id} --
 
     @router.delete("/session/{session_id}")
-    async def delete_session(session_id: str, _auth=Depends(require_ui_auth)):
+    @limiter.limit("10/minute")
+    async def delete_session(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
         """Eliminar sessio"""
+        session_id = validate_string_input(session_id, max_length=100, context="path")
         deleted = session_mgr.delete_session(session_id)
         if not deleted:
             raise HTTPException(status_code=404, detail=get_message(None, "webui.session.not_found"))

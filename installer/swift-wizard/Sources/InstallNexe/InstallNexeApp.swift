@@ -5,6 +5,7 @@ import SwiftUI
 
 @main
 struct InstallNexeApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var engine = InstallerEngine()
 
     var body: some Scene {
@@ -18,6 +19,15 @@ struct InstallNexeApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
+    }
+}
+
+/// Evitar que el procés quedi viu en background quan es tanca la finestra.
+/// Sense això, si l'usuari ejecta el DMG, el procés fa SIGBUS (KERN_MEMORY_ERROR)
+/// perquè el kernel no pot servir pàgines del volum desmuntat.
+class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
     }
 }
 

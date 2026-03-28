@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-installation-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Installation guide for server-nexe 0.8.2. Three methods: macOS DMG with SwiftUI wizard (6 screens, hardware detection, 17 models, bundled Python 3.12), CLI headless (setup.sh with Linux support), and Docker (docker-compose with Ollama). Covers system requirements, backend selection (MLX/llama.cpp/Ollama), model catalog by RAM tier, post-install verification, tray app, uninstaller, and troubleshooting."
-tags: [installation, setup, dmg, swiftui, wizard, docker, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller]
+abstract: "Installation guide for server-nexe 0.8.5 pre-release. Three methods: macOS DMG with SwiftUI wizard (6 screens, hardware detection, 17 models, bundled Python 3.12), CLI headless (setup.sh with Linux support), and Docker (docker-compose with Ollama). Covers system requirements, backend selection, model catalog by RAM tier, post-install verification, tray app, uninstaller, encryption opt-in, and troubleshooting."
+tags: [installation, setup, dmg, swiftui, wizard, docker, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption]
 chunk_size: 800
 priority: P1
 
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Installation — server-nexe 0.8.2
+# Installation — server-nexe 0.8.5 pre-release
 
 Three installation methods available. Choose based on your platform and preferences.
 
@@ -140,6 +140,23 @@ curl http://127.0.0.1:9119/health    # Health check
 open http://127.0.0.1:9119/ui        # Web UI
 ```
 
+## Encryption at Rest (opt-in)
+
+After installation, you can enable encryption at rest:
+
+```bash
+# Enable encryption
+export NEXE_ENCRYPTION_ENABLED=true
+
+# Check current status
+./nexe encryption status
+
+# Migrate existing data to encrypted format
+./nexe encryption encrypt-all
+```
+
+This encrypts SQLite databases (via SQLCipher), chat sessions (.json → .enc), and RAG document text. See SECURITY.md for full details.
+
 ## Tray App (macOS)
 
 System tray app with: server start/stop, status indicator (pulsing during startup), dark/light mode (auto by time + manual toggle), quick links to Web UI, uninstaller access, multilingual menu (ca/es/en), Ollama opens in background.
@@ -171,3 +188,4 @@ Accessible from tray menu. Double confirmation, calculates space, removes Dock/L
 | NEXE_DEFAULT_MAX_TOKENS | Max response tokens | 4096 |
 | NEXE_LANG | Server language | ca |
 | NEXE_ENV | Environment | production |
+| NEXE_ENCRYPTION_ENABLED | Enable encryption at rest | false |

@@ -245,8 +245,15 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                         logger.warning(f"Could not start Ollama.app: {e}")
 
         if backend:
+            # Validate backend exists before accepting switch
+            valid_backends = {"ollama", "ollama_module", "mlx", "mlx_module", "llamacpp", "llama_cpp_module", "auto"}
+            if backend not in valid_backends:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid backend '{backend}'. Valid backends: ollama, mlx, llamacpp, auto"
+                )
             os.environ["NEXE_MODEL_ENGINE"] = backend
-            logger.info(f"Backend canviat a: {backend}")
+            logger.info(f"Backend changed to: {backend}")
         if model:
             os.environ["NEXE_DEFAULT_MODEL"] = model
             logger.info(f"Model canviat a: {model}")

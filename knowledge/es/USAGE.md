@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-usage-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia de uso de server-nexe 0.8.2. Cubre comandos CLI (go, chat, memory, knowledge, status), funcionalidades de la Web UI (selector i18n, indicador de carga, panel info RAG, tamanos de modelo, overlay de subida, fallback de backend), memoria automatica MEM_SAVE, subida de documentos con aislamiento de sesion, ejemplos de uso de la API (curl, Python) y casos de uso practicos."
-tags: [uso, cli, web-ui, chat, memoria, knowledge, subida, i18n, indicador-carga, mem-save, ejemplos-api, casos-de-uso]
+abstract: "Guia de uso de server-nexe 0.8.5 pre-release. Cubre comandos CLI (go, chat, memory, knowledge, status, encryption), funcionalidades de la Web UI (i18n, indicador de carga, panel info RAG, tamanos de modelo, overlay de subida, fallback de backend), MEM_SAVE memoria automatica, subida de documentos con aislamiento de sesion, comandos de encriptacion, ejemplos de uso de la API (curl, Python), y casos de uso practicos."
+tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption]
 chunk_size: 800
 priority: P1
 
@@ -17,12 +17,12 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Guia de uso — server-nexe 0.8.2
+# Guia de uso — server-nexe 0.8.5 pre-release
 
 ## Iniciar el servidor
 
 ```bash
-./nexe go    # Iniciar servidor → http://127.0.0.1:9119
+./nexe go    # Iniciar servidor -> http://127.0.0.1:9119
 ```
 
 En macOS con la app de bandeja instalada, el servidor arranca automaticamente al iniciar sesion.
@@ -42,6 +42,9 @@ En macOS con la app de bandeja instalada, el servidor arranca automaticamente al
 | `./nexe memory stats` | Estadisticas de memoria |
 | `./nexe knowledge ingest` | Indexar documentos de la carpeta knowledge/ |
 | `./nexe health` | Health check |
+| `./nexe encryption status` | Comprobar estado de encriptacion |
+| `./nexe encryption encrypt-all` | Migrar datos a formato encriptado |
+| `./nexe encryption export-key` | Exportar clave maestra para backup |
 
 ## Web UI
 
@@ -76,11 +79,29 @@ Subir documentos via el boton de clip en la entrada del chat. Soportados: .txt, 
 
 El modelo extrae y guarda automaticamente hechos de las conversaciones:
 
-- El usuario dice "Me llamo Jordi" → el modelo guarda `[MEM_SAVE: name=Jordi]`
-- El usuario dice "Olvida mi nombre" → el modelo elimina la entrada de memoria correspondiente
-- Siguiente conversacion: "Como me llamo?" → RAG recupera "name=Jordi" → el modelo responde correctamente
+- El usuario dice "Me llamo Jordi" -> el modelo guarda `[MEM_SAVE: name=Jordi]`
+- El usuario dice "Olvida mi nombre" -> el modelo elimina la entrada de memoria correspondiente
+- Siguiente conversacion: "Como me llamo?" -> RAG recupera "name=Jordi" -> el modelo responde correctamente
 
 No se necesitan comandos extra. Funciona tanto en CLI como en Web UI. Indicadores: badge `[MEM:N]` muestra el recuento de hechos guardados.
+
+## Encriptacion
+
+La encriptacion en reposo es opt-in. Activala para encriptar tus datos almacenados:
+
+```bash
+# Comprobar estado actual
+./nexe encryption status
+
+# Activar y migrar datos existentes
+export NEXE_ENCRYPTION_ENABLED=true
+./nexe encryption encrypt-all
+
+# Exportar clave maestra (para backup — guardar de forma segura!)
+./nexe encryption export-key
+```
+
+Que se encripta: bases de datos SQLite (memories.db via SQLCipher), sesiones de chat (.json -> .enc), texto de documentos RAG (TextStore). Los payloads de Qdrant ya no contienen texto (solo vectores + IDs).
 
 ## Uso de la API
 
@@ -117,8 +138,9 @@ curl -X POST http://127.0.0.1:9119/v1/memory/store \
 1. **Asistente personal con memoria:** Pregunta sobre tus proyectos, preferencias, fechas limite. MEM_SAVE recuerda el contexto automaticamente.
 2. **Base de conocimiento privada:** Sube documentos tecnicos, consultalos en lenguaje natural. Aislado por sesion en cada conversacion.
 3. **Desarrollo asistido por IA:** La API compatible con OpenAI funciona con Cursor, Continue, Zed. Apuntalos a http://127.0.0.1:9119/v1.
-4. **Busqueda semantica:** Usa /v1/memory/search para recuperacion de documentos basada en similitud sin necesidad de coincidencia exacta de palabras clave.
+4. **Busqueda semantica:** Usa /v1/memory/search para recuperacion de documentos basada en similitud sin coincidencia exacta de palabras clave.
 5. **Experimentacion con modelos:** Cambia entre backends MLX, llama.cpp y Ollama para comparar velocidad y calidad.
+6. **IA local segura:** Activa la encriptacion en reposo para manejar datos sensibles sin ninguna dependencia de la nube.
 
 ## Consejos
 
@@ -126,3 +148,4 @@ curl -X POST http://127.0.0.1:9119/v1/memory/store \
 - **Primera respuesta lenta:** La carga del modelo tarda tiempo (10-60s). El indicador de carga muestra el progreso.
 - **Backend desconectado:** El servidor hace auto-fallback al primer backend disponible. Comprueba con `./nexe status`.
 - **Modelos grandes:** Los modelos de 32B+ necesitan 32+ GB de RAM y pueden tardar minutos en cargar. El timeout es de 600s.
+- **Encriptacion:** Activa la encriptacion pronto — migrar grandes conjuntos de datos luego lleva tiempo. Exporta y guarda la clave maestra de forma segura.

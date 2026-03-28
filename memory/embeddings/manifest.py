@@ -14,7 +14,7 @@ MODULE_ID = "embeddings"
 
 MANIFEST = {
     "name": "embeddings",
-    "version": "0.8.2",
+    "version": "0.8.5",
     "description": "Multilingual embedding and vectorization system",
     "author": "Jordi Goy",
     "type": "memory_core",

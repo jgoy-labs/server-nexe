@@ -154,13 +154,28 @@ async def _forward_to_ollama(
                     except (ValueError, json.JSONDecodeError, AttributeError):
                         error_detail = f"Ollama returned HTTP {resp.status_code}"
                     raise HTTPException(status_code=resp.status_code, detail=error_detail)
-                response = resp.json()
-                response.setdefault("nexe_engine", "ollama")
+                raw = resp.json()
+                # Convert Ollama native format to OpenAI-compatible format
+                response = {
+                    "id": f"chatcmpl-{raw.get('created_at', '')}",
+                    "object": "chat.completion",
+                    "model": raw.get("model", ""),
+                    "choices": [{
+                        "index": 0,
+                        "message": raw.get("message", {"role": "assistant", "content": ""}),
+                        "finish_reason": "stop" if raw.get("done") else "length",
+                    }],
+                    "usage": {
+                        "prompt_tokens": raw.get("prompt_eval_count", 0),
+                        "completion_tokens": raw.get("eval_count", 0),
+                        "total_tokens": (raw.get("prompt_eval_count", 0) or 0) + (raw.get("eval_count", 0) or 0),
+                    },
+                    "nexe_engine": "ollama",
+                }
                 if fallback_from:
-                    response.setdefault(
-                        "nexe_fallback",
-                        {"from": fallback_from, "to": "ollama", "reason": fallback_reason or "fallback"},
-                    )
+                    response["nexe_fallback"] = {
+                        "from": fallback_from, "to": "ollama", "reason": fallback_reason or "fallback",
+                    }
                 return response
         except httpx.ConnectError:
             raise HTTPException(

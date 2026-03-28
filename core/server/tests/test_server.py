@@ -26,9 +26,9 @@ def test_root_endpoint(client):
   assert response.status_code == 200
   data = response.json()
   assert "system" in data
-  assert data["system"] == "Nexe 0.8.2"
+  assert data["system"] == "Nexe 0.8.5"
   assert "version" in data
-  assert data["version"] == "0.8.2"
+  assert data["version"] == "0.8.5"
 
 def test_health_endpoint(client):
   """Test health endpoint"""

@@ -1,10 +1,10 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-plugins-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete guide to the server-nexe 0.8.2 plugin system. Covers NexeModule Protocol (duck typing, not inheritance), manifest.toml format, plugin file structure, lifecycle (discovery → loading → initialization → integration → shutdown), context object, router registration, existing plugins (MLX, llama.cpp, Ollama, Security, Web UI), how to create a new plugin step by step, common errors and best practices."
+abstract: "Complete guide to the server-nexe 0.8.5 pre-release plugin system. Covers NexeModule Protocol (duck typing, not inheritance), manifest.toml format, plugin file structure, lifecycle (discovery → loading → initialization → integration → shutdown), context object, router registration, existing plugins (MLX, llama.cpp, Ollama, Security with Unicode normalization, Web UI with input validation), how to create a new plugin step by step, common errors and best practices."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Plugin System — server-nexe 0.8.2
+# Plugin System — server-nexe 0.8.5 pre-release
 
 server-nexe uses a plugin architecture based on automatic discovery via manifest.toml files. Plugins are independent modules that add functionality without modifying the core. No manual registration needed — the system scans, discovers, and loads plugins automatically.
 
@@ -37,23 +37,20 @@ class MyPlugin:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="my_plugin",
-            version="0.8.2",
+            version="0.8.5",
             description="What it does",
             author="Author Name",
-            module_type="local_llm_option",  # or "core", "web_interface"
+            module_type="local_llm_option",
             quadrant="core"
         )
 
     async def initialize(self, context: Dict[str, Any]) -> bool:
-        # Setup plugin. Return True on success, False on failure.
         return True
 
     async def shutdown(self) -> None:
-        # Cleanup. Must be idempotent (safe to call multiple times).
         pass
 
     async def health_check(self) -> HealthResult:
-        # Return health status. Must be fast (< 1 second).
         return HealthResult(status=HealthStatus.HEALTHY, message="OK")
 ```
 
@@ -69,8 +66,6 @@ def get_router_prefix(self) -> str:
     return "/my-plugin"
 ```
 
-The kernel detects this via `isinstance(module, NexeModuleWithRouter)` and automatically registers the router in FastAPI.
-
 ### Optional: NexeModuleWithSpecialists
 
 For plugins that send/receive specialist components to other modules:
@@ -85,20 +80,20 @@ async def register_specialist(self, specialist: Any) -> bool: ...
 
 ```python
 class ModuleMetadata:
-    name: str               # Plugin identifier
-    version: str            # Version (match server-nexe version)
-    description: str        # Human-readable description
-    author: str             # Author name
+    name: str
+    version: str
+    description: str
+    author: str
     module_type: str        # "local_llm_option" | "core" | "web_interface"
     quadrant: str           # "core" (default)
-    dependencies: List[str] # Other modules this depends on
-    tags: List[str]         # Search tags
+    dependencies: List[str]
+    tags: List[str]
 
 class HealthResult:
     status: HealthStatus    # HEALTHY | DEGRADED | UNHEALTHY | UNKNOWN
-    message: str            # Human-readable status
-    details: Dict           # Extra info
-    checks: List[Dict]      # Sub-checks
+    message: str
+    details: Dict
+    checks: List[Dict]
 
 class ModuleStatus(Enum):
     DISCOVERED | LOADING | INITIALIZED | RUNNING | DEGRADED | FAILED | STOPPED
@@ -113,7 +108,7 @@ Every plugin MUST have a `manifest.toml` file. This is the single source of trut
 ```toml
 [module]
 name = "my_plugin"
-version = "0.8.2"
+version = "0.8.5"
 type = "local_llm_option"
 description = "What this plugin does"
 location = "plugins/my_plugin/"
@@ -148,7 +143,7 @@ protected_routes = ["/process"]
 - All sections under `[module.*]` — never top-level sections
 - `[module.entry]` is MANDATORY — without it, discovery fails
 - `[module.router].prefix` must match `[module.endpoints].router_prefix`
-- Version should match server-nexe version (0.8.2)
+- Version should match server-nexe version
 
 ## Plugin File Structure
 
@@ -179,8 +174,6 @@ plugins/my_plugin/
 ```
 
 ### manifest.py (lazy initialization pattern)
-
-This file prevents importing heavy dependencies at scan time:
 
 ```python
 from typing import Optional
@@ -213,31 +206,16 @@ DISCOVERY → LOADING → INITIALIZATION → INTEGRATION → RUNNING → SHUTDOW
 ```
 
 ### 1. Discovery
-The ModuleManager scans `plugins/`, `memory/`, `personality/` for `manifest.toml` files. Extracts metadata without importing Python code. Detects dependency cycles.
+The ModuleManager scans `plugins/`, `memory/`, `personality/` for `manifest.toml` files. Extracts metadata without importing Python code.
 
 ### 2. Loading
-Dynamic Python import: `from plugins.my_plugin.module import MyPluginModule`. Validates NexeModule Protocol via `validate_module()`. Status: DISCOVERED → LOADED.
+Dynamic Python import: `from plugins.my_plugin.module import MyPluginModule`. Validates NexeModule Protocol.
 
 ### 3. Initialization
-Calls `await module.initialize(context)`. The context contains:
-
-```python
-context = {
-    "config": {                    # Global config from server.toml
-        "core": {"server": {"host": "127.0.0.1", "port": 9119}},
-        "plugins": {...},
-    },
-    "services": {                  # Shared services
-        "logger": logging.Logger,
-        "i18n": I18nManager,
-        "event_system": EventSystem,
-    },
-    "modules": ModuleRegistry,     # Access to other loaded modules
-}
-```
+Calls `await module.initialize(context)`. Context contains config, services (logger, i18n, event_system), and module registry.
 
 ### 4. Integration
-If the module implements `NexeModuleWithRouter`, the kernel calls `get_router()` and `get_router_prefix()`, then registers the router in FastAPI via `app.include_router()`.
+If the module implements `NexeModuleWithRouter`, the kernel registers the router in FastAPI via `app.include_router()`.
 
 ### 5. Shutdown
 Calls `await module.shutdown()` during server stop. Must be idempotent.
@@ -248,9 +226,9 @@ Calls `await module.shutdown()` during server stop. Must be idempotent.
 |--------|------|--------|-------------|
 | **mlx_module** | local_llm_option | /mlx | Apple Silicon native, prefix caching (trie), Metal GPU, is_model_loaded() |
 | **llama_cpp_module** | local_llm_option | /llama-cpp | GGUF universal, ModelPool LRU, CPU/GPU, is_model_loaded() |
-| **ollama_module** | local_llm_option | /ollama | HTTP bridge to Ollama, auto-start (open -g macOS), VRAM cleanup on shutdown, streaming, is_model_loaded() via /api/ps |
-| **security** | core | /security | Dual-key auth, 6 injection detectors, 69 jailbreak patterns, rate limiting, RFC5424 audit logging, permanent=true |
-| **web_ui_module** | web_interface | /ui | Web chat UI, session manager, document upload (session-isolated), memory helper (intent detection, MEM_SAVE), i18n (ca/es/en), 6 route files |
+| **ollama_module** | local_llm_option | /ollama | HTTP bridge to Ollama, auto-start, VRAM cleanup on shutdown, streaming, is_model_loaded() via /api/ps |
+| **security** | core | /security | Dual-key auth, 6 injection detectors with Unicode normalization (NFKC), 69 jailbreak patterns, rate limiting (all endpoints), RFC5424 audit logging, permanent=true |
+| **web_ui_module** | web_interface | /ui | Web chat UI, session manager, document upload (session-isolated), memory helper (MEM_SAVE), input validation (validate_string_input on all routes), RAG context sanitization, i18n (ca/es/en), 6 route files |
 
 ### Common patterns in LLM backend plugins
 - All implement `is_model_loaded()` (Ollama via /api/ps, MLX/llama.cpp via pool stats)
@@ -275,7 +253,7 @@ Copy the minimal manifest.toml template above. Change name, description, entry c
 
 Implement NexeModule Protocol (metadata property, initialize, shutdown, health_check). If you need HTTP endpoints, also implement get_router() and get_router_prefix().
 
-**Critical pattern:** Create the router FIRST in initialize(), before any setup that might fail. This ensures /health and /info endpoints work even if initialization fails partially.
+**Critical pattern:** Create the router FIRST in initialize(), before any setup that might fail.
 
 ```python
 async def initialize(self, context):
@@ -297,23 +275,23 @@ Copy the lazy initialization template above. Change the import path and class na
 
 ### Step 5: Restart server
 
-The ModuleManager discovers new plugins automatically on startup. No registration needed.
+The ModuleManager discovers new plugins automatically on startup.
 
 ### Step 6: Verify
 
 ```bash
-./nexe modules              # Should list your plugin
-curl http://127.0.0.1:9119/my-plugin/health   # Should return health status
-curl http://127.0.0.1:9119/my-plugin/info      # Should return plugin info
+./nexe modules
+curl http://127.0.0.1:9119/my-plugin/health
+curl http://127.0.0.1:9119/my-plugin/info
 ```
 
 ## Common Errors
 
 ### 1. Missing [module.entry]
-Without `[module.entry]` in manifest.toml, the scanner cannot load the plugin. It will be silently skipped.
+Without `[module.entry]` in manifest.toml, the scanner cannot load the plugin.
 
 ### 2. Router prefix mismatch
-`[module.endpoints].router_prefix` and `[module.router].prefix` MUST match. Otherwise endpoints register at wrong paths.
+`[module.endpoints].router_prefix` and `[module.router].prefix` MUST match.
 
 ### 3. Router prefix set after constructor
 ```python
@@ -326,18 +304,18 @@ self._router = APIRouter(prefix="/my-plugin")
 ```
 
 ### 4. Blocking health_check
-Never use synchronous HTTP calls in health_check(). Use async httpx.AsyncClient or check cached internal state.
+Never use synchronous HTTP calls in health_check(). Use async httpx.AsyncClient.
 
 ### 5. Non-idempotent initialize/shutdown
-Both methods may be called multiple times. Always check `self._initialized` guard at the top.
+Both methods may be called multiple times. Always check `self._initialized` guard.
 
 ## Best Practices
 
 1. **Router first** — Create router before any other setup in initialize()
 2. **Idempotent everything** — initialize() and shutdown() safe to call repeatedly
 3. **Fast health_check** — Under 1 second, no external API calls
-4. **Declare dependencies** — In manifest.toml `[module.dependencies].modules`, the kernel loads them first
-5. **Use context services** — Access i18n, logger, event system from context, don't create your own
+4. **Declare dependencies** — In manifest.toml, the kernel loads them first
+5. **Use context services** — Access i18n, logger, event system from context
 6. **Tests alongside code** — Put tests in `plugins/my_plugin/tests/`
 7. **Lazy manifest.py** — Never import heavy dependencies at module scan time
 
@@ -346,7 +324,6 @@ Both methods may be called multiple times. Always check `self._initialized` guar
 | Concept | File |
 |---------|------|
 | NexeModule Protocol | `core/loader/protocol.py` |
-| ModuleMetadata, HealthResult | `core/loader/protocol.py` |
 | Module Discovery | `personality/module_manager/discovery.py` |
 | Module Lifecycle | `personality/module_manager/module_lifecycle.py` |
 | Router Registration | `core/server/factory_modules.py` |

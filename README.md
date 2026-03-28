@@ -220,7 +220,7 @@ Server Nexe is actively developed. Here's what's coming:
 
 - [ ] Docker container for Linux deployment
 - [ ] Full Linux compatibility audit
-- [ ] Updated knowledge base for v0.8.2
+- [x] Updated knowledge base for v0.8.5
 - [ ] Website updates (server-nexe.org / server-nexe.com)
 - [ ] macOS code signing & notarization
 - [ ] Configurable inference parameters via UI
@@ -274,5 +274,5 @@ See [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Version 0.8.2</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
+  <strong>Version 0.8.5</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
 </p>

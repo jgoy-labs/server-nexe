@@ -32,6 +32,12 @@ DEFAULT_CONFIG = {
         'environment': {
             'mode': 'production'  # 'production' or 'development'
         }
+    },
+    'security': {
+        'encryption': {
+            'enabled': False,
+            'warn_unencrypted': True
+        }
     }
 }
 

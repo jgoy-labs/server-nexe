@@ -10,12 +10,13 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from plugins.security.core.auth_dependencies import require_api_key
 import structlog
 
 logger = structlog.get_logger(__name__)
 
-router = APIRouter(prefix="/rag", tags=["rag-v1", "future"])
+router = APIRouter(prefix="/rag", tags=["rag-v1", "future"], dependencies=[Depends(require_api_key)])
 
 @router.post("/search", summary="Semantic search in RAG vector store")
 async def rag_search_v1():

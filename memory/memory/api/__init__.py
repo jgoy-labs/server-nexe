@@ -80,6 +80,8 @@ class MemoryAPI:
     qdrant_url: Optional[str] = None,
     qdrant_path: Optional[Path] = None,
     embedding_model: str = "paraphrase-multilingual-mpnet-base-v2",
+    crypto_provider=None,
+    text_store_path: Optional[Path] = None,
   ):
     """
     Inicialitza Memory API.
@@ -94,6 +96,9 @@ class MemoryAPI:
     self.embedding_model = embedding_model
     self.vector_size = self.DEFAULT_VECTOR_SIZE
 
+    self._crypto = crypto_provider
+    self._text_store_path = text_store_path
+    self._text_store = None
     self._qdrant: Optional[QdrantClient] = None
     self._embedder = None
     self._executor = ThreadPoolExecutor(max_workers=4)
@@ -126,6 +131,15 @@ class MemoryAPI:
       else:
         self._qdrant = QdrantClient(url=self.qdrant_url, prefer_grpc=False)
         logger.info("MemoryAPI initialized (url=%s)", self.qdrant_url)
+
+      # Initialize text store if path provided
+      if self._text_store_path:
+        from .text_store import TextStore
+        self._text_store = TextStore(
+          db_path=self._text_store_path,
+          crypto_provider=self._crypto,
+        )
+        logger.info("TextStore initialized at %s", self._text_store_path)
 
       await self._init_embedder()
       self._initialized = True
@@ -167,6 +181,10 @@ class MemoryAPI:
 
     if self._executor:
       self._executor.shutdown(wait=True)
+
+    if self._text_store:
+      self._text_store.close()
+      self._text_store = None
 
     self._qdrant = None
     self._embedder = None
@@ -253,6 +271,7 @@ class MemoryAPI:
       metadata,
       doc_id,
       ttl_seconds,
+      text_store=self._text_store,
     )
 
   async def search(
@@ -293,6 +312,7 @@ class MemoryAPI:
       threshold,
       filter_metadata,
       include_expired,
+      text_store=self._text_store,
     )
 
   async def get(self, doc_id: str, collection: str) -> Optional[Document]:
@@ -302,7 +322,7 @@ class MemoryAPI:
     if not await self.collection_exists(collection):
       raise CollectionNotFoundError(f"Collection '{collection}' does not exist.")
 
-    return await get_document(self._qdrant, self._executor, doc_id, collection)
+    return await get_document(self._qdrant, self._executor, doc_id, collection, text_store=self._text_store)
 
   async def delete(self, doc_id: str, collection: str) -> bool:
     """Elimina un document."""
@@ -311,7 +331,7 @@ class MemoryAPI:
     if not await self.collection_exists(collection):
       raise CollectionNotFoundError(f"Collection '{collection}' does not exist.")
 
-    return await delete_document(self._qdrant, self._executor, doc_id, collection)
+    return await delete_document(self._qdrant, self._executor, doc_id, collection, text_store=self._text_store)
 
   async def count(self, collection: str) -> int:
     """Compta documents en una collection."""

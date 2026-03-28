@@ -11,6 +11,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import re
+import unicodedata
 from typing import Any
 
 def detect_xss_attempt(text: str) -> bool:
@@ -32,6 +33,7 @@ def detect_xss_attempt(text: str) -> bool:
   """
   if not text:
     return False
+  text = unicodedata.normalize('NFKC', text)
 
   text_lower = text.lower()
 
@@ -67,6 +69,7 @@ def detect_sql_injection(text: str) -> bool:
   """
   if not text:
     return False
+  text = unicodedata.normalize('NFKC', text)
 
   text_lower = text.lower()
 
@@ -100,6 +103,8 @@ def detect_nosql_injection(data: Any) -> bool:
     - MongoDB operators ($where, $regex, $ne, etc.)
     - JavaScript code in strings
   """
+  if isinstance(data, str):
+    data = unicodedata.normalize('NFKC', data)
   if isinstance(data, dict):
     for key in data.keys():
       if isinstance(key, str) and key.startswith('$'):
@@ -145,6 +150,7 @@ def detect_command_injection(text: str) -> bool:
   """
   if not text:
     return False
+  text = unicodedata.normalize('NFKC', text)
 
   dangerous_chars = [
     ';',
@@ -178,6 +184,7 @@ def detect_path_traversal(text: str) -> bool:
   """
   if not text:
     return False
+  text = unicodedata.normalize('NFKC', text)
 
   traversal_patterns = [
     r'\.\.',
@@ -212,6 +219,7 @@ def detect_ldap_injection(text: str) -> bool:
   """
   if not text:
     return False
+  text = unicodedata.normalize('NFKC', text)
 
   ldap_special_chars = ['*', '(', ')', '\\', '\x00']
 

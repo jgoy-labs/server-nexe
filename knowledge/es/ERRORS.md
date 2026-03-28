@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-errors-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Errores comunes y soluciones para server-nexe 0.8.2. Cubre errores de instalacion, arranque del servidor, Web UI, autenticacion API, carga de modelos, memoria/RAG, Docker y problemas de streaming."
-tags: [errores, troubleshooting, depuracion, instalacion, arranque, web-ui, api, modelos, memoria, docker, streaming]
+abstract: "Errores comunes y soluciones para server-nexe 0.8.5 pre-release. Cubre errores de instalacion, arranque del servidor, Web UI, autenticacion API, carga de modelos, memoria/RAG, Docker, streaming y errores de encriptacion."
+tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, docker, streaming, encryption]
 chunk_size: 800
 priority: P1
 
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Errores comunes — server-nexe 0.8.2
+# Errores comunes — server-nexe 0.8.5 pre-release
 
 ## Errores de instalacion
 
@@ -46,8 +46,8 @@ expires: null
 | 403 CSRF | Discrepancia de token CSRF | Limpiar cache del navegador y recargar |
 | Chat not responding | Modelo cargandose (primer mensaje) | Esperar al indicador de carga. Puede tardar 10-60s en la primera carga. |
 | Streaming stops at 2nd message | Bug de _renderTimer (pre-v0.8.2) | Corregido en v0.8.2. Actualizar a la ultima version. |
-| Old JS/CSS cached | Cache agresiva del navegador | Corregido en v0.8.2 con cache-busting (?v=timestamp). Recarga forzada: Cmd+Shift+R |
-| Thinking box not scrolling | Bug de auto-scroll (pre-v0.8.2) | Corregido en v0.8.2. Actualizar a la ultima version. |
+| Old JS/CSS cached | Cache agresiva del navegador | Corregido con cache-busting (?v=timestamp). Recarga forzada: Cmd+Shift+R |
+| 429 Too Many Requests | Rate limit excedido | Esperar y reintentar. Limites por endpoint (5-30/min para UI). |
 
 ## Errores de API
 
@@ -55,14 +55,14 @@ expires: null
 |-------|-------|----------|
 | 401 Missing X-API-Key | Sin cabecera de autenticacion | Anadir `-H "X-API-Key: YOUR_KEY"` a la peticion |
 | 429 Rate Limited | Demasiadas peticiones | Esperar y reintentar. Comprobar limites de rate en `.env` |
-| 408 Timeout | Inferencia del modelo demasiado lenta | Aumentar timeout de NEXE_DEFAULT_MAX_TOKENS (por defecto 4096). Los modelos grandes necesitan 600s. |
-| Empty error message | httpx.ReadTimeout tiene str() vacio | Corregido en v0.8.2 con repr(e). Comprobar logs del servidor. |
+| 408 Timeout | Inferencia del modelo demasiado lenta | Aumentar timeout de NEXE_DEFAULT_MAX_TOKENS. Los modelos grandes necesitan 600s. |
+| Empty error message | httpx.ReadTimeout tiene str() vacio | Corregido con repr(e). Comprobar logs del servidor. |
 
 ## Errores de modelo
 
 | Error | Causa | Solucion |
 |-------|-------|----------|
-| OOM Killed | Modelo demasiado grande para la RAM | Usar modelo mas pequeno. 8GB RAM → modelos 2B maximo. |
+| OOM Killed | Modelo demasiado grande para la RAM | Usar modelo mas pequeno. 8GB RAM -> modelos 2B maximo. |
 | Model loading very slow | Modelo grande o GPU fria | Normal para modelos 32B+. El indicador de carga muestra el progreso. |
 | MLX not available | Mac Intel o Linux | MLX es solo para Apple Silicon. Usar llama.cpp u Ollama. |
 | Qwen3.5 fails on MLX | Modelo multimodal incompatible | Usar backend Ollama para modelos Qwen3.5. |
@@ -75,6 +75,16 @@ expires: null
 | Wrong RAG results | Umbral demasiado alto | Bajar umbral via el slider de la UI o variables de entorno NEXE_RAG_*_THRESHOLD. |
 | Duplicate memories | Problema de umbral de deduplicacion | La deduplicacion comprueba similitud > 0.80. Entradas muy similares pero diferentes pueden guardarse ambas. |
 | Documents not visible | Sesion incorrecta | Los documentos estan aislados por sesion. Subir en la misma sesion donde estas chateando. |
+
+## Errores de encriptacion
+
+| Error | Causa | Solucion |
+|-------|-------|----------|
+| Keyring not available | Keyring del SO no configurado (Linux sin Secret Service) | Configurar variable de entorno `NEXE_MASTER_KEY` o crear fichero `~/.nexe/master.key` (chmod 600) |
+| sqlcipher3 not installed | Dependencia faltante | `pip install sqlcipher3`. Cae a SQLite en texto plano con aviso. |
+| Cannot decrypt data | Clave maestra incorrecta | Asegurar que se usa la misma clave. Exportar con `./nexe encryption export-key`. |
+| Migration failed | Base de datos corrupta o migracion interrumpida | El fichero de backup .bak se preserva. Restaurar desde backup y reintentar. |
+| Encryption status: disabled | Funcionalidad no activada | Configurar `NEXE_ENCRYPTION_ENABLED=true` en .env o en el entorno |
 
 ## Errores de Docker
 

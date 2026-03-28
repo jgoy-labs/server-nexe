@@ -46,7 +46,7 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
       "- **system-admin** — Server restart and supervision\n"
       "- **rag-v1 / embeddings-v1 / documents-v1** — Endpoints under development (return 501)"
     ),
-    version="0.8.2",
+    version="0.8.5",
     lifespan=lifespan
   )
 

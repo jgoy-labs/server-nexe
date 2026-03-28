@@ -55,10 +55,10 @@ class LlamaCppConfig:
         """Validate configuration after creation."""
         if not self.model_path:
             logger.warning(
-                "LlamaCppConfig: model_path buit. "
-                "Configura NEXE_LLAMA_CPP_MODEL o passa model_path."
+                "LlamaCppConfig: model_path is empty. "
+                "Set NEXE_LLAMA_CPP_MODEL or pass model_path."
             )
-        # Expandir ~ a home directory
+        # Expand ~ to home directory
         if self.model_path.startswith("~"):
             self.model_path = os.path.expanduser(self.model_path)
         # Resolve relative paths based on project root

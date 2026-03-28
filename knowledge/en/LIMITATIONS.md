@@ -1,11 +1,11 @@
 # === METADATA RAG ===
-versio: "1.1"
-data: 2026-03-27
+versio: "2.0"
+data: 2026-03-28
 id: nexe-limitations
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Honest documentation of server-nexe 0.8.2 limitations. Covers platform support (macOS tested, Linux partial, Windows not yet), model quality vs cloud (GPT-4/Claude), RAG limitations (embeddings, chunking, cold start, contradictions), API partial OpenAI compatibility, performance (single instance, concurrency), security constraints, and functional gaps (no multi-user, no sync, no fine-tuning)."
-tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest]
+abstract: "Honest documentation of server-nexe 0.8.5 pre-release limitations. Covers platform support (macOS tested, Linux partial, Windows not yet), model quality vs cloud (GPT-4/Claude), RAG limitations (embeddings, chunking, cold start, contradictions), API partial OpenAI compatibility, performance (single instance, concurrency), security constraints, encryption caveats (opt-in, new, not battle-tested), and functional gaps (no multi-user, no sync, no fine-tuning)."
+tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
 
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Limitations — server-nexe 0.8.2
+# Limitations — server-nexe 0.8.5 pre-release
 
 This document honestly describes what server-nexe cannot do or does not do well.
 
@@ -27,7 +27,7 @@ This document honestly describes what server-nexe cannot do or does not do well.
 |----------|--------|
 | macOS Apple Silicon | Tested, all 3 backends |
 | macOS Intel | Tested, llama.cpp + Ollama (no MLX) |
-| Linux x86_64 | Partial — unit tests pass (3901/3901), CI green, not production-tested |
+| Linux x86_64 | Partial — unit tests pass, CI green, not production-tested |
 | Linux ARM64 | Docker supported, not directly tested |
 | Windows | Not supported |
 
@@ -75,11 +75,19 @@ Partially compatible with OpenAI API format:
 
 ## Security
 
-- **Prompt injection:** Local models may follow injected instructions. Sanitizer catches common patterns (69 jailbreak patterns) but not all.
+- **Prompt injection:** Local models may follow injected instructions. Sanitizer catches common patterns (69 jailbreak patterns, 6 injection detectors with Unicode normalization) but not all.
 - **No TLS by default:** HTTP on localhost. Use reverse proxy for HTTPS.
 - **Single-user:** No multi-user isolation. One API key = full access.
-- **Qdrant unencrypted:** Vectors on disk in plaintext. Use disk encryption.
+- **AI audits, not external audits:** Security has been reviewed by autonomous AI sessions, not by third-party security firms. This is thorough but not exhaustive.
 - **Ollama keep_alive bug:** keep_alive:0 doesn't always release VRAM (known Ollama issue).
+
+## Encryption Caveats
+
+- **Opt-in:** Encryption at rest is not enabled by default. Users must explicitly activate it.
+- **New feature:** Added in v0.8.5. Tested (68 tests, 0 failures) but not yet battle-tested in production with real users.
+- **Key management:** Master key stored in OS Keyring, env var, or file. If the key is lost, encrypted data cannot be recovered.
+- **SQLCipher dependency:** Requires `sqlcipher3` package. Falls back to plaintext SQLite with a warning if not installed.
+- **Migration:** Migrating large datasets (many memories, many sessions) can take time. Backup before migrating.
 
 ## Functional Gaps
 
@@ -90,6 +98,13 @@ Partially compatible with OpenAI API format:
 - **No real-time collaboration** — Single-user, single-session design.
 - **No scheduled tasks** — No cron-like automation built-in.
 - **Web UI is functional but basic** — Not a full-featured chat app. Working streaming, uploads, memory, i18n, but no message editing, no branching, no export.
+
+## Project Reality
+
+- **One developer** — Built by a single person with AI-assisted development and auditing.
+- **One real user** — Only the developer has used it so far. No third-party feedback or multi-user testing.
+- **Not enterprise-grade** — It's a personal open-source project, not a product with SLA or support guarantees.
+- **Active development** — Things change. APIs may evolve. Documentation may lag behind code.
 
 ## What server-nexe is NOT
 

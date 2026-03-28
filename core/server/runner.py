@@ -186,15 +186,17 @@ def main():
   )
 
   # Quick reference commands
-  print(f"\n{BOLD}{RED}QUICK COMMANDS:{RESET}")
-  print(f"  {CYAN}Interactive Chat:{RESET}  ./nexe chat")
-  print(f"  {CYAN}View logs:{RESET}         ./nexe logs")
-  print(f"  {CYAN}RAG ingest:{RESET}        ./nexe memory store \"text\"")
-  print(f"  {CYAN}System status:{RESET}     ./nexe status")
-  print(f"\n{BOLD}QUICK CONFIG:{RESET}")
-  print(f"  To change personality (System Prompt):")
-  print(f"  edit {YELLOW}personality/server.toml{RESET}")
-  print(f"{YELLOW}Server running at: {host}:{port}{RESET}\n")
+  logger.info(
+    f"\n{BOLD}{RED}QUICK COMMANDS:{RESET}\n"
+    f"  {CYAN}Interactive Chat:{RESET}  ./nexe chat\n"
+    f"  {CYAN}View logs:{RESET}         ./nexe logs\n"
+    f"  {CYAN}RAG ingest:{RESET}        ./nexe memory store \"text\"\n"
+    f"  {CYAN}System status:{RESET}     ./nexe status\n"
+    f"\n{BOLD}QUICK CONFIG:{RESET}\n"
+    f"  To change personality (System Prompt):\n"
+    f"  edit {YELLOW}personality/server.toml{RESET}\n"
+    f"{YELLOW}Server running at: {host}:{port}{RESET}"
+  )
 
   try:
     uvicorn.run(

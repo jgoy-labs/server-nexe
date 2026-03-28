@@ -10,6 +10,9 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 
 
 @pytest.fixture(autouse=True)
@@ -19,10 +22,23 @@ def set_api_key(monkeypatch):
     monkeypatch.delenv("NEXE_DEV_MODE", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def disable_rate_limiter():
+    """Disable rate limiter during tests to avoid 429s."""
+    from core.dependencies import limiter
+    limiter.enabled = False
+    yield
+    limiter.enabled = True
+
+
 @pytest.fixture
 def app():
     from plugins.web_ui_module.manifest import router_public
+    from core.dependencies import limiter
     _app = FastAPI()
+    _app.state.limiter = limiter
+    _app.add_middleware(SlowAPIMiddleware)
+    _app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     _app.include_router(router_public)
     return _app
 

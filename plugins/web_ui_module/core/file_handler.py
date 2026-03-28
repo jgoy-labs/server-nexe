@@ -25,13 +25,13 @@ CHUNK_OVERLAP = 200  # overlap between chunks for context
 
 class FileHandler:
     """
-    Gestió de fitxers pujats per la UI web.
+    File management for web UI uploads.
 
-    Característiques:
-    - Validació d'extensions
-    - Límit de mida
-    - Extracció de contingut (txt, md, pdf)
-    - Emmagatzematge temporal
+    Features:
+    - Extension validation
+    - Size limits
+    - Content extraction (txt, md, pdf)
+    - Temporary storage
     """
 
     def __init__(self, upload_dir: Path):
@@ -148,15 +148,15 @@ class FileHandler:
 
     def chunk_text(self, text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list:
         """
-        Dividir text en chunks amb overlap per mantenir context.
+        Split text into chunks with overlap to maintain context.
 
         Args:
-            text: Text a dividir
-            chunk_size: Mida màxima de cada chunk
-            overlap: Solapament entre chunks
+            text: Text to split
+            chunk_size: Maximum size of each chunk
+            overlap: Overlap between chunks
 
         Returns:
-            Llista de chunks
+            List of chunks
         """
         if len(text) <= chunk_size:
             return [text]
@@ -212,13 +212,13 @@ class FileHandler:
 
     def cleanup_old_files(self, max_age_hours: int = 24) -> int:
         """
-        Netejar fitxers temporals antics
+        Clean up old temporary files
 
         Args:
-            max_age_hours: Màxim edat dels fitxers en hores
+            max_age_hours: Maximum age of files in hours
 
         Returns:
-            Nombre de fitxers eliminats
+            Number of deleted files
         """
         import time
 

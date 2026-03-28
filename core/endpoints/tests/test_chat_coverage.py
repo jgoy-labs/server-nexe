@@ -10,6 +10,16 @@ import os
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from core.dependencies import limiter as _limiter
+
+
+@pytest.fixture(autouse=True)
+def _disable_rate_limiter():
+    """Disable slowapi rate limiter for direct function calls (no real Request)."""
+    _limiter.enabled = False
+    yield
+    _limiter.enabled = True
+
 
 # ─── Test _save_conversation_to_memory ─────────────────────────────────
 class TestSaveConversationToMemory:
