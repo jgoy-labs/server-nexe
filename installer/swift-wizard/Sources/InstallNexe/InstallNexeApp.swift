@@ -29,6 +29,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Auto-expulsar el DMG quan el wizard es tanca
+        let bundlePath = Bundle.main.bundlePath
+        if bundlePath.hasPrefix("/Volumes/") {
+            let components = bundlePath.split(separator: "/")
+            if components.count >= 2 {
+                let volumePath = "/" + components[0...1].joined(separator: "/")
+                let eject = Process()
+                eject.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+                eject.arguments = ["detach", volumePath, "-force"]
+                try? eject.run()
+            }
+        }
+    }
 }
 
 /// NSViewRepresentable que intercepta el botó vermell de la finestra

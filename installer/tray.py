@@ -110,7 +110,8 @@ def _get_process_ram(pid):
 class NexeTray(rumps.App):
     """macOS menu bar app for controlling the Nexe server."""
 
-    def __init__(self):
+    def __init__(self, attach_pid=None):
+        self._attach_pid = attach_pid
         self.lang = _detect_lang()
         self.strings = T.get(self.lang, T["ca"])
 
@@ -196,6 +197,13 @@ class NexeTray(rumps.App):
         self._timer = rumps.Timer(self._update_stats, 3)
         self._timer.start()
 
+        # If attaching to an already-running server, show as running immediately
+        if self._attach_pid:
+            self.server_start_time = time.time()
+            self.icon = ICON_RUNNING
+            self.status_item.title = self.t("status_running")
+            self.toggle_item.title = self.t("stop")
+
     def t(self, key, **kwargs):
         """Get translated string."""
         s = self.strings.get(key, key)
@@ -252,7 +260,7 @@ class NexeTray(rumps.App):
         import urllib.error
 
         blink_on = True
-        max_wait = 15
+        max_wait = 20
         start = time.time()
 
         while time.time() - start < max_wait:
@@ -281,6 +289,23 @@ class NexeTray(rumps.App):
         self.toggle_item.title = self.t("stop")
 
     def _stop_server(self):
+        # Attach mode: server is external, send SIGTERM
+        if self._attach_pid:
+            self.toggle_item.title = self.t("stopping")
+            try:
+                import signal
+                os.kill(self._attach_pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                pass
+            self._attach_pid = None
+            self.server_start_time = None
+            self.icon = ICON_STOPPED
+            self.status_item.title = self.t("status_stopped")
+            self.toggle_item.title = self.t("start")
+            self.ram_item.title = self.t("ram", ram="—")
+            self.uptime_item.title = self.t("uptime", uptime="—")
+            return
+
         if not self.server_process:
             return
 
@@ -315,6 +340,31 @@ class NexeTray(rumps.App):
     # ── Stats update ──────────────────────────────────────────────────────
 
     def _update_stats(self, _timer):
+        # Attach mode: monitor external server PID
+        if self._attach_pid:
+            try:
+                os.kill(self._attach_pid, 0)  # check alive
+            except ProcessLookupError:
+                # Server died externally
+                self._attach_pid = None
+                self.server_start_time = None
+                self.icon = ICON_STOPPED
+                self.status_item.title = self.t("status_stopped")
+                self.toggle_item.title = self.t("start")
+                self.ram_item.title = self.t("ram", ram="—")
+                self.uptime_item.title = self.t("uptime", uptime="—")
+                return
+            except PermissionError:
+                pass  # alive but can't signal
+
+            ram_bytes = _get_process_ram(self._attach_pid)
+            if ram_bytes > 0:
+                self.ram_item.title = self.t("ram", ram=_format_bytes(ram_bytes))
+            if self.server_start_time:
+                elapsed = time.time() - self.server_start_time
+                self.uptime_item.title = self.t("uptime", uptime=_format_uptime(elapsed))
+            return
+
         if not self.server_process or self.server_process.poll() is not None:
             if self.server_process and self.server_process.poll() is not None:
                 self.server_process = None
@@ -384,7 +434,10 @@ class NexeTray(rumps.App):
         rumps.quit_application()
 
     def _quit(self, _sender):
-        self._stop_server()
+        if not self._attach_pid:
+            # Normal mode: tray owns the server, stop it
+            self._stop_server()
+        # Attach mode: just quit tray, leave server running in terminal
         if self._server_log_fh:
             try:
                 self._server_log_fh.close()
@@ -402,10 +455,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--autostart", action="store_true",
                         help="Engega el servidor automaticament al obrir")
+    parser.add_argument("--attach", action="store_true",
+                        help="Attach to an already-running server (don't start one)")
+    parser.add_argument("--server-pid", type=int, default=None,
+                        help="PID of the running server process to monitor")
     args = parser.parse_args()
 
-    app = NexeTray()
-    if args.autostart:
+    app = NexeTray(attach_pid=args.server_pid if args.attach else None)
+    if args.autostart and not args.attach:
         import threading
         def auto():
             import time
@@ -413,7 +470,7 @@ def main():
             import urllib.error
             time.sleep(0.5)
             app._start_server()
-            for _ in range(30):
+            for _ in range(40):  # 20s timeout (M1 8GB pot trigar)
                 try:
                     req = urllib.request.urlopen(
                         f"http://localhost:{SERVER_PORT}/health", timeout=2
