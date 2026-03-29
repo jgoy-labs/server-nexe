@@ -16,22 +16,6 @@ MODEL_CATALOG = {
     # ─────────────────────────────────────────────────────────────────────────
     "small": [
         {
-            "key": "qwen35_2b",
-            "name": "Qwen3.5 2B",
-            "origin": "Alibaba",
-            "year": 2026,
-            "lang": {"ca": "Multilingüe +100 idiomes", "es": "Multilingüe +100 idiomas", "en": "Multilingual +100 languages"},
-            "params": "2B",
-            "disk_gb": 1.5,
-            "ram_gb": 2.0,
-            "description": {"ca": "Multimodal, tool calling i thinking. Successor de Qwen3", "es": "Multimodal, tool calling y thinking. Sucesor de Qwen3", "en": "Multimodal, tool calling and thinking. Qwen3 successor"},
-            "mlx": None,  # multimodal (vision_tower) incompatible amb mlx_lm text-only
-            "ollama": "qwen3.5:2b",
-            "gguf": None,
-            "chat_format": "chatml",
-            "prompt_tier": "small",
-        },
-        {
             "key": "phi35",
             "name": "Phi-3.5 Mini",
             "origin": "Microsoft",
@@ -75,6 +59,22 @@ MODEL_CATALOG = {
             "description": {"ca": "Multimodal, tool calling, thinking. Ideal per Macs amb 8 GB", "es": "Multimodal, tool calling, thinking. Ideal para Macs con 8 GB", "en": "Multimodal, tool calling, thinking. Ideal for 8 GB Macs"},
             "mlx": None,  # multimodal (vision_tower) incompatible amb mlx_lm text-only
             "ollama": "qwen3.5:4b",
+            "gguf": None,
+            "chat_format": "chatml",
+            "prompt_tier": "small",
+        },
+        {
+            "key": "qwen35_2b",
+            "name": "Qwen3.5 2B",
+            "origin": "Alibaba",
+            "year": 2026,
+            "lang": {"ca": "Multilingüe +100 idiomes", "es": "Multilingüe +100 idiomas", "en": "Multilingual +100 languages"},
+            "params": "2B",
+            "disk_gb": 1.5,
+            "ram_gb": 2.0,
+            "description": {"ca": "Multimodal, tool calling i thinking (requereix think:true)", "es": "Multimodal, tool calling y thinking (requiere think:true)", "en": "Multimodal, tool calling and thinking (requires think:true)"},
+            "mlx": None,
+            "ollama": "qwen3.5:2b",
             "gguf": None,
             "chat_format": "chatml",
             "prompt_tier": "small",

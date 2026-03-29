@@ -15,6 +15,7 @@ from typing import Optional, Dict, Any, List
 import logging
 from plugins.security.core.auth_dependencies import require_api_key
 from ..constants import DEFAULT_VECTOR_SIZE
+from .models import validate_collection_name, InvalidCollectionNameError
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,7 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
         MemoryStoreResponse with document_id if successful
     """
     try:
+        validate_collection_name(body.collection)
         memory = await get_memory_api()
 
         # Ensure collection exists
@@ -108,6 +110,8 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
             message="Content stored successfully"
         )
 
+    except InvalidCollectionNameError:
+        raise HTTPException(status_code=400, detail="Invalid collection name. Must follow pattern 'module_type' with only lowercase, numbers and underscores.")
     except Exception as e:
         logger.error("Memory store failed: %s", e, exc_info=True)
         raise HTTPException(
@@ -129,6 +133,13 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         MemorySearchResponse with matching results
     """
     try:
+        # Validate collection names
+        if body.collection:
+            validate_collection_name(body.collection)
+        if body.collections:
+            for col in body.collections:
+                validate_collection_name(col)
+
         memory = await get_memory_api()
 
         # Determinar col·leccions a cercar
@@ -183,6 +194,8 @@ async def memory_search(request: Request, body: MemorySearchRequest):
             total=len(formatted_results)
         )
 
+    except InvalidCollectionNameError:
+        raise HTTPException(status_code=400, detail="Invalid collection name. Must follow pattern 'module_type' with only lowercase, numbers and underscores.")
     except Exception as e:
         logger.error("Memory search failed: %s", e, exc_info=True)
         raise HTTPException(

@@ -358,8 +358,12 @@ async def lifespan(app: FastAPI):
     # Session cleanup background task (N-5)
     try:
       from plugins.web_ui_module.api.routes import start_session_cleanup_task
-      start_session_cleanup_task()
-      logger.info("Session cleanup task started (runs every hour)")
+      web_ui = app.state.modules.get("web_ui_module")
+      if web_ui and hasattr(web_ui, 'session_manager'):
+        start_session_cleanup_task(web_ui.session_manager)
+        logger.info("Session cleanup task started (runs every hour)")
+      else:
+        logger.warning("web_ui_module not loaded — session cleanup task skipped")
     except Exception as e:
       logger.warning("Could not start session cleanup task: %s", e)
 

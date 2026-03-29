@@ -35,7 +35,7 @@ DEFAULT_CHUNK_SIZE = 800
 
 # Tags limits
 MIN_TAGS = 1
-MAX_TAGS = 15
+MAX_TAGS = 20
 
 
 @dataclass
@@ -267,8 +267,8 @@ class RAGHeaderParser:
 
         if not header.abstract:
             errors.append("Field 'abstract' is required")
-        elif len(header.abstract) > 500:
-            errors.append(f"'abstract' too long ({len(header.abstract)}/500 chars)")
+        elif len(header.abstract) > 600:
+            errors.append(f"'abstract' too long ({len(header.abstract)}/600 chars)")
 
         if len(header.tags) < MIN_TAGS:
             errors.append(f"Minimum {MIN_TAGS} tags required")

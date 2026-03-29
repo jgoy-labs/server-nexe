@@ -347,7 +347,7 @@ Contingut
             assert header.lang == "es"
 
     def test_abstract_too_long_validation(self):
-        long_abstract = "a" * 501
+        long_abstract = "a" * 601
         header = RAGHeader(
             id="test-id",
             abstract=long_abstract,

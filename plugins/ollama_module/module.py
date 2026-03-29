@@ -333,10 +333,28 @@ class OllamaModule:
                 "<|end|>", "<|endoftext|>", "</s>",
                 "<|eot_id|>", "<end_of_turn>", "<|im_end|>",
             ]
+            import os
+            explicit_ctx = os.environ.get("NEXE_OLLAMA_NUM_CTX")
+            if explicit_ctx:
+                num_ctx = int(explicit_ctx)
+            else:
+                try:
+                    import psutil
+                    ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+                except ImportError:
+                    ram_gb = 16
+                if ram_gb >= 64: num_ctx = 32768
+                elif ram_gb >= 32: num_ctx = 16384
+                elif ram_gb >= 24: num_ctx = 8192
+                elif ram_gb >= 16: num_ctx = 4096
+                else: num_ctx = 2048
             payload = {
                 "model": model, "messages": messages,
                 "stream": stream, "stop": stop_sequences,
-                "think": True
+                "think": os.getenv("NEXE_OLLAMA_THINK", "false").lower() == "true",
+                "options": {
+                    "num_ctx": num_ctx,
+                }
             }
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:

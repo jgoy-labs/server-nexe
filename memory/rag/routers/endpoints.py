@@ -41,9 +41,12 @@ def _get_metrics():
   return _RAG_SEARCHES, _RAG_SEARCH_DURATION
 
 def _get_file_rag():
-  """Get singleton FileRAGSource."""
-  from ..module import get_file_rag
-  return get_file_rag()
+  """Get singleton FileRAGSource. Returns None if not available."""
+  try:
+    from ..module import get_file_rag
+    return get_file_rag()
+  except (ImportError, Exception):
+    return None
 
 async def add_document_endpoint(request: Dict[str, Any]):
   """Afegir document al RAG."""
@@ -183,6 +186,8 @@ async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}
 
     try:
       file_rag = _get_file_rag()
+      if file_rag is None:
+        raise HTTPException(status_code=501, detail="File upload via RAG API not yet implemented. Use POST /ui/upload instead.")
       doc_id = await file_rag.add_file(file_path=tmp_path, metadata=meta_dict)
       metrics = file_rag.get_metrics()
 

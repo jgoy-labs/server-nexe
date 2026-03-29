@@ -33,6 +33,28 @@ TAGS_CACHE_TTL = 30  # seconds
 # CS7: Configurable stream timeout via env var (default 300s for thinking models)
 _OLLAMA_STREAM_TIMEOUT = float(os.environ.get("NEXE_OLLAMA_STREAM_TIMEOUT", "300"))
 
+def _auto_num_ctx() -> int:
+    """Auto-detect num_ctx based on system RAM. Override with NEXE_OLLAMA_NUM_CTX."""
+    explicit = os.environ.get("NEXE_OLLAMA_NUM_CTX")
+    if explicit:
+        return int(explicit)
+    try:
+        import psutil
+        ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+    except ImportError:
+        return 4096
+    if ram_gb >= 64:
+        return 32768
+    elif ram_gb >= 32:
+        return 16384
+    elif ram_gb >= 24:
+        return 8192
+    elif ram_gb >= 16:
+        return 4096
+    return 2048
+
+_OLLAMA_NUM_CTX = _auto_num_ctx()
+
 _OLLAMA_ERRORS = {
     "ca": {
         "no_model": "No hi ha cap model de CHAT descarregat a Ollama. Executa: ollama pull llama3.2",
@@ -126,9 +148,11 @@ async def _forward_to_ollama(
         "model": model_name,
         "messages": messages,
         "stream": request.stream,
+        "think": os.getenv("NEXE_OLLAMA_THINK", "false").lower() == "true",
         "options": {
             "temperature": request.temperature,
-            "num_predict": request.max_tokens or int(os.getenv("NEXE_DEFAULT_MAX_TOKENS", "4096"))
+            "num_predict": request.max_tokens or int(os.getenv("NEXE_DEFAULT_MAX_TOKENS", "4096")),
+            "num_ctx": _OLLAMA_NUM_CTX
         }
     }
 
