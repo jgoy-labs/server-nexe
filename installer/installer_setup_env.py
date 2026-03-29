@@ -37,6 +37,7 @@ def _make_venv_standalone(venv_path):
         shutil.copy2(str(bundled_lib), str(venv_lib))
 
     # Re-signar ad-hoc (sense hardened runtime) perque pip .so funcioni
+    # + treure quarantine (AirDrop/Safari afegeixen com.apple.quarantine)
     for name in ("python3.12", "python3", "python"):
         venv_bin = venv_path / "bin" / name
         if venv_bin.exists() and not venv_bin.is_symlink():
@@ -44,12 +45,33 @@ def _make_venv_standalone(venv_path):
                 ["codesign", "--force", "--sign", "-", str(venv_bin)],
                 capture_output=True,
             )
+            subprocess.run(
+                ["xattr", "-rd", "com.apple.quarantine", str(venv_bin)],
+                capture_output=True,
+            )
+
+    # Treure quarantine de libpython copiat
+    if venv_lib.exists():
+        subprocess.run(
+            ["xattr", "-rd", "com.apple.quarantine", str(venv_lib)],
+            capture_output=True,
+        )
 
 
 def setup_environment(project_root, hw, engine="auto"):
     print_step(f"{BOLD}{t('setting_up_env')}{RESET}")
 
+    import shutil as _shutil
+
     venv_path = project_root / "venv"
+
+    # Si el venv existeix però està trencat (pip3 no hi és), esborrar i recrear
+    if venv_path.exists():
+        pip3 = venv_path / "bin" / "pip3"
+        if not pip3.exists():
+            print(f"  ⚠️  Venv trencat detectat, recreant...")
+            _shutil.rmtree(venv_path)
+
     if not venv_path.exists():
         print(f"  📦 {t('creating_venv')}")
         if platform.system() == "Darwin":

@@ -64,7 +64,7 @@ class LlamaCppConfig:
         # Resolve relative paths based on project root
         elif not os.path.isabs(self.model_path):
             from pathlib import Path
-            project_root = Path(__file__).parents[2]  # From plugins/llama_cpp_module/ to project root
+            project_root = Path(__file__).parents[3]  # From plugins/llama_cpp_module/core/ to project root
             self.model_path = str(project_root / self.model_path)
 
     @classmethod

@@ -230,6 +230,20 @@ class InstallerEngine: ObservableObject {
                 nexeTar.waitUntilExit()
             }
 
+            // Treure quarantine de tot el directori (AirDrop/Safari l'afegeixen)
+            let xattr = Process()
+            xattr.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+            xattr.arguments = ["-rd", "com.apple.quarantine", installPath]
+            try? xattr.run()
+            xattr.waitUntilExit()
+
+            // Treure quarantine del Python bundled (dins l'app del DMG)
+            let xattrPy = Process()
+            xattrPy.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+            xattrPy.arguments = ["-rd", "com.apple.quarantine", pythonPath]
+            try? xattrPy.run()
+            xattrPy.waitUntilExit()
+
             await MainActor.run {
                 self.appendLog("Payload extracted. Starting installation...")
             }
