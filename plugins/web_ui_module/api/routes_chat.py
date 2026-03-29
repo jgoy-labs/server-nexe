@@ -573,13 +573,20 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
                                     # Save LLM-extracted facts to memory
                                     _mem_saved_count = 0
-                                    # Patrons de fets brossa que el model pot inventar
+                                    # Junk patterns: false facts the model may generate
                                     _junk_patterns = _re.compile(
-                                        r'(?i)(no\s+(coneix|s.han|tinc|té|hi ha)|'
-                                        r'no\s+s.han\s+detectat|'
+                                        r'(?i)(no\s+(coneix|s\.han|tinc|té|hi ha)|'
+                                        r'no\s+s\.han\s+detectat|'
                                         r'busco\s+ajuda|necessit[oa]|'
                                         r'primera\s+interacci|'
-                                        r'no\s+personal|sense\s+dades)',
+                                        r'no\s+personal|sense\s+dades|'
+                                        # English junk patterns
+                                        r"I\s+don.t\s+(know|have)|no\s+information|"
+                                        r"first\s+interaction|not\s+personal|no\s+data|"
+                                        r"no\s+previous|cannot\s+recall|"
+                                        # Prompt injection markers in facts
+                                        r'\[MEM_SAVE|ignore\s+(all\s+)?previous|'
+                                        r'system\s+prompt|override\s+instruction)',
                                     )
                                     for fact in _mem_saves:
                                         fact = fact.strip()

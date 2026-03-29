@@ -101,6 +101,66 @@ def _start_parent_watchdog():
   logger.debug("Parent watchdog started — monitoring tray PID %d", tray_pid)
 
 
+def _maybe_launch_tray():
+    """Launch the macOS tray icon if on macOS and no tray is already running."""
+    from pathlib import Path
+
+    # Guard 1: Already launched from tray
+    if os.environ.get("NEXE_TRAY_PID"):
+        logger.debug("Tray already running (NEXE_TRAY_PID set) — skipping tray launch")
+        return
+
+    # Guard 2: macOS only
+    if sys.platform != "darwin":
+        return
+
+    # Guard 3: Docker/headless — no GUI
+    if os.environ.get("NEXE_DOCKER") or os.environ.get("CONTAINER"):
+        return
+
+    # Guard 4: User opted out
+    if os.environ.get("NEXE_NO_TRAY"):
+        return
+
+    # Guard 5: Check rumps availability
+    try:
+        import rumps  # noqa: F401
+    except ImportError:
+        logger.debug("rumps not installed — tray not available")
+        return
+
+    # Guard 6: Check if a tray process is already running
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "installer.tray"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            logger.debug("Tray process already running — skipping launch")
+            return
+    except Exception:
+        pass
+
+    # Launch tray in --attach mode
+    project_root = Path(__file__).resolve().parent.parent
+    venv_python = project_root / "venv" / "bin" / "python"
+    python_exe = str(venv_python) if venv_python.exists() else sys.executable
+
+    server_pid = os.getpid()
+
+    try:
+        subprocess.Popen(
+            [python_exe, "-m", "installer.tray", "--attach", "--server-pid", str(server_pid)],
+            cwd=str(project_root),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,  # Fully detach from terminal
+        )
+        logger.info("Tray launched in attach mode (server PID %d)", server_pid)
+    except Exception as e:
+        logger.debug("Could not launch tray: %s", e)
+
+
 def main():
   """
   Main entry point for running the server directly.
@@ -196,6 +256,8 @@ def main():
     f"  edit {YELLOW}personality/server.toml{RESET}\n"
     f"{YELLOW}Server running at: {host}:{port}{RESET}"
   )
+
+  _maybe_launch_tray()
 
   try:
     uvicorn.run(

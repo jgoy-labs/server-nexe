@@ -497,17 +497,27 @@ class NexeUI {
         this.loadBackends();
     }
 
-    async loadBackends() {
+    async loadBackends(retryCount = 0) {
         const backendSel = document.getElementById('backendSelect');
         const modelSel = document.getElementById('modelSelect');
         if (!backendSel || !modelSel) return;
 
         try {
             const resp = await this.fetchWithCsrf('/ui/backends');
-            if (!resp.ok) return;
+            if (!resp.ok) {
+                if (retryCount < 3) {
+                    setTimeout(() => this.loadBackends(retryCount + 1), 2000 * (retryCount + 1));
+                }
+                return;
+            }
             const data = await resp.json();
             this._backends = data.backends;
             this._currentModel = data.current_model || '';
+
+            if (!data.backends.length && retryCount < 3) {
+                setTimeout(() => this.loadBackends(retryCount + 1), 2000 * (retryCount + 1));
+                return;
+            }
 
             backendSel.innerHTML = '';
             for (const b of data.backends) {
@@ -522,15 +532,21 @@ class NexeUI {
 
             this._updateModelSelect(backendSel.value, this._currentModel);
 
-            backendSel.addEventListener('change', () => {
-                this._updateModelSelect(backendSel.value);
-                this._applyBackendChange();
-            });
-            modelSel.addEventListener('change', () => {
-                this._applyBackendChange();
-            });
+            if (!this._backendListenersAttached) {
+                this._backendListenersAttached = true;
+                backendSel.addEventListener('change', () => {
+                    this._updateModelSelect(backendSel.value);
+                    this._applyBackendChange();
+                });
+                modelSel.addEventListener('change', () => {
+                    this._applyBackendChange();
+                });
+            }
         } catch (e) {
             console.error('Failed to load backends:', e);
+            if (retryCount < 3) {
+                setTimeout(() => this.loadBackends(retryCount + 1), 2000 * (retryCount + 1));
+            }
         }
     }
 

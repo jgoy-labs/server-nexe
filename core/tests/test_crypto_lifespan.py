@@ -46,6 +46,7 @@ class TestCryptoInitLogic:
         config = {'security': {'encryption': {'enabled': False}}}
         assert self._run_crypto_init(config) is False
 
+    @patch.dict(os.environ, {}, clear=True)
     def test_enabled_via_config(self):
         config = {'security': {'encryption': {'enabled': True}}}
         assert self._run_crypto_init(config) is True
