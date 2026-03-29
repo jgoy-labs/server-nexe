@@ -4,38 +4,38 @@
 # ─────────────────────────────────────────────────────────────
 
 # --- Core Server ---
-fastapi==0.115.0
-uvicorn[standard]==0.34.3
-pydantic==2.10.6
+fastapi==0.135.2
+uvicorn[standard]==0.42.0
+pydantic==2.12.5
 python-multipart==0.0.22
 starlette-csrf==3.0.0
 colorama==0.4.6
 tomli==2.0.1; python_version < "3.11"
-httpx==0.27.2
-qdrant-client==1.16.1
+httpx==0.28.1
+qdrant-client==1.17.1
 toml==0.10.2
 structlog==25.5.0
-click==8.1.7
-rich==13.7.0
-typer==0.9.0
-python-dotenv==1.2.1
-pyyaml==6.0.1
-numpy==1.26.4
+click==8.3.1
+rich==14.3.3
+typer==0.24.1
+python-dotenv==1.2.2
+pyyaml==6.0.3
+numpy==2.4.4
 slowapi==0.1.9
-prometheus-client==0.19.0
-tenacity==9.1.2
-psutil==5.9.8
-huggingface_hub==0.36.2
+prometheus-client==0.24.1
+tenacity==9.1.4
+psutil==7.2.2
+huggingface_hub==1.8.0
 # macOS-only deps (tray app) → requirements-macos.txt
 
 # --- Memory & RAG ---
 sentence-transformers>=4.0.0,<6.0.0
-pypdf==6.7.5  # PDF support for knowledge ingestion (security fixes)
+pypdf==6.9.2  # PDF support for knowledge ingestion (security fixes)
 
 # --- Testing ---
-pytest>=8.0.0,<9.0.0
-pytest-asyncio>=0.23.0,<1.0.0
-pytest-cov>=5.0.0,<6.0.0
+pytest>=8.0.0,<10.0.0
+pytest-asyncio>=0.23.0,<2.0.0
+pytest-cov>=5.0.0,<8.0.0
 
 # --- Inference Engines (Apple Silicon / MLX) ---
 # Note: Install only on Mac ARM64
