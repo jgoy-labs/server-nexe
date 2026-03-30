@@ -10,6 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import html
+import re
 from typing import Optional, List, Dict, Any
 from fastapi import HTTPException
 
@@ -23,6 +24,12 @@ from .injection_detectors import (
 )
 
 from .messages import get_message
+
+_MEM_TAG_RE = re.compile(r'\[MEM_SAVE:\s*.+?\]', re.IGNORECASE)
+
+def strip_memory_tags(text: str) -> str:
+  """Strip [MEM_SAVE: ...] tags from user input to prevent memory injection."""
+  return _MEM_TAG_RE.sub('', text).strip()
 
 def sanitize_html(text: str) -> str:
   """
@@ -85,9 +92,11 @@ def validate_string_input(
     HTTPException: If validation fails
   """
   # In chat context, skip detectors prone to false positives with code snippets
+  # Path traversal (`..`) triggers on normal ellipsis ("vei..." = HTTP 400)
   if context == "chat":
     check_command = False
     check_ldap = False
+    check_path_traversal = False
   if not isinstance(text, str):
     raise HTTPException(
       400,

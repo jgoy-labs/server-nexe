@@ -305,8 +305,8 @@ class TestSystemHealthVersion:
         """/health té una versió de fallback si config no disponible."""
         from core.endpoints.system import system_health
         source = inspect.getsource(system_health)
-        # Ha de tenir un fallback (0.8.x)
-        assert "0.8" in source
+        # Ha de tenir un fallback (0.9.x)
+        assert "0.9" in source
 
 
 # ═══════════════════════════════════════════════════════════════════════════

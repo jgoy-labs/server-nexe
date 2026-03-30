@@ -196,7 +196,7 @@ class TestKnowledgeFolderDiscovery:
         if not readme.exists():
             pytest.skip("README.md not found")
         text = readme.read_text()
-        assert "0.8" in text
+        assert "0.9" in text
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -288,7 +288,7 @@ class TestIngestAndSearch:
             )
         results = asyncio.run(_search())
         combined = " ".join(r.text or "" for r in results)
-        assert "0.8" in combined
+        assert "0.9" in combined
 
     def test_search_scores_are_positive(self, ingested):
         import asyncio
@@ -343,7 +343,7 @@ RAG_QA_PAIRS = [
     },
     {
         "question": "Quina és la versió actual de NEXE?",
-        "expected_keywords": ["0.8"],
+        "expected_keywords": ["0.9"],
         "doc": "README.md"
     },
 ]
@@ -429,7 +429,7 @@ class TestRAGChatOllama:
         assert r.status_code == 200
         body = r.json()
         text = body.get("response") or body.get("message") or body.get("text") or str(body)
-        assert "0.8" in text, f"No conté '0.8': {text[:300]}"
+        assert "0.9" in text, f"No conté '0.8': {text[:300]}"
 
     def test_chat_rag_context_present_in_response(self, rag_client):
         """El camp rag_context o similar ha d'existir si el model troba docs rellevants."""
@@ -528,4 +528,4 @@ class TestRAGChatMLX:
         assert r.status_code == 200
         body = r.json()
         response_text = body.get("response") or body.get("message") or str(body)
-        assert "0.8" in response_text, f"No conté '0.8': {response_text[:300]}"
+        assert "0.9" in response_text, f"No conté '0.8': {response_text[:300]}"

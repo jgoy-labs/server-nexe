@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-installation-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia de instalacion de server-nexe 0.8.5 pre-release. Tres metodos: DMG para macOS con wizard SwiftUI (6 pantallas, deteccion de hardware, 15 modelos, Python 3.12 incluido), CLI headless (setup.sh con soporte Linux) y Docker (docker-compose con Ollama). Cubre requisitos del sistema, seleccion de backend, catalogo de modelos por nivel de RAM, verificacion post-instalacion, app de bandeja, desinstalador, encriptacion opt-in y resolucion de problemas."
+abstract: "Guia de instalacion de server-nexe 0.9.0 pre-release. Tres metodos: DMG para macOS con wizard SwiftUI (6 pantallas, deteccion de hardware, 15 modelos, Python 3.12 incluido), CLI headless (setup.sh con soporte Linux) y Docker (docker-compose con Ollama). Cubre requisitos del sistema, seleccion de backend, catalogo de modelos por nivel de RAM, verificacion post-instalacion, app de bandeja, desinstalador, encriptacion opt-in y resolucion de problemas."
 tags: [installation, setup, dmg, swiftui, wizard, docker, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption]
 chunk_size: 800
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Instalacion — server-nexe 0.8.5 pre-release
+# Instalacion — server-nexe 0.9.0 pre-release
 
 Tres metodos de instalacion disponibles. Elige segun tu plataforma y preferencias.
 

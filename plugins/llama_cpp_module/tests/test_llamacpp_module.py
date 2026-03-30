@@ -7,7 +7,7 @@ from core.loader.protocol import HealthStatus
 async def test_llamacpp_module_metadata():
     module = LlamaCppModule()
     assert module.metadata.name == "llama_cpp_module"
-    assert module.metadata.version == "0.8.5"
+    assert module.metadata.version == "0.9.0"
     assert module.metadata.module_type == "local_llm_option"
 
 @pytest.mark.asyncio

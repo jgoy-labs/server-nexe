@@ -39,7 +39,7 @@ It does **not** defend against:
 - Trusted host middleware
 - No inline scripts — language injection via `data-` HTML attributes
 
-### Encryption at rest (opt-in, v0.8.5+)
+### Encryption at rest (opt-in, v0.9.0+)
 - AES-256-GCM with HKDF-SHA256 key derivation
 - Master key stored in OS Keyring (preferred), environment variable, or file fallback
 - SQLCipher for encrypted SQLite databases
@@ -68,7 +68,7 @@ The AI audit covered: injection detection, authentication flows, rate limiting, 
 
 | Version | Supported |
 |---------|-----------|
-| 0.8.5   | Current release, receives fixes |
+| 0.9.0   | Current release, receives fixes |
 | 0.8.2   | No longer supported |
 | < 0.8.0 | Not supported |
 
@@ -99,4 +99,4 @@ Server Nexe uses `cryptography` (>=44.0.0) for encryption, `keyring` (>=25.0.0) 
 
 ---
 
-*v0.8.5 · Apache 2.0 · Jordi Goy*
+*v0.9.0 · Apache 2.0 · Jordi Goy*

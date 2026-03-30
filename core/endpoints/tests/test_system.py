@@ -226,12 +226,12 @@ class TestSystemHealthEndpoint:
         app = make_app()
         client = TestClient(app)
         mock_state = MagicMock()
-        mock_state.config = {"meta": {"version": "0.8.5"}}
+        mock_state.config = {"meta": {"version": "0.9.0"}}
         with patch("core.lifespan.get_server_state", return_value=mock_state):
             resp = client.get("/admin/system/health")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["version"] == "0.8.5"
+        assert data["version"] == "0.9.0"
 
 
 class TestSupervisorStatusEndpoint:

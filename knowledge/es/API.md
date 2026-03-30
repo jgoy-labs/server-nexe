@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-api-reference
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa de la REST API de server-nexe 0.8.5 pre-release. Cubre todos los endpoints: chat completions (compatible OpenAI, streaming, RAG), memoria (store, search), busqueda RAG, subida de documentos, sesiones, bootstrap, health checks, modulos, backends, i18n, comandos CLI de encriptacion. Incluye autenticacion (X-API-Key dual-key), rate limiting por endpoint, marcadores de streaming, y configuracion."
+abstract: "Referencia completa de la REST API de server-nexe 0.9.0 pre-release. Cubre todos los endpoints: chat completions (compatible OpenAI, streaming, RAG), memoria (store, search), busqueda RAG, subida de documentos, sesiones, bootstrap, health checks, modulos, backends, i18n, comandos CLI de encriptacion. Incluye autenticacion (X-API-Key dual-key), rate limiting por endpoint, marcadores de streaming, y configuracion."
 tags: [api, rest, endpoints, chat, memory, rag, authentication, rate-limiting, streaming, openai-compatible, upload, sessions, bootstrap, health, backends, encryption]
 chunk_size: 800
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Referencia REST API — server-nexe 0.8.5 pre-release
+# Referencia REST API — server-nexe 0.9.0 pre-release
 
 ## URL Base
 

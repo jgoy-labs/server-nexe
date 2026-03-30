@@ -173,8 +173,8 @@ class TestRootEndpoint:
         resp = client.get("/")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["system"] == "Nexe 0.8.5"
-        assert data["version"] == "0.8.5"
+        assert data["system"] == "Nexe 0.9.0"
+        assert data["version"] == "0.9.0"
         assert "description" in data
         assert "status" in data
 
@@ -292,8 +292,8 @@ class TestApiInfoEndpoint:
         resp = client.get("/api/info")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["name"] == "Nexe 0.8.5"
-        assert data["version"] == "0.8.5"
+        assert data["name"] == "Nexe 0.9.0"
+        assert data["version"] == "0.9.0"
         assert isinstance(data["endpoints"], list)
         assert len(data["endpoints"]) == 3
 

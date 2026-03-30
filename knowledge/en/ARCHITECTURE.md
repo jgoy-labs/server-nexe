@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-architecture
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Internal architecture of server-nexe 0.8.5 pre-release. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, Docker, encryption pipeline, request sanitization pipeline, and Mermaid diagrams."
+abstract: "Internal architecture of server-nexe 0.9.0 pre-release. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, Docker, encryption pipeline, request sanitization pipeline, and Mermaid diagrams."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, docker, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Architecture — server-nexe 0.8.5 pre-release
+# Architecture — server-nexe 0.9.0 pre-release
 
 ## Five-Layer Architecture
 
@@ -135,7 +135,7 @@ server-nexe/
 │   ├── bootstrap_tokens.py       # Bootstrap token system (DB persist)
 │   ├── models.py                 # Pydantic models
 │   │
-│   ├── crypto/                   # Encryption at rest (new in v0.8.5)
+│   ├── crypto/                   # Encryption at rest (new in v0.9.0)
 │   │   ├── __init__.py           # Package + check_encryption_status()
 │   │   ├── provider.py           # CryptoProvider (AES-256-GCM, HKDF-SHA256)
 │   │   ├── keys.py               # Master key management (keyring/env/file)
@@ -265,7 +265,7 @@ Handles startup and shutdown of the server. Split into 3 submodules.
 ```toml
 [module]
 name = "module_name"
-version = "0.8.5"
+version = "0.9.0"
 type = "local_llm_option"
 description = "Module description"
 location = "plugins/module_name/"

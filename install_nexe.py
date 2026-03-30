@@ -2,7 +2,7 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.8.5
+Version: 0.9.0
 Author: Jordi Goy
 Location: install_nexe.py
 Description: Façade entry point — delegates to installer/install.py.

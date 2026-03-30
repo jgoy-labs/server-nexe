@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Core identity of server-nexe: what it is, what it is NOT (not npm nexe, not Ollama, not ChatGPT), who made it, what it does (including encryption at-rest), current status (0.8.5 pre-release), official links, AI-ready documentation, and how to support the project."
+abstract: "Core identity of server-nexe: what it is, what it is NOT (not npm nexe, not Ollama, not ChatGPT), who made it, what it does (including encryption at-rest), current status (0.9.0 pre-release), official links, AI-ready documentation, and how to support the project."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready]
 chunk_size: 800
 priority: P1
@@ -59,7 +59,7 @@ server-nexe combines five capabilities:
 
 ## Current status
 
-- **Version:** 0.8.5 pre-release
+- **Version:** 0.9.0 pre-release
 - **Primary platform:** macOS (Apple Silicon and Intel) — tested
 - **Linux:** Partial support (unit tests pass, not production-tested)
 - **Windows:** Not yet supported

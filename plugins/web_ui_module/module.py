@@ -56,7 +56,7 @@ class WebUIModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="web_ui_module",
-            version="0.8.5",
+            version="0.9.0",
             description="Interficie web estil Ollama per demostrar sistema modular",
             author="Jordi Goy",
             module_type="web_interface",

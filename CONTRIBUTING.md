@@ -65,7 +65,7 @@ plugins/my_module/
 ```toml
 [module]
 name = "my_module"
-version = "0.8.5"
+version = "0.9.0"
 description = "What this module does"
 author = "Your Name"
 
@@ -88,7 +88,7 @@ class Module:
     def __init__(self):
         self.metadata = ModuleMetadata(
             name="my_module",
-            version="0.8.5",
+            version="0.9.0",
             description="What this module does",
         )
 
@@ -149,4 +149,4 @@ Be respectful and constructive. This is a personal project maintained in spare t
 
 ---
 
-*v0.8.5 · Apache 2.0 · Jordi Goy*
+*v0.9.0 · Apache 2.0 · Jordi Goy*

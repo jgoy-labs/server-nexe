@@ -31,7 +31,7 @@ async def v1_root(request: Request):
   return JSONResponse({
     "api_version": "v1",
     "status": "operational",
-    "description": "Nexe 0.8.5 Versioned API",
+    "description": "Nexe 0.9.0 Versioned API",
     "endpoints": {
       "workflows": {
         "base": "/v1/workflows",

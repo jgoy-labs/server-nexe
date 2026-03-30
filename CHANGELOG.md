@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.0] - 2026-03-31
+
+### Added
+- **Memory v1** — Automatic fact extraction, semantic deduplication, dreaming (offline consolidation). 22 new files, ~4765 lines. Qdrant embedded, zero external processes.
+- Qdrant singleton pool for thread-safe concurrent access
+- MEM_SAVE input injection prevention (strip user-side tags)
+- Security false positive tests (47 scenarios)
+
+### Fixed
+- Installer venv no longer depends on DMG mount path after ejection
+- GPT-OSS thinking detection now works during streaming (not retroactively)
+- SEC-002: MEM_SAVE tags stripped from user input before LLM processing
+
+### Changed
+- Version bump from 0.8.5 to 0.9.0
+
 ## [0.8.5] - 2026-03-28
 
 ### Added

@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-limitations
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Honest documentation of server-nexe 0.8.5 pre-release limitations. Covers platform support (macOS tested, Linux partial, Windows not yet), model quality vs cloud (GPT-4/Claude), RAG limitations (embeddings, chunking, cold start, contradictions), API partial OpenAI compatibility, performance (single instance, concurrency), security constraints, encryption caveats (opt-in, new, not battle-tested), and functional gaps (no multi-user, no sync, no fine-tuning)."
+abstract: "Honest documentation of server-nexe 0.9.0 pre-release limitations. Covers platform support (macOS tested, Linux partial, Windows not yet), model quality vs cloud (GPT-4/Claude), RAG limitations (embeddings, chunking, cold start, contradictions), API partial OpenAI compatibility, performance (single instance, concurrency), security constraints, encryption caveats (opt-in, new, not battle-tested), and functional gaps (no multi-user, no sync, no fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Limitations — server-nexe 0.8.5 pre-release
+# Limitations — server-nexe 0.9.0 pre-release
 
 This document honestly describes what server-nexe cannot do or does not do well.
 
@@ -84,7 +84,7 @@ Partially compatible with OpenAI API format:
 ## Encryption Caveats
 
 - **Opt-in:** Encryption at rest is not enabled by default. Users must explicitly activate it.
-- **New feature:** Added in v0.8.5. Tested (68 tests, 0 failures) but not yet battle-tested in production with real users.
+- **New feature:** Added in v0.9.0. Tested (68 tests, 0 failures) but not yet battle-tested in production with real users.
 - **Key management:** Master key stored in OS Keyring, env var, or file. If the key is lost, encrypted data cannot be recovered.
 - **SQLCipher dependency:** Requires `sqlcipher3` package. Falls back to plaintext SQLite with a warning if not installed.
 - **Migration:** Migrating large datasets (many memories, many sessions) can take time. Backup before migrating.

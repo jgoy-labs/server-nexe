@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-rag-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete reference of the server-nexe RAG memory system (v0.8.5 pre-release). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent, session-isolated document upload, embeddings (768D), chunking parameters, context building with i18n labels, RAG weight visualization, RAG context sanitization, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
+abstract: "Complete reference of the server-nexe RAG memory system (v0.9.0 pre-release). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent, session-isolated document upload, embeddings (768D), chunking parameters, context building with i18n labels, RAG weight visualization, RAG context sanitization, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 800
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# RAG System — server-nexe 0.8.5 pre-release
+# RAG System — server-nexe 0.9.0 pre-release
 
 RAG (Retrieval-Augmented Generation) is the persistent memory system of server-nexe. It augments the LLM's responses by injecting relevant information retrieved from vector memory into the prompt context.
 
@@ -52,13 +52,13 @@ The Web UI also allows real-time threshold adjustment via a slider (default 0.30
 
 ## Qdrant Payloads (no text)
 
-As of v0.8.5, Qdrant payloads **no longer contain text content**. Each payload only stores:
+As of v0.9.0, Qdrant payloads **no longer contain text content**. Each payload only stores:
 - `entry_type` — the type of entry
 - `original_id` — link back to SQLite for the full text
 
 All text lives in SQLite (optionally encrypted via SQLCipher). This means even without encryption enabled, Qdrant vectors alone cannot reconstruct the original text content.
 
-## TextStore (new in v0.8.5)
+## TextStore (new in v0.9.0)
 
 `TextStore` (`memory/memory/api/text_store.py`) is a SQLite-backed storage for RAG document text, decoupled from Qdrant:
 

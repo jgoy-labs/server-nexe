@@ -66,7 +66,7 @@ class OllamaModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="ollama_module",
-            version="0.8.5",
+            version="0.9.0",
             description="Integracio amb Ollama per executar models LLM locals",
             author="Jordi Goy",
             module_type="local_llm_option",

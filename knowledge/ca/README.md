@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-overview
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Visio general de server-nexe 0.8.5 pre-release, un servidor d'IA local amb memoria RAG persistent. Cobreix que es, backends (MLX, llama.cpp, Ollama), funcionalitats (MEM_SAVE, i18n, Docker, aillament de sessions, encriptacio at-rest), arquitectura, 15 models disponibles, stack tecnologic, metodes d'instal·lacio, documentacio AI-ready i suport de plataformes actual."
+abstract: "Visio general de server-nexe 0.9.0 pre-release, un servidor d'IA local amb memoria RAG persistent. Cobreix que es, backends (MLX, llama.cpp, Ollama), funcionalitats (MEM_SAVE, i18n, Docker, aillament de sessions, encriptacio at-rest), arquitectura, 15 models disponibles, stack tecnologic, metodes d'instal·lacio, documentacio AI-ready i suport de plataformes actual."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready]
 chunk_size: 800
 priority: P1
@@ -17,9 +17,9 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# server-nexe 0.8.5 pre-release — Servidor d'IA local amb memoria persistent
+# server-nexe 0.9.0 pre-release — Servidor d'IA local amb memoria persistent
 
-**Versio:** 0.8.5 pre-release
+**Versio:** 0.9.0 pre-release
 **Port per defecte:** 9119
 **Autor:** Jordi Goy (Barcelona)
 **Llicencia:** Apache 2.0

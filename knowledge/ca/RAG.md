@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-rag-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.8.5 pre-release). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat, pujada de documents amb aillament de sessio, embeddings (768D), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio de context RAG, poda intel·ligent, deduplicacio, TextStore per a text encriptat i payloads de Qdrant sense text."
+abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.9.0 pre-release). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat, pujada de documents amb aillament de sessio, embeddings (768D), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio de context RAG, poda intel·ligent, deduplicacio, TextStore per a text encriptat i payloads de Qdrant sense text."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 800
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Sistema RAG — server-nexe 0.8.5 pre-release
+# Sistema RAG — server-nexe 0.9.0 pre-release
 
 RAG (Retrieval-Augmented Generation) es el sistema de memoria persistent de server-nexe. Augmenta les respostes del LLM injectant informacio rellevant recuperada de la memoria vectorial al context del prompt.
 
@@ -52,13 +52,13 @@ La Web UI tambe permet l'ajust en temps real del llindar via un slider (per defe
 
 ## Payloads de Qdrant (sense text)
 
-A partir de la v0.8.5, els payloads de Qdrant **ja no contenen text**. Cada payload nomes emmagatzema:
+A partir de la v0.9.0, els payloads de Qdrant **ja no contenen text**. Cada payload nomes emmagatzema:
 - `entry_type` — el tipus d'entrada
 - `original_id` — enllac de tornada a SQLite per al text complet
 
 Tot el text viu a SQLite (opcionalment encriptat via SQLCipher). Aixo significa que fins i tot sense encriptacio activada, els vectors de Qdrant sols no poden reconstruir el contingut original del text.
 
-## TextStore (nou a la v0.8.5)
+## TextStore (nou a la v0.9.0)
 
 `TextStore` (`memory/memory/api/text_store.py`) es un emmagatzematge SQLite per al text de documents RAG, desacoblat de Qdrant:
 

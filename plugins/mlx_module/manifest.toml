@@ -1,12 +1,12 @@
 # ─────────────────────────────────────────────────────────────
 # ModuleID: mlx_module
-# Nexe v0.8.5 | Antigravity | 2026-01-02
+# Nexe v0.9.0 | Antigravity | 2026-01-02
 # server-nexe/plugins/mlx_module/manifest.toml
 # ─────────────────────────────────────────────────────────────
 
 [module]
 name = "mlx_module"
-version = "0.8.5"
+version = "0.9.0"
 type = "local_llm_option"
 description = "Motor d'inferència ultra-optimitzat per a Apple Silicon (M1/M2/M3/M4) usant MLX. Inclou prefix matching real amb TTFT instantani en converses llargues."
 location = "plugins/mlx_module/"

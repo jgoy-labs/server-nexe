@@ -14,7 +14,7 @@ def make_valid_config(tmp_path, extra=None):
     """Crea un fitxer server.toml vàlid per tests"""
     config = {
         "meta": {
-            "version": "0.8.5",
+            "version": "0.9.0",
             "environment": "production"
         },
         "core": {
@@ -139,7 +139,7 @@ class TestValidateMethod:
 
     def test_invalid_port(self, tmp_path):
         config = {
-            "meta": {"version": "0.8.5", "environment": "production"},
+            "meta": {"version": "0.9.0", "environment": "production"},
             "core": {"server": {"host": "127.0.0.1", "port": 99999}},
             "personality": {"orchestrator": {"modules_path": str(tmp_path)}},
             "plugins": {"models": {"primary": "llama3.2"}},
@@ -155,7 +155,7 @@ class TestValidateMethod:
 
     def test_port_zero_invalid(self, tmp_path):
         config = {
-            "meta": {"version": "0.8.5", "environment": "production"},
+            "meta": {"version": "0.9.0", "environment": "production"},
             "core": {"server": {"host": "127.0.0.1", "port": 0}},
             "personality": {"orchestrator": {"modules_path": str(tmp_path)}},
             "plugins": {"models": {"primary": "llama3.2"}},
@@ -170,7 +170,7 @@ class TestValidateMethod:
 
     def test_invalid_environment(self, tmp_path):
         config = {
-            "meta": {"version": "0.8.5", "environment": "invalid_env"},
+            "meta": {"version": "0.9.0", "environment": "invalid_env"},
             "core": {"server": {"host": "127.0.0.1", "port": 9119}},
             "personality": {"orchestrator": {"modules_path": str(tmp_path)}},
             "plugins": {"models": {"primary": "llama3.2"}},
@@ -186,7 +186,7 @@ class TestValidateMethod:
 
     def test_invalid_log_level(self, tmp_path):
         config = {
-            "meta": {"version": "0.8.5", "environment": "production"},
+            "meta": {"version": "0.9.0", "environment": "production"},
             "core": {"server": {"host": "127.0.0.1", "port": 9119}},
             "personality": {"orchestrator": {"modules_path": str(tmp_path)}},
             "plugins": {"models": {"primary": "llama3.2"}},
