@@ -11,12 +11,24 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import Dict, Any
 
-# Dimensio dels vectors d'embeddings.
-# Correspon al model paraphrase-multilingual-mpnet-base-v2 (768 dims).
-# Si canvies el model d'embeddings, canvia nomes aquest valor.
-DEFAULT_VECTOR_SIZE = 768
+from memory.embeddings.constants import DEFAULT_VECTOR_SIZE  # noqa: F401 — canonical source
 
 MODULE_ID = "memory"
+
+# ── v1 Decisions (frozen) ──
+# Trust: 2 levels only (trusted / untrusted). No 4-tier system.
+# Episodic dedup: 2 bands (>0.92 refresh, <0.92 new). No link-on-write.
+# Graph overlay: OFF. related_ids stored inline as JSON array in episodic.
+# Exploratory mode: CLI/user only. No API endpoint.
+# Retrieve threshold: floor=0.45, ceiling=0.65. No generic dynamic.
+# Embedding model: paraphrase-multilingual-mpnet-base-v2, 768 dims.
+# Storage: SQLite = source of truth. Qdrant embedded = rebuildable index.
+# user_id: mandatory on ALL tables from day 1. No cross-user contamination.
+V1_RETRIEVE_FLOOR = 0.45
+V1_RETRIEVE_CEILING = 0.65
+V1_DEDUP_REFRESH_THRESHOLD = 0.92
+V1_STAGING_TTL_HOURS = 48
+V1_TOMBSTONE_TTL_DAYS = 90
 
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
@@ -65,4 +77,10 @@ MANIFEST: Dict[str, Any] = {
 __all__ = [
   "MANIFEST",
   "MODULE_ID",
+  "DEFAULT_VECTOR_SIZE",
+  "V1_RETRIEVE_FLOOR",
+  "V1_RETRIEVE_CEILING",
+  "V1_DEDUP_REFRESH_THRESHOLD",
+  "V1_STAGING_TTL_HOURS",
+  "V1_TOMBSTONE_TTL_DAYS",
 ]

@@ -74,6 +74,8 @@ class MemoryAPI:
   )
   DEFAULT_VECTOR_SIZE = DEFAULT_VECTOR_SIZE
 
+  DEFAULT_QDRANT_PATH = Path("storage/vectors")
+
   def __init__(
     self,
     qdrant_url: Optional[str] = None,
@@ -87,11 +89,12 @@ class MemoryAPI:
 
     Args:
       qdrant_url: URL del servidor Qdrant (default: http://localhost:6333)
-      qdrant_path: Path local per mode fitxer/test (prioritat sobre qdrant_url)
+      qdrant_path: Path local per mode fitxer/test (prioritat sobre qdrant_url).
+                   Default: storage/vectors (embedded mode)
       embedding_model: Model d'embeddings (default: paraphrase-multilingual-mpnet-base-v2)
     """
     self.qdrant_url = qdrant_url or self.DEFAULT_QDRANT_URL
-    self.qdrant_path = qdrant_path
+    self.qdrant_path = qdrant_path if qdrant_path is not None else self.DEFAULT_QDRANT_PATH
     self.embedding_model = embedding_model
     self.vector_size = self.DEFAULT_VECTOR_SIZE
 
@@ -124,11 +127,13 @@ class MemoryAPI:
 
     try:
       # Use local mode if qdrant_path is set, otherwise connect to URL
+      from core.qdrant_pool import get_qdrant_client
+
       if self.qdrant_path:
-        self._qdrant = QdrantClient(path=str(self.qdrant_path))
+        self._qdrant = get_qdrant_client(path=str(self.qdrant_path))
         logger.info("MemoryAPI initialized (path=%s)", self.qdrant_path)
       else:
-        self._qdrant = QdrantClient(url=self.qdrant_url, prefer_grpc=False)
+        self._qdrant = get_qdrant_client(url=self.qdrant_url)
         logger.info("MemoryAPI initialized (url=%s)", self.qdrant_url)
 
       # Initialize text store if path provided

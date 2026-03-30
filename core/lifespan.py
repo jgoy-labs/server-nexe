@@ -23,7 +23,6 @@ from .lifespan_services import (
     _auto_start_services,
     OLLAMA_HEALTH_TIMEOUT,
     OLLAMA_UNLOAD_TIMEOUT,
-    QDRANT_HEALTH_TIMEOUT,
 )
 from .lifespan_tokens import generate_bootstrap_token, setup_bootstrap_tokens
 from .lifespan_ollama import cleanup_ollama_startup, cleanup_ollama_shutdown
@@ -47,7 +46,6 @@ class ServerState:
     self.i18n = None
     self.module_manager = None
     self.registry = None
-    self.qdrant_process = None
     self.ollama_process = None
     self.qdrant_available: bool = False
     self.crypto_provider = None
@@ -118,6 +116,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
       logger.warning("Encryption init failed (non-fatal): %s", e)
       server_state.crypto_provider = None
+
+    # Init Qdrant singleton pool
+    from core.qdrant_pool import get_qdrant_client, close_qdrant_client
+    qdrant_url = os.environ.get("NEXE_QDRANT_URL")
+    qdrant_path = os.environ.get("NEXE_QDRANT_PATH", "storage/vectors")
+    get_qdrant_client(url=qdrant_url, path=qdrant_path if not qdrant_url else None)
 
     # Auto-start services (Qdrant, Ollama) if not running
     await _auto_start_services(server_state.config, server_state.project_root, server_state)
@@ -310,6 +314,31 @@ async def lifespan(app: FastAPI):
     except Exception as e:
       logger.warning("Knowledge: Auto-ingest failed: %s", str(e))
 
+    # === MEMORY SERVICE v1 ===
+    try:
+      from memory.memory.memory_service import MemoryService
+      memory_service = MemoryService()
+      await memory_service.initialize()
+      app.state.memory_service = memory_service
+      logger.info("MemoryService v1 initialized")
+
+      # DreamingCycle as independent background task
+      try:
+        from memory.memory.workers.dreaming_cycle import DreamingCycle
+        dreaming = DreamingCycle(
+            store=memory_service._store,
+            vector_index=memory_service._vector_index,
+        )
+        server_state._dreaming_task = asyncio.create_task(dreaming.run())
+        server_state._dreaming_cycle = dreaming
+        logger.info("DreamingCycle background task started")
+      except Exception as e:
+        logger.warning("DreamingCycle not started (non-fatal): %s", e)
+
+    except Exception as e:
+      logger.warning("MemoryService v1 not available (non-fatal): %s", e)
+      app.state.memory_service = None
+
     # Bootstrap tokens
     setup_bootstrap_tokens(server_state, _translate)
 
@@ -422,7 +451,31 @@ async def lifespan(app: FastAPI):
             except Exception:
               logger.debug("Failed to force-stop %s process", name)
 
-      _stop_process(server_state.qdrant_process, "Qdrant")
+      # Close Qdrant singleton pool
+      try:
+        from core.qdrant_pool import close_qdrant_client
+        close_qdrant_client()
+        logger.info("Qdrant pool closed")
+      except Exception as e:
+        logger.debug("Qdrant pool close failed: %s", e)
+
+      # Graceful shutdown MemoryService v1
+      try:
+        if hasattr(server_state, '_dreaming_task') and server_state._dreaming_task:
+          if hasattr(server_state, '_dreaming_cycle') and server_state._dreaming_cycle:
+            server_state._dreaming_cycle.stop()
+          server_state._dreaming_task.cancel()
+          try:
+            await server_state._dreaming_task
+          except (asyncio.CancelledError, Exception):
+            pass
+          logger.info("DreamingCycle stopped")
+        if hasattr(app.state, 'memory_service') and app.state.memory_service:
+          await app.state.memory_service.shutdown()
+          logger.info("MemoryService shut down")
+      except Exception as e:
+        logger.warning("MemoryService shutdown error (non-fatal): %s", e)
+
       _stop_process(server_state.ollama_process, "Ollama")
 
       if server_state.api_integrator:

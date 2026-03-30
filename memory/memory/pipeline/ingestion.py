@@ -15,6 +15,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
+from memory.embeddings.constants import DEFAULT_VECTOR_SIZE
 from ..models.memory_entry import MemoryEntry
 from ..engines.flash_memory import FlashMemory
 from ..engines.persistence import PersistenceManager
@@ -253,7 +254,7 @@ class IngestionPipeline:
     return embedding.astype(np.float32).tolist()
 
   @staticmethod
-  def _generate_test_embedding(text: str, size: int = 768) -> List[float]:
+  def _generate_test_embedding(text: str, size: int = DEFAULT_VECTOR_SIZE) -> List[float]:
     """Generate deterministic embeddings for tests without external models."""
     import hashlib
     import random

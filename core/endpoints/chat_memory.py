@@ -21,29 +21,47 @@ _pending_save_tasks: set = set()
 
 
 async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: str):
-    """Background task to save conversation data to RAG-searchable memory."""
+    """Background task to save conversation data to memory via MemoryService or Qdrant."""
     try:
-        from memory.memory.api.v1 import get_memory_api
-
-        # Create conversation text
         conversation_text = f"User: {user_msg}\nAssistant: {assistant_msg}"
+
+        # Try MemoryService first (v1 pipeline)
+        try:
+            from memory.memory.module import get_memory_service
+            svc = get_memory_service()
+            if svc and svc.initialized:
+                entry_id = await svc.remember(
+                    user_id="default",
+                    text=conversation_text,
+                    source="chat_interaction",
+                    trust_level="untrusted",
+                )
+                if entry_id:
+                    logger.info("Conversation saved via MemoryService (id=%s)", entry_id)
+                try:
+                    from core.metrics.registry import MEMORY_OPERATIONS
+                    MEMORY_OPERATIONS.labels(operation="autosave").inc()
+                except Exception:
+                    pass
+                return
+        except ImportError:
+            pass
+
+        # Legacy Qdrant path
+        from memory.memory.api.v1 import get_memory_api
 
         logger.info("Auto-saving conversation to RAG memory (nexe_web_ui)...")
 
-        # Use MemoryAPI to store in Qdrant HTTP (same place RAG searches)
         memory = await get_memory_api()
 
-        # Ensure collection exists (idempotent to handle concurrent requests)
         try:
             if not await memory.collection_exists("nexe_web_ui"):
                 await memory.create_collection("nexe_web_ui", vector_size=DEFAULT_VECTOR_SIZE)
                 logger.info("Created nexe_web_ui collection")
         except Exception:
-            # Collection may have been created by concurrent request — verify it exists
             if not await memory.collection_exists("nexe_web_ui"):
                 raise
 
-        # Store the conversation
         doc_id = await memory.store(
             text=conversation_text,
             collection="nexe_web_ui",

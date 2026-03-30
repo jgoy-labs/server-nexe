@@ -12,7 +12,6 @@ www.jgoy.net · https://server-nexe.org
 import argparse
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 from core.cli.output import NEXE_LOGO
@@ -98,14 +97,14 @@ def show_stats():
 
   if "sqlite" in stats:
     s = stats["sqlite"]
-    print(f"\n🗄️ SQLite:")
+    print("\n🗄️ SQLite:")
     print(f"  Total entries: {s.get('total_entries', 0)}")
     print(f"  Episodic: {s.get('episodic_count', 0)}")
     print(f"  Semantic: {s.get('semantic_count', 0)}")
 
   if "qdrant" in stats:
     q = stats["qdrant"]
-    print(f"\n🔷 Qdrant:")
+    print("\n🔷 Qdrant:")
     print(f"  Collection: {q.get('collection', 'nexe_memory')}")
     print(f"  Vectors: {q.get('vectors', 0)}")
     print(f"  Dimensions: {q.get('dimensions', 768)}")
@@ -113,7 +112,7 @@ def show_stats():
 
   if "flash" in stats:
     f = stats["flash"]
-    print(f"\n⚡ FlashMemory:")
+    print("\n⚡ FlashMemory:")
     print(f"  Cached entries: {f.get('total_entries', 0)}")
     print(f"  Expired pending: {f.get('expired_pending', 0)}")
 

@@ -69,9 +69,39 @@ async def get_memory_info():
     "manifest": MANIFEST,
     "endpoints": [
       "/memory/health",
-      "/memory/info"
+      "/memory/info",
+      "/memory/stats/{user_id}",
+      "/memory/profile/{user_id}",
     ]
   }
+
+@router_public.get("/stats/{user_id}")
+async def get_memory_stats(user_id: str):
+  """Get memory statistics for a user via MemoryService."""
+  try:
+    from .module import get_memory_service
+    svc = get_memory_service()
+    if not svc:
+      return JSONResponse(content={"error": "MemoryService not initialized"}, status_code=503)
+    stats = await svc.stats(user_id)
+    return stats.model_dump()
+  except Exception as e:
+    logger.error("memory_stats_error", error=str(e), exc_info=True)
+    return JSONResponse(content={"error": str(e)}, status_code=500)
+
+@router_public.get("/profile/{user_id}")
+async def get_memory_profile(user_id: str):
+  """Get profile for a user via MemoryService."""
+  try:
+    from .module import get_memory_service
+    svc = get_memory_service()
+    if not svc:
+      return JSONResponse(content={"error": "MemoryService not initialized"}, status_code=503)
+    profile = await svc.get_profile(user_id)
+    return profile
+  except Exception as e:
+    logger.error("memory_profile_error", error=str(e), exc_info=True)
+    return JSONResponse(content={"error": str(e)}, status_code=500)
 
 __all__ = [
   "router_public"

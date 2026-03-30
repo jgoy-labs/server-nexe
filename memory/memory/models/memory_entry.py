@@ -11,10 +11,10 @@ www.jgoy.net · https://server-nexe.org
 
 import hashlib
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .memory_types import MemoryType
+from .memory_types import MemoryType, TrustLevel, ValidatorDecision
 
 class MemoryEntry(BaseModel):
   """Memory entry with basic metadata support."""
@@ -125,4 +125,54 @@ class MemoryEntry(BaseModel):
     }
   )
 
-__all__ = ["MemoryEntry"]
+
+class ExtractedFact(BaseModel):
+  """Output from the extractor pipeline stage."""
+
+  content: str = Field(..., description="Extracted fact text")
+  entity: str = Field(default="user", description="Entity this fact refers to")
+  attribute: Optional[str] = Field(default=None, description="Schema attribute if matched")
+  value: Optional[str] = Field(default=None, description="Extracted value")
+  tags: List[str] = Field(default_factory=list)
+  importance: float = Field(default=0.6, ge=0.0, le=1.0)
+  source: str = Field(default="heuristic")
+  is_correction: bool = Field(default=False)
+
+
+class ValidatorResult(BaseModel):
+  """Output from the validator pipeline stage."""
+
+  decision: ValidatorDecision
+  scores: Dict[str, float] = Field(default_factory=dict)
+  reason: str = Field(default="")
+  trust_level: TrustLevel = Field(default=TrustLevel.UNTRUSTED)
+
+
+class MemoryCard(BaseModel):
+  """Formatted memory for LLM context injection."""
+
+  content: str
+  confidence: str = Field(default="moderate", description="high, moderate, low")
+  source_store: str = Field(default="episodic")
+  score: float = Field(default=0.0)
+  entry_id: Optional[str] = Field(default=None)
+  metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class MemoryStats(BaseModel):
+  """Statistics for the memory system."""
+
+  profile_count: int = 0
+  episodic_count: int = 0
+  staging_count: int = 0
+  tombstone_count: int = 0
+  working_memory_count: int = 0
+
+
+__all__ = [
+  "MemoryEntry",
+  "ExtractedFact",
+  "ValidatorResult",
+  "MemoryCard",
+  "MemoryStats",
+]

@@ -54,8 +54,9 @@ def generate_env_file(project_root, model_config):
                     f.write(f"NEXE_LLAMA_CPP_CHAT_FORMAT={model_config.get('chat_format', 'chatml')}\n")
                 elif model_config['engine'] == 'ollama':
                     f.write(f"NEXE_OLLAMA_MODEL={model_config['id']}\n")
-                f.write("NEXE_QDRANT_HOST=localhost\n")
-                f.write("NEXE_QDRANT_PORT=6333\n")
+                f.write("NEXE_QDRANT_PATH=storage/vectors\n")
+                f.write("# Optional: external Qdrant (Docker, cluster)\n")
+                f.write("# NEXE_QDRANT_URL=http://localhost:6333\n")
                 f.write("# Configurable timeouts (seconds)\n")
                 f.write("NEXE_QDRANT_TIMEOUT=5.0\n")
                 f.write("NEXE_SQLITE_PRELOAD_TIMEOUT=10.0\n")

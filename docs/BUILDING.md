@@ -15,7 +15,7 @@ How to build the macOS installer DMG from source.
 bash installer/build-python-bundle.sh
 ```
 
-Creates `Install Nexe.app/Contents/Resources/python/` (~49 MB).
+Creates `InstallNexe.app/Contents/Resources/python/` (~49 MB).
 This is **gitignored** — it's a build artifact, not source code. Only needs to run once unless Python version changes.
 
 The script downloads [python-build-standalone](https://github.com/indygreg/python-build-standalone) (cpython 3.12.8), trims unnecessary modules, fixes dylib paths, and codesigns the binaries.
@@ -57,7 +57,7 @@ These files are created during the build but **never committed**:
 
 | Artifact | Size | Purpose |
 |----------|------|---------|
-| `Install Nexe.app/` | ~70 MB | App bundle with Python + Swift wizard |
+| `InstallNexe.app/` | ~70 MB | App bundle with Python + Swift wizard |
 | `Install Nexe.dmg` | ~20 MB | Final distributable DMG |
 | `installer/swift-wizard/.build/` | ~50 MB | Swift compilation cache |
 
@@ -67,7 +67,7 @@ These files are created during the build but **never committed**:
 installer/build-python-bundle.sh    (one-time)
          |
          v
-Install Nexe.app/Contents/Resources/python/   (gitignored)
+InstallNexe.app/Contents/Resources/python/   (gitignored)
          |
          v
 installer/build_dmg.sh              (each release)

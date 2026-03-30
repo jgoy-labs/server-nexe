@@ -3,6 +3,11 @@
 Server Nexe
 Location: installer/installer_setup_qdrant.py
 Description: Qdrant binary download and macOS quarantine management.
+
+DEPRECATED (v0.8.5): Qdrant now runs in embedded mode (QdrantClient(path=)).
+No external binary needed. This module is kept for backwards compatibility
+with existing installations that still use the external binary.
+New installations should use NEXE_QDRANT_PATH=storage/vectors (default).
 ────────────────────────────────────
 """
 

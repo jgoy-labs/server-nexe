@@ -383,6 +383,9 @@ def get_file_rag():
   """
   Get or create singleton FileRAGSource instance (thread-safe).
 
+  Uses embedded Qdrant (path=) by default. If NEXE_QDRANT_URL is set,
+  uses external Qdrant via HTTP (Docker, cluster, Qdrant Cloud).
+
   Returns:
     FileRAGSource: Singleton instance for file uploads
   """
@@ -391,14 +394,18 @@ def get_file_rag():
   with _file_rag_lock:
     if _file_rag_instance is None:
       from memory.rag_sources.file.source import FileRAGSource
-      _qdrant_url = (
-        os.environ.get("NEXE_QDRANT_URL")
-        or f"http://{os.environ.get('NEXE_QDRANT_HOST', 'localhost')}:{os.environ.get('NEXE_QDRANT_PORT', '6333')}"
-      )
-      _file_rag_instance = FileRAGSource(
-        qdrant_url=_qdrant_url,
-        table_name="uploaded_files"
-      )
+      _qdrant_url = os.environ.get("NEXE_QDRANT_URL")
+      if _qdrant_url:
+        _file_rag_instance = FileRAGSource(
+          qdrant_url=_qdrant_url,
+          table_name="uploaded_files"
+        )
+      else:
+        _qdrant_path = os.environ.get("NEXE_QDRANT_PATH", "storage/vectors")
+        _file_rag_instance = FileRAGSource(
+          qdrant_path=_qdrant_path,
+          table_name="uploaded_files"
+        )
   return _file_rag_instance
 
 __all__ = ["RAGModule", "get_file_rag"]

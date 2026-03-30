@@ -600,7 +600,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             result = await memory_helper.save_to_memory(
                                                 content=fact,
                                                 session_id=session.id,
-                                                metadata={"type": "user_fact", "source": "llm_extract"}
+                                                metadata={"type": "user_fact", "source": "llm_extract", "is_mem_save": True}
                                             )
                                             # Comptar nomes si realment s'ha guardat (no duplicat)
                                             if result.get("document_id"):
@@ -692,7 +692,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         _save_r = await memory_helper.save_to_memory(
                             content=_fact,
                             session_id=session.id,
-                            metadata={"type": "user_fact", "source": "llm_extract"}
+                            metadata={"type": "user_fact", "source": "llm_extract", "is_mem_save": True}
                         )
                         if _save_r.get("document_id"):
                             logger.info("MEM_SAVE (no-stream): '%s'", _fact[:80])

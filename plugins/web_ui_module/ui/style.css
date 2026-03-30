@@ -663,11 +663,14 @@ body.light .icon-moon,
     display: flex;
     flex-direction: column;
     background: var(--bg-primary);
+    min-width: 0;
+    overflow: hidden;
 }
 
 .chat-messages {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 2rem;
 }
 
@@ -785,6 +788,8 @@ body.light .icon-moon,
 .message-text {
     color: var(--text-primary);
     line-height: 1.6;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 /* User messages: keep plain text */

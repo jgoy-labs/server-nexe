@@ -84,7 +84,7 @@ def app(ctx: click.Context, version: bool, no_banner: bool):
 
   \b
   Core commands:
-   go       Start complete system (Qdrant + Server)
+   go       Start complete system (Server + embedded Qdrant)
    stop     Stop all Nexe services
    status   System status
    modules  List available CLI modules
@@ -159,26 +159,25 @@ def _start_nexe(ctx: click.Context):
 @app.command()
 @click.pass_context
 def go(ctx: click.Context):
-  """Start the full Nexe system (Qdrant + Server)."""
+  """Start the full Nexe system (Server with embedded Qdrant)."""
   _start_nexe(ctx)
 
 @app.command(name="go!")
 @click.pass_context
 def go_bang(ctx: click.Context):
-  """Start the full Nexe system (Qdrant + Server). Alias for 'go'."""
+  """Start the full Nexe system (Server with embedded Qdrant). Alias for 'go'."""
   _start_nexe(ctx)
 
 @app.command()
 @click.option('--force', '-f', is_flag=True, help='Skip confirmation')
 @click.pass_context
 def stop(ctx: click.Context, force: bool):
-  """Stop all Nexe services (server + Qdrant)."""
+  """Stop all Nexe services (server)."""
   import os
   import signal
 
   services = [
     ("Nexe Server", "uvicorn.*nexe"),
-    ("Qdrant", "qdrant.*disable-telemetry"),
   ]
 
   found = []

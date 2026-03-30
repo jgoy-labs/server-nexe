@@ -10,7 +10,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 from typing import Dict, Any, List
-from pathlib import Path
 import psutil
 import structlog
 
