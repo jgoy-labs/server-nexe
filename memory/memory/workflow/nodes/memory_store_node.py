@@ -131,6 +131,26 @@ class MemoryStoreNode(Node):
         ttl_seconds=ttl_seconds
       )
 
+      # Try MemoryService first (v1), fallback to legacy pipeline
+      try:
+        from memory.memory.module import get_memory_service
+        svc = get_memory_service()
+      except Exception:
+        svc = None
+      if svc and svc.initialized:
+        entry_id = await svc.remember(
+          user_id="default",
+          text=content,
+          source=source,
+          trust_level="untrusted",
+        )
+        logger.info("Memory stored via MemoryService: %s", entry_id)
+        return {
+          "entry_id": entry_id,
+          "success": entry_id is not None
+        }
+
+      # Legacy fallback
       module = MemoryModule.get_instance()
 
       if not module._initialized:

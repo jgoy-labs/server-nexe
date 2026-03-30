@@ -423,7 +423,7 @@ class TestInitialize:
         from memory.memory.api import MemoryAPI
         api = MemoryAPI(qdrant_url="http://localhost:6333")
 
-        with patch("memory.memory.api.QdrantClient", side_effect=Exception("connection failed")):
+        with patch("core.qdrant_pool.get_qdrant_client", side_effect=Exception("connection failed")):
             with pytest.raises(Exception, match="connection failed"):
                 asyncio.run(api.initialize())
 

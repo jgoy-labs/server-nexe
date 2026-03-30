@@ -149,26 +149,33 @@ class MemoryCLI:
 
   async def cmd_stats(self, args) -> int:
     """
-    Show Memory statistics.
+    Show Memory statistics (v1: MemoryService + legacy).
 
     Returns:
       0 if success, 1 if error
     """
     try:
+      # Try MemoryService first (v1)
+      from .module import get_memory_service
+      svc = get_memory_service()
+      if svc:
+        user_id = getattr(args, "user_id", "default")
+        ms = await svc.stats(user_id)
+        logger.info("\nMemory Statistics (v1)")
+        logger.info("=" * 60)
+        logger.info("  Profile:  %s", ms.profile_count)
+        logger.info("  Episodic: %s", ms.episodic_count)
+        logger.info("  Staging:  %s", ms.staging_count)
+        logger.info("  Tombstones: %s", ms.tombstone_count)
+        return 0
+
+      # Fallback to legacy RAMContext
       if not self.module._ram_context:
-        logger.error("RAMContext not initialized")
-        return 1
-
+        logger.error("RAMContext not initialized"); return 1
       stats = await self.module._ram_context.get_stats()
-
-      logger.info("\n📊 Memory Statistics")
-      logger.info("=" * 60)
-      logger.info("Total available: %s", stats['total_available'])
-      logger.info("Max entries:   %s", stats['max_entries'])
-      logger.info("\nBy type:")
-      logger.info(" Episodic:   %s", stats['episodic_count'])
-      logger.info(" Semantic:   %s", stats['semantic_count'])
-
+      logger.info("\nMemory Stats: total=%s max=%s episodic=%s semantic=%s",
+                   stats['total_available'], stats['max_entries'],
+                   stats['episodic_count'], stats['semantic_count'])
       return 0
 
     except Exception as e:
@@ -196,6 +203,66 @@ class MemoryCLI:
     except Exception as e:
       logger.error("Cleanup error: %s", e)
       return 1
+
+  def _get_svc(self):
+    """Get MemoryService or None."""
+    from .module import get_memory_service
+    return get_memory_service()
+
+  async def cmd_inspect(self, args) -> int:
+    """Inspect a memory entry by ID."""
+    try:
+      svc = self._get_svc()
+      if not svc:
+        logger.error("MemoryService not initialized"); return 1
+      for p in svc._store.get_profile(args.user_id):
+        if p["id"] == args.entry_id:
+          logger.info("\nProfile: %s\n  attr=%s value=%s trust=%s", args.entry_id, p["attribute"], p["value_json"], p["trust_level"])
+          return 0
+      for ep in svc._store.get_episodic(args.user_id, limit=10000):
+        if ep["id"] == args.entry_id:
+          logger.info("\nEpisodic: %s\n  content=%s importance=%s", args.entry_id, ep["content"][:200], ep["importance"])
+          return 0
+      logger.info("Entry not found: %s", args.entry_id); return 1
+    except Exception as e:
+      logger.error("Inspect error: %s", e); return 1
+
+  async def cmd_search(self, args) -> int:
+    """Search memory by query."""
+    try:
+      svc = self._get_svc()
+      if not svc:
+        logger.error("MemoryService not initialized"); return 1
+      cards = await svc.recall(args.user_id, args.query, limit=args.limit)
+      logger.info("\nSearch '%s' (%d found)", args.query, len(cards))
+      for i, c in enumerate(cards, 1):
+        logger.info("%d. [%s] %s (%.2f)", i, c.confidence, c.content[:100], c.score)
+      return 0
+    except Exception as e:
+      logger.error("Search error: %s", e); return 1
+
+  async def cmd_mirror(self, args) -> int:
+    """Export human-readable memory mirror."""
+    try:
+      svc = self._get_svc()
+      if not svc:
+        logger.error("MemoryService not initialized"); return 1
+      logger.info(await svc.export_mirror(args.user_id)); return 0
+    except Exception as e:
+      logger.error("Mirror error: %s", e); return 1
+
+  async def cmd_gc(self, args) -> int:
+    """Run garbage collection (dry-run available)."""
+    try:
+      svc = self._get_svc()
+      if not svc:
+        logger.error("MemoryService not initialized"); return 1
+      s = await svc.stats(args.user_id)
+      logger.info("\nGC user '%s': profile=%d episodic=%d staging=%d tombstones=%d",
+                   args.user_id, s.profile_count, s.episodic_count, s.staging_count, s.tombstone_count)
+      logger.info("  (dry-run)" if args.dry_run else "  GC daemon stub (v1)"); return 0
+    except Exception as e:
+      logger.error("GC error: %s", e); return 1
 
 def create_parser() -> argparse.ArgumentParser:
   """Create argument parser for Memory CLI"""
@@ -259,15 +326,27 @@ def create_parser() -> argparse.ArgumentParser:
     help="Truncate content to avoid info leaks (default: True)"
   )
 
-  subparsers.add_parser(
-    "stats",
-    help="Show Memory statistics"
-  )
+  stats_p = subparsers.add_parser("stats", help="Show Memory statistics")
+  stats_p.add_argument("--user-id", type=str, default="default", help="User ID")
 
-  subparsers.add_parser(
-    "cleanup",
-    help="Cleanup expired memories"
-  )
+  subparsers.add_parser("cleanup", help="Cleanup expired memories")
+
+  # v1 debug commands
+  ins_p = subparsers.add_parser("inspect", help="Inspect entry by ID")
+  ins_p.add_argument("entry_id", type=str, help="Entry ID")
+  ins_p.add_argument("--user-id", type=str, default="default", help="User ID")
+
+  srch_p = subparsers.add_parser("search", help="Search memory")
+  srch_p.add_argument("query", type=str, help="Search query")
+  srch_p.add_argument("--user-id", type=str, default="default", help="User ID")
+  srch_p.add_argument("-l", "--limit", type=int, default=10, help="Max results")
+
+  mir_p = subparsers.add_parser("mirror", help="Export memory mirror")
+  mir_p.add_argument("--user-id", type=str, default="default", help="User ID")
+
+  gc_p = subparsers.add_parser("gc", help="Garbage collection")
+  gc_p.add_argument("--dry-run", action="store_true", help="Preview only")
+  gc_p.add_argument("--user-id", type=str, default="default", help="User ID")
 
   return parser
 
@@ -287,6 +366,14 @@ async def async_main(args):
       return await cli.cmd_stats(args)
     elif args.command == "cleanup":
       return await cli.cmd_cleanup(args)
+    elif args.command == "inspect":
+      return await cli.cmd_inspect(args)
+    elif args.command == "search":
+      return await cli.cmd_search(args)
+    elif args.command == "mirror":
+      return await cli.cmd_mirror(args)
+    elif args.command == "gc":
+      return await cli.cmd_gc(args)
     else:
       logger.error("No command specified. Use --help for usage.")
       return 1

@@ -15,7 +15,7 @@ import time
 from typing import Dict, Any, List, Optional
 from nexe_flow.core.node import Node, NodeMetadata, NodeInput, NodeOutput
 
-from memory.memory import MemoryModule, MemoryType, MemoryEntry
+from memory.memory import MemoryModule, MemoryEntry
 from memory.memory.rag_logger import get_rag_logger
 
 logger = logging.getLogger(__name__)
@@ -104,6 +104,25 @@ class MemoryRecallNode(Node):
     logger.info(f"  limit={limit}, type={entry_type_str}, query={query[:30] if query else 'None'}...")
 
     try:
+      # Try MemoryService first (v1)
+      try:
+        from memory.memory.module import get_memory_service
+        svc = get_memory_service()
+      except Exception:
+        svc = None
+      if svc and svc.initialized and query:
+        user_id = person_id if person_id != "default" else "default"
+        cards = await svc.recall(user_id, query, limit=limit)
+        total_ms = (time.time() - start_time) * 1000
+        context = self._format_cards(cards)
+        rag_log.recall_complete("memory_service", len(cards), len(context), total_ms)
+        return {
+          "context": context,
+          "entries": [{"id": c.entry_id, "content": c.content[:200], "source": c.source_store, "score": c.score} for c in cards],
+          "entry_count": len(cards),
+          "source": "memory_service"
+        }
+
       module = MemoryModule.get_instance()
 
       if not module._initialized:
@@ -166,8 +185,6 @@ class MemoryRecallNode(Node):
         logger.info("  STEP 3: Qdrant (semantic search)")
 
         try:
-          from memory.memory.pipeline.ingestion import IngestionPipeline
-
           embedding = await self._get_embedding(query)
 
           if embedding:
@@ -250,6 +267,17 @@ class MemoryRecallNode(Node):
       logger.warning(f"Embedding error: {e}")
 
     return None
+
+  def _format_cards(self, cards) -> str:
+    """Format MemoryCards as context for LLM."""
+    if not cards:
+      return ""
+    parts = ["[MEMORY CONTEXT]"]
+    for card in cards:
+      prefix = f"[{card.confidence.upper()}]" if hasattr(card, 'confidence') else ""
+      parts.append(f"{prefix} {card.content}")
+    parts.append("[END MEMORY CONTEXT]")
+    return "\n".join(parts)
 
   def _format_context(self, entries: List[MemoryEntry]) -> str:
     """Format entries as context for LLM."""

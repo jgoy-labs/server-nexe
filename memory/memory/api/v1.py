@@ -75,24 +75,41 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
     """
     Store content in semantic memory (RAG).
 
-    Used by /save command in chat CLI.
-
-    Args:
-        body: Content to store with optional metadata
-
-    Returns:
-        MemoryStoreResponse with document_id if successful
+    Uses MemoryService.remember() if available, falls back to direct Qdrant.
     """
     try:
         validate_collection_name(body.collection)
+
+        # Try MemoryService first (v1 pipeline)
+        try:
+            from ..module import get_memory_service
+            svc = get_memory_service()
+        except Exception:
+            svc = None
+        if svc and svc.initialized:
+            metadata = body.metadata or {}
+            user_id = metadata.get("user_id", "default")
+            entry_id = await svc.remember(
+                user_id=user_id,
+                text=body.content,
+                source="api",
+                trust_level="untrusted",
+            )
+            return MemoryStoreResponse(
+                success=entry_id is not None,
+                document_id=entry_id,
+                message="Content processed via MemoryService"
+                if entry_id
+                else "Content rejected by pipeline",
+            )
+
+        # Fallback to direct Qdrant
         memory = await get_memory_api()
 
-        # Ensure collection exists
         if not await memory.collection_exists(body.collection):
             await memory.create_collection(body.collection, vector_size=DEFAULT_VECTOR_SIZE)
             logger.info("Created collection on demand: %s", body.collection)
 
-        # Store the content
         metadata = body.metadata or {}
         metadata["source"] = metadata.get("source", "chat-cli")
 

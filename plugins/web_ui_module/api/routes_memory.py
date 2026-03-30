@@ -33,7 +33,7 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
     @router.post("/memory/save")
     @limiter.limit("10/minute")
     async def memory_save(request: Request, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
-        """Guardar contingut explicitament a la memoria"""
+        """Guardar contingut explicitament a la memoria (via MemoryService if available)"""
         content = body.get("content", "")
         session_id = body.get("session_id", "unknown")
         metadata = body.get("metadata", {})

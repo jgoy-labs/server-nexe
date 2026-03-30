@@ -33,15 +33,21 @@ class TestCheckModuleInitializedCoverage:
 class TestCheckFlashStoragePathsCoverage:
 
     def test_paths_not_writable(self):
-        with patch("memory.memory.health.Path") as MockPath:
-            mock_dir = MagicMock()
-            mock_dir.mkdir = MagicMock()
-            mock_test_file = MagicMock()
-            mock_test_file.write_text.side_effect = PermissionError("denied")
-            mock_dir.__truediv__ = MagicMock(return_value=mock_test_file)
-            MockPath.return_value = mock_dir
-            result = check_flash_storage_paths()
-            assert result["name"] == "storage_paths"
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            flash_dir = root / "storage" / "memory" / "flash"
+            flash_dir.mkdir(parents=True)
+            # Make dir read-only so write_text fails
+            flash_dir.chmod(0o444)
+            try:
+                with patch("core.paths.get_repo_root", return_value=root):
+                    result = check_flash_storage_paths()
+                    assert result["name"] == "storage_paths"
+                    assert result["status"] == "fail"
+            finally:
+                flash_dir.chmod(0o755)
 
     def test_paths_exception(self):
         with patch("core.paths.get_repo_root", side_effect=Exception("fs error")):

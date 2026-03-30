@@ -72,6 +72,8 @@ class PersistenceManager:
     f"http://{os.getenv('NEXE_QDRANT_HOST', 'localhost')}:{os.getenv('NEXE_QDRANT_PORT', '6333')}"
   )
 
+  DEFAULT_QDRANT_PATH = Path("storage/vectors")
+
   def __init__(
     self,
     db_path: Path,
@@ -82,7 +84,7 @@ class PersistenceManager:
     crypto_provider=None
   ):
     self.db_path = db_path
-    self.qdrant_path = qdrant_path
+    self.qdrant_path = qdrant_path if qdrant_path is not None else self.DEFAULT_QDRANT_PATH
     self.qdrant_url = qdrant_url or self.DEFAULT_QDRANT_URL
     self.collection_name = collection_name
     self.vector_size = vector_size
@@ -230,20 +232,16 @@ class PersistenceManager:
     self._qdrant_available = False
 
     try:
+      from core.qdrant_pool import get_qdrant_client
+
       if self.qdrant_path:
         # Mode Embedded (Local files)
         self.qdrant_path.mkdir(parents=True, exist_ok=True)
-        self.qdrant = QdrantClient(path=str(self.qdrant_path))
+        self.qdrant = get_qdrant_client(path=str(self.qdrant_path))
         logger.info("Qdrant initialized in EMBEDDED mode at %s", self.qdrant_path)
       else:
         # Mode Server (HTTP)
-        qdrant_api_key = os.getenv("QDRANT_API_KEY")  # None = no auth (local)
-        self.qdrant = QdrantClient(
-          url=self.qdrant_url,
-          api_key=qdrant_api_key,
-          prefer_grpc=False,
-          timeout=QDRANT_TIMEOUT
-        )
+        self.qdrant = get_qdrant_client(url=self.qdrant_url)
         logger.info("Qdrant initialized in SERVER mode at %s", self.qdrant_url)
 
       collections = self.qdrant.get_collections().collections
@@ -623,16 +621,9 @@ class PersistenceManager:
       return []
 
   def close(self):
-    """Close resources"""
+    """Close resources. No tanca el QdrantClient — es compartit via pool."""
     self.executor.shutdown(wait=True)
-    if self.qdrant:
-      try:
-        self.qdrant.close()
-      except Exception as e:
-        logger.debug("PersistenceManager close failed: %s", e)
-      finally:
-        if hasattr(self.qdrant, "_client"):
-          delattr(self.qdrant, "_client")
+    self.qdrant = None
     logger.info("PersistenceManager closed")
 
 __all__ = ["PersistenceManager", "StorageError"]

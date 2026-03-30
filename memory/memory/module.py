@@ -12,7 +12,6 @@ www.jgoy.net · https://server-nexe.org
 from typing import Optional, Dict, Any
 import threading
 import logging
-from pathlib import Path
 
 from personality.i18n import get_i18n
 from core.lifespan import get_server_state
@@ -21,23 +20,28 @@ from .engines.flash_memory import FlashMemory
 from .engines.ram_context import RAMContext
 from .constants import DEFAULT_VECTOR_SIZE
 from .engines.persistence import PersistenceManager
+from .models.memory_entry import MemoryEntry
 from .pipeline.ingestion import IngestionPipeline
 
 logger = logging.getLogger(__name__)
 
+def get_memory_service():
+    """Get the MemoryService from the active MemoryModule instance. Returns None if not initialized."""
+    instance = MemoryModule._instance
+    if instance is None or not instance._initialized:
+        return None
+    return instance._memory_service
+
+
 class MemoryModule:
   """
-  Memory Module - Flash Memory + RAM Context + Persistence.
+  Memory Module - Flash Memory + RAM Context + Persistence + MemoryService.
 
   Singleton that manages:
   - Flash Memory (temporary cache for results)
   - RAM Context (current session context)
   - Persistence (save/load sessions)
-
-  Features:
-  - Base Singleton structure
-  - Health checks
-  - Flash Memory
+  - MemoryService (v1 facade for pipeline + storage)
 
   Usage:
     module = MemoryModule.get_instance()
@@ -72,6 +76,7 @@ class MemoryModule:
     self._ram_context = None
     self._persistence = None
     self._pipeline = None
+    self._memory_service = None
 
     logger.debug(f"MemoryModule created: {self.module_id} v{self.version}")
 
@@ -147,6 +152,19 @@ class MemoryModule:
         embedding_model=None
       )
 
+      # Initialize MemoryService (v1 facade)
+      try:
+        from .memory_service import MemoryService
+        self._memory_service = MemoryService(
+          db_path=vectors_path / "memory_v1.db",
+          qdrant_path=str(qdrant_path),
+        )
+        await self._memory_service.initialize()
+        logger.info("MemoryService initialized")
+      except Exception as e:
+        logger.warning("MemoryService init failed (non-fatal): %s", e)
+        self._memory_service = None
+
       preload_limit = final_config.get("ram_preload_limit", 50)
       preload_types = final_config.get("ram_preload_entry_types", ["episodic"])
 
@@ -199,11 +217,15 @@ class MemoryModule:
       if self._pipeline:
         self._pipeline.close()
 
+      if self._memory_service:
+        await self._memory_service.shutdown()
+
       self._initialized = False
       self._flash_memory = None
       self._ram_context = None
       self._persistence = None
       self._pipeline = None
+      self._memory_service = None
 
       logger.debug("MemoryModule shutdown complete")
       return True
@@ -240,7 +262,7 @@ class MemoryModule:
       "config": self.manifest.get("config", {})
     }
 
-  async def ingest(self, entry: "MemoryEntry") -> bool:
+  async def ingest(self, entry: MemoryEntry) -> bool:
     """
     Ingests an entry into memory via pipeline.
 
@@ -285,4 +307,4 @@ class MemoryModule:
 
     return metrics.get_metrics()
 
-__all__ = ["MemoryModule"]
+__all__ = ["MemoryModule", "get_memory_service"]

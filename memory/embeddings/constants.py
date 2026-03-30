@@ -13,6 +13,11 @@ from typing import Dict, Any
 
 MODULE_ID = "embeddings"
 
+# Embedding vector dimensionality.
+# Model: paraphrase-multilingual-mpnet-base-v2 (768 dims).
+# If you change the embedding model, change only this value.
+DEFAULT_VECTOR_SIZE = 768
+
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
   "name": "embeddings",
@@ -59,4 +64,5 @@ MANIFEST: Dict[str, Any] = {
 __all__ = [
   "MANIFEST",
   "MODULE_ID",
+  "DEFAULT_VECTOR_SIZE",
 ]

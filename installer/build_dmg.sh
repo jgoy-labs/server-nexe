@@ -31,7 +31,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APP_NAME="Install Nexe"
+APP_NAME="InstallNexe"
 APP_BUNDLE="$PROJECT_ROOT/$APP_NAME.app"
 DMG_NAME="Install Nexe.dmg"
 DMG_PATH="$PROJECT_ROOT/$DMG_NAME"
@@ -187,6 +187,7 @@ tar czf "$PAYLOAD_TMP/payload.tar.gz" \
     --exclude='.env' \
     --exclude='*.dmg' \
     --exclude='*.pkg' \
+    --exclude='InstallNexe.app' \
     --exclude='Install Nexe.app' \
     --exclude='Nexe.app' \
     --exclude='diari' \
@@ -251,7 +252,7 @@ info "Building DMG..."
 # Create temporary DMG (read-write, empty)
 DMG_TMP="$(mktemp -d)/tmp.dmg"
 DMG_SIZE_MB=$(( $(du -sm "$APP_BUNDLE" | cut -f1) + 50 ))
-[ "$DMG_SIZE_MB" -lt 50 ] && DMG_SIZE_MB=50
+[ "$DMG_SIZE_MB" -lt 100 ] && DMG_SIZE_MB=100
 
 # Detach any previous volume with same name
 hdiutil detach "/Volumes/$DMG_VOLUME_NAME" -force 2>/dev/null || true

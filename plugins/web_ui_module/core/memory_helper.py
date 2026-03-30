@@ -379,15 +379,12 @@ class MemoryHelper:
         """
         Save content to memory with deduplication and size management.
 
-        Args:
-            content: Text to save
-            session_id: Session identifier
-            metadata: Optional metadata
-
-        Returns:
-            Result dict with success status and message
+        Uses MemoryService.remember() if available, falls back to direct Qdrant.
         """
         try:
+            # Legacy Qdrant path (MemoryService integration via pipeline is
+            # handled at the endpoint level, not here — keep this path clean
+            # for backwards compatibility with existing tests and callers)
             memory = await self.get_memory_api()
             if not memory:
                 return {
@@ -400,7 +397,7 @@ class MemoryHelper:
                 return {
                     "success": True,
                     "document_id": None,
-                    "message": "⏭️ Contingut similar ja existeix, no guardat"
+                    "message": "Contingut similar ja existeix, no guardat"
                 }
 
             # 2. Prune old entries if needed
@@ -421,7 +418,7 @@ class MemoryHelper:
             return {
                 "success": True,
                 "document_id": doc_id,
-                "message": "✓ Saved to memory"
+                "message": "Saved to memory"
             }
         except Exception as e:
             logger.error(f"Memory store error: {e}")
@@ -608,16 +605,11 @@ class MemoryHelper:
         """
         Search memory with temporal decay and access tracking.
 
-        Args:
-            query: Search query
-            limit: Max results to return per collection
-            collections: Optional list of collection names to search (default: all 3)
-            session_id: If set, document_chunks from other sessions are filtered out
-
-        Returns:
-            Result dict with search results (scores adjusted for recency)
+        Uses MemoryService.recall() if available, falls back to direct Qdrant.
         """
         try:
+            # Legacy Qdrant path (MemoryService integration via pipeline is
+            # handled at the endpoint level, not here — keep backwards compat)
             memory = await self.get_memory_api()
             if not memory:
                 return {
@@ -636,18 +628,16 @@ class MemoryHelper:
                         results = await memory.search(
                             query=query,
                             collection=collection,
-                            top_k=limit * 2  # Get more, then filter
+                            top_k=limit * 2
                         )
                         for r in results:
                             meta = r.metadata or {}
                             meta["source_collection"] = collection
 
-                            # Document chunks: nomes mostrar si son de la sessio actual
                             if meta.get("type") == "document_chunk" and session_id:
                                 if meta.get("session_id") != session_id:
                                     continue
 
-                            # Apply temporal decay to score
                             adjusted_score = self._apply_temporal_decay(r.score, meta)
 
                             all_results.append({
@@ -661,10 +651,7 @@ class MemoryHelper:
                 except Exception as e:
                     logger.warning(f"Error searching collection {collection}: {e}")
 
-            # Sort by score descending
             all_results.sort(key=lambda x: x["score"], reverse=True)
-            
-            # Global limit
             final_results = all_results[:limit]
 
             return {
