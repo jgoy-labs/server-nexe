@@ -180,8 +180,6 @@ tar czf "$PAYLOAD_TMP/payload.tar.gz" \
     --exclude='__pycache__' \
     --exclude='.pytest_cache' \
     --exclude='.ruff_cache' \
-    --exclude='storage' \
-    --exclude='knowledge' \
     --exclude='qdrant' \
     --exclude='snapshots' \
     --exclude='.env' \
@@ -196,7 +194,7 @@ tar czf "$PAYLOAD_TMP/payload.tar.gz" \
     --exclude='.DS_Store' \
     --exclude='.coverage' \
     --exclude='.build' \
-    core/ plugins/ memory/ personality/ installer/ tests/ \
+    core/ plugins/ memory/ personality/ installer/ tests/ knowledge/ \
     setup.sh requirements.txt requirements-macos.txt pyproject.toml .env.example \
     install_nexe.py LICENSE 2>/dev/null || warn "Some files excluded from payload"
 

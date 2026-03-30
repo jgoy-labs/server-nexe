@@ -57,6 +57,7 @@ Nexe.app/
 
 # Storage (124 GB! — Qdrant vectors, DBs, logs de producció)
 storage/
+!memory/memory/storage/
 *.db
 *.sqlite
 *.log
