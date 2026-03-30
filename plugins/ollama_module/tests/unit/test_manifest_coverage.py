@@ -185,7 +185,7 @@ class TestInfoEndpoint:
         mock_module = MagicMock()
         mock_module.get_info.return_value = {
             "name": "ollama_module",
-            "version": "0.8.5"
+            "version": "0.9.0"
         }
 
         c = _make_client(mock_module)

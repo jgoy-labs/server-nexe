@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-security-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentació de seguretat per a server-nexe 0.8.5 pre-release. Cobreix autenticació dual-key amb rotació, rate limiting (tots els endpoints), 6 detectors d'injecció amb normalització Unicode, 47 patrons de jailbreak, capçaleres de seguretat OWASP, logging d'auditoria RFC5424, validació d'input (validate_string_input a totes les rutes UI), sanitització de context RAG, encriptació at-rest (CryptoProvider AES-256-GCM, SQLCipher, sessions encriptades), resultats d'auditoria IA (v1+v2+mega-test), i checklist de seguretat."
+abstract: "Documentació de seguretat per a server-nexe 0.9.0 pre-release. Cobreix autenticació dual-key amb rotació, rate limiting (tots els endpoints), 6 detectors d'injecció amb normalització Unicode, 47 patrons de jailbreak, capçaleres de seguretat OWASP, logging d'auditoria RFC5424, validació d'input (validate_string_input a totes les rutes UI), sanitització de context RAG, encriptació at-rest (CryptoProvider AES-256-GCM, SQLCipher, sessions encriptades), resultats d'auditoria IA (v1+v2+mega-test), i checklist de seguretat."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher]
 chunk_size: 800
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Seguretat — server-nexe 0.8.5 pre-release
+# Seguretat — server-nexe 0.9.0 pre-release
 
 server-nexe esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
 
@@ -98,7 +98,7 @@ L'endpoint `POST /v1/chat/completions` valida i sanititza l'input a traves del s
 
 `_sanitize_rag_context()` s'aplica al context RAG abans d'injectar-lo al prompt del LLM via la Web UI. Aixo filtra patrons d'injeccio dels documents recuperats i les entrades de memoria, evitant que contingut emmagatzemat s'utilitzi com a vector d'atac.
 
-**Consistencia del pipeline:** A partir de la v0.8.5, l'API i la Web UI comparteixen les mateixes capes de seguretat — validacio d'input, sanititzacio RAG i rate limiting s'apliquen de manera consistent a les dues interficies.
+**Consistencia del pipeline:** A partir de la v0.9.0, l'API i la Web UI comparteixen les mateixes capes de seguretat — validacio d'input, sanititzacio RAG i rate limiting s'apliquen de manera consistent a les dues interficies.
 
 ## Deteccio d'injeccions
 
@@ -124,11 +124,11 @@ Logging d'events de seguretat **compatible amb RFC5424** via `plugins/security/s
 - Ruta dels logs: `storage/system-logs/security/`
 - Events: errors d'autenticacio, activacions de rate limit, intents d'injeccio, accions d'administrador
 - Logging d'IP real: `request.client.host`
-- El logging en temps d'execucio utilitza `logger.info()` en lloc de `print()` (migrat a la v0.8.5)
+- El logging en temps d'execucio utilitza `logger.info()` en lloc de `print()` (migrat a la v0.9.0)
 
 ## Encriptacio at-rest (opt-in)
 
-**Afegida a la v0.8.5.** L'encriptacio at-rest es opt-in i recentment afegida. S'ha testejat (68 tests) pero encara no ha passat per us en produccio amb usuaris reals fora del desenvolupament.
+**Afegida a la v0.9.0.** L'encriptacio at-rest es opt-in i recentment afegida. S'ha testejat (68 tests) pero encara no ha passat per us en produccio amb usuaris reals fora del desenvolupament.
 
 ### CryptoProvider
 

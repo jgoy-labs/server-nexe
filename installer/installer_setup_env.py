@@ -19,6 +19,82 @@ from .installer_display import (
 from .installer_i18n import t
 
 
+def _is_dmg_python(executable_path):
+    """Detecta si l'executable Python ve d'un DMG montat (.app dins /Volumes/)."""
+    return "/Volumes/" in executable_path and ".app/" in executable_path
+
+
+def _find_python_bundle_root(executable_path):
+    """Troba l'arrel del bundle Python (directori amb bin/ i lib/).
+
+    Puja des de l'executable fins a trobar un directori que contingui
+    tant bin/python3 com lib/libpython3.12.dylib.
+    Retorna None si no és un bundle reconegut.
+    """
+    path = Path(executable_path).resolve()
+    # L'executable sol ser a .../python/bin/python3
+    # L'arrel del bundle és .../python/
+    candidate = path.parent.parent  # bin/python3 -> python/
+    if (candidate / "bin" / "python3").exists() and (candidate / "lib").exists():
+        return candidate
+    # Fallback: buscar cap amunt
+    for parent in path.parents:
+        if (parent / "bin" / "python3").exists() and (parent / "lib" / "libpython3.12.dylib").exists():
+            return parent
+    return None
+
+
+def _copy_python_bundle(bundle_root, install_dir):
+    """Copia el bundle Python complet al directori d'instal·lació.
+
+    Crea install_dir/python_bundle/ amb bin/ i lib/ copiats.
+    Retorna el path al python3 local.
+    """
+    import shutil
+
+    dest = install_dir / "python_bundle"
+    dest_python = dest / "bin" / "python3"
+
+    # Si ja existeix, retorna directament
+    if dest_python.exists():
+        return str(dest_python)
+
+    # Copiar bin/ i lib/
+    dest_bin = dest / "bin"
+    dest_lib = dest / "lib"
+
+    if dest_bin.exists():
+        shutil.rmtree(dest_bin)
+    if dest_lib.exists():
+        shutil.rmtree(dest_lib)
+
+    shutil.copytree(str(bundle_root / "bin"), str(dest_bin), symlinks=False)
+    shutil.copytree(str(bundle_root / "lib"), str(dest_lib), symlinks=False)
+
+    # Assegurar permisos d'execució
+    for f in dest_bin.iterdir():
+        if f.is_file():
+            f.chmod(f.stat().st_mode | 0o755)
+
+    return str(dest_python)
+
+
+def _get_python_for_venv(project_root):
+    """Retorna el path al Python que s'ha d'usar per crear el venv.
+
+    Si estem dins un DMG (sys.executable a /Volumes/*.app/), copia
+    el bundle Python al directori d'instal·lació i retorna el Python local.
+    Si no, retorna sys.executable directament.
+    """
+    if _is_dmg_python(sys.executable):
+        bundle_root = _find_python_bundle_root(sys.executable)
+        if bundle_root is not None:
+            print(f"  📦 DMG detectat — copiant Python bundle a {project_root}/python_bundle/")
+            local_python = _copy_python_bundle(bundle_root, project_root)
+            return local_python
+    return sys.executable
+
+
 def _make_venv_standalone(venv_path):
     """Fer el venv autònom del DMG/app bundle.
 
@@ -77,8 +153,9 @@ def setup_environment(project_root, hw, engine="auto"):
         if platform.system() == "Darwin":
             # macOS: --copies --without-pip per evitar SIGABRT del binari copiat
             # (necessita libpython copiada ABANS de poder executar ensurepip)
+            python_for_venv = _get_python_for_venv(project_root)
             subprocess.run(
-                [sys.executable, "-m", "venv", "--copies", "--without-pip", "venv"],
+                [python_for_venv, "-m", "venv", "--copies", "--without-pip", "venv"],
                 check=True,
             )
             _make_venv_standalone(venv_path)

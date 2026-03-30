@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-limitations
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentacio honesta de les limitacions de server-nexe 0.8.5 pre-release. Cobreix suport de plataformes (macOS testejat, Linux parcial, Windows no suportat), qualitat de models vs nuvol (GPT-4/Claude), limitacions del RAG (embeddings, chunking, inici en fred, contradiccions), compatibilitat parcial amb l'API d'OpenAI, rendiment (instancia unica, concurrencia), restriccions de seguretat, advertencies d'encriptacio (opt-in, nova, no provada en batalla) i mancances funcionals (sense multi-usuari, sense sync, sense fine-tuning)."
+abstract: "Documentacio honesta de les limitacions de server-nexe 0.9.0 pre-release. Cobreix suport de plataformes (macOS testejat, Linux parcial, Windows no suportat), qualitat de models vs nuvol (GPT-4/Claude), limitacions del RAG (embeddings, chunking, inici en fred, contradiccions), compatibilitat parcial amb l'API d'OpenAI, rendiment (instancia unica, concurrencia), restriccions de seguretat, advertencies d'encriptacio (opt-in, nova, no provada en batalla) i mancances funcionals (sense multi-usuari, sense sync, sense fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Limitacions — server-nexe 0.8.5 pre-release
+# Limitacions — server-nexe 0.9.0 pre-release
 
 Aquest document descriu honestament el que server-nexe no pot fer o no fa be.
 
@@ -84,7 +84,7 @@ Parcialment compatible amb el format de l'API d'OpenAI:
 ## Advertencies d'encriptacio
 
 - **Opt-in:** L'encriptacio at-rest no esta activada per defecte. Els usuaris han d'activar-la explicitament.
-- **Funcionalitat nova:** Afegida a la v0.8.5. Testejada (68 tests, 0 errors) pero encara no provada en batalla en produccio amb usuaris reals.
+- **Funcionalitat nova:** Afegida a la v0.9.0. Testejada (68 tests, 0 errors) pero encara no provada en batalla en produccio amb usuaris reals.
 - **Gestio de claus:** La clau mestra s'emmagatzema a l'OS Keyring, variable d'entorn o fitxer. Si la clau es perd, les dades encriptades no es poden recuperar.
 - **Dependencia de SQLCipher:** Requereix el paquet `sqlcipher3`. Fa fallback a SQLite en text pla amb un avis si no esta instal·lat.
 - **Migracio:** Migrar conjunts de dades grans (moltes memories, moltes sessions) pot trigar. Fes copia de seguretat abans de migrar.

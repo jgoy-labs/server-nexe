@@ -1,12 +1,12 @@
 # ─────────────────────────────────────────────────────────────
 # ModuleID: web_ui_module
-# Nexe v0.8.5 | Web UI Demo Plugin | 2026-01-11
+# Nexe v0.9.0 | Web UI Demo Plugin | 2026-01-11
 # server-nexe/plugins/web_ui_module/manifest.toml
 # ─────────────────────────────────────────────────────────────
 
 [module]
 name = "web_ui_module"
-version = "0.8.5"
+version = "0.9.0"
 type = "web_interface"
 description = "Interfície web estil Ollama per demostrar el sistema modular de Nexe. Inclou xat amb streaming, sessions i upload de documents."
 location = "plugins/web_ui_module/"

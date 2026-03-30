@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-errors-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Errors comuns i solucions per a server-nexe 0.8.5 pre-release. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, Docker, streaming i errors d'encriptacio."
+abstract: "Errors comuns i solucions per a server-nexe 0.9.0 pre-release. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, Docker, streaming i errors d'encriptacio."
 tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, docker, streaming, encryption]
 chunk_size: 800
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Errors comuns — server-nexe 0.8.5 pre-release
+# Errors comuns — server-nexe 0.9.0 pre-release
 
 ## Errors d'instal·lacio
 

@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-usage-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Usage guide for server-nexe 0.8.5 pre-release. Covers CLI commands (go, chat, memory, knowledge, status, encryption), Web UI features (i18n, loading indicator, RAG info panel, model sizes, upload overlay, backend fallback), MEM_SAVE automatic memory, document upload with session isolation, encryption commands, API usage examples (curl, Python), and practical use cases."
+abstract: "Usage guide for server-nexe 0.9.0 pre-release. Covers CLI commands (go, chat, memory, knowledge, status, encryption), Web UI features (i18n, loading indicator, RAG info panel, model sizes, upload overlay, backend fallback), MEM_SAVE automatic memory, document upload with session isolation, encryption commands, API usage examples (curl, Python), and practical use cases."
 tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption]
 chunk_size: 800
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Usage Guide — server-nexe 0.8.5 pre-release
+# Usage Guide — server-nexe 0.9.0 pre-release
 
 ## Starting the Server
 

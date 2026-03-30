@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-rag-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.8.5 pre-release). Cubre 3 colecciones Qdrant con thresholds, MEM_SAVE memoria automatica, intent de borrado, subida de documentos con aislamiento por sesion, embeddings (768D), parametros de chunking, construccion de contexto con etiquetas i18n, visualizacion de pesos RAG, sanitizacion de contexto RAG, poda inteligente, deduplicacion, TextStore para texto encriptado, y payloads de Qdrant sin texto."
+abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.9.0 pre-release). Cubre 3 colecciones Qdrant con thresholds, MEM_SAVE memoria automatica, intent de borrado, subida de documentos con aislamiento por sesion, embeddings (768D), parametros de chunking, construccion de contexto con etiquetas i18n, visualizacion de pesos RAG, sanitizacion de contexto RAG, poda inteligente, deduplicacion, TextStore para texto encriptado, y payloads de Qdrant sin texto."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 800
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Sistema RAG — server-nexe 0.8.5 pre-release
+# Sistema RAG — server-nexe 0.9.0 pre-release
 
 RAG (Retrieval-Augmented Generation) es el sistema de memoria persistente de server-nexe. Aumenta las respuestas del LLM inyectando informacion relevante recuperada de la memoria vectorial en el contexto del prompt.
 
@@ -52,13 +52,13 @@ La Web UI tambien permite ajustar el threshold en tiempo real via un slider (por
 
 ## Payloads de Qdrant (sin texto)
 
-A partir de la v0.8.5, los payloads de Qdrant **ya no contienen texto**. Cada payload solo almacena:
+A partir de la v0.9.0, los payloads de Qdrant **ya no contienen texto**. Cada payload solo almacena:
 - `entry_type` — el tipo de entrada
 - `original_id` — enlace a SQLite para el texto completo
 
 Todo el texto reside en SQLite (opcionalmente encriptado via SQLCipher). Esto significa que incluso sin encriptacion activada, los vectores de Qdrant por si solos no pueden reconstruir el contenido original del texto.
 
-## TextStore (nuevo en v0.8.5)
+## TextStore (nuevo en v0.9.0)
 
 `TextStore` (`memory/memory/api/text_store.py`) es un almacenamiento basado en SQLite para texto de documentos RAG, desacoplado de Qdrant:
 

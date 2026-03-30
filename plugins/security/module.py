@@ -45,7 +45,7 @@ class SecurityModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="security",
-            version="0.8.5",
+            version="0.9.0",
             description="Security core: auth, rate limiting, injection detection, scanning",
             author="Jordi Goy",
             module_type="core",

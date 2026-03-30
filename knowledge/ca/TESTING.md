@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-testing-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia de testing i cobertura per a server-nexe 0.8.5 pre-release. 4143 funcions de test, 3213 passats a l'ultima execucio completa, 0 errors. Tests col·locats amb els moduls. Cobreix estructura de tests, execucio, cobertura, correccions de tests de l'auditoria IA, tests de crypto (68 nous), resultats del mega-test v1/v2 i valoracio honesta de les limitacions del testing."
+abstract: "Estrategia de testing i cobertura per a server-nexe 0.9.0 pre-release. 4143 funcions de test, 3213 passats a l'ultima execucio completa, 0 errors. Tests col·locats amb els moduls. Cobreix estructura de tests, execucio, cobertura, correccions de tests de l'auditoria IA, tests de crypto (68 nous), resultats del mega-test v1/v2 i valoracio honesta de les limitacions del testing."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Testing — server-nexe 0.8.5 pre-release
+# Testing — server-nexe 0.9.0 pre-release
 
 ## Resultats dels tests
 
@@ -73,7 +73,7 @@ pytest core memory personality plugins \
 
 El `conftest.py` arrel proporciona fixtures compartides. Cada modul pot tenir el seu propi `conftest.py`.
 
-## Tests de crypto (nous a la v0.8.5)
+## Tests de crypto (nous a la v0.9.0)
 
 68 tests afegits per al sistema d'encriptacio at-rest:
 

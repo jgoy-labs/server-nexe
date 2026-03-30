@@ -33,7 +33,7 @@ V1_TOMBSTONE_TTL_DAYS = 90
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
   "name": "memory",
-  "version": "0.8.5",
+  "version": "0.9.0",
   "description": "Memory System - Flash, RAM Context and Persistence with lifecycle management",
   "author": "J.Goy",
   "category": "memory.core",

@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-security-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Security documentation for server-nexe 0.8.5 pre-release. Covers dual-key API authentication with rotation, rate limiting (all endpoints), 6 injection detectors with Unicode normalization, 47 jailbreak patterns, OWASP security headers, RFC5424 audit logging, input validation (validate_string_input on all UI routes), RAG context sanitization, encryption at-rest (CryptoProvider AES-256-GCM, SQLCipher, encrypted sessions), AI audit results (v1+v2+mega-test), and security checklist."
+abstract: "Security documentation for server-nexe 0.9.0 pre-release. Covers dual-key API authentication with rotation, rate limiting (all endpoints), 6 injection detectors with Unicode normalization, 47 jailbreak patterns, OWASP security headers, RFC5424 audit logging, input validation (validate_string_input on all UI routes), RAG context sanitization, encryption at-rest (CryptoProvider AES-256-GCM, SQLCipher, encrypted sessions), AI audit results (v1+v2+mega-test), and security checklist."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher]
 chunk_size: 800
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Security — server-nexe 0.8.5 pre-release
+# Security — server-nexe 0.9.0 pre-release
 
 server-nexe is designed for trusted local environments. All data stays on-device. No telemetry, no external calls.
 
@@ -98,7 +98,7 @@ The API endpoint `POST /v1/chat/completions` validates and sanitizes input throu
 
 `_sanitize_rag_context()` is applied to RAG context before injection into the LLM prompt via the Web UI. This filters injection patterns from retrieved documents and memory entries, preventing stored content from being used as attack vectors.
 
-**Pipeline consistency:** As of v0.8.5, the API and Web UI share the same security layers — input validation, RAG sanitization, and rate limiting are applied consistently across both interfaces.
+**Pipeline consistency:** As of v0.9.0, the API and Web UI share the same security layers — input validation, RAG sanitization, and rate limiting are applied consistently across both interfaces.
 
 ## Injection Detection
 
@@ -124,11 +124,11 @@ The API endpoint `POST /v1/chat/completions` validates and sanitizes input throu
 - Log path: `storage/system-logs/security/`
 - Events: auth failures, rate limit triggers, injection attempts, admin actions
 - Real IP logging: `request.client.host`
-- Runtime logging uses `logger.info()` instead of `print()` (migrated in v0.8.5)
+- Runtime logging uses `logger.info()` instead of `print()` (migrated in v0.9.0)
 
 ## Encryption at Rest (opt-in)
 
-**Added in v0.8.5.** Encryption at rest is opt-in and recently added. It has been tested (68 tests) but has not yet been through production use with real users outside development.
+**Added in v0.9.0.** Encryption at rest is opt-in and recently added. It has been tested (68 tests) but has not yet been through production use with real users outside development.
 
 ### CryptoProvider
 

@@ -878,6 +878,8 @@ class NexeUI {
                 let tTok = 0;         // think token count
                 let tBlock = null;    // .think-block DOM element
                 let tTextEl = null;   // .think-text inside block
+                let tGptOssChecked = false; // GPT-OSS format detection done?
+                let tIsGptOss = false;      // GPT-OSS thinking mode active?
 
                 const startThinkBlock = () => {
                     lastMsg.querySelector('.message-content').insertAdjacentHTML('afterbegin',
@@ -937,19 +939,71 @@ class NexeUI {
                                 tMode = 'thinking';
                                 tBuf = tBuf.slice(s + 7);
                                 startThinkBlock();
-                            } else if (tBuf.trimStart().length > 0 && !tBuf.trimStart().startsWith('<')) {
+                            } else if (!tGptOssChecked && fullResponse.length + tBuf.length >= 30) {
+                                // Check for GPT-OSS "analysis...final" format
+                                tGptOssChecked = true;
+                                const combined = (fullResponse + tBuf).toLowerCase().trimStart();
+                                if (combined.startsWith('analysis')) {
+                                    tIsGptOss = true;
+                                    tMode = 'thinking';
+                                    tContent = fullResponse + tBuf;
+                                    fullResponse = '';
+                                    tBuf = '';
+                                    startThinkBlock();
+                                    if (tTextEl) tTextEl.textContent = tContent.replace(/^analysis\s*/i, '');
+                                    tTok = Math.ceil(tContent.length / 4);
+                                    break;
+                                } else {
+                                    // Not GPT-OSS — resposta directa
+                                    tMode = 'responding';
+                                    this.setAiState('streaming');
+                                    this._startStreamStats();
+                                }
+                            } else if (tGptOssChecked && tBuf.trimStart().length > 0 && !tBuf.trimStart().startsWith('<')) {
                                 // Primer char no es tag — resposta directa
                                 tMode = 'responding';
                                 this.setAiState('streaming');
                                 this._startStreamStats();
-                            } else if (tBuf.length > 7) {
+                            } else if (tBuf.length > 7 && tGptOssChecked) {
                                 // Large buffer without <think> — direct response
                                 tMode = 'responding';
                                 this.setAiState('streaming');
                                 this._startStreamStats();
+                            } else if (tBuf.trimStart().length > 0 && !tBuf.trimStart().startsWith('<') && tBuf.length < 30 && !tGptOssChecked) {
+                                // Could be GPT-OSS — wait for more data
+                                fullResponse += tBuf;
+                                tBuf = '';
+                                break;
                             } else {
                                 break; // wait for more data
                             }
+                        } else if (tMode === 'thinking' && tIsGptOss) {
+                            // GPT-OSS thinking mode: accumulate and look for end marker
+                            tContent += tBuf;
+                            tBuf = '';
+                            const displayContent = tContent.replace(/^analysis\s*/i, '');
+                            if (tTextEl) {
+                                tTextEl.textContent = displayContent;
+                                tTextEl.scrollTop = tTextEl.scrollHeight;
+                            }
+                            tTok = Math.ceil(tContent.length / 4);
+                            const tokEl = tBlock?.querySelector('.think-tokens');
+                            if (tokEl) tokEl.textContent = `~${tTok} tok`;
+                            // Look for end marker: "assistantfinal" or standalone "final"
+                            const endMatch = tContent.match(/(assistant\s*final|(?<!\w)final)(.*)$/is);
+                            if (endMatch) {
+                                const markerIdx = tContent.lastIndexOf(endMatch[1]);
+                                const thinkText = tContent.substring(0, markerIdx).replace(/^analysis\s*/i, '').trim();
+                                if (tTextEl) tTextEl.textContent = thinkText;
+                                tTok = Math.ceil(thinkText.length / 4);
+                                closeThinkBlock();
+                                tMode = 'responding';
+                                fullResponse = endMatch[2].trimStart();
+                                this.setAiState('streaming');
+                                this._startStreamStats();
+                                if (fullResponse) this._scheduleRender(assistantMessageDiv, fullResponse);
+                            }
+                            break;
                         } else if (tMode === 'thinking') {
                             const e = tBuf.indexOf('</think>');
                             if (e >= 0) {

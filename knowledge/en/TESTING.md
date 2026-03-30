@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-testing-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Testing strategy and coverage for server-nexe 0.8.5 pre-release. 4143 test functions, 3213 passed in latest full run, 0 failures. Tests collocated with modules. Covers test structure, running tests, coverage, AI audit test fixes, crypto tests (68 new), mega-test v1/v2 results, and honest assessment of testing limitations."
+abstract: "Testing strategy and coverage for server-nexe 0.9.0 pre-release. 4143 test functions, 3213 passed in latest full run, 0 failures. Tests collocated with modules. Covers test structure, running tests, coverage, AI audit test fixes, crypto tests (68 new), mega-test v1/v2 results, and honest assessment of testing limitations."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Testing — server-nexe 0.8.5 pre-release
+# Testing — server-nexe 0.9.0 pre-release
 
 ## Test Results
 
@@ -73,7 +73,7 @@ pytest core memory personality plugins \
 
 Root `conftest.py` provides shared fixtures. Each module can have its own `conftest.py`.
 
-## Crypto Tests (new in v0.8.5)
+## Crypto Tests (new in v0.9.0)
 
 68 tests added for the encryption at-rest system:
 

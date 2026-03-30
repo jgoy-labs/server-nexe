@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-architecture
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Arquitectura interna de server-nexe 0.8.5 pre-release. Disseny de cinc capes: Interficies, Core (FastAPI factory, endpoints separats, lifespan, crypto), Plugins (5 moduls amb auto-descobriment), Serveis Base (RAG memoria de 3 capes amb TextStore), Emmagatzematge. Cobreix refactoritzacio modular, module manager, i18n, Docker, pipeline d'encriptacio, pipeline de sanititzacio de peticions i diagrames Mermaid."
+abstract: "Arquitectura interna de server-nexe 0.9.0 pre-release. Disseny de cinc capes: Interficies, Core (FastAPI factory, endpoints separats, lifespan, crypto), Plugins (5 moduls amb auto-descobriment), Serveis Base (RAG memoria de 3 capes amb TextStore), Emmagatzematge. Cobreix refactoritzacio modular, module manager, i18n, Docker, pipeline d'encriptacio, pipeline de sanititzacio de peticions i diagrames Mermaid."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, docker, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Arquitectura — server-nexe 0.8.5 pre-release
+# Arquitectura — server-nexe 0.9.0 pre-release
 
 ## Arquitectura de cinc capes
 
@@ -135,7 +135,7 @@ server-nexe/
 │   ├── bootstrap_tokens.py       # Sistema de bootstrap token (persistent a BD)
 │   ├── models.py                 # Models Pydantic
 │   │
-│   ├── crypto/                   # Encriptacio at-rest (nou a la v0.8.5)
+│   ├── crypto/                   # Encriptacio at-rest (nou a la v0.9.0)
 │   │   ├── __init__.py           # Paquet + check_encryption_status()
 │   │   ├── provider.py           # CryptoProvider (AES-256-GCM, HKDF-SHA256)
 │   │   ├── keys.py               # Gestio de clau mestra (keyring/env/fitxer)
@@ -265,7 +265,7 @@ Gestiona l'arrencada i l'aturada del servidor. Separat en 3 submoduls.
 ```toml
 [module]
 name = "module_name"
-version = "0.8.5"
+version = "0.9.0"
 type = "local_llm_option"
 description = "Module description"
 location = "plugins/module_name/"

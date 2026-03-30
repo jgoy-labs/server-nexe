@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-plugins-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia completa del sistema de plugins de server-nexe 0.8.5 pre-release. Cubre el Protocol NexeModule (duck typing, no herencia), formato manifest.toml, estructura de ficheros del plugin, ciclo de vida (discovery -> loading -> initialization -> integration -> shutdown), objeto context, registro de routers, plugins existentes (MLX, llama.cpp, Ollama, Security con normalizacion Unicode, Web UI con validacion de entrada), como crear un plugin nuevo paso a paso, errores comunes y buenas practicas."
+abstract: "Guia completa del sistema de plugins de server-nexe 0.9.0 pre-release. Cubre el Protocol NexeModule (duck typing, no herencia), formato manifest.toml, estructura de ficheros del plugin, ciclo de vida (discovery -> loading -> initialization -> integration -> shutdown), objeto context, registro de routers, plugins existentes (MLX, llama.cpp, Ollama, Security con normalizacion Unicode, Web UI con validacion de entrada), como crear un plugin nuevo paso a paso, errores comunes y buenas practicas."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Sistema de plugins — server-nexe 0.8.5 pre-release
+# Sistema de plugins — server-nexe 0.9.0 pre-release
 
 server-nexe usa una arquitectura de plugins basada en descubrimiento automatico via ficheros manifest.toml. Los plugins son modulos independientes que anaden funcionalidad sin modificar el core. No hace falta registro manual — el sistema escanea, descubre y carga plugins automaticamente.
 
@@ -37,7 +37,7 @@ class MyPlugin:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="my_plugin",
-            version="0.8.5",
+            version="0.9.0",
             description="Que hace",
             author="Nombre Autor",
             module_type="local_llm_option",
@@ -108,7 +108,7 @@ Todo plugin DEBE tener un fichero `manifest.toml`. Es la fuente unica de verdad 
 ```toml
 [module]
 name = "my_plugin"
-version = "0.8.5"
+version = "0.9.0"
 type = "local_llm_option"
 description = "Que hace este plugin"
 location = "plugins/my_plugin/"

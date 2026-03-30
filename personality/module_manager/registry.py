@@ -278,7 +278,7 @@ class ModuleRegistry:
       'openapi': '3.0.0',
       'info': {
         'title': 'Nexe 0.8 Modular API',
-        'version': '0.8.5',
+        'version': '0.9.0',
         'description': 'Auto-generated API from Nexe modular system'
       },
       'paths': {}

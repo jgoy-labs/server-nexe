@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-security-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentacion de seguridad de server-nexe 0.8.5 pre-release. Cubre autenticacion dual-key con rotacion, rate limiting (todos los endpoints), 6 detectores de inyeccion con normalizacion Unicode, 47 patrones de jailbreak, cabeceras de seguridad OWASP, logging de auditoria RFC5424, validacion de entrada (validate_string_input en todas las rutas UI), sanitizacion de contexto RAG, encriptacion en reposo (CryptoProvider AES-256-GCM, SQLCipher, sesiones encriptadas), resultados de auditoria IA (v1+v2+mega-test), y checklist de seguridad."
+abstract: "Documentacion de seguridad de server-nexe 0.9.0 pre-release. Cubre autenticacion dual-key con rotacion, rate limiting (todos los endpoints), 6 detectores de inyeccion con normalizacion Unicode, 47 patrones de jailbreak, cabeceras de seguridad OWASP, logging de auditoria RFC5424, validacion de entrada (validate_string_input en todas las rutas UI), sanitizacion de contexto RAG, encriptacion en reposo (CryptoProvider AES-256-GCM, SQLCipher, sesiones encriptadas), resultados de auditoria IA (v1+v2+mega-test), y checklist de seguridad."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher]
 chunk_size: 800
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Seguridad — server-nexe 0.8.5 pre-release
+# Seguridad — server-nexe 0.9.0 pre-release
 
 server-nexe esta disenado para entornos locales de confianza. Todos los datos permanecen en el dispositivo. Sin telemetria, sin llamadas externas.
 
@@ -98,7 +98,7 @@ El endpoint API `POST /v1/chat/completions` valida y sanitiza la entrada a trave
 
 `_sanitize_rag_context()` se aplica al contexto RAG antes de inyectarlo en el prompt del LLM via la Web UI. Filtra patrones de inyeccion de documentos recuperados y entradas de memoria, evitando que el contenido almacenado se use como vector de ataque.
 
-**Consistencia del pipeline:** A partir de la v0.8.5, la API y la Web UI comparten las mismas capas de seguridad — validacion de entrada, sanitizacion RAG y rate limiting se aplican de forma consistente en ambas interfaces.
+**Consistencia del pipeline:** A partir de la v0.9.0, la API y la Web UI comparten las mismas capas de seguridad — validacion de entrada, sanitizacion RAG y rate limiting se aplican de forma consistente en ambas interfaces.
 
 ## Deteccion de inyecciones
 
@@ -124,11 +124,11 @@ El endpoint API `POST /v1/chat/completions` valida y sanitiza la entrada a trave
 - Ruta de logs: `storage/system-logs/security/`
 - Eventos: fallos de autenticacion, triggers de rate limit, intentos de inyeccion, acciones de administracion
 - Logging de IP real: `request.client.host`
-- El logging en tiempo de ejecucion usa `logger.info()` en lugar de `print()` (migrado en v0.8.5)
+- El logging en tiempo de ejecucion usa `logger.info()` en lugar de `print()` (migrado en v0.9.0)
 
 ## Encriptacion en reposo (opt-in)
 
-**Anadida en v0.8.5.** La encriptacion en reposo es opt-in y ha sido anadida recientemente. Ha sido probada (68 tests) pero aun no ha pasado por uso en produccion con usuarios reales fuera del desarrollo.
+**Anadida en v0.9.0.** La encriptacion en reposo es opt-in y ha sido anadida recientemente. Ha sido probada (68 tests) pero aun no ha pasado por uso en produccion con usuarios reales fuera del desarrollo.
 
 ### CryptoProvider
 
