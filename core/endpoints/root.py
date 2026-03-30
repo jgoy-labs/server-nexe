@@ -111,7 +111,7 @@ async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthRespon
   )
 
 @router.get("/health/ready", summary="Readiness check — verifies required modules")
-@limiter.limit("30/minute")
+@limiter.limit("120/minute")
 async def readiness_check(request: Request) -> dict:
   """
   Readiness check.

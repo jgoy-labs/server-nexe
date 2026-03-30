@@ -341,7 +341,29 @@ class NexeUI {
         input.focus();
     }
 
-    initUI() {
+    async _waitForReady() {
+        const overlay = document.getElementById('readinessOverlay');
+        if (!overlay) return;
+        overlay.style.display = 'flex';
+        while (true) {
+            try {
+                const r = await fetch('/health/ready', { cache: 'no-store' });
+                if (r.ok) {
+                    const data = await r.json();
+                    if (data.status === 'healthy' || data.status === 'degraded') {
+                        overlay.style.display = 'none';
+                        return;
+                    }
+                }
+            } catch { /* server not ready yet */ }
+            await new Promise(res => setTimeout(res, 1000));
+        }
+    }
+
+    async initUI() {
+        // Wait for server readiness before loading UI
+        await this._waitForReady();
+
         // Prevent duplicate event listeners when initUI() is called multiple times
         // (e.g. init → 401 → login → initUI again)
         if (this._listenersAttached) return;
@@ -1001,7 +1023,10 @@ class NexeUI {
                                 fullResponse = endMatch[2].trimStart();
                                 this.setAiState('streaming');
                                 this._startStreamStats();
-                                if (fullResponse) this._scheduleRender(assistantMessageDiv, fullResponse);
+                                if (fullResponse) {
+                                    this._streamTokens += Math.ceil(fullResponse.length / 4);
+                                    this._scheduleRender(assistantMessageDiv, fullResponse);
+                                }
                             }
                             break;
                         } else if (tMode === 'thinking') {

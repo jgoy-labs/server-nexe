@@ -57,7 +57,7 @@ MODEL_CATALOG = {
             "disk_gb": 3.4,
             "ram_gb": 4.0,
             "description": {"ca": "Multimodal, tool calling, thinking. Ideal per Macs amb 8 GB", "es": "Multimodal, tool calling, thinking. Ideal para Macs con 8 GB", "en": "Multimodal, tool calling, thinking. Ideal for 8 GB Macs"},
-            "mlx": None,  # multimodal (vision_tower) incompatible amb mlx_lm text-only
+            "mlx": None,  # HF té mlx_vlm (vision) però server-nexe usa mlx_lm (text-only) — incompatible
             "ollama": "qwen3.5:4b",
             "gguf": None,
             "chat_format": "chatml",
@@ -142,7 +142,7 @@ MODEL_CATALOG = {
             "disk_gb": 6.6,
             "ram_gb": 8.0,
             "description": {"ca": "Multimodal, thinking, tool calling. Millor relacio qualitat/mida de la familia. Apache 2.0", "es": "Multimodal, thinking, tool calling. Mejor relacion calidad/tamaño de la familia. Apache 2.0", "en": "Multimodal, thinking, tool calling. Best quality/size ratio of the family. Apache 2.0"},
-            "mlx": None,  # multimodal (vision_tower) incompatible amb mlx_lm text-only
+            "mlx": None,  # HF té mlx_vlm (vision) però server-nexe usa mlx_lm (text-only) — incompatible
             "ollama": "qwen3.5:9b",
             "gguf": None,
             "chat_format": "chatml",
@@ -163,7 +163,7 @@ MODEL_CATALOG = {
             "disk_gb": 17.0,
             "ram_gb": 20,
             "description": {"ca": "Multimodal complet, thinking avançat, tool calling. El millor Qwen per RAG i català. Apache 2.0", "es": "Multimodal completo, thinking avanzado, tool calling. El mejor Qwen para RAG y catalán. Apache 2.0", "en": "Full multimodal, advanced thinking, tool calling. Best Qwen for RAG and Catalan. Apache 2.0"},
-            "mlx": None,  # multimodal (vision_tower) incompatible amb mlx_lm text-only
+            "mlx": None,  # HF té mlx_vlm (vision) però server-nexe usa mlx_lm (text-only) — incompatible
             "ollama": "qwen3.5:27b",
             "gguf": None,
             "chat_format": "chatml",
@@ -227,7 +227,7 @@ MODEL_CATALOG = {
             "disk_gb": 19.0,
             "ram_gb": 22,
             "description": {"ca": "Especialitzat en raonament — pensa pas a pas. Compita amb models molt més grans", "es": "Especializado en razonamiento — piensa paso a paso. Compite con modelos mucho más grandes", "en": "Reasoning specialist — thinks step by step. Competes with much larger models"},
-            "mlx": None,
+            "mlx": "mlx-community/QwQ-32B-4bit",
             "ollama": "qwq:32b",
             "gguf": None,
             "chat_format": "chatml",
