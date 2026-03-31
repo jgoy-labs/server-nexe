@@ -196,7 +196,7 @@ tar czf "$PAYLOAD_TMP/payload.tar.gz" \
     --exclude='.build' \
     core/ plugins/ memory/ personality/ installer/ tests/ knowledge/ \
     setup.sh requirements.txt requirements-macos.txt pyproject.toml .env.example \
-    install_nexe.py LICENSE 2>/dev/null || warn "Some files excluded from payload"
+    install_nexe.py LICENSE COMMANDS.md 2>/dev/null || warn "Some files excluded from payload"
 
 mv "$PAYLOAD_TMP/payload.tar.gz" "$RESOURCES/payload.tar.gz"
 rm -rf "$PAYLOAD_TMP"

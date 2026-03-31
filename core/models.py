@@ -23,7 +23,7 @@ class SystemResponse(BaseModel):
   model_config = ConfigDict(
     json_schema_extra={
       "example": {
-        "system": "Nexe 0.8",
+        "system": "Nexe 0.9",
         "description": "Module orchestration system operational",
         "status": "System ready and operational",
         "version": "0.9.0",
@@ -66,7 +66,7 @@ class ApiInfoResponse(BaseModel):
   model_config = ConfigDict(
     json_schema_extra={
       "example": {
-        "name": "Nexe 0.8",
+        "name": "Nexe 0.9",
         "version": "0.9.0",
         "description": "Module orchestration system operational",
         "endpoints": [

@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, R
 from plugins.web_ui_module.messages import get_message
 from plugins.security.core.input_sanitizers import validate_string_input
 from core.dependencies import limiter
-from core.endpoints.chat_sanitization import _sanitize_rag_context
+from core.endpoints.chat_sanitization import _filter_rag_injection
 
 def _get_memory_helper():
     """Lazy resolve via routes module so test patches work."""
@@ -119,8 +119,8 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
             else:
                 chunk_size = 1500
             logger.info(f"chunk_size auto={chunk_size} per {_doc_len} chars ({file.filename})")
-        # Security: sanitize content before RAG storage to prevent prompt injection
-        body_content = _sanitize_rag_context(body_content)
+        # Security: filter injection patterns but do NOT truncate (chunking handles size)
+        body_content = _filter_rag_injection(body_content)
         chunks = file_handler.chunk_text(body_content, chunk_size=chunk_size)
         logger.info(f"Document '{file.filename}': {len(body_content)} chars -> {len(chunks)} chunks (chunk_size={chunk_size})")
 

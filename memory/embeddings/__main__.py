@@ -124,7 +124,7 @@ async def cmd_stats():
 def main():
   """Main CLI entry point"""
   parser = argparse.ArgumentParser(
-    description="Embeddings Module - Nexe 0.8",
+    description="Embeddings Module - Nexe 0.9",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog="""
 Examples:

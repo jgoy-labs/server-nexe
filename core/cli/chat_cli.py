@@ -181,12 +181,15 @@ async def get_response_stream(engine: str, prompt: str, system: str, history: li
 @click.option('--no-rag', is_flag=True, help='Disable memory context (RAG)')
 @click.option('--model', '-m', help='Model name (for Ollama)')
 @click.option('--verbose', '-v', is_flag=True, help='Show RAG detail per source')
-def chat(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool):
+@click.option('--rag-threshold', type=float, default=None, help='RAG score threshold (0.20-0.70)')
+@click.option('--collections', '-c', default=None, help='Comma-separated collections: memory,knowledge,docs (default: all)')
+def chat(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool,
+         rag_threshold: Optional[float], collections: Optional[str]):
     """
     Start an interactive chat with Nexe.
     Auto-detects the configured engine if none is specified.
     """
-    asyncio.run(_chat_async(engine, system, no_rag, model, verbose))
+    asyncio.run(_chat_async(engine, system, no_rag, model, verbose, rag_threshold, collections))
 
 def detect_model():
     """Detect which model is currently configured."""
@@ -210,7 +213,8 @@ def detect_model():
     return "auto"
 
 
-async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool = False):
+async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool = False,
+                      rag_threshold: Optional[float] = None, collections: Optional[str] = None):
     from .utils.api_client import NexeAPIClient
 
     if not engine:
@@ -252,6 +256,21 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
     if not session_id:
         click.echo(click.style("⚠️  Could not create UI session. Check that the web_ui module is active.", fg="yellow"))
         return
+
+    # Parse collection names to internal IDs
+    _COLL_ALIASES = {'memory': 'nexe_web_ui', 'knowledge': 'user_knowledge', 'docs': 'nexe_documentation'}
+    _rag_collections = None
+    if collections:
+        _rag_collections = [_COLL_ALIASES.get(c.strip(), c.strip()) for c in collections.split(',')]
+        click.echo(click.style(f"  Collections: {', '.join(_rag_collections)}", fg="cyan"))
+    if rag_threshold is not None:
+        click.echo(click.style(f"  RAG threshold: {rag_threshold}", fg="cyan"))
+
+    _stream_kwargs = {}
+    if rag_threshold is not None:
+        _stream_kwargs['rag_threshold'] = rag_threshold
+    if _rag_collections is not None:
+        _stream_kwargs['rag_collections'] = _rag_collections
 
     click.echo(f"\n  {click.style('🚀 Nexe Chat', fg='cyan', bold=True)}")
     click.echo(f"  {click.style('Engine:', fg='yellow')} {engine}  |  {click.style('Model:', fg='yellow')} {model}  |  {click.style('Memory:', fg='yellow')} ✅ Active")
@@ -308,7 +327,7 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                     # If there is a follow-up message, send it now
                     if upload_ok and follow_up:
                         first = True
-                        async for chunk in _stream_with_spinner(client.chat_ui_stream(message=follow_up, session_id=session_id)):
+                        async for chunk in _stream_with_spinner(client.chat_ui_stream(message=follow_up, session_id=session_id, **_stream_kwargs)):
                             if first:
                                 first = False
                                 click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
@@ -322,7 +341,7 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                         if success:
                             ack_prompt = f"The user just asked you to remember this: \"{cmd_arg}\". Reply briefly confirming you will remember it, without repeating all the information."
                             first = True
-                            async for chunk in _stream_with_spinner(client.chat_ui_stream(message=ack_prompt, session_id=session_id)):
+                            async for chunk in _stream_with_spinner(client.chat_ui_stream(message=ack_prompt, session_id=session_id, **_stream_kwargs)):
                                 if first:
                                     first = False
                                     click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
@@ -372,7 +391,7 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
             _mem_saved = False
             _compact_count = 0
 
-            async for chunk in _stream_with_spinner(client.chat_ui_stream(message=user_input, session_id=session_id)):
+            async for chunk in _stream_with_spinner(client.chat_ui_stream(message=user_input, session_id=session_id, **_stream_kwargs)):
                 if isinstance(chunk, dict):
                     # Metadata from server
                     if "MODEL" in chunk:

@@ -1,7 +1,7 @@
 {
   "server_core": {
     "api": {
-      "title": "Nexe 0.8 API",
+      "title": "Nexe 0.9 API",
       "description": "Sistema de orquestación de módulos de IA",
       "server_type": "Servidor de módulos de IA",
       "welcome": {
@@ -27,7 +27,7 @@
       }
     },
     "startup": {
-      "starting_from": "Iniciando Nexe 0.8 desde: {path}",
+      "starting_from": "Iniciando Nexe 0.9 desde: {path}",
       "starting_server_on": "Iniciando servidor en {host}:{port}",
       "loading_config": "Cargando configuración...",
       "config_loaded": "Configuración cargada",

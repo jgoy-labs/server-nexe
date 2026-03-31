@@ -1,5 +1,5 @@
 """
-Tests d'integració reals contra el servidor Nexe 0.8.
+Tests d'integració reals contra el servidor Nexe 0.9.
 
 Requereix:
 - Servidor Nexe actiu a localhost:9119

@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 70)
 
     msg = _translate(server_state.i18n, "core.server.banner",
-      "Nexe 0.8 - Modular AI System")
+      "Nexe 0.9 - Modular AI System")
     logger.info(msg)
 
     reload_trigger = server_state.project_root / ".nexe_reload_trigger.py"
@@ -136,7 +136,7 @@ async def lifespan(app: FastAPI):
     logger.info(msg)
 
     msg = _translate(server_state.i18n, "core.server.all_systems_go",
-      "All systems operational - Nexe 0.8 ready!")
+      "All systems operational - Nexe 0.9 ready!")
     logger.info(msg)
 
     server_state.api_integrator = APIIntegrator(app, server_state.i18n)
@@ -495,7 +495,7 @@ async def lifespan(app: FastAPI):
       logger.error(msg)
 
     msg = _translate(server_state.i18n, "core.server.shutdown_goodbye",
-      "Nexe 0.8 stopped successfully. See you soon!")
+      "Nexe 0.9 stopped successfully. See you soon!")
     logger.info(msg)
 
 def get_server_state() -> ServerState:

@@ -54,6 +54,33 @@ _RAG_INJECTION_PATTERNS = [
     re.compile(r'\[CONTEXT[^\]]*\]', re.IGNORECASE),    # Our own context markers
 ]
 
+def _filter_rag_injection(text: str) -> str:
+    """
+    Filter prompt injection patterns from text WITHOUT truncating.
+
+    Use this for content being INDEXED (upload/ingest path) where truncation
+    would cause data loss. The full sanitization (_sanitize_rag_context) with
+    truncation should only be applied at RETRIEVAL time (chat endpoint).
+
+    Args:
+        text: Raw text to filter
+
+    Returns:
+        Text with injection patterns removed but full length preserved
+    """
+    if not text:
+        return ""
+
+    filtered = text
+    for pattern in _RAG_INJECTION_PATTERNS:
+        filtered = pattern.sub('[FILTERED]', filtered)
+
+    filtered = filtered.replace('[/CONTEXT]', '[/CONTEXT_ESCAPED]')
+    filtered = filtered.replace('[CONTEXT', '[CONTEXT_ESCAPED')
+
+    return filtered
+
+
 def _sanitize_rag_context(context: str) -> str:
     """
     Sanitize RAG retrieved content before injecting into prompt.

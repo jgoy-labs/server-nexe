@@ -129,7 +129,7 @@ def get_repo_root(start_path: Optional[Path] = None) -> Path:
     return root
 
   raise RuntimeError(
-    "Could not detect Nexe 0.8 root.\n\n"
+    "Could not detect Nexe 0.9 root.\n\n"
     "No strategy found a valid root:\n"
     f" 1. NEXE_HOME env var: {'not set' if not os.getenv('NEXE_HOME') else 'invalid'}\n"
     f" 2. Markers (server.toml): not found\n"

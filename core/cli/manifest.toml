@@ -6,14 +6,14 @@
 # Descripció:
 # Manifest operatiu del CLI Central Nexe. Utilitzat pel ModuleManager
 # per identificar metadades, dependències i integracions.
-# Orquestrador de CLIs de tots els mòduls Nexe 0.8.
+# Orquestrador de CLIs de tots els mòduls Nexe 0.9.
 # ─────────────────────────────────────────────────────────────
 
 [module]
 name = "cli"
 version = "1.0.0"
 type = "core"
-description = "CLI Central Nexe - Orquestrador que unifica l'accés a tots els CLIs dels mòduls Nexe 0.8 sota la comanda 'nexe'. Descobreix CLIs dinàmicament via manifest.toml, executa via subprocess per aïllament, i suporta mode offline"
+description = "CLI Central Nexe - Orquestrador que unifica l'accés a tots els CLIs dels mòduls Nexe 0.9 sota la comanda 'nexe'. Descobreix CLIs dinàmicament via manifest.toml, executa via subprocess per aïllament, i suporta mode offline"
 location = "core/cli/"
 permanent = true
 author = "Nexe Team (Jordi Goy 0.8)"

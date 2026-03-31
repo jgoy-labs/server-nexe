@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class LlamaCppChatNode:
     """
-    Motor d'inferència per a Llama.cpp adaptat per a Nexe 0.8.
+    Motor d'inferència per a Llama.cpp adaptat per a Nexe 0.9.
 
     Usa ModelPool per gestionar instàncies Llama amb LRU eviction.
     Cada sessió pot tenir la seva pròpia instància (si max_sessions > 1).

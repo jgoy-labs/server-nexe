@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: personality/events/event_system.py
-Description: Global asynchronous event management system for Nexe 0.8.
+Description: Global asynchronous event management system for Nexe 0.9.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 __all__ = ['EventSystem']
 
 class EventSystem:
-  """Global event management system for Nexe 0.8"""
+  """Global event management system for Nexe 0.9"""
   
   def __init__(self, i18n_manager=None):
     """

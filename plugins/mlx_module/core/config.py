@@ -136,7 +136,7 @@ class MLXConfig:
         logger.info(
             "MLXConfig loaded: model=%s, max_tokens=%d, max_kv_size=%d, "
             "temp=%.1f, top_p=%.1f, max_caches=%d",
-            config.model_path[-40:] if config.model_path else "(empty)",
+            config.model_path if config.model_path else "(empty)",
             config.max_tokens,
             config.max_kv_size,
             config.temperature,

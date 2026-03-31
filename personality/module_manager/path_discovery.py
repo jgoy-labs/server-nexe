@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 class PathDiscovery:
   """
-  Module path discovery for Nexe 0.8.
+  Module path discovery for Nexe 0.9.
 
   Searches for modules in:
   - Known paths (plugins/moduls, memory/modules, etc.)

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: core/metrics/registry.py
-Description: Prometheus metrics registry per Nexe 0.8.
+Description: Prometheus metrics registry per Nexe 0.9.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

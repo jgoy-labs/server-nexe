@@ -63,7 +63,7 @@ def detect_sql_injection(text: str) -> bool:
   Returns:
     True if SQL injection pattern detected, False otherwise
 
-  Note: In air-gapped Nexe 0.8, SQL injection is low risk (no external DB),
+  Note: In air-gapped Nexe 0.9, SQL injection is low risk (no external DB),
      but this validator provides defense-in-depth.
   """
   if not text:
@@ -214,7 +214,7 @@ def detect_ldap_injection(text: str) -> bool:
   Returns:
     True if LDAP injection pattern detected, False otherwise
 
-  Note: Low risk in air-gapped Nexe 0.8 (no LDAP), but included for completeness.
+  Note: Low risk in air-gapped Nexe 0.9 (no LDAP), but included for completeness.
   """
   if not text:
     return False

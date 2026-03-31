@@ -90,7 +90,7 @@ async def module_manager_info():
     return JSONResponse(content={
       "name": "module_manager",
       "version": __version__,
-      "description": "Centralized module management system for Nexe 0.8",
+      "description": "Centralized module management system for Nexe 0.9",
       "features": [
         "Auto-discovery of modules",
         "Lifecycle management",
@@ -147,7 +147,7 @@ async def list_registered_modules():
 MODULE_METADATA = {
   "name": "module_manager",
   "version": "0.9.0",
-  "description": "Centralized module management system for Nexe 0.8",
+  "description": "Centralized module management system for Nexe 0.9",
   "router": router_public,
   "prefix": "/modules",
   "tags": ["modules", "management", "core"],

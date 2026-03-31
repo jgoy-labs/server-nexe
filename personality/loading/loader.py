@@ -37,7 +37,7 @@ logger = get_logger(__name__)
 
 class ModuleLoader:
   """
-  Global dynamic module loader for Nexe 0.8 (FAÇADE).
+  Global dynamic module loader for Nexe 0.9 (FAÇADE).
 
   Coordina tots els components especialitzats:
   - ModuleFinder: Cerca fitxers API

@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 class MLXChatNode:
     """
-    Motor d'inferència per a MLX adaptat per a Nexe 0.8.
+    Motor d'inferència per a MLX adaptat per a Nexe 0.9.
 
     Manté:
     - Un sol model carregat (singleton)

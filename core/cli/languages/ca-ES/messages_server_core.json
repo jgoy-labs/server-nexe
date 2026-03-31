@@ -1,7 +1,7 @@
 {
   "server_core": {
     "api": {
-      "title": "Nexe 0.8 API",
+      "title": "Nexe 0.9 API",
       "description": "Sistema d'orquestració de mòduls d'IA",
       "server_type": "Servidor de mòduls d'IA",
       "welcome": {
@@ -27,7 +27,7 @@
       }
     },
     "startup": {
-      "starting_from": "Iniciant Nexe 0.8 des de: {path}",
+      "starting_from": "Iniciant Nexe 0.9 des de: {path}",
       "starting_server_on": "Iniciant servidor a {host}:{port}",
       "loading_config": "Carregant configuració...",
       "config_loaded": "Configuració carregada",

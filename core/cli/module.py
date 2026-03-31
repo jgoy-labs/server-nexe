@@ -124,4 +124,4 @@ CLI Central - Module Orchestrator
     Returns:
       str: Greeting message with ASCII art
     """
-    return f"{self.get_ascii_art()}\nHello {name}! Welcome to the Nexe Central CLI 0.8."
+    return f"{self.get_ascii_art()}\nHello {name}! Welcome to the Nexe Central CLI 0.9."
