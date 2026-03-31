@@ -569,6 +569,13 @@ body.light .icon-moon,
     cursor: pointer;
 }
 
+.collection-icon {
+    width: 13px;
+    height: 13px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
 .collection-name {
     user-select: none;
 }
