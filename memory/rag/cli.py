@@ -253,7 +253,7 @@ def create_parser() -> argparse.ArgumentParser:
   """Create argument parser for RAG CLI"""
   parser = argparse.ArgumentParser(
     prog="rag",
-    description="Nexe 0.8 - RAG Module CLI",
+    description="Nexe 0.9 - RAG Module CLI",
     formatter_class=argparse.RawDescriptionHelpFormatter
   )
 

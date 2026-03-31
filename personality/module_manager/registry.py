@@ -277,7 +277,7 @@ class ModuleRegistry:
     spec = {
       'openapi': '3.0.0',
       'info': {
-        'title': 'Nexe 0.8 Modular API',
+        'title': 'Nexe 0.9 Modular API',
         'version': '0.9.0',
         'description': 'Auto-generated API from Nexe modular system'
       },

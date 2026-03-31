@@ -49,7 +49,7 @@ def test_create_app_basic(monkeypatch):
   app = create_app()
 
   assert app is not None
-  assert app.title == "Nexe 0.8 API" or "Nexe" in app.title
+  assert app.title == "Nexe 0.9 API" or "Nexe" in app.title
   assert hasattr(app, "routes")
 
 def test_create_app_caches_instance(monkeypatch):

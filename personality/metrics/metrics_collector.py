@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 __all__ = ['MetricsCollector']
 
 class MetricsCollector:
-  """Global metrics collection and management system for Nexe 0.8"""
+  """Global metrics collection and management system for Nexe 0.9"""
   
   def __init__(self, i18n_manager=None):
     """

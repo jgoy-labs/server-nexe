@@ -183,7 +183,7 @@ def main():
   project_root = app.state.project_root
 
   logger.info(
-    translate(i18n, "server_core.startup.starting_from", "Starting Nexe 0.8 from: {path}", path=str(project_root))
+    translate(i18n, "server_core.startup.starting_from", "Starting Nexe 0.9 from: {path}", path=str(project_root))
   )
 
   server_config = config.get('core', {}).get('server', {})

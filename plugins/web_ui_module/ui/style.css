@@ -534,6 +534,45 @@ body.light .icon-moon,
     gap: 0.3rem;
 }
 
+.collection-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-top: 0.5rem;
+    padding: 0 0.1rem;
+}
+
+.collection-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-bottom: 0.1rem;
+}
+
+.collection-title {
+    font-size: 0.72rem;
+}
+
+.collection-check {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.15rem 0;
+}
+
+.collection-check input[type="checkbox"] {
+    width: 13px;
+    height: 13px;
+    accent-color: var(--primary-color);
+    cursor: pointer;
+}
+
+.collection-name {
+    user-select: none;
+}
+
 .rag-info-toggle {
     font-size: 0.75rem;
     color: var(--text-muted);

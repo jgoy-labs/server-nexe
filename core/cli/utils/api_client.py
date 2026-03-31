@@ -157,7 +157,9 @@ class NexeAPIClient:
     _MARKER_RE = re.compile(r'\x00\[(\w+):([^\]]*)\]\x00')
     _MEM_MARKER = "\x00[MEM]\x00"
 
-    async def chat_ui_stream(self, message: str, session_id: str) -> AsyncGenerator[Union[str, dict], None]:
+    async def chat_ui_stream(self, message: str, session_id: str, *,
+                             rag_threshold: Optional[float] = None,
+                             rag_collections: Optional[list] = None) -> AsyncGenerator[Union[str, dict], None]:
         """
         Send a streaming request to /ui/chat (same pipeline as the web UI).
         Uses server sessions, nexe_web_ui RAG, and intent detection.
@@ -168,6 +170,10 @@ class NexeAPIClient:
         """
         url = f"{self.base_url}/ui/chat"
         payload = {"message": message, "session_id": session_id, "stream": True}
+        if rag_threshold is not None:
+            payload["rag_threshold"] = rag_threshold
+        if rag_collections is not None:
+            payload["rag_collections"] = rag_collections
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:

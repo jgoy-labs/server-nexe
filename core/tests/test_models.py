@@ -16,13 +16,13 @@ from core.models import (
 class TestSystemResponse:
     def test_creation_with_all_fields(self):
         r = SystemResponse(
-            system="Nexe 0.8",
+            system="Nexe 0.9",
             description="Descripció",
             status="operatiu",
             version="0.9.0",
             type="servidor_bàsic"
         )
-        assert r.system == "Nexe 0.8"
+        assert r.system == "Nexe 0.9"
         assert r.description == "Descripció"
         assert r.status == "operatiu"
         assert r.version == "0.9.0"
@@ -84,12 +84,12 @@ class TestApiInfoResponse:
             EndpointInfo(path="/health", method="GET", description="Salut"),
         ]
         r = ApiInfoResponse(
-            name="Nexe 0.8",
+            name="Nexe 0.9",
             version="0.9.0",
             description="Descripció API",
             endpoints=endpoints
         )
-        assert r.name == "Nexe 0.8"
+        assert r.name == "Nexe 0.9"
         assert len(r.endpoints) == 2
         assert r.endpoints[0].path == "/"
 

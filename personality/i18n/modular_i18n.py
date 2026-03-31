@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 __all__ = ['ModularI18nManager']
 
 class ModularI18nManager:
-  """Modular internationalisation manager for Nexe 0.8."""
+  """Modular internationalisation manager for Nexe 0.9."""
   
   def __init__(self, config_path: Path = None, base_path: Path = None):
     """

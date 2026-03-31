@@ -29,11 +29,11 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
   from core.middleware import setup_all_middleware
 
   app = FastAPI(
-    title=translate(i18n, "server_core.api.title", "Nexe 0.8 API"),
+    title=translate(i18n, "server_core.api.title", "Nexe 0.9 API"),
     description=translate(
       i18n,
       "server_core.api.description",
-      "**Nexe 0.8** — Local AI server with persistent memory.\n\n"
+      "**Nexe 0.9** — Local AI server with persistent memory.\n\n"
       "## Authentication\n"
       "Most endpoints require the `X-API-Key` header.\n\n"
       "## Endpoint groups\n"

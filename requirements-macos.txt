@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────
-# Nexe Server 0.8 - macOS-only Dependencies
+# Nexe Server 0.9 - macOS-only Dependencies
 # Installed automatically on macOS by setup.sh / installer
 # ─────────────────────────────────────────────────────────────
 

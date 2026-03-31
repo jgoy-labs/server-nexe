@@ -50,6 +50,10 @@ const UI_STRINGS = {
         model_loaded: "Model carregat",
         send_error: "Error: No s'ha pogut enviar el missatge.",
         connection_error: "Error de connexió",
+        col_title: "Col·leccions",
+        col_memory: "Memòria",
+        col_knowledge: "Coneixement",
+        col_docs: "Docs del sistema",
     },
     en: {
         login_subtitle: "Enter your API Key to access",
@@ -96,6 +100,10 @@ const UI_STRINGS = {
         model_loaded: "Model loaded",
         send_error: "Error: Could not send the message.",
         connection_error: "Connection error",
+        col_title: "Collections",
+        col_memory: "Memory",
+        col_knowledge: "Knowledge",
+        col_docs: "System Docs",
     },
     es: {
         login_subtitle: "Introduce la API Key para acceder",
@@ -142,6 +150,10 @@ const UI_STRINGS = {
         model_loaded: "Modelo cargado",
         send_error: "Error: No se pudo enviar el mensaje.",
         connection_error: "Error de conexión",
+        col_title: "Colecciones",
+        col_memory: "Memoria",
+        col_knowledge: "Conocimiento",
+        col_docs: "Docs del sistema",
     }
 };
 
@@ -222,6 +234,11 @@ class NexeUI {
                 `<li>${this.t('rag_panel_high')}</li>` +
                 `<li>${this.t('rag_panel_rec')}</li></ul>`;
         }
+        // Collections
+        s('.collection-title', 'col_title');
+        s('[data-i18n="col_memory"]', 'col_memory');
+        s('[data-i18n="col_knowledge"]', 'col_knowledge');
+        s('[data-i18n="col_docs"]', 'col_docs');
         // Input
         s('#messageInput', 'placeholder', 'placeholder');
         // Buttons
@@ -296,6 +313,52 @@ class NexeUI {
                 console.warn('Could not save language to server:', e);
             }
         });
+    }
+
+    _initCollectionToggles() {
+        const COLL_MAP = {
+            colMemory: 'nexe_web_ui',
+            colKnowledge: 'user_knowledge',
+            colDocs: 'nexe_documentation'
+        };
+        const saved = localStorage.getItem('nexe_collections');
+        if (saved) {
+            try {
+                const disabled = JSON.parse(saved);
+                for (const [id, coll] of Object.entries(COLL_MAP)) {
+                    const cb = document.getElementById(id);
+                    if (cb) cb.checked = !disabled.includes(coll);
+                }
+            } catch (e) { /* ignore corrupt localStorage */ }
+        }
+        for (const id of Object.keys(COLL_MAP)) {
+            const cb = document.getElementById(id);
+            if (cb) cb.addEventListener('change', () => this._saveCollectionState());
+        }
+    }
+
+    _saveCollectionState() {
+        const COLL_MAP = {
+            colMemory: 'nexe_web_ui',
+            colKnowledge: 'user_knowledge',
+            colDocs: 'nexe_documentation'
+        };
+        const disabled = [];
+        for (const [id, coll] of Object.entries(COLL_MAP)) {
+            const cb = document.getElementById(id);
+            if (cb && !cb.checked) disabled.push(coll);
+        }
+        localStorage.setItem('nexe_collections', JSON.stringify(disabled));
+    }
+
+    _getActiveCollections() {
+        const ALL = ['nexe_web_ui', 'user_knowledge', 'nexe_documentation'];
+        const saved = localStorage.getItem('nexe_collections');
+        if (!saved) return ALL;
+        try {
+            const disabled = JSON.parse(saved);
+            return ALL.filter(c => !disabled.includes(c));
+        } catch (e) { return ALL; }
     }
 
     showLoginOverlay() {
@@ -429,6 +492,9 @@ class NexeUI {
             });
         }
 
+        // Collection checkboxes — restore from localStorage
+        this._initCollectionToggles();
+
         // Toggle light/dark theme (detects OS preference if no saved preference)
         const themeBtn = document.getElementById('themeToggleBtn');
         if (themeBtn) {
@@ -515,8 +581,9 @@ class NexeUI {
         } catch (e) {
             const el = document.getElementById('modelInfoText');
             if (el) el.textContent = 'nexe';
+        } finally {
+            this.loadBackends();
         }
-        this.loadBackends();
     }
 
     async loadBackends(retryCount = 0) {
@@ -854,6 +921,8 @@ class NexeUI {
             const ragThreshold = ragSlider ? parseFloat(ragSlider.value) : 0.40;
             const backendSel = document.getElementById('backendSelect');
             const modelSel = document.getElementById('modelSelect');
+            // Collection toggles — build list of active collections
+            const ragCollections = this._getActiveCollections();
             const response = await this.fetchWithCsrf('/ui/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -862,6 +931,7 @@ class NexeUI {
                     session_id: this.currentSessionId,
                     stream: true,
                     rag_threshold: ragThreshold,
+                    rag_collections: ragCollections.length < 3 ? ragCollections : undefined,
                     backend: backendSel ? backendSel.value : undefined,
                     model: modelSel ? modelSel.value : undefined
                 }),

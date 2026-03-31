@@ -103,7 +103,7 @@ async def cli_list():
 MODULE_METADATA = {
   "name": "cli",
   "version": "1.0.0",
-  "description": "Nexe Central CLI - Nexe 0.8 module CLI orchestrator",
+  "description": "Nexe Central CLI - Nexe 0.9 module CLI orchestrator",
   "router": router_public,
   "prefix": "/cli",
   "tags": ["cli", "terminal", "commands"],
