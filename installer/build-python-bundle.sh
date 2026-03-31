@@ -8,7 +8,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-APP_DIR="$PROJECT_ROOT/Install Nexe.app"
+# Use InstallNexe.app (no spaces — macOS Sequoia provenance fix 2026-03-29)
+APP_DIR="$PROJECT_ROOT/InstallNexe.app"
 RESOURCES="$APP_DIR/Contents/Resources"
 FRAMEWORKS="$APP_DIR/Contents/Frameworks"
 

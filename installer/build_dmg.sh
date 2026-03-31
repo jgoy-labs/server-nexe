@@ -263,7 +263,9 @@ hdiutil create \
 
 # Mount read-write, copy app and add background
 MOUNT_POINT="/Volumes/$DMG_VOLUME_NAME"
-hdiutil attach "$DMG_TMP" -nobrowse -readwrite || error "hdiutil attach failed"
+# Note: Do NOT use -nobrowse here — Finder needs to see the volume
+# for the AppleScript window customization to work (fixes -1728 error)
+hdiutil attach "$DMG_TMP" -readwrite || error "hdiutil attach failed"
 
 # Copy app bundle to DMG
 cp -R "$APP_BUNDLE" "$MOUNT_POINT/"
@@ -273,6 +275,8 @@ mkdir -p "$MOUNT_POINT/.background"
 cp "$DMG_BACKGROUND" "$MOUNT_POINT/.background/background.png"
 
 # Set window properties via AppleScript
+# Wait for Finder to index the volume (fixes intermittent -1728 error)
+sleep 2
 osascript <<APPLESCRIPT
 tell application "Finder"
     tell disk "$DMG_VOLUME_NAME"
