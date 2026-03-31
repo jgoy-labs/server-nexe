@@ -449,6 +449,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         _first_chunk = True
                                         _first_content_after_think = None
                                         _has_any_thinking = False
+                                        _mem_tag_buf = ""  # Buffer for cross-chunk [MEM_SAVE: ...] tags
                                         async for chunk in chat_result:
                                             content = ""
                                             thinking = ""
@@ -523,7 +524,15 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                     visible = ''.join(_vis_parts)
                                                 else:
                                                     visible = content
-                                                # Strip [MEM_SAVE: ...] from visible stream
+                                                # Strip [MEM_SAVE: ...] from visible stream (cross-chunk safe)
+                                                visible = _mem_tag_buf + visible
+                                                _mem_tag_buf = ""
+                                                # Check for incomplete tag at end of chunk
+                                                _bracket = visible.rfind('[')
+                                                if _bracket >= 0 and ']' not in visible[_bracket:] and 'MEM' in visible[_bracket:]:
+                                                    _mem_tag_buf = visible[_bracket:]
+                                                    visible = visible[:_bracket]
+                                                # Strip complete tags
                                                 visible = _re.sub(r'\[MEM_SAVE:\s*.+?\]\s*', '', visible)
                                                 if visible:
                                                     yield visible
