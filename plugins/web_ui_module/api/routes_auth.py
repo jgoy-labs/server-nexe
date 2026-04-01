@@ -74,7 +74,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         try:
             from core.lifespan import get_server_state
             state = get_server_state()
-            version = state.config.get('meta', {}).get('version', '0.8')
+            version = state.config.get('meta', {}).get('version', '0.9')
             # Detectar backend real (com /status)
             modules = getattr(state, 'modules', {}) or {}
             if configured_backend in ("mlx", "auto"):
@@ -83,7 +83,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                 if configured_backend == "mlx" and not mlx_ok:
                     backend = "ollama"
         except Exception:
-            version = "0.8"
+            version = "0.9"
         lang = get_server_lang()
         # RAG collections info
         rag_collections = []

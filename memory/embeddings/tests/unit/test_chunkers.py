@@ -481,7 +481,7 @@ class App:
     if chunker is None:
       chunker = registry.get_default_chunker()
 
-    text = """# Nexe 0.8
+    text = """# Nexe 0.9
 
 Sistema modular.
 

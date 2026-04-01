@@ -135,9 +135,9 @@ def get_repo_root(start_path: Optional[Path] = None) -> Path:
     f" 2. Markers (server.toml): not found\n"
     f" 3. Site-packages: not detected\n\n"
     "Solutions:\n"
-    " 1. Set NEXE_HOME: export NEXE_HOME=/path/to/NEXE-0.8\n"
-    " 2. Run from root: cd /path/to/NEXE-0.8\n"
-    " 3. Pass --project-root: nexe-security --project-root /path/to/NEXE-0.8\n\n"
+    " 1. Set NEXE_HOME: export NEXE_HOME=/path/to/NEXE-0.9\n"
+    " 2. Run from root: cd /path/to/NEXE-0.9\n"
+    " 3. Pass --project-root: nexe-security --project-root /path/to/NEXE-0.9\n\n"
     f"Current directory: {Path.cwd()}\n"
     f"paths.py location: {Path(__file__).parent}\n"
   )

@@ -316,9 +316,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             base_system_prompt = _get_system_prompt(_state, _lang)
                         except Exception:
                             base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
-                        # Inject current date so the model knows today's date
-                        from datetime import date as _date
-                        system_prompt = base_system_prompt + f"\n\nToday's date: {_date.today().isoformat()}"
+                        # Inject current date+time so the model knows when "now" is
+                        from datetime import datetime as _dt
+                        system_prompt = base_system_prompt + f"\n\nToday: {_dt.now().strftime('%Y-%m-%d %H:%M')}"
 
                         # 4. Prepare messages payload for engine
                         engine_messages = [
@@ -441,6 +441,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     except Exception as e:
                                         logger.debug("Model loaded check failed for %s: %s", model_name, e)
 
+                                import time as _time_mod
+                                _stream_start_t = _time_mod.time()
                                 try:
                                     # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)
                                     if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
@@ -574,9 +576,6 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 clean_response = _re.sub(r'\[MEM_SAVE:\s*.+?\]\s*', '', clean_response).strip()
 
                                 if clean_response:
-                                    session.add_message("assistant", clean_response)
-                                    session_mgr._save_session_to_disk(session)
-
                                     # Save LLM-extracted facts to memory
                                     _mem_saved_count = 0
                                     # Junk patterns: false facts the model may generate
@@ -618,6 +617,26 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             logger.debug("MEM_SAVE failed: %s", e)
                                     if _mem_saved_count > 0:
                                         yield f"\x00[MEM:{_mem_saved_count}]\x00"
+
+                                    # Save message with stats for persistence
+                                    _elapsed = round(_time_mod.time() - _stream_start_t, 1)
+                                    _est_tokens = max(1, len(full_response) // 4)
+                                    _rag_avg_val = None
+                                    if rag_count > 0 and _rag_items:
+                                        _rag_avg_val = round(sum(s for _, s in _rag_items) / len(_rag_items), 2)
+                                    _saved_facts = [f.strip() for f in _mem_saves if f.strip() and len(f.strip()) >= 5] if _mem_saved_count > 0 else None
+                                    _saved_rag_items = [[str(c)[:30], round(s, 2)] for c, s in _rag_items] if _rag_items else None
+                                    session.add_message("assistant", clean_response, stats={
+                                        "tokens": _est_tokens,
+                                        "elapsed": _elapsed,
+                                        "model": str(model_name)[:100] if model_name else None,
+                                        "rag_count": rag_count if rag_count > 0 else None,
+                                        "rag_avg": _rag_avg_val,
+                                        "rag_items": _saved_rag_items,
+                                        "mem_saved": _mem_saved_count if _mem_saved_count > 0 else None,
+                                        "mem_facts": _saved_facts,
+                                    })
+                                    session_mgr._save_session_to_disk(session)
 
                             return StreamingResponse(
                                 response_generator(),
@@ -705,7 +724,12 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     except Exception as e:
                         logger.debug("MEM_SAVE failed (no-stream): %s", e)
 
-        session.add_message("assistant", response_text)
+        _elapsed_ns = 0
+        session.add_message("assistant", response_text, stats={
+            "tokens": max(1, len(response_text) // 4),
+            "elapsed": _elapsed_ns,
+            "model": str(model_name)[:100] if model_name else None,
+        })
         session_mgr._save_session_to_disk(session)
 
         # AUTO-SAVE: guarda missatge usuari directament (sense LLM)

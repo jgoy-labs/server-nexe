@@ -44,7 +44,7 @@ class NexeAPIClient:
 
         self.headers = {
             "Content-Type": "application/json",
-            "X-Client-ID": "nexe-cli-0.8"
+            "X-Client-ID": "nexe-cli-0.9"
         }
         if self.api_key:
             self.headers["Authorization"] = f"Bearer {self.api_key}"

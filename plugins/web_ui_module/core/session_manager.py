@@ -37,14 +37,18 @@ class ChatSession:
         self.attached_document: Optional[Dict[str, str]] = None  # {"filename": "...", "content": "..."}
         self.context_summary: Optional[str] = None  # Resum dels missatges compactats
         self.compaction_count: int = 0  # Quantes vegades s'ha compactat
+        self.custom_name: Optional[str] = None  # User-defined session name
 
-    def add_message(self, role: str, content: str):
+    def add_message(self, role: str, content: str, stats: dict = None):
         """Afegir missatge a l'historial"""
-        self.messages.append({
+        msg = {
             "role": role,
             "content": content,
             "timestamp": datetime.now(timezone.utc).isoformat()
-        })
+        }
+        if stats:
+            msg["stats"] = stats
+        self.messages.append(msg)
         self.last_activity = datetime.now(timezone.utc)
 
     def add_context_file(self, filename: str):
@@ -162,6 +166,8 @@ class ChatSession:
             "messages": self.messages,
             "attached_document": self.attached_document,
         }
+        if self.custom_name is not None:
+            d["custom_name"] = self.custom_name
         if self.context_summary:
             d["context_summary"] = self.context_summary
             d["compaction_count"] = self.compaction_count
@@ -176,6 +182,7 @@ class ChatSession:
         session.messages = data.get("messages", [])
         session.context_files = data.get("context_files", [])
         session.attached_document = data.get("attached_document")
+        session.custom_name = data.get("custom_name")
         session.context_summary = data.get("context_summary")
         session.compaction_count = data.get("compaction_count", 0)
         return session
@@ -294,6 +301,12 @@ class SessionManager:
         self._validate_session_id(session_id)
         return self._sessions.get(session_id)
 
+    def save_session(self, session_id: str):
+        """Persist a session to disk."""
+        session = self._sessions.get(session_id)
+        if session:
+            self._save_session_to_disk(session)
+
     def get_or_create_session(self, session_id: str = None) -> ChatSession:
         """Get an existing session or create a new one."""
         if session_id:
@@ -325,7 +338,7 @@ class SessionManager:
                 "last_activity": s.last_activity.isoformat(),
                 "message_count": len(s.messages),
                 "context_files": s.context_files,
-                "first_message": first_user[:60] if first_user else None
+                "first_message": s.custom_name or (first_user[:60] if first_user else None)
             })
         return sessions
 
