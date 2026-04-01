@@ -86,11 +86,11 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 )
                 if result["success"]:
                     _safe_content = str(content_to_save).replace("\x00", "").replace("]", "")[:200]
-                    response_text = f"Saved to memory: \"{_safe_content}\"\n\nI'll remember this for future conversations.\x00[MEM]\x00"
+                    response_text = f"\x00[MODEL:nexe-system]\x00Saved to memory: \"{_safe_content}\"\n\nI'll remember this for future conversations.\x00[MEM]\x00"
                 else:
-                    response_text = f"Could not save: {result.get('message', 'Unknown error')}"
+                    response_text = f"\x00[MODEL:nexe-system]\x00Could not save: {result.get('message', 'Unknown error')}"
             else:
-                response_text = "What do you want me to remember? Write what you want to save."
+                response_text = "\x00[MODEL:nexe-system]\x00What do you want me to remember? Write what you want to save."
             memory_action = "save"
 
         elif intent == "delete":
@@ -103,13 +103,13 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     # (the model would see the fact in history and re-save it via MEM_SAVE)
                     if session.messages and session.messages[-1]["role"] == "user":
                         session.messages[-1]["content"] = f"[Memory command: delete '{content_to_delete[:50]}']"
-                    response_text = f"Deleted from memory: {result['deleted']} entry(ies) related to \"{content_to_delete[:100]}\""
+                    response_text = f"\x00[MODEL:nexe-system]\x00Deleted from memory: {result['deleted']} entry(ies) related to \"{content_to_delete[:100]}\""
                 elif result["success"]:
-                    response_text = f"Nothing found in memory about \"{content_to_delete[:100]}\""
+                    response_text = f"\x00[MODEL:nexe-system]\x00Nothing found in memory about \"{content_to_delete[:100]}\""
                 else:
-                    response_text = f"Error: {result.get('message', 'Unknown error')}"
+                    response_text = f"\x00[MODEL:nexe-system]\x00Error: {result.get('message', 'Unknown error')}"
             else:
-                response_text = "What do you want me to forget? Write what you want to delete."
+                response_text = "\x00[MODEL:nexe-system]\x00What do you want me to forget? Write what you want to delete."
             memory_action = "delete"
 
         elif intent == "recall":
@@ -316,9 +316,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             base_system_prompt = _get_system_prompt(_state, _lang)
                         except Exception:
                             base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
-                        # System prompt SEMPRE estatic (cachejable per MLX)
-                        # El document o RAG van als messages[], no al system prompt
-                        system_prompt = base_system_prompt
+                        # Inject current date so the model knows today's date
+                        from datetime import date as _date
+                        system_prompt = base_system_prompt + f"\n\nToday's date: {_date.today().isoformat()}"
 
                         # 4. Prepare messages payload for engine
                         engine_messages = [
@@ -449,7 +449,6 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         _first_chunk = True
                                         _first_content_after_think = None
                                         _has_any_thinking = False
-                                        _mem_tag_buf = ""  # Buffer for cross-chunk [MEM_SAVE: ...] tags
                                         async for chunk in chat_result:
                                             content = ""
                                             thinking = ""
@@ -486,15 +485,18 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                 full_response += "</think>"
 
                                             if content:
-                                                # GPT-OSS: NO netejar tags server-side
-                                                # El client (_parseThinkingChannels) necessita
-                                                # l'estructura analysis/assistant/final intacta
                                                 _is_gpt_oss = "gpt-oss" in model_name.lower()
-                                                if not _is_gpt_oss:
+                                                if _is_gpt_oss:
+                                                    # GPT-OSS: normalitzar analysis/assistant → think tags
+                                                    # perquè el client detecti thinking en temps real
+                                                    content = content.replace('<|analysis|>', '<think>')
+                                                    content = content.replace('<|assistant|>', '</think>')
+                                                    content = _re.sub(r'<\|[^|]+\|>', '', content)
+                                                    content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
+                                                else:
                                                     # Models normals: normalitzar thinking tags
                                                     content = content.replace('<|thinking|>', '<think>')
                                                     content = content.replace('<|/thinking|>', '</think>')
-                                                    # Netejar tags (<|channel|>, ....) server-side
                                                     content = _re.sub(r'<\|[^|]+\|>', '', content)
                                                     content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
                                                 full_response += content
@@ -524,16 +526,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                     visible = ''.join(_vis_parts)
                                                 else:
                                                     visible = content
-                                                # Strip [MEM_SAVE: ...] from visible stream (cross-chunk safe)
-                                                visible = _mem_tag_buf + visible
-                                                _mem_tag_buf = ""
-                                                # Check for incomplete tag at end of chunk
-                                                _bracket = visible.rfind('[')
-                                                if _bracket >= 0 and ']' not in visible[_bracket:] and 'MEM' in visible[_bracket:]:
-                                                    _mem_tag_buf = visible[_bracket:]
-                                                    visible = visible[:_bracket]
-                                                # Strip complete tags
-                                                visible = _re.sub(r'\[MEM_SAVE:\s*.+?\]\s*', '', visible)
+                                                # [MEM_SAVE: ...] tags pass through to client
+                                                # Client handles them like <think> blocks (blue collapsible)
                                                 if visible:
                                                     yield visible
                                     else:

@@ -54,6 +54,8 @@ const UI_STRINGS = {
         col_memory: "Memòria",
         col_knowledge: "Coneixement",
         col_docs: "Docs del sistema",
+        mem_saving: "Guardant memòria...",
+        mem_saved: "Memòria guardada",
     },
     en: {
         login_subtitle: "Enter your API Key to access",
@@ -104,6 +106,8 @@ const UI_STRINGS = {
         col_memory: "Memory",
         col_knowledge: "Knowledge",
         col_docs: "System Docs",
+        mem_saving: "Saving memory...",
+        mem_saved: "Memory saved",
     },
     es: {
         login_subtitle: "Introduce la API Key para acceder",
@@ -154,6 +158,8 @@ const UI_STRINGS = {
         col_memory: "Memoria",
         col_knowledge: "Conocimiento",
         col_docs: "Docs del sistema",
+        mem_saving: "Guardando memoria...",
+        mem_saved: "Memoria guardada",
     }
 };
 
@@ -1085,12 +1091,22 @@ class NexeUI {
                             const endMatch = tContent.match(/(assistant\s*final|(?<!\w)final)(.*)$/is);
                             if (endMatch) {
                                 const markerIdx = tContent.lastIndexOf(endMatch[1]);
-                                const thinkText = tContent.substring(0, markerIdx).replace(/^analysis\s*/i, '').trim();
+                                let thinkText = tContent.substring(0, markerIdx).replace(/^analysis\s*/i, '').trim();
+                                // Extract MEM_SAVE from thinking → move to fullResponse for badge
+                                const _memGpt = [];
+                                thinkText = thinkText.replace(/\[MEM_SAVE:\s*(.+?)\]\s*/g, (_, f) => {
+                                    _memGpt.push(f);
+                                    return '';
+                                });
                                 if (tTextEl) tTextEl.textContent = thinkText;
                                 tTok = Math.ceil(thinkText.length / 4);
                                 closeThinkBlock();
                                 tMode = 'responding';
                                 fullResponse = endMatch[2].trimStart();
+                                // Inject MEM_SAVE AFTER fullResponse assignment (not before — it overwrites)
+                                if (_memGpt.length > 0) {
+                                    fullResponse += '\n' + _memGpt.map(f => `[MEM_SAVE: ${f}]`).join('\n');
+                                }
                                 this.setAiState('streaming');
                                 this._startStreamStats();
                                 if (fullResponse) {
@@ -1103,6 +1119,15 @@ class NexeUI {
                             const e = tBuf.indexOf('</think>');
                             if (e >= 0) {
                                 tContent += tBuf.slice(0, e);
+                                // Extract MEM_SAVE from thinking → move to fullResponse for badge
+                                const _memInThink = [];
+                                tContent = tContent.replace(/\[MEM_SAVE:\s*(.+?)\]\s*/g, (_, f) => {
+                                    _memInThink.push(f);
+                                    return '';
+                                });
+                                if (_memInThink.length > 0) {
+                                    fullResponse += _memInThink.map(f => `[MEM_SAVE: ${f}]`).join('\n') + '\n';
+                                }
                                 tTok += Math.ceil(tContent.length / 4);
                                 if (tTextEl) tTextEl.textContent = tContent;
                                 tBuf = tBuf.slice(e + 8).replace(/^\n+/, '');
@@ -1132,7 +1157,6 @@ class NexeUI {
                             // Detect retroactive </think> (DeepSeek without opening <think>)
                             const closIdx = tBuf.indexOf('</think>');
                             if (closIdx >= 0 && !tContent) {
-                                // Everything in fullResponse + buf up to </think> is thinking
                                 const thinkPart = fullResponse + tBuf.slice(0, closIdx);
                                 if (thinkPart.trim().length > 10) {
                                     tContent = thinkPart.trim();
@@ -1146,6 +1170,7 @@ class NexeUI {
                                     continue;
                                 }
                             }
+                            // [MEM_SAVE: ...] tags pass through — stripped at final render (post-streaming)
                             tBuf = _cleanModelTags(tBuf);
                             fullResponse += tBuf;
                             this._streamTokens += Math.ceil(tBuf.length / 4);
@@ -1234,10 +1259,10 @@ class NexeUI {
                             }
                         }
 
-                        // Detect saved memory token
-                        if (chunk.includes('\x00[MEM]\x00')) {
+                        // Detect saved memory count token [MEM:N] or [MEM]
+                        if (chunk.match(/\x00\[MEM:?\d*\]\x00/)) {
                             memorySaved = true;
-                            chunk = chunk.replace('\x00[MEM]\x00', '');
+                            chunk = chunk.replace(/\x00\[MEM:?\d*\]\x00/g, '');
                         }
 
                         processChunk(chunk);
@@ -1262,15 +1287,40 @@ class NexeUI {
                         if (parsed.thinking) {
                             // Show thinking block retroactively
                             startThinkBlock();
-                            if (tTextEl) tTextEl.textContent = parsed.thinking;
+                            // Extract MEM_SAVE from thinking → move to content for badge
+                            let _cleanThink = parsed.thinking;
+                            const _memRetro = [];
+                            _cleanThink = _cleanThink.replace(/\[MEM_SAVE:\s*(.+?)\]\s*/g, (_, f) => {
+                                _memRetro.push(f);
+                                return '';
+                            });
+                            if (tTextEl) tTextEl.textContent = _cleanThink;
                             const tokEl = tBlock?.querySelector('.think-tokens');
-                            if (tokEl) tokEl.textContent = `~${Math.ceil(parsed.thinking.length / 4)} tok`;
+                            if (tokEl) tokEl.textContent = `~${Math.ceil(_cleanThink.length / 4)} tok`;
                             closeThinkBlock();
-                            fullResponse = parsed.content;
+                            fullResponse = parsed.content + (_memRetro.length > 0 ? '\n' + _memRetro.map(f => `[MEM_SAVE: ${f}]`).join('\n') : '');
                         } else {
                             fullResponse = _cleanModelTags(fullResponse);
                         }
                     }
+                    // Strip [MEM_SAVE: ...] from final render and collect facts for stats badge
+                    const memFacts = [];
+                    fullResponse = fullResponse.replace(/\[MEM_SAVE:\s*(.+?)\]\s*/g, (_, fact) => {
+                        memFacts.push(fact);
+                        return '';
+                    });
+                    if (memFacts.length > 0) {
+                        memorySaved = true;
+                        // Clean up orphaned MEM_SAVE remnants (intro lines ending in ":", lone dots)
+                        fullResponse = fullResponse.replace(/\n[^\n]*:\s*\n\s*\.\s*\n/g, '\n');
+                        fullResponse = fullResponse.replace(/\n\s*\.\s*\n/g, '\n');
+                        fullResponse = fullResponse.replace(/\n{3,}/g, '\n\n');
+                    }
+                    // Strip model tags that leak into visible text
+                    fullResponse = fullResponse.replace(/\[ACTION\]:\s*[^\n]*/g, '');
+                    fullResponse = fullResponse.replace(/\[MEM:\d+\]/g, '');
+                    fullResponse = fullResponse.replace(/\[MEM\]/g, '');
+                    // Note: renderMarkdown sanitizes HTML via marked.js (safe render)
                     assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse);
                     if (tMode !== 'responding' && tMode !== 'init') closeThinkBlock();
                     // Stats per missatge
@@ -1282,9 +1332,20 @@ class NexeUI {
                         const timeStr = elapsed > 0 ? `${elapsed.toFixed(1)}s` : '';
                         const spdStr = finalSpd ? ` · ${finalSpd} tok/s` : '';
                         const modelShort = usedModel ? usedModel.split('/').pop() : '';
-                        const memBadge = memorySaved
-                            ? `<span class="stat-item stat-mem"><i data-lucide="bookmark-check"></i><span>${this.t('saved')}</span></span>`
-                            : '';
+                        let memBadge = '';
+                        if (memorySaved && memFacts.length > 0) {
+                            const factsHtml = memFacts.map(f => {
+                                const safe = f.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                                return '<div class="mem-fact">' + safe + '</div>';
+                            }).join('');
+                            memBadge = '<span class="stat-item stat-mem mem-expandable">'
+                                + '<i data-lucide="bookmark-check"></i>'
+                                + '<span>' + this.t('saved') + '</span>'
+                                + '<div class="mem-tooltip">' + factsHtml + '</div>'
+                                + '</span>';
+                        } else if (memorySaved) {
+                            memBadge = '<span class="stat-item stat-mem"><i data-lucide="bookmark-check"></i><span>' + this.t('saved') + '</span></span>';
+                        }
                         let ragBadge = '';
                         if (ragCount > 0) {
                             const pct = ragAvg > 0 ? Math.round(ragAvg * 100) : 0;
@@ -1599,7 +1660,7 @@ class NexeUI {
         if (this._renderTimer) return;
         this._renderTimer = setTimeout(() => {
             this._renderTimer = null;
-            el.innerHTML = this.renderMarkdown(content);
+            el.innerHTML = this.renderMarkdown(content.replace(/\[MEM_SAVE:\s*.+?\]\s*/g, ''));
         }, 80);
     }
 
