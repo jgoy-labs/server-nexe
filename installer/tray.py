@@ -495,10 +495,8 @@ class NexeTray(rumps.App):
 
     def _quit(self, _sender):
         self._stop_ram_monitor()
-        if not self._attach_pid:
-            # Normal mode: tray owns the server, stop it
-            self._stop_server()
-        # Attach mode: just quit tray, leave server running in terminal
+        # Always stop the server when quitting tray
+        self._stop_server()
         if self._server_log_fh:
             try:
                 self._server_log_fh.close()
