@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Security false positive tests (47 scenarios)
 
 ### Fixed
+- **Tray keyboard lock**: moved RAM polling (`_get_process_ram`) to background daemon thread (`_RamMonitor`). The main event loop (NSApplication/rumps) never calls `subprocess.run` now, preventing keyboard freeze after long runtime
 - Installer venv no longer depends on DMG mount path after ejection
 - GPT-OSS thinking detection now works during streaming (not retroactively)
 - SEC-002: MEM_SAVE tags stripped from user input before LLM processing
