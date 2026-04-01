@@ -129,15 +129,28 @@ def _maybe_launch_tray():
         logger.debug("rumps not installed — tray not available")
         return
 
-    # Guard 6: Check if a tray process is already running
+    # Guard 6: Kill stale tray before launching fresh one
     try:
         result = subprocess.run(
             ["pgrep", "-f", "installer.tray"],
             capture_output=True, text=True, timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
-            logger.debug("Tray process already running — skipping launch")
-            return
+            stale_pids = [int(p) for p in result.stdout.strip().split('\n') if p.strip()]
+            for pid in stale_pids:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except (ProcessLookupError, PermissionError):
+                    pass
+            time.sleep(1)
+            # Force kill if still alive (rumps may ignore SIGTERM)
+            for pid in stale_pids:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+            time.sleep(0.3)
+            logger.debug("Killed stale tray process(es) — launching fresh one")
     except Exception:
         pass
 
