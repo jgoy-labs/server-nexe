@@ -173,15 +173,12 @@ class MemoryAPI:
       raise RuntimeError("MemoryAPI not initialized. Call initialize() first.")
 
   async def close(self):
-    """Tanca connexions i allibera recursos."""
-    if self._qdrant:
-      try:
-        self._qdrant.close()
-      except Exception as e:
-        logger.debug("MemoryAPI close failed: %s", e)
-      finally:
-        if hasattr(self._qdrant, "_client"):
-          delattr(self._qdrant, "_client")
+    """Tanca connexions i allibera recursos.
+
+    NOTE: Do NOT close the Qdrant client here — it comes from the shared pool
+    (core.qdrant_pool) and other consumers depend on it. The pool handles
+    lifecycle via close_qdrant_client() at shutdown.
+    """
 
     if self._executor:
       self._executor.shutdown(wait=True)
