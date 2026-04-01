@@ -71,6 +71,24 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             raise HTTPException(status_code=404, detail=get_message(None, "webui.session.not_found"))
         return {"status": "deleted"}
 
+    # -- PATCH /session/{session_id} (rename) --
+
+    @router.patch("/session/{session_id}")
+    @limiter.limit("10/minute")
+    async def rename_session(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
+        """Rename a session"""
+        session_id = validate_string_input(session_id, max_length=100, context="path")
+        session = session_mgr.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail=get_message(None, "webui.session.not_found"))
+        body = await request.json()
+        name = validate_string_input(body.get("name", ""), max_length=100, context="body")
+        if not name or not name.strip():
+            raise HTTPException(status_code=400, detail="Name must be 1-100 chars")
+        session.custom_name = name.strip()
+        session_mgr.save_session(session_id)
+        return {"ok": True, "name": session.custom_name}
+
     # -- GET /sessions --
 
     @router.get("/sessions")

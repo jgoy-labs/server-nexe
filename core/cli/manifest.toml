@@ -1,6 +1,6 @@
 # ─────────────────────────────────────────────────────────────
 # ModuleID: cli
-# Nexe v0.8 | Jordi Goy | 2025-12-01
+# Nexe v0.9 | Jordi Goy | 2025-12-01
 # server-nexe/core/cli/manifest.toml
 #
 # Descripció:
@@ -16,7 +16,7 @@ type = "core"
 description = "CLI Central Nexe - Orquestrador que unifica l'accés a tots els CLIs dels mòduls Nexe 0.9 sota la comanda 'nexe'. Descobreix CLIs dinàmicament via manifest.toml, executa via subprocess per aïllament, i suporta mode offline"
 location = "core/cli/"
 permanent = true
-author = "Nexe Team (Jordi Goy 0.8)"
+author = "Nexe Team (Jordi Goy 0.9)"
 created = "2025-12-01"
 last_updated = "2025-12-01"
 example = false

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: core/cli/__init__.py
-Description: Central Nexe CLI 0.8 - Orchestrator for module CLIs.
+Description: Central Nexe CLI 0.9 - Orchestrator for module CLIs.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

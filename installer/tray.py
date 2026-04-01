@@ -12,6 +12,7 @@ Description: macOS menu bar app for controlling the Nexe server.
 import os
 import subprocess
 import sys
+import threading
 import time
 import webbrowser
 from pathlib import Path
@@ -76,32 +77,77 @@ def _format_uptime(seconds):
     return f"{days}d {hours % 24}h {mins:02d}m"
 
 
-def _get_process_ram(pid):
-    """Get RSS memory of a process and its children (macOS)."""
-    try:
-        result = subprocess.run(
-            ["ps", "-o", "rss=", "-p", str(pid)],
-            capture_output=True, text=True, timeout=5,
-        )
-        if result.returncode == 0 and result.stdout.strip():
+# ═══════════════════════════════════════════════════════════════════════════
+# RAM MONITOR — background thread, never blocks main event loop
+# ═══════════════════════════════════════════════════════════════════════════
+class _RamMonitor:
+    """Background thread that polls process RAM without blocking the main thread.
+
+    The main thread (NSApplication event loop / rumps) must never call
+    subprocess.run — doing so blocks keyboard event delivery on macOS.
+    This class runs all subprocess calls in a daemon thread and exposes
+    a cached_ram property that can be read instantly from any thread.
+    """
+
+    def __init__(self, pid, interval=10):
+        self._pid = pid
+        self._interval = interval
+        self._cached_ram = 0
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(target=self._poll_loop, daemon=True)
+        self._thread.start()
+
+    @property
+    def cached_ram(self):
+        with self._lock:
+            return self._cached_ram
+
+    def stop(self):
+        self._stop_event.set()
+
+    def _poll_loop(self):
+        while not self._stop_event.is_set():
+            try:
+                os.kill(self._pid, 0)
+            except ProcessLookupError:
+                break
+            except PermissionError:
+                pass  # alive but can't signal
+
+            ram = self._read_ram()
+            if ram > 0:
+                with self._lock:
+                    self._cached_ram = ram
+
+            self._stop_event.wait(self._interval)
+
+    def _read_ram(self):
+        """Read RSS of process + children. Runs in background thread only."""
+        try:
+            result = subprocess.run(
+                ["ps", "-o", "rss=", "-p", str(self._pid)],
+                capture_output=True, text=True, timeout=2,
+            )
+            if result.returncode != 0 or not result.stdout.strip():
+                return 0
             rss_kb = int(result.stdout.strip())
             children = subprocess.run(
-                ["pgrep", "-P", str(pid)],
-                capture_output=True, text=True, timeout=5,
+                ["pgrep", "-P", str(self._pid)],
+                capture_output=True, text=True, timeout=2,
             )
             if children.returncode == 0:
                 for child_pid in children.stdout.strip().split("\n"):
                     if child_pid.strip():
                         child_rss = subprocess.run(
                             ["ps", "-o", "rss=", "-p", child_pid.strip()],
-                            capture_output=True, text=True, timeout=5,
+                            capture_output=True, text=True, timeout=2,
                         )
                         if child_rss.returncode == 0 and child_rss.stdout.strip():
                             rss_kb += int(child_rss.stdout.strip())
-            return rss_kb * 1024  # Convert KB to bytes
-    except Exception:
-        pass
-    return 0
+            return rss_kb * 1024
+        except Exception:
+            return 0
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -127,6 +173,7 @@ class NexeTray(rumps.App):
         self.server_start_time = None
         self._server_log_path = PROJECT_ROOT / "storage" / "logs" / "server.log"
         self._server_log_fh = None
+        self._ram_monitor = None
 
         # Menu items
         self.status_item = rumps.MenuItem(self.strings["status_stopped"])
@@ -193,8 +240,8 @@ class NexeTray(rumps.App):
             self.quit_item,
         ]
 
-        # Update timer (every 3 seconds)
-        self._timer = rumps.Timer(self._update_stats, 3)
+        # Update timer (every 5 seconds — RAM polling is in background thread)
+        self._timer = rumps.Timer(self._update_stats, 5)
         self._timer.start()
 
         # If attaching to an already-running server, show as running immediately
@@ -203,6 +250,7 @@ class NexeTray(rumps.App):
             self.icon = ICON_RUNNING
             self.status_item.title = self.t("status_running")
             self.toggle_item.title = self.t("stop")
+            self._ram_monitor = _RamMonitor(self._attach_pid)
 
     def t(self, key, **kwargs):
         """Get translated string."""
@@ -252,7 +300,6 @@ class NexeTray(rumps.App):
         self.server_start_time = time.time()
 
         self.status_item.title = self.t("starting")
-        import threading
         threading.Thread(target=self._wait_server_ready, daemon=True).start()
 
     def _wait_server_ready(self):
@@ -287,8 +334,17 @@ class NexeTray(rumps.App):
         self.icon = ICON_RUNNING
         self.status_item.title = self.t("status_running")
         self.toggle_item.title = self.t("stop")
+        if self.server_process:
+            self._ram_monitor = _RamMonitor(self.server_process.pid)
+
+    def _stop_ram_monitor(self):
+        if self._ram_monitor:
+            self._ram_monitor.stop()
+            self._ram_monitor = None
 
     def _stop_server(self):
+        self._stop_ram_monitor()
+
         # Attach mode: server is external, send SIGTERM
         if self._attach_pid:
             self.toggle_item.title = self.t("stopping")
@@ -346,6 +402,7 @@ class NexeTray(rumps.App):
                 os.kill(self._attach_pid, 0)  # check alive
             except ProcessLookupError:
                 # Server died externally
+                self._stop_ram_monitor()
                 self._attach_pid = None
                 self.server_start_time = None
                 self.icon = ICON_STOPPED
@@ -357,7 +414,8 @@ class NexeTray(rumps.App):
             except PermissionError:
                 pass  # alive but can't signal
 
-            ram_bytes = _get_process_ram(self._attach_pid)
+            mon = self._ram_monitor
+            ram_bytes = mon.cached_ram if mon else 0
             if ram_bytes > 0:
                 self.ram_item.title = self.t("ram", ram=_format_bytes(ram_bytes))
             if self.server_start_time:
@@ -367,6 +425,7 @@ class NexeTray(rumps.App):
 
         if not self.server_process or self.server_process.poll() is not None:
             if self.server_process and self.server_process.poll() is not None:
+                self._stop_ram_monitor()
                 self.server_process = None
                 self.server_start_time = None
                 self.icon = ICON_STOPPED
@@ -376,7 +435,8 @@ class NexeTray(rumps.App):
                 self.uptime_item.title = self.t("uptime", uptime="—")
             return
 
-        ram_bytes = _get_process_ram(self.server_process.pid)
+        mon = self._ram_monitor
+        ram_bytes = mon.cached_ram if mon else 0
         if ram_bytes > 0:
             self.ram_item.title = self.t("ram", ram=_format_bytes(ram_bytes))
 
@@ -434,6 +494,7 @@ class NexeTray(rumps.App):
         rumps.quit_application()
 
     def _quit(self, _sender):
+        self._stop_ram_monitor()
         if not self._attach_pid:
             # Normal mode: tray owns the server, stop it
             self._stop_server()
@@ -463,7 +524,6 @@ def main():
 
     app = NexeTray(attach_pid=args.server_pid if args.attach else None)
     if args.autostart and not args.attach:
-        import threading
         def auto():
             import time
             import urllib.request

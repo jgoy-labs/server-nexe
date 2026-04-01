@@ -136,7 +136,29 @@ body.frame-hidden { padding: 0; }
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
+    transition: width 300ms ease;
+    overflow: hidden;
 }
+.sidebar.collapsed {
+    width: 42px;
+}
+.sidebar.collapsed .sidebar-header > *:not(.logo) { display: none; }
+.sidebar.collapsed .sidebar-header .logo > *:not(.header-actions) { display: none; }
+.sidebar.collapsed .sidebar-header .header-actions > *:not(.btn-sidebar-toggle) { display: none; }
+.sidebar.collapsed .sidebar-header { padding: 0.5rem 0.4rem; border-bottom: none; }
+.sidebar.collapsed .sidebar-content { display: none; }
+
+.btn-sidebar-toggle {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.2rem;
+    display: flex;
+    align-items: center;
+}
+.btn-sidebar-toggle:hover { color: var(--text-secondary); }
+.btn-sidebar-toggle svg { width: 16px; height: 16px; }
 
 .sidebar-header {
     padding: 0.5rem 1rem;
@@ -281,6 +303,28 @@ body.frame-hidden { padding: 0; }
     color: var(--text-muted);
 }
 
+.session-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+.session-item:hover .session-item-actions { opacity: 1; pointer-events: auto; }
+
+.btn-rename-session {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.2rem;
+    color: var(--text-muted);
+    transition: color 0.2s;
+    line-height: 1;
+}
+.btn-rename-session:hover { color: var(--text-secondary); }
+.btn-rename-session svg { width: 12px; height: 12px; }
+
 .btn-delete-session {
     background: none;
     border: none;
@@ -290,6 +334,19 @@ body.frame-hidden { padding: 0; }
     color: var(--text-muted);
     transition: color 0.2s, transform 0.2s;
     border-radius: 0.25rem;
+}
+
+.session-rename-input {
+    width: 100%;
+    font-size: 0.875rem;
+    padding: 0.15rem 0.3rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--primary-color);
+    border-radius: 3px;
+    outline: none;
+    font-family: inherit;
+    box-sizing: border-box;
 }
 
 .btn-delete-session:hover {
@@ -382,6 +439,7 @@ body.frame-hidden { padding: 0; }
     opacity: 1;
     color: var(--text-secondary);
 }
+.footer-support svg { width: 12px; height: 12px; vertical-align: -1px; }
 
 .footer-link-sep {
     color: var(--text-muted);
@@ -821,7 +879,22 @@ body.light .icon-moon,
 .message-content {
     flex: 1;
     min-width: 0;
+    position: relative;
 }
+
+.copy-btn {
+    margin-left: auto;
+    opacity: 0.4;
+    background: none;
+    border: none;
+    padding: 0.1rem 0.2rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: opacity var(--transition), color var(--transition);
+    line-height: 1;
+}
+.copy-btn svg { width: 12px; height: 12px; }
+.copy-btn:hover { opacity: 1; color: var(--text-secondary); }
 
 .message-role {
     font-size: 0.75rem;
@@ -846,6 +919,12 @@ body.light .icon-moon,
 /* Assistant messages: rendered markdown */
 .message.assistant .message-text {
     white-space: normal;
+}
+.message.assistant .message-text:not(:empty) {
+    background: rgba(230, 32, 32, 0.04);
+    border-left: 3px solid rgba(230, 32, 32, 0.3);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
 }
 
 .message.user .message-avatar {
@@ -1102,6 +1181,118 @@ body.light .icon-moon,
     max-height: 260px;
     overflow-y: auto;
     border-top: 1px solid rgba(255, 130, 0, 0.1);
+}
+
+/* ============================================
+   Memory block (blue, same pattern as thinking)
+   ============================================ */
+
+.mem-block {
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-left: 3px solid rgba(96, 165, 250, 0.5);
+    background: rgba(59, 130, 246, 0.03);
+    border-radius: 4px;
+    margin-top: 0.75rem;
+    overflow: hidden;
+}
+
+.mem-block[open] {
+    border-left-color: rgba(59, 130, 246, 1);
+    animation: mem-pulse 1.5s ease-in-out infinite;
+}
+
+.mem-block:not([open]) {
+    animation: none;
+    border-left-color: rgba(59, 130, 246, 0.4);
+}
+
+@keyframes mem-pulse {
+    0%, 100% { border-left-color: rgba(59, 130, 246, 1); }
+    50%       { border-left-color: rgba(59, 130, 246, 0.25); }
+}
+
+.mem-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+}
+
+.mem-header::-webkit-details-marker { display: none; }
+
+.mem-header svg {
+    width: 13px;
+    height: 13px;
+    color: rgba(96, 165, 250, 0.8);
+    flex-shrink: 0;
+}
+
+.mem-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(96, 165, 250, 0.8);
+    font-weight: 700;
+}
+
+.mem-count {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-left: auto;
+    font-family: var(--font-mono);
+}
+
+.mem-text {
+    padding: 0.1rem 0.75rem 0.6rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    border-top: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+.mem-fact {
+    padding: 0.15rem 0;
+}
+
+/* Memory badge tooltip (expandable on click) */
+.mem-expandable {
+    position: relative;
+    cursor: pointer;
+}
+
+.mem-tooltip {
+    display: none;
+    position: absolute;
+    bottom: 1.5rem;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    border-left: 3px solid rgba(96, 165, 250, 0.6);
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+    min-width: 200px;
+    max-width: 350px;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.mem-expandable:hover .mem-tooltip,
+.mem-expandable.open .mem-tooltip {
+    display: block;
+}
+
+.mem-tooltip .mem-fact {
+    padding: 0.2rem 0;
+    border-bottom: 1px solid rgba(96, 165, 250, 0.1);
+}
+
+.mem-tooltip .mem-fact:last-child {
+    border-bottom: none;
 }
 
 /* ============================================

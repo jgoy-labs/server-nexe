@@ -552,6 +552,27 @@ class NexeUI {
             });
         }
 
+        // Sidebar toggle
+        const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebarToggleBtn && sidebar) {
+            if (localStorage.getItem('nexe_sidebar_collapsed') === '1') {
+                sidebar.classList.add('collapsed');
+                const iconInit = sidebarToggleBtn.querySelector('i');
+                if (iconInit) iconInit.setAttribute('data-lucide', 'panel-left-open');
+            }
+            sidebarToggleBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('collapsed');
+                const collapsed = sidebar.classList.contains('collapsed');
+                const iconEl = sidebarToggleBtn.querySelector('i');
+                if (iconEl) {
+                    iconEl.setAttribute('data-lucide', collapsed ? 'panel-left-open' : 'panel-left-close');
+                    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [sidebarToggleBtn] });
+                }
+                localStorage.setItem('nexe_sidebar_collapsed', collapsed ? '1' : '0');
+            });
+        }
+
         // Load sessions i info model
         this.loadSessions();
         this.loadServerInfo();
@@ -813,22 +834,79 @@ class NexeUI {
                 minute: '2-digit'
             });
 
-            sessionEl.innerHTML = `
-                <div class="session-item-content">
-                    <div class="session-item-title">
-                        ${session.first_message || this.t('new_chat')}
-                    </div>
-                    <div class="session-item-meta">${timeStr}</div>
-                </div>
-                <button class="btn-delete-session" title="${this.t('delete_session')}">✕</button>
-            `;
+            const contentEl = document.createElement('div');
+            contentEl.className = 'session-item-content';
 
-            // Click on session content to load
-            const contentEl = sessionEl.querySelector('.session-item-content');
+            const titleEl = document.createElement('div');
+            titleEl.className = 'session-item-title';
+            titleEl.textContent = session.first_message || this.t('new_chat');
+            contentEl.appendChild(titleEl);
+
+            const metaEl = document.createElement('div');
+            metaEl.className = 'session-item-meta';
+            metaEl.textContent = timeStr;
+            contentEl.appendChild(metaEl);
+
+            const actionsEl = document.createElement('div');
+            actionsEl.className = 'session-item-actions';
+
+            const renameBtn = document.createElement('button');
+            renameBtn.className = 'btn-rename-session';
+            renameBtn.title = 'Rename';
+            const pencilI = document.createElement('i');
+            pencilI.setAttribute('data-lucide', 'pencil');
+            renameBtn.appendChild(pencilI);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-delete-session';
+            deleteBtn.title = this.t('delete_session');
+            deleteBtn.textContent = '\u2715';
+
+            actionsEl.appendChild(renameBtn);
+            actionsEl.appendChild(deleteBtn);
+
+            sessionEl.appendChild(contentEl);
+            sessionEl.appendChild(actionsEl);
+
             contentEl.addEventListener('click', () => this.loadSession(session.id));
 
-            // Click on delete button
-            const deleteBtn = sessionEl.querySelector('.btn-delete-session');
+            renameBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const input = document.createElement('input');
+                input.className = 'session-rename-input';
+                input.value = titleEl.textContent;
+                input.maxLength = 100;
+                titleEl.replaceWith(input);
+                input.addEventListener('click', (ev) => ev.stopPropagation());
+                input.focus();
+                input.select();
+
+                let finished = false;
+                const finish = async (save) => {
+                    if (finished) return;
+                    finished = true;
+                    if (save && input.value.trim()) {
+                        try {
+                            await this.fetchWithCsrf(`/ui/session/${session.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name: input.value.trim() })
+                            });
+                            titleEl.textContent = input.value.trim();
+                        } catch (err) {
+                            console.error('Rename failed:', err);
+                        }
+                    }
+                    input.replaceWith(titleEl);
+                };
+
+                input.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+                    if (ev.key === 'Escape') { finish(false); }
+                });
+                input.addEventListener('blur', () => finish(true));
+            });
+
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.deleteSession(session.id);
@@ -836,6 +914,7 @@ class NexeUI {
 
             this.sessionsList.appendChild(sessionEl);
         });
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [this.sessionsList] });
     }
 
     async deleteSession(sessionId) {
@@ -881,7 +960,7 @@ class NexeUI {
         this.chatMessages.innerHTML = '';
 
         messages.forEach(msg => {
-            this.addMessageToChat(msg.role, msg.content, false);
+            this.addMessageToChat(msg.role, msg.content, false, msg.stats || null);
         });
 
         this.scrollToBottom();
@@ -1305,8 +1384,12 @@ class NexeUI {
                     }
                     // Strip [MEM_SAVE: ...] from final render and collect facts for stats badge
                     const memFacts = [];
+                    const _seenFacts = new Set();
                     fullResponse = fullResponse.replace(/\[MEM_SAVE:\s*(.+?)\]\s*/g, (_, fact) => {
-                        memFacts.push(fact);
+                        if (!_seenFacts.has(fact)) {
+                            _seenFacts.add(fact);
+                            memFacts.push(fact);
+                        }
                         return '';
                     });
                     if (memFacts.length > 0) {
@@ -1379,7 +1462,26 @@ class NexeUI {
                             ${ragBadge}
                             ${compactBadge}
                             ${memBadge}
-                        `;
+                            <button class="copy-btn" title="Copy"><i data-lucide="copy"></i></button>
+                        `;  // Safe: all values are server-controlled (token counts, model names, pre-built badge HTML)
+                        const _copyBtn = statsEl.querySelector('.copy-btn');
+                        if (_copyBtn) {
+                            const _textDiv = lastMsg.querySelector('.message-text');
+                            _copyBtn.addEventListener('click', () => {
+                                navigator.clipboard.writeText(_textDiv ? _textDiv.innerText : '').then(() => {
+                                    const checkI = document.createElement('i');
+                                    checkI.setAttribute('data-lucide', 'check');
+                                    _copyBtn.replaceChildren(checkI);
+                                    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [_copyBtn] });
+                                    setTimeout(() => {
+                                        const restoreI = document.createElement('i');
+                                        restoreI.setAttribute('data-lucide', 'copy');
+                                        _copyBtn.replaceChildren(restoreI);
+                                        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [_copyBtn] });
+                                    }, 2000);
+                                }).catch(() => {});
+                            });
+                        }
                         if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [statsEl] });
                     }
                 } catch (readError) {
@@ -1427,7 +1529,7 @@ class NexeUI {
         }
     }
 
-    addMessageToChat(role, content, scroll = true) {
+    addMessageToChat(role, content, scroll = true, stats = null) {
         // Remove welcome screen if exists
         const welcome = this.chatMessages.querySelector('.welcome-screen');
         if (welcome) {
@@ -1440,26 +1542,156 @@ class NexeUI {
         const avatarIcon = role === 'user' ? 'user' : 'bot';
         const roleName = role === 'user' ? 'Tu' : 'Nexe';
 
-        // User messages: escape HTML, Assistant messages: render Markdown
-        const messageContent = role === 'user'
-            ? this.escapeHtml(content)
-            : this.renderMarkdown(content);
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        const avatarI = document.createElement('i');
+        avatarI.setAttribute('data-lucide', avatarIcon);
+        avatarDiv.appendChild(avatarI);
 
-        messageEl.innerHTML = `
-            <div class="message-avatar"><i data-lucide="${avatarIcon}"></i></div>
-            <div class="message-content">
-                <div class="message-role">${roleName}</div>
-                <div class="message-text">${messageContent}</div>
-                ${role === 'assistant' ? '<div class="message-stats"></div>' : ''}
-            </div>
-        `;
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+
+        const roleDiv = document.createElement('div');
+        roleDiv.className = 'message-role';
+        roleDiv.textContent = roleName;
+        contentDiv.appendChild(roleDiv);
+
+        const textDiv = document.createElement('div');
+        textDiv.className = 'message-text';
+        if (role === 'user') {
+            textDiv.textContent = content;
+        } else {
+            // Rendered via marked.js with custom renderer that escapes raw HTML
+            textDiv.innerHTML = this.renderMarkdown(content);
+        }
+        contentDiv.appendChild(textDiv);
+
+        if (role === 'assistant') {
+            const statsDiv = document.createElement('div');
+            statsDiv.className = 'message-stats';
+            if (stats) {
+                this._renderSavedStats(statsDiv, stats, textDiv);
+            }
+            contentDiv.appendChild(statsDiv);
+        }
+
+        messageEl.appendChild(avatarDiv);
+        messageEl.appendChild(contentDiv);
 
         this.chatMessages.appendChild(messageEl);
-        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [messageEl.querySelector('.message-avatar')] });
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [avatarDiv] });
 
         if (scroll) {
             this.scrollToBottom();
         }
+    }
+
+    _renderSavedStats(statsDiv, stats, textDiv) {
+        const tok = stats.tokens || 0;
+        const elapsed = stats.elapsed || 0;
+        const speed = elapsed > 0.5 ? (tok / elapsed).toFixed(1) : null;
+        const model = stats.model ? stats.model.split('/').pop() : '';
+        const ragCount = stats.rag_count || 0;
+        const ragAvg = stats.rag_avg || 0;
+        const memSaved = stats.mem_saved || 0;
+
+        const addStat = (icon, text) => {
+            const span = document.createElement('span');
+            span.className = 'stat-item';
+            const i = document.createElement('i');
+            i.setAttribute('data-lucide', icon);
+            span.appendChild(i);
+            const s = document.createElement('span');
+            s.textContent = text;
+            span.appendChild(s);
+            return span;
+        };
+
+        if (tok > 0) statsDiv.appendChild(addStat('activity', `${tok} tok`));
+        if (elapsed > 0) {
+            const timeText = speed ? `${elapsed}s · ${speed} tok/s` : `${elapsed}s`;
+            statsDiv.appendChild(addStat('timer', timeText));
+        }
+        if (model) {
+            const modelSpan = addStat('cpu', model);
+            modelSpan.classList.add('stat-model');
+            statsDiv.appendChild(modelSpan);
+        }
+        if (ragCount > 0) {
+            const ragSpan = document.createElement('span');
+            ragSpan.className = 'stat-item stat-rag';
+            const ragIcon = document.createElement('i');
+            ragIcon.setAttribute('data-lucide', 'book-open');
+            ragSpan.appendChild(ragIcon);
+            const ragText = document.createElement('span');
+            ragText.textContent = `RAG ${ragCount}`;
+            ragSpan.appendChild(ragText);
+            if (stats.rag_items && stats.rag_items.length > 0) {
+                const barSpan = document.createElement('span');
+                barSpan.className = 'rag-bar';
+                stats.rag_items.forEach(([col, score]) => {
+                    const block = document.createElement('span');
+                    block.className = 'rag-block';
+                    block.style.opacity = Math.max(0.2, score);
+                    block.title = `${col}: ${Math.round(score * 100)}%`;
+                    barSpan.appendChild(block);
+                });
+                ragSpan.appendChild(barSpan);
+            }
+            if (ragAvg > 0) {
+                const pctSpan = document.createElement('span');
+                pctSpan.textContent = ` ${Math.round(ragAvg * 100)}%`;
+                ragSpan.appendChild(pctSpan);
+            }
+            statsDiv.appendChild(ragSpan);
+        }
+        if (memSaved > 0) {
+            const memSpan = document.createElement('span');
+            memSpan.className = 'stat-item stat-mem' + (stats.mem_facts ? ' mem-expandable' : '');
+            const memIcon = document.createElement('i');
+            memIcon.setAttribute('data-lucide', 'bookmark-check');
+            memSpan.appendChild(memIcon);
+            const memText = document.createElement('span');
+            memText.textContent = this.t('saved');
+            memSpan.appendChild(memText);
+            if (stats.mem_facts && stats.mem_facts.length > 0) {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'mem-tooltip';
+                stats.mem_facts.forEach(fact => {
+                    const div = document.createElement('div');
+                    div.className = 'mem-fact';
+                    div.textContent = fact;
+                    tooltip.appendChild(div);
+                });
+                memSpan.appendChild(tooltip);
+            }
+            statsDiv.appendChild(memSpan);
+        }
+
+        // Copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.title = 'Copy';
+        const copyI = document.createElement('i');
+        copyI.setAttribute('data-lucide', 'copy');
+        copyBtn.appendChild(copyI);
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(textDiv.innerText).then(() => {
+                const checkI = document.createElement('i');
+                checkI.setAttribute('data-lucide', 'check');
+                copyBtn.replaceChildren(checkI);
+                if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [copyBtn] });
+                setTimeout(() => {
+                    const restoreI = document.createElement('i');
+                    restoreI.setAttribute('data-lucide', 'copy');
+                    copyBtn.replaceChildren(restoreI);
+                    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [copyBtn] });
+                }, 2000);
+            }).catch(() => {});
+        });
+        statsDiv.appendChild(copyBtn);
+
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [statsDiv] });
     }
 
     renderMarkdown(text) {
@@ -1583,8 +1815,9 @@ class NexeUI {
     }
 
     removeFilePreview() {
-        this.filePreview.innerHTML = '';
+        this.filePreview.replaceChildren();
         this.filePreview.classList.remove('active');
+        this.uploadedFile = null;
     }
 
     setupDragAndDrop() {
