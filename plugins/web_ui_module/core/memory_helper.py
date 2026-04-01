@@ -26,6 +26,7 @@ SIMILARITY_THRESHOLD = 0.80       # No guardar si similaritat > 80% (baixat de 0
 PRUNE_BATCH_SIZE = 30             # How many entries to remove when the limit is exceeded
 TEMPORAL_DECAY_DAYS = 7           # Dies per aplicar decay temporal (recent = bonus)
 MIN_IMPORTANCE_SCORE = 0.3        # Minimum to save (filters out chatter)
+DELETE_THRESHOLD = 0.82           # Threshold for delete (higher = safer, only close matches)
 
 # Memory types for structured storage
 MEMORY_TYPES = {
@@ -140,6 +141,30 @@ DELETE_TRIGGERS = [
     r'\berase\b.*memory',
 ]
 
+# Patterns that indicate user wants to LIST/SEE stored memories
+LIST_TRIGGERS = [
+    # Catalan
+    r'qu[eè]\s+record[ea]s\s+(de\s+mi|sobre\s+mi)',
+    r'qu[eè]\s+saps\s+(de\s+mi|sobre\s+mi)',
+    r'quines\s+mem[oò]ries\s+tens',
+    r'mostra\s+(la\s+)?mem[oò]ria',
+    r'llista\s+(les\s+)?mem[oò]ries',
+    r'qu[eè]\s+tens\s+guardat',
+    # Spanish
+    r'qu[eé]\s+recuerdas\s+(de\s+m[ií]|sobre\s+m[ií])',
+    r'qu[eé]\s+sabes\s+(de\s+m[ií]|sobre\s+m[ií])',
+    r'qu[eé]\s+memorias\s+tienes',
+    r'muestra\s+(la\s+)?memoria',
+    r'lista\s+(las\s+)?memorias',
+    r'qu[eé]\s+tienes\s+guardado',
+    # English
+    r'what\s+do\s+you\s+remember\s+(about\s+me)?',
+    r'what\s+do\s+you\s+know\s+about\s+me',
+    r'list\s+(my\s+)?memories',
+    r'show\s+(my\s+)?memor(y|ies)',
+    r'what\s+have\s+you\s+saved',
+]
+
 class MemoryHelper:
     """Helper class for memory operations with intent detection and smart extraction."""
 
@@ -148,6 +173,7 @@ class MemoryHelper:
         self.save_triggers = [re.compile(p, re.IGNORECASE) for p in SAVE_TRIGGERS]
         self.recall_regex = [re.compile(p, re.IGNORECASE) for p in RECALL_PATTERNS]
         self.delete_triggers = [re.compile(p, re.IGNORECASE) for p in DELETE_TRIGGERS]
+        self.list_triggers = [re.compile(p, re.IGNORECASE) for p in LIST_TRIGGERS]
         # Patterns per detectar xerrameca (no guardar)
         self.skip_patterns = [
             re.compile(r'^(hola|hey|ei|bon dia|bona tarda|bones|adéu|fins aviat)', re.IGNORECASE),
@@ -247,6 +273,11 @@ class MemoryHelper:
                     content = content.rstrip(',').strip()
                 if content:
                     return ('delete', content)
+
+        # Check for LIST intent (before recall — "que recordes de mi?" matches both)
+        for pattern in self.list_triggers:
+            if pattern.search(message):
+                return ('list', None)
 
         # Check for recall intent
         for pattern in self.recall_regex:
@@ -450,33 +481,97 @@ class MemoryHelper:
         try:
             memory = await self.get_memory_api()
             if not memory:
-                return {"success": False, "message": "Memory API not available"}
+                return {"success": False, "deleted": 0, "deleted_facts": [], "message": "Memory API not available"}
 
             deleted = 0
+            deleted_facts = []
             for collection in ["nexe_web_ui", "user_knowledge"]:
                 try:
                     if not await memory.collection_exists(collection):
                         continue
                     results = await memory.search(
-                        query=content, collection=collection, top_k=5, threshold=0.6
+                        query=content, collection=collection, top_k=5, threshold=DELETE_THRESHOLD
                     )
                     for r in results:
                         try:
+                            fact_text = ""
+                            if hasattr(r, 'payload') and r.payload:
+                                fact_text = r.payload.get("text", "")
+                            elif hasattr(r, 'metadata') and r.metadata:
+                                fact_text = r.metadata.get("text", "")
+                            if not fact_text and hasattr(r, 'text'):
+                                fact_text = r.text or ""
+                            deleted_facts.append({"id": str(r.id), "text": fact_text, "score": round(r.score, 2)})
                             await memory.delete(r.id, collection)
                             deleted += 1
-                            logger.info("Deleted memory entry %s from %s (score=%.2f)", r.id, collection, r.score)
+                            logger.info("Deleted memory entry %s from %s (score=%.2f): %s", r.id, collection, r.score, fact_text[:80])
                         except Exception as e:
                             logger.warning("Failed to delete %s from %s: %s", r.id, collection, e)
                 except Exception as e:
                     logger.debug("Delete search in %s failed: %s", collection, e)
 
             if deleted > 0:
-                return {"success": True, "deleted": deleted, "message": f"Esborrat {deleted} entrada(es) de la memoria"}
+                return {"success": True, "deleted": deleted, "deleted_facts": deleted_facts, "message": f"Esborrat {deleted} entrada(es) de la memoria"}
             else:
-                return {"success": True, "deleted": 0, "message": "No s'ha trobat res similar a la memoria"}
+                return {"success": True, "deleted": 0, "deleted_facts": [], "message": "No s'ha trobat res similar a la memoria"}
         except Exception as e:
             logger.error("Memory delete error: %s", e)
-            return {"success": False, "message": f"Error esborrant: {str(e)}"}
+            return {"success": False, "deleted": 0, "deleted_facts": [], "message": f"Error esborrant: {str(e)}"}
+
+    async def list_memories(self, limit: int = 20) -> Dict[str, Any]:
+        """
+        List all stored memory facts.
+
+        Returns:
+            Dict with facts list, total count, and status
+        """
+        try:
+            memory = await self.get_memory_api()
+            if not memory:
+                return {"success": False, "facts": [], "total": 0, "message": "Memory not available"}
+
+            collection = "nexe_web_ui"
+            if not await memory.collection_exists(collection):
+                return {"success": True, "facts": [], "total": 0, "message": "No memories stored"}
+
+            total = await memory.count(collection)
+            if total == 0:
+                return {"success": True, "facts": [], "total": 0, "message": "No memories stored"}
+
+            results = await memory.search(
+                query="user personal facts preferences",
+                collection=collection,
+                top_k=min(limit, 50),
+                threshold=0.0,
+            )
+
+            facts = []
+            for r in results:
+                meta = r.payload if hasattr(r, 'payload') else {}
+                if not meta:
+                    meta = r.metadata if hasattr(r, 'metadata') else {}
+                text = meta.get("text", "")
+                if not text and hasattr(r, 'text'):
+                    text = r.text or ""
+                if not text:
+                    continue
+                facts.append({
+                    "id": str(r.id) if hasattr(r, 'id') else meta.get("original_id", ""),
+                    "text": text,
+                    "created_at": meta.get("created_at", meta.get("saved_at", "")),
+                    "source": meta.get("source", "unknown"),
+                    "type": meta.get("type", "unknown"),
+                })
+
+            return {
+                "success": True,
+                "facts": facts,
+                "total": total,
+                "message": f"{len(facts)} memories found (of {total} total)"
+            }
+        except Exception as e:
+            logger.error("Memory list error: %s", e)
+            return {"success": False, "facts": [], "total": 0, "message": str(e)}
 
     async def auto_save(
         self,
