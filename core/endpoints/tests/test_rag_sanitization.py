@@ -50,18 +50,25 @@ class TestFilterRagInjection:
 class TestSanitizeRagContext:
     """Tests for _sanitize_rag_context (with truncation for chat prompt)."""
 
-    def test_truncates_long_context(self):
-        """Chat context SHOULD be truncated to prevent model overflow."""
-        text = "B" * 10_000
-        result = _sanitize_rag_context(text)
-        assert len(result) < 10_000
-        assert "[...truncat]" in result
+    def test_dynamic_limit_larger_than_hardcoded(self):
+        """Dynamic limit (context_window * ratio * chars_per_token) > hardcoded 4000."""
+        from core.endpoints.chat_sanitization import DEFAULT_CONTEXT_WINDOW, MAX_CONTEXT_RATIO, CHARS_PER_TOKEN_ESTIMATE
+        dynamic = int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO * CHARS_PER_TOKEN_ESTIMATE)
+        assert dynamic > MAX_RAG_CONTEXT_LENGTH
 
-    def test_respects_max_length(self):
-        text = "C" * (MAX_RAG_CONTEXT_LENGTH + 100)
+    def test_6000_chars_not_truncated(self):
+        """6000 chars (5 RAG results) should NOT be truncated with default settings."""
+        text = "D" * 6000
         result = _sanitize_rag_context(text)
-        # Truncated text + "[...truncat]" marker
-        assert result.startswith("C" * MAX_RAG_CONTEXT_LENGTH)
+        assert "[...truncat]" not in result
+        assert len(result) == 6000
+
+    def test_very_long_context_truncated(self):
+        """Extremely long context should still be truncated."""
+        text = "E" * 50_000
+        result = _sanitize_rag_context(text)
+        assert len(result) < 50_000
+        assert "[...truncat]" in result
 
     def test_short_text_unchanged(self):
         text = "Short text"
