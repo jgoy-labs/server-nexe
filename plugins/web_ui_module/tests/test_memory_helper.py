@@ -94,7 +94,9 @@ class TestDetectIntentRecall:
         assert intent == "recall"
 
     def test_recall_catala_que_saps(self, mh):
-        intent, _ = mh.detect_intent("Què saps sobre mi?")
+        # "Què saps sobre mi?" now matches 'list' intent (more specific than recall)
+        # Recall still works for non-personal queries like "Què saps sobre Python?"
+        intent, _ = mh.detect_intent("Què saps sobre Python?")
         assert intent == "recall"
 
     def test_recall_catala_com_em_dic(self, mh):

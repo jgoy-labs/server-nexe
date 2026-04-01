@@ -1295,6 +1295,43 @@ body.light .icon-moon,
     border-bottom: none;
 }
 
+/* Memory delete badge (red, same pattern as save badge) */
+.stat-mem-del {
+    color: #ef4444;
+}
+.stat-mem-del svg {
+    color: #ef4444;
+}
+.mem-del-tooltip {
+    border-left-color: rgba(239, 68, 68, 0.6);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+.mem-del-tooltip .mem-fact {
+    border-bottom-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Memory list block (collapsible) */
+.memory-list-block {
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    font-size: 0.85rem;
+}
+.memory-list-block summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: rgba(96, 165, 250, 0.9);
+}
+.memory-list-block pre {
+    margin: 8px 0 0 0;
+    white-space: pre-wrap;
+    font-family: inherit;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
 /* ============================================
    Stats per missatge
    ============================================ */

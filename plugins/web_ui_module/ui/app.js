@@ -1032,6 +1032,9 @@ class NexeUI {
                 let assistantMessageDiv = null;
                 let fullResponse = "";
                 let memorySaved = false;
+                let memoryDeleted = false;
+                let deletedCount = 0;
+                let deletedFacts = [];
                 let ragCount = 0;
                 let ragAvg = 0;
                 let ragItems = [];  // [{col, score}]
@@ -1344,6 +1347,15 @@ class NexeUI {
                             chunk = chunk.replace(/\x00\[MEM:?\d*\]\x00/g, '');
                         }
 
+                        // Detect deleted memory token [DEL:N:fact1|fact2|...]
+                        const delMatch = chunk.match(/\x00\[DEL:(\d+):(.+?)\]\x00/);
+                        if (delMatch) {
+                            memoryDeleted = true;
+                            deletedCount = parseInt(delMatch[1]);
+                            deletedFacts = delMatch[2].split('|');
+                            chunk = chunk.replace(/\x00\[DEL:\d+:.+?\]\x00/g, '');
+                        }
+
                         processChunk(chunk);
                         this.scrollToBottom();
                     }
@@ -1403,6 +1415,8 @@ class NexeUI {
                     fullResponse = fullResponse.replace(/\[ACTION\]:\s*[^\n]*/g, '');
                     fullResponse = fullResponse.replace(/\[MEM:\d+\]/g, '');
                     fullResponse = fullResponse.replace(/\[MEM\]/g, '');
+                    // Strip [DEL:N:...] tokens from final render
+                    fullResponse = fullResponse.replace(/\[DEL:\d+:.+?\]/g, '');
                     // Note: renderMarkdown sanitizes HTML via marked.js (safe render)
                     assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse);
                     if (tMode !== 'responding' && tMode !== 'init') closeThinkBlock();
@@ -1428,6 +1442,20 @@ class NexeUI {
                                 + '</span>';
                         } else if (memorySaved) {
                             memBadge = '<span class="stat-item stat-mem"><i data-lucide="bookmark-check"></i><span>' + this.t('saved') + '</span></span>';
+                        }
+                        let delBadge = '';
+                        if (memoryDeleted && deletedFacts.length > 0) {
+                            const delFactsHtml = deletedFacts.map(f => {
+                                const safe = f.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                                return '<div class="mem-fact">' + safe + '</div>';
+                            }).join('');
+                            delBadge = '<span class="stat-item stat-mem-del mem-expandable">'
+                                + '<i data-lucide="trash-2"></i>'
+                                + '<span>esborrat (' + deletedCount + ')</span>'
+                                + '<div class="mem-tooltip mem-del-tooltip">' + delFactsHtml + '</div>'
+                                + '</span>';
+                        } else if (memoryDeleted) {
+                            delBadge = '<span class="stat-item stat-mem-del"><i data-lucide="trash-2"></i><span>esborrat</span></span>';
                         }
                         let ragBadge = '';
                         if (ragCount > 0) {
@@ -1462,6 +1490,7 @@ class NexeUI {
                             ${ragBadge}
                             ${compactBadge}
                             ${memBadge}
+                            ${delBadge}
                             <button class="copy-btn" title="Copy"><i data-lucide="copy"></i></button>
                         `;  // Safe: all values are server-controlled (token counts, model names, pre-built badge HTML)
                         const _copyBtn = statsEl.querySelector('.copy-btn');
@@ -1893,7 +1922,7 @@ class NexeUI {
         if (this._renderTimer) return;
         this._renderTimer = setTimeout(() => {
             this._renderTimer = null;
-            el.innerHTML = this.renderMarkdown(content.replace(/\[MEM_SAVE:\s*.+?\]\s*/g, ''));
+            el.innerHTML = this.renderMarkdown(content.replace(/\[MEM_SAVE:\s*.+?\]\s*/g, '').replace(/\[DEL:\d+:.+?\]/g, ''));
         }, 80);
     }
 

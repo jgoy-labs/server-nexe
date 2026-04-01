@@ -100,17 +100,45 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 result = await memory_helper.delete_from_memory(content_to_delete)
                 if result["success"] and result.get("deleted", 0) > 0:
                     # Sanitize message in history to avoid re-save loop
-                    # (the model would see the fact in history and re-save it via MEM_SAVE)
                     if session.messages and session.messages[-1]["role"] == "user":
                         session.messages[-1]["content"] = f"[Memory command: delete '{content_to_delete[:50]}']"
-                    response_text = f"\x00[MODEL:nexe-system]\x00Deleted from memory: {result['deleted']} entry(ies) related to \"{content_to_delete[:100]}\""
+                    deleted_facts = result.get("deleted_facts", [])
+                    facts_detail = ""
+                    if deleted_facts:
+                        facts_list = ", ".join(f'"{f["text"][:60]}"' for f in deleted_facts[:5])
+                        facts_detail = f" [{facts_list}]"
+                    response_text = (
+                        f"\x00[MODEL:nexe-system]\x00"
+                        f"Deleted {result['deleted']} memory(ies){facts_detail}. "
+                        f"I won't remember this anymore."
+                    )
+                    # Emit delete token for frontend badge
+                    if deleted_facts:
+                        facts_pipe = "|".join(f["text"][:80] for f in deleted_facts[:5])
+                        response_text += f"\x00[DEL:{result['deleted']}:{facts_pipe}]\x00"
                 elif result["success"]:
-                    response_text = f"\x00[MODEL:nexe-system]\x00Nothing found in memory about \"{content_to_delete[:100]}\""
+                    response_text = f"\x00[MODEL:nexe-system]\x00Nothing found about \"{content_to_delete[:100]}\" in memory."
                 else:
                     response_text = f"\x00[MODEL:nexe-system]\x00Error: {result.get('message', 'Unknown error')}"
             else:
-                response_text = "\x00[MODEL:nexe-system]\x00What do you want me to forget? Write what you want to delete."
+                response_text = "\x00[MODEL:nexe-system]\x00What do you want me to forget?"
             memory_action = "delete"
+
+        elif intent == "list":
+            list_result = await memory_helper.list_memories(limit=20)
+            if list_result["success"] and list_result["facts"]:
+                facts_lines = []
+                for i, f in enumerate(list_result["facts"], 1):
+                    date_str = f.get("created_at", "")[:10] if f.get("created_at") else ""
+                    facts_lines.append(f"  {i}. {f['text']}" + (f" ({date_str})" if date_str else ""))
+                facts_text = "\n".join(facts_lines)
+                total = list_result["total"]
+                shown = len(list_result["facts"])
+                header = f"Active memory — {shown} of {total} entries:\n"
+                response_text = f"\x00[MODEL:nexe-system]\x00{header}{facts_text}"
+            else:
+                response_text = "\x00[MODEL:nexe-system]\x00No memories stored."
+            memory_action = "list"
 
         elif intent == "recall":
             # Recall intent: DON'T show raw results, use LLM with memory context
