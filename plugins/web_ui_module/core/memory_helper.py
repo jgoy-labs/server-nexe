@@ -166,9 +166,18 @@ class MemoryHelper:
         return False
 
     async def get_memory_api(self):
-        """Get or initialize Memory API instance (module-level singleton)."""
-        global _memory_api_instance
-        if _memory_api_instance is None:
+        """Get or initialize Memory API instance (module-level singleton, thread-safe)."""
+        global _memory_api_instance, _memory_api_init_failed
+        if _memory_api_instance is not None:
+            self._memory_api = _memory_api_instance
+            return _memory_api_instance
+        if _memory_api_init_failed:
+            return None
+        async with _memory_init_lock:
+            # Double-check after acquiring lock
+            if _memory_api_instance is not None:
+                self._memory_api = _memory_api_instance
+                return _memory_api_instance
             try:
                 from memory.memory.api import MemoryAPI
                 api = MemoryAPI()
@@ -196,7 +205,8 @@ class MemoryHelper:
                 logger.info("MemoryAPI singleton initialized and cached")
             except Exception as e:
                 logger.error(f"Failed to initialize Memory API: {e}")
-                _memory_api_instance = None
+                _memory_api_init_failed = True
+                return None
         self._memory_api = _memory_api_instance
         return _memory_api_instance
 
@@ -652,7 +662,16 @@ class MemoryHelper:
                     logger.warning(f"Error searching collection {collection}: {e}")
 
             all_results.sort(key=lambda x: x["score"], reverse=True)
-            final_results = all_results[:limit]
+            # Deduplicate: keep highest-scoring result per unique content
+            _seen_content = set()
+            deduped = []
+            for r in all_results:
+                # Use first 200 chars as dedup key (chunks from same doc are similar)
+                _key = r["content"][:200].strip()
+                if _key not in _seen_content:
+                    _seen_content.add(_key)
+                    deduped.append(r)
+            final_results = deduped[:limit]
 
             return {
                 "success": True,
@@ -734,6 +753,10 @@ class MemoryHelper:
 # Global instances (module-level singletons)
 _memory_helper = MemoryHelper()
 _memory_api_instance = None  # Singleton to avoid re-creating the model on each request
+_memory_api_init_failed = False  # Prevent infinite retry on init failure
+
+import asyncio as _asyncio
+_memory_init_lock = _asyncio.Lock()  # Prevent concurrent double-init (race condition fix)
 
 def get_memory_helper() -> MemoryHelper:
     """Get global memory helper instance."""

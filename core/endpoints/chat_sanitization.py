@@ -100,11 +100,12 @@ def _sanitize_rag_context(context: str) -> str:
     if not context:
         return ""
 
-    # 1. Truncate to prevent context overflow
-    sanitized = context[:MAX_RAG_CONTEXT_LENGTH]
-    if len(context) > MAX_RAG_CONTEXT_LENGTH:
+    # 1. Truncate to prevent context overflow (dynamic based on model context window)
+    max_chars = max(MAX_RAG_CONTEXT_LENGTH, int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO * CHARS_PER_TOKEN_ESTIMATE))
+    sanitized = context[:max_chars]
+    if len(context) > max_chars:
         sanitized += "\n[...truncat]"
-        logger.warning("RAG context truncated from %d to %d chars", len(context), MAX_RAG_CONTEXT_LENGTH)
+        logger.warning("RAG context truncated from %d to %d chars (window=%d, ratio=%.1f)", len(context), max_chars, DEFAULT_CONTEXT_WINDOW, MAX_CONTEXT_RATIO)
 
     # 2. Remove prompt injection patterns
     for pattern in _RAG_INJECTION_PATTERNS:
