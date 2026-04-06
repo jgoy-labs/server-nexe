@@ -81,10 +81,22 @@ class TestRAGContextSanitization:
 
     def test_long_context_truncated(self):
         """Verifica que context llarg és truncat."""
-        from core.endpoints.chat import _sanitize_rag_context, MAX_RAG_CONTEXT_LENGTH
-        long_context = "x" * (MAX_RAG_CONTEXT_LENGTH + 1000)
+        from core.endpoints.chat import _sanitize_rag_context
+        from core.endpoints.chat_sanitization import (
+            MAX_RAG_CONTEXT_LENGTH,
+            DEFAULT_CONTEXT_WINDOW,
+            MAX_CONTEXT_RATIO,
+            CHARS_PER_TOKEN_ESTIMATE,
+        )
+        # El límit real és dinàmic: max(literal, window * ratio * chars_per_token)
+        effective_max = max(
+            MAX_RAG_CONTEXT_LENGTH,
+            int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO * CHARS_PER_TOKEN_ESTIMATE),
+        )
+        long_context = "x" * (effective_max + 1000)
         result = _sanitize_rag_context(long_context)
-        assert len(result) <= MAX_RAG_CONTEXT_LENGTH + 20  # +20 per el tag de truncat
+        assert len(result) <= effective_max + 20  # +20 per el tag de truncat
+        assert len(result) < len(long_context)
 
     def test_injection_markers_removed(self):
         """Verifica que marcadors d'instrucció són filtrats."""

@@ -16,8 +16,19 @@ class TestSanitizeRagContext:
         assert _sanitize_rag_context(None) == ""
 
     def test_long_text_truncated(self):
-        from core.endpoints.chat import _sanitize_rag_context, MAX_RAG_CONTEXT_LENGTH
-        long_text = "a" * (MAX_RAG_CONTEXT_LENGTH + 500)
+        from core.endpoints.chat import _sanitize_rag_context
+        from core.endpoints.chat_sanitization import (
+            MAX_RAG_CONTEXT_LENGTH,
+            DEFAULT_CONTEXT_WINDOW,
+            MAX_CONTEXT_RATIO,
+            CHARS_PER_TOKEN_ESTIMATE,
+        )
+        # El límit real és dinàmic: max(literal, window * ratio * chars_per_token)
+        effective_max = max(
+            MAX_RAG_CONTEXT_LENGTH,
+            int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO * CHARS_PER_TOKEN_ESTIMATE),
+        )
+        long_text = "a" * (effective_max + 500)
         result = _sanitize_rag_context(long_text)
         # El resultat ha de ser truncat + tag
         assert len(result) < len(long_text)

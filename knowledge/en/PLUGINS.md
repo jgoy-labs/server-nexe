@@ -1,6 +1,6 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-06
 id: nexe-plugins-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
@@ -220,6 +220,79 @@ If the module implements `NexeModuleWithRouter`, the kernel registers the router
 ### 5. Shutdown
 Calls `await module.shutdown()` during server stop. Must be idempotent.
 
+## Activation & Security — Dual System
+
+server-nexe has **three complementary mechanisms** to decide which plugins get activated. All three coexist and combine — they are not alternatives.
+
+### 1. `server.toml` — `[plugins.modules]` section
+
+Static declarative list in `personality/server.toml` (line 172). This is the primary source: it tells the server which plugins MUST be activated at startup.
+
+```toml
+[plugins.modules]
+enabled = ["security", "rag", "ollama_module", "mlx_module", "llama_cpp_module", "web_ui_module"]
+```
+
+To add a new plugin, it must be included explicitly here.
+
+### 2. `NEXE_APPROVED_MODULES` — env var (security allowlist)
+
+Validated by `get_module_allowlist()` in `core/config.py:240`. This is an additional security layer on top of the `server.toml` list:
+
+- **Development mode** (`NEXE_ENV=development` or unset): `NEXE_APPROVED_MODULES` is **optional**. If not defined, `get_module_allowlist()` returns `None` and filters nothing.
+- **Production mode** (`NEXE_ENV=production` or `[core.environment].mode = "production"`): `NEXE_APPROVED_MODULES` is **MANDATORY**. If missing, the server aborts with `ValueError("SECURITY ERROR: NEXE_APPROVED_MODULES is required in production")`.
+
+Format: comma-separated list, e.g. `NEXE_APPROVED_MODULES="security,ollama_module,web_ui_module"`. The ModuleManager uses this set to filter the `server.toml` list.
+
+### 3. `PathDiscovery` — drop-in discovery
+
+Defined in `personality/module_manager/path_discovery.py`. It automatically scans known paths looking for folders containing `manifest.toml`:
+
+```python
+known_paths = [
+    "plugins", "plugins/core", "plugins/tools",
+    "storage", "storage/core", "storage/tools",
+    "memory/core", "memory/tools",
+    "core/core", "core/tools",
+    "personality/core", "personality/tools"
+]
+```
+
+- **Strict mode** (production): only known paths + explicitly configured ones.
+- **Dev mode**: also auto-discovers folders with `modul`/`module`/`mods` in the name.
+
+### How to add a new plugin (4 steps)
+
+1. Place the folder at `plugins/<name>/` with `manifest.toml` + `manifest.py` + `module.py` + `__init__.py`.
+2. Add the name to `[plugins.modules].enabled` in `personality/server.toml`.
+3. (Production only) Add it to the `NEXE_APPROVED_MODULES` env var.
+4. Restart the server — `PathDiscovery` finds it automatically, `ModuleDiscovery` loads it.
+
+## ModuleManager Architecture
+
+The ModuleManager lives in `personality/module_manager/` — 13 files, ~3279 lines. It is the central facade of the plugin system.
+
+### Main components
+
+| File | Responsibility |
+|------|----------------|
+| `module_manager.py` | Central facade, lifecycle, load/unload/health (642 lines) |
+| `config_manager.py` | Loads `server.toml`, parsed config, secrets |
+| `config_validator.py` | Configuration validation and schemas |
+| `module_lifecycle.py` | Initialization, shutdown, error handling |
+| `path_discovery.py` | Scans paths (`plugins/`, `memory/modules/`, `core/tools/`...) |
+| `discovery.py` | Imports manifests, detects capabilities |
+| `registry.py` | Registry of loaded modules, cache |
+| `system_lifecycle.py` | Global system startup/shutdown |
+
+### Discovery flow
+
+1. `PathDiscovery.discover_all_paths()` finds folders with `manifest.toml`
+2. `ModuleDiscovery` imports each `manifest.py` and validates the Protocol
+3. `ModuleRegistry` registers discovered instances
+4. `ModuleLoader` dynamically loads the classes
+5. `APIIntegrator` includes the routers in the FastAPI app via `load_plugin_routers()`
+
 ## Existing Plugins (5)
 
 | Plugin | Type | Router | Key features |
@@ -324,7 +397,12 @@ Both methods may be called multiple times. Always check `self._initialized` guar
 | Concept | File |
 |---------|------|
 | NexeModule Protocol | `core/loader/protocol.py` |
+| ModuleManager facade | `personality/module_manager/module_manager.py` |
+| Path Discovery | `personality/module_manager/path_discovery.py` |
 | Module Discovery | `personality/module_manager/discovery.py` |
 | Module Lifecycle | `personality/module_manager/module_lifecycle.py` |
+| Config Manager | `personality/module_manager/config_manager.py` |
+| Module Registry | `personality/module_manager/registry.py` |
+| Security Allowlist | `core/config.py:240` (`get_module_allowlist()`) |
 | Router Registration | `core/server/factory_modules.py` |
 | Reference plugin (cleanest) | `plugins/llama_cpp_module/` |

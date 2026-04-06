@@ -61,11 +61,14 @@ def make_memory_mock(
 
 @pytest.fixture(autouse=True)
 def reset_singleton():
-    """Reseteja el singleton global entre tests."""
+    """Reseteja el singleton global entre tests (instance + init_failed flag)."""
     original = mh_module._memory_api_instance
+    original_failed = mh_module._memory_api_init_failed
     mh_module._memory_api_instance = None
+    mh_module._memory_api_init_failed = False
     yield
     mh_module._memory_api_instance = original
+    mh_module._memory_api_init_failed = original_failed
 
 
 # ─── Tests get_memory_api ─────────────────────────────────────────────────────
@@ -76,9 +79,11 @@ class TestGetMemoryApi:
         mem = make_memory_mock(collection_exists=True)
         helper = MemoryHelper()
 
-        # MemoryAPI is imported inside the function: patch the source module
-        with patch("memory.memory.api.MemoryAPI", return_value=mem):
-            result = asyncio.run(helper.get_memory_api())
+        # MemoryAPI is imported inside the function: patch the source module.
+        # També forcem v1 a fallar perquè caigui a la branca legacy on viu el mock.
+        with patch("memory.memory.api.v1.get_memory_api", side_effect=ImportError("force fallback")):
+            with patch("memory.memory.api.MemoryAPI", return_value=mem):
+                result = asyncio.run(helper.get_memory_api())
 
         assert result is mem
         assert mh_module._memory_api_instance is mem
@@ -87,8 +92,9 @@ class TestGetMemoryApi:
         mem = make_memory_mock(collection_exists=False)
         helper = MemoryHelper()
 
-        with patch("memory.memory.api.MemoryAPI", return_value=mem):
-            asyncio.run(helper.get_memory_api())
+        with patch("memory.memory.api.v1.get_memory_api", side_effect=ImportError("force fallback")):
+            with patch("memory.memory.api.MemoryAPI", return_value=mem):
+                asyncio.run(helper.get_memory_api())
 
         assert mem.create_collection.call_count == 2  # nexe_web_ui + user_knowledge
 
@@ -105,8 +111,9 @@ class TestGetMemoryApi:
 
     def test_returns_none_on_exception(self):
         helper = MemoryHelper()
-        with patch("memory.memory.api.MemoryAPI", side_effect=Exception("no MemoryAPI")):
-            result = asyncio.run(helper.get_memory_api())
+        with patch("memory.memory.api.v1.get_memory_api", side_effect=ImportError("force fallback")):
+            with patch("memory.memory.api.MemoryAPI", side_effect=Exception("no MemoryAPI")):
+                result = asyncio.run(helper.get_memory_api())
 
         assert result is None
         assert mh_module._memory_api_instance is None
@@ -114,8 +121,9 @@ class TestGetMemoryApi:
     def test_sets_instance_attribute(self):
         mem = make_memory_mock()
         helper = MemoryHelper()
-        with patch("memory.memory.api.MemoryAPI", return_value=mem):
-            asyncio.run(helper.get_memory_api())
+        with patch("memory.memory.api.v1.get_memory_api", side_effect=ImportError("force fallback")):
+            with patch("memory.memory.api.MemoryAPI", return_value=mem):
+                asyncio.run(helper.get_memory_api())
 
         assert helper._memory_api is mem
 
