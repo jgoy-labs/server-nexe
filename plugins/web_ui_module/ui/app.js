@@ -51,11 +51,19 @@ const UI_STRINGS = {
         send_error: "Error: No s'ha pogut enviar el missatge.",
         connection_error: "Error de connexió",
         col_title: "Col·leccions",
-        col_memory: "Memòria",
-        col_knowledge: "Coneixement",
-        col_docs: "Docs del sistema",
+        col_memory: "Memòria personal",
+        col_knowledge: "Documents pujats",
+        col_docs: "Base de coneixement",
+        col_memory_tip: "Fets personals recordats de converses anteriors",
+        col_knowledge_tip: "Documents que has pujat a aquesta sessió",
+        col_docs_tip: "Documentació del sistema (IDENTITY, guies, etc.)",
         mem_saving: "Guardant memòria...",
         mem_saved: "Memòria guardada",
+        backend_label: "Motor",
+        model_label: "Model",
+        starting: "Iniciant...",
+        support_link: "Suport",
+        rag_filter_label: "Filtre RAG",
     },
     en: {
         login_subtitle: "Enter your API Key to access",
@@ -103,11 +111,19 @@ const UI_STRINGS = {
         send_error: "Error: Could not send the message.",
         connection_error: "Connection error",
         col_title: "Collections",
-        col_memory: "Memory",
-        col_knowledge: "Knowledge",
-        col_docs: "System Docs",
+        col_memory: "Personal memory",
+        col_knowledge: "Uploaded documents",
+        col_docs: "Knowledge base",
+        col_memory_tip: "Personal facts remembered from previous conversations",
+        col_knowledge_tip: "Documents you uploaded in this session",
+        col_docs_tip: "System documentation (IDENTITY, guides, etc.)",
         mem_saving: "Saving memory...",
         mem_saved: "Memory saved",
+        backend_label: "Backend",
+        model_label: "Model",
+        starting: "Starting...",
+        support_link: "Support",
+        rag_filter_label: "RAG Filter",
     },
     es: {
         login_subtitle: "Introduce la API Key para acceder",
@@ -155,11 +171,19 @@ const UI_STRINGS = {
         send_error: "Error: No se pudo enviar el mensaje.",
         connection_error: "Error de conexión",
         col_title: "Colecciones",
-        col_memory: "Memoria",
-        col_knowledge: "Conocimiento",
-        col_docs: "Docs del sistema",
+        col_memory: "Memoria personal",
+        col_knowledge: "Documentos subidos",
+        col_docs: "Base de conocimiento",
+        col_memory_tip: "Hechos personales recordados de conversaciones anteriores",
+        col_knowledge_tip: "Documentos que has subido en esta sesión",
+        col_docs_tip: "Documentación del sistema (IDENTITY, guías, etc.)",
         mem_saving: "Guardando memoria...",
         mem_saved: "Memoria guardada",
+        backend_label: "Motor",
+        model_label: "Modelo",
+        starting: "Iniciando...",
+        support_link: "Soporte",
+        rag_filter_label: "Filtro RAG",
     }
 };
 
@@ -245,6 +269,13 @@ class NexeUI {
         s('[data-i18n="col_memory"]', 'col_memory');
         s('[data-i18n="col_knowledge"]', 'col_knowledge');
         s('[data-i18n="col_docs"]', 'col_docs');
+        // Collection tooltips
+        const colMemLabel = document.querySelector('[data-i18n="col_memory"]');
+        if (colMemLabel) colMemLabel.closest('label').title = this.t('col_memory_tip');
+        const colKnowLabel = document.querySelector('[data-i18n="col_knowledge"]');
+        if (colKnowLabel) colKnowLabel.closest('label').title = this.t('col_knowledge_tip');
+        const colDocsLabel = document.querySelector('[data-i18n="col_docs"]');
+        if (colDocsLabel) colDocsLabel.closest('label').title = this.t('col_docs_tip');
         // Input
         s('#messageInput', 'placeholder', 'placeholder');
         // Buttons
@@ -260,6 +291,20 @@ class NexeUI {
         if (statusText) statusText.textContent = this.t('connected');
         // Language selector
         s('#langSelect', 'language', 'title');
+        // Backend/Model labels
+        const bLabels = document.querySelectorAll('.backend-selector-title');
+        if (bLabels[0]) bLabels[0].textContent = this.t('backend_label');
+        if (bLabels[1]) bLabels[1].textContent = this.t('model_label');
+        // Readiness overlay
+        s('#readinessText', 'starting');
+        // Support link
+        const supportLink = document.querySelector('.footer-support');
+        if (supportLink) {
+            const heartIcon = supportLink.querySelector('i');
+            supportLink.textContent = '';
+            if (heartIcon) supportLink.appendChild(heartIcon);
+            supportLink.append(' ' + this.t('support_link'));
+        }
         // HTML lang
         document.documentElement.lang = this.lang;
         // Re-render Lucide icons
@@ -281,24 +326,41 @@ class NexeUI {
         }
     }
 
-    fetchWithCsrf(url, options = {}) {
+    async fetchWithCsrf(url, options = {}) {
         const opts = { ...options };
         const method = (opts.method || 'GET').toUpperCase();
         opts.credentials = opts.credentials || 'same-origin';
         if (this.apiKey) {
             opts.headers = { ...(opts.headers || {}), 'X-API-Key': this.apiKey };
         }
-        return fetch(url, opts);
+        const resp = await fetch(url, opts);
+        // Auto-retry once on 401 — handles startup race condition (BUG-04)
+        if (resp.status === 401 && this.apiKey && !opts._retried) {
+            await new Promise(r => setTimeout(r, 500));
+            opts._retried = true;
+            if (this.apiKey) {
+                opts.headers = { ...(opts.headers || {}), 'X-API-Key': this.apiKey };
+            }
+            return fetch(url, opts);
+        }
+        return resp;
     }
 
-    init() {
+    async init() {
         this.applyI18n();
         this._initLangSelector();
         if (!this.apiKey) {
             this.showLoginOverlay();
             return;
         }
-        this.initUI();
+        try {
+            await this.initUI();
+        } catch (err) {
+            console.error('[nexe] initUI failed:', err);
+            // Force-hide readiness overlay so user sees something
+            const overlay = document.getElementById('readinessOverlay');
+            if (overlay) overlay.style.display = 'none';
+        }
     }
 
     _initLangSelector() {
@@ -391,7 +453,13 @@ class NexeUI {
                     this.apiKey = key;
                     localStorage.setItem('nexe_api_key', key);
                     overlay.style.display = 'none';
-                    this.initUI();
+                    try {
+                        await this.initUI();
+                    } catch (err) {
+                        console.error('[nexe] initUI after login failed:', err);
+                        const ro = document.getElementById('readinessOverlay');
+                        if (ro) ro.style.display = 'none';
+                    }
                     if (typeof lucide !== 'undefined') lucide.createIcons();
                 } else {
                     error.style.display = 'block';
@@ -414,7 +482,10 @@ class NexeUI {
         const overlay = document.getElementById('readinessOverlay');
         if (!overlay) return;
         overlay.style.display = 'flex';
-        while (true) {
+        const MAX_ATTEMPTS = 120; // ~6 min at 3s intervals
+        let attempts = 0;
+        while (attempts < MAX_ATTEMPTS) {
+            attempts++;
             try {
                 const r = await fetch('/health/ready', { cache: 'no-store' });
                 if (r.ok) {
@@ -423,10 +494,18 @@ class NexeUI {
                         overlay.style.display = 'none';
                         return;
                     }
+                    console.warn('[nexe] readiness: status =', data.status);
+                } else {
+                    console.warn('[nexe] readiness: HTTP', r.status);
                 }
-            } catch { /* server not ready yet */ }
-            await new Promise(res => setTimeout(res, 1000));
+            } catch (err) {
+                console.warn('[nexe] readiness fetch error:', err.message || err);
+            }
+            await new Promise(res => setTimeout(res, 3000));
         }
+        // Timeout — hide overlay anyway so user can interact
+        console.error('[nexe] readiness timeout after', MAX_ATTEMPTS, 'attempts — forcing UI load');
+        overlay.style.display = 'none';
     }
 
     async initUI() {
@@ -779,6 +858,7 @@ class NexeUI {
     }
 
     async createNewSession() {
+        this._abortIfGenerating();
         try {
             const response = await this.fetchWithCsrf('/ui/session/new', {
                 method: 'POST',
@@ -790,6 +870,7 @@ class NexeUI {
                 const data = await response.json();
                 this.currentSessionId = data.session_id;
                 this.clearChat();
+                this.removeFilePreview();
                 this.loadSessions();
                 this.showWelcome();
             }
@@ -942,12 +1023,14 @@ class NexeUI {
     }
 
     async loadSession(sessionId) {
+        this._abortIfGenerating();
         try {
             const response = await this.fetchWithCsrf(`/ui/session/${sessionId}/history`);
             if (response.ok) {
                 const data = await response.json();
                 this.currentSessionId = sessionId;
                 this.clearChat();
+                this.removeFilePreview();
                 this.renderMessages(data.messages || []);
                 this.renderSessions();
             }
@@ -1304,6 +1387,21 @@ class NexeUI {
                             chunk = chunk.replace(/\x00\[COMPACT:\d+\]\x00/, '');
                         }
 
+                        // Detectar DOC_TRUNCATED (document massa gran pel context)
+                        const truncMatch = chunk.match(/\x00\[DOC_TRUNCATED:(\d+)\]\x00/);
+                        if (truncMatch) {
+                            const truncPct = parseInt(truncMatch[1]);
+                            chunk = chunk.replace(/\x00\[DOC_TRUNCATED:\d+\]\x00/, '');
+                            const truncNotice = document.createElement('div');
+                            truncNotice.className = 'trunc-notice';
+                            truncNotice.textContent = this.lang === 'es'
+                                ? `\u26A0 Documento demasiado grande para el contexto actual (${truncPct}% descartado)`
+                                : this.lang === 'en'
+                                ? `\u26A0 Document too large for current context (${truncPct}% discarded)`
+                                : `\u26A0 Document massa gran pel context actual (${truncPct}% descartat)`;
+                            lastMsg.querySelector('.message-content').insertBefore(truncNotice, assistantMessageDiv);
+                        }
+
                         // Detectar MODEL_LOADING (model carregant-se a VRAM)
                         const loadingMatch = chunk.match(/\x00\[MODEL_LOADING:([^\]|]+)\|?([^\]]*)\]\x00/);
                         if (loadingMatch) {
@@ -1410,6 +1508,11 @@ class NexeUI {
                         fullResponse = fullResponse.replace(/\n[^\n]*:\s*\n\s*\.\s*\n/g, '\n');
                         fullResponse = fullResponse.replace(/\n\s*\.\s*\n/g, '\n');
                         fullResponse = fullResponse.replace(/\n{3,}/g, '\n\n');
+                    }
+                    // Guard: si la resposta queda buida despres de treure MEM_SAVE, mostrar checkmark
+                    if (!fullResponse.trim() && memFacts.length > 0) {
+                        console.warn('[nexe] Empty response after stripping MEM_SAVE — showing checkmark. Facts:', memFacts);
+                        fullResponse = '\u2713';
                     }
                     // Strip model tags that leak into visible text
                     fullResponse = fullResponse.replace(/\[ACTION\]:\s*[^\n]*/g, '');
@@ -1555,6 +1658,19 @@ class NexeUI {
     stopGeneration() {
         if (this.abortController && this.isGenerating) {
             this.abortController.abort();
+        }
+    }
+
+    _abortIfGenerating() {
+        if (this.isGenerating && this.abortController) {
+            this.abortController.abort();
+            this.messageInput.disabled = false;
+            this.sendBtn.style.display = 'flex';
+            this.stopBtn.style.display = 'none';
+            this.isGenerating = false;
+            this.abortController = null;
+            this._stopStreamStats();
+            this.setAiState('idle');
         }
     }
 
@@ -1847,6 +1963,13 @@ class NexeUI {
         this.filePreview.replaceChildren();
         this.filePreview.classList.remove('active');
         this.uploadedFile = null;
+        // Netejar document server-side
+        if (this.currentSessionId) {
+            this.fetchWithCsrf('/ui/session/' + this.currentSessionId + '/clear-document', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            }).catch(function(e) { console.warn('Could not clear document:', e); });
+        }
     }
 
     setupDragAndDrop() {
@@ -1887,27 +2010,33 @@ class NexeUI {
     }
 
     showWelcome() {
+        // NOTE: innerHTML uses only trusted i18n strings from UI_STRINGS, not user input
         this.chatMessages.innerHTML = `
             <div class="welcome-screen">
                 <div class="welcome-icon"><i data-lucide="bot"></i></div>
                 <h2>${this.t('welcome_title')}</h2>
                 <p>${this.t('welcome_subtitle')}</p>
                 <div class="features">
-                    <div class="feature">
+                    <div class="feature feature-clickable" data-action="chat" title="${this.t('feature_chat')}">
                         <span class="feature-icon"><i data-lucide="message-circle"></i></span>
                         <span>${this.t('feature_chat')}</span>
                     </div>
-                    <div class="feature">
+                    <div class="feature feature-clickable" data-action="upload" title="${this.t('feature_upload')}">
                         <span class="feature-icon"><i data-lucide="folder-open"></i></span>
                         <span>${this.t('feature_upload')}</span>
                     </div>
-                    <div class="feature">
+                    <div class="feature" title="${this.t('feature_local')}">
                         <span class="feature-icon"><i data-lucide="lock"></i></span>
                         <span>${this.t('feature_local')}</span>
                     </div>
                 </div>
             </div>
         `;
+        // Make features clickable
+        const chatFeature = this.chatMessages.querySelector('[data-action="chat"]');
+        if (chatFeature) chatFeature.addEventListener('click', () => this.messageInput.focus());
+        const uploadFeature = this.chatMessages.querySelector('[data-action="upload"]');
+        if (uploadFeature) uploadFeature.addEventListener('click', () => this.fileInput.click());
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 

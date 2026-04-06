@@ -1,12 +1,12 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-02
 id: nexe-rag-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Complete reference of the server-nexe RAG memory system (v0.9.0 pre-release). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent, session-isolated document upload, embeddings (768D), chunking parameters, context building with i18n labels, RAG weight visualization, RAG context sanitization, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
-chunk_size: 800
+chunk_size: 600
 priority: P1
 
 # === OPCIONAL ===
@@ -102,7 +102,9 @@ server-nexe has an automatic memory system similar to ChatGPT or Claude. The mod
 
 **Deduplication:** Before saving, checks similarity with existing entries. If similarity > 0.80, the entry is considered duplicate and not saved.
 
-**Delete intent:** When user says "forget that X", searches for entries with similarity >= 0.6 and deletes the closest match.
+**Delete intent (MEM_DELETE):** When user says "forget that X", searches for entries with similarity >= DELETE_THRESHOLD (0.70). Deletes the closest match. Anti-re-save guard: `_recently_deleted_facts` prevents the model from re-saving a just-deleted fact within the same session.
+
+**Large document truncation:** If an uploaded document is too large for the available context, it is truncated and the UI shows a yellow warning via the SSE marker `[DOC_TRUNCATED:XX%]` indicating the percentage discarded.
 
 ## RAG Context Sanitization
 
@@ -119,8 +121,8 @@ Documents uploaded via the Web UI are indexed into `user_knowledge` collection w
 - Documents persist within the session (not cleared on page refresh)
 - Metadata is generated without LLM (instant, no model required)
 
-**Supported formats:** .txt, .md, .pdf
-**Chunking for uploads:** 2500 characters per chunk, 150 characters overlap.
+**Supported formats:** .txt, .md, .pdf (with magic bytes validation SEC-004)
+**Chunking for uploads:** Dynamic based on document size -- 800 chars (<20K), 1000 (<100K), 1200 (<300K), 1500 (>=300K). If the document has a valid RAG header, the specified chunk_size is used.
 
 ## Document Ingestion
 
@@ -132,7 +134,7 @@ Documents uploaded via the Web UI are indexed into `user_knowledge` collection w
 
 ### User knowledge (user_knowledge via CLI)
 - Source: `knowledge/` folder (ca/en/es subfolders)
-- Chunking: 2500 characters per chunk, 150 characters overlap
+- Chunking: 1500 characters per chunk by default (configurable via RAG header chunk_size), overlap = max(50, chunk_size/10)
 - Ingested via `core/ingest/ingest_knowledge.py`
 - Supports RAG headers with metadata (`#!RAG id=..., priority=...`)
 

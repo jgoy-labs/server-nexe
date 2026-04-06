@@ -37,8 +37,148 @@ def _compact_session(session, engine, session_mgr):
 logger = logging.getLogger(__name__)
 
 
+# ─── Bug 17 — Hardened MEM_SAVE extractor ────────────────────────────────────
+# El format estricte que acceptem és: [MEM_SAVE: <text>]
+# - <text> ha de tenir entre 5 i MEM_SAVE_MAX_LEN caracters
+# - No pot contenir newlines, tabs, brackets ([]), brackets HTML, ni control chars
+# - Només lletres (incloent accents/cyrillic), digits, espai i puntuació segura
+# - Es rebutgen explicitament: <, >, [, ], {, }, |, `, \x00-\x1f
+# - Es rebutgen MEM_SAVE niats (un MEM_SAVE dins l'altre)
+MEM_SAVE_MAX_LEN = 200
+MEM_SAVE_MIN_LEN = 5
+
+# Whitelist: lletres unicode, digits, espai i puntuació safe ( . , ; : ! ? ' " - + / = % $ € @ # & ( ) )
+_MEM_SAVE_ALLOWED_CHARS = _re.compile(
+    r"^[\w\s\.\,\;\:\!\?\'\"\-\+\/\=\%\$\€\@\#\&\(\)]+$",
+    _re.UNICODE,
+)
+# Caracters forbidden explicits (defensa addicional)
+_MEM_SAVE_FORBIDDEN = _re.compile(r"[\x00-\x1f\x7f<>\[\]\{\}\|`\\]")
+# Format estricte: ha de començar amb [MEM_SAVE: i acabar amb ] sense bracket nestat
+_MEM_SAVE_STRICT_RE = _re.compile(r'\[MEM_SAVE:\s*([^\[\]\n\r\t]{1,250})\]')
+
+
+def _is_valid_mem_save_text(text: str, user_input: str = "") -> bool:
+    """
+    Bug 17 — Valida estrictament el text d'un MEM_SAVE extret del LLM.
+
+    Args:
+        text: contingut entre [MEM_SAVE: ...]
+        user_input: missatge usuari original — si MEM_SAVE és exactament el mateix
+                    l'extractem com a sospitós (probable echo/injection)
+
+    Returns:
+        True si és segur per guardar, False si s'ha de rebutjar.
+    """
+    if not isinstance(text, str):
+        return False
+    text = text.strip()
+    if not text:
+        return False
+    if len(text) < MEM_SAVE_MIN_LEN or len(text) > MEM_SAVE_MAX_LEN:
+        return False
+    # Cap newline, tab, control char ni bracket
+    if _MEM_SAVE_FORBIDDEN.search(text):
+        return False
+    # Whitelist de caracters
+    if not _MEM_SAVE_ALLOWED_CHARS.match(text):
+        return False
+    # No permetre paraules-clau d'injecció (case-insensitive)
+    _lowered = text.lower()
+    _bad_keywords = (
+        'mem_save', 'system prompt', 'ignore previous',
+        'ignore all previous', 'override instruction',
+        '<script', 'javascript:', 'onerror=', 'onload=',
+    )
+    for kw in _bad_keywords:
+        if kw in _lowered:
+            return False
+    # Si el MEM_SAVE és exactament el missatge usuari (o el conté literal),
+    # és sospitós: el LLM ha "fet eco" del prompt.
+    if user_input:
+        _user_clean = user_input.strip().lower()
+        if _user_clean and (_lowered == _user_clean or (len(_user_clean) > 10 and _user_clean in _lowered)):
+            return False
+    return True
+
+
+def compute_context_budget(
+    max_context_chars: int,
+    system_chars: int,
+    history_chars: int,
+    message_chars: int,
+    document_chars: int,
+    history_ratio: float = 0.30,
+    response_buffer: int = 500,
+):
+    """
+    Bug 32 — Calcula el budget de context preservant un mínim per l'historial.
+
+    Args:
+        max_context_chars: capacitat total del context window (en chars).
+        system_chars: caràcters del system prompt.
+        history_chars: caràcters reals de l'historial actual.
+        message_chars: caràcters del missatge user actual.
+        document_chars: caràcters del document a injectar (0 si no n'hi ha).
+        history_ratio: fracció del context reservada com a mínim per historial (0..0.9).
+        response_buffer: chars reservats per la resposta del model.
+
+    Returns:
+        dict amb:
+          - history_reserve: mínim de chars reservats per historial
+          - history_effective: chars reals que ocuparà l'historial (no es trunca)
+          - available_chars: chars disponibles per document/RAG
+          - doc_truncated_pct: % del document que s'ha tallat (0 si cap)
+          - doc_kept_chars: chars del document que s'envien
+    """
+    history_ratio = max(0.0, min(0.9, history_ratio))
+    # Fix Consultor passada 1 — Finding 5: `history_reserve` es en realitat
+    # el "sol minim" (floor) reservat per a l'historial. El historial real
+    # (`history_effective`) pot creixer per damunt d'aquest sol si els
+    # missatges son llargs. Mantenim el nom public (env var
+    # NEXE_HISTORY_CONTEXT_RATIO i clau del dict retornat) pero
+    # documentem el significat exacte aqui per evitar confusions futures.
+    history_floor = int(max_context_chars * history_ratio)
+    history_reserve = history_floor  # alias per retrocompatibilitat
+    history_effective = max(history_chars, history_floor)
+    available_chars = max_context_chars - system_chars - history_effective - message_chars - response_buffer
+
+    doc_truncated_pct = 0
+    doc_kept_chars = 0
+    if document_chars > 0 and available_chars > 0:
+        if document_chars > available_chars:
+            doc_kept_chars = available_chars
+            doc_truncated_pct = round((1 - available_chars / document_chars) * 100)
+        else:
+            doc_kept_chars = document_chars
+
+    return {
+        "history_reserve": history_reserve,
+        "history_effective": history_effective,
+        "available_chars": available_chars,
+        "doc_truncated_pct": doc_truncated_pct,
+        "doc_kept_chars": doc_kept_chars,
+    }
+
+
+def _extract_safe_mem_saves(text: str, user_input: str = "") -> list:
+    """
+    Bug 17 — Extreu i valida tots els [MEM_SAVE: ...] d'un text de manera segura.
+
+    Returns:
+        Llista de strings vàlids per guardar (potencialment buida).
+    """
+    if not isinstance(text, str) or not text:
+        return []
+    matches = _MEM_SAVE_STRICT_RE.findall(text)
+    return [m.strip() for m in matches if _is_valid_mem_save_text(m, user_input)]
+
+
 def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     """Registra endpoint: POST /chat"""
+
+    # Concurrency limiter: max 2 simultaneous chat requests to avoid Ollama overload
+    _chat_semaphore = asyncio.Semaphore(2)
 
     # -- POST /chat --
     #    ~550 lines: intent detection, RAG, compaction,
@@ -48,6 +188,19 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     @limiter.limit("20/minute")
     async def chat(request: FastAPIRequest, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Chat endpoint with streaming and memory intent detection"""
+        # Acquire semaphore with timeout to avoid queueing forever
+        try:
+            async with asyncio.timeout(5):
+                await _chat_semaphore.acquire()
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=429, detail="Server busy, try again in a moment")
+        try:
+            return await _chat_inner(request, body, _auth)
+        finally:
+            _chat_semaphore.release()
+
+    async def _chat_inner(request: FastAPIRequest, body: Dict[str, Any], _auth):
+        """Inner chat logic, called under semaphore."""
         message = body.get("message", "")
         session_id = body.get("session_id")
         stream = body.get("stream", False)
@@ -71,6 +224,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
         response_text = ""
         memory_action = None
+        model_name = None
 
         if intent == "save":
             # Save to memory
@@ -112,6 +266,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         f"Deleted {result['deleted']} memory(ies){facts_detail}. "
                         f"I won't remember this anymore."
                     )
+                    # Guardar fets esborrats per evitar re-save al torn següent
+                    if deleted_facts:
+                        session._recently_deleted_facts = [f["text"] for f in deleted_facts]
                     # Emit delete token for frontend badge
                     if deleted_facts:
                         facts_pipe = "|".join(f["text"][:80] for f in deleted_facts[:5])
@@ -155,6 +312,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 module_manager = get_server_state().module_manager
                 # Prioritzar model/backend del request (selector UI) sobre env vars
                 model_name = body.get("model") or os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
+                if len(model_name) > 100:
+                    raise HTTPException(status_code=400, detail="Model name too long (max 100 chars)")
                 preferred_engine = (body.get("backend") or os.getenv("NEXE_MODEL_ENGINE", "auto")).lower()
 
                 # Log available modules
@@ -346,7 +505,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
                         # Inject current date+time so the model knows when "now" is
                         from datetime import datetime as _dt
-                        system_prompt = base_system_prompt + f"\n\nToday: {_dt.now().strftime('%Y-%m-%d %H:%M')}"
+                        system_prompt = base_system_prompt + f"\n\nToday: {_dt.now().strftime('%Y-%m-%d')}"
 
                         # 4. Prepare messages payload for engine
                         engine_messages = [
@@ -354,16 +513,43 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             for m in context_messages
                         ]
 
-                        # Token budget: estimate total context and truncate if needed
+                        # ── Bug 32: Dynamic context budget ─────────────────────────────────
+                        # Reserve a minimum slice of the model context for conversation history
+                        # so that a huge attached document never wipes out previous turns.
+                        # Configurable via NEXE_HISTORY_CONTEXT_RATIO (default 0.30 = 30%).
                         MAX_CONTEXT_CHARS = int(_os.environ.get("NEXE_MAX_CONTEXT_CHARS", "24000"))
+                        try:
+                            _history_ratio = float(_os.environ.get("NEXE_HISTORY_CONTEXT_RATIO", "0.30"))
+                        except ValueError:
+                            _history_ratio = 0.30
+
                         system_chars = len(system_prompt)
                         history_chars = sum(len(m.get("content", "")) for m in context_messages)
                         message_chars = len(message)
-                        available_chars = MAX_CONTEXT_CHARS - system_chars - history_chars - message_chars - 500
+
+                        _budget = compute_context_budget(
+                            max_context_chars=MAX_CONTEXT_CHARS,
+                            system_chars=system_chars,
+                            history_chars=history_chars,
+                            message_chars=message_chars,
+                            document_chars=len(document_context) if document_context else 0,
+                            history_ratio=_history_ratio,
+                            response_buffer=500,
+                        )
+                        available_chars = _budget["available_chars"]
 
                         # Injectar context als messages (no al system prompt -> MLX pot cachear el prefix)
-                        if document_context and available_chars > 0:
-                            document_context = document_context[:available_chars]
+                        _doc_truncated_pct = _budget["doc_truncated_pct"]
+                        if document_context and _budget["doc_kept_chars"] > 0:
+                            _original_doc_len = len(document_context)
+                            document_context = document_context[: _budget["doc_kept_chars"]]
+                            if _doc_truncated_pct > 0:
+                                logger.info(
+                                    "Bug 32: document truncated %s%% to preserve history reserve "
+                                    "(history=%s, reserve=%s, doc_orig=%s, doc_kept=%s)",
+                                    _doc_truncated_pct, history_chars, _budget["history_reserve"],
+                                    _original_doc_len, _budget["doc_kept_chars"],
+                                )
                             # Document adjuntat: va davant del missatge de l'usuari
                             doc_block = (
                                 "[DOCUMENT ADJUNTAT]\n"
@@ -374,10 +560,25 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 f"{message}"
                             )
                             engine_messages.append({"role": "user", "content": doc_block})
+                        elif document_context and _budget["doc_kept_chars"] == 0:
+                            # Bug 32: no queda espai pel document; descartem perquè l'historial té prioritat.
+                            logger.warning(
+                                "Bug 32: dropping document (history reserved fully) — history=%s, reserve=%s",
+                                history_chars, _budget["history_reserve"],
+                            )
+                            document_context = ""
+                            engine_messages.append({"role": "user", "content": message})
                         elif rag_context and available_chars > 0:
                             rag_context = rag_context[:available_chars]
                             # Context RAG: docs sistema, docs tecnics, memoria
-                            rag_block = f"[CONTEXT]\n{rag_context}[FI CONTEXT]\n\n{message}"
+                            _rag_instruction = {
+                                "ca": "INFORMACIO RECUPERADA DE LA MEMORIA. UTILITZA-LA per respondre. Si la resposta es aqui, cita-la directament:",
+                                "es": "INFORMACION RECUPERADA DE LA MEMORIA. UTILIZALA para responder. Si la respuesta esta aqui, citala directamente:",
+                                "en": "RETRIEVED INFORMATION FROM MEMORY. USE IT to answer. If the answer is here, cite it directly:",
+                            }
+                            _lang_key = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
+                            _instr = _rag_instruction.get(_lang_key, _rag_instruction["en"])
+                            rag_block = f"[CONTEXT]\n{_instr}\n{rag_context}\n[FI CONTEXT]\n\n{message}"
                             engine_messages.append({"role": "user", "content": rag_block})
                         else:
                             engine_messages.append({"role": "user", "content": message})
@@ -458,6 +659,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             yield f"\x00[RAG_ITEM:{_safe_col}|{_score:.2f}]\x00"
                                 if _compacted:
                                     yield f"\x00[COMPACT:{int(session.compaction_count)}]\x00"
+                                if _doc_truncated_pct > 0:
+                                    yield f"\x00[DOC_TRUNCATED:{_doc_truncated_pct}]\x00"
 
                                 # Check if model is loaded (Ollama, MLX, llama.cpp)
                                 if hasattr(engine, 'is_model_loaded'):
@@ -599,9 +802,13 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 else:
                                     # Fallback: treure prefix "analysis..." si hi es
                                     clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
-                                # Extract [MEM_SAVE: ...] facts from LLM response
-                                _mem_saves = _re.findall(r'\[MEM_SAVE:\s*(.+?)\]', clean_response)
-                                clean_response = _re.sub(r'\[MEM_SAVE:\s*.+?\]\s*', '', clean_response).strip()
+                                # Bug 17: Extract [MEM_SAVE: ...] facts amb validacio estricta.
+                                # _extract_safe_mem_saves filtra per format/longitud/whitelist
+                                # i rebutja MEM_SAVE que copien el missatge usuari.
+                                _mem_saves = _extract_safe_mem_saves(clean_response, user_input=message)
+                                # Tot i així, el strip del cos visible s'aplica al patró ampli per
+                                # eliminar QUALSEVOL [MEM_SAVE: ...] (vàlid o no) de la resposta.
+                                clean_response = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
 
                                 if clean_response:
                                     # Save LLM-extracted facts to memory
@@ -625,6 +832,17 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         fact = fact.strip()
                                         if not fact or len(fact) < 5:
                                             continue
+                                        # No re-guardar fets recentment esborrats
+                                        _deleted = getattr(session, '_recently_deleted_facts', [])
+                                        if _deleted:
+                                            _skip = False
+                                            for _del_fact in _deleted:
+                                                if fact.lower() in _del_fact.lower() or _del_fact.lower() in fact.lower():
+                                                    logger.debug("MEM_SAVE skip (recently deleted): '%s'", fact[:80])
+                                                    _skip = True
+                                                    break
+                                            if _skip:
+                                                continue
                                         # Filtrar fets negatius/brossa
                                         if _junk_patterns.search(fact):
                                             logger.debug("MEM_SAVE skip (junk): '%s'", fact[:80])
@@ -702,6 +920,15 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         if response_text:
                             logger.info(f"{engine_name} succeeded!")
                             break
+                    except ValueError as e:
+                        error_msg = str(e)
+                        if "not found" in error_msg.lower():
+                            raise HTTPException(status_code=404, detail=error_msg)
+                        raise HTTPException(status_code=400, detail=error_msg)
+                    except ConnectionError as e:
+                        raise HTTPException(status_code=503, detail=f"Cannot connect to {engine_name}: {e}")
+                    except TimeoutError as e:
+                        raise HTTPException(status_code=504, detail=f"Timeout calling {engine_name}: {e}")
                     except Exception as e:
                         logger.warning(f"{engine_name} failed: {e}")
                         logger.debug("Engine error details:", exc_info=True)
@@ -709,6 +936,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
                 if not response_text:
                     response_text = "Error: No AI engine available (try starting Ollama with 'ollama serve')"
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error calling LLM: {e}")
                 response_text = f"Error: {str(e)}"
@@ -724,22 +953,32 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 response_text = _m_ns.group(1).strip()
             else:
                 response_text = _re.sub(r'^analysis\s*', '', response_text, flags=_re.IGNORECASE).strip()
-            # Extreure [MEM_SAVE: ...] fets abans de strip
-            _mem_saves_ns = _re.findall(r'\[MEM_SAVE:\s*(.+?)\]', response_text)
-            response_text = _re.sub(r'\[MEM_SAVE:\s*.+?\]\s*', '', response_text).strip()
+            # Bug 17: Extreure [MEM_SAVE: ...] fets amb validacio estricta abans de strip
+            _mem_saves_ns = _extract_safe_mem_saves(response_text, user_input=message)
+            response_text = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', response_text).strip()
             # Save extracted facts to memory
             if _mem_saves_ns:
                 _junk_re = _re.compile(
                     r'(?i)(no\s+(coneix|s.han|tinc|té|hi ha)|'
                     r'no\s+s.han\s+detectat|busco\s+ajuda|necessit[oa]|'
-                    r'primera\s+interacci|no\s+personal|sense\s+dades)',
+                    r'primera\s+interacci|no\s+personal|sense\s+dades|'
+                    # Anti-hallucination: detect fabricated personal data
+                    r'se\s+llama\s+\w+\s+y\s+(vive|tiene|trabaja)|'
+                    r'el\s+usuario\s+se\s+llama|the\s+user.s\s+name\s+is|'
+                    r'l.usuari\s+es\s+diu)',
                 )
+                # Anti-hallucination: skip MEM_SAVEs on first interaction
+                _prior_msgs = [m for m in session.messages if m.get("role") == "user"]
+                _is_first_turn = len(_prior_msgs) <= 1
                 for _fact in _mem_saves_ns:
                     _fact = _fact.strip()
                     if not _fact or len(_fact) < 5:
                         continue
                     if _junk_re.search(_fact):
                         logger.debug("MEM_SAVE skip (junk/no-stream): '%s'", _fact[:80])
+                        continue
+                    if _is_first_turn:
+                        logger.debug("MEM_SAVE skip (first turn, likely hallucination): '%s'", _fact[:80])
                         continue
                     try:
                         _save_r = await memory_helper.save_to_memory(

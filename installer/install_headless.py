@@ -18,8 +18,19 @@ import sys
 import time
 import threading
 import traceback
+import warnings
 from datetime import datetime
 from pathlib import Path
+
+# Bug 3 (2026-04-06) — silenciar warnings de HuggingFace al log GUI.
+# Abans `Please set a HF_TOKEN...` arribava a la GUI durant la instal·lació
+# headless i confonia l'usuari. Ara desactivem telemetria, progress bars i
+# els warnings específics abans que cap import HF els pugui emetre.
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
+warnings.filterwarnings("ignore", message=".*HF_TOKEN.*")
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
 # Import root: parent of installer/ package (works from both app bundle and repo)
 _import_root = str(Path(__file__).parent.parent.resolve())
@@ -42,11 +53,23 @@ from installer.installer_setup_models import (
     _download_mlx_model,
 )
 from installer.installer_finalize import _write_commands_file
+from installer.installer_reinstall import (
+    DEFAULT_REINSTALL_MODE,
+    VALID_REINSTALL_MODES,
+    apply_reinstall_mode,
+    detect_existing_install,
+)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # INSTALLATION LOG — persistent file for debugging failures
 # ═══════════════════════════════════════════════════════════════════════════
-LOG_DIR = PROJECT_ROOT / "storage" / "logs"
+# Dev #3 fix (Consultor passada 1, finding 3): abans LOG_DIR era
+# PROJECT_ROOT/storage/logs, però `apply_reinstall_mode(BACKUP)` mou
+# `storage/` a `.nexe-backups/` i el FileHandler queda escrivint a un
+# fd mort. Ara els logs d'instal·lació viuen a ~/.nexe/install_logs/,
+# fora del project_root, persistents entre instal·lacions i immunes
+# al backup/wipe de l'installer.
+LOG_DIR = Path.home() / ".nexe" / "install_logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOG_DIR / f"log_installer_error_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
@@ -152,6 +175,37 @@ def _run_headless_inner(config):
     project_root = Path(config.get("path", str(PROJECT_ROOT)))
     model_key = config.get("model_key")
     engine = config.get("engine", "ollama")
+    # Bug 28 fix — permet a l'usuari saltar proactivament la descarrega
+    # del model. El model escollit queda registrat a `.env` (per a quan
+    # l'usuari el descarregui manualment despres via `nexe model pull`),
+    # pero NO toquem `storage/models/` i no consumim ample de banda.
+    skip_model_download = bool(config.get("skip_model_download", False))
+    reinstall_mode = config.get("reinstall_mode", DEFAULT_REINSTALL_MODE)
+    if reinstall_mode not in VALID_REINSTALL_MODES:
+        _log.warning(
+            "Invalid reinstall_mode=%r, falling back to default %r",
+            reinstall_mode, DEFAULT_REINSTALL_MODE,
+        )
+        reinstall_mode = DEFAULT_REINSTALL_MODE
+
+    # Bug 7 fix — gestió de reinstal·lació amb 3 modes (wipe/overwrite/backup).
+    # Si detectem una instal·lació prèvia, apliquem el mode escollit per
+    # l'usuari abans de fer res més. Sense això, la mateixa API key, vectors
+    # i knowledge base es reciclarien (i la KB es duplicaria per re-ingestió).
+    if project_root.exists() and detect_existing_install(project_root):
+        try:
+            summary = apply_reinstall_mode(project_root, reinstall_mode)
+            _log.info(
+                "Reinstall mode=%s applied: removed=%d backup_dir=%s",
+                summary["mode"], len(summary["removed"]), summary["backup_dir"],
+            )
+            if summary.get("backup_dir"):
+                print(f"[BACKUP] {summary['backup_dir']}", flush=True)
+            print(f"[REINSTALL] mode={reinstall_mode}", flush=True)
+        except Exception as e:
+            _log.error(f"Reinstall mode application failed: {e}\n{traceback.format_exc()}")
+            print(f"[ERROR] Reinstall mode failed: {e}", flush=True)
+            sys.exit(1)
 
     # Set language for i18n
     os.environ["NEXE_LANG"] = lang
@@ -251,26 +305,57 @@ def _run_headless_inner(config):
         sys.exit(1)
 
     # ── Step 3: Download model ──────────────────────────────────────────
-    emit(3, "running", f"Downloading {model_config['name']} ({engine})...")
-    _log.info(f"Starting model download: {model_config['name']} engine={engine} id={model_config['id']}")
-    try:
-        if engine == "ollama":
-            ensure_ollama_installed()
-            _download_ollama_model(model_config)
-        elif engine == "llama_cpp":
-            _download_gguf_model(model_config, project_root)
-        elif engine == "mlx":
-            _download_mlx_model(model_config, project_root, python_path)
-        _log.info("Model download complete")
-        emit(3, "done")
-    except Exception as e:
-        _log.error(f"Model download failed: {e}\n{traceback.format_exc()}")
-        emit(3, "error", str(e)[:200])
-        print(f"[ERROR] Model download failed: {e}", flush=True)
-        _model_ok = False
-        # Continue — model can be downloaded later
+    # Bug 28 fix — si l'usuari ha demanat saltar la descarrega, el
+    # model queda registrat al .env (Step 4) pero no descarreguem res.
+    # L'usuari pot fer `nexe model pull <name>` despres.
+    if skip_model_download:
+        emit(3, "running", "Skipping model download (user requested)")
+        _log.info(
+            "Skipping model download per skip_model_download=True; "
+            "model_key=%s engine=%s id=%s will be registered in .env only",
+            model_key, engine, model_config["id"],
+        )
+        emit(3, "done", "Skipped (model registered, download deferred)")
+        print("[MODEL_SKIPPED] download deferred", flush=True)
+        _model_ok = True  # treated as success — user opted out explicitly
     else:
-        _model_ok = True
+        emit(3, "running", f"Downloading {model_config['name']} ({engine})...")
+        _log.info(f"Starting model download: {model_config['name']} engine={engine} id={model_config['id']}")
+        try:
+            if engine == "ollama":
+                if not ensure_ollama_installed():
+                    _log.warning("Ollama installation failed or skipped")
+                    emit(3, "error", "Ollama not available")
+                    raise RuntimeError("Ollama installation failed — cannot download model")
+                _download_ollama_model(model_config, headless=True)
+            elif engine == "llama_cpp":
+                _download_gguf_model(model_config, project_root, headless=True)
+            elif engine == "mlx":
+                if not hw.get("has_metal", False):
+                    _log.warning("MLX requested but Metal not available — falling back to ollama")
+                    emit(3, "running", "MLX not available (no Metal), falling back to Ollama...")
+                    # Rebuild model_config for ollama fallback
+                    ollama_id = selected_model.get("ollama")
+                    if ollama_id:
+                        model_config = {**model_config, "engine": "ollama", "id": ollama_id}
+                        engine = "ollama"
+                        if not ensure_ollama_installed():
+                            raise RuntimeError("Ollama installation failed — cannot download model")
+                        _download_ollama_model(model_config, headless=True)
+                    else:
+                        raise RuntimeError(f"No Ollama fallback for model {model_config['name']}")
+                else:
+                    _download_mlx_model(model_config, project_root, python_path, headless=True)
+            _log.info("Model download complete")
+            emit(3, "done")
+        except Exception as e:
+            _log.error(f"Model download failed: {e}\n{traceback.format_exc()}")
+            emit(3, "error", str(e)[:200])
+            print(f"[ERROR] Model download failed: {e}", flush=True)
+            _model_ok = False
+            # Continue — model can be downloaded later
+        else:
+            _model_ok = True
 
     # ── Step 4: Configure .env ──────────────────────────────────────────
     emit(4, "running", "Generating configuration...")
@@ -476,10 +561,48 @@ def _get_model_size(model_key):
 # ═══════════════════════════════════════════════════════════════════════════
 # ENTRY POINT — reads JSON config from stdin
 # ═══════════════════════════════════════════════════════════════════════════
+def _parse_cli_overrides(argv):
+    """Parse minimal CLI overrides — currently only --reinstall-mode.
+
+    Bug 7 — permet a un usuari headless triar el mode de reinstal·lació
+    sense haver de fer-ho via JSON. El JSON segueix manant si també l'aporta.
+    """
+    overrides = {}
+    it = iter(argv)
+    for arg in it:
+        if arg == "--reinstall-mode":
+            try:
+                overrides["reinstall_mode"] = next(it)
+            except StopIteration:
+                print("[ERROR] --reinstall-mode requires a value", flush=True)
+                sys.exit(2)
+        elif arg.startswith("--reinstall-mode="):
+            overrides["reinstall_mode"] = arg.split("=", 1)[1]
+        elif arg == "--skip-model-download":
+            # Bug 28 fix — flag CLI per saltar la descarrega del model
+            # de forma proactiva (no nomes en cas d'error). El model
+            # escollit queda registrat al .env per a descarrega manual
+            # posterior via `nexe model pull <name>`.
+            overrides["skip_model_download"] = True
+    if "reinstall_mode" in overrides:
+        if overrides["reinstall_mode"] not in VALID_REINSTALL_MODES:
+            print(
+                f"[ERROR] Invalid --reinstall-mode={overrides['reinstall_mode']!r}. "
+                f"Valid: {', '.join(VALID_REINSTALL_MODES)}",
+                flush=True,
+            )
+            sys.exit(2)
+    return overrides
+
+
 if __name__ == "__main__":
     try:
+        cli_overrides = _parse_cli_overrides(sys.argv[1:])
         raw = sys.stdin.read()
         config = json.loads(raw)
+        # CLI overrides aplicats si el JSON no els porta
+        for k, v in cli_overrides.items():
+            config.setdefault(k, v)
         _log.info(f"Starting installation with config: {json.dumps(config, ensure_ascii=False)}")
         # Emit log path immediately so GUI can always show it on failures.
         print(f"[LOG] {LOG_FILE}", flush=True)

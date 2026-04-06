@@ -23,6 +23,7 @@ from fastapi.responses import StreamingResponse
 from ..chat_memory import _pending_save_tasks, _save_conversation_to_memory
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
+from .ollama_helpers import auto_num_ctx
 
 logger = logging.getLogger(__name__)
 
@@ -33,27 +34,7 @@ TAGS_CACHE_TTL = 30  # seconds
 # CS7: Configurable stream timeout via env var (default 300s for thinking models)
 _OLLAMA_STREAM_TIMEOUT = float(os.environ.get("NEXE_OLLAMA_STREAM_TIMEOUT", "300"))
 
-def _auto_num_ctx() -> int:
-    """Auto-detect num_ctx based on system RAM. Override with NEXE_OLLAMA_NUM_CTX."""
-    explicit = os.environ.get("NEXE_OLLAMA_NUM_CTX")
-    if explicit:
-        return int(explicit)
-    try:
-        import psutil
-        ram_gb = psutil.virtual_memory().total / (1024 ** 3)
-    except ImportError:
-        return 4096
-    if ram_gb >= 64:
-        return 32768
-    elif ram_gb >= 32:
-        return 16384
-    elif ram_gb >= 24:
-        return 8192
-    elif ram_gb >= 16:
-        return 4096
-    return 2048
-
-_OLLAMA_NUM_CTX = _auto_num_ctx()
+_OLLAMA_NUM_CTX = auto_num_ctx()
 
 _OLLAMA_ERRORS = {
     "ca": {
@@ -110,7 +91,8 @@ async def _forward_to_ollama(
             async with httpx.AsyncClient(timeout=3.0) as client:
                 tags_resp = await client.get(f"{_ollama_host}/api/tags")
                 if tags_resp.status_code != 200:
-                     raise HTTPException(status_code=502, detail=f"Ollama error (HTTP {tags_resp.status_code})")
+                     from core.messages import get_message as _core_msg
+                     raise HTTPException(status_code=502, detail=_core_msg(None, "core.ollama.http_error", status=tags_resp.status_code))
                 available_models = [m.get("name", "") for m in tags_resp.json().get("models", [])]
                 _ollama_tags_cache["models"] = available_models
                 _ollama_tags_cache["ts"] = _now
@@ -127,12 +109,22 @@ async def _forward_to_ollama(
             if matching:
                 model_name = matching[0]
                 logger.info("Using available model: %s", model_name)
-            elif chat_models:
-                # Use first available chat model as fallback
-                model_name = chat_models[0]
-                logger.warning("Requested model not found. Using available model: %s", model_name)
             else:
+                # Bug 23 (2026-04-06) — abans, si el model demanat no existia,
+                # agafavem silenciosament el primer chat_model com a fallback i
+                # retornavem una resposta amb un model que l'usuari no havia
+                # demanat (HTTP 200). Això enganyava als clients. Ara, si no
+                # tenim match exacte ni parcial, llancem 404 amb missatge clar.
+                # Si ni tan sols hi ha chat models disponibles, 503 com abans.
                 _lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+                if chat_models:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=(
+                            f"Model '{model_name}' not found. "
+                            f"Available chat models: {', '.join(chat_models[:5])}"
+                        ),
+                    )
                 raise HTTPException(
                     status_code=503,
                     detail=_OLLAMA_ERRORS.get(_lang, _OLLAMA_ERRORS["en"])["no_model"]
@@ -201,9 +193,10 @@ async def _forward_to_ollama(
                     }
                 return response
         except httpx.ConnectError:
+            from core.messages import get_message as _core_msg
             raise HTTPException(
                 status_code=503,
-                detail="Ollama not responding. Verify it is running: ollama serve"
+                detail=_core_msg(None, "core.ollama.not_responding")
             )
 
 async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user_msg: str = None):

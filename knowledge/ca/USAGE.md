@@ -1,12 +1,12 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-02
 id: nexe-usage-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia d'us per a server-nexe 0.9.0 pre-release. Cobreix comandes CLI (go, chat, memory, knowledge, status, encryption), funcionalitats de la Web UI (i18n, indicador de carrega, panell d'informacio RAG, mides de models, overlay de pujada, fallback de backend), memoria automatica MEM_SAVE, pujada de documents amb aillament de sessio, comandes d'encriptacio, exemples d'us de l'API (curl, Python) i casos d'us practics."
-tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption]
-chunk_size: 800
+abstract: "Com fer servir server-nexe: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119), memoria automatica MEM_SAVE, pujada de documents PDF/TXT, comandes d'encriptacio. Exemples d'API amb curl i Python. Com instal-lar models, com canviar d'idioma (NEXE_LANG), com gestionar la memoria."
+tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption, how-to, commands]
+chunk_size: 600
 priority: P1
 
 # === OPCIONAL ===
@@ -64,6 +64,14 @@ Acces a `http://127.0.0.1:9119/ui`. Requereix clau API (guardada a localStorage 
 - **Overlay de pujada:** Spinner + temporitzador + nom de fitxer durant la pujada de documents. Input bloquejat fins a completar. Mostra recompte de chunks i temps despres de completar.
 - **Persistencia de sessio:** Clau API i preferencies a localStorage. Les sessions sobreviuen al recarregar la pagina.
 - **Auto-scroll:** El xat i les caixes de pensament fan auto-scroll cap avall durant el streaming.
+- **Sidebar col·lapsable:** Toggle amb icona panel-left, estat persistent a localStorage. (nou 2026-04-01)
+- **Rename sessions:** Boto llapis per renombrar sessions inline via PATCH endpoint. (nou 2026-04-01)
+- **Boto copiar text:** Copia respostes al porta-retalls amb feedback visual copy/check. (nou 2026-04-01)
+- **Toggles de col·leccions:** Checkboxes a la sidebar per activar/desactivar Memory/Knowledge/Docs individualment. Persistent a localStorage. CLI: `--collections`. (nou 2026-04-01)
+- **Pantalla de benvinguda:** Features clicables ("Conversa" foca input, "Documents" obre upload). (nou 2026-04-02)
+- **Bloc MEM_SAVE blau:** Les memories guardades es mostren com a `<details>` blau col·lapsable (com thinking taronja). (nou 2026-04-01)
+- **Avis de document truncat:** Notificacio groc quan un document es massa gran pel context. (nou 2026-04-02)
+- **Mode clar/fosc automatic:** Detecta preferencia del sistema via `matchMedia`. (existent)
 
 ### Pujada de documents
 
@@ -80,7 +88,7 @@ Puja documents via el boto del clip a l'entrada del xat. Suportats: .txt, .md, .
 El model extreu i guarda automaticament fets de les converses:
 
 - L'usuari diu "Em dic Jordi" -> el model guarda `[MEM_SAVE: name=Jordi]`
-- L'usuari diu "Oblida el meu nom" -> el model esborra l'entrada de memoria coincident
+- L'usuari diu "Oblida el meu nom" -> MEM_DELETE: cerca per similitud (threshold 0.70), esborra la coincidencia mes propera, guard anti-re-save
 - Propera conversa: "Com em dic?" -> RAG recupera "name=Jordi" -> el model respon correctament
 
 No calen comandes extra. Funciona tant al CLI com a la Web UI. Indicadors: el badge `[MEM:N]` mostra el recompte de fets guardats.

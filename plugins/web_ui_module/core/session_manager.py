@@ -12,7 +12,9 @@ www.jgoy.net · https://server-nexe.org
 import re
 import uuid
 import json
+import asyncio
 import logging
+import threading
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
@@ -38,6 +40,7 @@ class ChatSession:
         self.context_summary: Optional[str] = None  # Resum dels missatges compactats
         self.compaction_count: int = 0  # Quantes vegades s'ha compactat
         self.custom_name: Optional[str] = None  # User-defined session name
+        self._recently_deleted_facts: list = []  # Transient, not persisted to disk
 
     def add_message(self, role: str, content: str, stats: dict = None):
         """Afegir missatge a l'historial"""
@@ -213,7 +216,26 @@ class SessionManager:
         self._storage_path.mkdir(parents=True, exist_ok=True)
         self._crypto = crypto_provider
         self._sessions: Dict[str, ChatSession] = {}
-        self._load_sessions()
+        # Bug 16: protegir accessos concurrents al dict _sessions.
+        # Usem RLock (reentrant) perque alguns metodes en criden d'altres
+        # tambe protegits (e.g. get_or_create_session -> create_session)
+        # i aixi evitem deadlock per re-acquisicio.
+        # Tot i que els metodes son sincrons, varies coroutines poden
+        # cridar-los des de threadpools (FastAPI run_in_threadpool) i el
+        # GIL no garanteix atomicity entre check + mutate (e.g.
+        # `if id in dict: del dict[id]`).
+        self._sessions_lock = threading.RLock()
+        # Lock asyncio lazy: instanciat el primer cop que es necessita
+        # (al __init__ pot no haver-hi loop encara, e.g. tests sync).
+        self._sessions_alock: Optional[asyncio.Lock] = None
+        with self._sessions_lock:
+            self._load_sessions()
+
+    def _get_async_lock(self) -> asyncio.Lock:
+        """Lazy-init de l'asyncio.Lock per evitar requerir un loop al __init__."""
+        if self._sessions_alock is None:
+            self._sessions_alock = asyncio.Lock()
+        return self._sessions_alock
 
     def _load_sessions(self):
         """Load sessions from disk (encrypted .enc and/or plain .json)."""
@@ -288,46 +310,59 @@ class SessionManager:
             logger.error("Failed to delete session file %s: %s", session_id, e)
 
     def create_session(self, session_id: str = None) -> ChatSession:
-        """Create a new chat session."""
+        """Create a new chat session. (Bug 16: protegit per RLock)"""
         if session_id:
             self._validate_session_id(session_id)
         session = ChatSession(session_id)
-        self._sessions[session.id] = session
-        self._save_session_to_disk(session)
+        with self._sessions_lock:
+            self._sessions[session.id] = session
+            self._save_session_to_disk(session)
         return session
 
     def get_session(self, session_id: str) -> Optional[ChatSession]:
-        """Get an existing session."""
+        """Get an existing session. (Bug 16: protegit per RLock)"""
         self._validate_session_id(session_id)
-        return self._sessions.get(session_id)
+        with self._sessions_lock:
+            return self._sessions.get(session_id)
 
     def save_session(self, session_id: str):
-        """Persist a session to disk."""
-        session = self._sessions.get(session_id)
-        if session:
-            self._save_session_to_disk(session)
+        """Persist a session to disk. (Bug 16: protegit per RLock)"""
+        with self._sessions_lock:
+            session = self._sessions.get(session_id)
+            if session:
+                self._save_session_to_disk(session)
 
     def get_or_create_session(self, session_id: str = None) -> ChatSession:
-        """Get an existing session or create a new one."""
+        """Get an existing session or create a new one.
+
+        Bug 16: tot el check + create dins el mateix RLock per evitar
+        race condition entre dues peticions concurrents que crearien
+        dues sessions amb el mateix id.
+        """
         if session_id:
             self._validate_session_id(session_id)
-        if session_id and session_id in self._sessions:
-            return self._sessions[session_id]
-        return self.create_session(session_id)
+        with self._sessions_lock:
+            if session_id and session_id in self._sessions:
+                return self._sessions[session_id]
+            # create_session reentra el lock (RLock) sense problema
+            return self.create_session(session_id)
 
     def delete_session(self, session_id: str) -> bool:
-        """Delete a session."""
+        """Delete a session. (Bug 16: protegit per RLock)"""
         self._validate_session_id(session_id)
-        if session_id in self._sessions:
-            del self._sessions[session_id]
-            self._delete_session_from_disk(session_id)
-            return True
-        return False
+        with self._sessions_lock:
+            if session_id in self._sessions:
+                del self._sessions[session_id]
+                self._delete_session_from_disk(session_id)
+                return True
+            return False
 
     def list_sessions(self) -> List[dict]:
-        """List all sessions (metadata only)."""
+        """List all sessions (metadata only). (Bug 16: snapshot dins RLock)"""
         sessions = []
-        for s in self._sessions.values():
+        with self._sessions_lock:
+            sessions_snapshot = list(self._sessions.values())
+        for s in sessions_snapshot:
             first_user = next(
                 (m["content"] for m in s.messages if m.get("role") == "user"),
                 None
@@ -353,13 +388,14 @@ class SessionManager:
             Number of removed sessions
         """
         cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
-        expired_ids = [
-            sid for sid, session in self._sessions.items()
-            if session.last_activity < cutoff
-        ]
-        for sid in expired_ids:
-            del self._sessions[sid]
-            self._delete_session_from_disk(sid)
+        with self._sessions_lock:
+            expired_ids = [
+                sid for sid, session in self._sessions.items()
+                if session.last_activity < cutoff
+            ]
+            for sid in expired_ids:
+                del self._sessions[sid]
+                self._delete_session_from_disk(sid)
         if expired_ids:
             logger.info(
                 "Cleaned %d inactive session(s) older than %dh",

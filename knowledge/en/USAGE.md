@@ -1,12 +1,12 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-02
 id: nexe-usage-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Usage guide for server-nexe 0.9.0 pre-release. Covers CLI commands (go, chat, memory, knowledge, status, encryption), Web UI features (i18n, loading indicator, RAG info panel, model sizes, upload overlay, backend fallback), MEM_SAVE automatic memory, document upload with session isolation, encryption commands, API usage examples (curl, Python), and practical use cases."
-tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption]
-chunk_size: 800
+abstract: "How to use server-nexe: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119), automatic MEM_SAVE memory, PDF/TXT document upload, encryption commands. API examples with curl and Python. How to install models, change language (NEXE_LANG), manage memory."
+tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption, how-to, commands]
+chunk_size: 600
 priority: P1
 
 # === OPCIONAL ===
@@ -64,6 +64,14 @@ Access at `http://127.0.0.1:9119/ui`. Requires API key (stored in localStorage a
 - **Upload overlay:** Spinner + timer + filename during document upload. Input blocked until complete. Shows chunk count and time after completion.
 - **Session persistence:** API key and preferences in localStorage. Sessions survive page refresh.
 - **Auto-scroll:** Chat and thinking boxes auto-scroll to bottom during streaming.
+- **Collapsible sidebar:** Toggle with panel-left icon, state persistent in localStorage. (new 2026-04-01)
+- **Rename sessions:** Pencil button for inline rename via PATCH endpoint. (new 2026-04-01)
+- **Copy text button:** Copy responses to clipboard with visual copy/check feedback. (new 2026-04-01)
+- **Collection toggles:** Sidebar checkboxes to enable/disable Memory/Knowledge/Docs individually. Persistent in localStorage. CLI: `--collections`. (new 2026-04-01)
+- **Welcome screen:** Clickable features ("Chat" focuses input, "Documents" opens upload). (new 2026-04-02)
+- **Blue MEM_SAVE block:** Saved memories shown as collapsible blue `<details>` (like orange thinking). (new 2026-04-01)
+- **Document truncation warning:** Yellow notice when document is too large for context. (new 2026-04-02)
+- **Auto light/dark mode:** Detects system preference via `matchMedia`. (existing)
 
 ### Document Upload
 
@@ -80,7 +88,7 @@ Upload documents via the paperclip button in the chat input. Supported: .txt, .m
 The model automatically extracts and saves facts from conversations:
 
 - User says "My name is Jordi" → model saves `[MEM_SAVE: name=Jordi]`
-- User says "Forget my name" → model deletes the matching memory entry
+- User says "Forget my name" → MEM_DELETE: similarity search (threshold 0.70), deletes closest match, anti-re-save guard
 - Next conversation: "What's my name?" → RAG retrieves "name=Jordi" → model answers correctly
 
 No extra commands needed. Works in both CLI and Web UI. Indicators: `[MEM:N]` badge shows count of saved facts.

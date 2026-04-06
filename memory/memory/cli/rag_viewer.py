@@ -15,6 +15,7 @@ import subprocess
 from pathlib import Path
 
 from core.cli.output import NEXE_LOGO
+from memory.embeddings.constants import DEFAULT_VECTOR_SIZE
 
 # Configurable CLI timeout via environment variable
 CLI_QDRANT_TIMEOUT = float(os.getenv('NEXE_CLI_QDRANT_TIMEOUT', '5.0'))
@@ -73,7 +74,7 @@ def show_stats():
             stats["qdrant"] = {
               "collection": module._persistence.collection_name,
               "vectors": result.get("points_count", 0),
-              "dimensions": config.get("size", 768),
+              "dimensions": config.get("size", DEFAULT_VECTOR_SIZE),
               "status": result.get("status", "unknown"),
             }
 
@@ -107,7 +108,7 @@ def show_stats():
     print("\n🔷 Qdrant:")
     print(f"  Collection: {q.get('collection', 'nexe_memory')}")
     print(f"  Vectors: {q.get('vectors', 0)}")
-    print(f"  Dimensions: {q.get('dimensions', 768)}")
+    print(f"  Dimensions: {q.get('dimensions', DEFAULT_VECTOR_SIZE)}")
     print(f"  Status: {q.get('status', 'unknown')}")
 
   if "flash" in stats:

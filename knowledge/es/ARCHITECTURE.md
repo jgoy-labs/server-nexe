@@ -1,6 +1,6 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-02
 id: nexe-architecture
 
 # === CONTINGUT RAG (OBLIGATORI) ===
@@ -117,7 +117,7 @@ flowchart TB
 Cuatro ficheros monoliticos fueron divididos en mas de 20 submodulos durante la refactorizacion de deuda tecnica de marzo 2026:
 - chat.py (1187 lineas) dividido en 8 submodulos
 - routes.py (974 lineas) dividido en 6 submodulos
-- lifespan.py (681 lineas) dividido en 3 submodulos
+- lifespan.py (681 lineas) dividido en 4 submodulos
 - tray.py (707 lineas) dividido en 2 submodulos
 
 ```
@@ -126,6 +126,7 @@ server-nexe/
 │   ├── app.py                    # Punto de entrada (delega a la factory)
 │   ├── config.py                 # Carga de configuracion TOML + .env
 │   ├── lifespan.py               # Orquestador del ciclo de vida
+│   ├── lifespan_modules.py       # Carga de modulos de memoria y plugins
 │   ├── lifespan_services.py      # Auto-arranque de servicios (Qdrant, Ollama)
 │   ├── lifespan_tokens.py        # Generacion de token bootstrap
 │   ├── lifespan_ollama.py        # Gestion del ciclo de vida de Ollama
@@ -150,6 +151,7 @@ server-nexe/
 │   │   ├── chat_engines/         # Generadores por backend
 │   │   │   ├── routing.py        # Logica de seleccion de engine
 │   │   │   ├── ollama.py         # Generador streaming Ollama
+│   │   │   ├── ollama_helpers.py # auto_num_ctx() unificado para Ollama
 │   │   │   ├── mlx.py            # Generador streaming MLX
 │   │   │   └── llama_cpp.py      # Generador streaming llama.cpp
 │   │   ├── root.py               # GET /, /health, /api/info
@@ -177,7 +179,7 @@ server-nexe/
 │   │
 │   ├── ingest/                   # Ingestion de documentos
 │   │   ├── ingest_docs.py        # docs/ -> nexe_documentation (500/50 chars)
-│   │   └── ingest_knowledge.py   # knowledge/ -> user_knowledge (1500/200 chars)
+│   │   └── ingest_knowledge.py   # knowledge/ -> user_knowledge (1500/150 chars)
 │   │
 │   ├── metrics/                  # Prometheus /metrics
 │   ├── resilience/               # Circuit breaker, retry
@@ -206,6 +208,7 @@ server-nexe/
 │   ├── swift-wizard/             # Wizard SwiftUI (12 ficheros Swift, 6 pantallas)
 │   ├── build_dmg.sh              # Constructor de DMG con firma
 │   ├── tray.py                   # App de bandeja del sistema
+│   ├── tray_monitor.py           # _RamMonitor (hilo daemon para polling RAM)
 │   ├── tray_uninstaller.py       # Desinstalador con backup
 │   └── install_headless.py       # Instalador headless (compatible con Linux)
 │
@@ -229,7 +232,7 @@ La app se crea mediante una factory singleton con double-check locking:
 
 ## Lifespan Manager
 
-Gestiona el arranque y apagado del servidor. Dividido en 3 submodulos.
+Gestiona el arranque y apagado del servidor. Dividido en 4 submodulos.
 
 **Secuencia de arranque:**
 1. Cargar configuracion de server.toml
@@ -326,6 +329,7 @@ Capa Embeddings (memory/embeddings/) — generacion de vectores + interfaz Qdran
 - `[RAG_ITEM:score|collection|source]` — detalle RAG por fuente
 - `[MEM:N]` — numero de hechos guardados en memoria
 - `[COMPACT:N]` — indicador de compactacion de contexto
+- `[DOC_TRUNCATED:XX%]` — aviso de documento truncado por limite de contexto (nuevo 2026-04-02)
 
 ## Arquitectura del modulo Web UI
 

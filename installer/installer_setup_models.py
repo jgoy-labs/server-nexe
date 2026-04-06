@@ -8,6 +8,7 @@ Description: Model downloads (Ollama/GGUF/MLX) and Ollama installation.
 
 import os
 import sys
+import shutil
 import subprocess
 
 from .installer_display import (
@@ -16,6 +17,22 @@ from .installer_display import (
     print_step, print_success, print_warn,
 )
 from .installer_i18n import t
+
+
+def _find_ollama() -> str:
+    """Find ollama binary — app bundles have minimal PATH."""
+    found = shutil.which("ollama")
+    if found:
+        return found
+    for path in [
+        "/usr/local/bin/ollama",
+        "/opt/homebrew/bin/ollama",
+        os.path.expanduser("~/bin/ollama"),
+        "/Applications/Ollama.app/Contents/Resources/ollama",
+    ]:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return "ollama"  # fallback, let subprocess raise FileNotFoundError
 
 
 def _show_manual_instructions(model, engine):
@@ -53,8 +70,8 @@ def ensure_ollama_installed():
     """
     import platform
 
-    result = subprocess.run(["which", "ollama"], capture_output=True)
-    if result.returncode == 0:
+    ollama_bin = _find_ollama()
+    if os.path.isfile(ollama_bin):
         print_success(t('ollama_installed'))
         return True
 
@@ -96,7 +113,7 @@ def ensure_ollama_installed():
         return False
 
 
-def _download_ollama_model(model_config):
+def _download_ollama_model(model_config, headless=False):
     """Download Ollama model immediately after selection."""
     clear()
     print(APP_LOGO)
@@ -108,20 +125,27 @@ def _download_ollama_model(model_config):
     print(f"   {t('engine_ollama_label')}")
     print()
 
-    print(f"{BOLD}{t('download_options')}{RESET}\n")
-    print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
-    print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
-    print()
+    if headless:
+        choice = "1"  # Always download in headless mode
+    else:
+        print(f"{BOLD}{t('download_options')}{RESET}\n")
+        print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
+        print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
+        print()
 
-    choice = input(f"{BOLD}[1/2]:{RESET} ").strip()
+        try:
+            choice = input(f"{BOLD}[1/2]:{RESET} ").strip()
+        except (EOFError, OSError):
+            choice = "1"  # Default to download if no stdin
 
     if choice == "1":
         try:
+            ollama_bin = _find_ollama()
             print(f"\n{CYAN}[1/3]{RESET} {t('ollama_checking')}")
-            result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
+            result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)
             if result.returncode != 0:
                 print(f"{YELLOW}[...]{RESET} {t('starting_ollama')}")
-                subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen([ollama_bin, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 # Wait for Ollama to be ready (max 15s)
                 import time
                 import socket
@@ -135,10 +159,10 @@ def _download_ollama_model(model_config):
                     print(f"{YELLOW}[WARN]{RESET} Ollama may not be ready yet")
 
             print(f"\n{CYAN}[2/3]{RESET} {t('downloading_model_progress')}")
-            print(f"      {DIM}ollama pull {model_id}{RESET}\n")
+            print(f"      {DIM}{ollama_bin} pull {model_id}{RESET}\n")
 
             process = subprocess.Popen(
-                ["ollama", "pull", model_id],
+                [ollama_bin, "pull", model_id],
                 stdout=sys.stdout,
                 stderr=sys.stderr
             )
@@ -148,7 +172,7 @@ def _download_ollama_model(model_config):
                 raise subprocess.CalledProcessError(return_code, "ollama pull")
 
             print(f"\n{CYAN}[3/4]{RESET} {t('verifying_download')}")
-            result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
+            result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)
             model_base = model_id.split(":")[0]
             if model_base in result.stdout or model_id in result.stdout:
                 print_success(t('model_downloaded_ok').format(id=model_id))
@@ -157,10 +181,10 @@ def _download_ollama_model(model_config):
                 print(f"  {DIM}{t('run_ollama_list')}{RESET}")
 
             print(f"\n{CYAN}[4/4]{RESET} {t('downloading_embeddings_step')}")
-            print(f"      {DIM}ollama pull nomic-embed-text{RESET}\n")
+            print(f"      {DIM}{ollama_bin} pull nomic-embed-text{RESET}\n")
 
             embed_process = subprocess.Popen(
-                ["ollama", "pull", "nomic-embed-text"],
+                [ollama_bin, "pull", "nomic-embed-text"],
                 stdout=sys.stdout,
                 stderr=sys.stderr
             )
@@ -174,18 +198,29 @@ def _download_ollama_model(model_config):
 
         except subprocess.CalledProcessError as e:
             print_warn(f"{t('download_failed')} (code: {e.returncode})")
+            if headless:
+                raise
             _show_manual_instructions(model_config, "ollama")
         except FileNotFoundError:
             print_warn(t('ollama_not_found'))
+            if headless:
+                raise
             _show_manual_instructions(model_config, "ollama")
     else:
         _show_manual_instructions(model_config, "ollama")
+        print(f"\n{YELLOW}⚠️  Model {model_id} NOT downloaded. Before starting nexe, run:{RESET}")
+        print(f"  {CYAN}ollama pull {model_id}{RESET}")
+        print(f"  {CYAN}ollama pull nomic-embed-text{RESET}")
         print(f"\n{GREEN}{t('download_skipped')}{RESET}")
 
-    input(f"\n{DIM}[{t('press_enter')}]{RESET}")
+    if not headless:
+        try:
+            input(f"\n{DIM}[{t('press_enter')}]{RESET}")
+        except (EOFError, OSError):
+            pass
 
 
-def _download_gguf_model(model_config, project_root):
+def _download_gguf_model(model_config, project_root, headless=False):
     """Download GGUF model immediately after selection."""
     clear()
     print(APP_LOGO)
@@ -195,12 +230,18 @@ def _download_gguf_model(model_config, project_root):
     print(f"   {t('engine_gguf_label')}")
     print()
 
-    print(f"{BOLD}{t('download_options')}{RESET}\n")
-    print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
-    print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
-    print()
+    if headless:
+        choice = "1"  # Always download in headless mode
+    else:
+        print(f"{BOLD}{t('download_options')}{RESET}\n")
+        print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
+        print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
+        print()
 
-    choice = input(f"{BOLD}[1/2]:{RESET} ").strip()
+        try:
+            choice = input(f"{BOLD}[1/2]:{RESET} ").strip()
+        except (EOFError, OSError):
+            choice = "1"  # Default to download if no stdin
 
     if choice == "1":
         try:
@@ -218,19 +259,34 @@ def _download_gguf_model(model_config, project_root):
                 model_config['id']
             ], check=True)
 
+            # Verify file was actually downloaded and has content
+            if not output_path.exists() or output_path.stat().st_size == 0:
+                raise RuntimeError(f"Downloaded file is empty or missing: {output_path}")
+
             print_success(t('download_success'))
             print(f"  📁 {output_path}")
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
             print_warn(t('download_failed'))
+            if headless:
+                raise
+            _show_manual_instructions(model_config, "llama_cpp")
+        except Exception as e:
+            print_warn(f"{t('download_failed')}: {e}")
+            if headless:
+                raise
             _show_manual_instructions(model_config, "llama_cpp")
     else:
         _show_manual_instructions(model_config, "llama_cpp")
         print(f"\n{GREEN}{t('download_skipped')}{RESET}")
 
-    input(f"\n{DIM}[{t('press_enter')}]{RESET}")
+    if not headless:
+        try:
+            input(f"\n{DIM}[{t('press_enter')}]{RESET}")
+        except (EOFError, OSError):
+            pass
 
 
-def _download_mlx_model(model_config, project_root, python_path):
+def _download_mlx_model(model_config, project_root, python_path, headless=False):
     """Download MLX model immediately after selection."""
     clear()
     print(APP_LOGO)
@@ -244,12 +300,18 @@ def _download_mlx_model(model_config, project_root, python_path):
     print(f"   {t('engine_mlx_label')}")
     print()
 
-    print(f"{BOLD}{t('download_options')}{RESET}\n")
-    print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
-    print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
-    print()
+    if headless:
+        choice = "1"  # Always download in headless mode
+    else:
+        print(f"{BOLD}{t('download_options')}{RESET}\n")
+        print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
+        print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
+        print()
 
-    choice = input(f"{BOLD}[1/2]:{RESET} ").strip()
+        try:
+            choice = input(f"{BOLD}[1/2]:{RESET} ").strip()
+        except (EOFError, OSError):
+            choice = "1"  # Default to download if no stdin
 
     if choice == "1":
         try:
@@ -259,19 +321,27 @@ def _download_mlx_model(model_config, project_root, python_path):
 
             if local_model_path.exists() and any(local_model_path.iterdir()):
                 print(f"{GREEN}[OK]{RESET} {t('model_already_downloaded').format(path=local_model_path)}")
-                input(f"\n{DIM}[{t('press_enter')}]{RESET}")
+                if not headless:
+                    try:
+                        input(f"\n{DIM}[{t('press_enter')}]{RESET}")
+                    except (EOFError, OSError):
+                        pass
                 return
 
-            clear()
-            print(APP_LOGO)
-            print(f"\n{RED}{BOLD}{t('download_warning_title').format(size=model_config['disk_size'])}{RESET}\n")
-            print(f"  {YELLOW}1.{RESET} {t('download_warning_power')}")
-            print(f"  {YELLOW}2.{RESET} {t('download_warning_sleep')}")
-            print(f"  {YELLOW}3.{RESET} {t('download_warning_wifi')}")
-            print(f"\n  {DIM}• {t('download_warning_time')}{RESET}")
-            print(f"  {DIM}• {t('download_warning_resume')}{RESET}\n")
+            if not headless:
+                clear()
+                print(APP_LOGO)
+                print(f"\n{RED}{BOLD}{t('download_warning_title').format(size=model_config['disk_size'])}{RESET}\n")
+                print(f"  {YELLOW}1.{RESET} {t('download_warning_power')}")
+                print(f"  {YELLOW}2.{RESET} {t('download_warning_sleep')}")
+                print(f"  {YELLOW}3.{RESET} {t('download_warning_wifi')}")
+                print(f"\n  {DIM}• {t('download_warning_time')}{RESET}")
+                print(f"  {DIM}• {t('download_warning_resume')}{RESET}\n")
 
-            input(f"{GREEN}▶ {t('download_ready')} [Enter]:{RESET} ")
+                try:
+                    input(f"{GREEN}▶ {t('download_ready')} [Enter]:{RESET} ")
+                except (EOFError, OSError):
+                    pass
 
             print(f"\n{CYAN}[1/2]{RESET} {t('downloading_mlx_step')}")
             print(f"      {DIM}{t('mlx_destination').format(path=local_model_path)}{RESET}\n")
@@ -318,14 +388,14 @@ for attempt in range(max_retries):
                 else:
                     print(f"{GREEN}✓{RESET} {t('mlx_validated_ok')}")
             else:
-                print(f"\n{YELLOW}{t('download_failed_resume')}{RESET}")
-                print(f"{DIM}{t('partial_files_preserved')}{RESET}\n")
-                _show_manual_instructions(model_config, "mlx")
+                raise subprocess.CalledProcessError(return_code, "mlx_download")
 
         except Exception as e:
             print(f"\n{YELLOW}{t('download_failed_resume')}{RESET}")
             print(f"{DIM}Error: {str(e)[:200]}{RESET}")
             print(f"{DIM}{t('partial_files_preserved')}{RESET}\n")
+            if headless:
+                raise
             _show_manual_instructions(model_config, "mlx")
     else:
         _show_manual_instructions(model_config, "mlx")
@@ -333,4 +403,8 @@ for attempt in range(max_retries):
         print(f"   {t('mlx_fallback_ollama')}")
         print(f"\n{GREEN}{t('download_skipped')}{RESET}")
 
-    input(f"\n{DIM}[{t('press_enter')}]{RESET}")
+    if not headless:
+        try:
+            input(f"\n{DIM}[{t('press_enter')}]{RESET}")
+        except (EOFError, OSError):
+            pass

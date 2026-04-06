@@ -56,7 +56,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         global _server_lang
         lang = body.get("lang", "").strip().lower()
         if lang not in ("ca", "es", "en"):
-            raise HTTPException(status_code=400, detail="Supported languages: ca, es, en")
+            raise HTTPException(status_code=400, detail=get_message(None, "webui.auth.supported_languages"))
         _server_lang = lang
         _os.environ["NEXE_LANG"] = lang
         logger.info("Server language changed to: %s", lang)
@@ -209,17 +209,100 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
 
     # -- POST /backend --
 
+    # Bug 27 (2026-04-06) — normalització de noms de backend. El catàleg i
+    # els `.env` antics poden usar `llama_cpp`/`llama-cpp`/`llama_cpp_module`
+    # mentre que l'API esperava `llamacpp`. Acceptem tots aquests i els
+    # traduïm al nom canònic sense trencar backwards-compat.
+    _BACKEND_ALIASES = {
+        "ollama": "ollama",
+        "ollama_module": "ollama",
+        "mlx": "mlx",
+        "mlx_module": "mlx",
+        "llamacpp": "llamacpp",
+        "llama_cpp": "llamacpp",
+        "llama-cpp": "llamacpp",
+        "llama_cpp_module": "llamacpp",
+        "auto": "auto",
+    }
+
+    def _normalize_backend_name(name: str) -> str:
+        """Retorna el nom canònic del backend o '' si és invàlid."""
+        return _BACKEND_ALIASES.get((name or "").lower().strip(), "")
+
+    async def _backend_model_exists(canonical_backend: str, model_name: str) -> bool:
+        """Verifica best-effort que el model existeix per al backend indicat.
+
+        Bug 26 (2026-04-06) — abans s'acceptava qualsevol model sense
+        verificar i l'error només apareixia al primer chat. Ara, com a
+        mínim per Ollama (que té un endpoint de listing), comprovem que
+        el model existeix abans d'acceptar el canvi.
+
+        Per MLX/llamacpp la verificació exhaustiva requereix tocar el
+        plugin corresponent: acceptem sempre (best-effort) i ja fallarà
+        al primer ús si el model no existeix.
+
+        ⚠️ Dev D (Consultor passada 1): si Ollama no és accessible o tornem
+        abans de la verificació per timeout/error, acceptem optimisticament
+        (retornem True) per no bloquejar el canvi de backend durant downtime
+        d'Ollama. Això és un **mitigant parcial** del bug: quan Ollama cau,
+        podem acceptar un model inexistent. Loguem explícitament el cas per
+        traçabilitat.
+        """
+        if not model_name:
+            return True  # permetre canvi de backend sense model
+        if canonical_backend == "ollama":
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=3.0) as client:
+                    resp = await client.get("http://localhost:11434/api/tags")
+                    if resp.status_code != 200:
+                        # Ollama no accessible — no podem verificar, accepta
+                        logger.warning(
+                            "Bug 26 mitigant: Ollama returned %d en verificar "
+                            "model %r; acceptant optimisticament",
+                            resp.status_code, model_name,
+                        )
+                        return True
+                    data = resp.json()
+                    available = [m.get("name", "") for m in data.get("models", [])]
+                    # Acceptem match exacte o amb sufix :latest
+                    if model_name in available or f"{model_name}:latest" in available:
+                        return True
+                    # Partial match: mateixa família (ex. "qwen3.5:4b" → "qwen3.5")
+                    base = model_name.split(":")[0]
+                    return any(base == a.split(":")[0] for a in available)
+            except Exception as e:
+                logger.warning(
+                    "Bug 26 mitigant: no es pot verificar el model %r contra "
+                    "Ollama (%s); acceptant optimisticament",
+                    model_name, e,
+                )
+                return True  # no es pot verificar → acceptem
+        # MLX / llamacpp / auto: best-effort, acceptem
+        return True
+
     @router.post("/backend")
     async def set_backend(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Canvia el backend i/o model actiu en runtime. Arrenca Ollama si cal."""
         import os
         import subprocess
         import shutil
-        backend = request.get("backend", "").lower()
+        raw_backend = request.get("backend", "")
         model = request.get("model", "")
         ollama_started = False
 
-        if backend in ("ollama", "ollama_module"):
+        # Bug 27 — normalitzem abans de validar
+        canonical = _normalize_backend_name(raw_backend)
+        if raw_backend and not canonical:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Invalid backend '{raw_backend}'. Valid backends: "
+                    f"ollama, mlx, llamacpp, llama_cpp, auto"
+                ),
+            )
+
+        if canonical == "ollama":
             # Comprovar si Ollama corre, si no, intentar arrencar-lo
             try:
                 import httpx
@@ -228,32 +311,50 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                     if resp.status_code != 200:
                         raise ConnectionError()
             except Exception:
-                # Ollama no corre — intentar arrencar
+                # Ollama no corre — intentar arrencar headless (Bug Ollama GUI 2026-04-06)
+                # Prioritzem `ollama serve` directe (sense GUI). Fallback al binari del
+                # bundle Ollama.app (també en mode headless — NO fem `open -a Ollama`
+                # perquè això llançaria la GUI completa al Dock i la finestra).
                 if shutil.which("ollama"):
                     try:
-                        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        subprocess.Popen(
+                            ["ollama", "serve"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                            start_new_session=True,
+                        )
                         logger.info("Ollama service started automatically")
                         ollama_started = True
                     except Exception as e:
                         logger.warning(f"Could not start Ollama: {e}")
-                elif _os.path.exists("/Applications/Ollama.app"):
+                elif _os.path.exists("/Applications/Ollama.app/Contents/Resources/ollama"):
                     try:
-                        subprocess.Popen(["open", "-g", "-a", "Ollama"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                        logger.info("Ollama.app started automatically")
+                        subprocess.Popen(
+                            ["/Applications/Ollama.app/Contents/Resources/ollama", "serve"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                            start_new_session=True,
+                        )
+                        logger.info("ollama serve started headless from Ollama.app bundle")
                         ollama_started = True
                     except Exception as e:
-                        logger.warning(f"Could not start Ollama.app: {e}")
+                        logger.warning(f"Could not start ollama serve from bundle: {e}")
 
-        if backend:
-            # Validate backend exists before accepting switch
-            valid_backends = {"ollama", "ollama_module", "mlx", "mlx_module", "llamacpp", "llama_cpp_module", "auto"}
-            if backend not in valid_backends:
+        # Bug 26 — abans d'acceptar el canvi, validar que el model existeix
+        # per al backend escollit. Si el canvi només afecta el backend (sense
+        # model), ho permetem. Si hi ha model explicit i sabem comprovar-lo,
+        # llancem 400 si no existeix.
+        if canonical and model:
+            if not await _backend_model_exists(canonical, model):
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid backend '{backend}'. Valid backends: ollama, mlx, llamacpp, auto"
+                    detail=(
+                        f"Model '{model}' not found for backend '{canonical}'. "
+                        f"Verify the model is installed before switching."
+                    ),
                 )
-            os.environ["NEXE_MODEL_ENGINE"] = backend
-            logger.info(f"Backend changed to: {backend}")
+
+        if canonical:
+            os.environ["NEXE_MODEL_ENGINE"] = canonical
+            logger.info(f"Backend changed to: {canonical}")
         if model:
             os.environ["NEXE_DEFAULT_MODEL"] = model
             logger.info(f"Model canviat a: {model}")

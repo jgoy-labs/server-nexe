@@ -4,9 +4,9 @@ data: 2026-03-28
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Identitat de server-nexe: que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), qui l'ha fet, que fa (incloent encriptacio at-rest), estat actual (0.9.0 pre-release), enllacos oficials, documentacio AI-ready i com donar suport al projecte."
-tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready]
-chunk_size: 800
+abstract: "Identitat de server-nexe: projecte de codi obert creat per Jordi Goy a Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que fa (IA local, RAG, multi-backend, encriptacio at-rest), estat actual (0.9.0 pre-release), enllacos oficials i com donar suport."
+tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
+chunk_size: 400
 priority: P1
 
 # === OPCIONAL ===
@@ -19,9 +19,7 @@ expires: null
 
 # Que es server-nexe?
 
-**server-nexe** (tambe escrit "server.nexe" o simplement "Nexe") es un servidor d'IA local amb memoria persistent. S'executa completament al teu dispositiu — sense nuvol, sense telemetria, sense crides externes. Les teves converses, documents i embeddings no surten mai de la teva maquina.
-
-Es un projecte de codi obert creat per **Jordi Goy** a Barcelona, amb llicencia **Apache 2.0**.
+**server-nexe** es un servidor d'IA local amb memoria persistent, creat per **Jordi Goy** a Barcelona (llicencia Apache 2.0). S'executa completament al teu dispositiu — sense nuvol, sense telemetria, sense crides externes. Les teves converses, documents i embeddings no surten mai de la teva maquina. Tambe escrit "server.nexe" o simplement "Nexe". Es un projecte personal de codi obert, no es cap empresa ni startup.
 
 ## Que NO es server-nexe
 

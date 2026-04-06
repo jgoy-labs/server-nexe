@@ -173,4 +173,6 @@ def select_model(hw):
         "name": selected_model["name"],
         "disk_size": f"~{selected_model['disk_gb']} GB",
         "ram": selected_model["ram_gb"],
+        "prompt_tier": selected_model.get("prompt_tier", "full"),
+        "chat_format": selected_model.get("chat_format", "chatml"),
     }

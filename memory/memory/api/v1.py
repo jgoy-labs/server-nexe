@@ -26,6 +26,7 @@ class MemoryStoreRequest(BaseModel):
     content: str
     metadata: Optional[Dict[str, Any]] = None
     collection: str = "nexe_web_ui"
+    force: bool = False  # Bypass Gate heuristic (skip min-length check)
 
 class MemoryStoreResponse(BaseModel):
     """Response for store operation."""
@@ -94,6 +95,7 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
                 text=body.content,
                 source="api",
                 trust_level="untrusted",
+                force=body.force,
             )
             return MemoryStoreResponse(
                 success=entry_id is not None,

@@ -1,12 +1,12 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-02
 id: nexe-api-reference
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa de l'API REST per a server-nexe 0.9.0 pre-release. Cobreix tots els endpoints: chat completions (compatible amb OpenAI, streaming, RAG), memoria (store, search), cerca RAG, pujada de documents, sessions, bootstrap, health checks, moduls, backends, i18n, CLI d'encriptacio. Inclou autenticacio (X-API-Key dual-key), rate limiting per endpoint, marcadors de streaming i configuracio."
-tags: [api, rest, endpoints, chat, memory, rag, authentication, rate-limiting, streaming, openai-compatible, upload, sessions, bootstrap, health, backends, encryption]
-chunk_size: 800
+abstract: "API REST de server-nexe: endpoints /v1/chat/completions (compatible OpenAI), /memory/store, /memory/search, /rag/search, /upload, /sessions. Autenticacio X-API-Key dual-key. Rate limiting per endpoint. Streaming SSE. Port 9119 per defecte. Exemples curl i Python."
+tags: [api, rest, endpoints, chat, memory, rag, authentication, rate-limiting, streaming, openai-compatible, upload, sessions, bootstrap, health, backends, encryption, curl, python]
+chunk_size: 600
 priority: P1
 
 # === OPCIONAL ===
@@ -100,6 +100,7 @@ Chat completion compatible amb OpenAI amb suport RAG i streaming.
 - `[MEM:2]` — nombre de fets auto-guardats via MEM_SAVE
 - `[COMPACT:N]` — indicador de compactacio de context
 - `[THINKING]` / `[/THINKING]` — thinking tokens (models Ollama com qwen3.5)
+- `[DOC_TRUNCATED:XX%]` — percentatge de document descartat per limit de context (nou 2026-04-02)
 
 ### Informacio del sistema
 
@@ -201,6 +202,8 @@ Aquests endpoints serveixen la interficie web i els utilitza el frontend JavaScr
 | `/ui/session/{id}` | GET | Si | 30/min | Obtenir dades de la sessio (valida session_id) |
 | `/ui/session/{id}/history` | GET | Si | 30/min | Obtenir historial de xat de la sessio |
 | `/ui/session/{id}` | DELETE | Si | 10/min | Esborrar sessio |
+| `/ui/session/{id}` | PATCH | Si | per defecte | Renombrar sessio (nou 2026-04-01) |
+| `/ui/session/{id}/clear-document` | POST | Si | per defecte | Netejar document adjunt de la sessio (nou 2026-04-02) |
 | `/ui/sessions` | GET | Si | per defecte | Llistar totes les sessions |
 
 ### Fitxers
@@ -211,7 +214,7 @@ Aquests endpoints serveixen la interficie web i els utilitza el frontend JavaScr
 | `/ui/files` | GET | Si | per defecte | Llistar fitxers pujats |
 | `/ui/files/cleanup` | POST | Si | 5/min | Netejar fitxers temporals |
 
-**Pujada:** Accepta .txt, .md, .pdf. Chunks de 1500/200 caracters. Metadades generades sense LLM (instantani). Documents aillats a la sessio de pujada via session_id.
+**Pujada:** Accepta .txt, .md, .pdf. Chunking dinamic segons mida del document (800/1000/1200/1500 chars). Validacio de magic bytes (SEC-004). Metadades generades sense LLM (instantani). Documents aillats a la sessio de pujada via session_id.
 
 ## Comandes CLI d'encriptacio
 

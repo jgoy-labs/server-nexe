@@ -23,6 +23,7 @@ except ImportError:
 
 from core.resilience import ollama_breaker, CircuitOpenError
 from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
+from core.endpoints.chat_engines.ollama_helpers import auto_num_ctx
 
 from fastapi import APIRouter
 
@@ -30,6 +31,43 @@ logger = logging.getLogger(__name__)
 
 # Configurable timeout via environment variable
 OLLAMA_CONNECTION_TIMEOUT = float(os.getenv('NEXE_OLLAMA_CONNECTION_TIMEOUT', '10.0'))
+
+
+# --- Excepcions semantiques d'Ollama (Bug 15) ---
+# Aquests errors NO han d'obrir el circuit breaker — son errors d'aplicacio
+# (model inexistent, payload mal format, validacio) i no de la infraestructura.
+class OllamaSemanticError(Exception):
+  """Base d'errors semantics Ollama (4xx no infraestructura)."""
+
+  def __init__(self, message: str, status_code: int):
+    super().__init__(message)
+    self.status_code = status_code
+
+
+class ModelNotFoundError(OllamaSemanticError):
+  """El model demanat no existeix a la instancia Ollama (HTTP 404)."""
+
+  def __init__(self, model_name: str, message: str = None):
+    self.model_name = model_name
+    super().__init__(
+      message or f"Ollama model not found: {model_name}",
+      status_code=404,
+    )
+
+
+def _is_semantic_http_error(exc: BaseException) -> bool:
+  """Retorna True si l'excepcio es un error semantic 4xx (no infra) que NO
+  hauria d'obrir el circuit breaker. 5xx i errors de connexio si l'obren.
+  """
+  if httpx is None:
+    return False
+  if isinstance(exc, OllamaSemanticError):
+    return True
+  if isinstance(exc, httpx.HTTPStatusError):
+    code = exc.response.status_code
+    # 4xx semantics (404 model, 400 bad request, 422 validation...) -> no infra
+    return 400 <= code < 500
+  return False
 
 
 class OllamaModule:
@@ -120,12 +158,21 @@ class OllamaModule:
         # No corre — intentar arrencar
         is_macos = platform.system() == "Darwin"
 
-        if is_macos and os.path.exists("/Applications/Ollama.app"):
+        # Bug Ollama GUI (2026-04-06) — preferim sempre `ollama serve` headless.
+        # Abans feiem `open -a Ollama` que llança la GUI completa (Dock + finestra)
+        # i molesta l'usuari constantment. El binari serve viu dins el bundle de
+        # Ollama.app i el podem invocar directament sense aixecar la GUI.
+        macos_ollama_bin = "/Applications/Ollama.app/Contents/Resources/ollama"
+        if is_macos and os.path.exists(macos_ollama_bin):
             try:
-                subprocess.Popen(["open", "-g", "-a", "Ollama"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                logger.info("Ollama.app started automatically (macOS)")
+                subprocess.Popen(
+                    [macos_ollama_bin, "serve"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    start_new_session=True,  # No morir amb el parent process
+                )
+                logger.info("ollama serve started headless from Ollama.app bundle (macOS)")
             except Exception as e:
-                logger.warning("Could not start Ollama.app: %s", e)
+                logger.warning("Could not start ollama serve from bundle: %s", e)
         elif shutil.which("ollama"):
             try:
                 subprocess.Popen(
@@ -271,17 +318,36 @@ class OllamaModule:
             logger.warning("Circuit breaker OPEN for Ollama - skipping connection check")
             return False
 
-    @ollama_breaker.protect
     async def list_models(self) -> List[Dict[str, Any]]:
-        """List all available local models. Protected by Circuit Breaker."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(f"{self.base_url}/api/tags")
-            response.raise_for_status()
-            data = response.json()
-            models = data.get("models", [])
-            msg = self._t("logs.models_found", "Found {count} Ollama models", count=len(models))
-            logger.info(msg)
-            return models
+        """List all available local models.
+
+        Bug 15: ja no usa @ollama_breaker.protect directament perque aquest
+        decorator registra qualsevol Exception com a failure. Fem el control
+        manual per filtrar errors semantics 4xx (no infra) abans del breaker.
+        """
+        if not await ollama_breaker.check_circuit():
+            raise CircuitOpenError(
+                f"Circuit [ollama] is OPEN. Will retry in {ollama_breaker.config.timeout_seconds}s"
+            )
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(f"{self.base_url}/api/tags")
+                response.raise_for_status()
+                data = response.json()
+                models = data.get("models", [])
+                msg = self._t("logs.models_found", "Found {count} Ollama models", count=len(models))
+                logger.info(msg)
+                await ollama_breaker.record_success()
+                return models
+        except httpx.HTTPStatusError as e:
+            if _is_semantic_http_error(e):
+                # No tocar breaker — error d'aplicacio
+                raise
+            await ollama_breaker.record_failure(e)
+            raise
+        except (httpx.HTTPError, ConnectionError, TimeoutError) as e:
+            await ollama_breaker.record_failure(e)
+            raise
 
     async def pull_model(self, model_name: str) -> AsyncIterator[Dict[str, Any]]:
         """Download an Ollama model (streaming progress)."""
@@ -304,20 +370,52 @@ class OllamaModule:
                                 yield data
                             except json.JSONDecodeError:
                                 logger.warning("JSON invalid a pull: %s", line)
+        except httpx.HTTPStatusError as e:
+            if _is_semantic_http_error(e):
+                logger.warning("Ollama pull semantic error %d for %s", e.response.status_code, model_name)
+                if e.response.status_code == 404:
+                    raise ModelNotFoundError(model_name) from e
+                raise OllamaSemanticError(str(e), e.response.status_code) from e
+            await ollama_breaker.record_failure(e)
+            logger.error("Error descarregant model %s: %s", model_name, repr(e))
+            raise
         except (httpx.HTTPError, ConnectionError, TimeoutError) as e:
             await ollama_breaker.record_failure(e)
             logger.error("Error descarregant model %s: %s", model_name, repr(e))
             raise
 
-    @ollama_breaker.protect
     async def get_model_info(self, model_name: str) -> Dict[str, Any]:
-        """Obte informacio detallada d'un model. Protected by Circuit Breaker."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.base_url}/api/show", json={"name": model_name}
+        """Obte informacio detallada d'un model.
+
+        Bug 15: gestio manual del circuit breaker per distingir 404 (model
+        no trobat, error semantic) d'errors d'infraestructura. Un 404 NO ha
+        d'obrir el breaker — re-llancem ModelNotFoundError perque el caller
+        ho gestioni separadament.
+        """
+        if not await ollama_breaker.check_circuit():
+            raise CircuitOpenError(
+                f"Circuit [ollama] is OPEN. Will retry in {ollama_breaker.config.timeout_seconds}s"
             )
-            response.raise_for_status()
-            return response.json()
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    f"{self.base_url}/api/show", json={"name": model_name}
+                )
+                response.raise_for_status()
+                await ollama_breaker.record_success()
+                return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.warning("Ollama model not found: %s", model_name)
+                raise ModelNotFoundError(model_name) from e
+            if _is_semantic_http_error(e):
+                logger.warning("Ollama semantic error %d for model %s", e.response.status_code, model_name)
+                raise OllamaSemanticError(str(e), e.response.status_code) from e
+            await ollama_breaker.record_failure(e)
+            raise
+        except (httpx.HTTPError, ConnectionError, TimeoutError) as e:
+            await ollama_breaker.record_failure(e)
+            raise
 
     async def chat(
         self, model: str, messages: List[Dict[str, str]], stream: bool = True
@@ -333,24 +431,11 @@ class OllamaModule:
                 "<|end|>", "<|endoftext|>", "</s>",
                 "<|eot_id|>", "<end_of_turn>", "<|im_end|>",
             ]
-            import os
-            explicit_ctx = os.environ.get("NEXE_OLLAMA_NUM_CTX")
-            if explicit_ctx:
-                num_ctx = int(explicit_ctx)
-            else:
-                try:
-                    import psutil
-                    ram_gb = psutil.virtual_memory().total / (1024 ** 3)
-                except ImportError:
-                    ram_gb = 16
-                if ram_gb >= 64: num_ctx = 32768
-                elif ram_gb >= 32: num_ctx = 16384
-                elif ram_gb >= 24: num_ctx = 8192
-                elif ram_gb >= 16: num_ctx = 4096
-                else: num_ctx = 2048
+            num_ctx = auto_num_ctx()
             payload = {
                 "model": model, "messages": messages,
                 "stream": stream, "stop": stop_sequences,
+                "keep_alive": os.getenv("NEXE_OLLAMA_KEEP_ALIVE", "30m"),
                 "think": os.getenv("NEXE_OLLAMA_THINK", "false").lower() == "true",
                 "options": {
                     "num_ctx": num_ctx,
@@ -379,18 +464,47 @@ class OllamaModule:
                     await ollama_breaker.record_success()
                     yield response.json()
 
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.warning("Ollama chat: model %s not found (404)", model)
+                raise ModelNotFoundError(model) from e
+            if _is_semantic_http_error(e):
+                logger.warning("Ollama chat semantic error %d for %s", e.response.status_code, model)
+                raise OllamaSemanticError(str(e), e.response.status_code) from e
+            await ollama_breaker.record_failure(e)
+            logger.error("Chat fallida amb model %s: %s", model, repr(e))
+            raise
         except (httpx.HTTPError, ConnectionError, TimeoutError) as e:
             await ollama_breaker.record_failure(e)
             logger.error("Chat fallida amb model %s: %s", model, repr(e))
             raise
 
-    @ollama_breaker.protect
     async def delete_model(self, model_name: str) -> bool:
-        """Elimina un model local. Protected by Circuit Breaker."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.delete(
-                f"{self.base_url}/api/delete", json={"name": model_name}
+        """Elimina un model local.
+
+        Bug 15: gestio manual del breaker per filtrar 404 (model inexistent)
+        com a error semantic, no infraestructura.
+        """
+        if not await ollama_breaker.check_circuit():
+            raise CircuitOpenError(
+                f"Circuit [ollama] is OPEN. Will retry in {ollama_breaker.config.timeout_seconds}s"
             )
-            response.raise_for_status()
-            logger.info("Model %s eliminat correctament", model_name)
-            return True
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.delete(
+                    f"{self.base_url}/api/delete", json={"name": model_name}
+                )
+                response.raise_for_status()
+                logger.info("Model %s eliminat correctament", model_name)
+                await ollama_breaker.record_success()
+                return True
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise ModelNotFoundError(model_name) from e
+            if _is_semantic_http_error(e):
+                raise OllamaSemanticError(str(e), e.response.status_code) from e
+            await ollama_breaker.record_failure(e)
+            raise
+        except (httpx.HTTPError, ConnectionError, TimeoutError) as e:
+            await ollama_breaker.record_failure(e)
+            raise

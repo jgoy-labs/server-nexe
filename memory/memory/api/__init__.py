@@ -165,7 +165,8 @@ class MemoryAPI:
         return SentenceTransformer(self.embedding_model)
 
     self._embedder = await loop.run_in_executor(self._executor, _load_model)
-    logger.info("Embedder initialized: %s", self.embedding_model)
+    import os as _os
+    logger.info("SentenceTransformer initialized (PID=%s, model=%s)", _os.getpid(), self.embedding_model)
 
   def _ensure_initialized(self):
     """Verify that the API is initialized."""

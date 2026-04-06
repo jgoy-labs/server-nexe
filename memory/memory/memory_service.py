@@ -93,19 +93,25 @@ class MemoryService:
         trust_level: str = "untrusted",
         source: str = "user_message",
         is_mem_save: bool = False,
+        force: bool = False,
     ) -> Optional[str]:
         """
         Process text through the pipeline and store if worthy.
 
         Returns staging entry ID if accepted, None if rejected.
+        If force=True, bypass the Gate heuristic.
         """
-        # Gate
-        is_user = source in ("user_message", "cli", "web_ui")
-        gate_result = self._gate.evaluate(
-            text,
-            is_user_message=is_user,
-            is_mem_save=is_mem_save,
-        )
+        # Gate (skip if force=True)
+        if not force:
+            is_user = source in ("user_message", "cli", "web_ui")
+            gate_result = self._gate.evaluate(
+                text,
+                is_user_message=is_user,
+                is_mem_save=is_mem_save,
+            )
+        else:
+            from .pipeline.gate import GateResult
+            gate_result = GateResult(passed=True, reason="forced", score=1.0)
         if not gate_result.passed:
             logger.debug(
                 "Gate rejected: %s (reason=%s)", text[:50], gate_result.reason

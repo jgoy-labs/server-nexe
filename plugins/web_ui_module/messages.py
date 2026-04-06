@@ -15,10 +15,12 @@ logger = logging.getLogger(__name__)
 
 FALLBACK_MESSAGES = {
     "webui.auth.invalid_key": "Invalid or missing API key",
+    "webui.auth.supported_languages": "Supported languages: ca, es, en",
     "webui.static.ui_not_found": "UI not found",
     "webui.static.forbidden": "Forbidden",
     "webui.static.file_not_found": "File not found",
     "webui.session.not_found": "Session not found",
+    "webui.session.name_length": "Name must be 1-100 chars",
     "webui.file.extract_failed": "Could not extract text from file",
     "webui.chat.message_required": "Message is required",
     "webui.memory.content_required": "Content is required",

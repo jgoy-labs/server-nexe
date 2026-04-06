@@ -37,7 +37,18 @@ def generate_env_file(project_root, model_config):
                 f.write(f"NEXE_CSRF_SECRET={csrf_secret}\n")
                 f.write(f"NEXE_ENV=production\n")
                 f.write(f"NEXE_LOG_LEVEL=INFO\n")
-                f.write(f"NEXE_APPROVED_MODULES=security,llama_cpp_module,mlx_module,ollama_module,web_ui_module\n")
+                # Only include modules for the selected engine (avoids MLX errors on Ollama installs)
+                engine = model_config.get('engine', 'ollama')
+                base_modules = "security,web_ui_module"
+                if engine == 'ollama':
+                    approved_modules = f"{base_modules},ollama_module"
+                elif engine == 'mlx':
+                    approved_modules = f"{base_modules},mlx_module,ollama_module"
+                elif engine == 'llama_cpp':
+                    approved_modules = f"{base_modules},llama_cpp_module,ollama_module"
+                else:
+                    approved_modules = f"{base_modules},ollama_module,mlx_module,llama_cpp_module"
+                f.write(f"NEXE_APPROVED_MODULES={approved_modules}\n")
                 f.write(f"NEXE_LANG={lang}\n")
                 f.write(f"# Model configuration\n")
                 f.write(f"NEXE_DEFAULT_MODEL={model_config['id']}\n")
@@ -103,6 +114,7 @@ def _update_env_model_config(env_file, model_config):
     found_llama_cpp_chat_format = False
     found_prompt_tier = False
     found_ollama_model = False
+    found_approved_modules = False
     new_lines = []
 
     for line in lines:
@@ -139,6 +151,19 @@ def _update_env_model_config(env_file, model_config):
         elif line.startswith('NEXE_PROMPT_TIER='):
             found_prompt_tier = True
             new_lines.append(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
+        elif line.startswith('NEXE_APPROVED_MODULES='):
+            engine = model_config.get('engine', 'ollama')
+            base_modules = "security,web_ui_module"
+            if engine == 'ollama':
+                approved_modules = f"{base_modules},ollama_module"
+            elif engine == 'mlx':
+                approved_modules = f"{base_modules},mlx_module,ollama_module"
+            elif engine == 'llama_cpp':
+                approved_modules = f"{base_modules},llama_cpp_module,ollama_module"
+            else:
+                approved_modules = f"{base_modules},ollama_module,mlx_module,llama_cpp_module"
+            new_lines.append(f"NEXE_APPROVED_MODULES={approved_modules}\n")
+            found_approved_modules = True
         elif line.startswith('NEXE_OLLAMA_MODEL='):
             found_ollama_model = True
             if model_engine == 'ollama':
@@ -172,6 +197,18 @@ def _update_env_model_config(env_file, model_config):
         new_lines.append(f"NEXE_LLAMA_CPP_CHAT_FORMAT={chat_fmt}\n")
     if not found_prompt_tier:
         new_lines.append(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
+    if not found_approved_modules:
+        engine = model_config.get('engine', 'ollama')
+        base_modules = "security,web_ui_module"
+        if engine == 'ollama':
+            approved_modules = f"{base_modules},ollama_module"
+        elif engine == 'mlx':
+            approved_modules = f"{base_modules},mlx_module,ollama_module"
+        elif engine == 'llama_cpp':
+            approved_modules = f"{base_modules},llama_cpp_module,ollama_module"
+        else:
+            approved_modules = f"{base_modules},ollama_module,mlx_module,llama_cpp_module"
+        new_lines.append(f"NEXE_APPROVED_MODULES={approved_modules}\n")
     if not found_ollama_model and model_engine == 'ollama':
         new_lines.append(f"NEXE_OLLAMA_MODEL={model_id}\n")
 

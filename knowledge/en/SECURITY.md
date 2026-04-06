@@ -4,9 +4,9 @@ data: 2026-03-28
 id: nexe-security-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Security documentation for server-nexe 0.9.0 pre-release. Covers dual-key API authentication with rotation, rate limiting (all endpoints), 6 injection detectors with Unicode normalization, 47 jailbreak patterns, OWASP security headers, RFC5424 audit logging, input validation (validate_string_input on all UI routes), RAG context sanitization, encryption at-rest (CryptoProvider AES-256-GCM, SQLCipher, encrypted sessions), AI audit results (v1+v2+mega-test), and security checklist."
-tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher]
-chunk_size: 800
+abstract: "server-nexe security: dual-key authentication, rate limiting, 6 injection detectors, 47 jailbreak patterns, OWASP headers, RFC5424 logging, AES-256-GCM encryption at-rest (SQLCipher, .enc sessions), RAG sanitization. Fully local, zero external calls."
+tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher, local, privacy]
+chunk_size: 600
 priority: P1
 
 # === OPCIONAL ===
