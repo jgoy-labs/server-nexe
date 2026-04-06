@@ -229,8 +229,13 @@ class TestIngestKnowledge:
         assert result is True
         assert mock_memory.store.call_count >= 1
 
-    def test_recreates_collection_if_exists(self, tmp_path):
-        """Si la col·lecció existeix, la borra i recrea."""
+    def test_idempotent_does_not_delete_collection(self, tmp_path):
+        """F7 fix: si la col·lecció ja existeix, NO es delete (era destructiu).
+
+        Abans del fix, ingest_knowledge feia delete_collection + create_collection
+        i això esborrava qualsevol document que ja estigués a la col·lecció. Ara
+        només crea quan no existeix (idempotent).
+        """
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"
@@ -250,8 +255,8 @@ class TestIngestKnowledge:
             result = asyncio.run(ingest_knowledge())
 
         assert result is True
-        mock_memory.delete_collection.assert_called_once()
-        mock_memory.create_collection.assert_called_once()
+        mock_memory.delete_collection.assert_not_called()
+        mock_memory.create_collection.assert_not_called()
 
     def test_quiet_mode_suppresses_output(self, tmp_path):
         """quiet=True → no s'imprimeix res."""

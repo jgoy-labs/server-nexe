@@ -236,11 +236,15 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 result = await memory_helper.save_to_memory(
                     content=content_to_save,
                     session_id=session.id,
-                    metadata={"original_message": message, "type": "user_fact"}
+                    metadata={"original_message": message, "type": "user_fact"},
+                    collections=body.get("rag_collections"),
                 )
-                if result["success"]:
+                if result["success"] and result.get("document_id"):
                     _safe_content = str(content_to_save).replace("\x00", "").replace("]", "")[:200]
                     response_text = f"\x00[MODEL:nexe-system]\x00Saved to memory: \"{_safe_content}\"\n\nI'll remember this for future conversations.\x00[MEM]\x00"
+                elif result.get("duplicate"):
+                    _safe_content = str(content_to_save).replace("\x00", "").replace("]", "")[:200]
+                    response_text = f"\x00[MODEL:nexe-system]\x00Already in memory: \"{_safe_content}\" (similar entry exists)."
                 else:
                     response_text = f"\x00[MODEL:nexe-system]\x00Could not save: {result.get('message', 'Unknown error')}"
             else:
@@ -251,7 +255,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             # Delete from memory
             content_to_delete = extracted_content.strip() if extracted_content else ""
             if content_to_delete:
-                result = await memory_helper.delete_from_memory(content_to_delete)
+                result = await memory_helper.delete_from_memory(
+                    content_to_delete,
+                    collections=body.get("rag_collections"),
+                )
                 if result["success"] and result.get("deleted", 0) > 0:
                     # Sanitize message in history to avoid re-save loop
                     if session.messages and session.messages[-1]["role"] == "user":
@@ -282,7 +289,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             memory_action = "delete"
 
         elif intent == "list":
-            list_result = await memory_helper.list_memories(limit=20)
+            list_result = await memory_helper.list_memories(
+                limit=20,
+                collections=body.get("rag_collections"),
+            )
             if list_result["success"] and list_result["facts"]:
                 facts_lines = []
                 for i, f in enumerate(list_result["facts"], 1):
@@ -810,6 +820,17 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 # eliminar QUALSEVOL [MEM_SAVE: ...] (vàlid o no) de la resposta.
                                 clean_response = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
 
+                                # Bug #3 fix: si el model ha emès NOMÉS [MEM_SAVE: ...] sense text
+                                # envoltant, clean_response queda buit i el bloc save de sota no
+                                # s'executaria mai. Generem un text de fallback perquè (a) el bloc
+                                # save s'executi i els facts es desin, (b) el frontend mostri una
+                                # confirmació en comptes de quedar-se amb només el badge "✓".
+                                if not clean_response and _mem_saves:
+                                    _fallback_facts = [f.strip() for f in _mem_saves if f and f.strip()]
+                                    if _fallback_facts:
+                                        clean_response = "Memòria desada: " + ", ".join(_fallback_facts)
+                                        yield clean_response
+
                                 if clean_response:
                                     # Save LLM-extracted facts to memory
                                     _mem_saved_count = 0
@@ -999,17 +1020,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         })
         session_mgr._save_session_to_disk(session)
 
-        # AUTO-SAVE: guarda missatge usuari directament (sense LLM)
-        if response_text and not response_text.startswith("Error:") and not response_text.startswith("What do you want"):
-            try:
-                save_result = await memory_helper.auto_save(
-                    user_message=message,
-                    session_id=session.id,
-                )
-                if save_result.get("document_id"):
-                    logger.debug(f"Auto-saved to RAG: {message[:40]}")
-            except Exception as e:
-                logger.warning(f"Auto-save to RAG failed: {e}")
+        # auto_save call removed per HOMAD memoria v1 (2026-04-01) decision —
+        # manual MEM_SAVE only until Part 2. The helper.auto_save function is
+        # kept for direct test invocation but no longer called from the chat path.
 
         if stream:
             async def generate():

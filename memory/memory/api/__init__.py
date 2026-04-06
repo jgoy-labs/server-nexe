@@ -335,6 +335,36 @@ class MemoryAPI:
 
     return await delete_document(self._qdrant, self._executor, doc_id, collection, text_store=self._text_store)
 
+  async def scroll(
+    self,
+    collection: str,
+    limit: int = 50,
+    offset: Optional[Any] = None,
+  ):
+    """
+    Scroll all points in a collection without semantic ranking.
+
+    Returns (points, next_offset). Direct passthrough to qdrant_client.scroll().
+    Used for unbiased listing (no semantic query, no language bias).
+    """
+    self._ensure_initialized()
+
+    if not await self.collection_exists(collection):
+      raise CollectionNotFoundError(f"Collection '{collection}' does not exist.")
+
+    loop = asyncio.get_running_loop()
+
+    def _scroll():
+      return self._qdrant.scroll(
+        collection_name=collection,
+        limit=limit,
+        offset=offset,
+        with_payload=True,
+        with_vectors=False,
+      )
+
+    return await loop.run_in_executor(self._executor, _scroll)
+
   async def count(self, collection: str) -> int:
     """Compta documents en una collection."""
     self._ensure_initialized()

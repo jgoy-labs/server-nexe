@@ -29,7 +29,15 @@ def make_result(text="content", score=0.9, rid="id-1", metadata=None):
     return r
 
 
-def make_memory_mock(collection_exists=True, search_results=None, count=None):
+def make_point(text="content", rid="id-1", payload=None):
+    """Create a mock qdrant scroll point."""
+    p = MagicMock()
+    p.id = rid
+    p.payload = payload or {"text": text}
+    return p
+
+
+def make_memory_mock(collection_exists=True, search_results=None, count=None, scroll_points=None):
     """Create a complete MemoryAPI mock."""
     mem = MagicMock()
     mem.initialize = AsyncMock()
@@ -41,6 +49,9 @@ def make_memory_mock(collection_exists=True, search_results=None, count=None):
     results = search_results if search_results is not None else []
     mem.search = AsyncMock(return_value=results)
     mem.count = AsyncMock(return_value=count if count is not None else len(results))
+    # F3: list_memories now uses scroll instead of semantic search
+    points = scroll_points if scroll_points is not None else []
+    mem.scroll = AsyncMock(return_value=(points, None))
     return mem
 
 
@@ -244,11 +255,11 @@ class TestDeleteFromMemory:
 class TestListMemories:
 
     def test_list_returns_facts(self):
-        r1 = make_result(text="Em dic Joan", score=0.5, rid="id-1",
-                         metadata={"text": "Em dic Joan", "saved_at": "2026-03-01T10:00:00Z", "source": "web_ui", "type": "user_fact"})
-        r2 = make_result(text="Treballo a BCN", score=0.4, rid="id-2",
-                         metadata={"text": "Treballo a BCN", "saved_at": "2026-03-02T10:00:00Z", "source": "web_ui", "type": "user_fact"})
-        mem = make_memory_mock(search_results=[r1, r2], count=2)
+        p1 = make_point(text="Em dic Joan", rid="id-1",
+                        payload={"text": "Em dic Joan", "saved_at": "2026-03-01T10:00:00Z", "source": "web_ui", "type": "user_fact"})
+        p2 = make_point(text="Treballo a BCN", rid="id-2",
+                        payload={"text": "Treballo a BCN", "saved_at": "2026-03-02T10:00:00Z", "source": "web_ui", "type": "user_fact"})
+        mem = make_memory_mock(scroll_points=[p1, p2], count=2)
         mh_module._memory_api_instance = mem
         helper = MemoryHelper()
         helper._memory_api = mem
@@ -262,7 +273,7 @@ class TestListMemories:
         assert result["facts"][0]["id"] == "id-1"
 
     def test_list_empty_memory(self):
-        mem = make_memory_mock(collection_exists=True, search_results=[], count=0)
+        mem = make_memory_mock(collection_exists=True, scroll_points=[], count=0)
         mh_module._memory_api_instance = mem
         helper = MemoryHelper()
         helper._memory_api = mem
@@ -295,3 +306,142 @@ class TestListMemories:
         assert result["success"] is False
         assert result["facts"] == []
         mh_module._memory_api_init_failed = False
+
+
+# ═══════════════════════════════════════════════════════════════
+# F1 — _check_duplicate honest contract (Bug #4 part 2)
+# ═══════════════════════════════════════════════════════════════
+
+class TestSaveDuplicateContract:
+
+    def test_check_duplicate_returns_success_false_with_duplicate_flag(self):
+        """Bug #4 part 2: duplicates must NOT report success=True."""
+        mem = make_memory_mock()
+        helper = MemoryHelper()
+
+        with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)), \
+             patch.object(helper, "_check_duplicate", AsyncMock(return_value=True)):
+            result = asyncio.run(helper.save_to_memory("Duplicate content", "sess-1"))
+
+        assert result["success"] is False
+        assert result.get("duplicate") is True
+        assert result["document_id"] is None
+        mem.store.assert_not_called()
+
+
+# ═══════════════════════════════════════════════════════════════
+# F3 — list_memories uses scroll (no language bias)
+# ═══════════════════════════════════════════════════════════════
+
+class TestListMemoriesScroll:
+
+    def test_list_memories_uses_scroll_not_semantic_search(self):
+        """F3: list_memories must call scroll(), never search()."""
+        p = make_point(text="fact", rid="id-x", payload={"text": "fact"})
+        mem = make_memory_mock(scroll_points=[p], count=1)
+        mh_module._memory_api_instance = mem
+        helper = MemoryHelper()
+        helper._memory_api = mem
+
+        asyncio.run(helper.list_memories(limit=10))
+
+        mem.scroll.assert_called_once()
+        mem.search.assert_not_called()
+
+    def test_list_memories_returns_catalan_entries(self):
+        """F3: scroll returns content regardless of query language bias."""
+        p1 = make_point(text="El meu nom és Aran", rid="id-1",
+                        payload={"text": "El meu nom és Aran", "source": "web_ui"})
+        p2 = make_point(text="Visc a Vilafranca", rid="id-2",
+                        payload={"text": "Visc a Vilafranca", "source": "web_ui"})
+        mem = make_memory_mock(scroll_points=[p1, p2], count=2)
+        mh_module._memory_api_instance = mem
+        helper = MemoryHelper()
+        helper._memory_api = mem
+
+        result = asyncio.run(helper.list_memories(limit=20))
+
+        assert result["success"] is True
+        assert len(result["facts"]) == 2
+        texts = [f["text"] for f in result["facts"]]
+        assert "El meu nom és Aran" in texts
+        assert "Visc a Vilafranca" in texts
+
+
+# ═══════════════════════════════════════════════════════════════
+# Bug #10 — collections= filter on memory ops
+# ═══════════════════════════════════════════════════════════════
+
+class TestCollectionsFilter:
+
+    def test_list_memories_filter_excludes_when_no_nexe_web_ui(self):
+        """Bug #10: list returns empty when user disables nexe_web_ui."""
+        mem = make_memory_mock(scroll_points=[make_point()], count=1)
+        mh_module._memory_api_instance = mem
+        helper = MemoryHelper()
+        helper._memory_api = mem
+
+        result = asyncio.run(helper.list_memories(
+            limit=20, collections=["nexe_documentation", "user_knowledge"]
+        ))
+
+        assert result["success"] is True
+        assert result["facts"] == []
+        assert result["total"] == 0
+        mem.scroll.assert_not_called()
+
+    def test_list_memories_filter_includes_when_nexe_web_ui_present(self):
+        """Bug #10: list works normally when nexe_web_ui is in the filter."""
+        p = make_point(text="hello", payload={"text": "hello"})
+        mem = make_memory_mock(scroll_points=[p], count=1)
+        mh_module._memory_api_instance = mem
+        helper = MemoryHelper()
+        helper._memory_api = mem
+
+        result = asyncio.run(helper.list_memories(
+            limit=20, collections=["nexe_web_ui", "user_knowledge"]
+        ))
+
+        assert result["success"] is True
+        assert len(result["facts"]) == 1
+
+    def test_save_to_memory_filter_disabled(self):
+        """Bug #10: save rejected when nexe_web_ui not in collections."""
+        mem = make_memory_mock()
+        helper = MemoryHelper()
+
+        with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
+            result = asyncio.run(helper.save_to_memory(
+                "fact", "sess", collections=["user_knowledge"]
+            ))
+
+        assert result["success"] is False
+        assert "disabled" in result["message"].lower()
+        mem.store.assert_not_called()
+
+    def test_save_to_memory_filter_none_default(self):
+        """Bug #10: collections=None keeps legacy behavior (saves)."""
+        mem = make_memory_mock(search_results=[], count=0)
+        helper = MemoryHelper()
+
+        with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)), \
+             patch.object(helper, "_check_duplicate", AsyncMock(return_value=False)), \
+             patch.object(helper, "_prune_old_entries", AsyncMock(return_value=0)):
+            result = asyncio.run(helper.save_to_memory("fact", "sess", collections=None))
+
+        assert result["success"] is True
+        assert result["document_id"] == "doc-id-123"
+
+    def test_delete_from_memory_filter_collections(self):
+        """Bug #10: delete only iterates the requested collections."""
+        mem = make_memory_mock(search_results=[])
+        mh_module._memory_api_instance = mem
+        helper = MemoryHelper()
+        helper._memory_api = mem
+
+        asyncio.run(helper.delete_from_memory("foo", collections=["nexe_web_ui"]))
+
+        # collection_exists called for nexe_web_ui only (no user_knowledge)
+        called_cols = [c.args[0] for c in mem.collection_exists.call_args_list]
+        assert "nexe_web_ui" in called_cols
+        assert "user_knowledge" not in called_cols

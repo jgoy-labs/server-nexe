@@ -66,8 +66,13 @@ def _t(key, **kwargs):
     s = _I18N.get(key, {}).get(_LANG) or _I18N.get(key, {}).get("ca", key)
     return s.format(**kwargs) if kwargs else s
 
-# Collection for user knowledge
+# Collections
+# - USER_KNOWLEDGE_COLLECTION: ad-hoc docs uploaded by users from the chat UI
+# - DOCUMENTATION_COLLECTION: corporate know-how ingested from the `knowledge/`
+#   folder during install/post-install. The default target for this script
+#   (was wrongly defaulting to user_knowledge before the F7 fix).
 USER_KNOWLEDGE_COLLECTION = "user_knowledge"
+DOCUMENTATION_COLLECTION = "nexe_documentation"
 CHUNK_SIZE = 1500
 CHUNK_OVERLAP = 200
 
@@ -129,12 +134,19 @@ def read_file(file_path: Path) -> str:
     return ""
 
 
-async def ingest_knowledge(folder: Path = None, quiet: bool = False):
+async def ingest_knowledge(
+    folder: Path = None,
+    quiet: bool = False,
+    target_collection: str = DOCUMENTATION_COLLECTION,
+):
     """Ingest user documents from knowledge/ folder into Qdrant.
 
     Args:
         folder: Path to knowledge folder (default: PROJECT_ROOT/knowledge)
         quiet: If True, suppress output (for auto-ingest at startup)
+        target_collection: Destination collection (default: nexe_documentation,
+            i.e. corporate know-how). Use "user_knowledge" only for ad-hoc docs
+            uploaded by end users from the chat UI.
     """
     from memory.memory.api import MemoryAPI
 
@@ -194,13 +206,15 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
         log(_t("ensure_running"))
         return False
 
-    # Create/recreate collection
-    log(_t("preparing_col", c=USER_KNOWLEDGE_COLLECTION))
+    # Ensure target collection exists (idempotent — F7 fix).
+    # Previously this code did `delete_collection + create_collection` which
+    # was destructive: re-running ingest wiped any user docs already stored
+    # in the collection. Now we only create when missing.
+    log(_t("preparing_col", c=target_collection))
     try:
-        if await memory.collection_exists(USER_KNOWLEDGE_COLLECTION):
-            await memory.delete_collection(USER_KNOWLEDGE_COLLECTION)
-        await memory.create_collection(USER_KNOWLEDGE_COLLECTION, vector_size=DEFAULT_VECTOR_SIZE)
-        log(_t("col_ready", c=USER_KNOWLEDGE_COLLECTION))
+        if not await memory.collection_exists(target_collection):
+            await memory.create_collection(target_collection, vector_size=DEFAULT_VECTOR_SIZE)
+        log(_t("col_ready", c=target_collection))
     except Exception as e:
         log(_t("col_error", e=e))
         return False
@@ -226,7 +240,7 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
             if rag_header.is_valid:
                 log(_t("rag_header", id=rag_header.id, p=rag_header.priority))
                 doc_chunk_size = rag_header.chunk_size
-                doc_collection = rag_header.collection or USER_KNOWLEDGE_COLLECTION
+                doc_collection = rag_header.collection or target_collection
                 doc_priority = rag_header.priority
                 doc_tags = rag_header.tags
                 doc_abstract = rag_header.abstract
@@ -239,7 +253,7 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
                     log(_t("invalid_header", e=', '.join(rag_header.validation_errors[:2])))
                 body_content = content  # Use full content
                 doc_chunk_size = CHUNK_SIZE
-                doc_collection = USER_KNOWLEDGE_COLLECTION
+                doc_collection = target_collection
                 doc_priority = "P2"
                 doc_tags = []
                 doc_abstract = ""
@@ -296,7 +310,7 @@ async def ingest_knowledge(folder: Path = None, quiet: bool = False):
     log(_t("ingestion_done"))
     log(_t("docs_processed", n=len(files)))
     log(_t("total_chunks", n=total_chunks))
-    log(_t("collection", c=USER_KNOWLEDGE_COLLECTION))
+    log(_t("collection", c=target_collection))
     log(_t("ask_now"))
     log(f"{'='*60}\n")
 

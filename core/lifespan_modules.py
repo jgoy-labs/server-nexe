@@ -137,7 +137,14 @@ async def auto_ingest_knowledge(server_state):
                 else:
                     # First run - auto-ingest as fallback if installer didn't do it
                     logger.info("Knowledge: First run - auto-ingesting %d document(s)...", len(files_to_ingest))
-                    success = await ingest_knowledge(knowledge_path, quiet=True)
+                    # F7: explicit target_collection — auto-ingest at startup
+                    # writes corporate know-how to nexe_documentation, never
+                    # to the user_knowledge collection.
+                    success = await ingest_knowledge(
+                        knowledge_path,
+                        quiet=True,
+                        target_collection="nexe_documentation",
+                    )
                     if success:
                         logger.info("Knowledge: Ingestion completed successfully")
                         # Create marker to prevent re-ingestion on next startup
@@ -171,7 +178,10 @@ async def start_memory_service_v1(app, server_state):
             if project_root:
                 from pathlib import Path
                 db_path = Path(project_root) / "storage" / "vectors" / "memory_v1.db"
-                qdrant_path = str(Path(project_root) / "storage" / "vectors" / "qdrant_local")
+                # F8 fix: use the canonical storage/vectors path so the
+                # MemoryService shares the same singleton QdrantClient as
+                # the rest of the server (no second client on qdrant_local/).
+                qdrant_path = str(Path(project_root) / "storage" / "vectors")
                 memory_service = MemoryService(db_path=db_path, qdrant_path=qdrant_path)
             else:
                 memory_service = MemoryService()

@@ -422,14 +422,29 @@ class MemoryHelper:
         self,
         content: str,
         session_id: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        collections: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Save content to memory with deduplication and size management.
 
-        Uses MemoryService.remember() if available, falls back to direct Qdrant.
+        Args:
+            content: text to save.
+            session_id: session id (metadata).
+            metadata: extra metadata.
+            collections: user-selected RAG collections filter (Bug #10). If
+                non-None and does not include 'nexe_web_ui', the save is rejected.
         """
         try:
+            # Bug #10: respect user collection filter
+            if collections is not None and "nexe_web_ui" not in collections:
+                logger.info("Memory collection disabled by user — save_to_memory rejected")
+                return {
+                    "success": False,
+                    "document_id": None,
+                    "message": "Memory collection disabled",
+                }
+
             # Legacy Qdrant path (MemoryService integration via pipeline is
             # handled at the endpoint level, not here — keep this path clean
             # for backwards compatibility with existing tests and callers)
@@ -441,10 +456,13 @@ class MemoryHelper:
                 }
 
             # 1. Check for duplicates - skip if very similar content exists
+            # Honest contract: success=False so callers don't show fake "saved" badges
+            # (Bug #4 part 2). Use `duplicate=True` flag to distinguish from real errors.
             if await self._check_duplicate(content, memory):
                 return {
-                    "success": True,
+                    "success": False,
                     "document_id": None,
+                    "duplicate": True,
                     "message": "Contingut similar ja existeix, no guardat"
                 }
 
@@ -475,12 +493,18 @@ class MemoryHelper:
                 "message": f"Error saving to memory: {str(e)}"
             }
 
-    async def delete_from_memory(self, content: str) -> Dict[str, Any]:
+    async def delete_from_memory(
+        self,
+        content: str,
+        collections: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         """
         Search for similar content in memory and delete matching entries.
 
         Args:
-            content: Text to search for and delete
+            content: Text to search for and delete.
+            collections: user-selected RAG collections filter (Bug #10). If None,
+                defaults to ['nexe_web_ui', 'user_knowledge'].
 
         Returns:
             Result dict with success status and count of deleted entries
@@ -492,7 +516,8 @@ class MemoryHelper:
 
             deleted = 0
             deleted_facts = []
-            for collection in ["nexe_web_ui", "user_knowledge"]:
+            target_collections = collections if collections is not None else ["nexe_web_ui", "user_knowledge"]
+            for collection in target_collections:
                 try:
                     if not await memory.collection_exists(collection):
                         continue
@@ -525,14 +550,33 @@ class MemoryHelper:
             logger.error("Memory delete error: %s", e)
             return {"success": False, "deleted": 0, "deleted_facts": [], "message": f"Error esborrant: {str(e)}"}
 
-    async def list_memories(self, limit: int = 20) -> Dict[str, Any]:
+    async def list_memories(
+        self,
+        limit: int = 20,
+        collections: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         """
-        List all stored memory facts.
+        List all stored memory facts using unbiased scroll (no semantic query).
+
+        Args:
+            limit: Maximum number of facts to return.
+            collections: User-selected RAG collections filter (Bug #10).
+                If non-None and does not include 'nexe_web_ui', returns empty list.
 
         Returns:
-            Dict with facts list, total count, and status
+            Dict with facts list, total count, and status.
         """
         try:
+            # Bug #10: respect user collection filter — list is semantically personal
+            if collections is not None and "nexe_web_ui" not in collections:
+                logger.info("Memory collection disabled by user — list_memories returns empty")
+                return {
+                    "success": True,
+                    "facts": [],
+                    "total": 0,
+                    "message": "Memory collection disabled",
+                }
+
             memory = await self.get_memory_api()
             if not memory:
                 return {"success": False, "facts": [], "total": 0, "message": "Memory not available"}
@@ -545,29 +589,31 @@ class MemoryHelper:
             if total == 0:
                 return {"success": True, "facts": [], "total": 0, "message": "No memories stored"}
 
-            results = await memory.search(
-                query="user personal facts preferences",
+            # F3: scroll instead of semantic search to avoid query-language bias.
+            # Previously used `memory.search(query="user personal facts preferences", ...)`
+            # which biased against Catalan/Spanish content.
+            scroll_result = await memory.scroll(
                 collection=collection,
-                top_k=min(limit, 50),
-                threshold=0.0,
+                limit=min(limit, 50),
             )
+            # qdrant scroll returns a (points, next_offset) tuple
+            if isinstance(scroll_result, tuple):
+                points = scroll_result[0]
+            else:
+                points = scroll_result
 
             facts = []
-            for r in results:
-                meta = r.payload if hasattr(r, 'payload') else {}
-                if not meta:
-                    meta = r.metadata if hasattr(r, 'metadata') else {}
-                text = meta.get("text", "")
-                if not text and hasattr(r, 'text'):
-                    text = r.text or ""
+            for p in points:
+                payload = getattr(p, "payload", None) or {}
+                text = payload.get("text", "")
                 if not text:
                     continue
                 facts.append({
-                    "id": str(r.id) if hasattr(r, 'id') else meta.get("original_id", ""),
+                    "id": str(getattr(p, "id", "")) or payload.get("original_id", ""),
                     "text": text,
-                    "created_at": meta.get("created_at", meta.get("saved_at", "")),
-                    "source": meta.get("source", "unknown"),
-                    "type": meta.get("type", "unknown"),
+                    "created_at": payload.get("created_at", payload.get("saved_at", "")),
+                    "source": payload.get("source", "unknown"),
+                    "type": payload.get("type", "unknown"),
                 })
 
             return {

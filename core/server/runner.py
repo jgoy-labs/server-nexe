@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import atexit
 import logging
 import os
 import signal
@@ -16,6 +17,8 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LOAD .env AT MODULE LEVEL (before any imports that depend on env vars)
@@ -66,6 +69,62 @@ def kill_process_on_port(port: int) -> bool:
   except Exception as e:
     logger.debug("Failed to kill process on port %s: %s", port, e)
   return False
+
+def _acquire_pidfile(pid_path: Path, port: int) -> bool:
+  """Try to acquire the canonical server PID file.
+
+  Returns True if acquired (file written), False if another live server
+  already holds the lock. Stale lock files (dead PID, corrupt content)
+  are removed automatically.
+
+  Note: not atomic against TOCTOU races — acceptable for Fase 1B since
+  the port-in-use check upstream is the primary guard.
+  """
+  if pid_path.exists():
+    try:
+      raw = pid_path.read_text().strip().split("\n")
+      existing_pid = int(raw[0])
+      existing_port = raw[1] if len(raw) > 1 else "?"
+      try:
+        os.kill(existing_pid, 0)  # signal 0 = liveness probe
+        logger.error(
+          "Server already running. PID: %s on port %s. Use './nexe stop' to stop it.",
+          existing_pid, existing_port,
+        )
+        return False
+      except (ProcessLookupError, OSError):
+        logger.warning("Stale PID file found (PID %s dead), removing.", existing_pid)
+        try:
+          pid_path.unlink()
+        except OSError:
+          pass
+    except (ValueError, OSError, IndexError) as e:
+      logger.warning("Corrupt PID file (%s), removing.", e)
+      try:
+        pid_path.unlink()
+      except OSError:
+        pass
+
+  pid_path.parent.mkdir(parents=True, exist_ok=True)
+  pid_path.write_text(
+    f"{os.getpid()}\n{port}\n{datetime.now(timezone.utc).isoformat()}\n"
+  )
+  return True
+
+
+def _release_pidfile(pid_path: Path) -> None:
+  """Remove the PID file if it exists and belongs to us."""
+  try:
+    if pid_path.exists():
+      try:
+        existing_pid = int(pid_path.read_text().strip().split("\n")[0])
+      except (ValueError, OSError, IndexError):
+        existing_pid = None
+      if existing_pid is None or existing_pid == os.getpid():
+        pid_path.unlink()
+  except OSError as e:
+    logger.debug("Failed to release PID file %s: %s", pid_path, e)
+
 
 def _start_parent_watchdog():
   """If launched from the tray app, monitor that the parent is still alive.
@@ -180,6 +239,15 @@ def main():
 
   Loads configuration and starts uvicorn with the application factory.
   """
+  # Bug #2: rename the process so it shows as "server-nexe" instead of "Python"
+  # in `ps aux` and Activity Monitor. Force Quit still shows "Python" because
+  # that requires CFBundleName via a real .app bundle (deferred to v0.9.1).
+  try:
+    import setproctitle
+    setproctitle.setproctitle("server-nexe")
+  except ImportError:
+    pass  # Optional dependency
+
   setup_signal_handlers()
   _start_parent_watchdog()
 
@@ -269,6 +337,12 @@ def main():
     f"  edit {YELLOW}personality/server.toml{RESET}\n"
     f"{YELLOW}Server running at: {host}:{port}{RESET}"
   )
+
+  # ─── PID file canònic (Bug #1) ─────────────────────────────────────────
+  pidfile_path = Path(project_root) / "storage" / "run" / "server.pid"
+  if not _acquire_pidfile(pidfile_path, port):
+    sys.exit(1)
+  atexit.register(_release_pidfile, pidfile_path)
 
   _maybe_launch_tray()
 

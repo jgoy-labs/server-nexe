@@ -282,7 +282,10 @@ class TestSaveToMemory:
              patch.object(helper, "_check_duplicate", AsyncMock(return_value=True)):
             result = asyncio.run(helper.save_to_memory("Duplicate content", "sess-1"))
 
-        assert result["success"] is True
+        # Honest contract (Bug #4 part 2): duplicates return success=False
+        # with explicit duplicate=True flag so callers don't show fake "saved" badges.
+        assert result["success"] is False
+        assert result.get("duplicate") is True
         assert result["document_id"] is None
         mem.store.assert_not_called()
 

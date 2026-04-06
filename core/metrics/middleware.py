@@ -113,7 +113,10 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
       ACTIVE_CONNECTIONS.dec()
 
-      if duration > 1.0:
+      # Bug #5: skip slow_request warning for /ui/upload — uploads naturally
+      # exceed 1s and the warning duplicates uvicorn's access log entry,
+      # giving the false appearance of a duplicated upload log.
+      if duration > 1.0 and path != "/ui/upload":
         logger.warning(
           "slow_request",
           extra={

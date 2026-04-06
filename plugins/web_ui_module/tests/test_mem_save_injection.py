@@ -131,3 +131,105 @@ class TestExtractSafeMemSaves:
     def test_empty_text(self):
         assert _extract_safe_mem_saves("") == []
         assert _extract_safe_mem_saves(None) == []
+
+
+class TestBug3MemSaveStripFallback:
+    """Bug #3 — Quan el model emet només [MEM_SAVE: ...] sense text envoltant,
+    la lògica de strip de routes_chat deixava clean_response buit i el bloc
+    save no s'executava mai. El fix afegeix un fallback que (a) força que el
+    bloc save s'executi i (b) genera un text de confirmació visible.
+
+    Aquests tests reprodueixen la lògica de strip + fallback exactament com
+    a routes_chat.py (línies ~804-833) per garantir que el fix és efectiu
+    sense haver de muntar tot l'streaming HTTP.
+    """
+
+    @staticmethod
+    def _apply_strip_pipeline(full_response: str, user_input: str = ""):
+        """Reprodueix el pipeline de routes_chat (linies ~804-833)
+        i retorna (clean_response_final, mem_saves, fallback_used)."""
+        import re as _re
+        clean_response = full_response
+        clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", clean_response)
+        clean_response = _re.sub(r'<\|[^|]+\|>', '', clean_response)
+        clean_response = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', clean_response)
+        _m = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', clean_response, _re.IGNORECASE)
+        if _m:
+            clean_response = _m.group(1).strip()
+        else:
+            clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
+        mem_saves = _extract_safe_mem_saves(clean_response, user_input=user_input)
+        clean_response = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
+        fallback_used = False
+        if not clean_response and mem_saves:
+            _fallback_facts = [f.strip() for f in mem_saves if f and f.strip()]
+            if _fallback_facts:
+                clean_response = "Memòria desada: " + ", ".join(_fallback_facts)
+                fallback_used = True
+        return clean_response, mem_saves, fallback_used
+
+    def test_mem_save_only_block_no_surrounding_text(self):
+        """Bug #3 — model emet NOMÉS [MEM_SAVE: ...] sense text envoltant.
+        Sense el fix: clean_response queda buit, mem_saves no es desen.
+        Amb el fix: mem_saves es desen i hi ha text de fallback visible.
+        """
+        full_response = "[MEM_SAVE: l'usuari es diu Aran]"
+        clean, mem_saves, fallback_used = self._apply_strip_pipeline(
+            full_response, user_input="com em dic?"
+        )
+        assert mem_saves == ["l'usuari es diu Aran"], (
+            "Els mem_saves s'han d'extreure abans del strip"
+        )
+        assert fallback_used is True, (
+            "Sense text envoltant, el fallback s'ha d'activar"
+        )
+        assert clean == "Memòria desada: l'usuari es diu Aran", (
+            f"Text de fallback inesperat: {clean!r}"
+        )
+        # Sanity: clean_response NO ha de quedar buit (era el bug)
+        assert clean, "clean_response no ha de quedar buit quan hi ha mem_saves"
+
+    def test_mem_save_only_block_multiple_facts(self):
+        """Bug #3 — múltiples mem_saves sense text envoltant.
+        El fallback ha de llistar tots els facts amb separador ', '.
+        """
+        full_response = "[MEM_SAVE: vegetarian] [MEM_SAVE: viu a Girona]"
+        clean, mem_saves, fallback_used = self._apply_strip_pipeline(full_response)
+        assert mem_saves == ["vegetarian", "viu a Girona"]
+        assert fallback_used is True
+        assert clean == "Memòria desada: vegetarian, viu a Girona"
+
+    def test_mem_save_with_surrounding_text(self):
+        """Bug #3 — model emet text + [MEM_SAVE: ...] envoltats.
+        El comportament normal s'ha de mantenir: NO fallback, clean_response
+        conté el text envoltant net (sense el bloc MEM_SAVE).
+        """
+        full_response = "Hola Aran [MEM_SAVE: l'usuari es diu Aran] benvingut"
+        clean, mem_saves, fallback_used = self._apply_strip_pipeline(full_response)
+        assert mem_saves == ["l'usuari es diu Aran"]
+        assert fallback_used is False, (
+            "Si hi ha text envoltant, el fallback NO s'ha d'activar"
+        )
+        # El bloc MEM_SAVE s'elimina, el text envoltant queda
+        assert "[MEM_SAVE" not in clean
+        assert "Hola Aran" in clean
+        assert "benvingut" in clean
+
+    def test_no_mem_save_no_text_no_fallback(self):
+        """Bug #3 — resposta buida sense mem_saves NO ha d'activar fallback."""
+        full_response = ""
+        clean, mem_saves, fallback_used = self._apply_strip_pipeline(full_response)
+        assert mem_saves == []
+        assert fallback_used is False
+        assert clean == ""
+
+    def test_mem_save_only_with_invalid_facts_no_fallback(self):
+        """Bug #3 — si tots els mem_saves són invàlids (filtrats per
+        _extract_safe_mem_saves), el fallback NO s'activa perquè
+        mem_saves queda buit, encara que clean_response també sigui buit.
+        """
+        full_response = "[MEM_SAVE: <script>alert(1)</script>]"
+        clean, mem_saves, fallback_used = self._apply_strip_pipeline(full_response)
+        assert mem_saves == [], "Facts maliciosos han de ser filtrats"
+        assert fallback_used is False
+        assert clean == ""
