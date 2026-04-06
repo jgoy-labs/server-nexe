@@ -62,13 +62,22 @@ async def get_memory_api():
         from . import MemoryAPI
         _memory_api = MemoryAPI()
         await _memory_api.initialize()
-        # Ensure default collection exists
-        try:
-            if not await _memory_api.collection_exists("nexe_web_ui"):
-                await _memory_api.create_collection("nexe_web_ui", vector_size=DEFAULT_VECTOR_SIZE)
-                logger.info("Created default collection: nexe_web_ui")
-        except Exception as e:
-            logger.warning("Could not create default collection: %s", e)
+        # Ensure canonical collections exist (F5 fix). Previously only
+        # nexe_web_ui was created and nexe_documentation was a silent
+        # skip in recall_from_memory(), making the "Base de coneixement"
+        # sidebar permanently empty.
+        canonical_collections = (
+            "nexe_web_ui",        # personal memory MEM_SAVE
+            "user_knowledge",     # ad-hoc docs uploaded via chat UI
+            "nexe_documentation", # corporate know-how from knowledge/ folder
+        )
+        for col in canonical_collections:
+            try:
+                if not await _memory_api.collection_exists(col):
+                    await _memory_api.create_collection(col, vector_size=DEFAULT_VECTOR_SIZE)
+                    logger.info("Created canonical collection: %s", col)
+            except Exception as e:
+                logger.warning("Could not create canonical collection %s: %s", col, e)
     return _memory_api
 
 @router.post("/store", response_model=MemoryStoreResponse, dependencies=[Depends(require_api_key)], summary="Store content in semantic memory (API key required)")
@@ -167,7 +176,7 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         elif body.collection:
             cols = [body.collection]
         else:
-            cols = ["nexe_documentation", "nexe_web_ui", "user_knowledge", "nexe_web_ui"]
+            cols = ["nexe_documentation", "nexe_web_ui", "user_knowledge"]
 
         formatted_results = []
         search_errors = 0

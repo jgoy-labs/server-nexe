@@ -125,7 +125,12 @@ class MemoryModule:
 
       vectors_path = project_root / "storage" / "vectors"
       db_path = vectors_path / "metadata_memory.db"
-      qdrant_path = vectors_path / "qdrant_local"
+      # F8 fix: previously qdrant_path = vectors_path / "qdrant_local" which
+      # opened a SECOND QdrantClient on a legacy embedded directory and was
+      # the root cause of bug F4 (two clients with diverging collections).
+      # Now MemoryModule shares the same singleton client as MemoryAPI and
+      # the rest of the server, all rooted at storage/vectors/.
+      qdrant_path = vectors_path
 
       self._flash_memory = FlashMemory(
         default_ttl_seconds=final_config.get("flash_ttl_seconds", 1800)

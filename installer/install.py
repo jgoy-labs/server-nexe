@@ -309,7 +309,9 @@ def run_installer():
                 f"import sys; sys.path.insert(0, '{project_root}'); "
                 "import asyncio; "
                 "from core.ingest.ingest_knowledge import ingest_knowledge; "
-                f"asyncio.run(ingest_knowledge(quiet=False))"
+                # F7: explicit target_collection so install-time docs go to
+                # nexe_documentation (corporate know-how), not user_knowledge.
+                f"asyncio.run(ingest_knowledge(quiet=False, target_collection='nexe_documentation'))"
             ], check=True, capture_output=False, text=True, timeout=300, env=ingest_env)
 
             print(f"\n  {t('knowledge_indexed_ok')}")

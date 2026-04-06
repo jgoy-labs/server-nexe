@@ -4,3 +4,4 @@
 # ─────────────────────────────────────────────────────────────
 
 rumps==0.4.0  # macOS menu bar tray app (requires PyObjC)
+setproctitle>=1.3.3  # Renames process visible in `ps`/Activity Monitor (Bug #2)

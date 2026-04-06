@@ -146,10 +146,11 @@ class NexeTray(rumps.App):
         self._version_item = rumps.MenuItem(f"server.nexe v{self._version}")
         self._version_item.set_callback(None)
 
-        # Website link in main menu
-        self._web_item = rumps.MenuItem(
-            "server-nexe.com",
-            callback=self._open_website,
+        # Bug #9: Documentation link in main menu (replaces duplicate website
+        # entry — website is still available in the Settings submenu).
+        self._docs_item = rumps.MenuItem(
+            self.strings["docs"],
+            callback=self._open_docs,
         )
 
         # Build menu
@@ -165,7 +166,7 @@ class NexeTray(rumps.App):
             self.ram_item,
             self.uptime_item,
             None,
-            self._web_item,
+            self._docs_item,
             self.settings_menu,
             None,
             self.quit_item,
@@ -209,6 +210,24 @@ class NexeTray(rumps.App):
             )
             self.toggle_item.title = self.t("start")
             return
+
+        # ─── PID file check (Bug #1): detect orphan server ────────────────
+        pidfile = PROJECT_ROOT / "storage" / "run" / "server.pid"
+        if pidfile.exists():
+            try:
+                raw = pidfile.read_text().strip().split("\n")
+                existing_pid = int(raw[0])
+                try:
+                    os.kill(existing_pid, 0)  # liveness probe
+                    # PID alive — orphan server (not owned by this tray)
+                    self.status_item.title = f"Server orfe detectat (PID {existing_pid})"
+                    self.toggle_item.title = self.t("start")
+                    self.icon = ICON_RUNNING
+                    return
+                except (ProcessLookupError, OSError):
+                    pass  # stale, runner will clean it up on start
+            except (ValueError, OSError, IndexError):
+                pass  # corrupt, runner will handle it
 
         tray_pid = os.getpid()
         env = {
@@ -391,6 +410,11 @@ class NexeTray(rumps.App):
     def _open_website(self, _sender):
         webbrowser.open("https://server-nexe.com")
 
+    def _open_docs(self, _sender):
+        # Bug #9: docs subdomain may not exist yet — server-nexe.com root
+        # is a safe fallback (Jordi will set up /docs separately).
+        webbrowser.open("https://server-nexe.com/docs")
+
     def _open_donate(self, _sender):
         webbrowser.open("https://server-nexe.com/donate")
 
@@ -441,6 +465,15 @@ class NexeTray(rumps.App):
 # ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
+    # Bug #2: rename the tray process so it shows as "nexe-tray" instead of
+    # "Python" in `ps aux` and Activity Monitor. Force Quit still shows
+    # "Python" (requires CFBundleName via a real .app bundle — deferred to v0.9.1).
+    try:
+        import setproctitle
+        setproctitle.setproctitle("nexe-tray")
+    except ImportError:
+        pass  # Optional dependency
+
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--autostart", action="store_true",

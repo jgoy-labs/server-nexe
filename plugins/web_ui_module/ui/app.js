@@ -269,13 +269,19 @@ class NexeUI {
         s('[data-i18n="col_memory"]', 'col_memory');
         s('[data-i18n="col_knowledge"]', 'col_knowledge');
         s('[data-i18n="col_docs"]', 'col_docs');
-        // Collection tooltips
+        // Collection tooltips (Bug #8: visible ⓘ icon + label fallback)
         const colMemLabel = document.querySelector('[data-i18n="col_memory"]');
         if (colMemLabel) colMemLabel.closest('label').title = this.t('col_memory_tip');
+        const colMemInfo = document.getElementById('colMemoryInfo');
+        if (colMemInfo) colMemInfo.title = this.t('col_memory_tip');
         const colKnowLabel = document.querySelector('[data-i18n="col_knowledge"]');
         if (colKnowLabel) colKnowLabel.closest('label').title = this.t('col_knowledge_tip');
+        const colKnowInfo = document.getElementById('colKnowledgeInfo');
+        if (colKnowInfo) colKnowInfo.title = this.t('col_knowledge_tip');
         const colDocsLabel = document.querySelector('[data-i18n="col_docs"]');
         if (colDocsLabel) colDocsLabel.closest('label').title = this.t('col_docs_tip');
+        const colDocsInfo = document.getElementById('colDocsInfo');
+        if (colDocsInfo) colDocsInfo.title = this.t('col_docs_tip');
         // Input
         s('#messageInput', 'placeholder', 'placeholder');
         // Buttons
@@ -1025,18 +1031,44 @@ class NexeUI {
     async loadSession(sessionId) {
         this._abortIfGenerating();
         try {
-            const response = await this.fetchWithCsrf(`/ui/session/${sessionId}/history`);
+            // Bug #6 fix: use full session endpoint (not /history) to also receive attached_document
+            const response = await this.fetchWithCsrf(`/ui/session/${sessionId}`);
             if (response.ok) {
                 const data = await response.json();
                 this.currentSessionId = sessionId;
                 this.clearChat();
-                this.removeFilePreview();
+                // Local UI clear only — do NOT call removeFilePreview() because it
+                // POSTs to /clear-document and would wipe the backend attachment
+                // every time the user switches sessions.
+                this._clearFilePreviewLocal();
                 this.renderMessages(data.messages || []);
+
+                // Bug #6 fix: re-hydrate attached document badge if the session has one
+                if (data.attached_document && data.attached_document.filename) {
+                    const doc = data.attached_document;
+                    this.addUploadedFile({
+                        filename: doc.filename,
+                        size: doc.total_chars || 0
+                    });
+                    this.uploadedFile = { filename: doc.filename };
+                }
+
                 this.renderSessions();
             }
         } catch (error) {
             console.error('Error loading session:', error);
         }
+    }
+
+    _clearFilePreviewLocal() {
+        // Same UI cleanup as removeFilePreview() but WITHOUT the destructive
+        // POST /clear-document call. Used when switching sessions so we don't
+        // wipe the backend attachment of the session we're leaving.
+        if (this.filePreview) {
+            this.filePreview.replaceChildren();
+            this.filePreview.classList.remove('active');
+        }
+        this.uploadedFile = null;
     }
 
     renderMessages(messages) {
