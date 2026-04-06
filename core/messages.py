@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 FALLBACK_MESSAGES = {
     "core.bootstrap.invalid_ip": "Invalid IP address",
+    "core.ollama.http_error": "Ollama error (HTTP {status})",
+    "core.ollama.not_responding": "Ollama not responding. Verify it is running: ollama serve",
 }
 
 

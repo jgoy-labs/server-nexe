@@ -10,12 +10,13 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
+import os
 import re
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-MIN_LENGTH = 20
+MIN_LENGTH = int(os.environ.get("NEXE_MEMORY_MIN_LENGTH", "20"))
 UNIQUE_TOKEN_RATIO_MIN = 0.3
 
 # Stopwords (multilingual basic set)

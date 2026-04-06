@@ -1,12 +1,12 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-02
 id: nexe-usage-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia de uso de server-nexe 0.9.0 pre-release. Cubre comandos CLI (go, chat, memory, knowledge, status, encryption), funcionalidades de la Web UI (i18n, indicador de carga, panel info RAG, tamanos de modelo, overlay de subida, fallback de backend), MEM_SAVE memoria automatica, subida de documentos con aislamiento de sesion, comandos de encriptacion, ejemplos de uso de la API (curl, Python), y casos de uso practicos."
-tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption]
-chunk_size: 800
+abstract: "Como usar server-nexe: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119), memoria automatica MEM_SAVE, subida de documentos PDF/TXT, comandos de encriptacion. Ejemplos de API con curl y Python. Como instalar modelos, cambiar idioma (NEXE_LANG), gestionar memoria."
+tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption, how-to, commands]
+chunk_size: 600
 priority: P1
 
 # === OPCIONAL ===
@@ -64,6 +64,14 @@ Accesible en `http://127.0.0.1:9119/ui`. Requiere API key (almacenada en localSt
 - **Overlay de subida:** Spinner + temporizador + nombre de fichero durante la subida de documentos. Entrada bloqueada hasta completar. Muestra recuento de chunks y tiempo tras completar.
 - **Persistencia de sesion:** API key y preferencias en localStorage. Las sesiones sobreviven a la recarga de pagina.
 - **Auto-scroll:** Las cajas de chat y pensamiento hacen auto-scroll al fondo durante el streaming.
+- **Sidebar colapsable:** Toggle con icono panel-left, estado persistente en localStorage. (nuevo 2026-04-01)
+- **Renombrar sesiones:** Boton lapiz para renombrar inline via endpoint PATCH. (nuevo 2026-04-01)
+- **Boton copiar texto:** Copia respuestas al portapapeles con feedback visual copy/check. (nuevo 2026-04-01)
+- **Toggles de colecciones:** Checkboxes en la sidebar para activar/desactivar Memory/Knowledge/Docs individualmente. Persistente en localStorage. CLI: `--collections`. (nuevo 2026-04-01)
+- **Pantalla de bienvenida:** Features clicables ("Chat" foca input, "Documentos" abre upload). (nuevo 2026-04-02)
+- **Bloque MEM_SAVE azul:** Memorias guardadas se muestran como `<details>` azul colapsable (como thinking naranja). (nuevo 2026-04-01)
+- **Aviso de documento truncado:** Notificacion amarilla cuando un documento es demasiado grande para el contexto. (nuevo 2026-04-02)
+- **Modo claro/oscuro automatico:** Detecta preferencia del sistema via `matchMedia`. (existente)
 
 ### Subida de documentos
 
@@ -80,7 +88,7 @@ Subir documentos via el boton de clip en la entrada del chat. Soportados: .txt, 
 El modelo extrae y guarda automaticamente hechos de las conversaciones:
 
 - El usuario dice "Me llamo Jordi" -> el modelo guarda `[MEM_SAVE: name=Jordi]`
-- El usuario dice "Olvida mi nombre" -> el modelo elimina la entrada de memoria correspondiente
+- El usuario dice "Olvida mi nombre" -> MEM_DELETE: busqueda por similitud (threshold 0.70), borra la coincidencia mas cercana, guard anti-re-save
 - Siguiente conversacion: "Como me llamo?" -> RAG recupera "name=Jordi" -> el modelo responde correctamente
 
 No se necesitan comandos extra. Funciona tanto en CLI como en Web UI. Indicadores: badge `[MEM:N]` muestra el recuento de hechos guardados.

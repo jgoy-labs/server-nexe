@@ -218,11 +218,11 @@ NEXE_AUTOSTART_OLLAMA=true pytest -m "integration" -q
 
 Server Nexe is actively developed. Here's what's coming:
 
-- [ ] Docker container for Linux deployment
+- [x] Docker container for Linux deployment
 - [ ] Full Linux compatibility audit
-- [x] Updated knowledge base for v0.8.5
-- [ ] Website updates (server-nexe.org / server-nexe.com)
-- [ ] macOS code signing & notarization
+- [x] Updated knowledge base for v0.9.0
+- [x] Website updates (server-nexe.org / server-nexe.com)
+- [x] macOS code signing & notarization
 - [ ] Configurable inference parameters via UI
 - [ ] Community forum
 
@@ -274,5 +274,5 @@ See [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Version 0.8.5</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
+  <strong>Version 0.9.0</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
 </p>

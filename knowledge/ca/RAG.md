@@ -1,12 +1,12 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-02
 id: nexe-rag-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.9.0 pre-release). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat, pujada de documents amb aillament de sessio, embeddings (768D), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio de context RAG, poda intel·ligent, deduplicacio, TextStore per a text encriptat i payloads de Qdrant sense text."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
-chunk_size: 800
+chunk_size: 600
 priority: P1
 
 # === OPCIONAL ===
@@ -102,7 +102,9 @@ server-nexe te un sistema de memoria automatica similar a ChatGPT o Claude. El m
 
 **Deduplicacio:** Abans de guardar, comprova la similitud amb entrades existents. Si la similitud > 0.80, l'entrada es considera duplicada i no es guarda.
 
-**Intent d'esborrat:** Quan l'usuari diu "oblida que X", cerca entrades amb similitud >= 0.6 i esborra la coincidencia mes propera.
+**Intent d'esborrat (MEM_DELETE):** Quan l'usuari diu "oblida que X", cerca entrades amb similitud >= DELETE_THRESHOLD (0.70). Esborra la coincidencia mes propera. Guard anti-re-save: `_recently_deleted_facts` evita que el model torni a guardar un fet acabat d'esborrar dins la mateixa sessio.
+
+**Truncat de documents grans:** Si un document pujat es massa gran pel context disponible, es trunca i la UI mostra un avis groc amb el marcador SSE `[DOC_TRUNCATED:XX%]` indicant el percentatge descartat.
 
 ## Sanititzacio de context RAG
 
@@ -119,8 +121,8 @@ Els documents pujats via la Web UI s'indexen a la col·leccio `user_knowledge` a
 - Els documents persisteixen dins la sessio (no s'esborren en recarregar la pagina)
 - Les metadades es generen sense LLM (instantani, no cal model)
 
-**Formats suportats:** .txt, .md, .pdf
-**Chunking per a pujades:** 2500 caracters per chunk, 150 caracters de solapament.
+**Formats suportats:** .txt, .md, .pdf (amb validacio de magic bytes SEC-004)
+**Chunking per a pujades:** Dinamic segons mida del document — 800 chars (<20K), 1000 (<100K), 1200 (<300K), 1500 (>=300K). Si el document te capcalera RAG valida, s'utilitza el chunk_size especificat.
 
 ## Ingestio de documents
 
@@ -132,7 +134,7 @@ Els documents pujats via la Web UI s'indexen a la col·leccio `user_knowledge` a
 
 ### Coneixement de l'usuari (user_knowledge via CLI)
 - Font: carpeta `knowledge/` (subcarpetes ca/en/es)
-- Chunking: 2500 caracters per chunk, 150 caracters de solapament
+- Chunking: 1500 caracters per chunk per defecte (configurable via capcalera RAG chunk_size), solapament = max(50, chunk_size/10)
 - Ingerit via `core/ingest/ingest_knowledge.py`
 - Suporta capcaleres RAG amb metadades (`#!RAG id=..., priority=...`)
 

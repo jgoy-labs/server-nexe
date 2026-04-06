@@ -6,7 +6,7 @@ id: nexe-errors-guide
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Common errors and solutions for server-nexe 0.9.0 pre-release. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, Docker, streaming, and encryption errors."
 tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, docker, streaming, encryption]
-chunk_size: 800
+chunk_size: 600
 priority: P1
 
 # === OPCIONAL ===

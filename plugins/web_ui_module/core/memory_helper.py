@@ -26,7 +26,7 @@ SIMILARITY_THRESHOLD = 0.80       # No guardar si similaritat > 80% (baixat de 0
 PRUNE_BATCH_SIZE = 30             # How many entries to remove when the limit is exceeded
 TEMPORAL_DECAY_DAYS = 7           # Dies per aplicar decay temporal (recent = bonus)
 MIN_IMPORTANCE_SCORE = 0.3        # Minimum to save (filters out chatter)
-DELETE_THRESHOLD = 0.82           # Threshold for delete (higher = safer, only close matches)
+DELETE_THRESHOLD = 0.70           # Threshold for delete (baixat de 0.82 — era massa estricte per embeddings multilingues)
 
 # Memory types for structured storage
 MEMORY_TYPES = {
@@ -205,9 +205,16 @@ class MemoryHelper:
                 self._memory_api = _memory_api_instance
                 return _memory_api_instance
             try:
-                from memory.memory.api import MemoryAPI
-                api = MemoryAPI()
-                await api.initialize()
+                # Reutilitzar el singleton de v1.py si ja existeix (evita duplicar SentenceTransformer ~500MB)
+                try:
+                    from memory.memory.api.v1 import get_memory_api as _get_v1_api
+                    api = await _get_v1_api()
+                    logger.info("MemoryAPI singleton reused from v1.py")
+                except Exception as _v1_err:
+                    logger.debug("Could not reuse v1 singleton (%s), creating new MemoryAPI", _v1_err)
+                    from memory.memory.api import MemoryAPI
+                    api = MemoryAPI()
+                    await api.initialize()
 
                 # Ensure collections exist with correct dimensions (768)
                 for coll_name in ("nexe_web_ui", "user_knowledge"):

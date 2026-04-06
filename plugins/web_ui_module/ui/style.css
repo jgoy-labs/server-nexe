@@ -848,6 +848,16 @@ body.light .icon-moon,
     font-size: 0.875rem;
 }
 
+.feature-clickable {
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.feature-clickable:hover {
+    border-color: var(--primary-color);
+    background: var(--bg-tertiary, var(--bg-secondary));
+}
+
 /* Messages */
 .message {
     margin-bottom: 1.5rem;
@@ -1046,6 +1056,17 @@ body.light .icon-moon,
 /* ============================================
    Think Block — <details> natiu
    ============================================ */
+
+/* Document truncation notice */
+.trunc-notice {
+    padding: 0.4rem 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    background: rgba(234, 179, 8, 0.12);
+    border-left: 3px solid #eab308;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+}
 
 /* Model loading indicator */
 .model-loading-indicator {

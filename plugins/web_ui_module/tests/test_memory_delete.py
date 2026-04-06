@@ -220,9 +220,9 @@ class TestDeleteFromMemory:
         assert result["deleted"] == 0
         assert result["deleted_facts"] == []
 
-    def test_delete_uses_threshold_082(self):
-        """Verify DELETE_THRESHOLD constant is 0.82."""
-        assert DELETE_THRESHOLD == 0.82
+    def test_delete_uses_threshold_070(self):
+        """Verify DELETE_THRESHOLD constant is 0.70."""
+        assert DELETE_THRESHOLD == 0.70
 
     def test_delete_passes_threshold_to_search(self):
         mem = make_memory_mock(search_results=[])

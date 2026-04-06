@@ -12,9 +12,37 @@ www.jgoy.net · https://server-nexe.org
 import asyncio
 import logging
 import os
+import warnings as _warnings
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Any
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Environment setup — ha d'anar ABANS de qualsevol import que pogui carregar
+# HuggingFace/sentence-transformers transitivament. Mouríem encara mes amunt
+# pero os/warnings estan dalt de tot.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Force offline mode for HuggingFace — server must work without internet
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
+# Bug 14 (2026-04-06) — silenciar tqdm de sentence-transformers en runtime del
+# servidor. Les barres `Batches: 0%|...` es barrejaven amb els logs del servidor
+# i creaven línies corruptes. Aplicat NOMÉS en runtime servidor (no afecta la
+# descàrrega inicial de models, que es fa via installer/setup_models.py).
+os.environ.setdefault("TQDM_DISABLE", "1")
+
+# Bug 6 (2026-04-06) — silenciar warnings sorollosos en carregar embedders.
+# `paraphrase-multilingual-mpnet-base-v2` emet warnings UserWarning per
+# `position_ids UNEXPECTED` i `Some weights of...` que no aporten res.
+# Dev D (Consultor passada 1): moguts ABANS dels imports `from .lifespan_modules
+# import ...` per assegurar que s'apliquen encara que algun import transitiu
+# carregui sentence_transformers en temps d'import.
+_warnings.filterwarnings("ignore", message=".*position_ids.*", category=UserWarning)
+_warnings.filterwarnings("ignore", message=".*Some weights of.*", category=UserWarning)
+_warnings.filterwarnings("ignore", category=UserWarning, module="sentence_transformers")
+
 from fastapi import FastAPI
 
 from personality.integration import APIIntegrator
@@ -24,12 +52,19 @@ from .lifespan_services import (
     OLLAMA_HEALTH_TIMEOUT,
     OLLAMA_UNLOAD_TIMEOUT,
 )
-from .lifespan_tokens import generate_bootstrap_token, setup_bootstrap_tokens
+from .lifespan_tokens import (
+    generate_bootstrap_token,
+    setup_bootstrap_tokens,
+    start_bootstrap_token_renewal,
+    stop_bootstrap_token_renewal,
+)
 from .lifespan_ollama import cleanup_ollama_startup, cleanup_ollama_shutdown
-
-# Force offline mode for HuggingFace — server must work without internet
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
-os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+from .lifespan_modules import (
+    load_memory_modules,
+    initialize_plugin_modules,
+    auto_ingest_knowledge,
+    start_memory_service_v1,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +192,18 @@ async def lifespan(app: FastAPI):
         discovered = await server_state.module_manager.discover_modules()
         total_modules = list(server_state.module_manager._modules.keys())
 
+        # Bug 20 fix — startup summary: si el discover ha detectat cicles
+        # de dependencies, els mostrem amb prefix [WARN] perque no quedin
+        # amagats (abans els modules s'inhabilitaven en silenci).
+        try:
+          cycle_warnings = server_state.module_manager.get_cycle_warnings()
+        except Exception:
+          cycle_warnings = []
+        for cycle_chain in cycle_warnings:
+          logger.warning(
+            "[WARN] Module dependency cycle: %s", cycle_chain
+          )
+
         if total_modules:
           msg = _translate(server_state.i18n, "core.server.modules_loaded",
             "Modules loaded: {count} ({modules})",
@@ -189,158 +236,25 @@ async def lifespan(app: FastAPI):
       "Application started and ready to receive requests")
     logger.info(msg)
 
-    try:
-      # Use ModuleManager directly (SINGLE SOURCE OF TRUTH)
-      if not server_state.module_manager:
-        logger.warning("ModuleManager not available - skipping memory module loading")
-        raise RuntimeError("ModuleManager not available")
-
-      msg = _translate(server_state.i18n, "core.server.loading_memory",
-        "Loading Memory modules (Memory, RAG, Embeddings)...")
-      logger.info(msg)
-
-      loaded = await server_state.module_manager.load_memory_modules(config=server_state.config)
-
-      msg = _translate(server_state.i18n, "core.server.memory_loaded",
-        "Memory modules loaded: {count}", count=len(loaded))
-      logger.info(msg)
-
-      for id_res, instance in loaded.items():
-        logger.info("  - %s (%s)", instance.name, id_res)
-        try:
-          from core.metrics.registry import set_module_health
-          health = instance.get_health()
-          set_module_health(instance.name, health.get("status", "unhealthy"))
-        except Exception as e:
-          logger.debug("Module health update skipped: %s", e)
-
-      if not hasattr(app.state, 'modules'):
-        app.state.modules = {}
-      for module_id, instance in loaded.items():
-        app.state.modules.setdefault(module_id, instance)
-        if getattr(instance, "name", None):
-          app.state.modules.setdefault(instance.name, instance)
-        try:
-          capabilities = []
-          if hasattr(instance, "manifest"):
-            capabilities = list(instance.manifest.get("capabilities", []))
-          if hasattr(app.state, "module_registry"):
-            app.state.module_registry.register(
-              name=getattr(instance, "name", module_id),
-              instance=instance,
-              module_id=module_id,
-              capabilities=capabilities,
-              priority=10,
-            )
-        except Exception as e:
-          logger.debug("Module registry update skipped: %s", e)
-
-    except Exception as e:
-      msg = _translate(server_state.i18n, "core.server.memory_error",
-        "Error loading Memory modules: {error}", error=str(e))
-      logger.error(msg, exc_info=True)
-
-    # === INITIALIZE PLUGIN MODULES (MLX, LlamaCpp, Ollama, etc.) ===
-    try:
-      logger.info("Initializing plugin modules...")
-      plugin_modules = getattr(app.state, 'modules', {})
-
-      for module_name, instance in plugin_modules.items():
-        # Skip memory modules (already initialized)
-        if module_name in ['memory', 'rag', 'embeddings'] or module_name.startswith('{{NEXE_'):
-          continue
-
-        # Initialize if module has initialize method
-        if hasattr(instance, 'initialize') and callable(instance.initialize):
-          try:
-            logger.info(f"Initializing plugin: {module_name}")
-            context = {"config": server_state.config, "project_root": server_state.project_root}
-            success = await instance.initialize(context)
-            if success:
-              logger.info(f"  {module_name} initialized successfully")
-            else:
-              logger.warning(f"  {module_name} initialization returned False")
-          except Exception as e:
-            logger.error(f"Failed to initialize {module_name}: {e}", exc_info=True)
-    except Exception as e:
-      logger.error(f"Error during plugin initialization: {e}", exc_info=True)
-
-    # === AUTO-INGEST KNOWLEDGE FOLDER (FIRST RUN ONLY) ===
-    try:
-      nexe_env = os.getenv("NEXE_ENV", "production").lower()
-      auto_ingest_enabled = os.getenv("NEXE_AUTO_INGEST_KNOWLEDGE", "true").lower() == "true"
-
-      if nexe_env in ("test", "testing") or not auto_ingest_enabled:
-        logger.debug(
-          "Knowledge: Auto-ingest disabled (NEXE_ENV=%s, NEXE_AUTO_INGEST_KNOWLEDGE=%s)",
-          nexe_env,
-          auto_ingest_enabled,
-        )
-      else:
-        knowledge_path = server_state.project_root / "knowledge"
-        _nexe_lang = os.getenv("NEXE_LANG", "ca")
-        lang_path = knowledge_path / _nexe_lang
-        if lang_path.is_dir():
-          knowledge_path = lang_path
-        ingested_marker = server_state.project_root / "storage" / ".knowledge_ingested"
-
-        if knowledge_path.exists():
-          from core.ingest.ingest_knowledge import ingest_knowledge, SUPPORTED_EXTENSIONS
-
-          files_to_ingest = []
-          for ext in SUPPORTED_EXTENSIONS:
-            files_to_ingest.extend(knowledge_path.glob(f"**/*{ext}"))
-          files_to_ingest.extend(knowledge_path.glob("**/*.pdf"))
-
-          files_to_ingest = [f for f in files_to_ingest if not f.name.startswith('.')]
-
-          if files_to_ingest:
-            # Only auto-ingest if never done before (no marker file)
-            if ingested_marker.exists():
-              logger.debug("Knowledge: Already ingested. Skipping auto-ingest.")
-              logger.debug("Knowledge: To re-ingest, use: ./nexe knowledge ingest")
-            else:
-              # First run - auto-ingest as fallback if installer didn't do it
-              logger.info("Knowledge: First run - auto-ingesting %d document(s)...", len(files_to_ingest))
-              success = await ingest_knowledge(knowledge_path, quiet=True)
-              if success:
-                logger.info("Knowledge: Ingestion completed successfully")
-                # Create marker to prevent re-ingestion on next startup
-                ingested_marker.touch()
-              else:
-                logger.warning("Knowledge: Ingestion had some errors")
-          else:
-            logger.debug("Knowledge: No documents to ingest (folder empty or only README)")
-    except Exception as e:
-      logger.warning("Knowledge: Auto-ingest failed: %s", str(e))
-
-    # === MEMORY SERVICE v1 ===
-    try:
-      from memory.memory.memory_service import MemoryService
-      memory_service = MemoryService()
-      await memory_service.initialize()
-      app.state.memory_service = memory_service
-      logger.info("MemoryService v1 initialized")
-
-      # DreamingCycle as independent background task
-      try:
-        from memory.memory.workers.dreaming_cycle import DreamingCycle
-        dreaming = DreamingCycle(
-            store=memory_service._store,
-            vector_index=memory_service._vector_index,
-        )
-        server_state._dreaming_task = asyncio.create_task(dreaming.run())
-        server_state._dreaming_cycle = dreaming
-        logger.info("DreamingCycle background task started")
-      except Exception as e:
-        logger.warning("DreamingCycle not started (non-fatal): %s", e)
-
-    except Exception as e:
-      logger.warning("MemoryService v1 not available (non-fatal): %s", e)
-      app.state.memory_service = None
+    # Load memory modules, plugins, knowledge, and MemoryService v1
+    # (extracted to lifespan_modules.py for maintainability)
+    await load_memory_modules(app, server_state, _translate)
+    await initialize_plugin_modules(app, server_state)
+    await auto_ingest_knowledge(server_state)
+    await start_memory_service_v1(app, server_state)
 
     # Bootstrap tokens
     setup_bootstrap_tokens(server_state, _translate)
+
+    # Bug 11: auto-renovacio del bootstrap token. Sense aixo, en sessions
+    # llargues l'usuari ha de reiniciar el servidor quan el token expira.
+    try:
+      bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
+      auto_renew = os.getenv('NEXE_BOOTSTRAP_AUTO_RENEW', 'true').lower() == 'true'
+      if auto_renew:
+        start_bootstrap_token_renewal(ttl_minutes=bootstrap_ttl)
+    except Exception as e:
+      logger.warning("Could not start bootstrap token auto-renewal: %s", e)
 
     if hasattr(app.state, 'start_rate_limit_cleanup'):
       server_state._cleanup_task = asyncio.create_task(app.state.start_rate_limit_cleanup())
@@ -426,6 +340,12 @@ async def lifespan(app: FastAPI):
     logger.info(msg)
 
     try:
+      # Bug 11: stop bootstrap token auto-renewal task net
+      try:
+        await stop_bootstrap_token_renewal()
+      except Exception as e:
+        logger.debug("Error stopping bootstrap token renewal: %s", e)
+
       # Cleanup Ollama models on shutdown
       await cleanup_ollama_shutdown(OLLAMA_HEALTH_TIMEOUT, OLLAMA_UNLOAD_TIMEOUT)
 

@@ -1,6 +1,6 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-02
 id: nexe-architecture
 
 # === CONTINGUT RAG (OBLIGATORI) ===
@@ -117,7 +117,7 @@ flowchart TB
 Four monolithic files were split into 20+ submodules during the March 2026 tech debt refactoring:
 - chat.py (1187 lines) split into 8 submodules
 - routes.py (974 lines) split into 6 submodules
-- lifespan.py (681 lines) split into 3 submodules
+- lifespan.py (681 lines) split into 4 submodules
 - tray.py (707 lines) split into 2 submodules
 
 ```
@@ -126,6 +126,7 @@ server-nexe/
 │   ├── app.py                    # Entry point (delegates to factory)
 │   ├── config.py                 # TOML + .env configuration loading
 │   ├── lifespan.py               # Lifecycle orchestrator
+│   ├── lifespan_modules.py       # Memory module and plugin loading
 │   ├── lifespan_services.py      # Auto-start services (Qdrant, Ollama)
 │   ├── lifespan_tokens.py        # Bootstrap token generation
 │   ├── lifespan_ollama.py        # Ollama lifecycle management
@@ -150,6 +151,7 @@ server-nexe/
 │   │   ├── chat_engines/         # Per-backend generators
 │   │   │   ├── routing.py        # Engine selection logic
 │   │   │   ├── ollama.py         # Ollama streaming generator
+│   │   │   ├── ollama_helpers.py # Unified auto_num_ctx() for Ollama
 │   │   │   ├── mlx.py            # MLX streaming generator
 │   │   │   └── llama_cpp.py      # llama.cpp streaming generator
 │   │   ├── root.py               # GET /, /health, /api/info
@@ -177,7 +179,7 @@ server-nexe/
 │   │
 │   ├── ingest/                   # Document ingestion
 │   │   ├── ingest_docs.py        # docs/ → nexe_documentation (500/50 chars)
-│   │   └── ingest_knowledge.py   # knowledge/ → user_knowledge (1500/200 chars)
+│   │   └── ingest_knowledge.py   # knowledge/ → user_knowledge (1500/150 chars)
 │   │
 │   ├── metrics/                  # Prometheus /metrics
 │   ├── resilience/               # Circuit breaker, retry
@@ -206,6 +208,7 @@ server-nexe/
 │   ├── swift-wizard/             # SwiftUI wizard (12 Swift files, 6 screens)
 │   ├── build_dmg.sh              # DMG builder with signing
 │   ├── tray.py                   # System tray app
+│   ├── tray_monitor.py           # _RamMonitor (daemon thread for RAM polling)
 │   ├── tray_uninstaller.py       # Uninstaller with backup
 │   └── install_headless.py       # Headless installer (Linux compatible)
 │
@@ -229,7 +232,7 @@ The app is created via a singleton factory with double-check locking:
 
 ## Lifespan Manager
 
-Handles startup and shutdown of the server. Split into 3 submodules.
+Handles startup and shutdown of the server. Split into 4 submodules.
 
 **Startup sequence:**
 1. Load config from server.toml
@@ -326,6 +329,7 @@ Embeddings Layer (memory/embeddings/) — vector generation + Qdrant interface
 - `[RAG_ITEM:score|collection|source]` — per-source RAG detail
 - `[MEM:N]` — number of facts saved to memory
 - `[COMPACT:N]` — context compaction indicator
+- `[DOC_TRUNCATED:XX%]` — document truncation warning for context limit (new 2026-04-02)
 
 ## Web UI Module Architecture
 

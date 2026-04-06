@@ -54,7 +54,14 @@ def _normalize_engine(engine: str) -> str:
 def _required_modules_from_config(config: dict) -> set:
   required = set()
   modules_cfg = config.get("plugins", {}).get("modules", {})
-  required.update(modules_cfg.get("enabled", []))
+  enabled = set(modules_cfg.get("enabled", []))
+  # Cross with NEXE_APPROVED_MODULES env var — installer may restrict the allowlist
+  import os
+  approved_env = os.environ.get("NEXE_APPROVED_MODULES", "")
+  if approved_env:
+    approved = {m.strip() for m in approved_env.split(",") if m.strip()}
+    enabled = enabled & approved  # only require modules that are both enabled AND approved
+  required.update(enabled)
 
   preferred_engine = _normalize_engine(
     config.get("plugins", {}).get("models", {}).get("preferred_engine", "")

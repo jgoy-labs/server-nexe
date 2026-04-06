@@ -1,12 +1,12 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-02
 id: nexe-overview
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "General overview of server-nexe 0.9.0 pre-release, a local AI server with persistent RAG memory. Covers what it is, backends (MLX, llama.cpp, Ollama), features (MEM_SAVE, i18n, Docker, session isolation, encryption at-rest), architecture, 17 available models, technology stack, installation methods, AI-ready documentation, and current platform support."
-tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready]
-chunk_size: 800
+abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), Docker, session isolation, encryption at-rest. 15+ models available, 3 installation methods (DMG, CLI, Docker), AI-ready documentation. macOS tested, Linux partial."
+tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
+chunk_size: 600
 priority: P1
 
 # === OPCIONAL ===
@@ -72,7 +72,7 @@ server-nexe/
 │   ├── cli/               # CLI commands
 │   ├── server/            # Factory pattern, lifespan
 │   ├── ingest/            # Document ingestion (docs + knowledge)
-│   └── lifespan*.py       # Startup/shutdown (split into 3 submodules)
+│   └── lifespan*.py       # Startup/shutdown (split into 4 submodules)
 ├── plugins/               # Modular plugin system
 │   ├── mlx_module/        # Apple Silicon backend
 │   ├── llama_cpp_module/  # GGUF universal backend

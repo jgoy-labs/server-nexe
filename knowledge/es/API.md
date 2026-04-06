@@ -1,12 +1,12 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-02
 id: nexe-api-reference
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa de la REST API de server-nexe 0.9.0 pre-release. Cubre todos los endpoints: chat completions (compatible OpenAI, streaming, RAG), memoria (store, search), busqueda RAG, subida de documentos, sesiones, bootstrap, health checks, modulos, backends, i18n, comandos CLI de encriptacion. Incluye autenticacion (X-API-Key dual-key), rate limiting por endpoint, marcadores de streaming, y configuracion."
-tags: [api, rest, endpoints, chat, memory, rag, authentication, rate-limiting, streaming, openai-compatible, upload, sessions, bootstrap, health, backends, encryption]
-chunk_size: 800
+abstract: "REST API de server-nexe: endpoints /v1/chat/completions (compatible OpenAI), /memory/store, /memory/search, /rag/search, /upload, /sessions. Autenticacion X-API-Key dual-key. Rate limiting por endpoint. Streaming SSE. Puerto 9119 por defecto. Ejemplos curl y Python."
+tags: [api, rest, endpoints, chat, memory, rag, authentication, rate-limiting, streaming, openai-compatible, upload, sessions, bootstrap, health, backends, encryption, curl, python]
+chunk_size: 600
 priority: P1
 
 # === OPCIONAL ===
@@ -100,6 +100,7 @@ Chat completion compatible con OpenAI con soporte de RAG y streaming.
 - `[MEM:2]` — numero de hechos auto-guardados via MEM_SAVE
 - `[COMPACT:N]` — indicador de compactacion de contexto
 - `[THINKING]` / `[/THINKING]` — tokens de razonamiento (modelos Ollama como qwen3.5)
+- `[DOC_TRUNCATED:XX%]` — porcentaje de documento descartado por limite de contexto (nuevo 2026-04-02)
 
 ### Informacion del sistema
 
@@ -201,6 +202,8 @@ Estos endpoints sirven la interfaz web y son usados por el frontend JavaScript. 
 | `/ui/session/{id}` | GET | Si | 30/min | Obtener datos de sesion (valida session_id) |
 | `/ui/session/{id}/history` | GET | Si | 30/min | Obtener historial de chat de la sesion |
 | `/ui/session/{id}` | DELETE | Si | 10/min | Borrar sesion |
+| `/ui/session/{id}` | PATCH | Si | default | Renombrar sesion (nuevo 2026-04-01) |
+| `/ui/session/{id}/clear-document` | POST | Si | default | Limpiar documento adjunto de la sesion (nuevo 2026-04-02) |
 | `/ui/sessions` | GET | Si | default | Listar todas las sesiones |
 
 ### Ficheros
@@ -211,7 +214,7 @@ Estos endpoints sirven la interfaz web y son usados por el frontend JavaScript. 
 | `/ui/files` | GET | Si | default | Listar ficheros subidos |
 | `/ui/files/cleanup` | POST | Si | 5/min | Limpiar ficheros temporales |
 
-**Upload:** Acepta .txt, .md, .pdf. Chunks de 1500/200 caracteres. Metadatos generados sin LLM (instantaneo). Documentos aislados a la sesion de subida via session_id.
+**Upload:** Acepta .txt, .md, .pdf. Chunking dinamico segun tamano del documento (800/1000/1200/1500 chars). Validacion de magic bytes (SEC-004). Metadatos generados sin LLM (instantaneo). Documentos aislados a la sesion de subida via session_id.
 
 ## Comandos CLI de encriptacion
 

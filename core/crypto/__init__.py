@@ -52,6 +52,8 @@ def check_encryption_status(storage_path=None):
     if warnings:
         logger.warning(
             "Unencrypted data detected in storage/: %s. "
-            "Run 'nexe encryption encrypt-all' to protect your data.",
+            "To enable encryption: set NEXE_ENCRYPTION_ENABLED=true in .env. "
+            "To suppress this warning: set warn_unencrypted=false in server.toml [security.encryption]. "
+            "To encrypt existing data: run 'nexe encryption encrypt-all'.",
             "; ".join(warnings)
         )

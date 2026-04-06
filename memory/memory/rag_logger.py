@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from memory.embeddings.constants import DEFAULT_VECTOR_SIZE
+
 class Colors:
   RESET = "\033[0m"
   BOLD = "\033[1m"
@@ -407,7 +409,7 @@ class RAGLogger:
       self._write(f" {RAGEmojis.QDRANT} Qdrant:")
       self._write(f"   Collection: {q.get('collection', 'nexe_memory')}")
       self._write(f"   Vectors: {q.get('vectors', 0)}")
-      self._write(f"   Dimensions: {q.get('dimensions', 768)}")
+      self._write(f"   Dimensions: {q.get('dimensions', DEFAULT_VECTOR_SIZE)}")
 
     if "flash" in stats:
       f = stats["flash"]

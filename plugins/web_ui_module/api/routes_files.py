@@ -54,7 +54,7 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         content = await file.read()
         # Security: validate filename (path traversal, injection)
         filename = validate_string_input(file.filename or "", max_length=255, context="path")
-        valid, error = file_handler.validate_file(filename, len(content))
+        valid, error = file_handler.validate_file(filename, len(content), content_bytes=content)
         if not valid:
             raise HTTPException(status_code=400, detail=error)
 

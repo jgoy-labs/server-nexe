@@ -1,12 +1,12 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-02
 id: nexe-rag-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.9.0 pre-release). Cubre 3 colecciones Qdrant con thresholds, MEM_SAVE memoria automatica, intent de borrado, subida de documentos con aislamiento por sesion, embeddings (768D), parametros de chunking, construccion de contexto con etiquetas i18n, visualizacion de pesos RAG, sanitizacion de contexto RAG, poda inteligente, deduplicacion, TextStore para texto encriptado, y payloads de Qdrant sin texto."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
-chunk_size: 800
+chunk_size: 600
 priority: P1
 
 # === OPCIONAL ===
@@ -102,7 +102,9 @@ server-nexe tiene un sistema de memoria automatica similar a ChatGPT o Claude. E
 
 **Deduplicacion:** Antes de guardar, comprueba similitud con entradas existentes. Si similitud > 0.80, la entrada se considera duplicada y no se guarda.
 
-**Intent de borrado:** Cuando el usuario dice "olvida que X", busca entradas con similitud >= 0.6 y borra la coincidencia mas cercana.
+**Intent de borrado (MEM_DELETE):** Cuando el usuario dice "olvida que X", busca entradas con similitud >= DELETE_THRESHOLD (0.70). Borra la coincidencia mas cercana. Guard anti-re-save: `_recently_deleted_facts` evita que el modelo vuelva a guardar un hecho recien borrado dentro de la misma sesion.
+
+**Truncado de documentos grandes:** Si un documento subido es demasiado grande para el contexto disponible, se trunca y la UI muestra un aviso amarillo via el marcador SSE `[DOC_TRUNCATED:XX%]` indicando el porcentaje descartado.
 
 ## Sanitizacion de contexto RAG
 
@@ -119,8 +121,8 @@ Los documentos subidos via la Web UI se indexan en la coleccion `user_knowledge`
 - Los documentos persisten dentro de la sesion (no se borran al refrescar la pagina)
 - Los metadatos se generan sin LLM (instantaneo, no requiere modelo)
 
-**Formatos soportados:** .txt, .md, .pdf
-**Chunking para uploads:** 2500 caracteres por chunk, 150 caracteres de overlap.
+**Formatos soportados:** .txt, .md, .pdf (con validacion de magic bytes SEC-004)
+**Chunking para uploads:** Dinamico segun tamano del documento -- 800 chars (<20K), 1000 (<100K), 1200 (<300K), 1500 (>=300K). Si el documento tiene cabecera RAG valida, se usa el chunk_size especificado.
 
 ## Ingestion de documentos
 
@@ -132,7 +134,7 @@ Los documentos subidos via la Web UI se indexan en la coleccion `user_knowledge`
 
 ### Conocimiento de usuario (user_knowledge via CLI)
 - Fuente: carpeta `knowledge/` (subcarpetas ca/en/es)
-- Chunking: 2500 caracteres por chunk, 150 caracteres de overlap
+- Chunking: 1500 caracteres por chunk por defecto (configurable via cabecera RAG chunk_size), overlap = max(50, chunk_size/10)
 - Ingestado via `core/ingest/ingest_knowledge.py`
 - Soporta cabeceras RAG con metadatos (`#!RAG id=..., priority=...`)
 

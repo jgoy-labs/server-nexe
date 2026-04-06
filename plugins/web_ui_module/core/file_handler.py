@@ -18,6 +18,15 @@ logger = logging.getLogger(__name__)
 # Formats suportats (sync amb core/ingest/ingest_knowledge.py)
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".markdown", ".text", ".pdf"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Magic bytes per validacio MIME (SEC-004)
+MAGIC_BYTES = {
+    ".pdf": [b"%PDF"],
+    ".txt": None,    # text — validated via UTF-8 decode
+    ".md": None,
+    ".markdown": None,
+    ".text": None,
+}
 CHUNK_SIZE = 2500  # chars per chunk
 CHUNK_OVERLAP = 200  # overlap between chunks for context
 
@@ -37,13 +46,14 @@ class FileHandler:
         self.upload_dir = Path(upload_dir)
         self.upload_dir.mkdir(parents=True, exist_ok=True)
 
-    def validate_file(self, filename: str, file_size: int) -> Tuple[bool, str]:
+    def validate_file(self, filename: str, file_size: int, content_bytes: bytes = None) -> Tuple[bool, str]:
         """
         Validar fitxer abans de processar
 
         Args:
             filename: Nom del fitxer
             file_size: Mida en bytes
+            content_bytes: Contingut en bytes (per validar magic bytes)
 
         Returns:
             (valid, error_message)
@@ -57,6 +67,21 @@ class FileHandler:
         if file_size > MAX_FILE_SIZE:
             max_mb = MAX_FILE_SIZE / (1024 * 1024)
             return False, f"File too large. Maximum: {max_mb}MB"
+
+        # Validate magic bytes (SEC-004)
+        if content_bytes and ext in MAGIC_BYTES and MAGIC_BYTES[ext] is not None:
+            valid_magic = any(content_bytes[:len(m)] == m for m in MAGIC_BYTES[ext])
+            if not valid_magic:
+                logger.warning(f"Magic bytes mismatch for {filename} (ext={ext})")
+                return False, f"File content does not match {ext} format"
+
+        # Text files: verify UTF-8 decodable
+        if content_bytes and ext in {".txt", ".md", ".markdown", ".text"}:
+            try:
+                content_bytes[:4096].decode("utf-8")
+            except UnicodeDecodeError:
+                logger.warning(f"Non-UTF-8 content in text file {filename}")
+                return False, "File content is not valid UTF-8 text"
 
         return True, ""
 
