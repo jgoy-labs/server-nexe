@@ -23,8 +23,8 @@
 *secret*
 *credential*
 *token*
-!**/token*.py
-!**/secret*.py
+!**/*token*.py
+!**/*secret*.py
 .nat_secrets
 
 # =====================
