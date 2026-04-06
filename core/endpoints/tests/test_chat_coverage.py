@@ -472,11 +472,18 @@ class TestChatCompletionsRagBranches:
             result = asyncio.run(chat_completions(request, req, bg))
             assert isinstance(result, StreamingResponse)
 
-    def test_ollama_model_fallback(self):
-        """Lines 464, 484-485: model name fallback logic."""
+    def test_ollama_model_partial_match_uses_matching(self):
+        """Bug 23 (2026-04-06): si hi ha match parcial (mateixa família),
+        el codi ha de promocionar-lo al model canònic i seguir. Aquest test
+        verifica el camí de partial match. Abans, la versió "fallback al
+        primer chat model" també passava; ara només passa si hi ha matching
+        real."""
         from core.endpoints.chat import _forward_to_ollama, ChatCompletionRequest, Message
 
-        tags_data = {"models": [{"name": "mistral:latest"}]}
+        # El default de _forward_to_ollama sense env vars és "llama3.2".
+        # Posem un model disponible amb el mateix prefix perquè el partial
+        # match (`model_name.split(":")[0] in m`) l'agafi.
+        tags_data = {"models": [{"name": "llama3.2:latest"}]}
         mock_tags = MagicMock(status_code=200)
         mock_tags.json.return_value = tags_data
 
@@ -524,16 +531,19 @@ class TestChatCompletionsRagBranches:
 
         request = ChatCompletionRequest(
             messages=[Message(role="user", content="hi")],
-            stream=False
+            model="llama3.2",  # Bug 23: explicit model to avoid env pollution
+            stream=False,
         )
 
         from fastapi import HTTPException
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            with pytest.raises(HTTPException) as exc:
-                asyncio.run(_forward_to_ollama(
-                    [{"role": "user", "content": "hi"}], request
-                ))
-            assert exc.value.status_code == 500
+        env_copy = {k: v for k, v in os.environ.items() if not k.startswith("NEXE_")}
+        with patch.dict(os.environ, env_copy, clear=True):
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                with pytest.raises(HTTPException) as exc:
+                    asyncio.run(_forward_to_ollama(
+                        [{"role": "user", "content": "hi"}], request
+                    ))
+                assert exc.value.status_code == 500
 
     def test_ollama_non_streaming_with_fallback_info(self):
         """Line 537: fallback info added to non-streaming response."""
@@ -554,15 +564,18 @@ class TestChatCompletionsRagBranches:
 
         request = ChatCompletionRequest(
             messages=[Message(role="user", content="hi")],
-            stream=False
+            model="llama3.2",  # Bug 23: explicit model to avoid env pollution
+            stream=False,
         )
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            result = asyncio.run(_forward_to_ollama(
-                [{"role": "user", "content": "hi"}], request,
-                fallback_from="mlx", fallback_reason="module_unavailable"
-            ))
-            assert "nexe_fallback" in result
+        env_copy = {k: v for k, v in os.environ.items() if not k.startswith("NEXE_")}
+        with patch.dict(os.environ, env_copy, clear=True):
+            with patch("httpx.AsyncClient", return_value=mock_client):
+                result = asyncio.run(_forward_to_ollama(
+                    [{"role": "user", "content": "hi"}], request,
+                    fallback_from="mlx", fallback_reason="module_unavailable"
+                ))
+                assert "nexe_fallback" in result
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────
