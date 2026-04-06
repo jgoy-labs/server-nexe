@@ -78,12 +78,45 @@ SUPPORTED_EXTENSIONS = {".txt", ".md", ".markdown", ".text"}
 from core.ingest.chunking import chunk_text
 
 
+def _read_text_with_fallback(file_path: Path) -> str:
+    """Llegeix text amb fallback de codificació.
+
+    Bug 18 (2026-04-06) — abans el `read_text(encoding="utf-8")` llançava
+    UnicodeDecodeError per fitxers latin-1/cp1252 i s'ignoraven silenciosament
+    (els ingests quedaven amb chunks perduts sense cap avís). Ara intentem una
+    cadena d'encodings comuns i avisem via logger.info quan no és UTF-8.
+    """
+    # Dev D (Consultor passada 1): cp1252 ABANS de latin-1. latin-1 accepta
+    # tots els bytes 0-255 per construcció, pel que mai cauria a cp1252 si
+    # estigués abans. Els smart quotes/em-dashes de Windows-1252 quedarien
+    # com a caràcters de control invisibles. Provant cp1252 primer guanyem
+    # aquesta fidelitat pels fitxers Windows reals.
+    encodings = ("utf-8", "utf-8-sig", "cp1252", "latin-1")
+    last_err: UnicodeDecodeError | None = None
+    for enc in encodings:
+        try:
+            content = file_path.read_text(encoding=enc)
+            if enc != "utf-8":
+                logger.info(
+                    "File %s read with fallback encoding %s", file_path, enc
+                )
+            return content
+        except UnicodeDecodeError as exc:
+            last_err = exc
+            continue
+    logger.warning(
+        "File %s could not be decoded with encodings %s: %s",
+        file_path, encodings, last_err,
+    )
+    return ""
+
+
 def read_file(file_path: Path) -> str:
     """Read file content based on extension."""
     ext = file_path.suffix.lower()
 
     if ext in {".txt", ".md", ".markdown", ".text"}:
-        return file_path.read_text(encoding="utf-8")
+        return _read_text_with_fallback(file_path)
 
     elif ext == ".pdf":
         from pypdf import PdfReader

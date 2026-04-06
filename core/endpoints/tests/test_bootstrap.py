@@ -16,6 +16,10 @@ def client():
     app = FastAPI()
     app.state.i18n = None
     app.include_router(router)
+    # Bug 22: /api/bootstrap/info ara requereix X-API-Key. En tests unitaris
+    # de la lògica de bootstrap n'overridem l'auth.
+    from plugins.security.core.auth_dependencies import require_api_key
+    app.dependency_overrides[require_api_key] = lambda: "test-bypass"
     return TestClient(app, raise_server_exceptions=False)
 
 

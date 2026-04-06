@@ -160,6 +160,14 @@ class ModuleManager:
     """Discover available modules."""
     return await self.discovery.discover(self._modules, self._lock, force)
 
+  def get_cycle_warnings(self) -> List[str]:
+    """
+    Retorna els cicles de dependencies detectats a l'ultim discover.
+    Bug 20 fix — exposat perque el startup summary del lifespan (i tests)
+    puguin llegir-los i mostrar-los amb prefix [WARN].
+    """
+    return self.discovery.get_cycle_warnings()
+
   def discover_modules_sync(self, force: bool = False) -> List[str]:
     """Synchronous wrapper for discover_modules()."""
     return self.sync_wrapper.run_sync(

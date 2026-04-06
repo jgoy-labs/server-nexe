@@ -31,11 +31,15 @@ def download_qdrant(project_root, hw):
         print_success(t('qdrant_exists'))
         return True
 
-    # Show informative explanation and ask for permission
-    print(f"\n{BOLD}{'─'*60}{RESET}")
-    info_text = t('qdrant_download_info').format(bold=BOLD, reset=RESET)
-    print(info_text)
-    print(f"{BOLD}{'─'*60}{RESET}\n")
+    # Bug 5 (2026-04-06): el bloc didàctic ("Què és Qdrant?") només té sentit
+    # en mode interactiu (terminal). En headless (la GUI fa _auto_input que
+    # respon "y" automàticament) sortia per stdout i embrutava el log.
+    import sys
+    if sys.stdout.isatty():
+        print(f"\n{BOLD}{'─'*60}{RESET}")
+        info_text = t('qdrant_download_info').format(bold=BOLD, reset=RESET)
+        print(info_text)
+        print(f"{BOLD}{'─'*60}{RESET}\n")
 
     confirm = input(f"{t('qdrant_download_prompt')} {t('yes_no')}: ").strip().lower()
     if confirm not in ('y', 'yes', 's', 'si', 'sí'):
@@ -127,10 +131,14 @@ def _maybe_clear_quarantine(binary_path: Path) -> None:
     if platform.system().lower() != "darwin":
         return
 
-    info_text = t('qdrant_quarantine_info').format(bold=BOLD, reset=RESET)
-    print(f"\n{BOLD}{'─'*60}{RESET}")
-    print(info_text)
-    print(f"{BOLD}{'─'*60}{RESET}\n")
+    # Bug 5 (2026-04-06): bloc didàctic només en mode interactiu (vegeu nota
+    # més amunt sobre `qdrant_download_info`).
+    import sys
+    if sys.stdout.isatty():
+        info_text = t('qdrant_quarantine_info').format(bold=BOLD, reset=RESET)
+        print(f"\n{BOLD}{'─'*60}{RESET}")
+        print(info_text)
+        print(f"{BOLD}{'─'*60}{RESET}\n")
 
     confirm = input(f"{t('qdrant_quarantine_prompt')} {t('yes_no')}: ").lower()
     if confirm == 'n':

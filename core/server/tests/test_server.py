@@ -48,9 +48,12 @@ def test_api_info_endpoint(client):
   assert "endpoints" in data
   assert isinstance(data["endpoints"], list)
 
-def test_modules_endpoint(client):
-  """Test modules listing endpoint"""
-  response = client.get("/modules")
+def test_modules_endpoint(client, auth_headers, monkeypatch):
+  """Test modules listing endpoint (Bug 22: requires X-API-Key)."""
+  # Sincronitza la primary key amb la del fixture (load_api_keys es llegeix dinamicament)
+  monkeypatch.setenv("NEXE_PRIMARY_API_KEY", auth_headers["X-API-Key"])
+  monkeypatch.delenv("NEXE_PRIMARY_KEY_EXPIRES", raising=False)
+  response = client.get("/modules", headers=auth_headers)
   assert response.status_code == 200
   data = response.json()
   assert "status" in data

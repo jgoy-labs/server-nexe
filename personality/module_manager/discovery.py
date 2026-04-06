@@ -53,6 +53,22 @@ class ModuleDiscovery:
     self.config_manager = config_manager
     self.events = events
     self.i18n = i18n
+    # Bug 20 fix — guardem els cicles detectats perque siguin
+    # consultables des de fora (startup summary, status endpoints,
+    # tests). Sense aixo els modules s'inhabilitaven en silenci.
+    self._cycle_warnings: List[str] = []
+
+  def get_cycle_warnings(self) -> List[str]:
+    """
+    Retorna una copia de la llista de cicles detectats durant el
+    descobriment. El consumidor tipic es el startup summary del lifespan,
+    que imprimeix cada entry amb prefix [WARN].
+    """
+    return list(self._cycle_warnings)
+
+  def clear_cycle_warnings(self) -> None:
+    """Neteja la llista de cycle warnings (util en re-descobriments)."""
+    self._cycle_warnings.clear()
 
   async def discover(
     self,
@@ -77,6 +93,20 @@ class ModuleDiscovery:
     nexe_env = (os.getenv("NEXE_ENV") or "").lower()
     if nexe_env in ("test", "testing") or os.getenv("PYTEST_CURRENT_TEST"):
       force = True
+
+    # Bug 12 (2026-04-06) — abans s'executava discover() dos cops al startup:
+    # un cop sync des de core/server/factory_modules.py (pel routing) i un
+    # altre cop async des de core/lifespan.py (pel bootstrap). Ara, si els
+    # mòduls ja estan descoberts i no es força, fem un early return curt.
+    # Els tests sempre passen per aquesta funció amb force=True (via la
+    # branca anterior), així que no queden afectats.
+    if not force and modules_dict:
+      logger.info(
+        "Module discovery skipped: %d modules already known (use force=True to rediscover)",
+        len(modules_dict),
+        component="module_manager",
+      )
+      return list(modules_dict.keys())
 
     if not force and not self.path_discovery.load_cache():
       force = True
@@ -117,9 +147,21 @@ class ModuleDiscovery:
     cycles = detect_dependency_cycles(modules_dict)
     if cycles:
       cycle_str = ' -> '.join(cycles)
+      # Bug 20 fix — abans nomes hi havia un logger.error generic;
+      # ara afegim un missatge explicit i visible amb la cadena
+      # completa del cicle, i el guardem a `_cycle_warnings` perque
+      # qui imprimeixi el startup summary el pugui mostrar amb prefix
+      # [WARN] (els modules afectats queden enabled=False com abans).
+      logger.error(
+        "Module dependency cycle detected: %s "
+        "(modules disabled: %s)",
+        cycle_str, ", ".join(cycles),
+        component="module_manager",
+      )
       msg = get_message(self.i18n, 'discovery.cycles_detected',
               cycles=cycle_str)
       logger.error(msg, component="module_manager")
+      self._cycle_warnings.append(cycle_str)
       for module_name in cycles:
         if module_name in modules_dict:
           modules_dict[module_name].enabled = False

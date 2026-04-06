@@ -42,12 +42,12 @@ async def _upload(file: UploadFile = File(...), metadata: str = "{}"):
   """Upload file to RAG. Delegates to endpoints.upload_file_endpoint()."""
   return await upload_file_endpoint(file, metadata)
 
-@router_public.get("/health")
+@router_public.get("/health", dependencies=[Depends(require_api_key)])
 async def _health():
   """RAG module health check. Delegates to endpoints.health_endpoint()."""
   return await health_endpoint()
 
-@router_public.get("/info")
+@router_public.get("/info", dependencies=[Depends(require_api_key)])
 async def _info():
   """RAG module information. Delegates to endpoints.info_endpoint()."""
   return await info_endpoint()

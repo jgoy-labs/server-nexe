@@ -31,6 +31,13 @@ from .installer_setup_models import (
     _download_mlx_model,
 )
 from .installer_finalize import show_final_summary
+from .installer_reinstall import (
+    REINSTALL_MODE_BACKUP,
+    REINSTALL_MODE_OVERWRITE,
+    REINSTALL_MODE_WIPE,
+    apply_reinstall_mode,
+    detect_existing_install,
+)
 
 
 def run_installer():
@@ -50,22 +57,41 @@ def run_installer():
         print("Cancelled.")
         return
 
-    # 3.5. Clean existing venv to avoid conflicts
-    venv_path = project_root / "venv"
-    if venv_path.exists():
-        print(f"\n{YELLOW}[CLEAN]{RESET} {t('cleaning_venv')}")
-        shutil.rmtree(venv_path)
-        print(f"{GREEN}[OK]{RESET} {t('venv_removed')}")
-
-    storage_path = project_root / "storage"
-    if storage_path.exists():
-        confirm = input(f"\n{YELLOW}[WARN]{RESET} Delete storage/? (models, data) [y/N]: ").strip().lower()
-        if confirm in ('y', 'yes', 's', 'si'):
-            backup = project_root / f"storage.bak.{int(time.time())}"
-            shutil.move(str(storage_path), str(backup))
-            print(f"{GREEN}[OK]{RESET} Backed up to {backup.name}")
-        else:
-            print("  Keeping storage/")
+    # 3.5. Reinstall handling — Bug 7 fix.
+    # Si detectem instal·lació existent oferim 3 opcions:
+    #   1) Esborra-ho tot
+    #   2) Sobreescriu sistema preservant dades
+    #   3) Backup automàtic + instal·lació neta (default segur)
+    if detect_existing_install(project_root):
+        print(f"\n{YELLOW}[!] Instal·lació existent detectada a:{RESET} {project_root}")
+        print(f"\n  {CYAN}1){RESET} Esborra-ho tot (.env, storage/, knowledge/, venv)")
+        print(f"  {CYAN}2){RESET} Sobreescriu sistema preservant dades (manté .env, storage/, knowledge/)")
+        print(f"  {CYAN}3){RESET} Backup automàtic + instal·lació neta {DIM}[per defecte]{RESET}")
+        choice = input(f"\n{BOLD}Tria [1/2/3]:{RESET} ").strip()
+        mode_map = {
+            "1": REINSTALL_MODE_WIPE,
+            "2": REINSTALL_MODE_OVERWRITE,
+            "3": REINSTALL_MODE_BACKUP,
+            "": REINSTALL_MODE_BACKUP,
+        }
+        mode = mode_map.get(choice, REINSTALL_MODE_BACKUP)
+        try:
+            summary = apply_reinstall_mode(project_root, mode)
+            print(f"{GREEN}[OK]{RESET} Mode aplicat: {mode}")
+            if summary.get("backup_dir"):
+                print(f"  📦 Backup creat a: {summary['backup_dir']}")
+            if summary.get("removed"):
+                print(f"  🧹 {len(summary['removed'])} elements esborrats")
+        except Exception as e:
+            print_error(f"Reinstall mode failed: {e}")
+            return
+    else:
+        # Sense instal·lació prèvia: assegurem que el venv està net per si de cas.
+        venv_path = project_root / "venv"
+        if venv_path.exists():
+            print(f"\n{YELLOW}[CLEAN]{RESET} {t('cleaning_venv')}")
+            shutil.rmtree(venv_path)
+            print(f"{GREEN}[OK]{RESET} {t('venv_removed')}")
 
     # 4. MODEL SELECTION FIRST - while user is engaged
     model_config = select_model(hw)

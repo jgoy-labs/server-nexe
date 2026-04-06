@@ -324,21 +324,28 @@ class MLXPromptCacheManager:
             }
 
 
-# Singleton global
+# Singleton global (Bug 19: protegit amb double-checked locking)
 _prompt_cache_manager: Optional[MLXPromptCacheManager] = None
+_singleton_lock = threading.Lock()
 
 
 def get_prompt_cache_manager(max_size: int = 8) -> MLXPromptCacheManager:
     """
     Obtenir el singleton del gestor de cache.
 
+    Bug 19: thread-safe via double-checked locking. Sense lock, dues
+    crides concurrents podien crear dues instancies del singleton —
+    duplicant memoria i perdent cache compartida.
+
     Args:
-        max_size: Mida màxima (només s'aplica la primera vegada)
+        max_size: Mida maxima (nomes s'aplica la primera vegada)
 
     Returns:
         MLXPromptCacheManager singleton
     """
     global _prompt_cache_manager
     if _prompt_cache_manager is None:
-        _prompt_cache_manager = MLXPromptCacheManager(max_size)
+        with _singleton_lock:
+            if _prompt_cache_manager is None:  # double-check
+                _prompt_cache_manager = MLXPromptCacheManager(max_size)
     return _prompt_cache_manager

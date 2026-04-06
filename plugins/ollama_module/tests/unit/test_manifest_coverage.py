@@ -167,13 +167,13 @@ class TestChatStream:
 class TestHealthError:
     """Test health endpoint exception."""
 
-    def test_health_error(self):
+    def test_health_error(self, auth):
         """Exception in health check returns error."""
         mock_module = MagicMock()
         mock_module.health_check = AsyncMock(side_effect=Exception("Health broken"))
 
         c = _make_client(mock_module)
-        r = c.get("/ollama/health")
+        r = c.get("/ollama/health", headers=auth)
         # When health_check raises, the endpoint returns 500
         assert r.status_code in (200, 500)
 
@@ -181,7 +181,7 @@ class TestHealthError:
 class TestInfoEndpoint:
     """Test info endpoint."""
 
-    def test_info_returns_module_info(self):
+    def test_info_returns_module_info(self, auth):
         mock_module = MagicMock()
         mock_module.get_info.return_value = {
             "name": "ollama_module",
@@ -189,7 +189,7 @@ class TestInfoEndpoint:
         }
 
         c = _make_client(mock_module)
-        r = c.get("/ollama/info")
+        r = c.get("/ollama/info", headers=auth)
         assert r.status_code == 200
         data = r.json()
         assert data["name"] == "ollama_module"

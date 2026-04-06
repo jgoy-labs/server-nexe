@@ -24,10 +24,14 @@ def make_app(api_integrator=None, i18n=None):
 
     # Importar router i sobreescriure la dependència get_api_integrator
     from core.endpoints.modules import router, get_api_integrator, get_i18n
+    from plugins.security.core.auth_dependencies import require_api_key
     app.include_router(router)
 
     # Override de la dependència
     app.dependency_overrides[get_api_integrator] = lambda: api_integrator
+    # Bug 22: /modules ara requereix X-API-Key. En aquests tests unitaris
+    # de lògica de modules.py n'overridem l'auth.
+    app.dependency_overrides[require_api_key] = lambda: "test-bypass"
 
     return app
 
