@@ -566,32 +566,33 @@ class TestForwardToOllama:
 
         assert isinstance(result, dict)
 
-    def test_model_uses_first_available_when_not_found(self):
-        """Si model demanat no existeix i no hi ha match, usa el primer disponible."""
+    def test_model_not_found_raises_404(self):
+        """Bug 23 (2026-04-06): si el model demanat no existeix i no hi ha
+        match parcial, abans feiem fallback silenciós al primer chat model
+        (HTTP 200 amb un model diferent del demanat — enganyós). Ara retornem
+        HTTPException 404 perquè el client sàpiga que el model no existeix."""
         from core.endpoints.chat import _forward_to_ollama
+        from fastapi import HTTPException
 
         tags_data = {"models": [{"name": "mistral:7b"}]}
         mock_tags = MagicMock()
         mock_tags.status_code = 200
         mock_tags.json.return_value = tags_data
 
-        chat_resp = MagicMock()
-        chat_resp.status_code = 200
-        chat_resp.json.return_value = {"message": {"content": "OK"}}
-
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(return_value=mock_tags)
-        mock_client.post = AsyncMock(return_value=chat_resp)
 
         with patch("httpx.AsyncClient", return_value=mock_client):
-            result = asyncio.run(_forward_to_ollama(
-                [{"role": "user", "content": "Hi"}],
-                self._make_request(model="completely-nonexistent"),
-            ))
+            with pytest.raises(HTTPException) as exc_info:
+                asyncio.run(_forward_to_ollama(
+                    [{"role": "user", "content": "Hi"}],
+                    self._make_request(model="completely-nonexistent"),
+                ))
 
-        assert isinstance(result, dict)
+        assert exc_info.value.status_code == 404
+        assert "not found" in str(exc_info.value.detail).lower()
 
     def test_ollama_post_connect_error(self):
         """ConnectError durant POST → HTTPException 503."""
