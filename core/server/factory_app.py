@@ -9,6 +9,8 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import os
+
 from fastapi import FastAPI
 from typing import Any
 
@@ -28,6 +30,12 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
   from core.lifespan import lifespan
   from core.middleware import setup_all_middleware
 
+  # Bug 22 (security): /docs, /redoc, /openapi.json reveal full API map.
+  # Disable them outside development mode (NEXE_ENV=development) so production
+  # installations don't leak internal endpoint structure.
+  _nexe_env = os.getenv("NEXE_ENV", "production").lower()
+  _docs_enabled = _nexe_env in ("development", "test")
+
   app = FastAPI(
     title=translate(i18n, "server_core.api.title", "Nexe 0.9 API"),
     description=translate(
@@ -46,7 +54,10 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
       "- **rag-v1 / embeddings-v1 / documents-v1** — Endpoints under development (return 501)"
     ),
     version="0.9.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
   )
 
   setup_all_middleware(app, config, i18n)

@@ -15,6 +15,18 @@ from fastapi.testclient import TestClient
 
 from core.metrics.endpoint import metrics_router
 
+# Bug 22: /metrics ara requereix X-API-Key. Aquests tests fan servir una API key fixa.
+_TEST_KEY = "test-metrics-bug22-key"
+_HEADERS = {"X-API-Key": _TEST_KEY}
+
+
+@pytest.fixture(autouse=True)
+def _setup_api_key(monkeypatch):
+  monkeypatch.setenv("NEXE_PRIMARY_API_KEY", _TEST_KEY)
+  monkeypatch.delenv("NEXE_PRIMARY_KEY_EXPIRES", raising=False)
+  monkeypatch.setenv("NEXE_DEV_MODE", "false")
+
+
 class TestMetricsEndpoint:
   """Tests for metrics endpoint."""
 
@@ -32,7 +44,7 @@ class TestMetricsEndpoint:
 
   def test_get_metrics(self, client):
     """Test GET /metrics returns Prometheus format."""
-    response = client.get("/metrics")
+    response = client.get("/metrics", headers=_HEADERS)
     assert response.status_code == 200
     assert "text/plain" in response.headers.get("content-type", "")
     content = response.text
@@ -40,7 +52,7 @@ class TestMetricsEndpoint:
 
   def test_metrics_health(self, client):
     """Test GET /metrics/health."""
-    response = client.get("/metrics/health")
+    response = client.get("/metrics/health", headers=_HEADERS)
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
@@ -49,7 +61,7 @@ class TestMetricsEndpoint:
 
   def test_metrics_json(self, client):
     """Test GET /metrics/json."""
-    response = client.get("/metrics/json")
+    response = client.get("/metrics/json", headers=_HEADERS)
     assert response.status_code == 200
     data = response.json()
     assert "http" in data
@@ -73,7 +85,7 @@ class TestMetricsContent:
 
   def test_contains_nexe_metrics(self, client):
     """Test metrics contain Nexe-specific metrics."""
-    response = client.get("/metrics")
+    response = client.get("/metrics", headers=_HEADERS)
     content = response.text
 
     assert response.status_code == 200

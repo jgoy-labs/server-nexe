@@ -133,7 +133,7 @@ class TestListModels:
         ])
 
         c = TestClient(make_app_with_mock(mock_module), raise_server_exceptions=False)
-        r = c.get("/ollama/api/models")
+        r = c.get("/ollama/api/models", headers=auth)
 
         assert r.status_code == 200
         data = r.json()
@@ -145,14 +145,14 @@ class TestListModels:
         mock_module.list_models = AsyncMock(side_effect=Exception("Connection refused"))
 
         c = TestClient(make_app_with_mock(mock_module), raise_server_exceptions=False)
-        r = c.get("/ollama/api/models")
+        r = c.get("/ollama/api/models", headers=auth)
 
         assert r.status_code == 503
 
 
 class TestGetModelInfo:
 
-    def test_returns_model_info(self):
+    def test_returns_model_info(self, auth):
         mock_module = MagicMock()
         mock_module.get_model_info = AsyncMock(return_value={
             "modelfile": "FROM llama3",
@@ -161,18 +161,18 @@ class TestGetModelInfo:
         })
 
         c = TestClient(make_app_with_mock(mock_module), raise_server_exceptions=False)
-        r = c.get("/ollama/api/models/llama3/info")
+        r = c.get("/ollama/api/models/llama3/info", headers=auth)
 
         assert r.status_code == 200
         data = r.json()
         assert data["model"] == "llama3"
 
-    def test_returns_404_on_error(self):
+    def test_returns_404_on_error(self, auth):
         mock_module = MagicMock()
         mock_module.get_model_info = AsyncMock(side_effect=Exception("Model not found"))
 
         c = TestClient(make_app_with_mock(mock_module), raise_server_exceptions=False)
-        r = c.get("/ollama/api/models/nonexistent/info")
+        r = c.get("/ollama/api/models/nonexistent/info", headers=auth)
 
         assert r.status_code == 404
 
@@ -206,14 +206,14 @@ class TestDeleteModel:
 
 class TestHealthEndpoint:
 
-    def test_health_returns_200(self):
+    def test_health_returns_200(self, auth):
         mock_module = MagicMock()
         mock_result = MagicMock()
         mock_result.to_dict.return_value = {"status": "healthy", "connected": True}
         mock_module.health_check = AsyncMock(return_value=mock_result)
 
         c = TestClient(make_app_with_mock(mock_module), raise_server_exceptions=False)
-        r = c.get("/ollama/health")
+        r = c.get("/ollama/health", headers=auth)
 
         assert r.status_code == 200
 

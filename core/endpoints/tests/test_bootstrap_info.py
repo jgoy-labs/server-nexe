@@ -23,6 +23,9 @@ import core.bootstrap_tokens as bootstrap_tokens
 def client():
   app = FastAPI()
   app.include_router(bootstrap_router)
+  # Bug 22: /api/bootstrap/info requires X-API-Key (override en tests unitaris).
+  from plugins.security.core.auth_dependencies import require_api_key
+  app.dependency_overrides[require_api_key] = lambda: "test-bypass"
   return TestClient(app)
 
 

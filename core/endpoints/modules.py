@@ -12,6 +12,7 @@ www.jgoy.net · https://server-nexe.org
 from fastapi import APIRouter, Request, Depends
 
 from core.dependencies import limiter
+from plugins.security.core.auth_dependencies import require_api_key
 
 from core.models import (
   ModulesListResponse,
@@ -33,7 +34,12 @@ def get_api_integrator(request: Request):
 def configure_dependencies(api_integrator_instance, i18n_manager):
   """Legacy compatibility - dependencies now injected via app.state"""
 
-@router.get("/modules", response_model=ModulesListResponse, summary="List integrated modules and their APIs")
+@router.get(
+  "/modules",
+  response_model=ModulesListResponse,
+  summary="List integrated modules and their APIs",
+  dependencies=[Depends(require_api_key)],
+)
 @limiter.limit("10/minute")
 async def list_integrated_modules(
   request: Request,
@@ -57,7 +63,12 @@ async def list_integrated_modules(
           "API integrator not initialized"
     )
 
-@router.get("/modules/{module_name}/routes", response_model=ModuleRoutesResponse, summary="Registered routes for a specific module")
+@router.get(
+  "/modules/{module_name}/routes",
+  response_model=ModuleRoutesResponse,
+  summary="Registered routes for a specific module",
+  dependencies=[Depends(require_api_key)],
+)
 @limiter.limit("10/minute")
 async def get_module_routes(
   module_name: str,

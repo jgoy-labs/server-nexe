@@ -86,7 +86,7 @@ def create_router(module_instance) -> APIRouter:
 
     # --- Models ---
 
-    @router.get("/api/models")
+    @router.get("/api/models", dependencies=[Depends(require_api_key)])
     async def list_models():
         """Llista models locals d'Ollama."""
         module = _get_module()
@@ -140,7 +140,7 @@ def create_router(module_instance) -> APIRouter:
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}
         )
 
-    @router.get("/api/models/{model_name}/info")
+    @router.get("/api/models/{model_name}/info", dependencies=[Depends(require_api_key)])
     async def get_model_info(model_name: str):
         """Get detailed information about a model."""
         module = _get_module()
@@ -164,14 +164,14 @@ def create_router(module_instance) -> APIRouter:
 
     # --- Health & Info ---
 
-    @router.get("/health")
+    @router.get("/health", dependencies=[Depends(require_api_key)])
     async def health():
         """Health check del modul Ollama."""
         module = _get_module()
         result = await module.health_check()
         return result.to_dict()
 
-    @router.get("/info")
+    @router.get("/info", dependencies=[Depends(require_api_key)])
     async def info():
         """Informacio del modul Ollama."""
         module = _get_module()

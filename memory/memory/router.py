@@ -9,9 +9,11 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 import structlog
+
+from plugins.security.core.auth_dependencies import require_api_key
 
 from .constants import MANIFEST
 
@@ -19,7 +21,7 @@ logger = structlog.get_logger()
 
 router_public = APIRouter(prefix="/memory", tags=["Memory"])
 
-@router_public.get("/health")
+@router_public.get("/health", dependencies=[Depends(require_api_key)])
 async def get_memory_health():
   """
   Health check del mòdul Memory.
@@ -56,7 +58,7 @@ async def get_memory_health():
       status_code=503
     )
 
-@router_public.get("/info")
+@router_public.get("/info", dependencies=[Depends(require_api_key)])
 async def get_memory_info():
   """
   Informació del mòdul Memory.
@@ -75,7 +77,7 @@ async def get_memory_info():
     ]
   }
 
-@router_public.get("/stats/{user_id}")
+@router_public.get("/stats/{user_id}", dependencies=[Depends(require_api_key)])
 async def get_memory_stats(user_id: str):
   """Get memory statistics for a user via MemoryService."""
   try:
@@ -89,7 +91,7 @@ async def get_memory_stats(user_id: str):
     logger.error("memory_stats_error", error=str(e), exc_info=True)
     return JSONResponse(content={"error": str(e)}, status_code=500)
 
-@router_public.get("/profile/{user_id}")
+@router_public.get("/profile/{user_id}", dependencies=[Depends(require_api_key)])
 async def get_memory_profile(user_id: str):
   """Get profile for a user via MemoryService."""
   try:

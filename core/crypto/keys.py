@@ -77,11 +77,51 @@ def _try_file_get(path: Path = KEY_FILE_PATH) -> bytes | None:
 
 
 def _try_file_set(key: bytes, path: Path = KEY_FILE_PATH) -> bool:
-    """Store master key to file with restricted permissions (600)."""
+    """Store master key to file with restricted permissions (600).
+
+    Bug 8 fix — TOCTOU window: previously the key was written with
+    default umask (typically 644) and then chmod'd to 600. During that
+    window the key was world-readable. We now create the file via
+    os.open() with O_CREAT|O_EXCL|O_WRONLY and mode 0o600 so the file
+    is born with restrictive permissions and never exists with broader
+    ones. If the file already exists (legitimate reuse case), we
+    overwrite atomically via a temp file created the same secure way.
+    """
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(key)
-        path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+        # Restrict directory permissions too (700) — best effort
+        try:
+            path.parent.chmod(stat.S_IRWXU)  # 0o700
+        except Exception:
+            pass
+
+        # Write atomically to a sibling temp file with O_CREAT|O_EXCL|O_WRONLY
+        # so we never expose the key with relaxed permissions.
+        tmp_path = path.parent / f".master.key.tmp.{os.getpid()}"
+        # Clean any stale temp from a previous crash
+        try:
+            tmp_path.unlink()
+        except FileNotFoundError:
+            pass
+
+        flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+        fd = os.open(str(tmp_path), flags, 0o600)
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(key)
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception:
+            # If write failed, ensure tmp is removed
+            try:
+                tmp_path.unlink()
+            except FileNotFoundError:
+                pass
+            raise
+
+        # Atomic replace — preserves the 0o600 permissions of tmp_path
+        os.replace(str(tmp_path), str(path))
+
         logger.info("Master key stored at %s (permissions 600)", path)
         return True
     except Exception as e:

@@ -47,22 +47,9 @@ MODEL_CATALOG = {
             "chat_format": "chatml",
             "prompt_tier": "small",
         },
-        {
-            "key": "phi35",
-            "name": "Phi-3.5 Mini",
-            "origin": "Microsoft",
-            "year": 2024,
-            "lang": {"ca": "Multilingüe (Anglès principal)", "es": "Multilingüe (Inglés principal)", "en": "Multilingual (English primary)"},
-            "params": "3.8B",
-            "disk_gb": 2.4,
-            "ram_gb": 3.5,
-            "description": {"ca": "Molt ràpid, bo per tasques generals", "es": "Muy rápido, bueno para tareas generales", "en": "Very fast, good for general tasks"},
-            "mlx": "mlx-community/Phi-3.5-mini-instruct-4bit",
-            "ollama": "phi3:mini",
-            "gguf": "https://huggingface.co/microsoft/Phi-3.5-mini-instruct-gguf/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf",
-            "chat_format": "chatml",
-            "prompt_tier": "small",
-        },
+        # Phi-3.5 retirat del catàleg (Bug 29):
+        # la URL GGUF de Microsoft requereix login HF i descarregava
+        # 29 bytes (HTML d'error) provocant falles silencioses durant la instal·lació.
         {
             "key": "salamandra2b",
             "name": "Salamandra 2B",

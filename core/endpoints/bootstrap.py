@@ -15,12 +15,13 @@ import os
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 
 from core.messages import get_message
 
 from core.bootstrap_tokens import create_session_token
+from plugins.security.core.auth_dependencies import require_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -257,13 +258,19 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
     "message": "New token generated. Check terminal."
   }
 
-@router.get("/api/bootstrap/info", response_model=BootstrapInfoResponse, summary="Bootstrap system status (public, no auth)")
+@router.get(
+  "/api/bootstrap/info",
+  response_model=BootstrapInfoResponse,
+  summary="Bootstrap system status (requires API key in production)",
+  dependencies=[Depends(require_api_key)],
+)
 async def bootstrap_info(request: Request) -> BootstrapInfoResponse:
   """
   Return information about bootstrap status.
 
-  This endpoint is public (no authentication required) and allows
-  the frontend to make informed decisions about UI display.
+  Bug 22 (security): previously public, now requires X-API-Key.
+  In dev mode (`NEXE_DEV_MODE=true` from loopback) auth is auto-bypassed,
+  so the front-end installer flow on localhost continues to work.
 
   Returns:
     BootstrapInfoResponse with complete bootstrap system status

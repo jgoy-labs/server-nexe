@@ -124,9 +124,15 @@ class DreamingCycle:
             self._is_running = False
 
     def _count_pending(self) -> int:
-        """Count pending staging entries."""
+        """Count pending staging entries.
+
+        Bug 10 fix — abans la connexió SQLite no es tancava i causava un
+        connection leak acumulatiu (DreamingCycle corre cada 15 min).
+        Ara usem try/finally amb close() explícit.
+        """
         if not self._store:
             return 0
+        conn = None
         try:
             self._store.get_staging(user_id="*", status="pending", limit=1)
             # get_staging filters by user_id, so count all users
@@ -138,11 +144,23 @@ class DreamingCycle:
             return cursor.fetchone()[0]
         except Exception:
             return 0
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     async def _recover_stuck_leases(self):
-        """Reset leased entries older than 5 minutes."""
+        """Reset leased entries older than 5 minutes.
+
+        Bug 10 fix — abans la connexió SQLite no es tancava i causava un
+        connection leak a cada cicle (15 min). Ara usem try/finally amb
+        close() explícit.
+        """
         if not self._store:
             return
+        conn = None
         try:
             conn = self._store._connect()
             conn.execute(
@@ -154,12 +172,24 @@ class DreamingCycle:
             conn.commit()
         except Exception as e:
             logger.error("recover_stuck_leases failed: %s", e)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     async def _process_staging(self):
-        """Process pending staging entries in batches."""
+        """Process pending staging entries in batches.
+
+        Bug 10 fix — la connexió SQLite no es tancava mai i amb un leak
+        de ~1 conn/cicle s'acumulava ràpid (cycle cada 15 min). Ara
+        try/finally amb close() explícit.
+        """
         if not self._store:
             return
 
+        conn = None
         try:
             conn = self._store._connect()
             cursor = conn.execute(
@@ -191,119 +221,160 @@ class DreamingCycle:
 
         except Exception as e:
             logger.error("_process_staging failed: %s", e)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     async def _process_one(self, entry: Dict[str, Any]):
-        """Process a single staging entry to Profile or Episodic."""
+        """Process a single staging entry to Profile or Episodic.
+
+        Bug 10 fix — _process_one es crida un cop per cada entrada de
+        staging (batch de 10) a cada cicle de DreamingCycle. Abans cada
+        invocació obria una connexió SQLite i no la tancava mai — leak
+        quadràtic respecte del nombre d'entrades. Ara try/finally amb
+        close() explícit i tots els `return` anticipats surten via
+        finally.
+        """
         if not self._store:
             return
 
-        conn = self._store._connect()
-        entry_id = entry["id"]
-        user_id = entry["user_id"]
-        decision = entry.get("validator_decision", "stage_only")
-        target = entry.get("target_store")
+        conn = None
+        try:
+            conn = self._store._connect()
+            entry_id = entry["id"]
+            user_id = entry["user_id"]
+            decision = entry.get("validator_decision", "stage_only")
+            target = entry.get("target_store")
 
-        # Lease the entry
-        conn.execute(
-            "UPDATE staging SET status = 'leased', "
-            "leased_at = datetime('now'), worker_id = 'dreaming' "
-            "WHERE id = ?",
-            (entry_id,),
-        )
-        conn.commit()
+            # Lease the entry
+            conn.execute(
+                "UPDATE staging SET status = 'leased', "
+                "leased_at = datetime('now'), worker_id = 'dreaming' "
+                "WHERE id = ?",
+                (entry_id,),
+            )
+            conn.commit()
 
-        extractor_json = entry.get("extractor_output_json")
-        extractor_output = json.loads(extractor_json) if extractor_json else {}
+            extractor_json = entry.get("extractor_output_json")
+            extractor_output = json.loads(extractor_json) if extractor_json else {}
 
-        if decision == "upsert_profile" or target == "profile":
-            attribute = extractor_output.get("attribute")
-            value = extractor_output.get("value", entry.get("raw_text"))
-            if attribute:
-                self._store.upsert_profile(
-                    user_id=user_id,
-                    attribute=attribute,
-                    value=value,
-                    entity=extractor_output.get("entity", "user"),
-                    source=entry.get("source", "dreaming"),
-                    trust_level=entry.get("trust_level", "untrusted"),
-                    is_critical=extractor_output.get("is_critical", False),
-                )
-
-        elif decision in ("promote_episodic", "stage_only") or target == "episodic":
-            content = entry.get("raw_text", "")
-            content_hash = hashlib.sha256(
-                content.lower().strip().encode()
-            ).hexdigest()
-
-            # Tombstone check
-            if self._store.is_tombstoned(user_id, content_hash):
-                trust = entry.get("trust_level", "untrusted")
-                if trust != "trusted":
-                    logger.debug("Tombstoned content skipped: %s", entry_id)
-                    conn.execute(
-                        "UPDATE staging SET status = 'processed' WHERE id = ?",
-                        (entry_id,),
-                    )
-                    conn.commit()
-                    return
-
-            # Dedup check (v1: >0.92 refresh, <0.92 new)
-            if self._vector and self._vector.available and self._embedder:
-                try:
-                    embedding = self._embedder.encode(content)
-                    emb_list = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
-                    similar = self._vector.search(
-                        embedding=emb_list,
+            if decision == "upsert_profile" or target == "profile":
+                attribute = extractor_output.get("attribute")
+                value = extractor_output.get("value", entry.get("raw_text"))
+                if attribute:
+                    self._store.upsert_profile(
                         user_id=user_id,
-                        threshold=self._config.dedup_refresh_threshold,
-                        limit=1,
+                        attribute=attribute,
+                        value=value,
+                        entity=extractor_output.get("entity", "user"),
+                        source=entry.get("source", "dreaming"),
+                        trust_level=entry.get("trust_level", "untrusted"),
+                        is_critical=extractor_output.get("is_critical", False),
                     )
-                    if similar and similar[0]["score"] > self._config.dedup_refresh_threshold:
-                        # Quasi-duplicate: refresh
-                        existing_id = similar[0]["id"]
-                        conn.execute(
-                            "UPDATE episodic SET updated_at = datetime('now'), "
-                            "evidence_count = MIN(10, evidence_count + 1) "
-                            "WHERE id = ?",
-                            (existing_id,),
-                        )
+
+            elif decision in ("promote_episodic", "stage_only") or target == "episodic":
+                content = entry.get("raw_text", "")
+                content_hash = hashlib.sha256(
+                    content.lower().strip().encode()
+                ).hexdigest()
+
+                # Tombstone check
+                if self._store.is_tombstoned(user_id, content_hash):
+                    trust = entry.get("trust_level", "untrusted")
+                    if trust != "trusted":
+                        logger.debug("Tombstoned content skipped: %s", entry_id)
                         conn.execute(
                             "UPDATE staging SET status = 'processed' WHERE id = ?",
                             (entry_id,),
                         )
                         conn.commit()
                         return
-                except Exception as e:
-                    logger.debug("Dedup check failed, inserting as new: %s", e)
 
-            # Insert new episodic
-            importance = extractor_output.get("importance", 0.5)
-            self._store.insert_episodic(
-                user_id=user_id,
-                content=content,
-                memory_type=extractor_output.get("type", "fact"),
-                importance=importance,
-                source=entry.get("source", "dreaming"),
-                trust_level=entry.get("trust_level", "untrusted"),
-                namespace=entry.get("namespace", "default"),
-                metadata=extractor_output.get("metadata"),
-                related_ids=extractor_output.get("related_ids"),
+                # Dedup check (v1: >0.92 refresh, <0.92 new)
+                if self._vector and self._vector.available and self._embedder:
+                    try:
+                        embedding = self._embedder.encode(content)
+                        emb_list = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
+                        similar = self._vector.search(
+                            embedding=emb_list,
+                            user_id=user_id,
+                            threshold=self._config.dedup_refresh_threshold,
+                            limit=1,
+                        )
+                        if similar and similar[0]["score"] > self._config.dedup_refresh_threshold:
+                            # Quasi-duplicate: refresh
+                            existing_id = similar[0]["id"]
+                            # Bug 9 fix — abans usavem `MIN(10, evidence_count + 1)`
+                            # com a multi-arg function, que es una extensio SQLite
+                            # i no es portable a altres dialects (Postgres, MySQL,
+                            # ...). Calculem el cap de 10 en Python i passem el
+                            # valor com a parametre vinculat. Llegim primer el
+                            # valor actual i fem el min en codi.
+                            cur = conn.execute(
+                                "SELECT evidence_count FROM episodic WHERE id = ?",
+                                (existing_id,),
+                            )
+                            row = cur.fetchone()
+                            current_evidence = row[0] if row and row[0] is not None else 0
+                            new_evidence = min(10, current_evidence + 1)
+                            conn.execute(
+                                "UPDATE episodic SET updated_at = datetime('now'), "
+                                "evidence_count = ? "
+                                "WHERE id = ?",
+                                (new_evidence, existing_id),
+                            )
+                            conn.execute(
+                                "UPDATE staging SET status = 'processed' WHERE id = ?",
+                                (entry_id,),
+                            )
+                            conn.commit()
+                            return
+                    except Exception as e:
+                        logger.debug("Dedup check failed, inserting as new: %s", e)
+
+                # Insert new episodic
+                importance = extractor_output.get("importance", 0.5)
+                self._store.insert_episodic(
+                    user_id=user_id,
+                    content=content,
+                    memory_type=extractor_output.get("type", "fact"),
+                    importance=importance,
+                    source=entry.get("source", "dreaming"),
+                    trust_level=entry.get("trust_level", "untrusted"),
+                    namespace=entry.get("namespace", "default"),
+                    metadata=extractor_output.get("metadata"),
+                    related_ids=extractor_output.get("related_ids"),
+                )
+
+            # Mark processed
+            conn.execute(
+                "UPDATE staging SET status = 'processed' WHERE id = ?",
+                (entry_id,),
             )
-
-        # Mark processed
-        conn.execute(
-            "UPDATE staging SET status = 'processed' WHERE id = ?",
-            (entry_id,),
-        )
-        conn.commit()
+            conn.commit()
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     async def _sync_vector_index(self):
-        """Sync unsynced RDBMS entries to vector index."""
+        """Sync unsynced RDBMS entries to vector index.
+
+        Bug 10 fix — connection leak: la connexió SQLite no es tancava.
+        Ara usem try/finally amb close() explícit per evitar un leak
+        acumulatiu (cycle cada 15 min).
+        """
         if not self._store or not self._vector or not self._embedder:
             return
         if not self._vector.available:
             return
 
+        conn = None
         try:
             conn = self._store._connect()
             cursor = conn.execute(
@@ -348,11 +419,22 @@ class DreamingCycle:
 
         except Exception as e:
             logger.error("_sync_vector_index failed: %s", e)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     async def _gc_lightweight(self):
-        """Lightweight GC: expire TTL staging + old tombstones."""
+        """Lightweight GC: expire TTL staging + old tombstones.
+
+        Bug 10 fix — connection leak: la connexió SQLite no es tancava.
+        Ara try/finally amb close() explícit.
+        """
         if not self._store:
             return
+        conn = None
         try:
             conn = self._store._connect()
             now = datetime.now(timezone.utc).isoformat()
@@ -372,6 +454,12 @@ class DreamingCycle:
             conn.commit()
         except Exception as e:
             logger.error("_gc_lightweight failed: %s", e)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 
 __all__ = ["DreamingCycle"]

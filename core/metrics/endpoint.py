@@ -12,12 +12,14 @@ www.jgoy.net · https://server-nexe.org
 import logging
 from typing import Dict, Any
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, Response
 from prometheus_client import (
   generate_latest,
   CONTENT_TYPE_LATEST,
   REGISTRY,
 )
+
+from plugins.security.core.auth_dependencies import require_api_key
 
 from .registry import set_module_health
 
@@ -30,6 +32,7 @@ metrics_router = APIRouter(tags=["metrics"])
   summary="Prometheus metrics",
   description="Exposes metrics in Prometheus format for scraping",
   response_class=Response,
+  dependencies=[Depends(require_api_key)],
   responses={
     200: {
       "description": "Prometheus metrics",
@@ -57,6 +60,7 @@ async def get_metrics() -> Response:
   "/metrics/health",
   summary="Metrics health check",
   description="Verifies that the metrics system is working",
+  dependencies=[Depends(require_api_key)],
 )
 async def metrics_health() -> Dict[str, Any]:
   """
@@ -85,6 +89,7 @@ async def metrics_health() -> Dict[str, Any]:
   "/metrics/json",
   summary="Metrics summary (JSON)",
   description="Summary of key metrics in JSON format",
+  dependencies=[Depends(require_api_key)],
 )
 async def get_metrics_json() -> Dict[str, Any]:
   """
