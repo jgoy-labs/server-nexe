@@ -1,9 +1,10 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: core/loader/__init__.py
-Description: No description available.
+Description: Public API of core.loader. Exports the live module protocol
+             and the lazy-manifest factory used by every plugin.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -23,24 +24,9 @@ from .protocol import (
   module_has_specialists,
 )
 
-from .scanner import (
-  ModuleScanner,
-  ModuleDiscovery,
-  scan_modules,
-  discover_module,
-)
-
-from .registry import (
-  ModuleRegistry,
-  RegisteredModule,
-  get_registry,
-)
-
-from .loader import (
-  ModuleLoader,
-  ModuleLoadError,
-  get_loader,
-  bootstrap,
+from .manifest_base import (
+  create_lazy_manifest,
+  install_lazy_manifest,
 )
 
 __all__ = [
@@ -55,17 +41,8 @@ __all__ = [
   "validate_module",
   "module_has_router",
   "module_has_specialists",
-  "ModuleScanner",
-  "ModuleDiscovery",
-  "scan_modules",
-  "discover_module",
-  "ModuleRegistry",
-  "RegisteredModule",
-  "get_registry",
-  "ModuleLoader",
-  "ModuleLoadError",
-  "get_loader",
-  "bootstrap",
+  "create_lazy_manifest",
+  "install_lazy_manifest",
 ]
 
 __version__ = "1.0.0"

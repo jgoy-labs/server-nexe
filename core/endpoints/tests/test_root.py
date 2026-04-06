@@ -87,7 +87,10 @@ class TestRequiredModulesFromConfig:
         result = _required_modules_from_config({})
         assert result == set()
 
-    def test_enabled_modules(self):
+    def test_enabled_modules(self, monkeypatch):
+        # Aïllar de pollution d'entorn: NEXE_APPROVED_MODULES pot estar set
+        # per altres tests/fixtures i provoca intersecció buida.
+        monkeypatch.delenv("NEXE_APPROVED_MODULES", raising=False)
         from core.endpoints.root import _required_modules_from_config
         config = {"plugins": {"modules": {"enabled": ["security_module", "rag_module"]}}}
         result = _required_modules_from_config(config)

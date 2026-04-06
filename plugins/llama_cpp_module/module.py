@@ -11,9 +11,8 @@ www.jgoy.net · https://server-nexe.org
 
 import logging
 from typing import Optional, Dict, Any, List
-from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
 from .core.chat import LlamaCppChatNode
 from .core.config import LlamaCppConfig
@@ -72,26 +71,8 @@ class LlamaCppModule:
             return False
 
     def _init_router(self):
-        self._router = APIRouter(prefix="/llama-cpp")
-        
-        @self._router.get("/info")
-        async def get_info():
-            return self.get_info()
-
-        @self._router.post("/chat")
-        async def chat_endpoint(request: Dict[str, Any]):
-            if not self._initialized:
-                raise HTTPException(status_code=503, detail="Module not initialized")
-            
-            messages = request.get("messages", [])
-            system = request.get("system", "")
-            session_id = request.get("session_id", "default")
-            
-            try:
-                result = await self.chat(messages, system, session_id)
-                return result
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+        from .api.routes import create_router
+        self._router = create_router(self)
 
     def get_router(self) -> APIRouter:
         return self._router

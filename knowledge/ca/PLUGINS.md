@@ -1,6 +1,6 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-06
 id: nexe-plugins-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
@@ -220,6 +220,79 @@ Si el modul implementa `NexeModuleWithRouter`, el kernel registra el router a Fa
 ### 5. Shutdown
 Crida `await module.shutdown()` durant l'aturada del servidor. Ha de ser idempotent.
 
+## Activacio i seguretat — sistema dual
+
+server-nexe te **tres mecanismes complementaris** per decidir quins plugins s'activen. Els tres conviuen i es combinen — no son alternatives.
+
+### 1. `server.toml` — seccio `[plugins.modules]`
+
+Llista estatica declarativa al fitxer `personality/server.toml` (linia 172). Es la font primaria: indica al servidor quins plugins HA d'activar a l'arrencada.
+
+```toml
+[plugins.modules]
+enabled = ["security", "rag", "ollama_module", "mlx_module", "llama_cpp_module", "web_ui_module"]
+```
+
+Per afegir un plugin nou cal incloure'l explicitament aqui.
+
+### 2. `NEXE_APPROVED_MODULES` — env var (allowlist de seguretat)
+
+Validada per `get_module_allowlist()` a `core/config.py:240`. Es una capa de seguretat addicional sobre la llista de `server.toml`:
+
+- **Mode desenvolupament** (`NEXE_ENV=development` o no definit): `NEXE_APPROVED_MODULES` es **opcional**. Si no s'ha definit, `get_module_allowlist()` retorna `None` i no filtra res.
+- **Mode produccio** (`NEXE_ENV=production` o `[core.environment].mode = "production"`): `NEXE_APPROVED_MODULES` es **OBLIGATORI**. Si falta, el servidor aborda amb `ValueError("SECURITY ERROR: NEXE_APPROVED_MODULES is required in production")`.
+
+Format: llista separada per comes, ex: `NEXE_APPROVED_MODULES="security,ollama_module,web_ui_module"`. El ModuleManager usa aquest conjunt per filtrar la llista de `server.toml`.
+
+### 3. `PathDiscovery` — descobriment drop-in
+
+Definit a `personality/module_manager/path_discovery.py`. Escaneja automaticament paths coneguts cercant carpetes amb `manifest.toml`:
+
+```python
+known_paths = [
+    "plugins", "plugins/core", "plugins/tools",
+    "storage", "storage/core", "storage/tools",
+    "memory/core", "memory/tools",
+    "core/core", "core/tools",
+    "personality/core", "personality/tools"
+]
+```
+
+- **Strict mode** (produccio): nomes paths coneguts + configurats explicitament.
+- **Dev mode**: a mes, auto-descobreix carpetes amb `modul`/`module`/`mods` al nom.
+
+### Com afegir un plugin nou (4 passos)
+
+1. Posar la carpeta a `plugins/<nom>/` amb `manifest.toml` + `manifest.py` + `module.py` + `__init__.py`.
+2. Afegir el nom a `[plugins.modules].enabled` a `personality/server.toml`.
+3. (Nomes produccio) Afegir-lo a la variable d'entorn `NEXE_APPROVED_MODULES`.
+4. Reiniciar el server — `PathDiscovery` el troba automaticament, `ModuleDiscovery` el carrega.
+
+## Arquitectura del ModuleManager
+
+El ModuleManager viu a `personality/module_manager/` — 13 fitxers, ~3279 linies. Es la facade central del sistema de plugins.
+
+### Components principals
+
+| Fitxer | Responsabilitat |
+|--------|----------------|
+| `module_manager.py` | Facade central, cicle de vida, load/unload/health (642 linies) |
+| `config_manager.py` | Carrega `server.toml`, config parsejada, secrets |
+| `config_validator.py` | Validacions i esquemes de configuracio |
+| `module_lifecycle.py` | Inicialitzacio, shutdown, gestio d'errors |
+| `path_discovery.py` | Escaneja paths (`plugins/`, `memory/modules/`, `core/tools/`...) |
+| `discovery.py` | Importa manifests, detecta capabilities |
+| `registry.py` | Registre de moduls carregats, cache |
+| `system_lifecycle.py` | Startup/shutdown global del sistema |
+
+### Flux del descobriment
+
+1. `PathDiscovery.discover_all_paths()` troba carpetes amb `manifest.toml`
+2. `ModuleDiscovery` importa cada `manifest.py` i valida el Protocol
+3. `ModuleRegistry` registra les instancies descobertes
+4. `ModuleLoader` carrega les classes dinamicament
+5. `APIIntegrator` inclou els routers a l'app FastAPI via `load_plugin_routers()`
+
 ## Plugins existents (5)
 
 | Plugin | Tipus | Router | Caracteristiques clau |
@@ -324,7 +397,12 @@ Ambdos metodes es poden cridar multiples vegades. Posa sempre guard `self._initi
 | Concepte | Fitxer |
 |---------|------|
 | Protocol NexeModule | `core/loader/protocol.py` |
+| ModuleManager facade | `personality/module_manager/module_manager.py` |
+| Descobriment de paths | `personality/module_manager/path_discovery.py` |
 | Descobriment de moduls | `personality/module_manager/discovery.py` |
 | Cicle de vida de moduls | `personality/module_manager/module_lifecycle.py` |
+| Gestor de configuracio | `personality/module_manager/config_manager.py` |
+| Registre de moduls | `personality/module_manager/registry.py` |
+| Allowlist de seguretat | `core/config.py:240` (`get_module_allowlist()`) |
 | Registre de routers | `core/server/factory_modules.py` |
 | Plugin de referencia (el mes net) | `plugins/llama_cpp_module/` |
