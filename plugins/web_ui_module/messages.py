@@ -10,11 +10,13 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
+from fastapi import Request
 
 logger = logging.getLogger(__name__)
 
 FALLBACK_MESSAGES = {
     "webui.auth.invalid_key": "Invalid or missing API key",
+    "webui.auth.no_key_configured": "Server has no admin API key configured (FAIL CLOSED). Set NEXE_PRIMARY_API_KEY or NEXE_ADMIN_API_KEY.",
     "webui.auth.supported_languages": "Supported languages: ca, es, en",
     "webui.static.ui_not_found": "UI not found",
     "webui.static.forbidden": "Forbidden",
@@ -46,3 +48,19 @@ def get_message(i18n, key: str, **kwargs) -> str:
         return template.format(**kwargs)
     except (KeyError, IndexError):
         return template
+
+
+def get_i18n(request: Request):
+    """FastAPI Dependency: read i18n from app.state.
+
+    Returns None if app.state has no i18n attribute (test/dev fallback).
+    Same pattern as core/endpoints/root.py::get_i18n.
+
+    Used by Web UI routes to inject i18n into get_message() calls
+    instead of passing None (Codex P1 i18n bypass fix — Q3).
+
+    Note: the `request: Request` type hint is REQUIRED for FastAPI to
+    inject the Request object. Without it, FastAPI treats `request` as
+    a query parameter and returns 422 Unprocessable Entity.
+    """
+    return getattr(request.app.state, "i18n", None)

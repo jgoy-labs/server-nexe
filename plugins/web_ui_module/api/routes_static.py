@@ -8,16 +8,15 @@ www.jgoy.net · https://server-nexe.org
 ------------------------------------
 """
 
-import os as _os
 import time as _time
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse, Response
 
 # Cache-bust: changes every time the server restarts
 _BOOT_TS = str(int(_time.time()))
 
-from plugins.web_ui_module.messages import get_message
+from plugins.web_ui_module.messages import get_message, get_i18n
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +27,11 @@ def register_static_routes(router: APIRouter, *, module_ref):
     # -- GET / (serve_ui) --
 
     @router.get("/", response_class=HTMLResponse)
-    async def serve_ui():
+    async def serve_ui(i18n=Depends(get_i18n)):
         """Serve the main page with server language injected"""
         html_path = module_ref.ui_dir / "index.html"
         if not html_path.exists():
-            raise HTTPException(status_code=404, detail=get_message(None, "webui.static.ui_not_found"))
+            raise HTTPException(status_code=404, detail=get_message(i18n, "webui.static.ui_not_found"))
         html = html_path.read_text(encoding="utf-8")
         from plugins.web_ui_module.api.routes_auth import get_server_lang
         lang = get_server_lang()
@@ -47,13 +46,13 @@ def register_static_routes(router: APIRouter, *, module_ref):
     # -- GET /static/{filename:path} --
 
     @router.get("/static/{filename:path}")
-    async def serve_static(filename: str):
+    async def serve_static(filename: str, i18n=Depends(get_i18n)):
         """Serve CSS/JS"""
         file_path = (module_ref.ui_dir / filename).resolve()
         if not str(file_path).startswith(str(module_ref.ui_dir.resolve())):
-            raise HTTPException(status_code=403, detail=get_message(None, "webui.static.forbidden"))
+            raise HTTPException(status_code=403, detail=get_message(i18n, "webui.static.forbidden"))
         if not file_path.exists():
-            raise HTTPException(status_code=404, detail=get_message(None, "webui.static.file_not_found"))
+            raise HTTPException(status_code=404, detail=get_message(i18n, "webui.static.file_not_found"))
 
         # Determine media type
         _mime = {

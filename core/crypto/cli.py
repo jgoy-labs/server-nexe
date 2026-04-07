@@ -10,8 +10,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-import os
-import sys
 from pathlib import Path
 
 import click
@@ -135,9 +133,9 @@ def encryption_status():
     if crypto_available:
         click.echo("CryptoProvider: OK (master key available)")
 
-    # SQLCipher
+    # SQLCipher (defensive import — used to test availability)
     try:
-        from sqlcipher3 import dbapi2
+        from sqlcipher3 import dbapi2  # noqa: F401
         click.echo("SQLCipher: AVAILABLE")
     except ImportError:
         click.echo("SQLCipher: NOT INSTALLED (pip install sqlcipher3)")

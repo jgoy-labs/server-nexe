@@ -13,7 +13,7 @@ from typing import Dict, Any
 import logging
 from fastapi import APIRouter, HTTPException, Depends, Request
 
-from plugins.web_ui_module.messages import get_message
+from plugins.web_ui_module.messages import get_message, get_i18n
 from plugins.security.core.input_sanitizers import validate_string_input
 from core.dependencies import limiter
 
@@ -43,7 +43,7 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
         session_id = validate_string_input(session_id, max_length=100, context="path")
 
         if not content:
-            raise HTTPException(status_code=400, detail=get_message(None, "webui.memory.content_required"))
+            raise HTTPException(status_code=400, detail=get_message(get_i18n(request), "webui.memory.content_required"))
 
         memory_helper = _get_memory_helper()
         result = await memory_helper.save_to_memory(
@@ -65,7 +65,7 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
 
         # Security: validate input
         if not query:
-            raise HTTPException(status_code=400, detail=get_message(None, "webui.memory.query_required"))
+            raise HTTPException(status_code=400, detail=get_message(get_i18n(request), "webui.memory.query_required"))
         query = validate_string_input(query, max_length=1000, context="chat")
 
         memory_helper = _get_memory_helper()

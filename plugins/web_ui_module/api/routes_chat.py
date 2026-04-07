@@ -20,7 +20,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request as FastAPIRequest
 from fastapi.responses import StreamingResponse
 from core.dependencies import limiter
 
-from plugins.web_ui_module.messages import get_message
+from plugins.web_ui_module.messages import get_message, get_i18n
 from plugins.security.core.input_sanitizers import validate_string_input, strip_memory_tags
 from core.endpoints.chat_sanitization import _sanitize_rag_context
 
@@ -206,7 +206,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         stream = body.get("stream", False)
 
         if not message:
-            raise HTTPException(status_code=400, detail=get_message(None, "webui.chat.message_required"))
+            raise HTTPException(status_code=400, detail=get_message(get_i18n(request), "webui.chat.message_required"))
 
         # Security: strip [MEM_SAVE:] tags from user input to prevent memory injection (SEC-002)
         message = strip_memory_tags(message)

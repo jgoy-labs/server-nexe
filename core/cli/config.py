@@ -22,7 +22,15 @@ try:
 except ImportError:
   yaml = None
 
-DEFAULT_SERVER_URL = "http://localhost:9119"
+def _default_server_url() -> str:
+    """Compute default server URL from core.config (Q4.2 fix).
+
+    Lazy import to avoid circular dependency at module load.
+    """
+    from core.config import get_server_url
+    return get_server_url()
+
+DEFAULT_SERVER_URL = _default_server_url()
 DEFAULT_TIMEOUT = 30
 DEFAULT_VERIFY_SSL = False
 

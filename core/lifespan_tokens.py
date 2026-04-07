@@ -70,8 +70,12 @@ def setup_bootstrap_tokens(server_state, _translate) -> None:
   if nexe_env == "development" and bootstrap_display:
     title = _translate(server_state.i18n, "core.server.bootstrap_token_title",
       "NEXE FRAMEWORK INITIALIZATION CODE")
+    from core.config import DEFAULT_HOST, DEFAULT_PORT
     _srv = server_state.config.get("core", {}).get("server", {})
-    _nexe_url = os.environ.get("NEXE_API_BASE_URL", f"http://{_srv.get('host', '127.0.0.1')}:{_srv.get('port', 9119)}")
+    _nexe_url = os.environ.get(
+        "NEXE_API_BASE_URL",
+        f"http://{_srv.get('host', DEFAULT_HOST)}:{_srv.get('port', DEFAULT_PORT)}",
+    )
     url_msg = _translate(server_state.i18n, "core.server.bootstrap_token_url",
       "URL: {url}", url=_nexe_url)
     expiry_msg = _translate(server_state.i18n, "core.server.bootstrap_token_expiry",

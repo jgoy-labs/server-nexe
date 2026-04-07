@@ -423,10 +423,7 @@ class ModuleManager:
       result = module_manager.load_plugin_routers(app, Path.cwd())
       print(f"Loaded {result['loaded_count']} routers")
     """
-    import importlib
-    import os
     import traceback
-    from personality.module_manager.core_modules import get_core_modules
     from personality.data.models import SystemEvent, ModuleState
 
     result = {
@@ -461,8 +458,9 @@ class ModuleManager:
         # Import manifest
         manifest_module = self._import_plugin_manifest(module_info, project_root)
 
-        # Load routers
-        routers_loaded = self._load_plugin_routers_from_manifest(app, manifest_module, module_name, i18n)
+        # Load routers (return value intentionally discarded — registration
+        # happens via side effects on `app`)
+        self._load_plugin_routers_from_manifest(app, manifest_module, module_name, i18n)
 
         # Register instance in app.state (ALWAYS, even without routers)
         self._register_plugin_instance(app, module_name, manifest_module)

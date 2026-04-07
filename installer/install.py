@@ -16,7 +16,7 @@ from pathlib import Path
 from .installer_display import (
     APP_LOGO, clear,
     GREEN, RED, YELLOW, CYAN, BOLD, DIM, RESET,
-    print_step, print_success, print_warn, print_error,
+    print_step, print_error,
 )
 from .installer_i18n import select_language, t, get_lang
 from .installer_hardware import detect_hardware

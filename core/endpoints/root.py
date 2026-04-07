@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Depends
 
 from core.dependencies import limiter
+from plugins.security.core.auth_dependencies import require_api_key
 
 from core.resilience import (
   ollama_breaker,
@@ -197,9 +198,12 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
     endpoints=endpoints
   )
 
-@router.get("/status", summary="Real-time status: active engine, model, and loaded modules")
+@router.get("/status", summary="Real-time status: active engine, model, and loaded modules (API key required)")
 @limiter.limit("60/minute")
-async def server_status(request: Request) -> dict:
+async def server_status(
+  request: Request,
+  _: str = Depends(require_api_key),
+) -> dict:
   """
   Server status endpoint with actual runtime configuration.
 
@@ -254,9 +258,12 @@ async def server_status(request: Request) -> dict:
     "timestamp": datetime.now(timezone.utc).isoformat(),
   }
 
-@router.get("/health/circuits", summary="Circuit breaker status (Ollama, Qdrant, external HTTP)")
+@router.get("/health/circuits", summary="Circuit breaker status (Ollama, Qdrant, external HTTP) (API key required)")
 @limiter.limit("30/minute")
-async def circuit_status(request: Request) -> dict:
+async def circuit_status(
+  request: Request,
+  _: str = Depends(require_api_key),
+) -> dict:
   """
   Circuit Breaker status endpoint.
 

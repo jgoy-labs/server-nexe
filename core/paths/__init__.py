@@ -33,13 +33,6 @@ from .helpers import (
   get_core_root,
 )
 
-from .validation import (
-  _is_valid_core_root,
-  _log_detection_success,
-  _log_detection_failure,
-  _track_cwd_fallback_usage,
-)
-
 __all__ = [
   "get_repo_root",
   "reset_repo_root_cache",

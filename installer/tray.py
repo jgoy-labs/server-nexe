@@ -48,9 +48,15 @@ ICON_DIR = Path(__file__).parent / "tray_icons"
 ICON_RUNNING = str(ICON_DIR / "icon_running.png") if (ICON_DIR / "icon_running.png").exists() else None
 ICON_STOPPED = str(ICON_DIR / "icon_stopped.png") if (ICON_DIR / "icon_stopped.png").exists() else None
 
-# Server config
-SERVER_PORT = 9119
-WEB_UI_URL = f"http://127.0.0.1:{SERVER_PORT}/ui"
+# Server config — read from core.config (Q4.2 fix). Falls back to env vars
+# if core.config is not importable (e.g. tray launched outside the project).
+try:
+    from core.config import get_default_port, get_server_url
+    SERVER_PORT = get_default_port()
+    WEB_UI_URL = f"{get_server_url()}/ui"
+except Exception:
+    SERVER_PORT = int(os.environ.get("NEXE_SERVER_PORT", "9119"))
+    WEB_UI_URL = f"http://{os.environ.get('NEXE_SERVER_HOST', '127.0.0.1')}:{SERVER_PORT}/ui"
 
 
 # format_bytes, format_uptime and _RamMonitor imported from tray_monitor.py

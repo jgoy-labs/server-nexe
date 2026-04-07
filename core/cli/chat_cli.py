@@ -10,7 +10,6 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import sys
 import os
 import re
 import time
@@ -19,14 +18,13 @@ import logging
 import asyncio
 import click
 from pathlib import Path
-from typing import Optional, Dict, AsyncGenerator
+from typing import Optional, AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
 # Helpers for engine detection
 def get_default_system_prompt():
     """Read the system prompt from personality/server.toml if it exists."""
-    import os
     try:
         import tomllib
     except ImportError:
@@ -232,7 +230,8 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
 
     # Check server status
     import os as _os
-    _nexe_url = _os.environ.get("NEXE_API_BASE_URL", "http://127.0.0.1:9119").rstrip("/")
+    from core.config import get_server_url
+    _nexe_url = _os.environ.get("NEXE_API_BASE_URL", get_server_url()).rstrip("/")
     if not await client.is_server_running():
         click.echo(click.style(f"\n❌ Error: Nexe server not responding at {_nexe_url}", fg="red", bold=True))
         click.echo("Make sure you have run './nexe go' in another terminal before starting the chat.\n")

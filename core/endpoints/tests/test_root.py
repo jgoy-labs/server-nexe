@@ -11,6 +11,11 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
+# Q2.3: /status and /health/circuits now require X-API-Key (Codex P2 fix).
+# Use same pattern as Bug #22 HOMAD tests.
+_TEST_KEY = "test-status-q23-key"
+_HEADERS = {"X-API-Key": _TEST_KEY}
+
 
 def make_app(config=None, modules=None, i18n=None):
     app = FastAPI()
@@ -312,10 +317,17 @@ class TestApiInfoEndpoint:
 
 
 class TestStatusEndpoint:
+    @pytest.fixture(autouse=True)
+    def _setup_api_key(self, monkeypatch):
+        """Q2.3: /status now requires X-API-Key. Configure key for tests."""
+        monkeypatch.setenv("NEXE_PRIMARY_API_KEY", _TEST_KEY)
+        monkeypatch.delenv("NEXE_PRIMARY_KEY_EXPIRES", raising=False)
+        monkeypatch.setenv("NEXE_DEV_MODE", "false")
+
     def test_status_basic(self):
         app = make_app()
         client = TestClient(app)
-        resp = client.get("/status")
+        resp = client.get("/status", headers=_HEADERS)
         assert resp.status_code == 200
         data = resp.json()
         assert "engine" in data
@@ -331,7 +343,7 @@ class TestStatusEndpoint:
         app = make_app(modules=modules)
         client = TestClient(app)
         with patch.dict("os.environ", {"NEXE_MODEL_ENGINE": "mlx"}):
-            resp = client.get("/status")
+            resp = client.get("/status", headers=_HEADERS)
         assert resp.status_code == 200
         data = resp.json()
         assert data["engines_available"]["mlx"] is True
@@ -344,7 +356,7 @@ class TestStatusEndpoint:
         app = make_app(modules=modules)
         client = TestClient(app)
         with patch.dict("os.environ", {"NEXE_MODEL_ENGINE": "mlx"}):
-            resp = client.get("/status")
+            resp = client.get("/status", headers=_HEADERS)
         assert resp.status_code == 200
         data = resp.json()
         assert data["engines_available"]["mlx"] is False
@@ -356,7 +368,7 @@ class TestStatusEndpoint:
         modules = {"llama_cpp_module": mock_llama}
         app = make_app(modules=modules)
         client = TestClient(app)
-        resp = client.get("/status")
+        resp = client.get("/status", headers=_HEADERS)
         assert resp.status_code == 200
         data = resp.json()
         assert data["engines_available"]["llama_cpp"] is True
@@ -367,7 +379,7 @@ class TestStatusEndpoint:
         modules = {"ollama_module": mock_ollama}
         app = make_app(modules=modules)
         client = TestClient(app)
-        resp = client.get("/status")
+        resp = client.get("/status", headers=_HEADERS)
         assert resp.status_code == 200
         data = resp.json()
         assert data["engines_available"]["ollama"] is True
@@ -377,20 +389,49 @@ class TestStatusEndpoint:
         app = make_app()
         client = TestClient(app)
         with patch.dict("os.environ", {"NEXE_MODEL_ENGINE": "llama_cpp"}):
-            resp = client.get("/status")
+            resp = client.get("/status", headers=_HEADERS)
         assert resp.status_code == 200
         data = resp.json()
         assert data["engine"] == "ollama"
 
+    def test_status_without_api_key_returns_401(self, monkeypatch):
+        """Q2.3 anti-regression: /status without X-API-Key must return 401."""
+        # Use the autouse fixture key but DON'T send the header
+        app = make_app()
+        client = TestClient(app)
+        resp = client.get("/status")  # no headers
+        assert resp.status_code == 401
+
+    def test_status_with_invalid_api_key_returns_401(self):
+        """Q2.3 anti-regression: /status with wrong key returns 401."""
+        app = make_app()
+        client = TestClient(app)
+        resp = client.get("/status", headers={"X-API-Key": "wrong-key"})
+        assert resp.status_code == 401
+
 
 class TestCircuitStatusEndpoint:
+    @pytest.fixture(autouse=True)
+    def _setup_api_key(self, monkeypatch):
+        """Q2.3: /health/circuits now requires X-API-Key."""
+        monkeypatch.setenv("NEXE_PRIMARY_API_KEY", _TEST_KEY)
+        monkeypatch.delenv("NEXE_PRIMARY_KEY_EXPIRES", raising=False)
+        monkeypatch.setenv("NEXE_DEV_MODE", "false")
+
     def test_circuit_status(self):
         app = make_app()
         client = TestClient(app)
-        resp = client.get("/health/circuits")
+        resp = client.get("/health/circuits", headers=_HEADERS)
         assert resp.status_code == 200
         data = resp.json()
         assert "circuits" in data
         assert isinstance(data["circuits"], list)
         assert len(data["circuits"]) == 3
         assert "timestamp" in data
+
+    def test_circuit_status_without_api_key_returns_401(self):
+        """Q2.3 anti-regression: /health/circuits without X-API-Key returns 401."""
+        app = make_app()
+        client = TestClient(app)
+        resp = client.get("/health/circuits")
+        assert resp.status_code == 401
