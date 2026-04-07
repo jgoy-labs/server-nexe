@@ -45,7 +45,6 @@ from installer.installer_hardware import detect_hardware
 from installer.installer_catalog_data import MODEL_CATALOG
 from installer.installer_setup_env import setup_environment
 from installer.installer_setup_config import generate_env_file
-from installer.installer_setup_qdrant import download_qdrant
 from installer.installer_setup_models import (
     ensure_ollama_installed,
     _download_ollama_model,
@@ -145,8 +144,8 @@ def run_headless(config):
             - engine: str — "mlx" | "ollama" | "llama_cpp"
     """
     # ── Monkey-patch input() so existing interactive functions don't hang ──
-    # The existing installer functions (download_qdrant, _download_ollama_model,
-    # etc.) call input() for interactive prompts. In headless mode we auto-respond:
+    # The existing installer functions (_download_ollama_model, etc.) call
+    # input() for interactive prompts. In headless mode we auto-respond:
     #   - "[1/2]:" prompts → "1" (first option = "download now")
     #   - "(S/n):" prompts → "y" (yes, proceed)
     #   - "Press Enter" prompts → "" (just continue)
@@ -389,17 +388,13 @@ def _run_headless_inner(config):
     if cache_file.exists():
         cache_file.unlink()
 
-    # ── Step 5: Download Qdrant ─────────────────────────────────────────
-    emit(5, "running", "Downloading Qdrant vector database...")
-    _log.info("Starting Qdrant download")
-    try:
-        download_qdrant(project_root, hw)
-        _log.info("Qdrant download complete")
-        emit(5, "done")
-    except Exception as e:
-        _log.error(f"Qdrant download failed: {e}\n{traceback.format_exc()}")
-        emit(5, "error", str(e)[:200])
-        # Non-fatal — RAG will not work but system still functions
+    # ── Step 5: Qdrant (embedded, no external download) ─────────────────
+    # Q5.5 reobert (2026-04-08): Qdrant ara és embedded via QdrantClient(path=)
+    # a core/qdrant_pool.py. Cap binari extern necessari. L'step es manté per
+    # compatibilitat amb la GUI Swift wizard (7 steps esperats) però és no-op.
+    emit(5, "running", "Qdrant embedded (no external download needed)...")
+    _log.info("Qdrant is embedded (storage/vectors via QdrantClient path=), skipping external binary")
+    emit(5, "done")
 
     # Create nexe wrapper script
     nexe_wrapper = project_root / "nexe"
@@ -455,49 +450,29 @@ def _run_headless_inner(config):
     )
     knowledge_files = [f for f in knowledge_files if not f.name.startswith('.')]
 
-    qdrant_process = None
     if knowledge_files:
         try:
-            qdrant_bin = project_root / "qdrant"
-            qdrant_storage = project_root / "storage" / "qdrant"
-            qdrant_storage.mkdir(parents=True, exist_ok=True)
-
-            env = os.environ.copy()
-            env["QDRANT__STORAGE__STORAGE_PATH"] = str(qdrant_storage)
-            env["QDRANT__SERVICE__HTTP_PORT"] = "6333"
-            env["QDRANT__SERVICE__DISABLE_TELEMETRY"] = "true"
-
-            qdrant_process = subprocess.Popen(
-                [str(qdrant_bin), "--disable-telemetry"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                env=env,
-            )
-            time.sleep(3)
-
+            # Q5.5 reobert (2026-04-08): ingestió via embedded QdrantClient.
+            # Abans arrencàvem un binari Qdrant servidor extern a 'storage/qdrant/'
+            # que ningú connectava. Ara la ingestió va directament per embedded
+            # a 'storage/vectors/' via core/qdrant_pool.py.
             ingest_env = {**os.environ, "NEXE_LANG": lang, "TRANSFORMERS_VERBOSITY": "error"}
             subprocess.run([
                 str(python_path), "-c",
                 f"import sys; sys.path.insert(0, '{project_root}'); "
                 "import asyncio; "
                 "from core.ingest.ingest_knowledge import ingest_knowledge; "
-                "asyncio.run(ingest_knowledge(quiet=False))"
+                # F7: explicit target_collection — corporate docs go to
+                # nexe_documentation, not user_knowledge.
+                "asyncio.run(ingest_knowledge(quiet=False, target_collection='nexe_documentation'))"
             ], check=True, capture_output=False, text=True, timeout=300, env=ingest_env)
 
             # Mark as ingested
             marker = project_root / "storage" / ".knowledge_ingested"
             marker.touch()
-
-            qdrant_process.terminate()
-            qdrant_process.wait(timeout=5)
         except Exception as e:
             _log.error(f"Knowledge ingestion failed: {e}\n{traceback.format_exc()}")
             print(f"Knowledge ingestion warning: {e}", flush=True)
-            if qdrant_process is not None:
-                try:
-                    qdrant_process.terminate()
-                except Exception:
-                    pass
 
     _log.info("Knowledge ingestion complete")
     emit(7, "done")

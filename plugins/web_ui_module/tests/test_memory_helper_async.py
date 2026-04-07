@@ -96,7 +96,7 @@ class TestGetMemoryApi:
             with patch("memory.memory.api.MemoryAPI", return_value=mem):
                 asyncio.run(helper.get_memory_api())
 
-        assert mem.create_collection.call_count == 2  # nexe_web_ui + user_knowledge
+        assert mem.create_collection.call_count == 2  # personal_memory + user_knowledge
 
     def test_reuses_existing_singleton(self):
         mem = make_memory_mock()
@@ -554,7 +554,7 @@ class TestRecallFromMemory:
         async def search_side(query, collection, top_k):
             nonlocal call_count
             call_count += 1
-            if collection == "nexe_web_ui":
+            if collection == "personal_memory":
                 raise Exception("collection error")
             return [make_result("doc", score=0.8)]
 
@@ -619,7 +619,7 @@ class TestRecallFromMemory:
              patch.object(helper, "_apply_temporal_decay", wraps=helper._apply_temporal_decay) as spy:
             asyncio.run(helper.recall_from_memory("query"))
 
-        # Ha de ser cridat almenys una vegada per la col·lecció nexe_web_ui
+        # Ha de ser cridat almenys una vegada per la col·lecció personal_memory
         assert spy.call_count >= 1
 
 

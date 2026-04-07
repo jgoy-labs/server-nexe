@@ -12,7 +12,6 @@ priority: P1
 # === OPCIONAL ===
 lang: es
 type: docs
-collection: user_knowledge
 author: "Jordi Goy"
 expires: null
 ---
@@ -39,9 +38,9 @@ server-nexe usa 3 colecciones Qdrant especializadas. Cada una tiene un proposito
 |-----------|---------|-----------|-------|---------|
 | `nexe_documentation` | Documentacion del sistema (esta carpeta knowledge) | 0.4 | 3 | Auto-ingestada desde `docs/` y `knowledge/` en la instalacion |
 | `user_knowledge` | Documentos subidos por el usuario | 0.35 | 3 | Subidos via Web UI o `nexe knowledge ingest`. Aislados por sesion via metadatos session_id |
-| `nexe_web_ui` | Memoria de conversacion (MEM_SAVE) | 0.3 | 2 | Extraccion automatica del chat. Maximo 500 entradas con poda inteligente |
+| `personal_memory` | Memoria de conversacion (MEM_SAVE) | 0.3 | 2 | Extraccion automatica del chat. Maximo 500 entradas con poda inteligente |
 
-**Orden de busqueda:** nexe_documentation primero (prioridad sistema), luego user_knowledge, luego nexe_web_ui.
+**Orden de busqueda:** nexe_documentation primero (prioridad sistema), luego user_knowledge, luego personal_memory.
 
 **Los thresholds son configurables** via variables de entorno:
 - `NEXE_RAG_DOCS_THRESHOLD` (por defecto: 0.4)
@@ -85,7 +84,7 @@ server-nexe tiene un sistema de memoria automatica similar a ChatGPT o Claude. E
 1. El system prompt instruye al modelo a extraer hechos: nombres, trabajos, ubicaciones, preferencias, proyectos, deadlines
 2. El modelo genera marcadores `[MEM_SAVE: hecho]` dentro de su respuesta
 3. routes_chat.py parsea estos marcadores y los elimina del stream visible
-4. Los hechos se guardan en la coleccion `nexe_web_ui`
+4. Los hechos se guardan en la coleccion `personal_memory`
 5. La UI muestra el indicador `[MEM:N]` con el recuento de hechos guardados
 
 **Deteccion de intenciones (trilingue ca/es/en):**
@@ -146,7 +145,7 @@ Cuando el RAG encuentra resultados relevantes, se inyectan en el prompt del LLM 
 |----------|-----------|-----------|-----------|-------------------|
 | Docs sistema | SYSTEM DOCUMENTATION | DOCUMENTACIO DEL SISTEMA | DOCUMENTACION DEL SISTEMA | nexe_documentation |
 | Docs tecnicos | TECHNICAL DOCUMENTATION | DOCUMENTACIO TECNICA | DOCUMENTACION TECNICA | user_knowledge |
-| Memoria usuario | USER MEMORY | MEMORIA USUARI | MEMORIA USUARIO | nexe_web_ui |
+| Memoria usuario | USER MEMORY | MEMORIA USUARI | MEMORIA USUARIO | personal_memory |
 
 **Limites de contexto:**
 - `MAX_CONTEXT_CHARS` = 24000 (configurable via variable de entorno `NEXE_MAX_CONTEXT_CHARS`)
@@ -162,9 +161,9 @@ La Web UI y el CLI muestran puntuaciones de relevancia RAG:
 - **Detalle expandible:** Clic para ver puntuaciones individuales por fuente
 - **CLI:** Flag `--verbose` para ver detalle por fuente
 
-## Poda inteligente (coleccion nexe_web_ui)
+## Poda inteligente (coleccion personal_memory)
 
-Cuando `nexe_web_ui` supera `MAX_MEMORY_ENTRIES` (500), la poda inteligente elimina las entradas con puntuacion mas baja:
+Cuando `personal_memory` supera `MAX_MEMORY_ENTRIES` (500), la poda inteligente elimina las entradas con puntuacion mas baja:
 
 **Formula de retencion:**
 - type_weight (0.4): peso basado en el tipo de memoria
@@ -174,17 +173,17 @@ Cuando `nexe_web_ui` supera `MAX_MEMORY_ENTRIES` (500), la poda inteligente elim
 
 ## Almacenamiento Qdrant
 
-Qdrant funciona como un binario embebido (sin servidor externo). Datos almacenados en:
+Qdrant funciona en modo embedded via `QdrantClient(path=...)` en el pool singleton `core/qdrant_pool.py`. Datos almacenados en:
 ```
-storage/qdrant/
+storage/vectors/
 ├── collection/
 │   ├── nexe_documentation/
-│   ├── nexe_web_ui/
+│   ├── personal_memory/
 │   └── user_knowledge/
 └── meta.json
 ```
 
-**Puerto Qdrant:** 6333 (configurable via `NEXE_QDRANT_HOST` y `NEXE_QDRANT_PORT`)
+**Modo:** embedded (sin servidor externo, sin puerto). Los datos se cargan directamente del filesystem via RocksDB.
 **Algoritmo:** HNSW (Hierarchical Navigable Small World) para busqueda rapida de vecinos aproximados
 
 ## Configuracion clave
@@ -193,11 +192,8 @@ storage/qdrant/
 |----------|---------|---------|
 | NEXE_RAG_DOCS_THRESHOLD | 0.4 | Puntuacion minima para nexe_documentation |
 | NEXE_RAG_KNOWLEDGE_THRESHOLD | 0.35 | Puntuacion minima para user_knowledge |
-| NEXE_RAG_MEMORY_THRESHOLD | 0.3 | Puntuacion minima para nexe_web_ui |
+| NEXE_RAG_MEMORY_THRESHOLD | 0.3 | Puntuacion minima para personal_memory |
 | NEXE_MAX_CONTEXT_CHARS | 24000 | Ventana de contexto maxima en caracteres |
-| NEXE_QDRANT_HOST | localhost | Host Qdrant |
-| NEXE_QDRANT_PORT | 6333 | Puerto Qdrant |
-| NEXE_QDRANT_TIMEOUT | 5.0 | Timeout conexion Qdrant |
 | NEXE_OLLAMA_EMBED_MODEL | nomic-embed-text | Modelo de embeddings Ollama |
 | NEXE_ENCRYPTION_ENABLED | false | Activar encriptacion en reposo para TextStore/SQLCipher |
 

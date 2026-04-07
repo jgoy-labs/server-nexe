@@ -12,7 +12,6 @@ priority: P2
 # === OPCIONAL ===
 lang: es
 type: docs
-collection: user_knowledge
 author: "Jordi Goy"
 expires: null
 ---

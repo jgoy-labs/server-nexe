@@ -113,12 +113,12 @@ async def build_rag_context(
             except Exception as e:
                 logger.debug("RAG knowledge search failed: %s", e)
 
-            # 3. Search user memory (nexe_web_ui - conversations)
+            # 3. Search user memory (personal_memory - conversations)
             try:
-                if await memory.collection_exists("nexe_web_ui"):
+                if await memory.collection_exists("personal_memory"):
                     mem_results = await memory.search(
                         query=last_user_msg,
-                        collection="nexe_web_ui",
+                        collection="personal_memory",
                         top_k=2,
                         threshold=RAG_MEMORY_THRESHOLD
                     )

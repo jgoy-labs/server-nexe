@@ -23,7 +23,6 @@ from .installer_hardware import detect_hardware
 from .installer_catalog import select_model, MODEL_CATALOG
 from .installer_setup_env import setup_environment
 from .installer_setup_config import generate_env_file
-from .installer_setup_qdrant import download_qdrant
 from .installer_setup_models import (
     ensure_ollama_installed,
     _download_ollama_model,
@@ -206,8 +205,9 @@ def run_installer():
         print(f"  🧹 {t('module_cache_cleaned')}")
         print(f"     {DIM}{t('cache_explanation')}{RESET}")
 
-    # 11. Download Qdrant binary
-    download_qdrant(project_root, hw)
+    # 11. (Q5.5 reobert 2026-04-08) — Qdrant binari servidor extern eliminat.
+    #     El server v0.9.0 usa QdrantClient(path="storage/vectors") embedded
+    #     via core/qdrant_pool.py. Cap binari extern necessari.
 
     # 12. Create nexe wrapper script
     nexe_wrapper = project_root / "nexe"
@@ -282,27 +282,11 @@ def run_installer():
         print_step(f"{BOLD}{t('processing_knowledge').format(n=len(knowledge_files))}{RESET}")
         print(f"  {DIM}{t('processing_knowledge_wait')}{RESET}\n")
         try:
-            # Start Qdrant first
-            qdrant_bin = project_root / "qdrant"
-            qdrant_storage = project_root / "storage" / "qdrant"
-            qdrant_storage.mkdir(parents=True, exist_ok=True)
-
-            env = os.environ.copy()
-            env["QDRANT__STORAGE__STORAGE_PATH"] = str(qdrant_storage)
-            env["QDRANT__SERVICE__HTTP_PORT"] = "6333"
-            env["QDRANT__SERVICE__DISABLE_TELEMETRY"] = "true"
-
-            qdrant_process = subprocess.Popen(
-                [str(qdrant_bin), "--disable-telemetry"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                env=env
-            )
-
-            # Wait for Qdrant to start
-            time.sleep(3)
-
-            # Run ingestion with progress output (quiet=False)
+            # Q5.5 reobert (2026-04-08): ingestió via embedded QdrantClient.
+            # Abans arrencàvem un binari Qdrant servidor extern a 'storage/qdrant/'
+            # que ningú connectava (ingest_knowledge va per embedded via
+            # core/qdrant_pool.py a 'storage/vectors/'), deixant residu mort.
+            # Ara la ingestió va directament per embedded.
             ingest_env = {**os.environ, "NEXE_LANG": lang, "TRANSFORMERS_VERBOSITY": "error"}
             result = subprocess.run([
                 str(python_path), "-c",
@@ -320,22 +304,11 @@ def run_installer():
             marker_file = project_root / "storage" / ".knowledge_ingested"
             marker_file.touch()
 
-            # Stop Qdrant
-            qdrant_process.terminate()
-            qdrant_process.wait(timeout=5)
-
         except subprocess.TimeoutExpired:
             print(f"  {YELLOW}⚠️  {t('ingest_timeout')}{RESET}")
-            if 'qdrant_process' in locals():
-                qdrant_process.terminate()
         except Exception as e:
             print(f"  {YELLOW}⚠️  {t('ingest_error').format(error=str(e)[:200])}{RESET}")
             print(f"  {DIM}{t('ingest_auto_first_start')}{RESET}")
-            if 'qdrant_process' in locals():
-                try:
-                    qdrant_process.terminate()
-                except Exception:
-                    pass
     else:
         print(f"  {DIM}📝 {t('no_knowledge_docs')}{RESET}")
 

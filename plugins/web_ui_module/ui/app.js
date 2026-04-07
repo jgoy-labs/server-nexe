@@ -391,7 +391,7 @@ class NexeUI {
 
     _initCollectionToggles() {
         const COLL_MAP = {
-            colMemory: 'nexe_web_ui',
+            colMemory: 'personal_memory',
             colKnowledge: 'user_knowledge',
             colDocs: 'nexe_documentation'
         };
@@ -413,7 +413,7 @@ class NexeUI {
 
     _saveCollectionState() {
         const COLL_MAP = {
-            colMemory: 'nexe_web_ui',
+            colMemory: 'personal_memory',
             colKnowledge: 'user_knowledge',
             colDocs: 'nexe_documentation'
         };
@@ -426,7 +426,7 @@ class NexeUI {
     }
 
     _getActiveCollections() {
-        const ALL = ['nexe_web_ui', 'user_knowledge', 'nexe_documentation'];
+        const ALL = ['personal_memory', 'user_knowledge', 'nexe_documentation'];
         const saved = localStorage.getItem('nexe_collections');
         if (!saved) return ALL;
         try {

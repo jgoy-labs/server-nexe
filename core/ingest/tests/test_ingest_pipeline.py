@@ -485,10 +485,14 @@ class TestRAGChatMLX:
             import plugins.web_ui_module.memory_helper as mh
             mem = MemoryAPI()
             await mem.initialize()
-            # Clear nexe_web_ui to avoid contamination from previous test classes
-            if await mem.collection_exists("nexe_web_ui"):
-                await mem.delete_collection("nexe_web_ui")
-                await mem.create_collection("nexe_web_ui", vector_size=768)
+            # TODO (post-refactor 2026-04-08): aquest bloc escriu al storage/vectors/
+            # REAL del dev sense usar tmp_path. És un test-leak confirmat que contamina
+            # l'estat entre test runs. Refactoritzar per usar isolated QdrantClient
+            # amb tmp_path. Diferit a HOMAD memòria v1 Part 2 o sessió pròpia.
+            # Clear personal_memory to avoid contamination from previous test classes
+            if await mem.collection_exists("personal_memory"):
+                await mem.delete_collection("personal_memory")
+                await mem.create_collection("personal_memory", vector_size=768)
             await mem.close()
             # Reset memory_helper singleton so it picks up fresh collection
             mh._memory_api_instance = None

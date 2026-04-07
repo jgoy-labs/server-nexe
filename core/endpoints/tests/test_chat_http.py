@@ -382,7 +382,7 @@ class TestChatCompletionsEndpoint:
 
 class TestSaveConversationToMemory:
 
-    def test_saves_to_nexe_web_ui(self):
+    def test_saves_to_personal_memory(self):
         from core.endpoints.chat import _save_conversation_to_memory
 
         mock_memory = AsyncMock()
@@ -396,7 +396,7 @@ class TestSaveConversationToMemory:
 
         mock_memory.store.assert_called_once()
         call_kwargs = mock_memory.store.call_args
-        assert "nexe_web_ui" in str(call_kwargs)
+        assert "personal_memory" in str(call_kwargs)
 
     def test_creates_collection_if_not_exists(self):
         from core.endpoints.chat import _save_conversation_to_memory
