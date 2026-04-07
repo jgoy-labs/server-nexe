@@ -121,9 +121,12 @@ async def bootstrap_session(
       detail="Bootstrap not available in this environment"
     )
 
+  # Q3.1 fix: read i18n from app.state instead of passing None (Codex P1 i18n bypass)
+  _i18n = getattr(request.app.state, 'i18n', None)
+
   try:
     if client_ip == "unknown":
-      raise HTTPException(status_code=400, detail=get_message(None, "core.bootstrap.invalid_ip"))
+      raise HTTPException(status_code=400, detail=get_message(_i18n, "core.bootstrap.invalid_ip"))
     ip_obj = ipaddress.ip_address(client_ip)
     is_local = ip_obj.is_loopback
     is_private = ip_obj.is_private
@@ -137,7 +140,7 @@ async def bootstrap_session(
       )
   except ValueError:
     logger.error("Invalid IP received: %s", client_ip)
-    raise HTTPException(status_code=400, detail=get_message(None, "core.bootstrap.invalid_ip"))
+    raise HTTPException(status_code=400, detail=get_message(_i18n, "core.bootstrap.invalid_ip"))
 
   check_rate_limit(client_ip, request)
   
@@ -214,7 +217,8 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   """
   client_ip = request.client.host if request.client else "unknown"
 
-  if client_ip not in ["127.0.0.1", "::1", "localhost"]:
+  from core.config import get_localhost_aliases
+  if client_ip not in get_localhost_aliases():
     logger.warning("Regeneration attempt from %s", client_ip)
     raise HTTPException(
       status_code=403,

@@ -48,7 +48,8 @@ class WebUIModule:
         self.ui_dir = self._plugin_dir / "ui"
         self.upload_dir = self.ui_dir / "uploads"
         self.file_handler = FileHandler(self.upload_dir)
-        self.api_base_url = os.getenv("NEXE_API_BASE_URL", "http://127.0.0.1:9119")
+        from core.config import get_server_url
+        self.api_base_url = os.getenv("NEXE_API_BASE_URL", get_server_url())
 
     # --- NexeModule Protocol ---
 
@@ -149,10 +150,11 @@ class WebUIModule:
         if env_url:
             return env_url.rstrip("/")
 
+        from core.config import DEFAULT_HOST, DEFAULT_PORT
         config = (context or {}).get("config", {}) or {}
         server_config = config.get("core", {}).get("server", {})
-        host = server_config.get("host", "127.0.0.1")
-        port = server_config.get("port", 9119)
+        host = server_config.get("host", DEFAULT_HOST)
+        port = server_config.get("port", DEFAULT_PORT)
         if host in ("0.0.0.0", "::"):
-            host = "127.0.0.1"
+            host = DEFAULT_HOST
         return f"http://{host}:{port}"

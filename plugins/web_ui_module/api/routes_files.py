@@ -14,7 +14,7 @@ import logging
 import os as _os
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request
 
-from plugins.web_ui_module.messages import get_message
+from plugins.web_ui_module.messages import get_message, get_i18n
 from plugins.security.core.input_sanitizers import validate_string_input
 from core.dependencies import limiter
 from core.endpoints.chat_sanitization import _filter_rag_injection
@@ -48,7 +48,8 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         request: Request,
         file: UploadFile = File(...),
         session_id: Optional[str] = Form(None),
-        _auth=Depends(require_ui_auth)
+        _auth=Depends(require_ui_auth),
+        i18n=Depends(get_i18n),
     ):
         """Upload file and add to session context + automatic memory ingestion"""
         content = await file.read()
@@ -62,7 +63,7 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         text = await file_handler.extract_text_async(file_path)
         if not text:
             file_handler.delete_file(file_path)
-            raise HTTPException(status_code=400, detail=get_message(None, "webui.file.extract_failed"))
+            raise HTTPException(status_code=400, detail=get_message(i18n, "webui.file.extract_failed"))
 
         # Parse RAG header if available
         rag_header = None

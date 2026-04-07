@@ -47,8 +47,9 @@ class WebSecurityCheck:
             })
 
         # Check 2: Detectors d'injeccio disponibles?
+        # Defensive imports: validate availability via try/except, F401 noqa.
         try:
-            from plugins.security.core.injection_detectors import (
+            from plugins.security.core.injection_detectors import (  # noqa: F401
                 detect_xss_attempt,
                 detect_sql_injection,
                 detect_command_injection,
@@ -73,7 +74,7 @@ class WebSecurityCheck:
         try:
             from plugins.security.sanitizer.module import get_sanitizer
             sanitizer = get_sanitizer()
-            result = sanitizer.is_safe("test")
+            sanitizer.is_safe("test")  # Smoke test, return value not stored
             findings.append({
                 "check": "web_security",
                 "severity": "LOW",

@@ -229,8 +229,9 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
 
   # Default True in prod, False in dev, but disabled if known local host
   # unless explicitly forced in config.
-  host = server_config.get('host', '127.0.0.1')
-  is_local = host in ("localhost", "127.0.0.1", "::1")
+  from core.config import DEFAULT_HOST, get_localhost_aliases
+  host = server_config.get('host', DEFAULT_HOST)
+  is_local = host in set(get_localhost_aliases())
   # 0.0.0.0 binds ALL interfaces including public — treat as non-local
 
   cookie_secure = is_prod and not is_local
@@ -265,11 +266,12 @@ def setup_trusted_hosts(app: FastAPI, config: Dict[str, Any]) -> None:
     app: FastAPI application instance
     config: Configuration dictionary
   """
+  from core.config import DEFAULT_HOST, get_localhost_aliases
   server_config = config.get('core', {}).get('server', {})
-  host = server_config.get('host', '127.0.0.1')
+  host = server_config.get('host', DEFAULT_HOST)
 
-  # Base allowed hosts: always include localhost variants
-  allowed = {"localhost", "127.0.0.1", "::1"}
+  # Base allowed hosts: always include localhost variants (Q4.4 DRY fix)
+  allowed = set(get_localhost_aliases())
 
   # If server binds to a custom host/domain, allow it too
   if host and host not in ("0.0.0.0", ""):

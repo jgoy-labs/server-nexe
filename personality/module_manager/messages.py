@@ -9,6 +9,8 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import logging
+
 FALLBACK_MESSAGES = {
   'paths.manifests_dir': 'manifests',
   'files.manifest_toml': 'manifest.toml',

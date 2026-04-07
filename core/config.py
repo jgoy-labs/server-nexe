@@ -268,3 +268,70 @@ def get_module_allowlist(config: Dict[str, Any] = None) -> Optional[set]:
             "Set NEXE_APPROVED_MODULES or NEXE_ENV=development."
         )
     return None
+
+
+# Localhost aliases — single source of truth (Gemini hardcode fix)
+# Default: 127.0.0.1, ::1, localhost. Override via NEXE_LOCALHOST_ALIASES env
+# (comma-separated). Used by bootstrap IP allowlist + middleware host checks.
+DEFAULT_LOCALHOST_ALIASES = ["127.0.0.1", "::1", "localhost"]
+
+
+def get_localhost_aliases() -> list:
+    """Return list of IPs/hostnames considered localhost.
+
+    Reads NEXE_LOCALHOST_ALIASES env var (comma-separated) if set,
+    otherwise returns DEFAULT_LOCALHOST_ALIASES. Used to centralize
+    the previously-hardcoded ['127.0.0.1', '::1', 'localhost'] lists
+    spread across bootstrap.py and middleware.py (Gemini finding).
+    """
+    custom = os.getenv("NEXE_LOCALHOST_ALIASES", "").strip()
+    if custom:
+        return [s.strip() for s in custom.split(",") if s.strip()]
+    return list(DEFAULT_LOCALHOST_ALIASES)
+
+
+# Network defaults — single source of truth (Gemini hardcode fix Q4)
+# Used to centralize the previously-hardcoded "9119" / "127.0.0.1" lists
+# spread across runner.py, lifespan.py, middleware.py, cli/*, installer/tray.py
+# and plugins/web_ui_module/module.py.
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 9119
+
+
+def get_default_host() -> str:
+    """Return the default server host.
+
+    Reads NEXE_SERVER_HOST env var if set, otherwise returns DEFAULT_HOST.
+    Used as fallback for `config.get('host', ...)` patterns across the
+    codebase to remove hardcoded literals.
+    """
+    return os.environ.get("NEXE_SERVER_HOST", DEFAULT_HOST)
+
+
+def get_default_port() -> int:
+    """Return the default server port.
+
+    Reads NEXE_SERVER_PORT env var if set, otherwise returns DEFAULT_PORT.
+    Raises ValueError if NEXE_SERVER_PORT is set but not a valid integer
+    (fail-fast: invalid config should not silently fall back).
+    """
+    raw = os.environ.get("NEXE_SERVER_PORT")
+    if raw is None or raw == "":
+        return DEFAULT_PORT
+    return int(raw)
+
+
+def get_server_url(scheme: str = "http") -> str:
+    """Return canonical server URL based on env / defaults.
+
+    Args:
+        scheme: URL scheme (http or https). Default: http.
+
+    Returns:
+        f"{scheme}://{host}:{port}" using NEXE_SERVER_HOST/NEXE_SERVER_PORT
+        env vars or DEFAULT_HOST/DEFAULT_PORT.
+
+    Used by core/cli/config.py and installer/tray.py to remove hardcoded
+    "http://localhost:9119" / "http://127.0.0.1:9119" literals (Q4.2).
+    """
+    return f"{scheme}://{get_default_host()}:{get_default_port()}"

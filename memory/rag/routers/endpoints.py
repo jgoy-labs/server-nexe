@@ -16,10 +16,9 @@ from pathlib import Path
 from typing import Any, Dict
 
 import structlog
-from fastapi import Depends, File, HTTPException, UploadFile
+from fastapi import File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-from plugins.security.core.auth import require_api_key
 
 logger = structlog.get_logger()
 

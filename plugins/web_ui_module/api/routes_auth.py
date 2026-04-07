@@ -14,10 +14,10 @@ from typing import Dict, Any, Optional
 import os as _os
 import logging
 import secrets
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends, Header, Request
 
 from plugins.security.core.auth_config import get_admin_api_key
-from plugins.web_ui_module.messages import get_message
+from plugins.web_ui_module.messages import get_message, get_i18n
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +29,31 @@ def get_server_lang() -> str:
 
 
 def make_require_ui_auth():
-    """Crea la dependencia FastAPI d'autenticacio per a la Web UI."""
-    async def _require_ui_auth(x_api_key: Optional[str] = Header(None)):
-        """Valida API key per a endpoints de la Web UI"""
+    """Crea la dependencia FastAPI d'autenticacio per a la Web UI.
+
+    FAIL CLOSED: si no hi ha API key configurada al servidor, totes les
+    peticions UI son rebutjades amb 503. Mai mode permissive (que era el
+    bug Codex P1: si NEXE_PRIMARY_API_KEY/NEXE_ADMIN_API_KEY estaven
+    buides, les rutes UI quedaven obertes a tothom).
+    """
+    async def _require_ui_auth(
+        request: Request,
+        x_api_key: Optional[str] = Header(None),
+    ):
+        """Valida API key per a endpoints de la Web UI (FAIL CLOSED)"""
         expected = get_admin_api_key()
-        if expected and not secrets.compare_digest(x_api_key or "", expected):
-            raise HTTPException(status_code=401, detail=get_message(None, "webui.auth.invalid_key"))
+        if not expected:
+            # FAIL CLOSED: no key configured = no UI access
+            logger.error("UI auth requested but no admin API key configured (FAIL CLOSED)")
+            raise HTTPException(
+                status_code=503,
+                detail=get_message(get_i18n(request), "webui.auth.no_key_configured")
+            )
+        if not secrets.compare_digest(x_api_key or "", expected):
+            raise HTTPException(
+                status_code=401,
+                detail=get_message(get_i18n(request), "webui.auth.invalid_key"),
+            )
     return _require_ui_auth
 
 
@@ -51,12 +70,16 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     # -- POST /lang --
 
     @router.post("/lang")
-    async def set_language(body: dict, _auth=Depends(require_ui_auth)):
+    async def set_language(
+        body: dict,
+        _auth=Depends(require_ui_auth),
+        i18n=Depends(get_i18n),
+    ):
         """Canvia l'idioma del servidor"""
         global _server_lang
         lang = body.get("lang", "").strip().lower()
         if lang not in ("ca", "es", "en"):
-            raise HTTPException(status_code=400, detail=get_message(None, "webui.auth.supported_languages"))
+            raise HTTPException(status_code=400, detail=get_message(i18n, "webui.auth.supported_languages"))
         _server_lang = lang
         _os.environ["NEXE_LANG"] = lang
         logger.info("Server language changed to: %s", lang)

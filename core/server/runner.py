@@ -267,9 +267,10 @@ def main():
     translate(i18n, "server_core.startup.starting_from", "Starting Nexe 0.9 from: {path}", path=str(project_root))
   )
 
+  from core.config import DEFAULT_HOST, DEFAULT_PORT
   server_config = config.get('core', {}).get('server', {})
-  host = server_config.get('host', '127.0.0.1')
-  port = server_config.get('port', 9119)
+  host = server_config.get('host', DEFAULT_HOST)
+  port = server_config.get('port', DEFAULT_PORT)
   workers = server_config.get('workers', 1)
   if workers > 1:
     logger.warning(

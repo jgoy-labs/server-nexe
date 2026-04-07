@@ -20,9 +20,9 @@ from pathlib import Path
 # (Consistency with llm_router/config.py - redundant but harmless)
 try:
     from dotenv import load_dotenv
-    _env_path = Path(__file__).parents[3] / ".env"  # root directory .env
-    if not _env_path.exists():
-        _env_path = Path.cwd() / ".env"
+    # Use path relative to this file (NOT cwd) — cwd is unsafe and can change
+    # at runtime. Removes Path.cwd() fallback that was a latent bug.
+    _env_path = Path(__file__).parents[3] / ".env"  # project root .env
     if _env_path.exists():
         load_dotenv(_env_path)
 except ImportError:

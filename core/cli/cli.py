@@ -308,8 +308,6 @@ def setup_models(ctx: click.Context, apply: bool):
                 click.echo("   This may take a few minutes depending on your connection. Please wait...")
                 
                 # Check for huggingface-cli
-                import shutil
-                import subprocess
                 
                 # Download to storage/models to keep it locally managed
                 # By default mlx-lm uses ~/.cache/huggingface.

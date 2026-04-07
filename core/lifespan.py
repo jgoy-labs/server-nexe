@@ -161,9 +161,10 @@ async def lifespan(app: FastAPI):
     # Auto-start services (Qdrant, Ollama) if not running
     await _auto_start_services(server_state.config, server_state.project_root, server_state)
 
+    from core.config import DEFAULT_HOST, DEFAULT_PORT
     server_config = server_state.config.get('core', {}).get('server', {})
-    host = server_config.get('host', '127.0.0.1')
-    port = server_config.get('port', 9119)
+    host = server_config.get('host', DEFAULT_HOST)
+    port = server_config.get('port', DEFAULT_PORT)
 
     msg = _translate(server_state.i18n, "core.server.binding_server",
       "Server ready at {host}:{port}",
@@ -312,7 +313,10 @@ async def lifespan(app: FastAPI):
 
     # Final message: Server ready
     _srv_cfg = server_state.config.get("core", {}).get("server", {})
-    _nexe_url = os.environ.get("NEXE_API_BASE_URL", f"http://{_srv_cfg.get('host', '127.0.0.1')}:{_srv_cfg.get('port', 9119)}")
+    _nexe_url = os.environ.get(
+        "NEXE_API_BASE_URL",
+        f"http://{_srv_cfg.get('host', DEFAULT_HOST)}:{_srv_cfg.get('port', DEFAULT_PORT)}",
+    )
     _api_key = os.environ.get("NEXE_PRIMARY_API_KEY", "")
     _lang = os.environ.get("NEXE_LANG", "ca")
 

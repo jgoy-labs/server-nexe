@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import hashlib
 import logging
 import os
-from typing import Any, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

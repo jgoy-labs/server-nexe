@@ -28,7 +28,8 @@ class NexeAPIClient:
     
     def __init__(self, base_url: str = None):
         if base_url is None:
-            base_url = os.environ.get("NEXE_API_BASE_URL", "http://127.0.0.1:9119")
+            from core.config import get_server_url
+            base_url = os.environ.get("NEXE_API_BASE_URL", get_server_url())
         self.base_url = base_url.rstrip("/")
         
         # Load environment variables

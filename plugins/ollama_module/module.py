@@ -22,17 +22,20 @@ except ImportError:
 from fastapi import APIRouter
 
 from core.loader.protocol import HealthResult, HealthStatus, ModuleMetadata
-from core.resilience import ollama_breaker
+from core.resilience import ollama_breaker  # noqa: F401 — accessed dynamically by core/models.py
 
 from .core.client import (
     DEFAULT_BASE_URL,
-    OLLAMA_CONNECTION_TIMEOUT,
+    OLLAMA_CONNECTION_TIMEOUT,  # noqa: F401 — re-export used by tests
     OllamaClient,
     resolve_base_url,
 )
 from .core.chat import OllamaChat
-from .core.errors import ModelNotFoundError, OllamaSemanticError
-from .core.errors import is_semantic_http_error as _raw_is_semantic_http_error
+from .core.errors import (
+    ModelNotFoundError,  # noqa: F401 — re-export used by tests
+    OllamaSemanticError,  # noqa: F401 — re-export used by tests
+    is_semantic_http_error as _raw_is_semantic_http_error,
+)
 from .core.models import OllamaModels
 
 logger = logging.getLogger(__name__)

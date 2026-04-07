@@ -57,7 +57,9 @@ def validate_production_security(i18n: Any, config: Any = None) -> None:
   approved_modules = os.getenv("NEXE_APPROVED_MODULES", "").strip()
 
   try:
-    allowlist = get_module_allowlist()
+    # Pass config so production mode detection respects server.toml,
+    # not just NEXE_ENV env var (Codex P1 fix).
+    allowlist = get_module_allowlist(config)
   except ValueError:
     error_msg = translate(
       i18n,

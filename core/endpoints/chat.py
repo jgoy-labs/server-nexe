@@ -15,7 +15,7 @@ import os
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request, BackgroundTasks, HTTPException
+from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from plugins.security.core.auth_dependencies import require_api_key
 from plugins.security.core.input_sanitizers import validate_string_input
@@ -245,3 +245,51 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
             )
 
     return response
+
+
+# Re-exports for backwards compatibility (used by tests and other modules
+# that import from core.endpoints.chat instead of the original submodule).
+# Adding __all__ silences ruff F401 for these intentional re-exports.
+__all__ = [
+    "router",
+    "chat_completions",
+    # Re-exported from .chat_schemas
+    "Message",
+    "ChatCompletionRequest",
+    # Re-exported from .chat_sanitization
+    "_sanitize_rag_context",
+    "_sanitize_sse_token",
+    "_estimate_tokens",
+    "MAX_RAG_CONTEXT_LENGTH",
+    "MAX_CONTEXT_RATIO",
+    "DEFAULT_CONTEXT_WINDOW",
+    "CHARS_PER_TOKEN_ESTIMATE",
+    # Re-exported from .chat_rag
+    "build_rag_context",
+    "_rag_result_to_text",
+    "_RAG_CONTEXT_LABELS",
+    "RAG_DOCS_THRESHOLD",
+    "RAG_KNOWLEDGE_THRESHOLD",
+    "RAG_MEMORY_THRESHOLD",
+    # Re-exported from .chat_memory
+    "_save_conversation_to_memory",
+    "_pending_save_tasks",
+    # Re-exported from .chat_engines.routing
+    "_normalize_engine",
+    "_get_preferred_engine",
+    "_engine_available",
+    "_resolve_engine",
+    # Re-exported from .chat_engines.ollama
+    "_forward_to_ollama",
+    "_ollama_stream_generator",
+    "_ollama_tags_cache",
+    "TAGS_CACHE_TTL",
+    "_OLLAMA_STREAM_TIMEOUT",
+    "_OLLAMA_ERRORS",
+    # Re-exported from .chat_engines.mlx
+    "_forward_to_mlx",
+    "_mlx_stream_generator",
+    # Re-exported from .chat_engines.llama_cpp
+    "_forward_to_llama_cpp",
+    "_llama_cpp_stream_generator",
+]
