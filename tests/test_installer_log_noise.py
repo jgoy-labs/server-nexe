@@ -101,19 +101,11 @@ def test_bug4_app_logo_no_ansi_when_not_tty():
 # ═══════════════════════════════════════════════════════════════════════════
 # Bug 5 — Bloc didàctic Qdrant només en mode interactiu
 # ═══════════════════════════════════════════════════════════════════════════
-
-def test_bug5_qdrant_didactic_block_guarded_by_isatty():
-    """El codi font ha de tenir el bloc didàctic protegit per `sys.stdout.isatty()`."""
-    src = Path("/Users/jgoy/AI/nat/dev/server-nexe/installer/installer_setup_qdrant.py").read_text()
-    # Cal que les dues invocacions a `qdrant_download_info` i `qdrant_quarantine_info`
-    # estiguin dins blocs `if sys.stdout.isatty():`
-    assert src.count("if sys.stdout.isatty():") >= 2, (
-        "Bug 5: el bloc didàctic ha d'estar emboltat amb `if sys.stdout.isatty():` "
-        "(2 ocurrències esperades, una per download i una per quarantine)."
-    )
-    # I les dues claus de traducció han de continuar existint
-    assert "qdrant_download_info" in src
-    assert "qdrant_quarantine_info" in src
+# Q5.5 reobert (2026-04-08): el test `test_bug5_qdrant_didactic_block_guarded_by_isatty`
+# verificava que installer/installer_setup_qdrant.py tenia blocs didàctics protegits
+# per `sys.stdout.isatty()`. Aquell fitxer ha estat ELIMINAT perquè Qdrant ara és
+# embedded (core/qdrant_pool.py) i no cal descarregar cap binari extern. El test
+# queda obsolet per disseny — el bug que validava ja no pot existir.
 
 
 # ═══════════════════════════════════════════════════════════════════════════

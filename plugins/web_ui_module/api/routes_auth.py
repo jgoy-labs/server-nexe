@@ -113,7 +113,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         try:
             from memory.memory.api.v1 import get_memory_api
             mem = await get_memory_api()
-            for coll_name in ("nexe_documentation", "nexe_web_ui", "user_knowledge"):
+            for coll_name in ("nexe_documentation", "personal_memory", "user_knowledge"):
                 try:
                     if await mem.collection_exists(coll_name):
                         count = await mem.count(coll_name)

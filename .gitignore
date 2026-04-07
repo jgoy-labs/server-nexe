@@ -71,6 +71,7 @@ snapshots/
 
 # User uploads (poden contenir dades personals)
 plugins/web_ui_module/static/uploads/
+plugins/web_ui_module/ui/uploads/
 
 # Cache personalitat
 personality/.module_cache.json

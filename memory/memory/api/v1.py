@@ -25,7 +25,7 @@ class MemoryStoreRequest(BaseModel):
     """Request body for storing content in memory."""
     content: str
     metadata: Optional[Dict[str, Any]] = None
-    collection: str = "nexe_web_ui"
+    collection: str = "personal_memory"
     force: bool = False  # Bypass Gate heuristic (skip min-length check)
 
 class MemoryStoreResponse(BaseModel):
@@ -62,14 +62,23 @@ async def get_memory_api():
         from . import MemoryAPI
         _memory_api = MemoryAPI()
         await _memory_api.initialize()
+        # Les 3 col·leccions canòniques ("passadissos de la biblioteca RAG"):
+        # - nexe_documentation: knowhow del propi nexe (knowledge/ folder auto-ingest)
+        # - user_knowledge: documents ad-hoc que l'usuari puja al chat
+        # - personal_memory: fets que el chat recorda de l'usuari (MEM_SAVE/RECALL)
+        #
+        # Nota: la col·lecció de memòria personal es deia "nexe_web_ui" fins
+        # al refactor del 2026-04-08 (origen tècnic del plugin web_ui_module).
+        # Renombrada a "personal_memory" per alinear el nom amb la funció.
+        #
         # Ensure canonical collections exist (F5 fix). Previously only
-        # nexe_web_ui was created and nexe_documentation was a silent
-        # skip in recall_from_memory(), making the "Base de coneixement"
-        # sidebar permanently empty.
+        # the personal memory collection was created and nexe_documentation
+        # was a silent skip in recall_from_memory(), making the "Base de
+        # coneixement" sidebar permanently empty.
         canonical_collections = (
-            "nexe_web_ui",        # personal memory MEM_SAVE
-            "user_knowledge",     # ad-hoc docs uploaded via chat UI
             "nexe_documentation", # corporate know-how from knowledge/ folder
+            "user_knowledge",     # ad-hoc docs uploaded via chat UI
+            "personal_memory",    # personal memory MEM_SAVE (was nexe_web_ui pre-2026-04-08)
         )
         for col in canonical_collections:
             try:
@@ -176,7 +185,7 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         elif body.collection:
             cols = [body.collection]
         else:
-            cols = ["nexe_documentation", "nexe_web_ui", "user_knowledge"]
+            cols = ["nexe_documentation", "personal_memory", "user_knowledge"]
 
         formatted_results = []
         search_errors = 0

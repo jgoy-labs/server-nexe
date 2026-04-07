@@ -163,7 +163,7 @@ class NexeAPIClient:
                              rag_collections: Optional[list] = None) -> AsyncGenerator[Union[str, dict], None]:
         """
         Send a streaming request to /ui/chat (same pipeline as the web UI).
-        Uses server sessions, nexe_web_ui RAG, and intent detection.
+        Uses server sessions, personal_memory RAG, and intent detection.
 
         Yields:
             str: text chunks

@@ -91,7 +91,7 @@ class TestMemoryStoreEndpoint:
         with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_mem)):
             resp = client.post(
                 "/memory/store",
-                json={"content": "Test content", "collection": "nexe_web_ui"},
+                json={"content": "Test content", "collection": "personal_memory"},
                 headers={"X-Api-Key": API_KEY}
             )
 
@@ -125,7 +125,7 @@ class TestMemoryStoreEndpoint:
                 json={
                     "content": "Content with meta",
                     "metadata": {"source": "cli", "user": "test"},
-                    "collection": "nexe_web_ui"
+                    "collection": "personal_memory"
                 },
                 headers={"X-Api-Key": API_KEY}
             )
@@ -152,7 +152,7 @@ class TestMemoryStoreEndpoint:
         assert resp.status_code == 401
 
     def test_store_default_collection(self):
-        """Si no s'especifica collection, usa nexe_web_ui."""
+        """Si no s'especifica collection, usa personal_memory."""
         client = TestClient(make_app())
         mock_mem = make_mock_memory()
 
@@ -166,7 +166,7 @@ class TestMemoryStoreEndpoint:
         assert resp.status_code == 200
         # Check store was called with default collection
         call_kwargs = mock_mem.store.call_args[1]
-        assert call_kwargs["collection"] == "nexe_web_ui"
+        assert call_kwargs["collection"] == "personal_memory"
 
     def test_store_sets_default_source_metadata(self):
         """Metadata source = 'chat-cli' per defecte."""
@@ -202,7 +202,7 @@ class TestMemorySearchEndpoint:
         with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_mem)):
             resp = client.post(
                 "/memory/search",
-                json={"query": "test query", "collection": "nexe_web_ui"},
+                json={"query": "test query", "collection": "personal_memory"},
                 headers={"X-Api-Key": API_KEY}
             )
 

@@ -12,7 +12,6 @@ priority: P2
 # === OPCIONAL ===
 lang: en
 type: docs
-collection: user_knowledge
 author: "Jordi Goy"
 expires: null
 ---
@@ -30,7 +29,7 @@ PLUGINS           MLX | llama.cpp | Ollama | Security | Web UI
       |
 BASE SERVICES     Memory (RAG) | Qdrant | Embeddings | SQLite/SQLCipher | TextStore
       |
-STORAGE           models/ | qdrant/ | vectors/ | logs/ | cache/ | *.enc
+STORAGE           models/ | vectors/ | logs/ | cache/ | sessions/ | *.enc
 ```
 
 Design principles: modularity, plugin-based backends, API-first, native RAG as first-class, simplicity, encryption opt-in.
@@ -178,8 +177,8 @@ server-nexe/
 │   │   └── client.py             # HTTP client for local API
 │   │
 │   ├── ingest/                   # Document ingestion
-│   │   ├── ingest_docs.py        # docs/ → nexe_documentation (500/50 chars)
-│   │   └── ingest_knowledge.py   # knowledge/ → user_knowledge (1500/150 chars)
+│   │   ├── ingest_docs.py        # docs/ → nexe_documentation (500/50 chars, destructive)
+│   │   └── ingest_knowledge.py   # knowledge/ → nexe_documentation (default, idempotent post-F7, chunk_size per-document via frontmatter)
 │   │
 │   ├── metrics/                  # Prometheus /metrics
 │   ├── resilience/               # Circuit breaker, retry
@@ -237,7 +236,7 @@ Handles startup and shutdown of the server. Split into 4 submodules.
 **Startup sequence:**
 1. Load config from server.toml
 2. Initialize APIIntegrator (personality system)
-3. Auto-start Qdrant (embedded binary, port 6333)
+3. Initialize Qdrant embedded (singleton pool at `core/qdrant_pool.py`, path `storage/vectors/`)
 4. Auto-start Ollama (if available, background mode)
 5. Load memory modules (Memory → RAG → Embeddings, correct order)
 6. Initialize plugin modules (MLX, llama.cpp, Ollama, Security, Web UI)
@@ -315,7 +314,7 @@ Embeddings Layer (memory/embeddings/) — vector generation + Qdrant interface
 
 1. **chat_schemas.py** — Pydantic models (Message, ChatCompletionRequest with use_rag=True default)
 2. **chat_sanitization.py** — SSE token sanitization (null bytes, control chars), context truncation (MAX_CONTEXT_CHARS=24000)
-3. **chat_rag.py** — RAG context builder: searches nexe_documentation (0.4), user_knowledge (0.35), nexe_web_ui (0.3)
+3. **chat_rag.py** — RAG context builder: searches nexe_documentation (0.4), user_knowledge (0.35), personal_memory (0.3)
 4. **chat_memory.py** — MEM_SAVE parsing, save conversation to memory
 5. **chat_engines/routing.py** — Engine selection (auto, ollama, mlx, llama_cpp)
 6. **chat_engines/ollama.py** — Ollama streaming with thinking token support

@@ -26,7 +26,13 @@ HEADER_END = "---"
 VALID_PRIORITIES = ["P0", "P1", "P2", "P3"]
 VALID_TYPES = ["docs", "tutorial", "api", "faq", "notes", "config", "other"]
 VALID_LANGS = ["ca", "es", "en", "multi"]
-DEFAULT_COLLECTIONS = ["nexe_web_ui", "user_knowledge", "system"]
+# Les 3 col·leccions canòniques del RAG ("passadissos de la biblioteca"):
+# - nexe_documentation: knowhow del propi nexe (auto-ingest de knowledge/)
+# - user_knowledge: documents ad-hoc pujats per l'usuari al chat
+# - personal_memory: fets que el chat recorda (MEM_SAVE/RECALL)
+# Nota: "personal_memory" es deia "nexe_web_ui" fins al refactor 2026-04-08.
+# La constant "system" existia pre-v0.9.0 però cap codi la feia servir — eliminada.
+DEFAULT_COLLECTIONS = ["nexe_documentation", "user_knowledge", "personal_memory"]
 
 # Chunk size limits
 MIN_CHUNK_SIZE = 400

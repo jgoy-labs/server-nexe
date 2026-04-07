@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # ============================================
 # MEMORY MANAGEMENT CONFIG
 # ============================================
-MAX_MEMORY_ENTRIES = 500          # Maximum entries in nexe_web_ui
+MAX_MEMORY_ENTRIES = 500          # Maximum entries in personal_memory
 SIMILARITY_THRESHOLD = 0.80       # No guardar si similaritat > 80% (baixat de 0.85)
 PRUNE_BATCH_SIZE = 30             # How many entries to remove when the limit is exceeded
 TEMPORAL_DECAY_DAYS = 7           # Dies per aplicar decay temporal (recent = bonus)
@@ -217,7 +217,7 @@ class MemoryHelper:
                     await api.initialize()
 
                 # Ensure collections exist with correct dimensions (768)
-                for coll_name in ("nexe_web_ui", "user_knowledge"):
+                for coll_name in ("personal_memory", "user_knowledge"):
                     if await api.collection_exists(coll_name):
                         try:
                             info = api._qdrant.get_collection(coll_name)
@@ -303,7 +303,7 @@ class MemoryHelper:
         try:
             results = await memory.search(
                 query=content,
-                collection="nexe_web_ui",
+                collection="personal_memory",
                 top_k=1
             )
             if results and len(results) > 0:
@@ -367,11 +367,11 @@ class MemoryHelper:
         Returns number of entries pruned.
         """
         try:
-            if not await memory.collection_exists("nexe_web_ui"):
+            if not await memory.collection_exists("personal_memory"):
                 return 0
 
             # Check count first to avoid unnecessary search
-            current_count = await memory.count("nexe_web_ui")
+            current_count = await memory.count("personal_memory")
             if current_count <= MAX_MEMORY_ENTRIES:
                 return 0
 
@@ -380,7 +380,7 @@ class MemoryHelper:
             # a minimal query to retrieve all entries by vector similarity)
             all_entries = await memory.search(
                 query=" ",
-                collection="nexe_web_ui",
+                collection="personal_memory",
                 top_k=current_count
             )
 
@@ -405,7 +405,7 @@ class MemoryHelper:
             for entry, score in to_delete:
                 try:
                     if hasattr(entry, 'id') and entry.id:
-                        await memory.delete(entry.id, collection="nexe_web_ui")
+                        await memory.delete(entry.id, collection="personal_memory")
                         deleted += 1
                         logger.debug(f"Pruned entry (retention={score:.2f}): {entry.text[:50] if entry.text else 'N/A'}...")
                 except Exception as e:
@@ -433,11 +433,11 @@ class MemoryHelper:
             session_id: session id (metadata).
             metadata: extra metadata.
             collections: user-selected RAG collections filter (Bug #10). If
-                non-None and does not include 'nexe_web_ui', the save is rejected.
+                non-None and does not include 'personal_memory', the save is rejected.
         """
         try:
             # Bug #10: respect user collection filter
-            if collections is not None and "nexe_web_ui" not in collections:
+            if collections is not None and "personal_memory" not in collections:
                 logger.info("Memory collection disabled by user — save_to_memory rejected")
                 return {
                     "success": False,
@@ -477,7 +477,7 @@ class MemoryHelper:
 
             doc_id = await memory.store(
                 text=content,
-                collection="nexe_web_ui",
+                collection="personal_memory",
                 metadata=meta
             )
 
@@ -504,7 +504,7 @@ class MemoryHelper:
         Args:
             content: Text to search for and delete.
             collections: user-selected RAG collections filter (Bug #10). If None,
-                defaults to ['nexe_web_ui', 'user_knowledge'].
+                defaults to ['personal_memory', 'user_knowledge'].
 
         Returns:
             Result dict with success status and count of deleted entries
@@ -516,7 +516,7 @@ class MemoryHelper:
 
             deleted = 0
             deleted_facts = []
-            target_collections = collections if collections is not None else ["nexe_web_ui", "user_knowledge"]
+            target_collections = collections if collections is not None else ["personal_memory", "user_knowledge"]
             for collection in target_collections:
                 try:
                     if not await memory.collection_exists(collection):
@@ -561,14 +561,14 @@ class MemoryHelper:
         Args:
             limit: Maximum number of facts to return.
             collections: User-selected RAG collections filter (Bug #10).
-                If non-None and does not include 'nexe_web_ui', returns empty list.
+                If non-None and does not include 'personal_memory', returns empty list.
 
         Returns:
             Dict with facts list, total count, and status.
         """
         try:
             # Bug #10: respect user collection filter — list is semantically personal
-            if collections is not None and "nexe_web_ui" not in collections:
+            if collections is not None and "personal_memory" not in collections:
                 logger.info("Memory collection disabled by user — list_memories returns empty")
                 return {
                     "success": True,
@@ -581,7 +581,7 @@ class MemoryHelper:
             if not memory:
                 return {"success": False, "facts": [], "total": 0, "message": "Memory not available"}
 
-            collection = "nexe_web_ui"
+            collection = "personal_memory"
             if not await memory.collection_exists(collection):
                 return {"success": True, "facts": [], "total": 0, "message": "No memories stored"}
 
@@ -684,7 +684,7 @@ class MemoryHelper:
         if not memory:
             return {"success": False, "chunks_saved": 0, "message": "Memory API not available"}
 
-        # Documents van a user_knowledge (separat de nexe_web_ui que es per memoria personal)
+        # Documents van a user_knowledge (separat de personal_memory que es per memoria personal)
         DOC_COLLECTION = "user_knowledge"
         if not await memory.collection_exists(DOC_COLLECTION):
             await memory.create_collection(DOC_COLLECTION, vector_size=DEFAULT_VECTOR_SIZE)
@@ -776,7 +776,7 @@ class MemoryHelper:
                     "message": "Memory API not available"
                 }
 
-            _all_collections = ["nexe_documentation", "nexe_web_ui", "user_knowledge"]
+            _all_collections = ["nexe_documentation", "personal_memory", "user_knowledge"]
             collections_to_search = [c for c in _all_collections if c in collections] if collections else _all_collections
             all_results = []
 
@@ -848,11 +848,11 @@ class MemoryHelper:
                 return {"error": "Memory API not available"}
 
             count = 0
-            if await memory.collection_exists("nexe_web_ui"):
-                count = await memory.count("nexe_web_ui")
+            if await memory.collection_exists("personal_memory"):
+                count = await memory.count("personal_memory")
 
             return {
-                "collection": "nexe_web_ui",
+                "collection": "personal_memory",
                 "entry_count": count,
                 "max_entries": MAX_MEMORY_ENTRIES,
                 "similarity_threshold": SIMILARITY_THRESHOLD,
@@ -864,7 +864,7 @@ class MemoryHelper:
 
     async def clear_memory(self, confirm: bool = False) -> Dict[str, Any]:
         """
-        Clear all entries from nexe_web_ui collection.
+        Clear all entries from personal_memory collection.
 
         Args:
             confirm: Must be True to actually clear
@@ -883,10 +883,10 @@ class MemoryHelper:
             if not memory:
                 return {"success": False, "message": "Memory API not available"}
 
-            if await memory.collection_exists("nexe_web_ui"):
+            if await memory.collection_exists("personal_memory"):
                 # Delete and recreate collection
-                await memory.delete_collection("nexe_web_ui")
-                await memory.create_collection("nexe_web_ui", vector_size=DEFAULT_VECTOR_SIZE)
+                await memory.delete_collection("personal_memory")
+                await memory.create_collection("personal_memory", vector_size=DEFAULT_VECTOR_SIZE)
                 logger.info("Memory collection cleared and recreated")
 
             return {

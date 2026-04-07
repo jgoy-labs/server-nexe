@@ -12,7 +12,6 @@ priority: P1
 # === OPCIONAL ===
 lang: en
 type: docs
-collection: user_knowledge
 author: "Jordi Goy"
 expires: null
 ---
@@ -35,7 +34,7 @@ It is NOT npm nexe (a Node.js compiler). It is NOT a Windows server product. It 
 ## Core capabilities
 
 1. **100% Local and Private** — All inference, memory and storage happen on-device. Zero cloud dependency.
-2. **Persistent RAG Memory** — Remembers context across sessions using Qdrant vector search with 768-dimensional embeddings. Three collections: nexe_documentation (system docs), user_knowledge (uploaded documents), nexe_web_ui (conversation memory).
+2. **Persistent RAG Memory** — Remembers context across sessions using Qdrant vector search with 768-dimensional embeddings. Three collections: nexe_documentation (system docs), user_knowledge (uploaded documents), personal_memory (conversation memory).
 3. **Automatic Memory (MEM_SAVE)** — The model extracts facts from conversations automatically (name, job, preferences) and saves them to memory. Zero extra latency (same LLM call). Supports save, delete and recall intents in 3 languages.
 4. **Multi-Backend Inference** — MLX (Apple Silicon native), llama.cpp (GGUF, universal with Metal), Ollama (bridge). Same OpenAI-compatible API, switchable backends.
 5. **Modular Plugin System** — Security, web UI, RAG, each backend — everything is a plugin with independent manifests. Auto-discovered at startup.

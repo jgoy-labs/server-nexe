@@ -204,8 +204,8 @@ class TestDeleteFromMemory:
         r1 = make_result(text="Em dic Joan", score=0.90, rid="id-1")
         r2 = make_result(text="Treballo a BCN", score=0.85, rid="id-2")
         mem = make_memory_mock(search_results=[r1, r2])
-        # Only nexe_web_ui exists, user_knowledge does not
-        mem.collection_exists = AsyncMock(side_effect=lambda c: c == "nexe_web_ui")
+        # Only personal_memory exists, user_knowledge does not
+        mem.collection_exists = AsyncMock(side_effect=lambda c: c == "personal_memory")
         mh_module._memory_api_instance = mem
         helper = MemoryHelper()
         helper._memory_api = mem
@@ -374,8 +374,8 @@ class TestListMemoriesScroll:
 
 class TestCollectionsFilter:
 
-    def test_list_memories_filter_excludes_when_no_nexe_web_ui(self):
-        """Bug #10: list returns empty when user disables nexe_web_ui."""
+    def test_list_memories_filter_excludes_when_no_personal_memory(self):
+        """Bug #10: list returns empty when user disables personal_memory."""
         mem = make_memory_mock(scroll_points=[make_point()], count=1)
         mh_module._memory_api_instance = mem
         helper = MemoryHelper()
@@ -390,8 +390,8 @@ class TestCollectionsFilter:
         assert result["total"] == 0
         mem.scroll.assert_not_called()
 
-    def test_list_memories_filter_includes_when_nexe_web_ui_present(self):
-        """Bug #10: list works normally when nexe_web_ui is in the filter."""
+    def test_list_memories_filter_includes_when_personal_memory_present(self):
+        """Bug #10: list works normally when personal_memory is in the filter."""
         p = make_point(text="hello", payload={"text": "hello"})
         mem = make_memory_mock(scroll_points=[p], count=1)
         mh_module._memory_api_instance = mem
@@ -399,14 +399,14 @@ class TestCollectionsFilter:
         helper._memory_api = mem
 
         result = asyncio.run(helper.list_memories(
-            limit=20, collections=["nexe_web_ui", "user_knowledge"]
+            limit=20, collections=["personal_memory", "user_knowledge"]
         ))
 
         assert result["success"] is True
         assert len(result["facts"]) == 1
 
     def test_save_to_memory_filter_disabled(self):
-        """Bug #10: save rejected when nexe_web_ui not in collections."""
+        """Bug #10: save rejected when personal_memory not in collections."""
         mem = make_memory_mock()
         helper = MemoryHelper()
 
@@ -439,9 +439,9 @@ class TestCollectionsFilter:
         helper = MemoryHelper()
         helper._memory_api = mem
 
-        asyncio.run(helper.delete_from_memory("foo", collections=["nexe_web_ui"]))
+        asyncio.run(helper.delete_from_memory("foo", collections=["personal_memory"]))
 
-        # collection_exists called for nexe_web_ui only (no user_knowledge)
+        # collection_exists called for personal_memory only (no user_knowledge)
         called_cols = [c.args[0] for c in mem.collection_exists.call_args_list]
-        assert "nexe_web_ui" in called_cols
+        assert "personal_memory" in called_cols
         assert "user_knowledge" not in called_cols

@@ -50,21 +50,21 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
         # Legacy Qdrant path
         from memory.memory.api.v1 import get_memory_api
 
-        logger.info("Auto-saving conversation to RAG memory (nexe_web_ui)...")
+        logger.info("Auto-saving conversation to RAG memory (personal_memory)...")
 
         memory = await get_memory_api()
 
         try:
-            if not await memory.collection_exists("nexe_web_ui"):
-                await memory.create_collection("nexe_web_ui", vector_size=DEFAULT_VECTOR_SIZE)
-                logger.info("Created nexe_web_ui collection")
+            if not await memory.collection_exists("personal_memory"):
+                await memory.create_collection("personal_memory", vector_size=DEFAULT_VECTOR_SIZE)
+                logger.info("Created personal_memory collection")
         except Exception:
-            if not await memory.collection_exists("nexe_web_ui"):
+            if not await memory.collection_exists("personal_memory"):
                 raise
 
         doc_id = await memory.store(
             text=conversation_text,
-            collection="nexe_web_ui",
+            collection="personal_memory",
             metadata={
                 "type": "conversation_turn",
                 "auto_saved": True,
@@ -73,7 +73,7 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
             }
         )
 
-        logger.info("Conversation saved to nexe_web_ui (id=%s)", doc_id)
+        logger.info("Conversation saved to personal_memory (id=%s)", doc_id)
 
         try:
             from core.metrics.registry import MEMORY_OPERATIONS

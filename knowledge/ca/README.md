@@ -12,7 +12,6 @@ priority: P1
 # === OPCIONAL ===
 lang: ca
 type: docs
-collection: user_knowledge
 author: "Jordi Goy"
 expires: null
 ---
@@ -35,7 +34,7 @@ NO es npm nexe (un compilador de Node.js). NO es un producte de servidor Windows
 ## Capacitats principals
 
 1. **100% local i privat** — Tota la inferencia, memoria i emmagatzematge passen al dispositiu. Zero dependencia del nuvol.
-2. **Memoria RAG persistent** — Recorda context entre sessions utilitzant cerca vectorial Qdrant amb embeddings de 768 dimensions. Tres col·leccions: nexe_documentation (docs del sistema), user_knowledge (documents pujats), nexe_web_ui (memoria de conversa).
+2. **Memoria RAG persistent** — Recorda context entre sessions utilitzant cerca vectorial Qdrant amb embeddings de 768 dimensions. Tres col·leccions: nexe_documentation (docs del sistema), user_knowledge (documents pujats), personal_memory (memoria de conversa).
 3. **Memoria automatica (MEM_SAVE)** — El model extreu fets de les converses automaticament (nom, feina, preferencies) i els guarda a memoria. Zero latencia extra (mateixa crida LLM). Suporta intents de guardar, esborrar i recuperar en 3 idiomes.
 4. **Inferencia multi-backend** — MLX (natiu Apple Silicon), llama.cpp (GGUF, universal amb Metal), Ollama (bridge). Mateixa API compatible amb OpenAI, backends intercanviables.
 5. **Sistema modular de plugins** — Seguretat, web UI, RAG, cada backend — tot es un plugin amb manifests independents. Auto-descobriment a l'arrencada.

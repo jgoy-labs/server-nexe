@@ -12,7 +12,6 @@ priority: P2
 # === OPCIONAL ===
 lang: ca
 type: docs
-collection: user_knowledge
 author: "Jordi Goy"
 expires: null
 ---
@@ -30,7 +29,7 @@ PLUGINS           MLX | llama.cpp | Ollama | Security | Web UI
       |
 SERVEIS BASE      Memoria (RAG) | Qdrant | Embeddings | SQLite/SQLCipher | TextStore
       |
-EMMAGATZEMATGE    models/ | qdrant/ | vectors/ | logs/ | cache/ | *.enc
+EMMAGATZEMATGE    models/ | vectors/ | logs/ | cache/ | sessions/ | *.enc
 ```
 
 Principis de disseny: modularitat, backends basats en plugins, API-first, RAG natiu com a primera classe, simplicitat, encriptacio opt-in.
@@ -178,8 +177,8 @@ server-nexe/
 │   │   └── client.py             # Client HTTP per a l'API local
 │   │
 │   ├── ingest/                   # Ingestio de documents
-│   │   ├── ingest_docs.py        # docs/ -> nexe_documentation (500/50 caracters)
-│   │   └── ingest_knowledge.py   # knowledge/ -> user_knowledge (1500/150 caracters)
+│   │   ├── ingest_docs.py        # docs/ -> nexe_documentation (500/50 chars, destructiu)
+│   │   └── ingest_knowledge.py   # knowledge/ -> nexe_documentation (default, idempotent post-F7, chunk_size per document via frontmatter)
 │   │
 │   ├── metrics/                  # Prometheus /metrics
 │   ├── resilience/               # Circuit breaker, retry
@@ -237,7 +236,7 @@ Gestiona l'arrencada i l'aturada del servidor. Separat en 4 submoduls.
 **Sequencia d'arrencada:**
 1. Carregar configuracio de server.toml
 2. Inicialitzar APIIntegrator (sistema de personalitat)
-3. Auto-arrencar Qdrant (binari embegut, port 6333)
+3. Inicialitzar Qdrant embedded (pool singleton a `core/qdrant_pool.py`, path `storage/vectors/`)
 4. Auto-arrencar Ollama (si disponible, en segon pla)
 5. Carregar moduls de memoria (Memory -> RAG -> Embeddings, ordre correcte)
 6. Inicialitzar moduls de plugins (MLX, llama.cpp, Ollama, Security, Web UI)
@@ -315,7 +314,7 @@ Capa d'Embeddings (memory/embeddings/) — generacio de vectors + interficie Qdr
 
 1. **chat_schemas.py** — Models Pydantic (Message, ChatCompletionRequest amb use_rag=True per defecte)
 2. **chat_sanitization.py** — Sanititzacio de tokens SSE (bytes nuls, caracters de control), truncament de context (MAX_CONTEXT_CHARS=24000)
-3. **chat_rag.py** — Constructor de context RAG: cerca a nexe_documentation (0.4), user_knowledge (0.35), nexe_web_ui (0.3)
+3. **chat_rag.py** — Constructor de context RAG: cerca a nexe_documentation (0.4), user_knowledge (0.35), personal_memory (0.3)
 4. **chat_memory.py** — Parseig de MEM_SAVE, guardar conversa a memoria
 5. **chat_engines/routing.py** — Seleccio de motor (auto, ollama, mlx, llama_cpp)
 6. **chat_engines/ollama.py** — Streaming d'Ollama amb suport de thinking tokens

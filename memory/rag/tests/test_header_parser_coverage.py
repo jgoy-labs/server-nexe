@@ -47,7 +47,7 @@ class TestCreateHeader:
             priority="P0",
             lang="es",
             type="tutorial",
-            collection="nexe_web_ui",
+            collection="personal_memory",
             author="Test Author",
             expires="2027-01-01",
             related=["doc-a", "doc-b"],
@@ -55,7 +55,7 @@ class TestCreateHeader:
         assert "full-doc" in result
         assert "lang: es" in result
         assert "type: tutorial" in result
-        assert "collection: nexe_web_ui" in result
+        assert "collection: personal_memory" in result
         assert 'author: "Test Author"' in result
         assert "expires: 2027-01-01" in result
         assert "related:" in result

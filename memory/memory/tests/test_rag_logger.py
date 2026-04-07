@@ -321,7 +321,7 @@ class TestRAGLogger:
     def test_memory_route_with_collections(self):
         logger = self._make_logger()
         with patch.object(logger, "_write") as mock_write:
-            logger.memory_route(collections=["nexe_web_ui", "user_knowledge"], timing_ms=30.0)
+            logger.memory_route(collections=["personal_memory", "user_knowledge"], timing_ms=30.0)
             assert mock_write.call_count > 0
 
     def test_memory_route_empty_collections(self):
@@ -337,13 +337,13 @@ class TestRAGLogger:
             {"score": 0.7, "content": "Document 2 content"},
         ]
         with patch.object(logger, "_write") as mock_write:
-            logger.memory_collection_search(collection="nexe_web_ui", results=3, timing_ms=200.0, top_results=top_results)
+            logger.memory_collection_search(collection="personal_memory", results=3, timing_ms=200.0, top_results=top_results)
             assert mock_write.call_count > 0
 
     def test_memory_collection_search_no_top(self):
         logger = self._make_logger()
         with patch.object(logger, "_write") as mock_write:
-            logger.memory_collection_search(collection="nexe_web_ui", results=0, timing_ms=50.0)
+            logger.memory_collection_search(collection="personal_memory", results=0, timing_ms=50.0)
             assert mock_write.call_count > 0
 
     def test_memory_memory_search(self):

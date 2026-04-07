@@ -88,7 +88,8 @@ def test_run_headless_skip_model_does_not_download(monkeypatch, tmp_path):
         )
 
     monkeypatch.setattr(ih, "generate_env_file", _fake_generate)
-    monkeypatch.setattr(ih, "download_qdrant", lambda *a, **k: None)
+    # Q5.5 reobert (2026-04-08): download_qdrant eliminat — Qdrant és embedded.
+    # El mock que abans existia aquí ja no cal perquè la funció no existeix.
     monkeypatch.setattr(ih, "_write_commands_file", lambda *a, **k: None)
 
     # Curtcircuit per al subprocess d'embeddings i ingestio
