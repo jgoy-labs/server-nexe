@@ -111,6 +111,13 @@ struct ModelPickerView: View {
 
                 Spacer()
 
+                Button(t("btn_skip_model")) {
+                    engine.selectedModel = nil
+                    onNext()
+                }
+                .controlSize(.large)
+                .foregroundColor(.secondary)
+
                 Button(action: onNext) {
                     Text(t("btn_next"))
                         .frame(width: 140)
@@ -118,7 +125,6 @@ struct ModelPickerView: View {
                 .controlSize(.large)
                 .buttonStyle(.borderedProminent)
                 .tint(.nexeRed)
-                .disabled(engine.selectedModel == nil)
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 16)

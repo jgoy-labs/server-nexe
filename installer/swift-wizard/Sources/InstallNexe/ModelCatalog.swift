@@ -7,31 +7,28 @@ struct AIModel: Codable, Identifiable {
     let name: String
     let origin: String
     let year: Int?
-    let lang: [String: String]
+    let role: String?
     let params: String
     let diskGB: Double
     let ramGB: Double
     let description: [String: String]
-    let mlx: String?
+    let mlx: Bool?
     let ollama: String?
     let gguf: String?
-    let chatFormat: String
-    let promptTier: String
+    let iberic: Bool?
 
     var id: String { key }
 
     enum CodingKeys: String, CodingKey {
-        case key, name, origin, year, lang, params, description, mlx, ollama, gguf
+        case key, name, origin, year, role, params, description, mlx, ollama, gguf, iberic
         case diskGB = "disk_gb"
-        case ramGB = "ram_gb"
-        case chatFormat = "chat_format"
-        case promptTier = "prompt_tier"
+        case ramGB  = "ram_gb"
     }
 
     /// Retorna els engines disponibles per aquest model
     var availableEngines: [String] {
         var engines: [String] = []
-        if mlx != nil { engines.append("mlx") }
+        if mlx == true { engines.append("mlx") }
         if ollama != nil { engines.append("ollama") }
         if gguf != nil { engines.append("llama_cpp") }
         return engines
@@ -39,7 +36,7 @@ struct AIModel: Codable, Identifiable {
 
     /// Tria l'engine recomanat (MLX > Ollama > llama_cpp)
     func recommendedEngine(isAppleSilicon: Bool) -> String {
-        if isAppleSilicon, mlx != nil { return "mlx" }
+        if isAppleSilicon, mlx == true { return "mlx" }
         if ollama != nil { return "ollama" }
         if gguf != nil { return "llama_cpp" }
         return "ollama"
@@ -50,11 +47,6 @@ struct AIModel: Codable, Identifiable {
         return description[lang.rawValue] ?? description["en"] ?? ""
     }
 
-    /// Idiomes suportats localitzats
-    func localizedLang(lang: Lang) -> String {
-        return self.lang[lang.rawValue] ?? self.lang["en"] ?? ""
-    }
-
     /// Crea un model custom a partir d'un nom d'Ollama
     static func customOllama(_ name: String) -> AIModel {
         return AIModel(
@@ -62,16 +54,15 @@ struct AIModel: Codable, Identifiable {
             name: name,
             origin: "Ollama",
             year: nil,
-            lang: ["ca": "Variable", "es": "Variable", "en": "Variable"],
+            role: "custom",
             params: "—",
             diskGB: 0,
             ramGB: 0,
             description: ["ca": "Model personalitzat", "es": "Modelo personalizado", "en": "Custom model"],
-            mlx: nil,
+            mlx: false,
             ollama: name,
             gguf: nil,
-            chatFormat: "chatml",
-            promptTier: "standard"
+            iberic: false
         )
     }
 
@@ -83,16 +74,15 @@ struct AIModel: Codable, Identifiable {
             name: shortName,
             origin: "Hugging Face",
             year: nil,
-            lang: ["ca": "Variable", "es": "Variable", "en": "Variable"],
+            role: "custom",
             params: "—",
             diskGB: 0,
             ramGB: 0,
             description: ["ca": repo, "es": repo, "en": repo],
-            mlx: nil,
+            mlx: false,
             ollama: nil,
             gguf: repo,
-            chatFormat: "chatml",
-            promptTier: "standard"
+            iberic: false
         )
     }
 }

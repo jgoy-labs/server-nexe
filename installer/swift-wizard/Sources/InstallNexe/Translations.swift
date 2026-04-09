@@ -93,6 +93,7 @@ struct T {
             "model_custom_hf_label": "Repo Hugging Face (GGUF)",
             "model_custom_hf_hint": "Ex: TheBloke/Llama-2-7B-GGUF",
             "model_custom_warning": "Assegura't que el model existeix i es compatible amb el teu hardware.",
+            "btn_skip_model": "Continuar sense model",
 
             // Confirm
             "confirm_title": "Resum de la instal·lacio",
@@ -187,6 +188,7 @@ struct T {
             "model_custom_hf_label": "Repo Hugging Face (GGUF)",
             "model_custom_hf_hint": "Ej: TheBloke/Llama-2-7B-GGUF",
             "model_custom_warning": "Asegurate de que el modelo existe y es compatible con tu hardware.",
+            "btn_skip_model": "Continuar sin modelo",
 
             "confirm_title": "Resumen de la instalacion",
             "confirm_desc": "Se descargaran los siguientes componentes. Necesitaras conexion a internet.",
@@ -278,6 +280,7 @@ struct T {
             "model_custom_hf_label": "Hugging Face Repo (GGUF)",
             "model_custom_hf_hint": "E.g.: TheBloke/Llama-2-7B-GGUF",
             "model_custom_warning": "Make sure the model exists and is compatible with your hardware.",
+            "btn_skip_model": "Continue without model",
 
             "confirm_title": "Installation summary",
             "confirm_desc": "The following components will be downloaded. You'll need an internet connection.",
