@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] — Cirurgia Bloc 2 Security & Memory Pipeline (2026-04-08)
+
+### Fixed
+
+- **Item 17 — MEM_SAVE bug**: `POST /v1/memory/store` was rejected by the Gate heuristic (`reason="model_generated"`) because `source="api"` mapped to `is_user_message=False` and `is_mem_save` was not passed. Fixed by passing `is_mem_save=True` — the store endpoint IS an explicit MEM_SAVE operation and should bypass the "model_generated" gate.
+- **Item 21 — SQLCIPHER false sense of security**: `core/lifespan.py` declared "encryption ENABLED" without checking `SQLCIPHER_AVAILABLE`. If `sqlcipher3` was missing, sessions were encrypted but the `memories.db` database was not. Fixed with fail-closed behavior: server refuses to start with a clear `RuntimeError` if encryption is requested but `sqlcipher3` is not installed.
+
+### Security
+
+- **Item 19 — Memory injection via direct API**: `POST /v1/chat/completions` did not apply `strip_memory_tags` to user messages, allowing `[MEM_SAVE: ...]` injection via the API while the Web UI was protected. Fixed.
+- **Item 20 — Prompt injection via auto-ingest**: `core/ingest/ingest_knowledge.py` and `core/ingest/ingest_docs.py` did not apply `_filter_rag_injection` to document chunks before storing, while the upload UI path was protected. Fixed.
+
+### Changed
+
+- **Item 22 — Workflows metadata honest**: `GET /v1/` metadata updated: `workflows.status` changed from `"implemented"` (false) to `"stub-v0.9.1"`. New `core/endpoints/workflows.py` router added that returns `501 Not Implemented` for any `/v1/workflows/*` path.
+- **Item 24 — Pipeline unique enforced**: Removed 3 plugin chat endpoints that bypassed the canonical pipeline (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`). All chat must go through `/ui/chat` (canonical) or `/v1/chat/completions` (OpenAI-compat). Item 23 (auth bypass) resolved by this removal.
+
 ## [0.9.0] - 2026-03-31
 
 ### Added

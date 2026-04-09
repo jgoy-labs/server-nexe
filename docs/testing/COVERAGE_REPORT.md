@@ -2,7 +2,7 @@
 
 **Data:** 2026-03-15
 **Autor:** Jordi Goy (www.jgoy.net)
-**Generació de tests:** Claude Opus 4.6 (Anthropic) — execució autònoma amb agents paral·lels, ~2h 30m de computació total
+**Generació de tests:** execució autònoma amb agents paral·lels, ~2h 30m de computació total
 **Supervisió:** Jordi Goy
 
 ---
@@ -22,7 +22,7 @@
 
 ## Metodologia
 
-Tests unitaris generats automàticament per **Claude Opus 4.6** mitjançant un sistema de **10 agents paral·lels** organitzats en 5 fases:
+Tests unitaris generats mitjançant un sistema de **10 agents paral·lels** organitzats en 5 fases:
 
 | Fase | Objectiu | Agents | Tests creats |
 |------|----------|--------|-------------|
@@ -111,5 +111,5 @@ pytest --cov --cov-report=term-missing -q 2>&1 | tail -5
 
 ---
 
-*Tests generats per Claude Opus 4.6 (Anthropic) amb sistema multi-agent paral·lel.*
+*Tests generats amb sistema multi-agent paral·lel.*
 *Supervisat per Jordi Goy.*

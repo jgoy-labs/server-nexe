@@ -283,6 +283,8 @@ Gestiona l'arrencada i l'aturada del servidor. Separat en 4 submoduls.
 
 **Per que bundle i no `python -m` directe:** macOS Sequoia aplica restriccions de provenance a processos Python sense bundle signat. El bundle té `LSUIElement=true` i `CFBundleIdentifier=net.servernexe.tray`, que macOS reconeix com a app legítima de menu bar.
 
+**Mode headless (`install_headless.py`):** El mode headless instal·la el servidor (`Nexe.app`) i configura el Login Item (arrencada automàtica) a macOS. Tanmateix, **NO instal·la el tray de sistema (`NexeTray.app`)** — no hi haurà icona a la barra de menú. Si voleu el tray a macOS, useu l'instal·lador GUI (`install.py` + wizard Swift).
+
 ## Module Manager
 
 `personality/module_manager/` es la FONT UNICA DE VERITAT per a tots els moduls. NO existeix cap `plugins/base.py` ni `plugins/registry.py`.
@@ -448,3 +450,14 @@ def health(self) -> Dict[str, Any]
 - La migració de Qdrant NO és plug & play — cal crear l'adapter i els mètodes de col·lecció
 - El path de substitució és el més important, no la substitució automàtica
 - Qdrant embedded no exposa cap port de xarxa (`storage/vectors/` ha de ser escrivible)
+
+## Models MLX — Compatibilitat
+
+El catàleg de l'installer (`installer/swift-wizard/Resources/models.json`) inclou models nous com **gemma4** (Google Gemma 4) i **Qwen3.5-VLM** (Alibaba). Aquests models estan marcats amb `"mlx": true` al catàleg, però **no han estat verificats amb `mlx_module`** i no apareixen al registre de models MLX (`personality/models/registry.py`).
+
+**Comportament actual:**
+- Via Ollama: funcionen (si el tag Ollama és vàlid i el model és disponible al servidor Ollama)
+- Via MLX: poden fallar silenciosament si no existeix el model HF corresponent a `mlx-community/`
+- `nexe model list` i `nexe model pull` no els mostren (no estan al `MODEL_REGISTRY`)
+
+**Recomanació:** Usa Ollama per a gemma4 i Qwen3.5-VLM. El suport MLX s'afegirà al `MODEL_REGISTRY` quan s'hagi verificat la compatibilitat amb `mlx-community/` HuggingFace IDs.

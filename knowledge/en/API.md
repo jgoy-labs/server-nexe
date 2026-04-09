@@ -50,7 +50,7 @@ Rate limiting is applied to **all endpoints** — both API and Web UI.
 | NEXE_RATE_LIMIT_CHAT | 60/minute | /v1/chat/completions |
 | NEXE_RATE_LIMIT_MEMORY | 30/minute | /v1/memory/* |
 | NEXE_RATE_LIMIT_RAG | 30/minute | /v1/rag/* |
-| NEXE_RATE_LIMIT_UPLOAD | 10/minute | /ui/upload |
+| NEXE_RATE_LIMIT_UPLOAD | 5/minute | /ui/upload |
 | NEXE_RATE_LIMIT_DEFAULT | 120/minute | All other endpoints |
 
 ### Web UI endpoints (per endpoint)

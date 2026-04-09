@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 from fastapi import APIRouter, Request, Depends
 
-from core.dependencies import limiter
+from core.dependencies import limiter, get_i18n
 from plugins.security.core.auth_dependencies import require_api_key
 
 from core.models import (
@@ -20,10 +20,6 @@ from core.models import (
 )
 
 router = APIRouter(tags=["modules"])
-
-def get_i18n(request: Request):
-  """Get i18n from app state"""
-  return getattr(request.app.state, 'i18n', None)
 
 def get_api_integrator(request: Request):
   """Get API integrator from lifespan state"""

@@ -27,6 +27,20 @@ except ImportError:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
+
+def _apply_env_overrides(merged: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply environment variable overrides to a loaded config dict.
+
+    Priority: env var > server.toml > built-in default.
+    Currently handles: NEXE_SERVER_PORT.
+    """
+    raw_port = os.environ.get("NEXE_SERVER_PORT")
+    if raw_port:
+        merged['core']['server']['port'] = int(raw_port)  # ValueError if not int (fail-fast)
+        logger.debug("NEXE_SERVER_PORT override: port=%s", raw_port)
+    return merged
+
+
 # Default configuration
 DEFAULT_CONFIG = {
     'core': {
@@ -105,7 +119,7 @@ def load_config(
             logger.warning(i18n.t("server_core.startup.config_not_found"))
         else:
             logger.warning("No config file found, using defaults")
-        return copy.deepcopy(DEFAULT_CONFIG)
+        return _apply_env_overrides(copy.deepcopy(DEFAULT_CONFIG))
 
     # Load config
     try:
@@ -125,7 +139,7 @@ def load_config(
         else:
             logger.info("Config loaded successfully")
 
-        return merged
+        return _apply_env_overrides(merged)
 
     except Exception as e:
         if i18n:
@@ -133,7 +147,7 @@ def load_config(
                                 path=str(found_path), error=str(e)))
         else:
             logger.error("Error loading config from %s: %s", found_path, e)
-        return copy.deepcopy(DEFAULT_CONFIG)
+        return _apply_env_overrides(copy.deepcopy(DEFAULT_CONFIG))
 
 
 def save_config(config: Dict[str, Any], config_path: Path) -> bool:
