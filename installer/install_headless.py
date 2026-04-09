@@ -213,45 +213,52 @@ def _run_headless_inner(config):
 
     # Find the model in the catalog
     selected_model = None
-    for category in MODEL_CATALOG.values():
-        for model in category:
-            if model["key"] == model_key:
-                selected_model = model
+    if model_key:
+        for category in MODEL_CATALOG.values():
+            for model in category:
+                if model["key"] == model_key:
+                    selected_model = model
+                    break
+            if selected_model:
                 break
-        if selected_model:
-            break
 
-    if not selected_model:
-        print(f"[ERROR] Model not found: {model_key}", flush=True)
-        sys.exit(1)
+        if not selected_model:
+            print(f"[ERROR] Model not found: {model_key}", flush=True)
+            sys.exit(1)
 
     # Build model_config (same structure as select_model() returns)
-    model_id = _model_id_for_engine(selected_model, engine)
-    if not model_id:
-        for fallback_engine in ("mlx", "ollama", "llama_cpp"):
-            model_id = _model_id_for_engine(selected_model, fallback_engine)
-            if model_id:
-                _log.warning(
-                    "Engine '%s' not available for model '%s', falling back to '%s'",
-                    engine, selected_model["key"], fallback_engine,
-                )
-                engine = fallback_engine
-                break
+    if selected_model:
+        model_id = _model_id_for_engine(selected_model, engine)
+        if not model_id:
+            for fallback_engine in ("mlx", "ollama", "llama_cpp"):
+                model_id = _model_id_for_engine(selected_model, fallback_engine)
+                if model_id:
+                    _log.warning(
+                        "Engine '%s' not available for model '%s', falling back to '%s'",
+                        engine, selected_model["key"], fallback_engine,
+                    )
+                    engine = fallback_engine
+                    break
 
-    if not model_id:
-        print(f"[ERROR] No downloadable artifact found for model: {model_key}", flush=True)
-        sys.exit(1)
+        if not model_id:
+            print(f"[ERROR] No downloadable artifact found for model: {model_key}", flush=True)
+            sys.exit(1)
 
-    model_config = {
-        "size": _get_model_size(model_key),
-        "engine": engine,
-        "id": model_id,
-        "name": selected_model["name"],
-        "disk_size": f"~{selected_model['disk_gb']} GB",
-        "ram": selected_model["ram_gb"],
-        "prompt_tier": selected_model.get("prompt_tier", "full"),
-        "chat_format": selected_model.get("chat_format", "chatml"),
-    }
+        model_config = {
+            "size": _get_model_size(model_key),
+            "engine": engine,
+            "id": model_id,
+            "name": selected_model["name"],
+            "disk_size": f"~{selected_model['disk_gb']} GB",
+            "ram": selected_model["ram_gb"],
+            "prompt_tier": selected_model.get("prompt_tier", "full"),
+            "chat_format": selected_model.get("chat_format", "chatml"),
+        }
+    else:
+        # "Continuar sense model" — instal·la sense descarregar cap model
+        model_config = None
+        skip_model_download = True
+        _log.info("No model selected — installing without model download")
 
     # Detect hardware (quiet — prints are captured by GUI log)
     hw = detect_hardware()
@@ -307,14 +314,13 @@ def _run_headless_inner(config):
     # Bug 28 fix — si l'usuari ha demanat saltar la descarrega, el
     # model queda registrat al .env (Step 4) pero no descarreguem res.
     # L'usuari pot fer `nexe model pull <name>` despres.
-    if skip_model_download:
+    if skip_model_download or model_config is None:
         emit(3, "running", "Skipping model download (user requested)")
         _log.info(
-            "Skipping model download per skip_model_download=True; "
-            "model_key=%s engine=%s id=%s will be registered in .env only",
-            model_key, engine, model_config["id"],
+            "Skipping model download; model_key=%s",
+            model_key or "none",
         )
-        emit(3, "done", "Skipped (model registered, download deferred)")
+        emit(3, "done", "Skipped (no model selected or download deferred)")
         print("[MODEL_SKIPPED] download deferred", flush=True)
         _model_ok = True  # treated as success — user opted out explicitly
     else:

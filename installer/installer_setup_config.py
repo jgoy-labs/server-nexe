@@ -13,7 +13,7 @@ from .installer_display import (
 from .installer_i18n import t, get_lang
 
 
-def generate_env_file(project_root, model_config):
+def generate_env_file(project_root, model_config=None):
     """Generate .env file with security and model config.
 
     Security: API key is NOT printed to stdout to prevent exposure
@@ -38,7 +38,7 @@ def generate_env_file(project_root, model_config):
                 f.write(f"NEXE_ENV=production\n")
                 f.write(f"NEXE_LOG_LEVEL=INFO\n")
                 # Only include modules for the selected engine (avoids MLX errors on Ollama installs)
-                engine = model_config.get('engine', 'ollama')
+                engine = model_config.get('engine', 'ollama') if model_config else 'ollama'
                 base_modules = "security,web_ui_module"
                 if engine == 'ollama':
                     approved_modules = f"{base_modules},ollama_module"
@@ -51,20 +51,26 @@ def generate_env_file(project_root, model_config):
                 f.write(f"NEXE_APPROVED_MODULES={approved_modules}\n")
                 f.write(f"NEXE_LANG={lang}\n")
                 f.write(f"# Model configuration\n")
-                f.write(f"NEXE_DEFAULT_MODEL={model_config['id']}\n")
-                f.write(f"NEXE_MODEL_ENGINE={model_config['engine']}\n")
-                f.write(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
-                # Engine-specific model paths (using relative paths for portability)
-                if model_config['engine'] == 'mlx':
-                    model_name = model_config['id'].split('/')[-1]
-                    f.write(f"NEXE_MLX_MODEL=storage/models/{model_name}\n")
-                elif model_config['engine'] == 'llama_cpp':
-                    # GGUF models are downloaded as single files
-                    filename = model_config['id'].split('/')[-1]
-                    f.write(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
-                    f.write(f"NEXE_LLAMA_CPP_CHAT_FORMAT={model_config.get('chat_format', 'chatml')}\n")
-                elif model_config['engine'] == 'ollama':
-                    f.write(f"NEXE_OLLAMA_MODEL={model_config['id']}\n")
+                if model_config:
+                    f.write(f"NEXE_DEFAULT_MODEL={model_config['id']}\n")
+                    f.write(f"NEXE_MODEL_ENGINE={model_config['engine']}\n")
+                    f.write(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
+                    # Engine-specific model paths (using relative paths for portability)
+                    if model_config['engine'] == 'mlx':
+                        model_name = model_config['id'].split('/')[-1]
+                        f.write(f"NEXE_MLX_MODEL=storage/models/{model_name}\n")
+                    elif model_config['engine'] == 'llama_cpp':
+                        # GGUF models are downloaded as single files
+                        filename = model_config['id'].split('/')[-1]
+                        f.write(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
+                        f.write(f"NEXE_LLAMA_CPP_CHAT_FORMAT={model_config.get('chat_format', 'chatml')}\n")
+                    elif model_config['engine'] == 'ollama':
+                        f.write(f"NEXE_OLLAMA_MODEL={model_config['id']}\n")
+                else:
+                    # No model selected — instal·la sense model, l'usuari afegirà un model manualment
+                    f.write(f"# NEXE_DEFAULT_MODEL=  (configura via 'nexe model pull <name>')\n")
+                    f.write(f"NEXE_MODEL_ENGINE=ollama\n")
+                    f.write(f"NEXE_PROMPT_TIER=small\n")
                 f.write("NEXE_QDRANT_PATH=storage/vectors\n")
                 f.write("# Optional: external Qdrant (Docker, cluster)\n")
                 f.write("# NEXE_QDRANT_URL=http://localhost:6333\n")
