@@ -163,10 +163,15 @@ elif [ -f "$RESOURCES/AppIcon.icns" ]; then
     : # already there
 fi
 
-# ── Step 3: Export models.json ───────────────────────────────────
-if [ -f "$SCRIPT_DIR/export_catalog_json.py" ]; then
-    info "Exporting models.json..."
-    python3 "$SCRIPT_DIR/export_catalog_json.py" "$RESOURCES/models.json" 2>/dev/null || warn "models.json export failed (non-fatal)"
+# ── Step 3: Copy models.json (Swift tier format) ─────────────────
+MODELS_SRC="$SCRIPT_DIR/swift-wizard/Resources/models.json"
+if [ -f "$MODELS_SRC" ]; then
+    info "Copying models.json (tier format)..."
+    cp "$MODELS_SRC" "$RESOURCES/models.json"
+    TIER_COUNT=$(python3 -c "import json; d=json.load(open('$RESOURCES/models.json')); print(len(d))" 2>/dev/null || echo "?")
+    info "  tiers: $TIER_COUNT"
+else
+    warn "models.json not found at $MODELS_SRC"
 fi
 
 # ── Step 4: Create payload.tar.gz ────────────────────────────────
