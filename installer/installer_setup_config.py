@@ -102,6 +102,10 @@ def generate_env_file(project_root, model_config=None):
 
 def _update_env_model_config(env_file, model_config):
     """Update model configuration in existing .env file."""
+    if model_config is None:
+        # No model selected — keep existing .env as-is
+        return
+
     import os
     import secrets
 
