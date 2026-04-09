@@ -69,13 +69,15 @@ VALID_REINSTALL_MODES = (
 DEFAULT_REINSTALL_MODE = REINSTALL_MODE_BACKUP
 
 # Marcadors d'instal·lació existent (qualsevol indica instal·lació prèvia)
-INSTALL_MARKERS = (".env", "storage", "venv", "knowledge")
+INSTALL_MARKERS = (".env", "storage", "venv")
 
 # Paths considerats "dades d'usuari" — backup/wipe els toca
-USER_DATA_PATHS = (".env", "storage", "knowledge")
+# knowledge/ NO és dada d'usuari — és documentació del sistema que ve del payload.
+# Wipe + reinstal·lació sobreescriu knowledge/ automàticament via tar.
+USER_DATA_PATHS = (".env", "storage")
 
 # Paths considerats "sistema" — overwrite també els pot tocar
-SYSTEM_PATHS = ("venv", "qdrant", "nexe", "core", "memory", "personality", "plugins")
+SYSTEM_PATHS = ("venv", "qdrant", "nexe", "core", "memory", "personality", "plugins", "knowledge")
 
 # Keychain identifiers — han de coincidir amb core/crypto/keys.py
 KEYRING_SERVICE = "server-nexe"
