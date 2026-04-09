@@ -199,14 +199,18 @@ class InstallerEngine: ObservableObject {
             tar.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
             tar.arguments = ["xzf", payloadPath, "-C", installPath]
             tar.currentDirectoryURL = URL(fileURLWithPath: installPath)
+            let tarErrPipe = Pipe()
+            tar.standardError = tarErrPipe
 
             do {
                 try tar.run()
                 tar.waitUntilExit()
 
                 if tar.terminationStatus != 0 {
+                    let errData = tarErrPipe.fileHandleForReading.readDataToEndOfFile()
+                    let errMsg = String(data: errData, encoding: .utf8) ?? "unknown"
                     await MainActor.run {
-                        self.appendLog("[ERROR] Failed to extract payload (exit \(tar.terminationStatus))")
+                        self.appendLog("[ERROR] Failed to extract payload (exit \(tar.terminationStatus)): \(errMsg)")
                         self.installError = "Failed to extract payload"
                     }
                     return
