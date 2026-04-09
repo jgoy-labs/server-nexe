@@ -252,78 +252,34 @@ info "Building DMG..."
 # Remove old DMG
 [ -f "$DMG_PATH" ] && rm "$DMG_PATH"
 
-# Create temporary DMG (read-write, empty)
-DMG_TMP="$(mktemp -d)/tmp.dmg"
-DMG_SIZE_MB=$(( $(du -sm "$APP_BUNDLE" | cut -f1) + 50 ))
-[ "$DMG_SIZE_MB" -lt 100 ] && DMG_SIZE_MB=100
-
 # Detach any previous volume with same name
 hdiutil detach "/Volumes/$DMG_VOLUME_NAME" -force 2>/dev/null || true
 
-hdiutil create \
-    -size "${DMG_SIZE_MB}m" \
-    -fs HFS+ \
-    -volname "$DMG_VOLUME_NAME" \
-    "$DMG_TMP" || error "hdiutil create failed"
+# Crear staging dir amb l'app bundle
+DMG_STAGING="$(mktemp -d)/dmg_staging"
+mkdir -p "$DMG_STAGING"
+cp -R "$APP_BUNDLE" "$DMG_STAGING/"
 
-# Mount read-write, copy app and add background
-MOUNT_POINT="/Volumes/$DMG_VOLUME_NAME"
-# Note: Do NOT use -nobrowse here — Finder needs to see the volume
-# for the AppleScript window customization to work (fixes -1728 error)
-hdiutil attach "$DMG_TMP" -readwrite || error "hdiutil attach failed"
+info "Building DMG..."
+# create-dmg gestiona background, icones i DS_Store correctament a Sequoia
+# ⚠️ POSICIÓ VALIDADA — NO CANVIAR {260, 145} sense revisar el background (520x400)
+CREATE_DMG="$(which create-dmg 2>/dev/null || echo /opt/homebrew/bin/create-dmg)"
+if [ ! -x "$CREATE_DMG" ]; then
+    error "create-dmg no trobat. Instal·la: brew install create-dmg"
+fi
 
-# Copy app bundle to DMG
-cp -R "$APP_BUNDLE" "$MOUNT_POINT/"
+"$CREATE_DMG" \
+    --volname "$DMG_VOLUME_NAME" \
+    --background "$DMG_BACKGROUND" \
+    --window-pos 100 100 \
+    --window-size 520 400 \
+    --icon-size 128 \
+    --icon "$APP_NAME.app" 260 145 \
+    --no-internet-enable \
+    "$DMG_PATH" \
+    "$DMG_STAGING/" || error "create-dmg failed"
 
-# Add background
-mkdir -p "$MOUNT_POINT/.background"
-cp "$DMG_BACKGROUND" "$MOUNT_POINT/.background/background.png"
-
-# Set window properties via AppleScript
-# Sequoia fix: use activate + POSIX alias for background picture
-# Wait for Finder to index the volume
-sleep 3
-MOUNT_POSIX="/Volumes/$DMG_VOLUME_NAME"
-osascript - "$MOUNT_POSIX" "$DMG_VOLUME_NAME" "$APP_NAME" <<'APPLESCRIPT'
-on run {mountPath, volName, appName}
-    set bgAlias to POSIX file (mountPath & "/.background/background.png")
-    tell application "Finder"
-        activate
-        tell disk volName
-            open
-            set current view of container window to icon view
-            set toolbar visible of container window to false
-            set statusbar visible of container window to false
-            set the bounds of container window to {100, 100, 620, 500}
-            set viewOptions to the icon view options of container window
-            set arrangement of viewOptions to not arranged
-            set icon size of viewOptions to 128
-            set background picture of viewOptions to bgAlias
-            -- ⚠️ POSICIÓ VALIDADA — NO CANVIAR sense revisar amb el background (520x400)
-            -- Finestra: {100,100,620,500} = 520x400. Icona centrada sobre el logo.
-            set position of item (appName & ".app") of container window to {260, 145}
-            close
-            open
-            update without registering applications
-            delay 2
-            close
-        end tell
-    end tell
-end run
-APPLESCRIPT
-
-# Unmount
-sync
-sleep 1
-hdiutil detach "$MOUNT_POINT" -force 2>/dev/null || true
-sleep 1
-
-# Convert to compressed (read-only)
-hdiutil convert "$DMG_TMP" \
-    -format ULMO \
-    -o "$DMG_PATH" || error "hdiutil convert failed"
-
-rm -f "$DMG_TMP"
+rm -rf "$DMG_STAGING"
 
 # ── Step 9: Sign DMG + Notarize ──────────────────────────────────
 if security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
