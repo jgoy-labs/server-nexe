@@ -280,30 +280,36 @@ mkdir -p "$MOUNT_POINT/.background"
 cp "$DMG_BACKGROUND" "$MOUNT_POINT/.background/background.png"
 
 # Set window properties via AppleScript
-# Wait for Finder to index the volume (fixes intermittent -1728 error)
-sleep 2
-osascript <<APPLESCRIPT
-tell application "Finder"
-    tell disk "$DMG_VOLUME_NAME"
-        open
-        set current view of container window to icon view
-        set toolbar visible of container window to false
-        set statusbar visible of container window to false
-        set the bounds of container window to {100, 100, 620, 500}
-        set viewOptions to the icon view options of container window
-        set arrangement of viewOptions to not arranged
-        set icon size of viewOptions to 128
-        set background picture of viewOptions to file ".background:background.png"
-        -- ⚠️ POSICIÓ VALIDADA — NO CANVIAR sense revisar amb el background (520x400)
-        -- Finestra: {100,100,620,500} = 520x400. Icona centrada sobre el logo.
-        set position of item "$APP_NAME.app" of container window to {260, 145}
-        close
-        open
-        update without registering applications
-        delay 1
-        close
+# Sequoia fix: use activate + POSIX alias for background picture
+# Wait for Finder to index the volume
+sleep 3
+MOUNT_POSIX="/Volumes/$DMG_VOLUME_NAME"
+osascript - "$MOUNT_POSIX" "$DMG_VOLUME_NAME" "$APP_NAME" <<'APPLESCRIPT'
+on run {mountPath, volName, appName}
+    set bgAlias to POSIX file (mountPath & "/.background/background.png")
+    tell application "Finder"
+        activate
+        tell disk volName
+            open
+            set current view of container window to icon view
+            set toolbar visible of container window to false
+            set statusbar visible of container window to false
+            set the bounds of container window to {100, 100, 620, 500}
+            set viewOptions to the icon view options of container window
+            set arrangement of viewOptions to not arranged
+            set icon size of viewOptions to 128
+            set background picture of viewOptions to bgAlias
+            -- ⚠️ POSICIÓ VALIDADA — NO CANVIAR sense revisar amb el background (520x400)
+            -- Finestra: {100,100,620,500} = 520x400. Icona centrada sobre el logo.
+            set position of item (appName & ".app") of container window to {260, 145}
+            close
+            open
+            update without registering applications
+            delay 2
+            close
+        end tell
     end tell
-end tell
+end run
 APPLESCRIPT
 
 # Unmount
