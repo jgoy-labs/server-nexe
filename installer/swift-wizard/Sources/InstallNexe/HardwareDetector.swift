@@ -11,13 +11,15 @@ struct HardwareInfo {
     let diskFreeGB: Int
     let diskTotalGB: Int
 
-    /// Mida recomanada de model (mateixa lògica que installer_hardware.py)
-    var recommendedSize: String {
-        let usableRAM = Double(ramGB) * 0.55
-        if usableRAM >= 28 { return "xl" }
-        if usableRAM >= 8 { return "large" }
-        if usableRAM >= 5 { return "medium" }
-        return "small"
+    /// Tier de RAM recomanat — 7 tiers, regla del 25% (mateixa lògica que installer_hardware.py)
+    var ramTier: String {
+        if ramGB >= 128 { return "tier_128" }
+        if ramGB >= 64  { return "tier_64" }
+        if ramGB >= 48  { return "tier_48" }
+        if ramGB >= 32  { return "tier_32" }
+        if ramGB >= 24  { return "tier_24" }
+        if ramGB >= 16  { return "tier_16" }
+        return "tier_8"
     }
 
     static func detect() -> HardwareInfo {

@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import pytest
 import time
-from ..module import SanitizerModule, SanitizeResult, get_sanitizer
+from ..module import SanitizerModule, get_sanitizer
 from ..core.patterns import (
   JAILBREAK_PATTERNS,
   INJECTION_PATTERNS,

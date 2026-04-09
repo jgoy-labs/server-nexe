@@ -9,10 +9,9 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import pytest
 from ..module import SanitizerModule, SanitizeResult, get_sanitizer
 from ..core.detectors import detect_jailbreak, detect_prompt_injection, get_severity, detect_all
-from ..core.patterns import MAX_INPUT_LENGTH, MAX_SCAN_LENGTH, SEVERITY_KEYWORDS
+from ..core.patterns import MAX_INPUT_LENGTH, MAX_SCAN_LENGTH
 from ..health import get_health
 
 

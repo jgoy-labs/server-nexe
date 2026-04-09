@@ -6,10 +6,9 @@ Lines: 32 (METRICS_ENABLED=True), 42-46 (_is_loopback_ip), 89-94 (secondary key 
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
 from datetime import datetime, timezone, timedelta
-import os
 
 
 class TestIsLoopbackIp:
@@ -192,7 +191,7 @@ class TestExpiredKeyReasons:
     @pytest.mark.asyncio
     async def test_primary_expired_reason(self):
         """Line 180: primary_key_expired reason. Need a valid secondary so it doesn't go to 500."""
-        from plugins.security.core.auth_models import ApiKeyData, ApiKeyConfig, KeyStatus
+        from plugins.security.core.auth_models import ApiKeyData, ApiKeyConfig
 
         past = datetime.now(timezone.utc) - timedelta(days=10)
         primary = ApiKeyData(key="old-primary", expires_at=past)

@@ -9,14 +9,17 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from qdrant_client import QdrantClient
+if TYPE_CHECKING:
+    from qdrant_client import QdrantClient
 
 from ..constants import DEFAULT_VECTOR_SIZE
 

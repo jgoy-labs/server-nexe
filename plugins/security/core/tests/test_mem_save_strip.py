@@ -1,5 +1,4 @@
 """Tests for MEM_SAVE tag stripping from user input."""
-import pytest
 from plugins.security.core.input_sanitizers import strip_memory_tags
 
 

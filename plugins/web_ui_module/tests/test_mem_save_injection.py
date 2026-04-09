@@ -11,7 +11,6 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import pytest
 
 from plugins.web_ui_module.api.routes_chat import (
     _is_valid_mem_save_text,

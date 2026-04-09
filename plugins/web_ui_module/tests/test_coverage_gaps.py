@@ -11,12 +11,10 @@ Covers:
 
 import pytest
 import asyncio
-import json
 import time
 import os
-from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 
 from plugins.web_ui_module.core.session_manager import ChatSession, SessionManager
 from plugins.web_ui_module.core.file_handler import FileHandler
@@ -228,7 +226,6 @@ class TestWebUIModuleGaps:
     async def test_chat_not_initialized(self):
         """Line 210: chat when not initialized returns 503."""
         from plugins.web_ui_module.module import WebUIModule
-        from fastapi import HTTPException
         mod = WebUIModule()
         assert mod._initialized is False
 
@@ -291,7 +288,6 @@ class TestWebUIModuleGaps:
     async def test_stream_chat_response_error(self):
         """Lines 361-364: streaming with error response."""
         from plugins.web_ui_module.module import WebUIModule
-        import httpx
         mod = WebUIModule()
         mod._initialized = True
         mod.api_base_url = "http://127.0.0.1:99999"  # Invalid port
@@ -311,7 +307,6 @@ class TestWebUIModuleGaps:
     async def test_fetch_chat_response_error(self):
         """Lines 368, 370: non-streaming with error response."""
         from plugins.web_ui_module.module import WebUIModule
-        from fastapi import HTTPException
         mod = WebUIModule()
         mod._initialized = True
         mod.api_base_url = "http://127.0.0.1:99999"  # Invalid port

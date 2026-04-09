@@ -9,7 +9,6 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import pytest
 from plugins.security.security_logger.sanitizers import (
   obfuscate_ip,
   redact_api_key,

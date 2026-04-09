@@ -12,7 +12,6 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import pytest
 
 from plugins.web_ui_module.api.routes_chat import compute_context_budget
 

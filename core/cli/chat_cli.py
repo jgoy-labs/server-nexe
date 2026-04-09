@@ -257,7 +257,7 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
         return
 
     # Parse collection names to internal IDs
-    _COLL_ALIASES = {'memory': 'personal_memory', 'knowledge': 'user_knowledge', 'docs': 'nexe_documentation'}
+    _COLL_ALIASES = {'memory': 'personal_memory', 'knowledge': 'nexe_documentation', 'docs': 'nexe_documentation'}
     _rag_collections = None
     if collections:
         _rag_collections = [_COLL_ALIASES.get(c.strip(), c.strip()) for c in collections.split(',')]

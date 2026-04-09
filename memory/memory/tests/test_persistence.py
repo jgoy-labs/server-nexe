@@ -290,7 +290,7 @@ class TestPersistenceManagerAdditional:
 
         # Make _store_qdrant fail
         with patch.object(pm, '_store_qdrant', side_effect=Exception("Qdrant error")):
-            with pytest.raises(StorageError, match="Rollback performed"):
+            with pytest.raises(StorageError, match="Strict rollback"):
                 await pm.store(entry, embedding=[0.1] * 768, strict=True)
 
         # Entry should have been rolled back from SQLite

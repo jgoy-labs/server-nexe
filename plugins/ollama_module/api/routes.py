@@ -13,9 +13,7 @@ www.jgoy.net · https://server-nexe.org
 import json
 import logging
 from pathlib import Path
-from typing import List
-
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -23,19 +21,6 @@ from plugins.security.core.validators import validate_safe_path
 from plugins.security.core.auth import require_api_key
 
 logger = logging.getLogger(__name__)
-
-
-class ChatMessage(BaseModel):
-    """Model per missatge de chat"""
-    role: str
-    content: str
-
-
-class ChatRequest(BaseModel):
-    """Request per chat amb Ollama"""
-    model: str
-    messages: List[ChatMessage]
-    stream: bool = True
 
 
 class PullModelRequest(BaseModel):
@@ -115,29 +100,6 @@ def create_router(module_instance) -> APIRouter:
             progress_stream(),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-        )
-
-    @router.post("/api/chat")
-    async def chat(request: ChatRequest, _: str = Depends(require_api_key)):
-        """Chat with Ollama model (streaming). Requires API key."""
-        module = _get_module()
-        messages = [{"role": m.role, "content": m.content} for m in request.messages]
-
-        async def chat_stream():
-            try:
-                async for chunk in module.chat(model=request.model, messages=messages, stream=True):
-                    data = json.dumps(chunk)
-                    yield f"data: {data}\n\n"
-                    if chunk.get("done", False):
-                        break
-            except Exception as e:
-                logger.error("Chat failed: %s", e)
-                yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
-
-        return StreamingResponse(
-            chat_stream(),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}
         )
 
     @router.get("/api/models/{model_name}/info", dependencies=[Depends(require_api_key)])

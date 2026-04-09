@@ -10,11 +10,8 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
-from pathlib import Path
 
 from ..logger import SecurityEventLogger
-from ..enums import SecurityEventType, SecuritySeverity
 
 
 @pytest.fixture

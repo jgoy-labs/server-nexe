@@ -231,7 +231,7 @@ Aquestes auditories IA troben molts problemes pero **no son exhaustives** — hi
 
 - [ ] El fitxer `.env` te permisos restringits (chmod 600)
 - [ ] Les claus API son fortes (32+ caracters hexadecimals)
-- [ ] El port de Qdrant (6333) no esta exposat a la xarxa
+- [x] Qdrant embedded — cap port de xarxa exposat (no calen regles de firewall per Qdrant)
 - [ ] El port del servidor (9119) esta vinculat a 127.0.0.1 (no 0.0.0.0)
 - [ ] L'encriptacio de disc esta activada (FileVault a macOS, LUKS a Linux)
 - [ ] El rate limiting esta configurat adequadament

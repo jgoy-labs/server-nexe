@@ -7,7 +7,7 @@ struct ModelPickerView: View {
     let onNext: () -> Void
     let onBack: () -> Void
 
-    @State private var selectedTab: String = "medium"
+    @State private var selectedTab: String = "tier_16"
     @State private var selectedEngineOption: String = "auto"
     @State private var customOllamaName: String = ""
     @State private var customHFRepo: String = ""
@@ -26,14 +26,21 @@ struct ModelPickerView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
-            // Tabs (small/medium/large/custom)
-            Picker("", selection: $selectedTab) {
-                Text(t("model_tab_small")).tag("small")
-                Text(t("model_tab_medium")).tag("medium")
-                Text(t("model_tab_large")).tag("large")
-                Text(t("model_tab_custom")).tag("custom")
+            // Tabs RAM (7 tiers + custom)
+            ScrollView(.horizontal, showsIndicators: false) {
+                Picker("", selection: $selectedTab) {
+                    Text("8 GB").tag("tier_8")
+                    Text("16 GB").tag("tier_16")
+                    Text("24 GB").tag("tier_24")
+                    Text("32 GB").tag("tier_32")
+                    Text("48 GB").tag("tier_48")
+                    Text("64 GB").tag("tier_64")
+                    Text("128 GB").tag("tier_128")
+                    Text(t("model_tab_custom")).tag("custom")
+                }
+                .pickerStyle(.segmented)
+                .frame(minWidth: 640)
             }
-            .pickerStyle(.segmented)
             .padding(.horizontal, 24)
 
             if selectedTab == "custom" {
@@ -56,7 +63,7 @@ struct ModelPickerView: View {
                 ScrollView {
                     LazyVStack(spacing: 10) {
                         ForEach(engine.catalog.models(for: selectedTab)) { model in
-                            let tooLarge = model.ramGB > Double(engine.hardware.ramGB) * 0.55
+                            let tooLarge = model.ramGB > Double(engine.hardware.ramGB) * 0.75
                             ModelCard(
                                 model: model,
                                 isSelected: engine.selectedModel?.key == model.key,
@@ -117,15 +124,13 @@ struct ModelPickerView: View {
             .padding(.bottom, 16)
         }
         .onAppear {
-            selectedTab = engine.hardware.recommendedSize
-            if selectedTab == "xl" { selectedTab = "large" }
+            selectedTab = engine.hardware.ramTier
         }
     }
 
     private func isRecommended(_ model: AIModel) -> Bool {
-        let size = engine.hardware.recommendedSize
-        let sizeModels = engine.catalog.models(for: size == "xl" ? "large" : size)
-        return sizeModels.first?.key == model.key
+        let tier = engine.hardware.ramTier
+        return engine.catalog.models(for: tier).first?.key == model.key
     }
 
     private func t(_ key: String) -> String {

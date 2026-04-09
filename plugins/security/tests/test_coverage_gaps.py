@@ -16,12 +16,10 @@ Covers:
 """
 
 import pytest
-import os
-import json
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
 
 
@@ -35,7 +33,7 @@ class TestSecurityManifestNoOpLimiter:
     def test_noop_limiter_limit_returns_decorator(self):
         """Line 25-28: NoOpLimiter.limit() returns identity decorator."""
         from plugins.security.manifest import (
-            router_public, get_module_instance,
+            get_module_instance,
         )
         instance = get_module_instance()
         assert instance.metadata.name == "security"

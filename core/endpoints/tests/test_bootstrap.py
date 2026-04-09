@@ -540,7 +540,7 @@ class TestRegenerateBootstrap:
 
         with patch("core.bootstrap_tokens.get_bootstrap_token",
                    return_value={"token": "T", "expires": 0, "used": True}), \
-             patch("core.lifespan.generate_bootstrap_token", return_value="NEW-TOKEN"), \
+             patch("core.lifespan_tokens.generate_bootstrap_token", return_value="NEW-TOKEN"), \
              patch("core.bootstrap_tokens.set_bootstrap_token"):
             result = asyncio.run(
                 regenerate_bootstrap(mock_request)
@@ -558,7 +558,7 @@ class TestRegenerateBootstrap:
 
         with patch("core.bootstrap_tokens.get_bootstrap_token",
                    return_value={"token": "T", "expires": 0, "used": True}), \
-             patch("core.lifespan.generate_bootstrap_token", return_value="NEW-TOKEN"), \
+             patch("core.lifespan_tokens.generate_bootstrap_token", return_value="NEW-TOKEN"), \
              patch("core.bootstrap_tokens.set_bootstrap_token"):
             result = asyncio.run(
                 regenerate_bootstrap(mock_request)

@@ -26,16 +26,17 @@ expires: null
 | Permission denied on setup.sh | Missing execute permission | `chmod +x setup.sh` |
 | ModuleNotFoundError | Dependencies not installed | Activate venv: `source venv/bin/activate`, then `pip install -r requirements.txt` |
 | rumps import error on Linux | macOS-only dependency | Normal on Linux — rumps is in requirements-macos.txt, not requirements.txt |
-| Qdrant binary not found | Not downloaded | Run installer again, or download manually for your platform |
 
 ## Server Startup Errors
 
 | Error | Cause | Solution |
 |-------|-------|----------|
 | Port 9119 already in use | Another process on that port | `lsof -i :9119` and kill, or change port in server.toml |
-| Qdrant connection refused | Qdrant not running or wrong port | Check port 6333, restart server with `./nexe go` |
+| Qdrant connection refused | Qdrant embedded failed to initialize | Restart the server with `./nexe go`. If the issue persists, check logs at `storage/logs/`. |
 | Ollama not available | Ollama not installed or not running | Install from ollama.com. Server will auto-start Ollama on boot. |
 | asyncio.Lock deadlock | Python 3.12 event loop issue | Fixed in v0.8.2 via lazy init in module_lifecycle.py. Update to latest. |
+| Server already running (PID X) | Another active server instance | Use "Quit" from the tray, or `pkill -9 server-nexe`. Verify: `lsof -iTCP:9119` |
+| Orphaned server (Quit from tray doesn't work) | Bug pre-v0.9.0 (fixed) — tray was not sending SIGTERM to server | Update to v0.9.0+. Workaround: `pkill -f "core.app"` or `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
 
 ## Web UI Errors
 

@@ -5,7 +5,7 @@ Lines: 23-30 (NoOpLimiter), 105-142 (scan logic), 184-186 (report error),
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -16,7 +16,6 @@ class TestNoOpLimiterFallback:
 
     def test_noop_limiter_decorator_passthrough(self):
         """NoOpLimiter.limit() should return a decorator that returns the function unchanged."""
-        from plugins.security.manifest import RATE_LIMITING_AVAILABLE
 
         # If rate limiting is available, we can't test NoOpLimiter directly,
         # but we can construct one manually
@@ -319,7 +318,6 @@ class TestSecurityScanAsyncChecks:
 
     def test_scan_async_check_run(self, client, auth):
         """Lines 119-127: async check.run() coroutine function branch."""
-        import asyncio
 
         mock_auth = MagicMock()
         # Make run an async function
@@ -386,7 +384,7 @@ class TestReportExceptionPath:
 
     def test_report_exception_path(self):
         """Lines 184-186: exception in report causes 500."""
-        from plugins.security.manifest import router_public, MODULE_NAME, MODULE_METADATA
+        from plugins.security.manifest import router_public
         app = FastAPI()
         app.include_router(router_public)
         client = TestClient(app, raise_server_exceptions=False)

@@ -231,7 +231,7 @@ Estas auditorias IA encuentran muchos problemas pero **no son exhaustivas** — 
 
 - [ ] El fichero `.env` tiene permisos restringidos (chmod 600)
 - [ ] Las API keys son fuertes (32+ caracteres hexadecimales)
-- [ ] El puerto de Qdrant (6333) no esta expuesto a la red
+- [x] Qdrant embedded — ningun puerto de red expuesto (no se necesitan reglas de firewall para Qdrant)
 - [ ] El puerto del servidor (9119) esta vinculado a 127.0.0.1 (no 0.0.0.0)
 - [ ] Encriptacion de disco activada (FileVault en macOS, LUKS en Linux)
 - [ ] Rate limiting configurado adecuadamente

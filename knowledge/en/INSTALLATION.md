@@ -93,7 +93,7 @@ cd server-nexe
 docker-compose up
 ```
 
-- **Dockerfile:** Python 3.12-slim, embedded Qdrant binary (auto-detects linux-amd64/arm64), non-root user (`nexe`), EXPOSE 9119 6333
+- **Dockerfile:** Python 3.12-slim, Qdrant embedded (storage at `storage/vectors/`), non-root user (`nexe`), EXPOSE 9119
 - **docker-compose.yml:** Two services — Nexe + Ollama
 - **docker-entrypoint.sh:** Sequential start (Qdrant → wait for health → Nexe), 15s timeout with warning
 
@@ -169,7 +169,7 @@ Accessible from tray menu. Double confirmation, calculates space, removes Dock/L
 | Problem | Solution |
 |---------|----------|
 | Port 9119 in use | `lsof -i :9119` then kill, or change in server.toml |
-| Qdrant won't start | Check port 6333, check binary permissions |
+| Qdrant won't start | Verify that `storage/vectors/` is writable and has no lock files (`*.lock`). Restart the server. |
 | Ollama not found | Install from ollama.com, or use MLX/llama.cpp |
 | Python version error | Requires 3.11+. DMG bundles 3.12. |
 | MLX not available | Apple Silicon only. Use llama.cpp or Ollama. |

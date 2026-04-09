@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from memory.embeddings.constants import DEFAULT_VECTOR_SIZE
+from memory.embeddings.adapters import QdrantAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -38,34 +39,28 @@ class VectorIndex:
         self._init_client()
 
     def _init_client(self):
-        """Initialize the Qdrant embedded client."""
+        """Initialize the QdrantAdapter embedded client."""
         try:
-            from qdrant_client.models import Distance, VectorParams
-            from core.qdrant_pool import get_qdrant_client
-
             self._qdrant_path.mkdir(parents=True, exist_ok=True)
-            self._client = get_qdrant_client(path=str(self._qdrant_path))
+            self._client = QdrantAdapter.from_pool(
+                collection_name=COLLECTION_NAME,
+                path=str(self._qdrant_path),
+            )
 
-            # Ensure collection exists
-            collections = self._client.get_collections().collections
-            names = [c.name for c in collections]
-            if COLLECTION_NAME not in names:
-                self._client.create_collection(
-                    collection_name=COLLECTION_NAME,
-                    vectors_config=VectorParams(
-                        size=VECTOR_SIZE,
-                        distance=Distance.COSINE,
-                    ),
-                )
+            # Ensure collection exists via helper (oculta VectorParams/Distance)
+            created = self._client.ensure_collection(
+                collection_name=COLLECTION_NAME,
+                vector_size=VECTOR_SIZE,
+                distance="cosine",
+            )
+            if created:
                 logger.info(
                     "Created collection '%s' at %s",
                     COLLECTION_NAME, self._qdrant_path,
                 )
 
             self._available = True
-            logger.info(
-                "VectorIndex initialized at %s", self._qdrant_path
-            )
+            logger.info("VectorIndex initialized at %s", self._qdrant_path)
         except Exception as e:
             logger.warning("VectorIndex init failed: %s", e)
             self._available = False
@@ -94,14 +89,11 @@ class VectorIndex:
         if not self._available or not entries:
             return 0
 
-        from qdrant_client.models import PointStruct
-
-        points = []
-        for entry, embedding in zip(entries, embeddings):
-            point = PointStruct(
-                id=entry["id"],
-                vector=embedding,
-                payload={
+        points_data = [
+            {
+                "id": entry["id"],
+                "vector": embedding,
+                "payload": {
                     "rdbms_id": entry.get("rdbms_id", entry["id"]),
                     "user_id": entry["user_id"],
                     "namespace": entry.get("namespace", "default"),
@@ -111,14 +103,15 @@ class VectorIndex:
                     "trust_level": entry.get("trust_level", "untrusted"),
                     "created_at": entry.get("created_at"),
                 },
-            )
-            points.append(point)
-
-        self._client.upsert(
+            }
+            for entry, embedding in zip(entries, embeddings)
+        ]
+        # upsert_points oculta PointStruct al caller
+        self._client.upsert_points(
             collection_name=COLLECTION_NAME,
-            points=points,
+            points_data=points_data,
         )
-        return len(points)
+        return len(points_data)
 
     def search(
         self,
@@ -144,21 +137,18 @@ class VectorIndex:
         if not self._available:
             return []
 
-        from qdrant_client.models import Filter, FieldCondition, MatchValue
-
-        conditions = [
-            FieldCondition(key="user_id", match=MatchValue(value=user_id)),
-            FieldCondition(key="state", match=MatchValue(value="active")),
+        # search_with_filter oculta Filter/FieldCondition/MatchValue al caller
+        filter_conditions = [
+            {"key": "user_id", "value": user_id},
+            {"key": "state", "value": "active"},
         ]
         if namespace:
-            conditions.append(
-                FieldCondition(key="namespace", match=MatchValue(value=namespace))
-            )
+            filter_conditions.append({"key": "namespace", "value": namespace})
 
-        results = self._client.search(
+        results = self._client.search_with_filter(
             collection_name=COLLECTION_NAME,
             query_vector=embedding,
-            query_filter=Filter(must=conditions),
+            filter_conditions=filter_conditions,
             limit=limit,
             score_threshold=threshold,
         )
@@ -177,13 +167,11 @@ class VectorIndex:
         if not self._available or not ids:
             return 0
 
-        from qdrant_client.models import PointIdsList
-
-        self._client.delete(
+        # delete_by_ids oculta PointIdsList al caller
+        return self._client.delete_by_ids(
             collection_name=COLLECTION_NAME,
-            points_selector=PointIdsList(points=ids),
+            ids=ids,
         )
-        return len(ids)
 
     def count(self) -> int:
         """Count total entries in the index."""
@@ -193,7 +181,7 @@ class VectorIndex:
         return info.points_count
 
     def close(self):
-        """Close the Qdrant client."""
+        """Close the QdrantAdapter client."""
         if self._client:
             try:
                 self._client.close()

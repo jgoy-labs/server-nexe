@@ -1,344 +1,337 @@
 {
-  "small": [
+  "tier_8": [
     {
-      "key": "qwen35_2b",
-      "name": "Qwen3.5 2B",
+      "key": "qwen35_9b",
+      "name": "Qwen3.5 9B",
       "origin": "Alibaba",
       "year": 2026,
-      "lang": {
-        "ca": "Multilingüe +100 idiomes",
-        "es": "Multilingüe +100 idiomas",
-        "en": "Multilingual +100 languages"
-      },
-      "params": "2B",
-      "disk_gb": 1.5,
-      "ram_gb": 2.0,
-      "description": {
-        "ca": "Multimodal, tool calling i thinking. Successor de Qwen3",
-        "es": "Multimodal, tool calling y thinking. Sucesor de Qwen3",
-        "en": "Multimodal, tool calling and thinking. Qwen3 successor"
-      },
-      "mlx": null,
-      "ollama": "qwen3.5:2b",
+      "role": "general",
+      "params": "9B",
+      "ram_gb": 5.5,
+      "disk_gb": 6.0,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
+      "ollama": "qwen3.5:9b",
       "gguf": null,
-      "chat_format": "chatml",
-      "prompt_tier": "small"
+      "iberic": false,
+      "description": {
+        "ca": "El millor equilibri qualitat/velocitat per a 8 GB. Multilingüe, thinking, visió (VL). Apache 2.0.",
+        "es": "El mejor equilibrio calidad/velocidad para 8 GB. Multilingüe, thinking, visión (VL). Apache 2.0.",
+        "en": "Best quality/speed balance for 8 GB. Multilingual, thinking, vision (VL). Apache 2.0."
+      }
+    },
+    {
+      "key": "gemma4_e4b",
+      "name": "Gemma 4 E4B",
+      "origin": "Google",
+      "year": 2026,
+      "role": "multimodal",
+      "params": "8B totals / ~4-8B efectius (MoE)",
+      "ram_gb": 5.0,
+      "disk_gb": 4.5,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
+      "ollama": "gemma4:e4b",
+      "gguf": null,
+      "iberic": false,
+      "description": {
+        "ca": "Multimodal, thinking configurable, visió (imatge i àudio). Excel·lent per creativitat i anàlisi visual.",
+        "es": "Multimodal, thinking configurable, visión (imagen y audio). Excelente para creatividad y análisis visual.",
+        "en": "Multimodal, configurable thinking, vision (image and audio). Excellent for creativity and visual analysis."
+      }
     },
     {
       "key": "salamandra2b",
       "name": "Salamandra 2B",
       "origin": "BSC/AINA (Catalunya)",
       "year": 2025,
-      "lang": {
-        "ca": "Català, Castellà, Euskera, Gallec",
-        "es": "Catalán, Castellano, Euskera, Gallego",
-        "en": "Catalan, Spanish, Basque, Galician"
-      },
+      "role": "iberic",
       "params": "2B",
-      "disk_gb": 1.5,
       "ram_gb": 2.5,
-      "description": {
-        "ca": "Optimitzat per llengües ibèriques",
-        "es": "Optimizado para lenguas ibéricas",
-        "en": "Optimized for Iberian languages"
-      },
-      "mlx": null,
+      "disk_gb": 1.5,
+      "backends": ["ollama"],
+      "mlx": false,
       "ollama": "hdnh2006/salamandra-2b-instruct",
       "gguf": null,
-      "chat_format": "chatml",
-      "prompt_tier": "small"
-    },
-    {
-      "key": "qwen35_4b",
-      "name": "Qwen3.5 4B",
-      "origin": "Alibaba",
-      "year": 2026,
-      "lang": {
-        "ca": "Multilingüe (excel·lent català)",
-        "es": "Multilingüe (excelente catalán)",
-        "en": "Multilingual (excellent Catalan)"
-      },
-      "params": "4B",
-      "disk_gb": 3.4,
-      "ram_gb": 4.0,
+      "iberic": true,
       "description": {
-        "ca": "Multimodal, tool calling, thinking. Ideal per Macs amb 8 GB",
-        "es": "Multimodal, tool calling, thinking. Ideal para Macs con 8 GB",
-        "en": "Multimodal, tool calling, thinking. Ideal for 8 GB Macs"
-      },
-      "mlx": null,
-      "ollama": "qwen3.5:4b",
-      "gguf": null,
-      "chat_format": "chatml",
-      "prompt_tier": "small"
+        "ca": "Entrenat des de zero en català, castellà i llengües ibèriques al MareNostrum 5. Petit però sorprenent.",
+        "es": "Entrenado desde cero en catalán, castellano y lenguas ibéricas en MareNostrum 5. Pequeño pero sorprendente.",
+        "en": "Trained from scratch in Catalan, Spanish and Iberian languages on MareNostrum 5. Small but surprising."
+      }
     }
   ],
-  "medium": [
+  "tier_16": [
     {
-      "key": "mistral7b",
-      "name": "Mistral 7B",
-      "origin": "Mistral AI (França)",
-      "year": 2023,
-      "lang": {
-        "ca": "Multilingüe",
-        "es": "Multilingüe",
-        "en": "Multilingual"
-      },
-      "params": "7B",
-      "disk_gb": 4.1,
-      "ram_gb": 5.5,
+      "key": "llama4_scout",
+      "name": "Llama 4 Scout",
+      "origin": "Meta",
+      "year": 2026,
+      "role": "context",
+      "params": "109B totals / 17B actius (MoE)",
+      "ram_gb": 8.0,
+      "disk_gb": 7.5,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
+      "ollama": "llama4:scout",
+      "gguf": null,
+      "iberic": false,
       "description": {
-        "ca": "Excel·lent equilibri qualitat/velocitat",
-        "es": "Excelente equilibrio calidad/velocidad",
-        "en": "Excellent quality/speed balance"
-      },
-      "mlx": "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
-      "ollama": "mistral:latest",
-      "gguf": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf",
-      "chat_format": "chatml",
-      "prompt_tier": "full"
+        "ca": "Context de 10 milions de tokens ⚡ — el disbarat útil per a documents enormes. Thinking fort i visió nativa.",
+        "es": "Contexto de 10 millones de tokens ⚡ — el disparate útil para documentos enormes. Thinking fuerte y visión nativa.",
+        "en": "10 million token context ⚡ — absurdly useful for huge documents. Strong thinking and native vision."
+      }
     },
     {
       "key": "salamandra7b",
       "name": "Salamandra 7B",
       "origin": "BSC/AINA (Catalunya)",
       "year": 2025,
-      "lang": {
-        "ca": "Català, Castellà, Euskera, Gallec",
-        "es": "Catalán, Castellano, Euskera, Gallego",
-        "en": "Catalan, Spanish, Basque, Galician"
-      },
+      "role": "iberic",
       "params": "7B",
-      "disk_gb": 4.9,
       "ram_gb": 6.5,
-      "description": {
-        "ca": "El millor per català i llengües ibèriques",
-        "es": "El mejor para catalán y lenguas ibéricas",
-        "en": "Best for Catalan and Iberian languages"
-      },
-      "mlx": null,
+      "disk_gb": 4.9,
+      "backends": ["ollama", "llama.cpp"],
+      "mlx": false,
       "ollama": "hdnh2006/salamandra-7b-instruct:q4_K_M",
       "gguf": "https://huggingface.co/cstr/salamandra-7b-instruct-GGUF/resolve/main/salamandra-7b-instruct-Q4_K_M.gguf",
-      "chat_format": "chatml",
-      "prompt_tier": "full"
-    },
-    {
-      "key": "gemma3_12b",
-      "name": "Gemma 3 12B",
-      "origin": "Google DeepMind",
-      "year": 2025,
-      "lang": {
-        "ca": "Multilingüe (excel·lent català)",
-        "es": "Multilingüe (excelente catalán)",
-        "en": "Multilingual (excellent Catalan)"
-      },
-      "params": "12B",
-      "disk_gb": 7.0,
-      "ram_gb": 9.0,
+      "iberic": true,
       "description": {
-        "ca": "Molt bon seguiment d'instruccions i RAG",
-        "es": "Muy buen seguimiento de instrucciones y RAG",
-        "en": "Excellent instruction following and RAG"
-      },
-      "mlx": "mlx-community/gemma-3-12b-it-4bit",
-      "ollama": "gemma3:12b",
-      "gguf": null,
-      "chat_format": "chatml",
-      "prompt_tier": "full"
-    },
-    {
-      "key": "qwen35_9b",
-      "name": "Qwen3.5 9B",
-      "origin": "Alibaba",
-      "year": 2026,
-      "lang": {
-        "ca": "Multilingüe (excel·lent català)",
-        "es": "Multilingüe (excelente catalán)",
-        "en": "Multilingual (excellent Catalan)"
-      },
-      "params": "9B",
-      "disk_gb": 6.6,
-      "ram_gb": 8.0,
-      "description": {
-        "ca": "Multimodal, thinking, tool calling. Millor relacio qualitat/mida de la familia. Apache 2.0",
-        "es": "Multimodal, thinking, tool calling. Mejor relacion calidad/tamaño de la familia. Apache 2.0",
-        "en": "Multimodal, thinking, tool calling. Best quality/size ratio of the family. Apache 2.0"
-      },
-      "mlx": null,
-      "ollama": "qwen3.5:9b",
-      "gguf": null,
-      "chat_format": "chatml",
-      "prompt_tier": "full"
+        "ca": "El model recomanat per a feina seriosa en català. Entrenat des de zero al BSC.",
+        "es": "El modelo recomendado para trabajo serio en catalán. Entrenado desde cero en el BSC.",
+        "en": "The recommended model for serious Catalan work. Trained from scratch at BSC."
+      }
     }
   ],
-  "large": [
+  "tier_24": [
     {
       "key": "qwen35_27b",
       "name": "Qwen3.5 27B",
       "origin": "Alibaba",
       "year": 2026,
-      "lang": {
-        "ca": "Multilingüe (excel·lent català)",
-        "es": "Multilingüe (excelente catalán)",
-        "en": "Multilingual (excellent Catalan)"
-      },
+      "role": "general",
       "params": "27B",
+      "ram_gb": 18.0,
       "disk_gb": 17.0,
-      "ram_gb": 20,
-      "description": {
-        "ca": "Multimodal complet, thinking avançat, tool calling. El millor Qwen per RAG i català. Apache 2.0",
-        "es": "Multimodal completo, thinking avanzado, tool calling. El mejor Qwen para RAG y catalán. Apache 2.0",
-        "en": "Full multimodal, advanced thinking, tool calling. Best Qwen for RAG and Catalan. Apache 2.0"
-      },
-      "mlx": null,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
       "ollama": "qwen3.5:27b",
       "gguf": null,
-      "chat_format": "chatml",
-      "prompt_tier": "full"
-    },
-    {
-      "key": "gemma3_27b",
-      "name": "Gemma 3 27B",
-      "origin": "Google DeepMind",
-      "year": 2025,
-      "lang": {
-        "ca": "Multilingüe (excel·lent català)",
-        "es": "Multilingüe (excelente catalán)",
-        "en": "Multilingual (excellent Catalan)"
-      },
-      "params": "27B",
-      "disk_gb": 16.2,
-      "ram_gb": 20,
+      "iberic": false,
       "description": {
-        "ca": "Excel·lent memòria RAG i català. Testat i recomanat",
-        "es": "Excelente memoria RAG y catalán. Testado y recomendado",
-        "en": "Excellent RAG memory and Catalan. Tested and recommended"
-      },
-      "mlx": "mlx-community/gemma-3-27b-it-4bit",
-      "ollama": "gemma3:27b",
-      "gguf": null,
-      "chat_format": "chatml",
-      "prompt_tier": "full"
+        "ca": "El millor ràtio qualitat/mida del moment. Thinking excel·lent, tool calling. Ideal per RAG i català. Apache 2.0.",
+        "es": "El mejor ratio calidad/tamaño del momento. Thinking excelente, tool calling. Ideal para RAG y catalán. Apache 2.0.",
+        "en": "Best quality/size ratio right now. Excellent thinking, tool calling. Ideal for RAG and Catalan. Apache 2.0."
+      }
     },
     {
-      "key": "gpt_oss_20b",
-      "name": "GPT-OSS 20B",
-      "origin": "OpenAI (Open Source)",
-      "year": 2025,
-      "lang": {
-        "ca": "Multilingüe",
-        "es": "Multilingüe",
-        "en": "Multilingual"
-      },
-      "params": "21B (MoE, 3.6B actius)",
-      "disk_gb": 22.2,
-      "ram_gb": 24,
+      "key": "gemma4_31b",
+      "name": "Gemma 4 31B",
+      "origin": "Google",
+      "year": 2026,
+      "role": "reasoning",
+      "params": "31B (dense)",
+      "ram_gb": 18.0,
+      "disk_gb": 18.5,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
+      "ollama": "gemma4:31b",
+      "gguf": null,
+      "iberic": false,
       "description": {
-        "ca": "Model obert d'OpenAI, MoE eficient. Llicència Apache 2.0",
-        "es": "Modelo abierto de OpenAI, MoE eficiente. Licencia Apache 2.0",
-        "en": "OpenAI open model, efficient MoE. Apache 2.0 license"
-      },
-      "mlx": "lmstudio-community/gpt-oss-20b-MLX-8bit",
-      "ollama": "gpt-oss:20b",
-      "gguf": null,
-      "chat_format": "chatml",
-      "prompt_tier": "full"
-    },
+        "ca": "Alternativa potent en raonament i visió. Context 256K. Thinking excel·lent.",
+        "es": "Alternativa potente en razonamiento y visión. Contexto 256K. Thinking excelente.",
+        "en": "Powerful reasoning and vision alternative. 256K context. Excellent thinking."
+      }
+    }
+  ],
+  "tier_32": [
     {
-      "key": "qwen25_32b",
-      "name": "Qwen2.5 32B",
+      "key": "qwen35_35b_moe",
+      "name": "Qwen3.5 35B-A3B",
       "origin": "Alibaba",
-      "year": 2024,
-      "lang": {
-        "ca": "Multilingüe (excel·lent multi-idioma)",
-        "es": "Multilingüe (excelente multi-idioma)",
-        "en": "Multilingual (excellent multi-language)"
-      },
-      "params": "32B",
-      "disk_gb": 19.0,
-      "ram_gb": 22,
-      "description": {
-        "ca": "Excel·lent en multi-idioma i seguiment d'instruccions",
-        "es": "Excelente en multi-idioma y seguimiento de instrucciones",
-        "en": "Excellent multilingual and instruction following"
-      },
-      "mlx": "mlx-community/Qwen2.5-32B-Instruct-4bit",
-      "ollama": "qwen2.5:32b",
-      "gguf": "https://huggingface.co/bartowski/Qwen2.5-32B-Instruct-GGUF/resolve/main/Qwen2.5-32B-Instruct-Q4_K_M.gguf",
-      "chat_format": "chatml",
-      "prompt_tier": "full"
-    },
-    {
-      "key": "qwq_32b",
-      "name": "QwQ 32B",
-      "origin": "Alibaba",
-      "year": 2025,
-      "lang": {
-        "ca": "Multilingüe (raonament avançat)",
-        "es": "Multilingüe (razonamiento avanzado)",
-        "en": "Multilingual (advanced reasoning)"
-      },
-      "params": "32B",
-      "disk_gb": 19.0,
-      "ram_gb": 22,
-      "description": {
-        "ca": "Especialitzat en raonament — pensa pas a pas. Compita amb models molt més grans",
-        "es": "Especializado en razonamiento — piensa paso a paso. Compite con modelos mucho más grandes",
-        "en": "Reasoning specialist — thinks step by step. Competes with much larger models"
-      },
-      "mlx": null,
-      "ollama": "qwq:32b",
+      "year": 2026,
+      "role": "general",
+      "params": "35B totals / 3B actius (MoE)",
+      "ram_gb": 21.0,
+      "disk_gb": 21.0,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
+      "ollama": "qwen3.5:35b-a3b",
       "gguf": null,
-      "chat_format": "chatml",
-      "prompt_tier": "full"
+      "iberic": false,
+      "description": {
+        "ca": "Velocitat de 9B amb qualitat de 35B. Thinking excel·lent. El punt dolç per a 32 GB. Apache 2.0.",
+        "es": "Velocidad de 9B con calidad de 35B. Thinking excelente. El punto dulce para 32 GB. Apache 2.0.",
+        "en": "9B speed with 35B quality. Excellent thinking. The sweet spot for 32 GB. Apache 2.0."
+      }
     },
     {
-      "key": "deepseek_r1_32b",
-      "name": "DeepSeek R1 32B",
-      "origin": "DeepSeek AI (Xina)",
+      "key": "deepseek_r1_distill_32b",
+      "name": "DeepSeek R1 Distill 32B",
+      "origin": "DeepSeek AI",
       "year": 2025,
-      "lang": {
-        "ca": "Multilingüe (raonament avançat)",
-        "es": "Multilingüe (razonamiento avanzado)",
-        "en": "Multilingual (advanced reasoning)"
-      },
-      "params": "32B",
+      "role": "reasoning",
+      "params": "32B (Distill Qwen)",
+      "ram_gb": 22.0,
       "disk_gb": 19.0,
-      "ram_gb": 22,
-      "description": {
-        "ca": "Model de raonament — pensa abans de respondre. Ideal per anàlisi i documents",
-        "es": "Modelo de razonamiento — piensa antes de responder. Ideal para análisis y documentos",
-        "en": "Reasoning model — thinks before answering. Ideal for analysis and documents"
-      },
-      "mlx": "mlx-community/DeepSeek-R1-Distill-Qwen-32B-4bit",
+      "backends": ["ollama", "mlx", "llama.cpp"],
+      "mlx": true,
       "ollama": "deepseek-r1:32b",
       "gguf": "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-32B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf",
-      "chat_format": "chatml",
-      "prompt_tier": "full"
+      "iberic": false,
+      "description": {
+        "ca": "Raonament pas a pas visible estil o1. Pensa abans de respondre. Ideal per anàlisi i documents.",
+        "es": "Razonamiento paso a paso visible estilo o1. Piensa antes de responder. Ideal para análisis y documentos.",
+        "en": "Visible step-by-step o1-style reasoning. Thinks before answering. Ideal for analysis and documents."
+      }
     },
     {
-      "key": "mixtral",
-      "name": "Mixtral 8x7B",
-      "origin": "Mistral AI (França)",
-      "year": 2023,
-      "lang": {
-        "ca": "Multilingüe",
-        "es": "Multilingüe",
-        "en": "Multilingual"
-      },
-      "params": "47B (MoE)",
-      "disk_gb": 26,
-      "ram_gb": 32,
+      "key": "alia_40b",
+      "name": "ALIA-40B Instruct",
+      "origin": "BSC (Catalunya)",
+      "year": 2026,
+      "role": "iberic",
+      "params": "40B",
+      "ram_gb": 24.0,
+      "disk_gb": 24.0,
+      "backends": ["llama.cpp"],
+      "mlx": false,
+      "ollama": null,
+      "gguf": "https://huggingface.co/BSC-LT/ALIA-40b-instruct-2601-GGUF",
+      "iberic": true,
+      "note": "BSC recomana llama.cpp pur per millor rendiment. Ollama no recomanat.",
       "description": {
-        "ca": "Alta qualitat, model MoE eficient",
-        "es": "Alta calidad, modelo MoE eficiente",
-        "en": "High quality, efficient MoE model"
-      },
-      "mlx": "mlx-community/Mixtral-8x7B-Instruct-v0.1-4bit",
-      "ollama": "mixtral:latest",
-      "gguf": "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/resolve/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf",
-      "chat_format": "chatml",
-      "prompt_tier": "full"
+        "ca": "El model públic multilingüe més avançat fet a Europa. 9 idiomes ibèrics. MareNostrum 5. Només llama.cpp.",
+        "es": "El modelo público multilingüe más avanzado hecho en Europa. 9 idiomas ibéricos. MareNostrum 5. Solo llama.cpp.",
+        "en": "The most advanced public multilingual model made in Europe. 9 Iberian languages. MareNostrum 5. llama.cpp only."
+      }
+    }
+  ],
+  "tier_48": [
+    {
+      "key": "qwen35_122b_moe",
+      "name": "Qwen3.5 122B-A10B",
+      "origin": "Alibaba",
+      "year": 2026,
+      "role": "general",
+      "params": "122B totals / 10B actius (MoE)",
+      "ram_gb": 48.0,
+      "disk_gb": 50.0,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
+      "ollama": "qwen3.5:122b-a10b",
+      "gguf": null,
+      "iberic": false,
+      "description": {
+        "ca": "Màxim per a codi i agents. Thinking excel·lent. Apache 2.0.",
+        "es": "Máximo para código y agentes. Thinking excelente. Apache 2.0.",
+        "en": "Maximum for code and agents. Excellent thinking. Apache 2.0."
+      }
+    },
+    {
+      "key": "llama4_maverick",
+      "name": "Llama 4 Maverick",
+      "origin": "Meta",
+      "year": 2026,
+      "role": "multimodal",
+      "params": "400B totals / 17B actius (MoE)",
+      "ram_gb": 38.0,
+      "disk_gb": 42.0,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
+      "ollama": "llama4:maverick",
+      "gguf": null,
+      "iberic": false,
+      "description": {
+        "ca": "Multimodal i context enorme (~1M tokens). Thinking fort i visió nativa.",
+        "es": "Multimodal y contexto enorme (~1M tokens). Thinking fuerte y visión nativa.",
+        "en": "Multimodal and huge context (~1M tokens). Strong thinking and native vision."
+      }
+    }
+  ],
+  "tier_64": [
+    {
+      "key": "qwen35_122b_moe",
+      "name": "Qwen3.5 122B-A10B",
+      "origin": "Alibaba",
+      "year": 2026,
+      "role": "general",
+      "params": "122B totals / 10B actius (MoE)",
+      "ram_gb": 48.0,
+      "disk_gb": 50.0,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
+      "ollama": "qwen3.5:122b-a10b",
+      "gguf": null,
+      "iberic": false,
+      "description": {
+        "ca": "Màxim per a codi i agents. Thinking excel·lent. Apache 2.0.",
+        "es": "Máximo para código y agentes. Thinking excelente. Apache 2.0.",
+        "en": "Maximum for code and agents. Excellent thinking. Apache 2.0."
+      }
+    },
+    {
+      "key": "gpt_oss_120b",
+      "name": "GPT-OSS 120B",
+      "origin": "OpenAI",
+      "year": 2025,
+      "role": "reasoning",
+      "params": "120B",
+      "ram_gb": 50.0,
+      "disk_gb": 52.0,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
+      "ollama": "gpt-oss:120b",
+      "gguf": null,
+      "iberic": false,
+      "description": {
+        "ca": "Model obert d'OpenAI. Raonament avançat i agents. Excel·lent amb MLX a Apple Silicon.",
+        "es": "Modelo abierto de OpenAI. Razonamiento avanzado y agentes. Excelente con MLX en Apple Silicon.",
+        "en": "OpenAI open model. Advanced reasoning and agents. Excellent with MLX on Apple Silicon."
+      }
+    }
+  ],
+  "tier_128": [
+    {
+      "key": "qwen35_397b_moe",
+      "name": "Qwen3.5 397B-A17B",
+      "origin": "Alibaba",
+      "year": 2026,
+      "role": "general",
+      "params": "397B totals / 17B actius (MoE)",
+      "ram_gb": 95.0,
+      "disk_gb": 100.0,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
+      "ollama": "qwen3.5:397b",
+      "gguf": null,
+      "iberic": false,
+      "description": {
+        "ca": "El més proper a un model tancat. Thinking excel·lent. El millor Qwen disponible localment. Apache 2.0.",
+        "es": "El más cercano a un modelo cerrado. Thinking excelente. El mejor Qwen disponible localmente. Apache 2.0.",
+        "en": "Closest to a closed model. Excellent thinking. Best Qwen available locally. Apache 2.0."
+      }
+    },
+    {
+      "key": "gpt_oss_120b",
+      "name": "GPT-OSS 120B",
+      "origin": "OpenAI",
+      "year": 2025,
+      "role": "reasoning",
+      "params": "120B",
+      "ram_gb": 50.0,
+      "disk_gb": 52.0,
+      "backends": ["ollama", "mlx"],
+      "mlx": true,
+      "ollama": "gpt-oss:120b",
+      "gguf": null,
+      "iberic": false,
+      "description": {
+        "ca": "Model obert d'OpenAI. Raonament avançat i agents. Excel·lent amb MLX a Apple Silicon.",
+        "es": "Modelo abierto de OpenAI. Razonamiento avanzado y agentes. Excelente con MLX en Apple Silicon.",
+        "en": "OpenAI open model. Advanced reasoning and agents. Excellent with MLX on Apple Silicon."
+      }
     }
   ]
 }

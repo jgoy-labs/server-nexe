@@ -411,7 +411,9 @@ class TestInitialize:
         api = MemoryAPI(qdrant_url="http://localhost:6333")
 
         mock_client = MagicMock()
-        with patch("memory.memory.api.QdrantClient", return_value=mock_client):
+        # QdrantClient ja no s'importa a memory.memory.api (TYPE_CHECKING guard).
+        # El client real ve de core.qdrant_pool.get_qdrant_client → patxem allà.
+        with patch("core.qdrant_pool.get_qdrant_client", return_value=mock_client):
             with patch.object(api, "_init_embedder", AsyncMock()):
                 result = asyncio.run(api.initialize())
         assert result is True

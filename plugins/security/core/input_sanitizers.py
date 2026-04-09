@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import html
 import re
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from fastapi import HTTPException
 
 from .injection_detectors import (

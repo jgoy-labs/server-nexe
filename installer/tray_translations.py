@@ -20,7 +20,9 @@ T = {
         "open_ui": "🌐 Obrir Web UI",
         "open_logs": "📄 Obrir logs",
         "docs": "📖 Documentació",
-        "ram": "🧠 RAM: {ram}",
+        # RAM del procés server-nexe (NO la RAM del model LLM extern)
+        "ram": "🧠 Server RAM: {ram}",
+        "venv_not_found": "Entorn Python no trobat. Torna a executar l'instal·lador.",
         "uptime": "⏱ Temps: {uptime}",
         "quit": "Sortir",
         "starting": "Engegant...",
@@ -53,7 +55,9 @@ T = {
         "open_ui": "🌐 Abrir Web UI",
         "open_logs": "📄 Abrir logs",
         "docs": "📖 Documentación",
-        "ram": "🧠 RAM: {ram}",
+        # RAM del proceso server-nexe (NO la RAM del modelo LLM externo)
+        "ram": "🧠 Server RAM: {ram}",
+        "venv_not_found": "Entorno Python no encontrado. Vuelve a ejecutar el instalador.",
         "uptime": "⏱ Tiempo: {uptime}",
         "quit": "Salir",
         "starting": "Iniciando...",
@@ -86,7 +90,9 @@ T = {
         "open_ui": "🌐 Open Web UI",
         "open_logs": "📄 Open logs",
         "docs": "📖 Documentation",
-        "ram": "🧠 RAM: {ram}",
+        # RAM of the server-nexe process (NOT the LLM model's RAM)
+        "ram": "🧠 Server RAM: {ram}",
+        "venv_not_found": "Python environment not found. Please run the installer again.",
         "uptime": "⏱ Uptime: {uptime}",
         "quit": "Quit",
         "starting": "Starting...",

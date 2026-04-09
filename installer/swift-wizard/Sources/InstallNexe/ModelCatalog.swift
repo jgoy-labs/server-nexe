@@ -98,47 +98,62 @@ struct AIModel: Codable, Identifiable {
 }
 
 struct ModelCatalog: Codable {
-    let small: [AIModel]
-    let medium: [AIModel]
-    let large: [AIModel]
+    let tier8: [AIModel]
+    let tier16: [AIModel]
+    let tier24: [AIModel]
+    let tier32: [AIModel]
+    let tier48: [AIModel]
+    let tier64: [AIModel]
+    let tier128: [AIModel]
+
+    enum CodingKeys: String, CodingKey {
+        case tier8   = "tier_8"
+        case tier16  = "tier_16"
+        case tier24  = "tier_24"
+        case tier32  = "tier_32"
+        case tier48  = "tier_48"
+        case tier64  = "tier_64"
+        case tier128 = "tier_128"
+    }
 
     /// Carrega el catàleg des del JSON als Resources del bundle
     static func load() -> ModelCatalog {
+        let empty = ModelCatalog(tier8: [], tier16: [], tier24: [], tier32: [], tier48: [], tier64: [], tier128: [])
+
         // Buscar models.json als Resources del bundle
         if let url = Bundle.main.url(forResource: "models", withExtension: "json"),
-           let data = try? Data(contentsOf: url) {
-            let decoder = JSONDecoder()
-            if let catalog = try? decoder.decode(ModelCatalog.self, from: data) {
-                return catalog
-            }
+           let data = try? Data(contentsOf: url),
+           let catalog = try? JSONDecoder().decode(ModelCatalog.self, from: data) {
+            return catalog
         }
 
         // Buscar al costat del binary (per desenvolupament)
         let binaryDir = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
         let devPath = binaryDir.appendingPathComponent("models.json")
-        if let data = try? Data(contentsOf: devPath) {
-            let decoder = JSONDecoder()
-            if let catalog = try? decoder.decode(ModelCatalog.self, from: data) {
-                return catalog
-            }
+        if let data = try? Data(contentsOf: devPath),
+           let catalog = try? JSONDecoder().decode(ModelCatalog.self, from: data) {
+            return catalog
         }
 
-        // Fallback: catàleg buit
-        return ModelCatalog(small: [], medium: [], large: [])
+        return empty
     }
 
     /// Tots els models en un array pla
     var allModels: [AIModel] {
-        return small + medium + large
+        return tier8 + tier16 + tier24 + tier32 + tier48 + tier64 + tier128
     }
 
-    /// Models d'una categoria
-    func models(for size: String) -> [AIModel] {
-        switch size {
-        case "small": return small
-        case "medium": return medium
-        case "large": return large
-        default: return []
+    /// Models d'un tier (claus: "tier_8", "tier_16", ..., "tier_128")
+    func models(for tier: String) -> [AIModel] {
+        switch tier {
+        case "tier_8":   return tier8
+        case "tier_16":  return tier16
+        case "tier_24":  return tier24
+        case "tier_32":  return tier32
+        case "tier_48":  return tier48
+        case "tier_64":  return tier64
+        case "tier_128": return tier128
+        default:         return []
         }
     }
 }

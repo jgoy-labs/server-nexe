@@ -7,15 +7,13 @@ Description: Tests pels Bugs 3, 4, 5, 6, 14 del Bloc 3 — soroll de log a la GU
 ────────────────────────────────────
 """
 
-import os
 import re
 import subprocess
 import sys
-import warnings
 from pathlib import Path
-from unittest import mock
 
-import pytest
+
+_ROOT = Path(__file__).parent.parent
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -27,7 +25,7 @@ def test_bug3_hf_token_env_vars_set_after_install_headless_import():
     # Forcem un re-import en subprocess net per evitar contaminació de l'estat
     code = (
         "import os, sys; "
-        "sys.path.insert(0, '/Users/jgoy/AI/nat/dev/server-nexe'); "
+        f"sys.path.insert(0, {str(_ROOT)!r}); "
         "import installer.install_headless; "
         "print(os.environ.get('HF_HUB_DISABLE_TELEMETRY','')); "
         "print(os.environ.get('HF_HUB_DISABLE_PROGRESS_BARS','')); "
@@ -44,10 +42,30 @@ def test_bug3_hf_token_env_vars_set_after_install_headless_import():
 
 
 def test_bug3_huggingface_logger_level_error():
-    """El logger huggingface_hub ha de quedar a ERROR perquè no escampi WARN."""
-    import installer.install_headless  # noqa: F401
+    """El logger huggingface_hub ha de quedar a ERROR perquè no escampi WARN.
+
+    Usa subprocess per evitar contaminació del caché d'imports de Python:
+    si install_headless ja ha estat importat per un test anterior, el codi
+    de nivell de mòdul (setLevel) no es re-executa en el procés actual.
+    """
+    code = (
+        "import sys; "
+        f"sys.path.insert(0, {str(_ROOT)!r}); "
+        "import installer.install_headless; "
+        "import logging; "
+        "print(logging.getLogger('huggingface_hub').level)"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
     import logging
-    assert logging.getLogger("huggingface_hub").level == logging.ERROR
+    assert result.returncode == 0, f"Error subprocess: {result.stderr!r}"
+    assert int(result.stdout.strip()) == logging.ERROR, (
+        f"Logger level incorrecte: {result.stdout.strip()!r} (esperat {logging.ERROR})"
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -62,7 +80,7 @@ def test_bug4_installer_display_constants_empty_when_not_tty():
     han de ser cadenes buides."""
     code = (
         "import sys; "
-        "sys.path.insert(0, '/Users/jgoy/AI/nat/dev/server-nexe'); "
+        f"sys.path.insert(0, {str(_ROOT)!r}); "
         "from installer import installer_display as d; "
         "import re; "
         "ansi = re.compile(r'\\x1b\\[[0-9;]*m'); "
@@ -83,7 +101,7 @@ def test_bug4_app_logo_no_ansi_when_not_tty():
     """El logo APP_LOGO no ha de contenir cap escapament ANSI en headless."""
     code = (
         "import sys; "
-        "sys.path.insert(0, '/Users/jgoy/AI/nat/dev/server-nexe'); "
+        f"sys.path.insert(0, {str(_ROOT)!r}); "
         "from installer import installer_display as d; "
         "import re; "
         "ansi = re.compile(r'\\x1b\\[[0-9;]*m'); "
@@ -116,7 +134,7 @@ def test_bug14_lifespan_sets_tqdm_disable():
     """Importar core.lifespan ha de fixar TQDM_DISABLE=1."""
     code = (
         "import sys; "
-        "sys.path.insert(0, '/Users/jgoy/AI/nat/dev/server-nexe'); "
+        f"sys.path.insert(0, {str(_ROOT)!r}); "
         "import core.lifespan; "
         "import os; "
         "print(os.environ.get('TQDM_DISABLE',''))"
@@ -135,7 +153,7 @@ def test_bug6_lifespan_filters_position_ids_warning():
     `.*Some weights of.*`."""
     code = (
         "import sys, warnings; "
-        "sys.path.insert(0, '/Users/jgoy/AI/nat/dev/server-nexe'); "
+        f"sys.path.insert(0, {str(_ROOT)!r}); "
         "import core.lifespan; "
         # warnings.filters: tuples (action, message_re, category, module_re, lineno)
         "filters = [(f[1].pattern if f[1] is not None and hasattr(f[1],'pattern') else '') for f in warnings.filters]; "

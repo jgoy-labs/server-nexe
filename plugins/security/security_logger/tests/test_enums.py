@@ -9,7 +9,6 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import pytest
 from plugins.security.security_logger.enums import SecurityEventType, SecuritySeverity
 
 class TestSecurityEventType:

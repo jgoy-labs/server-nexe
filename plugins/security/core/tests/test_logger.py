@@ -10,10 +10,9 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import json
-import pytest
 from pathlib import Path
 from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestLogSecurityEvent:
@@ -55,7 +54,6 @@ class TestLogSecurityEvent:
 
     def test_handles_write_error_gracefully(self):
         from plugins.security.core.logger import log_security_event
-        import plugins.security.core.logger as mod
 
         with patch.object(Path, 'open', side_effect=PermissionError("No access")):
             # Should not raise

@@ -18,6 +18,13 @@ import toml
 import logging
 import os
 
+try:
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+    from pydantic import Field
+    _PYDANTIC_SETTINGS_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _PYDANTIC_SETTINGS_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # Default configuration
@@ -335,3 +342,109 @@ def get_server_url(scheme: str = "http") -> str:
     "http://localhost:9119" / "http://127.0.0.1:9119" literals (Q4.2).
     """
     return f"{scheme}://{get_default_host()}:{get_default_port()}"
+
+
+# ─────────────────────────────────────────────────────────────
+# NexeSettings — Registry d'env vars per al futur panell admin
+#
+# Font única de veritat de totes les NEXE_* env vars.
+# No substitueix els consumidors existents (os.getenv directe);
+# actua com a registry per descobriment dinàmic.
+# Tota nova env var s'afegeix aquí i queda disponible al panell.
+# ─────────────────────────────────────────────────────────────
+
+if _PYDANTIC_SETTINGS_AVAILABLE:
+    class NexeSettings(BaseSettings):
+        model_config = SettingsConfigDict(
+            env_file=".env",
+            extra="ignore",
+            populate_by_name=True,
+        )
+
+        # --- Server ---
+        server_host: str = Field("127.0.0.1", description="Bind host del server", alias="NEXE_SERVER_HOST")
+        server_port: int = Field(9119, description="Port del server (1024-65535)", alias="NEXE_SERVER_PORT", ge=1024, le=65535)
+        env: str = Field("production", description="Entorn d'execució (production|development)", alias="NEXE_ENV")
+        home: Optional[str] = Field(None, description="Directori arrel del servidor", alias="NEXE_HOME")
+        logs_dir: Optional[str] = Field(None, description="Directori de logs", alias="NEXE_LOGS_DIR")
+
+        # --- Auth / Security ---
+        primary_api_key: str = Field("", description="API key principal (requerida en producció)", alias="NEXE_PRIMARY_API_KEY")
+        admin_api_key: Optional[str] = Field(None, description="API key d'administrador", alias="NEXE_ADMIN_API_KEY")
+        csrf_secret: Optional[str] = Field(None, description="Secret per a tokens CSRF", alias="NEXE_CSRF_SECRET")
+        approved_modules: Optional[str] = Field(None, description="Mòduls aprovats (comma-separated, requerit en prod)", alias="NEXE_APPROVED_MODULES")
+        localhost_aliases: str = Field("127.0.0.1,::1,localhost", description="Adreces considerades localhost (comma-separated)", alias="NEXE_LOCALHOST_ALIASES")
+        encryption_enabled: str = Field("", description="Activar SQLCIPHER (true|false|auto)", alias="NEXE_ENCRYPTION_ENABLED")
+        vpn_allowed_ips: str = Field("", description="IPs VPN permeses per bootstrap (comma-separated)", alias="NEXE_VPN_ALLOWED_IPS")
+        master_key: Optional[str] = Field(None, description="Clau mestra per a derivació de claus HKDF", alias="NEXE_MASTER_KEY")
+
+        # --- CLI / Client ---
+        api_base_url: Optional[str] = Field(None, description="URL base de l'API per al CLI", alias="NEXE_API_BASE_URL")
+        server_url: Optional[str] = Field(None, description="URL del server (override)", alias="NEXE_SERVER_URL")
+        timeout: Optional[float] = Field(None, description="Timeout requests CLI (segons)", alias="NEXE_TIMEOUT")
+        verify_ssl: Optional[str] = Field(None, description="Verificar SSL (true|false)", alias="NEXE_VERIFY_SSL")
+        color: Optional[str] = Field(None, description="Mode color CLI (true|false|auto)", alias="NEXE_COLOR")
+        cli_health_timeout: float = Field(5.0, description="Timeout health check CLI (segons)", alias="NEXE_CLI_HEALTH_TIMEOUT")
+
+        # --- Model engine ---
+        model_engine: Optional[str] = Field(None, description="Backend LLM actiu (ollama|mlx|llama_cpp)", alias="NEXE_MODEL_ENGINE")
+        default_model: str = Field("", description="Model per defecte", alias="NEXE_DEFAULT_MODEL")
+        mlx_model: Optional[str] = Field(None, description="Model MLX", alias="NEXE_MLX_MODEL")
+        llama_cpp_model: Optional[str] = Field(None, description="Path model llama.cpp", alias="NEXE_LLAMA_CPP_MODEL")
+        default_max_tokens: Optional[int] = Field(None, description="Màxim tokens per resposta", alias="NEXE_DEFAULT_MAX_TOKENS")
+        prompt_tier: Optional[str] = Field(None, description="Nivell de prompt del sistema (full|compact)", alias="NEXE_PROMPT_TIER")
+
+        # --- Ollama ---
+        ollama_host: str = Field("http://localhost:11434", description="URL del servidor Ollama", alias="NEXE_OLLAMA_HOST")
+        ollama_model: Optional[str] = Field(None, description="Model Ollama per defecte", alias="NEXE_OLLAMA_MODEL")
+        ollama_num_ctx: Optional[int] = Field(None, description="Context window Ollama (tokens)", alias="NEXE_OLLAMA_NUM_CTX")
+        ollama_stream_timeout: float = Field(300.0, description="Timeout streaming Ollama (segons)", alias="NEXE_OLLAMA_STREAM_TIMEOUT")
+        ollama_think: Optional[str] = Field(None, description="Activar mode think Ollama (true|false)", alias="NEXE_OLLAMA_THINK")
+        ollama_health_timeout: float = Field(5.0, description="Timeout health Ollama (segons)", alias="NEXE_OLLAMA_HEALTH_TIMEOUT")
+        ollama_unload_timeout: float = Field(10.0, description="Timeout unload model Ollama (segons)", alias="NEXE_OLLAMA_UNLOAD_TIMEOUT")
+        autostart_ollama: Optional[str] = Field(None, description="Iniciar Ollama automàticament (true|false)", alias="NEXE_AUTOSTART_OLLAMA")
+
+        # --- Qdrant ---
+        qdrant_path: str = Field("storage/vectors", description="Path base de dades Qdrant embedded", alias="NEXE_QDRANT_PATH")
+        qdrant_url: Optional[str] = Field(None, description="URL Qdrant extern (si no embedded)", alias="NEXE_QDRANT_URL")
+
+        # --- RAG / Language ---
+        lang: str = Field("ca", description="Idioma del servidor (ca|es|en)", alias="NEXE_LANG")
+        rag_docs_threshold: float = Field(0.4, description="Llindar similaritat RAG docs", alias="NEXE_RAG_DOCS_THRESHOLD")
+        rag_knowledge_threshold: float = Field(0.35, description="Llindar similaritat RAG knowledge", alias="NEXE_RAG_KNOWLEDGE_THRESHOLD")
+        rag_memory_threshold: float = Field(0.3, description="Llindar similaritat RAG memory", alias="NEXE_RAG_MEMORY_THRESHOLD")
+        auto_ingest_knowledge: Optional[str] = Field(None, description="Ingerir knowledge automàticament en iniciar (true|false)", alias="NEXE_AUTO_INGEST_KNOWLEDGE")
+        max_context_ratio: float = Field(0.3, description="Proporció màxima del context window per a l'historial", alias="NEXE_MAX_CONTEXT_RATIO")
+        default_context_window: int = Field(8192, description="Mida context window per defecte (tokens)", alias="NEXE_DEFAULT_CONTEXT_WINDOW")
+
+        # --- Runtime / Dev ---
+        dev_mode: Optional[str] = Field(None, description="Mode desenvolupament (true|false)", alias="NEXE_DEV_MODE")
+        docker: Optional[str] = Field(None, description="Execució en contenidor Docker (true|false)", alias="NEXE_DOCKER")
+        no_tray: Optional[str] = Field(None, description="Desactivar icona tray macOS (true|false)", alias="NEXE_NO_TRAY")
+        tray_pid: Optional[str] = Field(None, description="PID del procés tray (injectat per tray.py)", alias="NEXE_TRAY_PID")
+        force_reload: str = Field("false", description="Forçar recàrrega de l'app en canvis (true|false)", alias="NEXE_FORCE_RELOAD")
+
+        # --- Bootstrap ---
+        bootstrap_ttl: int = Field(30, description="TTL del token bootstrap (segons)", alias="NEXE_BOOTSTRAP_TTL")
+        bootstrap_display: bool = Field(True, description="Mostrar token bootstrap a la consola", alias="NEXE_BOOTSTRAP_DISPLAY")
+        bootstrap_auto_renew: bool = Field(True, description="Renovar token bootstrap automàticament", alias="NEXE_BOOTSTRAP_AUTO_RENEW")
+        auto_clean_enabled: bool = Field(False, description="Activar neteja automàtica de dades antigues", alias="NEXE_AUTO_CLEAN_ENABLED")
+        auto_clean_dry_run: bool = Field(True, description="Executar neteja automàtica en mode simulació", alias="NEXE_AUTO_CLEAN_DRY_RUN")
+
+        @classmethod
+        def list_settings(cls) -> list[dict]:
+            """Per al futur panell admin: llista totes les settings amb metadata.
+
+            Returns:
+                Llista de dicts amb: name (env var), field, default, description, type.
+            """
+            return [
+                {
+                    "name": (field_info.alias or name).upper(),
+                    "field": name,
+                    "default": field_info.default,
+                    "description": field_info.description,
+                    "type": str(field_info.annotation),
+                }
+                for name, field_info in cls.model_fields.items()
+            ]

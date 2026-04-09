@@ -30,8 +30,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 logger = logging.getLogger(__name__)
 
-from memory.memory.constants import DEFAULT_VECTOR_SIZE
-from memory.rag.header_parser import parse_rag_header, RAGHeader, VALID_PRIORITIES
+from core.endpoints.chat_sanitization import _filter_rag_injection  # noqa: E402
+from memory.memory.constants import DEFAULT_VECTOR_SIZE  # noqa: E402
+from memory.rag.header_parser import parse_rag_header, VALID_PRIORITIES
 
 import os as _os
 _LANG = _os.environ.get("NEXE_LANG", "ca")
@@ -277,6 +278,8 @@ async def ingest_knowledge(
             priority_weight = 4 - VALID_PRIORITIES.index(doc_priority) if doc_priority in VALID_PRIORITIES else 2
 
             for i, chunk in enumerate(chunks):
+                # SECURITY: Filter RAG injection patterns before storing
+                chunk = _filter_rag_injection(chunk)
                 await memory.store(
                     text=header_text + chunk,
                     collection=doc_collection,

@@ -235,20 +235,33 @@ Gestiona el arranque y apagado del servidor. Dividido en 4 submodulos.
 
 **Secuencia de arranque:**
 1. Cargar configuracion de server.toml
-2. Inicializar APIIntegrator (sistema de personalidad)
-3. Inicializar Qdrant embedded (pool singleton en `core/qdrant_pool.py`, path `storage/vectors/`)
-4. Auto-arranque de Ollama (si esta disponible, modo background)
-5. Cargar modulos de memoria (Memory -> RAG -> Embeddings, orden correcto)
-6. Inicializar modulos de plugins (MLX, llama.cpp, Ollama, Security, Web UI)
-7. Inicializar CryptoProvider si `NEXE_ENCRYPTION_ENABLED=true` (opt-in)
-8. Auto-ingestion de knowledge/ (solo en primera ejecucion, fichero marcador)
-9. Generar token bootstrap (256 bits, persistente en SQLite, TTL 30min)
+2. Escribir PID file atomico (`storage/run/server.pid`, `O_CREAT|O_EXCL`) — aborta si servidor ya en marcha
+3. Inicializar APIIntegrator (sistema de personalidad)
+4. Inicializar Qdrant embedded (pool singleton en `core/qdrant_pool.py`, path `storage/vectors/`)
+5. Auto-arranque de Ollama (si esta disponible, modo background) — timeout `NEXE_STARTUP_TIMEOUT` (default 30s)
+6. Cargar modulos de memoria (Memory -> RAG -> Embeddings, orden correcto) — timeout 30s
+7. Inicializar modulos de plugins (MLX, llama.cpp, Ollama, Security, Web UI) — timeout 30s
+8. Inicializar CryptoProvider si `NEXE_ENCRYPTION_ENABLED=true` (opt-in)
+9. Auto-ingestion de knowledge/ (solo en primera ejecucion, fichero marcador) — timeout 30s
+10. Generar token bootstrap (256 bits, persistente en SQLite, TTL 30min)
 
-**Secuencia de apagado:**
-1. Descargar modelos Ollama (limpieza VRAM via keep_alive:0)
-2. Cerrar conexiones Qdrant
-3. Terminar procesos hijos
-4. Sincronizar estado a disco
+**Secuencia de apagado (finally — siempre ejecuta, incluso en error):**
+1. Eliminar PID file (`storage/run/server.pid`) — siempre, primer paso
+2. Descargar modelos Ollama (limpieza VRAM via keep_alive:0)
+3. Cerrar conexiones Qdrant
+4. Terminar procesos hijos
+5. Cancelar tareas en background (rate limit cleanup, session cleanup)
+6. Reiniciar circuit breakers a CLOSED (estado limpio para proximo reinicio)
+7. Sincronizar estado a disco
+
+**PID file (`storage/run/server.pid`):**
+- Formato JSON: `{"pid": N, "port": P, "started": ISO}`
+- Adquirido atomicamente con `os.O_CREAT|O_EXCL|O_WRONLY` (sin race TOCTOU)
+- Single-instance guard: arranque aborta si el PID existente esta vivo
+- Handler SIGTERM en `core/server/runner.py` garantiza salida limpia antes de uvicorn
+
+**Variables de entorno:**
+- `NEXE_STARTUP_TIMEOUT` — timeout por fase de arranque en segundos (default: 30)
 
 ## Module Manager
 
@@ -367,7 +380,7 @@ El system prompt define la personalidad y comportamiento de Nexe. Se encuentra e
 
 ## Arquitectura Docker
 
-- **Dockerfile:** Python 3.12-slim, Qdrant embebido (linux-amd64/arm64 auto-deteccion), usuario non-root (nexe), EXPOSE 9119 6333
+- **Dockerfile:** Python 3.12-slim, Qdrant embedded (almacenamiento en `storage/vectors/`), usuario non-root (nexe), EXPOSE 9119
 - **docker-compose.yml:** Nexe + Ollama como servicios separados
 - **docker-entrypoint.sh:** Arranque secuencial (Qdrant -> Nexe), health check con polling
 
@@ -379,3 +392,39 @@ El system prompt define la personalidad y comportamiento de Nexe. Se encuentra e
 - Closures refactorizadas a funciones para permitir patching (decision clave de refactorizacion)
 - 68 nuevos tests de crypto (CryptoProvider, SQLCipher, sesiones, CLI)
 - Cobertura rastreada via .coveragerc
+
+## Cómo cambiar el vector store
+
+server-nexe usa Qdrant embedded como vector store por defecto. La capa de abstracción `QdrantAdapter` permite sustituirlo por otro backend (Weaviate, Chroma, Milvus, FAISS, etc.) sin tocar los consumidores.
+
+### Protocolo VectorStore
+
+Definido en `memory/embeddings/core/vectorstore.py`. Cualquier implementación debe cumplir:
+
+```python
+def add_vectors(self, vectors, texts, metadatas) -> List[str]
+def search(self, request: VectorSearchRequest) -> List[VectorSearchHit]
+def delete(self, ids: List[str]) -> int
+def health(self) -> Dict[str, Any]
+```
+
+### Implementación actual
+
+`memory/embeddings/adapters/qdrant_adapter.py` — `QdrantAdapter` implementa el Protocolo y expone métodos adicionales de gestión de colecciones para compatibilidad.
+
+### Añadir un nuevo backend
+
+1. Crear `memory/embeddings/adapters/weaviate_adapter.py` (o similar)
+2. Implementar los 4 métodos del Protocolo
+3. Crear `WeaviateAdapter.from_pool()` o equivalente
+4. Sustituir `QdrantAdapter` en los puntos de entrada:
+   - `memory/memory/engines/persistence.py:_init_qdrant()` — `QdrantAdapter.from_pool()`
+   - `memory/memory/api/__init__.py:initialize()` — `QdrantAdapter(client=raw_client)`
+   - `memory/memory/storage/vector_index.py:_init_client()` — `QdrantAdapter.from_pool()`
+5. Los consumidores (`documents.py`, `collections.py`) no necesitan modificarse
+
+### Notas
+
+- Migrar de Qdrant NO es plug & play — hay que crear el adapter y los métodos de colección
+- Lo importante es el camino de sustitución, no la sustitución automática
+- Qdrant embedded no expone ningún puerto de red (`storage/vectors/` debe ser escribible)

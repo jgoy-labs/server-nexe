@@ -17,8 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional
 
-from qdrant_client import QdrantClient
-from qdrant_client.models import FieldCondition, Filter, MatchValue, PointStruct, PointIdsList
+from typing import Any
 
 from .models import Document, SearchResult
 
@@ -46,7 +45,8 @@ def hex_to_uuid(hex_id: str) -> str:
   padded = hex_id.ljust(32, "0")
   return str(uuid.UUID(padded))
 
-def _delete_points(qdrant: QdrantClient, collection: str, point_ids: List[str]) -> None:
+def _delete_points(qdrant: Any, collection: str, point_ids: List[str]) -> None:
+  from memory.memory.engines.qdrant_types import PointIdsList
   try:
     qdrant.delete(
       collection_name=collection,
@@ -59,7 +59,7 @@ def _delete_points(qdrant: QdrantClient, collection: str, point_ids: List[str]) 
     )
 
 async def store_document(
-  qdrant: QdrantClient,
+  qdrant: Any,
   executor: ThreadPoolExecutor,
   generate_embedding: Callable[[str], List[float]],
   text: str,
@@ -128,6 +128,7 @@ async def store_document(
     }
 
   def _store():
+    from memory.memory.engines.qdrant_types import PointStruct
     uuid_id = hex_to_uuid(doc_id)
     point = PointStruct(
       id=uuid_id,
@@ -146,7 +147,7 @@ async def store_document(
   return doc_id
 
 async def search_documents(
-  qdrant: QdrantClient,
+  qdrant: Any,
   executor: ThreadPoolExecutor,
   generate_embedding: Callable[[str], List[float]],
   query: str,
@@ -179,6 +180,7 @@ async def search_documents(
   now_iso = datetime.now(timezone.utc).isoformat()
 
   def _search():
+    from memory.memory.engines.qdrant_types import FieldCondition, Filter, MatchValue
     conditions = []
     if filter_metadata:
       for key, value in filter_metadata.items():
@@ -248,7 +250,7 @@ async def search_documents(
   return result
 
 async def get_document(
-  qdrant: QdrantClient,
+  qdrant: Any,
   executor: ThreadPoolExecutor,
   doc_id: str,
   collection: str,
@@ -308,7 +310,7 @@ async def get_document(
   return await loop.run_in_executor(executor, _get)
 
 async def delete_document(
-  qdrant: QdrantClient,
+  qdrant: Any,
   executor: ThreadPoolExecutor,
   doc_id: str,
   collection: str,
@@ -340,7 +342,7 @@ async def delete_document(
   return result
 
 async def count_documents(
-  qdrant: QdrantClient,
+  qdrant: Any,
   executor: ThreadPoolExecutor,
   collection: str,
 ) -> int:
@@ -354,7 +356,7 @@ async def count_documents(
   return await loop.run_in_executor(executor, _count)
 
 async def cleanup_expired(
-  qdrant: QdrantClient,
+  qdrant: Any,
   executor: ThreadPoolExecutor,
   collection: str,
 ) -> int:

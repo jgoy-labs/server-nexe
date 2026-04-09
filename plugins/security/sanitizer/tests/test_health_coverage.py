@@ -5,7 +5,6 @@ Lines: 42-44 (patterns_loaded error), 56-58 (regex_compiled error),
        105-108 (injection not detected).
 """
 
-import pytest
 from unittest.mock import patch, MagicMock
 import time
 

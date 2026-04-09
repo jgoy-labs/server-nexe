@@ -1918,7 +1918,7 @@ class NexeUI {
             <div class="upload-overlay-content">
                 <span class="upload-spinner-lg"></span>
                 <div class="upload-overlay-text">${this.t('doc_uploading')}</div>
-                <div class="upload-overlay-file">${file.name}</div>
+                <div class="upload-overlay-file">${this.escapeHtml(file.name)}</div>
                 <div class="upload-overlay-timer"><span id="uploadElapsed">0</span>s / ~${estSec}s</div>
             </div>
         `;
@@ -1982,7 +1982,7 @@ class NexeUI {
         this.filePreview.innerHTML = `
             <div class="uploaded-file">
                 <span class="uploaded-file-icon"><i data-lucide="file-text"></i></span>
-                <span class="uploaded-file-name">${fileData.filename}</span>
+                <span class="uploaded-file-name">${this.escapeHtml(fileData.filename)}</span>
                 <span class="uploaded-file-size">(${sizeKB} KB)</span>
                 <button class="uploaded-file-remove" onclick="nexeUI.removeFilePreview()">✕</button>
             </div>

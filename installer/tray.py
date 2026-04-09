@@ -9,6 +9,7 @@ Description: macOS menu bar app for controlling the Nexe server.
 ────────────────────────────────────
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -58,6 +59,30 @@ except Exception:
     SERVER_PORT = int(os.environ.get("NEXE_SERVER_PORT", "9119"))
     WEB_UI_URL = f"http://{os.environ.get('NEXE_SERVER_HOST', '127.0.0.1')}:{SERVER_PORT}/ui"
 
+# PID file (written by core/server/runner.py — used as fallback for Quit)
+PID_FILE = PROJECT_ROOT / "storage" / "run" / "server.pid"
+
+
+def _send_sigterm_from_pid_file(pid_file: Path) -> None:
+    """Send SIGTERM to the server process recorded in pid_file.
+
+    Used as fallback in _quit() when neither _attach_pid nor server_process is set
+    (e.g. tray launched independently, server started separately via CLI).
+    Safe to call when file is absent or PID is already dead.
+    """
+    import signal as _signal
+    if not pid_file.exists():
+        return
+    try:
+        data = json.loads(pid_file.read_text())
+        pid = data.get("pid")
+        if not pid:
+            return
+        os.kill(pid, 0)  # Check alive — raises ProcessLookupError if dead
+        os.kill(pid, _signal.SIGTERM)
+    except (ProcessLookupError, PermissionError, json.JSONDecodeError, OSError, ValueError):
+        pass
+
 
 # format_bytes, format_uptime and _RamMonitor imported from tray_monitor.py
 
@@ -88,7 +113,7 @@ class NexeTray(rumps.App):
         super().__init__(
             name="server.nexe",
             icon=ICON_STOPPED,
-            template=None,
+            template=True,
             quit_button=None,
         )
 
@@ -221,8 +246,8 @@ class NexeTray(rumps.App):
         pidfile = PROJECT_ROOT / "storage" / "run" / "server.pid"
         if pidfile.exists():
             try:
-                raw = pidfile.read_text().strip().split("\n")
-                existing_pid = int(raw[0])
+                data = json.loads(pidfile.read_text())
+                existing_pid = int(data["pid"])
                 try:
                     os.kill(existing_pid, 0)  # liveness probe
                     # PID alive — orphan server (not owned by this tray)
@@ -232,7 +257,7 @@ class NexeTray(rumps.App):
                     return
                 except (ProcessLookupError, OSError):
                     pass  # stale, runner will clean it up on start
-            except (ValueError, OSError, IndexError):
+            except (ValueError, KeyError, OSError, json.JSONDecodeError):
                 pass  # corrupt, runner will handle it
 
         tray_pid = os.getpid()
@@ -456,8 +481,14 @@ class NexeTray(rumps.App):
 
     def _quit(self, _sender):
         self._stop_ram_monitor()
-        # Always stop the server when quitting tray
-        self._stop_server()
+        # Always stop the server when quitting tray.
+        # _stop_server() handles: (a) attach mode via _attach_pid,
+        # (b) self-started mode via server_process.
+        # Fallback (c): PID file, for when tray was started independently.
+        if not self._attach_pid and not self.server_process:
+            self._stop_server_via_pid_file()
+        else:
+            self._stop_server()
         if self._server_log_fh:
             try:
                 self._server_log_fh.close()
@@ -465,6 +496,10 @@ class NexeTray(rumps.App):
                 pass
             self._server_log_fh = None
         rumps.quit_application()
+
+    def _stop_server_via_pid_file(self):
+        """Send SIGTERM to server using storage/run/server.pid as fallback."""
+        _send_sigterm_from_pid_file(PID_FILE)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
