@@ -197,7 +197,7 @@ class InstallerEngine: ObservableObject {
 
             let tar = Process()
             tar.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-            tar.arguments = ["xzf", payloadPath, "-C", installPath]
+            tar.arguments = ["xzf", payloadPath, "-C", installPath, "--overwrite"]
             tar.currentDirectoryURL = URL(fileURLWithPath: installPath)
 
             do {
@@ -227,7 +227,7 @@ class InstallerEngine: ObservableObject {
                 }
                 let nexeTar = Process()
                 nexeTar.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-                nexeTar.arguments = ["xzf", nexeTarPath, "-C", installPath]
+                nexeTar.arguments = ["xzf", nexeTarPath, "-C", installPath, "--overwrite"]
                 try? nexeTar.run()
                 nexeTar.waitUntilExit()
             }
