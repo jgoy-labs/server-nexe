@@ -118,14 +118,16 @@ class InstallerEngine: ObservableObject {
     }
 
     private func doStartInstall() {
-        guard let model = selectedModel else { return }
+        let model = selectedModel  // nil = "Continuar sense model"
 
         // Determinar engine
         let engine: String
-        if selectedEngine == "auto" {
+        if let model = model, selectedEngine == "auto" {
             engine = model.recommendedEngine(isAppleSilicon: hardware.isAppleSilicon)
-        } else {
+        } else if selectedEngine != "auto" {
             engine = selectedEngine
+        } else {
+            engine = "ollama"  // default quan no hi ha model seleccionat
         }
 
         // Trobar Python bundled als Resources de l'app
@@ -155,7 +157,7 @@ class InstallerEngine: ObservableObject {
         extractPayloadAndRun(pythonPath: pythonPath, model: model, engine: engine)
     }
 
-    private func extractPayloadAndRun(pythonPath: String, model: AIModel, engine: String) {
+    private func extractPayloadAndRun(pythonPath: String, model: AIModel?, engine: String) {
         Task.detached { [weak self] in
             guard let self = self else { return }
 
@@ -260,7 +262,7 @@ class InstallerEngine: ObservableObject {
 
     private func runHeadlessInstaller(
         pythonPath: String, installPath: String,
-        model: AIModel, engine: String
+        model: AIModel?, engine: String
     ) async {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: pythonPath)
@@ -296,7 +298,7 @@ class InstallerEngine: ObservableObject {
         let config: [String: String] = [
             "lang": lang.rawValue,
             "path": installPath,
-            "model_key": model.key,
+            "model_key": model?.key ?? "",
             "engine": engine,
         ]
 
