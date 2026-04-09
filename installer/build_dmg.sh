@@ -193,6 +193,7 @@ tar czf "$PAYLOAD_TMP/payload.tar.gz" \
     --exclude='InstallNexe.app' \
     --exclude='Install Nexe.app' \
     --exclude='Nexe.app' \
+    --exclude='NexeTray.app' \
     --exclude='diari' \
     --exclude='dev-tools' \
     --exclude='.claude' \
@@ -277,7 +278,21 @@ fi
     --icon "$APP_NAME.app" 260 145 \
     --no-internet-enable \
     "$DMG_PATH" \
-    "$DMG_STAGING/" || error "create-dmg failed"
+    "$DMG_STAGING/" || {
+    warn "create-dmg AppleScript failed — retrying with --skip-jenkins (no background)"
+    rm -f "$DMG_PATH"
+    "$CREATE_DMG" \
+        --volname "$DMG_VOLUME_NAME" \
+        --window-pos 100 100 \
+        --window-size 520 400 \
+        --icon-size 128 \
+        --icon "$APP_NAME.app" 260 145 \
+        --no-internet-enable \
+        --skip-jenkins \
+        "$DMG_PATH" \
+        "$DMG_STAGING/" || error "create-dmg failed (both attempts)"
+    warn "DMG creat sense background (Finder no disponible)"
+}
 
 rm -rf "$DMG_STAGING"
 
