@@ -226,7 +226,7 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
     )
 
   from core.bootstrap_tokens import set_bootstrap_token, get_bootstrap_token
-  from core.lifespan import generate_bootstrap_token
+  from core.lifespan_tokens import generate_bootstrap_token
 
   current_info = get_bootstrap_token()
   if current_info and not current_info["used"] and datetime.now(timezone.utc).timestamp() < current_info["expires"]:

@@ -11,7 +11,6 @@ www.jgoy.net · https://server-nexe.org
 
 import asyncio
 import io
-import os
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import FastAPI

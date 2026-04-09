@@ -1,0 +1,23 @@
+#!/bin/bash
+# NexeTray — wrapper executable for the server-nexe tray app.
+# Launched by macOS as the bundle entry point so the process appears as
+# "server-nexe" in Force Quit / Activity Monitor (CFBundleName in Info.plist).
+#
+# The script finds the project root relative to this bundle's location
+# (installer/NexeTray.app/Contents/MacOS/ → ../../.. → project root)
+# and invokes the venv Python with the tray module.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+VENV_PYTHON="${PROJECT_ROOT}/venv/bin/python3"
+
+if [ ! -f "${VENV_PYTHON}" ]; then
+    # Fallback: use system Python if venv not yet created
+    VENV_PYTHON="$(which python3 2>/dev/null)"
+    if [ -z "${VENV_PYTHON}" ]; then
+        echo "server-nexe: Python not found. Please reinstall." >&2
+        exit 1
+    fi
+fi
+
+exec "${VENV_PYTHON}" -m installer.tray "$@"

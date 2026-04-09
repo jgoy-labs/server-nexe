@@ -50,8 +50,11 @@ async def _session_cleanup_loop(session_mgr):
 
 
 def start_session_cleanup_task(session_mgr):
-    """Start session cleanup background task. Call from lifespan startup."""
-    asyncio.create_task(_session_cleanup_loop(session_mgr))
+    """Start session cleanup background task. Call from lifespan startup.
+
+    Returns the asyncio.Task so the caller can cancel it on shutdown (N04).
+    """
+    return asyncio.create_task(_session_cleanup_loop(session_mgr))
 
 
 # ── Router factory ───────────────────────────────────────────────

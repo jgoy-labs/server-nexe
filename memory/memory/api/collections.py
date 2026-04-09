@@ -14,8 +14,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
-from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams
+from typing import Any
 
 from ..constants import DEFAULT_VECTOR_SIZE
 from .models import CollectionInfo, validate_collection_name
@@ -23,7 +22,7 @@ from .models import CollectionInfo, validate_collection_name
 logger = logging.getLogger(__name__)
 
 async def create_collection(
-  qdrant: QdrantClient,
+  qdrant: Any,
   executor: ThreadPoolExecutor,
   name: str,
   vector_size: int = DEFAULT_VECTOR_SIZE,
@@ -46,6 +45,8 @@ async def create_collection(
   loop = asyncio.get_running_loop()
 
   def _create():
+    from memory.memory.engines.qdrant_types import Distance, VectorParams
+
     collections = qdrant.get_collections().collections
     if name in [c.name for c in collections]:
       logger.info("Collection '%s' already exists", name)
@@ -69,7 +70,7 @@ async def create_collection(
   return await loop.run_in_executor(executor, _create)
 
 async def delete_collection(
-  qdrant: QdrantClient,
+  qdrant: Any,
   executor: ThreadPoolExecutor,
   name: str,
 ) -> bool:
@@ -89,7 +90,7 @@ async def delete_collection(
   return await loop.run_in_executor(executor, _delete)
 
 async def list_collections(
-  qdrant: QdrantClient,
+  qdrant: Any,
   executor: ThreadPoolExecutor,
 ) -> List[CollectionInfo]:
   """Llista totes les collections."""
@@ -114,7 +115,7 @@ async def list_collections(
   return await loop.run_in_executor(executor, _list)
 
 async def collection_exists(
-  qdrant: QdrantClient,
+  qdrant: Any,
   executor: ThreadPoolExecutor,
   name: str,
 ) -> bool:

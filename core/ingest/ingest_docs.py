@@ -14,14 +14,13 @@ www.jgoy.net · https://server-nexe.org
 import asyncio
 import logging
 import sys
-from pathlib import Path
-
 # Add project root to path
 from core.paths import get_repo_root
 PROJECT_ROOT = get_repo_root()
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from memory.memory.constants import DEFAULT_VECTOR_SIZE
+from core.endpoints.chat_sanitization import _filter_rag_injection  # noqa: E402
+from memory.memory.constants import DEFAULT_VECTOR_SIZE  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +89,8 @@ async def ingest_documentation():
             chunks = chunk_text(content)
 
             for i, chunk in enumerate(chunks):
+                # SECURITY: Filter RAG injection patterns before storing
+                chunk = _filter_rag_injection(chunk)
                 await memory.store(
                     text=header + chunk,
                     collection=DOCS_COLLECTION,

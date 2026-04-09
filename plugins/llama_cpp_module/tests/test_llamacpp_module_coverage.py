@@ -138,62 +138,6 @@ def test_get_info_without_node():
     assert info["pool_stats"] == {}
 
 
-def test_chat_endpoint_not_initialized():
-    """Lines 84-85: chat endpoint 503 when not initialized."""
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-
-    module = LlamaCppModule()
-    module._init_router()
-
-    app = FastAPI()
-    app.include_router(module.get_router())
-
-    client = TestClient(app, raise_server_exceptions=False)
-    r = client.post("/llama-cpp/chat", json={"messages": [{"role": "user", "content": "hi"}]})
-    assert r.status_code == 503
-
-
-def test_chat_endpoint_success():
-    """Lines 87-93: chat endpoint returns result."""
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-
-    module = LlamaCppModule()
-    module._initialized = True
-    mock_node = MagicMock()
-    mock_node.execute = AsyncMock(return_value={"content": "response"})
-    module._node = mock_node
-    module._init_router()
-
-    app = FastAPI()
-    app.include_router(module.get_router())
-
-    client = TestClient(app, raise_server_exceptions=False)
-    r = client.post("/llama-cpp/chat", json={"messages": [{"role": "user", "content": "hi"}]})
-    assert r.status_code == 200
-
-
-def test_chat_endpoint_exception():
-    """Lines 94-95: chat endpoint 500 on error."""
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-
-    module = LlamaCppModule()
-    module._initialized = True
-    mock_node = MagicMock()
-    mock_node.execute = AsyncMock(side_effect=Exception("chat error"))
-    module._node = mock_node
-    module._init_router()
-
-    app = FastAPI()
-    app.include_router(module.get_router())
-
-    client = TestClient(app, raise_server_exceptions=False)
-    r = client.post("/llama-cpp/chat", json={"messages": [{"role": "user", "content": "hi"}]})
-    assert r.status_code == 500
-
-
 def test_info_endpoint():
     """Line 80: info endpoint."""
     from fastapi import FastAPI

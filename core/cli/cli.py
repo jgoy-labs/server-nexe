@@ -138,12 +138,40 @@ def modules(ctx: click.Context, as_json: bool):
 
 def _start_nexe(ctx: click.Context):
   """Shared logic to start Nexe."""
+  import json
   import os
+  import signal
   import subprocess
   from pathlib import Path
 
   project_root = Path(__file__).parent.parent.parent
-  
+
+  # Item 11 — single instance check via PID file
+  pid_file = project_root / "storage" / "run" / "server.pid"
+  if pid_file.exists():
+    try:
+      data = json.loads(pid_file.read_text())
+      existing_pid = data.get("pid")
+      if existing_pid:
+        os.kill(existing_pid, 0)
+        click.echo(
+          f"🚫 Server already running (PID {existing_pid}). "
+          "Use 'Nexe Quit' from the tray, or run: pkill -9 server-nexe"
+        )
+        ctx.exit(1)
+        return
+    except ProcessLookupError:
+      pass  # Stale PID file — server is dead, continue normally
+    except (json.JSONDecodeError, OSError, ValueError):
+      pass  # Corrupt or unreadable PID file — continue normally
+
+  # Item 14.bis — explicit SIGTERM handler
+  def _term_handler(signum, frame):
+    click.echo("\n👋 Stopping (SIGTERM)...")
+    sys.exit(0)
+
+  signal.signal(signal.SIGTERM, _term_handler)
+
   click.echo("Starting Nexe Server...")
   try:
     result = subprocess.run(

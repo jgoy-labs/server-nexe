@@ -13,7 +13,7 @@ from fastapi import HTTPException, Header
 from typing import Optional
 import secrets
 
-from .auth_config import get_admin_api_key, is_dev_mode
+from .auth_config import get_admin_api_key
 
 def generate_api_key(length: int = 32) -> str:
   """

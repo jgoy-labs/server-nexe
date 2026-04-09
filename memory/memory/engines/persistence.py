@@ -1,47 +1,48 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: memory/memory/engines/persistence.py
-Description: PersistenceManager - SQLite (metadata) + Qdrant (vectors) with rollback.
+Description: PersistenceManager — SQLite (metadades) + QdrantAdapter (vectors).
+
+Arquitectura dual-store:
+  - SQLite (WAL): font de veritat per a metadades i contingut textual
+  - QdrantAdapter: índex vectorial per a cerca semàntica (substituïble)
+
+Substituibilitat:
+  El vector store s'accedeix via QdrantAdapter que implementa el Protocol
+  VectorStore. Per canviar de Qdrant a un altre backend, substitueix
+  QdrantAdapter per una altra implementació del Protocol.
+  Veure: knowledge/*/ARCHITECTURE.md — secció "Com canviar el vector store"
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
 import asyncio
-import json
 import logging
 import os
-import sqlite3
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import List, Optional, Dict, Any
-
-from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from typing import Any, Dict, List, Optional
 
 from ..constants import DEFAULT_VECTOR_SIZE
-
 from ..models.memory_entry import MemoryEntry
+from .persistence_sqlite import SqliteStorageMixin, SQLCIPHER_AVAILABLE
 
 logger = logging.getLogger(__name__)
 
-# SQLCipher: try to import, fall back to plain sqlite3
-try:
-    from sqlcipher3 import dbapi2 as sqlcipher
-    SQLCIPHER_AVAILABLE = True
-except ImportError:
-    sqlcipher = None
-    SQLCIPHER_AVAILABLE = False
 
-# Configurable timeouts via environment variables
-# SECURITY: Capped to MAX_TIMEOUT to prevent resource exhaustion
-MAX_TIMEOUT = 60.0  # Maximum allowed timeout in seconds
+class StorageError(Exception):
+    """Error en operacions de persistència."""
+
+
+# Configurable timeouts via variables d'entorn
+MAX_TIMEOUT = 60.0
 
 def _safe_timeout(env_var: str, default: float) -> float:
-    """Get timeout from environment with safety cap."""
+    """Timeout des d'env var amb cap de seguretat."""
     try:
         value = float(os.getenv(env_var, str(default)))
         if value <= 0:
@@ -50,580 +51,230 @@ def _safe_timeout(env_var: str, default: float) -> float:
     except (ValueError, TypeError):
         return default
 
-QDRANT_TIMEOUT = _safe_timeout('NEXE_QDRANT_TIMEOUT', 5.0)
-SQLITE_PRELOAD_TIMEOUT = _safe_timeout('NEXE_SQLITE_PRELOAD_TIMEOUT', 10.0)
 
-class StorageError(Exception):
-  """Error in persistence operations"""
+QDRANT_TIMEOUT = _safe_timeout("NEXE_QDRANT_TIMEOUT", 5.0)
+SQLITE_PRELOAD_TIMEOUT = _safe_timeout("NEXE_SQLITE_PRELOAD_TIMEOUT", 10.0)
 
-class PersistenceManager:
-  """
-  Dual persistence manager: SQLite + Qdrant.
 
-  Features:
-  - SQLite (WAL): metadata + text
-  - Qdrant: embedding vectors (via HTTP client to server)
-  - Rollback: delete SQLite if Qdrant fails
-  - run_in_executor for blocking operations
-  """
+class PersistenceManager(SqliteStorageMixin):
+    """
+    Gestor de persistència dual: SQLite + QdrantAdapter.
 
-  DEFAULT_QDRANT_URL = os.getenv(
-    "NEXE_QDRANT_URL",
-    f"http://{os.getenv('NEXE_QDRANT_HOST', 'localhost')}:{os.getenv('NEXE_QDRANT_PORT', '6333')}"
-  )
+    Hereda tota la lògica SQLite de SqliteStorageMixin.
+    Gestiona el vector store via QdrantAdapter (substituïble).
 
-  DEFAULT_QDRANT_PATH = Path("storage/vectors")
+    Features:
+      - SQLite WAL: metadades + text
+      - QdrantAdapter: vectors d'embedding (intercanviable)
+      - Rollback: elimina SQLite si Qdrant falla (mode strict)
+      - run_in_executor per operacions blocking
+    """
 
-  def __init__(
-    self,
-    db_path: Path,
-    qdrant_path: Path = None,
-    collection_name: str = "nexe_memory",
-    vector_size: int = DEFAULT_VECTOR_SIZE,
-    qdrant_url: str = None,
-    crypto_provider=None
-  ):
-    self.db_path = db_path
-    self.qdrant_path = qdrant_path if qdrant_path is not None else self.DEFAULT_QDRANT_PATH
-    self.qdrant_url = qdrant_url or self.DEFAULT_QDRANT_URL
-    self.collection_name = collection_name
-    self.vector_size = vector_size
-    self._crypto = crypto_provider
-    self._encrypted = False
+    DEFAULT_QDRANT_PATH = Path("storage/vectors")
 
-    self.executor = ThreadPoolExecutor(max_workers=4)
+    def __init__(
+        self,
+        db_path: Path,
+        qdrant_path: Optional[Path] = None,
+        collection_name: str = "nexe_memory",
+        vector_size: int = DEFAULT_VECTOR_SIZE,
+        qdrant_url: Optional[str] = None,
+        crypto_provider=None,
+    ):
+        self.db_path = db_path
+        self.qdrant_path = qdrant_path if qdrant_path is not None else self.DEFAULT_QDRANT_PATH
+        self.qdrant_url = qdrant_url
+        self.collection_name = collection_name
+        self.vector_size = vector_size
+        self._crypto = crypto_provider
+        self._encrypted = False
+        self._sqlite_preload_timeout = SQLITE_PRELOAD_TIMEOUT
 
-    self._init_sqlite()
+        self.executor = ThreadPoolExecutor(max_workers=4)
 
-    self._init_qdrant()
+        self._init_sqlite()
+        self._init_qdrant()
 
-    logger.info(
-      "PersistenceManager initialized (db=%s, encrypted=%s, qdrant=%s)",
-      db_path, self._encrypted, self.qdrant_url or "Embedded"
-    )
-
-  @staticmethod
-  def _is_plaintext_sqlite(path: Path) -> bool:
-    """Check if a file is a plain (unencrypted) SQLite database."""
-    if not path.exists() or path.stat().st_size == 0:
-      return False
-    with open(path, 'rb') as f:
-      header = f.read(16)
-    return header == b'SQLite format 3\x00'
-
-  def _migrate_to_encrypted(self):
-    """Migrate existing plain SQLite DB to SQLCipher."""
-    if not self._crypto or not SQLCIPHER_AVAILABLE:
-      return
-    if not self.db_path.exists():
-      return
-    if not self._is_plaintext_sqlite(self.db_path):
-      return  # Already encrypted or empty
-
-    logger.info("Migrating plain SQLite to SQLCipher: %s", self.db_path)
-    tmp_path = self.db_path.with_suffix('.db.encrypted')
-    try:
-      # Read all data from plain DB
-      plain_conn = sqlite3.connect(str(self.db_path))
-      plain_conn.execute("PRAGMA busy_timeout = 5000")
-
-      # Create encrypted DB
-      enc_conn = sqlcipher.connect(str(tmp_path))
-      dek = self._crypto.derive_key("sqlite")
-      enc_conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")
-      enc_conn.execute("PRAGMA cipher_compatibility = 4")
-      enc_conn.execute("PRAGMA busy_timeout = 5000")
-
-      # Copy schema + data (iterdump yields complete SQL statements)
-      for line in plain_conn.iterdump():
-        if line.strip() in ("BEGIN TRANSACTION;", "COMMIT;"):
-          continue  # Skip transaction control, we manage our own
-        enc_conn.execute(line)
-      enc_conn.commit()
-
-      plain_conn.close()
-      enc_conn.close()
-
-      # Remove stale WAL/SHM from plain DB (would confuse SQLCipher)
-      for suffix in ('.db-wal', '.db-shm'):
-        wal_file = self.db_path.with_suffix(suffix)
-        if wal_file.exists():
-          wal_file.unlink()
-
-      # Backup original, replace with encrypted
-      backup_path = self.db_path.with_suffix('.db.bak')
-      self.db_path.rename(backup_path)
-      tmp_path.rename(self.db_path)
-      logger.info("Migration complete. Backup at %s", backup_path)
-    except Exception as e:
-      logger.error("SQLCipher migration failed: %s. Keeping plain DB.", e)
-      if tmp_path.exists():
-        tmp_path.unlink()
-      return
-
-  def _init_sqlite(self):
-    """Initialize SQLite database with WAL mode."""
-    self.db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Determine if we should use encryption
-    if self._crypto and SQLCIPHER_AVAILABLE:
-      self._migrate_to_encrypted()
-      self._encrypted = True
-    elif self._crypto and not SQLCIPHER_AVAILABLE:
-      logger.warning(
-        "CryptoProvider provided but sqlcipher3 not installed. "
-        "Database will NOT be encrypted. Install sqlcipher3 for encryption."
-      )
-
-    with self._connect_sqlite() as conn:
-      cursor = conn.cursor()
-
-      cursor.execute("PRAGMA journal_mode=WAL")
-
-      cursor.execute("""
-        CREATE TABLE IF NOT EXISTS memory_entries (
-          id TEXT PRIMARY KEY,
-          entry_type TEXT NOT NULL,
-          content TEXT NOT NULL,
-          source TEXT NOT NULL,
-          timestamp REAL NOT NULL,
-          ttl_seconds INTEGER,
-          metadata_json TEXT,
-          created_at REAL DEFAULT (julianday('now'))
+        logger.info(
+            "PersistenceManager initialized (db=%s, encrypted=%s, qdrant=%s)",
+            db_path,
+            self._encrypted,
+            self.qdrant_path or self.qdrant_url or "Embedded",
         )
-      """)
 
-      cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_entry_type
-        ON memory_entries(entry_type)
-      """)
+    @staticmethod
+    def _hex_to_uuid(hex_id: str) -> str:
+        """Converteix hex ID a UUID per Qdrant."""
+        padded = hex_id.ljust(32, "0")
+        return str(uuid.UUID(padded))
+
+    def _init_qdrant(self):
+        """
+        Inicialitza el QdrantAdapter.
+
+        Prioritat:
+          1. Path local (mode embedded)
+          2. URL (mode servidor)
+        """
+        from memory.embeddings.adapters import QdrantAdapter
+        from memory.memory.engines.qdrant_types import Distance, VectorParams
+
+        self.qdrant: Optional[Any] = None
+        self._qdrant_available = False
 
-      cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_timestamp
-        ON memory_entries(timestamp DESC)
-      """)
-
-      conn.commit()
-
-    logger.info("SQLite initialized (encrypted=%s)", self._encrypted)
-
-  def _connect_sqlite(self):
-    """Open SQLite/SQLCipher connection with busy timeout."""
-    if self._encrypted and SQLCIPHER_AVAILABLE:
-      conn = sqlcipher.connect(str(self.db_path))
-      dek = self._crypto.derive_key("sqlite")
-      conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")
-      conn.execute("PRAGMA cipher_compatibility = 4")
-    else:
-      conn = sqlite3.connect(str(self.db_path))
-    conn.execute("PRAGMA busy_timeout = 5000")
-    return conn
-
-  def _init_qdrant(self):
-    """
-    Initialize Qdrant client.
-    
-    Priority:
-    1. Local Path (Embedded mode): If qdrant_path is provided.
-    2. URL (Server mode): If qdrant_url is configured.
-
-    """
-    self.qdrant = None
-    self._qdrant_available = False
-
-    try:
-      from core.qdrant_pool import get_qdrant_client
-
-      if self.qdrant_path:
-        # Mode Embedded (Local files)
-        self.qdrant_path.mkdir(parents=True, exist_ok=True)
-        self.qdrant = get_qdrant_client(path=str(self.qdrant_path))
-        logger.info("Qdrant initialized in EMBEDDED mode at %s", self.qdrant_path)
-      else:
-        # Mode Server (HTTP)
-        self.qdrant = get_qdrant_client(url=self.qdrant_url)
-        logger.info("Qdrant initialized in SERVER mode at %s", self.qdrant_url)
-
-      collections = self.qdrant.get_collections().collections
-      collection_names = [c.name for c in collections]
-
-      if self.collection_name not in collection_names:
-        self.qdrant.create_collection(
-          collection_name=self.collection_name,
-          vectors_config=VectorParams(
-            size=self.vector_size,
-            distance=Distance.COSINE
-          )
-        )
-        logger.info("Created Qdrant collection '%s'", self.collection_name)
-      else:
-        logger.debug("Qdrant collection '%s' already exists", self.collection_name)
-
-      self._qdrant_available = True
-
-    except Exception as e:
-      mode = "Embedded" if self.qdrant_path else "Server"
-      logger.warning(
-        "Qdrant %s mode failed: %s. Memory will use SQLite only (degraded mode).",
-        mode, e
-      )
-      self.qdrant = None
-      self._qdrant_available = False
-
-  async def store(
-    self,
-    entry: MemoryEntry,
-    embedding: Optional[List[float]] = None,
-    strict: bool = True
-  ) -> str:
-    """
-    Store entry with dual consistency management (SQLite + Qdrant).
-
-    Improved robustness in synchronization failures.
-
-    Args:
-      entry: MemoryEntry to save
-      embedding: Embedding vector (optional)
-      strict: If True, rollbacks SQLite if Qdrant fails. If False, allows "degraded mode".
-
-    Returns:
-      str: Entry ID
-
-    Raises:
-      StorageError: If persistence fails in strict mode
-    """
-    await self._store_sqlite(entry)
-
-    if embedding and self._qdrant_available:
-      try:
-        payload_vectors_only = {
-          "entry_type": entry.entry_type,
-          "original_id": entry.id,
-          # Text (content, source, metadata) lives only in SQLite.
-          # Qdrant stores vectors + minimal identifiers for search.
-        }
-        await self._store_qdrant(entry.id, embedding, payload_vectors_only)
-      except Exception as e:
-        if strict:
-          logger.error(
-            "CRITICAL: Qdrant storage failed for %s: %s. Performing ROLLBACK on SQLite to prevent divergence.",
-            entry.id, e
-          )
-          await self._delete_sqlite(entry.id)
-          raise StorageError(f"Storage failed (Strict mode: Rollback performed): {e}")
-        else:
-          logger.warning(
-            "DEGRADED: Qdrant storage failed for %s: %s. Entry kept in SQLite only.",
-            entry.id, e
-          )
-    elif embedding and not self._qdrant_available:
-      logger.debug("Entry %s stored only in SQLite (Qdrant service is unavailable/degraded).", entry.id)
-
-    return entry.id
-
-  async def _store_sqlite(self, entry: MemoryEntry):
-    """Store entry to SQLite (run_in_executor)"""
-    loop = asyncio.get_running_loop()
-
-    def _sync_store():
-      with self._connect_sqlite() as conn:
-        cursor = conn.cursor()
-
-        metadata_json = json.dumps(entry.metadata) if entry.metadata else None
-
-        # Use UNIX timestamp (seconds since epoch) - industry standard
-        unix_timestamp = entry.timestamp.timestamp()
-
-        cursor.execute("""
-          INSERT OR REPLACE INTO memory_entries
-          (id, entry_type, content, source, timestamp, ttl_seconds, metadata_json)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-          entry.id,
-          entry.entry_type,
-          entry.content,
-          entry.source,
-          unix_timestamp,
-          entry.ttl_seconds,
-          metadata_json
-        ))
-
-        conn.commit()
-
-    await loop.run_in_executor(self.executor, _sync_store)
-    logger.debug("Stored entry %s to SQLite", entry.id)
-
-  @staticmethod
-  def _hex_to_uuid(hex_id: str) -> str:
-    """
-    Convert SHA256 hex ID to UUID format for Qdrant.
-
-    Args:
-      hex_id: 16-character hex string (from SHA256[:16])
-
-    Returns:
-      UUID string in format 8-4-4-4-12
-    """
-    padded = hex_id.ljust(32, '0')
-    return str(uuid.UUID(padded))
-
-  async def _store_qdrant(self, entry_id: str, embedding: List[float], metadata: Dict[str, Any]):
-    """Store vector a Qdrant"""
-    uuid_id = PersistenceManager._hex_to_uuid(entry_id)
-
-    def _sync_upsert():
-      point = PointStruct(
-        id=uuid_id,
-        vector=embedding,
-        payload={
-          **(metadata or {}),
-          "original_id": entry_id
-        }
-      )
-      self.qdrant.upsert(
-        collection_name=self.collection_name,
-        points=[point]
-      )
-
-    if self.qdrant_path:
-      # In embedded mode (SQLite/Local), it is better not to use executor 
-      # to avoid sqlite3 "created in different thread" errors
-      _sync_upsert()
-    else:
-      # In server mode (HTTP), the executor allows not blocking the main thread
-      loop = asyncio.get_running_loop()
-      await loop.run_in_executor(self.executor, _sync_upsert)
-      
-    logger.debug("Stored vector for %s to Qdrant", entry_id)
-
-  async def _delete_sqlite(self, entry_id: str):
-    """Delete entry from SQLite (rollback helper)"""
-    loop = asyncio.get_running_loop()
-
-    def _sync_delete():
-      with self._connect_sqlite() as conn:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM memory_entries WHERE id = ?", (entry_id,))
-        conn.commit()
-
-    await loop.run_in_executor(self.executor, _sync_delete)
-    logger.debug("Deleted entry %s from SQLite (rollback)", entry_id)
-
-  async def get(self, entry_id: str) -> Optional[MemoryEntry]:
-    """Retrieve entry by ID"""
-    loop = asyncio.get_running_loop()
-
-    def _sync_get():
-      with self._connect_sqlite() as conn:
-        cursor = conn.cursor()
-
-        cursor.execute("""
-          SELECT id, entry_type, content, source, timestamp, ttl_seconds, metadata_json
-          FROM memory_entries
-          WHERE id = ?
-        """, (entry_id,))
-
-        row = cursor.fetchone()
-
-      if not row:
-        return None
-
-      return self._row_to_entry(row)
-
-    entry = await loop.run_in_executor(self.executor, _sync_get)
-    return entry
-
-  async def search(
-    self,
-    query_vector: List[float],
-    limit: int = 10,
-    filter_type: Optional[str] = None
-  ) -> List[tuple]:
-    """
-    Semantic search with Qdrant.
-
-    Args:
-      query_vector: Search vector
-      limit: Max results
-      filter_type: Filter by entry_type
-
-    Returns:
-      List[(entry_id, score)]
-    """
-    loop = asyncio.get_running_loop()
-
-    def _sync_search():
-      if hasattr(self.qdrant, "search"):
-        results = self.qdrant.search(
-          collection_name=self.collection_name,
-          query_vector=query_vector,
-          limit=limit
-        )
-      else:
-        # Fallback for modern qdrant-client versions (1.11+)
-        res = self.qdrant.query_points(
-          collection_name=self.collection_name,
-          query=query_vector,
-          limit=limit
-        )
-        results = res.points
-
-      # Convert Qdrant UUID string back to original_id if possible, 
-      # or simply return the UUID format that Qdrant uses.
-      # LocalClient returns IDs as strings or integers.
-      return [(r.id, r.score) for r in results]
-
-    if self.qdrant_path:
-      results = _sync_search()
-    else:
-      loop = asyncio.get_running_loop()
-      results = await loop.run_in_executor(self.executor, _sync_search)
-
-    logger.debug("Qdrant search returned %s results", len(results))
-    return results
-
-  def _row_to_entry(self, row: tuple) -> MemoryEntry:
-    """Convert SQLite row to MemoryEntry"""
-    from datetime import datetime, timezone
-
-    entry_id, entry_type, content, source, timestamp, ttl_seconds, metadata_json = row
-
-    metadata = json.loads(metadata_json) if metadata_json else {}
-
-
-    return MemoryEntry(
-      id=entry_id,
-      entry_type=entry_type,
-      content=content,
-      source=source,
-      timestamp=datetime.fromtimestamp(timestamp, tz=timezone.utc),
-      ttl_seconds=ttl_seconds,
-      metadata=metadata
-    )
-
-  async def get_stats(self) -> Dict[str, int]:
-    """Get persistence statistics"""
-    loop = asyncio.get_running_loop()
-
-    def _sync_stats():
-      conn = self._connect_sqlite()
-      cursor = conn.cursor()
-
-      cursor.execute("SELECT COUNT(*) FROM memory_entries")
-      total = cursor.fetchone()[0]
-
-      cursor.execute("SELECT COUNT(*) FROM memory_entries WHERE entry_type = 'episodic'")
-      episodic = cursor.fetchone()[0]
-
-      cursor.execute("SELECT COUNT(*) FROM memory_entries WHERE entry_type = 'semantic'")
-      semantic = cursor.fetchone()[0]
-
-      conn.close()
-
-      return {
-        "total_entries": total,
-        "episodic_count": episodic,
-        "semantic_count": semantic
-      }
-
-    stats = await loop.run_in_executor(self.executor, _sync_stats)
-    return stats
-
-  async def get_recent(
-    self,
-    limit: int = 50,
-    entry_types: Optional[List[str]] = None,
-    exclude_expired: bool = True
-  ) -> List[MemoryEntry]:
-    """
-    Retrieve the N most recent entries from SQLite.
-
-    Used for preload to RAMContext on boot.
-
-    Args:
-      limit: Max entries to return (default: 50)
-      entry_types: Filter by type (default: ["episodic"])
-      exclude_expired: Exclude expired entries by TTL (default: True)
-
-    Returns:
-      List[MemoryEntry] ordered by timestamp DESC
-    """
-    loop = asyncio.get_running_loop()
-    types_filter = entry_types or ["episodic"]
-
-    def _sync_get_recent():
-      from datetime import datetime, timezone
-
-      conn = self._connect_sqlite()
-      cursor = conn.cursor()
-
-      placeholders = ",".join(["?" for _ in types_filter])
-      query = f"""
-        SELECT id, entry_type, content, source, timestamp, ttl_seconds, metadata_json
-        FROM memory_entries
-        WHERE entry_type IN ({placeholders})
-        ORDER BY timestamp DESC
-        LIMIT ?
-      """
-
-      cursor.execute(query, (*types_filter, limit * 2))
-      rows = cursor.fetchall()
-      conn.close()
-
-      entries = []
-      # Use UNIX timestamp for TTL comparison
-      now_ts = datetime.now(timezone.utc).timestamp()
-
-      for row in rows:
-        if len(entries) >= limit:
-          break
-
-        entry_id, entry_type, content, source, timestamp, ttl_seconds, metadata_json = row
-
-        # TTL check using UNIX timestamps (seconds)
-        if exclude_expired and ttl_seconds:
-          expiry_ts = timestamp + ttl_seconds
-          if expiry_ts < now_ts:
-            continue
-
-        metadata = json.loads(metadata_json) if metadata_json else {}
-
-        # Convert UNIX timestamp back to datetime
         try:
-          entry_datetime = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-        except (ValueError, OSError):
-          entry_datetime = datetime.now(timezone.utc)
+            if self.qdrant_path:
+                self.qdrant_path.mkdir(parents=True, exist_ok=True)
+                self.qdrant = QdrantAdapter.from_pool(
+                    collection_name=self.collection_name,
+                    path=str(self.qdrant_path),
+                )
+                logger.info("Qdrant initialized in EMBEDDED mode at %s", self.qdrant_path)
+            else:
+                self.qdrant = QdrantAdapter.from_pool(
+                    collection_name=self.collection_name,
+                    url=self.qdrant_url,
+                )
+                logger.info("Qdrant initialized in SERVER mode at %s", self.qdrant_url)
 
-        entries.append(MemoryEntry(
-          id=entry_id,
-          entry_type=entry_type,
-          content=content,
-          source=source,
-          timestamp=entry_datetime,
-          ttl_seconds=ttl_seconds,
-          metadata=metadata
-        ))
+            collections = self.qdrant.get_collections().collections
+            collection_names = [c.name for c in collections]
 
-      return entries
+            if self.collection_name not in collection_names:
+                self.qdrant.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=self.vector_size,
+                        distance=Distance.COSINE,
+                    ),
+                )
+                logger.info("Created Qdrant collection '%s'", self.collection_name)
+            else:
+                logger.debug("Qdrant collection '%s' already exists", self.collection_name)
 
-    try:
-      entries = await asyncio.wait_for(
-        loop.run_in_executor(self.executor, _sync_get_recent),
-        timeout=SQLITE_PRELOAD_TIMEOUT
-      )
-      logger.info("Loaded %d recent entries from SQLite", len(entries))
-      return entries
-    except asyncio.TimeoutError:
-      logger.warning("SQLite preload timeout (%.1fs), continuing with empty RAM", SQLITE_PRELOAD_TIMEOUT)
-      return []
-    except Exception as e:
-      logger.warning("SQLite preload failed: %s, continuing with empty RAM", e)
-      return []
+            self._qdrant_available = True
 
-  def close(self):
-    """Close resources. No tanca el QdrantClient — es compartit via pool."""
-    self.executor.shutdown(wait=True)
-    self.qdrant = None
-    logger.info("PersistenceManager closed")
+        except Exception as e:
+            mode = "Embedded" if self.qdrant_path else "Server"
+            logger.warning(
+                "Qdrant %s mode failed: %s. Memory will use SQLite only (degraded mode).",
+                mode,
+                e,
+            )
+            self.qdrant = None
+            self._qdrant_available = False
 
-__all__ = ["PersistenceManager", "StorageError"]
+    async def store(
+        self,
+        entry: MemoryEntry,
+        embedding: Optional[List[float]] = None,
+        strict: bool = True,
+    ) -> str:
+        """
+        Desa entry amb consistència dual (SQLite + Qdrant).
+
+        Args:
+            entry: MemoryEntry a desar
+            embedding: Vector d'embedding (opcional)
+            strict: Si True, rollback SQLite si Qdrant falla
+
+        Returns:
+            ID de l'entry
+
+        Raises:
+            StorageError: Si la persistència falla en mode strict
+        """
+        await self._store_sqlite(entry)
+
+        if embedding and self._qdrant_available:
+            try:
+                payload = {
+                    "entry_type": entry.entry_type,
+                    "original_id": entry.id,
+                }
+                await self._store_qdrant(entry.id, embedding, payload)
+            except Exception as e:
+                if strict:
+                    logger.error(
+                        "CRITICAL: Qdrant storage failed for %s: %s. ROLLBACK SQLite.",
+                        entry.id, e,
+                    )
+                    await self._delete_sqlite(entry.id)
+                    raise StorageError(f"Storage failed (Strict rollback): {e}")
+                else:
+                    logger.warning(
+                        "DEGRADED: Qdrant failed for %s: %s. Entry kept in SQLite only.",
+                        entry.id, e,
+                    )
+        elif embedding and not self._qdrant_available:
+            logger.debug("Entry %s stored only in SQLite (Qdrant unavailable).", entry.id)
+
+        return entry.id
+
+    async def _store_qdrant(
+        self,
+        entry_id: str,
+        embedding: List[float],
+        metadata: Dict[str, Any],
+    ):
+        """Desa vector a Qdrant via QdrantAdapter."""
+        from memory.memory.engines.qdrant_types import PointStruct
+
+        uuid_id = PersistenceManager._hex_to_uuid(entry_id)
+
+        def _sync_upsert():
+            point = PointStruct(
+                id=uuid_id,
+                vector=embedding,
+                payload={**(metadata or {}), "original_id": entry_id},
+            )
+            self.qdrant.upsert(
+                collection_name=self.collection_name,
+                points=[point],
+            )
+
+        if self.qdrant_path:
+            _sync_upsert()
+        else:
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(self.executor, _sync_upsert)
+
+        logger.debug("Stored vector for %s to Qdrant", entry_id)
+
+    async def search(
+        self,
+        query_vector: List[float],
+        limit: int = 10,
+        filter_type: Optional[str] = None,
+    ) -> List[tuple]:
+        """
+        Cerca semàntica via QdrantAdapter.
+
+        Returns:
+            Llista de (entry_id, score)
+        """
+        loop = asyncio.get_running_loop()
+
+        def _sync_search():
+            return self.qdrant.client_search(
+                collection_name=self.collection_name,
+                query_vector=query_vector,
+                limit=limit,
+            )
+
+        if self.qdrant_path:
+            results = _sync_search()
+        else:
+            results = await loop.run_in_executor(self.executor, _sync_search)
+
+        logger.debug("Qdrant search returned %s results", len(results))
+        return [(r.id, r.score) for r in results]
+
+    def close(self):
+        """Tanca recursos. No tanca QdrantClient — és compartit via pool."""
+        self.executor.shutdown(wait=True)
+        self.qdrant = None
+        logger.info("PersistenceManager closed")
+
+
+__all__ = ["PersistenceManager", "StorageError", "SQLCIPHER_AVAILABLE"]

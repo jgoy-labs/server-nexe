@@ -12,7 +12,6 @@ from plugins.web_ui_module.core.memory_helper import (
     MEMORY_TYPES,
     SIMILARITY_THRESHOLD,
     TEMPORAL_DECAY_DAYS,
-    MIN_IMPORTANCE_SCORE,
 )
 
 

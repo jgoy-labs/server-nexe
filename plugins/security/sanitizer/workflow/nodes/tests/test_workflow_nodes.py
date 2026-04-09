@@ -10,7 +10,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import asyncio
-import pytest
 
 from plugins.security.sanitizer.workflow.nodes.intervention_node import (
     InterventionNode,

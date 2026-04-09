@@ -174,15 +174,23 @@ struct CompletionView: View {
         try? xattr.run()
         xattr.waitUntilExit()
 
-        // Llançar tray amb --autostart (engega servidor i obre navegador)
-        let venvPython = engine.installPath + "/venv/bin/python3"
+        // Llançar tray amb --autostart (engega servidor i obre navegador).
+        // Priority: NexeTray.app bundle (Gatekeeper-safe, correcte a macOS Sequoia).
+        // Fallback: python -m installer.tray (entorn dev sense bundle present).
+        let trayBundlePath = engine.installPath + "/installer/NexeTray.app/Contents/MacOS/NexeTray"
         let tray = Process()
-        tray.executableURL = URL(fileURLWithPath: venvPython)
-        tray.arguments = ["-m", "installer.tray", "--autostart"]
-        tray.currentDirectoryURL = URL(fileURLWithPath: engine.installPath)
-        // Passar idioma triat al tray
         var env = ProcessInfo.processInfo.environment
         env["NEXE_LANG"] = engine.lang.rawValue
+        if FileManager.default.fileExists(atPath: trayBundlePath) {
+            tray.executableURL = URL(fileURLWithPath: trayBundlePath)
+            tray.arguments = ["--autostart"]
+        } else {
+            let venvPython = engine.installPath + "/venv/bin/python3"
+            tray.executableURL = URL(fileURLWithPath: venvPython)
+            tray.arguments = ["-m", "installer.tray", "--autostart"]
+        }
+        tray.currentDirectoryURL = URL(fileURLWithPath: engine.installPath)
+        // Passar idioma triat al tray
         tray.environment = env
         try? tray.run()
     }

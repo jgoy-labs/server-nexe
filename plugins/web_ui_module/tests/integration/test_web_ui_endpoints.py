@@ -212,7 +212,6 @@ class TestChatOllama:
         engine = os.environ.get("NEXE_MODEL_ENGINE", "")
         if engine not in ("ollama", ""):
             pytest.skip("Ollama not selected engine")
-        import subprocess
         try:
             import urllib.request
             urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)

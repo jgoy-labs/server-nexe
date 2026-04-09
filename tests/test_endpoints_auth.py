@@ -35,9 +35,10 @@ PROTECTED_ENDPOINTS = [
 
 # Fix Consultor passada 1 — Finding 3: coverage Bug 22 incomplet.
 # Ampliem amb POST/DELETE protegits. Cada entry: (method, path, body_json).
+# Item 24 cirurgia 2026-04-08: /ollama/api/chat ELIMINAT (pipeline únic).
+# /mlx/chat i /llama-cpp/chat ELIMINATS. Retirades d'aquí per coherència.
 PROTECTED_WRITE_ENDPOINTS = [
     ("POST", "/ollama/api/pull", {"name": "dummy-model"}),
-    ("POST", "/ollama/api/chat", {"model": "dummy", "messages": []}),
     ("DELETE", "/ollama/api/models/dummy-model", None),
     ("POST", "/rag/document", {"text": "dummy", "metadata": {}}),
     ("POST", "/rag/search", {"query": "dummy"}),

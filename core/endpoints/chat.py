@@ -18,7 +18,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from plugins.security.core.auth_dependencies import require_api_key
-from plugins.security.core.input_sanitizers import validate_string_input
+from plugins.security.core.input_sanitizers import validate_string_input, strip_memory_tags
 
 from .chat_schemas import Message, ChatCompletionRequest
 from .chat_sanitization import (
@@ -114,6 +114,9 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
         if _msg.role is not None:
             _msg.role = validate_string_input(_msg.role, max_length=50, context="param")
         if _msg.content is not None:
+            # SECURITY: Strip memory injection tags BEFORE validate to match routes_chat.py pattern
+            if _msg.role == "user":
+                _msg.content = strip_memory_tags(_msg.content)
             _msg.content = validate_string_input(_msg.content, max_length=8000, context="chat")
 
     engine, preferred_fallback = _resolve_engine(body.engine, request.app.state)

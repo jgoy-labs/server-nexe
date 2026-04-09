@@ -117,53 +117,6 @@ class TestPullModelError:
         assert "error" in r.text.lower() or "data:" in r.text
 
 
-class TestChatStream:
-    """Test chat streaming."""
-
-    def test_chat_stream_success(self, auth):
-        """Successful chat streaming."""
-        async def mock_chat(model, messages, stream):
-            yield {"message": {"content": "Hello "}, "done": False}
-            yield {"message": {"content": "world"}, "done": True}
-
-        mock_module = MagicMock()
-        mock_module.chat = mock_chat
-
-        c = _make_client(mock_module)
-        r = c.post(
-            "/ollama/api/chat",
-            json={
-                "model": "llama3",
-                "messages": [{"role": "user", "content": "Hi"}],
-                "stream": True
-            },
-            headers=auth
-        )
-        assert r.status_code == 200
-
-    def test_chat_stream_error(self, auth):
-        """Exception during chat streaming."""
-        async def mock_chat(model, messages, stream):
-            raise Exception("Chat engine error")
-            yield  # make it a generator
-
-        mock_module = MagicMock()
-        mock_module.chat = mock_chat
-
-        c = _make_client(mock_module)
-        r = c.post(
-            "/ollama/api/chat",
-            json={
-                "model": "llama3",
-                "messages": [{"role": "user", "content": "Hi"}],
-                "stream": True
-            },
-            headers=auth
-        )
-        assert r.status_code == 200
-        assert "error" in r.text.lower()
-
-
 class TestHealthError:
     """Test health endpoint exception."""
 

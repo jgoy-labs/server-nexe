@@ -113,14 +113,15 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
                 text=body.content,
                 source="api",
                 trust_level="untrusted",
+                is_mem_save=True,   # /store IS an explicit MEM_SAVE: bypass model_generated gate
                 force=body.force,
             )
             return MemoryStoreResponse(
                 success=entry_id is not None,
                 document_id=entry_id,
-                message="Content processed via MemoryService"
+                message="Content stored successfully"
                 if entry_id
-                else "Content rejected by pipeline",
+                else "Content rejected: too short, empty, or repetitive",
             )
 
         # Fallback to direct Qdrant

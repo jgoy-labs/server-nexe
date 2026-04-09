@@ -13,11 +13,13 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 import logging
 from .chat import router as chat_router
+from .workflows import router_workflows
 
 logger = logging.getLogger(__name__)
 
 router_v1 = APIRouter(prefix="/v1", tags=["v1"])
 router_v1.include_router(chat_router)
+router_v1.include_router(router_workflows)
 
 @router_v1.get("", include_in_schema=True, summary="API v1 root — available endpoints and status")
 @router_v1.get("/", include_in_schema=False)
@@ -35,8 +37,8 @@ async def v1_root(request: Request):
     "endpoints": {
       "workflows": {
         "base": "/v1/workflows",
-        "status": "implemented",
-        "description": "Workflow management endpoints"
+        "status": "stub-v0.9.1",
+        "description": "Workflow management endpoints (planned v0.9.1+)"
       },
       "chat": {
         "base": "/v1/chat",

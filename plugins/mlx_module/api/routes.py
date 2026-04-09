@@ -11,8 +11,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-from typing import Any, Dict
-
 from fastapi import APIRouter, HTTPException
 
 logger = logging.getLogger(__name__)
@@ -37,23 +35,5 @@ def create_router(module_instance) -> APIRouter:
         """Informacio del modul MLX."""
         module = _get_module()
         return module.get_info()
-
-    @router.post("/chat")
-    async def chat_endpoint(request: Dict[str, Any]):
-        """Chat amb model MLX."""
-        module = _get_module()
-        if not module._initialized:
-            raise HTTPException(status_code=503, detail="Module not initialized")
-
-        messages = request.get("messages", [])
-        system = request.get("system", "")
-        session_id = request.get("session_id", "default")
-
-        try:
-            result = await module.chat(messages, system, session_id)
-            return result
-        except Exception as e:
-            logger.error("MLX chat failed: %s", e)
-            raise HTTPException(status_code=500, detail=str(e))
 
     return router

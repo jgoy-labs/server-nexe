@@ -9,7 +9,6 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import atexit
 import logging
 import os
 import signal
@@ -71,45 +70,69 @@ def kill_process_on_port(port: int) -> bool:
   return False
 
 def _acquire_pidfile(pid_path: Path, port: int) -> bool:
-  """Try to acquire the canonical server PID file.
+  """Try to acquire the canonical server PID file using an atomic O_EXCL open.
 
   Returns True if acquired (file written), False if another live server
   already holds the lock. Stale lock files (dead PID, corrupt content)
   are removed automatically.
 
-  Note: not atomic against TOCTOU races — acceptable for Fase 1B since
-  the port-in-use check upstream is the primary guard.
+  Atomic: uses os.open(O_CREAT|O_EXCL|O_WRONLY) so two concurrent callers
+  cannot both succeed — exactly one wins the race.
   """
-  if pid_path.exists():
+  import json as _json
+
+  pid_path.parent.mkdir(parents=True, exist_ok=True)
+  content = _json.dumps({
+    "pid": os.getpid(),
+    "port": port,
+    "started": datetime.now(timezone.utc).isoformat(),
+  }).encode()
+
+  for _attempt in range(2):  # up to 2 attempts: initial + after stale removal
     try:
-      raw = pid_path.read_text().strip().split("\n")
-      existing_pid = int(raw[0])
-      existing_port = raw[1] if len(raw) > 1 else "?"
+      fd = os.open(str(pid_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
       try:
-        os.kill(existing_pid, 0)  # signal 0 = liveness probe
-        logger.error(
-          "Server already running. PID: %s on port %s. Use './nexe stop' to stop it.",
-          existing_pid, existing_port,
-        )
-        return False
-      except (ProcessLookupError, OSError):
-        logger.warning("Stale PID file found (PID %s dead), removing.", existing_pid)
+        os.write(fd, content)
+      finally:
+        os.close(fd)
+      return True
+    except FileExistsError:
+      # File exists — check if the holder is alive
+      try:
+        raw = pid_path.read_text()
+        if not raw.strip():
+          # Buit: un altre procés acaba de crear-lo amb O_EXCL i encara escriu.
+          # Tractem com a locked — NO eliminem.
+          logger.debug("PID file exists but empty — another process is acquiring it.")
+          return False
+        data = _json.loads(raw)
+        existing_pid = int(data["pid"])
+        existing_port = data.get("port", "?")
+        try:
+          os.kill(existing_pid, 0)  # signal 0 = liveness probe
+          logger.error(
+            "Server already running. PID: %s on port %s. Use './nexe stop' to stop it.",
+            existing_pid, existing_port,
+          )
+          return False
+        except (ProcessLookupError, OSError):
+          logger.warning("Stale PID file found (PID %s dead), removing.", existing_pid)
+          try:
+            pid_path.unlink()
+          except OSError:
+            pass
+          # retry the atomic open in next iteration
+      except (ValueError, KeyError, OSError, Exception) as e:
+        logger.warning("Corrupt PID file (%s), removing.", e)
         try:
           pid_path.unlink()
         except OSError:
           pass
-    except (ValueError, OSError, IndexError) as e:
-      logger.warning("Corrupt PID file (%s), removing.", e)
-      try:
-        pid_path.unlink()
-      except OSError:
-        pass
+        # retry the atomic open in next iteration
 
-  pid_path.parent.mkdir(parents=True, exist_ok=True)
-  pid_path.write_text(
-    f"{os.getpid()}\n{port}\n{datetime.now(timezone.utc).isoformat()}\n"
-  )
-  return True
+  # Should not reach here, but fail-safe
+  logger.error("Could not acquire PID file after retries: %s", pid_path)
+  return False
 
 
 def _release_pidfile(pid_path: Path) -> None:
@@ -117,8 +140,10 @@ def _release_pidfile(pid_path: Path) -> None:
   try:
     if pid_path.exists():
       try:
-        existing_pid = int(pid_path.read_text().strip().split("\n")[0])
-      except (ValueError, OSError, IndexError):
+        import json as _json
+        data = _json.loads(pid_path.read_text())
+        existing_pid = int(data["pid"])
+      except Exception:
         existing_pid = None
       if existing_pid is None or existing_pid == os.getpid():
         pid_path.unlink()
@@ -160,8 +185,12 @@ def _start_parent_watchdog():
   logger.debug("Parent watchdog started — monitoring tray PID %d", tray_pid)
 
 
-def _maybe_launch_tray():
-    """Launch the macOS tray icon if on macOS and no tray is already running."""
+def _maybe_launch_tray(_project_root: "Path | None" = None):
+    """Launch the macOS tray icon if on macOS and no tray is already running.
+
+    Args:
+        _project_root: Override project root (tests only). If None, derived from __file__.
+    """
     from pathlib import Path
 
     # Guard 1: Already launched from tray
@@ -213,24 +242,58 @@ def _maybe_launch_tray():
     except Exception:
         pass
 
-    # Launch tray in --attach mode
-    project_root = Path(__file__).resolve().parent.parent
+    # Launch tray in --attach mode.
+    #
+    # Priority: NexeTray.app bundle (Gatekeeper-safe, macOS Sequoia provenance OK,
+    # appears as "server-nexe" in Activity Monitor via CFBundleName).
+    # Fallback: python -m installer.tray (dev mode, no bundle present).
+    #
+    # The bundle's entry point (NexeTray.app/Contents/MacOS/NexeTray) is a bash
+    # script that exec's the venv Python with the same args via "$@", so
+    # --attach and --server-pid are forwarded transparently.
+    project_root = _project_root if _project_root is not None else Path(__file__).resolve().parent.parent
     venv_python = project_root / "venv" / "bin" / "python"
     python_exe = str(venv_python) if venv_python.exists() else sys.executable
 
     server_pid = os.getpid()
+    tray_args = ["--attach", "--server-pid", str(server_pid)]
+
+    tray_binary = project_root / "installer" / "NexeTray.app" / "Contents" / "MacOS" / "NexeTray"
 
     try:
-        subprocess.Popen(
-            [python_exe, "-m", "installer.tray", "--attach", "--server-pid", str(server_pid)],
-            cwd=str(project_root),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,  # Fully detach from terminal
-        )
-        logger.info("Tray launched in attach mode (server PID %d)", server_pid)
+        if tray_binary.exists():
+            # App bundle path: Gatekeeper-safe, correct CFBundleName in Force Quit
+            subprocess.Popen(
+                [str(tray_binary)] + tray_args,
+                cwd=str(project_root),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            logger.info("Tray launched via bundle (server PID %d)", server_pid)
+        else:
+            # Fallback for dev environments without the app bundle
+            subprocess.Popen(
+                [python_exe, "-m", "installer.tray"] + tray_args,
+                cwd=str(project_root),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            logger.info("Tray launched via python -m (dev fallback, server PID %d)", server_pid)
     except Exception as e:
         logger.debug("Could not launch tray: %s", e)
+
+
+def _handle_sigterm(signum, frame):  # noqa: ARG001
+  """SIGTERM handler (N05). Garanteix sortida neta pre-uvicorn.
+
+  Un cop uvicorn arrenca, ell mateix gestiona SIGTERM i dispara el
+  lifespan finally (que neteja el PID file). Aquest handler cobreix la
+  finestra entre el registre del senyal i el moment que uvicorn pren el control.
+  """
+  logger.info("SIGTERM received — exiting cleanly")
+  sys.exit(0)
 
 
 def main():
@@ -339,11 +402,13 @@ def main():
     f"{YELLOW}Server running at: {host}:{port}{RESET}"
   )
 
-  # ─── PID file canònic (Bug #1) ─────────────────────────────────────────
-  pidfile_path = Path(project_root) / "storage" / "run" / "server.pid"
-  if not _acquire_pidfile(pidfile_path, port):
-    sys.exit(1)
-  atexit.register(_release_pidfile, pidfile_path)
+  # ─── SIGTERM handler (N05) ────────────────────────────────────────────
+  # Garanteix sortida neta pre-uvicorn (funció definida a nivell de mòdul).
+  signal.signal(signal.SIGTERM, _handle_sigterm)
+
+  # ─── PID file: gestionat pel lifespan (B06) ───────────────────────────
+  # L'escriptura i neteja del PID s'han mogut a core/lifespan.py.
+  # runner.py ja no gestiona el PID directament.
 
   _maybe_launch_tray()
 

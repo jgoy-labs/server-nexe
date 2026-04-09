@@ -231,7 +231,7 @@ These AI audits find many issues but are **not exhaustive** — there are certai
 
 - [ ] `.env` file has restricted permissions (chmod 600)
 - [ ] API keys are strong (32+ hex characters)
-- [ ] Qdrant port (6333) not exposed to network
+- [x] Qdrant embedded — no network port exposed (no firewall rules needed for Qdrant)
 - [ ] Server port (9119) bound to 127.0.0.1 (not 0.0.0.0)
 - [ ] Disk encryption enabled (FileVault on macOS, LUKS on Linux)
 - [ ] Rate limiting configured appropriately

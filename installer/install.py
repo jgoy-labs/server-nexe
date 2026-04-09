@@ -314,3 +314,52 @@ def run_installer():
 
     # 16. Final summary
     show_final_summary(model_config, project_root, global_symlink_created, lang)
+
+
+def add_login_item(app_path: str = "/Applications/Nexe.app") -> bool:
+    """Add Nexe to macOS login items via osascript (legacy, universal).
+
+    Equivalent to the Swift doAddLoginItem() in CompletionView.swift.
+    Returns True on success, False on failure.
+    """
+    script = (
+        f'tell application "System Events" to make login item at end '
+        f'with properties {{path:"{app_path}", hidden:true}}'
+    )
+    result = subprocess.run(
+        ["/usr/bin/osascript", "-e", script],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def main():
+    """Entry point with optional flags for headless / scripted use."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Nexe installer")
+    parser.add_argument(
+        "--add-login-item",
+        action="store_true",
+        help="Add Nexe to macOS login items after installation (auto-start at login)",
+    )
+    parser.add_argument(
+        "--app-path",
+        default="/Applications/Nexe.app",
+        help="Path to Nexe.app for the login item (default: /Applications/Nexe.app)",
+    )
+    args = parser.parse_args()
+
+    run_installer()
+
+    if args.add_login_item:
+        ok = add_login_item(app_path=args.app_path)
+        if ok:
+            print(f"{GREEN}✅ Login item added: Nexe will start at login.{RESET}")
+        else:
+            print(f"{YELLOW}⚠️  Could not add login item. Add manually via System Settings → General → Login Items.{RESET}")
+
+
+if __name__ == "__main__":
+    main()

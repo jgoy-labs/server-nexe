@@ -50,7 +50,7 @@ It is NOT npm nexe (a Node.js compiler). It is NOT a Windows server product. It 
 |-----------|-----------|
 | Language | Python 3.11+ (bundled 3.12 in installer) |
 | Web framework | FastAPI 0.115+ |
-| Vector database | Qdrant (embedded binary) |
+| Vector database | Qdrant (embedded, no external process required) |
 | LLM backends | MLX, llama.cpp (llama-cpp-python), Ollama |
 | Embeddings | nomic-embed-text (Ollama) / paraphrase-multilingual-mpnet-base-v2 (offline fallback) |
 | Embedding dimensions | 768 |

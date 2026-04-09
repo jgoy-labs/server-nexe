@@ -26,16 +26,17 @@ expires: null
 | Permission denied on setup.sh | Falta permiso de ejecucion | `chmod +x setup.sh` |
 | ModuleNotFoundError | Dependencias no instaladas | Activar venv: `source venv/bin/activate`, luego `pip install -r requirements.txt` |
 | rumps import error on Linux | Dependencia exclusiva de macOS | Normal en Linux — rumps esta en requirements-macos.txt, no en requirements.txt |
-| Qdrant binary not found | No descargado | Ejecutar el instalador de nuevo, o descargar manualmente para tu plataforma |
 
 ## Errores de arranque del servidor
 
 | Error | Causa | Solucion |
 |-------|-------|----------|
 | Port 9119 already in use | Otro proceso en ese puerto | `lsof -i :9119` y matar, o cambiar puerto en server.toml |
-| Qdrant connection refused | Qdrant no esta ejecutandose o puerto incorrecto | Comprobar puerto 6333, reiniciar servidor con `./nexe go` |
+| Qdrant connection refused | Qdrant embedded no se ha inicializado correctamente | Reinicia el servidor con `./nexe go`. Si persiste, revisa los logs en `storage/logs/`. |
 | Ollama not available | Ollama no instalado o no ejecutandose | Instalar desde ollama.com. El servidor auto-arrancara Ollama al iniciar. |
 | asyncio.Lock deadlock | Problema de event loop en Python 3.12 | Corregido en v0.8.2 via inicializacion lazy en module_lifecycle.py. Actualizar a la ultima version. |
+| Servidor ya en ejecucion (PID X) | Otra instancia activa del servidor | Usa "Quit" en el tray, o `pkill -9 server-nexe`. Verifica: `lsof -iTCP:9119` |
+| Servidor huerfano (Quit del tray no funciona) | Bug pre-v0.9.0 (corregido) — el tray no enviaba SIGTERM al servidor | Actualizar a v0.9.0+. Workaround: `pkill -f "core.app"` o `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
 
 ## Errores de Web UI
 

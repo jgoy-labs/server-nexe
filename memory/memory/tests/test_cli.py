@@ -290,25 +290,30 @@ class TestMemoryCLI:
 
     @pytest.mark.asyncio
     async def test_cmd_stats_no_ram_context(self):
-        """Test stats when RAM context is None."""
+        """Test stats when RAM context is None (legacy fallback path)."""
         cli = MemoryCLI()
         cli.module = MagicMock()
         cli.module._ram_context = None
 
-        args = argparse.Namespace()
-        result = await cli.cmd_stats(args)
+        # get_memory_service() pot retornar un svc vàlid si un test anterior
+        # ha inicialitzat el MemoryService (singleton). Forcem el fallback legacy.
+        with patch("memory.memory.module.get_memory_service", return_value=None):
+            args = argparse.Namespace()
+            result = await cli.cmd_stats(args)
         assert result == 1
 
     @pytest.mark.asyncio
     async def test_cmd_stats_exception(self):
-        """Test stats with exception."""
+        """Test stats with exception (legacy fallback path)."""
         cli = MemoryCLI()
         cli.module = MagicMock()
         cli.module._ram_context = MagicMock()
         cli.module._ram_context.get_stats = AsyncMock(side_effect=RuntimeError("fail"))
 
-        args = argparse.Namespace()
-        result = await cli.cmd_stats(args)
+        # Forcem el fallback legacy per assegurar que l'excepció de get_stats s'exercita.
+        with patch("memory.memory.module.get_memory_service", return_value=None):
+            args = argparse.Namespace()
+            result = await cli.cmd_stats(args)
         assert result == 1
 
     @pytest.mark.asyncio

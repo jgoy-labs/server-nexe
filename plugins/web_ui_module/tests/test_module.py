@@ -10,11 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import asyncio
-import json
-import os
 import pytest
-import tempfile
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient

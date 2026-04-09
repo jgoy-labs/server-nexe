@@ -11,8 +11,6 @@ import plugins.web_ui_module.core.memory_helper as mh_module
 from plugins.web_ui_module.core.memory_helper import (
     MemoryHelper,
     DELETE_THRESHOLD,
-    DELETE_TRIGGERS,
-    LIST_TRIGGERS,
 )
 
 

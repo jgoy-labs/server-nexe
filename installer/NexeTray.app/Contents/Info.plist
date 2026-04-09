@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>server-nexe</string>
+    <key>CFBundleDisplayName</key>
+    <string>server-nexe</string>
+    <key>CFBundleIdentifier</key>
+    <string>net.servernexe.tray</string>
+    <key>CFBundleVersion</key>
+    <string>0.9.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.9.0</string>
+    <key>CFBundleExecutable</key>
+    <string>NexeTray</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+</dict>
+</plist>

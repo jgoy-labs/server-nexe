@@ -205,6 +205,8 @@ server-nexe/
 │
 ├── installer/                    # Instal·lador macOS
 │   ├── swift-wizard/             # Wizard SwiftUI (12 fitxers Swift, 6 pantalles)
+│   ├── NexeTray.app/             # Bundle macOS oficial del tray (LSUIElement, CFBundleIdentifier=net.servernexe.tray)
+│   │   └── Contents/MacOS/NexeTray  # Bash wrapper → exec venv/python -m installer.tray "$@"
 │   ├── build_dmg.sh              # Constructor de DMG amb signatura
 │   ├── tray.py                   # Aplicacio de safata del sistema
 │   ├── tray_monitor.py           # _RamMonitor (thread daemon per RAM polling)
@@ -235,20 +237,51 @@ Gestiona l'arrencada i l'aturada del servidor. Separat en 4 submoduls.
 
 **Sequencia d'arrencada:**
 1. Carregar configuracio de server.toml
-2. Inicialitzar APIIntegrator (sistema de personalitat)
-3. Inicialitzar Qdrant embedded (pool singleton a `core/qdrant_pool.py`, path `storage/vectors/`)
-4. Auto-arrencar Ollama (si disponible, en segon pla)
-5. Carregar moduls de memoria (Memory -> RAG -> Embeddings, ordre correcte)
-6. Inicialitzar moduls de plugins (MLX, llama.cpp, Ollama, Security, Web UI)
-7. Inicialitzar CryptoProvider si `NEXE_ENCRYPTION_ENABLED=true` (opt-in)
-8. Auto-ingestio de knowledge/ (nomes la primera execucio, fitxer marcador)
-9. Generar bootstrap token (256 bits, persistent a SQLite, TTL de 30min)
+2. Escriure PID file atomic (`storage/run/server.pid`, `O_CREAT|O_EXCL`) — avorta si servidor ja en marxa
+3. Inicialitzar APIIntegrator (sistema de personalitat)
+4. Inicialitzar Qdrant embedded (pool singleton a `core/qdrant_pool.py`, path `storage/vectors/`)
+5. Auto-arrencar Ollama (si disponible, en segon pla) — timeout `NEXE_STARTUP_TIMEOUT` (default 30s)
+6. Carregar moduls de memoria (Memory -> RAG -> Embeddings, ordre correcte) — timeout 30s
+7. Inicialitzar moduls de plugins (MLX, llama.cpp, Ollama, Security, Web UI) — timeout 30s
+8. Inicialitzar CryptoProvider si `NEXE_ENCRYPTION_ENABLED=true` (opt-in)
+9. Auto-ingestio de knowledge/ (nomes la primera execucio, fitxer marcador) — timeout 30s
+10. Generar bootstrap token (256 bits, persistent a SQLite, TTL de 30min)
 
-**Sequencia d'aturada:**
-1. Descarregar models d'Ollama (neteja VRAM via keep_alive:0)
-2. Tancar connexions de Qdrant
-3. Finalitzar processos fills
-4. Sincronitzar estat a disc
+**Sequencia d'aturada (finally — sempre executa, fins i tot en error):**
+1. Eliminar PID file (`storage/run/server.pid`) — sempre, primer de tot
+2. Descarregar models d'Ollama (neteja VRAM via keep_alive:0)
+3. Tancar connexions de Qdrant
+4. Finalitzar processos fills
+5. Cancel·lar tasques en background (rate limit cleanup, session cleanup)
+6. Reiniciar circuit breakers a CLOSED (net per al proper reinici)
+7. Sincronitzar estat a disc
+
+**PID file (`storage/run/server.pid`):**
+- Format JSON: `{"pid": N, "port": P, "started": ISO}`
+- Adquirit atomicament amb `os.O_CREAT|O_EXCL|O_WRONLY` (sense race TOCTOU)
+- Single-instance guard: startup avorta si el PID existent esta viu
+- SIGTERM handler a `core/server/runner.py` garanteix sortida neta pre-uvicorn
+
+**Variables d'entorn relacionades:**
+- `NEXE_STARTUP_TIMEOUT` — timeout per fase d'arrencada en segons (default: 30)
+
+## Llançament del Tray (NexeTray.app)
+
+`core/server/runner.py` llança el tray en mode `--attach` un cop el servidor és en marxa.
+
+**Prioritat de llançament:**
+
+1. **`installer/NexeTray.app/Contents/MacOS/NexeTray`** (bundle oficial):
+   - Gatekeeper-safe, provenance OK a macOS Sequoia
+   - Apareix com "server-nexe" a Activity Monitor i Force Quit (CFBundleName)
+   - El binari és un bash wrapper que fa `exec venv/python -m installer.tray "$@"`
+   - Passa `--attach --server-pid PID` transparentment
+
+2. **`python -m installer.tray --attach --server-pid PID`** (fallback dev):
+   - S'usa quan el bundle no existeix (entorn de dev sense instal·lació)
+   - Apareix com "Python" a Activity Monitor — no recomanat en producció
+
+**Per que bundle i no `python -m` directe:** macOS Sequoia aplica restriccions de provenance a processos Python sense bundle signat. El bundle té `LSUIElement=true` i `CFBundleIdentifier=net.servernexe.tray`, que macOS reconeix com a app legítima de menu bar.
 
 ## Module Manager
 
@@ -367,7 +400,7 @@ El prompt del sistema defineix la personalitat i el comportament de Nexe. Viu a 
 
 ## Arquitectura Docker
 
-- **Dockerfile:** Python 3.12-slim, Qdrant embegut (linux-amd64/arm64 auto-deteccio), usuari no-root (nexe), EXPOSE 9119 6333
+- **Dockerfile:** Python 3.12-slim, Qdrant embedded (storage a `storage/vectors/`), usuari no-root (nexe), EXPOSE 9119
 - **docker-compose.yml:** Nexe + Ollama com a serveis separats
 - **docker-entrypoint.sh:** Arrencada sequencial (Qdrant -> Nexe), polling de health check
 
@@ -379,3 +412,39 @@ El prompt del sistema defineix la personalitat i el comportament de Nexe. Viu a 
 - Closures refactoritzades a funcions per a patchabilitat (decisio clau de refactoritzacio)
 - 68 nous tests de crypto (CryptoProvider, SQLCipher, sessions, CLI)
 - Cobertura rastrejada via .coveragerc
+
+## Com canviar el vector store
+
+server-nexe usa Qdrant embedded com a vector store per defecte. La capa d'abstracció `QdrantAdapter` permet substituir-lo per un altre backend (Weaviate, Chroma, Milvus, FAISS, etc.) sense tocar els consumidors.
+
+### Protocol VectorStore
+
+Definit a `memory/embeddings/core/vectorstore.py`. Qualsevol implementació ha de complir:
+
+```python
+def add_vectors(self, vectors, texts, metadatas) -> List[str]
+def search(self, request: VectorSearchRequest) -> List[VectorSearchHit]
+def delete(self, ids: List[str]) -> int
+def health(self) -> Dict[str, Any]
+```
+
+### Implementació actual
+
+`memory/embeddings/adapters/qdrant_adapter.py` — `QdrantAdapter` implementa el Protocol i exposa mètodes addicionals de gestió de col·leccions per compatibilitat.
+
+### Com afegir un nou backend
+
+1. Crear `memory/embeddings/adapters/weaviate_adapter.py` (o similar)
+2. Implementar els 4 mètodes del Protocol
+3. Crear `WeaviateAdapter.from_pool()` o equivalent
+4. Substituir `QdrantAdapter` als punts d'entrada:
+   - `memory/memory/engines/persistence.py:_init_qdrant()` — `QdrantAdapter.from_pool()`
+   - `memory/memory/api/__init__.py:initialize()` — `QdrantAdapter(client=raw_client)`
+   - `memory/memory/storage/vector_index.py:_init_client()` — `QdrantAdapter.from_pool()`
+5. Els consumidors (`documents.py`, `collections.py`) no cal tocar-los
+
+### Notes
+
+- La migració de Qdrant NO és plug & play — cal crear l'adapter i els mètodes de col·lecció
+- El path de substitució és el més important, no la substitució automàtica
+- Qdrant embedded no exposa cap port de xarxa (`storage/vectors/` ha de ser escrivible)

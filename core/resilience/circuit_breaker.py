@@ -252,6 +252,15 @@ class CircuitBreaker:
     """Public method to record a failure (for async generators)"""
     await self._record_failure(error)
 
+  def reset(self) -> None:
+    """Reinicia el circuit breaker a l'estat CLOSED net. N03.
+
+    Crida des del lifespan shutdown per evitar que estat corrupte
+    d'una sessió contamini el proper reinici del servidor.
+    """
+    self._state = CircuitBreakerState()
+    logger.debug("CircuitBreaker [%s]: reset to CLOSED", self.name)
+
 class CircuitOpenError(Exception):
   """Exception raised when the circuit is open"""
   pass
@@ -285,3 +294,13 @@ http_breaker = CircuitBreaker(
     max_retries=3,
   )
 )
+
+
+def reset_all_circuit_breakers() -> None:
+  """Reinicia tots els circuit breakers globals a l'estat CLOSED net. N03.
+
+  Crida des del lifespan shutdown. Evita que un breaker OPEN d'una sessió
+  anterior contamini el proper reinici del servidor (estat corrupte en reinici).
+  """
+  for _breaker in (ollama_breaker, qdrant_breaker, http_breaker):
+    _breaker.reset()

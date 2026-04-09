@@ -9,10 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import os
 import pytest
-import tempfile
-from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

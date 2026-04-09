@@ -18,6 +18,7 @@ from .circuit_breaker import (
   ollama_breaker,
   qdrant_breaker,
   http_breaker,
+  reset_all_circuit_breakers,
 )
 
 __all__ = [
@@ -29,4 +30,5 @@ __all__ = [
   "ollama_breaker",
   "qdrant_breaker",
   "http_breaker",
+  "reset_all_circuit_breakers",
 ]

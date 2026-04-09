@@ -82,6 +82,8 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
             raise HTTPException(status_code=400, detail=get_message(i18n, "webui.auth.supported_languages"))
         _server_lang = lang
         _os.environ["NEXE_LANG"] = lang
+        if i18n is not None:
+            i18n.set_language(lang)
         logger.info("Server language changed to: %s", lang)
         return {"status": "ok", "lang": lang}
 

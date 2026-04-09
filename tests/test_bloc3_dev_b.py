@@ -6,11 +6,10 @@ Description: Tests pels bugs 12, 18, 23, 26, 27 del Bloc 3.
 ────────────────────────────────────
 """
 
-import asyncio
 from pathlib import Path
-from unittest import mock
 
-import pytest
+
+_ROOT = Path(__file__).parent.parent
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -88,7 +87,7 @@ def test_bug18_read_file_undecodable_returns_empty(tmp_path: Path):
 
 def test_bug27_routes_auth_has_backend_aliases():
     """El fitxer routes_auth ha de contenir el dict d'alies per Bug 27."""
-    src = Path("/Users/jgoy/AI/nat/dev/server-nexe/plugins/web_ui_module/api/routes_auth.py").read_text()
+    src = (_ROOT / "plugins/web_ui_module/api/routes_auth.py").read_text()
     # Cal que hi hagi el _BACKEND_ALIASES amb els claus esperats
     assert "_BACKEND_ALIASES" in src, "Bug 27: _BACKEND_ALIASES no present"
     for alias in ("llama_cpp", "llama-cpp", "llama_cpp_module", "llamacpp"):
@@ -98,7 +97,7 @@ def test_bug27_routes_auth_has_backend_aliases():
 
 def test_bug26_routes_auth_has_model_exists_check():
     """routes_auth ha de cridar _backend_model_exists abans d'acceptar el canvi."""
-    src = Path("/Users/jgoy/AI/nat/dev/server-nexe/plugins/web_ui_module/api/routes_auth.py").read_text()
+    src = (_ROOT / "plugins/web_ui_module/api/routes_auth.py").read_text()
     assert "_backend_model_exists" in src, "Bug 26: verificació model no present"
     assert 'status_code=400' in src and "not found for backend" in src, (
         "Bug 26: HTTPException 400 per model inexistent no present"

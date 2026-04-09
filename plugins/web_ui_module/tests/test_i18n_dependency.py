@@ -10,7 +10,6 @@ Cirurgia post-BUS Q3.
 """
 
 from unittest.mock import MagicMock
-import pytest
 
 from plugins.web_ui_module.messages import get_message, get_i18n, FALLBACK_MESSAGES
 
