@@ -219,6 +219,8 @@ server-nexe/
 └── nexe                          # Ejecutable CLI
 ```
 
+**Nota instalador headless:** `install_headless.py` instala el servidor (`Nexe.app`) y configura el Login Item (inicio automático) en macOS. Sin embargo, **NO instala el tray del sistema (`NexeTray.app`)** — no habrá icono en la barra de menú. Si quieres el tray en macOS, usa el instalador GUI (`install.py` + wizard Swift).
+
 ## Patron Factory
 
 La app se crea mediante una factory singleton con double-check locking:
@@ -428,3 +430,14 @@ def health(self) -> Dict[str, Any]
 - Migrar de Qdrant NO es plug & play — hay que crear el adapter y los métodos de colección
 - Lo importante es el camino de sustitución, no la sustitución automática
 - Qdrant embedded no expone ningún puerto de red (`storage/vectors/` debe ser escribible)
+
+## Modelos MLX — Compatibilidad
+
+El catálogo del instalador (`installer/swift-wizard/Resources/models.json`) incluye modelos nuevos como **gemma4** (Google Gemma 4) y **Qwen3.5-VLM** (Alibaba). Estos modelos están marcados con `"mlx": true` en el catálogo, pero **no han sido verificados con `mlx_module`** y no aparecen en el registro de modelos MLX (`personality/models/registry.py`).
+
+**Comportamiento actual:**
+- Via Ollama: funcionan (si el tag Ollama es válido y el modelo está disponible en el servidor Ollama)
+- Via MLX: pueden fallar silenciosamente si no existe el modelo HF correspondiente en `mlx-community/`
+- `nexe model list` y `nexe model pull` no los muestran (no están en `MODEL_REGISTRY`)
+
+**Recomendación:** Usa Ollama para gemma4 y Qwen3.5-VLM. El soporte MLX se añadirá a `MODEL_REGISTRY` cuando se verifique la compatibilidad con HuggingFace IDs de `mlx-community/`.

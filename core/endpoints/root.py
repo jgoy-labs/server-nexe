@@ -14,7 +14,7 @@ import os
 from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Depends
 
-from core.dependencies import limiter
+from core.dependencies import limiter, get_i18n
 from plugins.security.core.auth_dependencies import require_api_key
 
 from core.resilience import (
@@ -39,10 +39,6 @@ def _get_qdrant_status() -> bool:
     return getattr(server_state, 'qdrant_available', False)
   except Exception:
     return False
-
-def get_i18n(request: Request):
-  """Get i18n from app state"""
-  return getattr(request.app.state, 'i18n', None)
 
 def _normalize_engine(engine: str) -> str:
   if not engine:

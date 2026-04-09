@@ -515,6 +515,16 @@ def _run_headless_inner(config):
     else:
         _log.info("Non-macOS platform: skipping .app copy and Login Items")
 
+    # F6: avís headless — no s'instal·la NexeTray.app (tray de sistema)
+    if platform.system() == "Darwin":
+        print(
+            "[INFO] Headless mode: NexeTray.app (menu-bar icon) has not been installed. "
+            "The server will auto-start on login (Login Item). "
+            "To add the tray icon, use the GUI installer.",
+            flush=True,
+        )
+        _log.info("Headless mode: NexeTray.app not installed (no tray icon)")
+
     print(f"[LOG] {LOG_FILE}", flush=True)
     if _model_ok:
         _log.info("Installation completed successfully")

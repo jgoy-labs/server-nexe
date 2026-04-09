@@ -977,6 +977,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             # Bug 17: Extreure [MEM_SAVE: ...] fets amb validacio estricta abans de strip
             _mem_saves_ns = _extract_safe_mem_saves(response_text, user_input=message)
             response_text = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', response_text).strip()
+            # F1 fix: si el model ha generat MEM_SAVE inline, reflectir-ho a memory_action
+            if _mem_saves_ns:
+                memory_action = "mem_save_inline"
             # Save extracted facts to memory
             if _mem_saves_ns:
                 _junk_re = _re.compile(

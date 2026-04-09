@@ -201,24 +201,43 @@ def go_bang(ctx: click.Context):
 @click.pass_context
 def stop(ctx: click.Context, force: bool):
   """Stop all Nexe services (server)."""
+  import json
   import os
   import signal
+  import subprocess
+  from pathlib import Path
 
-  services = [
-    ("Nexe Server", "uvicorn.*nexe"),
-  ]
+  project_root = Path(__file__).parent.parent.parent
+  pid_file = project_root / "storage" / "run" / "server.pid"
 
   found = []
-  for name, pattern in services:
+
+  # F4 fix: llegir PID file canònic primer (storage/run/server.pid)
+  pid_from_file = None
+  if pid_file.exists():
     try:
-      import subprocess
+      data = json.loads(pid_file.read_text())
+      candidate = data.get("pid")
+      if candidate:
+        os.kill(candidate, 0)  # Comprova si el procés existeix (signal 0 = no kill)
+        pid_from_file = candidate
+        found.append(("Nexe Server", None, [pid_from_file]))
+    except (ProcessLookupError, OSError):
+      # PID file obsolet: el procés ja no existeix
+      pid_file.unlink(missing_ok=True)
+    except Exception:
+      pass  # JSON malformat o altre error: fallback a pgrep
+
+  # Fallback: pgrep si no hi havia PID file vàlid
+  if not found:
+    try:
       result = subprocess.run(
-        ["pgrep", "-f", pattern],
+        ["pgrep", "-f", "uvicorn.*nexe"],
         capture_output=True, text=True
       )
       pids = [int(p) for p in result.stdout.strip().split('\n') if p.strip()]
       if pids:
-        found.append((name, pattern, pids))
+        found.append(("Nexe Server", "uvicorn.*nexe", pids))
     except Exception:
       pass
 
