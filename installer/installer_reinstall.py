@@ -184,11 +184,12 @@ def _is_project_root_running_bundle(project_root: Path) -> bool:
     except (OSError, RuntimeError):
         return False
 
+    # Nota: NO usar Path(__file__) — en mode headless, els scripts de
+    # l'installer es carreguen via PYTHONPATH des de project_root, de manera
+    # que __file__ resol dins project_root. Això és correcte i no indica
+    # que el binary vivi allà. Només comprovem sys.executable (el binary
+    # real del procés, que al DMG wizard és dins el bundle del DMG).
     candidates: list[Path] = []
-    try:
-        candidates.append(Path(__file__).resolve())
-    except (OSError, RuntimeError):
-        pass
     try:
         exe = Path(sys.executable).resolve()
         candidates.append(exe)
