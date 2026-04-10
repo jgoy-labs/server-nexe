@@ -56,6 +56,10 @@ _MEM_SAVE_ALLOWED_CHARS = _re.compile(
 _MEM_SAVE_FORBIDDEN = _re.compile(r"[\x00-\x1f\x7f<>\[\]\{\}\|`\\]")
 # Format estricte: ha de començar amb [MEM_SAVE: i acabar amb ] sense bracket nestat
 _MEM_SAVE_STRICT_RE = _re.compile(r'\[MEM_SAVE:\s*([^\[\]\n\r\t]{1,250})\]')
+# Bug B-mem-visible: gpt-oss:20b emet [MEMORIA: ...] en lloc de [MEM_SAVE: ...].
+# Normalitzem [MEMORIA: ...] → [MEM_SAVE: ...] a clean_response per processar-los
+# com a MEM_SAVE normals, i els strippem del visible per no mostrar-los a l'usuari.
+_MEMORIA_RE = _re.compile(r'\[MEMORIA:\s*([^\[\]\n\r\t]{1,250})\]', _re.IGNORECASE)
 
 
 def _is_valid_mem_save_text(text: str, user_input: str = "") -> bool:
@@ -779,6 +783,11 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                     visible = content
                                                 # [MEM_SAVE: ...] tags pass through to client
                                                 # Client handles them like <think> blocks (blue collapsible)
+                                                # Bug B-mem-visible: strip [MEMORIA: ...] from visible output —
+                                                # gpt-oss:20b emet aquest tag en lloc de [MEM_SAVE: ...].
+                                                # El processem a clean_response; aqui l'ocultem a l'usuari.
+                                                if visible and _MEMORIA_RE.search(visible):
+                                                    visible = _MEMORIA_RE.sub('', visible)
                                                 if visible:
                                                     yield visible
                                     else:
@@ -820,6 +829,11 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 else:
                                     # Fallback: treure prefix "analysis..." si hi es
                                     clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
+                                # Bug B-mem-visible: normalitzar [MEMORIA: ...] → [MEM_SAVE: ...] abans
+                                # d'extreure i strippear, perquè gpt-oss:20b emet [MEMORIA: ...].
+                                clean_response = _MEMORIA_RE.sub(
+                                    lambda m: f'[MEM_SAVE: {m.group(1)}]', clean_response
+                                )
                                 # Bug 17: Extract [MEM_SAVE: ...] facts amb validacio estricta.
                                 # _extract_safe_mem_saves filtra per format/longitud/whitelist
                                 # i rebutja MEM_SAVE que copien el missatge usuari.

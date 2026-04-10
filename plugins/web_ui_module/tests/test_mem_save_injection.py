@@ -12,9 +12,12 @@ www.jgoy.net · https://server-nexe.org
 """
 
 
+import re as _re
+
 from plugins.web_ui_module.api.routes_chat import (
     _is_valid_mem_save_text,
     _extract_safe_mem_saves,
+    _MEMORIA_RE,
     MEM_SAVE_MAX_LEN,
 )
 
@@ -232,3 +235,66 @@ class TestBug3MemSaveStripFallback:
         assert mem_saves == [], "Facts maliciosos han de ser filtrats"
         assert fallback_used is False
         assert clean == ""
+
+
+class TestBugBMemVisible:
+    """Bug B-mem-visible — gpt-oss:20b emet [MEMORIA: ...] en lloc de [MEM_SAVE: ...].
+    El tag ha de ser invisible a l'usuari i processat com un MEM_SAVE.
+    """
+
+    @staticmethod
+    def _apply_strip_pipeline_with_memoria(full_response: str, user_input: str = ""):
+        """Reprodueix el pipeline de routes_chat incloent la normalització [MEMORIA: ...]."""
+        clean_response = full_response
+        clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", clean_response)
+        clean_response = _re.sub(r'<\|[^|]+\|>', '', clean_response)
+        clean_response = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', clean_response)
+        _m = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', clean_response, _re.IGNORECASE)
+        if _m:
+            clean_response = _m.group(1).strip()
+        else:
+            clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
+        # Bug B-mem-visible: normalitzar [MEMORIA: ...] → [MEM_SAVE: ...]
+        clean_response = _MEMORIA_RE.sub(lambda m: f'[MEM_SAVE: {m.group(1)}]', clean_response)
+        mem_saves = _extract_safe_mem_saves(clean_response, user_input=user_input)
+        clean_response = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
+        return clean_response, mem_saves
+
+    def test_memoria_tag_normalized_to_mem_save(self):
+        """El tag [MEMORIA: ...] es normalitza a [MEM_SAVE: ...] i el fact es desa."""
+        full = "Hola! [MEMORIA: L'usuari es diu Aran i te 8 anys]"
+        clean, mem_saves = self._apply_strip_pipeline_with_memoria(full)
+        assert mem_saves == ["L'usuari es diu Aran i te 8 anys"], (
+            f"El fact ha d'extreure's: {mem_saves!r}"
+        )
+        assert "[MEMORIA" not in clean, "El tag [MEMORIA: ...] no ha d'aparèixer a clean_response"
+        assert "[MEM_SAVE" not in clean, "El tag [MEM_SAVE: ...] ha de ser stripejat de clean_response"
+
+    def test_memoria_tag_stripped_from_visible(self):
+        """El tag [MEMORIA: ...] es strippeja del visible abans de fer yield."""
+        visible = "Hola Aran! [MEMORIA: L'usuari es diu Aran i te 8 anys] Com puc ajudar?"
+        stripped = _MEMORIA_RE.sub('', visible)
+        assert "[MEMORIA" not in stripped
+        assert "Hola Aran!" in stripped
+        assert "Com puc ajudar?" in stripped
+
+    def test_memoria_tag_only_no_surrounding_text(self):
+        """[MEMORIA: ...] sol → el fact es desa i clean_response queda buit."""
+        full = "[MEMORIA: L'usuari te 8 anys]"
+        clean, mem_saves = self._apply_strip_pipeline_with_memoria(full)
+        assert "L'usuari te 8 anys" in mem_saves
+        assert "[MEMORIA" not in clean
+
+    def test_mem_save_still_works(self):
+        """La normalització de [MEMORIA: ...] no trenca [MEM_SAVE: ...] normal."""
+        full = "Resposta. [MEM_SAVE: l'usuari es diu Jordi]"
+        clean, mem_saves = self._apply_strip_pipeline_with_memoria(full)
+        assert mem_saves == ["l'usuari es diu Jordi"]
+        assert "[MEM_SAVE" not in clean
+
+    def test_memoria_case_insensitive(self):
+        """El regex [MEMORIA: ...] és case-insensitive."""
+        visible = "text [Memoria: lowercase variant] fi"
+        stripped = _MEMORIA_RE.sub('', visible)
+        assert "[Memoria" not in stripped
+        assert "[MEMORIA" not in stripped

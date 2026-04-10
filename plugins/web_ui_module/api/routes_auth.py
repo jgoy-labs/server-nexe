@@ -57,6 +57,40 @@ def make_require_ui_auth():
     return _require_ui_auth
 
 
+def _persist_env_vars(updates: dict) -> None:
+    """Escriu/actualitza parells clau=valor al fitxer .env del projecte.
+
+    - Si la clau ja existeix, substitueix el valor a la mateixa línia.
+    - Si no existeix, afegeix la línia al final.
+    - No toca les línies de comentaris ni les altres claus.
+    - Si no existeix el fitxer .env (instal·lació sense fitxer), silencia.
+    """
+    env_path = Path(__file__).parents[3] / ".env"
+    if not env_path.exists():
+        logger.debug("_persist_env_vars: .env not found at %s, skipping persist", env_path)
+        return
+    try:
+        lines = env_path.read_text(encoding="utf-8").splitlines(keepends=True)
+        remaining = dict(updates)
+        new_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("#") or "=" not in stripped:
+                new_lines.append(line)
+                continue
+            key = stripped.split("=", 1)[0].strip()
+            if key in remaining:
+                new_lines.append(f"{key}={remaining.pop(key)}\n")
+            else:
+                new_lines.append(line)
+        for key, val in remaining.items():
+            new_lines.append(f"{key}={val}\n")
+        env_path.write_text("".join(new_lines), encoding="utf-8")
+        logger.debug("_persist_env_vars: persisted %s to %s", list(updates.keys()), env_path)
+    except Exception as exc:
+        logger.warning("_persist_env_vars: could not write .env (%s)", exc)
+
+
 def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     """Registra endpoints: /auth, /info, /backends, /backend, /health"""
 
@@ -397,6 +431,15 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         if model:
             os.environ["NEXE_DEFAULT_MODEL"] = model
             logger.info(f"Model canviat a: {model}")
+
+        # Persistir canvis al .env perquè sobrevisquin al reinici
+        persist = {}
+        if canonical:
+            persist["NEXE_MODEL_ENGINE"] = canonical
+        if model:
+            persist["NEXE_DEFAULT_MODEL"] = model
+        if persist:
+            _persist_env_vars(persist)
 
         return {
             "status": "ok",
