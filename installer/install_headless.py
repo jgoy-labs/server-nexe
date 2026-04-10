@@ -488,7 +488,11 @@ def _run_headless_inner(config):
 
     # Copy Nexe.app to /Applications and add to Login Items (macOS only)
     if platform.system() == "Darwin":
-        nexe_app_src = project_root / "Nexe.app"
+        # Nexe.app is bundled inside InstallNexe.app/Contents/Resources/
+        # (install_headless.py lives at Resources/installer/install_headless.py,
+        # so parent.parent = Resources/).  Fall back to project_root for dev mode.
+        _bundle_nexe = Path(__file__).parent.parent / "Nexe.app"
+        nexe_app_src = _bundle_nexe if _bundle_nexe.exists() else project_root / "Nexe.app"
         nexe_app_dest = Path("/Applications/Nexe.app")
         nexe_app_ready = False
         if nexe_app_src.exists():

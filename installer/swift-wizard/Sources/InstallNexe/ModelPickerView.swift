@@ -35,7 +35,6 @@ struct ModelPickerView: View {
                     Text("32 GB").tag("tier_32")
                     Text("48 GB").tag("tier_48")
                     Text("64 GB").tag("tier_64")
-                    Text("128 GB").tag("tier_128")
                     Text(t("model_tab_custom")).tag("custom")
                 }
                 .pickerStyle(.segmented)

@@ -41,6 +41,17 @@ except ImportError:
             return decorator
     rumps = _RumpsStub()
 
+
+def _front_alert(*args, **kwargs):
+    """Show a rumps.alert, activating the app first so it appears on top."""
+    try:
+        from AppKit import NSApp
+        NSApp.activateIgnoringOtherApps_(True)
+    except Exception:
+        pass
+    return rumps.alert(*args, **kwargs)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # PATHS
 # ═══════════════════════════════════════════════════════════════════════════
@@ -235,7 +246,7 @@ class NexeTray(rumps.App):
 
         venv_python = PROJECT_ROOT / "venv" / "bin" / "python"
         if not venv_python.exists():
-            rumps.alert(
+            _front_alert(
                 title="Nexe",
                 message="Python venv not found. Please run the installer first.",
             )
@@ -477,12 +488,12 @@ class NexeTray(rumps.App):
             details += self.t("uninstall_failed") + "\n• " + "\n• ".join(failed)
 
         if failed:
-            rumps.alert(
+            _front_alert(
                 title=self.t("uninstall_title"),
                 message=self.t("uninstall_partial", details=details),
             )
         else:
-            rumps.alert(
+            _front_alert(
                 title=self.t("uninstall_title"),
                 message=self.t("uninstall_done", details=details),
             )

@@ -291,47 +291,5 @@
         "en": "OpenAI open model. Advanced reasoning and agents. Excellent with MLX on Apple Silicon."
       }
     }
-  ],
-  "tier_128": [
-    {
-      "key": "qwen35_397b_moe",
-      "name": "Qwen3.5 397B-A17B",
-      "origin": "Alibaba",
-      "year": 2026,
-      "role": "general",
-      "params": "397B totals / 17B actius (MoE)",
-      "ram_gb": 95.0,
-      "disk_gb": 100.0,
-      "backends": ["ollama", "mlx"],
-      "mlx": true,
-      "ollama": "qwen3.5:397b",
-      "gguf": null,
-      "iberic": false,
-      "description": {
-        "ca": "El més proper a un model tancat. Thinking excel·lent. El millor Qwen disponible localment. Apache 2.0.",
-        "es": "El más cercano a un modelo cerrado. Thinking excelente. El mejor Qwen disponible localmente. Apache 2.0.",
-        "en": "Closest to a closed model. Excellent thinking. Best Qwen available locally. Apache 2.0."
-      }
-    },
-    {
-      "key": "gpt_oss_120b",
-      "name": "GPT-OSS 120B",
-      "origin": "OpenAI",
-      "year": 2025,
-      "role": "reasoning",
-      "params": "120B",
-      "ram_gb": 50.0,
-      "disk_gb": 52.0,
-      "backends": ["ollama", "mlx"],
-      "mlx": true,
-      "ollama": "gpt-oss:120b",
-      "gguf": null,
-      "iberic": false,
-      "description": {
-        "ca": "Model obert d'OpenAI. Raonament avançat i agents. Excel·lent amb MLX a Apple Silicon.",
-        "es": "Modelo abierto de OpenAI. Razonamiento avanzado y agentes. Excelente con MLX en Apple Silicon.",
-        "en": "OpenAI open model. Advanced reasoning and agents. Excellent with MLX on Apple Silicon."
-      }
-    }
   ]
 }

@@ -71,6 +71,17 @@ def remove_login_items() -> bool:
         return False
 
 
+def _front_alert(*args, **kwargs):
+    """Show a rumps.alert, activating the app first so it appears on top."""
+    import rumps
+    try:
+        from AppKit import NSApp
+        NSApp.activateIgnoringOtherApps_(True)
+    except Exception:
+        pass
+    return rumps.alert(*args, **kwargs)
+
+
 def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
     """
     Perform the full uninstall process.
@@ -83,13 +94,11 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
     Returns:
         (removed: list[str], failed: list[str])
     """
-    import rumps
-
     # Calculate storage before showing warning
     storage_text = t_func("uninstall_storage", size=calculate_storage(install_dir))
 
     # First window: warning with what will be deleted
-    response = rumps.alert(
+    response = _front_alert(
         title=t_func("uninstall_title"),
         message=t_func("uninstall_warning", storage=storage_text),
         ok="No",
@@ -99,7 +108,7 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
         return None, None  # User cancelled
 
     # Second window: final confirmation
-    response2 = rumps.alert(
+    response2 = _front_alert(
         title=t_func("uninstall_title"),
         message=t_func("uninstall_confirm"),
         ok="No",
@@ -112,7 +121,7 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
     keep_data = False
     storage_dir = install_dir / "storage"
     if storage_dir.exists():
-        data_response = rumps.alert(
+        data_response = _front_alert(
             title=t_func("uninstall_data_title"),
             message=t_func("uninstall_data_message"),
             ok=t_func("uninstall_keep_data"),
