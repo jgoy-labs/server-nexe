@@ -503,7 +503,7 @@ def apply_reinstall_mode(
         # paths (.env, knowledge/) ja els ha mogut el backup_user_data,
         # els passem igualment al wipe per si alguna cosa residual.
         if exclude_models:
-            wipe_paths = [".env", "knowledge"]
+            wipe_paths = [".env"]  # knowledge/ NO: és codi sistema, el tar la reomple
             removed = wipe_user_data(
                 project_root,
                 paths=wipe_paths,
