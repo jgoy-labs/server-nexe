@@ -113,7 +113,7 @@ class NexeTray(rumps.App):
         super().__init__(
             name="server.nexe",
             icon=ICON_STOPPED,
-            template=True,
+            template=False,
             quit_button=None,
         )
 
@@ -376,6 +376,16 @@ class NexeTray(rumps.App):
 
     # ── Stats update ──────────────────────────────────────────────────────
 
+    def _format_ram_label(self, mon) -> str:
+        """Format RAM label as 'Nexe: X · Model: Y' (B3)."""
+        nexe_bytes = mon.cached_ram if mon else 0
+        model_bytes = mon.cached_model_ram if mon else 0
+        if nexe_bytes <= 0 and model_bytes <= 0:
+            return "—"
+        nexe_str = _format_bytes(nexe_bytes) if nexe_bytes > 0 else "—"
+        model_str = _format_bytes(model_bytes) if model_bytes > 0 else "—"
+        return f"Nexe: {nexe_str} · Model: {model_str}"
+
     def _update_stats(self, _timer):
         # Attach mode: monitor external server PID
         if self._attach_pid:
@@ -396,9 +406,9 @@ class NexeTray(rumps.App):
                 pass  # alive but can't signal
 
             mon = self._ram_monitor
-            ram_bytes = mon.cached_ram if mon else 0
-            if ram_bytes > 0:
-                self.ram_item.title = self.t("ram", ram=_format_bytes(ram_bytes))
+            ram_label = self._format_ram_label(mon)
+            if ram_label != "—":
+                self.ram_item.title = self.t("ram", ram=ram_label)
             if self.server_start_time:
                 elapsed = time.time() - self.server_start_time
                 self.uptime_item.title = self.t("uptime", uptime=_format_uptime(elapsed))
@@ -417,9 +427,9 @@ class NexeTray(rumps.App):
             return
 
         mon = self._ram_monitor
-        ram_bytes = mon.cached_ram if mon else 0
-        if ram_bytes > 0:
-            self.ram_item.title = self.t("ram", ram=_format_bytes(ram_bytes))
+        ram_label = self._format_ram_label(mon)
+        if ram_label != "—":
+            self.ram_item.title = self.t("ram", ram=ram_label)
 
         if self.server_start_time:
             elapsed = time.time() - self.server_start_time

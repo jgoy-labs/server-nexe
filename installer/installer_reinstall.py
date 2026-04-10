@@ -3,7 +3,7 @@
 Server Nexe
 Location: installer/installer_reinstall.py
 Description: Helpers per gestionar instal·lacions existents amb 3 modes:
-             - wipe      → esborra tot (.env, storage/, knowledge/, venv, qdrant)
+             - wipe      → esborra dades d'usuari (.env, storage/, venv); preserva knowledge/ (sistema)
              - overwrite → sobreescriu codi/binaris/catàleg, preservant dades d'usuari
              - backup    → fa backup de dades a <root>/.nexe-backups/<timestamp>/ i després wipe
 
@@ -50,6 +50,7 @@ import logging
 import os
 import shutil
 import signal
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -396,6 +397,16 @@ def _regenerate_env_for_overwrite(project_root: Path) -> bool:
         return False
 
 
+def _kill_existing_tray() -> None:
+    """Matar el procés nexe-tray existent abans de substituir el venv (B10)."""
+    result = subprocess.run(["pgrep", "-f", "nexe-tray"], capture_output=True, text=True)
+    for pid_str in result.stdout.strip().splitlines():
+        try:
+            os.kill(int(pid_str), signal.SIGTERM)
+        except (ProcessLookupError, ValueError):
+            pass
+
+
 def apply_reinstall_mode(
     project_root: Path,
     mode: str,
@@ -478,6 +489,8 @@ def apply_reinstall_mode(
             except OSError as e:
                 logger.warning("Could not remove knowledge marker: %s", e)
 
+        # Matar tray existent abans de substituir el venv
+        _kill_existing_tray()
         # Treiem el venv (es regenerarà). Mantenim .env, storage/, knowledge/.
         venv = project_root / "venv"
         if venv.exists():
@@ -527,6 +540,8 @@ def apply_reinstall_mode(
             )
 
         result["removed"] = [str(p) for p in removed]
+        # Matar tray existent abans de substituir el venv
+        _kill_existing_tray()
         venv = project_root / "venv"
         if venv.exists():
             _safe_remove(venv)
@@ -540,6 +555,8 @@ def apply_reinstall_mode(
         wipe_home_nexe=wipe_home_nexe,
     )
     result["removed"] = [str(p) for p in removed]
+    # Matar tray existent abans de substituir el venv
+    _kill_existing_tray()
     venv = project_root / "venv"
     if venv.exists():
         _safe_remove(venv)

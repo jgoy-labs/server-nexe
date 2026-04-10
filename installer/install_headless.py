@@ -437,7 +437,7 @@ def _run_headless_inner(config):
             "from sentence_transformers import SentenceTransformer; "
             "model = SentenceTransformer('paraphrase-multilingual-mpnet-base-v2'); "
             "print('Embeddings downloaded')"
-        ], check=True, capture_output=False, text=True, env=emb_env, timeout=300)
+        ], check=True, capture_output=True, text=True, env=emb_env, timeout=300)
         _log.info("Embeddings download complete")
         emit(6, "done")
     except Exception as e:
@@ -471,7 +471,7 @@ def _run_headless_inner(config):
                 # F7: explicit target_collection — corporate docs go to
                 # nexe_documentation, not user_knowledge.
                 "asyncio.run(ingest_knowledge(quiet=False, target_collection='nexe_documentation'))"
-            ], check=True, capture_output=False, text=True, timeout=300, env=ingest_env)
+            ], check=True, capture_output=True, text=True, timeout=300, env=ingest_env)
 
             # Mark as ingested
             marker = project_root / "storage" / ".knowledge_ingested"

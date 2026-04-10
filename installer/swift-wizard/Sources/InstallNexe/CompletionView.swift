@@ -120,6 +120,7 @@ struct CompletionView: View {
             // Botons
             HStack(spacing: 16) {
                 Button(t("btn_close")) {
+                    NSApp.setActivationPolicy(.prohibited)
                     NSApplication.shared.terminate(nil)
                 }
                 .controlSize(.large)
@@ -192,7 +193,17 @@ struct CompletionView: View {
         tray.currentDirectoryURL = URL(fileURLWithPath: engine.installPath)
         // Passar idioma triat al tray
         tray.environment = env
+        // Desacoblar stdout/stderr per evitar bloqueig de pipes i flash de focus
+        tray.standardOutput = nil
+        tray.standardError = nil
+        // Nota: no cridar waitUntilExit — el tray és independent i no bloquejant
         try? tray.run()
+
+        // Eliminar el flash de focus: retirar l'instalador del Dock/Activity Monitor
+        // just després de llançar el tray, abans que el compte enrere tanqui la finestra.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            NSApp.setActivationPolicy(.prohibited)
+        }
     }
 
     private func doAddToDock() {

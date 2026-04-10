@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>server-nexe</string>
+    <string>Nexe</string>
     <key>CFBundleDisplayName</key>
-    <string>server-nexe</string>
+    <string>Nexe</string>
     <key>CFBundleIdentifier</key>
     <string>net.servernexe.tray</string>
     <key>CFBundleVersion</key>

@@ -148,8 +148,8 @@ struct ConfirmView: View {
                 )
                 DownloadItem(
                     icon: "cylinder",
-                    name: "Qdrant",
-                    size: "~50 MB",
+                    name: "Vector DB",
+                    size: "—",
                     desc: t("confirm_qdrant_desc")
                 )
                 DownloadItem(

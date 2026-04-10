@@ -583,6 +583,24 @@ class NexeUI {
             });
         }
 
+        // Collection info icons — click shows tooltip text (B8)
+        const _showColInfo = (btn) => {
+            if (!btn) return;
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const existing = btn.parentElement.querySelector('.col-info-popup');
+                if (existing) { existing.remove(); return; }
+                const pop = document.createElement('span');
+                pop.className = 'col-info-popup';
+                pop.textContent = btn.title;
+                btn.parentElement.appendChild(pop);
+                setTimeout(() => pop.remove(), 3000);
+            });
+        };
+        _showColInfo(document.getElementById('colMemoryInfo'));
+        _showColInfo(document.getElementById('colKnowledgeInfo'));
+        _showColInfo(document.getElementById('colDocsInfo'));
+
         // Collection checkboxes — restore from localStorage
         this._initCollectionToggles();
 
