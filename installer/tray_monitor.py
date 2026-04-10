@@ -10,6 +10,8 @@ Description: Background RAM monitor for the Nexe tray app.
 import os
 import subprocess
 import threading
+import urllib.request
+import json as _json
 
 
 def format_bytes(b):
@@ -37,6 +39,25 @@ def format_uptime(seconds):
     return f"{days}d {hours % 24}h {mins:02d}m"
 
 
+def _read_ollama_model_ram() -> int:
+    """Query Ollama /api/ps and return total bytes of loaded models.
+
+    Returns 0 if Ollama is not running or no model is loaded.
+    Runs in background thread only — never call from the main thread.
+    """
+    try:
+        req = urllib.request.urlopen(
+            "http://localhost:11434/api/ps", timeout=2
+        )
+        data = _json.loads(req.read())
+        total = 0
+        for model in data.get("models", []):
+            total += model.get("size", 0)
+        return total
+    except Exception:
+        return 0
+
+
 class RamMonitor:
     """Background thread that polls process RAM without blocking the main thread.
 
@@ -44,12 +65,16 @@ class RamMonitor:
     subprocess.run — doing so blocks keyboard event delivery on macOS.
     This class runs all subprocess calls in a daemon thread and exposes
     a cached_ram property that can be read instantly from any thread.
+
+    Also polls Ollama /api/ps for loaded model RAM (B3).
+    cached_model_ram is 0 when no model is loaded.
     """
 
     def __init__(self, pid, interval=10):
         self._pid = pid
         self._interval = interval
         self._cached_ram = 0
+        self._cached_model_ram = 0
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._poll_loop, daemon=True)
@@ -59,6 +84,11 @@ class RamMonitor:
     def cached_ram(self):
         with self._lock:
             return self._cached_ram
+
+    @property
+    def cached_model_ram(self):
+        with self._lock:
+            return self._cached_model_ram
 
     def stop(self):
         self._stop_event.set()
@@ -76,6 +106,10 @@ class RamMonitor:
             if ram > 0:
                 with self._lock:
                     self._cached_ram = ram
+
+            model_ram = _read_ollama_model_ram()
+            with self._lock:
+                self._cached_model_ram = model_ram
 
             self._stop_event.wait(self._interval)
 

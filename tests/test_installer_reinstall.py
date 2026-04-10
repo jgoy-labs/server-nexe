@@ -33,7 +33,7 @@ def _make_install(root: Path) -> None:
     (root / "storage").mkdir()
     (root / "storage" / "vectors").mkdir()
     (root / "storage" / "vectors" / "qdrant.db").write_text("vectors")
-    (root / "knowledge").mkdir()
+    (root / "knowledge").mkdir(exist_ok=True)
     (root / "knowledge" / "doc.md").write_text("# doc")
     (root / "venv").mkdir()
     (root / "venv" / "bin").mkdir()
@@ -65,16 +65,19 @@ def test_detect_existing_install_with_venv(tmp_path):
 # ── wipe_user_data ──────────────────────────────────────────────────────
 
 
-def test_wipe_user_data_removes_env_storage_knowledge(tmp_path):
+def test_wipe_user_data_removes_env_and_storage(tmp_path):
+    """knowledge/ és documentació del sistema (s'ingereix, no és dada d'usuari).
+    wipe_user_data esborra .env i storage/, però preserva knowledge/ perquè
+    el tar del payload la sobreescriu en reinstal·lar."""
     _make_install(tmp_path)
     removed = wipe_user_data(tmp_path)
     removed_names = {p.name for p in removed}
     assert ".env" in removed_names
     assert "storage" in removed_names
-    assert "knowledge" in removed_names
+    assert "knowledge" not in removed_names
     assert not (tmp_path / ".env").exists()
     assert not (tmp_path / "storage").exists()
-    assert not (tmp_path / "knowledge").exists()
+    assert (tmp_path / "knowledge").exists()
     # venv NO el toca wipe_user_data — això ho fa apply_reinstall_mode
     assert (tmp_path / "venv").exists()
 
@@ -108,10 +111,12 @@ def test_backup_user_data_moves_files(tmp_path):
     backup_dir = backup_user_data(tmp_path)
     assert (backup_dir / ".env").exists()
     assert (backup_dir / ".env").read_text() == "NEXE_PRIMARY_API_KEY=secret-key\n"
-    assert (backup_dir / "knowledge" / "doc.md").exists()
-    # Originals ja NO hi són — s'han mogut, no copiat (avís Consultor #4)
+    # knowledge/ NO va al backup — és documentació del sistema, el tar la sobreescriu
+    assert not (backup_dir / "knowledge").exists()
+    # .env s'ha mogut (no copiat)
     assert not (tmp_path / ".env").exists()
-    assert not (tmp_path / "knowledge").exists()
+    # knowledge/ es preserva in-place (no és dada d'usuari)
+    assert (tmp_path / "knowledge" / "doc.md").exists()
 
 
 def test_backup_does_not_recurse_into_existing_backups(tmp_path):
@@ -152,14 +157,16 @@ def test_backup_does_not_recurse_into_existing_backups(tmp_path):
 # ── apply_reinstall_mode: WIPE ──────────────────────────────────────────
 
 
-def test_apply_wipe_removes_everything(tmp_path):
+def test_apply_wipe_removes_user_data_and_venv(tmp_path):
+    """WIPE esborra .env, storage/ i venv, però preserva knowledge/
+    (documentació del sistema — el tar la sobreescriu en reinstal·lar)."""
     _make_install(tmp_path)
     summary = apply_reinstall_mode(tmp_path, REINSTALL_MODE_WIPE)
     assert summary["mode"] == REINSTALL_MODE_WIPE
     assert summary["backup_dir"] is None
     assert not (tmp_path / ".env").exists()
     assert not (tmp_path / "storage").exists()
-    assert not (tmp_path / "knowledge").exists()
+    assert (tmp_path / "knowledge").exists()
     assert not (tmp_path / "venv").exists()
 
 
@@ -196,14 +203,16 @@ def test_apply_backup_then_wipe(tmp_path):
 
     backup_dir = Path(summary["backup_dir"])
     assert backup_dir.exists()
-    # Backup conté les dades
+    # Backup conté les dades d'usuari
     assert (backup_dir / ".env").read_text() == "NEXE_PRIMARY_API_KEY=secret-key\n"
-    assert (backup_dir / "knowledge" / "doc.md").exists()
+    # knowledge/ NO va al backup — és documentació del sistema
+    assert not (backup_dir / "knowledge").exists()
 
-    # I l'arrel del projecte ha quedat neta
+    # .env i venv s'han eliminat
     assert not (tmp_path / ".env").exists()
-    assert not (tmp_path / "knowledge").exists()
     assert not (tmp_path / "venv").exists()
+    # knowledge/ es preserva in-place (el tar la sobreescriurà)
+    assert (tmp_path / "knowledge" / "doc.md").exists()
     # storage/ ha estat esborrat (backup ja n'ha fet còpia abans)
     # Però com el backup ha creat storage/backups/<timestamp>, després
     # del wipe el directori 'storage' sencer no hi és. El backup_dir
@@ -568,9 +577,10 @@ def test_apply_backup_preserves_models_end_to_end(tmp_path):
     # Assert 3: storage/sessions/ original ja no hi és (s'ha mogut al backup)
     assert not sessions_dir.exists()
 
-    # Assert 4: .env i knowledge/ al backup
+    # Assert 4: .env al backup; knowledge/ NO (és sistema, es preserva in-place)
     assert (backup_dir / ".env").exists()
-    assert (backup_dir / "knowledge" / "doc.md").exists()
+    assert not (backup_dir / "knowledge").exists()
+    assert (tmp_path / "knowledge").exists()
 
     # Assert 5: venv eliminat per reinstal·lació
     assert not (tmp_path / "venv").exists()

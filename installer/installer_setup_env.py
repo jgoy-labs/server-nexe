@@ -156,14 +156,14 @@ def setup_environment(project_root, hw, engine="auto"):
             python_for_venv = _get_python_for_venv(project_root)
             subprocess.run(
                 [python_for_venv, "-m", "venv", "--copies", "--without-pip", "venv"],
-                check=True,
+                check=True, capture_output=True,
             )
             _make_venv_standalone(venv_path)
             # Ara el Python del venv funciona — instal·lar pip
             venv_python = str(venv_path / "bin" / "python3")
-            subprocess.run([venv_python, "-m", "ensurepip", "--upgrade"], check=True)
+            subprocess.run([venv_python, "-m", "ensurepip", "--upgrade"], check=True, capture_output=True)
         else:
-            subprocess.run([sys.executable, "-m", "venv", "venv"], check=True)
+            subprocess.run([sys.executable, "-m", "venv", "venv"], check=True, capture_output=True)
 
     # Path to pip/python based on OS
     if os.name == 'nt':
@@ -180,7 +180,7 @@ def setup_environment(project_root, hw, engine="auto"):
     req_file = project_root / "requirements.txt"
     if req_file.exists():
         print(f"  📥 {t('installing_deps')}")
-        subprocess.run([str(pip_path), "install", "-r", str(req_file)], check=True)
+        subprocess.run([str(pip_path), "install", "-r", str(req_file)], check=True, capture_output=True)
     else:
         print_error(t('requirements_not_found'))
         sys.exit(1)
@@ -189,7 +189,7 @@ def setup_environment(project_root, hw, engine="auto"):
     if platform.system() == "Darwin":
         req_macos = project_root / "requirements-macos.txt"
         if req_macos.exists():
-            subprocess.run([str(pip_path), "install", "-r", str(req_macos)], check=True)
+            subprocess.run([str(pip_path), "install", "-r", str(req_macos)], check=True, capture_output=True)
 
     # 3. Hardware-Specific Inference Engines
     print_step(f"{BOLD}{t('installing_inference')}{RESET}")
@@ -200,7 +200,7 @@ def setup_environment(project_root, hw, engine="auto"):
         # Pin to 0.30.7: first version with qwen3_5 architecture support.
         # Note: requires transformers>=5.0.0 which conflicts with sentence-transformers
         # metadata, but works correctly at runtime.
-        subprocess.run([str(pip_path), "install", "mlx-lm==0.30.7"], check=True)
+        subprocess.run([str(pip_path), "install", "mlx-lm==0.30.7"], check=True, capture_output=True)
 
     if engine in ("llama_cpp", "all"):
         print(f"  🏗️ {t('installing_universal')} {CYAN}llama-cpp-python{RESET}...")
@@ -218,6 +218,6 @@ def setup_environment(project_root, hw, engine="auto"):
             print_success(f"llama-cpp-python {t('installed_gpu')}")
         except subprocess.CalledProcessError:
             print_warn(t('gpu_failed'))
-            subprocess.run([str(pip_path), "install", "llama-cpp-python"], check=True)
+            subprocess.run([str(pip_path), "install", "llama-cpp-python"], check=True, capture_output=True)
 
     return python_path
