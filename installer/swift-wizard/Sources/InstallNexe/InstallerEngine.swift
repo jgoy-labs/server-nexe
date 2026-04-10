@@ -69,7 +69,7 @@ class InstallerEngine: ObservableObject {
     )
 
     // Catàleg
-    @Published var catalog: ModelCatalog = ModelCatalog(tier8: [], tier16: [], tier24: [], tier32: [], tier48: [], tier64: [], tier128: [])
+    @Published var catalog: ModelCatalog = ModelCatalog(tier8: [], tier16: [], tier24: [], tier32: [], tier48: [], tier64: [])
 
     private var process: Process?
 

@@ -94,7 +94,6 @@ struct ModelCatalog: Codable {
     let tier32: [AIModel]
     let tier48: [AIModel]
     let tier64: [AIModel]
-    let tier128: [AIModel]
 
     enum CodingKeys: String, CodingKey {
         case tier8   = "tier_8"
@@ -103,12 +102,11 @@ struct ModelCatalog: Codable {
         case tier32  = "tier_32"
         case tier48  = "tier_48"
         case tier64  = "tier_64"
-        case tier128 = "tier_128"
     }
 
     /// Carrega el catàleg des del JSON als Resources del bundle
     static func load() -> ModelCatalog {
-        let empty = ModelCatalog(tier8: [], tier16: [], tier24: [], tier32: [], tier48: [], tier64: [], tier128: [])
+        let empty = ModelCatalog(tier8: [], tier16: [], tier24: [], tier32: [], tier48: [], tier64: [])
 
         // Buscar models.json als Resources del bundle
         if let url = Bundle.main.url(forResource: "models", withExtension: "json"),
@@ -130,10 +128,10 @@ struct ModelCatalog: Codable {
 
     /// Tots els models en un array pla
     var allModels: [AIModel] {
-        return tier8 + tier16 + tier24 + tier32 + tier48 + tier64 + tier128
+        return tier8 + tier16 + tier24 + tier32 + tier48 + tier64
     }
 
-    /// Models d'un tier (claus: "tier_8", "tier_16", ..., "tier_128")
+    /// Models d'un tier (claus: "tier_8", "tier_16", ..., "tier_64")
     func models(for tier: String) -> [AIModel] {
         switch tier {
         case "tier_8":   return tier8
@@ -142,7 +140,6 @@ struct ModelCatalog: Codable {
         case "tier_32":  return tier32
         case "tier_48":  return tier48
         case "tier_64":  return tier64
-        case "tier_128": return tier128
         default:         return []
         }
     }

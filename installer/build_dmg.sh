@@ -207,6 +207,19 @@ tar czf "$PAYLOAD_TMP/payload.tar.gz" \
 mv "$PAYLOAD_TMP/payload.tar.gz" "$RESOURCES/payload.tar.gz"
 rm -rf "$PAYLOAD_TMP"
 
+# ── Step 4b: Bundle Nexe.app inside installer resources ──────────
+# Nexe.app is excluded from payload.tar.gz (it's a macOS .app bundle,
+# not source code). It must travel inside InstallNexe.app/Contents/Resources/
+# so install_headless.py can copy it to /Applications at install time.
+if [ -d "$PROJECT_ROOT/Nexe.app" ]; then
+    info "Bundling Nexe.app into installer resources..."
+    rm -rf "$RESOURCES/Nexe.app"
+    cp -R "$PROJECT_ROOT/Nexe.app" "$RESOURCES/Nexe.app"
+    info "  Nexe.app bundled OK"
+else
+    warn "Nexe.app not found at $PROJECT_ROOT/Nexe.app — /Applications install will be skipped"
+fi
+
 # ── Step 5: Copy Python runtime (if bundled) ─────────────────────
 # The python/ and tcl-tk/ dirs + libpython3.12.dylib should already
 # exist in the app bundle from a previous build or from

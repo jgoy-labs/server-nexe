@@ -9,7 +9,6 @@ struct CompletionView: View {
     @State private var addToDock = true
     @State private var addLoginItem = false
     @State private var nexeOpened = false
-    @State private var countdown = 0
 
     var body: some View {
         VStack(spacing: 16) {
@@ -126,13 +125,8 @@ struct CompletionView: View {
                 .controlSize(.large)
 
                 Button(action: openNexe) {
-                    if countdown > 0 {
-                        Text("\(t("btn_open_nexe")) (\(countdown)s)")
-                            .frame(width: 200)
-                    } else {
-                        Text(nexeOpened ? t("btn_opened") : t("btn_open_nexe"))
-                            .frame(width: 200)
-                    }
+                    Text(nexeOpened ? t("btn_opened") : t("btn_open_nexe"))
+                        .frame(width: 200)
                 }
                 .controlSize(.large)
                 .buttonStyle(.borderedProminent)
@@ -157,22 +151,6 @@ struct CompletionView: View {
 
     private func openNexe() {
         nexeOpened = true
-        countdown = 10
-        // Compte enrere visual — quan arriba a 0, tancar l'instal·lador
-        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
-            countdown -= 1
-            if countdown <= 0 {
-                timer.invalidate()
-                NSApplication.shared.terminate(nil)
-            }
-        }
-
-        // B7: amagar la finestra de l'instal·lador ABANS de llançar el tray
-        // per evitar el flash de focus. setActivationPolicy(.prohibited) retira
-        // l'app del Dock i de l'Activity Monitor, de manera que quan el tray
-        // pren el focus no hi ha finestra visible que parpellegi.
-        NSApp.windows.forEach { $0.orderOut(nil) }
-        NSApp.setActivationPolicy(.prohibited)
 
         // Eliminar quarantena de Nexe.app (pot bloquejar el llançament)
         let xattr = Process()
