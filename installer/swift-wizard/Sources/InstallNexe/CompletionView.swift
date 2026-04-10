@@ -167,9 +167,12 @@ struct CompletionView: View {
             }
         }
 
-        // Aplicar opcions
-        if addToDock { doAddToDock() }
-        if addLoginItem { doAddLoginItem() }
+        // B7: amagar la finestra de l'instal·lador ABANS de llançar el tray
+        // per evitar el flash de focus. setActivationPolicy(.prohibited) retira
+        // l'app del Dock i de l'Activity Monitor, de manera que quan el tray
+        // pren el focus no hi ha finestra visible que parpellegi.
+        NSApp.windows.forEach { $0.orderOut(nil) }
+        NSApp.setActivationPolicy(.prohibited)
 
         // Eliminar quarantena de Nexe.app (pot bloquejar el llançament)
         let xattr = Process()
@@ -202,10 +205,14 @@ struct CompletionView: View {
         // Nota: no cridar waitUntilExit — el tray és independent i no bloquejant
         try? tray.run()
 
-        // Eliminar el flash de focus: retirar l'instalador del Dock/Activity Monitor
-        // just després de llançar el tray, abans que el compte enrere tanqui la finestra.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            NSApp.setActivationPolicy(.prohibited)
+        // B-dock / B-login: executar en background per no bloquejar el main thread
+        // i per evitar que killall Dock interfereixi amb la transició de focus.
+        // S'executen DESPRÉS de llançar el tray perquè el killall Dock sigui invisible.
+        let snapAddToDock = addToDock
+        let snapAddLoginItem = addLoginItem
+        DispatchQueue.global(qos: .utility).async {
+            if snapAddToDock { doAddToDock() }
+            if snapAddLoginItem { doAddLoginItem() }
         }
     }
 
@@ -219,11 +226,12 @@ struct CompletionView: View {
         try? addDock.run()
         addDock.waitUntilExit()
 
-        // Reiniciar Dock per aplicar
+        // Reiniciar Dock per aplicar els canvis al plist
         let killDock = Process()
         killDock.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
         killDock.arguments = ["Dock"]
         try? killDock.run()
+        killDock.waitUntilExit()
     }
 
     private func doAddLoginItem() {
@@ -235,6 +243,7 @@ struct CompletionView: View {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
         process.arguments = ["-e", script]
         try? process.run()
+        process.waitUntilExit()
     }
 
     private func t(_ key: String) -> String {
