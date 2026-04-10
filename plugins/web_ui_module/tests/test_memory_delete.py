@@ -78,6 +78,12 @@ class TestDetectDeleteIntent:
         assert intent == "delete"
         assert "em dic Joan" in content
 
+    def test_delete_catalan_oblida_macarrons(self, mh):
+        """B-mem-delete: 'Oblida que m'agraden els macarrons' ha de ser intent delete."""
+        intent, content = mh.detect_intent("Oblida que m'agraden els macarrons")
+        assert intent == "delete"
+        assert "m'agraden els macarrons" in content
+
     def test_delete_catalan_esborra(self, mh):
         intent, content = mh.detect_intent("Esborra que treballo a Barcelona")
         assert intent == "delete"

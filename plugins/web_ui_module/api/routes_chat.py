@@ -225,6 +225,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         response_text = ""
         memory_action = None
         model_name = None
+        _mem_deleted = 0  # count of deleted entries (for session stats / UI badge)
 
         if intent == "save":
             # Save to memory
@@ -255,14 +256,17 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             # Delete from memory
             content_to_delete = extracted_content.strip() if extracted_content else ""
             if content_to_delete:
+                # B-mem-delete fix: sanitize history BEFORE the result check so that
+                # the original "Oblida que..." message is never seen by the LLM in
+                # subsequent turns, regardless of whether entries were actually deleted.
+                if session.messages and session.messages[-1]["role"] == "user":
+                    session.messages[-1]["content"] = f"[Memory command: delete '{content_to_delete[:50]}']"
                 result = await memory_helper.delete_from_memory(
                     content_to_delete,
                     collections=body.get("rag_collections"),
                 )
                 if result["success"] and result.get("deleted", 0) > 0:
-                    # Sanitize message in history to avoid re-save loop
-                    if session.messages and session.messages[-1]["role"] == "user":
-                        session.messages[-1]["content"] = f"[Memory command: delete '{content_to_delete[:50]}']"
+                    _mem_deleted = result["deleted"]
                     deleted_facts = result.get("deleted_facts", [])
                     facts_detail = ""
                     if deleted_facts:
@@ -285,6 +289,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 else:
                     response_text = f"\x00[MODEL:nexe-system]\x00Error: {result.get('message', 'Unknown error')}"
             else:
+                # content_to_delete empty: still sanitize history so the LLM
+                # does not see the raw "Oblida que..." in subsequent turns.
+                if session.messages and session.messages[-1]["role"] == "user":
+                    session.messages[-1]["content"] = "[Memory command: delete (no content specified)]"
                 response_text = "\x00[MODEL:nexe-system]\x00What do you want me to forget?"
             memory_action = "delete"
 
@@ -460,7 +468,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 recall_result = await memory_helper.recall_from_memory(message, limit=5, collections=_active_colls, session_id=session.id)
                                 if recall_result["success"] and recall_result["results"]:
                                     # Filter by minimum score (configurable, default 0.30)
-                                    rag_threshold = float(body.get("rag_threshold", 0.30))
+                                    rag_threshold = float(body.get("rag_threshold", 0.25))
                                     all_scores = [(r.get('metadata', {}).get('source_collection', '?'), r.get('score', 0)) for r in recall_result["results"]]
                                     logger.info("RAG pre-filter: %s results, threshold=%s, scores=%s", len(recall_result['results']), rag_threshold, all_scores)
                                     relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
@@ -1020,6 +1028,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             "tokens": max(1, len(response_text) // 4),
             "elapsed": _elapsed_ns,
             "model": str(model_name)[:100] if model_name else None,
+            "mem_deleted": _mem_deleted if _mem_deleted > 0 else None,
         })
         session_mgr._save_session_to_disk(session)
 

@@ -122,7 +122,7 @@ Durant la separacio del monolit (chat.py, routes.py, tray.py, lifespan.py), les 
 ### Filosofia de testing
 
 - Tests dins dels moduls (col·locats, no centralitzats)
-- Mocks per a serveis externs (Qdrant, Ollama)
+- Mocks per a serveis externs (Ollama) i serveis embedded (Qdrant embedded)
 - Codi real per a la logica interna
 - Preparats per a CI: tots els tests s'executen a GitHub Actions
 - Objectiu: >90% de cobertura per modul
@@ -143,4 +143,4 @@ El CI a Linux funciona perque `rumps` (tray de macOS) esta a `requirements-macos
 - **Un sol usuari real** — server-nexe fins ara nomes l'ha usat el desenvolupador. No hi ha feedback d'usuaris de tercers ni proves de batalla en entorns de produccio multi-usuari.
 - **Les auditories IA son exhaustives pero no completes** — troben molts problemes pero sens dubte en passen d'altres per alt. Els numeros de cobertura (97.4% baseline) semblen bons pero no garanteixen correccio.
 - **Els tests d'encriptacio son nous** — 68 tests per al sistema de crypto, pero el sistema encara no ha passat per us real en produccio.
-- **Els tests d'integracio requereixen serveis locals** — Qdrant i Ollama han d'estar en execucio. Es testegen en desenvolupament pero no a CI.
+- **Els tests d'integracio requereixen serveis locals** — Ollama ha d'estar en execucio (Qdrant es embedded, no cal cap proces separat). Es testegen en desenvolupament pero no a CI.

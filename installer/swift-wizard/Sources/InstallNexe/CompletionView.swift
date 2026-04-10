@@ -158,10 +158,13 @@ struct CompletionView: View {
     private func openNexe() {
         nexeOpened = true
         countdown = 10
-        // Compte enrere visual
+        // Compte enrere visual — quan arriba a 0, tancar l'instal·lador
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
             countdown -= 1
-            if countdown <= 0 { timer.invalidate() }
+            if countdown <= 0 {
+                timer.invalidate()
+                NSApplication.shared.terminate(nil)
+            }
         }
 
         // Aplicar opcions

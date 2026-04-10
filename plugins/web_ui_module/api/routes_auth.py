@@ -83,7 +83,8 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         _server_lang = lang
         _os.environ["NEXE_LANG"] = lang
         if i18n is not None:
-            i18n.set_language(lang)
+            lang_map = {"ca": "ca-ES", "es": "es-ES", "en": "en-US"}
+            i18n.current_language = lang_map.get(lang, lang)
         logger.info("Server language changed to: %s", lang)
         return {"status": "ok", "lang": lang}
 
@@ -93,7 +94,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     async def get_ui_info(_auth=Depends(require_ui_auth)):
         """Info del model i backend actiu"""
         import os
-        model_name = os.getenv("NEXE_DEFAULT_MODEL", "unknown")
+        model_name = os.getenv("NEXE_DEFAULT_MODEL", "")
         configured_backend = os.getenv("NEXE_MODEL_ENGINE", "auto")
         backend = configured_backend
         try:
@@ -107,8 +108,21 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                 mlx_ok = mlx_mod and hasattr(mlx_mod, '_node') and mlx_mod._node is not None
                 if configured_backend == "mlx" and not mlx_ok:
                     backend = "ollama"
+            # B-unknown: resolve model name from backend-specific env if not set
+            if not model_name:
+                effective_backend = backend or configured_backend
+                if effective_backend in ("ollama", "auto"):
+                    model_name = os.getenv("NEXE_OLLAMA_MODEL", "")
+                elif effective_backend == "mlx":
+                    model_name = os.getenv("NEXE_MLX_MODEL", "")
+                elif effective_backend == "llama_cpp":
+                    model_name = os.getenv("NEXE_LLAMA_CPP_MODEL", "")
+            if not model_name:
+                model_name = "nexe"
         except Exception:
             version = "0.9"
+            if not model_name:
+                model_name = os.getenv("NEXE_OLLAMA_MODEL", "") or "nexe"
         lang = get_server_lang()
         # RAG collections info
         rag_collections = []

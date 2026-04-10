@@ -52,7 +52,25 @@ class SQLiteStore:
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
-        """Get or create connection."""
+        """Get or create connection.
+
+        DreamingCycle (and any other caller) closes the connection it obtains
+        here after each operation.  When that happens self._conn still holds a
+        reference to the now-closed sqlite3.Connection object, so the
+        ``if self._conn is None`` guard would return the stale closed
+        connection on the next call, raising "Cannot operate on a closed
+        database."
+
+        We detect this by attempting a lightweight no-op against the
+        connection.  On failure we discard it and create a fresh one.
+        """
+        if self._conn is not None:
+            try:
+                self._conn.execute("SELECT 1")
+            except Exception:
+                # Connection is closed or broken — discard and reconnect.
+                self._conn = None
+
         if self._conn is None:
             self._conn = sqlite3.connect(str(self._db_path))
             self._conn.execute("PRAGMA busy_timeout = 5000")
