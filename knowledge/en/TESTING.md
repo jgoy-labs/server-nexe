@@ -122,7 +122,7 @@ During the monolith split (chat.py, routes.py, tray.py, lifespan.py), closures w
 ### Test philosophy
 
 - Tests inside modules (collocated, not centralized)
-- Mocks for external services (Qdrant, Ollama)
+- Mocks for external services (Ollama) and embedded services (Qdrant embedded)
 - Real code paths for internal logic
 - CI-ready: all tests run in GitHub Actions
 - Target: >90% coverage per module
@@ -143,4 +143,4 @@ Linux CI works because `rumps` (macOS tray) is in `requirements-macos.txt` (not 
 - **One real user** — server-nexe has only been used by the developer so far. There is no feedback from third-party users or battle-testing in production multi-user environments.
 - **AI audits are thorough but not exhaustive** — they find many issues but certainly miss others. Coverage numbers (97.4% baseline) look good but don't guarantee correctness.
 - **Encryption tests are new** — 68 tests for the crypto system, but the system has not been through real production use yet.
-- **Integration tests require local services** — Qdrant and Ollama must be running. These are tested in development but not in CI.
+- **Integration tests require local services** — Ollama must be running (Qdrant is embedded, no separate process needed). These are tested in development but not in CI.

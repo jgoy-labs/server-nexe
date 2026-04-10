@@ -71,12 +71,20 @@ def register_static_routes(router: APIRouter, *, module_ref):
         media_type = _mime.get(file_path.suffix, "application/octet-stream")
 
         # Read file and return as Response with proper headers
+        # CSS/JS: no-cache so ?v=boot_ts bust always works on restart.
+        # Images, fonts, etc.: cacheable for 1h.
+        _no_cache_exts = {".css", ".js", ".html"}
+        cache_header = (
+            "no-cache, no-store, must-revalidate"
+            if file_path.suffix in _no_cache_exts
+            else "public, max-age=3600"
+        )
         content = file_path.read_bytes()
         return Response(
             content=content,
             media_type=media_type,
             headers={
-                "Cache-Control": "public, max-age=3600",
+                "Cache-Control": cache_header,
                 "Content-Length": str(len(content))
             }
         )

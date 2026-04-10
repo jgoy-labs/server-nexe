@@ -677,6 +677,18 @@ body.light .icon-moon,
     margin-bottom: 0.2rem;
 }
 
+/* Collection warning banner (F-checks-info) */
+.collection-warning {
+    margin-top: 0.35rem;
+    padding: 0.3rem 0.5rem;
+    background: rgba(255, 180, 0, 0.12);
+    border: 1px solid rgba(255, 180, 0, 0.35);
+    border-radius: 0.3rem;
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
 /* Model info al sidebar header */
 .model-info {
     margin-top: 0.5rem;

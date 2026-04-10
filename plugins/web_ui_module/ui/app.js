@@ -37,6 +37,7 @@ const UI_STRINGS = {
         send: "Enviar",
         stop: "Aturar generació",
         saved: "guardat",
+        deleted: "esborrat",
         model_loading: "Carregant model a VRAM",
         doc_chat_only: "Aquest document només estarà disponible en aquest chat.",
         doc_uploading: "Processant document",
@@ -64,6 +65,8 @@ const UI_STRINGS = {
         starting: "Iniciant...",
         support_link: "Suport",
         rag_filter_label: "Filtre RAG",
+        col_warning_prefix: "⚠ Desactivat: ",
+        col_warning_suffix: ". Desmarca per reactivar.",
     },
     en: {
         login_subtitle: "Enter your API Key to access",
@@ -119,11 +122,14 @@ const UI_STRINGS = {
         col_docs_tip: "System documentation (IDENTITY, guides, etc.)",
         mem_saving: "Saving memory...",
         mem_saved: "Memory saved",
+        deleted: "deleted",
         backend_label: "Backend",
         model_label: "Model",
         starting: "Starting...",
         support_link: "Support",
         rag_filter_label: "RAG Filter",
+        col_warning_prefix: "⚠ Disabled: ",
+        col_warning_suffix: ". Uncheck to re-enable.",
     },
     es: {
         login_subtitle: "Introduce la API Key para acceder",
@@ -179,11 +185,14 @@ const UI_STRINGS = {
         col_docs_tip: "Documentación del sistema (IDENTITY, guías, etc.)",
         mem_saving: "Guardando memoria...",
         mem_saved: "Memoria guardada",
+        deleted: "borrado",
         backend_label: "Motor",
         model_label: "Modelo",
         starting: "Iniciando...",
         support_link: "Soporte",
         rag_filter_label: "Filtro RAG",
+        col_warning_prefix: "⚠ Desactivado: ",
+        col_warning_suffix: ". Desmarca para reactivar.",
     }
 };
 
@@ -315,6 +324,8 @@ class NexeUI {
         document.documentElement.lang = this.lang;
         // Re-render Lucide icons
         if (typeof lucide !== 'undefined') lucide.createIcons();
+        // Refresh collection warning with updated language
+        if (this._listenersAttached) this._updateCollectionWarning();
     }
 
     setAiState(state) {
@@ -356,6 +367,9 @@ class NexeUI {
         this.applyI18n();
         this._initLangSelector();
         if (!this.apiKey) {
+            // Hide readiness overlay immediately — no server contact needed yet
+            const ro = document.getElementById('readinessOverlay');
+            if (ro) ro.style.display = 'none';
             this.showLoginOverlay();
             return;
         }
@@ -407,8 +421,12 @@ class NexeUI {
         }
         for (const id of Object.keys(COLL_MAP)) {
             const cb = document.getElementById(id);
-            if (cb) cb.addEventListener('change', () => this._saveCollectionState());
+            if (cb) cb.addEventListener('change', () => {
+                this._saveCollectionState();
+                this._updateCollectionWarning();
+            });
         }
+        this._updateCollectionWarning();
     }
 
     _saveCollectionState() {
@@ -423,6 +441,28 @@ class NexeUI {
             if (cb && !cb.checked) disabled.push(coll);
         }
         localStorage.setItem('nexe_collections', JSON.stringify(disabled));
+    }
+
+    // F-checks-info + B-coll-check: show warning when any collection is disabled
+    _updateCollectionWarning() {
+        const warn = document.getElementById('collectionWarning');
+        if (!warn) return;
+        const active = this._getActiveCollections();
+        const COLL_LABELS = {
+            personal_memory: this.t('col_memory') || 'Personal memory',
+            user_knowledge: this.t('col_knowledge') || 'Knowledge base',
+            nexe_documentation: this.t('col_docs') || 'Documentation'
+        };
+        const ALL = ['personal_memory', 'user_knowledge', 'nexe_documentation'];
+        const disabled = ALL.filter(c => !active.includes(c));
+        if (disabled.length === 0) {
+            warn.style.display = 'none';
+            warn.textContent = '';
+        } else {
+            const names = disabled.map(c => COLL_LABELS[c] || c).join(', ');
+            warn.style.display = 'block';
+            warn.textContent = this.t('col_warning_prefix') + names + this.t('col_warning_suffix');
+        }
     }
 
     _getActiveCollections() {
@@ -559,12 +599,18 @@ class NexeUI {
         const ragSlider = document.getElementById('ragThresholdSlider');
         const ragBadge = document.getElementById('ragThresholdValue');
         if (ragSlider && ragBadge) {
+            const RAG_DEFAULT = 0.25;
             const saved = localStorage.getItem('nexe_rag_threshold');
             if (saved) {
                 const clamped = Math.min(parseFloat(saved), parseFloat(ragSlider.max));
                 ragSlider.value = clamped;
                 ragBadge.textContent = clamped;
                 if (clamped !== parseFloat(saved)) localStorage.setItem('nexe_rag_threshold', clamped);
+            } else {
+                // B-slider-reset: persist default so it survives page reloads
+                ragSlider.value = RAG_DEFAULT;
+                ragBadge.textContent = RAG_DEFAULT;
+                localStorage.setItem('nexe_rag_threshold', RAG_DEFAULT);
             }
             ragSlider.addEventListener('input', () => {
                 ragBadge.textContent = ragSlider.value;
@@ -1137,7 +1183,7 @@ class NexeUI {
 
         try {
             const ragSlider = document.getElementById('ragThresholdSlider');
-            const ragThreshold = ragSlider ? parseFloat(ragSlider.value) : 0.40;
+            const ragThreshold = ragSlider ? parseFloat(ragSlider.value) : 0.25;
             const backendSel = document.getElementById('backendSelect');
             const modelSel = document.getElementById('modelSelect');
             // Collection toggles — build list of active collections
@@ -1862,6 +1908,20 @@ class NexeUI {
                 memSpan.appendChild(tooltip);
             }
             statsDiv.appendChild(memSpan);
+        }
+
+        // B-mem-delete-ui: show red delete badge for historical delete operations
+        const memDeleted = stats.mem_deleted || 0;
+        if (memDeleted > 0) {
+            const delSpan = document.createElement('span');
+            delSpan.className = 'stat-item stat-mem-del';
+            const delIcon = document.createElement('i');
+            delIcon.setAttribute('data-lucide', 'trash-2');
+            delSpan.appendChild(delIcon);
+            const delText = document.createElement('span');
+            delText.textContent = this.t('deleted');
+            delSpan.appendChild(delText);
+            statsDiv.appendChild(delSpan);
         }
 
         // Copy button
