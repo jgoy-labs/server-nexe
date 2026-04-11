@@ -116,6 +116,14 @@ class OllamaChat:
             raise
 
     @property
-    def _timeout(self) -> float:
+    def _timeout(self):
+        httpx = _parent().httpx  # lazy-import pattern mantingut per a tests patch
         owner = getattr(self, "_owner", None)
-        return owner.timeout if owner is not None else 600.0
+        if owner is not None and getattr(owner, "timeout", None) is not None:
+            return owner.timeout
+        return httpx.Timeout(
+            connect=float(os.getenv("NEXE_OLLAMA_CONNECT_TIMEOUT", "5.0")),
+            read=float(os.getenv("NEXE_OLLAMA_READ_TIMEOUT", "600.0")),
+            write=float(os.getenv("NEXE_OLLAMA_WRITE_TIMEOUT", "10.0")),
+            pool=float(os.getenv("NEXE_OLLAMA_POOL_TIMEOUT", "5.0")),
+        )

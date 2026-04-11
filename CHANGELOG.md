@@ -4,22 +4,165 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased] — Cirurgia Bloc 2 Security & Memory Pipeline (2026-04-08)
+## [0.9.1] - 2026-04-11
 
-### Fixed
+Consolidated release: Cirurgia Bloc 2 (2026-04-08) + Mega-consultoria hardening (2026-04-11).
+
+### Security fixes (Mega-consultoria 2026-04-11)
+
+Derived from the full mega-consultoria real run at
+`~/Desktop/mega-consultoria-real-20260411/` and its plan v2.4 at
+`~/Desktop/mega-consultoria-real-20260411/fix/pla-v2.4.md`.
+
+- **P0-1** — httpx split timeout for Ollama (chat + models). Previously a
+  single 600s default meant Ollama hangs took up to 10 minutes to detect.
+  Now `connect=5s` fails fast on a dead server, `read=600s` for chat
+  (preserves thinking models like DeepSeek-R1 and QwQ), `read=60s` for
+  models list/info/delete (fast operations). Env vars:
+  `NEXE_OLLAMA_{CONNECT,READ,MODELS_READ,WRITE,POOL}_TIMEOUT`.
+  Commit `61a72a3`.
+
+- **P0-2** — llama_cpp_module ghost detection fixed. `/status` now reports
+  `engines_available.llama_cpp` accurately. Three combined changes:
+  - **P0-2.b** `core/lifespan_modules.py`: loader removes modules from
+    `app.state.modules` when `initialize()` returns `False`. Also uses
+    `list(plugin_modules.items())` to iterate safely while popping (avoids
+    `RuntimeError: dictionary changed size during iteration`). Commit `af32c2c`.
+  - **P0-2.a** `plugins/llama_cpp_module/module.py`: `import llama_cpp`
+    check at `initialize()` returns `False` immediately if the native lib
+    is missing (no phantom routes). Commit `06d5000`.
+  - **P0-2.c** `core/endpoints/root.py`: extracted `_check_llama_cpp_available(modules)`
+    helper that verifies `_node is not None`, symmetric with the existing
+    MLX check. Helper extraction enables unit testing without a real
+    `starlette.Request` (slowapi's `@limiter.limit` rejects `MagicMock`).
+    Commit `3cccd7f`.
+
+- **P0-3** — Model switching concurrency: added short `asyncio.Lock()`
+  around the `body.model` singleton mutation block in
+  `routes_chat.py:_chat_inner`. Commit `7aa18cb`.
+
+    **Design note**: server-nexe v0.9.x is architecturally single-user
+    (uvicorn workers=1, class-level singletons `LlamaCppChatNode._pool`
+    and `MLXChatNode._model`, in-process state, global
+    `_chat_semaphore(2)`). The short lock is a **pragmatic mitigation**
+    for the rare edge case of two concurrent requests racing to mutate
+    the same singletons. For mono-user local usage the scenario is
+    effectively never triggered. A full multi-user architecture refactor
+    (multi-pool LRU cache + `config_override` per request + removal of
+    class-level singletons + horizontal uvicorn workers) is **deferred**
+    until multi-user becomes an actual use case. See the complete
+    deferred-work scope at
+    `~/Desktop/mega-consultoria-real-20260411/fix/ISSUE-multiuser-refactor.md`.
+
+- **P1-1** — Jailbreak speed-bump: regex detector for common patterns
+  (ca/en: "ignora instruccions", "you are now a/an WORD", "forget your
+  rules", "DAN mode", "do anything now", etc.). Hooked after
+  `validate_string_input` in `/ui/chat`. **Opció B**: injects a
+  `[SECURITY NOTICE]` prefix instead of rejecting (400) to preserve UX on
+  false positives. Pattern #3 (`you are now a|an \w+`) is deliberately
+  tight to avoid false positives on conversational English ("you are now
+  at home", "you are now free to go", etc.). Commit `f8b75b7`.
+
+    **Note**: defense-in-depth only. Sophisticated attackers evade via
+    Unicode lookalikes, base64/gzip encoding, chained prompts, language
+    switching, etc. For real protection use content moderation at the
+    model level.
+
+- **P1-2** — Memory tag strip regex anchored to line start. Catches
+  `[MEMORIA:]`, `[MEM:]`, `[SYSTEM:]`, `[USER:]`, `[ASSISTANT:]`,
+  `[TOOL:]`, `[FUNCTION:]`, `[MEMORY:]` in addition to the original
+  `[MEM_SAVE:]`. Newlines are preserved via capture group 1. Commit `4a91058`.
+
+    **BREAKING** from v0.9.0 (documented inline in the updated tests):
+    - Mid-line tags are NO longer stripped. Before: any occurrence of
+      `[MEM_SAVE:...]` was stripped regardless of position. From 0.9.1:
+      only tags at the start of a line (or after `\n`) are stripped.
+      Rationale: reduce false positives on inline text like
+      `"review this [USER: Jordi] part"`.
+    - Empty tags like `[SYSTEM]` (no colon, no content) now match at
+      line start. Closes a jailbreak vector where attackers use bare
+      role tags.
+    - Equals separator `[MEMORIA=value]` also matches (not only `:`).
+    - Accepted tradeoff: `[memoria]` at the very start of a message
+      IS stripped even when used as a normal word. Users can work
+      around with any prefix.
+
+- **P1-4** — Upload content denylist for sensitive patterns. Scans the
+  first 8KB of each upload and rejects with HTTP 400 if a known pattern
+  is found. Patterns are tuned to the real stack used by this project:
+  - System: `root:x:0:0:` (most specific /etc/passwd signature)
+  - PEM private keys: RSA, OpenSSH, PKCS8, EC, DSA, PGP
+  - API tokens: `sk-ant-` (Anthropic / Claude Code), `sk-proj-` (OpenAI
+    GPT / Codex CLI / Responses API), `ghp_` + `github_pat_` (GitHub
+    PAT classic + fine-grained), `AIzaSy` (Google Gemini / AI Studio /
+    Cloud / Firebase).
+
+  Commit `145d742`.
+
+    **Note**: speed-bump only, trivially bypassed by `gzip`, `base64`,
+    `xor`, or any custom encoding. Protects against accidental drag&drop
+    of sensitive files, not determined adversaries. Generic AWS patterns
+    were explicitly NOT included — this project does not use AWS and a
+    generic OWASP checklist would add noise without value.
+
+### Cirurgia Bloc 2 — Security & Memory Pipeline (2026-04-08)
+
+#### Fixed
 
 - **Item 17 — MEM_SAVE bug**: `POST /v1/memory/store` was rejected by the Gate heuristic (`reason="model_generated"`) because `source="api"` mapped to `is_user_message=False` and `is_mem_save` was not passed. Fixed by passing `is_mem_save=True` — the store endpoint IS an explicit MEM_SAVE operation and should bypass the "model_generated" gate.
 - **Item 21 — SQLCIPHER false sense of security**: `core/lifespan.py` declared "encryption ENABLED" without checking `SQLCIPHER_AVAILABLE`. If `sqlcipher3` was missing, sessions were encrypted but the `memories.db` database was not. Fixed with fail-closed behavior: server refuses to start with a clear `RuntimeError` if encryption is requested but `sqlcipher3` is not installed.
 
-### Security
+#### Security
 
 - **Item 19 — Memory injection via direct API**: `POST /v1/chat/completions` did not apply `strip_memory_tags` to user messages, allowing `[MEM_SAVE: ...]` injection via the API while the Web UI was protected. Fixed.
 - **Item 20 — Prompt injection via auto-ingest**: `core/ingest/ingest_knowledge.py` and `core/ingest/ingest_docs.py` did not apply `_filter_rag_injection` to document chunks before storing, while the upload UI path was protected. Fixed.
 
-### Changed
+#### Changed
 
 - **Item 22 — Workflows metadata honest**: `GET /v1/` metadata updated: `workflows.status` changed from `"implemented"` (false) to `"stub-v0.9.1"`. New `core/endpoints/workflows.py` router added that returns `501 Not Implemented` for any `/v1/workflows/*` path.
 - **Item 24 — Pipeline unique enforced**: Removed 3 plugin chat endpoints that bypassed the canonical pipeline (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`). All chat must go through `/ui/chat` (canonical) or `/v1/chat/completions` (OpenAI-compat). Item 23 (auth bypass) resolved by this removal.
+
+### Deferred to 0.9.2+
+
+- **P1-3** — Auth rate limiting (`TTLCache` + `NEXE_TRUST_PROXY`
+  opt-in for `X-Forwarded-For` parsing). Only relevant when exposing
+  server-nexe to the internet via a reverse proxy (Caddy, Traefik,
+  Tailscale Funnel). For the current mono-user local deployment it is
+  unnecessary. Trigger: decision to expose beyond localhost.
+
+- **P0-3 full refactor** — Multi-pool LRU cache at `LlamaCppChatNode` +
+  `MLXChatNode`, `config_override` parameter through
+  `chat() → execute() → _get_model()`, `dataclasses.replace()` for
+  immutable per-request configs, removal of class-level singletons,
+  horizontal uvicorn workers, session manager migration. Full scope
+  documented at
+  `~/Desktop/mega-consultoria-real-20260411/fix/ISSUE-multiuser-refactor.md`.
+  Trigger: multi-user becomes an actual use case (ICATIA rollout,
+  parallel BUS agents, exposure beyond localhost).
+
+- **QI-37 — Version string consolidation**: 11 hardcoded `"0.9.0"`
+  references remain in `core/models.py`, `core/endpoints/root.py`,
+  `core/server/factory_app.py`, `core/cli/cli.py`,
+  `core/server/tests/test_server.py`, `installer/tray.py`,
+  `personality/module_manager/__init__.py`, etc. Only `pyproject.toml`
+  is updated in this release; the full consolidation is deferred to
+  0.9.2 because updating those strings would break
+  `core/server/tests/test_server.py` which literally asserts
+  `"Nexe 0.9.0"`. To be addressed with a single-source-of-truth pattern
+  (e.g. `importlib.metadata.version("server-nexe")`) in the next release.
+
+### Known issues
+
+- **`plugins/web_ui_module/tests/test_routes_lang_i18n.py`** — 5 tests
+  in `TestSetLanguageI18nPropagation` fail since commit `2cf4d9b`
+  (2026-04-10, "fix: POST /ui/lang 500 — use current_language instead
+  of missing set_language"). The production code was updated to use
+  `i18n.current_language = lang_map[...]` directly, but the tests still
+  expect `i18n.set_language(...)` to be called. **Pre-existing,
+  unrelated to this release** — not a regression introduced by the
+  mega-consultoria fixes. Fix deferred to 0.9.2 (test sync update).
+  See `~/Desktop/mega-consultoria-real-20260411/fix/ISSUE-test-lang-i18n-sync.md`
+  for details.
 
 ## [0.9.0] - 2026-03-31
 

@@ -46,6 +46,22 @@ class LlamaCppModule:
         if self._initialized:
             return True
 
+        # Verify native lib available BEFORE anything else (P0-2.a)
+        # If llama-cpp-python is not installed, fail fast so the loader
+        # (core/lifespan_modules.py, fixed in P0-2.b) removes us from
+        # app.state.modules and /status reports llama_cpp as unavailable.
+        try:
+            import llama_cpp  # noqa: F401
+        except ImportError:
+            logger.error(
+                "LlamaCppModule: llama-cpp-python not installed. "
+                "Module will NOT be available. Install with: "
+                "CMAKE_ARGS='-DLLAMA_METAL=on' pip install --force-reinstall "
+                "--no-cache-dir llama-cpp-python"
+            )
+            self._initialized = False
+            return False
+
         # Always initialize router to allow diagnostics
         self._init_router()
 

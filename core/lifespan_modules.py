@@ -77,7 +77,7 @@ async def initialize_plugin_modules(app, server_state):
         logger.info("Initializing plugin modules...")
         plugin_modules = getattr(app.state, 'modules', {})
 
-        for module_name, instance in plugin_modules.items():
+        for module_name, instance in list(plugin_modules.items()):
             # Skip memory modules (already initialized)
             if module_name in ['memory', 'rag', 'embeddings'] or module_name.startswith('{{NEXE_'):
                 continue
@@ -91,7 +91,13 @@ async def initialize_plugin_modules(app, server_state):
                     if success:
                         logger.info(f"  {module_name} initialized successfully")
                     else:
-                        logger.warning(f"  {module_name} initialization returned False")
+                        logger.warning(
+                            f"  {module_name} initialization returned False — "
+                            "removing from loaded modules"
+                        )
+                        plugin_modules.pop(module_name, None)
+                        # Note: plugin_modules is a reference to app.state.modules,
+                        # so this also cleans up app.state.modules automatically
                 except Exception as e:
                     logger.error(f"Failed to initialize {module_name}: {e}", exc_info=True)
     except Exception as e:

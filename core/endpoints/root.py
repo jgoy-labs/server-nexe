@@ -194,6 +194,24 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
     endpoints=endpoints
   )
 
+
+def _check_llama_cpp_available(modules: dict) -> bool:
+  """Check if llama_cpp_module is loaded AND has a working _node.
+
+  Symmetric with the MLX check inside /status (P0-2.c): only reports True
+  when the module has an active backend, not just when the dict key exists.
+  This catches edge cases where the loader didn't pop a failed module
+  (e.g., exception path from P0-2.b design choice).
+
+  Extracted as a pure helper so it can be unit-tested without a real
+  starlette.Request (slowapi's @limiter.limit rejects MagicMock).
+  """
+  if "llama_cpp_module" not in modules:
+    return False
+  instance = modules["llama_cpp_module"]
+  return hasattr(instance, '_node') and instance._node is not None
+
+
 @router.get("/status", summary="Real-time status: active engine, model, and loaded modules (API key required)")
 @limiter.limit("60/minute")
 async def server_status(
@@ -227,8 +245,9 @@ async def server_status(
     if hasattr(mlx_instance, '_node') and mlx_instance._node is not None:
       mlx_available = True
 
-  if "llama_cpp_module" in modules:
-    llama_cpp_available = True
+  # P0-2.c: use extracted helper for unit-testability (slowapi blocks direct
+  # call with MagicMock request, so the logic lives in a pure function).
+  llama_cpp_available = _check_llama_cpp_available(modules)
 
   if "ollama_module" in modules:
     ollama_available = True

@@ -37,6 +37,54 @@ def _get_parse_rag_header():
 logger = logging.getLogger(__name__)
 
 
+# P1-4: speed-bump denylist for accidental uploads of sensitive files.
+# NOT security — bypassed by trivial encoding (gzip, base64, xor, custom format).
+# Protects against drag&drop accidents (user selects wrong file) and catches
+# naive copy-paste of credentials files.
+#
+# Scan window is limited to the first 8KB as a design choice: these patterns
+# always appear near the start of their respective files (/etc/passwd headers,
+# PEM armor, credentials file keys). Expanding the window would cost CPU on
+# every upload without improving coverage for naive cases.
+_SENSITIVE_UPLOAD_PATTERNS = [
+    # System (most specific /etc/passwd signature — UID 0 GID 0)
+    b"root:x:0:0:",
+    # PEM-armored private keys (universal, high-value)
+    b"-----BEGIN RSA PRIVATE KEY-----",
+    b"-----BEGIN OPENSSH PRIVATE KEY-----",
+    b"-----BEGIN PRIVATE KEY-----",
+    b"-----BEGIN EC PRIVATE KEY-----",
+    b"-----BEGIN DSA PRIVATE KEY-----",
+    b"-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    # API tokens relevant to the real stack (Anthropic / OpenAI / GitHub / Google)
+    b"sk-ant-",       # Anthropic (Claude API + Claude Code CLI)
+    b"sk-proj-",      # OpenAI project key (GPT, Codex CLI, Responses API)
+    b"ghp_",          # GitHub personal access token (classic)
+    b"github_pat_",   # GitHub fine-grained PAT
+    b"AIzaSy",        # Google API key (Gemini, AI Studio, Cloud, Firebase)
+]
+_SENSITIVE_UPLOAD_SCAN_LIMIT = 8192  # bytes — first 8KB only, see design note above
+
+
+def _detect_sensitive_upload(content: bytes) -> Optional[bytes]:
+    """Scan the first 8KB of upload content for sensitive pattern markers.
+
+    Returns the matched pattern if found, None otherwise.
+
+    Speed-bump only — NOT security. Trivial to bypass with gzip, base64,
+    xor, or custom encoding. The goal is to catch accidental drag&drop of
+    local credentials files and naive copy-paste from forums, not
+    determined adversaries.
+    """
+    if not content:
+        return None
+    head = content[:_SENSITIVE_UPLOAD_SCAN_LIMIT]
+    for pat in _SENSITIVE_UPLOAD_PATTERNS:
+        if pat in head:
+            return pat
+    return None
+
+
 def register_file_routes(router: APIRouter, *, session_mgr, file_handler, require_ui_auth):
     """Registra endpoints: POST /upload, GET /files, DELETE /files/cleanup"""
 
@@ -53,6 +101,19 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
     ):
         """Upload file and add to session context + automatic memory ingestion"""
         content = await file.read()
+
+        # Security (P1-4): speed-bump denylist for sensitive content patterns.
+        # See _detect_sensitive_upload docstring for the design tradeoff.
+        _matched_pattern = _detect_sensitive_upload(content)
+        if _matched_pattern:
+            logger.warning(
+                f"Upload rejected: sensitive pattern detected {_matched_pattern[:30]!r}"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="File content rejected: matches sensitive pattern denylist",
+            )
+
         # Security: validate filename (path traversal, injection)
         filename = validate_string_input(file.filename or "", max_length=255, context="path")
         valid, error = file_handler.validate_file(filename, len(content), content_bytes=content)
