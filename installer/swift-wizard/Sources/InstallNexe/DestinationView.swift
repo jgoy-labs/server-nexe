@@ -123,8 +123,9 @@ struct DestinationView: View {
 
     private func updateDiskSpace() {
         let parentPath = (engine.installPath as NSString).deletingLastPathComponent
-        if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: parentPath),
-           let free = attrs[.systemFreeSize] as? Int64 {
+        let url = URL(fileURLWithPath: parentPath)
+        if let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
+           let free = values.volumeAvailableCapacityForImportantUsage {
             freeSpaceGB = Int(free / (1024 * 1024 * 1024))
             hasEnoughSpace = freeSpaceGB >= 5
         }
