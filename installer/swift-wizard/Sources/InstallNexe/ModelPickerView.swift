@@ -59,26 +59,33 @@ struct ModelPickerView: View {
                 )
             } else {
                 // Llista de models del catàleg
-                ScrollView {
-                    LazyVStack(spacing: 10) {
-                        ForEach(engine.catalog.models(for: selectedTab)) { model in
-                            let tooLarge = model.ramGB > Double(engine.hardware.ramGB) * 0.75
-                            ModelCard(
-                                model: model,
-                                isSelected: engine.selectedModel?.key == model.key,
-                                isRecommended: isRecommended(model),
-                                isDisabled: tooLarge,
-                                lang: engine.lang
-                            ) {
-                                if !tooLarge {
-                                    engine.selectedModel = model
-                                    selectedEngineOption = "auto"
-                                    engine.selectedEngine = "auto"
+                GeometryReader { geo in
+                    ScrollView {
+                        VStack {
+                            Spacer(minLength: 0)
+                            LazyVStack(spacing: 10) {
+                                ForEach(engine.catalog.models(for: selectedTab)) { model in
+                                    let tooLarge = model.ramGB > Double(engine.hardware.ramGB) * 0.75
+                                    ModelCard(
+                                        model: model,
+                                        isSelected: engine.selectedModel?.key == model.key,
+                                        isRecommended: isRecommended(model),
+                                        isDisabled: tooLarge,
+                                        lang: engine.lang
+                                    ) {
+                                        if !tooLarge {
+                                            engine.selectedModel = model
+                                            selectedEngineOption = "auto"
+                                            engine.selectedEngine = "auto"
+                                        }
+                                    }
                                 }
                             }
+                            .padding(.horizontal, 24)
+                            Spacer(minLength: 0)
                         }
+                        .frame(minHeight: geo.size.height)
                     }
-                    .padding(.horizontal, 24)
                 }
             }
 

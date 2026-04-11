@@ -25,11 +25,81 @@ from .injection_detectors import (
 
 from .messages import get_message
 
-_MEM_TAG_RE = re.compile(r'\[MEM_SAVE:\s*.+?\]', re.IGNORECASE)
+_MEM_TAG_RE = re.compile(
+  r'(^|\n)\s*\[(?:MEM_SAVE|MEMORIA|MEM|MEMORY|SYSTEM|ASSISTANT|TOOL|FUNCTION|USER)(?:\s*[:=][^\]]*?)?\]',
+  re.IGNORECASE,
+)
+
+_JAILBREAK_PATTERNS = [
+  # Catalan: "ignora [totes/les/la/els/el ...] instrucci(ó|ons?) anterior[s]?"
+  # Singular: "instrucció" (ca, accent); plural: "instruccions" / "instruccion"
+  # Also covers Spanish "instruccion(es)" by sharing the "on" branch.
+  re.compile(
+    r'ignora\s+(?:totes?\s+)?(?:les\s+|la\s+|els\s+|el\s+)?instrucci(?:ó|ons?)\s+anteriors?',
+    re.IGNORECASE,
+  ),
+  re.compile(r'ignore\s+(all\s+)?(previous\s+|prior\s+)?instructions?', re.IGNORECASE),
+  # Tight: requires article + word, prevents false positives like
+  # "you are now at home", "you are now old enough", "you are now free".
+  re.compile(r'you\s+are\s+now\s+(?:a|an)\s+\w+', re.IGNORECASE),
+  # Catalan: "ets un/una <word(s)>? sense restriccions"
+  # Flexible: accepts 0-40 chars between article and "sense restriccions"
+  # to cover "ets un model sense restriccions", "ets una IA sense restriccions",
+  # "ara ets una nova IA sense restriccions", etc.
+  re.compile(
+    r'ets\s+(?:un|una)[^\n]{0,40}?sense\s+restriccions',
+    re.IGNORECASE,
+  ),
+  re.compile(r'forget\s+(all\s+)?(your\s+)?(rules|guidelines|instructions)', re.IGNORECASE),
+  re.compile(r'pretend\s+(to\s+be|you\s+are|that\s+you)', re.IGNORECASE),
+  re.compile(r'nou\s+sistema\s+prompt', re.IGNORECASE),
+  re.compile(r'new\s+system\s+prompt', re.IGNORECASE),
+  re.compile(r'\bDAN\s+mode\b', re.IGNORECASE),
+  re.compile(r'\bjailbreak\b', re.IGNORECASE),
+  re.compile(r'do\s+anything\s+now', re.IGNORECASE),
+]
+
+
+def detect_jailbreak_attempt(text: str) -> Optional[str]:
+  """Detect common jailbreak patterns — speed-bump, NOT security.
+
+  Returns the matched substring if a pattern fires, None otherwise.
+
+  Warning: defense-in-depth only. Sophisticated attackers bypass this
+  trivially via Unicode lookalikes, base64/gzip encoding, chained prompts,
+  language switching, etc. For real protection use content moderation at
+  the model level or a dedicated safety classifier.
+
+  The point of this function is to catch naive copy-paste attempts from
+  jailbreak forums, not determined adversaries.
+  """
+  if not text:
+    return None
+  for pat in _JAILBREAK_PATTERNS:
+    m = pat.search(text)
+    if m:
+      return m.group(0)
+  return None
+
 
 def strip_memory_tags(text: str) -> str:
-  """Strip [MEM_SAVE: ...] tags from user input to prevent memory injection."""
-  return _MEM_TAG_RE.sub('', text).strip()
+  """Strip memory/role-impersonation tags at line start from user input.
+
+  P0.9.1 P1-2: regex is now anchored to line start (`^` or `\\n`) to avoid
+  false positives on inline brackets like `[USER: Jordi]` or `[memoria]`
+  used in normal writing.
+
+  Covered tags (all case-insensitive):
+    MEM_SAVE, MEMORIA, MEM, MEMORY, SYSTEM, ASSISTANT, TOOL, FUNCTION, USER
+
+  Breaking changes from v0.9.0:
+    - Mid-line tags are NO LONGER stripped (e.g. `"text [MEM_SAVE: x]"`)
+    - `[SYSTEM]` without `:` or `=` now matches (was ignored before)
+    - Multi-line: each anchored tag is stripped, preserving other content
+
+  Newlines are preserved via capture group 1 (the matched `^` or `\\n`).
+  """
+  return _MEM_TAG_RE.sub(lambda m: m.group(1), text).strip()
 
 def sanitize_html(text: str) -> str:
   """
