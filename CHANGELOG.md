@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.2] - 2026-04-12
+
+Security hardening: 4 P1 fixes from mega-consultoria 2026-04-11.
+
+### Security fixes
+
+- **P1-A** — Rate limit UI auth failures per IP. `make_require_ui_auth()` now
+  tracks failed authentication attempts in a per-IP in-memory dict with a 60s
+  sliding window. After 20 failures, returns `429 Too Many Requests`. Protects
+  `/ui/*` endpoints against brute force. Dict-in-memory is intentional (no
+  persistence needed between restarts; nexe 0.9.x is single-worker).
+  Commit `6651848`.
+
+- **P1-B** — Auth failures from the Web UI are now logged to the security log.
+  Previously `make_require_ui_auth()` raised `401` without calling
+  `security_logger.log_auth_failure()`, making brute force against `/ui/chat`
+  invisible to SIEM/security monitoring. Now uses the same lazy-import pattern
+  as `auth_dependencies.py:185-195`. Commit `293fd45`.
+
+- **P1-C** — Symlink upload attack blocked. Attack vector: `ln -s /etc/passwd
+  evil.pdf && curl -F "file=@evil.pdf"` ingested 17 chunks of `/etc/passwd`
+  into `user_knowledge`. Fix: `_is_symlink_outside_uploads()` check via
+  `os.path.realpath()` immediately after `save_file()`. If the saved path
+  resolves outside the uploads directory, the file is deleted and a `400` is
+  returned. Does NOT affect model symlinks (MLX/llama.cpp/Ollama never go
+  through `/upload`). Commit `353e1f6`.
+
+- **P1-D** — Encryption default changed from `false` to `auto`. Previously all
+  sessions were stored in plain text by default, contradicting the
+  "privacy-first" README. New behaviour: if `sqlcipher3` is available,
+  encryption is auto-enabled at startup; if not, a `WARNING` is logged and the
+  server continues in plain text. `NEXE_ENCRYPTION_ENABLED=false` suppresses
+  the warning. Existing plain-text data can be migrated with
+  `nexe encryption encrypt-all`. Commit `a9970d7`.
+
 ## [0.9.1] - 2026-04-11
 
 Consolidated release: Cirurgia Bloc 2 (2026-04-08) + Mega-consultoria hardening (2026-04-11).

@@ -388,7 +388,7 @@ if _PYDANTIC_SETTINGS_AVAILABLE:
         csrf_secret: Optional[str] = Field(None, description="Secret per a tokens CSRF", alias="NEXE_CSRF_SECRET")
         approved_modules: Optional[str] = Field(None, description="Mòduls aprovats (comma-separated, requerit en prod)", alias="NEXE_APPROVED_MODULES")
         localhost_aliases: str = Field("127.0.0.1,::1,localhost", description="Adreces considerades localhost (comma-separated)", alias="NEXE_LOCALHOST_ALIASES")
-        encryption_enabled: str = Field("", description="Activar SQLCIPHER (true|false|auto)", alias="NEXE_ENCRYPTION_ENABLED")
+        encryption_enabled: str = Field("auto", description="Activar SQLCIPHER (true|false|auto)", alias="NEXE_ENCRYPTION_ENABLED")
         vpn_allowed_ips: str = Field("", description="IPs VPN permeses per bootstrap (comma-separated)", alias="NEXE_VPN_ALLOWED_IPS")
         master_key: Optional[str] = Field(None, description="Clau mestra per a derivació de claus HKDF", alias="NEXE_MASTER_KEY")
 

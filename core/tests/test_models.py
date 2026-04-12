@@ -19,13 +19,13 @@ class TestSystemResponse:
             system="Nexe 0.9",
             description="Descripció",
             status="operatiu",
-            version="0.9.0",
+            version="0.9.1",
             type="servidor_bàsic"
         )
         assert r.system == "Nexe 0.9"
         assert r.description == "Descripció"
         assert r.status == "operatiu"
-        assert r.version == "0.9.0"
+        assert r.version == "0.9.1"
         assert r.type == "servidor_bàsic"
 
     def test_serialization(self):
@@ -50,12 +50,12 @@ class TestHealthResponse:
         r = HealthResponse(
             status="operatiu",
             message="Servidor operatiu",
-            version="0.9.0",
+            version="0.9.1",
             uptime="operacional"
         )
         assert r.status == "operatiu"
         assert r.message == "Servidor operatiu"
-        assert r.version == "0.9.0"
+        assert r.version == "0.9.1"
         assert r.uptime == "operacional"
 
     def test_serialization(self):
@@ -85,7 +85,7 @@ class TestApiInfoResponse:
         ]
         r = ApiInfoResponse(
             name="Nexe 0.9",
-            version="0.9.0",
+            version="0.9.1",
             description="Descripció API",
             endpoints=endpoints
         )

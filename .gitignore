@@ -118,3 +118,6 @@ Thumbs.db
 # (generats per errors de CLI: --output, --help)
 --output
 --help
+
+# DIARI INTERN (notes privades de dev, no van a GitHub)
+diari/

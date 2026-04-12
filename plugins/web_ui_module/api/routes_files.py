@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ------------------------------------
 """
 
+from pathlib import Path
 from typing import Optional
 import logging
 import os as _os
@@ -85,6 +86,24 @@ def _detect_sensitive_upload(content: bytes) -> Optional[bytes]:
     return None
 
 
+def _is_symlink_outside_uploads(file_path: Path) -> bool:
+    """P1-C: Retorna True si file_path és un symlink que apunta fora del directori d'uploads.
+
+    Compara el realpath del fitxer desat amb el realpath del seu directori pare.
+    Si el fitxer (o el destí del symlink) no viu dins del directori d'uploads,
+    és considerat maliciós i s'ha de rebutjar.
+
+    Attack vector: ln -s /etc/passwd evil.pdf → injectava /etc/passwd al RAG.
+    Patró testejable directament (igual que _detect_sensitive_upload) perquè
+    @limiter.limit rebutja MagicMock.
+
+    NOTA: No afecta models locals (MLX/llama.cpp/Ollama) que mai passen per /upload.
+    """
+    _real = _os.path.realpath(str(file_path))
+    _uploads_real = _os.path.realpath(str(file_path.parent))
+    return not _real.startswith(_uploads_real + _os.sep) and _real != _uploads_real
+
+
 def register_file_routes(router: APIRouter, *, session_mgr, file_handler, require_ui_auth):
     """Registra endpoints: POST /upload, GET /files, DELETE /files/cleanup"""
 
@@ -121,6 +140,16 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
             raise HTTPException(status_code=400, detail=error)
 
         file_path = await file_handler.save_file(filename, content)
+
+        # P1-C: Symlink check — el fitxer desat no ha de ser un symlink
+        # que apunti fora del directori d'uploads esperat.
+        if _is_symlink_outside_uploads(file_path):
+            file_handler.delete_file(file_path)
+            raise HTTPException(
+                status_code=400,
+                detail="File rejected: symlink outside upload directory",
+            )
+
         text = await file_handler.extract_text_async(file_path)
         if not text:
             file_handler.delete_file(file_path)

@@ -1,9 +1,8 @@
 """
-Tests per SC08 — POST /ui/lang ha de propagar l'idioma via i18n.set_language(lang).
+Tests per SC08 — POST /ui/lang ha de propagar l'idioma via i18n.current_language.
 
-Bug: routes_auth.py::set_language actualitzava os.environ["NEXE_LANG"] però no cridava
-i18n.set_language(lang), de manera que els missatges d'error de l'API quedaven en
-l'idioma d'arrencada fins al pròxim reinici.
+Verifica que routes_auth.py::set_language actualitza os.environ["NEXE_LANG"] i
+assigna i18n.current_language amb el format BCP-47 (ca-ES, es-ES, en-US).
 """
 
 import os
@@ -53,27 +52,27 @@ class TestSetLanguageI18nPropagation:
         result = await fn(body={"lang": "ca"}, _auth=None, i18n=i18n_mock)
 
         assert result == {"status": "ok", "lang": "ca"}
-        i18n_mock.set_language.assert_called_once_with("ca")
+        assert i18n_mock.current_language == "ca-ES"
 
     async def test_post_lang_calls_i18n_set_language_es(self):
-        """SC08: POST /lang es → crida i18n.set_language('es')."""
+        """SC08: POST /lang es → assigna i18n.current_language = 'es-ES'."""
         i18n_mock = _make_i18n_mock()
 
         fn = _make_set_language_fn(i18n_mock)
         result = await fn(body={"lang": "es"}, _auth=None, i18n=i18n_mock)
 
         assert result == {"status": "ok", "lang": "es"}
-        i18n_mock.set_language.assert_called_once_with("es")
+        assert i18n_mock.current_language == "es-ES"
 
     async def test_post_lang_calls_i18n_set_language_en(self):
-        """SC08: POST /lang en → crida i18n.set_language('en')."""
+        """SC08: POST /lang en → assigna i18n.current_language = 'en-US'."""
         i18n_mock = _make_i18n_mock()
 
         fn = _make_set_language_fn(i18n_mock)
         result = await fn(body={"lang": "en"}, _auth=None, i18n=i18n_mock)
 
         assert result == {"status": "ok", "lang": "en"}
-        i18n_mock.set_language.assert_called_once_with("en")
+        assert i18n_mock.current_language == "en-US"
 
     async def test_post_lang_no_i18n_no_crash(self):
         """SC08: si i18n és None (app.state sense i18n), no peta."""
@@ -120,18 +119,17 @@ class TestSetLanguageI18nPropagation:
 
         result = await fn(body={"lang": "  CA  "}, _auth=None, i18n=i18n_mock)
         assert result["lang"] == "ca"
-        i18n_mock.set_language.assert_called_once_with("ca")
+        assert i18n_mock.current_language == "ca-ES"
 
-    async def test_post_lang_set_language_returns_false(self):
-        """SC08: si i18n.set_language retorna False (idioma sense traduccions),
-        l'endpoint retorna OK igualment — el lang ja ha passat whitelist.
-        Comportament documentat: error de configuració del servidor, no de l'usuari.
+    async def test_post_lang_current_language_always_set(self):
+        """SC08: i18n.current_language s'assigna sempre que i18n no és None,
+        independentment de l'estat previ del mock.
         """
         i18n_mock = _make_i18n_mock()
-        i18n_mock.set_language = MagicMock(return_value=False)
+        i18n_mock.current_language = "en-US"  # estat previ diferent
         fn = _make_set_language_fn(i18n_mock)
 
         result = await fn(body={"lang": "ca"}, _auth=None, i18n=i18n_mock)
 
         assert result == {"status": "ok", "lang": "ca"}
-        i18n_mock.set_language.assert_called_once_with("ca")
+        assert i18n_mock.current_language == "ca-ES"
