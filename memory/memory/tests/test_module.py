@@ -48,12 +48,17 @@ class TestMemoryModule:
 
     MemoryModule._instance = None
 
-  async def test_initialization(self):
+  async def test_initialization(self, tmp_path):
     """Inicialitzar MemoryModule"""
+    from unittest.mock import patch, MagicMock
     MemoryModule._instance = None
 
     module = MemoryModule.get_instance()
-    result = await module.initialize()
+    with patch("memory.memory.module.get_server_state") as mock_gs:
+      mock_gs.return_value.project_root = tmp_path
+      mock_gs.return_value.config = {}
+      mock_gs.return_value.crypto_provider = None
+      result = await module.initialize()
 
     assert result is True
     assert module._initialized is True
@@ -65,17 +70,21 @@ class TestMemoryModule:
     await module.shutdown()
     MemoryModule._instance = None
 
-  async def test_double_initialization(self):
+  async def test_double_initialization(self, tmp_path):
     """Segona inicialització no falla (idempotent)"""
+    from unittest.mock import patch, MagicMock
     MemoryModule._instance = None
 
     module = MemoryModule.get_instance()
+    with patch("memory.memory.module.get_server_state") as mock_gs:
+      mock_gs.return_value.project_root = tmp_path
+      mock_gs.return_value.config = {}
+      mock_gs.return_value.crypto_provider = None
+      result1 = await module.initialize()
+      assert result1 is True
 
-    result1 = await module.initialize()
-    assert result1 is True
-
-    result2 = await module.initialize()
-    assert result2 is True
+      result2 = await module.initialize()
+      assert result2 is True
 
     await module.shutdown()
     MemoryModule._instance = None
@@ -214,7 +223,7 @@ class TestMemoryModule:
 class TestMemoryModuleAdditional:
   """Additional tests for uncovered lines."""
 
-  async def test_initialize_project_root_none_fallback(self):
+  async def test_initialize_project_root_none_fallback(self, tmp_path):
     """Lines 117-119: project_root is None, falls back to cwd."""
     from unittest.mock import patch, MagicMock
 
@@ -226,14 +235,15 @@ class TestMemoryModuleAdditional:
     mock_state.config = {}
     mock_state.crypto_provider = None
 
-    with patch("memory.memory.module.get_server_state", return_value=mock_state):
+    with patch("memory.memory.module.get_server_state", return_value=mock_state), \
+         patch("pathlib.Path.cwd", return_value=tmp_path):
       result = await module.initialize(config={"flash_ttl_seconds": 3600})
       assert result is True
 
     await module.shutdown()
     MemoryModule._instance = None
 
-  async def test_initialize_custom_config_merge(self):
+  async def test_initialize_custom_config_merge(self, tmp_path):
     """Line 111: custom config merged."""
     from unittest.mock import patch, MagicMock
 
@@ -241,7 +251,7 @@ class TestMemoryModuleAdditional:
     module = MemoryModule.get_instance()
 
     with patch("memory.memory.module.get_server_state") as mock_gs:
-      mock_gs.return_value.project_root = Path.cwd()
+      mock_gs.return_value.project_root = tmp_path
       mock_gs.return_value.config = {}
       mock_gs.return_value.crypto_provider = None
       result = await module.initialize(config={"ram_max_entries": 50})
@@ -268,7 +278,7 @@ class TestMemoryModuleAdditional:
     module._initialized = False
     MemoryModule._instance = None
 
-  async def test_shutdown_failure_returns_false(self):
+  async def test_shutdown_failure_returns_false(self, tmp_path):
     """Lines 208-210: shutdown exception returns False."""
     from unittest.mock import patch, MagicMock, AsyncMock
 
@@ -276,7 +286,7 @@ class TestMemoryModuleAdditional:
     module = MemoryModule.get_instance()
 
     with patch("memory.memory.module.get_server_state") as mock_gs:
-      mock_gs.return_value.project_root = Path.cwd()
+      mock_gs.return_value.project_root = tmp_path
       mock_gs.return_value.config = {}
       mock_gs.return_value.crypto_provider = None
       await module.initialize()
