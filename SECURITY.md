@@ -28,9 +28,30 @@ It does **not** defend against:
 - `validate_string_input()` on all Web UI endpoints
 - Filename validation on file uploads
 - Path traversal protection on session IDs
+- Upload content denylist (v0.9.1): scans first 8KB of uploads for API tokens (`sk-ant-`, `sk-proj-`, `ghp_`, `github_pat_`, `AIzaSy`), PEM private keys, and `/etc/passwd` signatures. Speed-bump only — protects against accidental upload, not determined adversaries.
+
+### Jailbreak detection (v0.9.1)
+- 47 pattern speed-bump detector for common jailbreak attempts (multilingual: ca/en/es)
+- Injects `[SECURITY NOTICE]` prefix instead of rejecting — preserves UX on false positives
+- Defense-in-depth only. Sophisticated attacks evade trivially. Real protection requires model-level content moderation.
+
+### Memory and RAG injection protection (v0.9.1)
+- Memory tag stripping on all input: `[MEM_SAVE:]`, `[SYSTEM:]`, `[USER:]`, `[ASSISTANT:]`, `[TOOL:]`, `[FUNCTION:]`, `[MEMORY:]`, `[MEMORIA:]`
+- Applied uniformly on both `/ui/chat` and `/v1/chat/completions` (previously only Web UI was protected)
+- RAG ingest pipeline applies `_filter_rag_injection` to document chunks before storing
+- Anti-re-save guard prevents delete-then-memorize loops
+
+### Pipeline enforcement (v0.9.1)
+- All chat goes through two canonical endpoints: `/ui/chat` (Web UI) and `/v1/chat/completions` (OpenAI-compatible API)
+- Direct plugin endpoints (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) removed — return 403
+- Ensures all requests pass through the full security pipeline (auth, rate limiting, input validation, jailbreak detection, memory tag stripping)
 
 ### Rate limiting
-- Per-endpoint rate limits (5-30 requests/minute depending on endpoint type)
+- Per-endpoint rate limits hardcoded in route decorators:
+  - `/v1/chat/completions`: 20/minute
+  - `/ui/chat`: 20/minute
+  - `/ui/upload`: 5/minute
+  - `/ui/memory/*`: 10-30/minute depending on operation
 - Applied to all Web UI and API endpoints
 
 ### Transport and headers
@@ -43,13 +64,14 @@ It does **not** defend against:
 - AES-256-GCM with HKDF-SHA256 key derivation
 - Master key stored in OS Keyring (preferred), environment variable, or file fallback
 - SQLCipher for encrypted SQLite databases
+- **Fail-closed** (v0.9.1): server refuses to start if encryption is requested but `sqlcipher3` is not installed. No silent fallback to plaintext.
 - Session files encrypted (.json to .enc migration)
 - RAG document text removed from Qdrant payloads (stored in encrypted TextStore)
-- CLI: `./nexe encryption status`, `./nexe encryption encrypt-all`, `./nexe encryption export-key`
+- CLI: `nexe encryption status`, `nexe encryption encrypt-all`, `nexe encryption export-key`
 
 ### Logging
 - Structured security event logs (JSON format)
-- Auth successes/failures, rate limit events, module rejections logged
+- Auth successes/failures, rate limit events, jailbreak detections, module rejections logged
 - No `print()` calls in production code — all output via structured logger
 
 ## What this project has NOT done
@@ -91,7 +113,6 @@ If that option is not available, open a minimal issue that says "security report
 |---------|---------|----------|
 | `NEXE_PRIMARY_API_KEY` | API authentication | `.env` |
 | `NEXE_ENCRYPTION_ENABLED` | Enable encryption at rest | `.env` or environment |
-| `NEXE_RATE_LIMIT_*` | Rate limiting thresholds | `.env` |
 | `NEXE_TRUSTED_HOSTS` | Allowed host headers | `.env` |
 
 ## Dependencies
