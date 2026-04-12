@@ -10,7 +10,9 @@ import sys
 import os
 
 # Afegir path del sistema per trobar ds_store instal·lat via pip3
-sys.path.insert(0, '/Users/jgoy/Library/Python/3.9/lib/python/site-packages')
+_user_site = os.path.expanduser("~/Library/Python/3.9/lib/python/site-packages")
+if os.path.isdir(_user_site):
+    sys.path.insert(0, _user_site)
 
 try:
     import ds_store
