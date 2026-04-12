@@ -1,9 +1,9 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: memory/embeddings/simple_embedder.py
-Description: No description available.
+Description: Simple synchronous embedder based on fastembed (ONNX).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -11,21 +11,31 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import List
 import logging
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 import numpy as np
+
+from .constants import DEFAULT_EMBEDDING_MODEL
 
 logger = logging.getLogger(__name__)
 
+
+def _normalize(v: np.ndarray) -> List[float]:
+  """L2-normalize a vector and return as list of floats."""
+  norm = np.linalg.norm(v)
+  if norm > 0:
+    v = v / norm
+  return v.astype(np.float32).tolist()
+
+
 class SimpleEmbedder:
   """
-  Simple synchronous embedder based on SentenceTransformer.
+  Simple synchronous embedder based on fastembed (ONNX).
 
   For cases where cache or async is not needed (e.g., RAG initialization).
 
   Attributes:
     model_name: Model name
-    model: SentenceTransformer instance
-    device: Device (cpu, mps, cuda)
+    model: TextEmbedding instance
   """
 
   _instances = {}
@@ -43,8 +53,8 @@ class SimpleEmbedder:
     Init SimpleEmbedder.
 
     Args:
-      model_name: Model sentence-transformers
-      device: cpu, mps, o cuda
+      model_name: Model name (fastembed compatible)
+      device: Ignored (fastembed uses ONNX runtime, auto-selects)
     """
     if self._initialized:
       return
@@ -52,10 +62,9 @@ class SimpleEmbedder:
     self.model_name = model_name
     self.device = device
 
-    logger.info(f"Loading model {model_name} on {device}")
+    logger.info(f"Loading model {model_name} (fastembed/ONNX)")
     try:
-      # Cache local only — server must work 100% offline
-      self.model = SentenceTransformer(model_name, device=device, local_files_only=True)
+      self.model = TextEmbedding(model_name)
     except Exception as e:
       raise RuntimeError(
           f"Embedding model '{model_name}' not available locally. "
@@ -76,16 +85,12 @@ class SimpleEmbedder:
     Returns:
       Embedding as list of floats
     """
-    embedding = self.model.encode(
-      text,
-      convert_to_numpy=True,
-      normalize_embeddings=normalize
-    )
+    embedding = list(self.model.embed([text]))[0]
 
-    if isinstance(embedding, np.ndarray):
-      embedding = embedding.tolist()
+    if normalize:
+      return _normalize(np.array(embedding))
 
-    return embedding
+    return np.array(embedding).astype(np.float32).tolist()
 
   def encode_batch(
     self,
@@ -104,22 +109,17 @@ class SimpleEmbedder:
     Returns:
       List of embeddings
     """
-    embeddings = self.model.encode(
-      texts,
-      convert_to_numpy=True,
-      normalize_embeddings=normalize,
-      batch_size=batch_size
-    )
+    embeddings = list(self.model.embed(texts, batch_size=batch_size))
 
-    if isinstance(embeddings, np.ndarray):
-      embeddings = embeddings.tolist()
+    if normalize:
+      return [_normalize(np.array(e)) for e in embeddings]
 
-    return embeddings
+    return [np.array(e).astype(np.float32).tolist() for e in embeddings]
 
   @property
   def dimensions(self) -> int:
     """Get embedding dimensions."""
-    return self.model.get_sentence_embedding_dimension()
+    return 768
 
 def get_embedder(model_name: str, device: str = "cpu") -> SimpleEmbedder:
   """
@@ -128,8 +128,8 @@ def get_embedder(model_name: str, device: str = "cpu") -> SimpleEmbedder:
   Returns singleton instance of the model.
 
   Args:
-    model_name: Model sentence-transformers
-    device: Device (cpu, mps, cuda)
+    model_name: Model name (fastembed compatible)
+    device: Ignored (fastembed uses ONNX runtime)
 
   Returns:
     SimpleEmbedder instance

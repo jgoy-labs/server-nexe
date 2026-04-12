@@ -44,7 +44,7 @@ features = [
 [model]
 # Model d'embeddings per defecte
 default_model = "paraphrase-multilingual-mpnet-base-v2"
-provider = "sentence-transformers"
+provider = "fastembed"
 dimension = 768
 max_sequence_length = 512
 
@@ -86,10 +86,8 @@ modules = []
 
 # Mòduls externs (Python packages)
 python = [
-  "sentence-transformers",
-  "torch",
-  "numpy",
-  "faiss-cpu"
+  "fastembed",
+  "numpy"
 ]
 
 [workflow]

@@ -21,9 +21,8 @@ MANIFEST = {
     "capabilities": ["text_encoding", "batch_encoding", "chunking"],
     "dependencies": {
         "python": [
-            "sentence-transformers>=2.3.1",
-            "numpy>=1.26.0",
-            "torch>=2.0.0"
+            "fastembed>=0.3.6",
+            "numpy>=1.26.0"
         ]
     }
 }

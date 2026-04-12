@@ -16,23 +16,25 @@ from unittest.mock import Mock, patch
 from memory.embeddings.core.async_encoder import AsyncEmbedder
 
 @pytest.fixture
-def mock_sentence_transformer():
+def mock_text_embedding():
   """
-  Mock SentenceTransformer per evitar carregar model real.
+  Mock fastembed TextEmbedding per evitar carregar model real.
   """
   mock = Mock()
 
-  mock.encode.return_value = np.random.rand(768).astype(np.float32)
+  def mock_embed(texts, **kwargs):
+    return iter([np.random.rand(768).astype(np.float32) for _ in texts])
 
+  mock.embed.side_effect = mock_embed
   return mock
 
 @pytest.fixture
 async def async_embedder():
   """
-  Fixture: AsyncEmbedder (sense carregar SentenceTransformer real).
+  Fixture: AsyncEmbedder (sense carregar fastembed TextEmbedding real).
 
-  Nota: SentenceTransformer s'importa dinàmicament dins _load_model,
-  per tant NO importem sentence_transformers aquí (per evitar deps pesades als unit tests).
+  Nota: TextEmbedding s'importa dinàmicament dins _load_model,
+  per tant NO importem fastembed aquí (per evitar deps pesades als unit tests).
   """
   AsyncEmbedder._instances.clear()
 
@@ -86,7 +88,7 @@ async def test_different_models_different_instances():
   AsyncEmbedder._instances.clear()
 
 @pytest.mark.asyncio
-async def test_lazy_loading(async_embedder, mock_sentence_transformer):
+async def test_lazy_loading(async_embedder, mock_text_embedding):
   """
   Test 3: Lazy loading del model.
 
@@ -96,13 +98,13 @@ async def test_lazy_loading(async_embedder, mock_sentence_transformer):
   """
   assert async_embedder._model is None, "Model no hauria d'estar carregat inicialment"
 
-  async_embedder._load_model = Mock(return_value=mock_sentence_transformer)
+  async_embedder._load_model = Mock(return_value=mock_text_embedding)
   await async_embedder.encode_async("test text")
 
   assert async_embedder._model is not None, "Model hauria d'estar carregat després encode"
 
 @pytest.mark.asyncio
-async def test_encode_async_single_text(async_embedder, mock_sentence_transformer):
+async def test_encode_async_single_text(async_embedder, mock_text_embedding):
   """
   Test 4: Encode single text async.
 
@@ -111,7 +113,7 @@ async def test_encode_async_single_text(async_embedder, mock_sentence_transforme
   - Format: List[float]
   - Dimensions correctes
   """
-  with patch.object(async_embedder, '_model', mock_sentence_transformer):
+  with patch.object(async_embedder, '_model', mock_text_embedding):
     result = await async_embedder.encode_async("hello world", normalize=True)
 
   assert isinstance(result, list), "Result hauria de ser llista"
@@ -130,7 +132,7 @@ async def test_encode_async_empty_text(async_embedder):
     await async_embedder.encode_async("", normalize=True)
 
 @pytest.mark.asyncio
-async def test_encode_batch_async(async_embedder, mock_sentence_transformer):
+async def test_encode_batch_async(async_embedder, mock_text_embedding):
   """
   Test 6: Encode batch de texts.
 
@@ -139,11 +141,9 @@ async def test_encode_batch_async(async_embedder, mock_sentence_transformer):
   - Mateix ordre que input
   - Format correcte
   """
-  mock_sentence_transformer.encode.return_value = np.random.rand(3, 768).astype(np.float32)
-
   texts = ["hello", "world", "test"]
 
-  with patch.object(async_embedder, '_model', mock_sentence_transformer):
+  with patch.object(async_embedder, '_model', mock_text_embedding):
     results = await async_embedder.encode_batch_async(texts, normalize=True, batch_size=32)
 
   assert isinstance(results, list), "Results haurien de ser llista"
@@ -175,7 +175,7 @@ async def test_encode_batch_with_empty_string(async_embedder):
     await async_embedder.encode_batch_async(texts, normalize=True)
 
 @pytest.mark.asyncio
-async def test_concurrent_encode(async_embedder, mock_sentence_transformer):
+async def test_concurrent_encode(async_embedder, mock_text_embedding):
   """
   Test 9: Concurrent encodes (stress test).
 
@@ -184,7 +184,7 @@ async def test_concurrent_encode(async_embedder, mock_sentence_transformer):
   - Thread-safe
   - No race conditions
   """
-  with patch.object(async_embedder, '_model', mock_sentence_transformer):
+  with patch.object(async_embedder, '_model', mock_text_embedding):
     tasks = [
       async_embedder.encode_async(f"text_{i}", normalize=True)
       for i in range(10)

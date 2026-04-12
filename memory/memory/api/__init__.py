@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
 
-from ..constants import DEFAULT_VECTOR_SIZE
+from ..constants import DEFAULT_EMBEDDING_MODEL, DEFAULT_VECTOR_SIZE
 
 from .models import (
   CollectionInfo,
@@ -83,7 +83,7 @@ class MemoryAPI:
     self,
     qdrant_url: Optional[str] = None,
     qdrant_path: Optional[Path] = None,
-    embedding_model: str = "paraphrase-multilingual-mpnet-base-v2",
+    embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     crypto_provider=None,
     text_store_path: Optional[Path] = None,
   ):
@@ -161,15 +161,18 @@ class MemoryAPI:
     loop = asyncio.get_running_loop()
 
     def _load_model():
-      from sentence_transformers import SentenceTransformer
+      from fastembed import TextEmbedding
       try:
-        return SentenceTransformer(self.embedding_model, local_files_only=True)
-      except Exception:
-        return SentenceTransformer(self.embedding_model)
+        return TextEmbedding(self.embedding_model)
+      except Exception as e:
+        raise RuntimeError(
+            f"Embedding model '{self.embedding_model}' not available locally. "
+            f"Run the installer to download it. Error: {e}"
+        ) from e
 
     self._embedder = await loop.run_in_executor(self._executor, _load_model)
     import os as _os
-    logger.info("SentenceTransformer initialized (PID=%s, model=%s)", _os.getpid(), self.embedding_model)
+    logger.info("TextEmbedding initialized (PID=%s, model=%s)", _os.getpid(), self.embedding_model)
 
   def _ensure_initialized(self):
     """Verify that the API is initialized."""
@@ -412,7 +415,13 @@ class MemoryAPI:
     loop = asyncio.get_running_loop()
 
     def _encode():
-      return self._embedder.encode(text).tolist()
+      import numpy as _np
+      v = list(self._embedder.embed([text]))[0]
+      arr = _np.array(v)
+      norm = _np.linalg.norm(arr)
+      if norm > 0:
+        arr = arr / norm
+      return arr.astype(_np.float32).tolist()
 
     return await loop.run_in_executor(self._executor, _encode)
 

@@ -40,15 +40,15 @@ class TestCheckModuleInitialized:
 
 
 class TestCheckDependenciesAvailable:
-    def test_sentence_transformers_available(self):
+    def test_fastembed_available(self):
         result = check_dependencies_available()
         # May pass or fail depending on environment
         assert result["name"] == "dependencies_available"
         assert result["status"] in ("pass", "fail")
 
     def test_import_error_returns_fail(self):
-        """Line 75: sentence-transformers not installed."""
-        with patch.dict("sys.modules", {"sentence_transformers": None}):
+        """fastembed not installed."""
+        with patch.dict("sys.modules", {"fastembed": None}):
             with patch("builtins.__import__", side_effect=ImportError("no module")):
                 result = check_dependencies_available()
         assert result["status"] == "fail"

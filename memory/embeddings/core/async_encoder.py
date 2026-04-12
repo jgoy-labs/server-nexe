@@ -1,9 +1,9 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: memory/embeddings/core/async_encoder.py
-Description: AsyncEmbedder: Wrapper async per SentenceTransformer que NO bloqueja l'event loop.
+Description: AsyncEmbedder: Wrapper async per fastembed TextEmbedding que NO bloqueja l'event loop.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -19,25 +19,33 @@ import structlog
 
 logger = structlog.get_logger()
 
+
+def _normalize(v: np.ndarray) -> List[float]:
+  """L2-normalize a vector and return as list of floats."""
+  norm = np.linalg.norm(v)
+  if norm > 0:
+    v = v / norm
+  return v.astype(np.float32).tolist()
+
+
 class AsyncEmbedder:
   """
-  Wrapper async per SentenceTransformer (no bloqueja event loop).
+  Wrapper async per fastembed TextEmbedding (no bloqueja event loop).
 
-  CRÍTIC: SentenceTransformer és síncron i bloquejant. Aquest wrapper
-  executa encode() en ThreadPoolExecutor per evitar bloquejar FastAPI.
+  CRÍTIC: fastembed és síncron i bloquejant. Aquest wrapper
+  executa embed() en ThreadPoolExecutor per evitar bloquejar FastAPI.
 
   Features:
   - Lazy loading del model (només carrega quan es necessita)
   - Thread-safe amb asyncio.Lock
   - Singleton per model (evita múltiples instàncies)
-  - Support per CPU i MPS (Apple Silicon)
   - Graceful shutdown del ThreadPool
 
   Attributes:
-    model_name: Nom del model sentence-transformers
-    device: Device (cpu, mps, cuda)
+    model_name: Nom del model
+    device: Device (ignored — fastembed uses ONNX runtime)
     max_workers: Màxim threads al pool (2 per Mac per thermal limits)
-    _model: Instància de SentenceTransformer (lazy loaded)
+    _model: Instància de TextEmbedding (lazy loaded)
     _load_lock: Lock per lazy loading thread-safe
     executor: ThreadPoolExecutor per encoding async
   """
@@ -69,9 +77,9 @@ class AsyncEmbedder:
     Init AsyncEmbedder.
 
     Args:
-      model_name: Model sentence-transformers (ex: paraphrase-multilingual-mpnet-base-v2)
+      model_name: Model name (fastembed compatible)
       max_workers: Threads al pool (2 per Mac, 4 per servers)
-      device: cpu, mps, o cuda
+      device: Ignored (fastembed uses ONNX runtime)
     """
     if self._initialized:
       return
@@ -126,16 +134,14 @@ class AsyncEmbedder:
     Carrega model en thread separat (bloquejant).
 
     IMPORTANT: Aquest mètode s'executa al ThreadPool, NO al main thread.
-    SentenceTransformer.encode() només pot córrer al thread que va crear el model.
 
     Returns:
-      SentenceTransformer instance
+      TextEmbedding instance
     """
-    from sentence_transformers import SentenceTransformer
+    from fastembed import TextEmbedding
 
     try:
-      # Cache local only — server must work 100% offline
-      return SentenceTransformer(self.model_name, device=self.device, local_files_only=True)
+      return TextEmbedding(self.model_name)
     except Exception as e:
       raise RuntimeError(
           f"Embedding model '{self.model_name}' not available locally. "
@@ -191,8 +197,6 @@ class AsyncEmbedder:
     """
     Encode síncron (executa al ThreadPool).
 
-    IMPORTANT: Aquest mètode s'executa al ThreadPool, NO al main event loop.
-
     Args:
       text: Text a convertir
       normalize: Si normalitzar
@@ -200,14 +204,12 @@ class AsyncEmbedder:
     Returns:
       Embedding com a llista de floats
     """
-    embedding = self._model.encode(
-      text,
-      convert_to_tensor=False,
-      normalize_embeddings=normalize,
-      show_progress_bar=False
-    )
+    embedding = list(self._model.embed([text]))[0]
 
-    return embedding.astype(np.float32).tolist()
+    if normalize:
+      return _normalize(np.array(embedding))
+
+    return np.array(embedding).astype(np.float32).tolist()
 
   async def encode_batch_async(
     self,
@@ -218,13 +220,10 @@ class AsyncEmbedder:
     """
     Encode batch de texts async (optimitzat).
 
-    Més eficient que encode_async individual perquè SentenceTransformer
-    pot processar batches en paral·lel internament.
-
     Args:
       texts: Llista de texts
       normalize: Si normalitzar embeddings
-      batch_size: Mida del batch intern (per SentenceTransformer)
+      batch_size: Mida del batch intern
 
     Returns:
       Llista d'embeddings (mateix ordre que texts)
@@ -281,15 +280,12 @@ class AsyncEmbedder:
     Returns:
       Llista d'embeddings
     """
-    embeddings = self._model.encode(
-      texts,
-      batch_size=batch_size,
-      convert_to_tensor=False,
-      normalize_embeddings=normalize,
-      show_progress_bar=False
-    )
+    embeddings = list(self._model.embed(texts, batch_size=batch_size))
 
-    return embeddings.astype(np.float32).tolist()
+    if normalize:
+      return [_normalize(np.array(e)) for e in embeddings]
+
+    return [np.array(e).astype(np.float32).tolist() for e in embeddings]
 
   async def shutdown(self):
     """

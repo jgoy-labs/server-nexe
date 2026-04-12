@@ -212,9 +212,9 @@ class IngestionPipeline:
 
   def _generate_embedding_sync(self, text: str) -> List[float]:
     """
-    Generate embedding with SentenceTransformer (legacy/fallback mode).
+    Generate embedding with fastembed (ONNX fallback mode).
 
-    DEPRECATED: Kept for compatibility if embedding_model != None.
+    Used when embedding_model is explicitly set (not using Ollama API).
 
     Args:
       text: Text to process
@@ -228,30 +228,29 @@ class IngestionPipeline:
     if os.getenv("NEXE_ENV") == "test" or os.getenv("PYTEST_CURRENT_TEST"):
       return self._generate_test_embedding(text)
 
-    from sentence_transformers import SentenceTransformer
+    from fastembed import TextEmbedding
     import numpy as np
 
     if not text.strip():
       raise ValueError("Text no pot estar buit")
 
-    if not hasattr(self, '_st_model') or self._st_model is None:
-      logger.info("Loading SentenceTransformer model: %s", self.embedding_model)
+    if not hasattr(self, '_fe_model') or self._fe_model is None:
+      logger.info("Loading fastembed model: %s", self.embedding_model)
       try:
-        self._st_model = SentenceTransformer(self.embedding_model, device="cpu", local_files_only=True)
+        self._fe_model = TextEmbedding(self.embedding_model)
       except Exception as e:
         raise RuntimeError(
             f"Embedding model '{self.embedding_model}' not available locally. "
             f"Run the installer to download it. Error: {e}"
         ) from e
 
-    embedding = self._st_model.encode(
-      text,
-      convert_to_tensor=False,
-      normalize_embeddings=True,
-      show_progress_bar=False
-    )
+    embedding = list(self._fe_model.embed([text]))[0]
+    arr = np.array(embedding)
+    norm = np.linalg.norm(arr)
+    if norm > 0:
+      arr = arr / norm
 
-    return embedding.astype(np.float32).tolist()
+    return arr.astype(np.float32).tolist()
 
   @staticmethod
   def _generate_test_embedding(text: str, size: int = DEFAULT_VECTOR_SIZE) -> List[float]:

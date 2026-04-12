@@ -18,14 +18,18 @@ from memory.embeddings.module import EmbeddingsModule
 from memory.embeddings.core.async_encoder import AsyncEmbedder
 
 @pytest.fixture
-def mock_sentence_transformer():
-  """Mock SentenceTransformer"""
+def mock_text_embedding():
+  """Mock fastembed TextEmbedding"""
   mock = Mock()
-  mock.encode.return_value = np.random.rand(768).astype(np.float32)
+
+  def mock_embed(texts, **kwargs):
+    return iter([np.random.rand(768).astype(np.float32) for _ in texts])
+
+  mock.embed.side_effect = mock_embed
   return mock
 
 @pytest.fixture
-async def setup_module(mock_sentence_transformer):
+async def setup_module(mock_text_embedding):
   """
   Setup EmbeddingsModule per tests.
 
@@ -39,9 +43,8 @@ async def setup_module(mock_sentence_transformer):
 
   await module.initialize(config={"model_name": "test-model", "device": "cpu"})
 
-  # Evitar importar sentence_transformers als unit tests (deps pesades a Linux)
   assert module._cached_embedder is not None
-  module._cached_embedder.encoder._load_model = Mock(return_value=mock_sentence_transformer)
+  module._cached_embedder.encoder._load_model = Mock(return_value=mock_text_embedding)
 
   yield module
 

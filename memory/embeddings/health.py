@@ -36,20 +36,20 @@ def check_module_initialized(module: Any) -> Dict[str, Any]:
 
 def check_dependencies_available() -> Dict[str, Any]:
   """
-  Check 2: Verify available dependencies (sentence-transformers).
+  Check 2: Verify available dependencies (fastembed).
 
   Returns:
     Dict: {"name": str, "status": "pass"|"warn"|"fail", "message": str}
   """
   try:
-    import sentence_transformers
-    version = sentence_transformers.__version__
+    import fastembed
+    version = fastembed.__version__
     return {
       "name": "dependencies_available",
       "status": "pass",
       "message": get_i18n().t(
         "embeddings.health.dependencies_ok",
-        "sentence-transformers {version} available",
+        "fastembed {version} available",
         version=version
       )
     }
@@ -59,7 +59,7 @@ def check_dependencies_available() -> Dict[str, Any]:
       "status": "fail",
       "message": get_i18n().t(
         "embeddings.health.dependencies_missing",
-        "sentence-transformers not installed (pip install sentence-transformers)"
+        "fastembed not installed (pip install fastembed)"
       )
     }
   except Exception as e:

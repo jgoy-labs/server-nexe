@@ -13,19 +13,21 @@ from typing import List, Protocol, runtime_checkable, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator, ValidationInfo
 from datetime import datetime
 
+from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
+
 class EmbeddingRequest(BaseModel):
   """
   Request per generar embedding d'un text.
 
   Attributes:
     text: Text a convertir en embedding (1-10K chars)
-    model: Nom del model sentence-transformers
+    model: Nom del model d'embeddings
     normalize: Si normalitzar l'embedding (L2 norm)
     use_cache: Si usar cache multi-nivell
     cache_version: Versió del cache (per invalidació)
   """
   text: str = Field(..., min_length=1, max_length=10000)
-  model: str = Field(default="paraphrase-multilingual-mpnet-base-v2")
+  model: str = Field(default=DEFAULT_EMBEDDING_MODEL)
   normalize: bool = True
   use_cache: bool = True
   cache_version: str = "v1"
@@ -82,7 +84,7 @@ class BatchEmbeddingRequest(BaseModel):
     batch_size: Mida del batch intern (per SentenceTransformer)
   """
   texts: List[str] = Field(..., min_length=1, max_length=100)
-  model: str = Field(default="paraphrase-multilingual-mpnet-base-v2")
+  model: str = Field(default=DEFAULT_EMBEDDING_MODEL)
   normalize: bool = True
   use_cache: bool = True
   batch_size: int = Field(default=32, ge=1, le=128)

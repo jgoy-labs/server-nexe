@@ -429,57 +429,49 @@ class TestInitialize:
             with pytest.raises(Exception, match="connection failed"):
                 asyncio.run(api.initialize())
 
-    def test_init_embedder_local_then_remote(self):
-        """Lines 136-148: _init_embedder with local_files_only fallback."""
+    def test_init_embedder_loads_model(self):
+        """_init_embedder loads TextEmbedding model."""
         import sys
         from memory.memory.api import MemoryAPI
         api = MemoryAPI()
 
         mock_model = MagicMock()
-        mock_st_module = MagicMock()
-        mock_st_module.SentenceTransformer = MagicMock(return_value=mock_model)
+        mock_fe_module = MagicMock()
+        mock_fe_module.TextEmbedding = MagicMock(return_value=mock_model)
 
         async def run():
-            orig = sys.modules.get("sentence_transformers")
-            sys.modules["sentence_transformers"] = mock_st_module
+            orig = sys.modules.get("fastembed")
+            sys.modules["fastembed"] = mock_fe_module
             try:
                 await api._init_embedder()
             finally:
                 if orig is not None:
-                    sys.modules["sentence_transformers"] = orig
+                    sys.modules["fastembed"] = orig
                 else:
-                    sys.modules.pop("sentence_transformers", None)
+                    sys.modules.pop("fastembed", None)
             assert api._embedder is mock_model
 
         asyncio.run(run())
 
-    def test_init_embedder_local_fails_downloads(self):
-        """Lines 143-145: local_files_only fails, downloads model."""
+    def test_init_embedder_model_not_found(self):
+        """_init_embedder raises RuntimeError when model not available."""
         import sys
         from memory.memory.api import MemoryAPI
         api = MemoryAPI()
 
-        mock_model = MagicMock()
-        call_count = [0]
-        def mock_st(*args, **kwargs):
-            call_count[0] += 1
-            if call_count[0] == 1 and kwargs.get("local_files_only"):
-                raise Exception("not found locally")
-            return mock_model
-
-        mock_st_module = MagicMock()
-        mock_st_module.SentenceTransformer = mock_st
+        mock_fe_module = MagicMock()
+        mock_fe_module.TextEmbedding = MagicMock(side_effect=OSError("not found"))
 
         async def run():
-            orig = sys.modules.get("sentence_transformers")
-            sys.modules["sentence_transformers"] = mock_st_module
+            orig = sys.modules.get("fastembed")
+            sys.modules["fastembed"] = mock_fe_module
             try:
-                await api._init_embedder()
+                with pytest.raises(RuntimeError, match="not available locally"):
+                    await api._init_embedder()
             finally:
                 if orig is not None:
-                    sys.modules["sentence_transformers"] = orig
+                    sys.modules["fastembed"] = orig
                 else:
-                    sys.modules.pop("sentence_transformers", None)
-            assert api._embedder is mock_model
+                    sys.modules.pop("fastembed", None)
 
         asyncio.run(run())
