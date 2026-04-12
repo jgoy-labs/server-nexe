@@ -38,13 +38,13 @@
 
 ## La Història
 
-Server Nexe va començar com un experiment de learning-by-doing: *"Què caldria per tenir un servidor d'IA completament local amb memòria persistent?"* Una pregunta en va portar una altra — backends d'inferència, pipelines RAG, cerca vectorial, sistemes de plugins, capes de seguretat, una interfície web, un instal·lador amb detecció de hardware.
+Server Nexe va començar com un experiment de learning-by-doing: *"Què caldria per tenir una IA pròpia i en local amb memòria persistent?"* Com que no faria un LLM, vaig començar a agafar peces per muntar un lego útil per a mi i el meu dia a dia. Una cosa en va portar una altra — backends d'inferència, pipelines RAG, cerca vectorial, sistemes de plugins, capes de seguretat, una interfície web, un instal·lador amb detecció de hardware.
 
-**Tot aquest projecte — codi, tests, auditories, documentació — ha estat construït per una sola persona orquestrant diferents models d'IA**, tant locals (MLX, Ollama) com al núvol (Claude, GPT, Gemini, DeepSeek, Qwen, Grok), com a col·laboradors. L'humà decideix què construir, dissenya l'arquitectura, revisa cada línia i executa cada test. Les IAs escriuen, auditen i fan stress-test sota direcció humana. Cap línia de codi surt sense que una persona l'entengui i se'n faci responsable.
+**Tot aquest projecte — codi, tests, auditories, documentació — ha estat construït per una persona orquestrant diferents models d'IA**, tant locals (MLX, Ollama) com al núvol (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), com a col·laboradors. L'humà decideix què construir, dissenya l'arquitectura, revisa línia i executa test. Les IAs escriuen, auditen i fan stress-test sota direcció humana.
 
-El que va començar com un prototip de cap de setmana s'ha convertit en un producte genuïnament útil: 4572 tests, auditories de seguretat, encriptació at-rest, un instal·lador macOS amb detecció de hardware, i un sistema de plugins. No està acabat — hi ha un roadmap ple d'idees — però ja fa el que es proposava: **executar un servidor d'IA a la teva màquina, amb memòria que persisteix, i zero dades sortint del teu dispositiu.**
+El que va començar com un prototip s'ha convertit en un producte genuïnament útil: 4572 tests, auditories de seguretat, encriptació at-rest, un instal·lador macOS amb detecció de hardware, i un sistema de plugins. No està acabat — hi ha un roadmap ple d'idees — però ja fa el que es proposava: **executar un servidor d'IA a la teva màquina, amb memòria que persisteix, i zero dades sortint del teu dispositiu.**
 
-No intenta competir amb ChatGPT ni Claude. És una eina open-source per a gent que vol ser propietària de la seva infraestructura d'IA. Construït per una persona a Barcelona, amb IA com a copilot, música, i tossuderia.
+No intenta competir amb ChatGPT ni Claude. Però sí pot ser complementari per a feines menys feixugues. És una eina open-source per a gent que vol ser propietària de la seva infraestructura d'IA. Construït per una persona a Barcelona, amb IA com a copilot, música, i tossuderia.
 
 ## Per Què Server Nexe?
 
@@ -308,7 +308,6 @@ Server Nexe està en desenvolupament actiu. Pròximament:
 - [x] Signatura de codi macOS i notarització (v0.9.0)
 - [x] Hardening de seguretat — detecció jailbreak, denylist uploads, enforcement pipeline (v0.9.1)
 - [ ] Suport multimodal — imatges via backends Ollama, llama.cpp i MLX
-- [ ] Auditoria completa de compatibilitat Linux
 - [ ] App nativa macOS (SwiftUI, substitueix el tray Python)
 - [ ] Paràmetres d'inferència configurables via UI
 - [ ] Fòrum de comunitat
