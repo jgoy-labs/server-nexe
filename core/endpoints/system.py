@@ -256,7 +256,7 @@ async def system_health() -> Dict[str, Any]:
   Example Response:
     {
       "status": "healthy",
-      "version": "0.9.0",
+      "version": "0.9.1",
       "platform": "Nexe Framework"
     }
   """

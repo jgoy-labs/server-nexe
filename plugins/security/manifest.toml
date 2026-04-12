@@ -10,7 +10,7 @@
 
 [module]
 name = "security"
-version = "0.9.0"
+version = "0.9.1"
 type = "core"
 description = "Security core: auth dual-key, rate limiting, injection detection (XSS/SQL/NoSQL/command/path/LDAP), scanning, sanitizer"
 location = "plugins/security/"

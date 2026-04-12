@@ -6,7 +6,7 @@
 
 [module]
 name = "mlx_module"
-version = "0.9.0"
+version = "0.9.1"
 type = "local_llm_option"
 description = "Motor d'inferència ultra-optimitzat per a Apple Silicon (M1/M2/M3/M4) usant MLX. Inclou prefix matching real amb TTFT instantani en converses llargues."
 location = "plugins/mlx_module/"

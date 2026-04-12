@@ -21,7 +21,7 @@ DEFAULT_VECTOR_SIZE = 768
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
   "name": "embeddings",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Multilingual embedding and vectorization system with multi-level caching",
   "author": "J.Goy",
   "category": "memory.core",

@@ -98,7 +98,7 @@ async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
           "Module orchestration system running",
     status=i18n.t('server_core.api.welcome.ready') if i18n else
         "System ready and operational",
-    version="0.9.0",
+    version="0.9.1",
     type=i18n.t('server_core.api.server_type') if i18n else "basic_server"
   )
 
@@ -110,7 +110,7 @@ async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthRespon
     status=i18n.t('server_core.api.health.status') if i18n else "operational",
     message=i18n.t('server_core.api.health.message') if i18n else
         "Basic server operational",
-    version="0.9.0",
+    version="0.9.1",
     uptime=i18n.t('server_core.api.health.uptime') if i18n else "operational"
   )
 
@@ -188,7 +188,7 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
 
   return ApiInfoResponse(
     name="Nexe 0.9.0",
-    version="0.9.0",
+    version="0.9.1",
     description=i18n.t('server_core.api.welcome.description') if i18n else
           "Module orchestration system running",
     endpoints=endpoints

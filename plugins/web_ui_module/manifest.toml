@@ -6,7 +6,7 @@
 
 [module]
 name = "web_ui_module"
-version = "0.9.0"
+version = "0.9.1"
 type = "web_interface"
 description = "Interfície web estil Ollama per demostrar el sistema modular de Nexe. Inclou xat amb streaming, sessions i upload de documents."
 location = "plugins/web_ui_module/"

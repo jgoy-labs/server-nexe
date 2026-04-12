@@ -26,7 +26,7 @@ from ..events.event_system import EventSystem
 from ..metrics.metrics_collector import MetricsCollector
 from ..loading.loader import ModuleLoader, ModuleValidationError
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 __author__ = "Jordi Goy, Nexe AI"
 
 __all__ = [
