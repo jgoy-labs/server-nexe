@@ -217,14 +217,19 @@ def _maybe_launch_tray(_project_root: "Path | None" = None):
         logger.debug("rumps not installed — tray not available")
         return
 
-    # Guard 6: Kill stale tray before launching fresh one
+    # Guard 6: Kill stale tray before launching fresh one.
+    # Cerca tant el mòdul Python (dev) com el binari NexeTray.app (bundle).
     try:
-        result = subprocess.run(
-            ["pgrep", "-f", "installer.tray"],
-            capture_output=True, text=True, timeout=5,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            stale_pids = [int(p) for p in result.stdout.strip().split('\n') if p.strip()]
+        stale_pids: list[int] = []
+        for pattern in ("installer.tray", "nexe-tray", "NexeTray"):
+            result = subprocess.run(
+                ["pgrep", "-f", pattern],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                stale_pids += [int(p) for p in result.stdout.strip().split('\n') if p.strip()]
+        stale_pids = list(set(stale_pids))
+        if stale_pids:
             for pid in stale_pids:
                 try:
                     os.kill(pid, signal.SIGTERM)
