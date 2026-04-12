@@ -65,6 +65,15 @@ _MEM_SAVE_STRICT_RE = _re.compile(r'\[MEM_SAVE:\s*([^\[\]\n\r\t]{1,250})\]')
 # com a MEM_SAVE normals, i els strippem del visible per no mostrar-los a l'usuari.
 _MEMORIA_RE = _re.compile(r'\[MEMORIA:\s*([^\[\]\n\r\t]{1,250})\]', _re.IGNORECASE)
 
+# ─── Re-prompt override ─────────────────────────────────────────────────────
+# Quan un model emet NOMÉS [MEM_SAVE: ...] sense resposta conversacional,
+# re-enviem el missatge amb aquest override afegit al system prompt.
+_REPROMPT_OVERRIDE = {
+    "ca": "\n\nIMPORTANT: La memòria ja s'ha guardat correctament. Ara respon de forma natural al missatge de l'usuari. NO emetis [MEM_SAVE:] — ja està fet. Simplement conversa.",
+    "es": "\n\nIMPORTANTE: La memoria ya se ha guardado correctamente. Ahora responde de forma natural al mensaje del usuario. NO emitas [MEM_SAVE:] — ya está hecho. Simplemente conversa.",
+    "en": "\n\nIMPORTANT: Memory has been saved successfully. Now respond naturally to the user's message. Do NOT emit [MEM_SAVE:] tags — already done. Just have a normal conversation.",
+}
+
 
 def _is_valid_mem_save_text(text: str, user_input: str = "") -> bool:
     """
@@ -873,16 +882,55 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 # eliminar QUALSEVOL [MEM_SAVE: ...] (vàlid o no) de la resposta.
                                 clean_response = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
 
-                                # Bug #3 fix: si el model ha emès NOMÉS [MEM_SAVE: ...] sense text
-                                # envoltant, clean_response queda buit i el bloc save de sota no
-                                # s'executaria mai. Generem un text de fallback perquè (a) el bloc
-                                # save s'executi i els facts es desin, (b) el frontend mostri una
-                                # confirmació en comptes de quedar-se amb només el badge "✓".
+                                # Re-prompt: si el model ha emès NOMÉS [MEM_SAVE: ...] sense
+                                # resposta conversacional, re-enviem amb system prompt sense
+                                # instruccions MEM_SAVE perquè generi una resposta natural.
                                 if not clean_response and _mem_saves:
                                     _fallback_facts = [f.strip() for f in _mem_saves if f and f.strip()]
                                     if _fallback_facts:
-                                        clean_response = "Memòria desada: " + ", ".join(_fallback_facts)
-                                        yield clean_response
+                                        _lang_short = _lang[:2] if _lang else "ca"
+                                        _rp_override = _REPROMPT_OVERRIDE.get(_lang_short, _REPROMPT_OVERRIDE["en"])
+                                        _rp_system = system_prompt + _rp_override
+                                        _rp_ok = False
+                                        try:
+                                            if 'model' in sig.parameters:
+                                                logger.info("Re-prompt: empty after MEM_SAVE, re-calling %s", model_name)
+                                                _rp_msgs = [{"role": "system", "content": _rp_system}] + messages
+                                                _rp_result = engine.chat(model=model_name, messages=_rp_msgs, stream=True)
+                                                _rp_response = ""
+                                                _rp_in_think = False
+                                                async for _rp_chunk in _rp_result:
+                                                    _rp_content = ""
+                                                    if isinstance(_rp_chunk, dict) and "message" in _rp_chunk:
+                                                        if _rp_chunk["message"].get("thinking", ""):
+                                                            continue
+                                                        _rp_content = _rp_chunk["message"].get("content", "")
+                                                    elif isinstance(_rp_chunk, dict):
+                                                        _rp_content = _rp_chunk.get("content", _rp_chunk.get("response", ""))
+                                                    elif isinstance(_rp_chunk, str):
+                                                        _rp_content = _rp_chunk
+                                                    if '<think>' in _rp_content:
+                                                        _rp_in_think = True
+                                                        _rp_content = _rp_content.split('<think>')[0]
+                                                    if '</think>' in _rp_content:
+                                                        _rp_in_think = False
+                                                        _rp_content = _rp_content.split('</think>')[-1]
+                                                    if _rp_in_think:
+                                                        continue
+                                                    _rp_content = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]', '', _rp_content)
+                                                    if _rp_content:
+                                                        _rp_response += _rp_content
+                                                        yield _rp_content
+                                                if _rp_response.strip():
+                                                    clean_response = _rp_response.strip()
+                                                    _rp_ok = True
+                                                    logger.info("Re-prompt OK: %d chars", len(clean_response))
+                                        except Exception as e:
+                                            logger.warning("Re-prompt failed: %s", e)
+                                        if not _rp_ok:
+                                            clean_response = "Memòria desada: " + ", ".join(_fallback_facts)
+                                            yield clean_response
+                                            logger.info("Re-prompt fallback: confirmation message")
 
                                 if clean_response:
                                     # Save LLM-extracted facts to memory

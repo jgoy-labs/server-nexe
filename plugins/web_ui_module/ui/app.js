@@ -1606,10 +1606,11 @@ class NexeUI {
                         fullResponse = fullResponse.replace(/\n\s*\.\s*\n/g, '\n');
                         fullResponse = fullResponse.replace(/\n{3,}/g, '\n\n');
                     }
-                    // Guard: si la resposta queda buida despres de treure MEM_SAVE, mostrar checkmark
+                    // Guard: si la resposta queda buida despres de treure MEM_SAVE
+                    // (el backend fa re-prompt, però per seguretat mantenim fallback UI)
                     if (!fullResponse.trim() && memFacts.length > 0) {
-                        console.warn('[nexe] Empty response after stripping MEM_SAVE — showing checkmark. Facts:', memFacts);
-                        fullResponse = '\u2713';
+                        console.info('[nexe] Empty response after MEM_SAVE — backend should have re-prompted. Facts:', memFacts);
+                        fullResponse = '\u2705 ' + memFacts.join(', ');
                     }
                     // Strip model tags that leak into visible text
                     fullResponse = fullResponse.replace(/\[ACTION\]:\s*[^\n]*/g, '');

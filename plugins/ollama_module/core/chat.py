@@ -56,7 +56,7 @@ class OllamaChat:
             "stream": stream,
             "stop": STOP_SEQUENCES,
             "keep_alive": os.getenv("NEXE_OLLAMA_KEEP_ALIVE", "30m"),
-            "think": os.getenv("NEXE_OLLAMA_THINK", "false").lower() == "true",
+            "think": os.getenv("NEXE_OLLAMA_THINK", "true").lower() == "true",
             "options": {
                 "num_ctx": auto_num_ctx(),
             },
