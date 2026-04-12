@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 
 import logging
 import os
-from typing import Any, AsyncIterator, Dict, List
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 try:
     import httpx
@@ -79,7 +79,7 @@ class OllamaModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="ollama_module",
-            version="0.9.1",
+            version="0.9.7",
             description="Integracio amb Ollama per executar models LLM locals",
             author="Jordi Goy",
             module_type="local_llm_option",
@@ -190,6 +190,7 @@ class OllamaModule:
         return await self.models_mgr.delete_model(model_name)
 
     def chat(
-        self, model: str, messages: List[Dict[str, str]], stream: bool = True
+        self, model: str, messages: List[Dict[str, str]], stream: bool = True,
+        images: Optional[List[str]] = None,
     ) -> AsyncIterator[Dict[str, Any]]:
-        return self.chat_mgr.chat(model, messages, stream=stream)
+        return self.chat_mgr.chat(model, messages, stream=stream, images=images)

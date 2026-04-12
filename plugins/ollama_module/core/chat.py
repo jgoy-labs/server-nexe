@@ -13,7 +13,7 @@ www.jgoy.net · https://server-nexe.org
 import json
 import logging
 import os
-from typing import Any, AsyncIterator, Dict, List
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 from core.endpoints.chat_engines.ollama_helpers import auto_num_ctx
 from core.resilience import CircuitOpenError
@@ -48,9 +48,9 @@ class OllamaChat:
     def base_url(self) -> str:
         return self.client.base_url
 
-    def _build_payload(self, model: str, messages: List[Dict[str, str]], stream: bool) -> Dict[str, Any]:
+    def _build_payload(self, model: str, messages: List[Dict[str, str]], stream: bool, images: Optional[List[str]] = None) -> Dict[str, Any]:
         """Construeix el payload /api/chat."""
-        return {
+        payload = {
             "model": model,
             "messages": messages,
             "stream": stream,
@@ -61,11 +61,15 @@ class OllamaChat:
                 "num_ctx": auto_num_ctx(),
             },
         }
+        if images:
+            payload["images"] = images
+        return payload
 
     async def chat(
-        self, model: str, messages: List[Dict[str, str]], stream: bool = True
+        self, model: str, messages: List[Dict[str, str]], stream: bool = True,
+        images: Optional[List[str]] = None,
     ) -> AsyncIterator[Dict[str, Any]]:
-        """Chat amb model Ollama (streaming o directe)."""
+        """Chat amb model Ollama (streaming o directe). images: base64 strings opcionals."""
         p = _parent()
         httpx = p.httpx
         ollama_breaker = p.ollama_breaker
@@ -76,7 +80,7 @@ class OllamaChat:
             )
 
         try:
-            payload = self._build_payload(model, messages, stream)
+            payload = self._build_payload(model, messages, stream, images=images)
 
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 if stream:

@@ -138,7 +138,7 @@ class ModelPool:
             self.config.flash_attn
         )
 
-        instance = Llama(
+        kwargs = dict(
             model_path=self.config.model_path,
             n_ctx=self.config.n_ctx,
             n_batch=self.config.n_batch,          # IMPORTANT: higher = more tok/s
@@ -150,6 +150,10 @@ class ModelPool:
             flash_attn=self.config.flash_attn,    # Flash attention
             verbose=False,  # Silenciar output de llama.cpp
         )
+        if self.config.mmproj_path:
+            kwargs["clip_model_path"] = self.config.mmproj_path
+
+        instance = Llama(**kwargs)
 
         logger.info("ModelPool: model loaded successfully")
         return instance

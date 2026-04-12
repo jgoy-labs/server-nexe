@@ -575,6 +575,15 @@ class NexeUI {
         this.sessionsList = document.getElementById('sessionsList');
         this.statsBar = document.getElementById('statsBar');
 
+        // VLM: imatge seleccionada {b64, type, name} o null
+        this._selectedImage = null;
+        this.imageBtn = document.getElementById('imageBtn');
+        this.imageInput = document.getElementById('imageInput');
+        this.imagePreviewBar = document.getElementById('imagePreviewBar');
+        this.imagePreviewThumb = document.getElementById('imagePreviewThumb');
+        this.imagePreviewName = document.getElementById('imagePreviewName');
+        this.imageBadge = document.getElementById('imageBadge');
+
         // Event listeners
         this.sendBtn.addEventListener('click', () => this.sendMessage());
         this.stopBtn.addEventListener('click', () => this.stopGeneration());
@@ -588,6 +597,14 @@ class NexeUI {
         this.newChatBtn.addEventListener('click', () => this.createNewSession());
         this.uploadBtn.addEventListener('click', () => this.fileInput.click());
         this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+
+        // VLM: image attach
+        if (this.imageBtn && this.imageInput) {
+            this.imageBtn.addEventListener('click', () => this.imageInput.click());
+            this.imageInput.addEventListener('change', (e) => this._handleImageSelect(e));
+            const clearBtn = document.getElementById('imageClearBtn');
+            if (clearBtn) clearBtn.addEventListener('click', () => this._clearSelectedImage());
+        }
 
         // Auto-resize textarea
         this.messageInput.addEventListener('input', () => {
@@ -1176,10 +1193,14 @@ class NexeUI {
         // Create AbortController for this request
         this.abortController = new AbortController();
 
-        // Add user message to chat
+        // Add user message to chat (amb preview imatge si n'hi ha)
         this.addMessageToChat('user', message);
         this.messageInput.value = '';
         this.messageInput.style.height = 'auto';
+
+        // Capturar imatge seleccionada i netejar l'estat VLM
+        const pendingImage = this._selectedImage ? { ...this._selectedImage } : null;
+        this._clearSelectedImage();
 
         try {
             const ragSlider = document.getElementById('ragThresholdSlider');
@@ -1188,18 +1209,20 @@ class NexeUI {
             const modelSel = document.getElementById('modelSelect');
             // Collection toggles — build list of active collections
             const ragCollections = this._getActiveCollections();
+            const chatBody = {
+                message: message,
+                session_id: this.currentSessionId,
+                stream: true,
+                rag_threshold: ragThreshold,
+                rag_collections: ragCollections.length < 3 ? ragCollections : undefined,
+                backend: backendSel ? backendSel.value : undefined,
+                model: modelSel ? modelSel.value : undefined,
+                ...(pendingImage ? { image_b64: pendingImage.b64, image_type: pendingImage.type } : {})
+            };
             const response = await this.fetchWithCsrf('/ui/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: message,
-                    session_id: this.currentSessionId,
-                    stream: true,
-                    rag_threshold: ragThreshold,
-                    rag_collections: ragCollections.length < 3 ? ragCollections : undefined,
-                    backend: backendSel ? backendSel.value : undefined,
-                    model: modelSel ? modelSel.value : undefined
-                }),
+                body: JSON.stringify(chatBody),
                 signal: this.abortController.signal
             });
 
@@ -1970,6 +1993,43 @@ class NexeUI {
         }
         return this.escapeHtml(text);
     }
+
+    // ── VLM image helpers ────────────────────────────────────────────────────
+
+    async _handleImageSelect(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowed.includes(file.type)) {
+            alert('Only JPEG, PNG and WebP images are supported.');
+            this.imageInput.value = '';
+            return;
+        }
+        const b64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        this._selectedImage = { b64, type: file.type, name: file.name };
+        // Mostra preview
+        if (this.imagePreviewBar) {
+            this.imagePreviewThumb.src = `data:${file.type};base64,${b64}`;
+            this.imagePreviewName.textContent = file.name;
+            this.imagePreviewBar.style.display = 'flex';
+        }
+        if (this.imageBadge) this.imageBadge.style.display = 'block';
+    }
+
+    _clearSelectedImage() {
+        this._selectedImage = null;
+        if (this.imageInput) this.imageInput.value = '';
+        if (this.imagePreviewBar) this.imagePreviewBar.style.display = 'none';
+        if (this.imagePreviewThumb) this.imagePreviewThumb.src = '';
+        if (this.imageBadge) this.imageBadge.style.display = 'none';
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
 
     async handleFileUpload(event) {
         const file = event.target.files?.[0] || event;

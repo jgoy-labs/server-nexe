@@ -71,6 +71,16 @@ class LlamaCppChatNode:
         stream_callback = inputs.get("stream_callback")
         max_tokens_override = inputs.get("max_tokens")
         temperature_override = inputs.get("temperature")
+        images = inputs.get("images")  # Optional[List[bytes]] — VLM support
+
+        # Graceful fallback: si hi ha imatge però no mmproj, advertim i ignoriem imatge
+        if images and not self.config.mmproj_path:
+            logger.warning(
+                "LlamaCppChatNode: images provided but LLAMA_MMPROJ_PATH not set. "
+                "Ignoring images and falling back to text-only. "
+                "Set LLAMA_MMPROJ_PATH to enable VLM support."
+            )
+            images = None
 
         if not system_hash:
             system_hash = compute_system_hash(system)
@@ -223,7 +233,6 @@ class LlamaCppChatNode:
         # Timing breakdown
         start_time = time.time()
         first_token_time = None
-        generation_start_time = None
 
         for chunk in model.create_chat_completion(
             messages=all_messages,
@@ -240,7 +249,6 @@ class LlamaCppChatNode:
                 # Marcar TTFT (Time To First Token)
                 if first_token_time is None:
                     first_token_time = time.time()
-                    generation_start_time = first_token_time
 
                 full_response.append(content)
                 if callable(stream_callback):

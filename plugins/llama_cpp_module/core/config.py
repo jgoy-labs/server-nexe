@@ -50,6 +50,7 @@ class LlamaCppConfig:
     use_mlock: bool = True
     use_mmap: bool = True
     flash_attn: bool = True
+    mmproj_path: str = ""  # Opcional: path al CLIP projector per models VLM (llava, etc.)
 
     def __post_init__(self):
         """Validate configuration after creation."""
@@ -86,6 +87,7 @@ class LlamaCppConfig:
             use_mlock=os.getenv("NEXE_LLAMA_CPP_USE_MLOCK", "true").lower() == "true",
             use_mmap=os.getenv("NEXE_LLAMA_CPP_USE_MMAP", "true").lower() == "true",
             flash_attn=os.getenv("NEXE_LLAMA_CPP_FLASH_ATTN", "true").lower() == "true",
+            mmproj_path=os.getenv("LLAMA_MMPROJ_PATH", ""),
         )
 
         logger.info(

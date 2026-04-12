@@ -10,8 +10,9 @@ www.jgoy.net · https://server-nexe.org
 ------------------------------------
 """
 
+import base64 as _base64
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import asyncio
 import logging
 import os as _os
@@ -231,6 +232,22 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         message = body.get("message", "")
         session_id = body.get("session_id")
         stream = body.get("stream", False)
+
+        # VLM: imatge opcional (base64 en JSON, max 10MB, formats segurs)
+        _ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+        _MAX_IMAGE_BYTES = 10 * 1024 * 1024
+        image_bytes: Optional[bytes] = None
+        image_b64 = body.get("image_b64")
+        if image_b64:
+            image_type = body.get("image_type", "")
+            if image_type not in _ALLOWED_IMAGE_TYPES:
+                raise HTTPException(status_code=400, detail="image_type not supported")
+            try:
+                image_bytes = _base64.b64decode(image_b64, validate=True)
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid base64 image")
+            if len(image_bytes) > _MAX_IMAGE_BYTES:
+                raise HTTPException(status_code=400, detail="Image too large (max 10MB)")
 
         if not message:
             raise HTTPException(status_code=400, detail=get_message(get_i18n(request), "webui.chat.message_required"))
@@ -652,11 +669,14 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         import inspect
                         sig = inspect.signature(engine.chat)
 
+                        _images_arg = [image_bytes] if image_bytes else None
+
                         if 'model' in sig.parameters:
                             # Ollama-style: chat(model, messages, stream=...)
                             # We inject system prompt as first message for Ollama
                             full_messages = [{"role": "system", "content": system_prompt}] + messages
-                            chat_result = engine.chat(model=model_name, messages=full_messages, stream=stream)
+                            chat_result = engine.chat(model=model_name, messages=full_messages, stream=stream,
+                                                      images=_images_arg)
                         else:
                             # MLX/LlamaCpp-style: chat(messages, system=...)
                             if engine_name in ("mlx_module", "llama_cpp_module"):
@@ -673,7 +693,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     queue.put_nowait(token)
 
                                 # Launch chat in background task
-                                ml_task = asyncio.create_task(engine.chat(messages=messages, system=system_prompt, stream_callback=stream_cb))
+                                ml_task = asyncio.create_task(engine.chat(
+                                    messages=messages, system=system_prompt, stream_callback=stream_cb,
+                                    images=_images_arg,
+                                ))
 
                                 # Async generator that yields from queue until task is done
                                 async def queue_generator():
@@ -700,7 +723,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 chat_result = queue_generator()
 
                             else:
-                                chat_result = engine.chat(messages=messages, system=system_prompt)
+                                chat_result = engine.chat(messages=messages, system=system_prompt,
+                                                          images=_images_arg)
 
                         # Flag si s'ha compactat per avisar al client
                         _compacted = session.compaction_count > 0 and session.context_summary is not None

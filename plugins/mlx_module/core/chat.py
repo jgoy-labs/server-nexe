@@ -18,9 +18,11 @@ Requereix:
 """
 import asyncio
 import gc
+import json
 import logging
 import threading
 import time
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from .config import MLXConfig
@@ -35,6 +37,32 @@ from .generate_helpers import (
 from core.utils import compute_system_hash
 
 logger = logging.getLogger(__name__)
+
+
+# Arquitectures VLM conegudes (config.json → architectures[])
+_VLM_ARCHITECTURES = {
+    "Qwen2VLForConditionalGeneration",
+    "LlavaNextForConditionalGeneration",
+    "LlavaForConditionalGeneration",
+    "PaliGemmaForConditionalGeneration",
+    "Gemma3ForConditionalGeneration",
+    "InternVLChatModel",
+}
+
+
+def _detect_vlm_capability(model_path: str) -> bool:
+    """Llegeix config.json del model per detectar si és VLM (text + visió)."""
+    if not model_path:
+        return False
+    config_path = Path(model_path) / "config.json"
+    if not config_path.exists():
+        return False
+    try:
+        config = json.loads(config_path.read_text())
+        archs = set(config.get("architectures", []))
+        return bool(_VLM_ARCHITECTURES & archs)
+    except Exception:
+        return False
 
 
 class MLXChatNode:
@@ -55,9 +83,10 @@ class MLXChatNode:
     """
 
     _model: Optional[Any] = None
-    _tokenizer: Optional[Any] = None
+    _tokenizer: Optional[Any] = None  # tokenizer (text) o processor (VLM)
     _lock: threading.RLock = threading.RLock()  # RLock: safe against accidental re-entrant calls
     _config: Optional[MLXConfig] = None
+    _is_vlm: bool = False  # True si el model carregat és VLM
 
     def __init__(self, config: Optional[MLXConfig] = None):
         """
@@ -76,26 +105,31 @@ class MLXChatNode:
 
     def _get_model(self) -> tuple:
         """
-        Obtenir model i tokenizer (lazy load singleton).
+        Obtenir model i tokenizer/processor (lazy load singleton).
+        Bifurca automàticament entre mlx_lm (text) i mlx_vlm (VLM) segons config.json.
 
         Returns:
-            tuple: (model, tokenizer)
+            tuple: (model, tokenizer_or_processor)
         """
         if MLXChatNode._model is None:
-            # Import lazy per evitar carregar mlx si no s'usa
-            from mlx_lm import load
+            is_vlm = _detect_vlm_capability(self.config.model_path)
+            MLXChatNode._is_vlm = is_vlm
 
             logger.info(
-                "MLXChatNode: loading model %s (max_kv_size=%d)",
+                "MLXChatNode: loading %s model %s (max_kv_size=%d)",
+                "VLM" if is_vlm else "text",
                 self.config.model_path[-50:] if self.config.model_path else "(empty)",
                 self.config.max_kv_size
             )
 
-            MLXChatNode._model, MLXChatNode._tokenizer = load(
-                self.config.model_path
-            )
+            if is_vlm:
+                from mlx_vlm import load
+                MLXChatNode._model, MLXChatNode._tokenizer = load(self.config.model_path)
+            else:
+                from mlx_lm import load
+                MLXChatNode._model, MLXChatNode._tokenizer = load(self.config.model_path)
 
-            logger.info("MLXChatNode: model loaded successfully")
+            logger.info("MLXChatNode: model loaded successfully (vlm=%s)", is_vlm)
 
         return MLXChatNode._model, MLXChatNode._tokenizer
 
@@ -123,6 +157,7 @@ class MLXChatNode:
         stream_callback = inputs.get("stream_callback")
         max_tokens_override = inputs.get("max_tokens")
         temperature_override = inputs.get("temperature")
+        images = inputs.get("images")  # Optional[List[bytes]] — VLM support
 
         # Log per debugging
         logger.info(
@@ -139,19 +174,28 @@ class MLXChatNode:
                 loop.call_soon_threadsafe(stream_callback, text)
 
         try:
-            # Run generation in thread (MLX is blocking)
-            # With PREFIX MATCHING via MLXPromptCacheManager
-            # Pass messages (for generation) and messages_for_cache (to store clean cache)
-            result = await asyncio.to_thread(
-                self._generate_blocking,
-                system,
-                messages,
-                messages_for_cache,  # To store clean cache (without memory context)
-                threadsafe_callback if stream_callback else None,
-                session_id,  # To separate caches per session
-                max_tokens_override,
-                temperature_override,
-            )
+            # VLM path: si hi ha imatges i el model és VLM, usa mlx_vlm directament
+            if images and MLXChatNode._is_vlm:
+                result = await asyncio.to_thread(
+                    self._generate_vlm,
+                    system, messages, images,
+                    threadsafe_callback if stream_callback else None,
+                    max_tokens_override, temperature_override,
+                )
+            else:
+                # Run generation in thread (MLX is blocking)
+                # With PREFIX MATCHING via MLXPromptCacheManager
+                # Pass messages (for generation) and messages_for_cache (to store clean cache)
+                result = await asyncio.to_thread(
+                    self._generate_blocking,
+                    system,
+                    messages,
+                    messages_for_cache,  # To store clean cache (without memory context)
+                    threadsafe_callback if stream_callback else None,
+                    session_id,  # To separate caches per session
+                    max_tokens_override,
+                    temperature_override,
+                )
 
             elapsed_ms = int((time.time() - start_time) * 1000)
 
@@ -224,6 +268,64 @@ class MLXChatNode:
                 str(e)
             )
             raise
+
+    def _generate_vlm(
+        self,
+        system: str,
+        messages: List[Dict],
+        images: List[bytes],
+        stream_callback: Optional[Callable[[str], None]] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Generació VLM amb mlx_vlm (text + imatge). Usa mlx_vlm.generate()."""
+        import io
+        from mlx_vlm import generate as vlm_generate
+        from mlx_vlm.prompt_utils import apply_chat_template
+        from PIL import Image
+
+        model, processor = self._get_model()
+
+        # Prepara el prompt via chat template del processor
+        formatted_prompt = apply_chat_template(
+            processor=processor,
+            config=processor.config if hasattr(processor, "config") else {},
+            prompt=messages[-1]["content"] if messages else "",
+            num_images=1,
+        )
+
+        # Prepara la imatge (primera del array)
+        pil_image = Image.open(io.BytesIO(images[0]))
+
+        start_time = time.time()
+        text = vlm_generate(
+            model=model,
+            processor=processor,
+            image=pil_image,
+            prompt=formatted_prompt,
+            max_tokens=max_tokens or self.config.max_tokens,
+            verbose=False,
+        )
+
+        if stream_callback:
+            stream_callback(text)
+
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        tokens = len(text.split())  # Estimació
+
+        return {
+            "text": text,           # Format consistent amb extract_metrics()
+            "tokens": tokens,
+            "tokens_per_second": round(tokens / max(elapsed_ms / 1000, 0.001), 1),
+            "prompt_tokens": 0,
+            "prefix_reused": False,
+            "cached_tokens": 0,
+            "actual_prefill_tokens": 0,
+            "prompt_tps": 0,
+            "peak_memory_mb": 0,
+            "identity_hash": "",
+            "vlm": True,            # Flag extra per indicar mode VLM
+        }
 
     def _generate_blocking(
         self,

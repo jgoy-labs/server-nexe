@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.7] - 2026-04-12
+
+Multimodal VLM: suport d'imatges als 4 backends (Ollama, MLX, Llama.cpp, Web UI).
+
+### Added
+
+- **Multimodal images (Ollama)**: `OllamaChat._build_payload()` and `chat()` accept
+  `images: Optional[List[str]]` (base64 strings). Passed through to Ollama `/api/chat`.
+- **Multimodal images (MLX)**: `_detect_vlm_capability()` reads `config.json` to detect
+  VLM architectures (Qwen2-VL, LLaVA, PaliGemma, Gemma3, InternVL). `MLXChatNode._get_model()`
+  bifurcates between `mlx_lm.load` (text) and `mlx_vlm.load` (VLM). New `_generate_vlm()`
+  method uses `mlx_vlm.generate()` with `PIL.Image`.
+- **Multimodal images (Llama.cpp)**: `mmproj_path` config field (env `LLAMA_MMPROJ_PATH`).
+  `ModelPool` passes `clip_model_path` to `Llama()` when set. Graceful fallback: images
+  ignored with warning if `mmproj_path` not configured.
+- **Multimodal images (Web UI backend)**: `/ui/chat` endpoint validates `image_b64` +
+  `image_type` (JPEG/PNG/WebP, max 10 MB). Passes `_images_arg` to all 3 engine call paths.
+- **Camera button UI**: `#imageBtn` (camera icon), `#imagePreviewBar` (thumbnail strip),
+  `#imageInput` (file picker, JPEG/PNG/WebP). `_handleImageSelect()` + `_clearSelectedImage()`.
+  `sendMessage()` includes `image_b64` / `image_type` when image pending.
+- **Dependency**: `mlx-vlm==0.1.27` added to installer (Apple Silicon). Compatible with
+  `mlx-lm==0.30.7` and `transformers>=4.57`.
+- **Tests**: 34 new multimodal tests across the 4 plugins (`test_multimodal.py`).
+
 ## [0.9.3] - 2026-04-12
 
 Dependency: replace `sentence-transformers` + PyTorch (~600 MB) with `fastembed` (ONNX, ~50 MB).

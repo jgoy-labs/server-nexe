@@ -195,12 +195,12 @@ def setup_environment(project_root, hw, engine="auto"):
     print_step(f"{BOLD}{t('installing_inference')}{RESET}")
 
     if hw['is_apple_silicon']:
-        print(f"   {t('detected_apple')} {CYAN}mlx-lm{RESET}...")
+        print(f"   {t('detected_apple')} {CYAN}mlx-lm{RESET} + {CYAN}mlx-vlm{RESET}...")
         print(f"   {DIM}{t('mlx_dep_warning_title')} {t('mlx_dep_warning_body')}{RESET}")
         # Pin to 0.30.7: first version with qwen3_5 architecture support.
-        # Note: requires transformers>=5.0.0 which conflicts with sentence-transformers
-        # metadata, but works correctly at runtime.
         subprocess.run([str(pip_path), "install", "mlx-lm==0.30.7"], check=True, capture_output=True)
+        # mlx-vlm 0.1.27: VLM multimodal (Qwen2-VL, LLaVA, etc). Compatible amb mlx-lm 0.30.7.
+        subprocess.run([str(pip_path), "install", "mlx-vlm==0.1.27"], check=True, capture_output=True)
 
     if engine in ("llama_cpp", "all"):
         print(f"  🏗️ {t('installing_universal')} {CYAN}llama-cpp-python{RESET}...")
