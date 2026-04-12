@@ -24,6 +24,7 @@ from memory.memory.api import (
   validate_collection_name,
   COLLECTION_NAME_PATTERN,
 )
+from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
 
 class TestNamingConvention:
   """Tests per la naming convention de collections."""
@@ -219,7 +220,7 @@ class TestMemoryAPIInit:
   def test_init_default_values(self):
     """Test inicialització amb valors per defecte."""
     api = MemoryAPI()
-    assert api.embedding_model == "paraphrase-multilingual-mpnet-base-v2"
+    assert api.embedding_model == DEFAULT_EMBEDDING_MODEL
     assert api.vector_size == 768  # DEFAULT_VECTOR_SIZE
     assert not api._initialized
 

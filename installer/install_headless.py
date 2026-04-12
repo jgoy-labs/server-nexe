@@ -432,7 +432,7 @@ def _run_headless_inner(config):
     _log.info("Starting embeddings download")
     try:
         # Read embedding model from server.toml (SSOT)
-        _emb_model = "paraphrase-multilingual-mpnet-base-v2"
+        _emb_model = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
         try:
             import toml as _toml
             _srv_cfg = _toml.load(PROJECT_ROOT / "personality" / "server.toml")
