@@ -205,7 +205,7 @@ class MemoryHelper:
                 self._memory_api = _memory_api_instance
                 return _memory_api_instance
             try:
-                # Reutilitzar el singleton de v1.py si ja existeix (evita duplicar SentenceTransformer ~500MB)
+                # Reutilitzar el singleton de v1.py si ja existeix (evita duplicar fastembed TextEmbedding)
                 try:
                     from memory.memory.api.v1 import get_memory_api as _get_v1_api
                     api = await _get_v1_api()
