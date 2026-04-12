@@ -83,7 +83,7 @@ DMG with guided wizard that detects your hardware, picks the right backend, reco
 <td width="50%">
 
 ### Built to Grow
-245 tests, security audit, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
+4572 tests, security audit, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
 
 </td>
 </tr>
@@ -100,25 +100,25 @@ Download the latest **[Install Nexe.dmg](https://github.com/jgoy-labs/server-nex
 ```bash
 git clone https://github.com/jgoy-labs/server-nexe.git
 cd server-nexe
-./setup.sh                # guided installation (detects hardware, picks backend & model)
-python -m core.cli go     # start server on port 9119
+./setup.sh      # guided installation (detects hardware, picks backend & model)
+nexe go         # start server on port 9119
 ```
 
 Once running:
 
 ```bash
-python -m core.cli chat               # interactive chat
-python -m core.cli chat --rag         # chat with RAG memory
-python -m core.cli memory store "Barcelona is the capital of Catalonia"
-python -m core.cli memory recall "capital Catalonia"
-python -m core.cli status             # system status
+nexe chat               # interactive chat
+nexe chat --rag         # chat with RAG memory
+nexe memory store "Barcelona is the capital of Catalonia"
+nexe memory recall "capital Catalonia"
+nexe status             # system status
 ```
 
 ### Option C: Headless (servers, scripts, CI)
 
 ```bash
 python -m installer.install_headless --backend ollama --model qwen3.5:latest
-python -m core.cli go
+nexe go
 ```
 
 **Endpoints at `http://localhost:9119`:**
@@ -176,10 +176,15 @@ Server Nexe includes a security module enabled by default:
 - **CSP headers** (script-src 'self', no unsafe-inline)
 - **CSRF protection** with token validation
 - **Rate limiting** per IP
-- **Input sanitization** — jailbreak and injection detection
+- **Input sanitization** — 6 injection detectors + Unicode normalization
+- **Jailbreak detection** — 47 pattern speed-bump detector (v0.9.1)
+- **Upload denylist** — blocks accidental upload of API keys, PEM keys (v0.9.1)
+- **Memory injection protection** — tag stripping on all input paths (v0.9.1)
+- **Pipeline enforcement** — all chat through canonical endpoints only (v0.9.1)
+- **Encryption at rest** — AES-256-GCM, SQLCipher, fail-closed (v0.9.1)
 - **Trusted host middleware**
 
-The project has passed a full technical audit (73 findings reviewed, 40 fixes implemented). See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+> **Note:** This project has not been tested in production with real users. Security testing has been performed by AI, not by professional auditors. See [SECURITY.md](SECURITY.md) for full disclosure and vulnerability reporting.
 
 ## Requirements
 
@@ -190,11 +195,11 @@ The project has passed a full technical audit (73 findings reviewed, 40 fixes im
 | **RAM** | 8 GB | 16 GB+ (for larger models) |
 | **Disk** | 10 GB free | 20 GB+ free |
 
-> **Linux**: Works with llama.cpp and Ollama backends. Docker support and full Linux compatibility are on the roadmap.
+> **Linux**: Works with llama.cpp and Ollama backends. Full Linux compatibility audit is on the roadmap.
 
 ## Testing
 
-245 tests with coverage reporting. CI runs the full suite on every push.
+4572 tests with coverage reporting. CI runs the full suite on every push.
 
 ```bash
 # Unit tests
@@ -218,11 +223,13 @@ NEXE_AUTOSTART_OLLAMA=true pytest -m "integration" -q
 
 Server Nexe is actively developed. Here's what's coming:
 
-- [x] Docker container for Linux deployment
+- [x] Persistent memory with RAG (v0.9.0)
+- [x] Encryption at rest — AES-256-GCM (v0.9.0)
+- [x] macOS code signing & notarization (v0.9.0)
+- [x] Security hardening — jailbreak detection, upload denylist, pipeline enforcement (v0.9.1)
+- [ ] Multimodal support — images via Ollama, llama.cpp and MLX backends
 - [ ] Full Linux compatibility audit
-- [x] Updated knowledge base for v0.9.0
-- [x] Website updates (server-nexe.org / server-nexe.com)
-- [x] macOS code signing & notarization
+- [ ] Native macOS app (SwiftUI, replaces Python tray)
 - [ ] Configurable inference parameters via UI
 - [ ] Community forum
 
@@ -274,5 +281,5 @@ See [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Version 0.9.0</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
+  <strong>Version 0.9.1</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
 </p>
