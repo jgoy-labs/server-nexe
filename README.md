@@ -30,6 +30,10 @@
   <a href="https://github.com/jgoy-labs/server-nexe/releases"><strong>Releases</strong></a>
 </p>
 
+<p align="center">
+  <a href="README-ca.md"><strong>Llegeix-me en Català</strong></a>
+</p>
+
 ---
 
 ## The Story
