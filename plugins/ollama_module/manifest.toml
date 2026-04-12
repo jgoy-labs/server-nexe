@@ -10,7 +10,7 @@
 
 [module]
 name = "ollama_module"
-version = "0.9.0"
+version = "0.9.1"
 type = "local_llm_option"
 description = "Integracio amb Ollama per executar models LLM locals sense dependencies de cloud. Gestio de models, streaming, embeddings locals."
 location = "plugins/ollama_module/"

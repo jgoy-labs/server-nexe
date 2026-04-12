@@ -97,7 +97,7 @@ class SecurityEventLogger(SecurityLoggerHelpers):
       "timestamp": datetime.now(timezone.utc).isoformat(),
       "hostname": "server-nexe",
       "appname": "Nexe",
-      "version": "0.9.0",
+      "version": "0.9.1",
 
       "event_type": event_type.value,
       "severity": severity.value,
