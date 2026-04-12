@@ -56,19 +56,20 @@ It does **not** defend against:
 
 Honest disclosure:
 
-- **No human security audit.** All security testing has been performed by AI (Claude, specifically). AI can find patterns and run systematic checks, but it is not a substitute for a professional penetration test.
+- **Not tested in production.** Server Nexe has not been deployed in a production environment with real users. All testing has been done in development by the author. The 4572 automated tests cover code correctness, not real-world adversarial conditions.
+- **No human security audit.** All security testing has been performed by AI (Claude). AI can find patterns and run systematic checks, but it is not a substitute for a professional penetration test.
 - **No formal threat model document.** The threat model above is implicit in the code, not a reviewed artifact.
 - **No bug bounty program.** This is a personal project with no budget for bounties.
 - **No CVE tracking process.** If a vulnerability is found, it will be fixed in the next release.
 - **No SOC 2, ISO 27001, or similar certification.** This is a local tool, not a SaaS.
 
-The AI audit covered: injection detection, authentication flows, rate limiting, encryption implementation, input validation, header security, and common OWASP patterns. Results were applied as code fixes. Tests verify the fixes hold. But "AI-audited" is not the same as "independently audited by security professionals."
+The AI audit covered: injection detection, authentication flows, rate limiting, encryption implementation, input validation, header security, and common OWASP patterns. Results were applied as code fixes. Tests verify the fixes hold. But "AI-audited" is not the same as "independently audited by security professionals," and "tested in dev" is not the same as "battle-tested in production."
 
 ## Supported versions
 
 | Version | Supported |
 |---------|-----------|
-| 0.9.0   | Current release, receives fixes |
+| 0.9.1   | Current release, receives fixes |
 | 0.8.2   | No longer supported |
 | < 0.8.0 | Not supported |
 
@@ -99,4 +100,4 @@ Server Nexe uses `cryptography` (>=44.0.0) for encryption, `keyring` (>=25.0.0) 
 
 ---
 
-*v0.9.0 · Apache 2.0 · Jordi Goy*
+*v0.9.1 · Apache 2.0 · Jordi Goy*
