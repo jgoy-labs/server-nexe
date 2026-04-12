@@ -10,9 +10,7 @@ Consolidated release: Cirurgia Bloc 2 (2026-04-08) + Mega-consultoria hardening 
 
 ### Security fixes (Mega-consultoria 2026-04-11)
 
-Derived from the full mega-consultoria real run at
-`~/Desktop/mega-consultoria-real-20260411/` and its plan v2.4 at
-`~/Desktop/mega-consultoria-real-20260411/fix/pla-v2.4.md`.
+Derived from a full security audit (mega-consultoria) with plan v2.4.
 
 - **P0-1** — httpx split timeout for Ollama (chat + models). Previously a
   single 600s default meant Ollama hangs took up to 10 minutes to detect.
@@ -51,8 +49,7 @@ Derived from the full mega-consultoria real run at
     (multi-pool LRU cache + `config_override` per request + removal of
     class-level singletons + horizontal uvicorn workers) is **deferred**
     until multi-user becomes an actual use case. See the complete
-    deferred-work scope at
-    `~/Desktop/mega-consultoria-real-20260411/fix/ISSUE-multiuser-refactor.md`.
+    deferred-work scope documented in ISSUE-multiuser-refactor.md.
 
 - **P1-1** — Jailbreak speed-bump: regex detector for common patterns
   (ca/en: "ignora instruccions", "you are now a/an WORD", "forget your
@@ -134,35 +131,17 @@ Derived from the full mega-consultoria real run at
   `MLXChatNode`, `config_override` parameter through
   `chat() → execute() → _get_model()`, `dataclasses.replace()` for
   immutable per-request configs, removal of class-level singletons,
-  horizontal uvicorn workers, session manager migration. Full scope
-  documented at
-  `~/Desktop/mega-consultoria-real-20260411/fix/ISSUE-multiuser-refactor.md`.
-  Trigger: multi-user becomes an actual use case (ICATIA rollout,
-  parallel BUS agents, exposure beyond localhost).
+  horizontal uvicorn workers, session manager migration.
+  Trigger: multi-user becomes an actual use case.
 
-- **QI-37 — Version string consolidation**: 11 hardcoded `"0.9.0"`
-  references remain in `core/models.py`, `core/endpoints/root.py`,
-  `core/server/factory_app.py`, `core/cli/cli.py`,
-  `core/server/tests/test_server.py`, `installer/tray.py`,
-  `personality/module_manager/__init__.py`, etc. Only `pyproject.toml`
-  is updated in this release; the full consolidation is deferred to
-  0.9.2 because updating those strings would break
-  `core/server/tests/test_server.py` which literally asserts
-  `"Nexe 0.9.0"`. To be addressed with a single-source-of-truth pattern
-  (e.g. `importlib.metadata.version("server-nexe")`) in the next release.
+- **QI-37 — Version string consolidation**: Resolved in commit `67242c9`
+  (34 files synced to 0.9.1). Future: adopt single-source-of-truth pattern
+  (e.g. `importlib.metadata.version("server-nexe")`).
 
 ### Known issues
 
-- **`plugins/web_ui_module/tests/test_routes_lang_i18n.py`** — 5 tests
-  in `TestSetLanguageI18nPropagation` fail since commit `2cf4d9b`
-  (2026-04-10, "fix: POST /ui/lang 500 — use current_language instead
-  of missing set_language"). The production code was updated to use
-  `i18n.current_language = lang_map[...]` directly, but the tests still
-  expect `i18n.set_language(...)` to be called. **Pre-existing,
-  unrelated to this release** — not a regression introduced by the
-  mega-consultoria fixes. Fix deferred to 0.9.2 (test sync update).
-  See `~/Desktop/mega-consultoria-real-20260411/fix/ISSUE-test-lang-i18n-sync.md`
-  for details.
+- None. All pre-existing test failures resolved (commit `3e3dad7`:
+  test_routes_lang_i18n synced with current_language assignment).
 
 ## [0.9.0] - 2026-03-31
 
@@ -192,7 +171,7 @@ Derived from the full mega-consultoria real run at
 - CLI commands: `nexe encryption status`, `nexe encryption encrypt-all`, `nexe encryption export-key`
 - Encryption status displayed in server startup banner
 - `NEXE_ENCRYPTION_ENABLED` environment variable for Docker/CI configuration
-- Docker support: Dockerfile (Python 3.12-slim + embedded Qdrant), docker-compose.yml, docker-entrypoint.sh
+- Docker support: Dockerfile, docker-compose.yml, docker-entrypoint.sh (removed in 0.9.1 — untested, bare-metal only)
 - Linux compatibility: conditional imports for macOS-only dependencies, platform-specific install guards
 - `NEXE_DEFAULT_MAX_TOKENS` environment variable to configure LLM response length
 - CLI `--verbose` flag for detailed per-source RAG weight information
@@ -237,7 +216,7 @@ Derived from the full mega-consultoria real run at
 - `/ui/info` returns actual runtime backend instead of config default
 - `i18n` labels no longer destroy child DOM elements
 - CSP-safe language injection via `data-nexe-lang` HTML attribute
-- Docker Qdrant health endpoint corrected to `/health`
+- Qdrant health endpoint corrected to `/health`
 - Dead code removed: 3 orphan modules, unused imports
 - `chunk_text()` unified to single implementation
 - `PROJECT_ROOT` resolution standardized via `get_repo_root()`
@@ -253,7 +232,7 @@ Derived from the full mega-consultoria real run at
 - Rate limiting on all Web UI endpoints (5-30 requests/minute per endpoint)
 - Unicode normalization (NFKC) applied to all 6 injection detectors
 - RAG context sanitization aligned between API and UI pipelines
-- Docker container runs as non-root user
+- Server process security hardened
 - Auth failure logging captures real client IP address
 - Runtime `print()` calls migrated to `logger.info()`
 
@@ -270,7 +249,7 @@ Derived from the full mega-consultoria real run at
 - Codebase consolidation: 52 quality findings applied
 - `colorama` dependency removed; `pyyaml` bumped; `tomli` removed
 - Requires new dependencies: `cryptography>=44.0.0`, `keyring>=25.0.0`, `sqlcipher3>=0.5.0`
-- Test suite: 4143 passing tests with 0 regressions
+- Test suite: 4143 passing tests at release time (4572 as of 0.9.1)
 
 ## [0.8.2] - 2026-03-23
 
