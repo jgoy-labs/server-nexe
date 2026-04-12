@@ -10,7 +10,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 from typing import Dict, Any, List
-from pathlib import Path
 import psutil
 import structlog
 
@@ -75,47 +74,49 @@ def check_dependencies_available() -> Dict[str, Any]:
 
 def check_device_available() -> Dict[str, Any]:
   """
-  Check 3: Detect available device (MPS/CUDA/CPU).
+  Check 3: Detect available ONNX Runtime providers (fastembed, no torch required).
 
-  Mac: Search for MPS (Apple Silicon) or CPU
-  Others: CUDA or CPU
+  fastembed uses ONNX Runtime internally. Reports available providers.
+  On Apple Silicon: CoreMLExecutionProvider or CPUExecutionProvider.
 
   Returns:
     Dict: {"name": str, "status": "pass"|"warn", "message": str, "device": str}
   """
   try:
-    import torch
+    import onnxruntime as ort
+    providers = ort.get_available_providers()
 
-    if torch.backends.mps.is_available():
-      device = "mps"
+    if "CoreMLExecutionProvider" in providers:
+      device = "coreml"
       status = "pass"
       message = get_i18n().t("embeddings.health.device_mps", "MPS (Apple Silicon) available")
-    elif torch.cuda.is_available():
-      device = f"cuda:{torch.cuda.current_device()}"
+    elif "CUDAExecutionProvider" in providers:
+      device = "cuda"
       status = "pass"
-      device_name = torch.cuda.get_device_name(0)
       message = get_i18n().t(
         "embeddings.health.device_cuda",
         "CUDA available ({device})",
-        device=device_name
+        device="CUDA"
       )
     else:
       device = "cpu"
-      status = "warn"
+      status = "pass"
       message = get_i18n().t("embeddings.health.device_cpu_only", "Only CPU available (slower performance)")
 
     return {
       "name": "device_available",
       "status": status,
       "message": message,
-      "device": device
+      "device": device,
+      "providers": providers
     }
 
   except ImportError:
+    # fastembed porta onnxruntime com a dep — si no existeix, és un problema d'instal·lació
     return {
       "name": "device_available",
       "status": "fail",
-      "message": get_i18n().t("embeddings.health.device_torch_missing", "torch not installed (pip install torch)")
+      "message": get_i18n().t("embeddings.health.device_torch_missing", "fastembed (ONNX) does not require torch")
     }
   except Exception as e:
     return {

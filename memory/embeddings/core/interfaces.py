@@ -78,10 +78,10 @@ class BatchEmbeddingRequest(BaseModel):
 
   Attributes:
     texts: Llista de texts (màx 100 per batch)
-    model: Model sentence-transformers
+    model: Model fastembed (ex: sentence-transformers/paraphrase-multilingual-mpnet-base-v2)
     normalize: Si normalitzar embeddings
     use_cache: Si usar cache
-    batch_size: Mida del batch intern (per SentenceTransformer)
+    batch_size: Mida del batch intern (per fastembed TextEmbedding)
   """
   texts: List[str] = Field(..., min_length=1, max_length=100)
   model: str = Field(default=DEFAULT_EMBEDDING_MODEL)

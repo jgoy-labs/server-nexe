@@ -59,7 +59,7 @@ class IngestionPipeline:
       "failures": 0
     }
 
-    backend = "Ollama API" if embedding_model is None else f"SentenceTransformer ({embedding_model})"
+    backend = "Ollama API" if embedding_model is None else f"fastembed ({embedding_model})"
     logger.info("IngestionPipeline initialized (embedding_backend=%s)", backend)
 
   async def ingest(self, entry: MemoryEntry) -> bool:
@@ -141,7 +141,7 @@ class IngestionPipeline:
 
   async def _generate_embedding(self, text: str) -> List[float]:
     """
-    Generate embedding via Ollama API or SentenceTransformer (fallback).
+    Generate embedding via Ollama API or fastembed (fallback).
 
     Args:
       text: Text to process
@@ -164,7 +164,7 @@ class IngestionPipeline:
     Generate embedding via Ollama API.
 
     Model: nomic-embed-text (768 dimensions)
-    Time: ~400ms (vs 8-10s with SentenceTransformer)
+    Time: ~400ms (vs 8-10s with fastembed)
 
     Args:
       text: Text to process

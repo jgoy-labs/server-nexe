@@ -4,7 +4,6 @@ Covers uncovered lines: 44-45, 75, 111-123, 132-139, 169-170, 183-194,
 226-236, 250-251, 293-296, 322-329.
 """
 
-import pytest
 from unittest.mock import patch, MagicMock, PropertyMock
 from memory.embeddings.health import (
     check_module_initialized,
@@ -56,48 +55,48 @@ class TestCheckDependenciesAvailable:
 
 
 class TestCheckDeviceAvailable:
-    def test_mps_available(self):
-        """Lines 107-110: MPS device detected."""
-        mock_torch = MagicMock()
-        mock_torch.backends.mps.is_available.return_value = True
-        with patch.dict("sys.modules", {"torch": mock_torch}):
-            with patch("builtins.__import__", return_value=mock_torch):
-                result = check_device_available()
-        # On Mac this should return pass with mps
+    def test_coreml_available(self):
+        """CoreML (Apple Silicon) provider detected via onnxruntime."""
+        mock_ort = MagicMock()
+        mock_ort.get_available_providers.return_value = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+        with patch.dict("sys.modules", {"onnxruntime": mock_ort}):
+            result = check_device_available()
         assert result["name"] == "device_available"
+        assert result["status"] == "pass"
+        assert result["device"] == "coreml"
 
     def test_cuda_available(self):
-        """Lines 111-119: CUDA device detected."""
-        mock_torch = MagicMock()
-        mock_torch.backends.mps.is_available.return_value = False
-        mock_torch.cuda.is_available.return_value = True
-        mock_torch.cuda.current_device.return_value = 0
-        mock_torch.cuda.get_device_name.return_value = "RTX 3090"
-        with patch.dict("sys.modules", {"torch": mock_torch}):
+        """CUDA provider detected via onnxruntime."""
+        mock_ort = MagicMock()
+        mock_ort.get_available_providers.return_value = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        with patch.dict("sys.modules", {"onnxruntime": mock_ort}):
             result = check_device_available()
         assert result["name"] == "device_available"
+        assert result["status"] == "pass"
+        assert result["device"] == "cuda"
 
     def test_cpu_only(self):
-        """Lines 121-123: Only CPU available."""
-        mock_torch = MagicMock()
-        mock_torch.backends.mps.is_available.return_value = False
-        mock_torch.cuda.is_available.return_value = False
-        with patch.dict("sys.modules", {"torch": mock_torch}):
+        """Only CPU provider available."""
+        mock_ort = MagicMock()
+        mock_ort.get_available_providers.return_value = ["CPUExecutionProvider"]
+        with patch.dict("sys.modules", {"onnxruntime": mock_ort}):
             result = check_device_available()
         assert result["name"] == "device_available"
+        assert result["status"] == "pass"
+        assert result["device"] == "cpu"
 
-    def test_torch_import_error(self):
-        """Lines 132-137: torch not installed."""
-        with patch.dict("sys.modules", {"torch": None}):
-            with patch("builtins.__import__", side_effect=ImportError("no torch")):
+    def test_onnxruntime_import_error(self):
+        """onnxruntime not installed (shouldn't happen — fastembed deps it)."""
+        with patch.dict("sys.modules", {"onnxruntime": None}):
+            with patch("builtins.__import__", side_effect=ImportError("no onnxruntime")):
                 result = check_device_available()
         assert result["status"] == "fail"
 
-    def test_torch_generic_error(self):
-        """Lines 138-146: generic error checking device."""
-        mock_torch = MagicMock()
-        mock_torch.backends.mps.is_available.side_effect = RuntimeError("bad")
-        with patch.dict("sys.modules", {"torch": mock_torch}):
+    def test_onnxruntime_generic_error(self):
+        """Generic error checking ONNX providers."""
+        mock_ort = MagicMock()
+        mock_ort.get_available_providers.side_effect = RuntimeError("bad provider")
+        with patch.dict("sys.modules", {"onnxruntime": mock_ort}):
             result = check_device_available()
         assert result["status"] == "fail"
 
@@ -105,7 +104,7 @@ class TestCheckDeviceAvailable:
 class TestCheckCacheDirectories:
     def test_writable_cache(self, tmp_path):
         """Lines 166-170, 172-181: writable cache directory."""
-        with patch("memory.embeddings.health.Path", return_value=tmp_path):
+        with patch("core.paths.get_repo_root", return_value=tmp_path):
             result = check_cache_directories()
         assert result["name"] == "cache_directories"
         # Should pass on a writable tmp_path

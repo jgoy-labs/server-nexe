@@ -26,7 +26,7 @@ async def embedding_node(
 
   Args:
     text: Text a convertir
-    model: Model sentence-transformers
+    model: Model fastembed (ex: sentence-transformers/paraphrase-multilingual-mpnet-base-v2)
     use_cache: Si usar cache multi-nivell
     normalize: Si normalitzar embedding
     cache_version: Versió del cache
