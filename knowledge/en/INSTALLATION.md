@@ -4,8 +4,8 @@ data: 2026-03-28
 id: nexe-installation-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "How to install server-nexe: 3 methods. (1) macOS DMG with SwiftUI wizard, bundled Python 3.12, 15 models. (2) CLI: git clone + ./setup.sh (macOS/Linux). (3) Docker with docker-compose and Ollama. Requirements: macOS 13+ or Linux, 8GB RAM minimum. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Default port: 9119."
-tags: [installation, setup, dmg, swiftui, wizard, docker, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption, how-to]
+abstract: "How to install server-nexe: 2 methods. (1) macOS DMG with SwiftUI wizard, bundled Python 3.12, models by RAM tier. (2) CLI: git clone + ./setup.sh (macOS/Linux). Requirements: macOS 13+ or Linux, 8GB RAM minimum. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Default port: 9119."
+tags: [installation, setup, dmg, swiftui, wizard, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption, how-to]
 chunk_size: 600
 priority: P1
 
@@ -16,9 +16,9 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Installation — server-nexe 0.9.0 pre-release
+# Installation — server-nexe 0.9.1
 
-Three installation methods available. Choose based on your platform and preferences.
+Two installation methods available. Choose based on your platform and preferences.
 
 ## System Requirements
 
@@ -83,50 +83,45 @@ After setup:
 ./nexe go    # Start server → http://127.0.0.1:9119
 ```
 
-## Method 3: Docker
+## Model Catalog
 
-For Linux servers or containerized deployments.
+### tier_8 (8 GB RAM)
+| Model | Engine | Year |
+|-------|--------|------|
+| Qwen3.5 9B | All | 2025 |
+| Gemma 4 E4B | All | 2025 |
+| Salamandra 2B | All | 2024 |
 
-```bash
-git clone https://github.com/jgoy-labs/server-nexe
-cd server-nexe
-docker-compose up
-```
+### tier_16 (16 GB RAM)
+| Model | Engine | Year |
+|-------|--------|------|
+| Llama 4 Scout (109B/17B active MoE) | All | 2025 |
+| Salamandra 7B | All | 2024 |
 
-- **Dockerfile:** Python 3.12-slim, Qdrant embedded (storage at `storage/vectors/`), non-root user (`nexe`), EXPOSE 9119
-- **docker-compose.yml:** Two services — Nexe + Ollama
-- **docker-entrypoint.sh:** Sequential start (Qdrant → wait for health → Nexe), 15s timeout with warning
+### tier_24 (24 GB RAM)
+| Model | Engine | Year |
+|-------|--------|------|
+| Qwen3.5 27B | All | 2025 |
+| Gemma 4 31B | All | 2025 |
 
-Mount `storage/` for persistent data (models, Qdrant vectors, logs).
+### tier_32 (32 GB RAM)
+| Model | Engine | Year |
+|-------|--------|------|
+| Qwen3.5 35B-A3B (MoE) | All | 2025 |
+| DeepSeek R1 Distill 32B | All | 2025 |
+| ALIA-40B Instruct | All | 2025 |
 
-## Model Catalog (15 models)
+### tier_48 (48 GB RAM)
+| Model | Engine | Year |
+|-------|--------|------|
+| Qwen3.5 122B-A10B (MoE) | All | 2025 |
+| Llama 4 Maverick (400B/17B active MoE) | All | 2025 |
 
-### Small (8 GB RAM)
-| Model | Size | Engine | Year |
-|-------|------|--------|------|
-| Qwen3 1.7B | 1.1 GB | All | 2025 |
-| Qwen3.5 2B | 1.5 GB | Ollama only | 2025 |
-| Phi-3.5 Mini | 2.4 GB | All | 2024 |
-| Salamandra 2B | 1.5 GB | All | 2024 |
-| Qwen3 4B | 2.5 GB | All | 2025 |
-
-### Medium (12-16 GB RAM)
-| Model | Size | Engine | Year |
-|-------|------|--------|------|
-| Mistral 7B | 4.1 GB | All | 2023 |
-| Salamandra 7B | 4.9 GB | All | 2024 |
-| Llama 3.1 8B | 4.7 GB | All | 2024 |
-| Qwen3 8B | 5.0 GB | All | 2025 |
-| Gemma 3 12B | 7.6 GB | All | 2025 |
-
-### Large (32+ GB RAM)
-| Model | Size | Engine | Year |
-|-------|------|--------|------|
-| Qwen3.5 27B | 17 GB | Ollama only | 2025 |
-| Qwen3 32B | 20 GB | All | 2025 |
-| Gemma 3 27B | 17 GB | All | 2025 |
-| DeepSeek R1 32B | 20 GB | All | 2025 |
-| Llama 3.1 70B | 40 GB | All | 2024 |
+### tier_64 (64 GB RAM)
+| Model | Engine | Year |
+|-------|--------|------|
+| Qwen3.5 122B-A10B | All | 2025 |
+| GPT-OSS 120B | All | 2025 |
 
 Custom models: Ollama (by name) or Hugging Face (GGUF repo URL).
 

@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Referencia REST API — server-nexe 0.9.0 pre-release
+# Referencia REST API — server-nexe 0.9.1
 
 ## URL Base
 
@@ -47,11 +47,13 @@ El rate limiting se aplica a **todos los endpoints** — tanto API como Web UI.
 
 | Variable | Por defecto | Aplica a |
 |----------|---------|-----------|
-| NEXE_RATE_LIMIT_CHAT | 60/minuto | /v1/chat/completions |
+| NEXE_RATE_LIMIT_CHAT | 20/minuto | /v1/chat/completions |
 | NEXE_RATE_LIMIT_MEMORY | 30/minuto | /v1/memory/* |
 | NEXE_RATE_LIMIT_RAG | 30/minuto | /v1/rag/* |
 | NEXE_RATE_LIMIT_UPLOAD | 5/minuto | /ui/upload |
 | NEXE_RATE_LIMIT_DEFAULT | 120/minuto | Todos los demas endpoints |
+
+**Nota:** Estas variables estan reservadas para implementacion futura. Los limites actuales estan configurados en el codigo fuente.
 
 ### Endpoints Web UI (por endpoint)
 
@@ -69,7 +71,7 @@ El rate limiting se aplica a **todos los endpoints** — tanto API como Web UI.
 
 ### Chat
 
-**POST /v1/chat/completions** (requiere API key, rate limit: 60/min)
+**POST /v1/chat/completions** (requiere API key, rate limit: 20/min)
 
 Chat completion compatible con OpenAI con soporte de RAG y streaming.
 

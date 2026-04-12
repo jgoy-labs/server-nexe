@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-testing-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia y cobertura de pruebas de server-nexe 0.9.0 pre-release. 4143 funciones de test, 3213 pasados en la ultima ejecucion completa, 0 fallos. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura, correcciones de tests de auditoria IA, tests de crypto (68 nuevos), resultados de mega-test v1/v2, y valoracion honesta de las limitaciones de las pruebas."
+abstract: "Estrategia y cobertura de pruebas de server-nexe 0.9.1. 4607 funciones de test, 3213 pasados en la ultima ejecucion completa, 0 fallos. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura, correcciones de tests de auditoria IA, tests de crypto (68 nuevos), resultados de mega-test v1/v2, y valoracion honesta de las limitaciones de las pruebas."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
 chunk_size: 800
 priority: P2
@@ -16,19 +16,19 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Pruebas — server-nexe 0.9.0 pre-release
+# Pruebas — server-nexe 0.9.1
 
 ## Resultados de las pruebas
 
 | Metrica | Valor |
 |---------|-------|
-| Total de funciones de test | 4143 |
+| Total de funciones de test | 4607 |
 | Pasados en ultima ejecucion | 3213 |
 | Fallidos | 0 |
 | Saltados | 6 |
 | XFailed | 1 |
 
-Nota: La diferencia entre el total de funciones de test (4143) y los pasados (3213) se debe a tests deseleccionados (marcadores integration, e2e, slow) que se excluyen de la ejecucion estandar.
+Nota: La diferencia entre el total de funciones de test (4607) y los pasados (3213) se debe a tests deseleccionados (marcadores integration, e2e, slow) que se excluyen de la ejecucion estandar.
 
 ## Estructura de los tests
 

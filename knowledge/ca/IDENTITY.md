@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Identitat de server-nexe: projecte de codi obert creat per Jordi Goy a Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que fa (IA local, RAG, multi-backend, encriptacio at-rest), estat actual (0.9.0 pre-release), enllacos oficials i com donar suport."
+abstract: "Identitat de server-nexe: projecte de codi obert creat per Jordi Goy a Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que fa (IA local, RAG, multi-backend, encriptacio at-rest), estat actual (0.9.1), enllacos oficials i com donar suport."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
 chunk_size: 400
 priority: P1
@@ -57,12 +57,12 @@ server-nexe combina cinc capacitats:
 
 ## Estat actual
 
-- **Versio:** 0.9.0 pre-release
+- **Versio:** 0.9.1
 - **Plataforma principal:** macOS (Apple Silicon i Intel) — testejat
 - **Linux:** Suport parcial (tests unitaris passen, no testejat en produccio)
 - **Windows:** Encara no suportat
 - **Port per defecte:** 9119
-- **Tests:** 4143 funcions de test, 0 errors a l'ultima execucio
+- **Tests:** 4607 funcions de test, 0 errors a l'ultima execucio
 
 ## Documentacio AI-Ready
 

@@ -16,9 +16,9 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Seguretat — server-nexe 0.9.0 pre-release
+# Seguretat — server-nexe 0.9.1
 
-server-nexe esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
+server-nexe 0.9.1 esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
 
 ## Autenticacio
 
@@ -39,12 +39,14 @@ El rate limiting s'aplica a **tots els endpoints** — tant a l'API (`/v1/*`) co
 
 | Variable | Per defecte | Endpoints |
 |----------|---------|-----------|
-| NEXE_RATE_LIMIT_CHAT | 60/min | /v1/chat/completions |
+| NEXE_RATE_LIMIT_CHAT | 20/min | /v1/chat/completions |
 | NEXE_RATE_LIMIT_MEMORY | 30/min | /v1/memory/* |
 | NEXE_RATE_LIMIT_RAG | 30/min | /v1/rag/* |
-| NEXE_RATE_LIMIT_UPLOAD | 10/min | /ui/upload |
+| NEXE_RATE_LIMIT_UPLOAD | 5/min | /ui/upload |
 | NEXE_RATE_LIMIT_DEFAULT | 120/min | Resta d'endpoints |
 | NEXE_RATE_LIMIT_GLOBAL | 100/min | Limit global |
+
+**Nota:** Aquestes variables estan reservades per a implementació futura. Els límits actuals estan configurats al codi font.
 
 ### Endpoints de la Web UI (fixats per endpoint)
 
@@ -211,7 +213,6 @@ Totes les auditories de seguretat les realitzen sessions autonomes d'IA (Claude)
 - Logging d'IP real en errors d'autenticacio (F-013)
 - Parametre context al sanitizer per reduir falsos positius al xat (F-005)
 - `repr(e)` en lloc de `str(e)` per a excepcions httpx (bug de string buida)
-- Docker USER no-root (F-030)
 - Migracio print() -> logger.info() per al codi en temps d'execucio
 - CVEs de dependencies corregides (pypdf, starlette)
 

@@ -4,8 +4,8 @@ data: 2026-03-28
 id: nexe-installation-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Como instalar server-nexe: 3 metodos. (1) DMG para macOS con wizard SwiftUI, Python 3.12 incluido, 15 modelos. (2) CLI: git clone + ./setup.sh (macOS/Linux). (3) Docker con docker-compose y Ollama. Requisitos: macOS 13+ o Linux, 8GB RAM minimo. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Puerto por defecto: 9119."
-tags: [installation, setup, dmg, swiftui, wizard, docker, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption, how-to]
+abstract: "Como instalar server-nexe: 2 metodos. (1) DMG para macOS con wizard SwiftUI, Python 3.12 incluido, modelos por tiers de RAM. (2) CLI: git clone + ./setup.sh (macOS/Linux). Requisitos: macOS 13+ o Linux, 8GB RAM minimo. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Puerto por defecto: 9119."
+tags: [installation, setup, dmg, swiftui, wizard, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption, how-to]
 chunk_size: 600
 priority: P1
 
@@ -16,9 +16,9 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Instalacion — server-nexe 0.9.0 pre-release
+# Instalacion — server-nexe 0.9.1
 
-Tres metodos de instalacion disponibles. Elige segun tu plataforma y preferencias.
+Dos metodos de instalacion disponibles. Elige segun tu plataforma y preferencias.
 
 ## Requisitos del sistema
 
@@ -83,50 +83,45 @@ Despues del setup:
 ./nexe go    # Iniciar servidor -> http://127.0.0.1:9119
 ```
 
-## Metodo 3: Docker
+## Catalogo de modelos
 
-Para servidores Linux o despliegues en contenedores.
+### tier_8 (8 GB RAM)
+| Modelo | Motor | Ano |
+|--------|-------|-----|
+| Qwen3.5 9B | Todos | 2025 |
+| Gemma 4 E4B | Todos | 2025 |
+| Salamandra 2B | Todos | 2024 |
 
-```bash
-git clone https://github.com/jgoy-labs/server-nexe
-cd server-nexe
-docker-compose up
-```
+### tier_16 (16 GB RAM)
+| Modelo | Motor | Ano |
+|--------|-------|-----|
+| Llama 4 Scout (109B/17B activos MoE) | Todos | 2025 |
+| Salamandra 7B | Todos | 2024 |
 
-- **Dockerfile:** Python 3.12-slim, Qdrant embedded (almacenamiento en `storage/vectors/`), usuario non-root (`nexe`), EXPOSE 9119
-- **docker-compose.yml:** Dos servicios — Nexe + Ollama
-- **docker-entrypoint.sh:** Arranque secuencial (Qdrant -> esperar health -> Nexe), timeout de 15s con aviso
+### tier_24 (24 GB RAM)
+| Modelo | Motor | Ano |
+|--------|-------|-----|
+| Qwen3.5 27B | Todos | 2025 |
+| Gemma 4 31B | Todos | 2025 |
 
-Montar `storage/` para datos persistentes (modelos, vectores Qdrant, logs).
+### tier_32 (32 GB RAM)
+| Modelo | Motor | Ano |
+|--------|-------|-----|
+| Qwen3.5 35B-A3B (MoE) | Todos | 2025 |
+| DeepSeek R1 Distill 32B | Todos | 2025 |
+| ALIA-40B Instruct | Todos | 2025 |
 
-## Catalogo de modelos (15 modelos)
+### tier_48 (48 GB RAM)
+| Modelo | Motor | Ano |
+|--------|-------|-----|
+| Qwen3.5 122B-A10B (MoE) | Todos | 2025 |
+| Llama 4 Maverick (400B/17B activos MoE) | Todos | 2025 |
 
-### Pequenos (8 GB RAM)
-| Modelo | Tamano | Motor | Ano |
-|--------|--------|-------|-----|
-| Qwen3 1.7B | 1.1 GB | Todos | 2025 |
-| Qwen3.5 2B | 1.5 GB | Solo Ollama | 2025 |
-| Phi-3.5 Mini | 2.4 GB | Todos | 2024 |
-| Salamandra 2B | 1.5 GB | Todos | 2024 |
-| Qwen3 4B | 2.5 GB | Todos | 2025 |
-
-### Medianos (12-16 GB RAM)
-| Modelo | Tamano | Motor | Ano |
-|--------|--------|-------|-----|
-| Mistral 7B | 4.1 GB | Todos | 2023 |
-| Salamandra 7B | 4.9 GB | Todos | 2024 |
-| Llama 3.1 8B | 4.7 GB | Todos | 2024 |
-| Qwen3 8B | 5.0 GB | Todos | 2025 |
-| Gemma 3 12B | 7.6 GB | Todos | 2025 |
-
-### Grandes (32+ GB RAM)
-| Modelo | Tamano | Motor | Ano |
-|--------|--------|-------|-----|
-| Qwen3.5 27B | 17 GB | Solo Ollama | 2025 |
-| Qwen3 32B | 20 GB | Todos | 2025 |
-| Gemma 3 27B | 17 GB | Todos | 2025 |
-| DeepSeek R1 32B | 20 GB | Todos | 2025 |
-| Llama 3.1 70B | 40 GB | Todos | 2024 |
+### tier_64 (64 GB RAM)
+| Modelo | Motor | Ano |
+|--------|-------|-----|
+| Qwen3.5 122B-A10B | Todos | 2025 |
+| GPT-OSS 120B | Todos | 2025 |
 
 Modelos personalizados: Ollama (por nombre) o Hugging Face (URL de repositorio GGUF).
 

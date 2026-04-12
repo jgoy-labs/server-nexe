@@ -4,7 +4,7 @@ data: 2026-04-02
 id: nexe-overview
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), Docker, session isolation, encryption at-rest. 15+ models available, 3 installation methods (DMG, CLI, Docker), AI-ready documentation. macOS tested, Linux partial."
+abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), session isolation, encryption at-rest. Models by RAM tiers (8GB to 64GB), 2 installation methods (DMG, CLI), AI-ready documentation. macOS tested, Linux partial."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -16,13 +16,13 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# server-nexe 0.9.0 pre-release — Local AI Server with Persistent Memory
+# server-nexe 0.9.1 — Local AI Server with Persistent Memory
 
-**Version:** 0.9.0 pre-release
+**Version:** 0.9.1
 **Default port:** 9119
 **Author:** Jordi Goy (Barcelona)
 **License:** Apache 2.0
-**Platforms:** macOS (tested), Linux (partial), Docker (supported)
+**Platforms:** macOS (tested), Linux (partial)
 **Website:** https://server-nexe.org | https://server-nexe.com
 
 ## What is server-nexe
@@ -42,7 +42,6 @@ It is NOT npm nexe (a Node.js compiler). It is NOT a Windows server product. It 
 7. **Document Upload with Session Isolation** — Upload documents via Web UI. Indexed into user_knowledge with session_id metadata. Documents only visible within the session they were uploaded to.
 8. **Encryption at Rest (opt-in)** — AES-256-GCM encryption for SQLite (via SQLCipher), chat sessions (.enc), and RAG document text (TextStore). Qdrant payloads contain only vectors and IDs, no text. Key management via OS Keyring, env var, or file. Recently added — not yet battle-tested in production.
 9. **Comprehensive Input Validation** — All endpoints (API and Web UI) have rate limiting, input validation (`validate_string_input`), and RAG context sanitization. 6 injection detectors with Unicode normalization. 47 jailbreak patterns.
-10. **Docker Support** — Dockerfile + docker-compose.yml with embedded Qdrant. Python 3.12-slim, non-root user, Linux amd64/arm64.
 
 ## Technology stack
 
@@ -59,7 +58,6 @@ It is NOT npm nexe (a Node.js compiler). It is NOT a Windows server product. It 
 | API | OpenAI-compatible (/v1/chat/completions) |
 | Authentication | X-API-Key (dual-key with rotation) |
 | Security | 6 injection detectors + Unicode normalization, 47 jailbreak patterns, rate limiting, CSP headers |
-| Containerization | Docker + docker-compose (Nexe + Ollama) |
 
 ## Architecture
 
@@ -83,7 +81,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer
 ├── storage/               # Runtime data (models, logs, qdrant vectors)
-├── tests/                 # Test suite (4143 test functions)
+├── tests/                 # Test suite (4607 test functions)
 └── nexe                   # Main CLI executable
 ```
 
@@ -105,35 +103,40 @@ The knowledge base (`knowledge/`) is designed for both human and AI consumption:
 - **Available in English, Catalan, and Spanish**
 - Point any AI assistant at this repository and it can understand the full architecture, create plugins, or contribute code
 
-## Available models (15 in installer catalog)
+## Available models (by RAM tier)
 
-### Small (8 GB RAM)
-- Qwen3 1.7B (1.1 GB) — Alibaba, 2025
-- Qwen3.5 2B (1.5 GB) — Alibaba, 2025 (Ollama only)
-- Phi-3.5 Mini (2.4 GB) — Microsoft, 2024
-- Salamandra 2B (1.5 GB) — BSC/AINA, 2024, optimized for Catalan
-- Qwen3 4B (2.5 GB) — Alibaba, 2025
+### tier_8 (8 GB RAM)
+- Qwen3.5 9B — Alibaba, 2025
+- Gemma 4 E4B — Google DeepMind, 2025
+- Salamandra 2B — BSC/AINA, 2024, optimized for Catalan
 
-### Medium (12-16 GB RAM)
-- Mistral 7B (4.1 GB) — Mistral AI, 2023
-- Salamandra 7B (4.9 GB) — BSC/AINA, 2024, best for Catalan
-- Llama 3.1 8B (4.7 GB) — Meta, 2024
-- Qwen3 8B (5.0 GB) — Alibaba, 2025
-- Gemma 3 12B (7.6 GB) — Google DeepMind, 2025
+### tier_16 (16 GB RAM)
+- Llama 4 Scout (109B/17B active MoE) — Meta, 2025
+- Salamandra 7B — BSC/AINA, 2024, best for Catalan
 
-### Large (32+ GB RAM)
-- Qwen3.5 27B (17 GB) — Alibaba, 2025 (Ollama only)
-- Qwen3 32B (20 GB) — Alibaba, 2025, hybrid reasoning
-- Gemma 3 27B (17 GB) — Google DeepMind, 2025
-- DeepSeek R1 32B (20 GB) — DeepSeek, 2025, advanced reasoning
-- Llama 3.1 70B (40 GB) — Meta, 2024
+### tier_24 (24 GB RAM)
+- Qwen3.5 27B — Alibaba, 2025
+- Gemma 4 31B — Google DeepMind, 2025
+
+### tier_32 (32 GB RAM)
+- Qwen3.5 35B-A3B (MoE) — Alibaba, 2025
+- DeepSeek R1 Distill 32B — DeepSeek, 2025, advanced reasoning
+- ALIA-40B Instruct — BSC/AINA, 2025
+
+### tier_48 (48 GB RAM)
+- Qwen3.5 122B-A10B (MoE) — Alibaba, 2025
+- Llama 4 Maverick (400B/17B active MoE) — Meta, 2025
+
+### tier_64 (64 GB RAM)
+- Qwen3.5 122B-A10B — Alibaba, 2025
+- GPT-OSS 120B — Meta, 2025
 
 Custom models also supported via Ollama (name) or Hugging Face (GGUF repo).
 
 ## Installation methods
 
 ### 1. macOS DMG Installer (recommended)
-SwiftUI native wizard with 6 screens: welcome, destination folder, model selection (15 models with hardware detection), confirmation, progress, completion. Bundles Python 3.12.
+SwiftUI native wizard with 6 screens: welcome, destination folder, model selection (hardware detection by RAM tier), confirmation, progress, completion. Bundles Python 3.12.
 
 ### 2. CLI headless
 ```bash
@@ -141,11 +144,6 @@ git clone https://github.com/jgoy-labs/server-nexe
 cd server-nexe
 ./setup.sh
 ./nexe go
-```
-
-### 3. Docker
-```bash
-docker-compose up
 ```
 
 ## Quick start
@@ -174,7 +172,6 @@ Authentication required: `X-API-Key` header with value from `.env` (`NEXE_PRIMAR
 | macOS Apple Silicon | Tested (all 3 backends) |
 | macOS Intel | Tested (llama.cpp + Ollama) |
 | Linux x86_64 | Partial (unit tests pass, CI green, not production-tested) |
-| Linux ARM64 | Docker supported |
 | Windows | Not yet supported |
 
 ## Current limitations

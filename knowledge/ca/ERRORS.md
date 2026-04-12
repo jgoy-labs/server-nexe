@@ -4,8 +4,8 @@ data: 2026-03-28
 id: nexe-errors-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Errors comuns i solucions per a server-nexe 0.9.0 pre-release. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, Docker, streaming i errors d'encriptacio."
-tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, docker, streaming, encryption]
+abstract: "Errors comuns i solucions per a server-nexe 0.9.1. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, streaming i errors d'encriptacio."
+tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, streaming, encryption]
 chunk_size: 600
 priority: P1
 
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Errors comuns — server-nexe 0.9.0 pre-release
+# Errors comuns — server-nexe 0.9.1
 
 ## Errors d'instal·lacio
 
@@ -36,7 +36,7 @@ expires: null
 | Ollama not available | Ollama no instal·lat o no en execucio | Instal·la des d'ollama.com. El servidor arrencara Ollama automaticament al boot. |
 | asyncio.Lock deadlock | Problema de l'event loop de Python 3.12 | Corregit a v0.8.2 via init lazy a module_lifecycle.py. Actualitza a l'ultima versio. |
 | Server ja en execució (PID X) | Un altre server actiu | Usa "Quit" al tray, o `pkill -9 server-nexe`. Verifica: `lsof -iTCP:9119` |
-| Server orfe (Quit del tray no funciona) | Bug pre-v0.9.0 (corregit) — el tray no enviava SIGTERM al server | Actualitza a v0.9.0+. Workaround: `pkill -f "core.app"` o `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
+| Server orfe (Quit del tray no funciona) | Bug pre-v0.9.0 (corregit) — el tray no enviava SIGTERM al server | Actualitza a v0.9.1. Workaround: `pkill -f "core.app"` o `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
 
 ## Errors de la Web UI
 
@@ -86,10 +86,3 @@ expires: null
 | Migration failed | Base de dades corrupta o migracio interrompuda | El fitxer de backup .bak es conserva. Restaura des del backup i reintenta. |
 | Encryption status: disabled | Funcionalitat no activada | Estableix `NEXE_ENCRYPTION_ENABLED=true` al .env o a l'entorn |
 
-## Errors de Docker
-
-| Error | Causa | Solucio |
-|-------|-------|----------|
-| Qdrant no arrenca | Discordanca d'arquitectura del binari | Docker auto-detecta amd64/arm64. Comprova la plataforma al Dockerfile. |
-| No es pot connectar a Ollama | Aillament de xarxa | Ollama s'executa com a servei separat de docker-compose. Comprova el nom del servei a la configuracio. |
-| L'emmagatzematge no persisteix | Volum no muntat | Munta `storage/` com a volum Docker. |

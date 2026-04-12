@@ -4,8 +4,8 @@ data: 2026-04-02
 id: nexe-architecture
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Internal architecture of server-nexe 0.9.0 pre-release. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, Docker, encryption pipeline, request sanitization pipeline, and Mermaid diagrams."
-tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, docker, i18n, module-manager, crypto, encryption, sanitization, mermaid]
+abstract: "Internal architecture of server-nexe 0.9.1. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, encryption pipeline, request sanitization pipeline, and Mermaid diagrams."
+tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
 
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Architecture — server-nexe 0.9.0 pre-release
+# Architecture — server-nexe 0.9.1
 
 ## Five-Layer Architecture
 
@@ -117,7 +117,7 @@ Four monolithic files were split into 20+ submodules during the March 2026 tech 
 - chat.py (1187 lines) split into 8 submodules
 - routes.py (974 lines) split into 6 submodules
 - lifespan.py (681 lines) split into 4 submodules
-- tray.py (707 lines) split into 2 submodules
+- tray.py (707 lines) split into 3 submodules
 
 ```
 server-nexe/
@@ -208,14 +208,13 @@ server-nexe/
 │   ├── build_dmg.sh              # DMG builder with signing
 │   ├── tray.py                   # System tray app
 │   ├── tray_monitor.py           # _RamMonitor (daemon thread for RAM polling)
+│   ├── tray_translations.py      # i18n translations for the tray (ca/es/en)
 │   ├── tray_uninstaller.py       # Uninstaller with backup
 │   └── install_headless.py       # Headless installer (Linux compatible)
 │
 ├── knowledge/                    # Docs for RAG ingestion (ca/es/en × 12 files)
 ├── storage/                      # Runtime data (not in git)
-├── tests/                        # 4143 test functions
-├── Dockerfile                    # Python 3.12-slim + embedded Qdrant
-├── docker-compose.yml            # Nexe + Ollama services
+├── tests/                        # 4607 test functions
 └── nexe                          # CLI executable
 ```
 
@@ -228,7 +227,7 @@ The app is created via a singleton factory with double-check locking:
 - `core/app.py` calls `create_app()` from `core/server/factory.py`
 - First call (~0.5s): loads i18n, config, discovers modules, registers routers
 - Cached calls (<10ms): returns existing instance
-- Factory is split into 7 submodules (factory_app, factory_state, factory_security, factory_i18n, factory_modules, factory_routers, helpers)
+- Factory is split into 6 submodules (factory_app, factory_state, factory_security, factory_i18n, factory_modules, factory_routers)
 - `reset_app_cache()` available for tests
 
 ## Lifespan Manager
@@ -282,7 +281,7 @@ Handles startup and shutdown of the server. Split into 4 submodules.
 ```toml
 [module]
 name = "module_name"
-version = "0.9.0"
+version = "0.9.1"
 type = "local_llm_option"
 description = "Module description"
 location = "plugins/module_name/"
@@ -380,15 +379,9 @@ The system prompt defines Nexe's personality and behavior. It lives in `personal
 - Web UI: applyI18n() with data attributes, preserves child elements
 - CSP-safe: data-nexe-lang attribute instead of inline script
 
-## Docker Architecture
-
-- **Dockerfile:** Python 3.12-slim, Qdrant embedded (storage at `storage/vectors/`), non-root user (nexe), EXPOSE 9119
-- **docker-compose.yml:** Nexe + Ollama as separate services
-- **docker-entrypoint.sh:** Sequential start (Qdrant → Nexe), health check polling
-
 ## Test Architecture
 
-- 4143 test functions, 3213 passed in latest run, 0 failures
+- 4607 test functions, 3213 passed in latest run, 0 failures
 - Tests collocated with modules (each module has tests/ folder)
 - Root conftest.py for shared fixtures
 - Closures refactored to functions for patchability (key refactoring decision)

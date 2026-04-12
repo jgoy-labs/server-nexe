@@ -4,8 +4,8 @@ data: 2026-03-28
 id: nexe-errors-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Errores comunes y soluciones para server-nexe 0.9.0 pre-release. Cubre errores de instalacion, arranque del servidor, Web UI, autenticacion API, carga de modelos, memoria/RAG, Docker, streaming y errores de encriptacion."
-tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, docker, streaming, encryption]
+abstract: "Errores comunes y soluciones para server-nexe 0.9.1. Cubre errores de instalacion, arranque del servidor, Web UI, autenticacion API, carga de modelos, memoria/RAG, streaming y errores de encriptacion."
+tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, streaming, encryption]
 chunk_size: 600
 priority: P1
 
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Errores comunes — server-nexe 0.9.0 pre-release
+# Errores comunes — server-nexe 0.9.1
 
 ## Errores de instalacion
 
@@ -36,7 +36,7 @@ expires: null
 | Ollama not available | Ollama no instalado o no ejecutandose | Instalar desde ollama.com. El servidor auto-arrancara Ollama al iniciar. |
 | asyncio.Lock deadlock | Problema de event loop en Python 3.12 | Corregido en v0.8.2 via inicializacion lazy en module_lifecycle.py. Actualizar a la ultima version. |
 | Servidor ya en ejecucion (PID X) | Otra instancia activa del servidor | Usa "Quit" en el tray, o `pkill -9 server-nexe`. Verifica: `lsof -iTCP:9119` |
-| Servidor huerfano (Quit del tray no funciona) | Bug pre-v0.9.0 (corregido) — el tray no enviaba SIGTERM al servidor | Actualizar a v0.9.0+. Workaround: `pkill -f "core.app"` o `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
+| Servidor huerfano (Quit del tray no funciona) | Bug pre-v0.9.0 (corregido) — el tray no enviaba SIGTERM al servidor | Actualizar a v0.9.1. Workaround: `pkill -f "core.app"` o `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
 
 ## Errores de Web UI
 
@@ -86,10 +86,3 @@ expires: null
 | Migration failed | Base de datos corrupta o migracion interrumpida | El fichero de backup .bak se preserva. Restaurar desde backup y reintentar. |
 | Encryption status: disabled | Funcionalidad no activada | Configurar `NEXE_ENCRYPTION_ENABLED=true` en .env o en el entorno |
 
-## Errores de Docker
-
-| Error | Causa | Solucion |
-|-------|-------|----------|
-| Qdrant not starting | Discrepancia de arquitectura del binario | Docker auto-detecta amd64/arm64. Comprobar plataforma en Dockerfile. |
-| Cannot connect to Ollama | Aislamiento de red | Ollama se ejecuta como servicio separado de docker-compose. Comprobar nombre del servicio en la configuracion. |
-| Storage not persisting | Volumen no montado | Montar `storage/` como volumen de Docker. |
