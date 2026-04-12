@@ -24,7 +24,8 @@ cp .env.example .env
 Start the server:
 
 ```bash
-python -m core.cli go
+nexe go
+# Or without the wrapper: python -m core.cli go
 ```
 
 ## Running tests
