@@ -12,6 +12,8 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 
+from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
+
 class EngineType(str, Enum):
     AUTO = "auto"
     MLX = "mlx"
@@ -43,7 +45,7 @@ PROFILES = {
         tier=HardwareTier.MICRO,
         primary_model="qwen2:0.5b",
         secondary_model="tinyllama",
-        embedding_model="paraphrase-multilingual-mpnet-base-v2",
+        embedding_model=DEFAULT_EMBEDDING_MODEL,
         preferred_engine=EngineType.LLAMA_CPP,
         max_tokens=1024,
         context_window=2048,
@@ -54,7 +56,7 @@ PROFILES = {
         tier=HardwareTier.CONSUMER,
         primary_model="phi3.5",         # Phi-3.5 Mini 3.8B — fast, good at following instructions
         secondary_model="llama3.2:3b",
-        embedding_model="paraphrase-multilingual-mpnet-base-v2",
+        embedding_model=DEFAULT_EMBEDDING_MODEL,
         preferred_engine=EngineType.MLX,
         max_tokens=2048,
         context_window=8192,
@@ -65,7 +67,7 @@ PROFILES = {
         tier=HardwareTier.PRO,
         primary_model="llama3.1:8b",    # Llama 3.1 8B — better quality for 16-32GB
         secondary_model="mistral:7b",
-        embedding_model="paraphrase-multilingual-mpnet-base-v2",
+        embedding_model=DEFAULT_EMBEDDING_MODEL,
         preferred_engine=EngineType.MLX,
         max_tokens=4096,
         context_window=32768,
@@ -76,7 +78,7 @@ PROFILES = {
         tier=HardwareTier.ULTRA,
         primary_model="llama3.1:70b",   # Llama 3.1 70B — maximum quality for >32GB
         secondary_model="mixtral:8x7b",
-        embedding_model="paraphrase-multilingual-mpnet-base-v2",
+        embedding_model=DEFAULT_EMBEDDING_MODEL,
         preferred_engine=EngineType.MLX,
         max_tokens=8192,
         context_window=65536,

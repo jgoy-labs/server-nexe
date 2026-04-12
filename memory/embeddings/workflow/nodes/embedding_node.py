@@ -12,10 +12,11 @@ www.jgoy.net · https://server-nexe.org
 from typing import Dict, Any
 from memory.embeddings.module import EmbeddingsModule
 from memory.embeddings.core.interfaces import EmbeddingRequest
+from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
 
 async def embedding_node(
   text: str,
-  model: str = "paraphrase-multilingual-mpnet-base-v2",
+  model: str = DEFAULT_EMBEDDING_MODEL,
   use_cache: bool = True,
   normalize: bool = True,
   cache_version: str = "v1"

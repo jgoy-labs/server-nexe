@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import Dict, Any
 
-from memory.embeddings.constants import DEFAULT_VECTOR_SIZE  # noqa: F401 — canonical source
+from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL, DEFAULT_VECTOR_SIZE  # noqa: F401 — canonical source
 
 MODULE_ID = "memory"
 
@@ -77,6 +77,7 @@ MANIFEST: Dict[str, Any] = {
 __all__ = [
   "MANIFEST",
   "MODULE_ID",
+  "DEFAULT_EMBEDDING_MODEL",
   "DEFAULT_VECTOR_SIZE",
   "V1_RETRIEVE_FLOOR",
   "V1_RETRIEVE_CEILING",

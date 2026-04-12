@@ -31,13 +31,11 @@ logger = structlog.get_logger()
 
 
 def _detect_device() -> str:
-    """Auto-detect best available device for embeddings."""
-    try:
-        import torch
-        if torch.backends.mps.is_available():
-            return "mps"
-    except (ImportError, AttributeError):
-        pass
+    """Auto-detect best available device for embeddings.
+
+    fastembed uses ONNX runtime which auto-selects the best provider.
+    This returns 'cpu' as fastembed handles device selection internally.
+    """
     return "cpu"
 
 
@@ -146,8 +144,9 @@ class EmbeddingsModule:
       return True
 
     try:
+      from .constants import DEFAULT_EMBEDDING_MODEL
       default_config = {
-        "model_name": "paraphrase-multilingual-mpnet-base-v2",
+        "model_name": DEFAULT_EMBEDDING_MODEL,
         "device": _detect_device(),
         "max_workers": 2,
         "cache_enabled": True,

@@ -375,7 +375,7 @@ def _memory_api_available():
     if not _qdrant_available():
         return False
     try:
-        from sentence_transformers import SentenceTransformer  # noqa: F401
+        from fastembed import TextEmbedding  # noqa: F401
         return True
     except Exception:
         return False

@@ -23,29 +23,27 @@ from memory.embeddings.core.async_encoder import AsyncEmbedder
 pytestmark = pytest.mark.integration
 
 @pytest.fixture
-def mock_sentence_transformer():
+def mock_text_embedding():
   """
-  Mock SentenceTransformer per tests.
+  Mock fastembed TextEmbedding per tests.
 
-  IMPORTANT: encode() ha de retornar:
-  - Single text: 1D array (768,)
-  - Batch: 2D array (N, 768)
+  IMPORTANT: embed() retorna un iterador de vectors numpy.
   """
   mock = Mock()
 
-  def mock_encode(text_or_texts, **kwargs):
+  def mock_embed(text_or_texts, **kwargs):
     if isinstance(text_or_texts, list):
-      return np.random.rand(len(text_or_texts), 768).astype(np.float32)
+      return iter([np.random.rand(768).astype(np.float32) for _ in text_or_texts])
     else:
-      return np.random.rand(768).astype(np.float32)
+      return iter([np.random.rand(768).astype(np.float32)])
 
-  mock.encode.side_effect = mock_encode
+  mock.embed.side_effect = mock_embed
   return mock
 
 @pytest.fixture
-async def embeddings_module(mock_sentence_transformer):
+async def embeddings_module(mock_text_embedding):
   """
-  Fixture: EmbeddingsModule amb SentenceTransformer mockat.
+  Fixture: EmbeddingsModule amb fastembed TextEmbedding mockat.
 
   NOTA: El mock ha de mantenir-se durant tot el test perquè
   el model es carrega lazy durant encode().
@@ -56,8 +54,8 @@ async def embeddings_module(mock_sentence_transformer):
 
   module = EmbeddingsModule.get_instance()
 
-  with patch('sentence_transformers.SentenceTransformer',
-        return_value=mock_sentence_transformer):
+  with patch('fastembed.TextEmbedding',
+        return_value=mock_text_embedding):
     await module.initialize(config={
       "model_name": "test-model",
       "device": "cpu",

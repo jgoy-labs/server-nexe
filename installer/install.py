@@ -253,19 +253,29 @@ def run_installer():
     if confirm not in ('y', 'yes', 's', 'si', 'sí'):
         print(f"  {DIM}{t('embeddings_skipped')}{RESET}")
     else:
-        print_step(f"{BOLD}{t('downloading_embeddings_step')} (paraphrase-multilingual-mpnet-base-v2)...{RESET}")
+        # Read embedding model from server.toml (SSOT)
+        _emb_model = "paraphrase-multilingual-mpnet-base-v2"
+        try:
+            import toml as _toml
+            _srv_cfg = _toml.load(project_root / "personality" / "server.toml")
+            _emb_model = _srv_cfg.get("plugins", {}).get("models", {}).get("embedding", _emb_model)
+        except Exception:
+            pass
+        print_step(f"{BOLD}{t('downloading_embeddings_step')} ({_emb_model})...{RESET}")
         print(f"  {DIM}{t('downloading_model_progress')}{RESET}\n")
         try:
-            # Don't capture output so user sees download progress from sentence-transformers
+            # Don't capture output so user sees download progress from fastembed
             msg_start = t('embeddings_starting').replace("'", "\\'")
             msg_done = t('embeddings_done').replace("'", "\\'")
             emb_env = {**os.environ, "TRANSFORMERS_VERBOSITY": "error"}
             result = subprocess.run([
                 str(python_path), "-c",
-                f"from sentence_transformers import SentenceTransformer; "
+                f"from fastembed import TextEmbedding; "
+                f"import sys; "
                 f"print('\\n  {msg_start}\\n'); "
-                f"model = SentenceTransformer('paraphrase-multilingual-mpnet-base-v2'); "
-                f"print('\\n  {msg_done}')"
+                f"model = TextEmbedding(sys.argv[1]); "
+                f"print('\\n  {msg_done}')",
+                _emb_model,
             ], check=True, capture_output=False, env=emb_env)
             print(f"\n  {t('embeddings_downloaded_ok')}")
         except subprocess.CalledProcessError as e:

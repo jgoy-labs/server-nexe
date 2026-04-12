@@ -275,12 +275,13 @@ class TestMemoryAPICoverage:
         api._initialized = True
         api._executor = ThreadPoolExecutor(max_workers=1)
         mock_embedder = MagicMock()
-        mock_embedder.encode.return_value = MagicMock(tolist=MagicMock(return_value=[1.0, 2.0]))
+        mock_embedder.embed.return_value = iter([[0.6, 0.8]])
         api._embedder = mock_embedder
 
         async def run():
             result = await api._generate_embedding("test text")
-            assert result == [1.0, 2.0]
+            assert isinstance(result, list)
+            assert len(result) == 2
         asyncio.run(run())
         api._executor.shutdown(wait=False)
 

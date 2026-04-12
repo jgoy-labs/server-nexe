@@ -50,7 +50,8 @@ async def cmd_encode(text: str, model: str = None):
       config["model_name"] = model
     await module.initialize(config=config)
   
-  request = EmbeddingRequest(text=text, model=model or "paraphrase-multilingual-mpnet-base-v2")
+  from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
+  request = EmbeddingRequest(text=text, model=model or DEFAULT_EMBEDDING_MODEL)
   response = await module.encode(request)
   
   print(json.dumps({

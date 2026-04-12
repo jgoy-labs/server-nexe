@@ -13,9 +13,11 @@ from typing import Dict, Any
 
 MODULE_ID = "embeddings"
 
-# Embedding vector dimensionality.
-# Model: paraphrase-multilingual-mpnet-base-v2 (768 dims).
-# If you change the embedding model, change only this value.
+# ── SSOT: Embedding model defaults ──────────────────────────────────────
+# Change the model here (or override in personality/server.toml).
+# All modules import from this file — no hardcoded model names elsewhere.
+DEFAULT_EMBEDDING_MODEL = "paraphrase-multilingual-mpnet-base-v2"
+DEFAULT_EMBEDDING_PROVIDER = "fastembed"
 DEFAULT_VECTOR_SIZE = 768
 
 MANIFEST: Dict[str, Any] = {
@@ -50,7 +52,7 @@ MANIFEST: Dict[str, Any] = {
   "languages": ["ca-ES", "en-US", "es-ES"],
 
   "default_config": {
-    "model": "paraphrase-multilingual-mpnet-base-v2",
+    "model": DEFAULT_EMBEDDING_MODEL,
     "device": "cpu",
     "max_workers": 2,
     "cache_l1_size": 1000,
@@ -64,5 +66,7 @@ MANIFEST: Dict[str, Any] = {
 __all__ = [
   "MANIFEST",
   "MODULE_ID",
+  "DEFAULT_EMBEDDING_MODEL",
+  "DEFAULT_EMBEDDING_PROVIDER",
   "DEFAULT_VECTOR_SIZE",
 ]

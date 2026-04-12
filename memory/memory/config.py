@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 from dataclasses import dataclass, field
 from typing import Optional
 
-from memory.embeddings.constants import DEFAULT_VECTOR_SIZE
+from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL, DEFAULT_VECTOR_SIZE
 
 
 @dataclass
@@ -71,7 +71,7 @@ class MemoryConfig:
     gc: GCConfig = field(default_factory=GCConfig)
     db_path: Optional[str] = None
     qdrant_path: str = "storage/vectors"
-    embedding_model: str = "paraphrase-multilingual-mpnet-base-v2"
+    embedding_model: str = DEFAULT_EMBEDDING_MODEL
     vector_size: int = DEFAULT_VECTOR_SIZE
     dedup_refresh_threshold: float = 0.92
 

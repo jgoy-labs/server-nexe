@@ -43,7 +43,7 @@ os.environ.setdefault("TQDM_DISABLE", "1")
 # carregui sentence_transformers en temps d'import.
 _warnings.filterwarnings("ignore", message=".*position_ids.*", category=UserWarning)
 _warnings.filterwarnings("ignore", message=".*Some weights of.*", category=UserWarning)
-_warnings.filterwarnings("ignore", category=UserWarning, module="sentence_transformers")
+_warnings.filterwarnings("ignore", category=UserWarning, module="fastembed")
 
 from fastapi import FastAPI
 

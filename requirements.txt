@@ -28,7 +28,7 @@ huggingface_hub==0.36.2
 # macOS-only deps (tray app) → requirements-macos.txt
 
 # --- Memory & RAG ---
-sentence-transformers>=4.0.0,<6.0.0
+fastembed>=0.3.6
 pypdf>=6.9.2  # PDF support for knowledge ingestion (CVE-2026-31826, CVE-2026-33123, CVE-2026-33699 fixed)
 
 # --- Encryption at rest ---

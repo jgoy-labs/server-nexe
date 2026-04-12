@@ -431,12 +431,22 @@ def _run_headless_inner(config):
     emit(6, "running", "Downloading embedding model...")
     _log.info("Starting embeddings download")
     try:
+        # Read embedding model from server.toml (SSOT)
+        _emb_model = "paraphrase-multilingual-mpnet-base-v2"
+        try:
+            import toml as _toml
+            _srv_cfg = _toml.load(PROJECT_ROOT / "personality" / "server.toml")
+            _emb_model = _srv_cfg.get("plugins", {}).get("models", {}).get("embedding", _emb_model)
+        except Exception:
+            pass
         emb_env = {**os.environ, "TRANSFORMERS_VERBOSITY": "error"}
         subprocess.run([
             str(python_path), "-c",
-            "from sentence_transformers import SentenceTransformer; "
-            "model = SentenceTransformer('paraphrase-multilingual-mpnet-base-v2'); "
-            "print('Embeddings downloaded')"
+            "import sys; "
+            "from fastembed import TextEmbedding; "
+            "model = TextEmbedding(sys.argv[1]); "
+            "print('Embeddings downloaded')",
+            _emb_model,
         ], check=True, capture_output=True, text=True, env=emb_env, timeout=300)
         _log.info("Embeddings download complete")
         emit(6, "done")

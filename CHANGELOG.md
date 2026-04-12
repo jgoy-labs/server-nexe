@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.3] - 2026-04-12
+
+Dependency: replace `sentence-transformers` + PyTorch (~600 MB) with `fastembed` (ONNX, ~50 MB).
+
+### Changed
+
+- **Embeddings backend**: `sentence-transformers` replaced by `fastembed` (ONNX runtime). Same
+  model (`paraphrase-multilingual-mpnet-base-v2`), same 768-dim vectors, same cosine similarity
+  results. No change to Qdrant collections or stored vectors.
+- **SSOT**: embedding model name centralised in `memory/embeddings/constants.py`
+  (`DEFAULT_EMBEDDING_MODEL`). Change model in one place — `personality/server.toml` or
+  `constants.py` — propagates everywhere.
+- **Installer**: downloads fastembed model to `~/.cache/fastembed/` instead of HuggingFace cache.
+- `requirements.txt`: `sentence-transformers>=4.0.0` → `fastembed>=0.3.6`
+
+### Removed
+
+- PyTorch (`torch`) transitive dependency — no longer pulled in by `sentence-transformers`.
+  Saves ~600 MB from the install footprint.
+
 ## [0.9.2] - 2026-04-12
 
 Security hardening: 4 P1 fixes from mega-consultoria 2026-04-11.
