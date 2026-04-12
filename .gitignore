@@ -103,7 +103,6 @@ dev-tools/run_all_day.sh
 dev-tools/logs/
 
 # Fitxers generats/temporals
-COMMANDS.md
 TESTING_REPORT.md
 
 # =====================
