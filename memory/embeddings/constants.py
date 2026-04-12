@@ -16,7 +16,7 @@ MODULE_ID = "embeddings"
 # ── SSOT: Embedding model defaults ──────────────────────────────────────
 # Change the model here (or override in personality/server.toml).
 # All modules import from this file — no hardcoded model names elsewhere.
-DEFAULT_EMBEDDING_MODEL = "paraphrase-multilingual-mpnet-base-v2"
+DEFAULT_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 DEFAULT_EMBEDDING_PROVIDER = "fastembed"
 DEFAULT_VECTOR_SIZE = 768
 

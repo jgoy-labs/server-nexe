@@ -7,10 +7,12 @@ Description: Installer orchestrator — coordinates all installation steps.
 """
 
 import os
+import re
 import shutil
 import sys
 import subprocess
 import time
+from datetime import datetime
 from pathlib import Path
 
 from .installer_display import (
@@ -39,6 +41,33 @@ from .installer_reinstall import (
 )
 
 
+class _TeeWriter:
+    """Duplicates stdout to a log file, stripping ANSI codes for the file."""
+    _ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
+
+    def __init__(self, log_path):
+        self._terminal = sys.stdout
+        self._log = open(log_path, 'w', encoding='utf-8')
+        self._log.write(f"# Nexe Installer Log — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        self.log_path = log_path
+
+    def write(self, text):
+        self._terminal.write(text)
+        self._log.write(self._ANSI_RE.sub('', text))
+        self._log.flush()
+
+    def flush(self):
+        self._terminal.flush()
+        self._log.flush()
+
+    def close(self):
+        self._log.close()
+        sys.stdout = self._terminal
+
+    def __getattr__(self, name):
+        return getattr(self._terminal, name)
+
+
 def run_installer():
     # 1. Language selection
     select_language()
@@ -47,6 +76,13 @@ def run_installer():
     print(APP_LOGO)
     project_root = Path(__file__).parent.parent.resolve()
 
+    # Setup install log — storage/logs/ may not exist yet, create early
+    log_dir = project_root / "storage" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / f"install_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    tee = _TeeWriter(log_path)
+    sys.stdout = tee
+
     # 2. Hardware detection
     hw = detect_hardware()
 
@@ -54,6 +90,7 @@ def run_installer():
     confirm = input(f"\n{BOLD}{t('proceed_install')}{RESET} {t('yes_no')}: ").strip().lower()
     if confirm not in ('y', 'yes', 's', 'si', 'sí'):
         print("Cancelled.")
+        tee.close()
         return
 
     # 3.5. Reinstall handling — Bug 7 fix.
@@ -254,7 +291,7 @@ def run_installer():
         print(f"  {DIM}{t('embeddings_skipped')}{RESET}")
     else:
         # Read embedding model from server.toml (SSOT)
-        _emb_model = "paraphrase-multilingual-mpnet-base-v2"
+        _emb_model = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
         try:
             import toml as _toml
             _srv_cfg = _toml.load(project_root / "personality" / "server.toml")
@@ -324,6 +361,10 @@ def run_installer():
 
     # 16. Final summary
     show_final_summary(model_config, project_root, global_symlink_created, lang)
+
+    # Close install log
+    print(f"\n  {DIM}📋 Install log: {log_path}{RESET}")
+    tee.close()
 
 
 def add_login_item(app_path: str = "/Applications/Nexe.app") -> bool:
