@@ -36,9 +36,11 @@
 
 Server Nexe started as a learning-by-doing experiment: *"What would it take to run a fully local AI server with persistent memory?"* One question led to another — inference backends, RAG pipelines, vector search, plugin systems, security layers, a web UI, an installer with hardware detection.
 
-What began as a weekend prototype has grown into a real, working system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
+**This entire project — code, tests, audits, documentation — has been built by one person orchestrating different AI models**, both local (MLX, Ollama) and cloud (Claude, GPT, Gemini), as collaborators. The human decides what to build, designs the architecture, reviews every line, and runs every test. The AIs write, audit, and stress-test under human direction. No line of code ships without a person understanding it and taking responsibility for it.
 
-This is not trying to compete with ChatGPT or Claude. It's an open-source tool for people who want to own their AI infrastructure. Built by one person in Barcelona, with code, music, and stubbornness.
+What began as a weekend prototype has turned into a genuinely useful product: 4572 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
+
+This is not trying to compete with ChatGPT or Claude. It's an open-source tool for people who want to own their AI infrastructure. Built by one person in Barcelona, with AI as co-pilot, music, and stubbornness.
 
 ## Why Server Nexe?
 
