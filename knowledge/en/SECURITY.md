@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Security — server-nexe 0.9.0 pre-release
+# Security — server-nexe 0.9.1
 
 server-nexe is designed for trusted local environments. All data stays on-device. No telemetry, no external calls.
 
@@ -39,12 +39,14 @@ Rate limiting is applied to **all endpoints** — both the API (`/v1/*`) and the
 
 | Variable | Default | Endpoints |
 |----------|---------|-----------|
-| NEXE_RATE_LIMIT_CHAT | 60/min | /v1/chat/completions |
+| NEXE_RATE_LIMIT_CHAT | 20/min | /v1/chat/completions |
 | NEXE_RATE_LIMIT_MEMORY | 30/min | /v1/memory/* |
 | NEXE_RATE_LIMIT_RAG | 30/min | /v1/rag/* |
-| NEXE_RATE_LIMIT_UPLOAD | 10/min | /ui/upload |
+| NEXE_RATE_LIMIT_UPLOAD | 5/min | /ui/upload |
 | NEXE_RATE_LIMIT_DEFAULT | 120/min | All other endpoints |
 | NEXE_RATE_LIMIT_GLOBAL | 100/min | Global cap |
+
+**Note:** These variables are reserved for future implementation. Current limits are configured in source code.
 
 ### Web UI endpoints (hardcoded per endpoint)
 
@@ -211,7 +213,6 @@ All security audits are performed by autonomous AI sessions (Claude) as part of 
 - Real IP logging in auth failures (F-013)
 - Sanitizer context parameter to reduce false positives in chat (F-005)
 - `repr(e)` instead of `str(e)` for httpx exceptions (empty string bug)
-- Docker USER non-root (F-030)
 - print() → logger.info() migration for runtime code
 - Dependencies CVEs fixed (pypdf, starlette)
 

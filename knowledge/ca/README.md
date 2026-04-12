@@ -4,7 +4,7 @@ data: 2026-04-02
 id: nexe-overview
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe es un servidor d'IA local amb memoria RAG persistent creat per Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalitats: MEM_SAVE, i18n (ca/es/en), Docker, aillament de sessions, encriptacio at-rest. 15 models disponibles, 3 metodes d'instal-lacio (DMG, CLI, Docker), documentacio AI-ready. macOS testejat, Linux parcial."
+abstract: "server-nexe es un servidor d'IA local amb memoria RAG persistent creat per Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalitats: MEM_SAVE, i18n (ca/es/en), aillament de sessions, encriptacio at-rest. Models per tiers (8GB a 64GB), 2 metodes d'instal-lacio (DMG, CLI), documentacio AI-ready. macOS testejat, Linux parcial."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -16,13 +16,13 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# server-nexe 0.9.0 pre-release — Servidor d'IA local amb memoria persistent
+# server-nexe 0.9.1 — Servidor d'IA local amb memoria persistent
 
-**Versio:** 0.9.0 pre-release
+**Versio:** 0.9.1
 **Port per defecte:** 9119
 **Autor:** Jordi Goy (Barcelona)
 **Llicencia:** Apache 2.0
-**Plataformes:** macOS (testejat), Linux (parcial), Docker (suportat)
+**Plataformes:** macOS (testejat), Linux (parcial)
 **Web:** https://server-nexe.org | https://server-nexe.com
 
 ## Que es server-nexe
@@ -42,7 +42,6 @@ NO es npm nexe (un compilador de Node.js). NO es un producte de servidor Windows
 7. **Pujada de documents amb aillament de sessio** — Puja documents via la Web UI. Indexats a user_knowledge amb metadades de session_id. Els documents nomes son visibles dins la sessio on s'han pujat.
 8. **Encriptacio at-rest (opt-in)** — Encriptacio AES-256-GCM per a SQLite (via SQLCipher), sessions de xat (.enc) i text de documents RAG (TextStore). Els payloads de Qdrant contenen nomes vectors i IDs, sense text. Gestio de claus via OS Keyring, variable d'entorn o fitxer. Recentment afegida — encara no provada en batalla en produccio.
 9. **Validacio d'input completa** — Tots els endpoints (API i Web UI) tenen rate limiting, validacio d'input (`validate_string_input`) i sanititzacio de context RAG. 6 detectors d'injeccio amb normalitzacio Unicode. 47 patrons de jailbreak.
-10. **Suport Docker** — Dockerfile + docker-compose.yml amb Qdrant embegut. Python 3.12-slim, usuari no-root, Linux amd64/arm64.
 
 ## Stack tecnologic
 
@@ -59,7 +58,6 @@ NO es npm nexe (un compilador de Node.js). NO es un producte de servidor Windows
 | API | Compatible amb OpenAI (/v1/chat/completions) |
 | Autenticacio | X-API-Key (dual-key amb rotacio) |
 | Seguretat | 6 detectors d'injeccio + normalitzacio Unicode, 47 patrons de jailbreak, rate limiting, capcaleres CSP |
-| Contenidors | Docker + docker-compose (Nexe + Ollama) |
 
 ## Arquitectura
 
@@ -83,7 +81,7 @@ server-nexe/
 ├── personality/           # Prompts del sistema, module manager, i18n, server.toml
 ├── installer/             # Wizard SwiftUI, constructor de DMG, app de safata, instal·lador headless
 ├── storage/               # Dades en temps d'execucio (models, logs, vectors Qdrant)
-├── tests/                 # Suite de tests (4143 funcions de test)
+├── tests/                 # Suite de tests (4607 funcions de test)
 └── nexe                   # Executable CLI principal
 ```
 
@@ -105,35 +103,40 @@ La base de coneixement (`knowledge/`) esta dissenyada tant per a consum huma com
 - **Disponible en angles, catala i castella**
 - Apunta qualsevol assistent d'IA a aquest repositori i podra entendre l'arquitectura completa, crear plugins o contribuir codi
 
-## Models disponibles (15 al cataleg de l'instal·lador)
+## Models disponibles (per tiers de RAM)
 
-### Petits (8 GB RAM)
-- Qwen3 1.7B (1.1 GB) — Alibaba, 2025
-- Qwen3.5 2B (1.5 GB) — Alibaba, 2025 (nomes Ollama)
-- Phi-3.5 Mini (2.4 GB) — Microsoft, 2024
-- Salamandra 2B (1.5 GB) — BSC/AINA, 2024, optimitzat per al catala
-- Qwen3 4B (2.5 GB) — Alibaba, 2025
+### tier_8 (8 GB RAM)
+- Qwen3.5 9B — Alibaba, 2025
+- Gemma 4 E4B — Google DeepMind, 2025
+- Salamandra 2B — BSC/AINA, 2024, optimitzat per al catala
 
-### Mitjans (12-16 GB RAM)
-- Mistral 7B (4.1 GB) — Mistral AI, 2023
-- Salamandra 7B (4.9 GB) — BSC/AINA, 2024, el millor per al catala
-- Llama 3.1 8B (4.7 GB) — Meta, 2024
-- Qwen3 8B (5.0 GB) — Alibaba, 2025
-- Gemma 3 12B (7.6 GB) — Google DeepMind, 2025
+### tier_16 (16 GB RAM)
+- Llama 4 Scout (109B/17B actius MoE) — Meta, 2025
+- Salamandra 7B — BSC/AINA, 2024, el millor per al catala
 
-### Grans (32+ GB RAM)
-- Qwen3.5 27B (17 GB) — Alibaba, 2025 (nomes Ollama)
-- Qwen3 32B (20 GB) — Alibaba, 2025, raonament hibrid
-- Gemma 3 27B (17 GB) — Google DeepMind, 2025
-- DeepSeek R1 32B (20 GB) — DeepSeek, 2025, raonament avancat
-- Llama 3.1 70B (40 GB) — Meta, 2024
+### tier_24 (24 GB RAM)
+- Qwen3.5 27B — Alibaba, 2025
+- Gemma 4 31B — Google DeepMind, 2025
+
+### tier_32 (32 GB RAM)
+- Qwen3.5 35B-A3B (MoE) — Alibaba, 2025
+- DeepSeek R1 Distill 32B — DeepSeek, 2025, raonament avancat
+- ALIA-40B Instruct — BSC/AINA, 2025
+
+### tier_48 (48 GB RAM)
+- Qwen3.5 122B-A10B (MoE) — Alibaba, 2025
+- Llama 4 Maverick (400B/17B actius MoE) — Meta, 2025
+
+### tier_64 (64 GB RAM)
+- Qwen3.5 122B-A10B — Alibaba, 2025
+- GPT-OSS 120B — Meta, 2025
 
 Tambe es suporten models personalitzats via Ollama (per nom) o Hugging Face (repositori GGUF).
 
 ## Metodes d'instal·lacio
 
 ### 1. Instal·lador DMG per a macOS (recomanat)
-Wizard natiu SwiftUI amb 6 pantalles: benvinguda, carpeta de desti, seleccio de model (15 models amb deteccio de maquinari), confirmacio, progres, finalitzacio. Inclou Python 3.12.
+Wizard natiu SwiftUI amb 6 pantalles: benvinguda, carpeta de desti, seleccio de model (deteccio de maquinari per tiers), confirmacio, progres, finalitzacio. Inclou Python 3.12.
 
 ### 2. CLI headless
 ```bash
@@ -141,11 +144,6 @@ git clone https://github.com/jgoy-labs/server-nexe
 cd server-nexe
 ./setup.sh
 ./nexe go
-```
-
-### 3. Docker
-```bash
-docker-compose up
 ```
 
 ## Inici rapid
@@ -174,7 +172,6 @@ Autenticacio requerida: capcalera `X-API-Key` amb el valor de `.env` (`NEXE_PRIM
 | macOS Apple Silicon | Testejat (tots 3 backends) |
 | macOS Intel | Testejat (llama.cpp + Ollama) |
 | Linux x86_64 | Parcial (tests unitaris passen, CI verd, no testejat en produccio) |
-| Linux ARM64 | Docker suportat |
 | Windows | Encara no suportat |
 
 ## Limitacions actuals

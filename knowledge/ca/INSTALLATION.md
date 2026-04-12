@@ -4,8 +4,8 @@ data: 2026-03-28
 id: nexe-installation-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Com instal-lar server-nexe: 3 metodes. (1) DMG per macOS amb wizard SwiftUI, Python 3.12 inclos, 15 models. (2) CLI: git clone + ./setup.sh (macOS/Linux). (3) Docker amb docker-compose i Ollama. Requisits: macOS 13+ o Linux, 8GB RAM minim. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Port per defecte: 9119."
-tags: [installation, setup, dmg, swiftui, wizard, docker, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption, how-to]
+abstract: "Com instal-lar server-nexe: 2 metodes. (1) DMG per macOS amb wizard SwiftUI, Python 3.12 inclos, models per tiers de RAM. (2) CLI: git clone + ./setup.sh (macOS/Linux). Requisits: macOS 13+ o Linux, 8GB RAM minim. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Port per defecte: 9119."
+tags: [installation, setup, dmg, swiftui, wizard, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption, how-to]
 chunk_size: 600
 priority: P1
 
@@ -16,9 +16,9 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Instal·lacio — server-nexe 0.9.0 pre-release
+# Instal·lacio — server-nexe 0.9.1
 
-Tres metodes d'instal·lacio disponibles. Tria segons la teva plataforma i preferencies.
+Dos metodes d'instal·lacio disponibles. Tria segons la teva plataforma i preferencies.
 
 ## Requisits del sistema
 
@@ -83,50 +83,45 @@ Despres de la configuracio:
 ./nexe go    # Arrencar servidor -> http://127.0.0.1:9119
 ```
 
-## Metode 3: Docker
+## Cataleg de models
 
-Per a servidors Linux o desplegaments en contenidors.
+### tier_8 (8 GB RAM)
+| Model | Motor | Any |
+|-------|--------|------|
+| Qwen3.5 9B | Tots | 2025 |
+| Gemma 4 E4B | Tots | 2025 |
+| Salamandra 2B | Tots | 2024 |
 
-```bash
-git clone https://github.com/jgoy-labs/server-nexe
-cd server-nexe
-docker-compose up
-```
+### tier_16 (16 GB RAM)
+| Model | Motor | Any |
+|-------|--------|------|
+| Llama 4 Scout (109B/17B actius MoE) | Tots | 2025 |
+| Salamandra 7B | Tots | 2024 |
 
-- **Dockerfile:** Python 3.12-slim, Qdrant embedded (storage a `storage/vectors/`), usuari no-root (`nexe`), EXPOSE 9119
-- **docker-compose.yml:** Dos serveis — Nexe + Ollama
-- **docker-entrypoint.sh:** Arrencada sequencial (Qdrant -> esperar health -> Nexe), timeout de 15s amb avis
+### tier_24 (24 GB RAM)
+| Model | Motor | Any |
+|-------|--------|------|
+| Qwen3.5 27B | Tots | 2025 |
+| Gemma 4 31B | Tots | 2025 |
 
-Munta `storage/` per a dades persistents (models, vectors Qdrant, logs).
+### tier_32 (32 GB RAM)
+| Model | Motor | Any |
+|-------|--------|------|
+| Qwen3.5 35B-A3B (MoE) | Tots | 2025 |
+| DeepSeek R1 Distill 32B | Tots | 2025 |
+| ALIA-40B Instruct | Tots | 2025 |
 
-## Cataleg de models (15 models)
+### tier_48 (48 GB RAM)
+| Model | Motor | Any |
+|-------|--------|------|
+| Qwen3.5 122B-A10B (MoE) | Tots | 2025 |
+| Llama 4 Maverick (400B/17B actius MoE) | Tots | 2025 |
 
-### Petits (8 GB RAM)
-| Model | Mida | Motor | Any |
-|-------|------|--------|------|
-| Qwen3 1.7B | 1.1 GB | Tots | 2025 |
-| Qwen3.5 2B | 1.5 GB | Nomes Ollama | 2025 |
-| Phi-3.5 Mini | 2.4 GB | Tots | 2024 |
-| Salamandra 2B | 1.5 GB | Tots | 2024 |
-| Qwen3 4B | 2.5 GB | Tots | 2025 |
-
-### Mitjans (12-16 GB RAM)
-| Model | Mida | Motor | Any |
-|-------|------|--------|------|
-| Mistral 7B | 4.1 GB | Tots | 2023 |
-| Salamandra 7B | 4.9 GB | Tots | 2024 |
-| Llama 3.1 8B | 4.7 GB | Tots | 2024 |
-| Qwen3 8B | 5.0 GB | Tots | 2025 |
-| Gemma 3 12B | 7.6 GB | Tots | 2025 |
-
-### Grans (32+ GB RAM)
-| Model | Mida | Motor | Any |
-|-------|------|--------|------|
-| Qwen3.5 27B | 17 GB | Nomes Ollama | 2025 |
-| Qwen3 32B | 20 GB | Tots | 2025 |
-| Gemma 3 27B | 17 GB | Tots | 2025 |
-| DeepSeek R1 32B | 20 GB | Tots | 2025 |
-| Llama 3.1 70B | 40 GB | Tots | 2024 |
+### tier_64 (64 GB RAM)
+| Model | Motor | Any |
+|-------|--------|------|
+| Qwen3.5 122B-A10B | Tots | 2025 |
+| GPT-OSS 120B | Tots | 2025 |
 
 Models personalitzats: Ollama (per nom) o Hugging Face (URL de repositori GGUF).
 

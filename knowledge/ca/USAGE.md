@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Guia d'us — server-nexe 0.9.0 pre-release
+# Guia d'us — server-nexe 0.9.1
 
 ## Arrencar el servidor
 

@@ -4,7 +4,7 @@ data: 2026-04-02
 id: nexe-rag-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete reference of the server-nexe RAG memory system (v0.9.0 pre-release). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent, session-isolated document upload, embeddings (768D), chunking parameters, context building with i18n labels, RAG weight visualization, RAG context sanitization, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
+abstract: "Complete reference of the server-nexe RAG memory system (v0.9.1). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent, session-isolated document upload, embeddings (768D), chunking parameters, context building with i18n labels, RAG weight visualization, RAG context sanitization, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# RAG System — server-nexe 0.9.0 pre-release
+# RAG System — server-nexe 0.9.1
 
 RAG (Retrieval-Augmented Generation) is the persistent memory system of server-nexe. It augments the LLM's responses by injecting relevant information retrieved from vector memory into the prompt context.
 

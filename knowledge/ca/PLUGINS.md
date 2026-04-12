@@ -4,7 +4,7 @@ data: 2026-04-06
 id: nexe-plugins-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia completa del sistema de plugins de server-nexe 0.9.0 pre-release. Cobreix Protocol NexeModule (duck typing, no herencia), format manifest.toml, estructura de fitxers del plugin, cicle de vida (discovery -> loading -> initialization -> integration -> shutdown), objecte context, registre de routers, plugins existents (MLX, llama.cpp, Ollama, Security amb normalitzacio Unicode, Web UI amb validacio d'input), com crear un plugin nou pas a pas, errors comuns i bones practiques."
+abstract: "Guia completa del sistema de plugins de server-nexe 0.9.1. Cobreix Protocol NexeModule (duck typing, no herencia), format manifest.toml, estructura de fitxers del plugin, cicle de vida (discovery -> loading -> initialization -> integration -> shutdown), objecte context, registre de routers, plugins existents (MLX, llama.cpp, Ollama, Security amb normalitzacio Unicode, Web UI amb validacio d'input), com crear un plugin nou pas a pas, errors comuns i bones practiques."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Sistema de plugins — server-nexe 0.9.0 pre-release
+# Sistema de plugins — server-nexe 0.9.1
 
 server-nexe utilitza una arquitectura de plugins basada en descobriment automatic via fitxers manifest.toml. Els plugins son moduls que afegeixen funcionalitat sense modificar el core. No cal registre manual — el sistema escaneja, descobreix i carrega plugins automaticament.
 
@@ -36,7 +36,7 @@ class MyPlugin:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="my_plugin",
-            version="0.9.0",
+            version="0.9.1",
             description="What it does",
             author="Author Name",
             module_type="local_llm_option",
@@ -107,7 +107,7 @@ Tot plugin HA de tenir un fitxer `manifest.toml`. Es la font unica de veritat pe
 ```toml
 [module]
 name = "my_plugin"
-version = "0.9.0"
+version = "0.9.1"
 type = "local_llm_option"
 description = "What this plugin does"
 location = "plugins/my_plugin/"
@@ -219,7 +219,7 @@ Si el modul implementa `NexeModuleWithRouter`, el kernel registra el router a Fa
 ### 5. Shutdown
 Crida `await module.shutdown()` durant l'aturada del servidor. Ha de ser idempotent.
 
-## Activacio i seguretat — sistema dual
+## Activacio i seguretat — sistema triple
 
 server-nexe te **tres mecanismes complementaris** per decidir quins plugins s'activen. Els tres conviuen i es combinen — no son alternatives.
 
@@ -236,7 +236,7 @@ Per afegir un plugin nou cal incloure'l explicitament aqui.
 
 ### 2. `NEXE_APPROVED_MODULES` — env var (allowlist de seguretat)
 
-Validada per `get_module_allowlist()` a `core/config.py:240`. Es una capa de seguretat addicional sobre la llista de `server.toml`:
+Validada per `get_module_allowlist()` a `core/config.py:261`. Es una capa de seguretat addicional sobre la llista de `server.toml`:
 
 - **Mode desenvolupament** (`NEXE_ENV=development` o no definit): `NEXE_APPROVED_MODULES` es **opcional**. Si no s'ha definit, `get_module_allowlist()` retorna `None` i no filtra res.
 - **Mode produccio** (`NEXE_ENV=production` o `[core.environment].mode = "production"`): `NEXE_APPROVED_MODULES` es **OBLIGATORI**. Si falta, el servidor aborda amb `ValueError("SECURITY ERROR: NEXE_APPROVED_MODULES is required in production")`.
@@ -402,6 +402,6 @@ Ambdos metodes es poden cridar multiples vegades. Posa sempre guard `self._initi
 | Cicle de vida de moduls | `personality/module_manager/module_lifecycle.py` |
 | Gestor de configuracio | `personality/module_manager/config_manager.py` |
 | Registre de moduls | `personality/module_manager/registry.py` |
-| Allowlist de seguretat | `core/config.py:240` (`get_module_allowlist()`) |
+| Allowlist de seguretat | `core/config.py:261` (`get_module_allowlist()`) |
 | Registre de routers | `core/server/factory_modules.py` |
 | Plugin de referencia (el mes net) | `plugins/llama_cpp_module/` |

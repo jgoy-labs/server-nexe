@@ -4,8 +4,8 @@ data: 2026-03-28
 id: nexe-errors-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Common errors and solutions for server-nexe 0.9.0 pre-release. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, Docker, streaming, and encryption errors."
-tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, docker, streaming, encryption]
+abstract: "Common errors and solutions for server-nexe 0.9.1. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, streaming, and encryption errors."
+tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, streaming, encryption]
 chunk_size: 600
 priority: P1
 
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Common Errors — server-nexe 0.9.0 pre-release
+# Common Errors — server-nexe 0.9.1
 
 ## Installation Errors
 
@@ -36,7 +36,7 @@ expires: null
 | Ollama not available | Ollama not installed or not running | Install from ollama.com. Server will auto-start Ollama on boot. |
 | asyncio.Lock deadlock | Python 3.12 event loop issue | Fixed in v0.8.2 via lazy init in module_lifecycle.py. Update to latest. |
 | Server already running (PID X) | Another active server instance | Use "Quit" from the tray, or `pkill -9 server-nexe`. Verify: `lsof -iTCP:9119` |
-| Orphaned server (Quit from tray doesn't work) | Bug pre-v0.9.0 (fixed) — tray was not sending SIGTERM to server | Update to v0.9.0+. Workaround: `pkill -f "core.app"` or `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
+| Orphaned server (Quit from tray doesn't work) | Bug pre-v0.9.0 (fixed) — tray was not sending SIGTERM to server | Update to v0.9.1. Workaround: `pkill -f "core.app"` or `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
 
 ## Web UI Errors
 
@@ -86,10 +86,3 @@ expires: null
 | Migration failed | Corrupted database or interrupted migration | Backup .bak file is preserved. Restore from backup and retry. |
 | Encryption status: disabled | Feature not enabled | Set `NEXE_ENCRYPTION_ENABLED=true` in .env or environment |
 
-## Docker Errors
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| Qdrant not starting | Binary architecture mismatch | Docker auto-detects amd64/arm64. Check Dockerfile platform. |
-| Cannot connect to Ollama | Network isolation | Ollama runs as separate docker-compose service. Check service name in config. |
-| Storage not persisting | Volume not mounted | Mount `storage/` as Docker volume. |

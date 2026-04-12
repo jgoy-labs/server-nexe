@@ -4,8 +4,8 @@ data: 2026-04-02
 id: nexe-architecture
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Arquitectura interna de server-nexe 0.9.0 pre-release. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, Docker, pipeline de encriptacion, pipeline de sanitizacion de peticiones, y diagramas Mermaid."
-tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, docker, i18n, module-manager, crypto, encryption, sanitization, mermaid]
+abstract: "Arquitectura interna de server-nexe 0.9.1. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, pipeline de encriptacion, pipeline de sanitizacion de peticiones, y diagramas Mermaid."
+tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
 
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Arquitectura — server-nexe 0.9.0 pre-release
+# Arquitectura — server-nexe 0.9.1
 
 ## Arquitectura de cinco capas
 
@@ -117,7 +117,7 @@ Cuatro ficheros monoliticos fueron divididos en mas de 20 submodulos durante la 
 - chat.py (1187 lineas) dividido en 8 submodulos
 - routes.py (974 lineas) dividido en 6 submodulos
 - lifespan.py (681 lineas) dividido en 4 submodulos
-- tray.py (707 lineas) dividido en 2 submodulos
+- tray.py (707 lineas) dividido en 3 submodulos
 
 ```
 server-nexe/
@@ -208,14 +208,13 @@ server-nexe/
 │   ├── build_dmg.sh              # Constructor de DMG con firma
 │   ├── tray.py                   # App de bandeja del sistema
 │   ├── tray_monitor.py           # _RamMonitor (hilo daemon para polling RAM)
+│   ├── tray_translations.py      # Traducciones i18n de la bandeja (ca/es/en)
 │   ├── tray_uninstaller.py       # Desinstalador con backup
 │   └── install_headless.py       # Instalador headless (compatible con Linux)
 │
 ├── knowledge/                    # Documentacion para ingestion RAG (ca/es/en x 12 ficheros)
 ├── storage/                      # Datos en tiempo de ejecucion (no en git)
-├── tests/                        # 4143 funciones de test
-├── Dockerfile                    # Python 3.12-slim + Qdrant embebido
-├── docker-compose.yml            # Servicios Nexe + Ollama
+├── tests/                        # 4607 funciones de test
 └── nexe                          # Ejecutable CLI
 ```
 
@@ -228,7 +227,7 @@ La app se crea mediante una factory singleton con double-check locking:
 - `core/app.py` llama a `create_app()` de `core/server/factory.py`
 - Primera llamada (~0.5s): carga i18n, config, descubre modulos, registra routers
 - Llamadas cacheadas (<10ms): devuelve la instancia existente
-- La factory esta dividida en 7 submodulos (factory_app, factory_state, factory_security, factory_i18n, factory_modules, factory_routers, helpers)
+- La factory esta dividida en 6 submodulos (factory_app, factory_state, factory_security, factory_i18n, factory_modules, factory_routers)
 - `reset_app_cache()` disponible para tests
 
 ## Lifespan Manager
@@ -282,7 +281,7 @@ Gestiona el arranque y apagado del servidor. Dividido en 4 submodulos.
 ```toml
 [module]
 name = "module_name"
-version = "0.9.0"
+version = "0.9.1"
 type = "local_llm_option"
 description = "Descripcion del modulo"
 location = "plugins/module_name/"
@@ -380,15 +379,9 @@ El system prompt define la personalidad y comportamiento de Nexe. Se encuentra e
 - Web UI: applyI18n() con data attributes, preserva elementos hijos
 - Compatible con CSP: atributo data-nexe-lang en lugar de script inline
 
-## Arquitectura Docker
-
-- **Dockerfile:** Python 3.12-slim, Qdrant embedded (almacenamiento en `storage/vectors/`), usuario non-root (nexe), EXPOSE 9119
-- **docker-compose.yml:** Nexe + Ollama como servicios separados
-- **docker-entrypoint.sh:** Arranque secuencial (Qdrant -> Nexe), health check con polling
-
 ## Arquitectura de tests
 
-- 4143 funciones de test, 3213 pasados en la ultima ejecucion, 0 fallos
+- 4607 funciones de test, 3213 pasados en la ultima ejecucion, 0 fallos
 - Tests colocados junto a los modulos (cada modulo tiene carpeta tests/)
 - conftest.py raiz para fixtures compartidas
 - Closures refactorizadas a funciones para permitir patching (decision clave de refactorizacion)
