@@ -1,0 +1,106 @@
+# .gitoss-sync — Inventari whitelist per /push paranoic
+# Defineix exactament QUÈ pot arribar a GitHub.
+# Generat 2026-04-12 per /push amb context complet del repo.
+#
+# Format:
+#   [sync]    → dirs i fitxers permesos
+#   [[exclude]] → sempre bloquejats (per si el .gitignore falla)
+
+[sync]
+
+  # Directoris de codi font
+  dirs = [
+    "core",
+    "installer",
+    "memory",
+    "personality",
+    "plugins",
+    "tests",
+    "docs",
+    "knowledge",
+    "dev-tools",
+    ".github",
+  ]
+
+  # Fitxers arrel
+  files = [
+    ".coveragerc",
+    ".env.example",
+    ".gitignore",
+    ".gitoss-sync",
+    "CHANGELOG.md",
+    "COMMANDS.md",
+    "conftest.py",
+    "CONTRIBUTING.md",
+    "install_nexe.py",
+    "LICENSE",
+    "pyproject.toml",
+    "pytest-full.ini",
+    "pytest.ini",
+    "README.md",
+    "README-ca.md",
+    "requirements.txt",
+    "requirements-macos.txt",
+    "SECURITY.md",
+    "setup.sh",
+    "SetupNexe.command",
+  ]
+
+# Fitxers i dirs que MAI han d'arribar a GitHub
+# (segona línia de defensa darrere .gitignore)
+[[exclude]]
+  paths = [
+    # Secrets
+    ".env",
+    ".env.*",
+    "*.pem", "*.key", "*.p12", "*.cer", "*.crt",
+    ".nat_secrets",
+
+    # Binaris i builds
+    "qdrant",
+    "nexe",
+    "*.dmg",
+    "*.pkg",
+    "Install Nexe.dmg",
+    "rw.*.dmg",
+    "dist/",
+    "build/",
+    "releases/",
+
+    # Apps compilades
+    "Nexe.app/",
+    "InstallNexe.app/",
+    "Install Nexe.app/",
+
+    # Runtime i dades
+    "storage/",
+    "snapshots/",
+    "*.db",
+    "*.sqlite",
+    "*.log",
+    ".qdrant-initialized",
+    "plugins/web_ui_module/ui/uploads/",
+    "plugins/web_ui_module/static/uploads/",
+    "personality/.module_cache.json",
+
+    # Python
+    "__pycache__/",
+    "*.pyc",
+    "venv/",
+    ".venv/",
+    ".pytest_cache/",
+    ".coverage",
+    "htmlcov/",
+
+    # Dev intern
+    ".claude/",
+    ".ruff_cache/",
+    "diari/",
+    "dev-tools/run_all_day.sh",
+    "dev-tools/logs/",
+
+    # OS i accidentals
+    ".DS_Store",
+    "--output",
+    "--help",
+  ]
