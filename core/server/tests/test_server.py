@@ -31,7 +31,7 @@ def test_root_endpoint(client):
   assert "system" in data
   assert data["system"] == "Nexe 0.9.0"
   assert "version" in data
-  assert data["version"] == "0.9.0"
+  assert data["version"] == "0.9.1"
 
 def test_health_endpoint(client):
   """Test health endpoint"""

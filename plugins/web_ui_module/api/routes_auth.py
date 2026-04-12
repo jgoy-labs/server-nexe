@@ -14,6 +14,7 @@ from typing import Dict, Any, Optional
 import os as _os
 import logging
 import secrets
+import time as _time
 from fastapi import APIRouter, HTTPException, Depends, Header, Request
 
 from plugins.security.core.auth_config import get_admin_api_key
@@ -26,6 +27,32 @@ _server_lang = _os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
 
 def get_server_lang() -> str:
     return _server_lang
+
+
+# P1-A: Rate limit de fallades d'autenticació per IP.
+# Dict en memòria: {ip: [timestamps monotonic de fallades dins de la finestra]}.
+# Nexe 0.9.x és single-worker (uvicorn workers=1) — no cal lock.
+_ui_auth_failures: dict[str, list[float]] = {}
+_UI_RATE_LIMIT: int = 20   # màxim d'intents fallits dins la finestra
+_UI_RATE_WINDOW: float = 60.0  # finestra en segons
+
+
+def _check_ui_rate_limit(ip: str) -> bool:
+    """Retorna True si la IP ha superat el límit de fallades d'auth."""
+    now = _time.monotonic()
+    cutoff = now - _UI_RATE_WINDOW
+    timestamps = [t for t in _ui_auth_failures.get(ip, []) if t > cutoff]
+    _ui_auth_failures[ip] = timestamps
+    return len(timestamps) >= _UI_RATE_LIMIT
+
+
+def _record_ui_auth_failure(ip: str) -> None:
+    """Registra una fallada d'autenticació per a la IP donada."""
+    now = _time.monotonic()
+    cutoff = now - _UI_RATE_WINDOW
+    timestamps = [t for t in _ui_auth_failures.get(ip, []) if t > cutoff]
+    timestamps.append(now)
+    _ui_auth_failures[ip] = timestamps
 
 
 def make_require_ui_auth():
@@ -49,7 +76,27 @@ def make_require_ui_auth():
                 status_code=503,
                 detail=get_message(get_i18n(request), "webui.auth.no_key_configured")
             )
+        # P1-A: Rate limit check — ABANS del compare_digest per evitar timing side-channel
+        _client_ip = str(request.client.host) if request.client else "unknown"
+        if _check_ui_rate_limit(_client_ip):
+            raise HTTPException(
+                status_code=429,
+                detail="Too many authentication failures. Try again later.",
+            )
         if not secrets.compare_digest(x_api_key or "", expected):
+            # P1-A: Registra la fallada per al rate limit
+            _record_ui_auth_failure(_client_ip)
+            # P1-B: Log auth failure al security log (patró de auth_dependencies.py:185-195)
+            try:
+                from plugins.security.security_logger import get_security_logger
+                _sec_log = get_security_logger()
+                _sec_log.log_auth_failure(
+                    reason="invalid_ui_api_key",
+                    ip_address=_client_ip,
+                    endpoint=str(request.url.path),
+                )
+            except ImportError:
+                pass
             raise HTTPException(
                 status_code=401,
                 detail=get_message(get_i18n(request), "webui.auth.invalid_key"),
