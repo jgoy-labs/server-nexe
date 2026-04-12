@@ -836,23 +836,15 @@ class TestCachedEmbedderFinal:
 
 class TestAsyncEncoderFinal:
 
-    def test_load_model_local_files_fallback(self):
-        """Lines 135-142: local_files_only fails, raises RuntimeError (offline-only)."""
-        call_count = [0]
-
-        def fake_st(name, **kwargs):
-            call_count[0] += 1
-            if kwargs.get("local_files_only"):
-                raise OSError("not cached")
-            return MagicMock()
-
-        # Mock sentence_transformers at module level to avoid import issues
-        mock_st_module = MagicMock()
-        mock_st_module.SentenceTransformer = fake_st
+    def test_load_model_not_available(self):
+        """_load_model raises RuntimeError when model not available."""
+        # Mock fastembed at module level to avoid import issues
+        mock_fe_module = MagicMock()
+        mock_fe_module.TextEmbedding = MagicMock(side_effect=OSError("not cached"))
 
         import sys
-        orig = sys.modules.get("sentence_transformers")
-        sys.modules["sentence_transformers"] = mock_st_module
+        orig = sys.modules.get("fastembed")
+        sys.modules["fastembed"] = mock_fe_module
         try:
             # Re-import to get clean module
             import importlib
@@ -869,15 +861,14 @@ class TestAsyncEncoderFinal:
             encoder.device = "cpu"
             with pytest.raises(RuntimeError, match="not available locally"):
                 encoder._load_model()
-            assert call_count[0] == 1
 
             if "test-fallback-model" in AsyncEmbedder._instances:
                 del AsyncEmbedder._instances["test-fallback-model"]
         finally:
             if orig is not None:
-                sys.modules["sentence_transformers"] = orig
+                sys.modules["fastembed"] = orig
             else:
-                sys.modules.pop("sentence_transformers", None)
+                sys.modules.pop("fastembed", None)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
