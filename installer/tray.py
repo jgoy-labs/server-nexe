@@ -109,14 +109,14 @@ class NexeTray(rumps.App):
         self.lang = _detect_lang()
         self.strings = T.get(self.lang, T["ca"])
 
-        # Read version from server.toml if available
-        _version = "0.9.1"
+        # Read version from pyproject.toml (single source of truth)
+        _version = "0.9"
         try:
             import tomllib
-            _toml_path = PROJECT_ROOT / "personality" / "server.toml"
+            _toml_path = PROJECT_ROOT / "pyproject.toml"
             if _toml_path.exists():
                 with open(_toml_path, "rb") as f:
-                    _version = tomllib.load(f).get("meta", {}).get("version", "0.9.1")
+                    _version = tomllib.load(f).get("project", {}).get("version", _version)
         except Exception:
             pass
         self._version = _version
