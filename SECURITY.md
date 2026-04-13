@@ -28,20 +28,20 @@ It does **not** defend against:
 - `validate_string_input()` on all Web UI endpoints
 - Filename validation on file uploads
 - Path traversal protection on session IDs
-- Upload content denylist (v0.9.1): scans first 8KB of uploads for API tokens (`sk-ant-`, `sk-proj-`, `ghp_`, `github_pat_`, `AIzaSy`), PEM private keys, and `/etc/passwd` signatures. Speed-bump only — protects against accidental upload, not determined adversaries.
+- Upload content denylist (v0.9.7): scans first 8KB of uploads for API tokens (`sk-ant-`, `sk-proj-`, `ghp_`, `github_pat_`, `AIzaSy`), PEM private keys, and `/etc/passwd` signatures. Speed-bump only — protects against accidental upload, not determined adversaries.
 
-### Jailbreak detection (v0.9.1)
+### Jailbreak detection (v0.9.7)
 - 47 pattern speed-bump detector for common jailbreak attempts (multilingual: ca/en/es)
 - Injects `[SECURITY NOTICE]` prefix instead of rejecting — preserves UX on false positives
 - Defense-in-depth only. Sophisticated attacks evade trivially. Real protection requires model-level content moderation.
 
-### Memory and RAG injection protection (v0.9.1)
+### Memory and RAG injection protection (v0.9.7)
 - Memory tag stripping on all input: `[MEM_SAVE:]`, `[SYSTEM:]`, `[USER:]`, `[ASSISTANT:]`, `[TOOL:]`, `[FUNCTION:]`, `[MEMORY:]`, `[MEMORIA:]`
 - Applied uniformly on both `/ui/chat` and `/v1/chat/completions` (previously only Web UI was protected)
 - RAG ingest pipeline applies `_filter_rag_injection` to document chunks before storing
 - Anti-re-save guard prevents delete-then-memorize loops
 
-### Pipeline enforcement (v0.9.1)
+### Pipeline enforcement (v0.9.7)
 - All chat goes through two canonical endpoints: `/ui/chat` (Web UI) and `/v1/chat/completions` (OpenAI-compatible API)
 - Direct plugin endpoints (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) removed — return 403
 - Ensures all requests pass through the full security pipeline (auth, rate limiting, input validation, jailbreak detection, memory tag stripping)
@@ -64,7 +64,7 @@ It does **not** defend against:
 - AES-256-GCM with HKDF-SHA256 key derivation
 - Master key stored in OS Keyring (preferred), environment variable, or file fallback
 - SQLCipher for encrypted SQLite databases
-- **Fail-closed** (v0.9.1): server refuses to start if encryption is requested but `sqlcipher3` is not installed. No silent fallback to plaintext.
+- **Fail-closed** (v0.9.7): server refuses to start if encryption is requested but `sqlcipher3` is not installed. No silent fallback to plaintext.
 - Session files encrypted (.json to .enc migration)
 - RAG document text removed from Qdrant payloads (stored in encrypted TextStore)
 - CLI: `nexe encryption status`, `nexe encryption encrypt-all`, `nexe encryption export-key`
@@ -78,7 +78,7 @@ It does **not** defend against:
 
 Honest disclosure:
 
-- **Not tested in production.** Server Nexe has not been deployed in a production environment with real users. All testing has been done in development by the author. The 4572 automated tests cover code correctness, not real-world adversarial conditions.
+- **Not tested in production.** Server Nexe has not been deployed in a production environment with real users. All testing has been done in development by the author. The 4665 automated tests cover code correctness, not real-world adversarial conditions.
 - **No human security audit.** All security testing has been performed by AI (Claude). AI can find patterns and run systematic checks, but it is not a substitute for a professional penetration test.
 - **No formal threat model document.** The threat model above is implicit in the code, not a reviewed artifact.
 - **No bug bounty program.** This is a personal project with no budget for bounties.
@@ -91,7 +91,7 @@ The AI audit covered: injection detection, authentication flows, rate limiting, 
 
 | Version | Supported |
 |---------|-----------|
-| 0.9.1   | Current release, receives fixes |
+| 0.9.7   | Current release, receives fixes |
 | 0.8.2   | No longer supported |
 | < 0.8.0 | Not supported |
 
@@ -121,4 +121,4 @@ Server Nexe uses `cryptography` (>=44.0.0) for encryption, `keyring` (>=25.0.0) 
 
 ---
 
-*v0.9.1 · Apache 2.0 · Jordi Goy*
+*v0.9.7 · Apache 2.0 · Jordi Goy*

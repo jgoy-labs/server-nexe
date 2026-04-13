@@ -42,7 +42,7 @@ Server Nexe started as a learning-by-doing experiment: *"What would it take to h
 
 **This entire project — code, tests, audits, documentation — has been built by one person orchestrating different AI models**, both local (MLX, Ollama) and cloud (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), as collaborators. The human decides what to build, designs the architecture, reviews lines and runs tests. The AIs write, audit, and stress-test under human direction.
 
-What began as a prototype has turned into a genuinely useful product: 4572 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
+What began as a prototype has turned into a genuinely useful product: 4665 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
 
 This is not trying to compete with ChatGPT or Claude. But it can be complementary for less demanding tasks. It's an open-source tool for people who want to own their AI infrastructure. Built by one person in Barcelona, with AI as co-pilot, music, and stubbornness.
 
@@ -89,7 +89,7 @@ DMG with guided wizard that detects your hardware, picks the right backend, reco
 <td width="50%">
 
 ### Built to Grow
-4572 tests, security audit, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
+4665 tests, security audit, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
 
 </td>
 </tr>
@@ -205,7 +205,7 @@ Server Nexe includes a security module enabled by default:
 
 ## Testing
 
-4572 tests with coverage reporting. CI runs the full suite on every push.
+4665 tests with coverage reporting. CI runs the full suite on every push.
 
 ```bash
 # Unit tests
@@ -233,7 +233,7 @@ Server Nexe is actively developed. Here's what's coming:
 - [x] Encryption at rest — AES-256-GCM (v0.9.0)
 - [x] macOS code signing & notarization (v0.9.0)
 - [x] Security hardening — jailbreak detection, upload denylist, pipeline enforcement (v0.9.1)
-- [ ] Multimodal support — images via Ollama, llama.cpp and MLX backends
+- [x] Multimodal support (v0.9.7 — Ollama, MLX, llama.cpp, Web UI)
 - [ ] Native macOS app (SwiftUI, replaces Python tray)
 - [ ] Configurable inference parameters via UI
 - [ ] Community forum
@@ -253,6 +253,7 @@ server-nexe is built on the shoulders of these amazing open-source projects:
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) — Efficient GGUF model inference
 - [Ollama](https://ollama.ai) — Local model management and serving
 - [sentence-transformers](https://www.sbert.net) — Text embedding models
+- [fastembed](https://github.com/qdrant/fastembed) — ONNX-based fast embedding backend (since v0.9.3)
 - [Hugging Face](https://huggingface.co) — Model hub and transformers library
 
 **Infrastructure**
@@ -286,5 +287,5 @@ See [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Version 0.9.1</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
+  <strong>Version 0.9.7</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
 </p>
