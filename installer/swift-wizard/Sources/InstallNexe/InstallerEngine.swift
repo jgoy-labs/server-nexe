@@ -32,7 +32,7 @@ class InstallerEngine: ObservableObject {
         let hour = Calendar.current.component(.hour, from: Date())
         return hour < 7 || hour >= 20  // fosc de 20h a 7h
     }()
-    @Published var installPath: String = NSHomeDirectory() + "/server-nexe"
+    @Published var installPath: String = "/Applications/server-nexe"
     @Published var selectedModel: AIModel?
     @Published var selectedEngine: String = "auto"
 

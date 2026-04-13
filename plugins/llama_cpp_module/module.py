@@ -10,7 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any, List
 
 from fastapi import APIRouter
 from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
@@ -136,7 +136,7 @@ class LlamaCppModule:
                 details=stats
             )
         except Exception as e:
-            return HealthResult(status=HealthStatus.UNHEALTHY, message=str(e))
+            return HealthResult(status=HealthStatus.DEGRADED, message=str(e))
 
     async def shutdown(self) -> None:
         """Cleanup logic"""

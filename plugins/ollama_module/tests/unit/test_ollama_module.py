@@ -4,7 +4,7 @@ Tests unitaris per plugins/ollama_module/module.py
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
-from plugins.ollama_module.module import OllamaModule, OLLAMA_CONNECTION_TIMEOUT
+from plugins.ollama_module.module import OllamaModule
 
 
 class TestOllamaModuleInit:
@@ -134,7 +134,7 @@ class TestOllamaModuleHealthCheck:
         module = OllamaModule()
         with patch.object(module, "check_connection", return_value=False):
             result = await module.health_check()
-        assert result.status == HealthStatus.UNHEALTHY
+        assert result.status == HealthStatus.DEGRADED
 
     @pytest.mark.asyncio
     async def test_health_check_exception(self):

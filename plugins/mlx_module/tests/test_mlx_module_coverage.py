@@ -97,7 +97,7 @@ async def test_health_check_healthy():
 
 @pytest.mark.asyncio
 async def test_health_check_exception():
-    """Lines 129-130: health check when node raises exception."""
+    """Lines 129-130: health check when node raises exception returns DEGRADED (not unhealthy — module is loaded, backend unavailable)."""
     module = MLXModule()
     module._initialized = True
     mock_node = MagicMock()
@@ -105,7 +105,38 @@ async def test_health_check_exception():
     module._node = mock_node
 
     result = await module.health_check()
-    assert result.status == HealthStatus.UNHEALTHY
+    assert result.status == HealthStatus.DEGRADED
+
+
+@pytest.mark.asyncio
+async def test_is_model_loaded_no_node():
+    """Lines 86-87: is_model_loaded returns False when node is None."""
+    module = MLXModule()
+    module._node = None
+    result = await module.is_model_loaded()
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_is_model_loaded_node_reports_loaded():
+    """Lines 88-90: is_model_loaded returns pool stat when node present."""
+    module = MLXModule()
+    mock_node = MagicMock()
+    mock_node.get_pool_stats.return_value = {"model_loaded": True}
+    module._node = mock_node
+    result = await module.is_model_loaded("some-model")
+    assert result is True
+
+
+@pytest.mark.asyncio
+async def test_is_model_loaded_node_exception():
+    """Lines 91-92: is_model_loaded returns False on exception."""
+    module = MLXModule()
+    mock_node = MagicMock()
+    mock_node.get_pool_stats.side_effect = Exception("pool error")
+    module._node = mock_node
+    result = await module.is_model_loaded()
+    assert result is False
 
 
 @pytest.mark.asyncio

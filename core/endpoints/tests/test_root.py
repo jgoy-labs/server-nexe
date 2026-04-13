@@ -292,6 +292,55 @@ class TestReadinessEndpoint:
         data = resp.json()
         assert data["status"] == "degraded"
 
+    def test_readiness_engine_degraded_via_health_check_async(self):
+        """Mòdul requerit que retorna DEGRADED via health_check() async → readiness 'degraded' (no 'unhealthy').
+        Guard de regressió per BUG #5: ollama_module retornava UNHEALTHY quan Ollama no arrancava."""
+        from unittest.mock import AsyncMock as _AsyncMock
+
+        mock_module = MagicMock(spec=["health_check"])
+        mock_result = MagicMock()
+        mock_result.status.value = "degraded"
+        mock_module.health_check = _AsyncMock(return_value=mock_result)
+
+        config = {"plugins": {"models": {"preferred_engine": "ollama"}}}
+        modules = {"ollama_module": mock_module}
+        app = make_app(config=config, modules=modules)
+        client = TestClient(app)
+        resp = client.get("/health/ready")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "degraded", (
+            "Engine module DEGRADED (backend unavailable) must give readiness 'degraded', not 'unhealthy'"
+        )
+
+    def test_readiness_mixed_degraded_and_healthy_gives_degraded(self, monkeypatch):
+        """Un mòdul DEGRADED + un HEALTHY → readiness 'degraded'.
+        Aïlla NEXE_APPROVED_MODULES per garantir que 'security' no quedi filtrat en CI."""
+        from unittest.mock import AsyncMock as _AsyncMock
+        monkeypatch.delenv("NEXE_APPROVED_MODULES", raising=False)
+
+        mock_ollama = MagicMock(spec=["health_check"])
+        mock_res_degraded = MagicMock()
+        mock_res_degraded.status.value = "degraded"
+        mock_ollama.health_check = _AsyncMock(return_value=mock_res_degraded)
+
+        mock_security = MagicMock()
+        mock_security.get_health.return_value = {"status": "healthy"}
+
+        config = {
+            "plugins": {
+                "models": {"preferred_engine": "ollama"},
+                "modules": {"enabled": ["security"]},
+            }
+        }
+        modules = {"ollama_module": mock_ollama, "security": mock_security}
+        app = make_app(config=config, modules=modules)
+        client = TestClient(app)
+        resp = client.get("/health/ready")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "degraded"
+
 
 class TestApiInfoEndpoint:
     def test_api_info_without_i18n(self):

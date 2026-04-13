@@ -10,7 +10,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
@@ -153,7 +152,7 @@ class TestHealthCheck:
 
         assert result.status == HealthStatus.HEALTHY
 
-    def test_unhealthy_when_not_connected(self):
+    def test_degraded_when_not_connected(self):
         from plugins.ollama_module.module import OllamaModule
         from core.loader.protocol import HealthStatus
         m = OllamaModule()
@@ -161,7 +160,7 @@ class TestHealthCheck:
         with patch.object(m, "check_connection", AsyncMock(return_value=False)):
             result = asyncio.run(m.health_check())
 
-        assert result.status == HealthStatus.UNHEALTHY
+        assert result.status == HealthStatus.DEGRADED
 
     def test_degraded_on_exception(self):
         from plugins.ollama_module.module import OllamaModule

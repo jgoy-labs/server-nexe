@@ -113,7 +113,7 @@ struct DestinationView: View {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = t("dest_choose")
-        panel.directoryURL = URL(fileURLWithPath: NSHomeDirectory())
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
 
         if panel.runModal() == .OK, let url = panel.url {
             engine.installPath = url.appendingPathComponent("server-nexe").path

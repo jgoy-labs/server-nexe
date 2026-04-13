@@ -127,7 +127,7 @@ class OllamaModule:
                     details={"base_url": self.base_url},
                 )
             return HealthResult(
-                status=HealthStatus.UNHEALTHY,
+                status=HealthStatus.DEGRADED,
                 message="Ollama not reachable",
                 details={"base_url": self.base_url},
             )

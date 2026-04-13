@@ -9,6 +9,8 @@ struct CompletionView: View {
     @State private var addToDock = true
     @State private var addLoginItem = false
     @State private var nexeOpened = false
+    @State private var countdown: Int = 0
+    @State private var isCountingDown: Bool = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -114,24 +116,44 @@ struct CompletionView: View {
             }
             .padding(.horizontal, 60)
 
+            // Missatge countdown (BUG #4: explicar que s'obre system tray)
+            if isCountingDown {
+                VStack(spacing: 4) {
+                    Text(t("done_opening_tray"))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("\(countdown)")
+                        .font(.system(size: 28, weight: .bold, design: .monospaced))
+                        .foregroundColor(.nexeRed)
+                }
+                .padding(.top, 4)
+            }
+
             Spacer()
 
             // Botons
             HStack(spacing: 16) {
                 Button(t("btn_close")) {
+                    isCountingDown = false  // cancel·la countdown pendent si n'hi ha
                     NSApp.setActivationPolicy(.prohibited)
                     NSApplication.shared.terminate(nil)
                 }
                 .controlSize(.large)
 
-                Button(action: openNexe) {
-                    Text(nexeOpened ? t("btn_opened") : t("btn_open_nexe"))
-                        .frame(width: 200)
+                Button(action: startCountdown) {
+                    Text(
+                        nexeOpened
+                            ? t("btn_opened")
+                            : isCountingDown
+                                ? "\(countdown)s..."
+                                : t("btn_open_nexe")
+                    )
+                    .frame(width: 200)
                 }
                 .controlSize(.large)
                 .buttonStyle(.borderedProminent)
                 .tint(.nexeRed)
-                .disabled(nexeOpened)
+                .disabled(nexeOpened || isCountingDown)
             }
             .padding(.bottom, 20)
         }
@@ -149,13 +171,37 @@ struct CompletionView: View {
         }
     }
 
+    private func startCountdown() {
+        isCountingDown = true
+        countdown = 10
+        runCountdownStep()
+    }
+
+    private func runCountdownStep() {
+        // Guard: si el countdown ha estat cancel·lat (Tancar o altre event), aturar
+        guard isCountingDown else { return }
+        if countdown <= 0 {
+            isCountingDown = false
+            openNexe()
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [self] in
+            // Re-check guard dins la closure (per si Tancar es va cridar entre steps)
+            guard isCountingDown else { return }
+            countdown -= 1
+            runCountdownStep()
+        }
+    }
+
     private func openNexe() {
         nexeOpened = true
+
+        let nexeAppPath = engine.installPath + "/Nexe.app"
 
         // Eliminar quarantena de Nexe.app (pot bloquejar el llançament)
         let xattr = Process()
         xattr.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
-        xattr.arguments = ["-rd", "com.apple.quarantine", "/Applications/Nexe.app"]
+        xattr.arguments = ["-rd", "com.apple.quarantine", nexeAppPath]
         try? xattr.run()
         xattr.waitUntilExit()
 
@@ -183,23 +229,24 @@ struct CompletionView: View {
         // Nota: no cridar waitUntilExit — el tray és independent i no bloquejant
         try? tray.run()
 
-        // B-dock / B-login: executar en background per no bloquejar el main thread
-        // i per evitar que killall Dock interfereixi amb la transició de focus.
-        // S'executen DESPRÉS de llançar el tray perquè el killall Dock sigui invisible.
+        // B-dock / B-login: executar en background per no bloquejar el main thread.
+        // El countdown ja ha garantit que la UI estava estable, el killall Dock
+        // ara no causa el flash inicial (BUG #4).
         let snapAddToDock = addToDock
         let snapAddLoginItem = addLoginItem
+        let snapNexeAppPath = nexeAppPath
         DispatchQueue.global(qos: .utility).async {
-            if snapAddToDock { doAddToDock() }
-            if snapAddLoginItem { doAddLoginItem() }
+            if snapAddToDock { doAddToDock(nexeAppPath: snapNexeAppPath) }
+            if snapAddLoginItem { doAddLoginItem(nexeAppPath: snapNexeAppPath) }
         }
     }
 
-    private func doAddToDock() {
+    private func doAddToDock(nexeAppPath: String) {
         let addDock = Process()
         addDock.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
         addDock.arguments = [
             "write", "com.apple.dock", "persistent-apps", "-array-add",
-            "<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>/Applications/Nexe.app</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>"
+            "<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>\(nexeAppPath)</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>"
         ]
         try? addDock.run()
         addDock.waitUntilExit()
@@ -212,10 +259,12 @@ struct CompletionView: View {
         killDock.waitUntilExit()
     }
 
-    private func doAddLoginItem() {
+    private func doAddLoginItem(nexeAppPath: String) {
+        // Escapar cometes del path per evitar injection AppleScript
+        let safePath = nexeAppPath.replacingOccurrences(of: "\"", with: "\\\"")
         let script = """
         tell application "System Events" to make login item at end \
-        with properties {path:"/Applications/Nexe.app", hidden:true}
+        with properties {path:"\(safePath)", hidden:true}
         """
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")

@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+8 bugs resolts en instal·lació neta DMG v0.9.7.
+
+### Fixed
+
+- **Readiness check (P0)**: `ollama_module`, `mlx_module`, `llama_cpp_module` now return
+  `DEGRADED` (not `UNHEALTHY`) when the LLM backend is unavailable (Ollama not running,
+  model not loaded). The Web UI was blocked at "Iniciant..." on fresh installs because
+  `UNHEALTHY` caused the overall readiness to fail; `DEGRADED` unblocks the UI.
+- **Wizard: default install folder** now `/Applications/server-nexe` (was `~/server-nexe`).
+- **Wizard: models show RAM (ram_gb)** instead of disk size (disk_gb) in model cards.
+- **Wizard: tier selector (RAM tabs)** now centered (removed `minWidth: 640` ScrollView).
+- **Wizard: "Obrir Nexe" button** shows a 10-second countdown with tray explanation before
+  launching. Eliminates the screen flash caused by `killall Dock` at click time.
+- **Dock icon "?"**: `doAddToDock()` now uses the actual install path (`engine.installPath`)
+  instead of hardcoded `/Applications/Nexe.app`. Fixes broken Dock entry on non-standard paths.
+- **Login item path** (`doAddLoginItem`) also fixed to use `engine.installPath`.
+- **Logo glitch** on "Iniciant..." overlay: switched from `logo.png` to `logo.svg` for
+  crisp rendering at all resolutions without pixel artifacts.
+
 ## [0.9.7] - 2026-04-12
 
 Multimodal VLM: suport d'imatges als 4 backends (Ollama, MLX, Llama.cpp, Web UI).
