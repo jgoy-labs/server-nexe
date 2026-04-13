@@ -138,6 +138,31 @@ Logging d'events de seguretat **compatible amb RFC5424** via `plugins/security/s
 - Claus derivades per proposit: `"sqlite"`, `"sessions"`, `"text_store"`, `"backup"`
 - Implementacio: `core/crypto/provider.py`
 
+**Migrar la clau mestra a una nova màquina:**
+
+Si canvies d'ordinador o reinstal·les el sistema, has de moure la clau mestra per mantenir accés a les sessions `.enc` i la base de dades encriptada. La cadena de fallback és: OS Keyring → variable d'entorn → fitxer `~/.nexe/master.key`.
+
+```bash
+# 1. A la màquina ANTIGA — exporta la clau
+#    Opció A: des del keychain (si hi és)
+security find-generic-password -s "server-nexe" -w 2>/dev/null | xxd -r -p > master.key.backup
+
+#    Opció B: còpia directa del fitxer
+cp ~/.nexe/master.key master.key.backup
+
+# 2. Transfereix master.key.backup a la nova màquina (USB, SCP, AirDrop)
+
+# 3. A la màquina NOVA — col·loca la clau
+mkdir -p ~/.nexe
+cp master.key.backup ~/.nexe/master.key
+chmod 600 ~/.nexe/master.key
+
+# 4. Esborra el backup
+shred -u master.key.backup
+```
+
+Sense la clau original, les sessions `.enc` i la base de dades SQLCipher **no es poden desencriptar**. No hi ha recuperació possible.
+
 ### Que s'encripta
 
 | Component | Metode | Detalls |

@@ -138,6 +138,31 @@ El endpoint API `POST /v1/chat/completions` valida y sanitiza la entrada a trave
 - Claves derivadas por proposito: `"sqlite"`, `"sessions"`, `"text_store"`, `"backup"`
 - Implementacion: `core/crypto/provider.py`
 
+**Migrar la clave maestra a una nueva máquina:**
+
+Si cambias de ordenador o reinstalas el sistema, debes mover la clave maestra para mantener el acceso a las sesiones `.enc` y la base de datos cifrada. La cadena de fallback es: OS Keyring → variable de entorno → fichero `~/.nexe/master.key`.
+
+```bash
+# 1. En la máquina ANTIGUA — exporta la clave
+#    Opción A: desde el keychain (si está ahí)
+security find-generic-password -s "server-nexe" -w 2>/dev/null | xxd -r -p > master.key.backup
+
+#    Opción B: copia directa del fichero
+cp ~/.nexe/master.key master.key.backup
+
+# 2. Transfiere master.key.backup a la nueva máquina (USB, SCP, AirDrop)
+
+# 3. En la máquina NUEVA — coloca la clave
+mkdir -p ~/.nexe
+cp master.key.backup ~/.nexe/master.key
+chmod 600 ~/.nexe/master.key
+
+# 4. Borra el backup
+shred -u master.key.backup
+```
+
+Sin la clave original, las sesiones `.enc` y la base de datos SQLCipher **no se pueden descifrar**. No hay recuperación posible.
+
 ### Que se encripta
 
 | Componente | Metodo | Detalles |
