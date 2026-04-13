@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Instal·lacio — server-nexe 0.9.1
+# Instal·lacio — server-nexe 0.9.7
 
 Dos metodes d'instal·lacio disponibles. Tria segons la teva plataforma i preferencies.
 
@@ -134,9 +134,9 @@ curl http://127.0.0.1:9119/health    # Health check
 open http://127.0.0.1:9119/ui        # Web UI
 ```
 
-## Encriptacio at-rest (opt-in)
+## Encriptacio at-rest (default `auto`)
 
-Despres de la instal·lacio, pots activar l'encriptacio at-rest:
+Despres de la instal·lacio, l'encriptacio s'activa automaticament si sqlcipher3 esta disponible. Per gestionar-la manualment:
 
 ```bash
 # Activar encriptacio
@@ -182,4 +182,4 @@ Accessible des del menu de la safata. Doble confirmacio, calcula l'espai, elimin
 | NEXE_DEFAULT_MAX_TOKENS | Tokens maxims de resposta | 4096 |
 | NEXE_LANG | Idioma del servidor | ca |
 | NEXE_ENV | Entorn | production |
-| NEXE_ENCRYPTION_ENABLED | Activar encriptacio at-rest | false |
+| NEXE_ENCRYPTION_ENABLED | Activar encriptacio at-rest | auto (s'activa si sqlcipher3 disponible) |

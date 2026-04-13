@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Identidad de server-nexe: proyecto open-source creado por Jordi Goy en Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que hace (IA local, RAG, multi-backend, encriptacion en reposo), estado actual (0.9.1), enlaces oficiales y como apoyar."
+abstract: "Identidad de server-nexe: proyecto open-source creado por Jordi Goy en Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que hace (IA local, RAG, multi-backend, encriptacion en reposo), estado actual (0.9.7), enlaces oficiales y como apoyar."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
 chunk_size: 400
 priority: P1
@@ -39,7 +39,7 @@ server-nexe combina cinco capacidades:
 2. **Memoria RAG persistente** — Recuerda contexto entre sesiones usando busqueda vectorial Qdrant con embeddings de 768 dimensiones. Tres colecciones: documentacion del sistema, conocimiento del usuario y memoria del chat.
 3. **Inferencia multi-backend** — Elige entre MLX (nativo Apple Silicon), llama.cpp (GGUF, universal) u Ollama. Misma API, motores diferentes.
 4. **Sistema de plugins modular** — Seguridad, interfaz web, RAG, backends — todo es un plugin. Amplia sin tocar el nucleo.
-5. **Encriptacion en reposo (opt-in)** — Encriptacion AES-256-GCM para datos almacenados: SQLite via SQLCipher, sesiones de chat como ficheros .enc, y texto de documentos RAG desacoplado del almacenamiento vectorial. Anadida recientemente, aun no probada en batalla.
+5. **Encriptacion en reposo (default `auto`)** — Encriptacion AES-256-GCM para datos almacenados: SQLite via SQLCipher, sesiones de chat como ficheros .enc, y texto de documentos RAG desacoplado del almacenamiento vectorial. Se activa automaticamente si sqlcipher3 esta disponible. Anadida recientemente, aun no probada en batalla.
 
 ## Stack tecnologico
 
@@ -49,20 +49,20 @@ server-nexe combina cinco capacidades:
 | Framework web | FastAPI |
 | Base de datos vectorial | Qdrant |
 | Backends LLM | MLX, llama.cpp, Ollama |
-| Embeddings | sentence-transformers (768D) / nomic-embed-text |
-| Encriptacion | AES-256-GCM, HKDF-SHA256, SQLCipher (opt-in) |
+| Embeddings | fastembed ONNX (768D) / nomic-embed-text |
+| Encriptacion | AES-256-GCM, HKDF-SHA256, SQLCipher (default auto) |
 | CLI | Click + Rich |
 | API | Compatible con OpenAI (/v1/chat/completions) |
 | Licencia | Apache 2.0 |
 
 ## Estado actual
 
-- **Version:** 0.9.1
+- **Version:** 0.9.7
 - **Plataforma principal:** macOS (Apple Silicon e Intel) — probado
 - **Linux:** Soporte parcial (tests unitarios pasan, no probado en produccion)
 - **Windows:** Aun no soportado
 - **Puerto por defecto:** 9119
-- **Tests:** 4607 funciones de test, 0 fallos en la ultima ejecucion
+- **Tests:** 4665 funciones de test recopiladas (4804 totales), 0 fallos en la ultima ejecucion
 
 ## Documentacion AI-Ready
 

@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Guia d'us — server-nexe 0.9.1
+# Guia d'us — server-nexe 0.9.7
 
 ## Arrencar el servidor
 
@@ -94,7 +94,7 @@ No calen comandes extra. Funciona tant al CLI com a la Web UI. Indicadors: el ba
 
 ## Encriptacio
 
-L'encriptacio at-rest es opt-in. Activa-la per encriptar les teves dades emmagatzemades:
+L'encriptacio at-rest es `auto` per defecte — s'activa automaticament si `sqlcipher3` esta disponible. Per forcar-la o gestionar-la manualment:
 
 ```bash
 # Comprovar estat actual

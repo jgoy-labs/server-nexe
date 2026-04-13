@@ -4,7 +4,7 @@ data: 2026-04-02
 id: nexe-rag-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.9.1). Cubre 3 colecciones Qdrant con thresholds, MEM_SAVE memoria automatica, intent de borrado, subida de documentos con aislamiento por sesion, embeddings (768D), parametros de chunking, construccion de contexto con etiquetas i18n, visualizacion de pesos RAG, sanitizacion de contexto RAG, poda inteligente, deduplicacion, TextStore para texto encriptado, y payloads de Qdrant sin texto."
+abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.9.7). Cubre 3 colecciones Qdrant con thresholds, MEM_SAVE memoria automatica, intent de borrado, subida de documentos con aislamiento por sesion, embeddings (768D), parametros de chunking, construccion de contexto con etiquetas i18n, visualizacion de pesos RAG, sanitizacion de contexto RAG, poda inteligente, deduplicacion, TextStore para texto encriptado, y payloads de Qdrant sin texto."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Sistema RAG — server-nexe 0.9.1
+# Sistema RAG — server-nexe 0.9.7
 
 RAG (Retrieval-Augmented Generation) es el sistema de memoria persistente de server-nexe. Aumenta las respuestas del LLM inyectando informacion relevante recuperada de la memoria vectorial en el contexto del prompt.
 
@@ -70,7 +70,7 @@ Todo el texto reside en SQLite (opcionalmente encriptado via SQLCipher). Esto si
 
 **Modelo primario (via Ollama):** `nomic-embed-text` — 768 dimensiones. Usado cuando Ollama esta disponible.
 
-**Modelo fallback (offline):** `paraphrase-multilingual-mpnet-base-v2` via sentence-transformers — 768 dimensiones. Multilingue. Usado cuando Ollama no esta disponible.
+**Modelo fallback (offline):** `paraphrase-multilingual-mpnet-base-v2` via fastembed (ONNX) — 768 dimensiones. Multilingue. Usado cuando Ollama no esta disponible. (Migrado de sentence-transformers a fastembed desde v0.9.3.)
 
 Todos los vectores se almacenan con 768 dimensiones. Este valor esta centralizado en `memory/memory/constants.py` como `DEFAULT_VECTOR_SIZE = 768`.
 

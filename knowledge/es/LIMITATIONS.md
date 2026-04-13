@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-limitations
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentacion honesta de las limitaciones de server-nexe 0.9.1. Cubre soporte de plataformas (macOS probado, Linux parcial, Windows no soportado), calidad de modelos vs nube (GPT-4/Claude), limitaciones de RAG (embeddings, chunking, arranque en frio, contradicciones), compatibilidad parcial de API OpenAI, rendimiento (instancia unica, concurrencia), restricciones de seguridad, advertencias sobre encriptacion (opt-in, nueva, no probada en batalla), y carencias funcionales (sin multi-usuario, sin sincronizacion, sin fine-tuning)."
+abstract: "Documentacion honesta de las limitaciones de server-nexe 0.9.7. Cubre soporte de plataformas (macOS probado, Linux parcial, Windows no soportado), calidad de modelos vs nube (GPT-4/Claude), limitaciones de RAG (embeddings, chunking, arranque en frio, contradicciones), compatibilidad parcial de API OpenAI, rendimiento (instancia unica, concurrencia), restricciones de seguridad, advertencias sobre encriptacion (default auto, nueva, no probada en batalla), y carencias funcionales (sin multi-usuario, sin sincronizacion, sin fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Limitaciones — server-nexe 0.9.1
+# Limitaciones — server-nexe 0.9.7
 
 Este documento describe honestamente lo que server-nexe no puede hacer o no hace bien.
 
@@ -61,7 +61,7 @@ Parcialmente compatible con el formato de API de OpenAI:
 | /v1/completions (legacy) | No implementado |
 | /v1/fine-tuning | No implementado |
 | Function calling | No implementado |
-| Vision/multimodal | No implementado |
+| Vision/multimodal | Implementado desde v0.9.7 (Ollama, MLX, llama.cpp, Web UI) |
 
 ## Rendimiento
 
@@ -82,8 +82,8 @@ Parcialmente compatible con el formato de API de OpenAI:
 
 ## Advertencias sobre encriptacion
 
-- **Opt-in:** La encriptacion en reposo no esta activada por defecto. Los usuarios deben activarla explicitamente.
-- **Funcionalidad nueva:** Anadida en v0.9.0, disponible desde v0.9.1. Probada (68 tests, 0 fallos) pero aun no probada en batalla en produccion con usuarios reales.
+- **Default `auto`:** La encriptacion en reposo se activa automaticamente si `sqlcipher3` esta disponible. Se puede forzar con `NEXE_ENCRYPTION_ENABLED=true` o desactivar con `false`.
+- **Funcionalidad nueva:** Anadida en v0.9.0, disponible desde v0.9.7. Probada (68 tests, 0 fallos) pero aun no probada en batalla en produccion con usuarios reales.
 - **Gestion de claves:** Clave maestra almacenada en OS Keyring, variable de entorno, o fichero. Si se pierde la clave, los datos encriptados no se pueden recuperar.
 - **Dependencia SQLCipher:** Requiere el paquete `sqlcipher3`. Cae a SQLite en texto plano con aviso si no esta instalado.
 - **Migracion:** Migrar grandes conjuntos de datos (muchas memorias, muchas sesiones) puede llevar tiempo. Hacer backup antes de migrar.

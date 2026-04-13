@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Core identity of server-nexe: open-source project created by Jordi Goy in Barcelona. What it is, what it is NOT (not npm nexe, not Ollama, not ChatGPT), what it does (local AI, RAG, multi-backend, encryption at-rest), current status (0.9.1), official links and how to support."
+abstract: "Core identity of server-nexe: open-source project created by Jordi Goy in Barcelona. What it is, what it is NOT (not npm nexe, not Ollama, not ChatGPT), what it does (local AI, RAG, multi-backend, encryption at-rest), current status (0.9.7), official links and how to support."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
 chunk_size: 400
 priority: P1
@@ -39,7 +39,7 @@ server-nexe combines five capabilities:
 2. **Persistent RAG Memory** — Remembers context across sessions using Qdrant vector search with 768-dimensional embeddings. Three collections: system documentation, user knowledge, and chat memory.
 3. **Multi-Backend Inference** — Choose between MLX (Apple Silicon native), llama.cpp (GGUF, universal) or Ollama. Same API, different engines.
 4. **Modular Plugin System** — Security, web UI, RAG, backends — everything is a plugin. Extend without touching the core.
-5. **Encryption at Rest (opt-in)** — AES-256-GCM encryption for stored data: SQLite via SQLCipher, chat sessions as .enc files, and RAG document text decoupled from vector storage. Recently added, not yet battle-tested.
+5. **Encryption at Rest (default `auto`)** — AES-256-GCM encryption for stored data: SQLite via SQLCipher, chat sessions as .enc files, and RAG document text decoupled from vector storage. Activates automatically if sqlcipher3 is available. Recently added, not yet battle-tested.
 
 ## Technology stack
 
@@ -49,20 +49,20 @@ server-nexe combines five capabilities:
 | Web framework | FastAPI |
 | Vector database | Qdrant |
 | LLM backends | MLX, llama.cpp, Ollama |
-| Embeddings | sentence-transformers (768D) / nomic-embed-text |
-| Encryption | AES-256-GCM, HKDF-SHA256, SQLCipher (opt-in) |
+| Embeddings | fastembed ONNX (768D) / nomic-embed-text |
+| Encryption | AES-256-GCM, HKDF-SHA256, SQLCipher (default auto) |
 | CLI | Click + Rich |
 | API | OpenAI-compatible (/v1/chat/completions) |
 | License | Apache 2.0 |
 
 ## Current status
 
-- **Version:** 0.9.1
+- **Version:** 0.9.7
 - **Primary platform:** macOS (Apple Silicon and Intel) — tested
 - **Linux:** Partial support (unit tests pass, not production-tested)
 - **Windows:** Not yet supported
 - **Default port:** 9119
-- **Tests:** 4607 test functions, 0 failures in latest run
+- **Tests:** 4665 test functions collected (4804 total), 0 failures in latest run
 
 ## AI-Ready Documentation
 

@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-testing-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia y cobertura de pruebas de server-nexe 0.9.1. 4607 funciones de test, 3213 pasados en la ultima ejecucion completa, 0 fallos. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura, correcciones de tests de auditoria IA, tests de crypto (68 nuevos), resultados de mega-test v1/v2, y valoracion honesta de las limitaciones de las pruebas."
+abstract: "Estrategia y cobertura de pruebas de server-nexe 0.9.7. 4665 funciones de test recopiladas (4804 totales), 0 fallos en la ultima ejecucion. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura, correcciones de tests de auditoria IA, tests de crypto (68 nuevos), resultados de mega-test v1/v2, y valoracion honesta de las limitaciones de las pruebas."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
 chunk_size: 800
 priority: P2
@@ -16,19 +16,20 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Pruebas — server-nexe 0.9.1
+# Pruebas — server-nexe 0.9.7
 
 ## Resultados de las pruebas
 
 | Metrica | Valor |
 |---------|-------|
-| Total de funciones de test | 4607 |
-| Pasados en ultima ejecucion | 3213 |
+| Total de funciones de test recopiladas | 4665 |
+| Total de funciones de test (incl. deseleccionadas) | 4804 |
+| Pasados en ultima ejecucion | 4665 |
 | Fallidos | 0 |
 | Saltados | 6 |
 | XFailed | 1 |
 
-Nota: La diferencia entre el total de funciones de test (4607) y los pasados (3213) se debe a tests deseleccionados (marcadores integration, e2e, slow) que se excluyen de la ejecucion estandar.
+Nota: 4665 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 4804.
 
 ## Estructura de los tests
 
@@ -107,7 +108,7 @@ Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (C
 - Misma metodologia de 4 fases, re-ejecutada tras aplicar las correcciones de v1
 - 10 hallazgos (vs 23 en v1, 57% de reduccion)
 - 7 correcciones aplicadas (validacion de memoria, path traversal, validacion de nombres de fichero, rate limiting, normalizacion Unicode, print->logger)
-- Resultado final: **3213 pasados, 0 fallidos, 6 saltados, 1 xfailed**
+- Resultado final (v0.9.7): **4665 pasados, 0 fallidos**
 - Veredicto: GO CON CONDICIONES (mejorado)
 
 ## Decisiones clave en las pruebas

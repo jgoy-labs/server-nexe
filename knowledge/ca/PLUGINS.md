@@ -4,7 +4,7 @@ data: 2026-04-06
 id: nexe-plugins-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia completa del sistema de plugins de server-nexe 0.9.1. Cobreix Protocol NexeModule (duck typing, no herencia), format manifest.toml, estructura de fitxers del plugin, cicle de vida (discovery -> loading -> initialization -> integration -> shutdown), objecte context, registre de routers, plugins existents (MLX, llama.cpp, Ollama, Security amb normalitzacio Unicode, Web UI amb validacio d'input), com crear un plugin nou pas a pas, errors comuns i bones practiques."
+abstract: "Guia completa del sistema de plugins de server-nexe 0.9.7. Cobreix Protocol NexeModule (duck typing, no herencia), format manifest.toml, estructura de fitxers del plugin, cicle de vida (discovery -> loading -> initialization -> integration -> shutdown), objecte context, registre de routers, plugins existents (MLX, llama.cpp, Ollama, Security amb normalitzacio Unicode, Web UI amb validacio d'input), com crear un plugin nou pas a pas, errors comuns i bones practiques."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Sistema de plugins — server-nexe 0.9.1
+# Sistema de plugins — server-nexe 0.9.7
 
 server-nexe utilitza una arquitectura de plugins basada en descobriment automatic via fitxers manifest.toml. Els plugins son moduls que afegeixen funcionalitat sense modificar el core. No cal registre manual — el sistema escaneja, descobreix i carrega plugins automaticament.
 
@@ -36,7 +36,7 @@ class MyPlugin:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="my_plugin",
-            version="0.9.1",
+            version="0.9.7",
             description="What it does",
             author="Author Name",
             module_type="local_llm_option",
@@ -107,7 +107,7 @@ Tot plugin HA de tenir un fitxer `manifest.toml`. Es la font unica de veritat pe
 ```toml
 [module]
 name = "my_plugin"
-version = "0.9.1"
+version = "0.9.7"
 type = "local_llm_option"
 description = "What this plugin does"
 location = "plugins/my_plugin/"

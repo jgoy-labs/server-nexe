@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Instalacion — server-nexe 0.9.1
+# Instalacion — server-nexe 0.9.7
 
 Dos metodos de instalacion disponibles. Elige segun tu plataforma y preferencias.
 
@@ -134,9 +134,9 @@ curl http://127.0.0.1:9119/health    # Health check
 open http://127.0.0.1:9119/ui        # Web UI
 ```
 
-## Encriptacion en reposo (opt-in)
+## Encriptacion en reposo (default `auto`)
 
-Despues de la instalacion, puedes activar la encriptacion en reposo:
+Despues de la instalacion, la encriptacion se activa automaticamente si sqlcipher3 esta disponible. Para gestionarla manualmente:
 
 ```bash
 # Activar encriptacion
@@ -182,4 +182,4 @@ Accesible desde el menu de la bandeja. Doble confirmacion, calcula espacio, elim
 | NEXE_DEFAULT_MAX_TOKENS | Tokens maximos de respuesta | 4096 |
 | NEXE_LANG | Idioma del servidor | ca |
 | NEXE_ENV | Entorno | production |
-| NEXE_ENCRYPTION_ENABLED | Activar encriptacion en reposo | false |
+| NEXE_ENCRYPTION_ENABLED | Activar encriptacion en reposo | auto (se activa si sqlcipher3 disponible) |

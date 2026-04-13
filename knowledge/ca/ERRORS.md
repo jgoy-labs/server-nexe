@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-errors-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Errors comuns i solucions per a server-nexe 0.9.1. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, streaming i errors d'encriptacio."
+abstract: "Errors comuns i solucions per a server-nexe 0.9.7. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, streaming i errors d'encriptacio."
 tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, streaming, encryption]
 chunk_size: 600
 priority: P1
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Errors comuns — server-nexe 0.9.1
+# Errors comuns — server-nexe 0.9.7
 
 ## Errors d'instal·lacio
 
@@ -36,7 +36,7 @@ expires: null
 | Ollama not available | Ollama no instal·lat o no en execucio | Instal·la des d'ollama.com. El servidor arrencara Ollama automaticament al boot. |
 | asyncio.Lock deadlock | Problema de l'event loop de Python 3.12 | Corregit a v0.8.2 via init lazy a module_lifecycle.py. Actualitza a l'ultima versio. |
 | Server ja en execució (PID X) | Un altre server actiu | Usa "Quit" al tray, o `pkill -9 server-nexe`. Verifica: `lsof -iTCP:9119` |
-| Server orfe (Quit del tray no funciona) | Bug pre-v0.9.0 (corregit) — el tray no enviava SIGTERM al server | Actualitza a v0.9.1. Workaround: `pkill -f "core.app"` o `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
+| Server orfe (Quit del tray no funciona) | Bug pre-v0.9.0 (corregit) — el tray no enviava SIGTERM al server | Actualitza a v0.9.7. Workaround: `pkill -f "core.app"` o `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
 
 ## Errors de la Web UI
 
@@ -65,7 +65,7 @@ expires: null
 | OOM Killed | Model massa gran per a la RAM | Utilitza un model mes petit. 8GB RAM -> models 2B maxim. |
 | Carrega de model molt lenta | Model gran o GPU freda | Normal per a models 32B+. L'indicador de carrega mostra el progres. |
 | MLX not available | Mac Intel o Linux | MLX es nomes Apple Silicon. Utilitza llama.cpp o Ollama. |
-| Qwen3.5 falla amb MLX | Model multimodal incompatible | Utilitza el backend Ollama per als models Qwen3.5. |
+| Qwen3.5 falla amb MLX (versions < v0.9.7) | Model multimodal incompatible | Des de v0.9.7 el backend MLX suporta VLM via mlx_vlm. Si falla, utilitza el backend Ollama com a alternativa. |
 
 ## Errors de memoria/RAG
 

@@ -4,7 +4,7 @@ data: 2026-04-02
 id: nexe-architecture
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Internal architecture of server-nexe 0.9.1. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, encryption pipeline, request sanitization pipeline, and Mermaid diagrams."
+abstract: "Internal architecture of server-nexe 0.9.7. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, encryption pipeline, request sanitization pipeline, and Mermaid diagrams."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Architecture — server-nexe 0.9.1
+# Architecture — server-nexe 0.9.7
 
 ## Five-Layer Architecture
 
@@ -32,7 +32,7 @@ BASE SERVICES     Memory (RAG) | Qdrant | Embeddings | SQLite/SQLCipher | TextSt
 STORAGE           models/ | vectors/ | logs/ | cache/ | sessions/ | *.enc
 ```
 
-Design principles: modularity, plugin-based backends, API-first, native RAG as first-class, simplicity, encryption opt-in.
+Design principles: modularity, plugin-based backends, API-first, native RAG as first-class, simplicity, encryption auto-on (when available).
 
 ## Request Processing Pipeline
 
@@ -192,7 +192,7 @@ server-nexe/
 │   └── web_ui_module/            # Web interface (6 route files, session manager, memory helper)
 │
 ├── memory/                       # 3-sublayer RAG system
-│   ├── embeddings/               # Vector generation (Ollama + sentence-transformers)
+│   ├── embeddings/               # Vector generation (Ollama + fastembed ONNX)
 │   ├── memory/                   # Memory management (persistence, SQLCipher)
 │   │   └── api/
 │   │       └── text_store.py     # TextStore (SQLite text for RAG documents)
@@ -214,7 +214,7 @@ server-nexe/
 │
 ├── knowledge/                    # Docs for RAG ingestion (ca/es/en × 12 files)
 ├── storage/                      # Runtime data (not in git)
-├── tests/                        # 4607 test functions
+├── tests/                        # 4665 test functions
 └── nexe                          # CLI executable
 ```
 
@@ -242,7 +242,7 @@ Handles startup and shutdown of the server. Split into 4 submodules.
 5. Auto-start Ollama (if available, background mode) — timeout `NEXE_STARTUP_TIMEOUT` (default 30s)
 6. Load memory modules (Memory → RAG → Embeddings, correct order) — timeout 30s
 7. Initialize plugin modules (MLX, llama.cpp, Ollama, Security, Web UI) — timeout 30s
-8. Initialize CryptoProvider if `NEXE_ENCRYPTION_ENABLED=true` (opt-in)
+8. Initialize CryptoProvider per `NEXE_ENCRYPTION_ENABLED` (`auto` by default — active if sqlcipher3 available)
 9. Auto-ingest knowledge/ (first run only, marker file) — timeout 30s
 10. Generate bootstrap token (256-bit, SQLite persistent, 30min TTL)
 
@@ -281,7 +281,7 @@ Handles startup and shutdown of the server. Split into 4 submodules.
 ```toml
 [module]
 name = "module_name"
-version = "0.9.1"
+version = "0.9.7"
 type = "local_llm_option"
 description = "Module description"
 location = "plugins/module_name/"
@@ -381,7 +381,7 @@ The system prompt defines Nexe's personality and behavior. It lives in `personal
 
 ## Test Architecture
 
-- 4607 test functions, 3213 passed in latest run, 0 failures
+- 4665 test functions collected (4804 total), 0 failures in latest run
 - Tests collocated with modules (each module has tests/ folder)
 - Root conftest.py for shared fixtures
 - Closures refactored to functions for patchability (key refactoring decision)

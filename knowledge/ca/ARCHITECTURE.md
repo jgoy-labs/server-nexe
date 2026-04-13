@@ -4,7 +4,7 @@ data: 2026-04-02
 id: nexe-architecture
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Arquitectura interna de server-nexe 0.9.1. Disseny de cinc capes: Interficies, Core (FastAPI factory, endpoints separats, lifespan, crypto), Plugins (5 moduls amb auto-descobriment), Serveis Base (RAG memoria de 3 capes amb TextStore), Emmagatzematge. Cobreix refactoritzacio modular, module manager, i18n, pipeline d'encriptacio, pipeline de sanititzacio de peticions i diagrames Mermaid."
+abstract: "Arquitectura interna de server-nexe 0.9.7. Disseny de cinc capes: Interficies, Core (FastAPI factory, endpoints separats, lifespan, crypto), Plugins (5 moduls amb auto-descobriment), Serveis Base (RAG memoria de 3 capes amb TextStore), Emmagatzematge. Cobreix refactoritzacio modular, module manager, i18n, pipeline d'encriptacio, pipeline de sanititzacio de peticions i diagrames Mermaid."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Arquitectura — server-nexe 0.9.1
+# Arquitectura — server-nexe 0.9.7
 
 ## Arquitectura de cinc capes
 
@@ -32,7 +32,7 @@ SERVEIS BASE      Memoria (RAG) | Qdrant | Embeddings | SQLite/SQLCipher | TextS
 EMMAGATZEMATGE    models/ | vectors/ | logs/ | cache/ | sessions/ | *.enc
 ```
 
-Principis de disseny: modularitat, backends basats en plugins, API-first, RAG natiu com a primera classe, simplicitat, encriptacio opt-in.
+Principis de disseny: modularitat, backends basats en plugins, API-first, RAG natiu com a primera classe, simplicitat, encriptacio auto (quan esta disponible).
 
 ## Pipeline de processament de peticions
 
@@ -192,7 +192,7 @@ server-nexe/
 │   └── web_ui_module/            # Interficie web (6 fitxers de rutes, session manager, memory helper)
 │
 ├── memory/                       # Sistema RAG de 3 subcapes
-│   ├── embeddings/               # Generacio de vectors (Ollama + sentence-transformers)
+│   ├── embeddings/               # Generacio de vectors (Ollama + fastembed ONNX)
 │   ├── memory/                   # Gestio de memoria (persistencia, SQLCipher)
 │   │   └── api/
 │   │       └── text_store.py     # TextStore (text SQLite per a documents RAG)
@@ -216,7 +216,7 @@ server-nexe/
 │
 ├── knowledge/                    # Docs per a ingestio RAG (ca/es/en x 12 fitxers)
 ├── storage/                      # Dades en temps d'execucio (no a git)
-├── tests/                        # 4607 funcions de test
+├── tests/                        # 4665 funcions de test
 └── nexe                          # Executable CLI
 ```
 
@@ -242,7 +242,7 @@ Gestiona l'arrencada i l'aturada del servidor. Separat en 4 submoduls.
 5. Auto-arrencar Ollama (si disponible, en segon pla) — timeout `NEXE_STARTUP_TIMEOUT` (default 30s)
 6. Carregar moduls de memoria (Memory -> RAG -> Embeddings, ordre correcte) — timeout 30s
 7. Inicialitzar moduls de plugins (MLX, llama.cpp, Ollama, Security, Web UI) — timeout 30s
-8. Inicialitzar CryptoProvider si `NEXE_ENCRYPTION_ENABLED=true` (opt-in)
+8. Inicialitzar CryptoProvider segons `NEXE_ENCRYPTION_ENABLED` (`auto` per defecte — actiu si sqlcipher3 disponible)
 9. Auto-ingestio de knowledge/ (nomes la primera execucio, fitxer marcador) — timeout 30s
 10. Generar bootstrap token (256 bits, persistent a SQLite, TTL de 30min)
 
@@ -301,7 +301,7 @@ Gestiona l'arrencada i l'aturada del servidor. Separat en 4 submoduls.
 ```toml
 [module]
 name = "module_name"
-version = "0.9.1"
+version = "0.9.7"
 type = "local_llm_option"
 description = "Module description"
 location = "plugins/module_name/"
@@ -401,7 +401,7 @@ El prompt del sistema defineix la personalitat i el comportament de Nexe. Viu a 
 
 ## Arquitectura de tests
 
-- 4607 funcions de test, 3213 passats a l'ultima execucio, 0 errors
+- 4665 funcions de test col·lectades (4804 totals), 0 errors a l'ultima execucio
 - Tests col·locats amb els moduls (cada modul te una carpeta tests/)
 - conftest.py arrel per a fixtures compartides
 - Closures refactoritzades a funcions per a patchabilitat (decisio clau de refactoritzacio)
