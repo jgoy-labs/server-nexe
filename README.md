@@ -95,19 +95,9 @@ DMG with guided wizard that detects your hardware, picks the right backend, reco
 </tr>
 </table>
 
-## Design Philosophy
+## Design Intent
 
-Server Nexe is built around one core idea: **a hard, minimal, secure nucleus that you can build on top of**.
-
-The core is intentionally small and stable. It handles the hard parts — encryption, injection detection, RAG retrieval, session memory, streaming, multi-backend routing — so that everything built above it can be confident about what's underneath. Features live in plugins. The core doesn't grow to accommodate new use cases; plugins do.
-
-**Minimal by design.** The core has no optional features, no configuration that changes its security model, no code paths that only exist for edge cases. ~50K lines sounds like a lot until you count what it does: AES-256-GCM encryption at rest, 6 injection detectors, rate limiting, OpenAI-compatible API, RAG across 3 collections, automatic memory extraction, multi-backend inference with a unified pipeline, and a full installer. There is no padding.
-
-**Secure by default.** Encryption is `auto` — it activates itself if the dependencies are present. The pipeline enforces a single entry point (`/ui/chat`, `/v1/chat/completions`) and returns 403 on direct backend access. Security is not a layer added on top; it is part of the routing.
-
-**Modular without abstraction tax.** Plugins are isolated. Each plugin owns its router, its config, its tests. The core exposes a protocol; plugins implement it. You can remove the web UI, swap the security plugin, or add a new backend without touching anything else.
-
-The goal is not to be the most capable local AI server. The goal is to be the most *trustworthy base* to build capable things on top of.
+The aim has been to build a minimal, modular core where security and memory are solved at the base level — so that things built on top don't have to reinvent them. Whether that worked is for users to decide.
 
 ## Quick Start
 

@@ -31,17 +31,9 @@ server-nexe es un servidor de IA local con memoria persistente via RAG (Retrieva
 
 NO es npm nexe (un compilador de Node.js). NO es un producto de servidor Windows. NO es un sustituto de Ollama — puede usar Ollama como uno de sus backends.
 
-## Filosofia de diseño
+## Intencion de diseño
 
-server-nexe está construido alrededor de una idea central: **un núcleo duro, mínimo y seguro sobre el que construir**.
-
-El núcleo es intencionadamente pequeño y estable. Gestiona las partes difíciles — encriptación, detección de inyecciones, recuperación RAG, memoria de sesiones, streaming, enrutamiento multi-backend — para que todo lo que se construya encima pueda confiar en lo que hay debajo. Las funcionalidades viven en plugins. El núcleo no crece para accommodar nuevos casos de uso; lo hacen los plugins.
-
-**Mínimo por diseño.** ~50K líneas de núcleo que cubren: encriptación AES-256-GCM at-rest, 6 detectores de inyección, rate limiting, API compatible con OpenAI, RAG en 3 colecciones, extracción automática de memoria, inferencia multi-backend con pipeline unificado e instalador completo. Sin relleno.
-
-**Seguro por defecto.** La encriptación es `auto` — se activa sola cuando las dependencias están presentes. El pipeline aplica un punto de entrada único y devuelve 403 en el acceso directo a los backends. La seguridad no es una capa añadida; forma parte del enrutamiento.
-
-**Modular sin coste de abstracción.** Los plugins están aislados. Cada plugin tiene su router, su configuración, sus tests. El núcleo expone un protocolo; los plugins lo implementan. Puedes eliminar la Web UI, cambiar el plugin de seguridad o añadir un backend nuevo sin tocar nada más.
+El objetivo ha sido construir un núcleo mínimo y modular donde la seguridad y la memoria estén resueltas en la base — para que lo que se construya encima no tenga que reinventarlas. Si se ha conseguido, lo tienen que decir los usuarios.
 
 ## Capacidades principales
 
