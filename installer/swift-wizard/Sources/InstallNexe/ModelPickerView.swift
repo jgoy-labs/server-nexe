@@ -27,19 +27,17 @@ struct ModelPickerView: View {
                 .foregroundColor(.secondary)
 
             // Tabs RAM (7 tiers + custom)
-            ScrollView(.horizontal, showsIndicators: false) {
-                Picker("", selection: $selectedTab) {
-                    Text("8 GB").tag("tier_8")
-                    Text("16 GB").tag("tier_16")
-                    Text("24 GB").tag("tier_24")
-                    Text("32 GB").tag("tier_32")
-                    Text("48 GB").tag("tier_48")
-                    Text("64 GB").tag("tier_64")
-                    Text(t("model_tab_custom")).tag("custom")
-                }
-                .pickerStyle(.segmented)
-                .frame(minWidth: 640)
+            Picker("", selection: $selectedTab) {
+                Text("8 GB").tag("tier_8")
+                Text("16 GB").tag("tier_16")
+                Text("24 GB").tag("tier_24")
+                Text("32 GB").tag("tier_32")
+                Text("48 GB").tag("tier_48")
+                Text("64 GB").tag("tier_64")
+                Text(t("model_tab_custom")).tag("custom")
             }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 24)
 
             if selectedTab == "custom" {
@@ -256,7 +254,7 @@ struct ModelCard: View {
                     Text(model.params)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("\(String(format: "%.1f", model.diskGB)) GB")
+                    Text("\(String(format: "%.1f", model.ramGB)) GB RAM")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     HStack(spacing: 4) {

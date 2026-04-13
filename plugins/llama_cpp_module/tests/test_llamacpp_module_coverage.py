@@ -81,7 +81,7 @@ async def test_health_check_healthy():
 
 @pytest.mark.asyncio
 async def test_health_check_exception():
-    """Lines 128-129: health check exception returns UNHEALTHY."""
+    """Lines 128-129: health check exception returns DEGRADED (not unhealthy — module is loaded, backend unavailable)."""
     module = LlamaCppModule()
     module._initialized = True
     mock_node = MagicMock()
@@ -89,7 +89,7 @@ async def test_health_check_exception():
     module._node = mock_node
 
     result = await module.health_check()
-    assert result.status == HealthStatus.UNHEALTHY
+    assert result.status == HealthStatus.DEGRADED
 
 
 @pytest.mark.asyncio

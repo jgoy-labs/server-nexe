@@ -124,6 +124,7 @@ struct T {
             "done_dock": "Afegir Nexe al Dock",
             "done_login_item": "Obrir Nexe al iniciar el Mac",
             "done_menubar_info": "S'ha afegit una icona a la barra de menus (a dalt a la dreta) per controlar el servidor.",
+            "done_opening_tray": "S'obrira un system tray al costat del rellotge",
             "btn_opened": "Nexe obert!",
         ],
         .es: [
@@ -215,6 +216,7 @@ struct T {
             "done_dock": "Anadir Nexe al Dock",
             "done_login_item": "Abrir Nexe al iniciar el Mac",
             "done_menubar_info": "Se ha anadido un icono en la barra de menus (arriba a la derecha) para controlar el servidor.",
+            "done_opening_tray": "Se abrira un system tray junto al reloj",
             "btn_opened": "Nexe abierto!",
         ],
         .en: [
@@ -306,6 +308,7 @@ struct T {
             "done_dock": "Add Nexe to Dock",
             "done_login_item": "Open Nexe at Mac startup",
             "done_menubar_info": "A menu bar icon has been added (top right) to control the server.",
+            "done_opening_tray": "A system tray will appear next to the clock",
             "btn_opened": "Nexe opened!",
         ],
     ]
