@@ -125,6 +125,46 @@ Despres de la configuracio:
 
 Models personalitzats: Ollama (per nom) o Hugging Face (URL de repositori GGUF).
 
+### Carregar un model personalitzat
+
+**Ollama** — qualsevol model del registre públic o privat:
+```bash
+# 1. Descarrega el model amb Ollama
+ollama pull nom-del-model:tag
+
+# 2. Configura server-nexe per usar-lo
+# Edita storage/config/server.toml:
+# [plugins.models]
+# primary = "nom-del-model:tag"
+```
+
+**MLX (Hugging Face)** — qualsevol repositori MLX compatible:
+```bash
+# Descarrega el model a storage/models/
+python3 -c "
+from huggingface_hub import snapshot_download
+snapshot_download('organitzacio/nom-model-mlx', local_dir='storage/models/nom-model-mlx')
+"
+
+# Configura server.toml:
+# [plugins.models]
+# primary = "storage/models/nom-model-mlx"
+# preferred_engine = "mlx"
+```
+
+**llama.cpp (GGUF)** — qualsevol fitxer `.gguf`:
+```bash
+# Col·loca el fitxer a storage/models/
+cp /ruta/al/model.gguf storage/models/
+
+# Configura server.toml:
+# [plugins.models]
+# primary = "storage/models/model.gguf"
+# preferred_engine = "llama_cpp"
+```
+
+Reinicia el servidor per aplicar els canvis: `./nexe restart`
+
 ## Verificacio post-instal·lacio
 
 ```bash

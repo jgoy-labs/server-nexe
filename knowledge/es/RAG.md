@@ -101,6 +101,32 @@ server-nexe tiene un sistema de memoria automatica similar a ChatGPT o Claude. E
 
 **Deduplicacion:** Antes de guardar, comprueba similitud con entradas existentes. Si similitud > 0.80, la entrada se considera duplicada y no se guarda.
 
+**Flujo completo de un marcador MEM_SAVE:**
+
+```
+Respuesta LLM
+    │
+    ▼
+routes_chat.py — _extract_safe_mem_saves()
+    │  · Regex estricto: [MEM_SAVE: <texto 5-200 chars>]
+    │  · Normaliza [MEMORIA: ...] → [MEM_SAVE: ...]
+    │  · Valida whitelist de caracteres (unicode seguro)
+    │  · Rechaza keywords de inyección, eco del prompt usuario
+    │
+    ├─── texto limpio → flujo visible (el usuario no ve el marcador)
+    │
+    ▼
+chat_memory.py — auto_save_to_memory()
+    │  · Crea colección personal_memory si no existe
+    │  · Comprueba duplicados (similitud > 0.80 → descarta)
+    │
+    ▼
+Qdrant — colección personal_memory
+    · Vector 768D (fastembed/ONNX)
+    · Umbral de búsqueda: 0.3
+    · Máximo 500 entradas (poda inteligente)
+```
+
 **Intent de borrado (MEM_DELETE):** Cuando el usuario dice "olvida que X", busca entradas con similitud >= DELETE_THRESHOLD (0.70). Borra la coincidencia mas cercana. Guard anti-re-save: `_recently_deleted_facts` evita que el modelo vuelva a guardar un hecho recien borrado dentro de la misma sesion.
 
 **Truncado de documentos grandes:** Si un documento subido es demasiado grande para el contexto disponible, se trunca y la UI muestra un aviso amarillo via el marcador SSE `[DOC_TRUNCATED:XX%]` indicando el porcentaje descartado.

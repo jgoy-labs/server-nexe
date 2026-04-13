@@ -138,6 +138,31 @@ The API endpoint `POST /v1/chat/completions` validates and sanitizes input throu
 - Derived keys per purpose: `"sqlite"`, `"sessions"`, `"text_store"`, `"backup"`
 - Implementation: `core/crypto/provider.py`
 
+**Migrating the master key to a new machine:**
+
+If you change computers or reinstall the system, you must move the master key to keep access to `.enc` sessions and the encrypted database. The fallback chain is: OS Keyring → environment variable → `~/.nexe/master.key` file.
+
+```bash
+# 1. On the OLD machine — export the key
+#    Option A: from the keychain (if stored there)
+security find-generic-password -s "server-nexe" -w 2>/dev/null | xxd -r -p > master.key.backup
+
+#    Option B: direct file copy
+cp ~/.nexe/master.key master.key.backup
+
+# 2. Transfer master.key.backup to the new machine (USB, SCP, AirDrop)
+
+# 3. On the NEW machine — place the key
+mkdir -p ~/.nexe
+cp master.key.backup ~/.nexe/master.key
+chmod 600 ~/.nexe/master.key
+
+# 4. Delete the backup
+shred -u master.key.backup
+```
+
+Without the original key, `.enc` sessions and the SQLCipher database **cannot be decrypted**. There is no recovery possible.
+
 ### What is encrypted
 
 | Component | Method | Details |
