@@ -74,17 +74,22 @@ def register_static_routes(router: APIRouter, *, module_ref):
         # CSS/JS: no-cache so ?v=boot_ts bust always works on restart.
         # Images, fonts, etc.: cacheable for 1h.
         _no_cache_exts = {".css", ".js", ".html"}
+        is_no_cache = file_path.suffix in _no_cache_exts
         cache_header = (
             "no-cache, no-store, must-revalidate"
-            if file_path.suffix in _no_cache_exts
+            if is_no_cache
             else "public, max-age=3600"
         )
         content = file_path.read_bytes()
+        headers = {
+            "Cache-Control": cache_header,
+            "Content-Length": str(len(content)),
+        }
+        if is_no_cache:
+            headers["Pragma"] = "no-cache"
+            headers["Expires"] = "0"
         return Response(
             content=content,
             media_type=media_type,
-            headers={
-                "Cache-Control": cache_header,
-                "Content-Length": str(len(content))
-            }
+            headers=headers,
         )

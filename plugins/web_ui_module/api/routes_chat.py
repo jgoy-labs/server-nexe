@@ -669,7 +669,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         import inspect
                         sig = inspect.signature(engine.chat)
 
-                        _images_arg = [image_bytes] if image_bytes else None
+                        # Ollama/MLX/LlamaCpp esperen base64 strings, no bytes
+                        _images_arg = [image_b64] if image_b64 else None
 
                         if 'model' in sig.parameters:
                             # Ollama-style: chat(model, messages, stream=...)
