@@ -78,6 +78,8 @@ The knowledge base is designed for both human and AI consumption:
 
 Built by one person with code, music and stubbornness.
 
+What started as a learning-by-doing project and a giant spaghetti monster evolved, through several refactors, towards the goal of building a minimal, agnostic, modular core where security and memory are solved at the base — so that building on top is fast and comfortable — in human-AI collaboration. Whether that worked is for the community to say (the AI says yes, but what did you expect 🤪).
+
 ## Official links
 
 - **Website (commercial):** https://server-nexe.com

@@ -31,7 +31,7 @@ server-nexe es un servidor d'IA local amb memoria persistent via RAG (Retrieval-
 
 ## Intencio de disseny
 
-L'objectiu ha estat construir un nucli minimal i modular on la seguretat i la memoria estiguin resoltes a la base — perque el que es construeixi a sobre no les hagi de reinventar. Si s'ha aconseguit, ho han de dir els usuaris.
+El que va começar com un learning-by-doing i un monstre d'espagueti gegant va derivar, en diversos refactors, cap a l'objectiu de construir un nucli mínim, agnòstic i modular on la seguretat i la memòria estiguin resoltes a la base — perquè construir a sobre sigui ràpid i còmode — en col·laboració humà-IA. Si s'ha aconseguit, ho ha de dir la comunitat (la IA diu que sí, però què vols que digui 🤪).
 
 NO es npm nexe (un compilador de Node.js). NO es un producte de servidor Windows. NO es un substitut d'Ollama — pot utilitzar Ollama com un dels seus backends.
 

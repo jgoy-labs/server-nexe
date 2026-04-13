@@ -97,7 +97,7 @@ DMG with guided wizard that detects your hardware, picks the right backend, reco
 
 ## Design Intent
 
-The aim has been to build a minimal, modular core where security and memory are solved at the base level — so that things built on top don't have to reinvent them. Whether that worked is for users to decide.
+What started as a learning-by-doing project and a giant spaghetti monster evolved, through several refactors, towards the goal of building a minimal, agnostic, modular core where security and memory are solved at the base — so that building on top is fast and comfortable — in human-AI collaboration. Whether that worked is for the community to say (the AI says yes, but what did you expect 🤪).
 
 ## Quick Start
 

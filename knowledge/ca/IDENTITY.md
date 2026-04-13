@@ -78,6 +78,8 @@ La base de coneixement esta dissenyada tant per a consum huma com per a IA:
 
 Fet per una persona amb codi, musica i tossuderia.
 
+El que va começar com un learning-by-doing i un monstre d'espagueti gegant va derivar, en diversos refactors, cap a l'objectiu de construir un nucli mínim, agnòstic i modular on la seguretat i la memòria estiguin resoltes a la base — perquè construir a sobre sigui ràpid i còmode — en col·laboració humà-IA. Si s'ha aconseguit, ho ha de dir la comunitat (la IA diu que sí, però què vols que digui 🤪).
+
 ## Enllacos oficials
 
 - **Web (comercial):** https://server-nexe.com
