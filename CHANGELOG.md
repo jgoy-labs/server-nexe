@@ -6,9 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-8 bugs resolts en instal·lació neta DMG v0.9.7.
+Bugs instal·lació neta + core backend.
 
 ### Fixed
+
+- **llama_cpp VLM passthrough (BUG #9)**: images were extracted in `execute()` but never
+  passed to `_generate()`/`_generate_streaming()`. Added VLM bifurcation with dedicated
+  `_generate_vlm()`/`_generate_vlm_streaming()` methods (consistent with MLX pattern).
+  Images encoded as base64 data URIs in OpenAI-compatible message format.
+- **Versions hardcoded (BUG #10)**: 16+ locations had stale 0.9.0/0.9.1/1.0.0 strings.
+  Created `core/version.py` (reads from `pyproject.toml` via `tomllib`) as single source
+  of truth. All Python files now import `__version__`; Info.plist updated to 0.9.7.
 
 - **Readiness check (P0)**: `ollama_module`, `mlx_module`, `llama_cpp_module` now return
   `DEGRADED` (not `UNHEALTHY`) when the LLM backend is unavailable (Ollama not running,

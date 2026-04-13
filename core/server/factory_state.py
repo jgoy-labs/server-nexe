@@ -13,6 +13,8 @@ from fastapi import FastAPI
 from pathlib import Path
 from typing import Any
 
+from core.version import __version__
+
 def setup_app_state(app: FastAPI, i18n: Any, config: dict, project_root: Path, module_manager: Any) -> None:
   """
   Configure app state for Dependency Injection.
@@ -45,6 +47,6 @@ def setup_app_state(app: FastAPI, i18n: Any, config: dict, project_root: Path, m
   app.state.config = config
   app.state.project_root = project_root
   app.state.module_manager = module_manager
-  app.state.container = "0.9.0-DI" # Compatibility flag
+  app.state.container = f"{__version__}-DI"
 
 __all__ = ['setup_app_state']

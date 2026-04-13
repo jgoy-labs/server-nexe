@@ -136,27 +136,53 @@ async def auto_ingest_knowledge(server_state):
             files_to_ingest = [f for f in files_to_ingest if not f.name.startswith('.')]
 
             if files_to_ingest:
-                # Only auto-ingest if never done before (no marker file)
+                # BUG #20: Check marker AND verify Qdrant has content.
+                # If marker exists but Qdrant is empty (model change, wipe),
+                # we must re-ingest.
                 if ingested_marker.exists():
-                    logger.debug("Knowledge: Already ingested. Skipping auto-ingest.")
-                    logger.debug("Knowledge: To re-ingest, use: ./nexe knowledge ingest")
+                    _needs_reingest = False
+                    try:
+                        from memory.memory.api.v1 import get_memory_api as _get_v1_api
+                        _api = await _get_v1_api()
+                        if await _api.collection_exists("nexe_documentation"):
+                            doc_count = await _api.count("nexe_documentation")
+                            if doc_count >= 10:
+                                logger.debug(
+                                    "Knowledge: Already ingested (%d docs). Skipping.",
+                                    doc_count,
+                                )
+                                return
+                            else:
+                                logger.warning(
+                                    "Knowledge: Marker exists but only %d docs in Qdrant — re-ingesting",
+                                    doc_count,
+                                )
+                                _needs_reingest = True
+                        else:
+                            logger.warning("Knowledge: Marker exists but collection missing — re-ingesting")
+                            _needs_reingest = True
+                    except Exception as e:
+                        logger.warning("Knowledge: Could not verify Qdrant state (%s) — re-ingesting", e)
+                        _needs_reingest = True
+
+                    if _needs_reingest:
+                        ingested_marker.unlink(missing_ok=True)
+
+                # First run or re-ingest needed — ingest knowledge
+                logger.info("Knowledge: Auto-ingesting %d document(s)...", len(files_to_ingest))
+                # F7: explicit target_collection — auto-ingest at startup
+                # writes corporate know-how to nexe_documentation, never
+                # to the user_knowledge collection.
+                success = await ingest_knowledge(
+                    knowledge_path,
+                    quiet=True,
+                    target_collection="nexe_documentation",
+                )
+                if success:
+                    logger.info("Knowledge: Ingestion completed successfully")
+                    ingested_marker.touch()
                 else:
-                    # First run - auto-ingest as fallback if installer didn't do it
-                    logger.info("Knowledge: First run - auto-ingesting %d document(s)...", len(files_to_ingest))
-                    # F7: explicit target_collection — auto-ingest at startup
-                    # writes corporate know-how to nexe_documentation, never
-                    # to the user_knowledge collection.
-                    success = await ingest_knowledge(
-                        knowledge_path,
-                        quiet=True,
-                        target_collection="nexe_documentation",
-                    )
-                    if success:
-                        logger.info("Knowledge: Ingestion completed successfully")
-                        # Create marker to prevent re-ingestion on next startup
-                        ingested_marker.touch()
-                    else:
-                        logger.warning("Knowledge: Ingestion had some errors")
+                    logger.warning("Knowledge: Ingestion had some errors")
             else:
                 logger.debug("Knowledge: No documents to ingest (folder empty or only README)")
     except Exception as e:

@@ -277,13 +277,14 @@ async def ingest_knowledge(
             # Priority weight for search (P0=4, P1=3, P2=2, P3=1)
             priority_weight = 4 - VALID_PRIORITIES.index(doc_priority) if doc_priority in VALID_PRIORITIES else 2
 
+            # Build batch items for all chunks
+            BATCH_SIZE = 50
+            batch_items = []
             for i, chunk in enumerate(chunks):
-                # SECURITY: Filter RAG injection patterns before storing
                 chunk = _filter_rag_injection(chunk)
-                await memory.store(
-                    text=header_text + chunk,
-                    collection=doc_collection,
-                    metadata={
+                batch_items.append({
+                    "text": header_text + chunk,
+                    "metadata": {
                         "source": filename,
                         "doc_id": doc_id,
                         "chunk": i + 1,
@@ -293,14 +294,27 @@ async def ingest_knowledge(
                         "priority_weight": priority_weight,
                         "tags": doc_tags,
                         "lang": doc_lang,
-                        "abstract": doc_abstract[:200] if doc_abstract else ""
-                    }
-                )
-                total_chunks += 1
+                        "abstract": doc_abstract[:200] if doc_abstract else "",
+                    },
+                })
 
-                # Show chunk progress for large files
-                if len(chunks) > 5 and (i + 1) % 5 == 0:
-                    log(_t("chunks_progress", i=i+1, n=len(chunks)))
+            # Store in batches (with fallback to single-store)
+            for b_start in range(0, len(batch_items), BATCH_SIZE):
+                batch = batch_items[b_start:b_start + BATCH_SIZE]
+                try:
+                    await memory.store_batch(batch, collection=doc_collection)
+                    total_chunks += len(batch)
+                except Exception:
+                    # Fallback: store one by one
+                    for item in batch:
+                        await memory.store(
+                            text=item["text"],
+                            collection=doc_collection,
+                            metadata=item["metadata"],
+                        )
+                        total_chunks += 1
+                if len(chunks) > 5 and (b_start + BATCH_SIZE) <= len(batch_items):
+                    log(_t("chunks_progress", i=min(b_start + BATCH_SIZE, len(chunks)), n=len(chunks)))
 
             log(_t("completed", n=len(chunks)))
 

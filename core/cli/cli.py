@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: core/cli/cli.py
-Description: Central Nexe CLI 0.9.0 - Main Click application.
+Description: Central Nexe CLI - Main Click application.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -16,6 +16,7 @@ from typing import Optional, List
 from .router import CLIRouter
 from .output import print_banner, print_modules_table, print_status, print_error
 from .config import NexeConfig
+from core.version import __version__
 
 class DynamicGroup(click.Group):
   """
@@ -80,7 +81,7 @@ class DynamicGroup(click.Group):
 @click.pass_context
 def app(ctx: click.Context, version: bool, no_banner: bool):
   """
-  Nexe CLI Central - Nexe 0.9.0 Module Orchestrator
+  Nexe CLI Central — Module Orchestrator
 
   \b
   Core commands:
@@ -110,7 +111,7 @@ def app(ctx: click.Context, version: bool, no_banner: bool):
   ctx.obj['no_banner'] = no_banner
 
   if version:
-    click.echo("Nexe CLI v1.0.0")
+    click.echo(f"Nexe CLI v{__version__}")
     ctx.exit(0)
 
   if ctx.invoked_subcommand is None:

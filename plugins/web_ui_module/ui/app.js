@@ -67,6 +67,11 @@ const UI_STRINGS = {
         rag_filter_label: "Filtre RAG",
         col_warning_prefix: "⚠ Desactivat: ",
         col_warning_suffix: ". Desmarca per reactivar.",
+        doc_truncated: "⚠ Document massa gran pel context actual ({pct}% descartat)",
+        doc_uploaded: "✅ Document \"{name}\" carregat{chunks} en {time}s.",
+        doc_fragments: "fragments",
+        doc_summarize: "Resumeix aquest document",
+        doc_upload_error: "Error pujant el document",
     },
     en: {
         login_subtitle: "Enter your API Key to access",
@@ -130,6 +135,11 @@ const UI_STRINGS = {
         rag_filter_label: "RAG Filter",
         col_warning_prefix: "⚠ Disabled: ",
         col_warning_suffix: ". Uncheck to re-enable.",
+        doc_truncated: "⚠ Document too large for current context ({pct}% discarded)",
+        doc_uploaded: "✅ Document \"{name}\" uploaded{chunks} in {time}s.",
+        doc_fragments: "chunks",
+        doc_summarize: "Summarize this document",
+        doc_upload_error: "Error uploading document",
     },
     es: {
         login_subtitle: "Introduce la API Key para acceder",
@@ -193,6 +203,11 @@ const UI_STRINGS = {
         rag_filter_label: "Filtro RAG",
         col_warning_prefix: "⚠ Desactivado: ",
         col_warning_suffix: ". Desmarca para reactivar.",
+        doc_truncated: "⚠ Documento demasiado grande para el contexto actual ({pct}% descartado)",
+        doc_uploaded: "✅ Documento \"{name}\" cargado{chunks} en {time}s.",
+        doc_fragments: "fragmentos",
+        doc_summarize: "Resume este documento",
+        doc_upload_error: "Error subiendo el documento",
     }
 };
 
@@ -807,7 +822,7 @@ class NexeUI {
                 const opt = document.createElement('option');
                 opt.value = b.id;
                 const disconnected = b.connected === false;
-                opt.textContent = disconnected ? `${b.name} (desconnectat)` : b.name;
+                opt.textContent = disconnected ? `${b.name} (${this.t('disconnected')})` : b.name;
                 opt.dataset.connected = disconnected ? '0' : '1';
                 if (b.active) opt.selected = true;
                 backendSel.appendChild(opt);
@@ -867,7 +882,7 @@ class NexeUI {
 
         const el = document.getElementById('modelInfoText');
         if (wasDisconnected && el) {
-            el.textContent = `Arrencant Ollama...`;
+            el.textContent = `Ollama — ${this.t('starting')}`;
         }
 
         try {
@@ -879,12 +894,12 @@ class NexeUI {
             if (resp.ok) {
                 const data = await resp.json();
                 if (data.ollama_started) {
-                    if (el) el.textContent = `Arrencant Ollama...`;
+                    if (el) el.textContent = `Ollama — ${this.t('starting')}`;
                     // Retry fins que Ollama estigui connectat (max 30s)
                     let ready = false;
                     for (let i = 0; i < 10 && !ready; i++) {
                         await new Promise(r => setTimeout(r, 3000));
-                        if (el) el.textContent = `Arrencant Ollama... (${(i + 1) * 3}s)`;
+                        if (el) el.textContent = `Ollama — ${this.t('starting')} (${(i + 1) * 3}s)`;
                         try {
                             const r2 = await this.fetchWithCsrf('/ui/backends');
                             if (r2.ok) {
@@ -894,7 +909,7 @@ class NexeUI {
                                     ready = true;
                                     this._backends = d2.backends;
                                     this._updateModelSelect('ollama');
-                                    if (el) el.textContent = `Ollama connectat`;
+                                    if (el) el.textContent = `Ollama ${this.t('connected').toLowerCase()}`;
                                     // Actualitzar el dropdown (treure "desconnectat")
                                     const opt = backendSel.querySelector('[value="ollama"]');
                                     if (opt) opt.textContent = 'Ollama';
@@ -1514,11 +1529,7 @@ class NexeUI {
                             chunk = chunk.replace(/\x00\[DOC_TRUNCATED:\d+\]\x00/, '');
                             const truncNotice = document.createElement('div');
                             truncNotice.className = 'trunc-notice';
-                            truncNotice.textContent = this.lang === 'es'
-                                ? `\u26A0 Documento demasiado grande para el contexto actual (${truncPct}% descartado)`
-                                : this.lang === 'en'
-                                ? `\u26A0 Document too large for current context (${truncPct}% discarded)`
-                                : `\u26A0 Document massa gran pel context actual (${truncPct}% descartat)`;
+                            truncNotice.textContent = this.t('doc_truncated').replace('{pct}', truncPct);
                             lastMsg.querySelector('.message-content').insertBefore(truncNotice, assistantMessageDiv);
                         }
 
@@ -1637,6 +1648,7 @@ class NexeUI {
                     }
                     // Strip model tags that leak into visible text
                     fullResponse = fullResponse.replace(/\[ACTION\]:\s*[^\n]*/g, '');
+                    fullResponse = fullResponse.replace(/\[MODEL:[^\]]+\]/g, '');
                     fullResponse = fullResponse.replace(/\[MEM:\d+\]/g, '');
                     fullResponse = fullResponse.replace(/\[MEM\]/g, '');
                     // Strip [DEL:N:...] tokens from final render
@@ -2102,21 +2114,21 @@ class NexeUI {
                 this.addUploadedFile(data);
 
                 const elapsed = Math.round((Date.now() - t0) / 1000);
-                const chunkMsg = data.chunks_saved ? ` (${data.chunks_saved} fragments)` : '';
-                this.addMessageToChat('assistant', `✅ Document "${data.filename}" carregat${chunkMsg} en ${elapsed}s.\nℹ️ ${this.t('doc_chat_only')}`);
+                const chunkMsg = data.chunks_saved ? ` (${data.chunks_saved} ${this.t('doc_fragments')})` : '';
+                this.addMessageToChat('assistant', `${this.t('doc_uploaded').replace('{name}', data.filename).replace('{chunks}', chunkMsg).replace('{time}', elapsed)}\nℹ️ ${this.t('doc_chat_only')}`);
 
-                this.messageInput.value = `Resumeix aquest document`;
+                this.messageInput.value = this.t('doc_summarize');
                 this.messageInput.focus();
                 this.messageInput.select();
             } else {
                 const error = await response.json();
                 this.filePreview.classList.remove('active');
-                this.addMessageToChat('assistant', `❌ Error pujant document: ${error.detail}`);
+                this.addMessageToChat('assistant', `❌ ${this.t('doc_upload_error')}: ${error.detail}`);
             }
         } catch (error) {
             console.error('Error uploading file:', error);
             this.filePreview.classList.remove('active');
-            this.addMessageToChat('assistant', '❌ Error pujant el document.');
+            this.addMessageToChat('assistant', `❌ ${this.t('doc_upload_error')}.`);
         } finally {
             clearInterval(timerInterval);
             overlay.remove();

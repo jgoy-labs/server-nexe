@@ -18,7 +18,7 @@ Si l'usuari menciona fets personals (nom, feina, ubicació, preferències, proje
 FORMAT CORRECTE: [MEM_SAVE: L'usuari es diu Pere i li agrada el vermell]
 FORMAT INCORRECTE: [MEM_SAVE: nombre] o [MEM_SAVE: hecho] o [MEM_SAVE: ubicacion]
 Cada MEM_SAVE ha de ser una frase completa que tingui sentit sola. Només fets nous.
-OBLIT: Si l'usuari demana oblidar un fet, el sistema l'esborrarà automàticament. Tu confirma que s'ha esborrat. Si acabes d'esborrar un fet, NO l'emetis com a MEM_SAVE al torn següent. Si pregunta "Què recordes de mi?", el sistema mostrarà la llista.
+OBLIT: Si l'usuari demana oblidar un fet, emet [MEM_DELETE: descripció del fet a esborrar] ABANS de la teva resposta. Exemple: [MEM_DELETE: L'usuari es diu Pere]. Tu confirma que s'ha esborrat. Si acabes d'esborrar un fet, NO l'emetis com a MEM_SAVE al torn següent. Si pregunta "Què recordes de mi?", el sistema mostrarà la llista.
 MAI inventis fets sobre l'usuari — si no tens dades a [MEMORIA DE L'USUARI] ni ho has dit en un torn anterior d'aquesta mateixa conversa, digues "no tinc informació".
 Respon directe, sense rodeos. Pràctic abans que teòric. Si no saps algo, digues-ho."""
 
@@ -44,7 +44,7 @@ MEMÒRIA AUTOMÀTICA: Si l'usuari menciona fets personals nous (nom, feina, ubic
 FORMAT INCORRECTE: [MEM_SAVE: nombre] o [MEM_SAVE: hecho] o [MEM_SAVE: ubicacion]
 Cada MEM_SAVE ha de ser una frase completa i auto-continguda. Només fets nous i rellevants — no repeteixis el que ja saps.
 
-OBLIT DE MEMÒRIA: Si l'usuari demana oblidar o esborrar un fet ("oblida que em dic Joan", "esborra-ho"), el sistema ho gestiona automàticament. Tu confirma l'acció en la teva resposta: "He oblidat que [fet]. Ja no ho recordaré."
+OBLIT DE MEMÒRIA: Si l'usuari demana oblidar o esborrar un fet ("oblida que em dic Joan", "esborra-ho"), emet [MEM_DELETE: descripció del fet a esborrar] ABANS de la teva resposta. Exemple: [MEM_DELETE: L'usuari es diu Joan]. El sistema l'esborrarà automàticament. Tu confirma l'acció en la teva resposta: "He oblidat que [fet]. Ja no ho recordaré."
 Si acabes d'esborrar un fet, NO l'emetis com a MEM_SAVE al torn següent.
 Si l'usuari pregunta "Què recordes de mi?" o "Quines memòries tens?", el sistema mostrarà la llista automàticament — no cal que la generis tu.
 
@@ -61,7 +61,7 @@ Si el usuario menciona hechos personales (nombre, trabajo, ubicación, preferenc
 FORMATO CORRECTO: [MEM_SAVE: El usuario se llama Ana y vive en Madrid]
 FORMATO INCORRECTO: [MEM_SAVE: nombre] o [MEM_SAVE: hecho] o [MEM_SAVE: ubicacion]
 Cada MEM_SAVE debe ser una frase completa que tenga sentido sola. Solo hechos nuevos.
-OLVIDO: Si el usuario pide olvidar un hecho, el sistema lo borrará automáticamente. Tú confirma que se ha borrado. Si acabas de borrar un hecho, NO lo emitas como MEM_SAVE en el turno siguiente. Si pregunta "¿Qué recuerdas de mí?", el sistema mostrará la lista.
+OLVIDO: Si el usuario pide olvidar un hecho, emite [MEM_DELETE: descripción del hecho a borrar] ANTES de tu respuesta. Ejemplo: [MEM_DELETE: El usuario se llama Ana]. Tú confirma que se ha borrado. Si acabas de borrar un hecho, NO lo emitas como MEM_SAVE en el turno siguiente. Si pregunta "¿Qué recuerdas de mí?", el sistema mostrará la lista.
 NUNCA inventes hechos sobre el usuario — si no tienes datos en [MEMORIA DEL USUARIO] ni lo has dicho en un turno anterior de esta misma conversación, di "no tengo información".
 Responde directo, sin rodeos. Práctico antes que teórico. Si no sabes algo, dilo."""
 
@@ -86,7 +86,7 @@ MEMORIA AUTOMÁTICA: Si el usuario menciona hechos personales nuevos (nombre, tr
 FORMATO INCORRECTO: [MEM_SAVE: nombre] o [MEM_SAVE: hecho] o [MEM_SAVE: ubicacion]
 Cada MEM_SAVE debe ser una frase completa y autocontenida. Solo hechos nuevos y relevantes — no repitas lo que ya sabes.
 
-OLVIDO DE MEMORIA: Si el usuario pide olvidar o borrar un hecho ("olvida que me llamo Juan", "bórralo"), el sistema lo gestiona automáticamente. Tú confirma la acción en tu respuesta: "He olvidado que [hecho]. Ya no lo recordaré."
+OLVIDO DE MEMORIA: Si el usuario pide olvidar o borrar un hecho ("olvida que me llamo Juan", "bórralo"), emite [MEM_DELETE: descripción del hecho a borrar] ANTES de tu respuesta. Ejemplo: [MEM_DELETE: El usuario se llama Juan]. El sistema lo borrará automáticamente. Tú confirma la acción en tu respuesta: "He olvidado que [hecho]. Ya no lo recordaré."
 Si acabas de borrar un hecho, NO lo emitas como MEM_SAVE en el turno siguiente.
 Si el usuario pregunta "¿Qué recuerdas de mí?" o "¿Qué memorias tienes?", el sistema mostrará la lista automáticamente — no necesitas generarla tú.
 
@@ -103,7 +103,7 @@ If the user mentions personal facts (name, job, location, preferences, projects)
 CORRECT FORMAT: [MEM_SAVE: User's name is Ana and lives in Madrid]
 INCORRECT FORMAT: [MEM_SAVE: name] or [MEM_SAVE: fact] or [MEM_SAVE: location]
 Each MEM_SAVE must be a complete, self-contained sentence. Only new facts.
-FORGETTING: If the user asks to forget a fact, the system will delete it automatically. Confirm what was deleted. If you just deleted a fact, do NOT emit it as MEM_SAVE in the next turn. If they ask "What do you remember about me?", the system will show the list.
+FORGETTING: If the user asks to forget a fact, emit [MEM_DELETE: description of the fact to forget] BEFORE your response. Example: [MEM_DELETE: User's name is Ana]. Confirm what was deleted. If you just deleted a fact, do NOT emit it as MEM_SAVE in the next turn. If they ask "What do you remember about me?", the system will show the list.
 NEVER make up facts about the user — if you have no data in [USER MEMORY] and haven't stated it in a previous turn of this same conversation, say "I don't have that information".
 Reply direct, no fluff. Practical over theoretical. If you don't know, say so."""
 
@@ -128,7 +128,7 @@ AUTOMATIC MEMORY: If the user mentions new personal facts (name, job, location, 
 INCORRECT FORMAT: [MEM_SAVE: name] or [MEM_SAVE: fact] or [MEM_SAVE: location]
 Each MEM_SAVE must be a complete, self-contained sentence. Only new and relevant facts — don't repeat what you already know.
 
-MEMORY DELETION: If the user asks to forget or delete a fact ("forget that my name is John", "delete it"), the system handles it automatically. Confirm the action in your response: "I've forgotten that [fact]. I won't remember it anymore."
+MEMORY DELETION: If the user asks to forget or delete a fact ("forget that my name is John", "delete it"), emit [MEM_DELETE: description of the fact to forget] BEFORE your response. Example: [MEM_DELETE: User's name is John]. The system will delete it automatically. Confirm the action in your response: "I've forgotten that [fact]. I won't remember it anymore."
 If you just deleted a fact, do NOT emit it as MEM_SAVE in the next turn.
 If the user asks "What do you remember about me?" or "List my memories", the system will show the list automatically — you don't need to generate it.
 

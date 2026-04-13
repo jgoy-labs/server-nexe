@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from typing import Any
 
 from .helpers import translate
+from core.version import __version__
 
 def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
   """
@@ -37,7 +38,7 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
   _docs_enabled = _nexe_env in ("development", "test")
 
   app = FastAPI(
-    title=translate(i18n, "server_core.api.title", "Nexe 0.9 API"),
+    title=translate(i18n, "server_core.api.title", f"Nexe {__version__} API"),
     description=translate(
       i18n,
       "server_core.api.description",
@@ -53,7 +54,7 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
       "- **system-admin** — Server restart and supervision\n"
       "- **rag-v1 / embeddings-v1 / documents-v1** — Endpoints under development (return 501)"
     ),
-    version="0.9.1",
+    version=__version__,
     lifespan=lifespan,
     docs_url="/docs" if _docs_enabled else None,
     redoc_url="/redoc" if _docs_enabled else None,
