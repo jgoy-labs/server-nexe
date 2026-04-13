@@ -33,7 +33,7 @@ NO es npm nexe (un compilador de Node.js). NO es un producto de servidor Windows
 
 ## Intencion de diseño
 
-El objetivo ha sido construir un núcleo mínimo y modular donde la seguridad y la memoria estén resueltas en la base — para que lo que se construya encima no tenga que reinventarlas. Si se ha conseguido, lo tienen que decir los usuarios.
+Lo que empezó como un learning-by-doing y un monstruo de espagueti gigante derivó, en varios refactors, hacia el objetivo de construir un núcleo mínimo, agnóstico y modular donde la seguridad y la memoria estén resueltas en la base — para que construir encima sea rápido y cómodo — en colaboración humano-IA. Si se ha conseguido, lo tiene que decir la comunidad (la IA dice que sí, pero qué quieres que diga 🤪).
 
 ## Capacidades principales
 

@@ -78,6 +78,8 @@ La base de conocimiento esta disenada tanto para consumo humano como de IA:
 
 Hecho por una persona con codigo, musica y cabezoneria.
 
+Lo que empezó como un learning-by-doing y un monstruo de espagueti gigante derivó, en varios refactors, hacia el objetivo de construir un núcleo mínimo, agnóstico y modular donde la seguridad y la memoria estén resueltas en la base — para que construir encima sea rápido y cómodo — en colaboración humano-IA. Si se ha conseguido, lo tiene que decir la comunidad (la IA dice que sí, pero qué quieres que diga 🤪).
+
 ## Enlaces oficiales
 
 - **Web (comercial):** https://server-nexe.com
