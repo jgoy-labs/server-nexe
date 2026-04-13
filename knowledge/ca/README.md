@@ -29,6 +29,18 @@ expires: null
 
 server-nexe es un servidor d'IA local amb memoria persistent via RAG (Retrieval-Augmented Generation). S'executa completament a la maquina de l'usuari. Sense nuvol, sense telemetria, sense crides a APIs externes. Les converses, documents i embeddings no surten mai del dispositiu.
 
+## Filosofia de disseny
+
+server-nexe esta construït al voltant d'una idea central: **un nucli dur, minimal i segur sobre el qual construir**.
+
+El nucli es intencionadament petit i estable. Gestiona les parts difícils — encriptació, detecció d'injeccions, recuperació RAG, memoria de sessions, streaming, enrutament multi-backend — perque tot el que es construeixi a sobre pugui confiar en el que hi ha a sota. Les funcionalitats viuen als plugins. El nucli no creix per accommodar nous casos d'ús; ho fan els plugins.
+
+**Minimal per disseny.** ~50K línies de nucli que cobreixen: encriptació AES-256-GCM at-rest, 6 detectors d'injecció, rate limiting, API compatible amb OpenAI, RAG en 3 col·leccions, extracció automàtica de memoria, inferència multi-backend amb pipeline unificat i instal·lador complet. No hi ha padding.
+
+**Segur per defecte.** L'encriptació és `auto` — s'activa sola si les dependències estan presents. El pipeline aplica un punt d'entrada únic i retorna 403 a l'accés directe als backends. La seguretat no és una capa afegida; forma part de l'enrutament.
+
+**Modular sense cost d'abstracció.** Els plugins estan aïllats. Cada plugin té el seu router, la seva configuració, els seus tests. El nucli exposa un protocol; els plugins l'implementen. Pots eliminar la Web UI, canviar el plugin de seguretat o afegir un backend nou sense tocar res més.
+
 NO es npm nexe (un compilador de Node.js). NO es un producte de servidor Windows. NO es un substitut d'Ollama — pot utilitzar Ollama com un dels seus backends.
 
 ## Capacitats principals
