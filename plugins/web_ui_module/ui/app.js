@@ -1999,10 +1999,14 @@ class NexeUI {
     async _handleImageSelect(event) {
         const file = event.target.files?.[0];
         if (!file) return;
+        await this._attachImageFile(file);
+        if (this.imageInput) this.imageInput.value = '';
+    }
+
+    async _attachImageFile(file) {
         const allowed = ['image/jpeg', 'image/png', 'image/webp'];
         if (!allowed.includes(file.type)) {
             alert('Only JPEG, PNG and WebP images are supported.');
-            this.imageInput.value = '';
             return;
         }
         const b64 = await new Promise((resolve, reject) => {
@@ -2012,7 +2016,6 @@ class NexeUI {
             reader.readAsDataURL(file);
         });
         this._selectedImage = { b64, type: file.type, name: file.name };
-        // Mostra preview
         if (this.imagePreviewBar) {
             this.imagePreviewThumb.src = `data:${file.type};base64,${b64}`;
             this.imagePreviewName.textContent = file.name;
@@ -2035,9 +2038,15 @@ class NexeUI {
         const file = event.target.files?.[0] || event;
         if (!file || !file.name) return;
 
-        await this.uploadFile(file);
+        // Si és una imatge, redirigir al flux VLM en lloc del RAG de documents
+        const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+        if (IMAGE_TYPES.includes(file.type)) {
+            await this._attachImageFile(file);
+            this.fileInput.value = '';
+            return;
+        }
 
-        // Reset file input
+        await this.uploadFile(file);
         this.fileInput.value = '';
     }
 
