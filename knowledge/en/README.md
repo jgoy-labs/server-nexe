@@ -31,6 +31,18 @@ server-nexe is a local AI server with persistent memory via RAG (Retrieval-Augme
 
 It is NOT npm nexe (a Node.js compiler). It is NOT a Windows server product. It is NOT a replacement for Ollama — it can use Ollama as one of its backends.
 
+## Design Philosophy
+
+server-nexe is built around one core idea: **a hard, minimal, secure nucleus that you can build on top of**.
+
+The core is intentionally small and stable. It handles the hard parts — encryption, injection detection, RAG retrieval, session memory, streaming, multi-backend routing — so that everything built above it can trust what is underneath. Features live in plugins. The core does not grow to accommodate new use cases; plugins do.
+
+**Minimal by design.** ~50K lines of core covering: AES-256-GCM encryption at rest, 6 injection detectors, rate limiting, OpenAI-compatible API, RAG across 3 collections, automatic memory extraction, multi-backend inference with a unified pipeline, and a full installer. No padding.
+
+**Secure by default.** Encryption is `auto` — it activates itself when dependencies are present. The pipeline enforces a single entry point and returns 403 on direct backend access. Security is not a layer added on top; it is part of the routing.
+
+**Modular without abstraction tax.** Plugins are isolated. Each plugin owns its router, its config, its tests. The core exposes a protocol; plugins implement it. You can remove the web UI, swap the security plugin, or add a new backend without touching anything else.
+
 ## Core capabilities
 
 1. **100% Local and Private** — All inference, memory and storage happen on-device. Zero cloud dependency.
