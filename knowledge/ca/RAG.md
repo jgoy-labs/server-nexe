@@ -195,7 +195,7 @@ storage/vectors/
 | NEXE_RAG_MEMORY_THRESHOLD | 0.3 | Puntuacio minima per a personal_memory |
 | NEXE_MAX_CONTEXT_CHARS | 24000 | Finestra de context maxima en caracters |
 | NEXE_OLLAMA_EMBED_MODEL | nomic-embed-text | Model d'embedding d'Ollama |
-| NEXE_ENCRYPTION_ENABLED | false | Activar encriptacio at-rest per a TextStore/SQLCipher |
+| NEXE_ENCRYPTION_ENABLED | auto | Activar encriptacio at-rest per a TextStore/SQLCipher |
 
 ## Limitacions
 

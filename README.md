@@ -252,8 +252,8 @@ server-nexe is built on the shoulders of these amazing open-source projects:
 - [MLX](https://github.com/ml-explore/mlx) — Apple Silicon native ML framework
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) — Efficient GGUF model inference
 - [Ollama](https://ollama.ai) — Local model management and serving
-- [sentence-transformers](https://www.sbert.net) — Text embedding models
-- [fastembed](https://github.com/qdrant/fastembed) — ONNX-based fast embedding backend (since v0.9.3)
+- [sentence-transformers](https://www.sbert.net) — Text embedding models (replaced by fastembed since v0.9.3)
+- [fastembed](https://github.com/qdrant/fastembed) — ONNX-based fast embedding backend (current, since v0.9.3)
 - [Hugging Face](https://huggingface.co) — Model hub and transformers library
 
 **Infrastructure**

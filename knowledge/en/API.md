@@ -246,7 +246,7 @@ Compatible with tools that use OpenAI API format: Cursor, Continue, Zed, custom 
 | Rate limits | .env | NEXE_RATE_LIMIT_* variables |
 | Timeout | .env | NEXE_DEFAULT_MAX_TOKENS (default 4096) |
 | CORS origins | server.toml `[core.server]` | Allowed origins |
-| Encryption | .env | NEXE_ENCRYPTION_ENABLED (default false) |
+| Encryption | .env | NEXE_ENCRYPTION_ENABLED (default auto) |
 
 ## Quick Examples
 

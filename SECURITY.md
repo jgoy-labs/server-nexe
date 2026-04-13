@@ -60,7 +60,7 @@ It does **not** defend against:
 - Trusted host middleware
 - No inline scripts — language injection via `data-` HTML attributes
 
-### Encryption at rest (opt-in, v0.9.0+)
+### Encryption at rest (default `auto` since v0.9.2, opt-in since v0.9.0)
 - AES-256-GCM with HKDF-SHA256 key derivation
 - Master key stored in OS Keyring (preferred), environment variable, or file fallback
 - SQLCipher for encrypted SQLite databases
