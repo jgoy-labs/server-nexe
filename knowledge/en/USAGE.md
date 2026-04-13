@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Usage Guide — server-nexe 0.9.1
+# Usage Guide — server-nexe 0.9.7
 
 ## Starting the Server
 
@@ -94,7 +94,7 @@ No extra commands needed. Works in both CLI and Web UI. Indicators: `[MEM:N]` ba
 
 ## Encryption
 
-Encryption at rest is opt-in. Enable it to encrypt your stored data:
+Encryption at rest defaults to `auto` — it activates automatically if `sqlcipher3` is available. To force it on or manage it manually:
 
 ```bash
 # Check current status

@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Referencia de l'API REST — server-nexe 0.9.1
+# Referencia de l'API REST — server-nexe 0.9.7
 
 ## URL base
 
@@ -110,7 +110,7 @@ Chat completion compatible amb OpenAI amb suport RAG i streaming.
 | `/` | GET | No | Informacio del sistema (versio, estat, port) |
 | `/health` | GET | No | Health check basic |
 | `/health/ready` | GET | No | Comprovacio de disponibilitat (verifica moduls requerits) |
-| `/health/circuits` | GET | No | Estat dels circuit breakers (Ollama, Qdrant) |
+| `/health/circuits` | GET | Sí (X-API-Key) | Estat dels circuit breakers (Ollama, Qdrant) |
 | `/status` | GET | No | Estat en temps real: motor actiu, model, moduls carregats |
 | `/api/info` | GET | No | Informacio de l'API i llista d'endpoints disponibles |
 | `/docs` | GET | No | Documentacio interactiva Swagger/OpenAPI |

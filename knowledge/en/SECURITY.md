@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Security — server-nexe 0.9.1
+# Security — server-nexe 0.9.7
 
 server-nexe is designed for trusted local environments. All data stays on-device. No telemetry, no external calls.
 
@@ -127,9 +127,9 @@ The API endpoint `POST /v1/chat/completions` validates and sanitizes input throu
 - Real IP logging: `request.client.host`
 - Runtime logging uses `logger.info()` instead of `print()` (migrated in v0.9.0)
 
-## Encryption at Rest (opt-in)
+## Encryption at Rest (default `auto`)
 
-**Added in v0.9.0.** Encryption at rest is opt-in and recently added. It has been tested (68 tests) but has not yet been through production use with real users outside development.
+**Added in v0.9.0, default `auto` since v0.9.7.** Encryption at rest activates automatically if `sqlcipher3` is available (mode `auto`). It has been tested (68 tests) but has not yet been through production use with real users outside development.
 
 ### CryptoProvider
 
@@ -200,7 +200,7 @@ All security audits are performed by autonomous AI sessions (Claude) as part of 
 - Same 4-phase methodology, re-run after applying v1 fixes
 - 10 findings (vs 23 in v1, **57% reduction**)
 - 7 additional fixes applied: memory endpoint validation (CRITICAL), session path traversal, filename validation, rate limiting all UI endpoints, Unicode normalization in injection detectors, print()→logger migration
-- 3213 tests passed, 0 failed
+- 4665 tests passed, 0 failed
 - Verdict: **GO WITH CONDITIONS** (improved)
 
 ### Key fixes from audits
@@ -225,7 +225,7 @@ These AI audits find many issues but are **not exhaustive** — there are certai
 - **Local model limitations:** Models may follow prompt injection instructions. Mitigation: sanitizer + jailbreak patterns + Unicode normalization.
 - **Single-user design:** No multi-user isolation. One API key = full access.
 - **No TLS by default:** HTTP on localhost. Use reverse proxy (nginx/caddy) for HTTPS if exposing to network.
-- **Encryption is opt-in:** Not enabled by default. Users must explicitly activate it.
+- **Encryption defaults to `auto`:** Activates automatically if `sqlcipher3` is available. Can be forced with `NEXE_ENCRYPTION_ENABLED=true` or disabled with `false`.
 - **New encryption system:** CryptoProvider is recently added and has not been through production use with external users.
 
 ## Security Checklist

@@ -4,7 +4,7 @@ data: 2026-04-02
 id: nexe-rag-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.9.1). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat, pujada de documents amb aillament de sessio, embeddings (768D), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio de context RAG, poda intel·ligent, deduplicacio, TextStore per a text encriptat i payloads de Qdrant sense text."
+abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.9.7). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat, pujada de documents amb aillament de sessio, embeddings (768D), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio de context RAG, poda intel·ligent, deduplicacio, TextStore per a text encriptat i payloads de Qdrant sense text."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Sistema RAG — server-nexe 0.9.1
+# Sistema RAG — server-nexe 0.9.7
 
 RAG (Retrieval-Augmented Generation) es el sistema de memoria persistent de server-nexe. Augmenta les respostes del LLM injectant informacio rellevant recuperada de la memoria vectorial al context del prompt.
 
@@ -70,7 +70,7 @@ Tot el text viu a SQLite (opcionalment encriptat via SQLCipher). Aixo significa 
 
 **Model principal (via Ollama):** `nomic-embed-text` — 768 dimensions. S'utilitza quan Ollama esta disponible.
 
-**Model de fallback (offline):** `paraphrase-multilingual-mpnet-base-v2` via sentence-transformers — 768 dimensions. Multilingue. S'utilitza quan Ollama no esta disponible.
+**Model de fallback (offline):** `paraphrase-multilingual-mpnet-base-v2` via fastembed (ONNX) — 768 dimensions. Multilingue. S'utilitza quan Ollama no esta disponible. (Migrat de sentence-transformers a fastembed des de v0.9.3.)
 
 Tots els vectors s'emmagatzemen amb 768 dimensions. Aquest valor esta centralitzat a `memory/memory/constants.py` com `DEFAULT_VECTOR_SIZE = 768`.
 

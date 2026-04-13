@@ -16,9 +16,9 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# server-nexe 0.9.1 — Servidor de IA local con memoria persistente
+# server-nexe 0.9.7 — Servidor de IA local con memoria persistente
 
-**Version:** 0.9.1
+**Version:** 0.9.7
 **Puerto por defecto:** 9119
 **Autor:** Jordi Goy (Barcelona)
 **Licencia:** Apache 2.0
@@ -40,7 +40,7 @@ NO es npm nexe (un compilador de Node.js). NO es un producto de servidor Windows
 5. **Sistema modular de plugins** — Seguridad, web UI, RAG, cada backend — todo es un plugin con manifests independientes. Auto-descubrimiento al arrancar.
 6. **Multilingue (ca/es/en)** — i18n completo: UI, system prompts, etiquetas de contexto RAG, mensajes de error, instalador. El servidor es la fuente de verdad para la seleccion de idioma.
 7. **Upload de documentos con aislamiento de sesion** — Sube documentos via la Web UI. Indexados en user_knowledge con metadatos session_id. Los documentos solo son visibles dentro de la sesion donde fueron subidos.
-8. **Encriptacion en reposo (opt-in)** — Encriptacion AES-256-GCM para SQLite (via SQLCipher), sesiones de chat (.enc), y texto de documentos RAG (TextStore). Los payloads de Qdrant solo contienen vectores e IDs, sin texto. Gestion de claves via OS Keyring, variable de entorno, o fichero. Anadida recientemente — aun no probada en batalla en produccion.
+8. **Encriptacion en reposo (default `auto`)** — Encriptacion AES-256-GCM para SQLite (via SQLCipher), sesiones de chat (.enc), y texto de documentos RAG (TextStore). Se activa automaticamente si sqlcipher3 esta disponible. Gestion de claves via OS Keyring, variable de entorno, o fichero. Anadida recientemente — aun no probada en batalla en produccion.
 9. **Validacion de entrada completa** — Todos los endpoints (API y Web UI) tienen rate limiting, validacion de entrada (`validate_string_input`), y sanitizacion de contexto RAG. 6 detectores de inyeccion con normalizacion Unicode. 47 patrones de jailbreak.
 
 ## Stack tecnologico
@@ -53,7 +53,7 @@ NO es npm nexe (un compilador de Node.js). NO es un producto de servidor Windows
 | Backends LLM | MLX, llama.cpp (llama-cpp-python), Ollama |
 | Embeddings | nomic-embed-text (Ollama) / paraphrase-multilingual-mpnet-base-v2 (fallback offline) |
 | Dimensiones de embedding | 768 |
-| Encriptacion | AES-256-GCM, HKDF-SHA256, SQLCipher (opt-in) |
+| Encriptacion | AES-256-GCM, HKDF-SHA256, SQLCipher (default auto) |
 | CLI | Click + Rich |
 | API | Compatible con OpenAI (/v1/chat/completions) |
 | Autenticacion | X-API-Key (dual-key con rotacion) |
@@ -81,7 +81,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # Wizard SwiftUI, constructor DMG, tray app, instalador headless
 ├── storage/               # Datos en tiempo de ejecucion (modelos, logs, vectores qdrant)
-├── tests/                 # Suite de tests (4607 funciones de test)
+├── tests/                 # Suite de tests (4665 funciones de test)
 └── nexe                   # Ejecutable CLI principal
 ```
 
@@ -181,7 +181,7 @@ Autenticacion requerida: cabecera `X-API-Key` con el valor de `.env` (`NEXE_PRIM
 - Sin sincronizacion multi-dispositivo.
 - Sin fine-tuning de modelos.
 - La API es parcialmente compatible con OpenAI (faltan /v1/embeddings, /v1/models).
-- La encriptacion en reposo es opt-in y nueva — aun no probada en batalla.
+- La encriptacion en reposo es `auto` por defecto (se activa si sqlcipher3 disponible) — nueva, aun no probada en batalla.
 - Proyecto de un solo desarrollador con auditorias asistidas por IA, no auditado formalmente.
 
 ## Documentacion relacionada

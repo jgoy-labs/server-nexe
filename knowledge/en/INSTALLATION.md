@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Installation — server-nexe 0.9.1
+# Installation — server-nexe 0.9.7
 
 Two installation methods available. Choose based on your platform and preferences.
 
@@ -134,9 +134,9 @@ curl http://127.0.0.1:9119/health    # Health check
 open http://127.0.0.1:9119/ui        # Web UI
 ```
 
-## Encryption at Rest (opt-in)
+## Encryption at Rest (default `auto`)
 
-After installation, you can enable encryption at rest:
+After installation, encryption activates automatically if sqlcipher3 is available. To manage it manually:
 
 ```bash
 # Enable encryption
@@ -182,4 +182,4 @@ Accessible from tray menu. Double confirmation, calculates space, removes Dock/L
 | NEXE_DEFAULT_MAX_TOKENS | Max response tokens | 4096 |
 | NEXE_LANG | Server language | ca |
 | NEXE_ENV | Environment | production |
-| NEXE_ENCRYPTION_ENABLED | Enable encryption at rest | false |
+| NEXE_ENCRYPTION_ENABLED | Enable encryption at rest | auto (activates if sqlcipher3 available) |

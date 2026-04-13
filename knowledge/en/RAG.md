@@ -4,7 +4,7 @@ data: 2026-04-02
 id: nexe-rag-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete reference of the server-nexe RAG memory system (v0.9.1). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent, session-isolated document upload, embeddings (768D), chunking parameters, context building with i18n labels, RAG weight visualization, RAG context sanitization, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
+abstract: "Complete reference of the server-nexe RAG memory system (v0.9.7). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent, session-isolated document upload, embeddings (768D), chunking parameters, context building with i18n labels, RAG weight visualization, RAG context sanitization, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# RAG System — server-nexe 0.9.1
+# RAG System — server-nexe 0.9.7
 
 RAG (Retrieval-Augmented Generation) is the persistent memory system of server-nexe. It augments the LLM's responses by injecting relevant information retrieved from vector memory into the prompt context.
 
@@ -70,7 +70,7 @@ All text lives in SQLite (optionally encrypted via SQLCipher). This means even w
 
 **Primary model (via Ollama):** `nomic-embed-text` — 768 dimensions. Used when Ollama is available.
 
-**Fallback model (offline):** `paraphrase-multilingual-mpnet-base-v2` via sentence-transformers — 768 dimensions. Multilingual. Used when Ollama is not available.
+**Fallback model (offline):** `paraphrase-multilingual-mpnet-base-v2` via fastembed (ONNX) — 768 dimensions. Multilingual. Used when Ollama is not available. (Migrated from sentence-transformers to fastembed since v0.9.3.)
 
 All vectors are stored with 768 dimensions. This value is centralized in `memory/memory/constants.py` as `DEFAULT_VECTOR_SIZE = 768`.
 

@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-errors-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Errores comunes y soluciones para server-nexe 0.9.1. Cubre errores de instalacion, arranque del servidor, Web UI, autenticacion API, carga de modelos, memoria/RAG, streaming y errores de encriptacion."
+abstract: "Errores comunes y soluciones para server-nexe 0.9.7. Cubre errores de instalacion, arranque del servidor, Web UI, autenticacion API, carga de modelos, memoria/RAG, streaming y errores de encriptacion."
 tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, streaming, encryption]
 chunk_size: 600
 priority: P1
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Errores comunes — server-nexe 0.9.1
+# Errores comunes — server-nexe 0.9.7
 
 ## Errores de instalacion
 
@@ -36,7 +36,7 @@ expires: null
 | Ollama not available | Ollama no instalado o no ejecutandose | Instalar desde ollama.com. El servidor auto-arrancara Ollama al iniciar. |
 | asyncio.Lock deadlock | Problema de event loop en Python 3.12 | Corregido en v0.8.2 via inicializacion lazy en module_lifecycle.py. Actualizar a la ultima version. |
 | Servidor ya en ejecucion (PID X) | Otra instancia activa del servidor | Usa "Quit" en el tray, o `pkill -9 server-nexe`. Verifica: `lsof -iTCP:9119` |
-| Servidor huerfano (Quit del tray no funciona) | Bug pre-v0.9.0 (corregido) — el tray no enviaba SIGTERM al servidor | Actualizar a v0.9.1. Workaround: `pkill -f "core.app"` o `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
+| Servidor huerfano (Quit del tray no funciona) | Bug pre-v0.9.0 (corregido) — el tray no enviaba SIGTERM al servidor | Actualizar a v0.9.7. Workaround: `pkill -f "core.app"` o `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
 
 ## Errores de Web UI
 
@@ -65,7 +65,7 @@ expires: null
 | OOM Killed | Modelo demasiado grande para la RAM | Usar modelo mas pequeno. 8GB RAM -> modelos 2B maximo. |
 | Model loading very slow | Modelo grande o GPU fria | Normal para modelos 32B+. El indicador de carga muestra el progreso. |
 | MLX not available | Mac Intel o Linux | MLX es solo para Apple Silicon. Usar llama.cpp u Ollama. |
-| Qwen3.5 fails on MLX | Modelo multimodal incompatible | Usar backend Ollama para modelos Qwen3.5. |
+| Qwen3.5 fails on MLX (versiones < v0.9.7) | Modelo multimodal incompatible | Desde v0.9.7 el backend MLX soporta VLM via mlx_vlm. Si falla, usar el backend Ollama como alternativa. |
 
 ## Errores de memoria/RAG
 

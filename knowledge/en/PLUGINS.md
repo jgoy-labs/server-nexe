@@ -4,7 +4,7 @@ data: 2026-04-06
 id: nexe-plugins-system
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete guide to the server-nexe 0.9.1 plugin system. Covers NexeModule Protocol (duck typing, not inheritance), manifest.toml format, plugin file structure, lifecycle (discovery → loading → initialization → integration → shutdown), context object, router registration, existing plugins (MLX, llama.cpp, Ollama, Security with Unicode normalization, Web UI with input validation), how to create a new plugin step by step, common errors and best practices."
+abstract: "Complete guide to the server-nexe 0.9.7 plugin system. Covers NexeModule Protocol (duck typing, not inheritance), manifest.toml format, plugin file structure, lifecycle (discovery → loading → initialization → integration → shutdown), context object, router registration, existing plugins (MLX, llama.cpp, Ollama, Security with Unicode normalization, Web UI with input validation), how to create a new plugin step by step, common errors and best practices."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Plugin System — server-nexe 0.9.1
+# Plugin System — server-nexe 0.9.7
 
 server-nexe uses a plugin architecture based on automatic discovery via manifest.toml files. Plugins are independent modules that add functionality without modifying the core. No manual registration needed — the system scans, discovers, and loads plugins automatically.
 
@@ -36,7 +36,7 @@ class MyPlugin:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="my_plugin",
-            version="0.9.1",
+            version="0.9.7",
             description="What it does",
             author="Author Name",
             module_type="local_llm_option",
@@ -107,7 +107,7 @@ Every plugin MUST have a `manifest.toml` file. This is the single source of trut
 ```toml
 [module]
 name = "my_plugin"
-version = "0.9.1"
+version = "0.9.7"
 type = "local_llm_option"
 description = "What this plugin does"
 location = "plugins/my_plugin/"

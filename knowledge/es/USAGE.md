@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Guia de uso — server-nexe 0.9.1
+# Guia de uso — server-nexe 0.9.7
 
 ## Iniciar el servidor
 
@@ -94,7 +94,7 @@ No se necesitan comandos extra. Funciona tanto en CLI como en Web UI. Indicadore
 
 ## Encriptacion
 
-La encriptacion en reposo es opt-in. Activala para encriptar tus datos almacenados:
+La encriptacion en reposo es `auto` por defecto — se activa automaticamente si `sqlcipher3` esta disponible. Para forzarla o gestionarla manualmente:
 
 ```bash
 # Comprobar estado actual

@@ -16,9 +16,9 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# server-nexe 0.9.1 — Local AI Server with Persistent Memory
+# server-nexe 0.9.7 — Local AI Server with Persistent Memory
 
-**Version:** 0.9.1
+**Version:** 0.9.7
 **Default port:** 9119
 **Author:** Jordi Goy (Barcelona)
 **License:** Apache 2.0
@@ -40,7 +40,7 @@ It is NOT npm nexe (a Node.js compiler). It is NOT a Windows server product. It 
 5. **Modular Plugin System** — Security, web UI, RAG, each backend — everything is a plugin with independent manifests. Auto-discovered at startup.
 6. **Multilingual (ca/es/en)** — Full i18n: UI, system prompts, RAG context labels, error messages, installer. Server is source of truth for language selection.
 7. **Document Upload with Session Isolation** — Upload documents via Web UI. Indexed into user_knowledge with session_id metadata. Documents only visible within the session they were uploaded to.
-8. **Encryption at Rest (opt-in)** — AES-256-GCM encryption for SQLite (via SQLCipher), chat sessions (.enc), and RAG document text (TextStore). Qdrant payloads contain only vectors and IDs, no text. Key management via OS Keyring, env var, or file. Recently added — not yet battle-tested in production.
+8. **Encryption at Rest (default `auto`)** — AES-256-GCM encryption for SQLite (via SQLCipher), chat sessions (.enc), and RAG document text (TextStore). Activates automatically if sqlcipher3 is available. Key management via OS Keyring, env var, or file. Recently added — not yet battle-tested in production.
 9. **Comprehensive Input Validation** — All endpoints (API and Web UI) have rate limiting, input validation (`validate_string_input`), and RAG context sanitization. 6 injection detectors with Unicode normalization. 47 jailbreak patterns.
 
 ## Technology stack
@@ -53,7 +53,7 @@ It is NOT npm nexe (a Node.js compiler). It is NOT a Windows server product. It 
 | LLM backends | MLX, llama.cpp (llama-cpp-python), Ollama |
 | Embeddings | nomic-embed-text (Ollama) / paraphrase-multilingual-mpnet-base-v2 (offline fallback) |
 | Embedding dimensions | 768 |
-| Encryption | AES-256-GCM, HKDF-SHA256, SQLCipher (opt-in) |
+| Encryption | AES-256-GCM, HKDF-SHA256, SQLCipher (default auto) |
 | CLI | Click + Rich |
 | API | OpenAI-compatible (/v1/chat/completions) |
 | Authentication | X-API-Key (dual-key with rotation) |
@@ -81,7 +81,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer
 ├── storage/               # Runtime data (models, logs, qdrant vectors)
-├── tests/                 # Test suite (4607 test functions)
+├── tests/                 # Test suite (4665 test functions)
 └── nexe                   # Main CLI executable
 ```
 
@@ -181,7 +181,7 @@ Authentication required: `X-API-Key` header with value from `.env` (`NEXE_PRIMAR
 - No multi-device sync.
 - No model fine-tuning.
 - API is partially compatible with OpenAI (missing /v1/embeddings, /v1/models).
-- Encryption at rest is opt-in and new — not yet battle-tested.
+- Encryption at rest defaults to `auto` (activates if sqlcipher3 available) — new, not yet battle-tested.
 - Single developer project with AI-assisted audits, not formally audited.
 
 ## Related documentation

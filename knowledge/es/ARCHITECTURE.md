@@ -4,7 +4,7 @@ data: 2026-04-02
 id: nexe-architecture
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Arquitectura interna de server-nexe 0.9.1. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, pipeline de encriptacion, pipeline de sanitizacion de peticiones, y diagramas Mermaid."
+abstract: "Arquitectura interna de server-nexe 0.9.7. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, pipeline de encriptacion, pipeline de sanitizacion de peticiones, y diagramas Mermaid."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Arquitectura — server-nexe 0.9.1
+# Arquitectura — server-nexe 0.9.7
 
 ## Arquitectura de cinco capas
 
@@ -32,7 +32,7 @@ SERVICIOS BASE    Memory (RAG) | Qdrant | Embeddings | SQLite/SQLCipher | TextSt
 ALMACENAMIENTO    models/ | vectors/ | logs/ | cache/ | sessions/ | *.enc
 ```
 
-Principios de diseno: modularidad, backends basados en plugins, API-first, RAG nativo como elemento de primera clase, simplicidad, encriptacion opt-in.
+Principios de diseno: modularidad, backends basados en plugins, API-first, RAG nativo como elemento de primera clase, simplicidad, encriptacion auto (cuando disponible).
 
 ## Pipeline de procesamiento de peticiones
 
@@ -192,7 +192,7 @@ server-nexe/
 │   └── web_ui_module/            # Interfaz web (6 ficheros de rutas, session manager, memory helper)
 │
 ├── memory/                       # Sistema RAG de 3 subcapas
-│   ├── embeddings/               # Generacion de vectores (Ollama + sentence-transformers)
+│   ├── embeddings/               # Generacion de vectores (Ollama + fastembed ONNX)
 │   ├── memory/                   # Gestion de memoria (persistencia, SQLCipher)
 │   │   └── api/
 │   │       └── text_store.py     # TextStore (almacenamiento SQLite de texto para documentos RAG)
@@ -214,7 +214,7 @@ server-nexe/
 │
 ├── knowledge/                    # Documentacion para ingestion RAG (ca/es/en x 12 ficheros)
 ├── storage/                      # Datos en tiempo de ejecucion (no en git)
-├── tests/                        # 4607 funciones de test
+├── tests/                        # 4665 funciones de test
 └── nexe                          # Ejecutable CLI
 ```
 
@@ -242,7 +242,7 @@ Gestiona el arranque y apagado del servidor. Dividido en 4 submodulos.
 5. Auto-arranque de Ollama (si esta disponible, modo background) — timeout `NEXE_STARTUP_TIMEOUT` (default 30s)
 6. Cargar modulos de memoria (Memory -> RAG -> Embeddings, orden correcto) — timeout 30s
 7. Inicializar modulos de plugins (MLX, llama.cpp, Ollama, Security, Web UI) — timeout 30s
-8. Inicializar CryptoProvider si `NEXE_ENCRYPTION_ENABLED=true` (opt-in)
+8. Inicializar CryptoProvider segun `NEXE_ENCRYPTION_ENABLED` (`auto` por defecto — activo si sqlcipher3 disponible)
 9. Auto-ingestion de knowledge/ (solo en primera ejecucion, fichero marcador) — timeout 30s
 10. Generar token bootstrap (256 bits, persistente en SQLite, TTL 30min)
 
@@ -281,7 +281,7 @@ Gestiona el arranque y apagado del servidor. Dividido en 4 submodulos.
 ```toml
 [module]
 name = "module_name"
-version = "0.9.1"
+version = "0.9.7"
 type = "local_llm_option"
 description = "Descripcion del modulo"
 location = "plugins/module_name/"
@@ -381,7 +381,7 @@ El system prompt define la personalidad y comportamiento de Nexe. Se encuentra e
 
 ## Arquitectura de tests
 
-- 4607 funciones de test, 3213 pasados en la ultima ejecucion, 0 fallos
+- 4665 funciones de test recopiladas (4804 totales), 0 fallos en la ultima ejecucion
 - Tests colocados junto a los modulos (cada modulo tiene carpeta tests/)
 - conftest.py raiz para fixtures compartidas
 - Closures refactorizadas a funciones para permitir patching (decision clave de refactorizacion)

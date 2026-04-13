@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Seguridad — server-nexe 0.9.1
+# Seguridad — server-nexe 0.9.7
 
 server-nexe esta disenado para entornos locales de confianza. Todos los datos permanecen en el dispositivo. Sin telemetria, sin llamadas externas.
 
@@ -127,9 +127,9 @@ El endpoint API `POST /v1/chat/completions` valida y sanitiza la entrada a trave
 - Logging de IP real: `request.client.host`
 - El logging en tiempo de ejecucion usa `logger.info()` en lugar de `print()` (migrado en v0.9.0)
 
-## Encriptacion en reposo (opt-in)
+## Encriptacion en reposo (default `auto`)
 
-**Anadida en v0.9.0.** La encriptacion en reposo es opt-in y ha sido anadida recientemente. Ha sido probada (68 tests) pero aun no ha pasado por uso en produccion con usuarios reales fuera del desarrollo.
+**Anadida en v0.9.0, default `auto` desde v0.9.7.** La encriptacion en reposo se activa automaticamente si `sqlcipher3` esta disponible (modo `auto`). Ha sido probada (68 tests) pero aun no ha pasado por uso en produccion con usuarios reales fuera del desarrollo.
 
 ### CryptoProvider
 
@@ -200,7 +200,7 @@ Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (C
 - Misma metodologia de 4 fases, re-ejecutada tras aplicar las correcciones de v1
 - 10 hallazgos (vs 23 en v1, **57% de reduccion**)
 - 7 correcciones adicionales aplicadas: validacion de endpoints de memoria (CRITICO), path traversal en sesiones, validacion de nombres de fichero, rate limiting en todos los endpoints UI, normalizacion Unicode en detectores de inyeccion, migracion print()->logger
-- 3213 tests pasados, 0 fallidos
+- 4665 tests pasados, 0 fallidos
 - Veredicto: **GO CON CONDICIONES** (mejorado)
 
 ### Correcciones clave de las auditorias
@@ -225,7 +225,7 @@ Estas auditorias IA encuentran muchos problemas pero **no son exhaustivas** — 
 - **Limitaciones de modelos locales:** Los modelos pueden seguir instrucciones de inyeccion de prompt. Mitigacion: sanitizer + patrones de jailbreak + normalizacion Unicode.
 - **Diseno para un solo usuario:** Sin aislamiento multi-usuario. Una API key = acceso completo.
 - **Sin TLS por defecto:** HTTP en localhost. Usar reverse proxy (nginx/caddy) para HTTPS si se expone a la red.
-- **La encriptacion es opt-in:** No esta activada por defecto. Los usuarios deben activarla explicitamente.
+- **La encriptacion es `auto` por defecto:** Se activa automaticamente si `sqlcipher3` esta disponible. Se puede forzar con `NEXE_ENCRYPTION_ENABLED=true` o desactivar con `false`.
 - **Sistema de encriptacion nuevo:** CryptoProvider ha sido anadido recientemente y no ha pasado por uso en produccion con usuarios externos.
 
 ## Checklist de seguridad

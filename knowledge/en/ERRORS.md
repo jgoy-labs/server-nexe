@@ -4,7 +4,7 @@ data: 2026-03-28
 id: nexe-errors-guide
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Common errors and solutions for server-nexe 0.9.1. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, streaming, and encryption errors."
+abstract: "Common errors and solutions for server-nexe 0.9.7. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, streaming, and encryption errors."
 tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, streaming, encryption]
 chunk_size: 600
 priority: P1
@@ -16,7 +16,7 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Common Errors — server-nexe 0.9.1
+# Common Errors — server-nexe 0.9.7
 
 ## Installation Errors
 
@@ -36,7 +36,7 @@ expires: null
 | Ollama not available | Ollama not installed or not running | Install from ollama.com. Server will auto-start Ollama on boot. |
 | asyncio.Lock deadlock | Python 3.12 event loop issue | Fixed in v0.8.2 via lazy init in module_lifecycle.py. Update to latest. |
 | Server already running (PID X) | Another active server instance | Use "Quit" from the tray, or `pkill -9 server-nexe`. Verify: `lsof -iTCP:9119` |
-| Orphaned server (Quit from tray doesn't work) | Bug pre-v0.9.0 (fixed) — tray was not sending SIGTERM to server | Update to v0.9.1. Workaround: `pkill -f "core.app"` or `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
+| Orphaned server (Quit from tray doesn't work) | Bug pre-v0.9.0 (fixed) — tray was not sending SIGTERM to server | Update to v0.9.7. Workaround: `pkill -f "core.app"` or `lsof -iTCP:9119 -sTCP:LISTEN` → `kill -9 <PID>` |
 
 ## Web UI Errors
 
@@ -65,7 +65,7 @@ expires: null
 | OOM Killed | Model too large for RAM | Use smaller model. 8GB RAM → 2B models max. |
 | Model loading very slow | Large model or cold GPU | Normal for 32B+ models. Loading indicator shows progress. |
 | MLX not available | Intel Mac or Linux | MLX is Apple Silicon only. Use llama.cpp or Ollama. |
-| Qwen3.5 fails on MLX | Multimodal model incompatible | Use Ollama backend for Qwen3.5 models. |
+| Qwen3.5 fails on MLX (versions < v0.9.7) | Multimodal model incompatible | Since v0.9.7 the MLX backend supports VLM via mlx_vlm. If it still fails, use the Ollama backend as an alternative. |
 
 ## Memory/RAG Errors
 

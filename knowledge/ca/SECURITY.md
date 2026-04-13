@@ -16,9 +16,9 @@ author: "Jordi Goy"
 expires: null
 ---
 
-# Seguretat — server-nexe 0.9.1
+# Seguretat — server-nexe 0.9.7
 
-server-nexe 0.9.1 esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
+server-nexe 0.9.7 esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
 
 ## Autenticacio
 
@@ -127,9 +127,9 @@ Logging d'events de seguretat **compatible amb RFC5424** via `plugins/security/s
 - Logging d'IP real: `request.client.host`
 - El logging en temps d'execucio utilitza `logger.info()` en lloc de `print()` (migrat a la v0.9.0)
 
-## Encriptacio at-rest (opt-in)
+## Encriptacio at-rest (default `auto`)
 
-**Afegida a la v0.9.0.** L'encriptacio at-rest es opt-in i recentment afegida. S'ha testejat (68 tests) pero encara no ha passat per us en produccio amb usuaris reals fora del desenvolupament.
+**Afegida a la v0.9.0, default `auto` des de v0.9.7.** L'encriptacio at-rest s'activa automaticament si `sqlcipher3` es disponible (mode `auto`). S'ha testejat (68 tests) pero encara no ha passat per us en produccio amb usuaris reals fora del desenvolupament.
 
 ### CryptoProvider
 
@@ -200,7 +200,7 @@ Totes les auditories de seguretat les realitzen sessions autonomes d'IA (Claude)
 - Mateixa metodologia de 4 fases, re-executada despres d'aplicar les correccions de la v1
 - 10 troballes (vs 23 a la v1, **57% de reduccio**)
 - 7 correccions addicionals aplicades: validacio d'endpoints de memoria (CRITIC), path traversal de sessions, validacio de noms de fitxer, rate limiting a tots els endpoints UI, normalitzacio Unicode als detectors d'injeccio, migracio print()->logger
-- 3213 tests passats, 0 fallats
+- 4665 tests passats, 0 fallats
 - Veredicte: **GO WITH CONDITIONS** (millorat)
 
 ### Correccions clau de les auditories
@@ -225,7 +225,7 @@ Aquestes auditories IA troben molts problemes pero **no son exhaustives** — hi
 - **Limitacions dels models locals:** Els models poden seguir instruccions d'injeccio de prompts. Mitigacio: sanitizer + patrons de jailbreak + normalitzacio Unicode.
 - **Disseny per a un sol usuari:** Sense aillament multi-usuari. Una clau API = acces complet.
 - **Sense TLS per defecte:** HTTP a localhost. Utilitza un reverse proxy (nginx/caddy) per a HTTPS si exposes a la xarxa.
-- **L'encriptacio es opt-in:** No activada per defecte. Els usuaris han d'activar-la explicitament.
+- **L'encriptacio es `auto` per defecte:** S'activa automaticament si `sqlcipher3` es disponible. Es pot forcar amb `NEXE_ENCRYPTION_ENABLED=true` o desactivar amb `false`.
 - **Sistema d'encriptacio nou:** CryptoProvider s'ha afegit recentment i no ha passat per us en produccio amb usuaris externs.
 
 ## Checklist de seguretat
