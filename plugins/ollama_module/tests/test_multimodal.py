@@ -31,14 +31,15 @@ class TestBuildPayload:
         assert "images" not in payload
 
     def test_with_images_adds_key(self):
-        """Amb imatges, el payload HA de tenir 'images'."""
+        """Amb imatges, 'images' va dins el darrer missatge user (format /api/chat)."""
         chat = self._chat()
         img = _make_image_b64()
         payload = chat._build_payload(
             "llava", [{"role": "user", "content": "Descriu"}], stream=True, images=[img]
         )
-        assert "images" in payload
-        assert payload["images"] == [img]
+        # images han d'estar dins el missatge user, NO al top-level
+        assert "images" not in payload
+        assert payload["messages"][-1]["images"] == [img]
 
     def test_empty_images_list_not_added(self):
         """Llista buida no afegeix la clau 'images'."""
@@ -130,8 +131,10 @@ async def test_chat_images_reach_payload():
         ):
             results.append(chunk)
 
-    assert "images" in captured_payload
-    assert captured_payload["images"] == [img_b64]
+    # images han d'estar dins el darrer missatge user, NO al top-level
+    assert "images" not in captured_payload
+    user_msgs = [m for m in captured_payload["messages"] if m.get("role") == "user"]
+    assert user_msgs[-1]["images"] == [img_b64]
 
 
 # ── OllamaModule.chat — signatura ─────────────────────────────────────────────

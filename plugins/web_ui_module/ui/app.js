@@ -2040,7 +2040,9 @@ class NexeUI {
 
         // Si és una imatge, redirigir al flux VLM en lloc del RAG de documents
         const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-        if (IMAGE_TYPES.includes(file.type)) {
+        const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
+        const _ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+        if (IMAGE_TYPES.includes(file.type) || IMAGE_EXTS.includes(_ext)) {
             await this._attachImageFile(file);
             this.fileInput.value = '';
             return;
@@ -2181,7 +2183,7 @@ class NexeUI {
         chatMain.addEventListener('drop', (e) => {
             const files = e.dataTransfer.files;
             if (files.length > 0) {
-                this.uploadFile(files[0]);
+                this.handleFileUpload({ target: { files } });
             }
         });
     }

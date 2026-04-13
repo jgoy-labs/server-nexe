@@ -62,7 +62,13 @@ class OllamaChat:
             },
         }
         if images:
-            payload["images"] = images
+            # Ollama /api/chat: images han d'anar dins el darrer missatge de l'usuari
+            # (no al top-level — que és el format de /api/generate, no /api/chat)
+            for i in range(len(payload["messages"]) - 1, -1, -1):
+                if payload["messages"][i].get("role") == "user":
+                    payload["messages"][i] = dict(payload["messages"][i])
+                    payload["messages"][i]["images"] = images
+                    break
         return payload
 
     async def chat(
