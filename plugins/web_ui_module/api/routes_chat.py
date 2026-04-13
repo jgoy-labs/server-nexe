@@ -66,6 +66,14 @@ _MEM_SAVE_STRICT_RE = _re.compile(r'\[MEM_SAVE:\s*([^\[\]\n\r\t]{1,250})\]')
 # com a MEM_SAVE normals, i els strippem del visible per no mostrar-los a l'usuari.
 _MEMORIA_RE = _re.compile(r'\[MEMORIA:\s*([^\[\]\n\r\t]{1,250})\]', _re.IGNORECASE)
 
+# ─── Bug 18 — MEM_DELETE tag extractor ────────────────────────────────────────
+# Format: [MEM_DELETE: <text>] — el model emet aquest tag quan l'usuari demana
+# oblidar un fet. El pipeline l'extreu, crida delete_from_memory(), i el stripeja
+# de la resposta visible. Fallback si la detecció d'intent des del missatge falla.
+_MEM_DELETE_RE = _re.compile(r'\[MEM_DELETE:\s*([^\[\]\n\r\t]{1,250})\]')
+# Normalitzar variants: [OLVIDA: ...], [OBLIT: ...] → [MEM_DELETE: ...]
+_OBLIT_RE = _re.compile(r'\[(OLVIDA|OBLIT|FORGET):\s*([^\[\]\n\r\t]{1,250})\]', _re.IGNORECASE)
+
 # ─── Re-prompt override ─────────────────────────────────────────────────────
 # Quan un model emet NOMÉS [MEM_SAVE: ...] sense resposta conversacional,
 # re-enviem el missatge amb aquest override afegit al system prompt.
@@ -526,6 +534,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         if not attached_doc:
                             try:
                                 _active_colls = body.get("rag_collections")
+                                logger.info("RAG: attempting recall (collections=%s)", _active_colls or "all")
                                 recall_result = await memory_helper.recall_from_memory(message, limit=5, collections=_active_colls, session_id=session.id)
                                 if recall_result["success"] and recall_result["results"]:
                                     # Filter by minimum score (configurable, default 0.30)
@@ -568,6 +577,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             _rag_items.append((col, score))
                                             preview = item['content'][:80].replace('\n', ' ')
                                             logger.info(f"  RAG [{col}] score={score:.2f} -> {repr(preview)}")
+                                elif not recall_result["success"]:
+                                    logger.warning("RAG: recall failed — %s", recall_result.get("message", "unknown"))
+                                else:
+                                    logger.info("RAG: no results for query (success=True, results=[])")
                             except Exception as e:
                                 logger.warning(f"RAG lookup failed: {e}")
 
@@ -651,9 +664,33 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             rag_context = rag_context[:available_chars]
                             # Context RAG: docs sistema, docs tecnics, memoria
                             _rag_instruction = {
-                                "ca": "INFORMACIO RECUPERADA DE LA MEMORIA. UTILITZA-LA per respondre. Si la resposta es aqui, cita-la directament:",
-                                "es": "INFORMACION RECUPERADA DE LA MEMORIA. UTILIZALA para responder. Si la respuesta esta aqui, citala directamente:",
-                                "en": "RETRIEVED INFORMATION FROM MEMORY. USE IT to answer. If the answer is here, cite it directly:",
+                                "ca": (
+                                    "INFORMACIO RECUPERADA. UTILITZA-LA per respondre. "
+                                    "Si la resposta es aqui, cita-la directament. "
+                                    "Fonts: [DOCUMENTACIO DEL SISTEMA] = knowledge base del sistema, "
+                                    "[DOCUMENTACIO TECNICA] = documents pujats per l'usuari, "
+                                    "[MEMORIA DE L'USUARI] = coses que l'usuari t'ha dit abans. "
+                                    "Quan et preguntin d'on saps algo, indica la font correcta. "
+                                    "MAI diguis que ho saps pel teu entrenament si la info ve d'aqui:"
+                                ),
+                                "es": (
+                                    "INFORMACION RECUPERADA. UTILIZALA para responder. "
+                                    "Si la respuesta esta aqui, citala directamente. "
+                                    "Fuentes: [DOCUMENTACION DEL SISTEMA] = knowledge base del sistema, "
+                                    "[DOCUMENTACION TECNICA] = documentos subidos por el usuario, "
+                                    "[MEMORIA DEL USUARIO] = cosas que el usuario te dijo antes. "
+                                    "Cuando te pregunten de donde sabes algo, indica la fuente correcta. "
+                                    "NUNCA digas que lo sabes por tu entrenamiento si la info viene de aqui:"
+                                ),
+                                "en": (
+                                    "RETRIEVED INFORMATION. USE IT to answer. "
+                                    "If the answer is here, cite it directly. "
+                                    "Sources: [SYSTEM DOCUMENTATION] = system knowledge base, "
+                                    "[TECHNICAL DOCUMENTATION] = documents uploaded by the user, "
+                                    "[USER MEMORY] = things the user told you before. "
+                                    "When asked where you know something from, indicate the correct source. "
+                                    "NEVER say you know it from training if the info comes from here:"
+                                ),
                             }
                             _lang_key = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
                             _instr = _rag_instruction.get(_lang_key, _rag_instruction["en"])
@@ -899,6 +936,34 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 clean_response = _MEMORIA_RE.sub(
                                     lambda m: f'[MEM_SAVE: {m.group(1)}]', clean_response
                                 )
+                                # Bug 18: Normalitzar [OLVIDA/OBLIT/FORGET: ...] → [MEM_DELETE: ...]
+                                clean_response = _OBLIT_RE.sub(
+                                    lambda m: f'[MEM_DELETE: {m.group(2)}]', clean_response
+                                )
+                                # Bug 18: Extract [MEM_DELETE: ...] i executar esborrat real
+                                _mem_deletes = _MEM_DELETE_RE.findall(clean_response)
+                                if _mem_deletes:
+                                    clean_response = _re.sub(r'\[MEM_DELETE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
+                                    _del_total = 0
+                                    for _del_fact in _mem_deletes:
+                                        _del_fact = _del_fact.strip()
+                                        if not _del_fact or len(_del_fact) < 3:
+                                            continue
+                                        try:
+                                            _del_result = await memory_helper.delete_from_memory(_del_fact)
+                                            if _del_result["success"] and _del_result.get("deleted", 0) > 0:
+                                                _del_total += _del_result["deleted"]
+                                                _del_facts = _del_result.get("deleted_facts", [])
+                                                if _del_facts:
+                                                    session._recently_deleted_facts = getattr(session, '_recently_deleted_facts', []) + [f["text"] for f in _del_facts]
+                                                logger.info("MEM_DELETE (model tag): deleted %d for '%s'", _del_result["deleted"], _del_fact[:80])
+                                            else:
+                                                logger.info("MEM_DELETE (model tag): no match for '%s'", _del_fact[:80])
+                                        except Exception as e:
+                                            logger.warning("MEM_DELETE failed: %s", e)
+                                    if _del_total > 0:
+                                        _mem_deleted += _del_total
+                                        yield f"\x00[DEL:{_del_total}]\x00"
                                 # Bug 17: Extract [MEM_SAVE: ...] facts amb validacio estricta.
                                 # _extract_safe_mem_saves filtra per format/longitud/whitelist
                                 # i rebutja MEM_SAVE que copien el missatge usuari.
@@ -1140,6 +1205,30 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             logger.info("MEM_SAVE (no-stream): '%s'", _fact[:80])
                     except Exception as e:
                         logger.debug("MEM_SAVE failed (no-stream): %s", e)
+
+            # Bug 18: Extreure [MEM_DELETE: ...] i [OLVIDA/OBLIT/FORGET: ...] (non-streaming)
+            response_text = _OBLIT_RE.sub(
+                lambda m: f'[MEM_DELETE: {m.group(2)}]', response_text
+            )
+            _mem_deletes_ns = _MEM_DELETE_RE.findall(response_text)
+            if _mem_deletes_ns:
+                response_text = _re.sub(r'\[MEM_DELETE:[^\[\]\n\r\t]{1,250}\]\s*', '', response_text).strip()
+                _del_total_ns = 0
+                for _del_fact in _mem_deletes_ns:
+                    _del_fact = _del_fact.strip()
+                    if not _del_fact or len(_del_fact) < 3:
+                        continue
+                    try:
+                        _del_result = await memory_helper.delete_from_memory(_del_fact)
+                        if _del_result["success"] and _del_result.get("deleted", 0) > 0:
+                            _del_total_ns += _del_result["deleted"]
+                            logger.info("MEM_DELETE (model tag, no-stream): deleted %d for '%s'", _del_result["deleted"], _del_fact[:80])
+                        else:
+                            logger.info("MEM_DELETE (model tag, no-stream): no match for '%s'", _del_fact[:80])
+                    except Exception as e:
+                        logger.warning("MEM_DELETE failed (no-stream): %s", e)
+                if _del_total_ns > 0:
+                    _mem_deleted += _del_total_ns
 
         _elapsed_ns = 0
         session.add_message("assistant", response_text, stats={

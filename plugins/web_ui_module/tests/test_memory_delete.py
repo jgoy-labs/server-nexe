@@ -116,6 +116,80 @@ class TestDetectDeleteIntent:
 
 
 # ═══════════════════════════════════════════════════════════════
+# BUG #18 — Mid-sentence delete patterns
+# ═══════════════════════════════════════════════════════════════
+
+class TestDetectDeleteMidSentence:
+    """BUG #18: Mid-sentence delete patterns that previously fell through to chat."""
+
+    def test_catalan_pots_esborrar(self, mh):
+        intent, content = mh.detect_intent("Pots esborrar que tinc 8 anys?")
+        assert intent == "delete"
+        assert "tinc 8 anys" in content
+
+    def test_catalan_pots_oblidar(self, mh):
+        intent, content = mh.detect_intent("Pots oblidar que visc a Barcelona?")
+        assert intent == "delete"
+        assert "visc a Barcelona" in content
+
+    def test_catalan_vull_que_oblidis(self, mh):
+        intent, content = mh.detect_intent("Vull que oblidis que m'agraden els gats")
+        assert intent == "delete"
+        assert "m'agraden els gats" in content
+
+    def test_catalan_podries_esborrar(self, mh):
+        intent, content = mh.detect_intent("Podries esborrar que treballo a Google?")
+        assert intent == "delete"
+        assert "treballo a Google" in content
+
+    def test_spanish_puedes_borrar(self, mh):
+        intent, content = mh.detect_intent("Puedes borrar que tengo 8 años?")
+        assert intent == "delete"
+        assert "tengo 8 años" in content
+
+    def test_spanish_quiero_que_olvides(self, mh):
+        intent, content = mh.detect_intent("Quiero que olvides que vivo en Madrid")
+        assert intent == "delete"
+        assert "vivo en Madrid" in content
+
+    def test_spanish_podrias_borrar(self, mh):
+        intent, content = mh.detect_intent("Podrías borrar que me llamo Juan?")
+        assert intent == "delete"
+        assert "me llamo Juan" in content
+
+    def test_english_can_you_delete(self, mh):
+        intent, content = mh.detect_intent("Can you delete that I am 8 years old?")
+        assert intent == "delete"
+        assert "I am 8 years old" in content
+
+    def test_english_can_you_forget(self, mh):
+        intent, content = mh.detect_intent("Can you forget that my name is John?")
+        assert intent == "delete"
+        assert "my name is John" in content
+
+    def test_english_i_want_you_to_forget(self, mh):
+        intent, content = mh.detect_intent("I want you to forget that I like cats")
+        assert intent == "delete"
+        assert "I like cats" in content
+
+    def test_english_please_delete_that(self, mh):
+        intent, content = mh.detect_intent("Please delete that my dog is called Rex")
+        assert intent == "delete"
+        assert "my dog is called Rex" in content
+
+    def test_negative_not_a_delete(self, mh):
+        """Normal chat about deletion should NOT trigger delete intent."""
+        intent, _ = mh.detect_intent("How do I delete files in Python?")
+        assert intent == "chat"
+
+    def test_existing_patterns_still_work(self, mh):
+        """Ensure existing start-of-string patterns still work after the change."""
+        intent, content = mh.detect_intent("Oblida que em dic Joan")
+        assert intent == "delete"
+        assert "em dic Joan" in content
+
+
+# ═══════════════════════════════════════════════════════════════
 # detect_intent — intent LIST
 # ═══════════════════════════════════════════════════════════════
 

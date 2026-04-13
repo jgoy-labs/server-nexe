@@ -267,6 +267,23 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                             size_bytes = m.get("size", 0)
                             size_gb = round(size_bytes / (1024**3), 1) if size_bytes else 0
                             model_list.append({"name": name, "size_gb": size_gb})
+                        # Bug #14: overlay RAM real from ollama ps for loaded models
+                        try:
+                            import urllib.request
+                            import json as _json
+                            req = urllib.request.urlopen("http://localhost:11434/api/ps", timeout=2)
+                            ps_data = _json.loads(req.read())
+                            for loaded in ps_data.get("models", []):
+                                loaded_name = loaded.get("name", "")
+                                loaded_size = loaded.get("size", 0)
+                                if loaded_name and loaded_size:
+                                    loaded_gb = round(loaded_size / (1024**3), 1)
+                                    for entry in model_list:
+                                        if entry["name"] == loaded_name:
+                                            entry["size_gb"] = loaded_gb
+                                            break
+                        except Exception:
+                            pass  # ollama ps unavailable — keep disk sizes
                     except Exception:
                         ollama_connected = False
                 backends.append({

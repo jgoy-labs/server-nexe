@@ -17,8 +17,6 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional
 
-from typing import Any
-
 from .models import Document, SearchResult
 
 logger = logging.getLogger(__name__)
@@ -145,6 +143,82 @@ async def store_document(
     ops.labels(operation="store").inc()
 
   return doc_id
+
+
+async def store_documents_batch(
+  qdrant: Any,
+  executor: ThreadPoolExecutor,
+  generate_embeddings_batch: Callable[[List[str]], List[List[float]]],
+  items: List[Dict[str, Any]],
+  collection: str,
+  text_store=None,
+) -> List[str]:
+  """
+  Batch store: generate all embeddings at once, then upsert in one call.
+
+  Each item in items: {"text": str, "metadata": dict|None, "doc_id": str|None, "ttl_seconds": int|None}
+  """
+  if not items:
+    return []
+
+  texts = [item["text"] for item in items]
+  embeddings = await generate_embeddings_batch(texts)
+
+  now = datetime.now(timezone.utc)
+  created_at_iso = now.isoformat()
+  doc_ids = []
+  points_data = []
+
+  for item, embedding in zip(items, embeddings):
+    text = item["text"]
+    metadata = item.get("metadata")
+    doc_id = item.get("doc_id")
+    ttl_seconds = item.get("ttl_seconds")
+
+    if doc_id is None:
+      content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+      doc_id = content_hash[:16]
+    doc_ids.append(doc_id)
+
+    expires_at_iso = None
+    if ttl_seconds is not None:
+      expires_at_iso = (now + timedelta(seconds=ttl_seconds)).isoformat()
+
+    if text_store:
+      text_store.put(
+        doc_id=doc_id, collection=collection, text=text,
+        metadata=metadata,
+        created_at=created_at_iso, expires_at=expires_at_iso,
+      )
+      payload = {"original_id": doc_id, "created_at": created_at_iso, "expires_at": expires_at_iso}
+    else:
+      payload = {
+        "original_id": doc_id, "text": text,
+        "created_at": created_at_iso, "expires_at": expires_at_iso,
+        **(metadata or {}),
+      }
+
+    points_data.append((doc_id, embedding, payload))
+
+  loop = asyncio.get_running_loop()
+
+  def _batch_upsert():
+    from memory.memory.engines.qdrant_types import PointStruct
+    points = [
+      PointStruct(id=hex_to_uuid(did), vector=emb, payload=pl)
+      for did, emb, pl in points_data
+    ]
+    qdrant.upsert(collection_name=collection, points=points)
+
+  await loop.run_in_executor(executor, _batch_upsert)
+
+  ops, _ = _get_metrics()
+  if ops:
+    ops.labels(operation="store_batch").inc(len(doc_ids))
+
+  logger.debug("Batch stored %d documents in collection %s", len(doc_ids), collection)
+  return doc_ids
+
 
 async def search_documents(
   qdrant: Any,

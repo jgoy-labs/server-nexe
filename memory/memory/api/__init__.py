@@ -46,6 +46,7 @@ from .operations import (
   list_collections,
   search_documents,
   store_document,
+  store_documents_batch,
 )
 
 logger = logging.getLogger(__name__)
@@ -282,6 +283,32 @@ class MemoryAPI:
       text_store=self._text_store,
     )
 
+  async def store_batch(
+    self,
+    items: List[Dict[str, Any]],
+    collection: str,
+  ) -> List[str]:
+    """
+    Batch store multiple documents with single embedding call.
+
+    Each item: {"text": str, "metadata": dict|None, "doc_id": str|None, "ttl_seconds": int|None}
+    """
+    self._ensure_initialized()
+
+    if not await self.collection_exists(collection):
+      raise CollectionNotFoundError(
+        f"Collection '{collection}' does not exist. Create it first."
+      )
+
+    return await store_documents_batch(
+      self._qdrant,
+      self._executor,
+      self._generate_embeddings_batch,
+      items,
+      collection,
+      text_store=self._text_store,
+    )
+
   async def search(
     self,
     query: str,
@@ -424,6 +451,23 @@ class MemoryAPI:
       return arr.astype(_np.float32).tolist()
 
     return await loop.run_in_executor(self._executor, _encode)
+
+  async def _generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
+    """Genera embeddings per un batch de textos en una sola crida fastembed."""
+    loop = asyncio.get_running_loop()
+
+    def _encode_batch():
+      import numpy as _np
+      results = []
+      for v in self._embedder.embed(texts):
+        arr = _np.array(v)
+        norm = _np.linalg.norm(arr)
+        if norm > 0:
+          arr = arr / norm
+        results.append(arr.astype(_np.float32).tolist())
+      return results
+
+    return await loop.run_in_executor(self._executor, _encode_batch)
 
   @staticmethod
   def _hex_to_uuid(hex_id: str) -> str:

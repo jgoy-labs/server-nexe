@@ -17,6 +17,7 @@ import asyncio
 import logging
 from typing import Dict, Any
 
+from core.version import __version__
 from plugins.security.core.auth import require_api_key
 
 router_admin = APIRouter(prefix="/admin/system", tags=["system-admin"])
@@ -262,9 +263,9 @@ async def system_health() -> Dict[str, Any]:
   """
   try:
     from core.lifespan import get_server_state
-    version = get_server_state().config.get('meta', {}).get('version', '0.9.0')
+    version = get_server_state().config.get('meta', {}).get('version', __version__)
   except Exception:
-    version = '0.9.0'
+    version = __version__
   return {
     "status": "healthy",
     "version": version,

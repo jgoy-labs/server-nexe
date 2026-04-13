@@ -139,6 +139,18 @@ DELETE_TRIGGERS = [
     r'\bforget\b.*memory',
     r'\bdelete\b.*memory',
     r'\berase\b.*memory',
+    # Catalan — mid-sentence ("Pots esborrar que...", "Vull que oblidis que...")
+    r'\bpots\s+(esborrar|oblidar|eliminar)\s+(que\s+)?',
+    r'\bvull\s+que\s+(esborris|oblidis|eliminis)\s+(que\s+)?',
+    r'\bpodries\s+(esborrar|oblidar|eliminar)\s+(que\s+)?',
+    # Spanish — mid-sentence ("Puedes borrar que...", "Quiero que olvides que...")
+    r'\bpuedes\s+(borrar|olvidar|eliminar)\s+(que\s+)?',
+    r'\bquiero\s+que\s+(borres|olvides|elimines)\s+(que\s+)?',
+    r'\bpodr[ií]as\s+(borrar|olvidar|eliminar)\s+(que\s+)?',
+    # English — mid-sentence ("Can you delete that...", "I want you to forget...")
+    r'\bcan\s+you\s+(delete|forget|erase|remove)\s+(that\s+)?',
+    r'\b(i\s+want|i\'d\s+like)\s+you\s+to\s+(forget|delete|erase|remove)\s+(that\s+)?',
+    r'\b(please\s+)?(delete|forget|erase|remove)\s+that\b',
 ]
 
 # Patterns that indicate user wants to LIST/SEE stored memories
@@ -270,14 +282,20 @@ class MemoryHelper:
 
         # Check for delete intent
         # "Oblida que em dic Claude" → delete, content = "em dic Claude"
+        # "Pots esborrar que tinc 8 anys?" → delete, content = "tinc 8 anys"
         for pattern in self.delete_triggers:
             match = pattern.search(message)
             if match:
+                content_after = message[match.end():].strip().rstrip('?!').strip()
+                content_before = message[:match.start()].strip().rstrip(',').strip()
                 if match.start() == 0:
-                    content = message[match.end():].strip()
+                    content = content_after
+                elif not content_after:
+                    # Match at end of string → content is before
+                    content = content_before
                 else:
-                    content = message[:match.start()].strip()
-                    content = content.rstrip(',').strip()
+                    # Mid-sentence match → content is after the verb
+                    content = content_after
                 if content:
                     return ('delete', content)
 
@@ -703,22 +721,30 @@ class MemoryHelper:
 
         logger.info(f"Ingesting '{filename}': {total} chunks → {DOC_COLLECTION}")
         t_total = time.time()
+        BATCH_SIZE = 50
 
-        for i, chunk in enumerate(chunks):
-            t0 = time.time()
-            try:
+        for batch_start in range(0, total, BATCH_SIZE):
+            batch_end = min(batch_start + BATCH_SIZE, total)
+            batch_chunks = chunks[batch_start:batch_end]
+            batch_items = []
+            for i, chunk in enumerate(batch_chunks, start=batch_start):
                 meta = {**base_meta, "chunk_index": i, "saved_at": datetime.now(timezone.utc).isoformat()}
-                await memory.store(
-                    text=chunk,
-                    collection=DOC_COLLECTION,
-                    metadata=meta,
-                )
-                saved += 1
+                batch_items.append({"text": chunk, "metadata": meta})
+            try:
+                t0 = time.time()
+                await memory.store_batch(batch_items, collection=DOC_COLLECTION)
+                saved += len(batch_items)
                 elapsed_ms = (time.time() - t0) * 1000
-                if i % 25 == 0 or i == total - 1:
-                    logger.info(f"  [{i+1}/{total}] {len(chunk)} chars, {elapsed_ms:.0f}ms")
+                logger.info(f"  [{batch_end}/{total}] batch of {len(batch_items)} chunks, {elapsed_ms:.0f}ms")
             except Exception as e:
-                logger.warning(f"  [{i}/{total}] chunk failed: {e}")
+                logger.warning(f"  Batch [{batch_start}-{batch_end}] failed ({e}), falling back to single")
+                for i, chunk in enumerate(batch_chunks, start=batch_start):
+                    try:
+                        meta = {**base_meta, "chunk_index": i, "saved_at": datetime.now(timezone.utc).isoformat()}
+                        await memory.store(text=chunk, collection=DOC_COLLECTION, metadata=meta)
+                        saved += 1
+                    except Exception as e2:
+                        logger.warning(f"  [{i}/{total}] chunk failed: {e2}")
 
         total_s = time.time() - t_total
         logger.info(f"Ingestion '{filename}': {saved}/{total} chunks in {total_s:.1f}s")
@@ -770,6 +796,7 @@ class MemoryHelper:
             # handled at the endpoint level, not here — keep backwards compat)
             memory = await self.get_memory_api()
             if not memory:
+                logger.warning("RAG recall: MemoryAPI not available (init failed or not ready)")
                 return {
                     "success": False,
                     "results": [],

@@ -7,6 +7,7 @@ llama.cpp té prefix caching automàtic quan el prefix és idèntic.
 
 """
 import asyncio
+import base64
 import time
 import logging
 from typing import Any, Dict, List, Optional
@@ -103,8 +104,22 @@ class LlamaCppChatNode:
             # Get model from pool (handles cache/reset automatically)
             model, cache_hit = self._get_model(session_id, system_hash)
 
-            # Executar amb create_chat_completion
-            if stream_callback:
+            # Executar amb create_chat_completion — bifurcació VLM/text
+            if images and self.config.mmproj_path:
+                # VLM path: imatges + clip model configurat
+                if stream_callback:
+                    result = await asyncio.to_thread(
+                        self._generate_vlm_streaming,
+                        model, system, messages, images, threadsafe_callback,
+                        max_tokens_override, temperature_override,
+                    )
+                else:
+                    result = await asyncio.to_thread(
+                        self._generate_vlm,
+                        model, system, messages, images,
+                        max_tokens_override, temperature_override,
+                    )
+            elif stream_callback:
                 result = await asyncio.to_thread(
                     self._generate_streaming,
                     model, system, messages, threadsafe_callback,
@@ -171,22 +186,13 @@ class LlamaCppChatNode:
         """Generate a response without streaming."""
         all_messages = [{"role": "system", "content": system}] + messages
 
-        # Stop sequences per diferents models
-        stop_sequences = [
-            "<|end|>", "<|endoftext|>",  # Phi-3.5, GPT
-            "</s>",  # Llama 2
-            "<|eot_id|>",  # Llama 3.x
-            "<end_of_turn>",  # Gemma
-            "<|im_end|>",  # ChatML format
-        ]
-
         start_time = time.time()
         response = model.create_chat_completion(
             messages=all_messages,
             max_tokens=max_tokens if max_tokens is not None else 2048,
             temperature=temperature if temperature is not None else 0.7,
             top_p=0.9,
-            stop=stop_sequences,
+            stop=self._STOP_SEQUENCES,
         )
         end_time = time.time()
 
@@ -217,15 +223,6 @@ class LlamaCppChatNode:
         """Generate a response with streaming."""
         all_messages = [{"role": "system", "content": system}] + messages
 
-        # Stop sequences per diferents models
-        stop_sequences = [
-            "<|end|>", "<|endoftext|>",  # Phi-3.5, GPT
-            "</s>",  # Llama 2
-            "<|eot_id|>",  # Llama 3.x
-            "<end_of_turn>",  # Gemma
-            "<|im_end|>",  # ChatML format
-        ]
-
         full_response = []
         prompt_tokens = 0
         completion_tokens = 0
@@ -240,7 +237,7 @@ class LlamaCppChatNode:
             temperature=temperature if temperature is not None else 0.7,
             top_p=0.9,
             stream=True,
-            stop=stop_sequences,
+            stop=self._STOP_SEQUENCES,
         ):
             delta = chunk.get("choices", [{}])[0].get("delta", {})
             content = delta.get("content", "")
@@ -280,6 +277,154 @@ class LlamaCppChatNode:
                 "prefill_ms": prefill_ms,      # TTFT - Time To First Token
                 "prefill_available": True,     # TTFT available via streaming
                 "generation_ms": generation_ms, # Generation time
+                "overhead_ms": 0,
+            },
+        }
+
+    @staticmethod
+    def _build_vlm_messages(
+        system: str,
+        messages: List[Dict],
+        images: List[bytes],
+    ) -> List[Dict]:
+        """Build multimodal messages with base64 image data URIs for llama-cpp-python VLM."""
+        all_messages = [{"role": "system", "content": system}]
+
+        has_user_msg = any(m.get("role") == "user" for m in messages)
+        if images and not has_user_msg:
+            logger.warning(
+                "LlamaCppChatNode: images provided but no user message found. "
+                "Images will be ignored."
+            )
+            images = []
+
+        for msg in messages:
+            if msg["role"] == "user" and images:
+                # Format OpenAI-compatible: content as list with text + image_url
+                content_parts: List[Dict[str, Any]] = [
+                    {"type": "text", "text": msg.get("content", "")},
+                ]
+                for img_bytes in images:
+                    b64 = base64.b64encode(img_bytes).decode("utf-8")
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64}"},
+                    })
+                all_messages.append({"role": "user", "content": content_parts})
+                # Only inject images into the first user message
+                images = []
+            else:
+                all_messages.append(msg)
+
+        return all_messages
+
+    # Stop sequences shared across all generation methods
+    _STOP_SEQUENCES = [
+        "<|end|>", "<|endoftext|>",  # Phi-3.5, GPT
+        "</s>",  # Llama 2
+        "<|eot_id|>",  # Llama 3.x
+        "<end_of_turn>",  # Gemma
+        "<|im_end|>",  # ChatML format
+    ]
+
+    def _generate_vlm(
+        self,
+        model: Any,
+        system: str,
+        messages: List[Dict],
+        images: List[bytes],
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Generate a VLM response without streaming (images + clip model)."""
+        all_messages = self._build_vlm_messages(system, messages, images)
+
+        start_time = time.time()
+        response = model.create_chat_completion(
+            messages=all_messages,
+            max_tokens=max_tokens if max_tokens is not None else 2048,
+            temperature=temperature if temperature is not None else 0.7,
+            top_p=0.9,
+            stop=self._STOP_SEQUENCES,
+        )
+        end_time = time.time()
+        total_ms = int((end_time - start_time) * 1000)
+
+        return {
+            "text": response["choices"][0]["message"]["content"],
+            "tokens": response["usage"]["completion_tokens"],
+            "prompt_tokens": response["usage"]["prompt_tokens"],
+            "timing": {
+                "prefill_ms": 0,
+                "generation_ms": total_ms,
+                "overhead_ms": 0,
+                "prefill_available": False,
+            },
+        }
+
+    def _generate_vlm_streaming(
+        self,
+        model: Any,
+        system: str,
+        messages: List[Dict],
+        images: List[bytes],
+        stream_callback: Any,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Generate a VLM response with streaming (images + clip model)."""
+        all_messages = self._build_vlm_messages(system, messages, images)
+
+        full_response = []
+        prompt_tokens = 0
+        completion_tokens = 0
+
+        start_time = time.time()
+        first_token_time = None
+
+        for chunk in model.create_chat_completion(
+            messages=all_messages,
+            max_tokens=max_tokens if max_tokens is not None else 2048,
+            temperature=temperature if temperature is not None else 0.7,
+            top_p=0.9,
+            stream=True,
+            stop=self._STOP_SEQUENCES,
+        ):
+            delta = chunk.get("choices", [{}])[0].get("delta", {})
+            content = delta.get("content", "")
+
+            if content:
+                if first_token_time is None:
+                    first_token_time = time.time()
+                full_response.append(content)
+                if callable(stream_callback):
+                    stream_callback(content)
+
+            usage = chunk.get("usage", {})
+            if usage:
+                prompt_tokens = usage.get("prompt_tokens", prompt_tokens)
+                completion_tokens = usage.get("completion_tokens", completion_tokens)
+
+        end_time = time.time()
+        text = "".join(full_response)
+        if completion_tokens == 0:
+            completion_tokens = len(text) // 4
+
+        if first_token_time:
+            prefill_ms = int((first_token_time - start_time) * 1000)
+            generation_ms = int((end_time - first_token_time) * 1000)
+        else:
+            prefill_ms = 0
+            generation_ms = int((end_time - start_time) * 1000)
+
+        return {
+            "text": text,
+            "tokens": completion_tokens,
+            "prompt_tokens": prompt_tokens,
+            "timing": {
+                "prefill_ms": prefill_ms,
+                "prefill_available": True,
+                "generation_ms": generation_ms,
                 "overhead_ms": 0,
             },
         }

@@ -18,6 +18,7 @@ from .collections import (
 
 from .documents import (
   store_document,
+  store_documents_batch,
   search_documents,
   get_document,
   delete_document,
@@ -32,6 +33,7 @@ __all__ = [
   "list_collections",
   "collection_exists",
   "store_document",
+  "store_documents_batch",
   "search_documents",
   "get_document",
   "delete_document",

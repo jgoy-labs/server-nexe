@@ -1,8 +1,7 @@
 """
 ────────────────────────────────────
 Server Nexe
-Version: 0.9.0
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: core/endpoints/root.py
 Description: Basic FastAPI server endpoints. Routes: / (system info), /health (health check),
 
@@ -13,6 +12,8 @@ www.jgoy.net · https://server-nexe.org
 import os
 from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Depends
+
+from core.version import __version__
 
 from core.dependencies import limiter, get_i18n
 from plugins.security.core.auth_dependencies import require_api_key
@@ -93,12 +94,12 @@ async def _module_health_status(instance) -> str:
 async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
   """Root endpoint with system information"""
   return SystemResponse(
-    system="Nexe 0.9.0",
+    system=f"Nexe {__version__}",
     description=i18n.t('server_core.api.welcome.description') if i18n else
           "Module orchestration system running",
     status=i18n.t('server_core.api.welcome.ready') if i18n else
         "System ready and operational",
-    version="0.9.1",
+    version=__version__,
     type=i18n.t('server_core.api.server_type') if i18n else "basic_server"
   )
 
@@ -110,7 +111,7 @@ async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthRespon
     status=i18n.t('server_core.api.health.status') if i18n else "operational",
     message=i18n.t('server_core.api.health.message') if i18n else
         "Basic server operational",
-    version="0.9.1",
+    version=__version__,
     uptime=i18n.t('server_core.api.health.uptime') if i18n else "operational"
   )
 
@@ -187,8 +188,8 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
   ]
 
   return ApiInfoResponse(
-    name="Nexe 0.9.0",
-    version="0.9.1",
+    name=f"Nexe {__version__}",
+    version=__version__,
     description=i18n.t('server_core.api.welcome.description') if i18n else
           "Module orchestration system running",
     endpoints=endpoints

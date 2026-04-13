@@ -181,8 +181,9 @@ class TestRootEndpoint:
         resp = client.get("/")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["system"] == "Nexe 0.9.0"
-        assert data["version"] == "0.9.1"
+        from core.version import __version__
+        assert data["system"] == f"Nexe {__version__}"
+        assert data["version"] == __version__
         assert "description" in data
         assert "status" in data
 
@@ -349,8 +350,9 @@ class TestApiInfoEndpoint:
         resp = client.get("/api/info")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["name"] == "Nexe 0.9.0"
-        assert data["version"] == "0.9.1"
+        from core.version import __version__
+        assert data["name"] == f"Nexe {__version__}"
+        assert data["version"] == __version__
         assert isinstance(data["endpoints"], list)
         assert len(data["endpoints"]) == 3
 
