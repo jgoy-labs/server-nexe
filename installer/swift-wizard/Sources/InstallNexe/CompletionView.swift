@@ -185,18 +185,36 @@ struct CompletionView: View {
     private func openNexe() {
         nexeOpened = true
 
-        let nexeAppPath = engine.installPath + "/Nexe.app"
+        // Llançament via /Applications/Nexe.app (el mateix bundle que hi ha al Dock).
+        // Així macOS registra que l'app està corrent i apareix el triangle sota la
+        // icona del Dock (abans es llançava NexeTray.app — bundle diferent, sense
+        // triangle). El bash launcher de Nexe.app gestiona port-check + tray spawn.
+        let dockAppPath = "/Applications/Nexe.app"
 
-        // Eliminar quarantena de Nexe.app (pot bloquejar el llançament)
+        // Eliminar quarantena per evitar bloqueig Gatekeeper
         let xattr = Process()
         xattr.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
-        xattr.arguments = ["-rd", "com.apple.quarantine", nexeAppPath]
+        xattr.arguments = ["-rd", "com.apple.quarantine", dockAppPath]
         try? xattr.run()
         xattr.waitUntilExit()
 
-        // Llançar tray amb --autostart (engega servidor i obre navegador).
-        // Priority: NexeTray.app bundle (Gatekeeper-safe, correcte a macOS Sequoia).
-        // Fallback: python -m installer.tray (entorn dev sense bundle present).
+        if FileManager.default.fileExists(atPath: dockAppPath) {
+            // Via `open -a`: macOS tracta el bundle com a app pròpia, aplica
+            // LSUIElement=false (dock presence), enganxa el triangle sota la icona
+            // del Dock, i evita dobles instàncies si ja corre.
+            let open = Process()
+            open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            open.arguments = ["-a", dockAppPath]
+            var env = ProcessInfo.processInfo.environment
+            env["NEXE_LANG"] = engine.lang.rawValue
+            open.environment = env
+            open.standardOutput = nil
+            open.standardError = nil
+            try? open.run()
+            return
+        }
+
+        // Fallback: entorn dev o /Applications/Nexe.app missing → llançar tray directe
         let trayBundlePath = engine.installPath + "/installer/NexeTray.app/Contents/MacOS/NexeTray"
         let tray = Process()
         var env = ProcessInfo.processInfo.environment
@@ -210,14 +228,10 @@ struct CompletionView: View {
             tray.arguments = ["-m", "installer.tray", "--autostart"]
         }
         tray.currentDirectoryURL = URL(fileURLWithPath: engine.installPath)
-        // Passar idioma triat al tray
         tray.environment = env
-        // Desacoblar stdout/stderr per evitar bloqueig de pipes i flash de focus
         tray.standardOutput = nil
         tray.standardError = nil
-        // Nota: no cridar waitUntilExit — el tray és independent i no bloquejant
         try? tray.run()
-
     }
 
     private func doAddToDock(nexeAppPath: String) {
