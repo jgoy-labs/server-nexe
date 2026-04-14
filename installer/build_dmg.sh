@@ -217,6 +217,24 @@ else
     warn "  Plist sync failed — continuing with possibly stale versions"
 fi
 
+# ── Step 4a-ter: Compilar launcher Swift natiu per Nexe.app ─────
+# El launcher natiu (vs bash script) gestiona applicationShouldHandleReopen,
+# apareix a Força la Sortida, i estabilitza el triangle "app activa" al Dock.
+# Reemplaca Nexe.app/Contents/MacOS/NexeTray amb el binari compilat.
+LAUNCHER_SRC="$SCRIPT_DIR/nexe_launcher.swift"
+LAUNCHER_DEST="$PROJECT_ROOT/Nexe.app/Contents/MacOS/NexeTray"
+if [ -f "$LAUNCHER_SRC" ] && [ -d "$PROJECT_ROOT/Nexe.app/Contents/MacOS" ]; then
+    info "Compiling native Nexe launcher (Swift)..."
+    if swiftc -O -o "$LAUNCHER_DEST" "$LAUNCHER_SRC" 2>&1; then
+        chmod +x "$LAUNCHER_DEST"
+        # Esborrar bash obsolet `nexe-tray` (sense capital) si hi era
+        rm -f "$PROJECT_ROOT/Nexe.app/Contents/MacOS/nexe-tray"
+        info "  Launcher compilat OK ($(du -h "$LAUNCHER_DEST" | cut -f1))"
+    else
+        error "Swift launcher compilation failed — Nexe.app Dock behavior breaks."
+    fi
+fi
+
 # ── Step 4b: Bundle Nexe.app i NexeTray.app inside installer resources ─
 # Ambdues són excluded del payload.tar.gz (són .app bundles, no codi font).
 # Han de viatjar dins InstallNexe.app/Contents/Resources/ perquè el Swift

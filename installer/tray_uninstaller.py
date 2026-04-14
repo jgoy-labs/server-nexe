@@ -71,15 +71,82 @@ def remove_login_items() -> bool:
         return False
 
 
-def _front_alert(*args, **kwargs):
-    """Show a rumps.alert, activating the app first so it appears on top."""
-    import rumps
+NS_STATUS_WINDOW_LEVEL = 25  # sobre qualsevol finestra d'app normal
+
+
+class _ForegroundContext:
+    """Context manager que promociona la tray a .regular durant tot un flux
+    d'alertes i la torna a .accessory (menubar only) al sortir. Es fa UNA
+    sola vegada per evitar interferir amb el modal event loop entre alertes
+    (causa de que les alertes es 'saltaven' — flip-flop d'activation policy).
+    """
+    def __init__(self):
+        self.old_policy = None
+
+    def __enter__(self):
+        try:
+            from AppKit import NSApp, NSApplicationActivationPolicyRegular
+            self.old_policy = NSApp.activationPolicy()
+            NSApp.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+            NSApp.activateIgnoringOtherApps_(True)
+        except Exception:
+            pass
+        return self
+
+    def __exit__(self, *exc):
+        if self.old_policy is not None:
+            try:
+                from AppKit import NSApp
+                NSApp.setActivationPolicy_(self.old_policy)
+            except Exception:
+                pass
+
+
+def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_):
+    """Show an always-on-top NSAlert.
+
+    Assumeix que activation policy JA està promocionada a .regular (via
+    _ForegroundContext al caller). Nomes puja window level i crida runModal.
+    Retorn compat rumps: 1 (OK) / 0 (Cancel) / -1 (Other).
+    """
     try:
-        from AppKit import NSApp
-        NSApp.activateIgnoringOtherApps_(True)
+        from AppKit import NSAlert, NSAlertStyleWarning
     except Exception:
-        pass
-    return rumps.alert(*args, **kwargs)
+        import rumps
+        kwargs = {}
+        if title is not None: kwargs["title"] = title
+        if message is not None: kwargs["message"] = message
+        if ok is not None: kwargs["ok"] = ok
+        if cancel is not None: kwargs["cancel"] = cancel
+        if other is not None: kwargs["other"] = other
+        return rumps.alert(**kwargs)
+
+    alert = NSAlert.alloc().init()
+    if title is not None:
+        alert.setMessageText_(str(title))
+    if message is not None:
+        alert.setInformativeText_(str(message))
+    alert.setAlertStyle_(NSAlertStyleWarning)
+
+    alert.addButtonWithTitle_(str(ok) if ok is not None else "OK")
+    if cancel is not None:
+        alert.addButtonWithTitle_(str(cancel))
+    if other is not None:
+        alert.addButtonWithTitle_(str(other))
+
+    window = alert.window()
+    window.setLevel_(NS_STATUS_WINDOW_LEVEL)
+    window.makeKeyAndOrderFront_(None)
+
+    response = alert.runModal()
+    # NSAlertFirstButtonReturn=1000, Second=1001, Third=1002
+    if response == 1000:
+        return 1
+    elif response == 1001:
+        return 0
+    elif response == 1002:
+        return -1
+    return response
 
 
 def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
@@ -97,37 +164,41 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
     # Calculate storage before showing warning
     storage_text = t_func("uninstall_storage", size=calculate_storage(install_dir))
 
-    # First window: warning with what will be deleted
-    response = _front_alert(
-        title=t_func("uninstall_title"),
-        message=t_func("uninstall_warning", storage=storage_text),
-        ok="No",
-        cancel=t_func("uninstall_title"),
-    )
-    if response != 0:
-        return None, None  # User cancelled
-
-    # Second window: final confirmation
-    response2 = _front_alert(
-        title=t_func("uninstall_title"),
-        message=t_func("uninstall_confirm"),
-        ok="No",
-        cancel=t_func("uninstall_title"),
-    )
-    if response2 != 0:
-        return None, None  # User cancelled
-
-    # Third window: ask about data backup
-    keep_data = False
-    storage_dir = install_dir / "storage"
-    if storage_dir.exists():
-        data_response = _front_alert(
-            title=t_func("uninstall_data_title"),
-            message=t_func("uninstall_data_message"),
-            ok=t_func("uninstall_keep_data"),
-            cancel=t_func("uninstall_delete_all"),
+    # Promocionem activation policy UNA vegada per tot el flux de 3 alertes.
+    # (Abans es promocionava/desmotava per alerta → race condition amb event
+    # loop → alertes es "saltaven" sense esperar input de l'usuari.)
+    with _ForegroundContext():
+        # First window: warning with what will be deleted
+        response = _front_alert(
+            title=t_func("uninstall_title"),
+            message=t_func("uninstall_warning", storage=storage_text, path=str(install_dir)),
+            ok="No",
+            cancel=t_func("uninstall_title"),
         )
-        keep_data = (data_response == 1)
+        if response != 0:
+            return None, None  # User cancelled
+
+        # Second window: final confirmation
+        response2 = _front_alert(
+            title=t_func("uninstall_title"),
+            message=t_func("uninstall_confirm"),
+            ok="No",
+            cancel=t_func("uninstall_title"),
+        )
+        if response2 != 0:
+            return None, None  # User cancelled
+
+        # Third window: ask about data backup
+        keep_data = False
+        storage_dir = install_dir / "storage"
+        if storage_dir.exists():
+            data_response = _front_alert(
+                title=t_func("uninstall_data_title"),
+                message=t_func("uninstall_data_message"),
+                ok=t_func("uninstall_keep_data"),
+                cancel=t_func("uninstall_delete_all"),
+            )
+            keep_data = (data_response == 1)
 
     # Backup storage/ if requested
     backup_path = None

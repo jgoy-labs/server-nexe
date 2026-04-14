@@ -87,6 +87,9 @@ struct InstallerWizardView: View {
             Text(t("cancel_confirm"))
         }
         .alert(t("existing_install_title"), isPresented: $engine.showExistingInstallAlert) {
+            Button(t("existing_install_backup")) {
+                engine.confirmBackupAndOverwrite()
+            }
             Button(t("existing_install_overwrite"), role: .destructive) {
                 engine.confirmOverwrite()
             }
@@ -95,7 +98,18 @@ struct InstallerWizardView: View {
                 currentStep = .destination
             }
         } message: {
-            Text(t("existing_install_msg"))
+            Text(String(
+                format: t("existing_install_msg"),
+                engine.installPath,
+                engine.proposedBackupPath
+            ))
+        }
+        .alert(t("backup_done_title"), isPresented: $engine.showBackupDoneAlert) {
+            Button("OK") {
+                engine.dismissBackupDoneAlert()
+            }
+        } message: {
+            Text(String(format: t("backup_done_msg"), engine.lastBackupPath))
         }
     }
 

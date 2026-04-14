@@ -1,6 +1,7 @@
 // InstallProgressView.swift — Pantalla 4: Progrés amb 7 passos, temps estimats i log visible
 
 import SwiftUI
+import AppKit
 
 struct InstallProgressView: View {
     @EnvironmentObject var engine: InstallerEngine
@@ -33,7 +34,14 @@ struct InstallProgressView: View {
                 }
             }
             .padding(.horizontal, 40)
-            .onReceive(timer) { _ in tick.toggle() }
+            .onReceive(timer) { _ in
+                tick.toggle()
+                // Recuperar focus periodicament durant l'install (subprocessos
+                // de tar/xattr/Python poden enviar la finestra al fons).
+                if !engine.installFinished {
+                    NSApp.windows.first?.orderFrontRegardless()
+                }
+            }
 
             // Error
             if let error = engine.installError {
@@ -79,6 +87,11 @@ struct InstallProgressView: View {
             }
             .padding(.horizontal, 40)
             .padding(.bottom, 16)
+        }
+        .onAppear {
+            // Bring wizard window to front quan comença l'install.
+            NSApp.activate(ignoringOtherApps: true)
+            NSApp.windows.first?.makeKeyAndOrderFront(nil)
         }
     }
 
