@@ -335,7 +335,7 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
     # La vella `:-` emet un warning deprecation que es colava al check i generava
     # fals positius. Filtrem també warning:/Error: per robustesa a futurs avisos.
     NEXE_LAUNCHER_ENT="$(codesign -d --entitlements - "$RESOURCES/Nexe.app/Contents/MacOS/NexeTray" 2>&1 \
-        | grep -vE '^(Executable=|warning:|Error:)' \
+        | { grep -vE '^(Executable=|warning:|Error:)' || true; } \
         | tr -d '[:space:]')"
     if [ -n "$NEXE_LAUNCHER_ENT" ]; then
         warn "Nexe.app/Contents/MacOS/NexeTray té entitlements — NO hauria (fuga des del wrapper extern?)"
