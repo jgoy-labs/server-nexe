@@ -136,9 +136,9 @@
       "gguf": null,
       "iberic": false,
       "description": {
-        "ca": "El millor ràtio qualitat/mida del moment. Thinking excel·lent, tool calling. Ideal per RAG i català. Apache 2.0.",
-        "es": "El mejor ratio calidad/tamaño del momento. Thinking excelente, tool calling. Ideal para RAG y catalán. Apache 2.0.",
-        "en": "Best quality/size ratio right now. Excellent thinking, tool calling. Ideal for RAG and Catalan. Apache 2.0."
+        "ca": "El millor ràtio qualitat/mida del moment. Thinking excel·lent, tool calling, visió (VL). Ideal per RAG i català. Apache 2.0.",
+        "es": "El mejor ratio calidad/tamaño del momento. Thinking excelente, tool calling, visión (VL). Ideal para RAG y catalán. Apache 2.0.",
+        "en": "Best quality/size ratio available. Excellent thinking, tool calling, vision (VL). Ideal for RAG and Catalan. Apache 2.0."
       }
     },
     {
@@ -184,9 +184,9 @@
       "gguf": null,
       "iberic": false,
       "description": {
-        "ca": "Velocitat de 9B amb qualitat de 35B. Thinking excel·lent. El punt dolç per a 32 GB. Apache 2.0.",
-        "es": "Velocidad de 9B con calidad de 35B. Thinking excelente. El punto dulce para 32 GB. Apache 2.0.",
-        "en": "9B speed with 35B quality. Excellent thinking. The sweet spot for 32 GB. Apache 2.0."
+        "ca": "Velocitat de 9B amb qualitat de 35B. Thinking excel·lent, visió (VL). El punt dolç per a 32 GB. Apache 2.0.",
+        "es": "Velocidad de 9B con calidad de 35B. Thinking excelente, visión (VL). El punto dulce para 32 GB. Apache 2.0.",
+        "en": "9B speed with 35B quality. Excellent thinking, vision (VL). Sweet spot for 32 GB. Apache 2.0."
       }
     },
     {
@@ -256,9 +256,9 @@
       "gguf": null,
       "iberic": false,
       "description": {
-        "ca": "Màxim per a codi i agents. Thinking excel·lent. Apache 2.0.",
-        "es": "Máximo para código y agentes. Thinking excelente. Apache 2.0.",
-        "en": "Maximum for code and agents. Excellent thinking. Apache 2.0."
+        "ca": "Màxim per a codi i agents. Thinking excel·lent, visió (VL). Apache 2.0.",
+        "es": "Máximo para código y agentes. Thinking excelente, visión (VL). Apache 2.0.",
+        "en": "Maximum for code and agents. Excellent thinking, vision (VL). Apache 2.0."
       }
     },
     {
@@ -304,9 +304,9 @@
       "gguf": null,
       "iberic": false,
       "description": {
-        "ca": "Màxim per a codi i agents. Thinking excel·lent. Apache 2.0.",
-        "es": "Máximo para código y agentes. Thinking excelente. Apache 2.0.",
-        "en": "Maximum for code and agents. Excellent thinking. Apache 2.0."
+        "ca": "Màxim per a codi i agents. Thinking excel·lent, visió (VL). Apache 2.0.",
+        "es": "Máximo para código y agentes. Thinking excelente, visión (VL). Apache 2.0.",
+        "en": "Maximum for code and agents. Excellent thinking, vision (VL). Apache 2.0."
       }
     },
     {
