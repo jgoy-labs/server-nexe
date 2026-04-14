@@ -81,6 +81,31 @@ struct DestinationView: View {
                 }
             }
 
+            // Opcions Dock / Login
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle(isOn: $engine.addToDock) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "dock.rectangle")
+                            .foregroundColor(.nexeRed)
+                        Text(t("done_dock"))
+                            .font(.subheadline)
+                    }
+                }
+                .toggleStyle(.checkbox)
+
+                Toggle(isOn: $engine.addLoginItem) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "power")
+                            .foregroundColor(.nexeRed)
+                        Text(t("done_login_item"))
+                            .font(.subheadline)
+                    }
+                }
+                .toggleStyle(.checkbox)
+            }
+            .padding(.horizontal, 60)
+            .padding(.top, 8)
+
             Spacer()
 
             // Botons
