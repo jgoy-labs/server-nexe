@@ -238,6 +238,10 @@ struct CompletionView: View {
         // Verificar que Nexe.app existeix abans d'afegir al Dock
         guard FileManager.default.fileExists(atPath: nexeAppPath) else { return }
 
+        // Idempotent: si ja hi ha una entrada que apunta a nexeAppPath, no afegir.
+        // Evita duplicats en reinstal·lacions successives.
+        if dockHasEntry(for: nexeAppPath) { return }
+
         let entry = "<dict><key>tile-data</key><dict><key>file-data</key><dict>" +
             "<key>_CFURLString</key><string>\(nexeAppPath)</string>" +
             "<key>_CFURLStringType</key><integer>0</integer>" +
@@ -257,12 +261,37 @@ struct CompletionView: View {
         killDock.waitUntilExit()
     }
 
+    /// Retorna true si el Dock ja té una entrada persistent-apps apuntant a appPath.
+    /// Check via `defaults read`: busquem el path (amb i sense prefix file://).
+    private func dockHasEntry(for appPath: String) -> Bool {
+        let read = Process()
+        read.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
+        read.arguments = ["read", "com.apple.dock", "persistent-apps"]
+        let pipe = Pipe()
+        read.standardOutput = pipe
+        read.standardError = nil
+        try? read.run()
+        read.waitUntilExit()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8) else { return false }
+        // `defaults read` serialitza com `file:///Applications/Nexe.app/` o path cru
+        return output.contains("file://\(appPath)") || output.contains("\"\(appPath)\"")
+    }
+
     private func doAddLoginItem(nexeAppPath: String) {
         // Escapar cometes del path per evitar injection AppleScript
         let safePath = nexeAppPath.replacingOccurrences(of: "\"", with: "\\\"")
+        // Idempotent: delete + re-add (evita duplicats si ja era Login Item).
+        // Un delete d'un item inexistent falla silenciosament — OK.
+        let appName = (nexeAppPath as NSString).lastPathComponent
+            .replacingOccurrences(of: ".app", with: "")
         let script = """
-        tell application "System Events" to make login item at end \
-        with properties {path:"\(safePath)", hidden:true}
+        tell application "System Events"
+            try
+                delete (every login item whose name is "\(appName)")
+            end try
+            make login item at end with properties {path:"\(safePath)", hidden:true}
+        end tell
         """
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
