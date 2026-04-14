@@ -90,30 +90,6 @@ struct CompletionView: View {
             }
             .padding(.horizontal, 50)
 
-            // Opcions post-instal·lació (triades a la pantalla de carpeta)
-            VStack(alignment: .leading, spacing: 8) {
-                Toggle(isOn: $engine.addToDock) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "dock.rectangle")
-                            .foregroundColor(.nexeRed)
-                        Text(t("done_dock"))
-                            .font(.subheadline)
-                    }
-                }
-                .toggleStyle(.checkbox)
-
-                Toggle(isOn: $engine.addLoginItem) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "power")
-                            .foregroundColor(.nexeRed)
-                        Text(t("done_login_item"))
-                            .font(.subheadline)
-                    }
-                }
-                .toggleStyle(.checkbox)
-            }
-            .padding(.horizontal, 60)
-
             // Missatge countdown (BUG #4: explicar que s'obre system tray)
             if isCountingDown {
                 VStack(spacing: 4) {
@@ -156,9 +132,20 @@ struct CompletionView: View {
             .padding(.bottom, 20)
         }
         .padding()
+        .onAppear { applyDockAndLogin() }
     }
 
     // MARK: - Accions
+
+    private func applyDockAndLogin() {
+        let nexeAppPath = engine.installPath + "/Nexe.app"
+        let snapAddToDock = engine.addToDock
+        let snapAddLoginItem = engine.addLoginItem
+        DispatchQueue.global(qos: .utility).async {
+            if snapAddToDock { doAddToDock(nexeAppPath: nexeAppPath) }
+            if snapAddLoginItem { doAddLoginItem(nexeAppPath: nexeAppPath) }
+        }
+    }
 
     private func copyKey() {
         NSPasteboard.general.clearContents()
@@ -227,25 +214,20 @@ struct CompletionView: View {
         // Nota: no cridar waitUntilExit — el tray és independent i no bloquejant
         try? tray.run()
 
-        // B-dock / B-login: executar en background per no bloquejar el main thread.
-        // El countdown ja ha garantit que la UI estava estable, el killall Dock
-        // ara no causa el flash inicial (BUG #4).
-        let snapAddToDock = engine.addToDock
-        let snapAddLoginItem = engine.addLoginItem
-        let snapNexeAppPath = nexeAppPath
-        DispatchQueue.global(qos: .utility).async {
-            if snapAddToDock { doAddToDock(nexeAppPath: snapNexeAppPath) }
-            if snapAddLoginItem { doAddLoginItem(nexeAppPath: snapNexeAppPath) }
-        }
     }
 
     private func doAddToDock(nexeAppPath: String) {
+        // Verificar que Nexe.app existeix abans d'afegir al Dock
+        guard FileManager.default.fileExists(atPath: nexeAppPath) else { return }
+
+        let entry = "<dict><key>tile-data</key><dict><key>file-data</key><dict>" +
+            "<key>_CFURLString</key><string>\(nexeAppPath)</string>" +
+            "<key>_CFURLStringType</key><integer>0</integer>" +
+            "</dict></dict><key>tile-type</key><string>file-tile</string></dict>"
+
         let addDock = Process()
         addDock.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-        addDock.arguments = [
-            "write", "com.apple.dock", "persistent-apps", "-array-add",
-            "<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>\(nexeAppPath)</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>"
-        ]
+        addDock.arguments = ["write", "com.apple.dock", "persistent-apps", "-array-add", entry]
         try? addDock.run()
         addDock.waitUntilExit()
 
