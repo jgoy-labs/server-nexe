@@ -117,11 +117,16 @@ struct DestinationView: View {
 
                 Button(action: onNext) {
                     Text(t("btn_next"))
-                        .frame(width: 120)
+                        .frame(width: 120, height: 22)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(hasEnoughSpace ? Color.nexeRed : Color.nexeRed.opacity(0.4))
+                        )
                 }
+                .buttonStyle(.plain)
                 .controlSize(.large)
-                .buttonStyle(.borderedProminent)
-                .tint(.nexeRed)
                 .disabled(!hasEnoughSpace)
             }
             .padding(.horizontal, 40)

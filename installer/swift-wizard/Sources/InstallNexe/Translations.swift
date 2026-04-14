@@ -87,6 +87,7 @@ struct T {
             "model_params": "Parametres",
             "model_recommended": "Recomanat",
             "model_too_large": "Massa gran",
+            "model_has_vision": "Suporta visió (VLM) — pot processar imatges",
             "model_warning_ram": "Aquest model necessita mes RAM de la disponible",
             "model_tab_custom": "Personalitzat",
             "model_custom_desc": "Escriu el nom d'un model d'Ollama o un repo de Hugging Face (GGUF).",
@@ -129,6 +130,7 @@ struct T {
             "done_menubar_info": "S'ha afegit una icona a la barra de menus (a dalt a la dreta) per controlar el servidor.",
             "done_opening_tray": "S'obrira un system tray al costat del rellotge",
             "btn_opened": "Nexe obert!",
+            "btn_starting": "Arrencant servidor...",
         ],
         .es: [
             "welcome_title": "Bienvenido a Nexe",
@@ -185,6 +187,7 @@ struct T {
             "model_params": "Parametros",
             "model_recommended": "Recomendado",
             "model_too_large": "Demasiado grande",
+            "model_has_vision": "Soporta visión (VLM) — puede procesar imágenes",
             "model_warning_ram": "Este modelo necesita mas RAM de la disponible",
             "model_tab_custom": "Personalizado",
             "model_custom_desc": "Escribe el nombre de un modelo de Ollama o un repo de Hugging Face (GGUF).",
@@ -224,6 +227,7 @@ struct T {
             "done_menubar_info": "Se ha anadido un icono en la barra de menus (arriba a la derecha) para controlar el servidor.",
             "done_opening_tray": "Se abrira un system tray junto al reloj",
             "btn_opened": "Nexe abierto!",
+            "btn_starting": "Arrancando servidor...",
         ],
         .en: [
             "welcome_title": "Welcome to Nexe",
@@ -280,6 +284,7 @@ struct T {
             "model_params": "Parameters",
             "model_recommended": "Recommended",
             "model_too_large": "Too large",
+            "model_has_vision": "Supports vision (VLM) — can process images",
             "model_warning_ram": "This model needs more RAM than available",
             "model_tab_custom": "Custom",
             "model_custom_desc": "Enter an Ollama model name or a Hugging Face repo (GGUF).",
@@ -319,6 +324,7 @@ struct T {
             "done_menubar_info": "A menu bar icon has been added (top right) to control the server.",
             "done_opening_tray": "A system tray will appear next to the clock",
             "btn_opened": "Nexe opened!",
+            "btn_starting": "Starting server...",
         ],
     ]
 }

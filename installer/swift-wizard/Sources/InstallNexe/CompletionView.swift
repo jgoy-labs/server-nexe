@@ -90,17 +90,13 @@ struct CompletionView: View {
             }
             .padding(.horizontal, 50)
 
-            // Missatge countdown (BUG #4: explicar que s'obre system tray)
+            // Countdown standalone — número gran, sense caption duplicat
+            // (done_menubar_info dalt ja explica que apareix tray a la dreta)
             if isCountingDown {
-                VStack(spacing: 4) {
-                    Text(t("done_opening_tray"))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("\(countdown)")
-                        .font(.system(size: 28, weight: .bold, design: .monospaced))
-                        .foregroundColor(.nexeRed)
-                }
-                .padding(.top, 4)
+                Text("\(countdown)")
+                    .font(.system(size: 32, weight: .bold, design: .monospaced))
+                    .foregroundColor(.nexeRed)
+                    .padding(.top, 4)
             }
 
             Spacer()
@@ -108,26 +104,24 @@ struct CompletionView: View {
             // Botons
             HStack(spacing: 16) {
                 Button(t("btn_close")) {
-                    isCountingDown = false  // cancel·la countdown pendent si n'hi ha
+                    isCountingDown = false
                     NSApp.setActivationPolicy(.prohibited)
                     NSApplication.shared.terminate(nil)
                 }
                 .controlSize(.large)
 
-                Button(action: startCountdown) {
+                Button(action: launchAndCountdown) {
                     Text(
                         nexeOpened
-                            ? t("btn_opened")
-                            : isCountingDown
-                                ? "\(countdown)s..."
-                                : t("btn_open_nexe")
+                            ? (isCountingDown ? t("btn_starting") : t("btn_opened"))
+                            : t("btn_open_nexe")
                     )
                     .frame(width: 200)
                 }
                 .controlSize(.large)
                 .buttonStyle(.borderedProminent)
                 .tint(.nexeRed)
-                .disabled(nexeOpened || isCountingDown)
+                .disabled(nexeOpened)
             }
             .padding(.bottom, 20)
         }
@@ -160,22 +154,23 @@ struct CompletionView: View {
         }
     }
 
-    private func startCountdown() {
+    /// Click "Obrir Nexe": llança el servidor IMMEDIATAMENT i inicia el
+    /// countdown en paral·lel (visual only — quan arriba a 0 no fa res extra,
+    /// simplement oculta el número, el servidor ja porta X segons arrencant).
+    private func launchAndCountdown() {
+        openNexe()
         isCountingDown = true
         countdown = 10
         runCountdownStep()
     }
 
     private func runCountdownStep() {
-        // Guard: si el countdown ha estat cancel·lat (Tancar o altre event), aturar
         guard isCountingDown else { return }
         if countdown <= 0 {
             isCountingDown = false
-            openNexe()
-            return
+            return  // visual only — el servidor ja corre de fa 10s
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [self] in
-            // Re-check guard dins la closure (per si Tancar es va cridar entre steps)
             guard isCountingDown else { return }
             countdown -= 1
             runCountdownStep()

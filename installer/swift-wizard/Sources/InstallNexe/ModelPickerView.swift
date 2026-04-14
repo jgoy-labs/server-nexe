@@ -213,6 +213,12 @@ struct ModelCard: View {
                     HStack {
                         Text(model.name)
                             .font(.headline)
+                        if model.hasVision {
+                            Image(systemName: "eye.fill")
+                                .font(.caption)
+                                .foregroundColor(.nexeRed)
+                                .help(T.get("model_has_vision", lang: lang))
+                        }
                         if isRecommended && !isDisabled {
                             Text(T.get("model_recommended", lang: lang))
                                 .font(.caption)

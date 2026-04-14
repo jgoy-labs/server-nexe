@@ -47,6 +47,19 @@ struct AIModel: Codable, Identifiable {
         return description[lang.rawValue] ?? description["en"] ?? ""
     }
 
+    /// Si el model té capacitat visual (VLM). Derivat de les descripcions
+    /// (catàleg actual no porta flag explícit — si es formalitza, canviar aquí).
+    var hasVision: Bool {
+        let keywords = ["visi", "vision", "visión", "multimod"]
+        for desc in description.values {
+            let lowered = desc.lowercased()
+            for kw in keywords {
+                if lowered.contains(kw) { return true }
+            }
+        }
+        return false
+    }
+
     /// Crea un model custom a partir d'un nom d'Ollama
     static func customOllama(_ name: String) -> AIModel {
         return AIModel(
