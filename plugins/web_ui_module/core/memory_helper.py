@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple, List
 
 from memory.memory.constants import DEFAULT_VECTOR_SIZE
+from memory.memory.config import resolve_ingest_config
 
 logger = logging.getLogger(__name__)
 
@@ -721,7 +722,10 @@ class MemoryHelper:
 
         logger.info(f"Ingesting '{filename}': {total} chunks → {DOC_COLLECTION}")
         t_total = time.time()
-        BATCH_SIZE = 50
+        # Bug #16: BATCH_SIZE was hardcoded to 50 here. Now sourced from
+        # the IngestConfig SSOT via the defensive resolver (default still
+        # 50 → behaviour-preserving). See memory/memory/config.py.
+        BATCH_SIZE = resolve_ingest_config(memory).store_batch_size
 
         for batch_start in range(0, total, BATCH_SIZE):
             batch_end = min(batch_start + BATCH_SIZE, total)

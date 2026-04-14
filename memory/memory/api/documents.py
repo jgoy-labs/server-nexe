@@ -152,17 +152,32 @@ async def store_documents_batch(
   items: List[Dict[str, Any]],
   collection: str,
   text_store=None,
+  *,
+  precomputed_embeddings: Optional[List[List[float]]] = None,
 ) -> List[str]:
   """
   Batch store: generate all embeddings at once, then upsert in one call.
 
   Each item in items: {"text": str, "metadata": dict|None, "doc_id": str|None, "ttl_seconds": int|None}
+
+  Bug #16: if `precomputed_embeddings` is provided (one vector per item,
+  same order), the `generate_embeddings_batch` callback is NOT invoked.
+  This is what the pre-computed KB path uses to bypass fastembed at
+  install time.
   """
   if not items:
     return []
 
   texts = [item["text"] for item in items]
-  embeddings = await generate_embeddings_batch(texts)
+  if precomputed_embeddings is not None:
+    if len(precomputed_embeddings) != len(items):
+      raise ValueError(
+        f"precomputed_embeddings length {len(precomputed_embeddings)} "
+        f"does not match items length {len(items)}"
+      )
+    embeddings = precomputed_embeddings
+  else:
+    embeddings = await generate_embeddings_batch(texts)
 
   now = datetime.now(timezone.utc)
   created_at_iso = now.isoformat()

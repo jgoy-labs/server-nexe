@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-04-14T22:05:32Z",
+  "prefix_format_version": "1.0",
+  "vector_dim": 768,
+  "vector_dtype": "float32",
+  "fastembed_version": "0.8.0",
+  "onnxruntime_version": "1.24.4",
+  "model_name": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+  "model_hf_commit": "4328cf26390c98c5e3c738b4460a05b95f4911f5",
+  "chunker_source_sha256": "f7d3cc436561af6da07385f61263673df0914e4b5b3fbf81d9265a5eefbab053",
+  "langs": {
+    "ca": {
+      "chunks": 206,
+      "source_sha256": "ca05458da1c3db42e2bc9c7789158fc7b1f5325d1b0cdf7377308095e69cd948",
+      "vectors_sha256": "bc5e2ca7835ee53a8f2db55e1d0f238faf1b2bc641ea4ff75debd09efce08d8f",
+      "metadata_sha256": "5ac9adb985b6c22048e2cb2a280f70f218a4acf4290294849b61559465104103"
+    },
+    "en": {
+      "chunks": 191,
+      "source_sha256": "46a4f9cbe4b08bbde8524ba97955184732d6d4cec5fd21cf2f51c99a128240e7",
+      "vectors_sha256": "3599c2dc86a14c03fb06b6c1a1972c30f5d83a6a1a8fdf144472d0eba9a42762",
+      "metadata_sha256": "830c9598f7cc9598da2530483371d16fd27be546110aa0574b8d8ebed2e30da2"
+    },
+    "es": {
+      "chunks": 205,
+      "source_sha256": "ca014c7f2f018da4856eace372e1b5d5f067047685488511b9522ad6a6786fa1",
+      "vectors_sha256": "b1240b8138185e6f8c34559788d71485e419b59478d1c7109543e262f7ac8ee9",
+      "metadata_sha256": "a5b15fa36a110e068ca86412b24bc1f4f0b6a5c1f68bd2f5adce5ccc6718a9db"
+    }
+  }
+}

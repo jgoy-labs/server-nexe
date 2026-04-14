@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "bug": 16,
+  "timestamp_utc": "20260414T214850Z",
+  "host": {
+    "platform": "darwin",
+    "python": "3.12.13"
+  },
+  "config": {
+    "mode": "knowledge",
+    "scenario": "cold-typical",
+    "runs_requested": 3,
+    "store_batch_size": 50,
+    "embed_batch_size": null,
+    "pre_warm": false,
+    "mega_batch": false,
+    "label": "PRECOMPUTE_FINAL_v3",
+    "pdf_path": null
+  },
+  "aggregate": {
+    "ok_runs": 3,
+    "total_runs": 3,
+    "phases": {
+      "total_ns": {
+        "min": 1249766375,
+        "max": 1414379667,
+        "median": 1254756875,
+        "mean": 1306300972.3333333,
+        "stdev": 93632149.67734331,
+        "p95": 1414379667
+      },
+      "model_init_ns": {
+        "min": 1120684459,
+        "max": 1281520500,
+        "median": 1120936209,
+        "mean": 1174380389.3333333,
+        "stdev": 92786142.98355553,
+        "p95": 1281520500
+      },
+      "chunking_ns": {
+        "min": 0,
+        "max": 0,
+        "median": 0,
+        "mean": 0.0,
+        "stdev": 0.0,
+        "p95": 0
+      },
+      "embed_ns": {
+        "min": 0,
+        "max": 0,
+        "median": 0,
+        "mean": 0.0,
+        "stdev": 0.0,
+        "p95": 0
+      },
+      "store_total_ns": {
+        "min": 0,
+        "max": 0,
+        "median": 0,
+        "mean": 0.0,
+        "stdev": 0.0,
+        "p95": 0
+      },
+      "upsert_ns_derived": {
+        "min": 0,
+        "max": 0,
+        "median": 0,
+        "mean": 0.0,
+        "stdev": 0.0,
+        "p95": 0
+      },
+      "warmup_ns": {
+        "min": 0,
+        "max": 0,
+        "median": 0,
+        "mean": 0.0,
+        "stdev": 0.0,
+        "p95": 0
+      },
+      "wall_ns_parent": {
+        "min": 1904900500,
+        "max": 2145111166,
+        "median": 2033428333,
+        "mean": 2027813333.0,
+        "stdev": 120203731.9877835,
+        "p95": 2145111166
+      },
+      "rss_peak_bytes": {
+        "min": 2994077696,
+        "max": 2994077696,
+        "median": 2994077696,
+        "mean": 2994077696.0,
+        "stdev": 0.0,
+        "p95": 2994077696
+      }
+    },
+    "total_chunks": null,
+    "docs_processed": null,
+    "lang": "ca",
+    "target_collection": null
+  },
+  "runs": [
+    {
+      "event": "ingest_complete",
+      "schema_version": 1,
+      "bug": 16,
+      "path": "precomputed",
+      "lang": "ca",
+      "total_ns": 1254756875,
+      "model_init_ns": 1120936209,
+      "ok": true,
+      "returncode": 0,
+      "wall_ns_parent": 2033428333,
+      "rss_peak_bytes": 2994077696,
+      "rss_delta_bytes": 2994077696,
+      "run_index": 0
+    },
+    {
+      "event": "ingest_complete",
+      "schema_version": 1,
+      "bug": 16,
+      "path": "precomputed",
+      "lang": "ca",
+      "total_ns": 1414379667,
+      "model_init_ns": 1281520500,
+      "ok": true,
+      "returncode": 0,
+      "wall_ns_parent": 2145111166,
+      "rss_peak_bytes": 2994077696,
+      "rss_delta_bytes": 0,
+      "run_index": 1
+    },
+    {
+      "event": "ingest_complete",
+      "schema_version": 1,
+      "bug": 16,
+      "path": "precomputed",
+      "lang": "ca",
+      "total_ns": 1249766375,
+      "model_init_ns": 1120684459,
+      "ok": true,
+      "returncode": 0,
+      "wall_ns_parent": 1904900500,
+      "rss_peak_bytes": 2994077696,
+      "rss_delta_bytes": 0,
+      "run_index": 2
+    }
+  ]
+}

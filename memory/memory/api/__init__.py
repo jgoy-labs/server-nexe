@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
     from qdrant_client import QdrantClient
 
 from ..constants import DEFAULT_EMBEDDING_MODEL, DEFAULT_VECTOR_SIZE
+from ..config import IngestConfig
 
 from .models import (
   CollectionInfo,
@@ -87,6 +89,7 @@ class MemoryAPI:
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     crypto_provider=None,
     text_store_path: Optional[Path] = None,
+    ingest_config: Optional[IngestConfig] = None,
   ):
     """
     Inicialitza Memory API.
@@ -96,11 +99,17 @@ class MemoryAPI:
       qdrant_path: Path local per mode fitxer/test (prioritat sobre qdrant_url).
                    Default: storage/vectors (embedded mode)
       embedding_model: Model d'embeddings (default: paraphrase-multilingual-mpnet-base-v2)
+      ingest_config: SSOT for ingest pipeline tunables (batch sizes, pre-warm,
+                     mega-batch). Default IngestConfig() preserves the exact
+                     historical behaviour (store_batch_size=50, no embed
+                     batch_size override, no pre-warm, no mega-batch).
+                     Introduced by bug #16 to remove hardcodes.
     """
     self.qdrant_url = qdrant_url or self.DEFAULT_QDRANT_URL
     self.qdrant_path = qdrant_path if qdrant_path is not None else self.DEFAULT_QDRANT_PATH
     self.embedding_model = embedding_model
     self.vector_size = self.DEFAULT_VECTOR_SIZE
+    self.ingest_config = ingest_config if ingest_config is not None else IngestConfig()
 
     self._crypto = crypto_provider
     self._text_store_path = text_store_path
@@ -109,6 +118,21 @@ class MemoryAPI:
     self._embedder = None
     self._executor = ThreadPoolExecutor(max_workers=4)
     self._initialized = False
+
+    # Bug #16 perf counters (opt-in via ingest_config.perf_logging).
+    # Zero overhead when disabled: the counters are only mutated if the
+    # flag is True at call sites. All durations are monotonic nanoseconds
+    # from time.perf_counter_ns(). See reset_perf_counters() and
+    # get_perf_snapshot() for the public API consumed by the benchmark.
+    self._perf: Dict[str, int] = {
+      "embed_ns": 0,
+      "embed_calls": 0,
+      "chunks_embedded": 0,
+      "store_total_ns": 0,
+      "store_calls": 0,
+      "chunks_stored": 0,
+      "warmup_ns": 0,
+    }
 
     if qdrant_path:
       logger.info(
@@ -160,11 +184,18 @@ class MemoryAPI:
   async def _init_embedder(self):
     """Inicialitza el model d'embeddings."""
     loop = asyncio.get_running_loop()
+    # Bug #16: forward `threads` to fastembed so ORT caps its intra-op
+    # thread pool. Default (None) lets fastembed decide; ingest_config
+    # currently sets 6 to avoid Apple Silicon E-core contention.
+    embed_threads = self.ingest_config.embed_threads
 
     def _load_model():
       from fastembed import TextEmbedding
+      kwargs = {}
+      if embed_threads is not None:
+        kwargs["threads"] = embed_threads
       try:
-        return TextEmbedding(self.embedding_model)
+        return TextEmbedding(self.embedding_model, **kwargs)
       except Exception as e:
         raise RuntimeError(
             f"Embedding model '{self.embedding_model}' not available locally. "
@@ -292,6 +323,11 @@ class MemoryAPI:
     Batch store multiple documents with single embedding call.
 
     Each item: {"text": str, "metadata": dict|None, "doc_id": str|None, "ttl_seconds": int|None}
+
+    Bug #16: when `ingest_config.perf_logging` is True, the wall-clock of
+    the whole store_batch operation (embed + upsert + prep) is accumulated
+    in `self._perf["store_total_ns"]`. Subtracting `embed_ns` from it
+    yields an approximation of the Qdrant upsert cost.
     """
     self._ensure_initialized()
 
@@ -300,6 +336,23 @@ class MemoryAPI:
         f"Collection '{collection}' does not exist. Create it first."
       )
 
+    perf_on = self.ingest_config.perf_logging
+    n_items = len(items)
+    if perf_on:
+      t0 = time.perf_counter_ns()
+      try:
+        return await store_documents_batch(
+          self._qdrant,
+          self._executor,
+          self._generate_embeddings_batch,
+          items,
+          collection,
+          text_store=self._text_store,
+        )
+      finally:
+        self._perf["store_total_ns"] += time.perf_counter_ns() - t0
+        self._perf["store_calls"] += 1
+        self._perf["chunks_stored"] += n_items
     return await store_documents_batch(
       self._qdrant,
       self._executor,
@@ -307,6 +360,55 @@ class MemoryAPI:
       items,
       collection,
       text_store=self._text_store,
+    )
+
+  async def store_batch_precomputed(
+    self,
+    items: List[Dict[str, Any]],
+    embeddings: List[List[float]],
+    collection: str,
+  ) -> List[str]:
+    """Batch store with pre-computed embeddings (bug #16 precompute path).
+
+    The embedding callback is never invoked — caller supplies vectors
+    aligned 1:1 with `items`. Skips fastembed entirely, so the cold
+    ingest cost collapses to Qdrant upsert time.
+    """
+    self._ensure_initialized()
+    if not await self.collection_exists(collection):
+      raise CollectionNotFoundError(
+        f"Collection '{collection}' does not exist. Create it first."
+      )
+    perf_on = self.ingest_config.perf_logging
+    n_items = len(items)
+    # Pass a no-op callback so store_documents_batch signature stays
+    # unchanged; the precomputed_embeddings kwarg short-circuits it.
+    async def _noop(_texts):  # pragma: no cover - should never execute
+      raise AssertionError("embedding callback invoked despite precomputed path")
+    if perf_on:
+      t0 = time.perf_counter_ns()
+      try:
+        return await store_documents_batch(
+          self._qdrant,
+          self._executor,
+          _noop,
+          items,
+          collection,
+          text_store=self._text_store,
+          precomputed_embeddings=embeddings,
+        )
+      finally:
+        self._perf["store_total_ns"] += time.perf_counter_ns() - t0
+        self._perf["store_calls"] += 1
+        self._perf["chunks_stored"] += n_items
+    return await store_documents_batch(
+      self._qdrant,
+      self._executor,
+      _noop,
+      items,
+      collection,
+      text_store=self._text_store,
+      precomputed_embeddings=embeddings,
     )
 
   async def search(
@@ -453,13 +555,27 @@ class MemoryAPI:
     return await loop.run_in_executor(self._executor, _encode)
 
   async def _generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-    """Genera embeddings per un batch de textos en una sola crida fastembed."""
+    """Genera embeddings per un batch de textos en una sola crida fastembed.
+
+    Bug #16: respecta `ingest_config.embed_batch_size` si està configurat.
+    Default None preserva el comportament històric (no passar batch_size
+    kwarg, FastEmbed aplica el seu default intern).
+
+    Quan `ingest_config.perf_logging` és True, acumula durada i recomptes
+    a `self._perf` — zero cost quan és False.
+    """
     loop = asyncio.get_running_loop()
+    embed_batch_size = self.ingest_config.embed_batch_size
+    perf_on = self.ingest_config.perf_logging
 
     def _encode_batch():
       import numpy as _np
       results = []
-      for v in self._embedder.embed(texts):
+      if embed_batch_size is not None:
+        iterator = self._embedder.embed(texts, batch_size=embed_batch_size)
+      else:
+        iterator = self._embedder.embed(texts)
+      for v in iterator:
         arr = _np.array(v)
         norm = _np.linalg.norm(arr)
         if norm > 0:
@@ -467,7 +583,73 @@ class MemoryAPI:
         results.append(arr.astype(_np.float32).tolist())
       return results
 
+    if perf_on:
+      t0 = time.perf_counter_ns()
+      out = await loop.run_in_executor(self._executor, _encode_batch)
+      self._perf["embed_ns"] += time.perf_counter_ns() - t0
+      self._perf["embed_calls"] += 1
+      self._perf["chunks_embedded"] += len(texts)
+      return out
     return await loop.run_in_executor(self._executor, _encode_batch)
+
+  async def warmup(self) -> None:
+    """Pre-carrega pesos ONNX/tokenizer amb una crida curta (~1 token).
+
+    Bug #16 pre-warm: la primera crida a `self._embedder.embed(...)` és cara
+    perquè fastembed fa lazy-init d'ONNX Runtime sessions. Fer-ho fora del
+    camí crític dona timings de workload nets.
+
+    No-op si `ingest_config.pre_warm` és False (default). L'invocant hauria
+    de respectar la flag per deixar la decisió a la config central.
+
+    Quan perf_logging està actiu, la durada queda isolada a `warmup_ns` i
+    els comptadors `embed_ns` / `chunks_embedded` NO reflecteixen aquesta
+    crida (es decrementen al final) — així el benchmark veu la durada del
+    workload real sense contaminació del pre-warm.
+    """
+    self._ensure_initialized()
+    if not self.ingest_config.pre_warm:
+      return
+    perf_on = self.ingest_config.perf_logging
+    if not perf_on:
+      await self._generate_embeddings_batch(["warmup"])
+      return
+    # Mesurem el warmup per separat. Prenem snapshot previ, cridem, i
+    # restem l'aportació del warmup als comptadors d'embed.
+    embed_ns_before = self._perf["embed_ns"]
+    embed_calls_before = self._perf["embed_calls"]
+    chunks_before = self._perf["chunks_embedded"]
+    t0 = time.perf_counter_ns()
+    await self._generate_embeddings_batch(["warmup"])
+    self._perf["warmup_ns"] += time.perf_counter_ns() - t0
+    # Revertim l'efecte del warmup sobre els comptadors de workload.
+    self._perf["embed_ns"] = embed_ns_before
+    self._perf["embed_calls"] = embed_calls_before
+    self._perf["chunks_embedded"] = chunks_before
+
+  def reset_perf_counters(self) -> None:
+    """Reset all perf counters to zero (bug #16 benchmark helper)."""
+    for k in self._perf:
+      self._perf[k] = 0
+
+  def get_perf_snapshot(self) -> Dict[str, int]:
+    """Return a snapshot of the current perf counters.
+
+    Keys returned:
+    - embed_ns: cumulative ns in _generate_embeddings_batch (workload only).
+    - embed_calls: number of embed batch calls (workload only).
+    - chunks_embedded: total items passed through embed (workload only).
+    - store_total_ns: cumulative ns in store_batch (embed + upsert + prep).
+    - store_calls: number of store_batch invocations.
+    - chunks_stored: total items stored.
+    - warmup_ns: cumulative ns spent in warmup() calls (isolated).
+    - upsert_ns_derived: store_total_ns - embed_ns (derived, may underflow
+      to 0 if rounding is unfavourable; treat as approximation).
+    """
+    snap = dict(self._perf)
+    derived = snap["store_total_ns"] - snap["embed_ns"]
+    snap["upsert_ns_derived"] = max(0, derived)
+    return snap
 
   @staticmethod
   def _hex_to_uuid(hex_id: str) -> str:
