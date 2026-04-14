@@ -331,10 +331,15 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
     codesign -dv "$APP_BUNDLE" 2>&1 || true
 
     # ── Verificació: launcher intern NO ha d'heretar entitlements del wrapper ──
-    NEXE_LAUNCHER_ENT="$(codesign -d --entitlements :- "$RESOURCES/Nexe.app/Contents/MacOS/NexeTray" 2>&1 | grep -v '^Executable=' | tr -d '[:space:]')"
+    # Nota: sintaxi `--entitlements -` (sense `:`) és la recomanada per Apple a macOS 26+.
+    # La vella `:-` emet un warning deprecation que es colava al check i generava
+    # fals positius. Filtrem també warning:/Error: per robustesa a futurs avisos.
+    NEXE_LAUNCHER_ENT="$(codesign -d --entitlements - "$RESOURCES/Nexe.app/Contents/MacOS/NexeTray" 2>&1 \
+        | grep -vE '^(Executable=|warning:|Error:)' \
+        | tr -d '[:space:]')"
     if [ -n "$NEXE_LAUNCHER_ENT" ]; then
         warn "Nexe.app/Contents/MacOS/NexeTray té entitlements — NO hauria (fuga des del wrapper extern?)"
-        codesign -d --entitlements :- "$RESOURCES/Nexe.app/Contents/MacOS/NexeTray" || true
+        codesign -d --entitlements - "$RESOURCES/Nexe.app/Contents/MacOS/NexeTray" || true
     else
         info "  OK: NexeTray no hereta entitlements del wrapper"
     fi
