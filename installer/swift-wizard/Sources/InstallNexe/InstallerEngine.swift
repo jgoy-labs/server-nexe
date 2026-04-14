@@ -36,7 +36,6 @@ class InstallerEngine: ObservableObject {
     @Published var selectedModel: AIModel?
     @Published var selectedEngine: String = "auto"
     @Published var addToDock: Bool = true
-    @Published var addLoginItem: Bool = false
 
     // Estat de la instal·lació
     @Published var steps: [InstallStep] = [

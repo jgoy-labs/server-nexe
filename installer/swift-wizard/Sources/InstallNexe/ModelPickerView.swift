@@ -126,9 +126,7 @@ struct ModelPickerView: View {
                     Text(t("btn_next"))
                         .frame(width: 140)
                 }
-                .controlSize(.large)
-                .buttonStyle(.borderedProminent)
-                .tint(.nexeRed)
+                .nexePrimaryButton()
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 16)

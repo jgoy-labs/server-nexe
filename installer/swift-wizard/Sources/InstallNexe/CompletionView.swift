@@ -118,30 +118,25 @@ struct CompletionView: View {
                     )
                     .frame(width: 200)
                 }
-                .controlSize(.large)
-                .buttonStyle(.borderedProminent)
-                .tint(.nexeRed)
+                .nexePrimaryButton()
                 .disabled(nexeOpened)
             }
             .padding(.bottom, 20)
         }
         .padding()
-        .onAppear { applyDockAndLogin() }
+        .onAppear { applyDockIcon() }
     }
 
     // MARK: - Accions
 
-    private func applyDockAndLogin() {
+    private func applyDockIcon() {
         // Nexe.app es copia a /Applications/Nexe.app per install_headless.py.
-        // És un .app normal (LSUIElement=false) amb icona pròpia i executable NexeTray:
-        // el target correcte per al Dock i Login Items (NO installPath/installer/NexeTray.app,
-        // que és LSUIElement=true i no apte per Dock).
+        // És un .app normal (LSUIElement=false) amb icona pròpia i executable
+        // NexeTray: el target correcte pel Dock.
+        guard engine.addToDock else { return }
         let nexeAppPath = "/Applications/Nexe.app"
-        let snapAddToDock = engine.addToDock
-        let snapAddLoginItem = engine.addLoginItem
         DispatchQueue.global(qos: .utility).async {
-            if snapAddToDock { doAddToDock(nexeAppPath: nexeAppPath) }
-            if snapAddLoginItem { doAddLoginItem(nexeAppPath: nexeAppPath) }
+            doAddToDock(nexeAppPath: nexeAppPath)
         }
     }
 
@@ -271,28 +266,6 @@ struct CompletionView: View {
         guard let output = String(data: data, encoding: .utf8) else { return false }
         // `defaults read` serialitza com `file:///Applications/Nexe.app/` o path cru
         return output.contains("file://\(appPath)") || output.contains("\"\(appPath)\"")
-    }
-
-    private func doAddLoginItem(nexeAppPath: String) {
-        // Escapar cometes del path per evitar injection AppleScript
-        let safePath = nexeAppPath.replacingOccurrences(of: "\"", with: "\\\"")
-        // Idempotent: delete + re-add (evita duplicats si ja era Login Item).
-        // Un delete d'un item inexistent falla silenciosament — OK.
-        let appName = (nexeAppPath as NSString).lastPathComponent
-            .replacingOccurrences(of: ".app", with: "")
-        let script = """
-        tell application "System Events"
-            try
-                delete (every login item whose name is "\(appName)")
-            end try
-            make login item at end with properties {path:"\(safePath)", hidden:true}
-        end tell
-        """
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", script]
-        try? process.run()
-        process.waitUntilExit()
     }
 
     private func t(_ key: String) -> String {
