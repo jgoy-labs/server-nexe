@@ -98,6 +98,39 @@ jobs:
           name: coverage-xml
           path: coverage.xml
 
+  precompute-check:
+    name: Precomputed KB Manifest
+    runs-on: ubuntu-latest
+    needs: security-audit
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate precomputed manifest (bug #16)
+        # Fast validation: does not regenerate vectors (would require
+        # downloading ~1 GB of model weights per CI run). Verifies that
+        # manifest.json is syntactically valid and that every source
+        # hash listed in it still matches the corresponding file on
+        # disk. MD edits, chunker/ingest source edits, and fastembed
+        # version bumps will all trigger a failure here so the repo
+        # cannot merge with a stale precomputed artefact set.
+        run: |
+          if [ -f knowledge/.embeddings/manifest.json ]; then
+            python scripts/precompute_kb.py --verify
+          else
+            echo "No precomputed manifest yet; runtime fallback active."
+          fi
+
   badge:
     name: Update Coverage Badge
     runs-on: ubuntu-latest

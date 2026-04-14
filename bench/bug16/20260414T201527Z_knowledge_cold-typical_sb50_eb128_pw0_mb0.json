@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "bug": 16,
+  "timestamp_utc": "20260414T201527Z",
+  "host": {
+    "platform": "darwin",
+    "python": "3.12.13"
+  },
+  "config": {
+    "mode": "knowledge",
+    "scenario": "cold-typical",
+    "runs_requested": 3,
+    "store_batch_size": 50,
+    "embed_batch_size": 128,
+    "pre_warm": false,
+    "mega_batch": false,
+    "label": "eb128",
+    "pdf_path": null
+  },
+  "aggregate": {
+    "ok_runs": 3,
+    "total_runs": 3,
+    "phases": {
+      "total_ns": {
+        "min": 14216494875,
+        "max": 14400897916,
+        "median": 14274704542,
+        "mean": 14297365777.666666,
+        "stdev": 94267009.52065401,
+        "p95": 14400897916
+      },
+      "model_init_ns": {
+        "min": 1056613042,
+        "max": 1085717958,
+        "median": 1073754917,
+        "mean": 1072028639.0,
+        "stdev": 14629048.521408595,
+        "p95": 1085717958
+      },
+      "chunking_ns": {
+        "min": 127084,
+        "max": 134584,
+        "median": 128916,
+        "mean": 130194.66666666667,
+        "stdev": 3910.08201107513,
+        "p95": 134584
+      },
+      "embed_ns": {
+        "min": 12906140295,
+        "max": 13050234543,
+        "median": 12931438624,
+        "mean": 12962604487.333334,
+        "stdev": 76936801.04251401,
+        "p95": 13050234543
+      },
+      "store_total_ns": {
+        "min": 13046346709,
+        "max": 13185569000,
+        "median": 13070281998,
+        "mean": 13100732569.0,
+        "stdev": 74438830.81760286,
+        "p95": 13185569000
+      },
+      "upsert_ns_derived": {
+        "min": 135334457,
+        "max": 140206414,
+        "median": 138843374,
+        "mean": 138128081.66666666,
+        "stdev": 2513508.224386054,
+        "p95": 140206414
+      },
+      "warmup_ns": {
+        "min": 0,
+        "max": 0,
+        "median": 0,
+        "mean": 0.0,
+        "stdev": 0.0,
+        "p95": 0
+      },
+      "wall_ns_parent": {
+        "min": 14802527958,
+        "max": 14995304833,
+        "median": 14845340542,
+        "mean": 14881057777.666666,
+        "stdev": 101230042.85508606,
+        "p95": 14995304833
+      },
+      "rss_peak_bytes": {
+        "min": 3842801664,
+        "max": 3843325952,
+        "median": 3842801664,
+        "mean": 3842976426.6666665,
+        "stdev": 302697.8179328905,
+        "p95": 3843325952
+      }
+    },
+    "total_chunks": 206,
+    "docs_processed": 12,
+    "lang": "ca",
+    "target_collection": "nexe_documentation"
+  },
+  "runs": [
+    {
+      "event": "ingest_complete",
+      "schema_version": 1,
+      "bug": 16,
+      "docs_processed": 12,
+      "total_chunks": 206,
+      "target_collection": "nexe_documentation",
+      "lang": "ca",
+      "total_ns": 14216494875,
+      "model_init_ns": 1056613042,
+      "chunking_ns": 134584,
+      "embed_ns": 12906140295,
+      "embed_calls": 12,
+      "chunks_embedded": 206,
+      "store_total_ns": 13046346709,
+      "store_calls": 12,
+      "chunks_stored": 206,
+      "warmup_ns": 0,
+      "upsert_ns_derived": 140206414,
+      "ok": true,
+      "returncode": 0,
+      "wall_ns_parent": 14802527958,
+      "rss_peak_bytes": 3842801664,
+      "rss_delta_bytes": 3842801664,
+      "run_index": 0
+    },
+    {
+      "event": "ingest_complete",
+      "schema_version": 1,
+      "bug": 16,
+      "docs_processed": 12,
+      "total_chunks": 206,
+      "target_collection": "nexe_documentation",
+      "lang": "ca",
+      "total_ns": 14274704542,
+      "model_init_ns": 1085717958,
+      "chunking_ns": 128916,
+      "embed_ns": 12931438624,
+      "embed_calls": 12,
+      "chunks_embedded": 206,
+      "store_total_ns": 13070281998,
+      "store_calls": 12,
+      "chunks_stored": 206,
+      "warmup_ns": 0,
+      "upsert_ns_derived": 138843374,
+      "ok": true,
+      "returncode": 0,
+      "wall_ns_parent": 14845340542,
+      "rss_peak_bytes": 3842801664,
+      "rss_delta_bytes": 0,
+      "run_index": 1
+    },
+    {
+      "event": "ingest_complete",
+      "schema_version": 1,
+      "bug": 16,
+      "docs_processed": 12,
+      "total_chunks": 206,
+      "target_collection": "nexe_documentation",
+      "lang": "ca",
+      "total_ns": 14400897916,
+      "model_init_ns": 1073754917,
+      "chunking_ns": 127084,
+      "embed_ns": 13050234543,
+      "embed_calls": 12,
+      "chunks_embedded": 206,
+      "store_total_ns": 13185569000,
+      "store_calls": 12,
+      "chunks_stored": 206,
+      "warmup_ns": 0,
+      "upsert_ns_derived": 135334457,
+      "ok": true,
+      "returncode": 0,
+      "wall_ns_parent": 14995304833,
+      "rss_peak_bytes": 3843325952,
+      "rss_delta_bytes": 524288,
+      "run_index": 2
+    }
+  ]
+}

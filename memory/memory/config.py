@@ -59,6 +59,38 @@ class GCConfig:
 
 
 @dataclass
+class IngestConfig:
+    """Ingest pipeline tunables (SSOT for batch sizes and strategy flags).
+
+    Defaults preserve the historical hardcoded behaviour exactly:
+    - store_batch_size=50 matched BATCH_SIZE=50 at ingest_knowledge.py:281
+      and plugins/web_ui_module/core/memory_helper.py:724.
+    - embed_batch_size=None means we do NOT pass batch_size kwarg to
+      fastembed.TextEmbedding.embed(...), so FastEmbed keeps its own
+      internal default (preserving prior behaviour).
+    - pre_warm=False and mega_batch=False keep the loop-per-doc path
+      historically in place. These flags exist so bug #16 can iterate
+      without re-touching production code paths.
+    - perf_logging=False means MemoryAPI does not accumulate timing
+      counters (zero overhead in production). Benchmarks flip it on
+      to collect per-phase timings without touching production code.
+    - embed_threads=6 caps the ORT CPU intra-op thread count that
+      fastembed forwards to ONNX Runtime. Bug #16 investigation found
+      that the fastembed default (auto = all cores) pulls E-cores into
+      the work and incurs context-switching penalties on Apple Silicon.
+      Six threads maps well to M4 Pro P-cores; set to None to restore
+      fastembed auto behaviour.
+    """
+
+    store_batch_size: int = 50
+    embed_batch_size: Optional[int] = None
+    embed_threads: Optional[int] = None
+    pre_warm: bool = False
+    mega_batch: bool = False
+    perf_logging: bool = False
+
+
+@dataclass
 class MemoryConfig:
     """Complete memory system configuration."""
 
@@ -69,6 +101,7 @@ class MemoryConfig:
     budgets: BudgetConfig = field(default_factory=BudgetConfig)
     retrieve: RetrieveConfig = field(default_factory=RetrieveConfig)
     gc: GCConfig = field(default_factory=GCConfig)
+    ingest: IngestConfig = field(default_factory=IngestConfig)
     db_path: Optional[str] = None
     qdrant_path: str = "storage/vectors"
     embedding_model: str = DEFAULT_EMBEDDING_MODEL
@@ -138,6 +171,24 @@ def get_config(profile_name: str = "m1_8gb") -> MemoryConfig:
     return PROFILES[profile_name]
 
 
+def resolve_ingest_config(memory_api) -> IngestConfig:
+    """Safely resolve the IngestConfig of a MemoryAPI-like object.
+
+    Bug #16: returns the IngestConfig attached to the given `memory_api`
+    if present and of the correct type, otherwise returns a fresh
+    IngestConfig() with default values. This keeps a single source of
+    truth (the dataclass defaults in this module) and tolerates test
+    doubles like MagicMock that do not wire up `ingest_config` explicitly.
+
+    Production MemoryAPI always initialises `ingest_config` to a real
+    IngestConfig instance, so in production this helper is a pass-through.
+    """
+    cfg = getattr(memory_api, "ingest_config", None)
+    if isinstance(cfg, IngestConfig):
+        return cfg
+    return IngestConfig()
+
+
 __all__ = [
     "MemoryConfig",
     "ExtractionConfig",
@@ -146,6 +197,8 @@ __all__ = [
     "BudgetConfig",
     "RetrieveConfig",
     "GCConfig",
+    "IngestConfig",
     "PROFILES",
     "get_config",
+    "resolve_ingest_config",
 ]
