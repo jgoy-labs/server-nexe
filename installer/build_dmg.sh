@@ -227,7 +227,7 @@ if [ -d "$PROJECT_ROOT/Nexe.app" ]; then
     cp -R "$PROJECT_ROOT/Nexe.app" "$RESOURCES/Nexe.app"
     info "  Nexe.app bundled OK"
 else
-    warn "Nexe.app not found at $PROJECT_ROOT/Nexe.app — /Applications install will be skipped"
+    error "Nexe.app not found at $PROJECT_ROOT/Nexe.app — DMG sense Nexe.app = sense icona Dock ni Login Item. Aborting."
 fi
 
 if [ -d "$PROJECT_ROOT/installer/NexeTray.app" ]; then
@@ -236,7 +236,7 @@ if [ -d "$PROJECT_ROOT/installer/NexeTray.app" ]; then
     cp -R "$PROJECT_ROOT/installer/NexeTray.app" "$RESOURCES/NexeTray.app"
     info "  NexeTray.app bundled OK"
 else
-    warn "NexeTray.app not found at $PROJECT_ROOT/installer/NexeTray.app — tray icon will be missing"
+    error "NexeTray.app not found at $PROJECT_ROOT/installer/NexeTray.app — DMG sense tray = servidor no arrenca. Aborting."
 fi
 
 # ── Step 5: Copy Python runtime (if bundled) ─────────────────────
