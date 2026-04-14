@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-03-28
 id: nexe-installation-guide
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "How to install server-nexe: 2 methods. (1) macOS DMG with SwiftUI wizard, bundled Python 3.12, models by RAM tier. (2) CLI: git clone + ./setup.sh (macOS/Linux). Requirements: macOS 13+ or Linux, 8GB RAM minimum. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Default port: 9119."

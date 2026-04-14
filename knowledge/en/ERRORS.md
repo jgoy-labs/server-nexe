@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-03-28
 id: nexe-errors-guide
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Common errors and solutions for server-nexe 0.9.7. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, streaming, and encryption errors."

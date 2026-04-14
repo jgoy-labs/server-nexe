@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-03-28
 id: nexe-testing-guide
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Testing strategy and coverage for server-nexe 0.9.7. 4665 test functions collected (4804 total), 0 failures in latest run. Tests collocated with modules. Covers test structure, running tests, coverage, AI audit test fixes, crypto tests (68 new), mega-test v1/v2 results, and honest assessment of testing limitations."

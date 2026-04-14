@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-04-02
 id: nexe-architecture
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Arquitectura interna de server-nexe 0.9.7. Disseny de cinc capes: Interficies, Core (FastAPI factory, endpoints separats, lifespan, crypto), Plugins (5 moduls amb auto-descobriment), Serveis Base (RAG memoria de 3 capes amb TextStore), Emmagatzematge. Cobreix refactoritzacio modular, module manager, i18n, pipeline d'encriptacio, pipeline de sanititzacio de peticions i diagrames Mermaid."

@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-04-02
 id: nexe-architecture
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Internal architecture of server-nexe 0.9.7. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, encryption pipeline, request sanitization pipeline, and Mermaid diagrams."

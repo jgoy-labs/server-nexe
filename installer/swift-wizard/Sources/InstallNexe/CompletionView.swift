@@ -90,15 +90,6 @@ struct CompletionView: View {
             }
             .padding(.horizontal, 50)
 
-            // Countdown standalone — número gran, sense caption duplicat
-            // (done_menubar_info dalt ja explica que apareix tray a la dreta)
-            if isCountingDown {
-                Text("\(countdown)")
-                    .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .foregroundColor(.nexeRed)
-                    .padding(.top, 4)
-            }
-
             Spacer()
 
             // Botons
@@ -113,10 +104,12 @@ struct CompletionView: View {
                 Button(action: launchAndCountdown) {
                     Text(
                         nexeOpened
-                            ? (isCountingDown ? t("btn_starting") : t("btn_opened"))
+                            ? (isCountingDown
+                                ? "\(t("btn_starting"))  \(countdown)"
+                                : t("btn_opened"))
                             : t("btn_open_nexe")
                     )
-                    .frame(width: 200)
+                    .frame(width: 220)
                 }
                 .nexePrimaryButton()
                 .disabled(nexeOpened)

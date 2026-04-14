@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-04-02
 id: nexe-overview
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "server-nexe es un servidor de IA local con memoria RAG persistente creado por Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalidades: MEM_SAVE, i18n (ca/es/en), aislamiento de sesiones, encriptacion en reposo. Modelos por tiers de RAM (8GB a 64GB), 2 metodos de instalacion (DMG, CLI). macOS probado, Linux parcial."

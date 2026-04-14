@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-03-28
 id: nexe-limitations
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Documentacio honesta de les limitacions de server-nexe 0.9.7. Cobreix suport de plataformes (macOS testejat, Linux parcial, Windows no suportat), qualitat de models vs nuvol (GPT-4/Claude), limitacions del RAG (embeddings, chunking, inici en fred, contradiccions), compatibilitat parcial amb l'API d'OpenAI, rendiment (instancia unica, concurrencia), restriccions de seguretat, advertencies d'encriptacio (default auto, nova, no provada en batalla) i mancances funcionals (sense multi-usuari, sense sync, sense fine-tuning)."

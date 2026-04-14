@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-04-06
 id: nexe-plugins-system
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Guia completa del sistema de plugins de server-nexe 0.9.7. Cubre el Protocol NexeModule (duck typing, no herencia), formato manifest.toml, estructura de ficheros del plugin, ciclo de vida (discovery -> loading -> initialization -> integration -> shutdown), objeto context, registro de routers, plugins existentes (MLX, llama.cpp, Ollama, Security con normalizacion Unicode, Web UI con validacion de entrada), como crear un plugin nuevo paso a paso, errores comunes y buenas practicas."

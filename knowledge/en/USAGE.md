@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-04-02
 id: nexe-usage-guide
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "How to use server-nexe: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119), automatic MEM_SAVE memory, PDF/TXT document upload, encryption commands. API examples with curl and Python. How to install models, change language (NEXE_LANG), manage memory."

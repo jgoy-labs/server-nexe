@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-04-02
 id: nexe-api-reference
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "server-nexe REST API: endpoints /v1/chat/completions (OpenAI-compatible), /memory/store, /memory/search, /rag/search, /upload, /sessions. X-API-Key dual-key authentication. Per-endpoint rate limiting. SSE streaming. Default port 9119. curl and Python examples."

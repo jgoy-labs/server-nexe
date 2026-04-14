@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-03-28
 id: nexe-security-guide
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "server-nexe security: dual-key authentication, rate limiting, 6 injection detectors, 47 jailbreak patterns, OWASP headers, RFC5424 logging, AES-256-GCM encryption at-rest (SQLCipher, .enc sessions), RAG sanitization. Fully local, zero external calls."
