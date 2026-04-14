@@ -29,7 +29,8 @@ class TestRAGHeader:
         assert header.chunk_size == DEFAULT_CHUNK_SIZE
         assert header.priority == "P2"
         assert header.type == "docs"
-        assert header.collection == "user_knowledge"
+        # collection=None → caller (ingest) aplica target_collection al seu critèri
+        assert header.collection is None
 
     def test_to_dict(self):
         header = RAGHeader(

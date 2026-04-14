@@ -483,7 +483,11 @@ def _run_headless_inner(config):
             # que ningú connectava. Ara la ingestió va directament per embedded
             # a 'storage/vectors/' via core/qdrant_pool.py.
             ingest_env = {**os.environ, "NEXE_LANG": lang, "TRANSFORMERS_VERBOSITY": "error"}
-            subprocess.run([
+            # NO check=True — si subprocess falla volem veure el stderr, no un
+            # CalledProcessError genèric. Capturem stdout/stderr i els escrivim
+            # al log de l'installer per visibilitat (bug 2026-04-14: ingest
+            # només processava IDENTITY.md i sortia 0 sense cap traça).
+            result = subprocess.run([
                 str(python_path), "-c",
                 f"import sys; sys.path.insert(0, '{project_root}'); "
                 "import asyncio; "
@@ -491,7 +495,15 @@ def _run_headless_inner(config):
                 # F7: explicit target_collection — corporate docs go to
                 # nexe_documentation, not user_knowledge.
                 "asyncio.run(ingest_knowledge(quiet=False, target_collection='nexe_documentation'))"
-            ], check=True, capture_output=True, text=True, timeout=300, env=ingest_env)
+            ], check=False, capture_output=True, text=True, timeout=300, env=ingest_env)
+
+            if result.stdout:
+                _log.info(f"[ingest stdout]\n{result.stdout.strip()}")
+            if result.stderr:
+                _log.warning(f"[ingest stderr]\n{result.stderr.strip()}")
+            if result.returncode != 0:
+                _log.error(f"Ingest subprocess returned non-zero: {result.returncode}")
+                raise RuntimeError(f"ingest_knowledge exited {result.returncode}")
 
             # Mark as ingested
             marker = project_root / "storage" / ".knowledge_ingested"

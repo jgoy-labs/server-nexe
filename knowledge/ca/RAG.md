@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-04-02
 id: nexe-rag-system
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.9.7). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat, pujada de documents amb aillament de sessio, embeddings (768D), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio de context RAG, poda intel·ligent, deduplicacio, TextStore per a text encriptat i payloads de Qdrant sense text."

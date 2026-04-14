@@ -60,7 +60,8 @@ class RAGHeader:
     # Opcionals
     lang: str = field(default_factory=lambda: os.getenv("NEXE_LANG", "ca").split("-")[0].lower())
     type: str = "docs"
-    collection: str = "user_knowledge"
+    # collection=None → el caller aplica el seu target_collection (bug 2026-04-14)
+    collection: Optional[str] = None
     author: str = ""
     expires: Optional[str] = None
     related: List[str] = field(default_factory=list)
@@ -154,7 +155,13 @@ class RAGHeaderParser:
         _default_lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
         header.lang = str(parsed.get("lang", _default_lang)).strip('"\'').lower()
         header.type = str(parsed.get("type", "docs")).strip('"\'').lower()
-        header.collection = str(parsed.get("collection", "user_knowledge")).strip('"\'')
+        # IMPORTANT: default ha de ser None perquè el caller (ingest_knowledge)
+        # pugui aplicar el seu target_collection. Si posem "user_knowledge" aquí
+        # obliguem a que tots els docs sense `collection:` explícit acabin a la
+        # col·lecció d'usuari — bug 2026-04-14 que feia que corporate docs
+        # (nexe_documentation) només continguessin fitxers amb header explícit.
+        _collection_raw = parsed.get("collection")
+        header.collection = str(_collection_raw).strip('"\'') if _collection_raw else None
         header.author = str(parsed.get("author", "")).strip('"\'')
         header.expires = parsed.get("expires")
         if header.expires:

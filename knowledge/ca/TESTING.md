@@ -2,6 +2,7 @@
 versio: "2.0"
 data: 2026-03-28
 id: nexe-testing-guide
+collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
 abstract: "Estrategia de testing i cobertura per a server-nexe 0.9.7. 4665 funcions de test col·lectades (4804 totals), 0 errors a l'ultima execucio. Tests col·locats amb els moduls. Cobreix estructura de tests, execucio, cobertura, correccions de tests de l'auditoria IA, tests de crypto (68 nous), resultats del mega-test v1/v2 i valoracio honesta de les limitacions del testing."
