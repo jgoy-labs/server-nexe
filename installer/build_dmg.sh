@@ -283,6 +283,26 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
         done
     fi
 
+    # Signar launcher natiu de Nexe.app (Swift binary). `--deep` NO el cobreix
+    # dins Resources/ — cal explícit amb hardened runtime + timestamp perquè
+    # Apple accepti notarització.
+    NEXE_LAUNCHER="$RESOURCES/Nexe.app/Contents/MacOS/NexeTray"
+    if [ -f "$NEXE_LAUNCHER" ] && file "$NEXE_LAUNCHER" | grep -q "Mach-O"; then
+        info "Signing Nexe.app native launcher..."
+        codesign --force --sign "$IDENTITY" --options runtime --timestamp "$NEXE_LAUNCHER"
+        info "  Signed: Nexe.app/Contents/MacOS/NexeTray"
+    fi
+    # Signar el bundle Nexe.app complet (seal de Info.plist, Resources, etc.)
+    if [ -d "$RESOURCES/Nexe.app" ]; then
+        codesign --force --sign "$IDENTITY" --options runtime --timestamp --deep "$RESOURCES/Nexe.app"
+        info "  Signed: Nexe.app bundle"
+    fi
+    # NexeTray.app (bash wrapper del tray — Step 4b)
+    if [ -d "$RESOURCES/NexeTray.app" ]; then
+        codesign --force --sign "$IDENTITY" --options runtime --timestamp --deep "$RESOURCES/NexeTray.app"
+        info "  Signed: NexeTray.app bundle"
+    fi
+
     info "Signing app bundle..."
     codesign --deep --force --verify --verbose \
         --sign "$IDENTITY" \
