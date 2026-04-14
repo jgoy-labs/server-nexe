@@ -117,9 +117,19 @@ def _model_id_for_engine(model, engine):
 
 
 def _write_project_marker(app_bundle, project_root):
-    """Persist the real install path inside Nexe.app for launcher lookup."""
-    marker = app_bundle / "Contents" / "Resources" / "project_root.txt"
-    marker.parent.mkdir(parents=True, exist_ok=True)
+    """Persist the real install path OUTSIDE Nexe.app to preserve codesigning seal.
+
+    Writing inside Contents/Resources/ breaks the bundle's sealed signature
+    (Gatekeeper refuses with 'a sealed resource is missing or invalid' and
+    'Nexe.app està malmès'). Marker lives at user level, outside any signed
+    bundle, readable by the Swift launcher via resolveProjectRoot().
+
+    Note: `app_bundle` kept as argument for backward compat — not used now.
+    """
+    _ = app_bundle  # keep signature compat
+    marker_dir = Path(os.path.expanduser("~/Library/Application Support/Nexe"))
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    marker = marker_dir / "project_root.txt"
     marker.write_text(str(project_root), encoding="utf-8")
 
 

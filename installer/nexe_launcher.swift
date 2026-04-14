@@ -17,27 +17,47 @@
 //   (fet automàticament per installer/build_dmg.sh)
 
 import Cocoa
+import Darwin
 
 // MARK: - Helpers de paths
 
 func resolveProjectRoot() -> String? {
-    // Nexe.app/Contents/MacOS/NexeTray → project root = parent de Nexe.app
+    let fm = FileManager.default
     let execPath = Bundle.main.executablePath ?? ""
-    let appDir = (execPath as NSString).deletingLastPathComponent  // MacOS/
-    let contentsDir = (appDir as NSString).deletingLastPathComponent  // Contents/
-    let bundleDir = (contentsDir as NSString).deletingLastPathComponent  // Nexe.app
-    let candidate1 = (bundleDir as NSString).deletingLastPathComponent  // parent
+    let appDir = (execPath as NSString).deletingLastPathComponent       // MacOS/
+    let contentsDir = (appDir as NSString).deletingLastPathComponent    // Contents/
+    let bundleDir = (contentsDir as NSString).deletingLastPathComponent // Nexe.app
+    let parentDir = (bundleDir as NSString).deletingLastPathComponent   // parent
 
-    // Cas dev: Nexe.app dins el projecte
-    if FileManager.default.isExecutableFile(atPath: candidate1 + "/venv/bin/python") {
-        return candidate1
+    // 1) Cas dev: Nexe.app dins el projecte (parent conté venv/)
+    if fm.isExecutableFile(atPath: parentDir + "/venv/bin/python") {
+        return parentDir
     }
 
-    // Cas producció: llegir marker project_root.txt dins Resources/
-    let markerPath = bundleDir + "/Contents/Resources/project_root.txt"
-    if let content = try? String(contentsOfFile: markerPath, encoding: .utf8) {
+    // 2) Cas producció: marker FORA del bundle, a ~/Library/Application Support/Nexe/
+    //    Fora del bundle perquè si fos dins Resources/ trencaria el seal
+    //    de codesign i Gatekeeper refusaria el llançament.
+    let home = NSHomeDirectory()
+    let extMarker = home + "/Library/Application Support/Nexe/project_root.txt"
+    if let content = try? String(contentsOfFile: extMarker, encoding: .utf8) {
         let path = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        if FileManager.default.isExecutableFile(atPath: path + "/venv/bin/python") {
+        if fm.isExecutableFile(atPath: path + "/venv/bin/python") {
+            return path
+        }
+    }
+
+    // 3) Fallback legacy: marker dins Resources/ (installs anteriors al fix).
+    //    Aquest path trenca la signatura — si el trobem, el moure'm a la
+    //    ubicació nova per recuperar la signatura.
+    let legacyMarker = bundleDir + "/Contents/Resources/project_root.txt"
+    if let content = try? String(contentsOfFile: legacyMarker, encoding: .utf8) {
+        let path = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if fm.isExecutableFile(atPath: path + "/venv/bin/python") {
+            // Migrar silenciosament a la ubicació bona
+            let newDir = home + "/Library/Application Support/Nexe"
+            try? fm.createDirectory(atPath: newDir, withIntermediateDirectories: true)
+            try? content.write(toFile: newDir + "/project_root.txt", atomically: true, encoding: .utf8)
+            try? fm.removeItem(atPath: legacyMarker)
             return path
         }
     }
@@ -62,6 +82,56 @@ func openWebUI() {
     try? task.run()
 }
 
+// MARK: - Lock file anti-race (doble-click al Dock)
+
+/// Path del lock file del launcher. Fora del bundle per no trencar codesign.
+func launcherLockPath() -> String {
+    let home = NSHomeDirectory()
+    return home + "/Library/Application Support/Nexe/launcher.pid"
+}
+
+/// Retorna true si el PID donat està viu (kill(pid, 0) == 0).
+func isPidAlive(_ pid: pid_t) -> Bool {
+    if pid <= 0 { return false }
+    // kill amb signal 0 no envia res — només comprova existència + permisos.
+    let res = kill(pid, 0)
+    if res == 0 { return true }
+    // ESRCH = no existeix; EPERM = existeix però no tenim permisos (viu)
+    return errno == EPERM
+}
+
+/// Retorna true si ja hi ha un launcher viu (cas: doble-click ràpid al Dock).
+/// Si no, escriu el nostre PID al lock i retorna false (via lliure).
+func acquireLauncherLock() -> Bool {
+    let lockPath = launcherLockPath()
+    let fm = FileManager.default
+    let dir = (lockPath as NSString).deletingLastPathComponent
+    try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+
+    if let content = try? String(contentsOfFile: lockPath, encoding: .utf8) {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let pid = Int32(trimmed), isPidAlive(pid), pid != getpid() {
+            // Ja hi ha un launcher viu — avortar silenciosament.
+            return false
+        }
+    }
+    // Escriure el nostre PID (sobrescriu lock orfe)
+    let myPid = String(getpid())
+    try? myPid.write(toFile: lockPath, atomically: true, encoding: .utf8)
+    return true
+}
+
+/// Esborra el lock file si encara és el nostre.
+func releaseLauncherLock() {
+    let lockPath = launcherLockPath()
+    if let content = try? String(contentsOfFile: lockPath, encoding: .utf8) {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if Int32(trimmed) == getpid() {
+            try? FileManager.default.removeItem(atPath: lockPath)
+        }
+    }
+}
+
 func showMissingVenvDialog() {
     let alert = NSAlert()
     alert.messageText = "Nexe"
@@ -77,6 +147,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var trayProcess: Process?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Lock file contra race de doble-click: si ja hi ha un launcher viu,
+        // sortir silenciosament (el primer ja està fent la feina).
+        if !acquireLauncherLock() {
+            NSApp.terminate(nil)
+            return
+        }
+
         // Si ja hi ha servidor escoltant (tray orfe d'una sessió anterior),
         // obrir UI i sortir — no duplicar tray.
         if isServerListening(port: 9119) {
@@ -138,9 +215,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Cmd+Q / Force Quit / "Quit" del menú → tancar el tray Python també
     func applicationWillTerminate(_ notification: Notification) {
         if let tray = trayProcess, tray.isRunning {
+            // SIGTERM primer; donar 8s perquè uvicorn faci graceful shutdown
+            // (graceful timeout intern ~30s, 8s és un compromís raonable).
             tray.terminate()
-            // Donar 2s perquè el tray es tanqui net abans de matar dur
-            let deadline = Date().addingTimeInterval(2.0)
+            let deadline = Date().addingTimeInterval(8.0)
             while tray.isRunning && Date() < deadline {
                 Thread.sleep(forTimeInterval: 0.1)
             }
@@ -148,6 +226,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 kill(tray.processIdentifier, SIGKILL)
             }
         }
+        // Alliberar lock file del launcher
+        releaseLauncherLock()
     }
 
     // No tancar l'app quan l'última finestra es tanca (no tenim finestres propies)

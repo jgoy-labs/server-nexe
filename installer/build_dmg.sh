@@ -293,18 +293,34 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
         info "  Signed: Nexe.app/Contents/MacOS/NexeTray"
     fi
     # Signar el bundle Nexe.app complet (seal de Info.plist, Resources, etc.)
+    # NO usem --deep aquí: el launcher intern (NexeTray) ja ha estat signat
+    # explícitament a dalt. --deep re-signaria i podria heretar entitlements
+    # del wrapper extern, cosa que NO volem (el launcher no els necessita).
     if [ -d "$RESOURCES/Nexe.app" ]; then
-        codesign --force --sign "$IDENTITY" --options runtime --timestamp --deep "$RESOURCES/Nexe.app"
-        info "  Signed: Nexe.app bundle"
+        codesign --force --sign "$IDENTITY" --options runtime --timestamp "$RESOURCES/Nexe.app"
+        info "  Signed: Nexe.app bundle (bottom-up, sense --deep)"
     fi
     # NexeTray.app (bash wrapper del tray — Step 4b)
     if [ -d "$RESOURCES/NexeTray.app" ]; then
-        codesign --force --sign "$IDENTITY" --options runtime --timestamp --deep "$RESOURCES/NexeTray.app"
+        codesign --force --sign "$IDENTITY" --options runtime --timestamp "$RESOURCES/NexeTray.app"
         info "  Signed: NexeTray.app bundle"
     fi
 
-    info "Signing app bundle..."
-    codesign --deep --force --verify --verbose \
+    # Frameworks del bundle extern (InstallNexe.app): signar explícitament
+    # abans del bundle pare perquè el seal final ja trobi les firmes correctes.
+    if [ -d "$APP_BUNDLE/Contents/Frameworks" ]; then
+        info "Signing InstallNexe.app Frameworks..."
+        find "$APP_BUNDLE/Contents/Frameworks" -type f \( -name '*.dylib' -o -perm +111 \) | while read f; do
+            if file "$f" | grep -q "Mach-O"; then
+                codesign --force --sign "$IDENTITY" --options runtime --timestamp "$f" 2>/dev/null || true
+            fi
+        done
+    fi
+
+    info "Signing app bundle (wrapper, sense --deep)..."
+    # NO --deep: evita re-signar recursivament el bundle intern Nexe.app i
+    # que el seu launcher hereti els entitlements d'InstallNexe.
+    codesign --force --verify --verbose \
         --sign "$IDENTITY" \
         --options runtime \
         --timestamp \
@@ -313,6 +329,19 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
 
     info "Verifying app signature..."
     codesign -dv "$APP_BUNDLE" 2>&1 || true
+
+    # ── Verificació: launcher intern NO ha d'heretar entitlements del wrapper ──
+    NEXE_LAUNCHER_ENT="$(codesign -d --entitlements :- "$RESOURCES/Nexe.app/Contents/MacOS/NexeTray" 2>&1 | grep -v '^Executable=' | tr -d '[:space:]')"
+    if [ -n "$NEXE_LAUNCHER_ENT" ]; then
+        warn "Nexe.app/Contents/MacOS/NexeTray té entitlements — NO hauria (fuga des del wrapper extern?)"
+        codesign -d --entitlements :- "$RESOURCES/Nexe.app/Contents/MacOS/NexeTray" || true
+    else
+        info "  OK: NexeTray no hereta entitlements del wrapper"
+    fi
+
+    # Verificació final (strict, --deep aquí només inspecciona — NO re-signa)
+    info "Verifying final bundle (strict + deep inspect)..."
+    codesign --verify --strict --deep --verbose=2 "$APP_BUNDLE" 2>&1 || warn "codesign --verify ha reportat problemes"
 else
     warn "No signing identity found — app bundle will be unsigned"
 fi

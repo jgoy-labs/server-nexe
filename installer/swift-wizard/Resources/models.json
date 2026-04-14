@@ -9,7 +9,10 @@
       "params": "9B",
       "ram_gb": 5.5,
       "disk_gb": 6.0,
-      "backends": ["ollama", "mlx"],
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
       "mlx": true,
       "ollama": "qwen3.5:9b",
       "gguf": null,
@@ -29,7 +32,10 @@
       "params": "8B totals / ~4-8B efectius (MoE)",
       "ram_gb": 5.0,
       "disk_gb": 4.5,
-      "backends": ["ollama", "mlx"],
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
       "mlx": true,
       "ollama": "gemma4:e4b",
       "gguf": null,
@@ -49,7 +55,9 @@
       "params": "2B",
       "ram_gb": 2.5,
       "disk_gb": 1.5,
-      "backends": ["ollama"],
+      "backends": [
+        "ollama"
+      ],
       "mlx": false,
       "ollama": "hdnh2006/salamandra-2b-instruct",
       "gguf": null,
@@ -71,7 +79,10 @@
       "params": "109B totals / 17B actius (MoE)",
       "ram_gb": 8.0,
       "disk_gb": 7.5,
-      "backends": ["ollama", "mlx"],
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
       "mlx": true,
       "ollama": "llama4:scout",
       "gguf": null,
@@ -91,10 +102,13 @@
       "params": "7B",
       "ram_gb": 6.5,
       "disk_gb": 4.9,
-      "backends": ["ollama", "llama.cpp"],
+      "backends": [
+        "ollama",
+        "llama.cpp"
+      ],
       "mlx": false,
       "ollama": "hdnh2006/salamandra-7b-instruct:q4_K_M",
-      "gguf": "https://huggingface.co/cstr/salamandra-7b-instruct-GGUF/resolve/main/salamandra-7b-instruct-Q4_K_M.gguf",
+      "gguf": "https://huggingface.co/hdnh2006/BSC-LT-salamandra-7b-instruct-gguf/resolve/main/salamandra-7b-instruct-Q4_K_M.gguf",
       "iberic": true,
       "description": {
         "ca": "El model recomanat per a feina seriosa en català. Entrenat des de zero al BSC.",
@@ -113,7 +127,10 @@
       "params": "27B",
       "ram_gb": 18.0,
       "disk_gb": 17.0,
-      "backends": ["ollama", "mlx"],
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
       "mlx": true,
       "ollama": "qwen3.5:27b",
       "gguf": null,
@@ -133,7 +150,10 @@
       "params": "31B (dense)",
       "ram_gb": 18.0,
       "disk_gb": 18.5,
-      "backends": ["ollama", "mlx"],
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
       "mlx": true,
       "ollama": "gemma4:31b",
       "gguf": null,
@@ -155,7 +175,10 @@
       "params": "35B totals / 3B actius (MoE)",
       "ram_gb": 21.0,
       "disk_gb": 21.0,
-      "backends": ["ollama", "mlx"],
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
       "mlx": true,
       "ollama": "qwen3.5:35b-a3b",
       "gguf": null,
@@ -175,7 +198,11 @@
       "params": "32B (Distill Qwen)",
       "ram_gb": 22.0,
       "disk_gb": 19.0,
-      "backends": ["ollama", "mlx", "llama.cpp"],
+      "backends": [
+        "ollama",
+        "mlx",
+        "llama.cpp"
+      ],
       "mlx": true,
       "ollama": "deepseek-r1:32b",
       "gguf": "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-32B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf",
@@ -195,10 +222,12 @@
       "params": "40B",
       "ram_gb": 24.0,
       "disk_gb": 24.0,
-      "backends": ["llama.cpp"],
+      "backends": [
+        "llama.cpp"
+      ],
       "mlx": false,
       "ollama": null,
-      "gguf": "https://huggingface.co/BSC-LT/ALIA-40b-instruct-2601-GGUF",
+      "gguf": "https://huggingface.co/BSC-LT/ALIA-40b-instruct-2601-GGUF/resolve/main/ALIA-40b-instruct-2601-Q8_0.gguf",
       "iberic": true,
       "note": "BSC recomana llama.cpp pur per millor rendiment. Ollama no recomanat.",
       "description": {
@@ -218,7 +247,10 @@
       "params": "122B totals / 10B actius (MoE)",
       "ram_gb": 48.0,
       "disk_gb": 50.0,
-      "backends": ["ollama", "mlx"],
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
       "mlx": true,
       "ollama": "qwen3.5:122b-a10b",
       "gguf": null,
@@ -238,7 +270,10 @@
       "params": "400B totals / 17B actius (MoE)",
       "ram_gb": 38.0,
       "disk_gb": 42.0,
-      "backends": ["ollama", "mlx"],
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
       "mlx": true,
       "ollama": "llama4:maverick",
       "gguf": null,
@@ -260,7 +295,10 @@
       "params": "122B totals / 10B actius (MoE)",
       "ram_gb": 48.0,
       "disk_gb": 50.0,
-      "backends": ["ollama", "mlx"],
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
       "mlx": true,
       "ollama": "qwen3.5:122b-a10b",
       "gguf": null,
@@ -280,7 +318,10 @@
       "params": "120B",
       "ram_gb": 50.0,
       "disk_gb": 52.0,
-      "backends": ["ollama", "mlx"],
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
       "mlx": true,
       "ollama": "gpt-oss:120b",
       "gguf": null,
