@@ -202,9 +202,7 @@ struct ConfirmView: View {
                     Text(t("btn_install"))
                         .frame(width: 160)
                 }
-                .controlSize(.large)
-                .buttonStyle(.borderedProminent)
-                .tint(.nexeRed)
+                .nexePrimaryButton()
             }
             .padding(.horizontal, 40)
             .padding(.bottom, 24)

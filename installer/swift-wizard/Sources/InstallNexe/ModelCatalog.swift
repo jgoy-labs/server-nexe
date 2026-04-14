@@ -47,14 +47,22 @@ struct AIModel: Codable, Identifiable {
         return description[lang.rawValue] ?? description["en"] ?? ""
     }
 
-    /// Si el model té capacitat visual (VLM). Derivat de les descripcions
-    /// (catàleg actual no porta flag explícit — si es formalitza, canviar aquí).
+    /// Si el model té capacitat visual (VLM). Derivat de les descripcions.
+    /// Matxing per paraula sencera (evita "visible" → false positive).
+    /// TODO: formalitzar amb flag `vision: bool` al catàleg Python.
     var hasVision: Bool {
-        let keywords = ["visi", "vision", "visión", "multimod"]
+        let vlmWords: Set<String> = [
+            "visió", "visio",        // ca
+            "visión", "vision",      // es/en
+            "multimodal",            // universal
+            "vl",                    // tag comú (VLM, VL models)
+            "vlm",
+        ]
+        let separators = CharacterSet.alphanumerics.inverted
         for desc in description.values {
-            let lowered = desc.lowercased()
-            for kw in keywords {
-                if lowered.contains(kw) { return true }
+            let words = desc.lowercased().components(separatedBy: separators)
+            for w in words where vlmWords.contains(w) {
+                return true
             }
         }
         return false

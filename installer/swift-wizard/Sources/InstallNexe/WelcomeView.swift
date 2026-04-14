@@ -90,9 +90,7 @@ struct WelcomeView: View {
                     .font(.headline)
                     .frame(width: 200)
             }
-            .controlSize(.large)
-            .buttonStyle(.borderedProminent)
-            .tint(.nexeRed)
+            .nexePrimaryButton()
             .padding(.bottom, 24)
         }
         .padding()
