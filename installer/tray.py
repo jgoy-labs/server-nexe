@@ -42,14 +42,72 @@ except ImportError:
     rumps = _RumpsStub()
 
 
-def _front_alert(*args, **kwargs):
-    """Show a rumps.alert, activating the app first so it appears on top."""
+NS_STATUS_WINDOW_LEVEL = 25
+
+
+def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_):
+    """NSAlert always-on-top (assumeix _ForegroundContext ja actiu)."""
     try:
-        from AppKit import NSApp
-        NSApp.activateIgnoringOtherApps_(True)
+        from AppKit import NSAlert, NSAlertStyleWarning
     except Exception:
-        pass
-    return rumps.alert(*args, **kwargs)
+        kwargs = {}
+        if title is not None: kwargs["title"] = title
+        if message is not None: kwargs["message"] = message
+        if ok is not None: kwargs["ok"] = ok
+        if cancel is not None: kwargs["cancel"] = cancel
+        if other is not None: kwargs["other"] = other
+        return rumps.alert(**kwargs)
+
+    alert = NSAlert.alloc().init()
+    if title is not None:
+        alert.setMessageText_(str(title))
+    if message is not None:
+        alert.setInformativeText_(str(message))
+    alert.setAlertStyle_(NSAlertStyleWarning)
+
+    alert.addButtonWithTitle_(str(ok) if ok is not None else "OK")
+    if cancel is not None:
+        alert.addButtonWithTitle_(str(cancel))
+    if other is not None:
+        alert.addButtonWithTitle_(str(other))
+
+    window = alert.window()
+    window.setLevel_(NS_STATUS_WINDOW_LEVEL)
+    window.makeKeyAndOrderFront_(None)
+
+    response = alert.runModal()
+    if response == 1000:
+        return 1
+    elif response == 1001:
+        return 0
+    elif response == 1002:
+        return -1
+    return response
+
+
+class _ForegroundContext:
+    """Promociona activation policy a .regular per un bloc d'alertes, i la
+    torna al valor anterior al sortir. Evita flip-flop entre alertes."""
+    def __init__(self):
+        self.old_policy = None
+
+    def __enter__(self):
+        try:
+            from AppKit import NSApp, NSApplicationActivationPolicyRegular
+            self.old_policy = NSApp.activationPolicy()
+            NSApp.setActivationPolicy_(NSApplicationActivationPolicyRegular)
+            NSApp.activateIgnoringOtherApps_(True)
+        except Exception:
+            pass
+        return self
+
+    def __exit__(self, *exc):
+        if self.old_policy is not None:
+            try:
+                from AppKit import NSApp
+                NSApp.setActivationPolicy_(self.old_policy)
+            except Exception:
+                pass
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -487,18 +545,38 @@ class NexeTray(rumps.App):
                 details += "\n\n"
             details += self.t("uninstall_failed") + "\n• " + "\n• ".join(failed)
 
-        if failed:
-            _front_alert(
-                title=self.t("uninstall_title"),
-                message=self.t("uninstall_partial", details=details),
-            )
-        else:
-            _front_alert(
-                title=self.t("uninstall_title"),
-                message=self.t("uninstall_done", details=details),
-            )
+        # Resultat final també s'ha de veure a front (NSStatusWindowLevel + .regular)
+        with _ForegroundContext():
+            if failed:
+                _front_alert(
+                    title=self.t("uninstall_title"),
+                    message=self.t("uninstall_partial", details=details),
+                )
+            else:
+                _front_alert(
+                    title=self.t("uninstall_title"),
+                    message=self.t("uninstall_done", details=details),
+                )
 
-        rumps.quit_application()
+        # Terminació: rumps.quit_application() a vegades no tanca el procés si
+        # el run loop esta dins un callback, i queda una icona zombie al menubar.
+        # Fem sortida explícita: quit rumps + pkill totes les trays + os._exit.
+        try:
+            rumps.quit_application()
+        except Exception:
+            pass
+        # Matar qualsevol altre nexe-tray/installer.tray orfe (no tocar PIDs
+        # del servidor — stop_server_func ja els ha aturat).
+        try:
+            subprocess.Popen(
+                ["pkill", "-f", "nexe-tray|installer.tray"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            pass
+        # Sortir de veritat (bypass de qualsevol run loop pendent)
+        import os as _os
+        _os._exit(0)
 
     def _quit(self, _sender):
         self._stop_ram_monitor()

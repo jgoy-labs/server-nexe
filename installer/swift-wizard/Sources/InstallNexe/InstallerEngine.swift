@@ -60,7 +60,19 @@ class InstallerEngine: ObservableObject {
 
     // Detecció instal·lació existent
     @Published var showExistingInstallAlert: Bool = false
+    @Published var showBackupDoneAlert: Bool = false
+    @Published var lastBackupPath: String = ""
     private var pendingInstallContinuation: (() -> Void)?
+
+    /// Path proposat per a la còpia de seguretat (sibling amb timestamp).
+    /// Si installPath és /Applications/server-nexe i ara són les 16:35:00 del
+    /// 14/04/2026, retorna /Applications/server-nexe-backup-20260414-163500
+    var proposedBackupPath: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let stamp = formatter.string(from: Date())
+        return installPath + "-backup-" + stamp
+    }
 
     private var installStartTime: Date?
 
@@ -110,6 +122,32 @@ class InstallerEngine: ObservableObject {
 
     func confirmOverwrite() {
         showExistingInstallAlert = false
+        pendingInstallContinuation?()
+        pendingInstallContinuation = nil
+    }
+
+    /// Usuari ha triat "Fer còpia i continuar".
+    /// Renombra installPath → installPath-backup-TIMESTAMP i llavors instal·la fresh.
+    /// Mv és atòmic i instantani (no copia bytes). Si falla (permisos, etc.),
+    /// desa l'error i no arrenca la instal·lació.
+    func confirmBackupAndOverwrite() {
+        showExistingInstallAlert = false
+        let backup = proposedBackupPath
+        do {
+            try FileManager.default.moveItem(atPath: installPath, toPath: backup)
+            lastBackupPath = backup
+            showBackupDoneAlert = true
+            // La continuació real s'executa quan l'usuari tanqui l'alerta de còpia.
+            // Deixem el callback intacte — dismissBackupDoneAlert() el disparara.
+        } catch {
+            appendLog("[ERROR] Could not move existing install to backup: \(error.localizedDescription)")
+            installError = "Backup failed: \(error.localizedDescription)"
+            pendingInstallContinuation = nil
+        }
+    }
+
+    func dismissBackupDoneAlert() {
+        showBackupDoneAlert = false
         pendingInstallContinuation?()
         pendingInstallContinuation = nil
     }
