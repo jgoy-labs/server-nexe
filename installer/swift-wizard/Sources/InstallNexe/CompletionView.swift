@@ -6,8 +6,6 @@ import AppKit
 struct CompletionView: View {
     @EnvironmentObject var engine: InstallerEngine
     @State private var copied = false
-    @State private var addToDock = true
-    @State private var addLoginItem = false
     @State private var nexeOpened = false
     @State private var countdown: Int = 0
     @State private var isCountingDown: Bool = false
@@ -92,9 +90,9 @@ struct CompletionView: View {
             }
             .padding(.horizontal, 50)
 
-            // Opcions post-instal·lació
+            // Opcions post-instal·lació (triades a la pantalla de carpeta)
             VStack(alignment: .leading, spacing: 8) {
-                Toggle(isOn: $addToDock) {
+                Toggle(isOn: $engine.addToDock) {
                     HStack(spacing: 8) {
                         Image(systemName: "dock.rectangle")
                             .foregroundColor(.nexeRed)
@@ -104,7 +102,7 @@ struct CompletionView: View {
                 }
                 .toggleStyle(.checkbox)
 
-                Toggle(isOn: $addLoginItem) {
+                Toggle(isOn: $engine.addLoginItem) {
                     HStack(spacing: 8) {
                         Image(systemName: "power")
                             .foregroundColor(.nexeRed)
@@ -232,8 +230,8 @@ struct CompletionView: View {
         // B-dock / B-login: executar en background per no bloquejar el main thread.
         // El countdown ja ha garantit que la UI estava estable, el killall Dock
         // ara no causa el flash inicial (BUG #4).
-        let snapAddToDock = addToDock
-        let snapAddLoginItem = addLoginItem
+        let snapAddToDock = engine.addToDock
+        let snapAddLoginItem = engine.addLoginItem
         let snapNexeAppPath = nexeAppPath
         DispatchQueue.global(qos: .utility).async {
             if snapAddToDock { doAddToDock(nexeAppPath: snapNexeAppPath) }
