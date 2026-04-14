@@ -225,17 +225,28 @@ class InstallerEngine: ObservableObject {
                 return
             }
 
-            // Descomprimir .nexe-app.tar.gz → Nexe.app (necessari per install_headless)
-            let nexeTarPath = installPath + "/.nexe-app.tar.gz"
-            if FileManager.default.fileExists(atPath: nexeTarPath) {
-                await MainActor.run {
-                    self.appendLog("Extracting Nexe.app...")
+            // Copiar Nexe.app i NexeTray.app des de Bundle Resources cap a installPath.
+            // Build_dmg.sh les bundleja a InstallNexe.app/Contents/Resources/ (excloses de payload).
+            // - Nexe.app → installPath/Nexe.app  (install_headless.py el copiarà a /Applications/Nexe.app)
+            // - NexeTray.app → installPath/installer/NexeTray.app  (CompletionView.openNexe el llença)
+            if let resDir = Bundle.main.resourcePath {
+                let fm = FileManager.default
+                let bundledNexe = resDir + "/Nexe.app"
+                if fm.fileExists(atPath: bundledNexe) {
+                    await MainActor.run { self.appendLog("Deploying Nexe.app...") }
+                    let dest = installPath + "/Nexe.app"
+                    try? fm.removeItem(atPath: dest)
+                    try? fm.copyItem(atPath: bundledNexe, toPath: dest)
                 }
-                let nexeTar = Process()
-                nexeTar.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-                nexeTar.arguments = ["xzf", nexeTarPath, "-C", installPath]
-                try? nexeTar.run()
-                nexeTar.waitUntilExit()
+                let bundledTray = resDir + "/NexeTray.app"
+                if fm.fileExists(atPath: bundledTray) {
+                    await MainActor.run { self.appendLog("Deploying NexeTray.app...") }
+                    let installerDir = installPath + "/installer"
+                    try? fm.createDirectory(atPath: installerDir, withIntermediateDirectories: true)
+                    let dest = installerDir + "/NexeTray.app"
+                    try? fm.removeItem(atPath: dest)
+                    try? fm.copyItem(atPath: bundledTray, toPath: dest)
+                }
             }
 
             // Treure quarantine de tot el directori (AirDrop/Safari l'afegeixen)

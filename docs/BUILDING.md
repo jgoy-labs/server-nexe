@@ -43,6 +43,41 @@ Output: `Install Nexe.dmg` at the project root (~20 MB).
 7. Creates DMG with background image
 8. Signs and notarizes DMG (unless `--no-notarize`)
 
+## Bumping version
+
+**Single source of truth:** `pyproject.toml` `[project].version`.
+
+Tot el que necessita la versió del projecte s'actualitza des d'aquí:
+
+```bash
+# 1. Edita pyproject.toml — canvia [project].version: "0.9.7" → "0.9.8"
+# 2. Sincronitza els Info.plist dels bundles macOS:
+python3 -m installer.sync_plist_versions
+# 3. Verifica que tot quadra:
+pytest core/tests/test_version.py core/tests/test_plist_versions.py
+```
+
+### Mapa de propagació
+
+| Destinatari | Com rep la versió | Cal bump manual? |
+|-------------|-------------------|------------------|
+| Codi Python (`from core.version import __version__`) | `core/version.py` llegeix `pyproject.toml` en runtime | ❌ automàtic |
+| `Nexe.app/Contents/Info.plist` | `installer/sync_plist_versions.py` | ❌ automàtic (sync) |
+| `installer/NexeTray.app/Contents/Info.plist` | `installer/sync_plist_versions.py` | ❌ automàtic (sync) |
+| `InstallNexe.app` / `Install Nexe.app` / `swift-wizard/Resources/Info.plist` | Versió pròpia de l'**installer** (no de server-nexe) | ✅ manual si bumps l'installer |
+
+El `build_dmg.sh` executa `sync_plist_versions.py` abans de bundlejar, així que una release de DMG mai no porta versions stale als bundles sincronitzats.
+
+### Afegir un nou bundle a sincronitzar
+
+Afegeix la ruta a `SYNCED_PLISTS` a `installer/sync_plist_versions.py`. El test `test_synced_plists_match_pyproject` hi passarà automàticament en cada CI run.
+
+### CHANGELOG
+
+Cada bump ha d'actualitzar `CHANGELOG.md` amb una secció nova `[X.Y.Z] — YYYY-MM-DD`.
+
+---
+
 ## Step 3: Publish release
 
 ```bash

@@ -207,10 +207,20 @@ tar czf "$PAYLOAD_TMP/payload.tar.gz" \
 mv "$PAYLOAD_TMP/payload.tar.gz" "$RESOURCES/payload.tar.gz"
 rm -rf "$PAYLOAD_TMP"
 
-# ── Step 4b: Bundle Nexe.app inside installer resources ──────────
-# Nexe.app is excluded from payload.tar.gz (it's a macOS .app bundle,
-# not source code). It must travel inside InstallNexe.app/Contents/Resources/
-# so install_headless.py can copy it to /Applications at install time.
+# ── Step 4a-bis: Sync .plist versions des de pyproject.toml ─────
+# Garanteix que Nexe.app i NexeTray.app porten la versió del projecte
+# abans de bundlejar-les. Font única: pyproject.toml ([project].version).
+info "Syncing Info.plist versions from pyproject.toml..."
+if python3 -m installer.sync_plist_versions; then
+    info "  Plist versions synced OK"
+else
+    warn "  Plist sync failed — continuing with possibly stale versions"
+fi
+
+# ── Step 4b: Bundle Nexe.app i NexeTray.app inside installer resources ─
+# Ambdues són excluded del payload.tar.gz (són .app bundles, no codi font).
+# Han de viatjar dins InstallNexe.app/Contents/Resources/ perquè el Swift
+# wizard les desplegui a installPath just abans d'executar install_headless.
 if [ -d "$PROJECT_ROOT/Nexe.app" ]; then
     info "Bundling Nexe.app into installer resources..."
     rm -rf "$RESOURCES/Nexe.app"
@@ -218,6 +228,15 @@ if [ -d "$PROJECT_ROOT/Nexe.app" ]; then
     info "  Nexe.app bundled OK"
 else
     warn "Nexe.app not found at $PROJECT_ROOT/Nexe.app — /Applications install will be skipped"
+fi
+
+if [ -d "$PROJECT_ROOT/installer/NexeTray.app" ]; then
+    info "Bundling NexeTray.app into installer resources..."
+    rm -rf "$RESOURCES/NexeTray.app"
+    cp -R "$PROJECT_ROOT/installer/NexeTray.app" "$RESOURCES/NexeTray.app"
+    info "  NexeTray.app bundled OK"
+else
+    warn "NexeTray.app not found at $PROJECT_ROOT/installer/NexeTray.app — tray icon will be missing"
 fi
 
 # ── Step 5: Copy Python runtime (if bundled) ─────────────────────
