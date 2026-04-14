@@ -520,7 +520,12 @@ def _run_headless_inner(config):
                 _log.warning(f"Could not copy Nexe.app to /Applications: {e}")
 
         # Add to Login Items (auto-start on boot)
-        if nexe_app_ready:
+        # Amb --no-login-item el Swift wizard gestiona aquesta decisió
+        # via checkbox — no l'afegim aquí per no duplicar ni ignorar la tria.
+        skip_login_item = bool(config.get("skip_login_item", False))
+        if skip_login_item:
+            _log.info("Login Items: skipped (managed by GUI wizard)")
+        elif nexe_app_ready:
             try:
                 subprocess.run([
                     "osascript", "-e",
@@ -589,6 +594,10 @@ def _parse_cli_overrides(argv):
             # escollit queda registrat al .env per a descarrega manual
             # posterior via `nexe model pull <name>`.
             overrides["skip_model_download"] = True
+        elif arg == "--no-login-item":
+            # El Swift wizard gestiona Login Items segons checkbox de l'usuari;
+            # amb aquesta flag, install_headless evita afegir-lo per no duplicar.
+            overrides["skip_login_item"] = True
     if "reinstall_mode" in overrides:
         if overrides["reinstall_mode"] not in VALID_REINSTALL_MODES:
             print(

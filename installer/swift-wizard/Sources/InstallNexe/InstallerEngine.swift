@@ -272,7 +272,8 @@ class InstallerEngine: ObservableObject {
     ) async {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: pythonPath)
-        process.arguments = ["-m", "installer.install_headless"]
+        // --no-login-item: el wizard gestiona Login Items via checkbox CompletionView
+        process.arguments = ["-m", "installer.install_headless", "--no-login-item"]
         process.currentDirectoryURL = URL(fileURLWithPath: installPath)
 
         // Variables d'entorn

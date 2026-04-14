@@ -138,7 +138,11 @@ struct CompletionView: View {
     // MARK: - Accions
 
     private func applyDockAndLogin() {
-        let nexeAppPath = engine.installPath + "/Nexe.app"
+        // Nexe.app es copia a /Applications/Nexe.app per install_headless.py.
+        // És un .app normal (LSUIElement=false) amb icona pròpia i executable NexeTray:
+        // el target correcte per al Dock i Login Items (NO installPath/installer/NexeTray.app,
+        // que és LSUIElement=true i no apte per Dock).
+        let nexeAppPath = "/Applications/Nexe.app"
         let snapAddToDock = engine.addToDock
         let snapAddLoginItem = engine.addLoginItem
         DispatchQueue.global(qos: .utility).async {
