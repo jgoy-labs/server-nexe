@@ -256,6 +256,15 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
         except Exception:
             failed.append("/Applications/Nexe.app")
 
+    # Remove marker file + app support dir (outside bundle per codesign seal)
+    support_dir = Path.home() / "Library" / "Application Support" / "Nexe"
+    if support_dir.exists():
+        try:
+            shutil.rmtree(support_dir)
+            removed.append(str(support_dir))
+        except Exception:
+            failed.append(str(support_dir))
+
     # Remove installation directory using a detached shell script
     cleanup_script = f"""#!/bin/bash
 sleep 2
