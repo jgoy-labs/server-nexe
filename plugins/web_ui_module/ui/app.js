@@ -880,9 +880,21 @@ class NexeUI {
     /// famílies/tags multimodals coneguts. Equivalent al hasVision del Swift wizard.
     _modelHasVision(name) {
         const n = (name || '').toLowerCase();
+        // Omni-models (video + audio) que requereixen torch/torchvision —
+        // no inclosos al DMG per mida. Detector els marca VLM pero la
+        // càrrega real peta. No mostrar 👁️ perquè no enganyi l'usuari.
+        // Veure knowledge/*/LIMITATIONS.md secció "Models multimodal (VLM)".
+        const omniExcludes = [
+            'qwen3.5-',     // Qwen3.5 MoE (A3B / A10B) — omni-video
+            'qwen3-omni',
+            'kimi-vl',
+            'qwen3-vl-moe',
+        ];
+        if (omniExcludes.some(p => n.includes(p))) return false;
+
         const patterns = [
-            'qwen3.5', 'qwen3-vl', 'qwen2.5-vl', 'qwen-vl',
-            'gemma4', 'gemma-3-vision',
+            'qwen3-vl', 'qwen2.5-vl', 'qwen-vl',
+            'gemma4', 'gemma-4', 'gemma-3-vision',
             'llama4', 'llama-4', 'llama3.2-vision',
             'pixtral', 'llava', 'moondream', 'bakllava',
             'minicpm-v', 'internvl', 'cogvlm',
