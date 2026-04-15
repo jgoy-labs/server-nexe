@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .installer_display import (
     CYAN, BOLD, DIM, RESET,
-    print_step, print_success, print_warn, print_error,
+    print_step, print_success, print_error,
 )
 from .installer_i18n import t
 
@@ -134,6 +134,83 @@ def _make_venv_standalone(venv_path):
         )
 
 
+def _find_bundle_resources(project_root):
+    """Retorna InstallNexe.app/Contents/Resources/ dins project_root si existeix.
+
+    És el directori on build_dmg.sh posa els subdirectoris `wheels/` (Python
+    wheels pre-descarregats) i `embeddings/` (model fastembed pre-descarregat)
+    per a l'offline install. Retorna None si l'app bundle no hi és — el flow
+    cau a online mode (PyPI + descàrrega a runtime), conservant el legacy.
+    """
+    candidate = project_root / "InstallNexe.app" / "Contents" / "Resources"
+    if candidate.is_dir():
+        return candidate
+    return None
+
+
+def _write_venv_pip_conf(venv_path, wheels_dir):
+    """Escriu venv/pip.conf per forçar pip a usar nomÉs wheels locals.
+
+    Efecte: totes les crides `pip install ...` posteriors dins el venv fan
+    servir `--find-links=wheels_dir --no-index` implícit. Zero tocar PyPI,
+    zero risc de compilació (no hi ha sdist a wheels_dir).
+
+    Retorna True si s'ha configurat, False si wheels_dir no és usable
+    (inexistent, no és dir, o està buit). En cas False, el caller cau a
+    online mode sense tocar el pip.conf.
+    """
+    if wheels_dir is None or not wheels_dir.is_dir():
+        return False
+    if not any(wheels_dir.glob("*.whl")):
+        return False
+    pip_conf = venv_path / "pip.conf"
+    pip_conf.write_text(
+        "[global]\n"
+        f"find-links = {wheels_dir}\n"
+        "no-index = true\n",
+        encoding="utf-8",
+    )
+    return True
+
+
+def _seed_fastembed_cache(bundle_embeddings_dir, cache_dir):
+    """Copia el bundle de fastembed al cache natiu de l'usuari.
+
+    Així, el primer `TextEmbedding(model_name)` que fa l'installer (via
+    `install.py`) troba el model ja present i no descarrega res de HuggingFace.
+    RAG funciona offline des del primer boot.
+
+    Retorna True si s'ha sembrat, False si el bundle no és usable (inexistent,
+    no és dir, o està buit). Idempotent: es pot cridar múltiples vegades.
+    """
+    import shutil as _shutil
+
+    if bundle_embeddings_dir is None or not bundle_embeddings_dir.is_dir():
+        return False
+    if not any(bundle_embeddings_dir.iterdir()):
+        return False
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    _shutil.copytree(
+        str(bundle_embeddings_dir),
+        str(cache_dir),
+        dirs_exist_ok=True,
+    )
+    return True
+
+
+def _default_fastembed_cache_dir():
+    """Ubicació del cache de fastembed per a l'usuari actual.
+
+    Respecta FASTEMBED_CACHE_DIR si està exportada (usada pel wizard al
+    dev Mac per redirigir el cache). Cau a `~/.cache/fastembed/` que és
+    la convenció cross-platform de fastembed.
+    """
+    env_override = os.environ.get("FASTEMBED_CACHE_DIR")
+    if env_override:
+        return Path(env_override).expanduser()
+    return Path.home() / ".cache" / "fastembed"
+
+
 def setup_environment(project_root, hw, engine="auto"):
     print_step(f"{BOLD}{t('setting_up_env')}{RESET}")
 
@@ -173,6 +250,19 @@ def setup_environment(project_root, hw, engine="auto"):
         pip_path = venv_path / "bin" / "pip3"
         python_path = venv_path / "bin" / "python3"
 
+    # Offline install: if the DMG bundle shipped wheels + embedding model,
+    # wire them in now. If the bundle is absent (e.g. running from a git
+    # checkout), everything below falls back to PyPI + HuggingFace at runtime
+    # (legacy behaviour preserved).
+    bundle_resources = _find_bundle_resources(project_root)
+    if bundle_resources is not None:
+        wheels_dir = bundle_resources / "wheels"
+        if _write_venv_pip_conf(venv_path, wheels_dir):
+            print(f"  📦 Offline install: wheels locals ({wheels_dir})")
+        embeddings_dir = bundle_resources / "embeddings"
+        if _seed_fastembed_cache(embeddings_dir, _default_fastembed_cache_dir()):
+            print("  📦 Embedding model disponible offline")
+
     # 1. Upgrade pip
     subprocess.run([str(pip_path), "install", "--upgrade", "pip"], capture_output=True)
 
@@ -205,25 +295,15 @@ def setup_environment(project_root, hw, engine="auto"):
         subprocess.run([str(pip_path), "install", "mlx-vlm==0.4.4"], check=True, capture_output=True)
 
     # Install llama-cpp-python always so users can switch engines from the UI
-    # (Motor dropdown) without re-running the installer. Size cost ~30MB with
-    # Metal. Previously gated on engine choice — left users with a dropdown
-    # option that failed silently on module init.
-    if True:
-        print(f"  🏗️ {t('installing_universal')} {CYAN}llama-cpp-python{RESET}...")
-        env = os.environ.copy()
-        if hw['is_apple_silicon']:
-            env["CMAKE_ARGS"] = "-DGGML_METAL=on"
-
-        try:
-            subprocess.run(
-                [str(pip_path), "install", "llama-cpp-python"],
-                env=env,
-                check=True,
-                capture_output=True
-            )
-            print_success(f"llama-cpp-python {t('installed_gpu')}")
-        except subprocess.CalledProcessError:
-            print_warn(t('gpu_failed'))
-            subprocess.run([str(pip_path), "install", "llama-cpp-python"], check=True, capture_output=True)
+    # (Motor dropdown). The arm64 macOS wheel published on PyPI (and the one
+    # bundled in offline mode) already ships with Metal enabled, so no
+    # source build and no Xcode Command Line Tools are required.
+    print(f"  🏗️ {t('installing_universal')} {CYAN}llama-cpp-python{RESET}...")
+    subprocess.run(
+        [str(pip_path), "install", "llama-cpp-python"],
+        check=True,
+        capture_output=True,
+    )
+    print_success(f"llama-cpp-python {t('installed_gpu')}")
 
     return python_path

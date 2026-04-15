@@ -25,9 +25,13 @@ set -euo pipefail
 
 # Flags
 NOTARIZE=true
-if [[ "${1:-}" == "--no-notarize" ]]; then
-    NOTARIZE=false
-fi
+SKIP_BUNDLES=false
+for arg in "$@"; do
+    case "$arg" in
+        --no-notarize)   NOTARIZE=false ;;
+        --skip-bundles)  SKIP_BUNDLES=true ;;  # reuse existing wheels+embeddings (dev iter)
+    esac
+done
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -50,6 +54,9 @@ NC='\033[0m'
 info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+# Exit code 14: offline-install bundles missing or too small. See
+# PLA-20260415-offline-install-bundle.md and skill /dmg-nexe.
+bundle_error() { echo -e "${RED}[ERROR]${NC} $1"; exit 14; }
 
 # ── Step 0: Preflight checks ────────────────────────────────────
 info "Preflight checks..."
@@ -264,6 +271,53 @@ fi
 # See docs/BUILDING.md for the full build flow.
 if [ ! -d "$RESOURCES/python" ]; then
     warn "No bundled Python runtime in app. Users will need system Python."
+fi
+
+# ── Step 5a: Build wheels bundle (offline install) ───────────────
+# Downloads all Python wheels as arm64 macOS 13+ binaries into
+# Resources/wheels/ so the client installer runs `pip install` with
+# --no-index --find-links, without ever touching PyPI or compiling.
+# Net effect: zero Xcode Command Line Tools prompt at install time.
+WHEELS_DIR="$RESOURCES/wheels"
+EMBEDDINGS_DIR="$RESOURCES/embeddings"
+
+if [ "$SKIP_BUNDLES" = true ]; then
+    warn "Skipping bundle rebuild (--skip-bundles) — reusing existing bundles"
+else
+    info "Building Python wheels bundle (~220 MB, arm64 macOS 13+)..."
+    if ! bash "$SCRIPT_DIR/build-wheels-bundle.sh"; then
+        bundle_error "build-wheels-bundle.sh failed. DMG would require online install."
+    fi
+    info "  Wheels bundle ready"
+
+    info "Building embedding model bundle (~470 MB)..."
+    if ! bash "$SCRIPT_DIR/build-embedding-bundle.sh"; then
+        bundle_error "build-embedding-bundle.sh failed. DMG would lack RAG at first boot."
+    fi
+    info "  Embedding bundle ready"
+fi
+
+# ── Step 5b: Validate bundle sizes (exit 14 on failure) ──────────
+# These checks catch silent failures of the build scripts (e.g. all
+# caches already populated, empty download) before we ship a DMG that
+# would fail at install time on the client machine.
+if [ ! -d "$WHEELS_DIR" ]; then
+    bundle_error "Wheels bundle missing at $WHEELS_DIR"
+fi
+if [ ! -d "$EMBEDDINGS_DIR" ]; then
+    bundle_error "Embedding bundle missing at $EMBEDDINGS_DIR"
+fi
+
+WHEELS_SIZE_MB=$(du -sm "$WHEELS_DIR" | cut -f1)
+EMBEDDINGS_SIZE_MB=$(du -sm "$EMBEDDINGS_DIR" | cut -f1)
+info "  Wheels:     ${WHEELS_SIZE_MB} MB"
+info "  Embeddings: ${EMBEDDINGS_SIZE_MB} MB"
+
+if [ "$WHEELS_SIZE_MB" -lt 100 ]; then
+    bundle_error "Wheels bundle only ${WHEELS_SIZE_MB} MB — expected 100+ MB."
+fi
+if [ "$EMBEDDINGS_SIZE_MB" -lt 400 ]; then
+    bundle_error "Embedding bundle only ${EMBEDDINGS_SIZE_MB} MB — expected 400+ MB."
 fi
 
 # ── Step 6: Code sign app bundle ──────────────────────────────────

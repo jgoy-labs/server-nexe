@@ -55,9 +55,12 @@ class LlamaCppModule:
         except ImportError:
             logger.error(
                 "LlamaCppModule: llama-cpp-python not installed. "
-                "Module will NOT be available. Install with: "
-                "CMAKE_ARGS='-DLLAMA_METAL=on' pip install --force-reinstall "
-                "--no-cache-dir llama-cpp-python"
+                "Module will NOT be available. "
+                "Reinstall the Nexe DMG (recommended), or from the venv run: "
+                "pip install llama-cpp-python "
+                "(the arm64 macOS PyPI wheel already ships with Metal — "
+                "forcing a source build is NOT necessary and will fail on "
+                "clean Macs without Xcode Command Line Tools)."
             )
             self._initialized = False
             return False
