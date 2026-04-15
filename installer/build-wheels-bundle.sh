@@ -2,11 +2,13 @@
 # ────────────────────────────────────────────────────────────────────────
 # build-wheels-bundle.sh
 # Downloads all Python wheels (requirements.txt + requirements-macos.txt +
-# inference engines) as arm64 macOS 13+ binaries into
+# inference engines) as arm64 macOS 14+ binaries into
 # InstallNexe.app/Contents/Resources/wheels/ so the client installer can
 # run "pip install --no-index --find-links wheels/" 100% offline.
 #
-# Target: Apple Silicon (arm64), macOS 13 Ventura or newer, Python 3.12.
+# Target: Apple Silicon (arm64), macOS 14 Sonoma or newer, Python 3.12.
+# (macOS 13 Ventura was dropped 2026-04-16: mlx 0.30.4+ — required by our
+# pinned mlx-lm 0.31.2 — ships wheels only for macosx_14_0_arm64+.)
 # Requires: network access + recent pip at build time (dev Mac).
 # Produces: ~220 MB of wheels. Fails clearly if any wheel is missing.
 # ────────────────────────────────────────────────────────────────────────
@@ -20,7 +22,7 @@ WHEELS_DIR="$RESOURCES/wheels"
 
 PY_TARGET_VERSION="3.12"
 PY_TARGET_ABI="cp312"
-PLATFORM_TAG="macosx_13_0_arm64"
+PLATFORM_TAG="macosx_14_0_arm64"
 
 REQ_BASE="$PROJECT_ROOT/requirements.txt"
 REQ_MACOS="$PROJECT_ROOT/requirements-macos.txt"
@@ -69,7 +71,7 @@ rm -rf "$WHEELS_DIR"
 mkdir -p "$WHEELS_DIR"
 
 # ── Step 3: Download wheels ────────────────────────────────────────────
-echo "==> Downloading wheels (only-binary, arm64 macOS 13+, cp312)..."
+echo "==> Downloading wheels (only-binary, arm64 macOS 14+, cp312)..."
 
 # Common pip download flags:
 #   --only-binary=:all:      reject source distributions (no compilation needed)
