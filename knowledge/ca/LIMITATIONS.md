@@ -49,7 +49,6 @@ Limitacions actuals:
 - **Model per defecte recomanat:** `gemma-4-e4b-4bit` (4.9 GB) o `gemma-4-31b-8bit` (20 GB). Imatge only, sense dependencies torch.
 - **Audio/veu:** No suportat. Models com Qwen3-Omni, Kimi-VL o DeepSeek-VL-V2 tenen branch d'audio a `mlx-vlm` pero el pipeline de server-nexe encara no el exposa.
 - **Video nativament:** No suportat (veure omni-models).
-- **Streaming de resposta VLM:** El flux actual (`_generate_vlm`) no suporta streaming token-a-token; envia el text complet al final. Text-only si que te streaming.
 
 ## Limitacions del RAG
 
