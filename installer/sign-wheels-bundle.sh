@@ -78,10 +78,15 @@ for whl in "$WHEELS_DIR"/*.whl; do
     rm -rf "$WORK"
     mkdir -p "$WORK"
 
-    # Unzip is tolerant to corrupt CRC-32 on individual members.
-    # Warnings (exit 1) are fine as long as the .so files extract clean —
-    # we'll re-verify signatures afterwards.
-    (cd "$WORK" && unzip -q "$whl" 2>/dev/null) || true
+    # Use Apple's `ditto -x -k` rather than `unzip -q`. Some wheels (the
+    # llama_cpp_python Metal wheel from abetlen's index is the canonical
+    # example) ship a zip64 central directory whose local-header offsets
+    # macOS `unzip` parses incorrectly — it skips every member past the
+    # break, exits 0, and leaves the critical lib/*.dylib files out. ditto
+    # handles the same archive cleanly (verified on submission
+    # ee85d2ec-ffb4-4d6f-88a6-d3c07f398cc7). zipfile also chokes here
+    # because the same wheel has a corrupt CRC-32 on a stray CMake file.
+    ditto -x -k "$whl" "$WORK" 2>/dev/null || true
 
     BIN_COUNT=0
     while IFS= read -r -d '' sofile; do
