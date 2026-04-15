@@ -82,7 +82,7 @@ class TestWebUIModuleInit:
         assert module.metadata.name == "web_ui_module"
 
     def test_metadata_version(self, module):
-        assert module.metadata.version == "0.9.8"
+        assert module.metadata.version == "0.9.9"
 
     def test_initialize_returns_true(self, tmp_path, monkeypatch):
         monkeypatch.setenv("NEXE_API_BASE_URL", "http://127.0.0.1:9119")

@@ -288,6 +288,18 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         memory_helper = _get_memory_helper()
         intent, extracted_content = memory_helper.detect_intent(message)
 
+        # Bug #18 P0: if a clear_all confirmation is pending from the previous turn,
+        # hijack the intent before the normal dispatch. This means a user who just
+        # got asked "are you sure?" can answer "sí" / "yes" / "esborra-ho tot" and
+        # have the nuke executed. If the reply doesn't match confirmation patterns,
+        # we clear the pending flag and let the message fall through as normal chat.
+        if getattr(session, "_pending_clear_all", False):
+            if memory_helper.matches_clear_all_confirm(message):
+                intent = "clear_all_confirm"
+            else:
+                session._pending_clear_all = False
+                # fall through with original intent (could be chat, save, delete, etc.)
+
         response_text = ""
         memory_action = None
         model_name = None
@@ -380,6 +392,43 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             else:
                 response_text = "\x00[MODEL:nexe-system]\x00No memories stored."
             memory_action = "list"
+
+        elif intent == "clear_all":
+            # Bug #18 P0: "Oblida tot" / "Forget everything" — arm the 2-turn
+            # confirmation. The actual wipe only happens on the next user message
+            # if it matches CLEAR_ALL_CONFIRM_TRIGGERS (see the intent hijack above).
+            session._pending_clear_all = True
+            response_text = (
+                "\x00[MODEL:nexe-system]\x00"
+                "Segur que vols esborrar TOTA la memòria personal? "
+                "Aquesta acció és irreversible. "
+                'Respon "sí, esborra-ho tot" per confirmar, '
+                "o qualsevol altra cosa per cancel·lar."
+            )
+            memory_action = "clear_all_pending"
+
+        elif intent == "clear_all_confirm":
+            # Hijacked from a pending clear_all. Execute the full wipe.
+            session._pending_clear_all = False
+            try:
+                clear_result = await memory_helper.clear_memory(confirm=True)
+                if clear_result.get("success"):
+                    response_text = (
+                        "\x00[MODEL:nexe-system]\x00"
+                        "✓ Memòria personal esborrada completament. "
+                        "Ja no recordo res sobre tu."
+                    )
+                    # Mark a synthetic deleted count so the UI badge shows
+                    _mem_deleted = max(_mem_deleted, 1)
+                    logger.info("clear_all executed via 2-turn confirmation (session=%s)", session.id)
+                else:
+                    _err = str(clear_result.get("message", "unknown"))
+                    response_text = f"\x00[MODEL:nexe-system]\x00Error esborrant la memòria: {_err}"
+                    logger.warning("clear_all failed: %s", _err)
+            except Exception as _clear_err:
+                response_text = f"\x00[MODEL:nexe-system]\x00Error esborrant la memòria: {_clear_err}"
+                logger.error("clear_all exception: %s", _clear_err)
+            memory_action = "clear_all"
 
         elif intent == "recall":
             # Recall intent: DON'T show raw results, use LLM with memory context

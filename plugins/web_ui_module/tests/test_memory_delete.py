@@ -190,6 +190,107 @@ class TestDetectDeleteMidSentence:
 
 
 # ═══════════════════════════════════════════════════════════════
+# BUG #18 — clear_all intent (wipe entire memory with confirmation)
+# ═══════════════════════════════════════════════════════════════
+
+class TestDetectClearAllIntent:
+    """BUG #18 P0: 'Oblida tot' must be clear_all, not delete('tot')."""
+
+    def test_catalan_oblida_tot(self, mh):
+        intent, content = mh.detect_intent("Oblida tot")
+        assert intent == "clear_all"
+        assert content is None
+
+    def test_catalan_oblida_ho_tot(self, mh):
+        intent, _ = mh.detect_intent("Oblida-ho tot")
+        assert intent == "clear_all"
+
+    def test_catalan_esborra_tot(self, mh):
+        intent, _ = mh.detect_intent("Esborra tot el que saps")
+        assert intent == "clear_all"
+
+    def test_catalan_esborra_memoria_sencera(self, mh):
+        intent, _ = mh.detect_intent("Esborra la memòria sencera")
+        assert intent == "clear_all"
+
+    def test_spanish_olvida_todo(self, mh):
+        intent, _ = mh.detect_intent("Olvida todo")
+        assert intent == "clear_all"
+
+    def test_spanish_olvidalo_todo(self, mh):
+        intent, _ = mh.detect_intent("Olvídalo todo")
+        assert intent == "clear_all"
+
+    def test_spanish_borra_memoria_entera(self, mh):
+        intent, _ = mh.detect_intent("Borra la memoria entera")
+        assert intent == "clear_all"
+
+    def test_english_forget_everything(self, mh):
+        intent, _ = mh.detect_intent("Forget everything")
+        assert intent == "clear_all"
+
+    def test_english_delete_all_memories(self, mh):
+        intent, _ = mh.detect_intent("Delete all memories")
+        assert intent == "clear_all"
+
+    def test_english_wipe_memory(self, mh):
+        intent, _ = mh.detect_intent("Wipe all my memories")
+        assert intent == "clear_all"
+
+    def test_clear_all_precedence_over_delete(self, mh):
+        """Regression guard: 'Oblida tot' must NOT fall through to delete('tot')."""
+        intent, content = mh.detect_intent("Oblida tot")
+        assert intent != "delete"
+        assert content is None
+
+    def test_specific_delete_still_works(self, mh):
+        """Guard: 'Oblida que em dic Joan' is still a normal delete, not clear_all."""
+        intent, content = mh.detect_intent("Oblida que em dic Joan")
+        assert intent == "delete"
+        assert "em dic Joan" in content
+
+    def test_chat_mentioning_forget_not_triggered(self, mh):
+        """Negative: topics about forgetting must not trigger clear_all."""
+        intent, _ = mh.detect_intent("How do I forget old commands in bash history?")
+        assert intent == "chat"
+
+
+class TestClearAllConfirm:
+    """BUG #18 P0: confirmation matcher for the 2-turn clear_all flow."""
+
+    def test_short_si(self, mh):
+        assert mh.matches_clear_all_confirm("sí")
+        assert mh.matches_clear_all_confirm("sí.")
+        assert mh.matches_clear_all_confirm("Sí,")
+
+    def test_short_yes(self, mh):
+        assert mh.matches_clear_all_confirm("yes")
+        assert mh.matches_clear_all_confirm("YES")
+
+    def test_si_esborra_tot(self, mh):
+        assert mh.matches_clear_all_confirm("sí, esborra-ho tot")
+        assert mh.matches_clear_all_confirm("sí esborra tot")
+
+    def test_yes_delete_everything(self, mh):
+        assert mh.matches_clear_all_confirm("yes, delete everything")
+        assert mh.matches_clear_all_confirm("yes wipe all")
+
+    def test_confirmo(self, mh):
+        assert mh.matches_clear_all_confirm("confirmo")
+        assert mh.matches_clear_all_confirm("confirm")
+
+    def test_endavant(self, mh):
+        assert mh.matches_clear_all_confirm("endavant")
+        assert mh.matches_clear_all_confirm("go ahead")
+
+    def test_no_match_for_random_chat(self, mh):
+        assert not mh.matches_clear_all_confirm("què recordes de mi?")
+        assert not mh.matches_clear_all_confirm("hola, com estàs?")
+        assert not mh.matches_clear_all_confirm("no, cancel")
+        assert not mh.matches_clear_all_confirm("sí que m'agrada el cafè")  # "sí que" ≠ confirm
+
+
+# ═══════════════════════════════════════════════════════════════
 # detect_intent — intent LIST
 # ═══════════════════════════════════════════════════════════════
 
@@ -309,9 +410,16 @@ class TestDeleteFromMemory:
         assert result["deleted"] == 0
         assert result["deleted_facts"] == []
 
-    def test_delete_uses_threshold_070(self):
-        """Verify DELETE_THRESHOLD constant is 0.70."""
-        assert DELETE_THRESHOLD == 0.70
+    def test_delete_uses_threshold_020(self):
+        """Verify DELETE_THRESHOLD constant is 0.20.
+
+        History: 0.82 → 0.70 (multilingual embeddings) → 0.55 → 0.20
+        (bug #18 e2e 2026-04-15). Empirical finding: even verbatim
+        queries scored below 0.55 with fastembed+paraphrase-multilingual.
+        0.20 guarantees the fact gets found at the cost of occasional
+        loose-match deletes. UX tradeoff accepted — 'forget' should
+        actually forget."""
+        assert DELETE_THRESHOLD == 0.20
 
     def test_delete_passes_threshold_to_search(self):
         mem = make_memory_mock(search_results=[])

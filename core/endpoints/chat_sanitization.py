@@ -52,6 +52,13 @@ _RAG_INJECTION_PATTERNS = [
     re.compile(r'<\|/?assistant\|>', re.IGNORECASE),    # Assistant role markers
     re.compile(r'###\s*(system|user|assistant)', re.IGNORECASE),  # Role headers
     re.compile(r'\[CONTEXT[^\]]*\]', re.IGNORECASE),    # Our own context markers
+    # Bug #18 P0: memory tags in RAG content can escalate to unauthorized deletes/saves.
+    # A malicious uploaded document can embed [MEM_DELETE: ...] — the LLM may copy it
+    # into its response, which the pipeline then executes. Neutralize at ingest + retrieval.
+    re.compile(r'\[MEM_DELETE:[^\]]{1,250}\]', re.IGNORECASE),
+    re.compile(r'\[MEM_SAVE:[^\]]{1,250}\]', re.IGNORECASE),
+    re.compile(r'\[(?:OLVIDA|OBLIT|FORGET):[^\]]{1,250}\]', re.IGNORECASE),  # MEM_DELETE aliases
+    re.compile(r'\[MEMORIA:[^\]]{1,250}\]', re.IGNORECASE),                   # MEM_SAVE alias (gpt-oss)
 ]
 
 def _filter_rag_injection(text: str) -> str:
