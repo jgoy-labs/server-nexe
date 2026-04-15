@@ -6,10 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-Bugs instal·lació neta + core backend.
+## [0.9.8] - 2026-04-15
+
+Robust VLM detection + mlx-vlm 0.4 API port + installer / KB updates.
 
 ### Fixed
 
+- **MLX VLM detection (silent degrade)**: `_detect_vlm_capability()` now combines
+  three any-of signals: `architectures[]` (expanded set with Qwen2_5_VL, Qwen3VL,
+  Qwen3_5Moe, Gemma4, LlavaOnevision, InternVL2, MiniCPMV, Idefics3, Mllama),
+  `vision_config` presence, and `model.safetensors.index.json` weight map keys
+  (`vision_tower`, `vision_model`, `visual.`, `mm_projector`, `image_newline`,
+  `patch_embed`). Previously unknown VLM architectures fell through to `mlx_lm`
+  and dumped 333 unmatched tensor names to the UI (Qwen3.5-MoE case).
+- **_generate_vlm ported to mlx-vlm ≥ 0.4**: (1) `image=` now expects str path or
+  List[str], not PIL.Image — incoming bytes are written to a NamedTemporaryFile
+  and its path is passed (cleanup in `finally`). (2) `generate()` returns a
+  `GenerationResult` dataclass, not raw str — we extract `.text` and map real
+  metrics (`prompt_tokens`, `generation_tokens`, `prompt_tps`, `generation_tps`,
+  `peak_memory`) into the response dict. Legacy str-result fallback kept.
 - **llama_cpp VLM passthrough (BUG #9)**: images were extracted in `execute()` but never
   passed to `_generate()`/`_generate_streaming()`. Added VLM bifurcation with dedicated
   `_generate_vlm()`/`_generate_vlm_streaming()` methods (consistent with MLX pattern).
@@ -17,7 +32,6 @@ Bugs instal·lació neta + core backend.
 - **Versions hardcoded (BUG #10)**: 16+ locations had stale 0.9.0/0.9.1/1.0.0 strings.
   Created `core/version.py` (reads from `pyproject.toml` via `tomllib`) as single source
   of truth. All Python files now import `__version__`; Info.plist updated to 0.9.7.
-
 - **Readiness check (P0)**: `ollama_module`, `mlx_module`, `llama_cpp_module` now return
   `DEGRADED` (not `UNHEALTHY`) when the LLM backend is unavailable (Ollama not running,
   model not loaded). The Web UI was blocked at "Iniciant..." on fresh installs because
@@ -32,6 +46,26 @@ Bugs instal·lació neta + core backend.
 - **Login item path** (`doAddLoginItem`) also fixed to use `engine.installPath`.
 - **Logo glitch** on "Iniciant..." overlay: switched from `logo.png` to `logo.svg` for
   crisp rendering at all resolutions without pixel artifacts.
+
+### Changed
+
+- **Installer pins**: `mlx-lm 0.30.7 → 0.31.2` and `mlx-vlm 0.1.27 → 0.4.4`
+  (adds support for gemma4, qwen3_5_moe, qwen3_vl, llava_onevision, and the
+  full modern VLM zoo). Side effect: `numpy 1.26 → 2.4` and `opencv 4.10 →
+  4.13`. Full test suite rerun after upgrade: 4679 passed, zero regressions
+  (the 11 pre-existing failures on readiness/i18n unchanged).
+- **Knowledge base**: new "Multimodal models (VLM)" section in
+  `knowledge/{ca,es,en}/LIMITATIONS.md` documenting supported architectures,
+  detection heuristics, torch dependency requirements for omni-video models
+  (Qwen3.5-MoE, Qwen3-Omni, Kimi-VL — NOT bundled in the DMG for size),
+  recommended default `gemma-4-e4b-4bit` / `gemma-4-31b-8bit`, and current
+  pipeline gaps (no audio, no native video, no VLM streaming yet).
+
+### Tests
+
+- +9 tests in `plugins/mlx_module/tests/test_multimodal.py` (12 → 21): new
+  architectures, `vision_config` detector, safetensors weight-map detector,
+  malformed JSON safety, `_generate_vlm` path + GenerationResult extraction.
 
 ## [0.9.7] - 2026-04-12
 

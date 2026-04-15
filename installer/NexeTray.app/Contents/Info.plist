@@ -2,29 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>Nexe</string>
-    <key>CFBundleDisplayName</key>
-    <string>Nexe</string>
-    <key>CFBundleIdentifier</key>
-    <string>net.servernexe.tray</string>
-    <key>CFBundleVersion</key>
-    <string>0.9.7</string>
-    <key>CFBundleShortVersionString</key>
-    <string>0.9.7</string>
-    <key>CFBundleExecutable</key>
-    <string>NexeTray</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleSignature</key>
-    <string>????</string>
-    <key>LSUIElement</key>
-    <true/>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-    <key>LSMinimumSystemVersion</key>
-    <string>12.0</string>
+	<key>CFBundleDisplayName</key>
+	<string>Nexe</string>
+	<key>CFBundleExecutable</key>
+	<string>NexeTray</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>net.servernexe.tray</string>
+	<key>CFBundleName</key>
+	<string>Nexe</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.9.8</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>0.9.8</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
 </dict>
 </plist>
