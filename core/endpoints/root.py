@@ -50,6 +50,13 @@ def _normalize_engine(engine: str) -> str:
   return value
 
 def _required_modules_from_config(config: dict) -> set:
+  # Inference engines are OPTIONAL at readiness time. A user can have all
+  # three approved (so the Motor dropdown shows them) but only have a model
+  # configured for one. Marking a modelless engine as required made the
+  # whole UI bail with status=unhealthy — unusable first-run UX. Only the
+  # actively-selected engine (preferred_engine) stays required.
+  OPTIONAL_ENGINES = {"mlx_module", "llama_cpp_module", "ollama_module"}
+
   required = set()
   modules_cfg = config.get("plugins", {}).get("modules", {})
   enabled = set(modules_cfg.get("enabled", []))
@@ -59,7 +66,9 @@ def _required_modules_from_config(config: dict) -> set:
   if approved_env:
     approved = {m.strip() for m in approved_env.split(",") if m.strip()}
     enabled = enabled & approved  # only require modules that are both enabled AND approved
-  required.update(enabled)
+  # Drop optional engines from the core requirement set; the preferred one is
+  # re-added below if explicitly selected.
+  required.update(enabled - OPTIONAL_ENGINES)
 
   preferred_engine = _normalize_engine(
     config.get("plugins", {}).get("models", {}).get("preferred_engine", "")
@@ -69,7 +78,9 @@ def _required_modules_from_config(config: dict) -> set:
     "mlx": "mlx_module",
     "llama_cpp": "llama_cpp_module",
   }
-  if preferred_engine in engine_map:
+  # Only require the preferred engine if it's both configured and enabled.
+  # "auto" or empty → no engine required (user can pick at runtime).
+  if preferred_engine in engine_map and engine_map[preferred_engine] in enabled:
     required.add(engine_map[preferred_engine])
 
   return required
