@@ -37,15 +37,21 @@ ENGINES=(
 [ -f "$REQ_BASE" ] || { echo "ERROR: $REQ_BASE not found" >&2; exit 1; }
 [ -f "$REQ_MACOS" ] || { echo "ERROR: $REQ_MACOS not found" >&2; exit 1; }
 
-# Use host python3 (build Mac is expected to have Python 3.12 available).
-# pip download does not execute setup.py for wheel-only downloads, so host
-# Python version only needs to be new enough to run pip itself.
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "ERROR: python3 not found in PATH" >&2
+# Use the bundled Python 3.12 (not host python3). pip resolves dependency
+# environment markers (python_version, platform_system, …) against the
+# *running* interpreter even when --python-version/--platform/--abi are
+# given. On build Macs with Python 3.13+ installed system-wide, markers
+# like `numpy>=2.1.0 ; python_version >= "3.13"` fire and break resolution
+# against numpy==1.26.4 pinned for our 3.12 target. Driving pip with the
+# bundle's 3.12 makes markers resolve correctly.
+BUNDLE_PY="$APP_DIR/Contents/Resources/python/bin/python3"
+if [ ! -x "$BUNDLE_PY" ]; then
+    echo "ERROR: bundled Python not found at $BUNDLE_PY" >&2
+    echo "       Run installer/build-python-bundle.sh first." >&2
     exit 1
 fi
 
-PIP_BIN=(python3 -m pip)
+PIP_BIN=("$BUNDLE_PY" -m pip)
 
 echo "==> Building wheels bundle"
 echo "    Platform: $PLATFORM_TAG"
