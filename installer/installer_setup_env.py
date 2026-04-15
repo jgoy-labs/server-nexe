@@ -197,10 +197,12 @@ def setup_environment(project_root, hw, engine="auto"):
     if hw['is_apple_silicon']:
         print(f"   {t('detected_apple')} {CYAN}mlx-lm{RESET} + {CYAN}mlx-vlm{RESET}...")
         print(f"   {DIM}{t('mlx_dep_warning_title')} {t('mlx_dep_warning_body')}{RESET}")
-        # Pin to 0.30.7: first version with qwen3_5 architecture support.
-        subprocess.run([str(pip_path), "install", "mlx-lm==0.30.7"], check=True, capture_output=True)
-        # mlx-vlm 0.1.27: VLM multimodal (Qwen2-VL, LLaVA, etc). Compatible amb mlx-lm 0.30.7.
-        subprocess.run([str(pip_path), "install", "mlx-vlm==0.1.27"], check=True, capture_output=True)
+        # mlx-lm 0.31.2: suport qwen3_5 + compatible mlx-vlm 0.4.4.
+        subprocess.run([str(pip_path), "install", "mlx-lm==0.31.2"], check=True, capture_output=True)
+        # mlx-vlm 0.4.4: suport ampli VLM (gemma4, qwen3_5_moe, qwen3_vl, llava,
+        # paligemma, internvl, …). Retorna GenerationResult i exigeix image=path.
+        # Arrossega numpy 2.x — verificat zero regressions a full suite.
+        subprocess.run([str(pip_path), "install", "mlx-vlm==0.4.4"], check=True, capture_output=True)
 
     # Install llama-cpp-python always so users can switch engines from the UI
     # (Motor dropdown) without re-running the installer. Size cost ~30MB with

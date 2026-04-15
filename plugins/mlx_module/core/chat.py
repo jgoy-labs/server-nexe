@@ -41,28 +41,83 @@ logger = logging.getLogger(__name__)
 
 # Arquitectures VLM conegudes (config.json → architectures[])
 _VLM_ARCHITECTURES = {
+    # Qwen VL family
     "Qwen2VLForConditionalGeneration",
+    "Qwen2_5_VLForConditionalGeneration",
+    "Qwen3VLForConditionalGeneration",
+    "Qwen3_5MoeForConditionalGeneration",
+    # Llava family
     "LlavaNextForConditionalGeneration",
     "LlavaForConditionalGeneration",
+    "LlavaOnevisionForConditionalGeneration",
+    # Google
     "PaliGemmaForConditionalGeneration",
     "Gemma3ForConditionalGeneration",
+    "Gemma4ForConditionalGeneration",
+    # InternVL
     "InternVLChatModel",
+    "InternVL2ChatModel",
+    # Others
+    "MiniCPMV",
+    "Idefics3ForConditionalGeneration",
+    "MllamaForConditionalGeneration",
 }
 
 
+# Patrons de keys vision al safetensors weight map (fallback quan architectura és desconeguda)
+_VLM_WEIGHT_PATTERNS = (
+    "vision_tower",
+    "vision_model",
+    "visual.",
+    "mm_projector",
+    "image_newline",
+    "patch_embed",
+)
+
+
 def _detect_vlm_capability(model_path: str) -> bool:
-    """Llegeix config.json del model per detectar si és VLM (text + visió)."""
+    """Detecta si el model és VLM combinant 3 senyals (any-of):
+
+    1. config.json → architectures[] conté una arquitectura VLM coneguda
+    2. config.json → conté vision_config (senyal estàndard HF)
+    3. model.safetensors.index.json → weight_map té keys vision (vision_tower,
+       vision_model, visual., mm_projector, ...)
+
+    El darrer pas cobreix models mal etiquetats o arquitectures noves.
+    """
     if not model_path:
         return False
-    config_path = Path(model_path) / "config.json"
+    root = Path(model_path)
+    config_path = root / "config.json"
     if not config_path.exists():
         return False
+
+    # 1 + 2: inspecció config.json
     try:
         config = json.loads(config_path.read_text())
-        archs = set(config.get("architectures", []))
-        return bool(_VLM_ARCHITECTURES & archs)
     except Exception:
         return False
+
+    archs = set(config.get("architectures", []))
+    if archs & _VLM_ARCHITECTURES:
+        return True
+    if "vision_config" in config and config.get("vision_config"):
+        return True
+
+    # 3: inspecció safetensors weight map (multi-shard)
+    index_path = root / "model.safetensors.index.json"
+    try:
+        if index_path.exists():
+            idx = json.loads(index_path.read_text())
+            wm = idx.get("weight_map", {})
+            for key in wm:
+                if any(p in key for p in _VLM_WEIGHT_PATTERNS):
+                    return True
+    except Exception:
+        # inspecció opcional; no bloquejar decisió si el JSON falla
+        pass
+
+    return False
 
 
 class MLXChatNode:
@@ -278,11 +333,15 @@ class MLXChatNode:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Generació VLM amb mlx_vlm (text + imatge). Usa mlx_vlm.generate()."""
-        import io
+        """Generació VLM amb mlx_vlm (text + imatge). Usa mlx_vlm.generate().
+
+        API mlx-vlm ≥ 0.4: `image` és path (str) o list de paths, i `generate()`
+        retorna `GenerationResult` amb .text + mètriques reals (no string pelat).
+        """
+        import os
+        import tempfile
         from mlx_vlm import generate as vlm_generate
         from mlx_vlm.prompt_utils import apply_chat_template
-        from PIL import Image
 
         model, processor = self._get_model()
 
@@ -294,35 +353,55 @@ class MLXChatNode:
             num_images=1,
         )
 
-        # Prepara la imatge (primera del array)
-        pil_image = Image.open(io.BytesIO(images[0]))
-
-        start_time = time.time()
-        text = vlm_generate(
-            model=model,
-            processor=processor,
-            image=pil_image,
-            prompt=formatted_prompt,
-            max_tokens=max_tokens or self.config.max_tokens,
-            verbose=False,
+        # mlx-vlm 0.4 espera path de fitxer — escriu bytes a tempfile
+        tmp = tempfile.NamedTemporaryFile(
+            prefix="nexe_vlm_", suffix=".img", delete=False
         )
+        try:
+            tmp.write(images[0])
+            tmp.flush()
+            tmp.close()
+
+            start_time = time.time()
+            result = vlm_generate(
+                model=model,
+                processor=processor,
+                image=tmp.name,
+                prompt=formatted_prompt,
+                max_tokens=max_tokens or self.config.max_tokens,
+                verbose=False,
+            )
+        finally:
+            try:
+                os.unlink(tmp.name)
+            except OSError:
+                pass
+
+        # mlx-vlm ≥ 0.4 retorna GenerationResult (dataclass), no str
+        text = result.text if hasattr(result, "text") else str(result)
+        prompt_tokens = getattr(result, "prompt_tokens", 0)
+        gen_tokens = getattr(result, "generation_tokens", len(text.split()))
+        prompt_tps = getattr(result, "prompt_tps", 0) or 0
+        gen_tps = getattr(result, "generation_tps", 0) or 0
+        peak_memory = getattr(result, "peak_memory", 0) or 0
 
         if stream_callback:
             stream_callback(text)
 
         elapsed_ms = int((time.time() - start_time) * 1000)
-        tokens = len(text.split())  # Estimació
 
         return {
             "text": text,           # Format consistent amb extract_metrics()
-            "tokens": tokens,
-            "tokens_per_second": round(tokens / max(elapsed_ms / 1000, 0.001), 1),
-            "prompt_tokens": 0,
+            "tokens": gen_tokens,
+            "tokens_per_second": round(gen_tps, 1) if gen_tps else round(
+                gen_tokens / max(elapsed_ms / 1000, 0.001), 1
+            ),
+            "prompt_tokens": prompt_tokens,
             "prefix_reused": False,
             "cached_tokens": 0,
-            "actual_prefill_tokens": 0,
-            "prompt_tps": 0,
-            "peak_memory_mb": 0,
+            "actual_prefill_tokens": prompt_tokens,
+            "prompt_tps": round(prompt_tps, 1),
+            "peak_memory_mb": round(peak_memory, 1),
             "identity_hash": "",
             "vlm": True,            # Flag extra per indicar mode VLM
         }
