@@ -71,6 +71,7 @@ const UI_STRINGS = {
         doc_uploaded: "✅ Document \"{name}\" carregat{chunks} en {time}s.",
         doc_fragments: "fragments",
         doc_summarize: "Resumeix aquest document",
+        image_describe: "Descriu aquesta foto",
         doc_upload_error: "Error pujant el document",
     },
     en: {
@@ -139,6 +140,7 @@ const UI_STRINGS = {
         doc_uploaded: "✅ Document \"{name}\" uploaded{chunks} in {time}s.",
         doc_fragments: "chunks",
         doc_summarize: "Summarize this document",
+        image_describe: "Describe this photo",
         doc_upload_error: "Error uploading document",
     },
     es: {
@@ -207,6 +209,7 @@ const UI_STRINGS = {
         doc_uploaded: "✅ Documento \"{name}\" cargado{chunks} en {time}s.",
         doc_fragments: "fragmentos",
         doc_summarize: "Resume este documento",
+        image_describe: "Describe esta foto",
         doc_upload_error: "Error subiendo el documento",
     }
 };
@@ -859,15 +862,31 @@ class NexeUI {
                 const opt = document.createElement('option');
                 // Suport objecte {name, size_gb} o string legacy
                 const name = typeof m === 'object' ? m.name : m;
-                const sizeGb = typeof m === 'object' ? m.size_gb : 0;
                 opt.value = name;
-                opt.textContent = sizeGb > 0 ? `${name} (${sizeGb}GB)` : name;
+                // Mostra 👁️ si té visió (heurística per nom, evita confusió GB/RAM)
+                const hasVision = this._modelHasVision(name);
+                opt.textContent = hasVision ? `👁️ ${name}` : name;
                 if (currentModel && (currentModel.includes(name) || name.includes(currentModel))) {
                     opt.selected = true;
                 }
                 modelSel.appendChild(opt);
             }
         }
+    }
+
+    /// Heurística client-side: un model té visió (VLM) si el nom conté
+    /// famílies/tags multimodals coneguts. Equivalent al hasVision del Swift wizard.
+    _modelHasVision(name) {
+        const n = (name || '').toLowerCase();
+        const patterns = [
+            'qwen3.5', 'qwen3-vl', 'qwen2.5-vl', 'qwen-vl',
+            'gemma4', 'gemma-3-vision',
+            'llama4', 'llama-4', 'llama3.2-vision',
+            'pixtral', 'llava', 'moondream', 'bakllava',
+            'minicpm-v', 'internvl', 'cogvlm',
+            '-vl', '-vlm', 'vision', 'multimodal',
+        ];
+        return patterns.some(p => n.includes(p));
     }
 
     async _applyBackendChange() {
@@ -2117,7 +2136,9 @@ class NexeUI {
                 const chunkMsg = data.chunks_saved ? ` (${data.chunks_saved} ${this.t('doc_fragments')})` : '';
                 this.addMessageToChat('assistant', `${this.t('doc_uploaded').replace('{name}', data.filename).replace('{chunks}', chunkMsg).replace('{time}', elapsed)}\nℹ️ ${this.t('doc_chat_only')}`);
 
-                this.messageInput.value = this.t('doc_summarize');
+                // Bug #17: prompt específic per imatges vs documents
+                const isImage = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(data.filename || file.name || '');
+                this.messageInput.value = this.t(isImage ? 'image_describe' : 'doc_summarize');
                 this.messageInput.focus();
                 this.messageInput.select();
             } else {

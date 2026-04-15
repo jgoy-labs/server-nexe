@@ -197,6 +197,27 @@ class ServerState:
 
 server_state = ServerState()
 
+
+async def _prewarm_fastembed() -> None:
+    """B.1: Pre-warm fastembed ONNX runtime al startup (background, non-blocking).
+
+    Obté el singleton MemoryAPI (creat o reutilitzat per get_memory_api),
+    activa pre_warm a la instància i crida warmup(). No modifica els
+    defaults globals d'IngestConfig.
+    """
+    import time as _time
+    try:
+        from memory.memory.api.v1 import get_memory_api
+        memory_api = await get_memory_api()
+        memory_api.ingest_config.pre_warm = True
+        t0 = _time.perf_counter_ns()
+        await memory_api.warmup()
+        elapsed_ms = (_time.perf_counter_ns() - t0) / 1_000_000
+        logger.info("MemoryAPI: fastembed pre-warm complete (%.1fms)", elapsed_ms)
+    except Exception as exc:
+        logger.warning("MemoryAPI: fastembed pre-warm failed (non-fatal): %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
   """
@@ -445,6 +466,10 @@ async def lifespan(app: FastAPI):
         "Rate limit cleanup task started")
       logger.info(msg)
 
+    # B.1 — pre-warm fastembed ONNX runtime (background, non-blocking)
+    server_state._prewarm_task = asyncio.create_task(_prewarm_fastembed())
+    logger.info("MemoryAPI: fastembed pre-warm task scheduled")
+
     auto_clean_enabled = os.getenv('NEXE_AUTO_CLEAN_ENABLED', os.getenv('AUTO_CLEAN_ENABLED', 'false')).lower() == 'true'
     if auto_clean_enabled:
       try:
@@ -600,7 +625,7 @@ async def lifespan(app: FastAPI):
         logger.debug("ModuleManager kept alive (stateless registry)")
 
       # Cancel·la cleanup tasks en background (N04)
-      for _task_attr in ('_cleanup_task', '_session_cleanup_task'):
+      for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task'):
         _task = getattr(server_state, _task_attr, None)
         if _task is not None and not _task.done():
           _task.cancel()
