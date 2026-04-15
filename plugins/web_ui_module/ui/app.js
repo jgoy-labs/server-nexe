@@ -2034,8 +2034,28 @@ class NexeUI {
     }
 
     renderMarkdown(text) {
+        if (!text) return '';
+
+        // Bug #18 P1 follow-up: system markers leak into non-streamed
+        // responses (intent=save/delete/list/clear_all return a pre-built
+        // response_text with \x00[MODEL:nexe-system]\x00... delimiters;
+        // when that text is serialized to JSON the \x00 bytes are lost,
+        // so the client receives bare [MODEL:nexe-system] tokens and the
+        // streaming-path stripper never sees them. Also hits loadSession
+        // (persisted messages re-rendered from disk). Central strip here
+        // = single source of truth for every render path.
+        const cleaned = text
+            .replace(/\x00/g, '')                       // stray delimiters
+            .replace(/\[MODEL:[^\]]+\]/g, '')          // [MODEL:nexe-system]
+            .replace(/\[MEM(?::\d+)?\]/g, '')          // [MEM] and [MEM:N]
+            .replace(/\[DEL:\d+(?::[^\]]*)?\]/g, '')   // [DEL:N:facts]
+            .replace(/\[MEM_SAVE:[^\]]*\]/g, '')       // [MEM_SAVE: ...]
+            .replace(/\[MEM_DELETE:[^\]]*\]/g, '')     // [MEM_DELETE: ...]
+            .replace(/\[MEMORIA:[^\]]*\]/g, '')        // [MEMORIA: ...] gpt-oss alias
+            .trimStart();                               // leading whitespace after strip
+
         // Use marked.js to render Markdown
-        if (typeof marked !== 'undefined' && text) {
+        if (typeof marked !== 'undefined' && cleaned) {
             try {
                 // Override raw HTML renderer to prevent XSS injection via HTML blocks
                 const renderer = new marked.Renderer();
@@ -2044,13 +2064,13 @@ class NexeUI {
                     const raw = typeof token === 'string' ? token : (token.text || '');
                     return _escape(raw);
                 };
-                return marked.parse(text, { breaks: true, gfm: true, renderer });
+                return marked.parse(cleaned, { breaks: true, gfm: true, renderer });
             } catch (e) {
                 console.error('Markdown parsing error:', e);
-                return this.escapeHtml(text);
+                return this.escapeHtml(cleaned);
             }
         }
-        return this.escapeHtml(text);
+        return this.escapeHtml(cleaned);
     }
 
     // ── VLM image helpers ────────────────────────────────────────────────────
@@ -2301,7 +2321,9 @@ class NexeUI {
         if (this._renderTimer) return;
         this._renderTimer = setTimeout(() => {
             this._renderTimer = null;
-            el.innerHTML = this.renderMarkdown(content.replace(/\[MEM_SAVE:\s*.+?\]\s*/g, '').replace(/\[DEL:\d+:.+?\]/g, ''));
+            // renderMarkdown now centralizes the strip (bug #18 follow-up)
+            const _rendered = this.renderMarkdown(content);
+            el.innerHTML = _rendered;  // safe: renderMarkdown sanitizes via marked.js custom renderer
         }, 80);
     }
 
