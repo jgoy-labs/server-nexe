@@ -30,6 +30,7 @@ Amunt: [[nat/dev/server-nexe/index_server-nexe|Index server-nexe]]
 ---
 
 ## Sessions
+- [[nat/dev/server-nexe/diari/2026-04/20260415/20260415_director_session_bug18|🎬 Director sessió Opus 4.6 (vespre) — cirurgia #18 completa: auditoria + 8 commits + 2 fixes UX + sync gitoss. Resum executiu consolidat.]] (2026-04-15)
 - [[nat/dev/server-nexe/diari/2026-04/20260415/20260415_bug18_tancament|🎯 Bug #18 MEM_DELETE tancat — últim P0 pre-v1.0. 7 commits atòmics: security RAG injection, clear_all 2-torns, threshold 0.70→0.20 (e2e finding), tests e2e Qdrant real (8/8), bump 0.9.9, client strip markers, prompt atòmic. 4706 tests, 0 regressions.]] (2026-04-15)
 - [[nat/dev/server-nexe/diari/2026-04/20260415/20260415_bug18_auditoria|🔬 Bug #18 Auditoria Fase 1 — inventari, matriu gaps P0/P1/P2, GO Fase 2]] (2026-04-15)
 - [[nat/dev/server-nexe/diari/2026-04/20260415/20260415_vlm_gemma4_streaming|🎯 VLM Gemma-4 end-to-end: detector robust + mlx-vlm 0.4.4 + streaming + bump 0.9.8 + Gemma-4 oficials + fix system prompt/MEM_SAVE + Nexe.app duplicació documentada. 12 commits, 4 syncs gitoss, install neta validada text+imatge+streaming+memòria.]] (2026-04-15)
