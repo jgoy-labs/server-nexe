@@ -8,14 +8,23 @@
 # Why: wheels from PyPI ship .so/.dylib signed ad-hoc (or by the wheel
 # author) and without a secure timestamp. Apple Notarization rejects
 # the whole .app if any nested Mach-O binary lacks a valid Developer ID
-# signature. Signing the .so files before the DMG is built makes the
-# notarization pass (429 issues -> 0 in the run that motivated this
-# script: submission e4311642-9af8-4546-883e-25b8c03e148b, 2026-04-16).
+# signature.
 #
-# A wheel is a ZIP; we unpack, codesign each native file, re-pack. The
-# RECORD file inside the wheel carries sha256 hashes for each entry —
-# pip install does not re-check them at install time by default, but to
-# keep external tooling happy we regenerate RECORD after signing.
+# Hybrid pipeline (picked after two failures with pure-CLI and pure-Python
+# approaches, 2026-04-16 run):
+#   - Unpack:   `unzip -q`   — tolerates wheels with corrupt CRC-32 on
+#                              individual members (e.g. ggml-config.cmake
+#                              inside llama_cpp_python 0.3.20); Python
+#                              zipfile raises BadZipFile and aborts.
+#   - Sign:     `codesign`   — per-file with hardened runtime + timestamp.
+#   - Record:   Python       — sha256 + urlsafe-b64 per PEP 376.
+#   - Repack:   Python       — zipfile supports zip64 streams, while
+#                              `zip -X` corrupts offsets in zip64 wheels
+#                              (same llama wheel round-trips as garbage).
+#
+# Early skip for pure-Python wheels uses `grep -c … || true` because
+# `grep -q` closes the pipe, unzip dies with SIGPIPE, and `set -o pipefail`
+# then swallows every wheel as "no native binaries".
 # ────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -37,8 +46,9 @@ if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "Developer I
     exit 2
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "ERROR: python3 not found in PATH (needed to regenerate RECORD)" >&2
+BUNDLE_PY="$APP_DIR/Contents/Resources/python/bin/python3"
+if [ ! -x "$BUNDLE_PY" ]; then
+    echo "ERROR: bundled Python not found at $BUNDLE_PY" >&2
     exit 3
 fi
 
@@ -49,7 +59,6 @@ echo "==> Signing native binaries inside wheels"
 echo "    Certificate: $CERT"
 echo "    Wheels dir:  $WHEELS_DIR"
 
-# ── Step 2: Iterate wheels and sign ────────────────────────────────────
 TOTAL_WHEELS=0
 SIGNED_WHEELS=0
 SIGNED_BINARIES=0
@@ -58,11 +67,7 @@ for whl in "$WHEELS_DIR"/*.whl; do
     [ -f "$whl" ] || continue
     TOTAL_WHEELS=$((TOTAL_WHEELS + 1))
 
-    # Skip wheels that don't contain native binaries (pure-Python).
-    # NOTE: `grep -q` closes the pipe early, causing `unzip` to die with
-    # SIGPIPE; with `set -o pipefail` the whole pipe then reports failure
-    # and `if !` would swallow it as "no match". Use `grep -c` with `|| true`
-    # so the pipe always finishes cleanly and we inspect the count.
+    # Skip wheels without native binaries.
     so_count=$(unzip -l "$whl" 2>/dev/null | grep -cE '\.(so|dylib)$' || true)
     if [ "${so_count:-0}" -eq 0 ]; then
         continue
@@ -73,11 +78,11 @@ for whl in "$WHEELS_DIR"/*.whl; do
     rm -rf "$WORK"
     mkdir -p "$WORK"
 
-    (cd "$WORK" && unzip -q "$whl")
+    # Unzip is tolerant to corrupt CRC-32 on individual members.
+    # Warnings (exit 1) are fine as long as the .so files extract clean —
+    # we'll re-verify signatures afterwards.
+    (cd "$WORK" && unzip -q "$whl" 2>/dev/null) || true
 
-    # Sign every native file. --force replaces any ad-hoc signature;
-    # --timestamp adds the secure timestamp Apple notarization requires;
-    # --options runtime enables the hardened runtime (same as our app).
     BIN_COUNT=0
     while IFS= read -r -d '' sofile; do
         codesign --force --timestamp --options runtime \
@@ -86,64 +91,53 @@ for whl in "$WHEELS_DIR"/*.whl; do
     done < <(find "$WORK" -type f \( -name '*.so' -o -name '*.dylib' \) -print0)
 
     if [ "$BIN_COUNT" -eq 0 ]; then
-        # Should not happen after the unzip -l filter, but stay safe.
+        rm -rf "$WORK"
         continue
     fi
 
-    # Regenerate RECORD so the file list + hashes stay consistent with
-    # our (now re-signed) .so binaries. We find it under *.dist-info/RECORD.
-    RECORD_PATH=$(find "$WORK" -type f -path '*.dist-info/RECORD' -print -quit)
-    if [ -n "$RECORD_PATH" ]; then
-        DIST_INFO_DIR=$(dirname "$RECORD_PATH")
-        python3 - "$WORK" "$DIST_INFO_DIR" "$RECORD_PATH" <<'PY'
+    # Regenerate RECORD (sha256/base64url per PEP 376) and repack through
+    # Python zipfile so zip64 wheels round-trip cleanly.
+    "$BUNDLE_PY" - "$WORK" "$whl" <<'PY'
 import base64
 import hashlib
-import os
 import sys
+import zipfile
 from pathlib import Path
 
-root = Path(sys.argv[1])
-dist_info = Path(sys.argv[2])
-record_path = Path(sys.argv[3])
+work = Path(sys.argv[1])
+out_whl = Path(sys.argv[2])
 
-def rec_hash(p: Path) -> tuple[str, int]:
-    data = p.read_bytes()
-    digest = hashlib.sha256(data).digest()
-    encoded = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
-    return f"sha256={encoded}", len(data)
+record_paths = list(work.glob("*.dist-info/RECORD"))
+if record_paths:
+    record = record_paths[0]
+    lines = []
+    for f in sorted(work.rglob("*")):
+        if not f.is_file():
+            continue
+        rel = f.relative_to(work).as_posix()
+        if f == record:
+            lines.append(f"{rel},,\n")
+            continue
+        data = f.read_bytes()
+        digest = hashlib.sha256(data).digest()
+        encoded = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+        lines.append(f"{rel},sha256={encoded},{len(data)}\n")
+    record.write_text("".join(lines), encoding="utf-8")
 
-lines = []
-for f in sorted(root.rglob("*")):
-    if not f.is_file():
-        continue
-    rel = f.relative_to(root).as_posix()
-    # RECORD itself is listed with empty hash+size per PEP 376.
-    if f == record_path:
-        lines.append(f"{rel},,\n")
-        continue
-    h, size = rec_hash(f)
-    lines.append(f"{rel},{h},{size}\n")
+if out_whl.exists():
+    out_whl.unlink()
 
-record_path.write_text("".join(lines), encoding="utf-8")
+with zipfile.ZipFile(out_whl, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
+    for f in sorted(work.rglob("*")):
+        if f.is_file():
+            zf.write(f, f.relative_to(work).as_posix())
 PY
-    fi
-
-    # Re-zip the wheel. -X strips extra file attributes that would
-    # otherwise bloat the zip and (on some tools) confuse readers.
-    # -r recurse; we zip *from inside WORK* so paths are relative,
-    # exactly as pip expects.
-    rm -f "$whl"
-    (cd "$WORK" && zip -X -q -r "$whl" .)
 
     SIGNED_WHEELS=$((SIGNED_WHEELS + 1))
     SIGNED_BINARIES=$((SIGNED_BINARIES + BIN_COUNT))
-
-    # Clean up this wheel's workdir promptly — 1 GB+ of wheels unpacked
-    # would easily overflow /tmp otherwise.
     rm -rf "$WORK"
 done
 
-# ── Step 3: Report ─────────────────────────────────────────────────────
 echo ""
 echo "==> Wheel signing complete"
 echo "    Total wheels scanned:   $TOTAL_WHEELS"
