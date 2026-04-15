@@ -40,6 +40,17 @@ Els models locals son menys capacos que els models al nuvol (GPT-4, Claude, etc.
 - **Models grans (32B+):** Bona qualitat, pero requereixen 32+ GB de RAM i carrega lenta.
 - **Catala:** Els models Salamandra (BSC/AINA) son els millors per al catala. Altres models tenen suport limitat de catala.
 
+## Models multimodal (VLM)
+
+El backend MLX suporta models de visio (imatge + text) a traves de `mlx-vlm 0.4.4`. Llista d'arquitectures detectades: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (tots), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama i mes. El detector tambe s'activa per `vision_config` al `config.json` o per keys `vision_tower`/`mm_projector` al `model.safetensors.index.json` (cobre arquitectures noves).
+
+Limitacions actuals:
+- **Omni-models amb video (Qwen3.5 MoE, Qwen3-Omni, Kimi-VL, …):** Requereixen `PyTorch` i `torchvision` per al seu `VideoProcessor`, que server-nexe **no inclou** al venv per mida (afegirien ~2 GB al DMG). Es carregaran via `mlx-vlm.load()` pero fallaran a la fase de preparacio del processor. **Workaround:** usar un VLM imatge-only (Gemma-4, Qwen2.5-VL, Llava) com a default.
+- **Model per defecte recomanat:** `gemma-4-e4b-4bit` (4.9 GB) o `gemma-4-31b-8bit` (20 GB). Imatge only, sense dependencies torch.
+- **Audio/veu:** No suportat. Models com Qwen3-Omni, Kimi-VL o DeepSeek-VL-V2 tenen branch d'audio a `mlx-vlm` pero el pipeline de server-nexe encara no el exposa.
+- **Video nativament:** No suportat (veure omni-models).
+- **Streaming de resposta VLM:** El flux actual (`_generate_vlm`) no suporta streaming token-a-token; envia el text complet al final. Text-only si que te streaming.
+
 ## Limitacions del RAG
 
 - **Homonims:** "bank" (seient) vs "bank" (finances) obtenen embeddings similars. Mateixa paraula, significats diferents.
