@@ -85,8 +85,22 @@ PIP_DOWNLOAD_ARGS=(
     --dest "$WHEELS_DIR"
 )
 
-# Core + macOS requirements
-"${PIP_BIN[@]}" "${PIP_DOWNLOAD_ARGS[@]}" -r "$REQ_BASE" -r "$REQ_MACOS"
+# Pure-Python packages distributed only as sdist on PyPI (no wheel).
+# They must be filtered out of pip-download (which uses --only-binary=:all:
+# and would abort) and rebuilt locally from sdist in Step 3b so the client
+# install stays 100% offline.
+SDIST_ONLY_PKGS=(
+    "rumps"
+)
+
+# Build a grep -E pattern: ^(rumps|other)([= ].*)?$ to match requirement lines
+SDIST_PATTERN="^($(IFS='|'; echo "${SDIST_ONLY_PKGS[*]}"))([=<>! ].*)?$"
+REQ_MACOS_FILTERED="$(mktemp -t reqmacos-filtered.XXXXXX)"
+trap 'rm -f "$REQ_MACOS_FILTERED"' EXIT
+grep -v -E "$SDIST_PATTERN" "$REQ_MACOS" > "$REQ_MACOS_FILTERED" || true
+
+# Core + macOS requirements (sdist-only packages filtered out)
+"${PIP_BIN[@]}" "${PIP_DOWNLOAD_ARGS[@]}" -r "$REQ_BASE" -r "$REQ_MACOS_FILTERED"
 
 # Inference engines (not in requirements.txt because install flow is per-host)
 for engine in "${ENGINES[@]}"; do
@@ -95,18 +109,17 @@ for engine in "${ENGINES[@]}"; do
 done
 
 # ── Step 3b: Build sdist-only wheels locally ────────────────────────────
-# Pure-Python packages distributed only as sdist on PyPI (no wheel). We
-# build them locally from sdist so the client install stays 100% offline
-# (pip install --no-index --find-links wheels/). Adding a package here
-# requires it to be pure-Python; packages needing compilation must come
-# pre-compiled as wheels.
-SDIST_ONLY=(
-    "rumps==0.4.0"
-)
+# Reads version pins from requirements-macos.txt so there is no duplication
+# between the filter whitelist and the actual pinned version.
 echo "==> Building sdist-only wheels locally..."
-for pkg in "${SDIST_ONLY[@]}"; do
-    echo "  → $pkg"
-    "${PIP_BIN[@]}" wheel "$pkg" --wheel-dir "$WHEELS_DIR" --no-deps
+for pkg in "${SDIST_ONLY_PKGS[@]}"; do
+    SPEC=$(grep -E "^${pkg}([=<>! ].*)?$" "$REQ_MACOS" | head -1 | awk '{print $1}')
+    if [ -z "$SPEC" ]; then
+        echo "ERROR: ${pkg} listed as SDIST_ONLY but not found in $REQ_MACOS" >&2
+        exit 5
+    fi
+    echo "  → $SPEC"
+    "${PIP_BIN[@]}" wheel "$SPEC" --wheel-dir "$WHEELS_DIR" --no-deps
 done
 
 # ── Step 4: Sanity checks ──────────────────────────────────────────────
