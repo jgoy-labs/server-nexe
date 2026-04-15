@@ -43,7 +43,7 @@ DMG_VOLUME_NAME="Install Nexe"
 DMG_BACKGROUND="$SCRIPT_DIR/dmg_background.png"
 SWIFT_WIZARD_DIR="$SCRIPT_DIR/swift-wizard"
 BUNDLE_ID="net.jgoy.nexe-installer"
-MIN_MACOS="13.0"
+MIN_MACOS="14.0"
 
 # Colours
 RED='\033[0;31m'
@@ -274,7 +274,7 @@ if [ ! -d "$RESOURCES/python" ]; then
 fi
 
 # ── Step 5a: Build wheels bundle (offline install) ───────────────
-# Downloads all Python wheels as arm64 macOS 13+ binaries into
+# Downloads all Python wheels as arm64 macOS 14+ binaries into
 # Resources/wheels/ so the client installer runs `pip install` with
 # --no-index --find-links, without ever touching PyPI or compiling.
 # Net effect: zero Xcode Command Line Tools prompt at install time.
@@ -284,7 +284,7 @@ EMBEDDINGS_DIR="$RESOURCES/embeddings"
 if [ "$SKIP_BUNDLES" = true ]; then
     warn "Skipping bundle rebuild (--skip-bundles) — reusing existing bundles"
 else
-    info "Building Python wheels bundle (~220 MB, arm64 macOS 13+)..."
+    info "Building Python wheels bundle (~220 MB, arm64 macOS 14+)..."
     if ! bash "$SCRIPT_DIR/build-wheels-bundle.sh"; then
         bundle_error "build-wheels-bundle.sh failed. DMG would require online install."
     fi

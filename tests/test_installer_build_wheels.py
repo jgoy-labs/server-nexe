@@ -69,9 +69,12 @@ def script_content() -> str:
     return _SCRIPT.read_text(encoding="utf-8")
 
 
-def test_build_wheels_target_platform_is_macos_13_arm64(script_content: str) -> None:
-    """Platform must match Jordi's decision: macOS 13 Ventura, arm64 only."""
-    assert "macosx_13_0_arm64" in script_content
+def test_build_wheels_target_platform_is_macos_14_arm64(script_content: str) -> None:
+    """Platform must match project decision: macOS 14 Sonoma, arm64 only.
+    macOS 13 Ventura was dropped 2026-04-16: mlx 0.30.4+ (required by our
+    pinned mlx-lm 0.31.2) publishes wheels only for macosx_14_0_arm64+."""
+    assert "macosx_14_0_arm64" in script_content
+    assert "macosx_13_0_arm64" not in script_content  # regression guard
 
 
 def test_build_wheels_python_version_matches_bundle(script_content: str) -> None:
