@@ -202,7 +202,11 @@ def setup_environment(project_root, hw, engine="auto"):
         # mlx-vlm 0.1.27: VLM multimodal (Qwen2-VL, LLaVA, etc). Compatible amb mlx-lm 0.30.7.
         subprocess.run([str(pip_path), "install", "mlx-vlm==0.1.27"], check=True, capture_output=True)
 
-    if engine in ("llama_cpp", "all"):
+    # Install llama-cpp-python always so users can switch engines from the UI
+    # (Motor dropdown) without re-running the installer. Size cost ~30MB with
+    # Metal. Previously gated on engine choice — left users with a dropdown
+    # option that failed silently on module init.
+    if True:
         print(f"  🏗️ {t('installing_universal')} {CYAN}llama-cpp-python{RESET}...")
         env = os.environ.copy()
         if hw['is_apple_silicon']:

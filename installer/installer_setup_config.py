@@ -37,17 +37,14 @@ def generate_env_file(project_root, model_config=None):
                 f.write(f"NEXE_CSRF_SECRET={csrf_secret}\n")
                 f.write(f"NEXE_ENV=production\n")
                 f.write(f"NEXE_LOG_LEVEL=INFO\n")
-                # Only include modules for the selected engine (avoids MLX errors on Ollama installs)
-                engine = model_config.get('engine', 'ollama') if model_config else 'ollama'
-                base_modules = "security,web_ui_module"
-                if engine == 'ollama':
-                    approved_modules = f"{base_modules},ollama_module"
-                elif engine == 'mlx':
-                    approved_modules = f"{base_modules},mlx_module,ollama_module"
-                elif engine == 'llama_cpp':
-                    approved_modules = f"{base_modules},llama_cpp_module,ollama_module"
-                else:
-                    approved_modules = f"{base_modules},ollama_module,mlx_module,llama_cpp_module"
+                # Approve all 3 inference backends so users can switch engines
+                # from the UI (Motor dropdown) without re-running the installer.
+                # Previously gated on wizard choice — left the dropdown with
+                # options that failed silently because the module was skipped.
+                # Non-Apple-Silicon Macs get mlx_module anyway; the module
+                # itself checks for mlx-lm availability and self-disables if
+                # missing (same defensive init as llama_cpp_module).
+                approved_modules = "security,web_ui_module,ollama_module,mlx_module,llama_cpp_module"
                 f.write(f"NEXE_APPROVED_MODULES={approved_modules}\n")
                 f.write(f"NEXE_LANG={lang}\n")
                 f.write(f"# Model configuration\n")
