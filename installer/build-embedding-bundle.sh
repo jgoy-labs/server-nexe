@@ -82,20 +82,23 @@ PY
 # ── Step 5: Validate downloaded artefacts ──────────────────────────────
 echo "==> Validating embedding bundle..."
 
-# The cache structure is fastembed-internal; we only assert there's at
-# least one model.onnx and one tokenizer.json anywhere under the dir.
-if ! find "$EMBEDDINGS_DIR" -type f -name 'model*.onnx' -print -quit | grep -q .; then
+# The HuggingFace Hub cache (used by fastembed for this model) stores
+# blobs under models--<org>--<name>/blobs/<sha256> and exposes the real
+# filenames (model.onnx, tokenizer.json, config.json, …) as *symlinks*
+# under snapshots/<revision>/. We therefore pass `find -L` so the -type f
+# predicate follows symlinks and matches the snapshot entries.
+if ! find -L "$EMBEDDINGS_DIR" -type f -name 'model*.onnx' -print -quit | grep -q .; then
     echo "ERROR: No model.onnx found under $EMBEDDINGS_DIR" >&2
     find "$EMBEDDINGS_DIR" -maxdepth 3 >&2
     exit 2
 fi
 
-if ! find "$EMBEDDINGS_DIR" -type f -name 'tokenizer.json' -print -quit | grep -q .; then
+if ! find -L "$EMBEDDINGS_DIR" -type f -name 'tokenizer.json' -print -quit | grep -q .; then
     echo "ERROR: No tokenizer.json found under $EMBEDDINGS_DIR" >&2
     exit 3
 fi
 
-if ! find "$EMBEDDINGS_DIR" -type f -name 'config.json' -print -quit | grep -q .; then
+if ! find -L "$EMBEDDINGS_DIR" -type f -name 'config.json' -print -quit | grep -q .; then
     echo "ERROR: No config.json found under $EMBEDDINGS_DIR" >&2
     exit 4
 fi
