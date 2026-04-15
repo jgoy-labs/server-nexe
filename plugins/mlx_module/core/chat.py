@@ -347,7 +347,7 @@ class MLXChatNode:
         """
         import os
         import tempfile
-        from mlx_vlm import generate as vlm_generate
+        from mlx_vlm import generate as vlm_generate, stream_generate as vlm_stream
         from mlx_vlm.prompt_utils import apply_chat_template
 
         model, processor = self._get_model()
@@ -408,14 +408,38 @@ class MLXChatNode:
                 tmp_path = tmp.name
 
             start_time = time.time()
-            result = vlm_generate(
-                model=model,
-                processor=processor,
-                image=tmp_path,  # None si no hi ha imatge → text-only sobre el VLM
-                prompt=formatted_prompt,
-                max_tokens=max_tokens or self.config.max_tokens,
-                verbose=False,
-            )
+            if stream_callback:
+                # Streaming: mlx_vlm.stream_generate yielda GenerationResult
+                # amb text=last_segment (delta) per a cada token. Acumulem
+                # i llencem els deltes al callback; mètriques del darrer yield.
+                full_text = ""
+                last = None
+                for chunk in vlm_stream(
+                    model=model,
+                    processor=processor,
+                    image=tmp_path,
+                    prompt=formatted_prompt,
+                    max_tokens=max_tokens or self.config.max_tokens,
+                ):
+                    delta = getattr(chunk, "text", "") or ""
+                    if delta:
+                        stream_callback(delta)
+                        full_text += delta
+                    last = chunk
+                result_text = full_text
+                result_obj = last
+            else:
+                # One-shot (no streaming): text complet al final
+                one = vlm_generate(
+                    model=model,
+                    processor=processor,
+                    image=tmp_path,
+                    prompt=formatted_prompt,
+                    max_tokens=max_tokens or self.config.max_tokens,
+                    verbose=False,
+                )
+                result_text = one.text if hasattr(one, "text") else str(one)
+                result_obj = one
         finally:
             if tmp_path:
                 try:
@@ -423,16 +447,13 @@ class MLXChatNode:
                 except OSError:
                     pass
 
-        # mlx-vlm ≥ 0.4 retorna GenerationResult (dataclass), no str
-        text = result.text if hasattr(result, "text") else str(result)
-        prompt_tokens = getattr(result, "prompt_tokens", 0)
-        gen_tokens = getattr(result, "generation_tokens", len(text.split()))
-        prompt_tps = getattr(result, "prompt_tps", 0) or 0
-        gen_tps = getattr(result, "generation_tps", 0) or 0
-        peak_memory = getattr(result, "peak_memory", 0) or 0
-
-        if stream_callback:
-            stream_callback(text)
+        # Mètriques reals (mlx-vlm ≥ 0.4 GenerationResult)
+        text = result_text
+        prompt_tokens = getattr(result_obj, "prompt_tokens", 0)
+        gen_tokens = getattr(result_obj, "generation_tokens", len(text.split()))
+        prompt_tps = getattr(result_obj, "prompt_tps", 0) or 0
+        gen_tps = getattr(result_obj, "generation_tps", 0) or 0
+        peak_memory = getattr(result_obj, "peak_memory", 0) or 0
 
         elapsed_ms = int((time.time() - start_time) * 1000)
 
