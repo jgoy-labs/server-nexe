@@ -1229,14 +1229,15 @@ class NexeUI {
         // Create AbortController for this request
         this.abortController = new AbortController();
 
-        // Add user message to chat (amb preview imatge si n'hi ha)
-        this.addMessageToChat('user', message);
-        this.messageInput.value = '';
-        this.messageInput.style.height = 'auto';
-
-        // Capturar imatge seleccionada i netejar l'estat VLM
+        // Capturar imatge seleccionada abans de netejar l'estat VLM
         const pendingImage = this._selectedImage ? { ...this._selectedImage } : null;
         this._clearSelectedImage();
+
+        // Add user message to chat — si hi ha imatge adjunta, mostra-la inline
+        const userImageUrl = pendingImage ? `data:${pendingImage.type};base64,${pendingImage.b64}` : null;
+        this.addMessageToChat('user', message, true, null, userImageUrl);
+        this.messageInput.value = '';
+        this.messageInput.style.height = 'auto';
 
         try {
             const ragSlider = document.getElementById('ragThresholdSlider');
@@ -1863,8 +1864,12 @@ class NexeUI {
             contentDiv.appendChild(imgEl);
         }
 
-        if (content) {
-            const textDiv = document.createElement('div');
+        // textDiv: sempre present per assistant (el streaming el necessita via querySelector)
+        // per user, només si hi ha contingut (bubbles imatge-only no en necessiten)
+        const needsTextDiv = role === 'assistant' || content;
+        let textDiv = null;
+        if (needsTextDiv) {
+            textDiv = document.createElement('div');
             textDiv.className = 'message-text';
             if (role === 'user') {
                 textDiv.textContent = content;
