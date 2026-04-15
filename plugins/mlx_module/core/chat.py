@@ -365,11 +365,23 @@ class MLXChatNode:
         except Exception:
             mdl_config = {"model_type": ""}
 
+        # Construeix la llista completa de missatges: system + historial.
+        # mlx_vlm.prompt_utils.apply_chat_template accepta list[{"role","content"}]
+        # i és imprescindible passar-hi el system (perquè el model vegi el
+        # contracte MEM_SAVE, personalitat, idioma, RAG context) i tot
+        # l'historial per a converses multi-turn. Abans només enviàvem
+        # messages[-1]["content"] → el model no tenia ni system ni historial.
+        all_messages: List[Dict[str, Any]] = []
+        if system:
+            all_messages.append({"role": "system", "content": system})
+        if messages:
+            all_messages.extend(messages)
+
         # Prepara el prompt via chat template del processor
         formatted_prompt = apply_chat_template(
             processor=processor,
             config=mdl_config,
-            prompt=messages[-1]["content"] if messages else "",
+            prompt=all_messages if all_messages else "",
             num_images=1 if has_image else 0,
         )
 
