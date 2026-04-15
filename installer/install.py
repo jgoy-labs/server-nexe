@@ -132,6 +132,54 @@ def run_installer():
     # 4. MODEL SELECTION FIRST - while user is engaged
     model_config = select_model(hw)
 
+    # 4b. Skip intended for power users who already run Ollama with local
+    # models. Don't force a download — detect the first locally available
+    # Ollama model and use it as the default. Only if nothing is detected,
+    # fall back to downloading Qwen3.5 2B (smallest multilingual option) so
+    # the server still boots with something. Previously the skip branch left
+    # .env without NEXE_DEFAULT_MODEL and the server came up unhealthy.
+    if model_config is None:
+        detected = None
+        try:
+            import json as _json
+            import urllib.request as _urlreq
+            with _urlreq.urlopen("http://localhost:11434/api/tags", timeout=2) as _resp:
+                _data = _json.loads(_resp.read().decode("utf-8"))
+                _models = _data.get("models", [])
+                if _models:
+                    detected = _models[0].get("name")
+        except Exception:
+            detected = None
+
+        if detected:
+            print(f"\n{GREEN}✓{RESET} {DIM}Model Ollama detectat: {CYAN}{detected}{RESET}{DIM} — s'usarà com a default.{RESET}\n")
+            model_config = {
+                "size": "small",
+                "engine": "ollama",
+                "id": detected,
+                "name": detected,
+                "disk_size": "(local)",
+                "ram": 0,
+                "prompt_tier": "full",
+                "chat_format": "chatml",
+            }
+        else:
+            print(f"\n{YELLOW}Cap model local detectat — instal·lant Qwen3.5 2B per defecte perquè el servidor arrenqui.{RESET}\n")
+            _fallback = next(
+                (m for m in MODEL_CATALOG["small"] if m.get("key") == "qwen35_2b"),
+                MODEL_CATALOG["small"][0],
+            )
+            model_config = {
+                "size": "small",
+                "engine": "ollama",
+                "id": _fallback["ollama"],
+                "name": _fallback["name"],
+                "disk_size": f"~{_fallback['disk_gb']} GB",
+                "ram": _fallback["ram_gb"],
+                "prompt_tier": _fallback.get("prompt_tier", "small"),
+                "chat_format": _fallback.get("chat_format", "chatml"),
+            }
+
     # 4.5. Show download confirmation screen with power warning
     clear()
     print(APP_LOGO)

@@ -76,8 +76,33 @@ class LlamaCppConfig:
         Returns:
             LlamaCppConfig amb valors de l'entorn o defaults.
         """
+        # If no explicit env var, auto-discover a GGUF dropped into
+        # storage/models/ (real file or symlink). Pick the first match
+        # sorted alphabetically for determinism. Enables the UX
+        # "drop a .gguf, restart, it just works" — no env var needed.
+        model_path = os.getenv("NEXE_LLAMA_CPP_MODEL", "")
+        if not model_path:
+            try:
+                from pathlib import Path
+                models_dir = Path("storage/models")
+                if not models_dir.exists():
+                    models_dir = Path(__file__).parents[3] / "storage/models"
+                if models_dir.exists():
+                    candidates = sorted(
+                        p for p in models_dir.iterdir()
+                        if p.is_file() and p.suffix.lower() == ".gguf"
+                    )
+                    if candidates:
+                        # Use absolute path so __post_init__ doesn't re-resolve
+                        # relative to a different project root than the one we
+                        # scanned.
+                        model_path = str(candidates[0].resolve())
+                        logger.info(f"LlamaCppConfig: auto-discovered GGUF model at {model_path}")
+            except Exception as e:
+                logger.debug(f"LlamaCppConfig: auto-discover scan failed: {e}")
+
         config = cls(
-            model_path=os.getenv("NEXE_LLAMA_CPP_MODEL", ""),
+            model_path=model_path,
             n_ctx=int(os.getenv("NEXE_LLAMA_CPP_N_CTX", "8192")),
             n_batch=int(os.getenv("NEXE_LLAMA_CPP_N_BATCH", "512")),
             n_gpu_layers=int(os.getenv("NEXE_LLAMA_CPP_GPU_LAYERS", "-1")),
