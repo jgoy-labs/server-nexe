@@ -229,11 +229,18 @@ class MLXChatNode:
                 loop.call_soon_threadsafe(stream_callback, text)
 
         try:
-            # VLM path: si hi ha imatges i el model és VLM, usa mlx_vlm directament
-            if images and MLXChatNode._is_vlm:
+            # VLM path: si el model és VLM, tota la generació passa per mlx_vlm.
+            # Decideixo sobre el path (no sobre _is_vlm singleton) perquè al
+            # primer request el model encara no està carregat i el flag és
+            # False per defecte → la bifurcació aniria erròniament al blocking
+            # path (que usa tokenizer.encode del processor VLM, sense encode).
+            is_vlm = MLXChatNode._is_vlm or _detect_vlm_capability(
+                self.config.model_path
+            )
+            if is_vlm:
                 result = await asyncio.to_thread(
                     self._generate_vlm,
-                    system, messages, images,
+                    system, messages, images or [],
                     threadsafe_callback if stream_callback else None,
                     max_tokens_override, temperature_override,
                 )
@@ -345,37 +352,76 @@ class MLXChatNode:
 
         model, processor = self._get_model()
 
+        has_image = bool(images)
+
+        # mlx-vlm apply_chat_template vol un dict amb "model_type".
+        # Gemma4Processor no té .config, i model.config és un dataclass
+        # ModelConfig (no dict). Llegim config.json directament.
+        try:
+            with open(
+                os.path.join(self.config.model_path, "config.json")
+            ) as _cf:
+                mdl_config = json.load(_cf)
+        except Exception:
+            mdl_config = {"model_type": ""}
+
         # Prepara el prompt via chat template del processor
         formatted_prompt = apply_chat_template(
             processor=processor,
-            config=processor.config if hasattr(processor, "config") else {},
+            config=mdl_config,
             prompt=messages[-1]["content"] if messages else "",
-            num_images=1,
+            num_images=1 if has_image else 0,
         )
 
-        # mlx-vlm 0.4 espera path de fitxer — escriu bytes a tempfile
-        tmp = tempfile.NamedTemporaryFile(
-            prefix="nexe_vlm_", suffix=".img", delete=False
-        )
+        tmp_path = None
         try:
-            tmp.write(images[0])
-            tmp.flush()
-            tmp.close()
+            if has_image:
+                # Les imatges poden arribar com bytes o com str (data URI
+                # `data:image/...;base64,...` o base64 pelat). Normalitzem
+                # a bytes abans d'escriure al tempfile.
+                raw = images[0]
+                if isinstance(raw, str):
+                    import base64
+                    # treu prefix data URI si hi és
+                    if raw.startswith("data:"):
+                        try:
+                            raw = raw.split(",", 1)[1]
+                        except IndexError:
+                            pass
+                    try:
+                        raw = base64.b64decode(raw, validate=False)
+                    except Exception as exc:
+                        raise ValueError(
+                            f"VLM image[0] is str but not valid base64: {exc}"
+                        ) from exc
+                if not isinstance(raw, (bytes, bytearray)):
+                    raise TypeError(
+                        f"VLM image[0] must be bytes or base64 str, got {type(raw).__name__}"
+                    )
+                # mlx-vlm 0.4 espera path de fitxer — escriu bytes a tempfile
+                tmp = tempfile.NamedTemporaryFile(
+                    prefix="nexe_vlm_", suffix=".img", delete=False
+                )
+                tmp.write(raw)
+                tmp.flush()
+                tmp.close()
+                tmp_path = tmp.name
 
             start_time = time.time()
             result = vlm_generate(
                 model=model,
                 processor=processor,
-                image=tmp.name,
+                image=tmp_path,  # None si no hi ha imatge → text-only sobre el VLM
                 prompt=formatted_prompt,
                 max_tokens=max_tokens or self.config.max_tokens,
                 verbose=False,
             )
         finally:
-            try:
-                os.unlink(tmp.name)
-            except OSError:
-                pass
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
         # mlx-vlm ≥ 0.4 retorna GenerationResult (dataclass), no str
         text = result.text if hasattr(result, "text") else str(result)
