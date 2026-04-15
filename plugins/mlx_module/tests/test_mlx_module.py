@@ -7,7 +7,7 @@ from core.loader.protocol import HealthStatus
 async def test_mlx_module_metadata():
     module = MLXModule()
     assert module.metadata.name == "mlx_module"
-    assert module.metadata.version == "0.9.7"
+    assert module.metadata.version == "0.9.8"
     assert module.metadata.module_type == "local_llm_option"
 
 @pytest.mark.asyncio

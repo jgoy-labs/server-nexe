@@ -34,7 +34,7 @@ class LlamaCppModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="llama_cpp_module",
-            version="0.9.7",
+            version="0.9.8",
             description="Universal Llama.cpp inference engine (GGUF)",
             author="Jordi Goy",
             module_type="local_llm_option",
