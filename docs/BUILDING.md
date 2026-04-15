@@ -114,6 +114,44 @@ Install Nexe.dmg                    (gitignored)
 gh release create                   (GitHub Releases)
 ```
 
+## Post-install layout
+
+After a clean install from the DMG, `/Applications/` contains:
+
+```
+/Applications/
+├── Nexe.app                      ← visible launcher (copy)
+└── server-nexe/                  ← install dir (install_path)
+    ├── Nexe.app                  ← same launcher, bundled inside
+    ├── installer/NexeTray.app
+    ├── core/, plugins/, venv/, storage/
+    └── nexe                      ← shell launcher
+```
+
+### Why two copies of `Nexe.app`
+
+This is **intentional duplication**, not a bug. `install_headless.py`
+(see the `DESIGN NOTE` block around the `/Applications/Nexe.app` copy)
+maintains both:
+
+- `<install_path>/Nexe.app` — shipped with the install dir, keeps
+  everything self-contained under `/Applications/server-nexe/`.
+- `/Applications/Nexe.app` — a physical copy placed at the Applications
+  root so the user sees a normal "Nexe" icon without digging into a
+  subfolder. Dock icons, Login Items, and Launch Services anchor to
+  this stable path.
+
+Both are plain copies (not hardlink / symlink). The tray uninstaller
+(`installer/tray_uninstaller.py`) removes both locations, so a clean
+uninstall leaves no orphans. Fresh-install flow via the DMG always
+rewrites both in lockstep.
+
+Known caveat: if someone manually updates one bundle in isolation (e.g.
+patching files in `<install_path>/Nexe.app/` without touching
+`/Applications/Nexe.app/`), the two will drift and Launch Services may
+pick the stale copy. Treat a full reinstall from DMG (or the wizard
+update flow) as the only supported update path for these bundles.
+
 ## Troubleshooting
 
 ### "No bundled Python runtime in app"
