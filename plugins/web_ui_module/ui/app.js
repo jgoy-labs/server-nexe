@@ -863,9 +863,11 @@ class NexeUI {
                 // Suport objecte {name, size_gb} o string legacy
                 const name = typeof m === 'object' ? m.name : m;
                 opt.value = name;
-                // Mostra 👁️ si té visió (heurística per nom, evita confusió GB/RAM)
+                // Mostra 👁️ si té visió + mida aproximada en RAM
                 const hasVision = this._modelHasVision(name);
-                opt.textContent = hasVision ? `👁️ ${name}` : name;
+                const sizeGb = typeof m === 'object' ? m.size_gb : 0;
+                const sizeTag = sizeGb > 0 ? ` (~${sizeGb}GB)` : '';
+                opt.textContent = (hasVision ? `👁️ ${name}` : name) + sizeTag;
                 if (currentModel && (currentModel.includes(name) || name.includes(currentModel))) {
                     opt.selected = true;
                 }
@@ -1826,7 +1828,7 @@ class NexeUI {
         }
     }
 
-    addMessageToChat(role, content, scroll = true, stats = null) {
+    addMessageToChat(role, content, scroll = true, stats = null, imageUrl = null) {
         // Remove welcome screen if exists
         const welcome = this.chatMessages.querySelector('.welcome-screen');
         if (welcome) {
@@ -1853,15 +1855,24 @@ class NexeUI {
         roleDiv.textContent = roleName;
         contentDiv.appendChild(roleDiv);
 
-        const textDiv = document.createElement('div');
-        textDiv.className = 'message-text';
-        if (role === 'user') {
-            textDiv.textContent = content;
-        } else {
-            // Rendered via marked.js with custom renderer that escapes raw HTML
-            textDiv.innerHTML = this.renderMarkdown(content);
+        if (imageUrl) {
+            const imgEl = document.createElement('img');
+            imgEl.src = imageUrl;
+            imgEl.className = 'message-image-preview';
+            imgEl.alt = content || 'imatge';
+            contentDiv.appendChild(imgEl);
         }
-        contentDiv.appendChild(textDiv);
+
+        if (content) {
+            const textDiv = document.createElement('div');
+            textDiv.className = 'message-text';
+            if (role === 'user') {
+                textDiv.textContent = content;
+            } else {
+                textDiv.innerHTML = this.renderMarkdown(content); // renderMarkdown sanititza l'HTML (custom renderer)
+            }
+            contentDiv.appendChild(textDiv);
+        }
 
         if (role === 'assistant') {
             const statsDiv = document.createElement('div');
@@ -2132,12 +2143,18 @@ class NexeUI {
 
                 this.addUploadedFile(data);
 
+                // Bug #17: prompt específic per imatges vs documents
+                const isImage = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(data.filename || file.name || '');
+
+                // Mostra la imatge inline al chat (bubble usuari) si és una foto
+                if (isImage) {
+                    const previewUrl = URL.createObjectURL(file);
+                    this.addMessageToChat('user', '', true, null, previewUrl);
+                }
+
                 const elapsed = Math.round((Date.now() - t0) / 1000);
                 const chunkMsg = data.chunks_saved ? ` (${data.chunks_saved} ${this.t('doc_fragments')})` : '';
                 this.addMessageToChat('assistant', `${this.t('doc_uploaded').replace('{name}', data.filename).replace('{chunks}', chunkMsg).replace('{time}', elapsed)}\nℹ️ ${this.t('doc_chat_only')}`);
-
-                // Bug #17: prompt específic per imatges vs documents
-                const isImage = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(data.filename || file.name || '');
                 this.messageInput.value = this.t(isImage ? 'image_describe' : 'doc_summarize');
                 this.messageInput.focus();
                 this.messageInput.select();
