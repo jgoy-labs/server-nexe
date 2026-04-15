@@ -288,3 +288,241 @@ class TestSetupEnvironmentNonDmg:
         venv_call = mock_subprocess.run.call_args_list[0]
         python_used = venv_call[0][0][0]
         assert python_used == sys.executable
+
+
+# ── Tests per _find_bundle_resources ─────────────────────────────────
+
+
+class TestFindBundleResources:
+    """Localitza InstallNexe.app/Contents/Resources/ per trobar wheels + embeddings bundled."""
+
+    def test_returns_resources_when_app_bundle_exists(self, tmp_path):
+        resources = tmp_path / "InstallNexe.app" / "Contents" / "Resources"
+        resources.mkdir(parents=True)
+        from installer.installer_setup_env import _find_bundle_resources
+        found = _find_bundle_resources(tmp_path)
+        assert found == resources
+
+    def test_returns_none_when_no_app_bundle(self, tmp_path):
+        from installer.installer_setup_env import _find_bundle_resources
+        assert _find_bundle_resources(tmp_path) is None
+
+    def test_returns_none_when_resources_is_file(self, tmp_path):
+        app = tmp_path / "InstallNexe.app" / "Contents"
+        app.mkdir(parents=True)
+        (app / "Resources").write_text("not a dir")
+        from installer.installer_setup_env import _find_bundle_resources
+        assert _find_bundle_resources(tmp_path) is None
+
+
+# ── Tests per _write_venv_pip_conf ───────────────────────────────────
+
+
+class TestWriteVenvPipConf:
+    """Configura pip del venv perquè usi wheels locals sense PyPI (no-index)."""
+
+    def _make_venv(self, tmp_path):
+        venv = tmp_path / "venv"
+        venv.mkdir()
+        return venv
+
+    def _make_wheels_dir(self, tmp_path, wheel_names=("fastapi-0.115.14-py3-none-any.whl",)):
+        wheels = tmp_path / "wheels"
+        wheels.mkdir()
+        for name in wheel_names:
+            (wheels / name).write_bytes(b"PK\x03\x04")  # minimal zip header
+        return wheels
+
+    def test_writes_pip_conf_when_wheels_present(self, tmp_path):
+        venv = self._make_venv(tmp_path)
+        wheels = self._make_wheels_dir(tmp_path)
+        from installer.installer_setup_env import _write_venv_pip_conf
+        ok = _write_venv_pip_conf(venv, wheels)
+        assert ok is True
+        pip_conf = venv / "pip.conf"
+        assert pip_conf.exists()
+        content = pip_conf.read_text(encoding="utf-8")
+        assert "[global]" in content
+        assert f"find-links = {wheels}" in content
+        assert "no-index = true" in content
+
+    def test_returns_false_when_wheels_dir_missing(self, tmp_path):
+        venv = self._make_venv(tmp_path)
+        from installer.installer_setup_env import _write_venv_pip_conf
+        ok = _write_venv_pip_conf(venv, tmp_path / "does_not_exist")
+        assert ok is False
+        assert not (venv / "pip.conf").exists()
+
+    def test_returns_false_when_wheels_dir_empty(self, tmp_path):
+        venv = self._make_venv(tmp_path)
+        empty_wheels = tmp_path / "wheels_empty"
+        empty_wheels.mkdir()
+        from installer.installer_setup_env import _write_venv_pip_conf
+        ok = _write_venv_pip_conf(venv, empty_wheels)
+        assert ok is False
+        assert not (venv / "pip.conf").exists()
+
+    def test_returns_false_when_wheels_dir_is_none(self, tmp_path):
+        venv = self._make_venv(tmp_path)
+        from installer.installer_setup_env import _write_venv_pip_conf
+        ok = _write_venv_pip_conf(venv, None)
+        assert ok is False
+
+
+# ── Tests per _seed_fastembed_cache ──────────────────────────────────
+
+
+class TestSeedFastembedCache:
+    """Copia el bundle d'embeddings al cache natiu de fastembed."""
+
+    def _make_bundle(self, tmp_path):
+        """Crea un directori que simula el bundle de fastembed amb model.onnx."""
+        bundle = tmp_path / "embeddings_bundle"
+        model_dir = bundle / "models--sentence-transformers--paraphrase-multilingual-mpnet-base-v2"
+        model_dir.mkdir(parents=True)
+        (model_dir / "model.onnx").write_bytes(b"\x00" * 512)
+        (model_dir / "tokenizer.json").write_text("{}")
+        (model_dir / "config.json").write_text("{}")
+        return bundle
+
+    def test_copies_bundle_to_cache(self, tmp_path):
+        bundle = self._make_bundle(tmp_path)
+        cache = tmp_path / "cache"
+        from installer.installer_setup_env import _seed_fastembed_cache
+        ok = _seed_fastembed_cache(bundle, cache)
+        assert ok is True
+        assert cache.is_dir()
+        found_onnx = list(cache.rglob("model.onnx"))
+        assert len(found_onnx) == 1
+        found_tok = list(cache.rglob("tokenizer.json"))
+        assert len(found_tok) == 1
+
+    def test_is_idempotent(self, tmp_path):
+        bundle = self._make_bundle(tmp_path)
+        cache = tmp_path / "cache"
+        from installer.installer_setup_env import _seed_fastembed_cache
+        assert _seed_fastembed_cache(bundle, cache) is True
+        assert _seed_fastembed_cache(bundle, cache) is True
+
+    def test_returns_false_when_bundle_missing(self, tmp_path):
+        from installer.installer_setup_env import _seed_fastembed_cache
+        ok = _seed_fastembed_cache(tmp_path / "nope", tmp_path / "cache")
+        assert ok is False
+
+    def test_returns_false_when_bundle_empty(self, tmp_path):
+        bundle = tmp_path / "empty_bundle"
+        bundle.mkdir()
+        from installer.installer_setup_env import _seed_fastembed_cache
+        ok = _seed_fastembed_cache(bundle, tmp_path / "cache")
+        assert ok is False
+
+    def test_returns_false_when_bundle_is_none(self, tmp_path):
+        from installer.installer_setup_env import _seed_fastembed_cache
+        ok = _seed_fastembed_cache(None, tmp_path / "cache")
+        assert ok is False
+
+
+# ── Tests per _default_fastembed_cache_dir ───────────────────────────
+
+
+class TestDefaultFastembedCacheDir:
+    """Respecta FASTEMBED_CACHE_DIR si està definit, cau a ~/.cache/fastembed si no."""
+
+    def test_respects_env_var_override(self, tmp_path, monkeypatch):
+        target = tmp_path / "custom_cache"
+        monkeypatch.setenv("FASTEMBED_CACHE_DIR", str(target))
+        from installer.installer_setup_env import _default_fastembed_cache_dir
+        assert _default_fastembed_cache_dir() == target
+
+    def test_falls_back_to_home_cache_dir(self, monkeypatch):
+        monkeypatch.delenv("FASTEMBED_CACHE_DIR", raising=False)
+        from installer.installer_setup_env import _default_fastembed_cache_dir
+        result = _default_fastembed_cache_dir()
+        assert result.name == "fastembed"
+        assert result.parent.name == ".cache"
+
+
+# ── Regression guard: CMAKE_ARGS must not come back ───────────────────
+
+
+class TestNoCmakeArgsRegression:
+    """Once llama-cpp-python wheels are bundled, CMAKE_ARGS forcing source
+    build must never come back — it was the cause of the Xcode CLT prompt
+    bug that blocked clean M1 installs. See PLA-20260415-offline-install-bundle."""
+
+    def test_installer_setup_env_does_not_set_cmake_args(self):
+        from pathlib import Path as _Path
+        src = (_Path(__file__).parent.parent / "installer" / "installer_setup_env.py").read_text(
+            encoding="utf-8"
+        )
+        assert "CMAKE_ARGS" not in src, (
+            "CMAKE_ARGS is back in installer_setup_env.py — this forces source "
+            "build of llama-cpp-python and triggers Xcode CLT prompt on clean Macs. "
+            "See PLA-20260415-offline-install-bundle.md."
+        )
+
+
+# ── Integration: setup_environment calls offline helpers if bundle present ──
+
+
+class TestSetupEnvironmentOfflineBundle:
+    """When InstallNexe.app/Contents/Resources/{wheels,embeddings}/ exist,
+    setup_environment must wire pip to them and seed the fastembed cache."""
+
+    @patch("installer.installer_setup_env.platform")
+    @patch("installer.installer_setup_env.subprocess")
+    @patch("installer.installer_setup_env._get_python_for_venv")
+    @patch("installer.installer_setup_env._make_venv_standalone")
+    @patch("installer.installer_setup_env._seed_fastembed_cache", return_value=True)
+    @patch("installer.installer_setup_env._write_venv_pip_conf", return_value=True)
+    @patch("installer.installer_setup_env.print_step")
+    @patch("installer.installer_setup_env.t", side_effect=lambda x: x)
+    def test_helpers_called_when_bundle_present(
+        self, mock_t, mock_print_step, mock_write_conf, mock_seed, mock_standalone,
+        mock_get_py, mock_subprocess, mock_platform, tmp_path,
+    ):
+        mock_platform.system.return_value = "Darwin"
+        mock_get_py.return_value = sys.executable
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / "requirements.txt").write_text("flask\n")
+
+        resources = project_root / "InstallNexe.app" / "Contents" / "Resources"
+        wheels = resources / "wheels"
+        wheels.mkdir(parents=True)
+        (wheels / "x.whl").write_bytes(b"PK")
+        embeddings = resources / "embeddings"
+        embeddings.mkdir()
+        (embeddings / "model.onnx").write_bytes(b"\x00")
+
+        hw = {"is_apple_silicon": False}
+        from installer.installer_setup_env import setup_environment
+        setup_environment(project_root, hw, engine="auto")
+
+        mock_write_conf.assert_called_once()
+        mock_seed.assert_called_once()
+
+    @patch("installer.installer_setup_env.platform")
+    @patch("installer.installer_setup_env.subprocess")
+    @patch("installer.installer_setup_env._get_python_for_venv")
+    @patch("installer.installer_setup_env._make_venv_standalone")
+    @patch("installer.installer_setup_env._seed_fastembed_cache", return_value=False)
+    @patch("installer.installer_setup_env._write_venv_pip_conf", return_value=False)
+    @patch("installer.installer_setup_env.print_step")
+    @patch("installer.installer_setup_env.t", side_effect=lambda x: x)
+    def test_no_bundle_still_works_online_mode(
+        self, mock_t, mock_print_step, mock_write_conf, mock_seed, mock_standalone,
+        mock_get_py, mock_subprocess, mock_platform, tmp_path,
+    ):
+        """When no bundle, setup_environment must still complete (fallback to PyPI)."""
+        mock_platform.system.return_value = "Darwin"
+        mock_get_py.return_value = sys.executable
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / "requirements.txt").write_text("flask\n")
+
+        hw = {"is_apple_silicon": False}
+        from installer.installer_setup_env import setup_environment
+        setup_environment(project_root, hw, engine="auto")
