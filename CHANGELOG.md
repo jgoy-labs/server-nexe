@@ -6,6 +6,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-04-15
+
+Bug #18 MEM_DELETE cirurgia pre-v1.0 — last P0 blocker closed.
+
+### Security
+
+- **RAG injection via memory tags (#18 P0)**: `_filter_rag_injection` now
+  neutralizes `[MEM_DELETE:…]`, `[MEM_SAVE:…]`, `[OLVIDA|OBLIT|FORGET:…]`
+  and `[MEMORIA:…]` at ingest time (ingest_docs, ingest_knowledge) and at
+  retrieval time (`_sanitize_rag_context`). Previously a malicious document
+  could embed a MEM_DELETE tag in its body; the LLM would copy it verbatim
+  into its response and the pipeline would execute the delete. Now every
+  such tag becomes `[FILTERED]` before the model ever sees it. 4 new tests
+  in `test_rag_sanitization.py`.
+
+### Fixed
+
+- **"Oblida tot" no longer arbitrarily deletes random facts (#18 P0)**:
+  previously `detect_intent("Oblida tot")` returned `('delete', 'tot')`,
+  which semantic-searched "tot" and deleted ~5 random facts similar to
+  that token. Added explicit `CLEAR_ALL_TRIGGERS` (ca/es/en) checked
+  **before** delete triggers, with a new `clear_all` intent. The pipeline
+  arms a 2-turn confirmation (`session._pending_clear_all`) — the user
+  must answer `sí, esborra-ho tot` / `yes delete everything` / `confirmo`
+  / `go ahead` to actually wipe. Any other reply cancels and falls through
+  as normal chat. Cables through to the previously-orphaned
+  `clear_memory(confirm=True)`.
+
+- **DELETE_THRESHOLD 0.70 → 0.20 (#18 P0)**: empirical finding from the
+  new e2e integration suite — fastembed + paraphrase-multilingual scored
+  even verbatim queries below 0.55. With the old 0.70 threshold, realistic
+  flows like `save "L'usuari es diu Jordi i viu a Barcelona"` →
+  `delete "em dic Jordi"` silently returned 0 matches and the fact was
+  never deleted. 0.20 guarantees the forget actually forgets; occasional
+  over-match on loosely related facts accepted as the better UX tradeoff
+  for a "forget" primitive.
+
+### Added
+
+- **E2E integration tests for MEM_DELETE (#18 P0)**: new
+  `tests/integration/test_mem_delete_e2e.py` with 8 tests against a real
+  Qdrant (embedded, tmp_path) + real fastembed embedder. Covers the full
+  save/list/delete/list-empty cycle, short-query-vs-long-stored matching
+  under the 0.20 threshold, unrelated-fact survival guard, clear_memory
+  wipe + safety rail, and RAG injection neutralization end-to-end.
+  Closes the empirical gap flagged by BUS v0.9.0 feedback ("mocks enganyen").
+  Marker `@pytest.mark.integration` — excluded from the default fast
+  suite, run explicitly.
+
 ## [0.9.8] - 2026-04-15
 
 Robust VLM detection + mlx-vlm 0.4 API port + installer / KB updates.

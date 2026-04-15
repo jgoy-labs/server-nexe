@@ -27,7 +27,7 @@ SIMILARITY_THRESHOLD = 0.80       # No guardar si similaritat > 80% (baixat de 0
 PRUNE_BATCH_SIZE = 30             # How many entries to remove when the limit is exceeded
 TEMPORAL_DECAY_DAYS = 7           # Dies per aplicar decay temporal (recent = bonus)
 MIN_IMPORTANCE_SCORE = 0.3        # Minimum to save (filters out chatter)
-DELETE_THRESHOLD = 0.70           # Threshold for delete (baixat de 0.82 — era massa estricte per embeddings multilingues)
+DELETE_THRESHOLD = 0.20           # Threshold for delete. History: 0.82 → 0.70 → 0.55 → 0.20 (bug #18 e2e 2026-04-15). Empirical: even verbatim queries scored below 0.55 with fastembed+paraphrase-multilingual. Jordi's call: 0.20 guarantees the fact actually gets found. Tradeoff accepted: delete may occasionally take down loosely related facts — UX for "oblida" is better served by erring toward the user's explicit forget request than by silently keeping the fact. See tests/integration/test_mem_delete_e2e.py for regression guard.
 
 # Memory types for structured storage
 MEMORY_TYPES = {
@@ -99,6 +99,55 @@ RECALL_PATTERNS = [
     r'\bwhat\s+do\s+you\s+know\s+(about|on)\b',
     r'\b(do\s+you\s+remember)\b',
     r'\bwhat\s*(is|\'s)\s+my\s+name\b',
+]
+
+# Bug #18 P0: explicit "clear all memory" patterns.
+# These must be checked BEFORE DELETE_TRIGGERS — otherwise "Oblida tot" matches
+# ^oblida\s+(que\s+)? with content="tot", and delete_from_memory("tot", thr=0.70)
+# then semantic-searches "tot" and deletes ~5 arbitrary facts instead of wiping
+# the collection. The pipeline handles clear_all with a 2-turn confirmation.
+CLEAR_ALL_TRIGGERS = [
+    # Catalan
+    r'^oblida\s+(ho\s+)?tot\b',
+    r'^oblida-ho\s+tot\b',
+    r'^esborra\s+(la\s+)?mem[oò]ria\s+(sencera|entera)\b',
+    r'^esborra\s+tot(\s+el\s+que\s+saps)?\b',
+    r'^esborra-ho\s+tot\b',
+    r'^elimina\s+(la\s+)?mem[oò]ria\s+(sencera|entera)\b',
+    # Spanish
+    r'^olv[ií]da(lo)?\s+todo\b',
+    r'^borra\s+(la\s+)?memoria\s+(entera|completa)\b',
+    r'^borra\s+todo(\s+lo\s+que\s+sabes)?\b',
+    r'^b[oó]rralo\s+todo\b',
+    r'^elimina\s+(la\s+)?memoria\s+(entera|completa)\b',
+    # English
+    r'^forget\s+everything\b',
+    r'^delete\s+all\s+memor(y|ies)\b',
+    r'^erase\s+all\s+memor(y|ies)\b',
+    r'^wipe\s+(all\s+)?(my\s+)?memor(y|ies)\b',
+    r'^clear\s+(all\s+)?(my\s+)?memor(y|ies)\b',
+]
+
+# Confirmation patterns for the 2-turn clear_all flow. Matched only when the
+# session has session._pending_clear_all == True.
+CLEAR_ALL_CONFIRM_TRIGGERS = [
+    # Catalan
+    r'\bs[ií][\s,]+(confirma|esborra|continua)',
+    r'\bs[ií][\s,]+(ho\s+)?esborra[\-\']?(ho)?\s+tot\b',
+    r'^s[ií][,.]?\s*$',
+    r'^confirmo\b',
+    r'^endavant\b',
+    # Spanish
+    r'\bs[ií][\s,]+(confirma|borra|continua)',
+    r'\bs[ií][\s,]+(lo\s+)?borra(lo)?\s+todo\b',
+    r'^s[ií][,.]?\s*$',
+    r'^confirmo\b',
+    # English
+    r'\byes[\s,]+(confirm|delete|continue)',
+    r'\byes[\s,]+(delete|wipe|clear|erase)\s+(all|everything)',
+    r'^yes[,.]?\s*$',
+    r'^confirm\b',
+    r'^go\s+ahead\b',
 ]
 
 # Patterns that indicate user wants to DELETE/FORGET something
@@ -187,6 +236,8 @@ class MemoryHelper:
         self.recall_regex = [re.compile(p, re.IGNORECASE) for p in RECALL_PATTERNS]
         self.delete_triggers = [re.compile(p, re.IGNORECASE) for p in DELETE_TRIGGERS]
         self.list_triggers = [re.compile(p, re.IGNORECASE) for p in LIST_TRIGGERS]
+        self.clear_all_triggers = [re.compile(p, re.IGNORECASE) for p in CLEAR_ALL_TRIGGERS]
+        self.clear_all_confirm_triggers = [re.compile(p, re.IGNORECASE) for p in CLEAR_ALL_CONFIRM_TRIGGERS]
         # Patterns per detectar xerrameca (no guardar)
         self.skip_patterns = [
             re.compile(r'^(hola|hey|ei|bon dia|bona tarda|bones|adéu|fins aviat)', re.IGNORECASE),
@@ -281,6 +332,14 @@ class MemoryHelper:
                 if content:
                     return ('save', content)
 
+        # Bug #18 P0: check for "clear all memory" BEFORE delete.
+        # "Oblida tot" would otherwise match ^oblida\s+(que\s+)? with content="tot",
+        # which semantic-searches "tot" and deletes arbitrary facts. Keep this
+        # check strictly above delete_triggers.
+        for pattern in self.clear_all_triggers:
+            if pattern.search(message):
+                return ('clear_all', None)
+
         # Check for delete intent
         # "Oblida que em dic Claude" → delete, content = "em dic Claude"
         # "Pots esborrar que tinc 8 anys?" → delete, content = "tinc 8 anys"
@@ -312,6 +371,19 @@ class MemoryHelper:
 
         # Default: normal chat
         return ('chat', None)
+
+    def matches_clear_all_confirm(self, message: str) -> bool:
+        """Return True if message confirms a pending clear_all operation.
+
+        Called from the chat pipeline only when session._pending_clear_all is True.
+        Accepts short affirmations ('sí', 'yes', 'confirmo') and explicit phrases
+        ('sí, esborra-ho tot', 'yes delete everything'). See CLEAR_ALL_CONFIRM_TRIGGERS.
+        """
+        msg = message.strip()
+        for pattern in self.clear_all_confirm_triggers:
+            if pattern.search(msg):
+                return True
+        return False
 
     async def _check_duplicate(self, content: str, memory) -> bool:
         """

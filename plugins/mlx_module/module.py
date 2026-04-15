@@ -34,7 +34,7 @@ class MLXModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="mlx_module",
-            version="0.9.8",
+            version="0.9.9",
             description="Ultra-optimized inference engine for Apple Silicon (MLX)",
             author="Jordi Goy",
             module_type="local_llm_option",
