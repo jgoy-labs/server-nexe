@@ -938,6 +938,18 @@ body.light .icon-moon,
     white-space: pre-wrap;
 }
 
+/* Imatge inline al chat (pujada per l'usuari) */
+.message-image-preview {
+    max-width: 320px;
+    max-height: 240px;
+    width: auto;
+    height: auto;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    display: block;
+    margin-top: 0.25rem;
+}
+
 /* Assistant messages: rendered markdown */
 .message.assistant .message-text {
     white-space: normal;
