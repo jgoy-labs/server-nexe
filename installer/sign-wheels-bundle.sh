@@ -105,12 +105,20 @@ for whl in "$WHEELS_DIR"/*.whl; do
     "$BUNDLE_PY" - "$WORK" "$whl" <<'PY'
 import base64
 import hashlib
+import os
 import sys
 import zipfile
 from pathlib import Path
 
 work = Path(sys.argv[1])
 out_whl = Path(sys.argv[2])
+
+# ZIP local-header date field can't encode anything before 1980-01-01.
+# ditto preserves whatever mtime the archive claims, and some wheels
+# have entries with mtime == 0 (epoch 1970). Clamp to the ZIP floor
+# so zipfile.write() doesn't raise ValueError on repack. Content is
+# unaffected — pip install does not inspect mtime.
+ZIP_EPOCH = 315532800  # 1980-01-01T00:00:00 UTC
 
 record_paths = list(work.glob("*.dist-info/RECORD"))
 if record_paths:
@@ -134,8 +142,12 @@ if out_whl.exists():
 
 with zipfile.ZipFile(out_whl, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
     for f in sorted(work.rglob("*")):
-        if f.is_file():
-            zf.write(f, f.relative_to(work).as_posix())
+        if not f.is_file():
+            continue
+        st = f.stat()
+        if st.st_mtime < ZIP_EPOCH:
+            os.utime(f, (ZIP_EPOCH, ZIP_EPOCH))
+        zf.write(f, f.relative_to(work).as_posix())
 PY
 
     SIGNED_WHEELS=$((SIGNED_WHEELS + 1))
