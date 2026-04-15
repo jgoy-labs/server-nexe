@@ -132,3 +132,34 @@ def test_build_wheels_verifies_critical_wheels_present(script_content: str) -> N
 def test_build_wheels_has_safe_bash_flags(script_content: str) -> None:
     """Script must fail fast on errors, unset vars, and pipe failures."""
     assert "set -euo pipefail" in script_content
+
+
+def test_build_wheels_uses_abetlen_llama_cpp_index(script_content: str) -> None:
+    """llama-cpp-python has no Metal wheels on PyPI — only sdist, which would
+    require a C toolchain on the client (breaks clean-M1 install). The
+    upstream maintainer (abetlen) publishes pre-built Metal wheels at
+    abetlen.github.io/llama-cpp-python/whl/metal/. The script must add it
+    as an --extra-index-url so pip download finds a ready-to-use wheel."""
+    assert "abetlen.github.io/llama-cpp-python/whl/metal" in script_content
+    assert "--extra-index-url" in script_content
+
+
+def test_build_wheels_uses_bundle_python(script_content: str) -> None:
+    """pip must run under the bundled Python 3.12, not host python3.
+    Reason: pip evaluates dependency environment markers (python_version,
+    platform_system, …) against the *running* interpreter even when
+    --python-version/--abi are given. Build Macs with Python 3.13+ would
+    dispatch markers like `numpy>=2.1.0 ; python_version >= "3.13"`, making
+    resolution fail against our pinned numpy==1.26.4."""
+    assert 'BUNDLE_PY="$APP_DIR/Contents/Resources/python/bin/python3"' in script_content
+    assert 'PIP_BIN=("$BUNDLE_PY" -m pip)' in script_content
+
+
+def test_build_wheels_handles_sdist_only_packages(script_content: str) -> None:
+    """Some pure-Python deps (e.g. rumps) ship only as sdist on PyPI. The
+    script must: (1) filter them out of pip-download (which uses
+    --only-binary=:all:), and (2) build wheels locally from sdist with
+    `pip wheel --no-deps` so the client install stays 100% offline."""
+    assert "SDIST_ONLY_PKGS" in script_content
+    assert '"rumps"' in script_content  # current whitelist entry
+    assert 'wheel "$SPEC" --wheel-dir "$WHEELS_DIR" --no-deps' in script_content
