@@ -77,6 +77,10 @@ echo "==> Downloading wheels (only-binary, arm64 macOS 13+, cp312)..."
 #   --python-version         target Python minor
 #   --implementation cp      CPython only
 #   --abi cp312              matches our bundled Python 3.12
+#   --extra-index-url        official llama-cpp-python Metal wheels index
+#                            (abetlen = upstream maintainer; PyPI ships only
+#                            sdist for this package, so the client install
+#                            would require a C toolchain without this)
 #   --dest                   output dir
 #
 # Pure-python ("py3-none-any") wheels are accepted automatically when
@@ -88,6 +92,7 @@ PIP_DOWNLOAD_ARGS=(
     --python-version "$PY_TARGET_VERSION"
     --implementation cp
     --abi "$PY_TARGET_ABI"
+    --extra-index-url "https://abetlen.github.io/llama-cpp-python/whl/metal/"
     --dest "$WHEELS_DIR"
 )
 
