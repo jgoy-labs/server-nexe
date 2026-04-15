@@ -519,6 +519,30 @@ def _run_headless_inner(config):
     _write_commands_file(project_root, nexe_cmd, model_config)
 
     # Copy Nexe.app to /Applications and add to Login Items (macOS only)
+    #
+    # DESIGN NOTE — intentional duplication of Nexe.app:
+    #   After installation, Nexe.app exists at TWO paths:
+    #     (a) <install_path>/Nexe.app         ← bundled with the install
+    #     (b) /Applications/Nexe.app          ← copy made here
+    #
+    #   Both are physical copies (not hardlink / symlink). Rationale:
+    #     · (b) gives the user a visible "Nexe" icon at the root of
+    #       /Applications, without making them dig into the install dir.
+    #     · Dock icon, Login Items, Launch Services anchor on the stable
+    #       `/Applications/Nexe.app` path.
+    #     · The uninstaller (installer/tray_uninstaller.py) wipes both
+    #       locations, so no orphans after clean removal.
+    #
+    #   Considered alternatives (and why not today):
+    #     · symlink (b) → (a): risky with Gatekeeper / LaunchServices on
+    #       current macOS (Tahoe 26.x); Login Items based on
+    #       alias/bookmark can break if the symlink is rewritten.
+    #     · move Nexe.app OUT of install dir entirely: bigger refactor
+    #       (paths, markers, uninstaller assumptions).
+    #
+    #   Known caveat: if someone updates (a) manually without refreshing
+    #   (b), the two can drift. Full-install flow (DMG wizard) refreshes
+    #   both, so the happy path stays consistent.
     if platform.system() == "Darwin":
         # Nexe.app is bundled inside InstallNexe.app/Contents/Resources/
         # (install_headless.py lives at Resources/installer/install_headless.py,
