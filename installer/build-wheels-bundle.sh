@@ -94,6 +94,21 @@ for engine in "${ENGINES[@]}"; do
     "${PIP_BIN[@]}" "${PIP_DOWNLOAD_ARGS[@]}" "$engine"
 done
 
+# ── Step 3b: Build sdist-only wheels locally ────────────────────────────
+# Pure-Python packages distributed only as sdist on PyPI (no wheel). We
+# build them locally from sdist so the client install stays 100% offline
+# (pip install --no-index --find-links wheels/). Adding a package here
+# requires it to be pure-Python; packages needing compilation must come
+# pre-compiled as wheels.
+SDIST_ONLY=(
+    "rumps==0.4.0"
+)
+echo "==> Building sdist-only wheels locally..."
+for pkg in "${SDIST_ONLY[@]}"; do
+    echo "  → $pkg"
+    "${PIP_BIN[@]}" wheel "$pkg" --wheel-dir "$WHEELS_DIR" --no-deps
+done
+
 # ── Step 4: Sanity checks ──────────────────────────────────────────────
 echo "==> Validating wheels..."
 
