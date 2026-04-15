@@ -325,6 +325,21 @@ IDENTITY="${NEXE_SIGNING_IDENTITY:-Developer ID Application: Jordi Goy (NHG3THR2
 ENTITLEMENTS="$SWIFT_WIZARD_DIR/InstallNexe.entitlements"
 
 if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
+    # Step 6a: signar els binaris natius dins els wheels del bundle.
+    # Wheels de PyPI porten .so/.dylib signats ad-hoc (o pel seu autor)
+    # sense timestamp segur; Apple Notarization rebutja qualsevol Mach-O
+    # nested sense Developer ID. Aquest script itera cada wheel, signa
+    # els .so/.dylib amb la nostra identitat + timestamp + hardened
+    # runtime, regenera el RECORD i re-empaqueta el wheel.
+    if [ -d "$WHEELS_DIR" ] && ls "$WHEELS_DIR"/*.whl >/dev/null 2>&1; then
+        info "Signing native binaries inside wheel bundle..."
+        if ! bash "$SCRIPT_DIR/sign-wheels-bundle.sh"; then
+            echo -e "${RED}[ERROR]${NC} sign-wheels-bundle.sh failed — notarization would reject the DMG." >&2
+            exit 1
+        fi
+        info "  Wheels bundle signed"
+    fi
+
     # Signar tots els binaris Mach-O del Python bundled individualment
     # (--deep no recorre Resources/python/ correctament i deixen signatura adhoc)
     if [ -d "$RESOURCES/python" ]; then
