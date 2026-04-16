@@ -34,6 +34,24 @@ Dos metodes d'instal·lacio disponibles. Tria segons la teva plataforma i prefer
 
 Wizard natiu SwiftUI amb 6 pantalles. Inclou Python 3.12 — sense dependencia del Python del sistema.
 
+### ⚡ Instal·lacio 100% offline (des de 2026-04-16)
+
+A partir d'aquesta versio, el DMG porta **tot** el que l'installer necessita:
+
+- Runtime Python 3.12 (~45 MB)
+- **Tots els wheels de Python** pre-compilats per a arm64 macOS 13+ (~220 MB): fastapi, pydantic, mlx-lm, mlx-vlm, llama-cpp-python (amb Metal), fastembed, onnxruntime, sqlcipher3, cryptography, i la resta del stack.
+- **Model d'embeddings multilingue** pre-descarregat (~470 MB): `sentence-transformers/paraphrase-multilingual-mpnet-base-v2` en format ONNX.
+
+Efectes practics:
+
+- Mida del DMG: **~700 MB** (abans ~20 MB).
+- Un cop baixat el DMG, l'instal·lacio **no requereix xarxa** i no necessita Xcode Command Line Tools.
+- **Cap prompt de macOS demanant "eines de desenvolupador"** durant l'install.
+- RAG funcional al primer boot: el model d'embeddings ja esta present.
+- L'unica cosa que segueix requerint xarxa post-install es la descarrega del model LLM que trieu (Qwen, Gemma, DeepSeek, etc.), si no useu un model ja present a Ollama local.
+
+Requisit: **Apple Silicon (M1+) amb macOS 13 Ventura o superior**. Intel Mac ja no son un target suportat.
+
 ### Que fa el wizard
 
 1. **Benvinguda:** Selector d'idioma (ca/es/en), logotip, informacio de versio
