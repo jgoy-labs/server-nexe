@@ -415,8 +415,26 @@ class TestWriteVenvPipConf:
         assert pip_conf.exists()
         content = pip_conf.read_text(encoding="utf-8")
         assert "[global]" in content
-        assert f"find-links = {wheels}" in content
+        assert "file://" in content, "find-links must use file:// URI to handle spaces in paths"
         assert "no-index = true" in content
+
+    def test_pip_conf_handles_spaces_in_path(self, tmp_path):
+        """Paths like '/Volumes/Install Nexe/...' must be percent-encoded so
+        pip doesn't split on the space. This was the root cause of the
+        'No matching distribution found for fastapi' error during M1 install."""
+        venv = self._make_venv(tmp_path)
+        spaced_dir = tmp_path / "path with spaces" / "wheels"
+        spaced_dir.mkdir(parents=True)
+        (spaced_dir / "x.whl").write_bytes(b"PK\x03\x04")
+        from installer.installer_setup_env import _write_venv_pip_conf
+        ok = _write_venv_pip_conf(venv, spaced_dir)
+        assert ok is True
+        content = (venv / "pip.conf").read_text(encoding="utf-8")
+        # Must NOT contain a bare space in the find-links value
+        find_links_line = [l for l in content.splitlines() if "find-links" in l][0]
+        uri_part = find_links_line.split("=", 1)[1].strip()
+        assert " " not in uri_part, f"Bare space in find-links URI: {uri_part!r}"
+        assert "%20" in uri_part or "path" not in uri_part  # %20 encodes the space
 
     def test_returns_false_when_wheels_dir_missing(self, tmp_path):
         venv = self._make_venv(tmp_path)
