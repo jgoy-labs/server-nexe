@@ -373,7 +373,7 @@ def setup_environment(project_root, hw, engine="auto"):
     print(f"  🏗️ {t('installing_universal')} {CYAN}llama-cpp-python{RESET}...")
     try:
         subprocess.run(
-            [str(pip_path), "install", "llama-cpp-python"],
+            [str(pip_path), "install", "llama-cpp-python==0.3.19"],
             check=True,
             capture_output=True,
         )
@@ -383,7 +383,7 @@ def setup_environment(project_root, hw, engine="auto"):
             print(f"  ⚠️ Offline install failed for llama-cpp-python — fallback to PyPI...")
             pip_conf_path.unlink(missing_ok=True)
             subprocess.run(
-                [str(pip_path), "install", "llama-cpp-python"],
+                [str(pip_path), "install", "llama-cpp-python==0.3.19"],
                 check=True,
                 capture_output=True,
             )

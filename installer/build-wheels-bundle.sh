@@ -30,7 +30,7 @@ REQ_MACOS="$PROJECT_ROOT/requirements-macos.txt"
 # Inference engines installed dynamically by installer_setup_env.py.
 # We must bundle their wheels here so the client install stays offline.
 ENGINES=(
-    "llama-cpp-python"
+    "llama-cpp-python==0.3.19"  # 0.3.20 has corrupt wheel on abetlen Metal index (Bad CRC-32)
     "mlx-lm==0.31.2"
     "mlx-vlm==0.4.4"
 )
@@ -106,6 +106,13 @@ SDIST_ONLY_PKGS=(
     "rumps"
 )
 
+# Transitive deps of sdist-only packages that have binary wheels on PyPI.
+# pip wheel --no-deps (Step 3b) skips these, so we download them explicitly
+# in Step 3c to keep the client install 100% offline.
+SDIST_TRANSITIVE_DEPS=(
+    "pyobjc-framework-Cocoa"   # rumps → pyobjc-framework-Cocoa → pyobjc-core
+)
+
 # Build a grep -E pattern: ^(rumps|other)([= ].*)?$ to match requirement lines
 SDIST_PATTERN="^($(IFS='|'; echo "${SDIST_ONLY_PKGS[*]}"))([=<>! ].*)?$"
 REQ_MACOS_FILTERED="$(mktemp -t reqmacos-filtered.XXXXXX)"
@@ -135,6 +142,18 @@ for pkg in "${SDIST_ONLY_PKGS[@]}"; do
     "${PIP_BIN[@]}" wheel "$SPEC" --wheel-dir "$WHEELS_DIR" --no-deps
 done
 
+# ── Step 3c: Download transitive deps of sdist-only packages ──────────
+# These have binary wheels on PyPI but were skipped by --no-deps above.
+# pip download resolves their full dep chain (e.g. pyobjc-framework-Cocoa
+# pulls pyobjc-core automatically).
+if [ "${#SDIST_TRANSITIVE_DEPS[@]}" -gt 0 ]; then
+    echo "==> Downloading transitive deps of sdist-only packages..."
+    for dep in "${SDIST_TRANSITIVE_DEPS[@]}"; do
+        echo "  → $dep"
+        "${PIP_BIN[@]}" "${PIP_DOWNLOAD_ARGS[@]}" "$dep"
+    done
+fi
+
 # ── Step 4: Sanity checks ──────────────────────────────────────────────
 echo "==> Validating wheels..."
 
@@ -157,6 +176,8 @@ EXPECTED_SUBSTRINGS=(
     "sqlcipher3-"
     "cryptography-"
     "rumps-"
+    "pyobjc_framework_cocoa-"
+    "pyobjc_core-"
 )
 
 MISSING=()
