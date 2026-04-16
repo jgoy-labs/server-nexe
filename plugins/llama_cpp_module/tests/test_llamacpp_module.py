@@ -1,7 +1,10 @@
 import pytest
+import importlib
 from unittest.mock import MagicMock, patch
 from plugins.llama_cpp_module.module import LlamaCppModule
 from core.loader.protocol import HealthStatus
+
+_llama_cpp_available = importlib.util.find_spec("llama_cpp") is not None
 
 @pytest.mark.asyncio
 async def test_llamacpp_module_metadata():
@@ -11,25 +14,12 @@ async def test_llamacpp_module_metadata():
     assert module.metadata.module_type == "local_llm_option"
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not _llama_cpp_available, reason="llama_cpp not installed")
 async def test_llamacpp_module_initialize_failure():
-    # Test initialize with invalid config (model file not exists)
     with patch("plugins.llama_cpp_module.core.config.os.path.exists", return_value=False):
         module = LlamaCppModule()
-        # Should start even with warning (degraded mode concept)
-        # But wait, looking at my module.py, it returns True and logs warning
         success = await module.initialize({})
         assert success is True
-        
-        health = await module.health_check()
-        # Since _node is not initialized if validate fails? 
-        # Actually in my module.py, I initialize _node anyway if validate returns True or it continues.
-        # Let's check my module.py logic again.
-        # It calls:
-        # if not llama_config.validate():
-        #     logger.warning("...")
-        #     return True 
-        # self._node = LlamaCppChatNode(config=llama_config)
-        # So it continues even if invalid.
 
 @pytest.mark.asyncio
 async def test_llamacpp_module_chat_not_initialized():
@@ -38,6 +28,7 @@ async def test_llamacpp_module_chat_not_initialized():
         await module.chat(messages=[{"role": "user", "content": "hola"}])
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not _llama_cpp_available, reason="llama_cpp not installed")
 async def test_llamacpp_module_get_router():
     module = LlamaCppModule()
     await module.initialize({})

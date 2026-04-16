@@ -46,6 +46,9 @@ const UI_STRINGS = {
         delete_session: "Eliminar sessió",
         confirm_delete: "Segur que vols eliminar aquesta sessió?",
         reasoning: "Raonament",
+        thinking_mode: "Raonament",
+        thinking_not_supported: "Aquest model no suporta raonament",
+        thinking_tip: "Activa el raonament intern — pensa pas a pas abans de respondre. No tots els models ho suporten.",
         generation_stopped: "Generació aturada",
         model_load_error: "Error carregant model",
         model_loaded: "Model carregat",
@@ -114,6 +117,9 @@ const UI_STRINGS = {
         delete_session: "Delete session",
         confirm_delete: "Are you sure you want to delete this session?",
         reasoning: "Reasoning",
+        thinking_mode: "Thinking",
+        thinking_not_supported: "This model does not support reasoning",
+        thinking_tip: "Enable reasoning — thinks step by step before answering. Not all models support this.",
         generation_stopped: "Generation stopped",
         model_load_error: "Error loading model",
         model_loaded: "Model loaded",
@@ -183,6 +189,9 @@ const UI_STRINGS = {
         delete_session: "Eliminar sesión",
         confirm_delete: "¿Seguro que quieres eliminar esta sesión?",
         reasoning: "Razonamiento",
+        thinking_mode: "Razonamiento",
+        thinking_not_supported: "Este modelo no soporta razonamiento",
+        thinking_tip: "Activa el razonamiento interno — piensa paso a paso antes de responder. No todos los modelos lo soportan.",
         generation_stopped: "Generación detenida",
         model_load_error: "Error cargando modelo",
         model_loaded: "Modelo cargado",
@@ -309,6 +318,11 @@ class NexeUI {
         if (colDocsLabel) colDocsLabel.closest('label').title = this.t('col_docs_tip');
         const colDocsInfo = document.getElementById('colDocsInfo');
         if (colDocsInfo) colDocsInfo.title = this.t('col_docs_tip');
+        // Thinking toggle tooltip
+        const thinkInfo = document.getElementById('thinkingInfo');
+        if (thinkInfo) thinkInfo.title = this.t('thinking_tip');
+        const thinkLabel = document.querySelector('[data-i18n="thinking_mode"]');
+        if (thinkLabel) thinkLabel.closest('label').title = this.t('thinking_tip');
         // Input
         s('#messageInput', 'placeholder', 'placeholder');
         // Buttons
@@ -491,6 +505,77 @@ class NexeUI {
             const disabled = JSON.parse(saved);
             return ALL.filter(c => !disabled.includes(c));
         } catch (e) { return ALL; }
+    }
+
+    // ── Thinking toggle ────────────────────────────────────────────
+    // Mirror of Python THINKING_CAPABLE safelist (ollama_module/core/chat.py)
+    _canThink(model) {
+        const THINKING_FAMILIES = [
+            'qwen3.5', 'qwen3', 'qwq',
+            'deepseek-r1',
+            'gemma3', 'gemma4',
+            'llama4', 'gpt-oss',
+        ];
+        const n = (model || '').toLowerCase().split('/').pop().split(':')[0];
+        return THINKING_FAMILIES.some(f => n.includes(f));
+    }
+
+    _initThinkingToggle() {
+        const cb = document.getElementById('thinkingToggle');
+        if (!cb) return;
+        // Default OFF — never auto-enable
+        cb.checked = false;
+        cb.addEventListener('change', () => {
+            this._onThinkingToggleChange();
+        });
+        // Set initial enabled/disabled state based on current model
+        this._updateThinkingToggle();
+    }
+
+    _updateThinkingToggle() {
+        const cb = document.getElementById('thinkingToggle');
+        if (!cb) return;
+        const modelSel = document.getElementById('modelSelect');
+        const model = modelSel ? modelSel.value : '';
+        const supported = this._canThink(model);
+        cb.disabled = !supported;
+        if (!supported && cb.checked) {
+            cb.checked = false;
+            this._onThinkingToggleChange();
+        }
+        cb.title = supported ? this.t('thinking_mode') : this.t('thinking_not_supported');
+    }
+
+    async _onThinkingToggleChange() {
+        const cb = document.getElementById('thinkingToggle');
+        if (!cb || !this.currentSessionId) return;
+        const desired = cb.checked;
+        try {
+            const resp = await this.fetchWithCsrf(`/ui/session/${this.currentSessionId}/thinking`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: desired })
+            });
+            if (!resp.ok) {
+                console.error('PATCH thinking failed:', resp.status);
+                cb.checked = !desired;  // revert on failure
+            }
+        } catch (e) {
+            console.error('Error toggling thinking:', e);
+            cb.checked = !desired;  // revert on network error
+        }
+    }
+
+    _restoreThinkingToggle(session) {
+        const cb = document.getElementById('thinkingToggle');
+        if (!cb) return;
+        const enabled = session && session.thinking_enabled === true;
+        const modelSel = document.getElementById('modelSelect');
+        const model = modelSel ? modelSel.value : '';
+        const supported = this._canThink(model);
+        cb.disabled = !supported;
+        cb.checked = supported && enabled;
+        cb.title = supported ? this.t('thinking_mode') : this.t('thinking_not_supported');
     }
 
     showLoginOverlay() {
@@ -685,6 +770,9 @@ class NexeUI {
         // Collection checkboxes — restore from localStorage
         this._initCollectionToggles();
 
+        // Thinking toggle — default OFF, disabled for non-thinking models
+        this._initThinkingToggle();
+
         // Toggle light/dark theme (detects OS preference if no saved preference)
         const themeBtn = document.getElementById('themeToggleBtn');
         if (themeBtn) {
@@ -832,6 +920,8 @@ class NexeUI {
             }
 
             this._updateModelSelect(backendSel.value, this._currentModel);
+            // Update thinking toggle after models are populated
+            this._updateThinkingToggle();
 
             if (!this._backendListenersAttached) {
                 this._backendListenersAttached = true;
@@ -863,11 +953,13 @@ class NexeUI {
                 // Suport objecte {name, size_gb} o string legacy
                 const name = typeof m === 'object' ? m.name : m;
                 opt.value = name;
-                // Mostra 👁️ si té visió + mida aproximada en RAM
-                const hasVision = this._modelHasVision(name);
+                // Mostra 👁️ si té visió, 🧠 si pensa + mida aproximada en RAM
+                const hasVision = this._modelHasVision(name, backendId);
+                const hasThinking = this._canThink(name);
                 const sizeGb = typeof m === 'object' ? m.size_gb : 0;
                 const sizeTag = sizeGb > 0 ? ` (~${sizeGb}GB)` : '';
-                opt.textContent = (hasVision ? `👁️ ${name}` : name) + sizeTag;
+                const prefix = (hasVision ? '👁️ ' : '') + (hasThinking ? '🧠 ' : '');
+                opt.textContent = prefix + name + sizeTag;
                 if (currentModel && (currentModel.includes(name) || name.includes(currentModel))) {
                     opt.selected = true;
                 }
@@ -878,23 +970,23 @@ class NexeUI {
 
     /// Heurística client-side: un model té visió (VLM) si el nom conté
     /// famílies/tags multimodals coneguts. Equivalent al hasVision del Swift wizard.
-    _modelHasVision(name) {
+    /// backend: 'ollama'|'mlx'|'llamacpp' — Qwen3.5 vision funciona a Ollama però no a MLX (torch).
+    _modelHasVision(name, backend) {
         const n = (name || '').toLowerCase();
-        // Omni-models (video + audio) que requereixen torch/torchvision —
-        // no inclosos al DMG per mida. Detector els marca VLM pero la
-        // càrrega real peta. No mostrar 👁️ perquè no enganyi l'usuari.
+        // Omni-models que requereixen torch/torchvision —
+        // a MLX peten. A Ollama funcionen bé.
         // Veure knowledge/*/LIMITATIONS.md secció "Models multimodal (VLM)".
         const omniExcludes = [
-            'qwen3.5-',     // Qwen3.5 MoE (A3B / A10B) — omni-video
+            'qwen3.5',      // Qwen3.5 (totes les mides) — torch requerit per MLX
             'qwen3-omni',
             'kimi-vl',
             'qwen3-vl-moe',
         ];
-        if (omniExcludes.some(p => n.includes(p))) return false;
+        if (backend === 'mlx' && omniExcludes.some(p => n.includes(p))) return false;
 
         const patterns = [
-            'qwen3-vl', 'qwen2.5-vl', 'qwen-vl',
-            'gemma4', 'gemma-4', 'gemma-3-vision',
+            'qwen3.5', 'qwen3-vl', 'qwen2.5-vl', 'qwen-vl',
+            'gemma4', 'gemma-4', 'gemma3', 'gemma-3',
             'llama4', 'llama-4', 'llama3.2-vision',
             'pixtral', 'llava', 'moondream', 'bakllava',
             'minicpm-v', 'internvl', 'cogvlm',
@@ -958,6 +1050,8 @@ class NexeUI {
         } catch (e) {
             console.error('Failed to set backend:', e);
         }
+        // Update thinking toggle state after model change
+        this._updateThinkingToggle();
     }
 
     _startStreamStats() {
@@ -1007,6 +1101,8 @@ class NexeUI {
                 this.currentSessionId = data.session_id;
                 this.clearChat();
                 this.removeFilePreview();
+                // Reset thinking toggle for new session (default OFF)
+                this._restoreThinkingToggle(null);
                 this.loadSessions();
                 this.showWelcome();
             }
@@ -1183,6 +1279,9 @@ class NexeUI {
                     this.uploadedFile = { filename: doc.filename };
                 }
 
+                // Restore thinking toggle state from session
+                this._restoreThinkingToggle(data);
+
                 this.renderSessions();
             }
         } catch (error) {
@@ -1313,7 +1412,17 @@ class NexeUI {
                 let tGptOssChecked = false; // GPT-OSS format detection done?
                 let tIsGptOss = false;      // GPT-OSS thinking mode active?
 
+                // Check if thinking blocks should be shown (toggle checked)
+                const _thinkToggle = document.getElementById('thinkingToggle');
+                const _showThinking = _thinkToggle && _thinkToggle.checked;
+
                 const startThinkBlock = () => {
+                    // If thinking toggle is OFF, don't create DOM — still parse tags to strip from output
+                    if (!_showThinking) {
+                        tBlock = null;
+                        tTextEl = null;
+                        return;
+                    }
                     lastMsg.querySelector('.message-content').insertAdjacentHTML('afterbegin',
                         `<details class="think-block" open>
                             <summary class="think-header">

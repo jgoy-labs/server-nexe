@@ -62,7 +62,7 @@ server-nexe combines five capabilities:
 - **Linux:** Partial support (unit tests pass, not production-tested)
 - **Windows:** Not yet supported
 - **Default port:** 9119
-- **Tests:** 4665 test functions collected (4804 total), 0 failures in latest run
+- **Tests:** 4770 test functions collected (4804 total), 0 failures in latest run
 
 ## AI-Ready Documentation
 

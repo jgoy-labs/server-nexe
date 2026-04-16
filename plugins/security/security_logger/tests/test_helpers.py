@@ -3,175 +3,109 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security_logger/tests/test_helpers.py
-Description: Tests per SecurityLoggerHelpers (tots els mètodes de log).
+Description: Behavioral tests for SecurityLoggerHelpers — verify JSON output,
+severity mapping, IP obfuscation, and log file creation.
+
+Replaces 24 assertion-free smoke tests with 8 tests that verify real behavior.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import json
 import pytest
 
 from ..logger import SecurityEventLogger
+from ..enums import SecurityEventType, SecuritySeverity
 
 
 @pytest.fixture
 def logger(tmp_path):
-    """Logger amb directori temporal per evitar fitxers reals."""
+    """Logger with temporary directory to avoid real files."""
     return SecurityEventLogger(log_dir=tmp_path / "security")
 
 
-class TestLogAuthFailure:
+def _read_log_events(logger):
+    """Read all JSON events from the log file."""
+    lines = logger.log_file.read_text().strip().splitlines()
+    return [json.loads(line) for line in lines]
 
-    def test_logs_auth_failure(self, logger):
-        logger.log_auth_failure(reason="Invalid key")
-        # No ha de llançar excepció
 
-    def test_logs_auth_failure_with_ip(self, logger):
+class TestLogFileCreation:
+
+    def test_log_file_created_on_first_event(self, logger):
+        logger.log_auth_failure(reason="test")
+        assert logger.log_file.exists()
+
+    def test_log_file_contains_valid_json(self, logger):
+        logger.log_auth_failure(reason="bad key")
+        events = _read_log_events(logger)
+        assert len(events) == 1
+        assert "timestamp" in events[0]
+        assert "event_type" in events[0]
+        assert "severity" in events[0]
+
+
+class TestEventContent:
+
+    def test_auth_failure_has_correct_fields(self, logger):
         logger.log_auth_failure(
-            reason="Token expired",
-            ip_address="192.168.1.100",
-            endpoint="/api/v1/chat"
-        )
-
-    def test_logs_auth_failure_with_details(self, logger):
-        logger.log_auth_failure(
-            reason="Missing header",
-            details={"expected_header": "X-API-Key"}
-        )
-
-
-class TestLogPathTraversal:
-
-    def test_logs_path_traversal(self, logger):
-        logger.log_path_traversal(attempted_path="../../../etc/passwd")
-
-    def test_logs_with_ip_and_endpoint(self, logger):
-        logger.log_path_traversal(
-            attempted_path="../../secret.txt",
-            ip_address="10.0.0.1",
-            endpoint="/ui/static"
-        )
-
-
-class TestLogRateLimitExceeded:
-
-    def test_logs_with_ip(self, logger):
-        logger.log_rate_limit_exceeded(
-            ip_address="203.0.113.1",
+            reason="Invalid key",
+            ip_address="203.0.113.42",
             endpoint="/api/v1/chat",
-            limit=100
         )
+        event = _read_log_events(logger)[0]
+        assert event["event_type"] == SecurityEventType.AUTH_FAILURE.value
+        assert event["severity"] == SecuritySeverity.WARNING.value
+        assert event["endpoint"] == "/api/v1/chat"
+        # IP should be obfuscated (GDPR)
+        assert event["ip_address"] == "203.0.113.xxx"
 
-    def test_logs_without_ip(self, logger):
-        logger.log_rate_limit_exceeded(endpoint="/health")
+    def test_path_traversal_includes_attempted_path_in_details(self, logger):
+        logger.log_path_traversal(attempted_path="../../../etc/passwd")
+        event = _read_log_events(logger)[0]
+        assert event["event_type"] == SecurityEventType.PATH_TRAVERSAL_ATTEMPT.value
+        assert event["severity"] == SecuritySeverity.ERROR.value
+        assert event["details"]["attempted_path"] == "../../../etc/passwd"
 
-    def test_logs_without_limit(self, logger):
-        logger.log_rate_limit_exceeded(ip_address="1.2.3.4")
+    def test_config_validation_redacts_missing_value(self, logger):
+        logger.log_config_validation_failed(config_key="SECRET_KEY", reason="missing")
+        event = _read_log_events(logger)[0]
+        assert event["details"]["value"] == "[redacted]"
+        assert event["details"]["config_key"] == "SECRET_KEY"
 
-    def test_logs_without_any_args(self, logger):
-        logger.log_rate_limit_exceeded()
-
-
-class TestLogModuleRejected:
-
-    def test_logs_module_rejected(self, logger):
-        logger.log_module_rejected(
-            module_name="unknown_module",
-            reason="not in allowlist"
-        )
-
-    def test_logs_different_modules(self, logger):
-        logger.log_module_rejected("evil_module", "disabled by admin")
-        logger.log_module_rejected("test_module", "not found")
-
-
-class TestLogConfigValidationFailed:
-
-    def test_logs_config_failure(self, logger):
+    def test_config_validation_shows_provided_value(self, logger):
         logger.log_config_validation_failed(
-            config_key="NEXE_PRIMARY_API_KEY",
-            reason="too short"
+            config_key="NEXE_ENV", reason="invalid", value="unknown"
         )
-
-    def test_logs_with_value(self, logger):
-        logger.log_config_validation_failed(
-            config_key="NEXE_ENV",
-            reason="invalid value",
-            value="unknown"
-        )
-
-    def test_logs_without_value_redacts(self, logger):
-        # Sense value → [redacted]
-        logger.log_config_validation_failed(
-            config_key="SECRET_KEY",
-            reason="missing"
-        )
+        event = _read_log_events(logger)[0]
+        assert event["details"]["value"] == "unknown"
 
 
-class TestLogXssAttempt:
+class TestSeverityMapping:
 
-    def test_logs_xss(self, logger):
-        logger.log_xss_attempt(
-            input_data="<script>alert('xss')</script>",
-            ip_address="1.2.3.4",
-            endpoint="/ui/chat",
-            parameter="message"
-        )
-
-    def test_logs_xss_minimal(self, logger):
-        logger.log_xss_attempt(input_data="<img onerror=x>")
-
-
-class TestLogSqlInjection:
-
-    def test_logs_sql_injection(self, logger):
-        logger.log_sql_injection_attempt(
-            input_data="'; DROP TABLE users; --",
-            ip_address="5.6.7.8",
-            endpoint="/api/v1/query",
-            parameter="q"
-        )
-
-    def test_logs_sql_minimal(self, logger):
+    def test_attack_events_use_error_or_critical(self, logger):
+        logger.log_xss_attempt(input_data="<script>alert(1)</script>")
         logger.log_sql_injection_attempt(input_data="' OR 1=1 --")
+        logger.log_command_injection_attempt(input_data="; rm -rf /")
+        events = _read_log_events(logger)
+        severities = {e["event_type"]: e["severity"] for e in events}
+        assert severities[SecurityEventType.XSS_ATTEMPT.value] == SecuritySeverity.ERROR.value
+        assert severities[SecurityEventType.SQL_INJECTION_ATTEMPT.value] == SecuritySeverity.ERROR.value
+        assert severities[SecurityEventType.COMMAND_INJECTION_ATTEMPT.value] == SecuritySeverity.CRITICAL.value
 
 
-class TestLogCommandInjection:
+class TestMultipleLoggers:
 
-    def test_logs_command_injection(self, logger):
-        logger.log_command_injection_attempt(
-            input_data="; rm -rf /",
-            ip_address="9.8.7.6",
-            endpoint="/api/exec",
-            parameter="cmd"
-        )
-
-    def test_logs_command_minimal(self, logger):
-        logger.log_command_injection_attempt(input_data="`cat /etc/passwd`")
-
-
-class TestLogInvalidContentType:
-
-    def test_logs_invalid_content_type(self, logger):
-        logger.log_invalid_content_type(
-            content_type="text/html",
-            ip_address="1.2.3.4",
-            endpoint="/api/v1/chat"
-        )
-
-    def test_logs_minimal(self, logger):
-        logger.log_invalid_content_type(content_type="multipart/form-data")
-
-
-class TestLogRequestTooLarge:
-
-    def test_logs_request_too_large(self, logger):
-        logger.log_request_too_large(
-            size=10_000_000,
-            max_size=1_000_000,
-            ip_address="1.2.3.4",
-            endpoint="/api/v1/chat"
-        )
-
-    def test_logs_minimal(self, logger):
-        logger.log_request_too_large(size=999999, max_size=500000)
+    def test_two_loggers_dont_interfere(self, tmp_path):
+        logger_a = SecurityEventLogger(log_dir=tmp_path / "a")
+        logger_b = SecurityEventLogger(log_dir=tmp_path / "b")
+        logger_a.log_auth_failure(reason="from A")
+        logger_b.log_xss_attempt(input_data="from B")
+        events_a = _read_log_events(logger_a)
+        events_b = _read_log_events(logger_b)
+        assert len(events_a) == 1
+        assert len(events_b) == 1
+        assert events_a[0]["event_type"] == SecurityEventType.AUTH_FAILURE.value
+        assert events_b[0]["event_type"] == SecurityEventType.XSS_ATTEMPT.value
+        assert "from B" in events_b[0]["details"]["input_preview"]

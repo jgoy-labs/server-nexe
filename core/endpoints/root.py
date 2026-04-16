@@ -78,9 +78,9 @@ def _required_modules_from_config(config: dict) -> set:
     "mlx": "mlx_module",
     "llama_cpp": "llama_cpp_module",
   }
-  # Only require the preferred engine if it's both configured and enabled.
+  # Require the preferred engine if explicitly configured.
   # "auto" or empty → no engine required (user can pick at runtime).
-  if preferred_engine in engine_map and engine_map[preferred_engine] in enabled:
+  if preferred_engine in engine_map:
     required.add(engine_map[preferred_engine])
 
   return required

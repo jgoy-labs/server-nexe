@@ -489,6 +489,21 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                     ),
                 )
 
+        # Unload previous Ollama model to free VRAM when switching
+        old_model = os.getenv("NEXE_DEFAULT_MODEL", "")
+        old_backend = os.getenv("NEXE_MODEL_ENGINE", "auto")
+        if old_model and model and old_model != model and old_backend in ("ollama", "auto"):
+            try:
+                import httpx as _httpx
+                async with _httpx.AsyncClient(timeout=5.0) as _uc:
+                    await _uc.post(
+                        "http://localhost:11434/api/chat",
+                        json={"model": old_model, "keep_alive": 0}
+                    )
+                    logger.info(f"Unloaded previous model from Ollama VRAM: {old_model}")
+            except Exception as _ue:
+                logger.debug(f"Could not unload previous model {old_model}: {_ue}")
+
         if canonical:
             os.environ["NEXE_MODEL_ENGINE"] = canonical
             logger.info(f"Backend changed to: {canonical}")

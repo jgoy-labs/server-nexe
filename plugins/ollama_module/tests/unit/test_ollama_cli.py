@@ -50,6 +50,8 @@ class TestStatusCommand:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 status()
+            mock_ollama.check_connection.assert_awaited_once()
+            mock_ollama.list_models.assert_awaited_once()
 
     def test_status_disconnected(self):
         """Test status when disconnected."""
@@ -64,6 +66,7 @@ class TestStatusCommand:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 status()
+            mock_ollama.check_connection.assert_awaited_once()
 
     def test_status_models_error(self):
         """Test status when listing models fails."""
@@ -79,6 +82,7 @@ class TestStatusCommand:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 status()
+            mock_ollama.check_connection.assert_awaited_once()
 
 
 class TestModelsCommand:
@@ -99,8 +103,10 @@ class TestModelsCommand:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with patch("plugins.ollama_module.cli.main.Table") as MockTable:
-                    MockTable.return_value = MagicMock()
+                    mock_table = MagicMock()
+                    MockTable.return_value = mock_table
                     models()
+                    assert mock_table.add_row.call_count == 2
 
     def test_models_empty(self):
         """Test when no models installed."""
@@ -114,6 +120,7 @@ class TestModelsCommand:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 models()
+            mock_ollama.list_models.assert_awaited_once()
 
     def test_models_error(self):
         """Test models command error."""
@@ -154,6 +161,7 @@ class TestPullCommand:
                     MockProgress.return_value.__exit__ = MagicMock()
                     mock_progress.add_task.return_value = "task1"
                     pull(model="mistral")
+                    mock_progress.update.assert_called()
 
     def test_pull_error(self):
         """Test pull command error."""
@@ -189,6 +197,7 @@ class TestInfoCommand:
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with patch("plugins.ollama_module.cli.main.Panel"):
                     info(model="mistral")
+            mock_ollama.get_model_info.assert_awaited_once()
 
     def test_info_long_params(self):
         """Test info with long parameters string."""
@@ -206,6 +215,7 @@ class TestInfoCommand:
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with patch("plugins.ollama_module.cli.main.Panel"):
                     info(model="mistral")
+            mock_ollama.get_model_info.assert_awaited_once()
 
     def test_info_error(self):
         """Test info command error."""
@@ -238,6 +248,7 @@ class TestDeleteCommand:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 delete(model="mistral", force=True)
+            mock_ollama.delete_model.assert_awaited_once()
 
     def test_delete_confirmed(self):
         """Test delete with confirmation."""
@@ -253,6 +264,7 @@ class TestDeleteCommand:
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
                 with patch.object(typer, "confirm", return_value=True):
                     delete(model="mistral", force=False)
+            mock_ollama.delete_model.assert_awaited_once()
 
     def test_delete_cancelled(self):
         """Test delete cancelled by user."""
@@ -313,6 +325,7 @@ class TestChatCommand:
                 mock_console.input.return_value = "exit"
                 with patch("plugins.ollama_module.cli.main.Panel"):
                     chat(model="mistral", system=None)
+                mock_console.input.assert_called()
 
     def test_chat_with_system_prompt(self):
         """Test chat with system prompt."""
@@ -328,6 +341,7 @@ class TestChatCommand:
                 mock_console.input.return_value = "quit"
                 with patch("plugins.ollama_module.cli.main.Panel"):
                     chat(model="mistral", system="Be helpful")
+                mock_console.input.assert_called()
 
     def test_chat_clear_command(self):
         """Test chat clear command."""
@@ -343,6 +357,7 @@ class TestChatCommand:
                 mock_console.input.side_effect = ["clear", "exit"]
                 with patch("plugins.ollama_module.cli.main.Panel"):
                     chat(model="mistral", system="sys")
+                assert mock_console.input.call_count == 2
 
     def test_chat_empty_input(self):
         """Test chat with empty input."""
@@ -358,6 +373,7 @@ class TestChatCommand:
                 mock_console.input.side_effect = ["", "q"]
                 with patch("plugins.ollama_module.cli.main.Panel"):
                     chat(model="mistral", system=None)
+                assert mock_console.input.call_count == 2
 
     def test_chat_keyboard_interrupt(self):
         """Test chat with KeyboardInterrupt."""
@@ -373,6 +389,7 @@ class TestChatCommand:
                 mock_console.input.side_effect = KeyboardInterrupt
                 with patch("plugins.ollama_module.cli.main.Panel"):
                     chat(model="mistral", system=None)
+                mock_console.input.assert_called_once()
 
     def test_chat_error_during_response(self):
         """Test chat error during response generation."""
@@ -398,6 +415,7 @@ class TestChatCommand:
                     with patch("plugins.ollama_module.cli.main.Panel"):
                         with patch("builtins.print"):
                             chat(model="mistral", system=None)
+                mock_console.input.assert_called()
 
 
 class TestAskCommand:
@@ -418,8 +436,9 @@ class TestAskCommand:
             with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
-                with patch("builtins.print"):
+                with patch("builtins.print") as mock_print:
                     ask(prompt="What is 2+2?", model="mistral", system=None)
+                mock_print.assert_called()
 
     def test_ask_with_system(self):
         """Test ask with system prompt."""
@@ -436,8 +455,9 @@ class TestAskCommand:
             with patch("plugins.ollama_module.cli.main.console") as mock_console:
                 mock_console.status.return_value.__enter__ = MagicMock()
                 mock_console.status.return_value.__exit__ = MagicMock(return_value=False)
-                with patch("builtins.print"):
+                with patch("builtins.print") as mock_print:
                     ask(prompt="2+2", model="mistral", system="Be brief")
+                mock_print.assert_called()
 
     def test_ask_not_connected(self):
         """Test ask when not connected."""

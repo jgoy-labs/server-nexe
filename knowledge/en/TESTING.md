@@ -5,7 +5,7 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Testing strategy and coverage for server-nexe 0.9.7. 4665 test functions collected (4804 total), 0 failures in latest run. Tests collocated with modules. Covers test structure, running tests, coverage, AI audit test fixes, crypto tests (68 new), mega-test v1/v2 results, and honest assessment of testing limitations."
+abstract: "Testing strategy and coverage for server-nexe 0.9.7. 4770 test functions collected (4804 total), 0 failures in latest run. Tests collocated with modules. Covers test structure, running tests, coverage, AI audit test fixes, crypto tests (68 new), mega-test v1/v2 results, and honest assessment of testing limitations."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
 chunk_size: 800
 priority: P2
@@ -23,14 +23,14 @@ expires: null
 
 | Metric | Value |
 |--------|-------|
-| Total test functions collected | 4665 |
+| Total test functions collected | 4770 |
 | Total test functions (incl. deselected) | 4804 |
-| Latest full run passed | 4665 |
+| Latest full run passed | 4770 |
 | Failed | 0 |
 | Skipped | 6 |
 | XFailed | 1 |
 
-Note: 4665 functions collected in the standard run (excluding integration/e2e/slow markers). The raw total including deselected tests is 4804.
+Note: 4770 functions collected in the standard run (excluding integration/e2e/slow markers). The raw total including deselected tests is 4804.
 
 ## Test Structure
 
@@ -109,7 +109,7 @@ All security audits are performed by autonomous AI sessions (Claude), not extern
 - Same 4-phase methodology, re-run after applying v1 fixes
 - 10 findings (vs 23 in v1, 57% reduction)
 - 7 fixes applied (memory validation, path traversal, filename validation, rate limiting, Unicode normalization, print→logger)
-- Final run (v0.9.7): **4665 passed, 0 failed**
+- Final run (v0.9.7): **4770 passed, 0 failed**
 - Verdict: GO WITH CONDITIONS (improved)
 
 ## Key Testing Decisions

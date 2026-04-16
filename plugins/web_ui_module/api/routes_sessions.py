@@ -89,6 +89,24 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         session_mgr.save_session(session_id)
         return {"ok": True, "name": session.custom_name}
 
+    # -- PATCH /session/{session_id}/thinking --
+
+    @router.patch("/session/{session_id}/thinking")
+    @limiter.limit("10/minute")
+    async def toggle_thinking(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
+        """Toggle thinking mode for a session"""
+        session_id = validate_string_input(session_id, max_length=100, context="path")
+        session = session_mgr.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail=get_message(get_i18n(request), "webui.session.not_found"))
+        body = await request.json()
+        enabled = body.get("enabled")
+        if not isinstance(enabled, bool):
+            raise HTTPException(status_code=422, detail="enabled must be boolean")
+        session.thinking_enabled = enabled
+        session_mgr.save_session(session_id)
+        return {"ok": True, "thinking_enabled": session.thinking_enabled}
+
     # -- POST /session/{session_id}/clear-document --
 
     @router.post("/session/{session_id}/clear-document")

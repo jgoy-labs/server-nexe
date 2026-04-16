@@ -86,7 +86,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer
 ├── storage/               # Runtime data (models, logs, qdrant vectors)
-├── tests/                 # Test suite (4665 test functions)
+├── tests/                 # Test suite (4770 test functions)
 └── nexe                   # Main CLI executable
 ```
 
@@ -110,31 +110,39 @@ The knowledge base (`knowledge/`) is designed for both human and AI consumption:
 
 ## Available models (by RAM tier)
 
+16 empirically tested models, 4 tiers. Each tier has 2 recommended models (one for Ollama, one for MLX). Icons: 👁 = vision (images), 🧠 = thinking (step-by-step reasoning).
+
 ### tier_8 (8 GB RAM)
-- Qwen3.5 9B — Alibaba, 2025
-- Gemma 4 E4B — Google DeepMind, 2025
-- Salamandra 2B — BSC/AINA, 2024, optimized for Catalan
+- 👁 🧠 **Gemma 3 4B** — Google DeepMind, 2025. Ollama + MLX. **Recommended MLX.**
+- 👁 🧠 Qwen3.5 4B — Alibaba, 2026. Ollama only (MLX requires torch). **Recommended Ollama.**
+- Qwen3 4B — Alibaba, 2025. Text, Ollama + MLX.
 
 ### tier_16 (16 GB RAM)
-- Llama 4 Scout (109B/17B active MoE) — Meta, 2025
-- Salamandra 7B — BSC/AINA, 2024, best for Catalan
+- 👁 🧠 **Gemma 4 E4B** — Google, 2026. Ollama + MLX. **Recommended MLX.**
+- Salamandra 7B — BSC/AINA, 2025. Ollama + llama.cpp (GGUF). Best for Catalan.
+- 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Ollama only (MLX requires torch). **Recommended Ollama.**
+- 👁 🧠 Gemma 3 12B — Google DeepMind, 2025. Ollama + MLX.
 
 ### tier_24 (24 GB RAM)
-- Qwen3.5 27B — Alibaba, 2025
-- Gemma 4 31B — Google DeepMind, 2025
+- 👁 🧠 **Gemma 4 31B** — Google, 2026. Ollama + MLX. **Recommended.**
+- 🧠 **Qwen3 14B** — Alibaba, 2025. Ollama + MLX. **Recommended.**
+- 🧠 GPT-OSS 20B — OpenAI, 2025. Ollama + MLX. Apache 2.0.
 
 ### tier_32 (32 GB RAM)
-- Qwen3.5 35B-A3B (MoE) — Alibaba, 2025
-- DeepSeek R1 Distill 32B — DeepSeek, 2025, advanced reasoning
-- ALIA-40B Instruct — BSC/AINA, 2025
+- 👁 🧠 Qwen3.5 27B — Alibaba, 2026. Ollama only (MLX requires torch).
+- 👁 🧠 Gemma 3 27B — Google DeepMind, 2025. MLX + llama.cpp (GGUF).
+- 🧠 DeepSeek R1 Distill 32B — DeepSeek, 2025. Ollama + llama.cpp (MLX unsupported: qwen2 arch).
+- 👁 🧠 **Gemma 4 31B** — Google, 2026. Ollama + MLX. **Recommended MLX.**
+- 👁 🧠 Qwen3.5 35B-A3B (MoE) — Alibaba, 2026. Ollama only.
+- **ALIA-40B Instruct** — BSC, 2026. Ollama + llama.cpp (GGUF). 9 Iberian languages. **Recommended Iberian.**
 
-### tier_48 (48 GB RAM)
-- Qwen3.5 122B-A10B (MoE) — Alibaba, 2025
-- Llama 4 Maverick (400B/17B active MoE) — Meta, 2025
+### Backend compatibility notes (verified 2026-04-16)
 
-### tier_64 (64 GB RAM)
-- Qwen3.5 122B-A10B — Alibaba, 2025
-- GPT-OSS 120B — Meta, 2025
+- **Qwen3.5 family on MLX**: requires PyTorch and torchvision for VideoProcessor. Works perfectly via Ollama with no extra dependencies. Optional: `pip install torch torchvision` in the venv to unlock MLX (~2 GB). Affects: Qwen3.5 2B/4B/9B/27B/35B-A3B/122B-A10B.
+- **DeepSeek R1 Distill on MLX**: error "Unsupported model: qwen2". Use Ollama or GGUF via llama.cpp.
+- **Gemma 4 E4B on MLX**: may be unstable (repetition loops) in small models. Works well for vision.
+- **Gemma 4 31B on MLX**: requires complete 8-bit download (~33 GB, 7 shards). Verify integrity.
+- **ALIA-40B**: 42 GB Q8_0. Verify integrity after download (truncated tensor case detected).
 
 Custom models also supported via Ollama (name) or Hugging Face (GGUF repo).
 

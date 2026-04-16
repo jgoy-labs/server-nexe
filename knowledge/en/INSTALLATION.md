@@ -102,45 +102,41 @@ After setup:
 ./nexe go    # Start server → http://127.0.0.1:9119
 ```
 
-## Model Catalog
+## Model Catalog (16 models, 4 tiers — verified 2026-04-16)
 
 ### tier_8 (8 GB RAM)
-| Model | Engine | Year |
-|-------|--------|------|
-| Qwen3.5 9B | All | 2025 |
-| Gemma 4 E4B | All | 2025 |
-| Salamandra 2B | All | 2024 |
+| Model | Backends | 👁 | 🧠 | Rec. |
+|-------|----------|-----|-----|------|
+| Gemma 3 4B | Ollama, MLX | 👁 | 🧠 | MLX |
+| Qwen3.5 4B | Ollama | 👁 | 🧠 | Ollama |
+| Qwen3 4B | Ollama, MLX | | | |
 
 ### tier_16 (16 GB RAM)
-| Model | Engine | Year |
-|-------|--------|------|
-| Llama 4 Scout (109B/17B active MoE) | All | 2025 |
-| Salamandra 7B | All | 2024 |
+| Model | Backends | 👁 | 🧠 | Rec. |
+|-------|----------|-----|-----|------|
+| Gemma 4 E4B | Ollama, MLX | 👁 | 🧠 | MLX |
+| Salamandra 7B | Ollama, llama.cpp | | | iberic |
+| Qwen3.5 9B | Ollama | 👁 | 🧠 | Ollama |
+| Gemma 3 12B | Ollama, MLX | 👁 | 🧠 | |
 
 ### tier_24 (24 GB RAM)
-| Model | Engine | Year |
-|-------|--------|------|
-| Qwen3.5 27B | All | 2025 |
-| Gemma 4 31B | All | 2025 |
+| Model | Backends | 👁 | 🧠 | Rec. |
+|-------|----------|-----|-----|------|
+| Gemma 4 31B | Ollama, MLX | 👁 | 🧠 | ✓ |
+| Qwen3 14B | Ollama, MLX | | 🧠 | ✓ |
+| GPT-OSS 20B | Ollama, MLX | | 🧠 | |
 
 ### tier_32 (32 GB RAM)
-| Model | Engine | Year |
-|-------|--------|------|
-| Qwen3.5 35B-A3B (MoE) | All | 2025 |
-| DeepSeek R1 Distill 32B | All | 2025 |
-| ALIA-40B Instruct | All | 2025 |
+| Model | Backends | 👁 | 🧠 | Rec. |
+|-------|----------|-----|-----|------|
+| Qwen3.5 27B | Ollama | 👁 | 🧠 | |
+| Gemma 3 27B | MLX, llama.cpp | 👁 | 🧠 | |
+| DeepSeek R1 32B | Ollama, llama.cpp | | 🧠 | |
+| Gemma 4 31B | Ollama, MLX | 👁 | 🧠 | MLX |
+| Qwen3.5 35B-A3B | Ollama | 👁 | 🧠 | |
+| ALIA-40B | Ollama, llama.cpp | | | iberic |
 
-### tier_48 (48 GB RAM)
-| Model | Engine | Year |
-|-------|--------|------|
-| Qwen3.5 122B-A10B (MoE) | All | 2025 |
-| Llama 4 Maverick (400B/17B active MoE) | All | 2025 |
-
-### tier_64 (64 GB RAM)
-| Model | Engine | Year |
-|-------|--------|------|
-| Qwen3.5 122B-A10B | All | 2025 |
-| GPT-OSS 120B | All | 2025 |
+Qwen3.5 family only works via Ollama (MLX requires torch). DeepSeek R1 only Ollama/GGUF (MLX does not support qwen2 arch).
 
 Custom models: Ollama (by name) or Hugging Face (GGUF repo URL).
 

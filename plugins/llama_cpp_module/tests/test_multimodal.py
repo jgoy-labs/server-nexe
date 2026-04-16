@@ -3,6 +3,7 @@ Tests suport multimodal (imatges) a llama_cpp_module.
 No requereix llama-cpp-python instal·lat — tot és mockejat.
 """
 
+import importlib.util
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -42,6 +43,10 @@ class TestModelPoolMmproj:
         from plugins.llama_cpp_module.core.config import LlamaCppConfig
         return LlamaCppConfig(model_path="/fake/model.gguf", mmproj_path=mmproj)
 
+    @pytest.mark.skipif(
+        importlib.util.find_spec("llama_cpp") is None,
+        reason="llama_cpp not installed"
+    )
     def test_create_instance_without_mmproj(self):
         """Sense mmproj, Llama() es crida sense clip_model_path."""
         from plugins.llama_cpp_module.core.model_pool import ModelPool
@@ -49,12 +54,16 @@ class TestModelPoolMmproj:
         pool = ModelPool(config)
 
         mock_llama_cls = MagicMock(return_value=MagicMock())
-        with patch("llama_cpp.Llama", mock_llama_cls):
+        with patch("plugins.llama_cpp_module.core.model_pool.Llama", mock_llama_cls):
             pool._create_instance()
 
         call_kwargs = mock_llama_cls.call_args.kwargs
         assert "clip_model_path" not in call_kwargs
 
+    @pytest.mark.skipif(
+        importlib.util.find_spec("llama_cpp") is None,
+        reason="llama_cpp not installed"
+    )
     def test_create_instance_with_mmproj(self):
         """Amb mmproj, Llama() rep clip_model_path."""
         from plugins.llama_cpp_module.core.model_pool import ModelPool
@@ -62,7 +71,7 @@ class TestModelPoolMmproj:
         pool = ModelPool(config)
 
         mock_llama_cls = MagicMock(return_value=MagicMock())
-        with patch("llama_cpp.Llama", mock_llama_cls):
+        with patch("plugins.llama_cpp_module.core.model_pool.Llama", mock_llama_cls):
             pool._create_instance()
 
         call_kwargs = mock_llama_cls.call_args.kwargs
