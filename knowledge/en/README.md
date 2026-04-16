@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-02
+data: 2026-04-16
 id: nexe-overview
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), session isolation, encryption at-rest. Models by RAM tiers (8GB to 64GB), 2 installation methods (DMG, CLI), AI-ready documentation. macOS tested, Linux partial."
+abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), session isolation, encryption at-rest, thinking toggle. Models by RAM tiers (8GB to 32GB, 16 models, 4 tiers), 2 installation methods (offline DMG 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux partial."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -13,17 +13,17 @@ priority: P1
 # === OPCIONAL ===
 lang: en
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# server-nexe 0.9.7 — Local AI Server with Persistent Memory
+# server-nexe 1.0.0-beta — Local AI Server with Persistent Memory
 
-**Version:** 0.9.7
+**Version:** 1.0.0-beta
 **Default port:** 9119
 **Author:** Jordi Goy (Barcelona)
 **License:** Apache 2.0
-**Platforms:** macOS (tested), Linux (partial)
+**Platforms:** macOS 14 Sonoma+ Apple Silicon (M1+) — tested. Linux x86_64 (partial).
 **Website:** https://server-nexe.org | https://server-nexe.com
 
 ## What is server-nexe
@@ -55,8 +55,8 @@ What started as a learning-by-doing project and a giant spaghetti monster evolve
 | Language | Python 3.11+ (bundled 3.12 in installer) |
 | Web framework | FastAPI 0.115+ |
 | Vector database | Qdrant (embedded, no external process required) |
-| LLM backends | MLX, llama.cpp (llama-cpp-python), Ollama |
-| Embeddings | nomic-embed-text (Ollama) / paraphrase-multilingual-mpnet-base-v2 (offline fallback) |
+| LLM backends | MLX, llama.cpp (llama-cpp-python 0.3.19 pinned), Ollama |
+| Embeddings | **fastembed ONNX (paraphrase-multilingual-mpnet-base-v2, 768D) — primary offline** / nomic-embed-text via Ollama (optional) |
 | Embedding dimensions | 768 |
 | Encryption | AES-256-GCM, HKDF-SHA256, SQLCipher (default auto) |
 | CLI | Click + Rich |
@@ -86,7 +86,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer
 ├── storage/               # Runtime data (models, logs, qdrant vectors)
-├── tests/                 # Test suite (4770 test functions)
+├── tests/                 # Test suite (4842 collected / 4990 total)
 └── nexe                   # Main CLI executable
 ```
 
@@ -104,7 +104,7 @@ User -> CLI/API/Web UI -> Auth -> Rate Limit -> Validate Input -> Core -> Plugin
 
 The knowledge base (`knowledge/`) is designed for both human and AI consumption:
 - **Structured YAML frontmatter** for RAG ingestion (chunk_size, tags, priority)
-- **12 thematic files** covering identity, architecture, API, security, testing, etc.
+- **13 thematic files** covering identity, architecture, API, security, testing, use cases, etc.
 - **Available in English, Catalan, and Spanish**
 - Point any AI assistant at this repository and it can understand the full architecture, create plugins, or contribute code
 
@@ -182,8 +182,9 @@ Authentication required: `X-API-Key` header with value from `.env` (`NEXE_PRIMAR
 
 | Platform | Status |
 |----------|--------|
-| macOS Apple Silicon | Tested (all 3 backends) |
-| macOS Intel | Tested (llama.cpp + Ollama) |
+| macOS 14 Sonoma+ Apple Silicon (M1+) | Tested (all 3 backends) |
+| macOS 13 Ventura | **NOT supported** (removed in v0.9.9) |
+| macOS Intel | **NOT supported** (removed in v0.9.9 — arm64-only wheels) |
 | Linux x86_64 | Partial (unit tests pass, CI green, not production-tested) |
 | Windows | Not yet supported |
 

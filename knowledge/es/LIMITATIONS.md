@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-16
 id: nexe-limitations
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentacion honesta de las limitaciones de server-nexe 0.9.7. Cubre soporte de plataformas (macOS probado, Linux parcial, Windows no soportado), calidad de modelos vs nube (GPT-4/Claude), limitaciones de RAG (embeddings, chunking, arranque en frio, contradicciones), compatibilidad parcial de API OpenAI, rendimiento (instancia unica, concurrencia), restricciones de seguridad, advertencias sobre encriptacion (default auto, nueva, no probada en batalla), y carencias funcionales (sin multi-usuario, sin sincronizacion, sin fine-tuning)."
+abstract: "Documentacion honesta de las limitaciones de server-nexe 1.0.0-beta. Cubre soporte de plataformas (macOS 14+ Apple Silicon only, Linux parcial, Intel y Windows NO soportados), calidad de modelos vs nube (GPT-4/Claude), limitaciones de RAG (embeddings, chunking, arranque en frio, contradicciones), compatibilidad parcial de API OpenAI, rendimiento (instancia unica, concurrencia), restricciones de seguridad, advertencias sobre encriptacion (default auto, nueva, no probada en batalla), y carencias funcionales (sin multi-usuario, sin sincronizacion, sin fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -13,11 +13,11 @@ priority: P2
 # === OPCIONAL ===
 lang: es
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Limitaciones — server-nexe 0.9.7
+# Limitaciones — server-nexe 1.0.0-beta
 
 Este documento describe honestamente lo que server-nexe no puede hacer o no hace bien.
 
@@ -25,8 +25,9 @@ Este documento describe honestamente lo que server-nexe no puede hacer o no hace
 
 | Plataforma | Estado |
 |------------|--------|
-| macOS Apple Silicon | Probado, los 3 backends |
-| macOS Intel | Probado, llama.cpp + Ollama (sin MLX) |
+| macOS 14 Sonoma+ Apple Silicon (M1+) | **Target principal** — probado, los 3 backends |
+| macOS 13 Ventura | **NO soportado** (eliminado en v0.9.9 por dependencias arm64-only del stack) |
+| macOS Intel | **NO soportado** (eliminado en v0.9.9 — wheels arm64-only, sin MLX) |
 | Linux x86_64 | Parcial — tests unitarios pasan, CI verde, no probado en produccion |
 | Linux ARM64 | No probado directamente |
 | Windows | No soportado |
@@ -42,7 +43,7 @@ Los modelos locales son menos capaces que los modelos en la nube (GPT-4, Claude,
 
 ## Modelos multimodales (VLM)
 
-El backend MLX soporta modelos de vision (imagen + texto) via `mlx-vlm 0.4.4`. Lista de arquitecturas detectadas: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (todos), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama y mas. El detector tambien se activa por `vision_config` en el `config.json` o por claves `vision_tower`/`mm_projector` en el `model.safetensors.index.json` (cubre arquitecturas nuevas).
+El backend MLX soporta modelos de vision (imagen + texto) via `mlx-vlm 0.4.4`. Lista de arquitecturas detectadas: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (todos), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama y mas. Desde **v0.9.8** el detector "any-of" de 3 senales (architectures + vision_config en el `config.json` + weight_map en el `model.safetensors.index.json`) cubre arquitecturas nuevas sin claves clasicas.
 
 Limitaciones actuales:
 - **Familia Qwen3.5 y modelos omni (Qwen3.5 2B/4B/9B/27B/35B/122B, Qwen3-Omni, Kimi-VL, …):** Requieren `PyTorch` y `torchvision` para su `VideoProcessor`, que server-nexe **no incluye** en el venv por tamano (~2 GB anadidos al DMG). Se cargaran via `mlx-vlm.load()` pero fallaran en la fase de preparacion del processor. **Funcionan perfectamente via Ollama** sin dependencias adicionales. **Opcional:** para usarlos via MLX, instalar manualmente: `pip install torch torchvision` en el venv de server-nexe — anade ~2 GB pero desbloquea Qwen3.5 MLX con prefix caching y vision. **Solucion sin instalar nada:** usar Ollama para Qwen3.5 (fallback automatico si MLX falla) o un VLM imagen-only como Gemma-4.

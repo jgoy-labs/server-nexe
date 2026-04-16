@@ -1,6 +1,6 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-02
+data: 2026-04-16
 id: nexe-api-reference
 collection: nexe_documentation
 
@@ -13,11 +13,11 @@ priority: P1
 # === OPCIONAL ===
 lang: ca
 type: api
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Referencia de l'API REST — server-nexe 0.9.7
+# Referencia de l'API REST — server-nexe 1.0.0-beta
 
 ## URL base
 
@@ -53,6 +53,7 @@ El rate limiting s'aplica a **tots els endpoints** — tant API com Web UI.
 | NEXE_RATE_LIMIT_RAG | 30/minut | /v1/rag/* |
 | NEXE_RATE_LIMIT_UPLOAD | 5/minut | /ui/upload |
 | NEXE_RATE_LIMIT_DEFAULT | 120/minut | Resta d'endpoints |
+| NEXE_RATE_LIMIT_GLOBAL | 100/minut | Limit global a tots els endpoints |
 
 **Nota:** Aquestes variables estan reservades per a implementació futura. Els límits actuals estan configurats al codi font.
 
@@ -67,6 +68,7 @@ El rate limiting s'aplica a **tots els endpoints** — tant API com Web UI.
 | POST /ui/files/cleanup | 5/minut |
 | GET /ui/session/{id} | 30/minut |
 | DELETE /ui/session/{id} | 10/minut |
+| PATCH /ui/session/{id}/thinking | 10/minut |
 
 ## Endpoints principals
 
@@ -103,6 +105,8 @@ Chat completion compatible amb OpenAI amb suport RAG i streaming.
 - `[COMPACT:N]` — indicador de compactacio de context
 - `[THINKING]` / `[/THINKING]` — thinking tokens (models Ollama com qwen3.5)
 - `[DOC_TRUNCATED:XX%]` — percentatge de document descartat per limit de context (nou 2026-04-02)
+
+**Bloc `[IMATGE ADJUNTA]`:** Quan un missatge inclou una imatge (backend VLM), l'endpoint de xat injecta un bloc `[IMATGE ADJUNTA]` que **prioritza la imatge sobre el context RAG**. El model processa la imatge directament i el RAG queda relegat a context secundari, evitant que documents recuperats distreguin la descripcio visual.
 
 ### Informacio del sistema
 
@@ -205,8 +209,11 @@ Aquests endpoints serveixen la interficie web i els utilitza el frontend JavaScr
 | `/ui/session/{id}/history` | GET | Si | 30/min | Obtenir historial de xat de la sessio |
 | `/ui/session/{id}` | DELETE | Si | 10/min | Esborrar sessio |
 | `/ui/session/{id}` | PATCH | Si | per defecte | Renombrar sessio (nou 2026-04-01) |
+| `/ui/session/{id}/thinking` | PATCH | Si | 10/min | Commutador del mode thinking (reasoning tokens) per sessio (nou v0.9.9) |
 | `/ui/session/{id}/clear-document` | POST | Si | per defecte | Netejar document adjunt de la sessio (nou 2026-04-02) |
 | `/ui/sessions` | GET | Si | per defecte | Llistar totes les sessions |
+
+**Thinking toggle** (`PATCH /ui/session/{id}/thinking`): permet activar o desactivar l'emissio de reasoning tokens per a una sessio concreta. Nomes disponible per a famílies de models compatibles (`THINKING_CAPABLE`: qwen3.5, qwen3, qwq, deepseek-r1, gemma3/4, llama4, gpt-oss). Per defecte està desactivat. Si el model no suporta thinking, l'endpoint retorna 400 amb missatge explicatiu i la UI ofereix retry automatic sense thinking.
 
 ### Fitxers
 

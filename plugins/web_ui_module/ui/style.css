@@ -792,8 +792,8 @@ body.light .icon-moon,
 
 /* Welcome Screen */
 .welcome-screen {
-    max-width: 600px;
-    margin: 4rem auto;
+    max-width: 780px;
+    margin: 3rem auto;
     text-align: center;
 }
 
@@ -824,9 +824,9 @@ body.light .icon-moon,
 }
 
 .features {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
     text-align: left;
 }
 
@@ -868,6 +868,13 @@ body.light .icon-moon,
 .feature-clickable:hover {
     border-color: var(--primary-color);
     background: var(--bg-tertiary, var(--bg-secondary));
+}
+
+.welcome-disclaimer {
+    margin-top: 1.5rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
 }
 
 /* Messages */

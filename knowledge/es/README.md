@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-02
+data: 2026-04-16
 id: nexe-overview
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe es un servidor de IA local con memoria RAG persistente creado por Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalidades: MEM_SAVE, i18n (ca/es/en), aislamiento de sesiones, encriptacion en reposo. Modelos por tiers de RAM (8GB a 64GB), 2 metodos de instalacion (DMG, CLI). macOS probado, Linux parcial."
+abstract: "server-nexe es un servidor de IA local con memoria RAG persistente creado por Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalidades: MEM_SAVE, i18n (ca/es/en), aislamiento de sesiones, encriptacion en reposo, thinking toggle. Modelos por tiers (8GB a 32GB, 16 modelos 4 tiers), 2 metodos de instalacion (DMG offline 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux parcial."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -13,17 +13,17 @@ priority: P1
 # === OPCIONAL ===
 lang: es
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# server-nexe 0.9.7 — Servidor de IA local con memoria persistente
+# server-nexe 1.0.0-beta — Servidor de IA local con memoria persistente
 
-**Version:** 0.9.7
+**Version:** 1.0.0-beta
 **Puerto por defecto:** 9119
 **Autor:** Jordi Goy (Barcelona)
 **Licencia:** Apache 2.0
-**Plataformas:** macOS (probado), Linux (parcial)
+**Plataformas:** macOS 14 Sonoma+ Apple Silicon (M1+) — probado. Linux x86_64 (parcial).
 **Web:** https://server-nexe.org | https://server-nexe.com
 
 ## Que es server-nexe
@@ -55,8 +55,8 @@ Lo que empezó como un learning-by-doing y un monstruo de espagueti gigante deri
 | Lenguaje | Python 3.11+ (3.12 bundled en instalador) |
 | Framework web | FastAPI 0.115+ |
 | Base de datos vectorial | Qdrant (binario embebido) |
-| Backends LLM | MLX, llama.cpp (llama-cpp-python), Ollama |
-| Embeddings | nomic-embed-text (Ollama) / paraphrase-multilingual-mpnet-base-v2 (fallback offline) |
+| Backends LLM | MLX, llama.cpp (llama-cpp-python 0.3.19 pinned), Ollama |
+| Embeddings | **fastembed ONNX (paraphrase-multilingual-mpnet-base-v2, 768D) — principal offline** / nomic-embed-text via Ollama (opcional) |
 | Dimensiones de embedding | 768 |
 | Encriptacion | AES-256-GCM, HKDF-SHA256, SQLCipher (default auto) |
 | CLI | Click + Rich |
@@ -86,7 +86,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # Wizard SwiftUI, constructor DMG, tray app, instalador headless
 ├── storage/               # Datos en tiempo de ejecucion (modelos, logs, vectores qdrant)
-├── tests/                 # Suite de tests (4770 funciones de test)
+├── tests/                 # Suite de tests (4842 recopiladas / 4990 totales)
 └── nexe                   # Ejecutable CLI principal
 ```
 
@@ -104,7 +104,7 @@ Usuario -> CLI/API/Web UI -> Auth -> Rate Limit -> Validar Entrada -> Core -> Pl
 
 La base de conocimiento (`knowledge/`) esta disenada tanto para consumo humano como de IA:
 - **Frontmatter YAML estructurado** para ingestion RAG (chunk_size, tags, priority)
-- **12 ficheros tematicos** cubriendo identidad, arquitectura, API, seguridad, pruebas, etc.
+- **13 ficheros tematicos** cubriendo identidad, arquitectura, API, seguridad, pruebas, casos de uso, etc.
 - **Disponible en ingles, catalan y espanol**
 - Apunta cualquier asistente de IA a este repositorio y podra entender la arquitectura completa, crear plugins o contribuir codigo
 
@@ -182,8 +182,9 @@ Autenticacion requerida: cabecera `X-API-Key` con el valor de `.env` (`NEXE_PRIM
 
 | Plataforma | Estado |
 |----------|--------|
-| macOS Apple Silicon | Probado (los 3 backends) |
-| macOS Intel | Probado (llama.cpp + Ollama) |
+| macOS 14 Sonoma+ Apple Silicon (M1+) | Probado (los 3 backends) |
+| macOS 13 Ventura | **NO soportado** (eliminado en v0.9.9) |
+| macOS Intel | **NO soportado** (eliminado en v0.9.9 — wheels arm64-only) |
 | Linux x86_64 | Parcial (tests unitarios pasan, CI verde, no probado en produccion) |
 | Windows | Aun no soportado |
 

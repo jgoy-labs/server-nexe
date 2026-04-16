@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-02
+data: 2026-04-16
 id: nexe-rag-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete reference of the server-nexe RAG memory system (v0.9.7). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent, session-isolated document upload, embeddings (768D), chunking parameters, context building with i18n labels, RAG weight visualization, RAG context sanitization, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
+abstract: "Complete reference of the server-nexe RAG memory system (v1.0.0-beta). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent (DELETE_THRESHOLD 0.20 post-Bug #18), session-isolated document upload, embeddings (768D, fastembed ONNX primary offline), chunking parameters, context building with i18n labels, RAG weight visualization, RAG injection sanitization (_filter_rag_injection), 2-turn clear_all confirmation, precomputed KB embeddings, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -13,11 +13,44 @@ priority: P1
 # === OPCIONAL ===
 lang: en
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# RAG System — server-nexe 0.9.7
+# RAG System — server-nexe 1.0.0-beta
+
+## Table of contents
+
+- [How RAG works in server-nexe](#how-rag-works-in-server-nexe)
+- [Qdrant Collections](#qdrant-collections)
+- [Qdrant Payloads (no text)](#qdrant-payloads-no-text)
+- [TextStore (new in v0.9.0)](#textstore-new-in-v090)
+- [Embeddings](#embeddings)
+- [MEM_SAVE — Automatic Memory](#mem_save--automatic-memory)
+  - [2-turn `clear_all` confirmation](#2-turn-clear_all-confirmation)
+  - [RAG injection sanitisation (`_filter_rag_injection`)](#rag-injection-sanitisation-_filter_rag_injection)
+- [RAG Context Sanitization](#rag-context-sanitization)
+- [Document Upload with Session Isolation](#document-upload-with-session-isolation)
+- [Document Ingestion](#document-ingestion)
+  - [System documentation (nexe_documentation)](#system-documentation-nexe_documentation)
+  - [User knowledge (user_knowledge via CLI)](#user-knowledge-user_knowledge-via-cli)
+- [Context Building](#context-building)
+- [RAG Weight Visualization](#rag-weight-visualization)
+- [Smart Pruning (personal_memory collection)](#smart-pruning-personal_memory-collection)
+- [Qdrant Storage](#qdrant-storage)
+- [Key Configuration](#key-configuration)
+- [Limitations](#limitations)
+- [Main Endpoints for RAG](#main-endpoints-for-rag)
+
+## In 30 seconds
+
+- **3 Qdrant collections:** `personal_memory`, `user_knowledge`, `nexe_documentation`
+- **`fastembed` ONNX embeddings** (multilingual, 768 dimensions, offline)
+- **Top-K retrieval** with per-collection thresholds (0.3 / 0.35 / 0.4)
+- **Automatic MEM_SAVE:** the model extracts facts from conversations and saves them
+- **`_filter_rag_injection`** neutralises malicious tags (MEM_SAVE, MEM_DELETE, OLVIDA, MEMORIA) on ingest and retrieval
+
+---
 
 RAG (Retrieval-Augmented Generation) is the persistent memory system of server-nexe. It augments the LLM's responses by injecting relevant information retrieved from vector memory into the prompt context.
 
@@ -69,9 +102,11 @@ All text lives in SQLite (optionally encrypted via SQLCipher). This means even w
 
 ## Embeddings
 
-**Primary model (via Ollama):** `nomic-embed-text` — 768 dimensions. Used when Ollama is available.
+**Primary model (offline, always available):** `paraphrase-multilingual-mpnet-base-v2` via **fastembed (ONNX)** — 768 dimensions, multilingual. It is the **primary backend** since v0.9.3 (migrated from sentence-transformers to fastembed, PyTorch removed ~600 MB). Works without Ollama, without network, and ships **bundled in the DMG** to guarantee offline installation.
 
-**Fallback model (offline):** `paraphrase-multilingual-mpnet-base-v2` via fastembed (ONNX) — 768 dimensions. Multilingual. Used when Ollama is not available. (Migrated from sentence-transformers to fastembed since v0.9.3.)
+**Optional model (via Ollama):** `nomic-embed-text` — 768 dimensions. Configurable via `NEXE_OLLAMA_EMBED_MODEL`. Used only if the user enables it explicitly; **it is not the primary path**.
+
+**Precomputed KB embeddings** (v0.9.8+): files in `knowledge/` have precomputed embeddings in `knowledge/.embeddings/`. At startup, if the hashes match, the system skips the computation and loads directly (10.7× cold-boot speedup). Embeddings regenerate automatically if the content changes.
 
 All vectors are stored with 768 dimensions. This value is centralized in `memory/memory/constants.py` as `DEFAULT_VECTOR_SIZE = 768`.
 
@@ -128,7 +163,29 @@ Qdrant — personal_memory collection
     · Max 500 entries (smart pruning)
 ```
 
-**Delete intent (MEM_DELETE):** When user says "forget that X", searches for entries with similarity >= DELETE_THRESHOLD (0.70). Deletes the closest match. Anti-re-save guard: `_recently_deleted_facts` prevents the model from re-saving a just-deleted fact within the same session.
+**Delete intent (MEM_DELETE):** When the user says "forget that X", searches for entries with similarity >= **DELETE_THRESHOLD (0.20 since v0.9.9)**. Deletes the closest match. Anti-re-save guard: `_recently_deleted_facts` prevents the model from re-saving a just-deleted fact within the same session.
+
+> **Bug #18 fix (v0.9.9):** The previous threshold (0.70) was too high and no match passed the check. It was adjusted to **0.20** after 8 real e2e tests (`tests/integration/test_mem_delete_e2e.py`) against embedded Qdrant + fastembed. Deletion now works consistently.
+
+### 2-turn `clear_all` confirmation
+
+If the user asks to delete **everything** (patterns like "delete all memory", "forget everything", "olvida todo"), the system does **NOT delete immediately**. Instead:
+
+1. **Turn 1:** The server detects the `CLEAR_ALL_TRIGGERS` pattern, marks `session._pending_clear_all = True` and asks for explicit confirmation ("Are you sure? This will erase all of your memory. Reply 'yes' to confirm.").
+2. **Turn 2:** If the user confirms with a short affirmative pattern (`yes`, `confirm`, `ok`, etc.), the collection is deleted. Any other message cancels the operation and resets the flag.
+
+This prevents accidental mass wipes caused by an ambiguous message or an injected instruction from a document/prompt.
+
+### RAG injection sanitisation (`_filter_rag_injection`)
+
+Before injecting RAG context into the LLM prompt (ingest + retrieval), `_filter_rag_injection` **neutralises control tags** that could manipulate memory via side-effect:
+
+- `[MEM_SAVE:…]` → removed (prevents the model from auto-saving just because it sees the pattern in a document)
+- `[MEM_DELETE:…]` → removed
+- `[OLVIDA:…]` / `[OBLIT:…]` / `[FORGET:…]` → removed (trilingual delete intents)
+- `[MEMORIA:…]` → removed
+
+This applies **both on ingest** (when a document or memory is stored) **and on retrieval** (when content is fetched for injection into the prompt), creating a double barrier against RAG injection.
 
 **Large document truncation:** If an uploaded document is too large for the available context, it is truncated and the UI shows a yellow warning via the SSE marker `[DOC_TRUNCATED:XX%]` indicating the percentage discarded.
 

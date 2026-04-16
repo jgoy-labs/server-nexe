@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-02
+data: 2026-04-16
 id: nexe-usage-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "How to use server-nexe: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119), automatic MEM_SAVE memory, PDF/TXT document upload, encryption commands. API examples with curl and Python. How to install models, change language (NEXE_LANG), manage memory."
+abstract: "How to use server-nexe 1.0.0-beta: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119) with thinking toggle, automatic MEM_SAVE memory, MEM_DELETE (threshold 0.20) with 2-turn clear_all confirmation, PDF/TXT document upload, encryption commands. API examples with curl and Python. How to install models, change language (NEXE_LANG), manage memory."
 tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption, how-to, commands]
 chunk_size: 600
 priority: P1
@@ -13,11 +13,38 @@ priority: P1
 # === OPCIONAL ===
 lang: en
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Usage Guide — server-nexe 0.9.7
+# Usage Guide — server-nexe 1.0.0-beta
+
+## Table of contents
+
+- [Starting the Server](#starting-the-server)
+- [CLI Commands](#cli-commands)
+- [Web UI](#web-ui)
+  - [Features](#features)
+  - [Document Upload](#document-upload)
+- [MEM_SAVE — Automatic Memory](#mem_save--automatic-memory)
+  - [Full wipe (`CLEAR_ALL`) — 2-turn confirmation](#full-wipe-clear_all--2-turn-confirmation)
+- [Encryption](#encryption)
+- [API Usage](#api-usage)
+  - [Chat (curl)](#chat-curl)
+  - [Chat (Python)](#chat-python)
+  - [Store to memory](#store-to-memory)
+- [Use cases](#use-cases)
+- [Tips](#tips)
+
+## In 30 seconds
+
+- **CLI:** `./nexe go` starts server + Qdrant + tray
+- **Web UI** at `http://127.0.0.1:9119/ui` (chat, document upload, sessions)
+- **OpenAI-compatible API:** `/v1/chat/completions`
+- **Automatic MEM_SAVE** (the model saves facts from the conversation)
+- **System tray menu** for start/stop, logs, uninstall
+
+---
 
 ## Starting the Server
 
@@ -61,6 +88,7 @@ Access at `http://127.0.0.1:9119/ui`. Requires API key (stored in localStorage a
 - **Language selector:** Footer dropdown CA/ES/EN. Changes all UI text instantly via `applyI18n()`. Server is source of truth (POST /ui/lang).
 - **Backend dropdown:** Shows all configured backends. Marks disconnected backends. Auto-fallback to first available backend if selected one is down.
 - **Thinking tokens:** Auto-scroll thinking box for models like qwen3.5 that emit thinking tokens.
+- **Per-session thinking toggle (v0.9.9):** ✨ sparkles icon next to the input + 🧠 dropdown in the session header to enable/disable thinking mode (reasoning tokens) for that session. Only available for compatible families (`THINKING_CAPABLE`: qwen3.5, qwen3, qwq, deepseek-r1, gemma3/4, llama4, gpt-oss). Default OFF. If the current model does not support thinking, the UI shows a warning and offers automatic retry without thinking. Internal endpoint: `PATCH /ui/session/{id}/thinking`.
 - **Upload overlay:** Spinner + timer + filename during document upload. Input blocked until complete. Shows chunk count and time after completion.
 - **Session persistence:** API key and preferences in localStorage. Sessions survive page refresh.
 - **Auto-scroll:** Chat and thinking boxes auto-scroll to bottom during streaming.
@@ -88,10 +116,19 @@ Upload documents via the paperclip button in the chat input. Supported: .txt, .m
 The model automatically extracts and saves facts from conversations:
 
 - User says "My name is Jordi" → model saves `[MEM_SAVE: name=Jordi]`
-- User says "Forget my name" → MEM_DELETE: similarity search (threshold 0.70), deletes closest match, anti-re-save guard
+- User says "Forget my name" → MEM_DELETE: similarity search (**threshold 0.20** since v0.9.9, previously 0.70), deletes closest match, anti-re-save guard
 - Next conversation: "What's my name?" → RAG retrieves "name=Jordi" → model answers correctly
 
 No extra commands needed. Works in both CLI and Web UI. Indicators: `[MEM:N]` badge shows count of saved facts.
+
+### Full wipe (`CLEAR_ALL`) — 2-turn confirmation
+
+If you ask to delete **all** memory ("delete everything", "forget everything", "olvida todo"), the system does **not delete immediately**. It follows a 2-turn flow:
+
+1. **Turn 1:** Detects the pattern and asks for confirmation ("Are you sure? This will erase all memory. Reply 'yes' to confirm.").
+2. **Turn 2:** If you reply `yes`/`confirm`/`ok`, the deletion runs. Any other reply cancels the operation.
+
+This prevents accidental mass wipes caused by an ambiguous message or injection from a document.
 
 ## Encryption
 
@@ -141,14 +178,9 @@ curl -X POST http://127.0.0.1:9119/v1/memory/store \
   -d '{"text": "Project deadline is March 30", "collection": "user_knowledge"}'
 ```
 
-## Practical Use Cases
+## Use cases
 
-1. **Personal assistant with memory:** Ask about your projects, preferences, deadlines. MEM_SAVE remembers context automatically.
-2. **Private knowledge base:** Upload technical docs, query them in natural language. Session-isolated per conversation.
-3. **AI-assisted development:** OpenAI-compatible API works with Cursor, Continue, Zed. Point them to http://127.0.0.1:9119/v1.
-4. **Semantic search:** Use /v1/memory/search for similarity-based document retrieval without exact keyword matching.
-5. **Model experimentation:** Switch between MLX, llama.cpp, and Ollama backends to compare speed and quality.
-6. **Secure local AI:** Enable encryption at rest for sensitive data handling without any cloud dependency.
+See **[[USE_CASES|practical use cases]]** for the full list with detailed context (personal assistant, private knowledge base, AI-assisted dev with Cursor/Continue/Zed, semantic search, model experimentation, secure local AI) and guidance on **when server-nexe is NOT the best tool**.
 
 ## Tips
 

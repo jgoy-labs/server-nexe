@@ -76,6 +76,21 @@ const UI_STRINGS = {
         doc_summarize: "Resumeix aquest document",
         image_describe: "Descriu aquesta foto",
         doc_upload_error: "Error pujant el document",
+        feature_image: "Puja imatges (.jpg, .png, .webp)",
+        feature_rag: "Filtre RAG i pesos personalitzables",
+        feature_tray: "Controla el servidor des de la icona al costat del rellotge",
+        feature_models: "Instal·la nous models (Ollama, MLX, llama.cpp)",
+        feature_sysprompt: "Personalitza el system prompt",
+        feature_basics: "Casos d'ús bàsics",
+        feature_plugin: "Com fer un plugin",
+        welcome_disclaimer: "⚠️ Els models petits poden no gestionar bé la memòria i tendeixen a al·lucinar més que els grans",
+        prompt_rag_help: "Com funciona el filtre RAG i com puc ajustar els pesos?",
+        prompt_models_help: "Quins models puc usar amb Nexe? Quines diferències hi ha entre models petits i grans?",
+        prompt_tray_help: "Com funciona la icona del tray a la barra de menú? Quines opcions té?",
+        prompt_models_install: "Com puc instal·lar nous models? Com afegir un model d'Ollama, MLX o llama.cpp?",
+        prompt_sysprompt: "Com puc canviar el system prompt de Nexe? On s'edita?",
+        prompt_basics: "Quins casos d'ús bàsics té Nexe? Per a que és útil?",
+        prompt_plugin: "Com es fa un plugin per a Nexe? Quina estructura ha de tenir?",
     },
     en: {
         login_subtitle: "Enter your API Key to access",
@@ -148,6 +163,21 @@ const UI_STRINGS = {
         doc_summarize: "Summarize this document",
         image_describe: "Describe this photo",
         doc_upload_error: "Error uploading document",
+        feature_image: "Upload images (.jpg, .png, .webp)",
+        feature_rag: "Customizable RAG filter & weights",
+        feature_tray: "Control the server from the icon next to the clock",
+        feature_models: "Install new models (Ollama, MLX, llama.cpp)",
+        feature_sysprompt: "Customize the system prompt",
+        feature_basics: "Basic use cases",
+        feature_plugin: "How to create a plugin",
+        welcome_disclaimer: "⚠️ Small models may struggle with memory and tend to hallucinate more than large ones",
+        prompt_rag_help: "How does the RAG filter work and how can I adjust the weights?",
+        prompt_models_help: "What models can I use with Nexe? What are the differences between small and large models?",
+        prompt_tray_help: "How does the tray icon in the menu bar work? What options does it have?",
+        prompt_models_install: "How can I install new models? How to add an Ollama, MLX or llama.cpp model?",
+        prompt_sysprompt: "How can I change Nexe's system prompt? Where do I edit it?",
+        prompt_basics: "What are the basic use cases for Nexe? What is it useful for?",
+        prompt_plugin: "How do I create a plugin for Nexe? What structure should it have?",
     },
     es: {
         login_subtitle: "Introduce la API Key para acceder",
@@ -220,6 +250,21 @@ const UI_STRINGS = {
         doc_summarize: "Resume este documento",
         image_describe: "Describe esta foto",
         doc_upload_error: "Error subiendo el documento",
+        feature_image: "Sube imágenes (.jpg, .png, .webp)",
+        feature_rag: "Filtro RAG y pesos personalizables",
+        feature_tray: "Controla el servidor desde el icono junto al reloj",
+        feature_models: "Instala nuevos modelos (Ollama, MLX, llama.cpp)",
+        feature_sysprompt: "Personaliza el system prompt",
+        feature_basics: "Casos de uso básicos",
+        feature_plugin: "Cómo crear un plugin",
+        welcome_disclaimer: "⚠️ Los modelos pequeños pueden no gestionar bien la memoria y tienden a alucinar más que los grandes",
+        prompt_rag_help: "¿Cómo funciona el filtro RAG y cómo puedo ajustar los pesos?",
+        prompt_models_help: "¿Qué modelos puedo usar con Nexe? ¿Qué diferencias hay entre modelos pequeños y grandes?",
+        prompt_tray_help: "¿Cómo funciona el icono del tray en la barra de menú? ¿Qué opciones tiene?",
+        prompt_models_install: "¿Cómo puedo instalar nuevos modelos? ¿Cómo añadir un modelo de Ollama, MLX o llama.cpp?",
+        prompt_sysprompt: "¿Cómo puedo cambiar el system prompt de Nexe? ¿Dónde se edita?",
+        prompt_basics: "¿Cuáles son los casos de uso básicos de Nexe? ¿Para qué es útil?",
+        prompt_plugin: "¿Cómo se crea un plugin para Nexe? ¿Qué estructura debe tener?",
     }
 };
 
@@ -849,6 +894,7 @@ class NexeUI {
         // Load sessions i info model
         this.loadSessions();
         this.loadServerInfo();
+        this.showWelcome();
 
         // Setup drag and drop
         this.setupDragAndDrop();
@@ -2404,18 +2450,83 @@ class NexeUI {
                         <span class="feature-icon"><i data-lucide="folder-open"></i></span>
                         <span>${this.t('feature_upload')}</span>
                     </div>
-                    <div class="feature" title="${this.t('feature_local')}">
+                    <div class="feature feature-clickable" data-action="image" title="${this.t('feature_image')}">
+                        <span class="feature-icon"><i data-lucide="image"></i></span>
+                        <span>${this.t('feature_image')}</span>
+                    </div>
+                    <div class="feature feature-clickable" data-action="rag" title="${this.t('feature_rag')}">
+                        <span class="feature-icon"><i data-lucide="sliders-horizontal"></i></span>
+                        <span>${this.t('feature_rag')}</span>
+                    </div>
+                    <div class="feature feature-clickable" data-action="tray" title="${this.t('feature_tray')}">
+                        <span class="feature-icon"><i data-lucide="layout-panel-top"></i></span>
+                        <span>${this.t('feature_tray')}</span>
+                    </div>
+                    <div class="feature feature-clickable" data-action="models" title="${this.t('feature_models')}">
+                        <span class="feature-icon"><i data-lucide="package-plus"></i></span>
+                        <span>${this.t('feature_models')}</span>
+                    </div>
+                    <div class="feature feature-clickable" data-action="sysprompt" title="${this.t('feature_sysprompt')}">
+                        <span class="feature-icon"><i data-lucide="pencil-line"></i></span>
+                        <span>${this.t('feature_sysprompt')}</span>
+                    </div>
+                    <div class="feature feature-clickable" data-action="basics" title="${this.t('feature_basics')}">
+                        <span class="feature-icon"><i data-lucide="book-open"></i></span>
+                        <span>${this.t('feature_basics')}</span>
+                    </div>
+                    <div class="feature feature-clickable" data-action="plugin" title="${this.t('feature_plugin')}">
+                        <span class="feature-icon"><i data-lucide="puzzle"></i></span>
+                        <span>${this.t('feature_plugin')}</span>
+                    </div>
+                    <div class="feature feature-clickable" data-action="local" title="${this.t('feature_local')}">
                         <span class="feature-icon"><i data-lucide="lock"></i></span>
                         <span>${this.t('feature_local')}</span>
                     </div>
                 </div>
+                <p class="welcome-disclaimer">${this.t('welcome_disclaimer')}</p>
             </div>
         `;
-        // Make features clickable
         const chatFeature = this.chatMessages.querySelector('[data-action="chat"]');
         if (chatFeature) chatFeature.addEventListener('click', () => this.messageInput.focus());
         const uploadFeature = this.chatMessages.querySelector('[data-action="upload"]');
         if (uploadFeature) uploadFeature.addEventListener('click', () => this.fileInput.click());
+        const imageFeature = this.chatMessages.querySelector('[data-action="image"]');
+        if (imageFeature) imageFeature.addEventListener('click', () => this.imageInput && this.imageInput.click());
+        const ragFeature = this.chatMessages.querySelector('[data-action="rag"]');
+        if (ragFeature) ragFeature.addEventListener('click', () => {
+            this.messageInput.value = this.t('prompt_rag_help');
+            this.messageInput.focus();
+        });
+        const trayFeature = this.chatMessages.querySelector('[data-action="tray"]');
+        if (trayFeature) trayFeature.addEventListener('click', () => {
+            this.messageInput.value = this.t('prompt_tray_help');
+            this.messageInput.focus();
+        });
+        const modelsFeature = this.chatMessages.querySelector('[data-action="models"]');
+        if (modelsFeature) modelsFeature.addEventListener('click', () => {
+            this.messageInput.value = this.t('prompt_models_install');
+            this.messageInput.focus();
+        });
+        const syspromptFeature = this.chatMessages.querySelector('[data-action="sysprompt"]');
+        if (syspromptFeature) syspromptFeature.addEventListener('click', () => {
+            this.messageInput.value = this.t('prompt_sysprompt');
+            this.messageInput.focus();
+        });
+        const basicsFeature = this.chatMessages.querySelector('[data-action="basics"]');
+        if (basicsFeature) basicsFeature.addEventListener('click', () => {
+            this.messageInput.value = this.t('prompt_basics');
+            this.messageInput.focus();
+        });
+        const pluginFeature = this.chatMessages.querySelector('[data-action="plugin"]');
+        if (pluginFeature) pluginFeature.addEventListener('click', () => {
+            this.messageInput.value = this.t('prompt_plugin');
+            this.messageInput.focus();
+        });
+        const localFeature = this.chatMessages.querySelector('[data-action="local"]');
+        if (localFeature) localFeature.addEventListener('click', () => {
+            this.messageInput.value = this.t('prompt_models_help');
+            this.messageInput.focus();
+        });
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 

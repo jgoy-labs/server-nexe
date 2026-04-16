@@ -30,7 +30,7 @@ nexe go
 
 ## Running tests
 
-The test suite has 4572 passing tests with 90% code coverage.
+The test suite has **4842 passing tests with ~85% code coverage** (of 4990 total; 148 deselected by default markers).
 
 ```bash
 # Fast unit tests (no external services needed)
@@ -66,7 +66,7 @@ plugins/my_module/
 ```toml
 [module]
 name = "my_module"
-version = "0.9.1"
+version = "1.0.0-beta"
 description = "What this module does"
 author = "Your Name"
 
@@ -80,28 +80,54 @@ prefix = "/my-module"
 
 ### module.py
 
+Each module implements the `NexeModule` protocol (see `core/loader/protocol.py`). The required members are `metadata`, `initialize`, `shutdown`, and `health_check`. Modules that expose HTTP endpoints additionally implement `NexeModuleWithRouter` (`get_router` + `get_router_prefix`).
+
+Minimal (faithful) example:
+
 ```python
-from core.loader.protocol import ModuleMetadata
+from typing import Any, Dict
+from fastapi import APIRouter
 
-class Module:
-    """Module implementing ModuleInterface."""
+from core.loader.protocol import (
+    HealthResult,
+    HealthStatus,
+    ModuleMetadata,
+)
 
-    def __init__(self):
-        self.metadata = ModuleMetadata(
+
+class MyModule:
+    """Implements NexeModule + NexeModuleWithRouter."""
+
+    @property
+    def metadata(self) -> ModuleMetadata:
+        return ModuleMetadata(
             name="my_module",
-            version="0.9.1",
+            version="1.0.0-beta",
             description="What this module does",
         )
 
-    def get_router(self):
-        """Return a FastAPI APIRouter with module endpoints."""
-        from fastapi import APIRouter
+    async def initialize(self, context: Dict[str, Any]) -> bool:
+        # Read config/services from `context` and wire up state.
+        return True
+
+    async def shutdown(self) -> None:
+        # Release resources. Must be idempotent.
+        pass
+
+    async def health_check(self) -> HealthResult:
+        return HealthResult(status=HealthStatus.HEALTHY, message="All good")
+
+    # Optional: only for modules that expose HTTP endpoints.
+    def get_router(self) -> APIRouter:
         router = APIRouter()
-        # Add routes here
+        # Add routes here.
         return router
+
+    def get_router_prefix(self) -> str:
+        return "/my-module"
 ```
 
-The module manager discovers plugins automatically on startup via `manifest.toml` files. No registration needed.
+The module manager discovers plugins automatically on startup via `manifest.toml` files. No explicit registration needed.
 
 ## Knowledge base (AI-ready docs)
 
@@ -150,4 +176,4 @@ Be respectful and constructive. This is a personal project maintained in spare t
 
 ---
 
-*v0.9.1 · Apache 2.0 · Jordi Goy*
+*v1.0.0-beta · Apache 2.0 · Jordi Goy*

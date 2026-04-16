@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-06
+data: 2026-04-16
 id: nexe-plugins-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete guide to the server-nexe 0.9.7 plugin system. Covers NexeModule Protocol (duck typing, not inheritance), manifest.toml format, plugin file structure, lifecycle (discovery → loading → initialization → integration → shutdown), context object, router registration, existing plugins (MLX, llama.cpp, Ollama, Security with Unicode normalization, Web UI with input validation), how to create a new plugin step by step, common errors and best practices."
+abstract: "Complete guide to the server-nexe 1.0.0-beta plugin system. Covers NexeModule Protocol (duck typing, not inheritance), manifest.toml format, plugin file structure, lifecycle (discovery → loading → initialization → integration → shutdown), context object, router registration, existing plugins (5: MLX, llama.cpp, Ollama, Security with Unicode normalization, Web UI with input validation), how to create a new plugin step by step, common errors and best practices."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -13,11 +13,11 @@ priority: P2
 # === OPCIONAL ===
 lang: en
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Plugin System — server-nexe 0.9.7
+# Plugin System — server-nexe 1.0.0-beta
 
 server-nexe uses a plugin architecture based on automatic discovery via manifest.toml files. Plugins are independent modules that add functionality without modifying the core. No manual registration needed — the system scans, discovers, and loads plugins automatically.
 
@@ -37,7 +37,7 @@ class MyPlugin:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="my_plugin",
-            version="0.9.7",
+            version="1.0.0-beta",
             description="What it does",
             author="Author Name",
             module_type="local_llm_option",
@@ -108,7 +108,7 @@ Every plugin MUST have a `manifest.toml` file. This is the single source of trut
 ```toml
 [module]
 name = "my_plugin"
-version = "0.9.7"
+version = "1.0.0-beta"
 type = "local_llm_option"
 description = "What this plugin does"
 location = "plugins/my_plugin/"
@@ -232,6 +232,8 @@ Static declarative list in `personality/server.toml` (line 172). This is the pri
 [plugins.modules]
 enabled = ["security", "rag", "ollama_module", "mlx_module", "llama_cpp_module", "web_ui_module"]
 ```
+
+> **Note: 5 real plugins, not 6.** The `enabled` list contains 6 names, but `rag` is **NOT a NexeModule plugin** — it is an internal subsystem managed by `memory/rag/` (the RAG layer of the memory system). It is listed here for historical coherence and so the module activator recognises it, but it has no `manifest.toml` and does not implement the NexeModule Protocol. The **5 real plugins** are: `mlx_module`, `llama_cpp_module`, `ollama_module`, `security`, `web_ui_module`.
 
 To add a new plugin, it must be included explicitly here.
 

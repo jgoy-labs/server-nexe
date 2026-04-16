@@ -39,6 +39,7 @@
     "pytest.ini",
     "README.md",
     "README-ca.md",
+    "README-es.md",
     "requirements.txt",
     "requirements-macos.txt",
     "SECURITY.md",

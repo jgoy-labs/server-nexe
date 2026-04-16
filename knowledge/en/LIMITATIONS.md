@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-16
 id: nexe-limitations
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Honest documentation of server-nexe 0.9.7 limitations. Covers platform support (macOS tested, Linux partial, Windows not yet), model quality vs cloud (GPT-4/Claude), RAG limitations (embeddings, chunking, cold start, contradictions), API partial OpenAI compatibility, performance (single instance, concurrency), security constraints, encryption caveats (default auto, new, not battle-tested), and functional gaps (no multi-user, no sync, no fine-tuning)."
+abstract: "Honest documentation of server-nexe 1.0.0-beta limitations. Covers platform support (macOS 14+ Apple Silicon only, Linux partial, Intel and Windows NOT supported), model quality vs cloud (GPT-4/Claude), RAG limitations (embeddings, chunking, cold start, contradictions), API partial OpenAI compatibility, performance (single instance, concurrency), security constraints, encryption caveats (default auto, new, not battle-tested), and functional gaps (no multi-user, no sync, no fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -13,11 +13,11 @@ priority: P2
 # === OPCIONAL ===
 lang: en
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Limitations — server-nexe 0.9.7
+# Limitations — server-nexe 1.0.0-beta
 
 This document honestly describes what server-nexe cannot do or does not do well.
 
@@ -25,8 +25,9 @@ This document honestly describes what server-nexe cannot do or does not do well.
 
 | Platform | Status |
 |----------|--------|
-| macOS Apple Silicon | Tested, all 3 backends |
-| macOS Intel | Tested, llama.cpp + Ollama (no MLX) |
+| macOS 14 Sonoma+ Apple Silicon (M1+) | **Primary target** — tested, all 3 backends |
+| macOS 13 Ventura | **NOT supported** (removed in v0.9.9 due to arm64-only dependencies in the stack) |
+| macOS Intel | **NOT supported** (removed in v0.9.9 — arm64-only wheels, no MLX) |
 | Linux x86_64 | Partial — unit tests pass, CI green, not production-tested |
 | Linux ARM64 | Not directly tested |
 | Windows | Not supported |
@@ -42,7 +43,7 @@ Local models are less capable than cloud models (GPT-4, Claude, etc.). This is t
 
 ## Multimodal models (VLM)
 
-The MLX backend supports vision models (image + text) via `mlx-vlm 0.4.4`. Detected architectures: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (all), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama and more. The detector also activates on `vision_config` in `config.json` or on keys `vision_tower`/`mm_projector` in `model.safetensors.index.json` (covers new architectures).
+The MLX backend supports vision models (image + text) via `mlx-vlm 0.4.4`. Detected architectures: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (all), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama and more. Since **v0.9.8** the 3-signal "any-of" detector (architectures + vision_config in `config.json` + weight_map in `model.safetensors.index.json`) covers new architectures that lack the classical keys.
 
 Current limitations:
 - **Qwen3.5 family and omni models (Qwen3.5 2B/4B/9B/27B/35B/122B, Qwen3-Omni, Kimi-VL, …):** Require `PyTorch` and `torchvision` for their `VideoProcessor`, which server-nexe **does not bundle** in the venv for size (~2 GB added to the DMG). They will load via `mlx-vlm.load()` but fail at the processor preparation stage. **They work perfectly via Ollama** with no extra dependencies. **Optional:** to use them via MLX, manually install: `pip install torch torchvision` in the server-nexe venv — adds ~2 GB but unlocks Qwen3.5 MLX with prefix caching and vision. **Workaround without installing anything:** use Ollama for Qwen3.5 (automatic fallback if MLX fails) or an image-only VLM like Gemma-4.

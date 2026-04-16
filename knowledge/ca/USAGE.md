@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-02
+data: 2026-04-16
 id: nexe-usage-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Com fer servir server-nexe: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119), memoria automatica MEM_SAVE, pujada de documents PDF/TXT, comandes d'encriptacio. Exemples d'API amb curl i Python. Com instal-lar models, com canviar d'idioma (NEXE_LANG), com gestionar la memoria."
+abstract: "Com fer servir server-nexe 1.0.0-beta: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119) amb thinking toggle, memoria automatica MEM_SAVE, MEM_DELETE (threshold 0.20) amb confirmacio clear_all 2-torns, pujada de documents PDF/TXT, comandes d'encriptacio. Exemples d'API amb curl i Python. Com instal-lar models, com canviar d'idioma (NEXE_LANG), com gestionar la memoria."
 tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption, how-to, commands]
 chunk_size: 600
 priority: P1
@@ -13,11 +13,38 @@ priority: P1
 # === OPCIONAL ===
 lang: ca
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Guia d'us — server-nexe 0.9.7
+# Guia d'us — server-nexe 1.0.0-beta
+
+## Taula de continguts
+
+- [Arrencar el servidor](#arrencar-el-servidor)
+- [Comandes CLI](#comandes-cli)
+- [Web UI](#web-ui)
+  - [Funcionalitats](#funcionalitats)
+  - [Pujada de documents](#pujada-de-documents)
+- [MEM_SAVE — Memoria automatica](#mem_save--memoria-automatica)
+  - [Esborrat total (`CLEAR_ALL`) — confirmació 2-torns](#esborrat-total-clear_all--confirmació-2-torns)
+- [Encriptacio](#encriptacio)
+- [Us de l'API](#us-de-lapi)
+  - [Xat (curl)](#xat-curl)
+  - [Xat (Python)](#xat-python)
+  - [Guardar a memoria](#guardar-a-memoria)
+- [Casos d'us](#casos-dus)
+- [Consells](#consells)
+
+## En 30 segons
+
+- **CLI:** `./nexe go` arrenca servidor + Qdrant + tray
+- **Web UI** a `http://127.0.0.1:9119/ui` (xat, pujada docs, sessions)
+- **API OpenAI-compatible:** `/v1/chat/completions`
+- **MEM_SAVE automatic** (el model guarda fets de la conversa)
+- **Menu al system tray** per start/stop, logs, uninstall
+
+---
 
 ## Arrencar el servidor
 
@@ -61,6 +88,7 @@ Acces a `http://127.0.0.1:9119/ui`. Requereix clau API (guardada a localStorage 
 - **Selector d'idioma:** Dropdown al peu CA/ES/EN. Canvia tot el text de la UI instantaniament via `applyI18n()`. El servidor es la font de veritat (POST /ui/lang).
 - **Dropdown de backend:** Mostra tots els backends configurats. Marca els backends desconnectats. Auto-fallback al primer backend disponible si el seleccionat cau.
 - **Thinking tokens:** Auto-scroll de la caixa de pensament per a models com qwen3.5 que emeten thinking tokens.
+- **Thinking toggle per sessio (v0.9.9):** Icona ✨ sparkles al costat de l'input + dropdown 🧠 al capçal de la sessió per activar/desactivar el mode thinking (reasoning tokens) per aquesta sessió. Només disponible per famílies compatibles (`THINKING_CAPABLE`: qwen3.5, qwen3, qwq, deepseek-r1, gemma3/4, llama4, gpt-oss). Default OFF. Si el model actual no suporta thinking, la UI mostra missatge d'avís i ofereix retry automàtic sense thinking. Endpoint intern: `PATCH /ui/session/{id}/thinking`.
 - **Overlay de pujada:** Spinner + temporitzador + nom de fitxer durant la pujada de documents. Input bloquejat fins a completar. Mostra recompte de chunks i temps despres de completar.
 - **Persistencia de sessio:** Clau API i preferencies a localStorage. Les sessions sobreviuen al recarregar la pagina.
 - **Auto-scroll:** El xat i les caixes de pensament fan auto-scroll cap avall durant el streaming.
@@ -88,10 +116,19 @@ Puja documents via el boto del clip a l'entrada del xat. Suportats: .txt, .md, .
 El model extreu i guarda automaticament fets de les converses:
 
 - L'usuari diu "Em dic Jordi" -> el model guarda `[MEM_SAVE: name=Jordi]`
-- L'usuari diu "Oblida el meu nom" -> MEM_DELETE: cerca per similitud (threshold 0.70), esborra la coincidencia mes propera, guard anti-re-save
+- L'usuari diu "Oblida el meu nom" -> MEM_DELETE: cerca per similitud (**threshold 0.20** des de v0.9.9, abans 0.70), esborra la coincidencia mes propera, guard anti-re-save
 - Propera conversa: "Com em dic?" -> RAG recupera "name=Jordi" -> el model respon correctament
 
 No calen comandes extra. Funciona tant al CLI com a la Web UI. Indicadors: el badge `[MEM:N]` mostra el recompte de fets guardats.
+
+### Esborrat total (`CLEAR_ALL`) — confirmació 2-torns
+
+Si demanes esborrar **tota** la memòria ("esborra-ho tot", "forget everything", "olvida todo"), el sistema **no esborra immediatament**. Segueix un flux de 2 torns:
+
+1. **Torn 1:** Detecta el patró i demana confirmació ("Estàs segur? Això esborrarà tota la memòria. Respon 'sí' per confirmar.").
+2. **Torn 2:** Si respons `sí`/`confirma`/`ok`, s'executa l'esborrat. Qualsevol altra resposta cancel·la l'operació.
+
+Aixo evita pèrdues massives accidentals per un missatge ambigu o per injecció des d'un document.
 
 ## Encriptacio
 
@@ -141,14 +178,9 @@ curl -X POST http://127.0.0.1:9119/v1/memory/store \
   -d '{"text": "Project deadline is March 30", "collection": "user_knowledge"}'
 ```
 
-## Casos d'us practics
+## Casos d'us
 
-1. **Assistent personal amb memoria:** Pregunta sobre els teus projectes, preferencies, terminis. MEM_SAVE recorda el context automaticament.
-2. **Base de coneixement privada:** Puja documents tecnics, consulta'ls en llenguatge natural. Aillament per sessio per conversa.
-3. **Desenvolupament assistit per IA:** L'API compatible amb OpenAI funciona amb Cursor, Continue, Zed. Apunta'ls a http://127.0.0.1:9119/v1.
-4. **Cerca semantica:** Utilitza /v1/memory/search per a recuperacio de documents basada en similitud sense necessitat de coincidencia exacta de paraules clau.
-5. **Experimentacio amb models:** Canvia entre backends MLX, llama.cpp i Ollama per comparar velocitat i qualitat.
-6. **IA local segura:** Activa l'encriptacio at-rest per a gestionar dades sensibles sense cap dependencia del nuvol.
+Consulta **[[USE_CASES|casos d'us practics]]** per a la llista completa amb context detallat (assistent personal, base de coneixement privada, dev amb Cursor/Continue/Zed, cerca semantica, experimentacio amb models, IA local segura) i guia de **quan server-nexe NO es la millor eina**.
 
 ## Consells
 

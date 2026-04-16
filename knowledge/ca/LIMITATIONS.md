@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-16
 id: nexe-limitations
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentacio honesta de les limitacions de server-nexe 0.9.7. Cobreix suport de plataformes (macOS testejat, Linux parcial, Windows no suportat), qualitat de models vs nuvol (GPT-4/Claude), limitacions del RAG (embeddings, chunking, inici en fred, contradiccions), compatibilitat parcial amb l'API d'OpenAI, rendiment (instancia unica, concurrencia), restriccions de seguretat, advertencies d'encriptacio (default auto, nova, no provada en batalla) i mancances funcionals (sense multi-usuari, sense sync, sense fine-tuning)."
+abstract: "Documentacio honesta de les limitacions de server-nexe 1.0.0-beta. Cobreix suport de plataformes (macOS 14+ Apple Silicon only, Linux parcial, Intel i Windows NO suportats), qualitat de models vs nuvol (GPT-4/Claude), limitacions del RAG (embeddings, chunking, inici en fred, contradiccions), compatibilitat parcial amb l'API d'OpenAI, rendiment (instancia unica, concurrencia), restriccions de seguretat, advertencies d'encriptacio (default auto, nova, no provada en batalla) i mancances funcionals (sense multi-usuari, sense sync, sense fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -13,11 +13,11 @@ priority: P2
 # === OPCIONAL ===
 lang: ca
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Limitacions — server-nexe 0.9.7
+# Limitacions — server-nexe 1.0.0-beta
 
 Aquest document descriu honestament el que server-nexe no pot fer o no fa be.
 
@@ -25,8 +25,9 @@ Aquest document descriu honestament el que server-nexe no pot fer o no fa be.
 
 | Plataforma | Estat |
 |----------|--------|
-| macOS Apple Silicon | Testejat, tots 3 backends |
-| macOS Intel | Testejat, llama.cpp + Ollama (sense MLX) |
+| macOS 14 Sonoma+ Apple Silicon (M1+) | **Target principal** — testejat, tots 3 backends |
+| macOS 13 Ventura | **NO suportat** (eliminat a v0.9.9 per dependencies arm64-only del stack) |
+| macOS Intel | **NO suportat** (eliminat a v0.9.9 — wheels arm64-only, sense MLX) |
 | Linux x86_64 | Parcial — tests unitaris passen, CI verd, no testejat en produccio |
 | Linux ARM64 | No testejat directament |
 | Windows | No suportat |
@@ -42,7 +43,7 @@ Els models locals son menys capacos que els models al nuvol (GPT-4, Claude, etc.
 
 ## Models multimodal (VLM)
 
-El backend MLX suporta models de visio (imatge + text) a traves de `mlx-vlm 0.4.4`. Llista d'arquitectures detectades: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (tots), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama i mes. El detector tambe s'activa per `vision_config` al `config.json` o per keys `vision_tower`/`mm_projector` al `model.safetensors.index.json` (cobre arquitectures noves).
+El backend MLX suporta models de visio (imatge + text) a traves de `mlx-vlm 0.4.4`. Llista d'arquitectures detectades: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (tots), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama i mes. Des de **v0.9.8** el detector "any-of" de 3 senyals (architectures + vision_config al `config.json` + weight_map al `model.safetensors.index.json`) cobreix arquitectures noves sense keys clàssiques.
 
 Limitacions actuals:
 - **Familia Qwen3.5 i omni-models (Qwen3.5 2B/4B/9B/27B/35B/122B, Qwen3-Omni, Kimi-VL, …):** Requereixen `PyTorch` i `torchvision` per al seu `VideoProcessor`, que server-nexe **no inclou** al venv per mida (afegirien ~2 GB al DMG). Es carregaran via `mlx-vlm.load()` pero fallaran a la fase de preparacio del processor. **Via Ollama funcionen perfectament** sense cap dependencia addicional. **Opcional:** si vols usar-los via MLX, instal·la manualment: `pip install torch torchvision` al venv de server-nexe — afegira ~2 GB pero desbloqueara Qwen3.5 MLX amb prefix caching i visio. **Workaround sense instal·lar res:** usar Ollama per Qwen3.5 (automàtic si MLX falla) o un VLM imatge-only com Gemma-4.
