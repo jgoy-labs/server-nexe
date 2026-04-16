@@ -338,7 +338,7 @@ def _run_headless_inner(config):
         _log.info(f"Starting model download: {model_config['name']} engine={engine} id={model_config['id']}")
         try:
             if engine == "ollama":
-                if not ensure_ollama_installed():
+                if not ensure_ollama_installed(headless=True):
                     _log.warning("Ollama installation failed or skipped")
                     emit(3, "error", "Ollama not available")
                     raise RuntimeError("Ollama installation failed — cannot download model")
@@ -354,7 +354,7 @@ def _run_headless_inner(config):
                     if ollama_id:
                         model_config = {**model_config, "engine": "ollama", "id": ollama_id}
                         engine = "ollama"
-                        if not ensure_ollama_installed():
+                        if not ensure_ollama_installed(headless=True):
                             raise RuntimeError("Ollama installation failed — cannot download model")
                         _download_ollama_model(model_config, headless=True)
                     else:
