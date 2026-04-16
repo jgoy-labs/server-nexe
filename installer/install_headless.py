@@ -518,56 +518,51 @@ def _run_headless_inner(config):
     # Write COMMANDS.md
     _write_commands_file(project_root, nexe_cmd, model_config)
 
-    # Copy Nexe.app to /Applications and add to Login Items (macOS only)
+    # Register Nexe.app at <install_path>/Nexe.app for Dock + Login Items (macOS only).
     #
-    # DESIGN NOTE — intentional duplication of Nexe.app:
-    #   After installation, Nexe.app exists at TWO paths:
-    #     (a) <install_path>/Nexe.app         ← bundled with the install
-    #     (b) /Applications/Nexe.app          ← copy made here
+    # Bug #19d (v1.0 release): Nexe.app lives ONLY inside the install directory.
+    # Earlier versions copied a second bundle to `/Applications/Nexe.app` to give
+    # users a visible icon there. That copy had no Python code next to it, so its
+    # Swift launcher resolved to the external marker file (fragile) and failed
+    # when the marker was stale — producing an app that silently did nothing.
+    # Single source of truth avoids drift and dead copies.
     #
-    #   Both are physical copies (not hardlink / symlink). Rationale:
-    #     · (b) gives the user a visible "Nexe" icon at the root of
-    #       /Applications, without making them dig into the install dir.
-    #     · Dock icon, Login Items, Launch Services anchor on the stable
-    #       `/Applications/Nexe.app` path.
-    #     · The uninstaller (installer/tray_uninstaller.py) wipes both
-    #       locations, so no orphans after clean removal.
-    #
-    #   Considered alternatives (and why not today):
-    #     · symlink (b) → (a): risky with Gatekeeper / LaunchServices on
-    #       current macOS (Tahoe 26.x); Login Items based on
-    #       alias/bookmark can break if the symlink is rewritten.
-    #     · move Nexe.app OUT of install dir entirely: bigger refactor
-    #       (paths, markers, uninstaller assumptions).
-    #
-    #   Known caveat: if someone updates (a) manually without refreshing
-    #   (b), the two can drift. Full-install flow (DMG wizard) refreshes
-    #   both, so the happy path stays consistent.
+    # Retrocompat: the uninstaller still cleans `/Applications/Nexe.app` if a
+    # pre-fix installation left one behind.
     if platform.system() == "Darwin":
-        # Nexe.app is bundled inside InstallNexe.app/Contents/Resources/
-        # (install_headless.py lives at Resources/installer/install_headless.py,
-        # so parent.parent = Resources/).  Fall back to project_root for dev mode.
-        _bundle_nexe = Path(__file__).parent.parent / "Nexe.app"
-        nexe_app_src = _bundle_nexe if _bundle_nexe.exists() else project_root / "Nexe.app"
-        nexe_app_dest = Path("/Applications/Nexe.app")
-        nexe_app_ready = False
-        if nexe_app_src.exists():
+        install_nexe_app = project_root / "Nexe.app"
+        nexe_app_ready = install_nexe_app.exists()
+        # Always persist the project-root marker so the Swift launcher can
+        # resolve the install dir from any launch path.
+        if nexe_app_ready:
+            try:
+                _write_project_marker(install_nexe_app, project_root)
+            except Exception as e:
+                _log.warning(f"Could not write project_root marker: {e}")
+
+        # Clean up legacy `/Applications/Nexe.app` from previous installs —
+        # it is always an orphan (no venv next to it) after the #19d fix.
+        # Guard: if the user chose `/Applications` as the install root
+        # (bare — headless CLI only, the GUI wizard forces `server-nexe`
+        # suffix via DestinationView), `install_nexe_app` resolves to the
+        # SAME path as `legacy_app` and a naive rmtree would wipe the
+        # bundle we just installed.
+        legacy_app = Path("/Applications/Nexe.app")
+        try:
+            same_target = legacy_app.resolve() == install_nexe_app.resolve()
+        except Exception:
+            same_target = False
+        if legacy_app.exists() and not same_target:
             try:
                 import shutil
-                if nexe_app_dest.exists():
-                    shutil.rmtree(nexe_app_dest)
-                shutil.copytree(nexe_app_src, nexe_app_dest)
-                _write_project_marker(nexe_app_dest, project_root)
-                nexe_app_ready = True
-                _log.info(f"Nexe.app copied to /Applications")
-            except PermissionError:
-                _log.warning("Could not copy Nexe.app to /Applications (permission denied)")
+                shutil.rmtree(legacy_app)
+                _log.info("Removed legacy /Applications/Nexe.app orphan")
             except Exception as e:
-                _log.warning(f"Could not copy Nexe.app to /Applications: {e}")
+                _log.warning(f"Could not remove legacy /Applications/Nexe.app: {e}")
 
-        # Add to Login Items (auto-start on boot)
-        # Amb --no-login-item el Swift wizard gestiona aquesta decisió
-        # via checkbox — no l'afegim aquí per no duplicar ni ignorar la tria.
+        # Login Items — point at the canonical install-dir Nexe.app.
+        # The Swift wizard owns the user's checkbox choice; with
+        # --no-login-item it skips this call to avoid duplicates.
         skip_login_item = bool(config.get("skip_login_item", False))
         if skip_login_item:
             _log.info("Login Items: skipped (managed by GUI wizard)")
@@ -575,16 +570,16 @@ def _run_headless_inner(config):
             try:
                 subprocess.run([
                     "osascript", "-e",
-                    'tell application "System Events" to make login item at end '
-                    'with properties {path:"/Applications/Nexe.app", hidden:true}'
+                    f'tell application "System Events" to make login item at end '
+                    f'with properties {{path:"{install_nexe_app}", hidden:true}}'
                 ], capture_output=True, timeout=10)
-                _log.info("Nexe added to Login Items")
+                _log.info("Nexe added to Login Items at %s", install_nexe_app)
             except Exception as e:
                 _log.warning(f"Could not add to Login Items: {e}")
         else:
-            _log.warning("Skipping Login Items setup: /Applications/Nexe.app unavailable")
+            _log.warning("Skipping Login Items setup: %s missing", install_nexe_app)
     else:
-        _log.info("Non-macOS platform: skipping .app copy and Login Items")
+        _log.info("Non-macOS platform: skipping .app registration and Login Items")
 
     # F6: avís headless — no s'instal·la NexeTray.app (tray de sistema)
     if platform.system() == "Darwin":

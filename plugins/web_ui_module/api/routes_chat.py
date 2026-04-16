@@ -281,7 +281,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             )
 
         session = session_mgr.get_or_create_session(session_id)
-        session.add_message("user", message)
+        # Bug #19c — persist the attached image along with the user message
+        # so that reloading the session restores it in the UI. Only the
+        # already-validated base64 (size + MIME) is persisted.
+        session.add_message("user", message, image_b64=image_b64)
         session_mgr._save_session_to_disk(session)
 
         # Detect intent (save, recall, or chat)
@@ -529,7 +532,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             LlamaCppChatNode._pool = ModelPool(new_config)
                                             logger.info(f"Llama.cpp model switched to: {new_config.model_path}")
 
-                        logger.info(f"Calling {engine_name}.chat with model={model_name}")
+                        # Per-session thinking toggle
+                        thinking_enabled = getattr(session, "thinking_enabled", False)
+
+                        logger.info(f"Calling {engine_name}.chat with model={model_name} thinking={thinking_enabled}")
 
                         # --- Context Compacting ---
                         # Si la sessio te massa missatges, compactar amb resum LLM
@@ -751,6 +757,37 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         messages = engine_messages
                         response_chunks = []
 
+                        # When an image is attached, wrap with context block (same pattern as documents)
+                        if image_b64:
+                            _img_blocks = {
+                                "ca": (
+                                    "[IMATGE ADJUNTA]\n"
+                                    "L'usuari ha adjuntat una imatge a aquest missatge. "
+                                    "Analitza la imatge i incorpora-la a la teva resposta. "
+                                    "Prioritza el que veus a la imatge per sobre de memòries anteriors.\n"
+                                    "[FI IMATGE]"
+                                ),
+                                "es": (
+                                    "[IMAGEN ADJUNTA]\n"
+                                    "El usuario ha adjuntado una imagen a este mensaje. "
+                                    "Analiza la imagen e incorpórala a tu respuesta. "
+                                    "Prioriza lo que ves en la imagen por encima de memorias anteriores.\n"
+                                    "[FIN IMAGEN]"
+                                ),
+                                "en": (
+                                    "[ATTACHED IMAGE]\n"
+                                    "The user has attached an image to this message. "
+                                    "Analyze the image and incorporate it into your response. "
+                                    "Prioritize what you see in the image over previous memories.\n"
+                                    "[END IMAGE]"
+                                ),
+                            }
+                            _lang_key2 = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
+                            _img_block = _img_blocks.get(_lang_key2, _img_blocks["en"])
+                            if messages and messages[-1]["role"] == "user":
+                                messages[-1] = dict(messages[-1])
+                                messages[-1]["content"] = f"{_img_block}\n\n{messages[-1]['content']}"
+
                         # Adapt to different chat signatures
                         import inspect
                         sig = inspect.signature(engine.chat)
@@ -763,7 +800,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             # We inject system prompt as first message for Ollama
                             full_messages = [{"role": "system", "content": system_prompt}] + messages
                             chat_result = engine.chat(model=model_name, messages=full_messages, stream=stream,
-                                                      images=_images_arg)
+                                                      images=_images_arg,
+                                                      thinking_enabled=thinking_enabled)
                         else:
                             # MLX/LlamaCpp-style: chat(messages, system=...)
                             if engine_name in ("mlx_module", "llama_cpp_module"):
@@ -782,7 +820,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 # Launch chat in background task
                                 ml_task = asyncio.create_task(engine.chat(
                                     messages=messages, system=system_prompt, stream_callback=stream_cb,
-                                    images=_images_arg,
+                                    images=_images_arg, thinking_enabled=thinking_enabled,
                                 ))
 
                                 # Async generator that yields from queue until task is done
@@ -811,7 +849,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
                             else:
                                 chat_result = engine.chat(messages=messages, system=system_prompt,
-                                                          images=_images_arg)
+                                                          images=_images_arg,
+                                                          thinking_enabled=thinking_enabled)
 
                         # Flag si s'ha compactat per avisar al client
                         _compacted = session.compaction_count > 0 and session.context_summary is not None
@@ -1035,7 +1074,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             if 'model' in sig.parameters:
                                                 logger.info("Re-prompt: empty after MEM_SAVE, re-calling %s", model_name)
                                                 _rp_msgs = [{"role": "system", "content": _rp_system}] + messages
-                                                _rp_result = engine.chat(model=model_name, messages=_rp_msgs, stream=True)
+                                                _rp_result = engine.chat(model=model_name, messages=_rp_msgs, stream=True,
+                                                                          thinking_enabled=thinking_enabled)
                                                 _rp_response = ""
                                                 _rp_in_think = False
                                                 async for _rp_chunk in _rp_result:
