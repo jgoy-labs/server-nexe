@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-06
+data: 2026-04-16
 id: nexe-plugins-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia completa del sistema de plugins de server-nexe 0.9.7. Cubre el Protocol NexeModule (duck typing, no herencia), formato manifest.toml, estructura de ficheros del plugin, ciclo de vida (discovery -> loading -> initialization -> integration -> shutdown), objeto context, registro de routers, plugins existentes (MLX, llama.cpp, Ollama, Security con normalizacion Unicode, Web UI con validacion de entrada), como crear un plugin nuevo paso a paso, errores comunes y buenas practicas."
+abstract: "Guia completa del sistema de plugins de server-nexe 1.0.0-beta. Cubre el Protocol NexeModule (duck typing, no herencia), formato manifest.toml, estructura de ficheros del plugin, ciclo de vida (discovery -> loading -> initialization -> integration -> shutdown), objeto context, registro de routers, plugins existentes (5: MLX, llama.cpp, Ollama, Security con normalizacion Unicode, Web UI con validacion de entrada), como crear un plugin nuevo paso a paso, errores comunes y buenas practicas."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -13,11 +13,11 @@ priority: P2
 # === OPCIONAL ===
 lang: es
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Sistema de plugins — server-nexe 0.9.7
+# Sistema de plugins — server-nexe 1.0.0-beta
 
 server-nexe usa una arquitectura de plugins basada en descubrimiento automatico via ficheros manifest.toml. Los plugins son modulos independientes que anaden funcionalidad sin modificar el core. No hace falta registro manual — el sistema escanea, descubre y carga plugins automaticamente.
 
@@ -37,7 +37,7 @@ class MyPlugin:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="my_plugin",
-            version="0.9.7",
+            version="1.0.0-beta",
             description="Que hace",
             author="Nombre Autor",
             module_type="local_llm_option",
@@ -108,7 +108,7 @@ Todo plugin DEBE tener un fichero `manifest.toml`. Es la fuente unica de verdad 
 ```toml
 [module]
 name = "my_plugin"
-version = "0.9.7"
+version = "1.0.0-beta"
 type = "local_llm_option"
 description = "Que hace este plugin"
 location = "plugins/my_plugin/"
@@ -232,6 +232,8 @@ Lista estatica declarativa en `personality/server.toml` (linea 172). Es la fuent
 [plugins.modules]
 enabled = ["security", "rag", "ollama_module", "mlx_module", "llama_cpp_module", "web_ui_module"]
 ```
+
+> **Nota: 5 plugins reales, no 6.** La lista de `enabled` contiene 6 nombres pero `rag` **NO es un plugin NexeModule** — es un subsistema interno gestionado por `memory/rag/` (la capa RAG del sistema de memoria). Se lista aqui por coherencia historica y para que el activador de modulos lo reconozca, pero no tiene `manifest.toml` ni implementa el Protocol NexeModule. Los **5 plugins reales** son: `mlx_module`, `llama_cpp_module`, `ollama_module`, `security`, `web_ui_module`.
 
 Para anadir un plugin nuevo hay que incluirlo explicitamente aqui.
 

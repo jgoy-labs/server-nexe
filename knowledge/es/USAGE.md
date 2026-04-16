@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-02
+data: 2026-04-16
 id: nexe-usage-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Como usar server-nexe: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119), memoria automatica MEM_SAVE, subida de documentos PDF/TXT, comandos de encriptacion. Ejemplos de API con curl y Python. Como instalar modelos, cambiar idioma (NEXE_LANG), gestionar memoria."
+abstract: "Como usar server-nexe 1.0.0-beta: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119) con thinking toggle, memoria automatica MEM_SAVE, MEM_DELETE (threshold 0.20) con confirmacion clear_all 2-turnos, subida de documentos PDF/TXT, comandos de encriptacion. Ejemplos de API con curl y Python. Como instalar modelos, cambiar idioma (NEXE_LANG), gestionar memoria."
 tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption, how-to, commands]
 chunk_size: 600
 priority: P1
@@ -13,11 +13,38 @@ priority: P1
 # === OPCIONAL ===
 lang: es
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Guia de uso — server-nexe 0.9.7
+# Guia de uso — server-nexe 1.0.0-beta
+
+## Tabla de contenidos
+
+- [Iniciar el servidor](#iniciar-el-servidor)
+- [Comandos CLI](#comandos-cli)
+- [Web UI](#web-ui)
+  - [Funcionalidades](#funcionalidades)
+  - [Subida de documentos](#subida-de-documentos)
+- [MEM_SAVE — Memoria automatica](#mem_save--memoria-automatica)
+  - [Borrado total (`CLEAR_ALL`) — confirmacion 2-turnos](#borrado-total-clear_all--confirmacion-2-turnos)
+- [Encriptacion](#encriptacion)
+- [Uso de la API](#uso-de-la-api)
+  - [Chat (curl)](#chat-curl)
+  - [Chat (Python)](#chat-python)
+  - [Guardar en memoria](#guardar-en-memoria)
+- [Casos de uso](#casos-de-uso)
+- [Consejos](#consejos)
+
+## En 30 segundos
+
+- **CLI:** `./nexe go` arranca servidor + Qdrant + tray
+- **Web UI** en `http://127.0.0.1:9119/ui` (chat, subida de documentos, sesiones)
+- **API compatible con OpenAI:** `/v1/chat/completions`
+- **MEM_SAVE automatico** (el modelo guarda hechos de la conversacion)
+- **Menu en el system tray** para start/stop, logs, uninstall
+
+---
 
 ## Iniciar el servidor
 
@@ -61,6 +88,7 @@ Accesible en `http://127.0.0.1:9119/ui`. Requiere API key (almacenada en localSt
 - **Selector de idioma:** Desplegable en el footer CA/ES/EN. Cambia todo el texto de la UI al instante via `applyI18n()`. El servidor es la fuente de verdad (POST /ui/lang).
 - **Desplegable de backend:** Muestra todos los backends configurados. Marca los backends desconectados. Auto-fallback al primer backend disponible si el seleccionado esta caido.
 - **Tokens de razonamiento:** Auto-scroll de la caja de pensamiento para modelos como qwen3.5 que emiten tokens de razonamiento.
+- **Thinking toggle por sesion (v0.9.9):** Icono ✨ sparkles junto al input + dropdown 🧠 en la cabecera de la sesion para activar/desactivar el modo thinking (reasoning tokens) para esa sesion. Solo disponible para familias compatibles (`THINKING_CAPABLE`: qwen3.5, qwen3, qwq, deepseek-r1, gemma3/4, llama4, gpt-oss). Default OFF. Si el modelo actual no soporta thinking, la UI muestra mensaje de aviso y ofrece retry automatico sin thinking. Endpoint interno: `PATCH /ui/session/{id}/thinking`.
 - **Overlay de subida:** Spinner + temporizador + nombre de fichero durante la subida de documentos. Entrada bloqueada hasta completar. Muestra recuento de chunks y tiempo tras completar.
 - **Persistencia de sesion:** API key y preferencias en localStorage. Las sesiones sobreviven a la recarga de pagina.
 - **Auto-scroll:** Las cajas de chat y pensamiento hacen auto-scroll al fondo durante el streaming.
@@ -88,10 +116,19 @@ Subir documentos via el boton de clip en la entrada del chat. Soportados: .txt, 
 El modelo extrae y guarda automaticamente hechos de las conversaciones:
 
 - El usuario dice "Me llamo Jordi" -> el modelo guarda `[MEM_SAVE: name=Jordi]`
-- El usuario dice "Olvida mi nombre" -> MEM_DELETE: busqueda por similitud (threshold 0.70), borra la coincidencia mas cercana, guard anti-re-save
+- El usuario dice "Olvida mi nombre" -> MEM_DELETE: busqueda por similitud (**threshold 0.20** desde v0.9.9, antes 0.70), borra la coincidencia mas cercana, guard anti-re-save
 - Siguiente conversacion: "Como me llamo?" -> RAG recupera "name=Jordi" -> el modelo responde correctamente
 
 No se necesitan comandos extra. Funciona tanto en CLI como en Web UI. Indicadores: badge `[MEM:N]` muestra el recuento de hechos guardados.
+
+### Borrado total (`CLEAR_ALL`) — confirmacion 2-turnos
+
+Si pides borrar **toda** la memoria ("borralo todo", "forget everything", "olvida todo"), el sistema **no borra inmediatamente**. Sigue un flujo de 2 turnos:
+
+1. **Turno 1:** Detecta el patron y pide confirmacion ("¿Estas seguro? Esto borrara toda la memoria. Responde 'si' para confirmar.").
+2. **Turno 2:** Si respondes `si`/`confirma`/`ok`, se ejecuta el borrado. Cualquier otra respuesta cancela la operacion.
+
+Esto evita perdidas masivas accidentales por un mensaje ambiguo o por inyeccion desde un documento.
 
 ## Encriptacion
 
@@ -141,14 +178,9 @@ curl -X POST http://127.0.0.1:9119/v1/memory/store \
   -d '{"text": "La fecha limite del proyecto es el 30 de marzo", "collection": "user_knowledge"}'
 ```
 
-## Casos de uso practicos
+## Casos de uso
 
-1. **Asistente personal con memoria:** Pregunta sobre tus proyectos, preferencias, fechas limite. MEM_SAVE recuerda el contexto automaticamente.
-2. **Base de conocimiento privada:** Sube documentos tecnicos, consultalos en lenguaje natural. Aislado por sesion en cada conversacion.
-3. **Desarrollo asistido por IA:** La API compatible con OpenAI funciona con Cursor, Continue, Zed. Apuntalos a http://127.0.0.1:9119/v1.
-4. **Busqueda semantica:** Usa /v1/memory/search para recuperacion de documentos basada en similitud sin coincidencia exacta de palabras clave.
-5. **Experimentacion con modelos:** Cambia entre backends MLX, llama.cpp y Ollama para comparar velocidad y calidad.
-6. **IA local segura:** Activa la encriptacion en reposo para manejar datos sensibles sin ninguna dependencia de la nube.
+Consulta **[[USE_CASES|casos de uso practicos]]** para la lista completa con contexto detallado (asistente personal, base de conocimiento privada, dev con Cursor/Continue/Zed, busqueda semantica, experimentacion con modelos, IA local segura) y guia de **cuando server-nexe NO es la mejor herramienta**.
 
 ## Consejos
 

@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-02
+data: 2026-04-16
 id: nexe-rag-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v0.9.7). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat, pujada de documents amb aillament de sessio, embeddings (768D), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio de context RAG, poda intel·ligent, deduplicacio, TextStore per a text encriptat i payloads de Qdrant sense text."
+abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v1.0.0-beta). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat (DELETE_THRESHOLD 0.20 post-Bug #18), pujada de documents amb aillament de sessio, embeddings (768D, fastembed ONNX principal offline), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio RAG injection (_filter_rag_injection), confirmacio clear_all 2-torns, precomputed KB embeddings, poda intel·ligent, deduplicacio, TextStore per a text encriptat i payloads de Qdrant sense text."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -13,11 +13,44 @@ priority: P1
 # === OPCIONAL ===
 lang: ca
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Sistema RAG — server-nexe 0.9.7
+# Sistema RAG — server-nexe 1.0.0-beta
+
+## Taula de continguts
+
+- [Com funciona RAG a server-nexe](#com-funciona-rag-a-server-nexe)
+- [Col·leccions Qdrant](#colleccions-qdrant)
+- [Payloads de Qdrant (sense text)](#payloads-de-qdrant-sense-text)
+- [TextStore (nou a la v0.9.0)](#textstore-nou-a-la-v090)
+- [Embeddings](#embeddings)
+- [MEM_SAVE — Memoria automatica](#mem_save--memoria-automatica)
+  - [Confirmacio `clear_all` 2-torns](#confirmacio-clear_all-2-torns)
+  - [Sanititzacio RAG injection (`_filter_rag_injection`)](#sanititzacio-rag-injection-_filter_rag_injection)
+- [Sanititzacio de context RAG](#sanititzacio-de-context-rag)
+- [Pujada de documents amb aillament de sessio](#pujada-de-documents-amb-aillament-de-sessio)
+- [Ingestio de documents](#ingestio-de-documents)
+  - [Documentacio del sistema (nexe_documentation)](#documentacio-del-sistema-nexe_documentation)
+  - [Coneixement de l'usuari (user_knowledge via CLI)](#coneixement-de-lusuari-user_knowledge-via-cli)
+- [Construccio del context](#construccio-del-context)
+- [Visualitzacio de pesos RAG](#visualitzacio-de-pesos-rag)
+- [Poda intel·ligent (col·leccio personal_memory)](#poda-intelligent-colleccio-personal_memory)
+- [Emmagatzematge Qdrant](#emmagatzematge-qdrant)
+- [Configuracio clau](#configuracio-clau)
+- [Limitacions](#limitacions)
+- [Endpoints principals per a RAG](#endpoints-principals-per-a-rag)
+
+## En 30 segons
+
+- **3 col·leccions Qdrant:** `personal_memory`, `user_knowledge`, `nexe_documentation`
+- **Embeddings `fastembed` ONNX** (multilingue, 768 dimensions, offline)
+- **Top-K retrieval** amb thresholds per col·leccio (0.3 / 0.35 / 0.4)
+- **MEM_SAVE automatic:** el model extreu fets de les converses i els guarda
+- **`_filter_rag_injection`** neutralitza tags maliciosos (MEM_SAVE, MEM_DELETE, OLVIDA, MEMORIA) a ingest i retrieval
+
+---
 
 RAG (Retrieval-Augmented Generation) es el sistema de memoria persistent de server-nexe. Augmenta les respostes del LLM injectant informacio rellevant recuperada de la memoria vectorial al context del prompt.
 
@@ -69,9 +102,11 @@ Tot el text viu a SQLite (opcionalment encriptat via SQLCipher). Aixo significa 
 
 ## Embeddings
 
-**Model principal (via Ollama):** `nomic-embed-text` — 768 dimensions. S'utilitza quan Ollama esta disponible.
+**Model principal (offline, sempre disponible):** `paraphrase-multilingual-mpnet-base-v2` via **fastembed (ONNX)** — 768 dimensions, multilingue. És el **backend principal** des de v0.9.3 (migrat de sentence-transformers a fastembed, PyTorch eliminat ~600 MB). Funciona sense Ollama, sense xarxa, i ve **bundled al DMG** per garantir instal·lació offline.
 
-**Model de fallback (offline):** `paraphrase-multilingual-mpnet-base-v2` via fastembed (ONNX) — 768 dimensions. Multilingue. S'utilitza quan Ollama no esta disponible. (Migrat de sentence-transformers a fastembed des de v0.9.3.)
+**Model opcional (via Ollama):** `nomic-embed-text` — 768 dimensions. Configurable via `NEXE_OLLAMA_EMBED_MODEL`. Només s'usa si l'usuari ho activa explícitament; **no és el camí principal**.
+
+**KB embeddings precomputats** (v0.9.8+): els fitxers de `knowledge/` tenen embeddings pre-calculats a `knowledge/.embeddings/`. A l'arrencada, si els hashes coincideixen, el sistema salta el càlcul i carrega directament (10.7× speedup a cold boot). Els embeddings es regeneren automàticament si canvia el contingut.
 
 Tots els vectors s'emmagatzemen amb 768 dimensions. Aquest valor esta centralitzat a `memory/memory/constants.py` com `DEFAULT_VECTOR_SIZE = 768`.
 
@@ -128,7 +163,29 @@ Qdrant — col·leccio personal_memory
     · Màxim 500 entrades (poda intel·ligent)
 ```
 
-**Intent d'esborrat (MEM_DELETE):** Quan l'usuari diu "oblida que X", cerca entrades amb similitud >= DELETE_THRESHOLD (0.70). Esborra la coincidencia mes propera. Guard anti-re-save: `_recently_deleted_facts` evita que el model torni a guardar un fet acabat d'esborrar dins la mateixa sessio.
+**Intent d'esborrat (MEM_DELETE):** Quan l'usuari diu "oblida que X", cerca entrades amb similitud >= **DELETE_THRESHOLD (0.20 des de v0.9.9)**. Esborra la coincidencia mes propera. Guard anti-re-save: `_recently_deleted_facts` evita que el model torni a guardar un fet acabat d'esborrar dins la mateixa sessio.
+
+> **Bug #18 fix (v0.9.9):** El threshold anterior (0.70) era massa alt i cap coincidència passava la prova. Es va ajustar a **0.20** després de 8 tests e2e reals (`tests/integration/test_mem_delete_e2e.py`) contra Qdrant embedded + fastembed. Ara l'esborrat funciona consistentment.
+
+### Confirmacio `clear_all` 2-torns
+
+Si l'usuari demana esborrar **tot** (patrons com "esborra tota la memòria", "forget everything", "olvida todo"), el sistema **NO esborra immediatament**. En lloc d'això:
+
+1. **Torn 1:** El servidor detecta el patró de `CLEAR_ALL_TRIGGERS`, marca `session._pending_clear_all = True` i demana confirmació explícita ("Estàs segur? Això esborrarà tota la teva memòria. Respon 'sí' per confirmar.").
+2. **Torn 2:** Si l'usuari confirma amb un patró afirmatiu curt (`sí`, `confirma`, `ok`, etc.), es procedeix a esborrar la col·lecció. Qualsevol altre missatge cancel·la l'operació i reseteja el flag.
+
+Això evita pèrdues massives accidentals per un missatge ambigu o una instrucció injectada per un document/prompt.
+
+### Sanititzacio RAG injection (`_filter_rag_injection`)
+
+Abans d'injectar context RAG al prompt del LLM (ingest + retrieval), `_filter_rag_injection` **neutralitza tags de control** que podrien manipular la memòria via efecte rebot:
+
+- `[MEM_SAVE:…]` → eliminat (evita que el model auto-guardi pel simple fet de veure el patró a un document)
+- `[MEM_DELETE:…]` → eliminat
+- `[OLVIDA:…]` / `[OBLIT:…]` / `[FORGET:…]` → eliminats (intents trilingües d'esborrat)
+- `[MEMORIA:…]` → eliminat
+
+Això s'aplica **tant a l'ingest** (quan un document o una memòria es guarda) **com al retrieval** (quan es recupera per injectar al prompt), creant una doble barrera contra injecció RAG.
 
 **Truncat de documents grans:** Si un document pujat es massa gran pel context disponible, es trunca i la UI mostra un avis groc amb el marcador SSE `[DOC_TRUNCATED:XX%]` indicant el percentatge descartat.
 

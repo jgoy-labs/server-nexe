@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-06
+data: 2026-04-16
 id: nexe-plugins-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia completa del sistema de plugins de server-nexe 0.9.7. Cobreix Protocol NexeModule (duck typing, no herencia), format manifest.toml, estructura de fitxers del plugin, cicle de vida (discovery -> loading -> initialization -> integration -> shutdown), objecte context, registre de routers, plugins existents (MLX, llama.cpp, Ollama, Security amb normalitzacio Unicode, Web UI amb validacio d'input), com crear un plugin nou pas a pas, errors comuns i bones practiques."
+abstract: "Guia completa del sistema de plugins de server-nexe 1.0.0-beta. Cobreix Protocol NexeModule (duck typing, no herencia), format manifest.toml, estructura de fitxers del plugin, cicle de vida (discovery -> loading -> initialization -> integration -> shutdown), objecte context, registre de routers, plugins existents (5: MLX, llama.cpp, Ollama, Security amb normalitzacio Unicode, Web UI amb validacio d'input), com crear un plugin nou pas a pas, errors comuns i bones practiques."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -13,11 +13,11 @@ priority: P2
 # === OPCIONAL ===
 lang: ca
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Sistema de plugins — server-nexe 0.9.7
+# Sistema de plugins — server-nexe 1.0.0-beta
 
 server-nexe utilitza una arquitectura de plugins basada en descobriment automatic via fitxers manifest.toml. Els plugins son moduls que afegeixen funcionalitat sense modificar el core. No cal registre manual — el sistema escaneja, descobreix i carrega plugins automaticament.
 
@@ -37,7 +37,7 @@ class MyPlugin:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="my_plugin",
-            version="0.9.7",
+            version="1.0.0-beta",
             description="What it does",
             author="Author Name",
             module_type="local_llm_option",
@@ -108,7 +108,7 @@ Tot plugin HA de tenir un fitxer `manifest.toml`. Es la font unica de veritat pe
 ```toml
 [module]
 name = "my_plugin"
-version = "0.9.7"
+version = "1.0.0-beta"
 type = "local_llm_option"
 description = "What this plugin does"
 location = "plugins/my_plugin/"
@@ -232,6 +232,8 @@ Llista estatica declarativa al fitxer `personality/server.toml` (linia 172). Es 
 [plugins.modules]
 enabled = ["security", "rag", "ollama_module", "mlx_module", "llama_cpp_module", "web_ui_module"]
 ```
+
+> **Nota: 5 plugins reals, no 6.** La llista d'`enabled` conté 6 noms però `rag` **NO és un plugin NexeModule** — és un subsistema intern gestionat per `memory/rag/` (la capa RAG del sistema de memòria). Es llista aquí per coherència històrica i perquè l'activador de mòduls el reconegui, però no té `manifest.toml` ni implementa el Protocol NexeModule. Els **5 plugins reals** són: `mlx_module`, `llama_cpp_module`, `ollama_module`, `security`, `web_ui_module`.
 
 Per afegir un plugin nou cal incloure'l explicitament aqui.
 

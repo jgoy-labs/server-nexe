@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-16
 id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia y cobertura de pruebas de server-nexe 0.9.7. 4770 funciones de test recopiladas (4810 totales), 0 fallos en la ultima ejecucion. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura, correcciones de tests de auditoria IA, tests de crypto (68 nuevos), resultados de mega-test v1/v2, y valoracion honesta de las limitaciones de las pruebas."
+abstract: "Estrategia y cobertura de pruebas de server-nexe 1.0.0-beta. 4842 funciones de test recopiladas (4990 totales, 148 deselected), 0 fallos en la ultima ejecucion. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura real ~85% global, correcciones de tests de auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultados de mega-test v1/v2 y valoracion honesta de las limitaciones de las pruebas."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
 chunk_size: 800
 priority: P2
@@ -13,24 +13,29 @@ priority: P2
 # === OPCIONAL ===
 lang: es
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Pruebas — server-nexe 0.9.7
+# Pruebas — server-nexe 1.0.0-beta
 
 ## Resultados de las pruebas
 
 | Metrica | Valor |
 |---------|-------|
-| Total de funciones de test recopiladas | 4770 |
-| Total de funciones de test (incl. deseleccionadas) | 4804 |
-| Pasados en ultima ejecucion | 4770 |
+| Total de funciones de test recopiladas | **4842** |
+| Total de funciones de test (incl. deseleccionadas) | **4990** (148 deselected por marcadores) |
+| Ultima ejecucion completa pasados | 4842 |
 | Fallidos | 0 |
 | Saltados | 6 |
 | XFailed | 1 |
+| **Cobertura real global** | **~85%** (baseline honesta, sin inflar) |
 
-Nota: 4770 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 4804.
+Nota: 4842 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 4990.
+
+> **Nota de honestidad sobre cobertura:** Badges historicos han reportado 97.4%, 91.1% o 93% en fases concretas del mega-test. Esos numeros correspondian a subconjuntos especificos (baseline de una fase, funcional contra servidor en vivo) y no al global del proyecto. La **cobertura real global del codigo**, medida con `pytest --cov` sobre todo el codebase, es **~85%**. Este es el valor que usamos como referencia.
+>
+> **Si las IAs nos estan enganando o no, lo direis vosotros.** Las auditorias que tenemos hasta ahora las han hecho modelos de IA (Claude, Gemini, Codex y otros), a menudo con **revisiones cruzadas** entre modelos y revision humana final por parte del desarrollador. Es un proceso util pero no infalible — un modelo puede defender una decision equivocada que otro no detecta. Por eso la comunidad (via [GitHub Issues](https://github.com/jgoy-labs/server-nexe/issues) o el foro en server-nexe.com) tiene un papel real: si veis tests que parecen teatro, cifras que no cuadran, o claims demasiado optimistas, **decidlo**. Esta doc es nuestra apuesta por la honestidad, no la prueba definitiva de que lo hemos acertado.
 
 ## Estructura de los tests
 
@@ -86,6 +91,18 @@ El `conftest.py` raiz proporciona fixtures compartidas. Cada modulo puede tener 
 | `plugins/web_ui_module/tests/test_session_manager.py` (+7) | 7 | Sesiones encriptadas (.json -> .enc) |
 | Tests de integracion lifespan | 14 | Integracion end-to-end de CryptoProvider |
 
+## Tests e2e MEM_DELETE (v0.9.9)
+
+En v0.9.9, el fix de Bug #18 (DELETE_THRESHOLD 0.70 → 0.20) vino acompanado de una bateria de **8 tests end-to-end** en `tests/integration/test_mem_delete_e2e.py`:
+
+- Qdrant embedded real (no mockeado)
+- fastembed ONNX real (no mockeado)
+- Ciclo completo: usuario guarda hecho → usuario pide olvidar → verificacion de que el hecho ya no se recupera
+- Cubre patrones trilingues (ca: "oblida...", es: "olvida...", en: "forget...")
+- Cubre edge cases: hechos similares pero no identicos, confirmacion clear_all 2-turnos, anti-re-save guard
+
+Estos tests son la **fuente de verdad empirica** para el valor del DELETE_THRESHOLD y cualquier cambio en el pipeline de MEM_DELETE debe pasarlos.
+
 ## Auditorias de seguridad e impacto en los tests
 
 Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (Claude), no por auditores externos. El desarrollador lanza sesiones de revision dedicadas que analizan el codigo, ejecutan tests y generan informes.
@@ -100,8 +117,8 @@ Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (C
 
 ### Mega-Test v1 Pre-Release
 - Auditoria autonoma de 4 fases: baseline, seguridad, funcional, GO/NO-GO
-- Baseline: 298 tests, 97.4% cobertura
-- Funcional: 158 tests contra servidor en vivo, 91.1% tasa de exito
+- Baseline (muestra de una fase): 298 tests, 97.4% cobertura **de esa fase concreta** (no global)
+- Funcional (muestra de una fase): 158 tests contra servidor en vivo, 91.1% tasa de exito
 - 23 hallazgos (1 critico, 6 altos, 7 medios, 7 bajos)
 - Veredicto: GO CON CONDICIONES
 
@@ -109,7 +126,7 @@ Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (C
 - Misma metodologia de 4 fases, re-ejecutada tras aplicar las correcciones de v1
 - 10 hallazgos (vs 23 en v1, 57% de reduccion)
 - 7 correcciones aplicadas (validacion de memoria, path traversal, validacion de nombres de fichero, rate limiting, normalizacion Unicode, print->logger)
-- Resultado final (v0.9.7): **4770 pasados, 0 fallidos**
+- Ejecucion final (v0.9.9): **4842 tests recopilados pasados, 0 fallidos** (4990 totales)
 - Veredicto: GO CON CONDICIONES (mejorado)
 
 ## Decisiones clave en las pruebas
@@ -143,6 +160,7 @@ El CI en Linux funciona porque `rumps` (tray de macOS) esta en `requirements-mac
 
 - **Probado por el desarrollador + sesiones autonomas de auditoria IA.** Ningun usuario externo aun. Sin auditoria de seguridad externa.
 - **Un solo usuario real** — server-nexe solo ha sido usado por el desarrollador hasta ahora. No hay feedback de usuarios externos ni pruebas en entornos de produccion multi-usuario.
-- **Las auditorias IA son exhaustivas pero no completas** — encuentran muchos problemas pero sin duda se escapan otros. Los numeros de cobertura (97.4% baseline) parecen buenos pero no garantizan la correccion.
+- **Las auditorias IA son exhaustivas pero no completas** — encuentran muchos problemas pero sin duda se escapan otros. La **cobertura real global es ~85%** (no 97%/91%/93% como aparece en badges antiguos: esos numeros correspondian a subconjuntos de fase).
 - **Los tests de encriptacion son nuevos** — 68 tests para el sistema de crypto, pero el sistema aun no ha pasado por uso real en produccion.
 - **Los tests de integracion requieren servicios locales** — Ollama debe estar ejecutandose (Qdrant es embebido, no requiere proceso separado). Se prueban en desarrollo pero no en CI.
+- **Tests generados por IA 🎭 — leed la cobertura con esta advertencia.** Los tests tambien estan escritos por IA bajo direccion humana (multi-model). Se han hecho auditorias de muestra pero **no podemos garantizar al 100% que no haya "test theatre"** (tests que pasan sin probar nada significativo — comprobaciones triviales, mocks que siempre devuelven el valor esperado, aserciones tautologicas). Un 85% de cobertura con potencial test theatre vale menos que un 70% con tests robustos. Revisiones futuras (humanas o IA independiente) pueden identificarlos y reescribirlos. Mientras tanto: tratad los tests como **senal util pero no prueba definitiva** — un bug en produccion puede manifestarse aunque los tests pasen.

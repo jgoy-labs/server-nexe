@@ -1,10 +1,10 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-16
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Identitat de server-nexe: projecte de codi obert creat per Jordi Goy a Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que fa (IA local, RAG, multi-backend, encriptacio at-rest), estat actual (0.9.7), enllacos oficials i com donar suport."
+abstract: "Identitat de server-nexe: projecte de codi obert creat per Jordi Goy a Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que fa (IA local, RAG, multi-backend, encriptacio at-rest), estat actual (1.0.0-beta, macOS 14+ Apple Silicon only), enllacos oficials i com donar suport."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
 chunk_size: 400
 priority: P1
@@ -13,11 +13,21 @@ priority: P1
 lang: ca
 type: docs
 collection: nexe_documentation
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
 # Que es server-nexe?
+
+## En 30 segons
+
+- **Servidor d'IA 100% local** (zero cloud)
+- **Amb memoria persistent** (RAG + MEM_SAVE)
+- **macOS 14+ Apple Silicon**, versio 1.0.0-beta
+- **Multi-backend:** MLX, llama.cpp, Ollama
+- **Open source** (Apache 2.0), projecte personal d'un desenvolupador
+
+---
 
 **server-nexe** es un servidor d'IA local amb memoria persistent, creat per **Jordi Goy** a Barcelona (llicencia Apache 2.0). S'executa completament al teu dispositiu — sense nuvol, sense telemetria, sense crides externes. Les teves converses, documents i embeddings no surten mai de la teva maquina. Tambe escrit "server.nexe" o simplement "Nexe". Es un projecte personal de codi obert, no es cap empresa ni startup.
 
@@ -45,11 +55,11 @@ server-nexe combina cinc capacitats:
 
 | Component | Tecnologia |
 |-----------|-----------|
-| Llenguatge | Python 3.11+ |
+| Llenguatge | Python 3.11+ (3.12 al bundle DMG) |
 | Framework web | FastAPI |
 | Base de dades vectorial | Qdrant |
 | Backends LLM | MLX, llama.cpp, Ollama |
-| Embeddings | fastembed ONNX (768D) / nomic-embed-text |
+| Embeddings | **fastembed ONNX (768D) — principal offline** / nomic-embed-text (Ollama, opcional) |
 | Encriptacio | AES-256-GCM, HKDF-SHA256, SQLCipher (default auto) |
 | CLI | Click + Rich |
 | API | Compatible amb OpenAI (/v1/chat/completions) |
@@ -57,12 +67,13 @@ server-nexe combina cinc capacitats:
 
 ## Estat actual
 
-- **Versio:** 0.9.7
-- **Plataforma principal:** macOS (Apple Silicon i Intel) — testejat
+- **Versio:** 1.0.0-beta
+- **Plataforma principal:** macOS 14 Sonoma o superior, **Apple Silicon (M1+) exclusivament** — testejat
+- **macOS Intel:** **NO suportat** (eliminat a v0.9.9 per dependencies arm64-only del stack)
 - **Linux:** Suport parcial (tests unitaris passen, no testejat en produccio)
 - **Windows:** Encara no suportat
 - **Port per defecte:** 9119
-- **Tests:** 4770 funcions de test col·lectades (4810 totals), 0 errors a l'ultima execucio
+- **Tests:** 4842 funcions de test col·lectades (4990 totals — 148 deselected per marcadors), 0 errors a l'ultima execucio
 
 ## Documentacio AI-Ready
 
@@ -74,7 +85,7 @@ La base de coneixement esta dissenyada tant per a consum huma com per a IA:
 
 ## Qui l'ha fet
 
-**Jordi Goy** — desenvolupador de software a Barcelona. server-nexe va comecar com un experiment de "learning by doing": explorar com construir un servidor d'IA completament local amb memoria persistent. Ha crescut fins a ser un sistema funcional amb RAG, multiples backends, arquitectura de plugins, interficie web, encriptacio at-rest i instal·lador macOS.
+**Jordi Goy** — desenvolupador a Barcelona. server-nexe va comecar com un experiment de "learning by doing": explorar com construir un servidor d'IA completament local amb memoria persistent. Ha crescut fins a ser un sistema funcional amb RAG, multiples backends, arquitectura de plugins, interficie web, encriptacio at-rest i instal·lador macOS.
 
 Fet per una persona amb codi, musica i tossuderia.
 
@@ -87,12 +98,17 @@ El que va começar com un learning-by-doing i un monstre d'espagueti gegant va d
 - **Codi font:** https://github.com/jgoy-labs/server-nexe
 - **Autor:** https://jgoy.net
 
+## Per que el nom "nexe"?
+
+**nexe** (del llati *nexus* = vincle) significa connexio, punt d'unio. En aquest projecte, **server-nexe es el punt on la IA i la persona es troben**: la interficie a traves de la qual un huma envia una pregunta, un document o una ordre, i rep una resposta. El nexe de contacte.
+
 ## Dona suport al projecte
 
 server-nexe es gratuit i de codi obert. Si et resulta util i vols ajudar a que el desenvolupament continuI:
 
 - **GitHub Sponsors:** https://github.com/sponsors/jgoy-labs
-- **Ko-fi:** https://ko-fi.com/jgoylabs
+- **Ko-fi:** https://ko-fi.com/servernexe
+- **Stripe:** https://buy.stripe.com/14A6oHct34lN5x7fKNgQE00 (pagament directe amb targeta — també accessible des de https://server-nexe.com)
 
 Cada contribucio ajuda a mantenir el projecte i financar noves funcionalitats.
 

@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-16
 id: nexe-security-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Seguridad de server-nexe: autenticacion dual-key, rate limiting, 6 detectores de inyeccion, 47 patrones jailbreak, cabeceras OWASP, logging RFC5424, encriptacion AES-256-GCM en reposo (SQLCipher, sesiones .enc), sanitizacion RAG. Todo local, cero llamadas externas."
+abstract: "Seguridad de server-nexe 1.0.0-beta: autenticacion dual-key, rate limiting (incl. PATCH thinking 10/min y NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectores de inyeccion, 47 patrones jailbreak, cabeceras OWASP, logging RFC5424, encriptacion AES-256-GCM en reposo (SQLCipher, sesiones .enc), MEK fallback order (file->keyring->env->generate), sanitizacion RAG injection (_filter_rag_injection). Todo local, cero llamadas externas."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher, local, privacy]
 chunk_size: 600
 priority: P1
@@ -13,13 +13,43 @@ priority: P1
 # === OPCIONAL ===
 lang: es
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Seguridad — server-nexe 0.9.7
+# Seguridad — server-nexe 1.0.0-beta
 
-server-nexe esta disenado para entornos locales de confianza. Todos los datos permanecen en el dispositivo. Sin telemetria, sin llamadas externas.
+## Tabla de contenidos
+
+- [Autenticacion](#autenticacion)
+- [Rate Limiting](#rate-limiting)
+  - [Endpoints API (configurables via `.env`)](#endpoints-api-configurables-via-env)
+  - [Endpoints Web UI (fijos por endpoint)](#endpoints-web-ui-fijos-por-endpoint)
+- [Cabeceras de seguridad (OWASP)](#cabeceras-de-seguridad-owasp)
+- [Validacion de entrada](#validacion-de-entrada)
+  - [Pipeline API (/v1/*)](#pipeline-api-v1)
+  - [Pipeline Web UI (/ui/*)](#pipeline-web-ui-ui)
+  - [Sanitizacion de contexto RAG](#sanitizacion-de-contexto-rag)
+- [Deteccion de inyecciones](#deteccion-de-inyecciones)
+- [Logging de auditoria](#logging-de-auditoria)
+- [Encriptacion en reposo (default `auto`)](#encriptacion-en-reposo-default-auto)
+  - [CryptoProvider](#cryptoprovider)
+  - [Que se encripta](#que-se-encripta)
+  - [Como activarlo](#como-activarlo)
+  - [Compatibilidad hacia atras](#compatibilidad-hacia-atras)
+- [Privacidad](#privacidad)
+- [Auditorias de seguridad](#auditorias-de-seguridad)
+  - [Auditoria IA v1 (marzo 2026)](#auditoria-ia-v1-marzo-2026)
+  - [Auditoria IA v2 (marzo 2026)](#auditoria-ia-v2-marzo-2026)
+  - [Mega-Test v1 Pre-Release (marzo 2026)](#mega-test-v1-pre-release-marzo-2026)
+  - [Mega-Test v2 Post-Correcciones (marzo 2026)](#mega-test-v2-post-correcciones-marzo-2026)
+  - [Correcciones clave de las auditorias](#correcciones-clave-de-las-auditorias)
+  - [Nota de honestidad](#nota-de-honestidad)
+- [Riesgos aceptados](#riesgos-aceptados)
+- [Checklist de seguridad](#checklist-de-seguridad)
+- [Reporte de vulnerabilidades](#reporte-de-vulnerabilidades)
+
+server-nexe 1.0.0-beta esta disenado para entornos locales de confianza. Todos los datos permanecen en el dispositivo. Sin telemetria, sin llamadas externas.
 
 ## Autenticacion
 
@@ -61,6 +91,7 @@ El rate limiting se aplica a **todos los endpoints** — tanto la API (`/v1/*`) 
 | GET /ui/session/{id} | 30/minuto |
 | GET /ui/session/{id}/history | 30/minuto |
 | DELETE /ui/session/{id} | 10/minuto |
+| PATCH /ui/session/{id}/thinking | 10/minuto |
 
 Implementacion: `slowapi` con decorador `@limiter.limit()` en cada endpoint. `RateLimitTracker` en `plugins/security/core/rate_limiting.py`.
 
@@ -116,6 +147,15 @@ El endpoint API `POST /v1/chat/completions` valida y sanitiza la entrada a trave
 
 **47 patrones de jailbreak** en `plugins/security/sanitizer/`: Pattern matching multilingue para intentos de inyeccion de prompt.
 
+**Neutralizacion de tags RAG injection** (`_filter_rag_injection`, v0.9.9): en ingest y retrieval, el sistema **neutraliza tags de control** que podrian manipular la memoria por rebote:
+
+- `[MEM_SAVE:…]` — eliminado (evita auto-guardado inducido por un documento)
+- `[MEM_DELETE:…]` — eliminado
+- `[OLVIDA:…]` / `[OBLIT:…]` / `[FORGET:…]` — eliminados (trilingue)
+- `[MEMORIA:…]` — eliminado
+
+Esto forma parte del fix del Bug #18 (ver RAG.md). Se aplica tanto en ingest (cuando se guarda un documento o memoria) como en retrieval (cuando se recupera para inyectar en el prompt).
+
 **Limite de tamano de peticion:** Cuerpo maximo de 100MB (proteccion contra DoS).
 
 **Truncamiento en logs:** Los mensajes de usuario se truncan a 200 caracteres en la salida de logs para prevenir inyeccion de logs y reducir el volumen.
@@ -130,18 +170,20 @@ El endpoint API `POST /v1/chat/completions` valida y sanitiza la entrada a trave
 
 ## Encriptacion en reposo (default `auto`)
 
-**Anadida en v0.9.0, default `auto` desde v0.9.7.** La encriptacion en reposo se activa automaticamente si `sqlcipher3` esta disponible (modo `auto`). Ha sido probada (68 tests) pero aun no ha pasado por uso en produccion con usuarios reales fuera del desarrollo.
+**Anadida en v0.9.0, default `auto` desde v0.9.2.** La encriptacion en reposo se activa automaticamente si `sqlcipher3` esta disponible (modo `auto`). Ha sido probada (68 tests) pero aun no ha pasado por uso en produccion con usuarios reales fuera del desarrollo.
 
 ### CryptoProvider
 
 - Algoritmo: **AES-256-GCM** con derivacion de claves **HKDF-SHA256**
-- Cadena de gestion de claves: OS Keyring (macOS Keychain) -> variable de entorno `NEXE_MASTER_KEY` -> fichero `~/.nexe/master.key` (permisos 600)
+- **Cadena de fallback de la MEK (Master Encryption Key)** (corregida en v0.9.9 — Bug #19b): **fichero `~/.nexe/master.key` (permisos 600) → OS Keyring (macOS Keychain) → variable de entorno `NEXE_MASTER_KEY` → generacion nueva**.
+  - Esto permite que las sesiones `.enc` sobrevivan a un reset del Keychain siempre que el fichero local o la env esten intactos.
+  - Antes de v0.9.9 el orden era keyring primero, y un reset del Keychain dejaba los datos irrecuperables.
 - Claves derivadas por proposito: `"sqlite"`, `"sessions"`, `"text_store"`, `"backup"`
 - Implementacion: `core/crypto/provider.py`
 
 **Migrar la clave maestra a una nueva máquina:**
 
-Si cambias de ordenador o reinstalas el sistema, debes mover la clave maestra para mantener el acceso a las sesiones `.enc` y la base de datos cifrada. La cadena de fallback es: OS Keyring → variable de entorno → fichero `~/.nexe/master.key`.
+Si cambias de ordenador o reinstalas el sistema, debes mover la clave maestra para mantener el acceso a las sesiones `.enc` y la base de datos cifrada. La cadena de fallback desde v0.9.9 es: fichero `~/.nexe/master.key` → OS Keyring → variable de entorno.
 
 ```bash
 # 1. En la máquina ANTIGUA — exporta la clave
@@ -203,7 +245,7 @@ Todo es compatible hacia atras. Si la encriptacion no esta activada, el comporta
 
 ## Auditorias de seguridad
 
-Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (Claude) como parte del proceso de desarrollo. El desarrollador lanza sesiones de revision dedicadas que analizan el codigo, ejecutan tests y generan informes estructurados con hallazgos. No son auditorias externas de empresas de seguridad.
+Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA **(Claude, Gemini, Codex y otros modelos segun disponibilidad)** como parte del proceso de desarrollo. El desarrollador lanza sesiones de revision dedicadas que analizan el codigo, ejecutan tests y generan informes estructurados con hallazgos. Cuando se quiere cuestionar una decision o detectar sesgo, se hacen **revisiones cruzadas** (un modelo IA audita lo que ha hecho otro). No son auditorias externas de empresas de seguridad humanas.
 
 ### Auditoria IA v1 (marzo 2026)
 - 73 hallazgos en 11 areas
@@ -217,7 +259,7 @@ Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (C
 - Calificacion: A
 
 ### Mega-Test v1 Pre-Release (marzo 2026)
-- Auditoria autonoma de 4 fases: baseline (298 tests, 97.4% cobertura), seguridad (23 hallazgos), funcional (158 tests, 91.1%), GO/NO-GO
+- Auditoria autonoma de 4 fases: baseline, seguridad (23 hallazgos), funcional (158 tests), GO/NO-GO
 - 23 hallazgos (1 critico, 6 altos, 7 medios, 7 bajos)
 - Veredicto: **GO CON CONDICIONES**
 - Correcciones aplicadas: validacion de entrada UI, sanitizacion de contexto RAG, rate limiting, CVEs de dependencias
@@ -226,7 +268,7 @@ Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (C
 - Misma metodologia de 4 fases, re-ejecutada tras aplicar las correcciones de v1
 - 10 hallazgos (vs 23 en v1, **57% de reduccion**)
 - 7 correcciones adicionales aplicadas: validacion de endpoints de memoria (CRITICO), path traversal en sesiones, validacion de nombres de fichero, rate limiting en todos los endpoints UI, normalizacion Unicode en detectores de inyeccion, migracion print()->logger
-- 4770 tests pasados, 0 fallidos
+- Ejecucion final (v0.9.9): **4842 tests recopilados pasados, 0 fallidos** (4990 totales, 148 deselected por marcadores)
 - Veredicto: **GO CON CONDICIONES** (mejorado)
 
 ### Correcciones clave de las auditorias
@@ -244,7 +286,7 @@ Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (C
 
 ### Nota de honestidad
 
-Estas auditorias IA encuentran muchos problemas pero **no son exhaustivas** — con certeza hay vulnerabilidades y bugs que no han sido detectados. La cobertura de tests (97.4% baseline, 91.1% funcional) es buena pero no del 100%. El sistema de encriptacion es nuevo y no ha sido probado en batalla en produccion con usuarios reales. Este es un proyecto open-source personal revisado por IA, no un producto empresarial auditado formalmente.
+Estas auditorias IA encuentran muchos problemas pero **no son exhaustivas** — con certeza hay vulnerabilidades y bugs que no han sido detectados. La cobertura de tests real es **~85% global** (baseline honesta, sin inflar — los badges antiguos de 97.4%/91.1%/93% eran excesivamente optimistas y se han revisado). El sistema de encriptacion es nuevo y no ha sido probado en batalla en produccion con usuarios reales. Este es un proyecto open-source personal revisado por IA, no un producto empresarial auditado formalmente.
 
 ## Riesgos aceptados
 

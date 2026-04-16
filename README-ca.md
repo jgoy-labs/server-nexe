@@ -7,6 +7,10 @@
 </p>
 
 <p align="center">
+  <em>He arribat al mínim viable per al món real, però falta feedback. 🚀</em>
+</p>
+
+<p align="center">
   <a href="https://github.com/jgoy-labs/server-nexe/actions/workflows/ci.yml"><img src="https://github.com/jgoy-labs/server-nexe/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src=".github/badges/coverage.svg" alt="Coverage">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
@@ -31,10 +35,36 @@
 </p>
 
 <p align="center">
-  <a href="README.md"><strong>Read in English</strong></a>
+  <a href="README.md"><strong>English</strong></a> ·
+  <a href="README-es.md"><strong>Español</strong></a>
 </p>
 
 ---
+
+## Taula de continguts
+
+- [La Història](#la-història)
+- [Captures](#captures)
+- [Per Què Server Nexe?](#per-què-server-nexe)
+- [Inici Ràpid](#inici-ràpid)
+  - [Opció A: Instal·lador DMG (macOS)](#opció-a-installador-dmg-macos)
+  - [Opció B: Línia de comandes](#opció-b-línia-de-comandes)
+  - [Opció C: Headless (servidors, scripts, CI)](#opció-c-headless-servidors-scripts-ci)
+- [Backends](#backends)
+- [Models Disponibles per Tiers de RAM](#models-disponibles-per-tiers-de-ram)
+- [Arquitectura](#arquitectura)
+  - [Pipeline de processament de peticions](#pipeline-de-processament-de-peticions)
+- [Sistema de Plugins](#sistema-de-plugins)
+- [Documentació AI-Ready](#documentació-ai-ready)
+- [Seguretat](#seguretat)
+- [Suport de Plataformes](#suport-de-plataformes)
+- [Requisits](#requisits)
+- [Testing](#testing)
+- [Full de Ruta](#full-de-ruta)
+- [Limitacions](#limitacions)
+- [Contribuir](#contribuir)
+- [Agraïments](#agraïments)
+- [Avís Legal](#avís-legal)
 
 ## La Història
 
@@ -42,9 +72,36 @@ Server Nexe va començar com un experiment de learning-by-doing: *"Què caldria 
 
 **Tot aquest projecte — codi, tests, auditories, documentació — ha estat construït per una persona orquestrant diferents models d'IA**, tant locals (MLX, Ollama) com al núvol (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), com a col·laboradors. L'humà decideix què construir, dissenya l'arquitectura, revisa línia i executa test. Les IAs escriuen, auditen i fan stress-test sota direcció humana.
 
-El que va començar com un prototip s'ha convertit en un producte genuïnament útil: 4572 tests, auditories de seguretat, encriptació at-rest, un instal·lador macOS amb detecció de hardware, i un sistema de plugins. No està acabat — hi ha un roadmap ple d'idees — però ja fa el que es proposava: **executar un servidor d'IA a la teva màquina, amb memòria que persisteix, i zero dades sortint del teu dispositiu.**
+El que va començar com un prototip s'ha convertit en un producte genuïnament útil: 4842 tests, auditories de seguretat, encriptació at-rest, un instal·lador macOS amb detecció de hardware, i un sistema de plugins. No està acabat — hi ha un roadmap ple d'idees — però ja fa el que es proposava: **executar un servidor d'IA a la teva màquina, amb memòria que persisteix, i zero dades sortint del teu dispositiu.**
 
 No intenta competir amb ChatGPT ni Claude. Però sí pot ser complementari per a feines menys feixugues. És una eina open-source per a gent que vol ser propietària de la seva infraestructura d'IA. Construït per una persona a Barcelona, amb IA com a copilot, música, i tossuderia.
+
+Més tècnicament: el que era un **monstre d'espagueti gegant** va acabar destil·lant-se, refactor rere refactor, cap a un **nucli mínim, agnòstic i modular** — on la seguretat i la memòria estan resoltes a la base perquè construir a sobre sigui ràpid i còmode, en col·laboració humà–IA. Si s'ha aconseguit, ho ha de dir la comunitat (la IA diu que sí, però què vols que digui 🤪).
+
+## Captures
+
+<table>
+<tr>
+<td width="50%" align="center">
+  <img src=".github/screenshots/light.png" alt="Web UI — mode clar" />
+  <br/><em>Web UI — mode clar</em>
+</td>
+<td width="50%" align="center">
+  <img src=".github/screenshots/dark.png" alt="Web UI — mode fosc" />
+  <br/><em>Web UI — mode fosc</em>
+</td>
+</tr>
+<tr>
+<td width="50%" align="center">
+  <img src=".github/screenshots/tray.png" alt="Menú del system tray" />
+  <br/><em>Menú del system tray (NexeTray.app)</em>
+</td>
+<td width="50%" align="center">
+  <img src=".github/screenshots/installer.png" alt="Wizard de l'instal·lador SwiftUI" />
+  <br/><em>Wizard SwiftUI de l'instal·lador (DMG)</em>
+</td>
+</tr>
+</table>
 
 ## Per Què Server Nexe?
 
@@ -103,7 +160,7 @@ Puja .txt, .md o .pdf i s'indexen automàticament per RAG. Cada document només 
 <td width="50%">
 
 ### Construït per Créixer
-4572 tests, auditoria de seguretat, i18n en 3 idiomes, API completa. El que va començar com un experiment es construeix amb pràctiques de producció.
+4842 tests (~85% cobertura), auditoria de seguretat, i18n en 3 idiomes, API completa. El que va començar com un experiment es construeix amb pràctiques de producció.
 
 </td>
 </tr>
@@ -164,16 +221,14 @@ L'instal·lador detecta automàticament el teu hardware i recomana el millor bac
 
 ## Models Disponibles per Tiers de RAM
 
-L'instal·lador organitza els models per la RAM disponible al teu equip:
+L'instal·lador organitza els 16 models del catàleg per la RAM disponible al teu equip (4 tiers):
 
 | Tier | Models | Origen |
 |------|--------|--------|
-| **8 GB** | Qwen3.5 9B, Gemma 4 E4B, Salamandra 2B | Alibaba, Google, BSC/AINA |
-| **16 GB** | Llama 4 Scout (109B MoE), Salamandra 7B | Meta, BSC/AINA |
-| **24 GB** | Qwen3.5 27B, Gemma 4 31B | Alibaba, Google |
-| **32 GB** | Qwen3.5 35B (MoE), DeepSeek R1 32B, ALIA-40B | Alibaba, DeepSeek, Govern d'Espanya |
-| **48 GB** | Qwen3.5 122B (MoE), Llama 4 Maverick (400B MoE) | Alibaba, Meta |
-| **64 GB** | Qwen3.5 122B, GPT-OSS 120B | Alibaba, Nomic/Together |
+| **8 GB** | Gemma 3 4B, Qwen3.5 4B, Qwen3 4B | Google, Alibaba |
+| **16 GB** | Gemma 4 E4B, Salamandra 7B, Qwen3.5 9B, Gemma 3 12B | Google, BSC/AINA, Alibaba |
+| **24 GB** | Gemma 4 31B, Qwen3 14B, GPT-OSS 20B | Google, Alibaba, OpenAI |
+| **32 GB** | Qwen3.5 27B, Gemma 3 27B, DeepSeek R1 32B, Qwen3.5 35B-A3B, ALIA-40B | Alibaba, Google, DeepSeek, Govern d'Espanya |
 
 A més, pots usar qualsevol model d'Ollama pel seu nom o qualsevol model GGUF de Hugging Face.
 
@@ -234,9 +289,9 @@ Server Nexe utilitza un protocol de duck typing (NexeModule Protocol) — sense 
 
 ## Documentació AI-Ready
 
-La carpeta `knowledge/` conté 12 documents temàtics × 3 idiomes = 36 fitxers, estructurats amb frontmatter YAML per a ingestió RAG:
+La carpeta `knowledge/` conté 13 documents temàtics × 3 idiomes = 39 fitxers, estructurats amb frontmatter YAML per a ingestió RAG:
 
-API, Arquitectura, Errors, Identitat, Instal·lació, Limitacions, Plugins, RAG, README, Seguretat, Testing, Ús.
+API, Arquitectura, Casos d'ús, Errors, Identitat, Instal·lació, Limitacions, Plugins, RAG, README, Seguretat, Testing, Ús.
 
 Apunta qualsevol assistent d'IA a aquest repo i pot entendre l'arquitectura completa.
 
@@ -268,26 +323,27 @@ Server Nexe inclou un mòdul de seguretat activat per defecte:
 
 | Plataforma | Estat | Backends |
 |-----------|-------|----------|
-| macOS Apple Silicon | Testejat, tots 3 backends | MLX, llama.cpp, Ollama |
-| macOS Intel | Testejat | llama.cpp, Ollama (sense MLX) |
+| macOS Apple Silicon (M1+) | **Suportat** — tots 3 backends | MLX, llama.cpp, Ollama |
+| macOS Intel | **No suportat** des de v0.9.9 | — |
+| macOS 13 Ventura o anterior | **No suportat** des de v0.9.9 (requereix macOS 14 Sonoma+) | — |
 | Linux x86_64 | **Parcial** — tests unitaris passen, CI verd, **NO testejat en producció** | llama.cpp, Ollama |
 | Linux ARM64 | No testejat directament | llama.cpp, Ollama (teòric) |
 | Windows | No suportat | — |
 
-> Server Nexe està optimitzat per macOS però hauria de funcionar a Linux amb els backends llama.cpp i Ollama. L'auditoria completa de compatibilitat Linux està al roadmap.
+> Des de v0.9.9, server-nexe requereix **macOS 14 Sonoma+ amb Apple Silicon (M1 o superior)**. Els wheels pre-construïts al DMG són `arm64` exclusius. Linux amb els backends llama.cpp i Ollama hauria de funcionar però l'auditoria completa de compatibilitat està al roadmap.
 
 ## Requisits
 
 | | Mínim | Recomanat |
 |---|-------|-----------|
-| **SO** | macOS 13+ | macOS 14+ (Apple Silicon) |
+| **SO** | macOS 14 Sonoma+ (Apple Silicon only) | macOS 14+ amb xip M-series recent |
 | **Python** | 3.11+ | 3.12+ |
 | **RAM** | 8 GB | 16 GB+ (per a models més grans) |
-| **Disc** | 10 GB lliure | 20 GB+ lliure |
+| **Disc** | 10 GB lliure | 20 GB+ lliure (DMG offline bundled ~1.2 GB) |
 
 ## Testing
 
-4572 tests amb informes de cobertura. El CI executa la suite completa a cada push.
+4842 tests (~85% cobertura honest). El CI executa la suite completa a cada push.
 
 ```bash
 # Tests unitaris
@@ -304,10 +360,16 @@ NEXE_AUTOSTART_OLLAMA=true pytest -m "integration" -q
 Server Nexe està en desenvolupament actiu. Pròximament:
 
 - [x] Memòria persistent amb RAG (v0.9.0)
-- [x] Encriptació at-rest — AES-256-GCM (v0.9.0)
+- [x] Encriptació at-rest — AES-256-GCM, default `auto` (v0.9.0, fail-closed v0.9.2)
 - [x] Signatura de codi macOS i notarització (v0.9.0)
 - [x] Hardening de seguretat — detecció jailbreak, denylist uploads, enforcement pipeline (v0.9.1)
-- [ ] Suport multimodal — imatges via backends Ollama, llama.cpp i MLX
+- [x] Embeddings `fastembed` ONNX — PyTorch eliminat (v0.9.3)
+- [x] Suport multimodal VLM — imatges via backends Ollama, llama.cpp i MLX (v0.9.7)
+- [x] VLM detector 3-signal + streaming + mlx-vlm 0.4.4 (v0.9.8)
+- [x] Precomputed KB embeddings — arrencada 10.7× més ràpida (v0.9.8)
+- [x] RAG injection sanitization + CLEAR_ALL 2-turn confirm (v0.9.9)
+- [x] Instal·lació offline 100% — DMG ~1.2 GB amb wheels + embedding bundled (v0.9.9+)
+- [x] Thinking toggle per sessió — endpoint `PATCH /ui/session/{id}/thinking` (v0.9.9+)
 - [ ] App nativa macOS (SwiftUI, substitueix el tray Python)
 - [ ] Paràmetres d'inferència configurables via UI
 - [ ] Fòrum de comunitat
@@ -323,7 +385,7 @@ Disclosure honest del que server Nexe **no** fa o no fa bé:
 - **API parcialment compatible amb OpenAI** — `/v1/chat/completions` funciona. Falten `/v1/embeddings`, `/v1/models`, function calling, i multimodal.
 - **Un sol usuari** — Disseny mono-usuari per arquitectura. Sense multi-device sync, sense comptes.
 - **Sense fine-tuning** — No es poden entrenar ni ajustar models.
-- **Encriptació nova** — Opt-in, afegida a v0.9.0, no provada en batalla. Si perds la clau mestra, les dades no es recuperen.
+- **Encriptació nova** — Afegida a v0.9.0 (default `auto` des de v0.9.2, fail-closed). No provada en batalla. Si perds la clau mestra, les dades no es recuperen (veure fallback MEK: file → keyring → env → generate).
 - **Un sol desenvolupador, un sol usuari real** — Projecte personal open-source, no producte enterprise.
 
 Consulta [knowledge/ca/LIMITATIONS.md](knowledge/ca/LIMITATIONS.md) per al detall complet.
@@ -340,7 +402,8 @@ server-nexe està construït sobre les espatlles d'aquests projectes open-source
 - [MLX](https://github.com/ml-explore/mlx) — Framework ML natiu per Apple Silicon
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) — Inferència eficient de models GGUF
 - [Ollama](https://ollama.ai) — Gestió i servei de models locals
-- [sentence-transformers](https://www.sbert.net) — Models d'embeddings de text
+- [fastembed](https://github.com/qdrant/fastembed) — Embeddings ONNX locals sense PyTorch (principal des de v0.9.3)
+- [sentence-transformers](https://www.sbert.net) — Models d'embeddings de text (històric, substituït per fastembed a v0.9.3)
 - [Hugging Face](https://huggingface.co) — Hub de models i llibreria transformers
 
 **Infraestructura**
@@ -372,5 +435,5 @@ Consulta [LICENSE](LICENSE) per als detalls.
 ---
 
 <p align="center">
-  <strong>Versió 0.9.1</strong> · Apache 2.0 · Fet per <a href="https://www.jgoy.net">Jordi Goy</a> a Barcelona
+  <strong>Versió 1.0.0-beta</strong> · Apache 2.0 · Fet per <a href="https://www.jgoy.net">Jordi Goy</a> a Barcelona
 </p>

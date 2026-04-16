@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-02
+data: 2026-04-16
 id: nexe-architecture
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Arquitectura interna de server-nexe 0.9.7. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, pipeline de encriptacion, pipeline de sanitizacion de peticiones, y diagramas Mermaid."
+abstract: "Arquitectura interna de server-nexe 1.0.0-beta. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, pipeline de encriptacion, pipeline de sanitizacion de peticiones, detector VLM 3-signal, precomputed KB embeddings, thinking toggle y diagramas Mermaid."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -13,11 +13,39 @@ priority: P2
 # === OPCIONAL ===
 lang: es
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Arquitectura — server-nexe 0.9.7
+# Arquitectura — server-nexe 1.0.0-beta
+
+## Tabla de contenidos
+
+- [Arquitectura de cinco capas](#arquitectura-de-cinco-capas)
+- [Pipeline de procesamiento de peticiones](#pipeline-de-procesamiento-de-peticiones)
+- [Arquitectura de componentes](#arquitectura-de-componentes)
+- [Pipeline de encriptacion](#pipeline-de-encriptacion)
+- [Estructura de directorios (post-refactorizacion marzo 2026)](#estructura-de-directorios-post-refactorizacion-marzo-2026)
+- [Patron Factory](#patron-factory)
+- [Lifespan Manager](#lifespan-manager)
+- [Arranque del Tray (NexeTray.app)](#arranque-del-tray-nexetrayapp)
+- [Module Manager](#module-manager)
+- [Arquitectura CLI](#arquitectura-cli)
+- [Arquitectura de memoria (3 subcapas)](#arquitectura-de-memoria-3-subcapas)
+- [Arquitectura del endpoint de chat](#arquitectura-del-endpoint-de-chat)
+- [Arquitectura del modulo Web UI](#arquitectura-del-modulo-web-ui)
+- [System prompt](#system-prompt)
+- [Integracion i18n](#integracion-i18n)
+- [Arquitectura de tests](#arquitectura-de-tests)
+- [Cómo cambiar el vector store](#cómo-cambiar-el-vector-store)
+  - [Protocolo VectorStore](#protocolo-vectorstore)
+  - [Implementación actual](#implementación-actual)
+  - [Añadir un nuevo backend](#añadir-un-nuevo-backend)
+  - [Notas](#notas)
+- [Detector VLM 3-signal any-of](#detector-vlm-3-signal-any-of)
+- [Precomputed KB embeddings](#precomputed-kb-embeddings)
+- [Thinking toggle (reasoning tokens)](#thinking-toggle-reasoning-tokens)
+- [Modelos MLX — Compatibilidad](#modelos-mlx--compatibilidad)
 
 ## Arquitectura de cinco capas
 
@@ -206,6 +234,8 @@ server-nexe/
 │
 ├── installer/                    # Instalador macOS
 │   ├── swift-wizard/             # Wizard SwiftUI (12 ficheros Swift, 6 pantallas)
+│   ├── NexeTray.app/             # Bundle macOS oficial del tray (LSUIElement, CFBundleIdentifier=net.servernexe.tray)
+│   │   └── Contents/MacOS/NexeTray  # Bash wrapper → exec venv/python -m installer.tray "$@"
 │   ├── build_dmg.sh              # Constructor de DMG con firma
 │   ├── tray.py                   # App de bandeja del sistema
 │   ├── tray_monitor.py           # _RamMonitor (hilo daemon para polling RAM)
@@ -214,12 +244,11 @@ server-nexe/
 │   └── install_headless.py       # Instalador headless (compatible con Linux)
 │
 ├── knowledge/                    # Documentacion para ingestion RAG (ca/es/en x 12 ficheros)
+│   └── .embeddings/              # KB embeddings precomputados (ONNX, 10.7× speedup en el arranque)
 ├── storage/                      # Datos en tiempo de ejecucion (no en git)
-├── tests/                        # 4770 funciones de test
+├── tests/                        # 4842 funciones de test recopiladas (4990 totales)
 └── nexe                          # Ejecutable CLI
 ```
-
-**Nota instalador headless:** `install_headless.py` instala el servidor (`Nexe.app`) y configura el Login Item (inicio automático) en macOS. Sin embargo, **NO instala el tray del sistema (`NexeTray.app`)** — no habrá icono en la barra de menú. Si quieres el tray en macOS, usa el instalador GUI (`install.py` + wizard Swift).
 
 ## Patron Factory
 
@@ -265,6 +294,26 @@ Gestiona el arranque y apagado del servidor. Dividido en 4 submodulos.
 **Variables de entorno:**
 - `NEXE_STARTUP_TIMEOUT` — timeout por fase de arranque en segundos (default: 30)
 
+## Arranque del Tray (NexeTray.app)
+
+`core/server/runner.py` lanza el tray en modo `--attach` una vez el servidor esta en marcha.
+
+**Prioridad de lanzamiento:**
+
+1. **`installer/NexeTray.app/Contents/MacOS/NexeTray`** (bundle oficial):
+   - Gatekeeper-safe, provenance OK en macOS Sequoia
+   - Aparece como "server-nexe" en Activity Monitor y Force Quit (CFBundleName)
+   - El binario es un bash wrapper que ejecuta `exec venv/python -m installer.tray "$@"`
+   - Pasa `--attach --server-pid PID` de forma transparente
+
+2. **`python -m installer.tray --attach --server-pid PID`** (fallback dev):
+   - Se usa cuando el bundle no existe (entorno de desarrollo sin instalacion)
+   - Aparece como "Python" en Activity Monitor — no recomendado en produccion
+
+**Por que bundle y no `python -m` directo:** macOS Sequoia aplica restricciones de provenance a procesos Python sin bundle firmado. El bundle tiene `LSUIElement=true` y `CFBundleIdentifier=net.servernexe.tray`, que macOS reconoce como app legitima de barra de menus.
+
+**Modo headless (`install_headless.py`):** El modo headless instala el servidor (`Nexe.app`) y configura el Login Item (arranque automatico) en macOS. Sin embargo, **NO instala el tray del sistema (`NexeTray.app`)** — no habra icono en la barra de menu. Si quieres el tray en macOS, usa el instalador GUI (`install.py` + wizard Swift).
+
 ## Module Manager
 
 `personality/module_manager/` es la FUENTE UNICA DE VERDAD para todos los modulos. NO existe `plugins/base.py` ni `plugins/registry.py`.
@@ -282,7 +331,7 @@ Gestiona el arranque y apagado del servidor. Dividido en 4 submodulos.
 ```toml
 [module]
 name = "module_name"
-version = "0.9.7"
+version = "1.0.0-beta"
 type = "local_llm_option"
 description = "Descripcion del modulo"
 location = "plugins/module_name/"
@@ -382,11 +431,13 @@ El system prompt define la personalidad y comportamiento de Nexe. Se encuentra e
 
 ## Arquitectura de tests
 
-- 4770 funciones de test recopiladas (4810 totales), 0 fallos en la ultima ejecucion
+- 4842 funciones de test recopiladas (4990 totales — 148 deselected por marcadores), 0 fallos en la ultima ejecucion
+- Cobertura real: ~85% global (baseline honesta, sin inflar)
 - Tests colocados junto a los modulos (cada modulo tiene carpeta tests/)
 - conftest.py raiz para fixtures compartidas
 - Closures refactorizadas a funciones para permitir patching (decision clave de refactorizacion)
-- 68 nuevos tests de crypto (CryptoProvider, SQLCipher, sesiones, CLI)
+- 68 tests de crypto (CryptoProvider, SQLCipher, sesiones, CLI)
+- 8 tests e2e MEM_DELETE (`tests/integration/test_mem_delete_e2e.py`) con Qdrant embedded + fastembed real
 - Cobertura rastreada via .coveragerc
 
 ## Cómo cambiar el vector store
@@ -424,6 +475,37 @@ def health(self) -> Dict[str, Any]
 - Migrar de Qdrant NO es plug & play — hay que crear el adapter y los métodos de colección
 - Lo importante es el camino de sustitución, no la sustitución automática
 - Qdrant embedded no expone ningún puerto de red (`storage/vectors/` debe ser escribible)
+
+## Detector VLM 3-signal any-of
+
+A partir de v0.9.8, el backend MLX usa un **detector VLM "any-of" con 3 señales** para identificar si un modelo es multimodal antes de cargarlo (`plugins/mlx_module/core/vlm_detection.py`):
+
+1. **`architectures`** en el `config.json` — keywords como `VL`, `Vision`, `VLM`, `Llava`, `PaliGemma`, `InternVL`, `MiniCPMV`, `Idefics`, `Mllama`, `Qwen2VL`, `Qwen2_5_VL`, `Qwen3VL`.
+2. **`vision_config`** en el `config.json` — bloque de configuración de visión presente.
+3. **`weight_map`** en el `model.safetensors.index.json` — claves como `vision_tower`, `mm_projector`, `vision_model`, `visual`.
+
+**Lógica "any-of":** si cualquiera de las 3 señales coincide, el modelo se considera VLM y se enruta a `mlx-vlm` (con `stream_generate` y `GenerationResult` API de `mlx-vlm 0.4.4`). Esto cubre arquitecturas nuevas que no tienen las claves clásicas (ej: modelos donde solo aparece `vision_config` sin `architectures` con keyword).
+
+## Precomputed KB embeddings
+
+Los ficheros de `knowledge/` pueden tener **embeddings precomputados** guardados en `knowledge/.embeddings/` (post-v0.9.8). En el arranque, si los hashes coinciden con los ficheros `.md` actuales, el sistema salta el cálculo de embeddings (fastembed ONNX, ~700ms por fichero) y carga directamente los vectores ya calculados.
+
+**Speedup medido:** 10.7× en el arranque en frío (cold boot). Útil especialmente en el DMG offline, donde los embeddings vienen ya dentro del bundle para cada idioma (ca/es/en × 12 ficheros).
+
+Los embeddings se regeneran automáticamente si cambia el contenido de los `.md` o el modelo de embeddings.
+
+## Thinking toggle (reasoning tokens)
+
+A partir de v0.9.9, server-nexe soporta **activación/desactivación de thinking tokens por sesión**:
+
+- **Endpoint:** `PATCH /ui/session/{id}/thinking` (rate limit 10/min)
+- **Safelist `THINKING_CAPABLE`:** familias de modelos que soportan reasoning — `qwen3.5`, `qwen3`, `qwq`, `deepseek-r1`, `gemma3/4`, `llama4`, `gpt-oss`.
+- **Función `can_think(model)`:** verifica si el modelo activo está en la safelist.
+- **Default OFF** — hay que activarlo explícitamente por sesión (UI: icono ✨ sparkles + dropdown 🧠).
+- **Fallback 400 retry:** si el modelo NO es thinking-capable y el usuario lo activa, el servidor devuelve 400 y la UI ofrece retry automático sin thinking.
+- **Env var `NEXE_OLLAMA_THINK`:** controla el default global para modelos Ollama (`true`/`false`).
+
+Los thinking tokens se emiten en el streaming con marcadores `[THINKING]…[/THINKING]` y la UI los renderiza como bloque colapsable naranja.
 
 ## Modelos MLX — Compatibilidad
 

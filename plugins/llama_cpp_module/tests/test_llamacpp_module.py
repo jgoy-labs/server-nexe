@@ -10,7 +10,7 @@ _llama_cpp_available = importlib.util.find_spec("llama_cpp") is not None
 async def test_llamacpp_module_metadata():
     module = LlamaCppModule()
     assert module.metadata.name == "llama_cpp_module"
-    assert module.metadata.version == "0.9.9"
+    assert module.metadata.version == "1.0.0-beta"
     assert module.metadata.module_type == "local_llm_option"
 
 @pytest.mark.asyncio

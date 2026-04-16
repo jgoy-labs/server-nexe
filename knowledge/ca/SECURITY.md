@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-16
 id: nexe-security-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Seguretat de server-nexe: autenticacio dual-key, rate limiting, 6 detectors d'injeccio, 47 patrons jailbreak, capsaleres OWASP, logging RFC5424, encriptacio AES-256-GCM at-rest (SQLCipher, sessions .enc), sanititzacio RAG. Tot local, zero crides externes."
+abstract: "Seguretat de server-nexe 1.0.0-beta: autenticacio dual-key, rate limiting (incl. PATCH thinking 10/min i NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectors d'injeccio, 47 patrons jailbreak, capsaleres OWASP, logging RFC5424, encriptacio AES-256-GCM at-rest (SQLCipher, sessions .enc), MEK fallback order (file->keyring->env->generate), sanititzacio RAG injection (_filter_rag_injection). Tot local, zero crides externes."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher, local, privacy]
 chunk_size: 600
 priority: P1
@@ -13,13 +13,43 @@ priority: P1
 # === OPCIONAL ===
 lang: ca
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Seguretat — server-nexe 0.9.7
+# Seguretat — server-nexe 1.0.0-beta
 
-server-nexe 0.9.7 esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
+## Taula de continguts
+
+- [Autenticacio](#autenticacio)
+- [Rate Limiting](#rate-limiting)
+  - [Endpoints de l'API (configurables via `.env`)](#endpoints-de-lapi-configurables-via-env)
+  - [Endpoints de la Web UI (fixats per endpoint)](#endpoints-de-la-web-ui-fixats-per-endpoint)
+- [Capcaleres de seguretat (OWASP)](#capcaleres-de-seguretat-owasp)
+- [Validacio d'input](#validacio-dinput)
+  - [Pipeline de l'API (/v1/*)](#pipeline-de-lapi-v1)
+  - [Pipeline de la Web UI (/ui/*)](#pipeline-de-la-web-ui-ui)
+  - [Sanititzacio de context RAG](#sanititzacio-de-context-rag)
+- [Deteccio d'injeccions](#deteccio-dinjeccions)
+- [Logging d'auditoria](#logging-dauditoria)
+- [Encriptacio at-rest (default `auto`)](#encriptacio-at-rest-default-auto)
+  - [CryptoProvider](#cryptoprovider)
+  - [Que s'encripta](#que-sencripta)
+  - [Com activar-ho](#com-activar-ho)
+  - [Compatibilitat enrere](#compatibilitat-enrere)
+- [Privacitat](#privacitat)
+- [Auditories de seguretat](#auditories-de-seguretat)
+  - [Auditoria IA v1 (marc 2026)](#auditoria-ia-v1-marc-2026)
+  - [Auditoria IA v2 (marc 2026)](#auditoria-ia-v2-marc-2026)
+  - [Mega-Test v1 Pre-Release (marc 2026)](#mega-test-v1-pre-release-marc-2026)
+  - [Mega-Test v2 Post-Correccions (marc 2026)](#mega-test-v2-post-correccions-marc-2026)
+  - [Correccions clau de les auditories](#correccions-clau-de-les-auditories)
+  - [Nota d'honestedat](#nota-dhonestedat)
+- [Riscos acceptats](#riscos-acceptats)
+- [Checklist de seguretat](#checklist-de-seguretat)
+- [Informar de vulnerabilitats](#informar-de-vulnerabilitats)
+
+server-nexe 1.0.0-beta esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
 
 ## Autenticacio
 
@@ -61,6 +91,7 @@ El rate limiting s'aplica a **tots els endpoints** — tant a l'API (`/v1/*`) co
 | GET /ui/session/{id} | 30/minut |
 | GET /ui/session/{id}/history | 30/minut |
 | DELETE /ui/session/{id} | 10/minut |
+| PATCH /ui/session/{id}/thinking | 10/minut |
 
 Implementacio: `slowapi` amb decorador `@limiter.limit()` a cada endpoint. `RateLimitTracker` a `plugins/security/core/rate_limiting.py`.
 
@@ -116,6 +147,15 @@ L'endpoint `POST /v1/chat/completions` valida i sanititza l'input a traves del s
 
 **47 patrons de jailbreak** a `plugins/security/sanitizer/`: Matching de patrons multilingue per a intents d'injeccio de prompts.
 
+**Neutralitzacio de tags RAG injection** (`_filter_rag_injection`, v0.9.9): a ingest i retrieval, el sistema **neutralitza tags de control** que podrien manipular la memoria per rebot:
+
+- `[MEM_SAVE:…]` — eliminat (evita auto-guardat induit per un document)
+- `[MEM_DELETE:…]` — eliminat
+- `[OLVIDA:…]` / `[OBLIT:…]` / `[FORGET:…]` — eliminats (trilingue)
+- `[MEMORIA:…]` — eliminat
+
+Aixo forma part del fix de Bug #18 (veure RAG.md). S'aplica tant a ingest (quan es guarda un document o memoria) com a retrieval (quan es recupera per injectar al prompt).
+
 **Limit de mida de peticio:** Cos de peticio maxim de 100MB (proteccio contra DoS).
 
 **Truncament de logs:** Els missatges d'usuari es truncen a 200 caracters a la sortida de logs per prevenir injeccio de logs i reduir el volum.
@@ -130,18 +170,20 @@ Logging d'events de seguretat **compatible amb RFC5424** via `plugins/security/s
 
 ## Encriptacio at-rest (default `auto`)
 
-**Afegida a la v0.9.0, default `auto` des de v0.9.7.** L'encriptacio at-rest s'activa automaticament si `sqlcipher3` es disponible (mode `auto`). S'ha testejat (68 tests) pero encara no ha passat per us en produccio amb usuaris reals fora del desenvolupament.
+**Afegida a la v0.9.0, default `auto` des de v0.9.2.** L'encriptacio at-rest s'activa automaticament si `sqlcipher3` es disponible (mode `auto`). S'ha testejat (68 tests) pero encara no ha passat per us en produccio amb usuaris reals fora del desenvolupament.
 
 ### CryptoProvider
 
 - Algorisme: **AES-256-GCM** amb derivacio de claus **HKDF-SHA256**
-- Cadena de gestio de claus: OS Keyring (macOS Keychain) -> variable d'entorn `NEXE_MASTER_KEY` -> fitxer `~/.nexe/master.key` (permisos 600)
+- **Cadena de fallback de la MEK (Master Encryption Key)** (corregit a v0.9.9 — Bug #19b): **fitxer `~/.nexe/master.key` (permisos 600) → OS Keyring (macOS Keychain) → variable d'entorn `NEXE_MASTER_KEY` → generacio nova**.
+  - Aixo permet que sessions `.enc` sobrevisquin un reset del Keychain sempre que el fitxer local o l'env estiguin intactes.
+  - Abans de v0.9.9 l'ordre era keyring primer, i un reset del Keychain feia les dades irrecuperables.
 - Claus derivades per proposit: `"sqlite"`, `"sessions"`, `"text_store"`, `"backup"`
 - Implementacio: `core/crypto/provider.py`
 
 **Migrar la clau mestra a una nova màquina:**
 
-Si canvies d'ordinador o reinstal·les el sistema, has de moure la clau mestra per mantenir accés a les sessions `.enc` i la base de dades encriptada. La cadena de fallback és: OS Keyring → variable d'entorn → fitxer `~/.nexe/master.key`.
+Si canvies d'ordinador o reinstal·les el sistema, has de moure la clau mestra per mantenir accés a les sessions `.enc` i la base de dades encriptada. La cadena de fallback des de v0.9.9 és: fitxer `~/.nexe/master.key` → OS Keyring → variable d'entorn.
 
 ```bash
 # 1. A la màquina ANTIGA — exporta la clau
@@ -203,7 +245,7 @@ Tot es compatible enrere. Si l'encriptacio no esta activada, el comportament es 
 
 ## Auditories de seguretat
 
-Totes les auditories de seguretat les realitzen sessions autonomes d'IA (Claude) com a part del proces de desenvolupament. El desenvolupador llanca sessions de revisio dedicades que analitzen codi, executen tests i generen informes estructurats amb troballes. No son auditories externes d'empreses de seguretat.
+Totes les auditories de seguretat les realitzen sessions autonomes d'IA **(Claude, Gemini, Codex i altres models segons disponibilitat)** com a part del proces de desenvolupament. El desenvolupador llanca sessions de revisio dedicades que analitzen codi, executen tests i generen informes estructurats amb troballes. Quan es vol criticar una decisio o detectar biaix, es fan **revisions creuades** (un model IA audita el que ha fet un altre). No son auditories externes d'empreses de seguretat humanes.
 
 ### Auditoria IA v1 (marc 2026)
 - 73 troballes en 11 arees
@@ -217,7 +259,7 @@ Totes les auditories de seguretat les realitzen sessions autonomes d'IA (Claude)
 - Nota: A
 
 ### Mega-Test v1 Pre-Release (marc 2026)
-- Auditoria autonoma de 4 fases: baseline (298 tests, 97.4% cobertura), seguretat (23 troballes), funcional (158 tests, 91.1%), GO/NO-GO
+- Auditoria autonoma de 4 fases: baseline, seguretat (23 troballes), funcional (158 tests), GO/NO-GO
 - 23 troballes (1 critica, 6 altes, 7 mitjanes, 7 baixes)
 - Veredicte: **GO WITH CONDITIONS**
 - Correccions aplicades: validacio d'input UI, sanititzacio de context RAG, rate limiting, CVEs de dependencies
@@ -226,7 +268,7 @@ Totes les auditories de seguretat les realitzen sessions autonomes d'IA (Claude)
 - Mateixa metodologia de 4 fases, re-executada despres d'aplicar les correccions de la v1
 - 10 troballes (vs 23 a la v1, **57% de reduccio**)
 - 7 correccions addicionals aplicades: validacio d'endpoints de memoria (CRITIC), path traversal de sessions, validacio de noms de fitxer, rate limiting a tots els endpoints UI, normalitzacio Unicode als detectors d'injeccio, migracio print()->logger
-- 4770 tests passats, 0 fallats
+- Execucio final (v0.9.9): **4842 tests col·lectats passats, 0 fallats** (4990 totals, 148 deselected per marcadors)
 - Veredicte: **GO WITH CONDITIONS** (millorat)
 
 ### Correccions clau de les auditories
@@ -244,7 +286,7 @@ Totes les auditories de seguretat les realitzen sessions autonomes d'IA (Claude)
 
 ### Nota d'honestedat
 
-Aquestes auditories IA troben molts problemes pero **no son exhaustives** — hi ha sens dubte vulnerabilitats i bugs que no s'han detectat. La cobertura de tests (97.4% baseline, 91.1% funcional) es bona pero no es del 100%. El sistema d'encriptacio es nou i no ha estat provat en batalla en produccio amb usuaris reals encara. Aixo es un projecte personal de codi obert revisat per IA, no un producte empresarial auditat formalment.
+Aquestes auditories IA troben molts problemes pero **no son exhaustives** — hi ha sens dubte vulnerabilitats i bugs que no s'han detectat. La cobertura de tests real és **~85% global** (baseline honest, sense inflar — badges antics de 97.4%/91.1%/93% eren excessivament optimistes i s'han revisat). El sistema d'encriptacio es nou i no ha estat provat en batalla en produccio amb usuaris reals encara. Aixo es un projecte personal de codi obert revisat per IA, no un producte empresarial auditat formalment.
 
 ## Riscos acceptats
 

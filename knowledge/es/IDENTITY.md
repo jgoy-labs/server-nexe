@@ -1,10 +1,10 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-16
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Identidad de server-nexe: proyecto open-source creado por Jordi Goy en Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que hace (IA local, RAG, multi-backend, encriptacion en reposo), estado actual (0.9.7), enlaces oficiales y como apoyar."
+abstract: "Identidad de server-nexe: proyecto open-source creado por Jordi Goy en Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que hace (IA local, RAG, multi-backend, encriptacion en reposo), estado actual (1.0.0-beta, macOS 14+ Apple Silicon only), enlaces oficiales y como apoyar."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
 chunk_size: 400
 priority: P1
@@ -13,11 +13,21 @@ priority: P1
 lang: es
 type: docs
 collection: nexe_documentation
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
 # Que es server-nexe?
+
+## En 30 segundos
+
+- **Servidor de IA 100% local** (cero cloud)
+- **Con memoria persistente** (RAG + MEM_SAVE)
+- **macOS 14+ Apple Silicon**, version 1.0.0-beta
+- **Multi-backend:** MLX, llama.cpp, Ollama
+- **Open source** (Apache 2.0), proyecto personal de un desarrollador
+
+---
 
 **server-nexe** es un servidor de IA local con memoria persistente, creado por **Jordi Goy** en Barcelona (licencia Apache 2.0). Funciona completamente en tu dispositivo — sin nube, sin telemetria, sin llamadas externas. Tus conversaciones, documentos y embeddings nunca salen de tu maquina. Tambien escrito "server.nexe" o simplemente "Nexe". Es un proyecto personal open-source, no es una empresa ni startup.
 
@@ -45,11 +55,11 @@ server-nexe combina cinco capacidades:
 
 | Componente | Tecnologia |
 |-----------|-----------|
-| Lenguaje | Python 3.11+ |
+| Lenguaje | Python 3.11+ (3.12 en el bundle DMG) |
 | Framework web | FastAPI |
 | Base de datos vectorial | Qdrant |
 | Backends LLM | MLX, llama.cpp, Ollama |
-| Embeddings | fastembed ONNX (768D) / nomic-embed-text |
+| Embeddings | **fastembed ONNX (768D) — principal offline** / nomic-embed-text (Ollama, opcional) |
 | Encriptacion | AES-256-GCM, HKDF-SHA256, SQLCipher (default auto) |
 | CLI | Click + Rich |
 | API | Compatible con OpenAI (/v1/chat/completions) |
@@ -57,12 +67,13 @@ server-nexe combina cinco capacidades:
 
 ## Estado actual
 
-- **Version:** 0.9.7
-- **Plataforma principal:** macOS (Apple Silicon e Intel) — probado
+- **Version:** 1.0.0-beta
+- **Plataforma principal:** macOS 14 Sonoma o superior, **Apple Silicon (M1+) exclusivamente** — probado
+- **macOS Intel:** **NO soportado** (eliminado en v0.9.9 por dependencias arm64-only del stack)
 - **Linux:** Soporte parcial (tests unitarios pasan, no probado en produccion)
 - **Windows:** Aun no soportado
 - **Puerto por defecto:** 9119
-- **Tests:** 4770 funciones de test recopiladas (4810 totales), 0 fallos en la ultima ejecucion
+- **Tests:** 4842 funciones de test recopiladas (4990 totales — 148 deselected por marcadores), 0 fallos en la ultima ejecucion
 
 ## Documentacion AI-Ready
 
@@ -87,12 +98,17 @@ Lo que empezó como un learning-by-doing y un monstruo de espagueti gigante deri
 - **Codigo fuente:** https://github.com/jgoy-labs/server-nexe
 - **Autor:** https://jgoy.net
 
+## Por que el nombre "nexe"?
+
+**nexe** (del latin *nexus* = vinculo) significa conexion, punto de union. En este proyecto, **server-nexe es el punto donde la IA y la persona se encuentran**: la interfaz a traves de la cual un humano envia una pregunta, un documento o una orden, y recibe una respuesta. El nexo de contacto.
+
 ## Apoya el proyecto
 
 server-nexe es gratuito y open-source. Si te resulta util y quieres ayudar a que el desarrollo continue:
 
 - **GitHub Sponsors:** https://github.com/sponsors/jgoy-labs
-- **Ko-fi:** https://ko-fi.com/jgoylabs
+- **Ko-fi:** https://ko-fi.com/servernexe
+- **Stripe:** https://buy.stripe.com/14A6oHct34lN5x7fKNgQE00 (pago directo con tarjeta — tambien accesible desde https://server-nexe.com)
 
 Cada contribucion ayuda a mantener el proyecto y financiar nuevas funcionalidades.
 

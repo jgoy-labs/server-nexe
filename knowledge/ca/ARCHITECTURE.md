@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-02
+data: 2026-04-16
 id: nexe-architecture
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Arquitectura interna de server-nexe 0.9.7. Disseny de cinc capes: Interficies, Core (FastAPI factory, endpoints separats, lifespan, crypto), Plugins (5 moduls amb auto-descobriment), Serveis Base (RAG memoria de 3 capes amb TextStore), Emmagatzematge. Cobreix refactoritzacio modular, module manager, i18n, pipeline d'encriptacio, pipeline de sanititzacio de peticions i diagrames Mermaid."
+abstract: "Arquitectura interna de server-nexe 1.0.0-beta. Disseny de cinc capes: Interficies, Core (FastAPI factory, endpoints separats, lifespan, crypto), Plugins (5 moduls amb auto-descobriment), Serveis Base (RAG memoria de 3 capes amb TextStore), Emmagatzematge. Cobreix refactoritzacio modular, module manager, i18n, pipeline d'encriptacio, pipeline de sanititzacio de peticions, detector VLM 3-signal, precomputed KB embeddings, thinking toggle i diagrames Mermaid."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -13,11 +13,39 @@ priority: P2
 # === OPCIONAL ===
 lang: ca
 type: docs
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Arquitectura — server-nexe 0.9.7
+# Arquitectura — server-nexe 1.0.0-beta
+
+## Taula de continguts
+
+- [Arquitectura de cinc capes](#arquitectura-de-cinc-capes)
+- [Pipeline de processament de peticions](#pipeline-de-processament-de-peticions)
+- [Arquitectura de components](#arquitectura-de-components)
+- [Pipeline d'encriptacio](#pipeline-dencriptacio)
+- [Estructura de directoris (post-refactoritzacio marc 2026)](#estructura-de-directoris-post-refactoritzacio-marc-2026)
+- [Patro Factory](#patro-factory)
+- [Gestor de Lifespan](#gestor-de-lifespan)
+- [Llançament del Tray (NexeTray.app)](#llançament-del-tray-nexetrayapp)
+- [Module Manager](#module-manager)
+- [Arquitectura del CLI](#arquitectura-del-cli)
+- [Arquitectura de memoria (3 subcapes)](#arquitectura-de-memoria-3-subcapes)
+- [Arquitectura de l'endpoint de xat](#arquitectura-de-lendpoint-de-xat)
+- [Arquitectura del modul Web UI](#arquitectura-del-modul-web-ui)
+- [Prompt del sistema](#prompt-del-sistema)
+- [Integracio i18n](#integracio-i18n)
+- [Arquitectura de tests](#arquitectura-de-tests)
+- [Com canviar el vector store](#com-canviar-el-vector-store)
+  - [Protocol VectorStore](#protocol-vectorstore)
+  - [Implementació actual](#implementació-actual)
+  - [Com afegir un nou backend](#com-afegir-un-nou-backend)
+  - [Notes](#notes)
+- [Detector VLM 3-signal any-of](#detector-vlm-3-signal-any-of)
+- [Precomputed KB embeddings](#precomputed-kb-embeddings)
+- [Thinking toggle (reasoning tokens)](#thinking-toggle-reasoning-tokens)
+- [Models MLX — Compatibilitat](#models-mlx--compatibilitat)
 
 ## Arquitectura de cinc capes
 
@@ -216,8 +244,9 @@ server-nexe/
 │   └── install_headless.py       # Instal·lador headless (compatible amb Linux)
 │
 ├── knowledge/                    # Docs per a ingestio RAG (ca/es/en x 12 fitxers)
+│   └── .embeddings/              # KB embeddings precomputats (ONNX, 10.7× speedup a l'arrencada)
 ├── storage/                      # Dades en temps d'execucio (no a git)
-├── tests/                        # 4770 funcions de test
+├── tests/                        # 4842 funcions de test col·lectades (4990 totals)
 └── nexe                          # Executable CLI
 ```
 
@@ -302,7 +331,7 @@ Gestiona l'arrencada i l'aturada del servidor. Separat en 4 submoduls.
 ```toml
 [module]
 name = "module_name"
-version = "0.9.7"
+version = "1.0.0-beta"
 type = "local_llm_option"
 description = "Module description"
 location = "plugins/module_name/"
@@ -402,11 +431,13 @@ El prompt del sistema defineix la personalitat i el comportament de Nexe. Viu a 
 
 ## Arquitectura de tests
 
-- 4770 funcions de test col·lectades (4810 totals), 0 errors a l'ultima execucio
+- 4842 funcions de test col·lectades (4990 totals — 148 deselected per marcadors), 0 errors a l'ultima execucio
+- Cobertura real: ~85% global (baseline honest, sense inflar)
 - Tests col·locats amb els moduls (cada modul te una carpeta tests/)
 - conftest.py arrel per a fixtures compartides
 - Closures refactoritzades a funcions per a patchabilitat (decisio clau de refactoritzacio)
-- 68 nous tests de crypto (CryptoProvider, SQLCipher, sessions, CLI)
+- 68 tests de crypto (CryptoProvider, SQLCipher, sessions, CLI)
+- 8 tests e2e MEM_DELETE (`tests/integration/test_mem_delete_e2e.py`) amb Qdrant embedded + fastembed real
 - Cobertura rastrejada via .coveragerc
 
 ## Com canviar el vector store
@@ -444,6 +475,37 @@ def health(self) -> Dict[str, Any]
 - La migració de Qdrant NO és plug & play — cal crear l'adapter i els mètodes de col·lecció
 - El path de substitució és el més important, no la substitució automàtica
 - Qdrant embedded no exposa cap port de xarxa (`storage/vectors/` ha de ser escrivible)
+
+## Detector VLM 3-signal any-of
+
+A partir de v0.9.8, el backend MLX usa un **detector VLM "any-of" amb 3 senyals** per identificar si un model és multimodal abans de carregar-lo (`plugins/mlx_module/core/vlm_detection.py`):
+
+1. **`architectures`** al `config.json` — keywords com `VL`, `Vision`, `VLM`, `Llava`, `PaliGemma`, `InternVL`, `MiniCPMV`, `Idefics`, `Mllama`, `Qwen2VL`, `Qwen2_5_VL`, `Qwen3VL`.
+2. **`vision_config`** al `config.json` — bloc de configuració de visió present.
+3. **`weight_map`** al `model.safetensors.index.json` — claus com `vision_tower`, `mm_projector`, `vision_model`, `visual`.
+
+**Lògica "any-of":** si qualsevol dels 3 senyals coincideix, el model es considera VLM i s'enruta a `mlx-vlm` (amb `stream_generate` i `GenerationResult` API de `mlx-vlm 0.4.4`). Aixo cobreix arquitectures noves que no tenen les claus clàssiques (ex: models on només apareix `vision_config` sense `architectures` amb keyword).
+
+## Precomputed KB embeddings
+
+Els fitxers de `knowledge/` poden tenir **embeddings precomputats** guardats a `knowledge/.embeddings/` (post-v0.9.8). A l'arrencada, si els hashes coincideixen amb els fitxers `.md` actuals, el sistema salta el càlcul d'embeddings (fastembed ONNX, ~700ms per fitxer) i carrega directament els vectors ja calculats.
+
+**Speedup mesurat:** 10.7× a l'arrencada en fred (cold boot). Útil especialment al DMG offline, on els embeddings venen ja dins el bundle per cada idioma (ca/es/en × 12 fitxers).
+
+Els embeddings es regeneren automàticament si canvia el contingut dels `.md` o el model d'embeddings.
+
+## Thinking toggle (reasoning tokens)
+
+A partir de v0.9.9, server-nexe suporta **activació/desactivació de thinking tokens per sessió**:
+
+- **Endpoint:** `PATCH /ui/session/{id}/thinking` (rate limit 10/min)
+- **Safelist `THINKING_CAPABLE`:** families de models que suporten reasoning — `qwen3.5`, `qwen3`, `qwq`, `deepseek-r1`, `gemma3/4`, `llama4`, `gpt-oss`.
+- **Funcio `can_think(model)`:** verifica si el model actiu és a la safelist.
+- **Default OFF** — cal activar-ho explícitament per sessió (UI: icona ✨ sparkles + dropdown 🧠).
+- **Fallback 400 retry:** si el model NO és thinking-capable i l'usuari l'activa, el servidor retorna 400 i la UI ofereix retry automàtic sense thinking.
+- **Env var `NEXE_OLLAMA_THINK`:** controla el default global per a models Ollama (`true`/`false`).
+
+Els thinking tokens s'emeten al streaming amb marcadors `[THINKING]…[/THINKING]` i la UI els renderitza com a bloc col·lapsable taronja.
 
 ## Models MLX — Compatibilitat
 

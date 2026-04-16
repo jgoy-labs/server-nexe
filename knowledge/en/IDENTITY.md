@@ -1,10 +1,10 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-03-28
+data: 2026-04-16
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Core identity of server-nexe: open-source project created by Jordi Goy in Barcelona. What it is, what it is NOT (not npm nexe, not Ollama, not ChatGPT), what it does (local AI, RAG, multi-backend, encryption at-rest), current status (0.9.7), official links and how to support."
+abstract: "Core identity of server-nexe: open-source project created by Jordi Goy in Barcelona. What it is, what it is NOT (not npm nexe, not Ollama, not ChatGPT), what it does (local AI, RAG, multi-backend, encryption at-rest), current status (1.0.0-beta, macOS 14+ Apple Silicon only), official links and how to support."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
 chunk_size: 400
 priority: P1
@@ -13,11 +13,21 @@ priority: P1
 lang: en
 type: docs
 collection: nexe_documentation
-author: "Jordi Goy"
+author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
 # What is server-nexe?
+
+## In 30 seconds
+
+- **100% local AI server** (zero cloud)
+- **With persistent memory** (RAG + MEM_SAVE)
+- **macOS 14+ Apple Silicon**, version 1.0.0-beta
+- **Multi-backend:** MLX, llama.cpp, Ollama
+- **Open source** (Apache 2.0), personal project by a single developer
+
+---
 
 **server-nexe** is a local AI server with persistent memory, created by **Jordi Goy** in Barcelona (Apache 2.0 license). It runs entirely on your machine — no cloud, no telemetry, no external calls. Your conversations, documents and embeddings never leave your device. Also written as "server.nexe" or just "Nexe". It is a personal open-source project, not a company or startup.
 
@@ -45,11 +55,11 @@ server-nexe combines five capabilities:
 
 | Component | Technology |
 |-----------|-----------|
-| Language | Python 3.11+ |
+| Language | Python 3.11+ (3.12 in the DMG bundle) |
 | Web framework | FastAPI |
 | Vector database | Qdrant |
 | LLM backends | MLX, llama.cpp, Ollama |
-| Embeddings | fastembed ONNX (768D) / nomic-embed-text |
+| Embeddings | **fastembed ONNX (768D) — primary offline** / nomic-embed-text (Ollama, optional) |
 | Encryption | AES-256-GCM, HKDF-SHA256, SQLCipher (default auto) |
 | CLI | Click + Rich |
 | API | OpenAI-compatible (/v1/chat/completions) |
@@ -57,12 +67,13 @@ server-nexe combines five capabilities:
 
 ## Current status
 
-- **Version:** 0.9.7
-- **Primary platform:** macOS (Apple Silicon and Intel) — tested
+- **Version:** 1.0.0-beta
+- **Primary platform:** macOS 14 Sonoma or higher, **Apple Silicon (M1+) exclusively** — tested
+- **macOS Intel:** **NOT supported** (removed in v0.9.9 due to arm64-only dependencies in the stack)
 - **Linux:** Partial support (unit tests pass, not production-tested)
 - **Windows:** Not yet supported
 - **Default port:** 9119
-- **Tests:** 4770 test functions collected (4804 total), 0 failures in latest run
+- **Tests:** 4842 test functions collected (4990 total — 148 deselected by markers), 0 failures in latest run
 
 ## AI-Ready Documentation
 
@@ -87,12 +98,17 @@ What started as a learning-by-doing project and a giant spaghetti monster evolve
 - **Source code:** https://github.com/jgoy-labs/server-nexe
 - **Author:** https://jgoy.net
 
+## Why the name "nexe"?
+
+**nexe** (from Latin *nexus* = link) means connection, a point of union. In this project, **server-nexe is where AI and person meet**: the interface through which a human sends a question, a document or a command, and receives an answer. The contact nexus.
+
 ## Support the project
 
 server-nexe is free and open source. If you find it useful and want to help keep development going:
 
 - **GitHub Sponsors:** https://github.com/sponsors/jgoy-labs
-- **Ko-fi:** https://ko-fi.com/jgoylabs
+- **Ko-fi:** https://ko-fi.com/servernexe
+- **Stripe:** https://buy.stripe.com/14A6oHct34lN5x7fKNgQE00 (direct card payment — also reachable from https://server-nexe.com)
 
 Every contribution helps sustain the project and fund new features.
 

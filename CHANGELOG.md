@@ -6,8 +6,144 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+_No changes yet._
+
+## [1.0.0-beta] - 2026-04-16
+
+### Summary
+
+First public pre-1.0 release. Confidence bump from `0.9.9` after the final documentation coherence audit — no functional code changes beyond what `0.9.9` already shipped. The project is now considered a **minimum viable product for the real world**, open to community feedback.
+
+### Changed
+
+- Version metadata bumped to `1.0.0-beta` across the codebase (pyproject, plugins, installer, knowledge base).
+- Knowledge base consolidated (13 thematic documents × 3 languages = 39 files), with Table of Contents and "In 30 seconds" quick intros added to user-facing docs (IDENTITY, INSTALLATION, USAGE, RAG).
+- New document: `USE_CASES.md` (ca/en/es) covering 6 practical use cases and "when server-nexe is NOT the best tool".
+- New section: `ERRORS.md` "How to report an error" with privacy warning for logs.
+- Honest coverage figure (~85%) replaces inflated historical badges (97.4%/91.1%/93%).
+- Security audits attribution expanded: Claude + Gemini + Codex + cross-model reviews (not just Claude).
+- `AI collaboration` credit in author metadata: `"Jordi Goy with AI collaboration"`.
+- Stripe / Ko-fi / GitHub Sponsors URLs corrected (Ko-fi was wrong: `/jgoylabs` → `/servernexe`).
+- Root READMEs synchronised across CA/EN/ES with screenshots (`.github/screenshots/`) and the "giant spaghetti monster → minimal core" story framing.
+
+### Unchanged (still true from 0.9.9)
+
+- All functional fixes from 0.9.9 remain (Bug #18 MEM_DELETE, Bug #19 crypto/memory/session/installer, offline install 100%, macOS 14+ Apple Silicon target, `llama-cpp-python==0.3.19` pin).
+- 4842 tests collected, ~85% global coverage.
+
+### Known limits
+
+- AI-only audits: no external human security audit yet.
+- Single-user by design.
+- Community feedback welcome via GitHub Issues and the forum at `server-nexe.com`.
+
+## [0.9.9] - 2026-04-16
+
+Pre-release consolidated: Bug #18 MEM_DELETE cirurgia + Bug #19 (4 sub-bugs) + offline-install bundle + Apple Silicon / macOS 14 narrowing + thinking toggle. Last P0 blockers closed before v1.0.
+
+### Security
+
+- **RAG injection via memory tags (#18 P0)**: `_filter_rag_injection` now
+  neutralizes `[MEM_DELETE:…]`, `[MEM_SAVE:…]`, `[OLVIDA|OBLIT|FORGET:…]`
+  and `[MEMORIA:…]` at ingest time (ingest_docs, ingest_knowledge) and at
+  retrieval time (`_sanitize_rag_context`). Previously a malicious document
+  could embed a MEM_DELETE tag in its body; the LLM would copy it verbatim
+  into its response and the pipeline would execute the delete. Now every
+  such tag becomes `[FILTERED]` before the model ever sees it. 4 new tests
+  in `test_rag_sanitization.py`.
+
+### Added
+
+- **E2E integration tests for MEM_DELETE (#18 P0)**: new
+  `tests/integration/test_mem_delete_e2e.py` with 8 tests against a real
+  Qdrant (embedded, tmp_path) + real fastembed embedder. Covers the full
+  save/list/delete/list-empty cycle, short-query-vs-long-stored matching
+  under the 0.20 threshold, unrelated-fact survival guard, clear_memory
+  wipe + safety rail, and RAG injection neutralization end-to-end.
+  Closes the empirical gap flagged by BUS v0.9.0 feedback ("mocks enganyen").
+  Marker `@pytest.mark.integration` — excluded from the default fast
+  suite, run explicitly.
+- **Thinking toggle endpoint**: `PATCH /session/{id}/thinking` (HOMAD,
+  rate-limited at 10/min) lets the UI flip `<think>` output on/off per
+  session. Backed by a `THINKING_CAPABLE` family safelist (qwen3.5,
+  qwen3, qwq, deepseek-r1, gemma3/4, llama4, gpt-oss) and a `can_think(model)`
+  helper; default is OFF, with a 400-retry fallback if the backend
+  refuses. UI adds the ✨ sparkles toggle + 🧠 model dropdown. New
+  env var `NEXE_OLLAMA_THINK`.
+- `installer/build-wheels-bundle.sh` — pre-downloads all Python wheels
+  (`--only-binary=:all:` for `macosx_14_0_arm64` + `cp312`) into
+  `InstallNexe.app/Contents/Resources/wheels/`. Validates critical wheels
+  are present and the total size is in range.
+- `installer/build-embedding-bundle.sh` — uses a temporary venv with
+  fastembed to pre-download the default multilingual embedding model into
+  `InstallNexe.app/Contents/Resources/embeddings/`. Validates the ONNX +
+  tokenizer + config artefacts are present.
+- `build_dmg.sh` Step 5a/5b: orchestrates both new scripts before codesign
+  and validates bundle sizes (exit code 14 on failure).
+- Four new helpers in `installer/installer_setup_env.py`:
+  `_find_bundle_resources`, `_write_venv_pip_conf`, `_seed_fastembed_cache`,
+  `_default_fastembed_cache_dir`.
+- Regression guards that grep `installer_setup_env.py` and
+  `plugins/llama_cpp_module/module.py` for `CMAKE_ARGS` — fail the test
+  suite if the flag is ever reintroduced.
+- 40+ new tests across `test_installer_build_wheels.py`,
+  `test_installer_build_embedding.py`, `test_installer_build_dmg.py`, and
+  new classes in `test_installer_setup_env.py`.
+
+### Changed
+
+- **BREAKING — Apple Silicon only, macOS 14 Sonoma+**. The installer
+  target narrows to Apple Silicon (arm64). Intel Macs and macOS 13
+  Ventura are no longer supported. Knowledge base updated in ca/es/en.
+- **Offline install: all Python wheels + embedding model bundled in the DMG**.
+  The installer no longer downloads anything from PyPI or HuggingFace at
+  install time. DMG size goes from ~20 MB to **~1.2 GB** (wheels + the
+  fastembed multilingual model). On the client, the venv's `pip.conf` is
+  configured with `find-links=<wheels>` and `no-index=true` so
+  `pip install -r requirements.txt` uses only bundled wheels, and the
+  fastembed cache is seeded from the bundled embedding model so
+  `install.py` finds it already present. Root cause fixed: clean M1
+  installs previously triggered the Xcode Command Line Tools prompt because
+  `CMAKE_ARGS="-DGGML_METAL=on"` forced a `llama-cpp-python` source build
+  even though the PyPI arm64 macOS wheel already ships with Metal. The
+  installer now drops `CMAKE_ARGS` entirely. See
+  `installer/build-wheels-bundle.sh`, `installer/build-embedding-bundle.sh`,
+  and the `--skip-bundles` flag on `build_dmg.sh` for dev iteration.
+- **`llama-cpp-python` pinned to `0.3.19`**. The `0.3.20` arm64 macOS
+  wheel on PyPI is corrupted (Bad CRC-32) and fails to install from a
+  clean venv. Pin held until upstream republishes a valid wheel.
+- **Ollama `keep_alive: 0` on model switch (#14)**. When the UI switches
+  models, the previous model is now unloaded explicitly so the new one
+  gets VRAM immediately instead of waiting for Ollama's default TTL.
+- **Image-attached prompt priority**. The internal `[IMATGE ADJUNTA]`
+  marker makes the attached image take precedence over RAG snippets in
+  the prompt, so multimodal backends see the picture instead of stale
+  retrieval context.
+- **Model catalog final layout**: 16 models across 4 tiers (8 / 16 / 24 /
+  32 GB). The 64 GB tier is removed; Salamandra 2B, Qwen3.5 2B,
+  Phi-4-mini, Llama 3.2 3B, Llama 4 Scout/Maverick, Mixtral, Mistral 7B,
+  Qwen2.5 32B, QwQ 32B and GPT-OSS 120B are dropped from the catalog.
+
 ### Fixed
 
+- **"Oblida tot" no longer arbitrarily deletes random facts (#18 P0)**:
+  previously `detect_intent("Oblida tot")` returned `('delete', 'tot')`,
+  which semantic-searched "tot" and deleted ~5 random facts similar to
+  that token. Added explicit `CLEAR_ALL_TRIGGERS` (ca/es/en) checked
+  **before** delete triggers, with a new `clear_all` intent. The pipeline
+  arms a 2-turn confirmation (`session._pending_clear_all`) — the user
+  must answer `sí, esborra-ho tot` / `yes delete everything` / `confirmo`
+  / `go ahead` to actually wipe. Any other reply cancels and falls through
+  as normal chat. Cables through to the previously-orphaned
+  `clear_memory(confirm=True)`.
+- **DELETE_THRESHOLD 0.70 → 0.20 (#18 P0)**: empirical finding from the
+  new e2e integration suite — fastembed + paraphrase-multilingual scored
+  even verbatim queries below 0.55. With the old 0.70 threshold, realistic
+  flows like `save "L'usuari es diu Jordi i viu a Barcelona"` →
+  `delete "em dic Jordi"` silently returned 0 matches and the fact was
+  never deleted. 0.20 guarantees the forget actually forgets; occasional
+  over-match on loosely related facts accepted as the better UX tradeoff
+  for a "forget" primitive.
 - **Bug #19a (P0) — personal_memory no longer wipes on restart.** The
   MemoryAPI singleton init previously contained a `delete_collection +
   create_collection` branch that fired whenever the Qdrant-reported vector
@@ -45,48 +181,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   at install time, with a guard against accidental self-deletion when
   `install_path == /Applications`.
 
-### Changed
-
-- **Offline install: all Python wheels + embedding model bundled in the DMG**.
-  The installer no longer downloads anything from PyPI or HuggingFace at
-  install time. DMG size goes from ~20 MB to **~700 MB**. On the client, the
-  venv's `pip.conf` is configured with `find-links=<wheels>` and
-  `no-index=true` so `pip install -r requirements.txt` uses only bundled
-  wheels, and the fastembed cache is seeded from the bundled embedding model
-  so `install.py` finds it already present. Root cause fixed: clean M1
-  installs previously triggered the Xcode Command Line Tools prompt because
-  `CMAKE_ARGS="-DGGML_METAL=on"` forced a `llama-cpp-python` source build
-  even though the PyPI arm64 macOS wheel already ships with Metal. The
-  installer now drops `CMAKE_ARGS` entirely. See
-  `installer/build-wheels-bundle.sh`, `installer/build-embedding-bundle.sh`,
-  and the `--skip-bundles` flag on `build_dmg.sh` for dev iteration.
-
-- **Apple Silicon only (arm64 macOS 13 Ventura+)**. The installer target
-  narrows to Apple Silicon; x86_64 Macs and pre-13 macOS are no longer
-  supported. Knowledge base updated in ca/es/en.
-
-### Added
-
-- `installer/build-wheels-bundle.sh` — pre-downloads all Python wheels
-  (`--only-binary=:all:` for `macosx_13_0_arm64` + `cp312`) into
-  `InstallNexe.app/Contents/Resources/wheels/`. Validates critical wheels
-  are present and the total size is in range.
-- `installer/build-embedding-bundle.sh` — uses a temporary venv with
-  fastembed to pre-download the default multilingual embedding model into
-  `InstallNexe.app/Contents/Resources/embeddings/`. Validates the ONNX +
-  tokenizer + config artefacts are present.
-- `build_dmg.sh` Step 5a/5b: orchestrates both new scripts before codesign
-  and validates bundle sizes (exit code 14 on failure).
-- Four new helpers in `installer/installer_setup_env.py`:
-  `_find_bundle_resources`, `_write_venv_pip_conf`, `_seed_fastembed_cache`,
-  `_default_fastembed_cache_dir`.
-- Regression guards that grep `installer_setup_env.py` and
-  `plugins/llama_cpp_module/module.py` for `CMAKE_ARGS` — fail the test
-  suite if the flag is ever reintroduced.
-- 40+ new tests across `test_installer_build_wheels.py`,
-  `test_installer_build_embedding.py`, `test_installer_build_dmg.py`, and
-  new classes in `test_installer_setup_env.py`.
-
 ### Removed
 
 - `CMAKE_ARGS="-DGGML_METAL=on"` block + try/except fallback in
@@ -95,55 +189,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `CMAKE_ARGS=...` suggestion in the error message of
   `plugins/llama_cpp_module/module.py` (obsolete advice that would
   re-trigger the same CLT prompt if a user followed it).
-
-## [0.9.9] - 2026-04-15
-
-Bug #18 MEM_DELETE cirurgia pre-v1.0 — last P0 blocker closed.
-
-### Security
-
-- **RAG injection via memory tags (#18 P0)**: `_filter_rag_injection` now
-  neutralizes `[MEM_DELETE:…]`, `[MEM_SAVE:…]`, `[OLVIDA|OBLIT|FORGET:…]`
-  and `[MEMORIA:…]` at ingest time (ingest_docs, ingest_knowledge) and at
-  retrieval time (`_sanitize_rag_context`). Previously a malicious document
-  could embed a MEM_DELETE tag in its body; the LLM would copy it verbatim
-  into its response and the pipeline would execute the delete. Now every
-  such tag becomes `[FILTERED]` before the model ever sees it. 4 new tests
-  in `test_rag_sanitization.py`.
-
-### Fixed
-
-- **"Oblida tot" no longer arbitrarily deletes random facts (#18 P0)**:
-  previously `detect_intent("Oblida tot")` returned `('delete', 'tot')`,
-  which semantic-searched "tot" and deleted ~5 random facts similar to
-  that token. Added explicit `CLEAR_ALL_TRIGGERS` (ca/es/en) checked
-  **before** delete triggers, with a new `clear_all` intent. The pipeline
-  arms a 2-turn confirmation (`session._pending_clear_all`) — the user
-  must answer `sí, esborra-ho tot` / `yes delete everything` / `confirmo`
-  / `go ahead` to actually wipe. Any other reply cancels and falls through
-  as normal chat. Cables through to the previously-orphaned
-  `clear_memory(confirm=True)`.
-
-- **DELETE_THRESHOLD 0.70 → 0.20 (#18 P0)**: empirical finding from the
-  new e2e integration suite — fastembed + paraphrase-multilingual scored
-  even verbatim queries below 0.55. With the old 0.70 threshold, realistic
-  flows like `save "L'usuari es diu Jordi i viu a Barcelona"` →
-  `delete "em dic Jordi"` silently returned 0 matches and the fact was
-  never deleted. 0.20 guarantees the forget actually forgets; occasional
-  over-match on loosely related facts accepted as the better UX tradeoff
-  for a "forget" primitive.
-
-### Added
-
-- **E2E integration tests for MEM_DELETE (#18 P0)**: new
-  `tests/integration/test_mem_delete_e2e.py` with 8 tests against a real
-  Qdrant (embedded, tmp_path) + real fastembed embedder. Covers the full
-  save/list/delete/list-empty cycle, short-query-vs-long-stored matching
-  under the 0.20 threshold, unrelated-fact survival guard, clear_memory
-  wipe + safety rail, and RAG injection neutralization end-to-end.
-  Closes the empirical gap flagged by BUS v0.9.0 feedback ("mocks enganyen").
-  Marker `@pytest.mark.integration` — excluded from the default fast
-  suite, run explicitly.
 
 ## [0.9.8] - 2026-04-15
 

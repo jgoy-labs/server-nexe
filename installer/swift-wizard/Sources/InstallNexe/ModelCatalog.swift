@@ -109,12 +109,12 @@ struct AIModel: Codable, Identifiable {
 }
 
 struct ModelCatalog: Codable {
-    let tier8: [AIModel]
-    let tier16: [AIModel]
-    let tier24: [AIModel]
-    let tier32: [AIModel]
-    let tier48: [AIModel]
-    let tier64: [AIModel]
+    var tier8: [AIModel]  = []
+    var tier16: [AIModel] = []
+    var tier24: [AIModel] = []
+    var tier32: [AIModel] = []
+    var tier48: [AIModel] = []
+    var tier64: [AIModel] = []
 
     enum CodingKeys: String, CodingKey {
         case tier8   = "tier_8"
@@ -123,6 +123,22 @@ struct ModelCatalog: Codable {
         case tier32  = "tier_32"
         case tier48  = "tier_48"
         case tier64  = "tier_64"
+    }
+
+    init(tier8: [AIModel] = [], tier16: [AIModel] = [], tier24: [AIModel] = [],
+         tier32: [AIModel] = [], tier48: [AIModel] = [], tier64: [AIModel] = []) {
+        self.tier8 = tier8; self.tier16 = tier16; self.tier24 = tier24
+        self.tier32 = tier32; self.tier48 = tier48; self.tier64 = tier64
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        tier8  = (try? c.decode([AIModel].self, forKey: .tier8))  ?? []
+        tier16 = (try? c.decode([AIModel].self, forKey: .tier16)) ?? []
+        tier24 = (try? c.decode([AIModel].self, forKey: .tier24)) ?? []
+        tier32 = (try? c.decode([AIModel].self, forKey: .tier32)) ?? []
+        tier48 = (try? c.decode([AIModel].self, forKey: .tier48)) ?? []
+        tier64 = (try? c.decode([AIModel].self, forKey: .tier64)) ?? []
     }
 
     /// Carrega el catàleg des del JSON als Resources del bundle
