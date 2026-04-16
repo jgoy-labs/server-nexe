@@ -277,17 +277,10 @@ def setup_environment(project_root, hw, engine="auto"):
         pip_path = venv_path / "bin" / "pip3"
         python_path = venv_path / "bin" / "python3"
 
-    # 1. Upgrade pip BEFORE writing pip.conf. With no-index=true active,
-    # pip cannot upgrade itself (it's not in the wheels bundle). Running
-    # the upgrade first lets pip use PyPI if available, or silently keep
-    # the ensurepip version if offline — both are fine for our needs.
-    subprocess.run([str(pip_path), "install", "--upgrade", "pip"], capture_output=True)
-
     # Offline install: if the DMG bundle shipped wheels + embedding model,
-    # wire them in now. pip.conf with no-index=true is written AFTER the
-    # pip upgrade so the upgrade itself is not blocked. If the bundle is
-    # absent (e.g. running from a git checkout), everything below falls
-    # back to PyPI + HuggingFace at runtime (legacy behaviour preserved).
+    # wire them in now. If the bundle is absent (e.g. running from a git
+    # checkout), everything below falls back to PyPI + HuggingFace at runtime
+    # (legacy behaviour preserved).
     bundle_resources = _find_bundle_resources(project_root)
     if bundle_resources is not None:
         wheels_dir = bundle_resources / "wheels"
@@ -297,11 +290,25 @@ def setup_environment(project_root, hw, engine="auto"):
         if _seed_fastembed_cache(embeddings_dir, _default_fastembed_cache_dir()):
             print("  📦 Embedding model disponible offline")
 
+    # 1. Upgrade pip
+    subprocess.run([str(pip_path), "install", "--upgrade", "pip"], capture_output=True)
+
     # 2. Install core requirements
     req_file = project_root / "requirements.txt"
     if req_file.exists():
         print(f"  📥 {t('installing_deps')}")
-        subprocess.run([str(pip_path), "install", "-r", str(req_file)], check=True, capture_output=True)
+        try:
+            subprocess.run([str(pip_path), "install", "-r", str(req_file)], check=True, capture_output=True)
+        except subprocess.CalledProcessError as e:
+            # Show pip's actual error so we can diagnose offline-install gaps
+            print(f"  ❌ pip install -r requirements.txt failed (exit {e.returncode}):")
+            if e.stderr:
+                for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-20:]:
+                    print(f"     {line}")
+            if e.stdout:
+                for line in e.stdout.decode("utf-8", errors="replace").splitlines()[-10:]:
+                    print(f"     {line}")
+            raise
     else:
         print_error(t('requirements_not_found'))
         sys.exit(1)
@@ -310,7 +317,14 @@ def setup_environment(project_root, hw, engine="auto"):
     if platform.system() == "Darwin":
         req_macos = project_root / "requirements-macos.txt"
         if req_macos.exists():
-            subprocess.run([str(pip_path), "install", "-r", str(req_macos)], check=True, capture_output=True)
+            try:
+                subprocess.run([str(pip_path), "install", "-r", str(req_macos)], check=True, capture_output=True)
+            except subprocess.CalledProcessError as e:
+                print(f"  ❌ pip install -r requirements-macos.txt failed (exit {e.returncode}):")
+                if e.stderr:
+                    for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-20:]:
+                        print(f"     {line}")
+                raise
 
     # 3. Hardware-Specific Inference Engines
     print_step(f"{BOLD}{t('installing_inference')}{RESET}")
