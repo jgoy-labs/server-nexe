@@ -280,21 +280,17 @@ class MemoryHelper:
                     api = MemoryAPI()
                     await api.initialize()
 
-                # Ensure collections exist with correct dimensions (768)
+                # Bug #19a — create missing collections only. Never delete or
+                # recreate an existing collection at startup: DEFAULT_VECTOR_SIZE
+                # is the single source of truth (768) and nothing in the normal
+                # runtime path should produce a different size. A transient
+                # qdrant_client anomaly or disk corruption returning a wrong
+                # dim used to silently wipe user memory here — that is worse
+                # than the rare mismatch. If a real mismatch ever appears,
+                # Qdrant will raise at the next upsert with a clear error
+                # surface, which is recoverable without data loss.
                 for coll_name in ("personal_memory", "user_knowledge"):
-                    if await api.collection_exists(coll_name):
-                        try:
-                            info = api._qdrant.get_collection(coll_name)
-                            vec_cfg = info.config.params.vectors
-                            dim = vec_cfg.size if hasattr(vec_cfg, 'size') else None
-                            if dim and dim != DEFAULT_VECTOR_SIZE:
-                                logger.warning("Collection %s has %d dims, expected %d — recreating", coll_name, dim, DEFAULT_VECTOR_SIZE)
-                                await api.delete_collection(coll_name)
-                                await api.create_collection(coll_name, vector_size=DEFAULT_VECTOR_SIZE)
-                                logger.info("Recreated %s with %d dims", coll_name, DEFAULT_VECTOR_SIZE)
-                        except Exception as dim_err:
-                            logger.debug("Could not verify dims for %s: %s", coll_name, dim_err)
-                    else:
+                    if not await api.collection_exists(coll_name):
                         await api.create_collection(coll_name, vector_size=DEFAULT_VECTOR_SIZE)
                         logger.info("Created memory collection %s", coll_name)
 

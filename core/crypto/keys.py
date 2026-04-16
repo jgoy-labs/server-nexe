@@ -12,6 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 import os
 import stat
+import tempfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -95,18 +96,21 @@ def _try_file_set(key: bytes, path: Path = KEY_FILE_PATH) -> bool:
         except Exception:
             pass
 
-        # Write atomically to a sibling temp file with O_CREAT|O_EXCL|O_WRONLY
-        # so we never expose the key with relaxed permissions.
-        tmp_path = path.parent / f".master.key.tmp.{os.getpid()}"
-        # Clean any stale temp from a previous crash
+        # Write atomically to a sibling temp file with restrictive mode,
+        # so we never expose the key with relaxed permissions. `mkstemp`
+        # returns a unique name per call, which also protects against
+        # same-process concurrent calls (two threads syncing the MEK after
+        # reading it from the keyring) that would otherwise collide on a
+        # shared PID-derived path.
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=".master.key.tmp.",
+            dir=str(path.parent),
+        )
+        tmp_path = Path(tmp_name)
         try:
-            tmp_path.unlink()
-        except FileNotFoundError:
-            pass
-
-        flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
-        fd = os.open(str(tmp_path), flags, 0o600)
-        try:
+            # mkstemp on POSIX returns 0o600 already, but set it explicitly
+            # for cross-platform safety.
+            os.chmod(tmp_path, 0o600)
             with os.fdopen(fd, "wb") as f:
                 f.write(key)
                 f.flush()
@@ -133,39 +137,55 @@ def get_or_create_master_key(key_file_path: Path = KEY_FILE_PATH) -> bytes:
     """
     Retrieve or generate the master encryption key (MEK).
 
-    Fallback chain:
-    1. OS keyring (macOS Keychain / Linux Secret Service / Windows Credential Locker)
-    2. NEXE_MASTER_KEY environment variable
-    3. Key file at ~/.nexe/master.key (permissions 600)
-    4. Generate new key → store in keyring (or file as fallback)
+    Fallback chain (fix bug #19b, pre-release v1.0):
+
+    1. Key file at ~/.nexe/master.key (permissions 600) — primary, persistent
+    2. OS keyring (macOS Keychain / Linux Secret Service / Windows Credential Locker)
+    3. NEXE_MASTER_KEY environment variable
+    4. Generate new key → store to BOTH file + keyring (dual-write)
+
+    Why file-first:
+    Before this fix, a single source (Keychain) was the primary store. When the
+    Keychain got invalidated (OS upgrade, user reset, sandboxing change), a
+    brand-new key was generated, silently rendering every existing .enc session
+    and SQLCipher DB unreadable. For an autonomous agent that reboots on its
+    own, losing memory is unacceptable. The file is the durable anchor; the
+    keyring is a convenience mirror.
+
+    The key is ALWAYS kept in both sources: generating writes to both; loading
+    from the keyring (with no file present) synchronises a copy to the file.
 
     Returns:
         32-byte master key
     """
-    # 1. Keyring
+    # 1. File (primary persistent store)
+    key = _try_file_get(key_file_path)
+    if key:
+        logger.debug("Master key loaded from %s", key_file_path)
+        # Opportunistic: mirror to keyring if empty, so future reads are fast
+        # and Keychain-based Spotlight/Sharing remain consistent.
+        if _try_keyring_get() is None:
+            _try_keyring_set(key)
+        return key
+
+    # 2. Keyring
     key = _try_keyring_get()
     if key:
         logger.debug("Master key loaded from OS keyring")
+        # Synchronise to file so a future Keychain reset does NOT regenerate.
+        _try_file_set(key, key_file_path)
         return key
 
-    # 2. Env var
+    # 3. Env var (for headless CI / containerised runs)
     key = _try_env_get()
     if key:
         logger.debug("Master key loaded from %s", ENV_VAR_NAME)
         return key
 
-    # 3. File
-    key = _try_file_get(key_file_path)
-    if key:
-        logger.debug("Master key loaded from %s", key_file_path)
-        return key
-
-    # 4. Generate new
+    # 4. Generate new — dual-write to file + keyring. File is mandatory;
+    # keyring is best-effort (some environments lack a secret service).
     key = os.urandom(KEY_SIZE)
     logger.info("Generated new master encryption key")
-
-    # Try to store: keyring first, file as fallback
-    if not _try_keyring_set(key):
-        _try_file_set(key, key_file_path)
-
+    _try_file_set(key, key_file_path)
+    _try_keyring_set(key)
     return key

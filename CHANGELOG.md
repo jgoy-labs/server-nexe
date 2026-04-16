@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Bug #19a (P0) — personal_memory no longer wipes on restart.** The
+  MemoryAPI singleton init previously contained a `delete_collection +
+  create_collection` branch that fired whenever the Qdrant-reported vector
+  size for `personal_memory` or `user_knowledge` did not match
+  `DEFAULT_VECTOR_SIZE` (768). A transient `qdrant_client` anomaly or local
+  storage corruption could cause the read to return a wrong size and
+  silently wipe every saved memory. `DEFAULT_VECTOR_SIZE` is the single
+  source of truth and nothing in the normal runtime path produces a
+  different size, so the defensive branch was removed. If a real mismatch
+  ever appears, Qdrant now surfaces a clear error at the next upsert rather
+  than destroying user data.
+- **Bug #19b (P0) — encrypted sessions (`.enc`) survive Keychain resets.**
+  The Master Encryption Key (MEK) fallback chain is reordered to
+  **file → keyring → env → generate**, and the file at `~/.nexe/master.key`
+  (mode 0o600) is now written on every generation AND synced from the
+  keyring when only the keyring has a key. Autonomous agents that reboot
+  after a macOS upgrade, Keychain reset, or sandbox change keep their
+  historical sessions and SQLCipher data readable. Atomic temp-file
+  writes now use `tempfile.mkstemp` (unique name per call) to avoid
+  collisions between concurrent in-process sync calls.
+- **Bug #19c (P1) — images persisted with chat messages.**
+  `ChatSession.add_message` now accepts an optional `image_b64` argument
+  and stores it alongside the message text. On reload, attached images
+  reappear inline in the UI. The field is emitted in the serialised JSON
+  only when a value is present, preserving backward compatibility with
+  existing session files. Corrupted `.enc` files now log at ERROR level
+  (they represent invisible user data) and `SessionManager` exposes
+  `corrupted_sessions_count` for health checks.
+- **Bug #19d — single Nexe.app installation.** The installer no longer
+  duplicates `Nexe.app` to `/Applications/Nexe.app`. The bundle lives
+  only at `<install_dir>/Nexe.app` (next to `venv/`, so the Swift
+  launcher resolves paths locally without relying on a marker file).
+  Dock and Login Items now target the install-dir bundle. Legacy
+  `/Applications/Nexe.app` left behind by earlier installs is removed
+  at install time, with a guard against accidental self-deletion when
+  `install_path == /Applications`.
+
 ### Changed
 
 - **Offline install: all Python wheels + embedding model bundled in the DMG**.

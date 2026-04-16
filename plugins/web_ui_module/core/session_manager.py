@@ -40,10 +40,18 @@ class ChatSession:
         self.context_summary: Optional[str] = None  # Resum dels missatges compactats
         self.compaction_count: int = 0  # Quantes vegades s'ha compactat
         self.custom_name: Optional[str] = None  # User-defined session name
+        self.thinking_enabled: bool = False  # Per-session thinking toggle (default OFF)
         self._recently_deleted_facts: list = []  # Transient, not persisted to disk
 
-    def add_message(self, role: str, content: str, stats: dict = None):
-        """Afegir missatge a l'historial"""
+    def add_message(self, role: str, content: str, stats: dict = None,
+                    image_b64: str = None):
+        """Afegir missatge a l'historial.
+
+        `image_b64` (bug #19c): si l'usuari adjunta una imatge al missatge,
+        es persisteix al mateix dict que el text per tal que reapareixi en
+        recarregar la sessió. Es guarda NOMÉS si té valor — missatges de
+        només text mantenen el format original al disc (backward compat).
+        """
         msg = {
             "role": role,
             "content": content,
@@ -51,6 +59,8 @@ class ChatSession:
         }
         if stats:
             msg["stats"] = stats
+        if image_b64:
+            msg["image_b64"] = image_b64
         self.messages.append(msg)
         self.last_activity = datetime.now(timezone.utc)
 
@@ -171,6 +181,7 @@ class ChatSession:
         }
         if self.custom_name is not None:
             d["custom_name"] = self.custom_name
+        d["thinking_enabled"] = self.thinking_enabled
         if self.context_summary:
             d["context_summary"] = self.context_summary
             d["compaction_count"] = self.compaction_count
@@ -186,6 +197,7 @@ class ChatSession:
         session.context_files = data.get("context_files", [])
         session.attached_document = data.get("attached_document")
         session.custom_name = data.get("custom_name")
+        session.thinking_enabled = data.get("thinking_enabled", False)
         session.context_summary = data.get("context_summary")
         session.compaction_count = data.get("compaction_count", 0)
         return session
@@ -216,6 +228,10 @@ class SessionManager:
         self._storage_path.mkdir(parents=True, exist_ok=True)
         self._crypto = crypto_provider
         self._sessions: Dict[str, ChatSession] = {}
+        # Bug #19b: expose count of .enc files that failed to decrypt at load.
+        # Non-zero means the MEK has changed since those sessions were written
+        # (Keychain reset, key rotation without migration, disk corruption).
+        self._corrupted_sessions_count: int = 0
         # Bug 16: protegir accessos concurrents al dict _sessions.
         # Usem RLock (reentrant) perque alguns metodes en criden d'altres
         # tambe protegits (e.g. get_or_create_session -> create_session)
@@ -230,6 +246,15 @@ class SessionManager:
         self._sessions_alock: Optional[asyncio.Lock] = None
         with self._sessions_lock:
             self._load_sessions()
+
+    @property
+    def corrupted_sessions_count(self) -> int:
+        """Number of .enc files that failed to decrypt at last load.
+
+        Exposed for /memory/health and debug endpoints — non-zero signals
+        MEK divergence between a past run and the current process.
+        """
+        return self._corrupted_sessions_count
 
     def _get_async_lock(self) -> asyncio.Lock:
         """Lazy-init de l'asyncio.Lock per evitar requerir un loop al __init__."""
@@ -252,7 +277,15 @@ class SessionManager:
                         self._sessions[session.id] = session
                         count += 1
                     except Exception as e:
-                        logger.warning("Error loading encrypted session %s: %s", file_path.name, e)
+                        # Bug #19b: this is user data becoming invisible,
+                        # not a routine warning. Escalate to ERROR and
+                        # keep a counter for health observability.
+                        self._corrupted_sessions_count += 1
+                        logger.error(
+                            "Error loading encrypted session %s: %s "
+                            "(MEK mismatch or file corruption)",
+                            file_path.name, e,
+                        )
 
                 # Migrate plain .json to .enc
                 for file_path in self._storage_path.glob("*.json"):

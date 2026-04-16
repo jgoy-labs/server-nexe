@@ -123,11 +123,11 @@ struct CompletionView: View {
     // MARK: - Accions
 
     private func applyDockIcon() {
-        // Nexe.app es copia a /Applications/Nexe.app per install_headless.py.
-        // És un .app normal (LSUIElement=false) amb icona pròpia i executable
-        // NexeTray: el target correcte pel Dock.
+        // Bug #19d fix (v1.0): Nexe.app viu NOMÉS a <install_dir>/Nexe.app.
+        // Abans es copiava una segona instància a /Applications/Nexe.app
+        // que acabava sent un orfe sense codi Python al costat.
         guard engine.addToDock else { return }
-        let nexeAppPath = "/Applications/Nexe.app"
+        let nexeAppPath = engine.installPath + "/Nexe.app"
         DispatchQueue.global(qos: .utility).async {
             doAddToDock(nexeAppPath: nexeAppPath)
         }
@@ -168,11 +168,10 @@ struct CompletionView: View {
     private func openNexe() {
         nexeOpened = true
 
-        // Llançament via /Applications/Nexe.app (el mateix bundle que hi ha al Dock).
+        // Llançament via <install_dir>/Nexe.app (el mateix bundle que hi ha al Dock).
         // Així macOS registra que l'app està corrent i apareix el triangle sota la
-        // icona del Dock (abans es llançava NexeTray.app — bundle diferent, sense
-        // triangle). El bash launcher de Nexe.app gestiona port-check + tray spawn.
-        let dockAppPath = "/Applications/Nexe.app"
+        // icona del Dock. El bash launcher de Nexe.app gestiona port-check + tray spawn.
+        let dockAppPath = engine.installPath + "/Nexe.app"
 
         // Eliminar quarantena per evitar bloqueig Gatekeeper
         let xattr = Process()

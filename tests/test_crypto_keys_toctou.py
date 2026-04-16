@@ -32,34 +32,33 @@ def test_file_set_creates_with_600_permissions(tmp_path):
     assert key_path.read_bytes() == key
 
 
-def test_file_set_uses_o_excl_via_temp(tmp_path):
-    """El fitxer temporal s'obre amb O_CREAT|O_EXCL|O_WRONLY i mode 0o600.
-
-    Capturem la trucada a os.open per verificar els flags i mode.
+def test_file_set_uses_unique_temp_via_mkstemp(tmp_path):
+    """El fitxer temporal es crea amb `tempfile.mkstemp` (nom únic,
+    `O_CREAT|O_EXCL|O_RDWR` internament). Això protegeix contra dues
+    crides concurrents dins el mateix procés que intentessin escriure
+    el mateix path de temp.
     """
+    import tempfile as _tempfile
     key_path = tmp_path / "master.key"
     key = b"\x02" * crypto_keys.KEY_SIZE
 
-    real_open = os.open
+    real_mkstemp = _tempfile.mkstemp
     captured = {}
 
-    def fake_open(path, flags, mode=0o777, *args, **kwargs):
-        # Només capturem la trucada al fitxer temp dins del nostre directori
-        if str(tmp_path) in str(path) and "master.key.tmp" in str(path):
-            captured["path"] = path
-            captured["flags"] = flags
-            captured["mode"] = mode
-        return real_open(path, flags, mode, *args, **kwargs)
+    def fake_mkstemp(*args, **kwargs):
+        captured["prefix"] = kwargs.get("prefix")
+        captured["dir"] = kwargs.get("dir")
+        return real_mkstemp(*args, **kwargs)
 
-    with patch.object(os, "open", side_effect=fake_open):
+    with patch.object(_tempfile, "mkstemp", side_effect=fake_mkstemp):
         ok = crypto_keys._try_file_set(key, path=key_path)
 
     assert ok is True
-    assert "flags" in captured, "os.open never called for the tmp key file"
-    assert captured["flags"] & os.O_CREAT
-    assert captured["flags"] & os.O_EXCL
-    assert captured["flags"] & os.O_WRONLY
-    assert captured["mode"] == 0o600
+    assert captured.get("prefix") == ".master.key.tmp."
+    assert captured.get("dir") == str(tmp_path)
+    # Final file has the restrictive mode we care about.
+    mode = stat.S_IMODE(key_path.stat().st_mode)
+    assert mode == 0o600
 
 
 def test_file_set_overwrite_existing_file_keeps_600(tmp_path):
@@ -78,8 +77,14 @@ def test_file_set_overwrite_existing_file_keeps_600(tmp_path):
     assert mode == 0o600
 
 
-def test_file_set_cleans_stale_temp(tmp_path):
-    """Un .master.key.tmp.<pid> orfe d'un crash previ no ha de bloquejar."""
+def test_file_set_ignores_pre_existing_stale_temp(tmp_path):
+    """Un .master.key.tmp.<pid> orfe d'un crash previ no ha de bloquejar.
+
+    El nou patró (tempfile.mkstemp) genera un nom únic cada cop, així que
+    un fitxer vell amb un altre suffix queda intacte i la nova escriptura
+    continua sense conflicte. La netja dels stale és opcional (no ens posa
+    en risc perquè cada crida usa un path nou).
+    """
     key_path = tmp_path / "master.key"
     stale = tmp_path / f".master.key.tmp.{os.getpid()}"
     stale.write_bytes(b"stale-junk")
@@ -89,8 +94,8 @@ def test_file_set_cleans_stale_temp(tmp_path):
     ok = crypto_keys._try_file_set(key, path=key_path)
     assert ok is True
     assert key_path.read_bytes() == key
-    # El temp s'ha consumit (renomenat al final)
-    assert not stale.exists()
+    # L'stale no bloqueja la nova escriptura, tot i que no el netegem
+    # (innòcu: no conté cap clau vàlida i no interfereix en reads futurs).
 
 
 def test_file_set_round_trip_with_get(tmp_path):

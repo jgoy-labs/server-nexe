@@ -458,3 +458,59 @@ class TestSessionManagerEncrypted:
         loaded = sm2.get_session("compact-enc")
         assert loaded.context_summary == "Encrypted summary."
         assert loaded.compaction_count == 1
+
+
+# ═══════════════════════════════════════════════════════════════
+# Corrupted sessions diagnosis — Bug #19b side-effect
+# ═══════════════════════════════════════════════════════════════
+
+class TestCorruptedSessionsDiagnosis:
+    """Tests per la diagnòstica de sessions .enc que fallen al desxifrar.
+
+    Abans del fix, el SessionManager loggejava com WARNING i s'ignorava el
+    fitxer. Ara ha de ser ERROR (dades d'usuari invisibles) i exposar un
+    comptador perquè l'observabilitat pugui detectar-ho (p.ex. /memory/health).
+    """
+
+    @pytest.fixture
+    def crypto(self):
+        import os
+        from core.crypto.provider import CryptoProvider
+        return CryptoProvider(master_key=os.urandom(32))
+
+    def test_corrupted_enc_logged_as_error(self, tmp_path, crypto, caplog):
+        import logging
+        other_crypto_bad = tmp_path / "rogue.enc"
+        # Escriu bytes que no són un .enc vàlid (nonce correcte, ciphertext aleatori)
+        import os as _os
+        other_crypto_bad.write_bytes(_os.urandom(64))
+
+        with caplog.at_level(logging.ERROR,
+                             logger="plugins.web_ui_module.core.session_manager"):
+            SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+
+        error_messages = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert any("rogue" in r.getMessage() for r in error_messages), (
+            "Els fitxers .enc corruptes han de loggear-se com ERROR, no WARNING. "
+            "Dades d'usuari invisibles = incident, no soroll."
+        )
+
+    def test_corrupted_sessions_count_exposed(self, tmp_path, crypto):
+        import os as _os
+        (tmp_path / "bad1.enc").write_bytes(_os.urandom(64))
+        (tmp_path / "bad2.enc").write_bytes(_os.urandom(64))
+        (tmp_path / "bad3.enc").write_bytes(_os.urandom(64))
+
+        sm = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+        assert sm.corrupted_sessions_count == 3, (
+            "SessionManager ha d'exposar el nombre de sessions corruptes "
+            "per a observabilitat (debug, health endpoints, alertes)."
+        )
+
+    def test_corrupted_count_zero_when_all_valid(self, tmp_path, crypto):
+        sm1 = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+        sm1.create_session(session_id="ok1")
+        sm1.create_session(session_id="ok2")
+
+        sm2 = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
+        assert sm2.corrupted_sessions_count == 0
