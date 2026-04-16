@@ -5,7 +5,7 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia de testing i cobertura per a server-nexe 0.9.7. 4665 funcions de test col·lectades (4804 totals), 0 errors a l'ultima execucio. Tests col·locats amb els moduls. Cobreix estructura de tests, execucio, cobertura, correccions de tests de l'auditoria IA, tests de crypto (68 nous), resultats del mega-test v1/v2 i valoracio honesta de les limitacions del testing."
+abstract: "Estrategia de testing i cobertura per a server-nexe 0.9.7. 4770 funcions de test col·lectades (4810 totals), 0 errors a l'ultima execucio. Tests col·locats amb els moduls. Cobreix estructura de tests, execucio, cobertura, correccions de tests de l'auditoria IA, tests de crypto (68 nous), resultats del mega-test v1/v2 i valoracio honesta de les limitacions del testing."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
 chunk_size: 800
 priority: P2
@@ -23,14 +23,14 @@ expires: null
 
 | Metrica | Valor |
 |--------|-------|
-| Total funcions de test col·lectades | 4665 |
+| Total funcions de test col·lectades | 4770 |
 | Total funcions de test (incl. deseleccionades) | 4804 |
-| Ultima execucio completa passats | 4665 |
+| Ultima execucio completa passats | 4770 |
 | Fallats | 0 |
 | Omesos | 6 |
 | XFailed | 1 |
 
-Nota: 4665 funcions col·lectades per l'execucio estandard (sense marcadors integration/e2e/slow). El total brut incloent tests deseleccionats es 4804.
+Nota: 4770 funcions col·lectades per l'execucio estandard (sense marcadors integration/e2e/slow). El total brut incloent tests deseleccionats es 4804.
 
 ## Estructura dels tests
 
@@ -109,7 +109,7 @@ Totes les auditories de seguretat les realitzen sessions autonomes d'IA (Claude)
 - Mateixa metodologia de 4 fases, re-executada despres d'aplicar les correccions de la v1
 - 10 troballes (vs 23 a la v1, 57% de reduccio)
 - 7 correccions aplicades (validacio de memoria, path traversal, validacio de noms de fitxer, rate limiting, normalitzacio Unicode, print->logger)
-- Execucio final (v0.9.7): **4665 passats, 0 fallats**
+- Execucio final (v0.9.7): **4770 passats, 0 fallats**
 - Veredicte: GO WITH CONDITIONS (millorat)
 
 ## Decisions clau de testing

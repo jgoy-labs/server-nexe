@@ -215,7 +215,7 @@ server-nexe/
 │
 ├── knowledge/                    # Docs for RAG ingestion (ca/es/en × 12 files)
 ├── storage/                      # Runtime data (not in git)
-├── tests/                        # 4665 test functions
+├── tests/                        # 4770 test functions
 └── nexe                          # CLI executable
 ```
 
@@ -382,7 +382,7 @@ The system prompt defines Nexe's personality and behavior. It lives in `personal
 
 ## Test Architecture
 
-- 4665 test functions collected (4804 total), 0 failures in latest run
+- 4770 test functions collected (4804 total), 0 failures in latest run
 - Tests collocated with modules (each module has tests/ folder)
 - Root conftest.py for shared fixtures
 - Closures refactored to functions for patchability (key refactoring decision)

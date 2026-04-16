@@ -27,6 +27,22 @@ STOP_SEQUENCES = [
     "<|eot_id|>", "<end_of_turn>", "<|im_end|>",
 ]
 
+# Families that support think:true in Ollama without returning 400.
+# Update when new thinking-capable models are released.
+THINKING_CAPABLE = {
+    "qwen3.5", "qwen3", "qwq",
+    "deepseek-r1", "deepseek-r1-distill",
+    "gemma3", "gemma4",
+    "llama4",
+    "gpt-oss",
+}
+
+
+def can_think(model: str) -> bool:
+    """Return True if the model supports think:true in Ollama without 400."""
+    name = model.split("/")[-1].split(":")[0].lower()
+    return any(family in name for family in THINKING_CAPABLE)
+
 
 def _parent():
     """Lazy import del modul parent (tests patchen httpx/ollama_breaker alla).
@@ -48,15 +64,23 @@ class OllamaChat:
     def base_url(self) -> str:
         return self.client.base_url
 
-    def _build_payload(self, model: str, messages: List[Dict[str, str]], stream: bool, images: Optional[List[str]] = None) -> Dict[str, Any]:
+    def _build_payload(self, model: str, messages: List[Dict[str, str]], stream: bool,
+                       images: Optional[List[str]] = None, thinking_enabled: bool = False) -> Dict[str, Any]:
         """Construeix el payload /api/chat."""
+        # Env var override (global) takes precedence if explicitly set
+        env_think = os.getenv("NEXE_OLLAMA_THINK")
+        if env_think is not None:
+            effective_think = env_think.lower() == "true"
+        else:
+            # Per-session thinking intersected with model capability (safety belt)
+            effective_think = thinking_enabled and can_think(model)
         payload = {
             "model": model,
             "messages": messages,
             "stream": stream,
             "stop": STOP_SEQUENCES,
             "keep_alive": os.getenv("NEXE_OLLAMA_KEEP_ALIVE", "30m"),
-            "think": os.getenv("NEXE_OLLAMA_THINK", "true").lower() == "true",
+            "think": effective_think,
             "options": {
                 "num_ctx": auto_num_ctx(),
             },
@@ -73,7 +97,7 @@ class OllamaChat:
 
     async def chat(
         self, model: str, messages: List[Dict[str, str]], stream: bool = True,
-        images: Optional[List[str]] = None,
+        images: Optional[List[str]] = None, thinking_enabled: bool = False,
     ) -> AsyncIterator[Dict[str, Any]]:
         """Chat amb model Ollama (streaming o directe). images: base64 strings opcionals."""
         p = _parent()
@@ -86,7 +110,8 @@ class OllamaChat:
             )
 
         try:
-            payload = self._build_payload(model, messages, stream, images=images)
+            payload = self._build_payload(model, messages, stream, images=images,
+                                          thinking_enabled=thinking_enabled)
 
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 if stream:
@@ -111,6 +136,31 @@ class OllamaChat:
                     yield response.json()
 
         except httpx.HTTPStatusError as e:
+            # Fallback: if think:true caused 400, retry without thinking
+            if e.response.status_code == 400 and payload.get("think"):
+                logger.warning("Model %s rejects think:true (400) — retrying without thinking", model)
+                payload["think"] = False
+                async with httpx.AsyncClient(timeout=self._timeout) as retry_client:
+                    if stream:
+                        async with retry_client.stream(
+                            "POST", f"{self.base_url}/api/chat", json=payload
+                        ) as retry_resp:
+                            retry_resp.raise_for_status()
+                            await ollama_breaker.record_success()
+                            async for line in retry_resp.aiter_lines():
+                                if line.strip():
+                                    try:
+                                        yield json.loads(line)
+                                    except json.JSONDecodeError:
+                                        pass
+                    else:
+                        retry_resp = await retry_client.post(
+                            f"{self.base_url}/api/chat", json=payload
+                        )
+                        retry_resp.raise_for_status()
+                        await ollama_breaker.record_success()
+                        yield retry_resp.json()
+                return
             if e.response.status_code == 404:
                 logger.warning("Ollama chat: model %s not found (404)", model)
                 raise ModelNotFoundError(model) from e

@@ -217,7 +217,7 @@ server-nexe/
 │
 ├── knowledge/                    # Docs per a ingestio RAG (ca/es/en x 12 fitxers)
 ├── storage/                      # Dades en temps d'execucio (no a git)
-├── tests/                        # 4665 funcions de test
+├── tests/                        # 4770 funcions de test
 └── nexe                          # Executable CLI
 ```
 
@@ -402,7 +402,7 @@ El prompt del sistema defineix la personalitat i el comportament de Nexe. Viu a 
 
 ## Arquitectura de tests
 
-- 4665 funcions de test col·lectades (4804 totals), 0 errors a l'ultima execucio
+- 4770 funcions de test col·lectades (4810 totals), 0 errors a l'ultima execucio
 - Tests col·locats amb els moduls (cada modul te una carpeta tests/)
 - conftest.py arrel per a fixtures compartides
 - Closures refactoritzades a funcions per a patchabilitat (decisio clau de refactoritzacio)

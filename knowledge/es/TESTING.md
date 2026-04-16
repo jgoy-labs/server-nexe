@@ -5,7 +5,7 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia y cobertura de pruebas de server-nexe 0.9.7. 4665 funciones de test recopiladas (4804 totales), 0 fallos en la ultima ejecucion. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura, correcciones de tests de auditoria IA, tests de crypto (68 nuevos), resultados de mega-test v1/v2, y valoracion honesta de las limitaciones de las pruebas."
+abstract: "Estrategia y cobertura de pruebas de server-nexe 0.9.7. 4770 funciones de test recopiladas (4810 totales), 0 fallos en la ultima ejecucion. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura, correcciones de tests de auditoria IA, tests de crypto (68 nuevos), resultados de mega-test v1/v2, y valoracion honesta de las limitaciones de las pruebas."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
 chunk_size: 800
 priority: P2
@@ -23,14 +23,14 @@ expires: null
 
 | Metrica | Valor |
 |---------|-------|
-| Total de funciones de test recopiladas | 4665 |
+| Total de funciones de test recopiladas | 4770 |
 | Total de funciones de test (incl. deseleccionadas) | 4804 |
-| Pasados en ultima ejecucion | 4665 |
+| Pasados en ultima ejecucion | 4770 |
 | Fallidos | 0 |
 | Saltados | 6 |
 | XFailed | 1 |
 
-Nota: 4665 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 4804.
+Nota: 4770 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 4804.
 
 ## Estructura de los tests
 
@@ -109,7 +109,7 @@ Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (C
 - Misma metodologia de 4 fases, re-ejecutada tras aplicar las correcciones de v1
 - 10 hallazgos (vs 23 en v1, 57% de reduccion)
 - 7 correcciones aplicadas (validacion de memoria, path traversal, validacion de nombres de fichero, rate limiting, normalizacion Unicode, print->logger)
-- Resultado final (v0.9.7): **4665 pasados, 0 fallidos**
+- Resultado final (v0.9.7): **4770 pasados, 0 fallidos**
 - Veredicto: GO CON CONDICIONES (mejorado)
 
 ## Decisiones clave en las pruebas

@@ -140,7 +140,7 @@ async def _forward_to_ollama(
         "model": model_name,
         "messages": messages,
         "stream": request.stream,
-        "think": os.getenv("NEXE_OLLAMA_THINK", "false").lower() == "true",
+        "think": os.getenv("NEXE_OLLAMA_THINK", "false").lower() == "true",  # NEVER default true — 400 on non-thinking models
         "options": {
             "temperature": request.temperature,
             "num_predict": request.max_tokens or int(os.getenv("NEXE_DEFAULT_MAX_TOKENS", "4096")),

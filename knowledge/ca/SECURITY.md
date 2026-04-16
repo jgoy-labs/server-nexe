@@ -226,7 +226,7 @@ Totes les auditories de seguretat les realitzen sessions autonomes d'IA (Claude)
 - Mateixa metodologia de 4 fases, re-executada despres d'aplicar les correccions de la v1
 - 10 troballes (vs 23 a la v1, **57% de reduccio**)
 - 7 correccions addicionals aplicades: validacio d'endpoints de memoria (CRITIC), path traversal de sessions, validacio de noms de fitxer, rate limiting a tots els endpoints UI, normalitzacio Unicode als detectors d'injeccio, migracio print()->logger
-- 4665 tests passats, 0 fallats
+- 4770 tests passats, 0 fallats
 - Veredicte: **GO WITH CONDITIONS** (millorat)
 
 ### Correccions clau de les auditories

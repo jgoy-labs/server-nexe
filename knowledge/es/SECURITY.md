@@ -226,7 +226,7 @@ Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (C
 - Misma metodologia de 4 fases, re-ejecutada tras aplicar las correcciones de v1
 - 10 hallazgos (vs 23 en v1, **57% de reduccion**)
 - 7 correcciones adicionales aplicadas: validacion de endpoints de memoria (CRITICO), path traversal en sesiones, validacion de nombres de fichero, rate limiting en todos los endpoints UI, normalizacion Unicode en detectores de inyeccion, migracion print()->logger
-- 4665 tests pasados, 0 fallidos
+- 4770 tests pasados, 0 fallidos
 - Veredicto: **GO CON CONDICIONES** (mejorado)
 
 ### Correcciones clave de las auditorias

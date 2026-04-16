@@ -191,6 +191,7 @@ class OllamaModule:
 
     def chat(
         self, model: str, messages: List[Dict[str, str]], stream: bool = True,
-        images: Optional[List[str]] = None,
+        images: Optional[List[str]] = None, thinking_enabled: bool = False,
     ) -> AsyncIterator[Dict[str, Any]]:
-        return self.chat_mgr.chat(model, messages, stream=stream, images=images)
+        return self.chat_mgr.chat(model, messages, stream=stream, images=images,
+                                  thinking_enabled=thinking_enabled)
