@@ -191,9 +191,13 @@ def _write_venv_pip_conf(venv_path, wheels_dir):
     if not any(wheels_dir.glob("*.whl")):
         return False
     pip_conf = venv_path / "pip.conf"
+    # Use file:// URI so paths with spaces (e.g. "/Volumes/Install Nexe/...")
+    # are not split by pip's config parser. Path.as_uri() percent-encodes
+    # spaces as %20.
+    wheels_uri = wheels_dir.resolve().as_uri()
     pip_conf.write_text(
         "[global]\n"
-        f"find-links = {wheels_dir}\n"
+        f"find-links = {wheels_uri}\n"
         "no-index = true\n",
         encoding="utf-8",
     )
