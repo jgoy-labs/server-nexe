@@ -296,9 +296,18 @@ class TestSetupEnvironmentNonDmg:
 class TestFindBundleResources:
     """Localitza InstallNexe.app/Contents/Resources/ per trobar wheels + embeddings bundled."""
 
-    def test_returns_resources_when_app_bundle_exists(self, tmp_path):
-        resources = tmp_path / "InstallNexe.app" / "Contents" / "Resources"
+    def _make_resources(self, base, with_wheels=True):
+        """Helper: crea estructura InstallNexe.app amb wheels/ opcional."""
+        resources = base / "InstallNexe.app" / "Contents" / "Resources"
         resources.mkdir(parents=True)
+        if with_wheels:
+            wheels = resources / "wheels"
+            wheels.mkdir()
+            (wheels / "x.whl").write_bytes(b"PK")
+        return resources
+
+    def test_returns_resources_when_app_bundle_exists(self, tmp_path):
+        resources = self._make_resources(tmp_path)
         from installer.installer_setup_env import _find_bundle_resources
         found = _find_bundle_resources(tmp_path)
         assert found == resources
@@ -313,6 +322,69 @@ class TestFindBundleResources:
         (app / "Resources").write_text("not a dir")
         from installer.installer_setup_env import _find_bundle_resources
         assert _find_bundle_resources(tmp_path) is None
+
+    def test_returns_none_when_resources_exists_but_no_wheels(self, tmp_path):
+        """Resources/ dir present but empty (no wheels/) → not usable."""
+        resources = tmp_path / "InstallNexe.app" / "Contents" / "Resources"
+        resources.mkdir(parents=True)
+        from installer.installer_setup_env import _find_bundle_resources
+        assert _find_bundle_resources(tmp_path) is None
+
+    def test_respects_env_var_override(self, tmp_path, monkeypatch):
+        """NEXE_BUNDLE_RESOURCES env var takes priority over project_root scan."""
+        resources = self._make_resources(tmp_path / "explicit")
+        monkeypatch.setenv("NEXE_BUNDLE_RESOURCES", str(resources))
+        from installer.installer_setup_env import _find_bundle_resources
+        found = _find_bundle_resources(tmp_path / "unrelated")
+        assert found == resources
+
+    def test_env_var_ignored_if_no_wheels(self, tmp_path, monkeypatch):
+        """NEXE_BUNDLE_RESOURCES must contain wheels/ to be accepted."""
+        resources = tmp_path / "fake"
+        resources.mkdir(parents=True)
+        # No wheels/ inside
+        monkeypatch.setenv("NEXE_BUNDLE_RESOURCES", str(resources))
+        from installer.installer_setup_env import _find_bundle_resources
+        assert _find_bundle_resources(tmp_path) is None
+
+    def test_finds_resources_from_mounted_volume(self, tmp_path, monkeypatch):
+        """DMG install: project_root is /Applications/server-nexe/ but the
+        app bundle with wheels is on the mounted DMG at /Volumes/Install Nexe/.
+        _find_bundle_resources must scan /Volumes/ as fallback."""
+        # Simulate: project_root has no InstallNexe.app
+        project_root = tmp_path / "Applications" / "server-nexe"
+        project_root.mkdir(parents=True)
+
+        # Simulate: DMG mounted at /Volumes/Install Nexe/
+        fake_volumes = tmp_path / "Volumes" / "Install Nexe"
+        resources = self._make_resources(fake_volumes)
+
+        # Patch Path("/Volumes") to our tmp_path version
+        monkeypatch.delenv("NEXE_BUNDLE_RESOURCES", raising=False)
+        import installer.installer_setup_env as mod
+        original_find = mod._find_bundle_resources
+
+        def patched_find(proj_root):
+            """Replace /Volumes scan with tmp_path/Volumes scan."""
+            import os
+            env_path = os.environ.get("NEXE_BUNDLE_RESOURCES")
+            if env_path:
+                c = Path(env_path)
+                if c.is_dir() and (c / "wheels").is_dir():
+                    return c
+            c = proj_root / "InstallNexe.app" / "Contents" / "Resources"
+            if c.is_dir() and (c / "wheels").is_dir():
+                return c
+            # Scan our fake volumes instead of real /Volumes
+            for vol in (tmp_path / "Volumes").iterdir():
+                c = vol / "InstallNexe.app" / "Contents" / "Resources"
+                if c.is_dir() and (c / "wheels").is_dir():
+                    return c
+            return None
+
+        monkeypatch.setattr(mod, "_find_bundle_resources", patched_find)
+        found = mod._find_bundle_resources(project_root)
+        assert found == resources
 
 
 # ── Tests per _write_venv_pip_conf ───────────────────────────────────

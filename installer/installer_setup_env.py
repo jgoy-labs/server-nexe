@@ -135,16 +135,43 @@ def _make_venv_standalone(venv_path):
 
 
 def _find_bundle_resources(project_root):
-    """Retorna InstallNexe.app/Contents/Resources/ dins project_root si existeix.
+    """Localitza InstallNexe.app/Contents/Resources/ amb wheels/ i embeddings/.
 
-    És el directori on build_dmg.sh posa els subdirectoris `wheels/` (Python
-    wheels pre-descarregats) i `embeddings/` (model fastembed pre-descarregat)
-    per a l'offline install. Retorna None si l'app bundle no hi és — el flow
-    cau a online mode (PyPI + descàrrega a runtime), conservant el legacy.
+    Cerca en ordre:
+    1. NEXE_BUNDLE_RESOURCES env var (set explícitament pel caller).
+    2. project_root/InstallNexe.app/... (dev/gitoss layout, co-located).
+    3. Volums muntats (/Volumes/*/InstallNexe.app/...) — cas DMG real: el
+       wizard SwiftUI corre des del DMG muntat, extreu el payload a
+       project_root (/Applications/server-nexe/), però l'app bundle amb
+       els wheels resta al volum DMG. Sense aquest fallback el pip.conf
+       no s'escriu i pip cau a PyPI (on llama-cpp-python només té sdist
+       → compilació → prompt CLT al M1 net).
+
+    Retorna None si cap candidat té wheels/ → el flow cau a online mode.
     """
+    # 1. Explicit env var (allows SwiftUI wizard or tests to override)
+    env_path = os.environ.get("NEXE_BUNDLE_RESOURCES")
+    if env_path:
+        candidate = Path(env_path)
+        if candidate.is_dir() and (candidate / "wheels").is_dir():
+            return candidate
+
+    # 2. Co-located with project (dev/gitoss layout)
     candidate = project_root / "InstallNexe.app" / "Contents" / "Resources"
-    if candidate.is_dir():
+    if candidate.is_dir() and (candidate / "wheels").is_dir():
         return candidate
+
+    # 3. Mounted DMG volume (client install)
+    volumes = Path("/Volumes")
+    if volumes.is_dir():
+        try:
+            for vol in volumes.iterdir():
+                candidate = vol / "InstallNexe.app" / "Contents" / "Resources"
+                if candidate.is_dir() and (candidate / "wheels").is_dir():
+                    return candidate
+        except PermissionError:
+            pass  # Some volumes may not be readable
+
     return None
 
 
