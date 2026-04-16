@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Offline install: all Python wheels + embedding model bundled in the DMG**.
+  The installer no longer downloads anything from PyPI or HuggingFace at
+  install time. DMG size goes from ~20 MB to **~700 MB**. On the client, the
+  venv's `pip.conf` is configured with `find-links=<wheels>` and
+  `no-index=true` so `pip install -r requirements.txt` uses only bundled
+  wheels, and the fastembed cache is seeded from the bundled embedding model
+  so `install.py` finds it already present. Root cause fixed: clean M1
+  installs previously triggered the Xcode Command Line Tools prompt because
+  `CMAKE_ARGS="-DGGML_METAL=on"` forced a `llama-cpp-python` source build
+  even though the PyPI arm64 macOS wheel already ships with Metal. The
+  installer now drops `CMAKE_ARGS` entirely. See
+  `installer/build-wheels-bundle.sh`, `installer/build-embedding-bundle.sh`,
+  and the `--skip-bundles` flag on `build_dmg.sh` for dev iteration.
+
+- **Apple Silicon only (arm64 macOS 13 Ventura+)**. The installer target
+  narrows to Apple Silicon; x86_64 Macs and pre-13 macOS are no longer
+  supported. Knowledge base updated in ca/es/en.
+
+### Added
+
+- `installer/build-wheels-bundle.sh` — pre-downloads all Python wheels
+  (`--only-binary=:all:` for `macosx_13_0_arm64` + `cp312`) into
+  `InstallNexe.app/Contents/Resources/wheels/`. Validates critical wheels
+  are present and the total size is in range.
+- `installer/build-embedding-bundle.sh` — uses a temporary venv with
+  fastembed to pre-download the default multilingual embedding model into
+  `InstallNexe.app/Contents/Resources/embeddings/`. Validates the ONNX +
+  tokenizer + config artefacts are present.
+- `build_dmg.sh` Step 5a/5b: orchestrates both new scripts before codesign
+  and validates bundle sizes (exit code 14 on failure).
+- Four new helpers in `installer/installer_setup_env.py`:
+  `_find_bundle_resources`, `_write_venv_pip_conf`, `_seed_fastembed_cache`,
+  `_default_fastembed_cache_dir`.
+- Regression guards that grep `installer_setup_env.py` and
+  `plugins/llama_cpp_module/module.py` for `CMAKE_ARGS` — fail the test
+  suite if the flag is ever reintroduced.
+- 40+ new tests across `test_installer_build_wheels.py`,
+  `test_installer_build_embedding.py`, `test_installer_build_dmg.py`, and
+  new classes in `test_installer_setup_env.py`.
+
+### Removed
+
+- `CMAKE_ARGS="-DGGML_METAL=on"` block + try/except fallback in
+  `installer_setup_env.py` (caused the CLT prompt on clean M1).
+- Unused `print_warn` import in `installer_setup_env.py`.
+- `CMAKE_ARGS=...` suggestion in the error message of
+  `plugins/llama_cpp_module/module.py` (obsolete advice that would
+  re-trigger the same CLT prompt if a user followed it).
+
 ## [0.9.9] - 2026-04-15
 
 Bug #18 MEM_DELETE cirurgia pre-v1.0 — last P0 blocker closed.
