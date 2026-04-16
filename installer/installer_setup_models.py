@@ -59,14 +59,17 @@ def _show_manual_instructions(model, engine):
     print(f"{DIM}💡 {t('manual_install_note')}{RESET}")
 
 
-def ensure_ollama_installed():
+def ensure_ollama_installed(headless=False):
     """
     Ensure Ollama is installed (universal fallback for LLM inference).
 
-    Ollama is always installed because:
-    1. It's the universal fallback when MLX/llama.cpp fail
-    2. It works on all platforms (macOS, Linux)
-    3. It's the easiest way to run models
+    In headless/GUI mode (headless=True), skips the interactive confirmation
+    and proceeds directly with the install — the user already chose a model
+    that requires Ollama via the wizard UI.
+
+    On macOS: downloads Ollama-darwin.zip, extracts Ollama.app to /Applications/,
+    and launches it (which registers the CLI at /usr/local/bin/ollama).
+    On Linux: uses the official install.sh script.
     """
     import platform
 
@@ -76,26 +79,146 @@ def ensure_ollama_installed():
         return True
 
     print_step(f"{BOLD}{t('installing_ollama')}{RESET}")
-    confirm = input(f"{t('ollama_install_confirm')} {t('yes_no')}: ").lower()
-    if confirm == 'n':
-        print_warn(t('ollama_install_skipped'))
-        print(f"  {DIM}{t('ollama_install_manual')}{RESET}")
-        return False
+
+    if not headless:
+        confirm = input(f"{t('ollama_install_confirm')} {t('yes_no')}: ").lower()
+        if confirm == 'n':
+            print_warn(t('ollama_install_skipped'))
+            print(f"  {DIM}{t('ollama_install_manual')}{RESET}")
+            return False
 
     system = platform.system().lower()
 
-    if system not in ("darwin", "linux"):
+    if system == "darwin":
+        return _install_ollama_macos()
+    elif system == "linux":
+        return _install_ollama_linux()
+    else:
         print_warn(f"Ollama auto-install not supported on {system}")
         print(f"  {DIM}{t('ollama_install_manual')}{RESET}")
         return False
 
+
+def _install_ollama_macos():
+    """Install Ollama.app on macOS from bundle (offline) or download (online).
+
+    Lookup order:
+    1. Bundled zip at InstallNexe.app/Contents/Resources/ollama/Ollama-darwin.zip
+       (placed there by build-ollama-bundle.sh → DMG install is 100% offline).
+    2. Online download from ollama.com/download/Ollama-darwin.zip.
+
+    Extracts to /Applications/Ollama.app, removes quarantine, launches the app
+    (which registers the CLI at /usr/local/bin/ollama on first run).
+    """
+    import tempfile
+    import zipfile
+
+    url = "https://ollama.com/download/Ollama-darwin.zip"
+    dest = Path("/Applications/Ollama.app")
+
+    try:
+        # 1. Try bundled zip (offline install from DMG)
+        bundle_zip = _find_bundle_ollama_zip()
+        if bundle_zip:
+            print(f"  📦 Ollama offline: instal·lant des del bundle...")
+            zip_path = str(bundle_zip)
+        else:
+            # 2. Download from internet
+            print(f"  📥 Downloading Ollama for macOS...")
+            tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+            zip_path = tmp.name
+            tmp.close()
+            result = subprocess.run(
+                ["curl", "-fSL", "-o", zip_path, url],
+                timeout=300, capture_output=True,
+            )
+            if result.returncode != 0:
+                print_warn(t('ollama_install_failed'))
+                print(f"  {CYAN}Download: {url}{RESET}")
+                return False
+
+        # Extract to /Applications/
+        print(f"  📦 Installing to /Applications/Ollama.app...")
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            zf.extractall("/Applications/")
+
+        # Clean up downloaded zip (not the bundled one)
+        if not bundle_zip and os.path.isfile(zip_path):
+            os.unlink(zip_path)
+
+        # Remove quarantine so Gatekeeper doesn't block it
+        subprocess.run(
+            ["xattr", "-rd", "com.apple.quarantine", str(dest)],
+            capture_output=True,
+        )
+
+        # Launch Ollama.app — registers CLI at /usr/local/bin/ollama
+        print(f"  🚀 Starting Ollama...")
+        subprocess.run(["open", "-a", "Ollama"], capture_output=True)
+
+        # Wait for CLI to become available (first launch setup)
+        import time
+        for _ in range(15):
+            time.sleep(2)
+            ollama_bin = _find_ollama()
+            if os.path.isfile(ollama_bin):
+                print_success(t('ollama_installed'))
+                return True
+
+        # App installed but CLI not yet — still counts as success
+        print_warn("Ollama.app installed but CLI not yet available — try again in a moment")
+        return True
+
+    except subprocess.TimeoutExpired:
+        print_warn("Ollama download timed out (>5 min)")
+        return False
+    except Exception as e:
+        print_warn(f"{t('ollama_install_failed')}: {e}")
+        print(f"  {CYAN}{url}{RESET}")
+        return False
+
+
+def _find_bundle_ollama_zip():
+    """Find Ollama-darwin.zip in the DMG bundle resources.
+
+    Same lookup logic as _find_bundle_resources() in installer_setup_env.py:
+    1. NEXE_BUNDLE_RESOURCES env var
+    2. Co-located InstallNexe.app (dev/gitoss)
+    3. Mounted DMG volumes (/Volumes/*)
+    """
+    candidates = []
+
+    env_path = os.environ.get("NEXE_BUNDLE_RESOURCES")
+    if env_path:
+        candidates.append(Path(env_path) / "ollama" / "Ollama-darwin.zip")
+
+    # Co-located (dev mode)
+    project_root = Path(__file__).parent.parent
+    candidates.append(project_root / "InstallNexe.app" / "Contents" / "Resources" / "ollama" / "Ollama-darwin.zip")
+
+    # Mounted DMG volumes
+    volumes = Path("/Volumes")
+    if volumes.is_dir():
+        try:
+            for vol in volumes.iterdir():
+                candidates.append(vol / "InstallNexe.app" / "Contents" / "Resources" / "ollama" / "Ollama-darwin.zip")
+        except PermissionError:
+            pass
+
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
+
+
+def _install_ollama_linux():
+    """Install Ollama on Linux via official install script."""
     try:
         print(f"  {DIM}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
         result = subprocess.run(
             ["bash", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
-            timeout=180
+            timeout=180,
         )
-
         if result.returncode == 0:
             print_success(t('ollama_installed'))
             return True
@@ -103,7 +226,6 @@ def ensure_ollama_installed():
             print_warn(t('ollama_install_failed'))
             print(f"  {CYAN}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
             return False
-
     except subprocess.TimeoutExpired:
         print_warn("Ollama install timed out (>3 min)")
         return False

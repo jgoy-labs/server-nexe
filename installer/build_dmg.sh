@@ -280,6 +280,7 @@ fi
 # Net effect: zero Xcode Command Line Tools prompt at install time.
 WHEELS_DIR="$RESOURCES/wheels"
 EMBEDDINGS_DIR="$RESOURCES/embeddings"
+OLLAMA_ZIP="$RESOURCES/ollama/Ollama-darwin.zip"
 
 if [ "$SKIP_BUNDLES" = true ]; then
     warn "Skipping bundle rebuild (--skip-bundles) — reusing existing bundles"
@@ -295,6 +296,12 @@ else
         bundle_error "build-embedding-bundle.sh failed. DMG would lack RAG at first boot."
     fi
     info "  Embedding bundle ready"
+
+    info "Building Ollama bundle (~156 MB)..."
+    if ! bash "$SCRIPT_DIR/build-ollama-bundle.sh"; then
+        bundle_error "build-ollama-bundle.sh failed. DMG would require online Ollama download."
+    fi
+    info "  Ollama bundle ready"
 fi
 
 # ── Step 5b: Validate bundle sizes (exit 14 on failure) ──────────
@@ -307,11 +314,16 @@ fi
 if [ ! -d "$EMBEDDINGS_DIR" ]; then
     bundle_error "Embedding bundle missing at $EMBEDDINGS_DIR"
 fi
+if [ ! -f "$OLLAMA_ZIP" ]; then
+    bundle_error "Ollama bundle missing at $OLLAMA_ZIP"
+fi
 
 WHEELS_SIZE_MB=$(du -sm "$WHEELS_DIR" | cut -f1)
 EMBEDDINGS_SIZE_MB=$(du -sm "$EMBEDDINGS_DIR" | cut -f1)
+OLLAMA_SIZE_MB=$(du -m "$OLLAMA_ZIP" | cut -f1)
 info "  Wheels:     ${WHEELS_SIZE_MB} MB"
 info "  Embeddings: ${EMBEDDINGS_SIZE_MB} MB"
+info "  Ollama:     ${OLLAMA_SIZE_MB} MB"
 
 if [ "$WHEELS_SIZE_MB" -lt 100 ]; then
     bundle_error "Wheels bundle only ${WHEELS_SIZE_MB} MB — expected 100+ MB."
