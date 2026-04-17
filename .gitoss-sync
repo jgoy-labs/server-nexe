@@ -20,6 +20,8 @@
     "knowledge",
     "dev-tools",
     ".github",
+    "bench",
+    "scripts",
   ]
 
   # Fitxers arrel
