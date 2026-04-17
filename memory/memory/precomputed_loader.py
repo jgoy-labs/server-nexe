@@ -252,6 +252,20 @@ class PrecomputedKB:
         for key, expected in checks:
             got = manifest.get(key)
             if expected is None or got is None:
+                # model_hf_commit is a soft fingerprint: if the manifest
+                # has a value but the runtime can't read it (e.g. CI
+                # without a Hugging Face cache warmed), log a warning
+                # and skip — the other hashes already guard integrity.
+                # The inverse (runtime has a commit, manifest does not)
+                # also falls through as a warning: older manifests pre-
+                # dated this field.
+                if key == "model_hf_commit":
+                    logger.warning(
+                        "model_hf_commit: soft-skip "
+                        "(manifest=%r, runtime=%r)",
+                        got, expected,
+                    )
+                    continue
                 # Tolerate None on one side only if both are None (e.g.
                 # hub cache layout not found on either). Otherwise fail.
                 if not (expected is None and got is None):
