@@ -219,4 +219,4 @@ Otros documentos de knowledge en esta carpeta:
 - Documentacion: https://server-nexe.org
 - Sitio comercial: https://server-nexe.com
 - Autor: https://jgoy.net
-- Soporte: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/jgoylabs
+- Soporte: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/servernexe | https://buy.stripe.com/14A6oHct34lN5x7fKNgQE00
