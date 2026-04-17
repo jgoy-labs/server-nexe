@@ -219,4 +219,4 @@ Altres documents de coneixement en aquesta carpeta:
 - Documentacio: https://server-nexe.org
 - Web comercial: https://server-nexe.com
 - Autor: https://jgoy.net
-- Suport: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/jgoylabs
+- Suport: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/servernexe | https://buy.stripe.com/14A6oHct34lN5x7fKNgQE00
