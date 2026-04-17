@@ -150,7 +150,6 @@ if [ -z "$PYTHON_BIN" ]; then
                 done
             fi
         fi
-    fi
 
     elif [[ "$(uname -s)" == "Linux" ]]; then
         echo -e "${YELLOW}→${NC} Linux detected. Install Python 3.12+ with your package manager:"
