@@ -68,13 +68,48 @@ class _TeeWriter:
         return getattr(self._terminal, name)
 
 
+def _is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _resolve_install_root(project_root: Path) -> Path:
+    """Linux only: if the project is inside a downloads/temp dir, copy to
+    ~/.local/share/nexe/ and use that as the real install root."""
+    if not sys.platform.startswith("linux"):
+        return project_root
+    home = Path.home()
+    suspect_parents = [
+        home / "Baixades", home / "Downloads", home / "Descargas",
+        home / "Téléchargements", home / "tmp", Path("/tmp"),
+    ]
+    if not any(_is_relative_to(project_root, p) for p in suspect_parents):
+        return project_root
+    return home / ".local" / "share" / "nexe"
+
+
 def run_installer():
     # 1. Language selection
     select_language()
 
     clear()
     print(APP_LOGO)
-    project_root = Path(__file__).parent.parent.resolve()
+    source_root = Path(__file__).parent.parent.resolve()
+    project_root = _resolve_install_root(source_root)
+    if project_root != source_root:
+        print(f"\n{YELLOW}[Linux]{RESET} Directori de descàrregues detectat.")
+        print(f"  Instal·lant a: {CYAN}{project_root}{RESET}\n")
+        if project_root.exists():
+            shutil.rmtree(project_root)
+        shutil.copytree(
+            source_root, project_root,
+            ignore=shutil.ignore_patterns("venv", "__pycache__", "*.pyc", ".git"),
+        )
+        os.chdir(project_root)
+        print(f"{GREEN}[OK]{RESET} Fitxers copiats a {project_root}\n")
 
     # Setup install log — storage/logs/ may not exist yet, create early
     log_dir = project_root / "storage" / "logs"
