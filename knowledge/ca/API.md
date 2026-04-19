@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Referencia de l'API REST — server-nexe 1.0.0-beta
+# Referencia de l'API REST — server-nexe 1.0.1-beta
 
 ## URL base
 

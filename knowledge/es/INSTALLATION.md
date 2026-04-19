@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Instalacion — server-nexe 1.0.0-beta
+# Instalacion — server-nexe 1.0.1-beta
 
 ## En 30 segundos
 
@@ -265,7 +265,7 @@ App de la barra de menu para controlar el servidor sin terminal. Construida sobr
 
 | Item | Que hace | Codigo |
 |------|----------|--------|
-| **server.nexe v1.0.0-beta** | Cabecera no clicable. Version leida dinamicamente de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
+| **server.nexe v1.0.1-beta** | Cabecera no clicable. Version leida dinamicamente de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
 | **Servidor activo / detenido** | Indicador de estado no clicable. El icono de la barra cambia: `ICON_RUNNING` (verde) cuando esta vivo, `ICON_STOPPED` (gris) cuando no. | `tray.py:197` |
 | **Detener / Iniciar servidor** | Arranca o detiene el proceso `core.app` (uvicorn + FastAPI + Qdrant). SIGTERM y, si hace falta, SIGKILL. PID en `storage/run/server.pid`. | `_toggle_server` → `tray.py:296` |
 | **Abrir Web UI** | Abre `http://127.0.0.1:9119/ui` en el navegador por defecto. | `_open_web_ui` → `tray.py:509` |
