@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def register_memory_routes(router: APIRouter, *, require_ui_auth):
-    """Registra endpoints: POST /memory/save, POST /memory/recall"""
+    """Registra endpoints: POST /memory/save, POST /memory/recall, POST /memory/confirm-delete"""
 
     # -- POST /memory/save --
 
@@ -74,4 +74,19 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
             limit=limit
         )
 
+        return result
+
+    # -- POST /memory/confirm-delete --
+
+    @router.post("/memory/confirm-delete")
+    @limiter.limit("10/minute")
+    async def memory_confirm_delete(request: Request, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
+        """Esborra un fet de memòria un cop l'usuari l'ha confirmat al frontend."""
+        fact = body.get("fact", "").strip()
+        if not fact:
+            raise HTTPException(status_code=400, detail="fact required")
+        fact = validate_string_input(fact, max_length=500, context="chat")
+        memory_helper = _get_memory_helper()
+        result = await memory_helper.delete_from_memory(fact)
+        logger.info("MEM_DELETE confirmed by user: '%s' → deleted=%d", fact[:80], result.get("deleted", 0))
         return result

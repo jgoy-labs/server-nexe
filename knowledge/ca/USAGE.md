@@ -46,6 +46,27 @@ expires: null
 
 ---
 
+## Icona de Nexe a la barra de menú (tray)
+
+La icona de Nexe apareix al costat del rellotge (barra de menú de macOS). Permet controlar el servidor sense obrir cap terminal.
+
+**Opcions del menú:**
+
+| Opció | Què fa |
+|-------|--------|
+| Aturar / Iniciar servidor | Engega o atura Nexe amb un clic |
+| Obrir Web UI | Obre el xat al navegador (`http://127.0.0.1:9119/ui`) |
+| Obrir logs | Mostra el fitxer de logs per si hi ha errors |
+| Server RAM | Mostra quanta memòria usa el model carregat |
+| Temps actiu | Quan de temps porta el servidor en marxa |
+| Documentació | Obre la documentació oficial |
+| Configuració → Desinstal·lar Nexe | Elimina Nexe amb còpia de seguretat automàtica |
+| Sortir | Atura el servidor i tanca la icona del tray |
+
+La icona és **verda** quan el servidor és actiu i **grisa** quan és aturat. Es refresca cada 5 segons.
+
+---
+
 ## Arrencar el servidor
 
 ```bash

@@ -35,7 +35,7 @@ Dos metodes d'instal·lacio disponibles. Tria segons la teva plataforma i prefer
 
 | Requisit | Minim | Recomanat |
 |------------|---------|-------------|
-| SO | **macOS 14 Sonoma** (Apple Silicon) / Linux x86_64 (parcial) | macOS 14+ (Apple Silicon M1+) |
+| SO | **macOS 14 Sonoma** (Apple Silicon) / Linux ARM64 Ubuntu 24.04 (testejat a VM) / Linux x86_64 (parcial) | macOS 14+ (Apple Silicon M1+) |
 | CPU | **Apple Silicon (M1+) obligatori** — Intel NO suportat | M2 Pro / M3 Pro / M4 |
 | RAM | 8 GB | 16+ GB |
 | Disc | 10 GB lliures | 20+ GB (per a models grans) |
@@ -103,6 +103,9 @@ Descarrega el DMG des de la pagina de releases de GitHub: https://github.com/jgo
 Per a usuaris que prefereixen la instal·lacio per terminal o estan a Linux.
 
 ```bash
+# Linux (Debian/Ubuntu) — prerequisits (un sol cop):
+# sudo apt-get install -y python3-venv python3-dev build-essential
+
 git clone https://github.com/jgoy-labs/server-nexe
 cd server-nexe
 ./setup.sh
@@ -111,6 +114,10 @@ cd server-nexe
 `setup.sh` detecta la teva plataforma:
 - **macOS:** Comprova Homebrew, Python 3.11+, crea venv, instal·la requirements.txt + requirements-macos.txt (rumps per a la safata)
 - **Linux:** Suggereix paquets apt/dnf, crea venv, instal·la nomes requirements.txt
+
+### Instal·lacio Linux — entorn testejat
+
+Testejat end-to-end a Ubuntu 24.04.4 LTS Desktop ARM64 dins una VM UTM en un Mac Apple Silicon (8 GB RAM assignats, backend Ollama a CPU). L'instal·lador detecta directoris de descarrega/temporals i mou la instal·lacio a `~/.local/share/nexe/` (XDG-compliant). Hardware Linux ARM64/x86_64 natiu encara no validat.
 
 Despres de la configuracio:
 ```bash

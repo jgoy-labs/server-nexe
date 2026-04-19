@@ -27,7 +27,7 @@ SIMILARITY_THRESHOLD = 0.80       # No guardar si similaritat > 80% (baixat de 0
 PRUNE_BATCH_SIZE = 30             # How many entries to remove when the limit is exceeded
 TEMPORAL_DECAY_DAYS = 7           # Dies per aplicar decay temporal (recent = bonus)
 MIN_IMPORTANCE_SCORE = 0.3        # Minimum to save (filters out chatter)
-DELETE_THRESHOLD = 0.20           # Threshold for delete. History: 0.82 → 0.70 → 0.55 → 0.20 (bug #18 e2e 2026-04-15). Empirical: even verbatim queries scored below 0.55 with fastembed+paraphrase-multilingual. Jordi's call: 0.20 guarantees the fact actually gets found. Tradeoff accepted: delete may occasionally take down loosely related facts — UX for "oblida" is better served by erring toward the user's explicit forget request than by silently keeping the fact. See tests/integration/test_mem_delete_e2e.py for regression guard.
+DELETE_THRESHOLD = 0.20           # Threshold for delete search. History: 0.82 → 0.70 → 0.55 → 0.20 (bug #18 e2e 2026-04-15). Low threshold guarantees the fact is found even with paraphrase-multilingual scoring. IMPORTANT: only the top-1 result is deleted (see delete_from_memory), so a low threshold is safe — we find more candidates but only act on the best match.
 
 # Memory types for structured storage
 MEMORY_TYPES = {
@@ -611,7 +611,7 @@ class MemoryHelper:
                     results = await memory.search(
                         query=content, collection=collection, top_k=5, threshold=DELETE_THRESHOLD
                     )
-                    for r in results:
+                    for r in results[:1]:  # only delete the top match — prevents collateral deletion of unrelated facts
                         try:
                             fact_text = ""
                             if hasattr(r, 'payload') and r.payload:

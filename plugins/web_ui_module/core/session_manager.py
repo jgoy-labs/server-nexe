@@ -140,6 +140,10 @@ class ChatSession:
     def apply_compaction(self, summary: str):
         """Aplica compacting: guarda resum i elimina missatges antics"""
         keep = self.messages[-self.COMPACT_KEEP:]
+        # Ensure keep starts with user (summary prepend adds user+assistant, so
+        # if keep[0] is assistant we'd get two consecutive assistant → VLM error)
+        while keep and keep[0].get("role") != "user":
+            keep = keep[1:]
         old_count = len(self.messages) - len(keep)
         self.context_summary = summary
         self.messages = keep
@@ -150,7 +154,9 @@ class ChatSession:
         )
 
     def get_context_messages(self) -> List[Dict[str, str]]:
-        """Obtenir missatges per enviar al model (amb resum si existeix)"""
+        """Obtenir missatges per enviar al model (amb resum si existeix).
+        Garanteix que la seqüència de rols alterna user/assistant correctament.
+        """
         msgs = []
         if self.context_summary:
             msgs.append({
@@ -162,7 +168,13 @@ class ChatSession:
                 "content": "Understood, I have the context from the previous conversation."
             })
         msgs.extend(self.messages)
-        return msgs
+        # Sanity check: drop consecutive duplicate roles to prevent VLM errors
+        cleaned = []
+        for m in msgs:
+            if cleaned and cleaned[-1]["role"] == m["role"]:
+                continue  # skip duplicate role
+            cleaned.append(m)
+        return cleaned
 
     def get_history(self) -> List[Dict[str, str]]:
         """Obtenir historial complet de missatges (per UI)"""

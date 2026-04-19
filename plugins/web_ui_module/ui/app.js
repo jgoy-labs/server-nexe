@@ -36,7 +36,7 @@ const UI_STRINGS = {
         upload_doc: "Pujar document",
         send: "Enviar",
         stop: "Aturar generació",
-        saved: "guardat",
+        saved: "He recordat",
         deleted: "esborrat",
         model_loading: "Carregant model a VRAM",
         doc_chat_only: "Aquest document només estarà disponible en aquest chat.",
@@ -84,12 +84,20 @@ const UI_STRINGS = {
         feature_basics: "Casos d'ús bàsics",
         feature_plugin: "Com fer un plugin",
         welcome_disclaimer: "⚠️ Els models petits poden no gestionar bé la memòria i tendeixen a al·lucinar més que els grans",
-        prompt_rag_help: "Com funciona el filtre RAG i com puc ajustar els pesos?",
-        prompt_models_help: "Quins models puc usar amb Nexe? Quines diferències hi ha entre models petits i grans?",
-        prompt_tray_help: "Com funciona la icona del tray a la barra de menú? Quines opcions té?",
-        prompt_models_install: "Com puc instal·lar nous models? Com afegir un model d'Ollama, MLX o llama.cpp?",
-        prompt_sysprompt: "Com puc canviar el system prompt de Nexe? On s'edita?",
-        prompt_basics: "Quins casos d'ús bàsics té Nexe? Per a que és útil?",
+        delete_confirm_title: "Confirmar esborrat",
+        delete_confirm_msg: "Nexe vol esborrar aquest record:",
+        delete_confirm_btn: "Sí, esborra",
+        delete_cancel_btn: "Cancel·lar",
+        delete_done: "Esborrat",
+        delete_cancelled: "Cancel·lat",
+        prompt_chat_help: "Com funciona la memòria de Nexe? Guarda el que li explico? Puc veure i esborrar el que recorda? Com funcionen les col·leccions i el filtre RAG?",
+        prompt_local_help: "Nexe és 100% local: tot corre al meu ordinador, cap dada va al núvol. Com funciona? Suporta el mode de raonament (thinking)?",
+        prompt_rag_help: "Què és el filtre RAG? Com puc ajustar-lo perquè Nexe busqui millor a la memòria?",
+        prompt_models_help: "Quins models puc usar? Com escullo el millor per al que necessito?",
+        prompt_tray_help: "Que fa la icona de Nexe al costat del rellotge? Puc aturar el servidor, veure l'estat, reiniciar-lo?",
+        prompt_models_install: "Com instal·lo un model nou? Puc usar models d'Ollama, MLX o llama.cpp?",
+        prompt_sysprompt: "Puc canviar com em respon Nexe? Com funciona el system prompt?",
+        prompt_basics: "Per a que serveix Nexe? Quins casos d'ús bàsics té?",
         prompt_plugin: "Com es fa un plugin per a Nexe? Quina estructura ha de tenir?",
     },
     en: {
@@ -123,7 +131,7 @@ const UI_STRINGS = {
         upload_doc: "Upload document",
         send: "Send",
         stop: "Stop generation",
-        saved: "saved",
+        saved: "Remembered",
         model_loading: "Loading model into VRAM",
         doc_chat_only: "This document will only be available in this chat.",
         doc_uploading: "Processing document",
@@ -171,12 +179,20 @@ const UI_STRINGS = {
         feature_basics: "Basic use cases",
         feature_plugin: "How to create a plugin",
         welcome_disclaimer: "⚠️ Small models may struggle with memory and tend to hallucinate more than large ones",
-        prompt_rag_help: "How does the RAG filter work and how can I adjust the weights?",
-        prompt_models_help: "What models can I use with Nexe? What are the differences between small and large models?",
-        prompt_tray_help: "How does the tray icon in the menu bar work? What options does it have?",
-        prompt_models_install: "How can I install new models? How to add an Ollama, MLX or llama.cpp model?",
-        prompt_sysprompt: "How can I change Nexe's system prompt? Where do I edit it?",
-        prompt_basics: "What are the basic use cases for Nexe? What is it useful for?",
+        delete_confirm_title: "Confirm deletion",
+        delete_confirm_msg: "Nexe wants to delete this memory:",
+        delete_confirm_btn: "Yes, delete",
+        delete_cancel_btn: "Cancel",
+        delete_done: "Deleted",
+        delete_cancelled: "Cancelled",
+        prompt_chat_help: "How does Nexe's memory work? Does it save what I tell it? Can I see and delete what it remembers? How do collections and the RAG filter work?",
+        prompt_local_help: "Nexe is 100% local: everything runs on my computer, no data goes to the cloud. How does it work? Does it support reasoning mode (thinking)?",
+        prompt_rag_help: "What is the RAG filter? How can I adjust it so Nexe searches memory better?",
+        prompt_models_help: "What models can I use? How do I pick the best one for what I need?",
+        prompt_tray_help: "What does the Nexe icon next to the clock do? Can I stop the server, see its status, restart it?",
+        prompt_models_install: "How do I install a new model? Can I use Ollama, MLX or llama.cpp models?",
+        prompt_sysprompt: "Can I change how Nexe responds to me? How does the system prompt work?",
+        prompt_basics: "What is Nexe for? What are its basic use cases?",
         prompt_plugin: "How do I create a plugin for Nexe? What structure should it have?",
     },
     es: {
@@ -210,7 +226,7 @@ const UI_STRINGS = {
         upload_doc: "Subir documento",
         send: "Enviar",
         stop: "Detener generación",
-        saved: "guardado",
+        saved: "Recordado",
         model_loading: "Cargando modelo en VRAM",
         doc_chat_only: "Este documento solo estará disponible en este chat.",
         doc_uploading: "Procesando documento",
@@ -258,12 +274,20 @@ const UI_STRINGS = {
         feature_basics: "Casos de uso básicos",
         feature_plugin: "Cómo crear un plugin",
         welcome_disclaimer: "⚠️ Los modelos pequeños pueden no gestionar bien la memoria y tienden a alucinar más que los grandes",
-        prompt_rag_help: "¿Cómo funciona el filtro RAG y cómo puedo ajustar los pesos?",
-        prompt_models_help: "¿Qué modelos puedo usar con Nexe? ¿Qué diferencias hay entre modelos pequeños y grandes?",
-        prompt_tray_help: "¿Cómo funciona el icono del tray en la barra de menú? ¿Qué opciones tiene?",
-        prompt_models_install: "¿Cómo puedo instalar nuevos modelos? ¿Cómo añadir un modelo de Ollama, MLX o llama.cpp?",
-        prompt_sysprompt: "¿Cómo puedo cambiar el system prompt de Nexe? ¿Dónde se edita?",
-        prompt_basics: "¿Cuáles son los casos de uso básicos de Nexe? ¿Para qué es útil?",
+        delete_confirm_title: "Confirmar borrado",
+        delete_confirm_msg: "Nexe quiere borrar este recuerdo:",
+        delete_confirm_btn: "Sí, borrar",
+        delete_cancel_btn: "Cancelar",
+        delete_done: "Borrado",
+        delete_cancelled: "Cancelado",
+        prompt_chat_help: "¿Cómo funciona la memoria de Nexe? ¿Guarda lo que le cuento? ¿Puedo ver y borrar lo que recuerda? ¿Cómo funcionan las colecciones y el filtro RAG?",
+        prompt_local_help: "Nexe es 100% local: todo corre en mi ordenador, ningún dato va a la nube. ¿Cómo funciona? ¿Soporta el modo de razonamiento (thinking)?",
+        prompt_rag_help: "¿Qué es el filtro RAG? ¿Cómo puedo ajustarlo para que Nexe busque mejor en la memoria?",
+        prompt_models_help: "¿Qué modelos puedo usar? ¿Cómo elijo el mejor para lo que necesito?",
+        prompt_tray_help: "¿Qué hace el icono de Nexe junto al reloj? ¿Puedo parar el servidor, ver el estado, reiniciarlo?",
+        prompt_models_install: "¿Cómo instalo un modelo nuevo? ¿Puedo usar modelos de Ollama, MLX o llama.cpp?",
+        prompt_sysprompt: "¿Puedo cambiar cómo me responde Nexe? ¿Cómo funciona el system prompt?",
+        prompt_basics: "¿Para qué sirve Nexe? ¿Cuáles son sus casos de uso básicos?",
         prompt_plugin: "¿Cómo se crea un plugin para Nexe? ¿Qué estructura debe tener?",
     }
 };
@@ -307,24 +331,20 @@ class NexeUI {
         s('#loginBtn', 'login_btn');
         s('#loginError', 'login_error', 'html');
         s('.login-hint', 'login_hint', 'html');
-        // Welcome
-        s('.welcome-screen h2', 'welcome_title');
-        s('.welcome-screen p', 'welcome_subtitle');
-        const features = document.querySelectorAll('.feature span:last-child');
-        if (features[0]) features[0].textContent = this.t('feature_chat');
-        if (features[1]) features[1].textContent = this.t('feature_upload');
-        if (features[2]) features[2].textContent = this.t('feature_local');
+        // Welcome — regenera tot el DOM si és visible (tots 10 botons traduïts)
+        if (this.chatMessages && this.chatMessages.querySelector('.welcome-screen')) {
+            this.showWelcome();
+        }
         // Sidebar
         s('#newChatBtn', 'new_chat');
         const newBtn = document.getElementById('newChatBtn');
         if (newBtn) { newBtn.innerHTML = `<i data-lucide="plus"></i> ${this.t('new_chat')}`; }
         s('.sessions-header h3', 'sessions');
-        s('#modelInfoText', 'loading');
         // Selectors
         const bSel = document.getElementById('backendSelect');
-        if (bSel && bSel.options[0]) bSel.options[0].textContent = this.t('loading');
+        if (bSel && bSel.options[0] && !bSel.options[0].value) bSel.options[0].textContent = this.t('loading');
         const mSel = document.getElementById('modelSelect');
-        if (mSel && mSel.options[0]) mSel.options[0].textContent = this.t('loading');
+        if (mSel && mSel.options[0] && !mSel.options[0].value) mSel.options[0].textContent = this.t('loading');
         // RAG — preserve the ⓘ button inside the title
         const ragTitle = document.querySelector('.rag-threshold-title');
         if (ragTitle) {
@@ -367,7 +387,10 @@ class NexeUI {
         const thinkInfo = document.getElementById('thinkingInfo');
         if (thinkInfo) thinkInfo.title = this.t('thinking_tip');
         const thinkLabel = document.querySelector('[data-i18n="thinking_mode"]');
-        if (thinkLabel) thinkLabel.closest('label').title = this.t('thinking_tip');
+        if (thinkLabel) {
+            thinkLabel.textContent = this.t('thinking_mode');
+            thinkLabel.closest('label').title = this.t('thinking_tip');
+        }
         // Input
         s('#messageInput', 'placeholder', 'placeholder');
         // Buttons
@@ -1357,6 +1380,7 @@ class NexeUI {
     }
 
     async sendMessage() {
+        if (this.isGenerating) return;
         const message = this.messageInput.value.trim();
         if (!message) return;
 
@@ -1376,8 +1400,7 @@ class NexeUI {
             } catch (e) { /* continue without session */ }
         }
 
-        // Disable input and show stop button
-        this.messageInput.disabled = true;
+        // Show stop button
         this.sendBtn.style.display = 'none';
         this.stopBtn.style.display = 'flex';
         this.isGenerating = true;
@@ -1759,10 +1782,25 @@ class NexeUI {
                             }
                         }
 
+                        // Detect saving spinner [SAVING]
+                        if (chunk.match(/\x00\[SAVING\]\x00/)) {
+                            chunk = chunk.replace(/\x00\[SAVING\]\x00/g, '');
+                            const savingEl = document.getElementById('nexe-mem-saving');
+                            if (!savingEl) {
+                                const el = document.createElement('span');
+                                el.id = 'nexe-mem-saving';
+                                el.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted,#888);margin-left:8px';
+                                el.textContent = `⏳ ${this.t('mem_saving')}`;
+                                const statsBar = responseEl && responseEl.parentElement && responseEl.parentElement.querySelector('.message-stats');
+                                if (statsBar) statsBar.appendChild(el);
+                            }
+                        }
                         // Detect saved memory count token [MEM:N] or [MEM]
                         if (chunk.match(/\x00\[MEM:?\d*\]\x00/)) {
                             memorySaved = true;
                             chunk = chunk.replace(/\x00\[MEM:?\d*\]\x00/g, '');
+                            const savingEl = document.getElementById('nexe-mem-saving');
+                            if (savingEl) savingEl.remove();
                         }
 
                         // Detect deleted memory token [DEL:N:fact1|fact2|...]
@@ -1772,6 +1810,14 @@ class NexeUI {
                             deletedCount = parseInt(delMatch[1]);
                             deletedFacts = delMatch[2].split('|');
                             chunk = chunk.replace(/\x00\[DEL:\d+:.+?\]\x00/g, '');
+                        }
+                        // Detect pending delete — model vol esborrar, però cal confirmació
+                        const pendingDelMatch = chunk.match(/\x00\[PENDING_DELETE:(.+?)\]\x00/);
+                        if (pendingDelMatch) {
+                            const fact = pendingDelMatch[1].replace(/\\\|/g, '|');
+                            chunk = chunk.replace(/\x00\[PENDING_DELETE:.+?\]\x00/g, '');
+                            // Show confirmation dialog after streaming ends
+                            setTimeout(() => this._showDeleteConfirmDialog(fact), 100);
                         }
 
                         processChunk(chunk);
@@ -1968,7 +2014,6 @@ class NexeUI {
         } finally {
             this._stopStreamStats();
             this.setAiState('idle');
-            this.messageInput.disabled = false;
             this.sendBtn.style.display = 'flex';
             this.stopBtn.style.display = 'none';
             this.isGenerating = false;
@@ -1983,10 +2028,75 @@ class NexeUI {
         }
     }
 
+    _showDeleteConfirmDialog(fact) {
+        const existing = document.getElementById('nexe-delete-confirm');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'nexe-delete-confirm';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+        const box = document.createElement('div');
+        box.style.cssText = 'background:var(--bg-secondary,#1e1e2e);border:1px solid var(--border,#333);border-radius:12px;padding:24px 28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4)';
+
+        const title = document.createElement('h3');
+        title.style.cssText = 'margin:0 0 8px;font-size:15px;color:var(--text-primary,#cdd6f4)';
+        title.textContent = this.t('delete_confirm_title');
+
+        const msg = document.createElement('p');
+        msg.style.cssText = 'margin:0 0 12px;font-size:13px;color:var(--text-secondary,#a6adc8)';
+        msg.textContent = this.t('delete_confirm_msg');
+
+        const factEl = document.createElement('div');
+        factEl.style.cssText = 'background:var(--bg-tertiary,#181825);border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:13px;color:var(--text-primary,#cdd6f4);word-break:break-word';
+        factEl.textContent = fact;
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:10px;justify-content:flex-end';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.style.cssText = 'padding:8px 16px;border-radius:8px;border:1px solid var(--border,#333);background:transparent;color:var(--text-secondary,#a6adc8);cursor:pointer;font-size:13px';
+        cancelBtn.textContent = this.t('delete_cancel_btn');
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.style.cssText = 'padding:8px 16px;border-radius:8px;border:none;background:#e74c3c;color:#fff;cursor:pointer;font-size:13px;font-weight:600';
+        confirmBtn.textContent = this.t('delete_confirm_btn');
+
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(confirmBtn);
+        box.appendChild(title);
+        box.appendChild(msg);
+        box.appendChild(factEl);
+        box.appendChild(btnRow);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        const close = (confirmed) => {
+            overlay.remove();
+            if (confirmed) {
+                this.fetchWithCsrf('/ui/memory/confirm-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fact })
+                }).then(r => r.json()).then(result => {
+                    if ((result.deleted || 0) > 0) {
+                        const facts = (result.deleted_facts || []).map(f => f.text || f).join(', ');
+                        this.addMessageToChat('assistant', `${this.t('delete_done')}: "${facts}"`);
+                    }
+                }).catch(() => {});
+            } else {
+                this.addMessageToChat('assistant', `↩️ ${this.t('delete_cancelled')}`);
+            }
+        };
+
+        confirmBtn.addEventListener('click', () => close(true));
+        cancelBtn.addEventListener('click', () => close(false));
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+    }
+
     _abortIfGenerating() {
         if (this.isGenerating && this.abortController) {
             this.abortController.abort();
-            this.messageInput.disabled = false;
             this.sendBtn.style.display = 'flex';
             this.stopBtn.style.display = 'none';
             this.isGenerating = false;
@@ -2289,7 +2399,6 @@ class NexeUI {
     async uploadFile(file) {
         // Overlay bloqueig amb spinner i timer
         this.uploadBtn.disabled = true;
-        this.messageInput.disabled = true;
         this.setAiState('thinking');
 
         const sizeMB = file.size / (1024 * 1024);
@@ -2363,7 +2472,6 @@ class NexeUI {
             clearInterval(timerInterval);
             overlay.remove();
             this.uploadBtn.disabled = false;
-            this.messageInput.disabled = false;
             this.setAiState('idle');
         }
     }
@@ -2487,7 +2595,10 @@ class NexeUI {
             </div>
         `;
         const chatFeature = this.chatMessages.querySelector('[data-action="chat"]');
-        if (chatFeature) chatFeature.addEventListener('click', () => this.messageInput.focus());
+        if (chatFeature) chatFeature.addEventListener('click', () => {
+            this.messageInput.value = this.t('prompt_chat_help');
+            this.messageInput.focus();
+        });
         const uploadFeature = this.chatMessages.querySelector('[data-action="upload"]');
         if (uploadFeature) uploadFeature.addEventListener('click', () => this.fileInput.click());
         const imageFeature = this.chatMessages.querySelector('[data-action="image"]');
@@ -2524,7 +2635,7 @@ class NexeUI {
         });
         const localFeature = this.chatMessages.querySelector('[data-action="local"]');
         if (localFeature) localFeature.addEventListener('click', () => {
-            this.messageInput.value = this.t('prompt_models_help');
+            this.messageInput.value = this.t('prompt_local_help');
             this.messageInput.focus();
         });
         if (typeof lucide !== 'undefined') lucide.createIcons();

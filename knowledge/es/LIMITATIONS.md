@@ -28,8 +28,8 @@ Este documento describe honestamente lo que server-nexe no puede hacer o no hace
 | macOS 14 Sonoma+ Apple Silicon (M1+) | **Target principal** — probado, los 3 backends |
 | macOS 13 Ventura | **NO soportado** (eliminado en v0.9.9 por dependencias arm64-only del stack) |
 | macOS Intel | **NO soportado** (eliminado en v0.9.9 — wheels arm64-only, sin MLX) |
-| Linux x86_64 | Parcial — tests unitarios pasan, CI verde, no probado en produccion |
-| Linux ARM64 | No probado directamente |
+| Linux ARM64 | Testeado en VM — Ubuntu 24.04 LTS Desktop ARM64 (UTM en Mac Apple Silicon), 8 GB RAM, instalacion CLI + backend Ollama en CPU. Hardware ARM64 nativo aun no validado. |
+| Linux x86_64 | Parcial — tests unitarios pasan, CI verde. Instalacion nativa aun no validada. |
 | Windows | No soportado |
 
 ## Calidad de los modelos
