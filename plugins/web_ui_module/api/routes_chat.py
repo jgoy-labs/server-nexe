@@ -362,7 +362,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         message = strip_memory_tags(message)
 
         # Security: validate input (XSS, SQL injection, path traversal)
-        message = validate_string_input(message, max_length=8000, context="chat")
+        message = validate_string_input(message, max_length=8000, context="chat", allow_html=True)
 
         # Security (P1-1): jailbreak speed-bump — defense-in-depth, NOT protection.
         # Sophisticated attackers bypass via Unicode / encoding / chained prompts.
