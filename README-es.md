@@ -16,8 +16,6 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
   <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white" alt="Python"></a>
   <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI"></a>
-  <a href="#soporte-de-plataformas"><img src="https://img.shields.io/badge/macOS-testeado%20✓-000000?logo=apple&logoColor=white" alt="macOS testeado"></a>
-  <a href="#soporte-de-plataformas"><img src="https://img.shields.io/badge/Linux-testeado%20en%20VM%20✓-22c55e?logo=linux&logoColor=white" alt="Linux testeado en VM"></a>
 </p>
 
 <p align="center">
@@ -177,16 +175,11 @@ Descarga el último **[Install Nexe.dmg](https://github.com/jgoy-labs/server-nex
 ### Opción B: Línea de comandos
 
 ```bash
-# Linux (Debian/Ubuntu) — prerrequisitos (una sola vez):
-# sudo apt-get install -y python3-venv python3-dev build-essential
-
 git clone https://github.com/jgoy-labs/server-nexe.git
 cd server-nexe
 ./setup.sh      # instalación guiada (detecta hardware, elige backend y modelo)
-nexe go         # arranca el servidor en el puerto 9119, luego abre http://localhost:9119
+nexe go         # arranca el servidor en el puerto 9119
 ```
-
-> Testeado en Ubuntu 24.04 ARM64 dentro de una VM UTM (Mac Apple Silicon, 8 GB RAM, backend Ollama en CPU).
 
 Una vez en marcha:
 
@@ -333,13 +326,11 @@ Server Nexe incluye un módulo de seguridad activado por defecto:
 | macOS Apple Silicon (M1+) | **Soportado** — los 3 backends | MLX, llama.cpp, Ollama |
 | macOS Intel | **No soportado** desde v0.9.9 | — |
 | macOS 13 Ventura o anterior | **No soportado** desde v0.9.9 (requiere macOS 14 Sonoma+) | — |
-| Linux ARM64 | **Testeado en VM** — Ubuntu 24.04 LTS Desktop ARM64 (UTM en Mac Apple Silicon), 8 GB RAM, backend Ollama (CPU). Hardware ARM64 nativo aún no validado. | llama.cpp, Ollama |
-| Linux x86_64 | Parcial — tests unitarios pasan, CI verde. Instalación nativa aún no validada. | llama.cpp, Ollama |
+| Linux x86_64 | **Parcial** — tests unitarios pasan, CI verde, **NO testeado en producción** | llama.cpp, Ollama |
+| Linux ARM64 | No testeado directamente | llama.cpp, Ollama (teórico) |
 | Windows | No soportado | — |
 
-> **Instalación Linux (CLI, testeada):** clona el repo, ejecuta `./setup.sh` (te guía por backend y modelo), después `nexe go` y abre `http://localhost:9119`. Testeado end-to-end en Ubuntu 24.04 ARM64 dentro de una VM UTM (Mac Apple Silicon, 8 GB RAM, CPU + Ollama). Prerrequisitos en Debian/Ubuntu: `sudo apt-get install -y python3-venv python3-dev build-essential`.
->
-> Desde v0.9.9, el **instalador DMG** requiere **macOS 14 Sonoma+ con Apple Silicon (M1 o superior)** — los wheels pre-construidos en el DMG son `arm64` exclusivos. La instalación CLI es el camino para Linux.
+> Desde v0.9.9, server-nexe requiere **macOS 14 Sonoma+ con Apple Silicon (M1 o superior)**. Los wheels pre-construidos en el DMG son `arm64` exclusivos. Linux con los backends llama.cpp y Ollama debería funcionar pero la auditoría completa de compatibilidad está en la hoja de ruta.
 
 ## Requisitos
 
@@ -444,5 +435,5 @@ Consulta [LICENSE](LICENSE) para los detalles.
 ---
 
 <p align="center">
-  <strong>Versión 1.0.0-beta</strong> · Apache 2.0 · Hecho por <a href="https://www.jgoy.net">Jordi Goy</a> en Barcelona
+  <strong>Versión 1.0.1-beta</strong> · Apache 2.0 · Hecho por <a href="https://www.jgoy.net">Jordi Goy</a> en Barcelona
 </p>

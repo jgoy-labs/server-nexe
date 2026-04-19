@@ -5,7 +5,7 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia de testing i cobertura per a server-nexe 1.0.0-beta. 4842 funcions de test col·lectades (4990 totals, 148 deselected), 0 errors a l'ultima execucio. Tests col·locats amb els moduls. Cobreix estructura de tests, execucio, cobertura real ~85% global, correccions de tests de l'auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultats del mega-test v1/v2 i valoracio honesta de les limitacions del testing."
+abstract: "Estrategia de testing i cobertura per a server-nexe 1.0.1-beta. 4842 funcions de test col·lectades (4990 totals, 148 deselected), 0 errors a l'ultima execucio. Tests col·locats amb els moduls. Cobreix estructura de tests, execucio, cobertura real ~85% global, correccions de tests de l'auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultats del mega-test v1/v2 i valoracio honesta de les limitacions del testing."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Testing — server-nexe 1.0.0-beta
+# Testing — server-nexe 1.0.1-beta
 
 ## Resultats dels tests
 

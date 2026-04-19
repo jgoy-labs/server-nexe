@@ -5,7 +5,7 @@ id: nexe-use-cases
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Casos d'us practics de server-nexe 1.0.0-beta: assistent personal amb memoria, base de coneixement privada, desenvolupament assistit (Cursor/Continue/Zed), cerca semantica, experimentacio amb backends, IA local segura per compliance. Inclou guia de quan server-nexe TE sentit (privacitat, offline, control) i quan NO (multi-usuari, models frontier, hardware limitat, fine-tuning, SLA)."
+abstract: "Casos d'us practics de server-nexe 1.0.1-beta: assistent personal amb memoria, base de coneixement privada, desenvolupament assistit (Cursor/Continue/Zed), cerca semantica, experimentacio amb backends, IA local segura per compliance. Inclou guia de quan server-nexe TE sentit (privacitat, offline, control) i quan NO (multi-usuari, models frontier, hardware limitat, fine-tuning, SLA)."
 tags: [use-cases, casos-d-us, assistent, rag, cursor, continue, zed, api, privacy, local, compliance, privacidad]
 chunk_size: 600
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Casos d'us — server-nexe 1.0.0-beta
+# Casos d'us — server-nexe 1.0.1-beta
 
 server-nexe esta pensat per a escenaris on **privacitat, control local i memoria persistent** tenen valor concret. Aquesta es la llista dels casos d'us mes testejats, amb context practic per a cada un.
 

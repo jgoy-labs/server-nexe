@@ -5,7 +5,7 @@ id: nexe-errors-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Errors comuns i solucions per a server-nexe 1.0.0-beta. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, streaming, errors d'encriptacio i fixes de Bug #19 (MEK fallback, personal_memory wipe)."
+abstract: "Errors comuns i solucions per a server-nexe 1.0.1-beta. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, streaming, errors d'encriptacio i fixes de Bug #19 (MEK fallback, personal_memory wipe)."
 tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, streaming, encryption]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Errors comuns — server-nexe 1.0.0-beta
+# Errors comuns — server-nexe 1.0.1-beta
 
 ## Errors d'instal·lacio
 
@@ -156,7 +156,7 @@ El menú del tray (veure `INSTALLATION.md` — App de safata (NexeTray, macOS)) 
 
 ### Què incloure al report (GitHub Issue)
 
-- **Versió**: la veuràs al menú del tray com a `server.nexe v1.0.0-beta` (o executa `./nexe --version`)
+- **Versió**: la veuràs al menú del tray com a `server.nexe v1.0.1-beta` (o executa `./nexe --version`)
 - **SO + hardware**: `sw_vers` i `uname -m` (M1/M2/M3/M4)
 - **Backend actiu**: MLX / llama.cpp / Ollama (el veus a `/ui/backends` o al tray)
 - **Model en ús**: nom del model carregat

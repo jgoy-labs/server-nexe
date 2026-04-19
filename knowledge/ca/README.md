@@ -17,13 +17,13 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# server-nexe 1.0.0-beta — Servidor d'IA local amb memoria persistent
+# server-nexe 1.0.1-beta — Servidor d'IA local amb memoria persistent
 
-**Versio:** 1.0.0-beta
+**Versio:** 1.0.1-beta
 **Port per defecte:** 9119
 **Autor:** Jordi Goy (Barcelona)
 **Llicencia:** Apache 2.0
-**Plataformes:** macOS 14 Sonoma+ Apple Silicon (M1+) — testejat. Linux ARM64 (Ubuntu 24.04, testejat a VM via UTM en Mac Apple Silicon, CPU + Ollama). Linux x86_64 (parcial).
+**Plataformes:** macOS 14 Sonoma+ Apple Silicon (M1+) — testejat. Linux x86_64 (parcial).
 **Web:** https://server-nexe.org | https://server-nexe.com
 
 ## Que es server-nexe
@@ -185,8 +185,7 @@ Autenticacio requerida: capcalera `X-API-Key` amb el valor de `.env` (`NEXE_PRIM
 | macOS 14 Sonoma+ Apple Silicon (M1+) | Testejat (tots 3 backends) |
 | macOS 13 Ventura | **NO suportat** (eliminat a v0.9.9) |
 | macOS Intel | **NO suportat** (eliminat a v0.9.9 — wheels arm64-only) |
-| Linux ARM64 | Testejat a VM (Ubuntu 24.04 via UTM en Mac Apple Silicon, 8 GB RAM, CPU + Ollama). Hardware natiu encara no validat. |
-| Linux x86_64 | Parcial (tests unitaris passen, CI verd, instal·lacio nativa encara no validada) |
+| Linux x86_64 | Parcial (tests unitaris passen, CI verd, no testejat en produccio) |
 | Windows | Encara no suportat |
 
 ## Limitacions actuals
@@ -220,4 +219,4 @@ Altres documents de coneixement en aquesta carpeta:
 - Documentacio: https://server-nexe.org
 - Web comercial: https://server-nexe.com
 - Autor: https://jgoy.net
-- Suport: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/servernexe | https://buy.stripe.com/14A6oHct34lN5x7fKNgQE00
+- Suport: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/jgoylabs

@@ -5,7 +5,7 @@ id: nexe-security-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Seguretat de server-nexe 1.0.0-beta: autenticacio dual-key, rate limiting (incl. PATCH thinking 10/min i NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectors d'injeccio, 47 patrons jailbreak, capsaleres OWASP, logging RFC5424, encriptacio AES-256-GCM at-rest (SQLCipher, sessions .enc), MEK fallback order (file->keyring->env->generate), sanititzacio RAG injection (_filter_rag_injection). Tot local, zero crides externes."
+abstract: "Seguretat de server-nexe 1.0.1-beta: autenticacio dual-key, rate limiting (incl. PATCH thinking 10/min i NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectors d'injeccio, 47 patrons jailbreak, capsaleres OWASP, logging RFC5424, encriptacio AES-256-GCM at-rest (SQLCipher, sessions .enc), MEK fallback order (file->keyring->env->generate), sanititzacio RAG injection (_filter_rag_injection). Tot local, zero crides externes."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher, local, privacy]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Seguretat — server-nexe 1.0.0-beta
+# Seguretat — server-nexe 1.0.1-beta
 
 ## Taula de continguts
 
@@ -49,7 +49,7 @@ expires: null
 - [Checklist de seguretat](#checklist-de-seguretat)
 - [Informar de vulnerabilitats](#informar-de-vulnerabilitats)
 
-server-nexe 1.0.0-beta esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
+server-nexe 1.0.1-beta esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
 
 ## Autenticacio
 

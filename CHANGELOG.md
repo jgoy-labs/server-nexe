@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 _No changes yet._
 
+## [1.0.1-beta] - 2026-04-20
+
+### Added
+
+- **Linux ARM64 support** documented (tested via UTM, Ubuntu 24.04).
+- **Installer: bundled Ollama offline** + fixed model tier threshold.
+- **Memory: delete confirmation flow**, atomic fact splitter, VLM role fixes.
+
+### Fixed
+
+- **Installer (Linux)**: copy to `~/.local/share/nexe/` when source is Downloads dir (avoids permission issues).
+
+### Changed
+
+- Dependency security bumps from gitoss sync: `fastapi`, `python-multipart`, `pytest`.
+- Version metadata bumped from `1.0.0-beta` to `1.0.1-beta` (pyproject, personality/server.toml, READMEs, SECURITY, CONTRIBUTING, installer Info.plist, knowledge base).
+- Plugin-owned versions (`plugins/*/manifest.toml` and `plugins/*/module.py`) untouched: plugins follow their own release cycle (version = codi introduït), independent of product bumps.
+
 ## [1.0.0-beta] - 2026-04-16
 
 ### Summary

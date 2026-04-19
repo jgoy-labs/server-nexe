@@ -5,7 +5,7 @@ id: nexe-usage-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "How to use server-nexe 1.0.0-beta: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119) with thinking toggle, automatic MEM_SAVE memory, MEM_DELETE (threshold 0.20) with 2-turn clear_all confirmation, PDF/TXT document upload, encryption commands. API examples with curl and Python. How to install models, change language (NEXE_LANG), manage memory."
+abstract: "How to use server-nexe 1.0.1-beta: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119) with thinking toggle, automatic MEM_SAVE memory, MEM_DELETE (threshold 0.20) with 2-turn clear_all confirmation, PDF/TXT document upload, encryption commands. API examples with curl and Python. How to install models, change language (NEXE_LANG), manage memory."
 tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption, how-to, commands]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Usage Guide — server-nexe 1.0.0-beta
+# Usage Guide — server-nexe 1.0.1-beta
 
 ## Table of contents
 

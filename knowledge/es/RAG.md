@@ -5,7 +5,7 @@ id: nexe-rag-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v1.0.0-beta). Cubre 3 colecciones Qdrant con thresholds, memoria automatica MEM_SAVE, intent de borrado (DELETE_THRESHOLD 0.20 post-Bug #18), subida de documentos con aislamiento por sesion, embeddings (768D, fastembed ONNX principal offline), parametros de chunking, construccion de contexto con etiquetas i18n, visualizacion de pesos RAG, sanitizacion RAG injection (_filter_rag_injection), confirmacion clear_all 2-turnos, precomputed KB embeddings, poda inteligente, deduplicacion, TextStore para texto encriptado y payloads de Qdrant sin texto."
+abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v1.0.1-beta). Cubre 3 colecciones Qdrant con thresholds, memoria automatica MEM_SAVE, intent de borrado (DELETE_THRESHOLD 0.20 post-Bug #18), subida de documentos con aislamiento por sesion, embeddings (768D, fastembed ONNX principal offline), parametros de chunking, construccion de contexto con etiquetas i18n, visualizacion de pesos RAG, sanitizacion RAG injection (_filter_rag_injection), confirmacion clear_all 2-turnos, precomputed KB embeddings, poda inteligente, deduplicacion, TextStore para texto encriptado y payloads de Qdrant sin texto."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Sistema RAG — server-nexe 1.0.0-beta
+# Sistema RAG — server-nexe 1.0.1-beta
 
 ## Tabla de contenidos
 
