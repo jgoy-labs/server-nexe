@@ -23,7 +23,7 @@ expires: null
 **Port per defecte:** 9119
 **Autor:** Jordi Goy (Barcelona)
 **Llicencia:** Apache 2.0
-**Plataformes:** macOS 14 Sonoma+ Apple Silicon (M1+) — testejat. Linux x86_64 (parcial).
+**Plataformes:** macOS 14 Sonoma+ Apple Silicon (M1+) — testejat. Linux ARM64 (Ubuntu 24.04, testejat a VM via UTM en Mac Apple Silicon, CPU + Ollama). Linux x86_64 (parcial).
 **Web:** https://server-nexe.org | https://server-nexe.com
 
 ## Que es server-nexe
@@ -185,7 +185,8 @@ Autenticacio requerida: capcalera `X-API-Key` amb el valor de `.env` (`NEXE_PRIM
 | macOS 14 Sonoma+ Apple Silicon (M1+) | Testejat (tots 3 backends) |
 | macOS 13 Ventura | **NO suportat** (eliminat a v0.9.9) |
 | macOS Intel | **NO suportat** (eliminat a v0.9.9 — wheels arm64-only) |
-| Linux x86_64 | Parcial (tests unitaris passen, CI verd, no testejat en produccio) |
+| Linux ARM64 | Testejat a VM (Ubuntu 24.04 via UTM en Mac Apple Silicon, 8 GB RAM, CPU + Ollama). Hardware natiu encara no validat. |
+| Linux x86_64 | Parcial (tests unitaris passen, CI verd, instal·lacio nativa encara no validada) |
 | Windows | Encara no suportat |
 
 ## Limitacions actuals

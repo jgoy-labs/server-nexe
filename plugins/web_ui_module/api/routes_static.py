@@ -21,6 +21,12 @@ from plugins.web_ui_module.messages import get_message, get_i18n
 logger = logging.getLogger(__name__)
 
 
+try:
+    from core.version import __version__ as _NEXE_VERSION
+except Exception:
+    _NEXE_VERSION = "unknown"
+
+
 def register_static_routes(router: APIRouter, *, module_ref):
     """Register endpoints: GET / (HTML), GET /static/{filename}"""
 
@@ -41,6 +47,7 @@ def register_static_routes(router: APIRouter, *, module_ref):
         # Cache-bust: append ?v=timestamp to CSS and JS so the browser reloads them
         html = html.replace('.css"', f'.css?v={_BOOT_TS}"')
         html = html.replace('.js"', f'.js?v={_BOOT_TS}"')
+        html = html.replace('{{NEXE_VERSION}}', f'v{_NEXE_VERSION}')
         return HTMLResponse(content=html)
 
     # -- GET /static/{filename:path} --

@@ -46,6 +46,27 @@ expires: null
 
 ---
 
+## Nexe Icon in the Menu Bar (tray)
+
+The Nexe icon appears next to the clock (macOS menu bar). It lets you control the server without opening a terminal.
+
+**Menu options:**
+
+| Option | What it does |
+|--------|-------------|
+| Stop / Start server | Start or stop Nexe with one click |
+| Open Web UI | Opens the chat in the browser (`http://127.0.0.1:9119/ui`) |
+| Open logs | Shows the log file if there are errors |
+| Server RAM | Shows how much memory the loaded model is using |
+| Uptime | How long the server has been running |
+| Documentation | Opens the official documentation |
+| Settings → Uninstall Nexe | Removes Nexe with an automatic backup |
+| Quit | Stops the server and closes the tray icon |
+
+The icon is **green** when the server is running and **grey** when stopped. It refreshes every 5 seconds.
+
+---
+
 ## Starting the Server
 
 ```bash

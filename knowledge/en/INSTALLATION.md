@@ -35,7 +35,7 @@ Two installation methods available. Choose based on your platform and preference
 
 | Requirement | Minimum | Recommended |
 |------------|---------|-------------|
-| OS | **macOS 14 Sonoma** (Apple Silicon) / Linux x86_64 (partial) | macOS 14+ (Apple Silicon M1+) |
+| OS | **macOS 14 Sonoma** (Apple Silicon) / Linux ARM64 Ubuntu 24.04 (tested in VM) / Linux x86_64 (partial) | macOS 14+ (Apple Silicon M1+) |
 | CPU | **Apple Silicon (M1+) required** — Intel NOT supported | M2 Pro / M3 Pro / M4 |
 | RAM | 8 GB | 16+ GB |
 | Disk | 10 GB free | 20+ GB (for larger models) |
@@ -103,6 +103,9 @@ Download the DMG from the GitHub releases page: https://github.com/jgoy-labs/ser
 For users who prefer terminal installation or are on Linux.
 
 ```bash
+# Linux (Debian/Ubuntu) — one-time prerequisites:
+# sudo apt-get install -y python3-venv python3-dev build-essential
+
 git clone https://github.com/jgoy-labs/server-nexe
 cd server-nexe
 ./setup.sh
@@ -111,6 +114,10 @@ cd server-nexe
 `setup.sh` detects your platform:
 - **macOS:** Checks Homebrew, Python 3.11+, creates venv, installs requirements.txt + requirements-macos.txt (rumps for tray)
 - **Linux:** Suggests apt/dnf packages, creates venv, installs requirements.txt only
+
+### Linux install — tested environment
+
+Tested end-to-end on Ubuntu 24.04.4 LTS Desktop ARM64 inside a UTM virtual machine on an Apple Silicon Mac (8 GB RAM assigned, Ollama backend on CPU). The installer auto-detects download/temp directories and relocates the install to `~/.local/share/nexe/` (XDG-compliant). Native Linux ARM64/x86_64 hardware is not yet validated.
 
 After setup:
 ```bash

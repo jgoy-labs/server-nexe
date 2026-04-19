@@ -16,6 +16,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
   <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white" alt="Python"></a>
   <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI"></a>
+  <a href="#platform-support"><img src="https://img.shields.io/badge/macOS-tested%20✓-000000?logo=apple&logoColor=white" alt="macOS tested"></a>
+  <a href="#platform-support"><img src="https://img.shields.io/badge/Linux-tested%20in%20VM%20✓-22c55e?logo=linux&logoColor=white" alt="Linux tested in VM"></a>
 </p>
 
 <p align="center">
@@ -175,11 +177,16 @@ Download the latest **[Install Nexe.dmg](https://github.com/jgoy-labs/server-nex
 ### Option B: Command Line
 
 ```bash
+# Linux (Debian/Ubuntu) — one-time prerequisites:
+# sudo apt-get install -y python3-venv python3-dev build-essential
+
 git clone https://github.com/jgoy-labs/server-nexe.git
 cd server-nexe
 ./setup.sh      # guided installation (detects hardware, picks backend & model)
-nexe go         # start server on port 9119
+nexe go         # start server on port 9119, then open http://localhost:9119
 ```
+
+> Tested on Ubuntu 24.04 ARM64 in a UTM VM (Apple Silicon Mac, 8 GB RAM, Ollama backend on CPU).
 
 Once running:
 
@@ -327,11 +334,13 @@ Server Nexe includes a security module enabled by default:
 | macOS Apple Silicon (M1+) | **Supported** — all 3 backends | MLX, llama.cpp, Ollama |
 | macOS Intel | **Not supported** since v0.9.9 | — |
 | macOS 13 Ventura or earlier | **Not supported** since v0.9.9 (requires macOS 14 Sonoma+) | — |
-| Linux x86_64 | **Partial** — unit tests pass, CI green, **NOT tested in production** | llama.cpp, Ollama |
-| Linux ARM64 | Not directly tested | llama.cpp, Ollama (theoretical) |
+| Linux ARM64 | **Tested in VM** — Ubuntu 24.04 LTS Desktop ARM64 (UTM on Apple Silicon Mac), 8 GB RAM, Ollama backend (CPU). Native ARM64 hardware not yet validated. | llama.cpp, Ollama |
+| Linux x86_64 | Partial — unit tests pass, CI green. Native install not yet validated. | llama.cpp, Ollama |
 | Windows | Not supported | — |
 
-> Since v0.9.9, server-nexe requires **macOS 14 Sonoma+ with Apple Silicon (M1 or later)**. The pre-built wheels in the DMG are `arm64` exclusive. Linux with the llama.cpp and Ollama backends should work, but the full compatibility audit is on the roadmap.
+> **Linux install (CLI, tested):** clone the repo, run `./setup.sh` (guides you through backend & model selection), then `nexe go` and open `http://localhost:9119`. Tested end-to-end on Ubuntu 24.04 ARM64 in a UTM VM (Apple Silicon Mac, 8 GB RAM, CPU + Ollama). Prerequisites on Debian/Ubuntu: `sudo apt-get install -y python3-venv python3-dev build-essential`.
+>
+> Since v0.9.9, the **DMG installer** requires **macOS 14 Sonoma+ with Apple Silicon (M1 or later)** — pre-built wheels in the DMG are `arm64` exclusive. The CLI install is the path for Linux.
 
 ## Requirements
 
@@ -344,7 +353,7 @@ Server Nexe includes a security module enabled by default:
 | **Disk** | 10 GB free | 20 GB+ free |
 
 > **Intel Macs and macOS 13 Ventura are no longer supported.** Apple Silicon only (arm64).
-> **Linux**: Works with llama.cpp and Ollama backends. Full Linux compatibility audit is on the roadmap.
+> **Linux**: Tested via CLI install on Ubuntu 24.04 ARM64 in a VM (UTM on Apple Silicon, 8 GB RAM, CPU + Ollama). Full Linux compatibility audit on native hardware is still on the roadmap.
 
 ## Testing
 

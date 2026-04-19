@@ -84,6 +84,95 @@ _REPROMPT_OVERRIDE = {
 }
 
 
+_ATOMIZER_SYSTEM = {
+    "ca": "Ets un separador de fets. Separa el fet en fets atòmics, UN per línia. Si ja és atòmic, retorna'l tal com és. Mai afegeixis explicacions — sols els fets.",
+    "es": "Eres un separador de hechos. Separa el hecho en hechos atómicos, UNO por línea. Si ya es atómico, devuélvelo tal cual. Nunca añadas explicaciones.",
+    "en": "You are a fact splitter. Split the fact into atomic facts, ONE per line. If already atomic, return it as-is. Never add explanations.",
+}
+
+
+async def _atomize_fact_llm(fact: str, engine, model_name: str, sig, lang: str = "ca") -> list:
+    """LLM-based atomizer: splits a combined fact into atomic facts.
+
+    Uses the already-loaded model with a minimal 2-message call.
+    Falls back to [fact] unchanged if the LLM call fails or returns nothing useful.
+    Only fires when the fact contains a conjunction ( i / y / and ).
+    """
+    if not _re.search(r'\s+(?:i|y|and)\s+', fact, _re.IGNORECASE):
+        return [fact]
+    system = _ATOMIZER_SYSTEM.get(lang[:2], _ATOMIZER_SYSTEM["en"])
+    msgs = [{"role": "system", "content": system}, {"role": "user", "content": fact}]
+    try:
+        gen = engine.chat(model=model_name, messages=msgs, stream=True, thinking_enabled=False) \
+              if 'model' in sig.parameters \
+              else engine.chat(messages=msgs, stream=True, thinking_enabled=False)
+        raw = ""
+        async for chunk in gen:
+            if isinstance(chunk, dict) and "message" in chunk:
+                raw += chunk["message"].get("content", "")
+            elif isinstance(chunk, dict):
+                raw += chunk.get("content", chunk.get("response", ""))
+            elif isinstance(chunk, str):
+                raw += chunk
+        lines = [l.strip() for l in raw.strip().splitlines() if l.strip() and len(l.strip()) >= 5]
+        if lines:
+            logger.info("Atomizer split '%s' → %d facts", fact[:60], len(lines))
+            return lines
+    except Exception as e:
+        logger.debug("Atomizer LLM failed (%s), keeping fact as-is", e)
+    return [fact]
+
+
+_ATOMIC_SUBJECT_CA = _re.compile(r"^(L'usuari[a]?|El usuari[a]?)\s+", _re.IGNORECASE)
+_ATOMIC_SUBJECT_ES = _re.compile(r"^(El usuario|La usuaria)\s+", _re.IGNORECASE)
+_ATOMIC_SUBJECT_EN = _re.compile(r"^(The user|User)\s+", _re.IGNORECASE)
+# Verbs que inicien un PREDICAT NOU — discriminen "i té 8 anys" (split) de "i els macarrons" (llista)
+_ATOMIC_SPLIT_CA = _re.compile(
+    r"\s+i\s+(?=(?:té|es diu|li agrada|li agraden|viu|treballa|estudia|és|fa|ha|parla|prefereix|utilitza|coneix|vol|sap|necessita|juga|llegeix|escriu|porta)\b)",
+    _re.IGNORECASE,
+)
+_ATOMIC_SPLIT_ES = _re.compile(
+    r"\s+y\s+(?=(?:tiene|se llama|le gusta|le gustan|vive|trabaja|estudia|es|hace|ha|habla|prefiere|utiliza|conoce|quiere|sabe|necesita|juega|lee|escribe|lleva)\b)",
+    _re.IGNORECASE,
+)
+_ATOMIC_SPLIT_EN = _re.compile(
+    r"\s+and\s+(?=(?:is|has|lives|works|studies|likes|prefers|uses|knows|speaks|understands|plays|reads|writes|does|wants|needs|wears)\b)",
+    _re.IGNORECASE,
+)
+
+
+def _split_atomic_fact(fact: str) -> list:
+    """Split a combined MEM_SAVE fact into atomic facts when safe to do so.
+
+    Example: "L'usuari es diu Aran i té 8 anys"
+         →  ["L'usuari es diu Aran", "L'usuari té 8 anys"]
+    Non-split: "L'usuari li agrada la vainilla i els macarrons"  (list, not two predicates)
+    """
+    for split_re, subject_re in (
+        (_ATOMIC_SPLIT_CA, _ATOMIC_SUBJECT_CA),
+        (_ATOMIC_SPLIT_ES, _ATOMIC_SUBJECT_ES),
+        (_ATOMIC_SPLIT_EN, _ATOMIC_SUBJECT_EN),
+    ):
+        m = subject_re.match(fact)
+        if not m:
+            continue
+        parts = split_re.split(fact)
+        if len(parts) < 2:
+            continue
+        subject = m.group(1)
+        result = []
+        for i, part in enumerate(parts):
+            part = part.strip()
+            if not part:
+                continue
+            if i > 0 and not subject_re.match(part):
+                part = f"{subject} {part}"
+            result.append(part)
+        if len(result) >= 2:
+            return result
+    return [fact]
+
+
 def _is_valid_mem_save_text(text: str, user_input: str = "") -> bool:
     """
     Bug 17 — Valida estrictament el text d'un MEM_SAVE extret del LLM.
@@ -190,6 +279,7 @@ def compute_context_budget(
 def _extract_safe_mem_saves(text: str, user_input: str = "") -> list:
     """
     Bug 17 — Extreu i valida tots els [MEM_SAVE: ...] d'un text de manera segura.
+    Aplica atomicity splitting: [MEM_SAVE: X i Y] → [X, Y] quan Y és un predicat nou.
 
     Returns:
         Llista de strings vàlids per guardar (potencialment buida).
@@ -197,7 +287,15 @@ def _extract_safe_mem_saves(text: str, user_input: str = "") -> list:
     if not isinstance(text, str) or not text:
         return []
     matches = _MEM_SAVE_STRICT_RE.findall(text)
-    return [m.strip() for m in matches if _is_valid_mem_save_text(m, user_input)]
+    result = []
+    for m in matches:
+        m = m.strip()
+        if not _is_valid_mem_save_text(m, user_input):
+            continue
+        for atomic in _split_atomic_fact(m):
+            if _is_valid_mem_save_text(atomic, user_input):
+                result.append(atomic)
+    return result
 
 
 def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
@@ -858,6 +956,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         if stream:
                             async def response_generator():
                                 full_response = ""
+                                _mem_saves = []  # init here so fallback extractor never hits UnboundLocalError
                                 _safe_model = str(model_name).replace("\x00", "").replace("]", "")[:100]
                                 yield f"\x00[MODEL:{_safe_model}]\x00"
                                 if rag_count > 0:
@@ -1028,30 +1127,42 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 clean_response = _OBLIT_RE.sub(
                                     lambda m: f'[MEM_DELETE: {m.group(2)}]', clean_response
                                 )
-                                # Bug 18: Extract [MEM_DELETE: ...] i executar esborrat real
+                                # Bug 18: Extract [MEM_DELETE: ...] — no esborrem immediatament.
+                                # Emitem PENDING_DELETE perquè el frontend mostri confirmació.
+                                # L'esborrat real passa a POST /ui/memory/confirm-delete.
                                 _mem_deletes = _MEM_DELETE_RE.findall(clean_response)
                                 if _mem_deletes:
                                     clean_response = _re.sub(r'\[MEM_DELETE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
-                                    _del_total = 0
                                     for _del_fact in _mem_deletes:
                                         _del_fact = _del_fact.strip()
                                         if not _del_fact or len(_del_fact) < 3:
                                             continue
-                                        try:
-                                            _del_result = await memory_helper.delete_from_memory(_del_fact)
-                                            if _del_result["success"] and _del_result.get("deleted", 0) > 0:
-                                                _del_total += _del_result["deleted"]
-                                                _del_facts = _del_result.get("deleted_facts", [])
-                                                if _del_facts:
-                                                    session._recently_deleted_facts = getattr(session, '_recently_deleted_facts', []) + [f["text"] for f in _del_facts]
-                                                logger.info("MEM_DELETE (model tag): deleted %d for '%s'", _del_result["deleted"], _del_fact[:80])
-                                            else:
-                                                logger.info("MEM_DELETE (model tag): no match for '%s'", _del_fact[:80])
-                                        except Exception as e:
-                                            logger.warning("MEM_DELETE failed: %s", e)
-                                    if _del_total > 0:
-                                        _mem_deleted += _del_total
-                                        yield f"\x00[DEL:{_del_total}]\x00"
+                                        logger.info("MEM_DELETE (model tag): pending confirmation for '%s'", _del_fact[:80])
+                                        _encoded = _del_fact.replace('|', '\\|')
+                                        yield f"\x00[PENDING_DELETE:{_encoded}]\x00"
+                                # Strip context block headers that models occasionally echo verbatim
+                                _CTX_HEADERS = _re.compile(
+                                    r'\[(?:CONTEXT|FI CONTEXT|MEMORIA DE L\'USUARI|MEMORIA DEL USUARIO|'
+                                    r'USER MEMORY|DOCUMENTACI[ÓO] DEL SISTEMA|SYSTEM DOCUMENTATION|'
+                                    r'DOCUMENTACI[ÓO] T[EÈ]CNICA|TECHNICAL DOCUMENTATION|'
+                                    r'DOCUMENT ADJUNTAT|FI DOCUMENT)\]',
+                                    _re.IGNORECASE
+                                )
+                                clean_response = _CTX_HEADERS.sub('', clean_response).strip()
+                                # Fallback extractor: models (e.g. Gemma-3 VLM) that say
+                                # "He recordat que [fact]" without emitting [MEM_SAVE:].
+                                # Only fires when _mem_saves is empty (i.e. model didn't tag).
+                                # Only extracts facts that start with known subject prefixes.
+                                _REMEMBERED_RE = _re.compile(
+                                    r'(?:He recordat que|He recordado que|I\'ve remembered that|I have remembered that)\s+'
+                                    r'((?:L\'usuari|El usuario|The user|l\'usuari|el usuario|the user)\s+[^.!?\n]{8,150})',
+                                    _re.IGNORECASE
+                                )
+                                if not _mem_saves:
+                                    for _rm in _REMEMBERED_RE.finditer(clean_response):
+                                        _extracted = _rm.group(1).strip().rstrip('.,!?')
+                                        if _extracted and _is_valid_mem_save_text(_extracted):
+                                            _mem_saves.append(_extracted)
                                 # Bug 17: Extract [MEM_SAVE: ...] facts amb validacio estricta.
                                 # _extract_safe_mem_saves filtra per format/longitud/whitelist
                                 # i rebutja MEM_SAVE que copien el missatge usuari.
@@ -1112,6 +1223,22 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             logger.info("Re-prompt fallback: confirmation message")
 
                                 if clean_response:
+                                    # Atomize facts with LLM before saving
+                                    if _mem_saves:
+                                        yield "\x00[SAVING]\x00"
+                                        _lang_short = _lang[:2] if _lang else "ca"
+                                        _atomized = []
+                                        for _raw_fact in _mem_saves:
+                                            _raw_fact = _raw_fact.strip()
+                                            if not _raw_fact:
+                                                continue
+                                            try:
+                                                _parts = await _atomize_fact_llm(_raw_fact, engine, model_name, sig, lang=_lang_short)
+                                                _atomized.extend(_parts)
+                                            except Exception:
+                                                _atomized.append(_raw_fact)
+                                        _mem_saves = _atomized
+
                                     # Save LLM-extracted facts to memory
                                     _mem_saved_count = 0
                                     # Junk patterns: false facts the model may generate

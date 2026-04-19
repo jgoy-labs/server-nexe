@@ -46,6 +46,27 @@ expires: null
 
 ---
 
+## Icono de Nexe en la barra de menú (tray)
+
+El icono de Nexe aparece junto al reloj (barra de menú de macOS). Permite controlar el servidor sin abrir ningún terminal.
+
+**Opciones del menú:**
+
+| Opción | Qué hace |
+|--------|----------|
+| Parar / Iniciar servidor | Enciende o apaga Nexe con un clic |
+| Abrir Web UI | Abre el chat en el navegador (`http://127.0.0.1:9119/ui`) |
+| Abrir logs | Muestra el fichero de logs si hay errores |
+| Server RAM | Muestra cuánta memoria usa el modelo cargado |
+| Tiempo activo | Cuánto tiempo lleva el servidor en marcha |
+| Documentación | Abre la documentación oficial |
+| Configuración → Desinstalar Nexe | Elimina Nexe con copia de seguridad automática |
+| Salir | Para el servidor y cierra el icono del tray |
+
+El icono es **verde** cuando el servidor está activo y **gris** cuando está parado. Se refresca cada 5 segundos.
+
+---
+
 ## Iniciar el servidor
 
 ```bash

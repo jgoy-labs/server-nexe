@@ -157,6 +157,7 @@ class MLXChatNode:
                 MLXChatNode._config.model_path != self.config.model_path):
             MLXChatNode._config = self.config
             MLXChatNode._model = None  # Force reload
+            MLXChatNode._is_vlm = False  # Reset: will be re-detected during _get_model()
 
     def _get_model(self) -> tuple:
         """
@@ -230,13 +231,10 @@ class MLXChatNode:
 
         try:
             # VLM path: si el model és VLM, tota la generació passa per mlx_vlm.
-            # Decideixo sobre el path (no sobre _is_vlm singleton) perquè al
-            # primer request el model encara no està carregat i el flag és
-            # False per defecte → la bifurcació aniria erròniament al blocking
-            # path (que usa tokenizer.encode del processor VLM, sense encode).
-            is_vlm = MLXChatNode._is_vlm or _detect_vlm_capability(
-                self.config.model_path
-            )
+            # Usem _detect_vlm_capability (llegeix config.json del model actual) com
+            # a font primària — és sempre fresca i no depèn del singleton _is_vlm
+            # que pot quedar obsolet en canviar de model VLM → text dins la mateixa sessió.
+            is_vlm = _detect_vlm_capability(self.config.model_path)
             if is_vlm:
                 result = await asyncio.to_thread(
                     self._generate_vlm,
