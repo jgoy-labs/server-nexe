@@ -1791,7 +1791,7 @@ class NexeUI {
                                 el.id = 'nexe-mem-saving';
                                 el.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted,#888);margin-left:8px';
                                 el.textContent = `⏳ ${this.t('mem_saving')}`;
-                                const statsBar = responseEl && responseEl.parentElement && responseEl.parentElement.querySelector('.message-stats');
+                                const statsBar = assistantMessageDiv && assistantMessageDiv.parentElement && assistantMessageDiv.parentElement.querySelector('.message-stats');
                                 if (statsBar) statsBar.appendChild(el);
                             }
                         }
