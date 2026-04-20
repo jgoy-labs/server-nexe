@@ -75,7 +75,7 @@ def detect_sql_injection(text: str) -> bool:
   sql_patterns = [
     r'\b(union|select|insert|update|delete|drop|create|alter)\b.*\bfrom\b',
     r';\s*(drop|delete|update|insert)',
-    r'--\s',
+    r'[\'"]\s*--',
     r'/\*.*\*/',
     r"'\s*(or|and)\s*'?\d+'\s*=",
     r'\bexec\b',

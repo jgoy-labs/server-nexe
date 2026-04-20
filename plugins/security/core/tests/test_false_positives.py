@@ -97,6 +97,15 @@ def _assert_not_blocked(message, description):
     ("el preu és 19.99€ o $24.50", "Preus amb símbols"),
     ("la IP del servidor és 192.168.1.100", "Adreça IP"),
     ("truca'm al +34 612 345 678", "Número de telèfon"),
+
+    # Separadors i signatures d'email (dos guions seguits de whitespace)
+    (
+        "Un saludo, Jordi\n\n----------------------------\n\nMi respuesta.\nHola!",
+        "Separador visual amb guions (cas real correu de seguiment)"
+    ),
+    ("Salutacions,\n-- \nJordi Goy", "Signatura RFC 3676 (-- + espai + newline)"),
+    ("text natural -- amb em-dash -- entre paraules", "Em-dash en conversa natural"),
+    ("opcions: -- primera -- segona -- tercera", "Guions separadors en enumeracio"),
 ])
 def test_normal_message_not_blocked(message, description):
     """Missatge normal d'usuari NO ha de ser bloquejat en context chat."""
