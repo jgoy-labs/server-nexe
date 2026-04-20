@@ -13,7 +13,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from fastapi import APIRouter
 from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
@@ -41,8 +41,12 @@ class WebUIModule:
     def __init__(self):
         self._initialized = False
         self._router = None
-        # SINGLETON: una sola instancia de SessionManager (fix F5)
-        self.session_manager = SessionManager()
+        # SessionManager es crea a initialize() un cop crypto_provider esta
+        # disponible. Crear-lo aqui sense crypto seguit d'un reemplacament mes
+        # tard generava dues instancies divergents (bug: el router podia
+        # capturar la referencia vella sense crypto, deixant sessions .enc
+        # invisibles al UI i guardant les noves sense encriptar).
+        self.session_manager: Optional[SessionManager] = None
         # Paths — disponibles immediatament per create_router
         self._plugin_dir = Path(__file__).parent
         self.ui_dir = self._plugin_dir / "ui"
@@ -70,14 +74,14 @@ class WebUIModule:
             return True
 
         try:
-            # Re-create SessionManager with crypto if available
+            # Create the one and only SessionManager, with crypto if available.
+            crypto = None
             try:
                 from core.lifespan import get_server_state
                 crypto = get_server_state().crypto_provider
-                if crypto:
-                    self.session_manager = SessionManager(crypto_provider=crypto)
             except Exception:
-                pass  # Keep original SessionManager without crypto
+                crypto = None
+            self.session_manager = SessionManager(crypto_provider=crypto)
 
             # Resolve API base URL
             self.api_base_url = self._resolve_api_base_url(context)
@@ -141,7 +145,7 @@ class WebUIModule:
             "name": self.metadata.name,
             "version": self.metadata.version,
             "initialized": self._initialized,
-            "sessions": len(self.session_manager.list_sessions()),
+            "sessions": len(self.session_manager.list_sessions()) if self.session_manager else 0,
             "type": self.metadata.module_type,
         }
 
