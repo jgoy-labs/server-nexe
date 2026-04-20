@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-_No changes yet._
+### Fixed
+
+- **Security filter: SQL detector false positives on natural text** (`plugins/security/core/injection_detectors.py`). The pattern `r'--\s'` triggered on legitimate user input such as email visual separators (`----------`), RFC 3676 signature delimiters (`-- \n`), em-dashes in prose and dash-separated enumerations. Chat messages containing any of these returned HTTP 400 "SQL detected" at `/ui/chat`. Replaced with `r'[\'"]\s*--'`, which only matches the quote-dashdash signature of real SQL comment injection attacks. All 5 real SQL attacks in `test_real_attacks_still_blocked` remain blocked via other patterns. 4 regression tests added covering the natural-text cases.
+- **UI: LaTeX math notation in chat output** (`plugins/web_ui_module/core/latex_sanitizer.py`, `plugins/web_ui_module/api/routes_chat.py`, `personality/server.toml`). Some models (notably Gemma-4-31B-8bit) emit LaTeX like `$\rightarrow$`, `$\times 2$`, `$\sqrt{x}$` and `\pi` in normal chat answers; the web UI renders Markdown via `marked.js` with no LaTeX engine, so users saw literal strings. Fixed server-side at the streaming boundary so web UI + future clients all benefit, without shipping KaTeX or any JS dependency. New `latex_to_unicode()` (two-pass inline-span + bare-command substitution, ~35 commands covered) and `LatexStreamBuffer` for chunked streams (retains trailing incomplete `\letters` and unclosed `$` so tokens split across chunks are reassembled before substitution). Currency (`$24.50`), shell variables (`$HOME`) and bare dollars survive untouched. FORMAT instruction added to all 6 system prompts (ca/es/en × small/full). 35 new pytest cases.
 
 ## [1.0.1-beta] - 2026-04-20
 
