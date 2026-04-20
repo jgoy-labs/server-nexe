@@ -59,6 +59,34 @@ def start_session_cleanup_task(session_mgr):
 
 # ── Router factory ───────────────────────────────────────────────
 
+class _SessionManagerProxy:
+    """Late-binding proxy to module_instance.session_manager.
+
+    create_router() is invoked by the loader *before* initialize() runs
+    (see core/loader/manifest_base._get_module). At that time the plugin
+    has not yet created its real SessionManager. Capturing
+    module_instance.session_manager as a local would snapshot None (or a
+    pre-crypto placeholder), and the routes would never see the real
+    manager built in initialize().
+
+    This proxy re-reads module_instance.session_manager on every attribute
+    access, so the routes always hit the current live instance.
+    """
+
+    __slots__ = ("_module",)
+
+    def __init__(self, module_instance):
+        self._module = module_instance
+
+    def __getattr__(self, name: str):
+        target = self._module.session_manager
+        if target is None:
+            raise RuntimeError(
+                "SessionManager accessed before WebUIModule.initialize() completed"
+            )
+        return getattr(target, name)
+
+
 def create_router(module_instance) -> APIRouter:
     """
     Crea l'APIRouter amb tots els endpoints del modul web_ui.
@@ -68,8 +96,10 @@ def create_router(module_instance) -> APIRouter:
       - module_instance.file_handler
       - module_instance.ui_dir  (directori static/ui)
     """
-    # Local references
-    session_mgr = module_instance.session_manager
+    # Late-binding proxy so route closures always read the live
+    # session_manager, even though the loader calls create_router()
+    # before initialize() builds it.
+    session_mgr = _SessionManagerProxy(module_instance)
     file_handler = module_instance.file_handler
     _module_ref = module_instance
 
