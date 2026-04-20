@@ -28,6 +28,7 @@ from plugins.security.core.input_sanitizers import (
     detect_jailbreak_attempt,
 )
 from core.endpoints.chat_sanitization import _sanitize_rag_context
+from plugins.web_ui_module.core.latex_sanitizer import LatexStreamBuffer, latex_to_unicode
 
 def _get_memory_helper():
     """Lazy resolve via routes module so test patches work."""
@@ -993,6 +994,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         _first_chunk = True
                                         _first_content_after_think = None
                                         _has_any_thinking = False
+                                        _latex_buf = LatexStreamBuffer()
                                         async for chunk in chat_result:
                                             content = ""
                                             thinking = ""
@@ -1078,7 +1080,13 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                 if visible and _MEMORIA_RE.search(visible):
                                                     visible = _MEMORIA_RE.sub('', visible)
                                                 if visible:
-                                                    yield visible
+                                                    emit = _latex_buf.feed(visible)
+                                                    if emit:
+                                                        yield emit
+                                        # Flush any buffered LaTeX pending at end of stream
+                                        _latex_tail = _latex_buf.flush()
+                                        if _latex_tail:
+                                            yield _latex_tail
                                     else:
                                         # Fallback for non-streaming engines
                                         yield "\x00[MODEL_READY]\x00"
@@ -1096,7 +1104,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
                                         if content:
                                             full_response += content
-                                            yield content
+                                            yield latex_to_unicode(content)
 
                                 except Exception as e:
                                     err_msg = repr(e) if not str(e) else str(e)
