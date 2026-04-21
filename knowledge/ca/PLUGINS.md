@@ -5,7 +5,7 @@ id: nexe-plugins-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia completa del sistema de plugins de server-nexe 1.0.1-beta. Cobreix Protocol NexeModule (duck typing, no herencia), format manifest.toml, estructura de fitxers del plugin, cicle de vida (discovery -> loading -> initialization -> integration -> shutdown), objecte context, registre de routers, plugins existents (5: MLX, llama.cpp, Ollama, Security amb normalitzacio Unicode, Web UI amb validacio d'input), com crear un plugin nou pas a pas, errors comuns i bones practiques."
+abstract: "Guia completa del sistema de plugins de server-nexe 1.0.2-beta. Cobreix Protocol NexeModule (duck typing, no herencia), format manifest.toml, estructura de fitxers del plugin, cicle de vida (discovery -> loading -> initialization -> integration -> shutdown), objecte context, registre de routers, plugins existents (5: MLX, llama.cpp, Ollama, Security amb normalitzacio Unicode, Web UI amb validacio d'input), com crear un plugin nou pas a pas, errors comuns i bones practiques."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Sistema de plugins — server-nexe 1.0.1-beta
+# Sistema de plugins — server-nexe 1.0.2-beta
 
 server-nexe utilitza una arquitectura de plugins basada en descobriment automatic via fitxers manifest.toml. Els plugins son moduls que afegeixen funcionalitat sense modificar el core. No cal registre manual — el sistema escaneja, descobreix i carrega plugins automaticament.
 

@@ -5,7 +5,7 @@ id: nexe-use-cases
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Casos de uso practicos de server-nexe 1.0.1-beta: asistente personal con memoria, base de conocimiento privada, desarrollo asistido (Cursor/Continue/Zed), busqueda semantica, experimentacion con backends, IA local segura para compliance. Incluye guia de cuando server-nexe tiene sentido (privacidad, offline, control) y cuando NO (multi-usuario, modelos frontier, hardware limitado, fine-tuning, SLA)."
+abstract: "Casos de uso practicos de server-nexe 1.0.2-beta: asistente personal con memoria, base de conocimiento privada, desarrollo asistido (Cursor/Continue/Zed), busqueda semantica, experimentacion con backends, IA local segura para compliance. Incluye guia de cuando server-nexe tiene sentido (privacidad, offline, control) y cuando NO (multi-usuario, modelos frontier, hardware limitado, fine-tuning, SLA)."
 tags: [use-cases, casos-de-uso, asistente, rag, cursor, continue, zed, api, privacy, privacidad, local, compliance]
 chunk_size: 600
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Casos de uso — server-nexe 1.0.1-beta
+# Casos de uso — server-nexe 1.0.2-beta
 
 server-nexe esta pensado para escenarios donde **privacidad, control local y memoria persistente** tienen valor concreto. Esta es la lista de los casos de uso mas probados, con contexto practico para cada uno.
 

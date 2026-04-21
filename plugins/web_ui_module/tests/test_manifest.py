@@ -28,6 +28,25 @@ def set_api_key(monkeypatch):
     monkeypatch.delenv("NEXE_DEV_MODE", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _ensure_module_initialized():
+    """Post-fix 5abd171 (session_manager late-init).
+
+    WebUIModule.__init__ no longer builds a SessionManager; initialize()
+    does. In production the lifespan calls initialize() before any
+    request hits the router. In tests we need to do the same, otherwise
+    _SessionManagerProxy raises "accessed before initialize()" on the
+    first endpoint call.
+
+    crypto_provider is None here because get_server_state() is not
+    patched — that's fine, the SessionManager degrades to plaintext
+    which is exactly what these tests expect.
+    """
+    inst = get_module_instance()
+    if not inst._initialized:
+        asyncio.run(inst.initialize({"config": {}}))
+
+
 @pytest.fixture
 def app():
     _app = FastAPI()

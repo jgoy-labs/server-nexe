@@ -4,7 +4,7 @@ data: 2026-04-16
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Identidad de server-nexe: proyecto open-source creado por Jordi Goy en Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que hace (IA local, RAG, multi-backend, encriptacion en reposo), estado actual (1.0.1-beta, macOS 14+ Apple Silicon only), enlaces oficiales y como apoyar."
+abstract: "Identidad de server-nexe: proyecto open-source creado por Jordi Goy en Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que hace (IA local, RAG, multi-backend, encriptacion en reposo), estado actual (1.0.2-beta, macOS 14+ Apple Silicon only), enlaces oficiales y como apoyar."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
 chunk_size: 400
 priority: P1
@@ -23,7 +23,7 @@ expires: null
 
 - **Servidor de IA 100% local** (cero cloud)
 - **Con memoria persistente** (RAG + MEM_SAVE)
-- **macOS 14+ Apple Silicon**, version 1.0.1-beta
+- **macOS 14+ Apple Silicon**, version 1.0.2-beta
 - **Multi-backend:** MLX, llama.cpp, Ollama
 - **Open source** (Apache 2.0), proyecto personal de un desarrollador
 
@@ -67,7 +67,7 @@ server-nexe combina cinco capacidades:
 
 ## Estado actual
 
-- **Version:** 1.0.1-beta
+- **Version:** 1.0.2-beta
 - **Plataforma principal:** macOS 14 Sonoma o superior, **Apple Silicon (M1+) exclusivamente** — probado
 - **macOS Intel:** **NO soportado** (eliminado en v0.9.9 por dependencias arm64-only del stack)
 - **Linux ARM64:** Testeado en VM (Ubuntu 24.04 via UTM en Mac Apple Silicon, 8 GB RAM, instalacion CLI + Ollama en CPU). Hardware nativo aun no validado.

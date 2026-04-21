@@ -435,5 +435,5 @@ Consulta [LICENSE](LICENSE) per als detalls.
 ---
 
 <p align="center">
-  <strong>Versió 1.0.1-beta</strong> · Apache 2.0 · Fet per <a href="https://www.jgoy.net">Jordi Goy</a> a Barcelona
+  <strong>Versió 1.0.2-beta</strong> · Apache 2.0 · Fet per <a href="https://www.jgoy.net">Jordi Goy</a> a Barcelona
 </p>

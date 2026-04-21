@@ -1,6 +1,6 @@
 [project]
 name = "server-nexe"
-version = "1.0.1-beta"
+version = "1.0.2-beta"
 requires-python = ">=3.11"
 
 [tool.ruff]

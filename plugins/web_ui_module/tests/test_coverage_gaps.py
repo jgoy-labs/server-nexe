@@ -415,9 +415,18 @@ class TestWebUIManifestGaps:
         assert len(result["tags"]) > 0
 
     def test_session_manager_instance(self):
-        """WebUIModule has session_manager."""
+        """WebUIModule.session_manager is None at __init__, built in initialize().
+
+        The placeholder is None on purpose — creating a SessionManager in
+        __init__ without a crypto_provider and then replacing it in
+        initialize() produced two divergent instances (see
+        test_session_manager_proxy.py).
+        """
         from plugins.web_ui_module.module import WebUIModule
         mod = WebUIModule()
+        assert mod.session_manager is None
+        ok = asyncio.run(mod.initialize({"config": {}}))
+        assert ok is True
         assert mod.session_manager is not None
 
     def test_file_handler_instance(self):

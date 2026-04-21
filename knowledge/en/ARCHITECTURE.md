@@ -5,7 +5,7 @@ id: nexe-architecture
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Internal architecture of server-nexe 1.0.1-beta. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, encryption pipeline, request sanitization pipeline, VLM 3-signal detector, precomputed KB embeddings, thinking toggle, and Mermaid diagrams."
+abstract: "Internal architecture of server-nexe 1.0.2-beta. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, encryption pipeline, request sanitization pipeline, VLM 3-signal detector, precomputed KB embeddings, thinking toggle, and Mermaid diagrams."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Architecture — server-nexe 1.0.1-beta
+# Architecture — server-nexe 1.0.2-beta
 
 ## Table of contents
 
@@ -331,7 +331,7 @@ Handles startup and shutdown of the server. Split into 4 submodules.
 ```toml
 [module]
 name = "module_name"
-version = "1.0.1-beta"
+version = "1.0.2-beta"
 type = "local_llm_option"
 description = "Module description"
 location = "plugins/module_name/"

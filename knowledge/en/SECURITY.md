@@ -5,7 +5,7 @@ id: nexe-security-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe 1.0.1-beta security: dual-key authentication, rate limiting (incl. PATCH thinking 10/min and NEXE_RATE_LIMIT_GLOBAL 100/min), 6 injection detectors, 47 jailbreak patterns, OWASP headers, RFC5424 logging, AES-256-GCM encryption at-rest (SQLCipher, .enc sessions), MEK fallback order (file->keyring->env->generate), RAG injection sanitization (_filter_rag_injection). Fully local, zero external calls."
+abstract: "server-nexe 1.0.2-beta security: dual-key authentication, rate limiting (incl. PATCH thinking 10/min and NEXE_RATE_LIMIT_GLOBAL 100/min), 6 injection detectors, 47 jailbreak patterns, OWASP headers, RFC5424 logging, AES-256-GCM encryption at-rest (SQLCipher, .enc sessions), MEK fallback order (file->keyring->env->generate), RAG injection sanitization (_filter_rag_injection). Fully local, zero external calls."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher, local, privacy]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Security — server-nexe 1.0.1-beta
+# Security — server-nexe 1.0.2-beta
 
 ## Table of contents
 
@@ -49,7 +49,7 @@ expires: null
 - [Security Checklist](#security-checklist)
 - [Reporting Vulnerabilities](#reporting-vulnerabilities)
 
-server-nexe 1.0.1-beta is designed for trusted local environments. All data stays on-device. No telemetry, no external calls.
+server-nexe 1.0.2-beta is designed for trusted local environments. All data stays on-device. No telemetry, no external calls.
 
 ## Authentication
 
