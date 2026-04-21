@@ -17,9 +17,9 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# server-nexe 1.0.1-beta — Servidor de IA local con memoria persistente
+# server-nexe 1.0.2-beta — Servidor de IA local con memoria persistente
 
-**Version:** 1.0.1-beta
+**Version:** 1.0.2-beta
 **Puerto por defecto:** 9119
 **Autor:** Jordi Goy (Barcelona)
 **Licencia:** Apache 2.0

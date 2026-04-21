@@ -442,5 +442,5 @@ See [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Version 1.0.1-beta</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
+  <strong>Version 1.0.2-beta</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
 </p>

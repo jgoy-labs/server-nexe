@@ -5,7 +5,7 @@ id: nexe-errors-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Common errors and solutions for server-nexe 1.0.1-beta. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, streaming, encryption errors, and Bug #19 fixes (MEK fallback, personal_memory wipe)."
+abstract: "Common errors and solutions for server-nexe 1.0.2-beta. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, streaming, encryption errors, and Bug #19 fixes (MEK fallback, personal_memory wipe)."
 tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, streaming, encryption]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Common Errors — server-nexe 1.0.1-beta
+# Common Errors — server-nexe 1.0.2-beta
 
 ## Installation Errors
 
@@ -156,7 +156,7 @@ The tray menu (see `INSTALLATION.md` — Tray App (NexeTray, macOS)) has a direc
 
 ### What to include in the report (GitHub Issue)
 
-- **Version**: you can see it in the tray menu as `server.nexe v1.0.1-beta` (or run `./nexe --version`)
+- **Version**: you can see it in the tray menu as `server.nexe v1.0.2-beta` (or run `./nexe --version`)
 - **OS + hardware**: `sw_vers` and `uname -m` (M1/M2/M3/M4)
 - **Active backend**: MLX / llama.cpp / Ollama (visible at `/ui/backends` or in the tray)
 - **Model in use**: name of the loaded model

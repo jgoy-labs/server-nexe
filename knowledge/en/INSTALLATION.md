@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Installation — server-nexe 1.0.1-beta
+# Installation — server-nexe 1.0.2-beta
 
 ## In 30 seconds
 
@@ -265,7 +265,7 @@ Menu bar app for controlling the server without a terminal. Built on the `rumps`
 
 | Item | What it does | Code |
 |------|--------------|------|
-| **server.nexe v1.0.1-beta** | Non-clickable header. Version read dynamically from `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
+| **server.nexe v1.0.2-beta** | Non-clickable header. Version read dynamically from `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
 | **Server running / stopped** | Non-clickable status indicator. Menu bar icon changes: `ICON_RUNNING` (green) when alive, `ICON_STOPPED` (grey) when not. | `tray.py:197` |
 | **Start / Stop server** | Spawns or stops the `core.app` process (uvicorn + FastAPI + Qdrant). SIGTERM then SIGKILL if needed. PID stored in `storage/run/server.pid`. | `_toggle_server` → `tray.py:296` |
 | **Open Web UI** | Opens `http://127.0.0.1:9119/ui` in the default browser. | `_open_web_ui` → `tray.py:509` |

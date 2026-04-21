@@ -11,10 +11,8 @@ struct HardwareInfo {
     let diskFreeGB: Int
     let diskTotalGB: Int
 
-    /// Tier de RAM recomanat — 6 tiers, regla del 25% (mateixa lògica que installer_hardware.py)
+    /// Tier de RAM recomanat — 4 tiers actius (tier_48/tier_64 eliminats del catàleg)
     var ramTier: String {
-        if ramGB >= 64  { return "tier_64" }
-        if ramGB >= 48  { return "tier_48" }
         if ramGB >= 32  { return "tier_32" }
         if ramGB >= 24  { return "tier_24" }
         if ramGB >= 16  { return "tier_16" }

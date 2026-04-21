@@ -5,7 +5,7 @@ id: nexe-architecture
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Arquitectura interna de server-nexe 1.0.1-beta. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, pipeline de encriptacion, pipeline de sanitizacion de peticiones, detector VLM 3-signal, precomputed KB embeddings, thinking toggle y diagramas Mermaid."
+abstract: "Arquitectura interna de server-nexe 1.0.2-beta. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, pipeline de encriptacion, pipeline de sanitizacion de peticiones, detector VLM 3-signal, precomputed KB embeddings, thinking toggle y diagramas Mermaid."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Arquitectura — server-nexe 1.0.1-beta
+# Arquitectura — server-nexe 1.0.2-beta
 
 ## Tabla de contenidos
 
@@ -331,7 +331,7 @@ Gestiona el arranque y apagado del servidor. Dividido en 4 submodulos.
 ```toml
 [module]
 name = "module_name"
-version = "1.0.1-beta"
+version = "1.0.2-beta"
 type = "local_llm_option"
 description = "Descripcion del modulo"
 location = "plugins/module_name/"

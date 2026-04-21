@@ -5,7 +5,7 @@ id: nexe-use-cases
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Practical use cases of server-nexe 1.0.1-beta: personal assistant with memory, private knowledge base, AI-assisted development (Cursor/Continue/Zed), semantic search, backend experimentation, secure local AI for compliance. Includes guidance on when server-nexe makes sense (privacy, offline, control) and when it does NOT (multi-user, frontier models, limited hardware, fine-tuning, SLA)."
+abstract: "Practical use cases of server-nexe 1.0.2-beta: personal assistant with memory, private knowledge base, AI-assisted development (Cursor/Continue/Zed), semantic search, backend experimentation, secure local AI for compliance. Includes guidance on when server-nexe makes sense (privacy, offline, control) and when it does NOT (multi-user, frontier models, limited hardware, fine-tuning, SLA)."
 tags: [use-cases, assistant, rag, cursor, continue, zed, api, privacy, local, compliance]
 chunk_size: 600
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Use Cases — server-nexe 1.0.1-beta
+# Use Cases — server-nexe 1.0.2-beta
 
 server-nexe is designed for scenarios where **privacy, local control and persistent memory** have concrete value. This is the list of the most tested use cases, with practical context for each.
 

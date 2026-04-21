@@ -5,7 +5,7 @@ id: nexe-limitations
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentacio honesta de les limitacions de server-nexe 1.0.1-beta. Cobreix suport de plataformes (macOS 14+ Apple Silicon only, Linux parcial, Intel i Windows NO suportats), qualitat de models vs nuvol (GPT-4/Claude), limitacions del RAG (embeddings, chunking, inici en fred, contradiccions), compatibilitat parcial amb l'API d'OpenAI, rendiment (instancia unica, concurrencia), restriccions de seguretat, advertencies d'encriptacio (default auto, nova, no provada en batalla) i mancances funcionals (sense multi-usuari, sense sync, sense fine-tuning)."
+abstract: "Documentacio honesta de les limitacions de server-nexe 1.0.2-beta. Cobreix suport de plataformes (macOS 14+ Apple Silicon only, Linux parcial, Intel i Windows NO suportats), qualitat de models vs nuvol (GPT-4/Claude), limitacions del RAG (embeddings, chunking, inici en fred, contradiccions), compatibilitat parcial amb l'API d'OpenAI, rendiment (instancia unica, concurrencia), restriccions de seguretat, advertencies d'encriptacio (default auto, nova, no provada en batalla) i mancances funcionals (sense multi-usuari, sense sync, sense fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Limitacions — server-nexe 1.0.1-beta
+# Limitacions — server-nexe 1.0.2-beta
 
 Aquest document descriu honestament el que server-nexe no pot fer o no fa be.
 

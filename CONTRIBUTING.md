@@ -66,7 +66,7 @@ plugins/my_module/
 ```toml
 [module]
 name = "my_module"
-version = "1.0.1-beta"
+version = "1.0.2-beta"
 description = "What this module does"
 author = "Your Name"
 
@@ -102,7 +102,7 @@ class MyModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="my_module",
-            version="1.0.1-beta",
+            version="1.0.2-beta",
             description="What this module does",
         )
 
@@ -176,4 +176,4 @@ Be respectful and constructive. This is a personal project maintained in spare t
 
 ---
 
-*v1.0.1-beta · Apache 2.0 · Jordi Goy*
+*v1.0.2-beta · Apache 2.0 · Jordi Goy*

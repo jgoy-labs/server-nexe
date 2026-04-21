@@ -5,7 +5,7 @@ id: nexe-limitations
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Honest documentation of server-nexe 1.0.1-beta limitations. Covers platform support (macOS 14+ Apple Silicon only, Linux partial, Intel and Windows NOT supported), model quality vs cloud (GPT-4/Claude), RAG limitations (embeddings, chunking, cold start, contradictions), API partial OpenAI compatibility, performance (single instance, concurrency), security constraints, encryption caveats (default auto, new, not battle-tested), and functional gaps (no multi-user, no sync, no fine-tuning)."
+abstract: "Honest documentation of server-nexe 1.0.2-beta limitations. Covers platform support (macOS 14+ Apple Silicon only, Linux partial, Intel and Windows NOT supported), model quality vs cloud (GPT-4/Claude), RAG limitations (embeddings, chunking, cold start, contradictions), API partial OpenAI compatibility, performance (single instance, concurrency), security constraints, encryption caveats (default auto, new, not battle-tested), and functional gaps (no multi-user, no sync, no fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Limitations — server-nexe 1.0.1-beta
+# Limitations — server-nexe 1.0.2-beta
 
 This document honestly describes what server-nexe cannot do or does not do well.
 

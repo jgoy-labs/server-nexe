@@ -5,7 +5,7 @@ id: nexe-plugins-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete guide to the server-nexe 1.0.1-beta plugin system. Covers NexeModule Protocol (duck typing, not inheritance), manifest.toml format, plugin file structure, lifecycle (discovery → loading → initialization → integration → shutdown), context object, router registration, existing plugins (5: MLX, llama.cpp, Ollama, Security with Unicode normalization, Web UI with input validation), how to create a new plugin step by step, common errors and best practices."
+abstract: "Complete guide to the server-nexe 1.0.2-beta plugin system. Covers NexeModule Protocol (duck typing, not inheritance), manifest.toml format, plugin file structure, lifecycle (discovery → loading → initialization → integration → shutdown), context object, router registration, existing plugins (5: MLX, llama.cpp, Ollama, Security with Unicode normalization, Web UI with input validation), how to create a new plugin step by step, common errors and best practices."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Plugin System — server-nexe 1.0.1-beta
+# Plugin System — server-nexe 1.0.2-beta
 
 server-nexe uses a plugin architecture based on automatic discovery via manifest.toml files. Plugins are independent modules that add functionality without modifying the core. No manual registration needed — the system scans, discovers, and loads plugins automatically.
 

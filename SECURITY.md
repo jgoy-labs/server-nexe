@@ -94,9 +94,9 @@ The AI audit covered: injection detection, authentication flows, rate limiting, 
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.1-beta    | Current release, receives fixes |
-| 0.9.9         | End of line (superseded by 1.0.1-beta) |
-| 0.9.0 – 0.9.8 | Not supported — upgrade to 1.0.1-beta |
+| 1.0.2-beta    | Current release, receives fixes |
+| 0.9.9         | End of line (superseded by 1.0.2-beta) |
+| 0.9.0 – 0.9.8 | Not supported — upgrade to 1.0.2-beta |
 | < 0.9.0       | Not supported |
 
 ## Reporting a vulnerability
@@ -126,4 +126,4 @@ Server Nexe uses `cryptography` (>=44.0.0) for encryption, `keyring` (>=25.0.0) 
 
 ---
 
-*v1.0.1-beta · Apache 2.0 · Jordi Goy*
+*v1.0.2-beta · Apache 2.0 · Jordi Goy*
