@@ -394,7 +394,7 @@ body.frame-hidden { padding: 0; }
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    margin-right: 12px;
+    margin-right: 20px;
 }
 
 .thinking-dots span {
