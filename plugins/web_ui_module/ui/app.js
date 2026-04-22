@@ -2759,9 +2759,11 @@ class NexeUI {
     _scheduleRender(el, content) {
         // Render markdown max every 80ms to avoid overloading the DOM
         if (this._renderTimer) return;
-        // Primer token real — treu el placeholder "Barrinant…" wave que
-        // estava a la bombolla buida.
-        if (el && el.classList.contains('thinking-placeholder')) {
+        // Primer token amb text REAL — treu el placeholder wave. No el
+        // netegem amb `content` buit, ja que els chunks [MODEL_LOADING]
+        // arriben abans dels tokens i netejarien el placeholder deixant
+        // un forat mentre el model encara carrega a VRAM.
+        if (el && el.classList.contains('thinking-placeholder') && content && content.trim()) {
             el.classList.remove('thinking-placeholder');
             el.textContent = '';
         }
