@@ -387,13 +387,14 @@ body.frame-hidden { padding: 0; }
 }
 
 /* Container dels 3 dots: flex + gap per separar-los entre si i també
-   del text "Thinking…" que ve al span següent, evitant que amb el
-   bounce un dels dots acabi visualment sobre la 'T'. */
+   del text "Thinking…" que ve al span següent. El `margin-right` dins
+   d'un flex parent ha de ser gran perquè el `gap` del `.thinking-badge`
+   ja aporta el seu i el 3r dot tendia a quedar sobre la 'T'. */
 .thinking-dots {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    margin-right: 4px;
+    margin-right: 12px;
 }
 
 .thinking-dots span {
