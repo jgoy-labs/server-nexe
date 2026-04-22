@@ -373,9 +373,14 @@ body.frame-hidden { padding: 0; }
 
 .thinking-badge.active { display: flex; }
 
-/* Reset del margin al footer global (no apilat com al sidebar). */
+/* Reset del margin al footer global (no apilat com al sidebar).
+   El `margin-right` només és actiu quan el badge es mostra (active);
+   en repòs està `display: none` i no afecta. És suficient aire perquè
+   el halo del `.status-dot.active` (4px box-shadow) no toqui els dots
+   taronges ni el text "Thinking" no xoqui amb "Connected". */
 .site-footer .thinking-badge {
     margin-top: 0;
+    margin-right: 20px;
 }
 
 .thinking-dots span {
