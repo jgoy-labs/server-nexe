@@ -379,19 +379,21 @@ body.frame-hidden { padding: 0; }
    .footer-right ja separa prou del .status-indicator. */
 .site-footer .thinking-badge {
     margin-top: 0;
-    margin-right: 10px;
+    margin-right: 0;
 }
 
-/* Animació del text "Thinking" al footer global — pulse d'opacitat
-   (reemplaça l'efecte que feien els 3 dots eliminats). Només aplica
-   al span amb text perquè no hi ha altres fills ara. */
+/* Animació del text "Thinking" al footer global — reemplaça l'efecte
+   que feien els 3 dots eliminats. Asimetria 0/80/100 → terra,
+   40 → salt (copia el feel del vell `@keyframes dot-bounce`): dóna
+   aquell "glitch" irregular que agradava a Jordi. */
 .site-footer .thinking-badge span {
-    animation: thinking-pulse 1.2s ease-in-out infinite;
+    animation: thinking-pulse 1s ease-in-out infinite;
+    display: inline-block;  /* necessari perquè transform afecti */
 }
 
 @keyframes thinking-pulse {
-    0%, 100% { opacity: 0.4; }
-    50%      { opacity: 1; }
+    0%, 80%, 100% { opacity: 0.4; transform: translateY(0); }
+    40%           { opacity: 1;   transform: translateY(-3px); }
 }
 
 .sidebar-footer {
