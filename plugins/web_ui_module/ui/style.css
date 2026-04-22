@@ -386,6 +386,16 @@ body.frame-hidden { padding: 0; }
     margin-right: 75px;
 }
 
+/* Container dels 3 dots: flex + gap per separar-los entre si i també
+   del text "Thinking…" que ve al span següent, evitant que amb el
+   bounce un dels dots acabi visualment sobre la 'T'. */
+.thinking-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-right: 4px;
+}
+
 .thinking-dots span {
     display: inline-block;
     width: 4px;
