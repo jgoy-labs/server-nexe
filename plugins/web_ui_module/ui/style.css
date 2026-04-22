@@ -425,11 +425,18 @@ body.frame-hidden { padding: 0; }
     gap: 0.4rem;
 }
 
-/* Footer-right té elements més densos (select, thinking-badge amb dots,
-   status-dot amb halo box-shadow). Cal més aire perquè el halo del dot
-   i l'últim "Thinking" no trepitgin el "Connected". */
+/* Footer-right només conté thinking-badge + status-indicator (el
+   selector d'idiomes viu al footer-left al costat del copyright).
+   Una mica més d'aire per separar els dots taronges del thinking
+   del halo verd del status-dot.active. */
 .footer-right {
     gap: 0.9rem;
+}
+
+/* Footer-left acull el selector d'idiomes + copyright — petit gap
+   perquè el select no quedi enganxat al "©". */
+.footer-left {
+    gap: 0.6rem;
 }
 
 .footer-text {
