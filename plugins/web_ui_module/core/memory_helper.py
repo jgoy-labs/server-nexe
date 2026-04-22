@@ -16,6 +16,7 @@ from typing import Optional, Dict, Any, Tuple, List
 
 from memory.memory.constants import DEFAULT_VECTOR_SIZE
 from memory.memory.config import resolve_ingest_config
+from core.endpoints.chat_sanitization import _filter_rag_injection
 
 logger = logging.getLogger(__name__)
 
@@ -795,13 +796,20 @@ class MemoryHelper:
         # 50 → behaviour-preserving). See memory/memory/config.py.
         BATCH_SIZE = resolve_ingest_config(memory).store_batch_size
 
+        # Defense-in-depth — Apliquem `_filter_rag_injection` a cada chunk
+        # abans d'indexar a `user_knowledge`. El mateix filtre ja es fa a
+        # retrieval (`_sanitize_rag_context`), però un document amb tags
+        # `[MEM_SAVE:]`, `[MEMORIA:]` o `[CONTEXT ...]` no hauria d'arribar
+        # mai al vector index sense neutralitzar. El filtre NO trunca — la
+        # truncació només s'aplica a RETRIEVAL.
         for batch_start in range(0, total, BATCH_SIZE):
             batch_end = min(batch_start + BATCH_SIZE, total)
             batch_chunks = chunks[batch_start:batch_end]
             batch_items = []
             for i, chunk in enumerate(batch_chunks, start=batch_start):
+                clean_chunk = _filter_rag_injection(chunk)
                 meta = {**base_meta, "chunk_index": i, "saved_at": datetime.now(timezone.utc).isoformat()}
-                batch_items.append({"text": chunk, "metadata": meta})
+                batch_items.append({"text": clean_chunk, "metadata": meta})
             try:
                 t0 = time.time()
                 await memory.store_batch(batch_items, collection=DOC_COLLECTION)
@@ -812,8 +820,9 @@ class MemoryHelper:
                 logger.warning(f"  Batch [{batch_start}-{batch_end}] failed ({e}), falling back to single")
                 for i, chunk in enumerate(batch_chunks, start=batch_start):
                     try:
+                        clean_chunk = _filter_rag_injection(chunk)
                         meta = {**base_meta, "chunk_index": i, "saved_at": datetime.now(timezone.utc).isoformat()}
-                        await memory.store(text=chunk, collection=DOC_COLLECTION, metadata=meta)
+                        await memory.store(text=clean_chunk, collection=DOC_COLLECTION, metadata=meta)
                         saved += 1
                     except Exception as e2:
                         logger.warning(f"  [{i}/{total}] chunk failed: {e2}")

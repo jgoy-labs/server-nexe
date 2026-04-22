@@ -106,7 +106,7 @@ OpenAI-compatible chat completion with RAG and streaming support.
 - `[THINKING]` / `[/THINKING]` — thinking tokens (Ollama models like qwen3.5)
 - `[DOC_TRUNCATED:XX%]` — percentage of document discarded due to context limit (new 2026-04-02)
 
-**`[IMATGE ADJUNTA]` block:** When a message includes an image (VLM backend), the chat endpoint injects an `[IMATGE ADJUNTA]` block that **prioritises the image over the RAG context**. The model processes the image directly and RAG is relegated to secondary context, preventing retrieved documents from distracting from the visual description.
+**`[ATTACHED IMAGE]` block:** When a message includes an image (VLM backend), the chat endpoint injects an `[ATTACHED IMAGE]` block that **prioritises the image over the RAG context**. The model processes the image directly and RAG is relegated to secondary context, preventing retrieved documents from distracting from the visual description.
 
 ### System Info
 

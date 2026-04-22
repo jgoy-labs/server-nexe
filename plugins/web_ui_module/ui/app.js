@@ -755,6 +755,26 @@ class NexeUI {
         this.imagePreviewName = document.getElementById('imagePreviewName');
         this.imageBadge = document.getElementById('imageBadge');
 
+        // Intercepta Cmd+C / Ctrl+C sobre missatges del xat: les bombolles
+        // (`.message.user`, `.message.assistant`) tenen fons de color i el
+        // copy HTML per defecte s'emporta el `background` estilitzat, que
+        // queda enganxat al destí. Substituïm el HTML del clipboard per
+        // text/plain + HTML nu sense estils.
+        this.chatMessages.addEventListener('copy', (e) => {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            const text = selection.toString();
+            if (!text) return;
+            e.preventDefault();
+            e.clipboardData.setData('text/plain', text);
+            // HTML "pla": cada línia <br>, sense atributs ni classes → no arrossega fons.
+            const html = text
+                .split('\n')
+                .map(l => l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+                .join('<br>');
+            e.clipboardData.setData('text/html', html);
+        });
+
         // Event listeners
         this.sendBtn.addEventListener('click', () => this.sendMessage());
         this.stopBtn.addEventListener('click', () => this.stopGeneration());
@@ -2163,6 +2183,15 @@ class NexeUI {
                 this._renderSavedStats(statsDiv, stats, textDiv);
             }
             contentDiv.appendChild(statsDiv);
+        } else if (role === 'user' && textDiv) {
+            // Simetria amb l'assistant: al missatge de l'usuari també hi ha
+            // d'haver el comptador aproximat de tokens i el botó de copiar.
+            // El count real ve del backend com a `prompt_tokens` quan arriba
+            // la resposta; mentre no hi és s'usa l'heurística ~1 tok / 4 chars.
+            const statsDiv = document.createElement('div');
+            statsDiv.className = 'message-stats';
+            this._renderUserStats(statsDiv, content, textDiv, stats);
+            contentDiv.appendChild(statsDiv);
         }
 
         messageEl.appendChild(avatarDiv);
@@ -2174,6 +2203,49 @@ class NexeUI {
         if (scroll) {
             this.scrollToBottom();
         }
+    }
+
+    _renderUserStats(statsDiv, content, textDiv, stats = null) {
+        // Comptador aproximat: ~1 token per cada 4 caràcters (heurística estàndard).
+        // Si el backend ens passa `prompt_tokens` al stats, prioritza aquell valor.
+        const approxTokens = Math.max(1, Math.ceil((content || '').length / 4));
+        const tokens = (stats && stats.prompt_tokens) || approxTokens;
+        const tokenLabel = (stats && stats.prompt_tokens) ? `${tokens} tok` : `~${tokens} tok`;
+
+        const tokSpan = document.createElement('span');
+        tokSpan.className = 'stat-item';
+        const tokI = document.createElement('i');
+        tokI.setAttribute('data-lucide', 'activity');
+        tokSpan.appendChild(tokI);
+        const tokText = document.createElement('span');
+        tokText.textContent = tokenLabel;
+        tokSpan.appendChild(tokText);
+        statsDiv.appendChild(tokSpan);
+
+        // Botó de copiar — mateix patró que el de l'assistant.
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.title = 'Copy';
+        const copyI = document.createElement('i');
+        copyI.setAttribute('data-lucide', 'copy');
+        copyBtn.appendChild(copyI);
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(textDiv.innerText).then(() => {
+                const checkI = document.createElement('i');
+                checkI.setAttribute('data-lucide', 'check');
+                copyBtn.replaceChildren(checkI);
+                if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [copyBtn] });
+                setTimeout(() => {
+                    const restoreI = document.createElement('i');
+                    restoreI.setAttribute('data-lucide', 'copy');
+                    copyBtn.replaceChildren(restoreI);
+                    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [copyBtn] });
+                }, 2000);
+            }).catch(() => {});
+        });
+        statsDiv.appendChild(copyBtn);
+
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [statsDiv] });
     }
 
     _renderSavedStats(statsDiv, stats, textDiv) {

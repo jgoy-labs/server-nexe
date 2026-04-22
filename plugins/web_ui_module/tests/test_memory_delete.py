@@ -380,6 +380,13 @@ class TestListNotRecall:
 class TestDeleteFromMemory:
 
     def test_delete_returns_deleted_facts(self):
+        """Verify delete returns structured deleted_facts metadata.
+
+        Design: delete_from_memory uses results[:1] to delete only the top
+        match in each collection, preventing cascade deletion of unrelated
+        facts above the threshold. Test verifies the structure of the
+        deleted_facts payload (id, text, score) for the top match.
+        """
         r1 = make_result(text="Em dic Joan", score=0.90, rid="id-1")
         r2 = make_result(text="Treballo a BCN", score=0.85, rid="id-2")
         mem = make_memory_mock(search_results=[r1, r2])
@@ -392,8 +399,9 @@ class TestDeleteFromMemory:
         result = asyncio.run(helper.delete_from_memory("em dic Joan"))
 
         assert result["success"] is True
-        assert result["deleted"] == 2
-        assert len(result["deleted_facts"]) == 2
+        # Top match only — see memory_helper.delete_from_memory `results[:1]`.
+        assert result["deleted"] == 1
+        assert len(result["deleted_facts"]) == 1
         assert result["deleted_facts"][0]["text"] == "Em dic Joan"
         assert result["deleted_facts"][0]["id"] == "id-1"
         assert result["deleted_facts"][0]["score"] == 0.90

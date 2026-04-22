@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Memory: `GCDaemon` was never invoked** (`memory/memory/workers/dreaming_cycle.py`, new `memory/memory/workers/gc_daemon.run_gc_for_active_users`). `GCDaemon` (score-based episodic pruning + budget enforcement + tombstone creation) existed and was exported, but nothing on the server ever called it — `DreamingCycle._gc_lightweight` only expired TTL rows. Integrated a default `GCDaemon` instance inside `DreamingCycle`; `run_cycle()` now runs it for every active user at the end of each cycle. No thread offload because `SQLiteStore._connect()` is not thread-safe (would hit `ProgrammingError`), but the work is light enough to run synchronously between `asyncio.sleep(0)` yields. Throttleable via `_gc_heavy_every` (defaults to every cycle).
+- **Memory: `DreamingCycle` was running without an embedder, so `_sync_vector_index` was a no-op in production** (`core/lifespan_modules.py`). `lifespan_modules.start_memory_service_v1` constructed `DreamingCycle(store=..., vector_index=...)` without passing `embedder=`. `_sync_vector_index` returned early if `self._embedder is None`, so every episodic entry written via `MemoryService` stayed in SQLite with `vector_synced=0` and never reached Qdrant — semantic search over episodic memories returned nothing from the background pipeline. Now `SimpleEmbedder(DEFAULT_EMBEDDING_MODEL)` is loaded via `asyncio.to_thread` (first-use ONNX init can block 5-30 s) and passed explicitly; failure to load is non-fatal and only skips vector sync.
+- **Tests: 18 regression fails in `test_manifest_coverage.py` after the session manager late-init fix** (`5abd171`). `test_manifest.py` got the new `_ensure_module_initialized` autouse fixture but the coverage-focused companion did not, so every `TestClient` request in that file raised `_SessionManagerProxy: accessed before initialize()`. Applied the same fixture pattern (+ moved `disable_rate_limiter` teardown to restore previous state instead of hard-coding `True`).
+- **Tests: `test_memory_delete.test_delete_returns_deleted_facts` asserted `deleted == 2`** against a design that deletes only the top-scored match per collection (`plugins/web_ui_module/core/memory_helper.py:614`, comment: "prevents collateral deletion of unrelated facts"). Test was outdated, not a prod bug. Updated the assertion and documented the `results[:1]` contract in the docstring.
+- **Tests: `llama_cpp` `TestModelPoolMmproj` patched a non-existent attribute** — `model_pool.py` imports `Llama` lazily inside `_create_instance`, so `patch("plugins.llama_cpp_module.core.model_pool.Llama", ...)` raised `AttributeError`. Patched `llama_cpp.Llama` at the source module instead.
+- **Tests: `mlx` VLM bifurcation test relied on the `_is_vlm` singleton** which `execute()` stopped using in favour of `_detect_vlm_capability(config.model_path)` (comment: "more accurate, no stale state on model switch"). Patched the detector to `True` alongside the existing singleton setup.
+- **Tests: `test_manifest.py` full-suite fails (5 pollutions) came from slowapi rate-limiter state carried over from `test_coverage_gaps.py`**, not from session-manager pollution as initially suspected. Added the `disable_rate_limiter` autouse fixture already present in `test_manifest_coverage.py` / `test_module.py`.
+- **Tests: integration fixtures `TestRAGChatOllama.rag_client` / `TestRAGChatMLX.rag_client_mlx` wrote to the real dev `storage/vectors/`** and (MLX path) called `delete_collection('personal_memory')` on the shared Qdrant — a confirmed test-leak. Isolated with `tmp_path_factory` + `NEXE_QDRANT_PATH` env override, restored on teardown.
+
+### Added
+
+- `memory/memory/tests/test_dreaming_gc_integration.py` — 8 tests covering GCDaemon invocation, no-users fastpath, throttling, logging, exception isolation, cooperative stop, default daemon build, and full `run_cycle` wiring.
+- `core/tests/test_lifespan_dreaming_embedder.py` — 2 tests verifying that `start_memory_service_v1` passes an embedder to `DreamingCycle` and survives embedder load failures.
+
 ## [1.0.2-beta] - 2026-04-21
 
 ### Fixed

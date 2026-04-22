@@ -1,15 +1,16 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: core/cli/__init__.py
-Description: Central Nexe CLI 0.9 - Orchestrator for module CLIs.
+Description: Orquestrador CLI Central Nexe per CLIs de mòduls.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+from core.version import __version__
+
 from .cli import app, main
 
-__all__ = ["app", "main"]
-__version__ = "1.0.0"
+__all__ = ["app", "main", "__version__"]

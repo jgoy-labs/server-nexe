@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_utc": "2026-04-21T17:21:14Z",
+  "generated_utc": "2026-04-21T21:46:03Z",
   "prefix_format_version": "1.0",
   "vector_dim": 768,
   "vector_dtype": "float32",
@@ -18,15 +18,15 @@
     },
     "en": {
       "chunks": 260,
-      "source_sha256": "81485c7db8cf6726c067fa646afb61d6045eff7d95ba7d2ecc5dd94c6fe5f891",
-      "vectors_sha256": "4f9fa77e8aac62c8d7ce4383676d32898a9205681af5f3a1586b849a5fa92e02",
-      "metadata_sha256": "8b28de847c31a1c0406cf20466b9d7ee112ea801fedc9aaced18490da90e8549"
+      "source_sha256": "8046d5ffa078e1924b869bc5c81db3236bea7ba4a4a9d665a019da3238ea8d88",
+      "vectors_sha256": "83ea3fa76ce765039a74eb36f6a4b3dd54f8fa4a998db137f3ad59f4775322aa",
+      "metadata_sha256": "c0442365215b5362517f78c260c621d5738193195ec10eae7c14e165d9a5ea79"
     },
     "es": {
       "chunks": 261,
-      "source_sha256": "e25fab5c2a7294e8ca4eb4b83a3852800b7ba1edb36c03541fe60563c4c0e29d",
-      "vectors_sha256": "d07d4fbd7f99a122fbf85ef0aeda6b5b94ca92bde81b7f8facfeeb38ed92fba6",
-      "metadata_sha256": "eec25e9fdd81667d0a2245459e29571106caa548a9c8183e8aa3af77f41213ce"
+      "source_sha256": "162ade3749da5ac53bfa3cd435f209dbb5f436a9b6e1047415283c2f8f5758db",
+      "vectors_sha256": "161b861bd8c2f672a8a10fde63adceab2d886ebc0a54cd443107ffd822e19e5b",
+      "metadata_sha256": "fdb463bcd748876b58159e4268f24aacf27ef7098b248439d798b179614f1cbd"
     }
   }
 }

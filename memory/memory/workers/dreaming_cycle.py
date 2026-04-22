@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from memory.memory.config import MemoryConfig
+from memory.memory.workers.gc_daemon import GCDaemon, run_gc_for_active_users
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class DreamingCycle:
         embedder=None,
         *,
         store=None,
+        gc_daemon: Optional[GCDaemon] = None,
     ):
         if config is None:
             from memory.memory.config import get_config
@@ -58,6 +60,18 @@ class DreamingCycle:
         self._is_running = False
         self._should_stop = False
         self._task: Optional[asyncio.Task] = None
+
+        # Full GC — score-based pruning + budget enforcement.
+        # _gc_lightweight only expires TTL; _gc_heavy runs the full GCDaemon
+        # per user every `_gc_heavy_every` cycles (defaults to every cycle,
+        # since scoring is cheap and idempotent).
+        self._gc_daemon = gc_daemon or GCDaemon(
+            config=config,
+            sqlite_store=self._store,
+            vector_index=self._vector,
+        )
+        self._gc_heavy_every = 1
+        self._gc_heavy_counter = 0
 
     async def run(self):
         """Start the dreaming cycle loop. Alias: start()."""
@@ -114,6 +128,7 @@ class DreamingCycle:
             await self._process_staging()
             await self._sync_vector_index()
             await self._gc_lightweight()
+            await self._gc_heavy()
 
             self._consecutive_skips = 0
             logger.debug("DreamingCycle: cycle complete")
@@ -425,6 +440,21 @@ class DreamingCycle:
                     conn.close()
                 except Exception:
                     pass
+
+    async def _gc_heavy(self):
+        """Delegate full GC (scoring + budget) to `run_gc_for_active_users`.
+
+        Throttled by `_gc_heavy_every` — defaults to every cycle since
+        scoring is cheap and idempotent.
+        """
+        if not self._store or not self._gc_daemon:
+            return
+        self._gc_heavy_counter += 1
+        if self._gc_heavy_counter % self._gc_heavy_every != 0:
+            return
+        await run_gc_for_active_users(
+            self._gc_daemon, self._store, stop_flag=lambda: self._should_stop,
+        )
 
     async def _gc_lightweight(self):
         """Lightweight GC: expire TTL staging + old tombstones.

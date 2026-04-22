@@ -47,6 +47,18 @@ def _ensure_module_initialized():
         asyncio.run(inst.initialize({"config": {}}))
 
 
+@pytest.fixture(autouse=True)
+def disable_rate_limiter():
+    """Disable the rate limiter during tests to avoid 429s from previous
+    test files polluting shared slowapi state (e.g. test_coverage_gaps.py
+    triggers requests against the same limiter instance)."""
+    from core.dependencies import limiter
+    previous = limiter.enabled
+    limiter.enabled = False
+    yield
+    limiter.enabled = previous
+
+
 @pytest.fixture
 def app():
     _app = FastAPI()

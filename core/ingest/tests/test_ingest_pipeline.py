@@ -375,8 +375,13 @@ class TestRAGChatOllama:
             pytest.skip("Qdrant not running at localhost:6333")
 
     @pytest.fixture(scope="class")
-    def rag_client(self):
-        """Client amb ingesta prèvia dels docs de knowledge/."""
+    def rag_client(self, tmp_path_factory):
+        """Client amb ingesta prèvia dels docs de knowledge/.
+
+        Isolated Qdrant path via NEXE_QDRANT_PATH so ingest_knowledge()
+        does not contaminate the dev `storage/vectors/`. Previous env var
+        is restored on teardown.
+        """
         import asyncio
         from core.ingest.ingest_knowledge import ingest_knowledge
         from fastapi.testclient import TestClient
@@ -387,12 +392,18 @@ class TestRAGChatOllama:
         os.environ.setdefault("NEXE_ENV", "testing")
         os.environ.setdefault("NEXE_DEV_MODE", "true")
 
-        # Ingestar knowledge/ca/
-        asyncio.run(
-            ingest_knowledge(quiet=True)
-        )
-        with TestClient(app, base_url="http://localhost") as client:
-            yield client, {"X-API-Key": api_key}
+        prev_qdrant_path = os.environ.get("NEXE_QDRANT_PATH")
+        tmp_qdrant = tmp_path_factory.mktemp("qdrant_rag_ollama")
+        os.environ["NEXE_QDRANT_PATH"] = str(tmp_qdrant)
+        try:
+            asyncio.run(ingest_knowledge(quiet=True))
+            with TestClient(app, base_url="http://localhost") as client:
+                yield client, {"X-API-Key": api_key}
+        finally:
+            if prev_qdrant_path is None:
+                os.environ.pop("NEXE_QDRANT_PATH", None)
+            else:
+                os.environ["NEXE_QDRANT_PATH"] = prev_qdrant_path
 
     def test_chat_answers_port_question(self, rag_client):
         client, headers = rag_client
@@ -470,7 +481,13 @@ class TestRAGChatMLX:
             pytest.skip("Qdrant not running")
 
     @pytest.fixture(scope="class")
-    def rag_client_mlx(self):
+    def rag_client_mlx(self, tmp_path_factory):
+        """Client MLX amb ingesta prèvia dels docs de knowledge/.
+
+        Isolated Qdrant path via NEXE_QDRANT_PATH so the reset +
+        delete_collection cycle does not touch the dev storage/vectors/.
+        Previous env var is restored on teardown.
+        """
         import asyncio
         from core.ingest.ingest_knowledge import ingest_knowledge
         from fastapi.testclient import TestClient
@@ -480,16 +497,17 @@ class TestRAGChatMLX:
         os.environ.setdefault("NEXE_PRIMARY_API_KEY", api_key)
         os.environ.setdefault("NEXE_DEV_MODE", "true")
 
+        prev_qdrant_path = os.environ.get("NEXE_QDRANT_PATH")
+        tmp_qdrant = tmp_path_factory.mktemp("qdrant_rag_mlx")
+        os.environ["NEXE_QDRANT_PATH"] = str(tmp_qdrant)
+
         async def _setup():
             from memory.memory.api import MemoryAPI
             import plugins.web_ui_module.memory_helper as mh
             mem = MemoryAPI()
             await mem.initialize()
-            # TODO (post-refactor 2026-04-08): aquest bloc escriu al storage/vectors/
-            # REAL del dev sense usar tmp_path. És un test-leak confirmat que contamina
-            # l'estat entre test runs. Refactoritzar per usar isolated QdrantClient
-            # amb tmp_path. Diferit a HOMAD memòria v1 Part 2 o sessió pròpia.
-            # Clear personal_memory to avoid contamination from previous test classes
+            # Start from a clean personal_memory collection in the isolated
+            # Qdrant. Previously this deleted the real dev collection.
             if await mem.collection_exists("personal_memory"):
                 await mem.delete_collection("personal_memory")
                 await mem.create_collection("personal_memory", vector_size=768)
@@ -498,9 +516,15 @@ class TestRAGChatMLX:
             mh._memory_api_instance = None
             await ingest_knowledge(quiet=True)
 
-        asyncio.run(_setup())
-        with TestClient(app, base_url="http://localhost") as client:
-            yield client, {"X-API-Key": api_key}
+        try:
+            asyncio.run(_setup())
+            with TestClient(app, base_url="http://localhost") as client:
+                yield client, {"X-API-Key": api_key}
+        finally:
+            if prev_qdrant_path is None:
+                os.environ.pop("NEXE_QDRANT_PATH", None)
+            else:
+                os.environ["NEXE_QDRANT_PATH"] = prev_qdrant_path
 
     def test_mlx_answers_port_question(self, rag_client_mlx):
         client, headers = rag_client_mlx

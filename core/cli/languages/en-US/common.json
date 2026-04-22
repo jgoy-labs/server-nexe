@@ -80,6 +80,41 @@
    "executing": "Executing",
    "success": "Success",
    "failed": "Failed"
+  },
+  "version_banner": "Nexe CLI v{version}",
+  "go": {
+   "starting_server": "Starting Nexe Server...",
+   "stopping_sigterm": "\n👋 Stopping (SIGTERM)...",
+   "stopping": "\n👋 Stopping..."
+  },
+  "stop": {
+   "no_services": "ℹ️  No Nexe services are running.",
+   "detected_services": "Detected services:",
+   "cancelled": "Cancelled.",
+   "services_stopped": "\n✅ Services stopped.",
+   "stopped_ok": "  ✓ {name} stopped (PID {pid})",
+   "no_longer_exists": "  - {name} no longer exists (PID {pid})",
+   "permission_denied": "  ✗ {name} — permission denied (PID {pid})"
+  },
+  "server_status": {
+   "offline": "✗ Server offline: {msg}",
+   "healthy": "✓ Server is healthy",
+   "unknown_status": "⚠ Server status: {st}"
+  },
+  "hardware": {
+   "analyzing": "Analyzing hardware..."
+  },
+  "common": {
+   "aborted": "\nAborted.",
+   "interrupted": "\nInterrupted."
+  },
+  "logs": {
+   "file_not_found": "⚠️ Log file not found: {path}",
+   "following": "👀 Following logs from: {path} (last {last} lines)",
+   "press_ctrl_c": "--- Press Ctrl+C to exit ---",
+   "stopping_viewer": "\n👋 Stopping log viewer.",
+   "dir_not_found": "❌ Logs directory not found: {path}",
+   "no_files": "📭 No log files found in storage/logs/"
   }
  }
 }

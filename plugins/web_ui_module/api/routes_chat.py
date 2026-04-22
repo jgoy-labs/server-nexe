@@ -592,9 +592,14 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         continue
 
                     try:
-                        # Resoldre ruta local del model si ve del selector UI
-                        # P0-3: short lock serializes rare concurrent body.model
-                        # mutations to class-level singletons. See ISSUE-multiuser-refactor.md
+                        # Resoldre ruta local del model si ve del selector UI.
+                        # _MODEL_SWITCH_LOCK serialitza mutacions concurrents de
+                        # `body.model` sobre els singletons de classe. A més,
+                        # l'env (`NEXE_MLX_MODEL` / `NEXE_LLAMA_CPP_MODEL`) es
+                        # muta només el temps mínim per construir el nou config
+                        # via `from_env()` i es restaura al `finally` per evitar
+                        # que la propera request que no especifiqui `body.model`
+                        # hereti el valor de l'anterior switch (P0-3 env leak).
                         if body.get("model"):
                             async with _MODEL_SWITCH_LOCK:
                                 from core.lifespan import get_server_state as _gss
@@ -604,9 +609,16 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 local_path = models_dir / model_name
 
                                 if engine_name == "mlx_module" and local_path.exists():
-                                    os.environ["NEXE_MLX_MODEL"] = str(local_path)
-                                    from plugins.mlx_module.core.config import MLXConfig
-                                    new_config = MLXConfig.from_env()
+                                    _prev_mlx = os.environ.get("NEXE_MLX_MODEL")
+                                    try:
+                                        os.environ["NEXE_MLX_MODEL"] = str(local_path)
+                                        from plugins.mlx_module.core.config import MLXConfig
+                                        new_config = MLXConfig.from_env()
+                                    finally:
+                                        if _prev_mlx is None:
+                                            os.environ.pop("NEXE_MLX_MODEL", None)
+                                        else:
+                                            os.environ["NEXE_MLX_MODEL"] = _prev_mlx
                                     if hasattr(engine, '_node') and engine._node:
                                         if engine._node.config.model_path != new_config.model_path:
                                             engine._node.config = new_config
@@ -615,11 +627,18 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             logger.info(f"MLX model switched to: {local_path}")
 
                                 elif engine_name == "llama_cpp_module" and local_path.exists():
-                                    os.environ["NEXE_LLAMA_CPP_MODEL"] = str(local_path)
-                                    from plugins.llama_cpp_module.core.config import LlamaCppConfig
-                                    from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
-                                    from plugins.llama_cpp_module.core.model_pool import ModelPool
-                                    new_config = LlamaCppConfig.from_env()
+                                    _prev_llama = os.environ.get("NEXE_LLAMA_CPP_MODEL")
+                                    try:
+                                        os.environ["NEXE_LLAMA_CPP_MODEL"] = str(local_path)
+                                        from plugins.llama_cpp_module.core.config import LlamaCppConfig
+                                        from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
+                                        from plugins.llama_cpp_module.core.model_pool import ModelPool
+                                        new_config = LlamaCppConfig.from_env()
+                                    finally:
+                                        if _prev_llama is None:
+                                            os.environ.pop("NEXE_LLAMA_CPP_MODEL", None)
+                                        else:
+                                            os.environ["NEXE_LLAMA_CPP_MODEL"] = _prev_llama
                                     if hasattr(engine, '_node') and engine._node:
                                         old_path = engine._node.config.model_path
                                         if old_path != new_config.model_path:
@@ -749,9 +768,15 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             base_system_prompt = _get_system_prompt(_state, _lang)
                         except Exception:
                             base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
-                        # Inject current date+time so the model knows when "now" is
+                        # Injecta data + hora (amb segons + zona horària local) al
+                        # system prompt perquè el model pugui resoldre consultes
+                        # sensibles al temps ("quina hora és?", "quant fa que…").
                         from datetime import datetime as _dt
-                        system_prompt = base_system_prompt + f"\n\nToday: {_dt.now().strftime('%Y-%m-%d')}"
+                        _now = _dt.now().astimezone()
+                        system_prompt = (
+                            base_system_prompt
+                            + f"\n\nNow: {_now.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+                        )
 
                         # 4. Prepare messages payload for engine
                         engine_messages = [
