@@ -401,7 +401,7 @@ class NexeUI {
         s('#stopBtn', 'stop', 'title');
         // Footer
         const thinkText = document.querySelector('.thinking-badge span:last-child');
-        if (thinkText) thinkText.textContent = this.t('thinking');
+        if (thinkText) this._setThinkingText(thinkText, this.t('thinking'));
         const statusText = document.querySelector('.status-indicator span');
         if (statusText) statusText.textContent = this.t('connected');
         // Language selector
@@ -426,6 +426,22 @@ class NexeUI {
         if (typeof lucide !== 'undefined') lucide.createIcons();
         // Refresh collection warning with updated language
         if (this._listenersAttached) this._updateCollectionWarning();
+    }
+
+    _setThinkingText(spanEl, text) {
+        // Descompon el text en un <span> per lletra perquè el CSS pugui
+        // aplicar un `animation-delay` diferent a cada una i formar una
+        // "onada" estil loading. Preserva espais amb nbsp ( ) perquè
+        // inline-block no col·lapsi el whitespace.
+        spanEl.textContent = '';
+        const chars = [...(text || '')];
+        chars.forEach((ch, i) => {
+            const letter = document.createElement('span');
+            letter.className = 'think-char';
+            letter.style.setProperty('--i', String(i));
+            letter.textContent = ch === ' ' ? ' ' : ch;
+            spanEl.appendChild(letter);
+        });
     }
 
     setAiState(state) {
