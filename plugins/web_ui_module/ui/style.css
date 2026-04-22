@@ -379,7 +379,19 @@ body.frame-hidden { padding: 0; }
    .footer-right ja separa prou del .status-indicator. */
 .site-footer .thinking-badge {
     margin-top: 0;
-    margin-right: 25px;
+    margin-right: 10px;
+}
+
+/* Animació del text "Thinking" al footer global — pulse d'opacitat
+   (reemplaça l'efecte que feien els 3 dots eliminats). Només aplica
+   al span amb text perquè no hi ha altres fills ara. */
+.site-footer .thinking-badge span {
+    animation: thinking-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes thinking-pulse {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 1; }
 }
 
 .sidebar-footer {
