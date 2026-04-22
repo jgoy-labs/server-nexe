@@ -1025,21 +1025,33 @@ body.light .icon-moon,
     transition: border-color 0.25s ease, color 0.25s ease;
 }
 
-/* Avatar NEXE gris → taronja mentre la IA pensa/genera — només a la
-   bombolla d'assistant més recent (les anteriors ja han acabat). */
+/* Avatar NEXE en mode "thinking/streaming": cicle lent de color
+   com un semàfor ambre (taronja intens → ambre suau → taronja). Canvi
+   continu per deixar clar que l'estat no és estàtic, sense ser
+   intrusiu: 3.5s per volta. */
 html[data-ai-state="thinking"] .message.assistant:last-of-type .message-avatar,
 html[data-ai-state="streaming"] .message.assistant:last-of-type .message-avatar {
-    border-color: var(--primary-color);
-    color: var(--primary-color);
+    animation: nexe-avatar-amber 3.5s ease-in-out infinite;
 }
 
-/* Placeholder "Barrinant…" dins la bombolla buida d'assistant durant
-   l'espera del primer token. Dóna aire perquè la wave sigui llegible. */
+@keyframes nexe-avatar-amber {
+    0%, 100% { border-color: var(--primary-color);     color: var(--primary-color); }
+    33%      { border-color: rgba(255, 160, 0, 1);     color: rgba(255, 160, 0, 1); }
+    66%      { border-color: rgba(255, 200, 0, 0.95);  color: rgba(255, 200, 0, 0.95); }
+}
+
+/* Placeholder "Processant…/Processing…/Procesando…" dins la bombolla
+   buida d'assistant durant l'espera del primer token. La "bandera"
+   esquerra (border-left) fa un pulse ambre per senyalar activitat
+   abans no arribi el primer token. */
 .message.assistant .message-text.thinking-placeholder {
-    background: transparent;
-    border-left-color: transparent;
     color: var(--primary-color);
-    opacity: 0.9;
+    animation: placeholder-border 1.5s ease-in-out infinite;
+}
+
+@keyframes placeholder-border {
+    0%, 100% { border-left-color: rgba(230, 32, 32, 0.3); }
+    50%      { border-left-color: rgba(255, 160, 0, 0.9); }
 }
 
 .message-avatar svg {
