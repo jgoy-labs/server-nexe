@@ -354,7 +354,11 @@ body.frame-hidden { padding: 0; }
     transform: scale(1.1);
 }
 
-/* Indicador Thinking al sidebar footer */
+/* Indicador Thinking — usat al sidebar footer i al footer global.
+   `margin-top` només fa falta dins el sidebar-footer (apilat vertical);
+   dins `.site-footer .footer-right` s'alinea horitzontalment amb la
+   resta de controls i cal resetejar-lo per no solapar-se amb el
+   `.status-indicator`. */
 .thinking-badge {
     display: none;
     align-items: center;
@@ -368,6 +372,11 @@ body.frame-hidden { padding: 0; }
 }
 
 .thinking-badge.active { display: flex; }
+
+/* Reset del margin al footer global (no apilat com al sidebar). */
+.site-footer .thinking-badge {
+    margin-top: 0;
+}
 
 .thinking-dots span {
     display: inline-block;
@@ -887,7 +896,9 @@ body.light .icon-moon,
 }
 
 .message.user {
-    background: var(--bg-tertiary);
+    /* El fons està al `.message-text` per simetria amb l'assistant i perquè
+       els `.message-stats` (tokens + copy) quedin FORA de la bombolla. */
+    background: transparent;
 }
 
 .message.assistant {
@@ -940,9 +951,16 @@ body.light .icon-moon,
     word-break: break-word;
 }
 
-/* User messages: keep plain text */
+/* User messages: keep plain text + bombolla pròpia (igual que l'assistant
+   té la seva bombolla vermella clara al text, l'usuari té la grisa). Així
+   els stats queden al dessota sense fons. */
 .message.user .message-text {
     white-space: pre-wrap;
+}
+.message.user .message-text:not(:empty) {
+    background: var(--bg-tertiary);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
 }
 
 /* Imatge inline al chat (pujada per l'usuari) */
