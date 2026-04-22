@@ -44,13 +44,19 @@ class ChatSession:
         self._recently_deleted_facts: list = []  # Transient, not persisted to disk
 
     def add_message(self, role: str, content: str, stats: dict = None,
-                    image_b64: str = None):
+                    image_b64: str = None, image_type: str = None):
         """Afegir missatge a l'historial.
 
         `image_b64` (bug #19c): si l'usuari adjunta una imatge al missatge,
         es persisteix al mateix dict que el text per tal que reapareixi en
         recarregar la sessió. Es guarda NOMÉS si té valor — missatges de
         només text mantenen el format original al disc (backward compat).
+
+        `image_type` (fix 2026-04-22): el MIME (`image/jpeg`, `image/png`…)
+        és necessari per reconstruir un `data:<mime>;base64,<b64>` vàlid
+        al frontend quan es recarrega la sessió. Sense ell, Safari i
+        alguns navigators no infereixen el format del b64 i la imatge
+        no es pinta.
         """
         msg = {
             "role": role,
@@ -61,6 +67,8 @@ class ChatSession:
             msg["stats"] = stats
         if image_b64:
             msg["image_b64"] = image_b64
+            if image_type:
+                msg["image_type"] = image_type
         self.messages.append(msg)
         self.last_activity = datetime.now(timezone.utc)
 

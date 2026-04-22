@@ -425,6 +425,13 @@ body.frame-hidden { padding: 0; }
     gap: 0.4rem;
 }
 
+/* Footer-right té elements més densos (select, thinking-badge amb dots,
+   status-dot amb halo box-shadow). Cal més aire perquè el halo del dot
+   i l'últim "Thinking" no trepitgin el "Connected". */
+.footer-right {
+    gap: 0.9rem;
+}
+
 .footer-text {
     font-size: 0.72rem;
     color: var(--text-muted);
@@ -759,6 +766,14 @@ body.light .icon-moon,
     gap: 0.5rem;
     font-size: 0.875rem;
     color: var(--text-secondary);
+}
+
+/* Al footer global el .status-indicator va amb la resta de controls
+   petits (lang-select, thinking-badge a 0.72rem). Igualar per no
+   trencar el baseline. */
+.site-footer .status-indicator {
+    font-size: 0.72rem;
+    gap: 0.4rem;
 }
 
 .status-dot {
