@@ -380,7 +380,10 @@ body.frame-hidden { padding: 0; }
    taronges ni el text "Thinking" no xoqui amb "Connected". */
 .site-footer .thinking-badge {
     margin-top: 0;
-    margin-right: 60px;
+    /* 75px: valor final calibrat empíricament per Jordi (iteracions
+       20→35→45→60→75). Sota això el text "Thinking" trepitja el
+       "Connected" del `.status-indicator`. */
+    margin-right: 75px;
 }
 
 .thinking-dots span {
