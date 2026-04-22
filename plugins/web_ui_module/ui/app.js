@@ -28,7 +28,7 @@ const UI_STRINGS = {
         rag_panel_low: "<strong>← Baix (0.20–0.35):</strong> Inclou més documents. El model té més info per respondre.",
         rag_panel_high: "<strong>→ Alt (0.50–0.70):</strong> Filtre estricte. Descarta documents. <em>El model pot inventar.</em>",
         rag_panel_rec: "<strong>Recomanat: 0.35–0.45</strong> — el model rep prou context sense soroll.",
-        thinking: "Pensant...",
+        thinking: "Barrinant...",
         connected: "Connectat",
         disconnected: "Desconnectat",
         toggle_theme: "Canviar tema",
@@ -1513,6 +1513,14 @@ class NexeUI {
                 const messages = this.chatMessages.querySelectorAll('.message.assistant');
                 const lastMsg = messages[messages.length - 1];
                 assistantMessageDiv = lastMsg.querySelector('.message-text');
+                // Placeholder amb onada de lletres mentre esperem el primer
+                // token. La classe `thinking-placeholder` serveix com a
+                // marcador — al primer token real `_clearThinkingPlaceholder`
+                // neteja el text abans de començar a escriure.
+                if (assistantMessageDiv) {
+                    assistantMessageDiv.classList.add('thinking-placeholder');
+                    this._setThinkingText(assistantMessageDiv, this.t('thinking'));
+                }
                 let loadingEl = null;
 
                 // Think state machine
@@ -1933,6 +1941,11 @@ class NexeUI {
                     // Strip [DEL:N:...] tokens from final render
                     fullResponse = fullResponse.replace(/\[DEL:\d+:.+?\]/g, '');
                     // Note: renderMarkdown sanitizes HTML via marked.js (safe render)
+                    // Guard: si per algun motiu no va entrar mai a _scheduleRender,
+                    // netejar el placeholder-classe aquí (no visible però l'eliminem).
+                    if (assistantMessageDiv.classList.contains('thinking-placeholder')) {
+                        assistantMessageDiv.classList.remove('thinking-placeholder');
+                    }
                     assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse);
                     if (tMode !== 'responding' && tMode !== 'init') closeThinkBlock();
                     // Stats per missatge
@@ -2746,6 +2759,12 @@ class NexeUI {
     _scheduleRender(el, content) {
         // Render markdown max every 80ms to avoid overloading the DOM
         if (this._renderTimer) return;
+        // Primer token real — treu el placeholder "Barrinant…" wave que
+        // estava a la bombolla buida.
+        if (el && el.classList.contains('thinking-placeholder')) {
+            el.classList.remove('thinking-placeholder');
+            el.textContent = '';
+        }
         this._renderTimer = setTimeout(() => {
             this._renderTimer = null;
             // renderMarkdown now centralizes the strip (bug #18 follow-up)

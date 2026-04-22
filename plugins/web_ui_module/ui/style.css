@@ -1022,6 +1022,24 @@ body.light .icon-moon,
 .message.assistant .message-avatar {
     background: var(--bg-secondary);
     border: 1px solid var(--border);
+    transition: border-color 0.25s ease, color 0.25s ease;
+}
+
+/* Avatar NEXE gris → taronja mentre la IA pensa/genera — només a la
+   bombolla d'assistant més recent (les anteriors ja han acabat). */
+html[data-ai-state="thinking"] .message.assistant:last-of-type .message-avatar,
+html[data-ai-state="streaming"] .message.assistant:last-of-type .message-avatar {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+/* Placeholder "Barrinant…" dins la bombolla buida d'assistant durant
+   l'espera del primer token. Dóna aire perquè la wave sigui llegible. */
+.message.assistant .message-text.thinking-placeholder {
+    background: transparent;
+    border-left-color: transparent;
+    color: var(--primary-color);
+    opacity: 0.9;
 }
 
 .message-avatar svg {
