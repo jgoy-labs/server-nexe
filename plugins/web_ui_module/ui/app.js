@@ -1811,6 +1811,16 @@ class NexeUI {
                                 <span>${this.t('model_loading')}… <strong>${loadingModel}</strong>${backendLabel ? ` <em class="loading-backend">[${backendLabel}]</em>` : ''} — <em class="loading-timer">0s</em></span>
                             `;
                             lastMsg.querySelector('.message-content').insertBefore(loadingEl, assistantMessageDiv);
+                            // Durant la càrrega del model a VRAM, el loadingEl blau
+                            // és la signal primària — amaguem el placeholder
+                            // "Processant…" per no xafar-lo visualment. Tornarà
+                            // al seu lloc amb el primer token real (si el model
+                            // encara està "pensant") o simplement el text
+                            // streaming sobrescriurà.
+                            if (assistantMessageDiv.classList.contains('thinking-placeholder')) {
+                                assistantMessageDiv.classList.remove('thinking-placeholder');
+                                assistantMessageDiv.textContent = '';
+                            }
                             this.scrollToBottom();
                             // Real-time timer
                             this._loadStartTime = Date.now();
