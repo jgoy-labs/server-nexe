@@ -382,8 +382,15 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         session = session_mgr.get_or_create_session(session_id)
         # Bug #19c — persist the attached image along with the user message
         # so that reloading the session restores it in the UI. Only the
-        # already-validated base64 (size + MIME) is persisted.
-        session.add_message("user", message, image_b64=image_b64)
+        # already-validated base64 (size + MIME) is persisted. Fix 2026-04-22:
+        # also persist the MIME so the frontend can rebuild `data:<mime>;…`
+        # exactly — Safari does not infer the type from base64 magic bytes.
+        _persisted_image_type = body.get("image_type") if image_b64 else None
+        session.add_message(
+            "user", message,
+            image_b64=image_b64,
+            image_type=_persisted_image_type,
+        )
         session_mgr._save_session_to_disk(session)
 
         # Detect intent (save, recall, or chat)

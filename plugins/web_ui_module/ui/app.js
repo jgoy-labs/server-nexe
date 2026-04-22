@@ -1393,7 +1393,15 @@ class NexeUI {
         this.chatMessages.innerHTML = '';
 
         messages.forEach(msg => {
-            this.addMessageToChat(msg.role, msg.content, false, msg.stats || null);
+            // Fix 2026-04-22: reconstrueix data URL de la imatge persistida
+            // a la sessió. Sense això, post-reinici la imatge desapareixia
+            // tot i tenir `image_b64` al disc.
+            let imageUrl = null;
+            if (msg.image_b64) {
+                const mime = msg.image_type || 'image/jpeg';
+                imageUrl = `data:${mime};base64,${msg.image_b64}`;
+            }
+            this.addMessageToChat(msg.role, msg.content, false, msg.stats || null, imageUrl);
         });
 
         this.scrollToBottom();
