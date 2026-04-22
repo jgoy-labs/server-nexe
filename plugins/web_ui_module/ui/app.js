@@ -1109,6 +1109,12 @@ class NexeUI {
         const model = modelSel.value;
         const selectedOpt = backendSel.selectedOptions[0];
         const wasDisconnected = selectedOpt && selectedOpt.dataset.connected === '0';
+        // Flag: el següent chat probablement disparar à MODEL_LOADING (el
+        // model nou encara no és a VRAM). `sendMessage` consulta aquest
+        // flag per saltar-se el placeholder "Processant…" wave i deixar
+        // que el banner blau de càrrega sigui la signal primària. El flag
+        // es neteja al MODEL_READY o al final del stream.
+        this._modelJustChanged = true;
 
         const el = document.getElementById('modelInfoText');
         if (wasDisconnected && el) {
@@ -1513,11 +1519,19 @@ class NexeUI {
                 const messages = this.chatMessages.querySelectorAll('.message.assistant');
                 const lastMsg = messages[messages.length - 1];
                 assistantMessageDiv = lastMsg.querySelector('.message-text');
-                // Placeholder amb onada de lletres mentre esperem el primer
-                // token. La classe `thinking-placeholder` serveix com a
-                // marcador — al primer token real `_clearThinkingPlaceholder`
-                // neteja el text abans de començar a escriure.
-                if (assistantMessageDiv) {
+                // Placeholder "Processant…" wave només quan tots dos
+                // condicionals ho permeten (lògica Jordi 2026-04-22):
+                //   (a) el toggle de thinking mode està OFF — si està ON,
+                //       el model obrirà un `.think-block` amb el seu propi
+                //       indicador i no cal ocupar la bombolla.
+                //   (b) l'usuari NO acaba de canviar de model — si n'ha
+                //       canviat, el `MODEL_LOADING` blau és la signal
+                //       primària; el placeholder arribaria tard igualment.
+                const _thinkOn = (() => {
+                    const tt = document.getElementById('thinkingToggle');
+                    return tt && tt.checked;
+                })();
+                if (assistantMessageDiv && !_thinkOn && !this._modelJustChanged) {
                     assistantMessageDiv.classList.add('thinking-placeholder');
                     this._setThinkingText(assistantMessageDiv, this.t('thinking'));
                 }
@@ -1833,6 +1847,9 @@ class NexeUI {
                         // Detect MODEL_READY (model loaded, starts responding)
                         if (chunk.includes('\x00[MODEL_READY]\x00')) {
                             chunk = chunk.replace('\x00[MODEL_READY]\x00', '');
+                            // Model ja carregat — si l'usuari envia més chats,
+                            // el placeholder "Processant…" wave ja pot tornar.
+                            this._modelJustChanged = false;
                             if (this._loadingTimer) { clearInterval(this._loadingTimer); this._loadingTimer = null; }
                             if (loadingEl) {
                                 const elapsed = Math.round((Date.now() - (this._loadStartTime || Date.now())) / 1000);
@@ -1887,6 +1904,9 @@ class NexeUI {
                     }
                     // Streaming done — if loading indicator remains, mark as loaded
                     if (this._loadingTimer) { clearInterval(this._loadingTimer); this._loadingTimer = null; }
+                    // Reset flag si no s'ha netejat via MODEL_READY (ex: model
+                    // ja estava carregat i no s'ha emès `[MODEL_READY]`).
+                    this._modelJustChanged = false;
                     if (loadingEl) {
                         const elapsed = Math.round((Date.now() - (this._loadStartTime || Date.now())) / 1000);
                         loadingEl.className = 'model-loading-indicator loaded';
