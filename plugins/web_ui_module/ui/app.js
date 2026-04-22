@@ -1852,12 +1852,27 @@ class NexeUI {
                             this._modelJustChanged = false;
                             if (this._loadingTimer) { clearInterval(this._loadingTimer); this._loadingTimer = null; }
                             if (loadingEl) {
-                                const elapsed = Math.round((Date.now() - (this._loadStartTime || Date.now())) / 1000);
-                                loadingEl.className = 'model-loading-indicator loaded';
-                                const _be = loadingEl.querySelector('.loading-backend');
-                                const _beText = _be ? ` ${_be.outerHTML}` : '';
-                                loadingEl.innerHTML = `<span>✓ ${this.t('model_loaded')} (${elapsed}s)${_beText}</span>`;
+                                const _loadingElRef = loadingEl;
                                 loadingEl = null;
+                                const startedAt = this._loadStartTime || Date.now();
+                                const visibleMs = Date.now() - startedAt;
+                                // Garantia mínima de 700ms de banner blau visible —
+                                // si MODEL_LOADING i MODEL_READY arriben al mateix
+                                // chunk (cas càrregues molt ràpides), l'usuari veia
+                                // directament el verd "0s" sense veure mai el blau.
+                                const MIN_BLUE_MS = 700;
+                                const finalize = () => {
+                                    const totalSec = Math.round((Date.now() - startedAt) / 1000);
+                                    _loadingElRef.className = 'model-loading-indicator loaded';
+                                    const _be = _loadingElRef.querySelector('.loading-backend');
+                                    const _beText = _be ? ` ${_be.outerHTML}` : '';
+                                    _loadingElRef.innerHTML = `<span>✓ ${this.t('model_loaded')} (${totalSec}s)${_beText}</span>`;
+                                };
+                                if (visibleMs < MIN_BLUE_MS) {
+                                    setTimeout(finalize, MIN_BLUE_MS - visibleMs);
+                                } else {
+                                    finalize();
+                                }
                             }
                         }
 
