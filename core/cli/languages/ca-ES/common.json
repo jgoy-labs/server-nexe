@@ -80,6 +80,41 @@
    "executing": "Executant",
    "success": "Èxit",
    "failed": "Fallat"
+  },
+  "version_banner": "Nexe CLI v{version}",
+  "go": {
+   "starting_server": "Iniciant Nexe Server...",
+   "stopping_sigterm": "\n👋 Aturant (SIGTERM)...",
+   "stopping": "\n👋 Aturant..."
+  },
+  "stop": {
+   "no_services": "ℹ️  Cap servei Nexe actiu.",
+   "detected_services": "Serveis detectats:",
+   "cancelled": "Cancel·lat.",
+   "services_stopped": "\n✅ Serveis aturats.",
+   "stopped_ok": "  ✓ {name} aturat (PID {pid})",
+   "no_longer_exists": "  - {name} ja no existeix (PID {pid})",
+   "permission_denied": "  ✗ {name} — permís denegat (PID {pid})"
+  },
+  "server_status": {
+   "offline": "✗ Servidor offline: {msg}",
+   "healthy": "✓ Servidor funciona correctament",
+   "unknown_status": "⚠ Estat del servidor: {st}"
+  },
+  "hardware": {
+   "analyzing": "Analitzant maquinari..."
+  },
+  "common": {
+   "aborted": "\nCancel·lat.",
+   "interrupted": "\nInterromput."
+  },
+  "logs": {
+   "file_not_found": "⚠️ Fitxer de log no trobat: {path}",
+   "following": "👀 Seguint logs de: {path} (últimes {last} línies)",
+   "press_ctrl_c": "--- Premeu Ctrl+C per sortir ---",
+   "stopping_viewer": "\n👋 Aturant el visor de logs.",
+   "dir_not_found": "❌ Directori de logs no trobat: {path}",
+   "no_files": "📭 Cap fitxer de log trobat a storage/logs/"
   }
  }
 }

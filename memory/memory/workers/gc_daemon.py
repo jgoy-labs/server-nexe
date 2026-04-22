@@ -9,10 +9,11 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import asyncio
 import logging
 import math
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from memory.memory.config import MemoryConfig
 
@@ -232,4 +233,65 @@ class GCDaemon:
         return result
 
 
-__all__ = ["GCDaemon"]
+async def run_gc_for_active_users(
+    gc_daemon: "GCDaemon",
+    store,
+    stop_flag: Optional[Callable[[], bool]] = None,
+) -> None:
+    """Invoke `gc_daemon.run_gc(user_id)` for every active episodic user.
+
+    Runs each `run_gc` call **on the event loop thread** — SQLiteStore
+    caches connections without check_same_thread=False, so offloading to
+    a worker thread would hit `ProgrammingError: SQLite objects created
+    in a thread can only be used in that same thread` (silently caught
+    inside run_gc and turned into a no-op). GCDaemon work is light
+    enough (scoring + a couple of SQL statements per user) to run
+    synchronously; we yield control via `await asyncio.sleep(0)` between
+    users so other tasks can progress.
+
+    Never raises — individual user failures are logged and skipped.
+
+    Args:
+        gc_daemon: a GCDaemon instance.
+        store: SQLite store with `_connect()`.
+        stop_flag: optional callable that returns True to abort early
+            between users (cooperative cancellation).
+    """
+    if not gc_daemon or not store:
+        return
+
+    user_ids: list[str] = []
+    conn = None
+    try:
+        conn = store._connect()
+        cursor = conn.execute(
+            "SELECT DISTINCT user_id FROM episodic WHERE state = 'active'"
+        )
+        user_ids = [row[0] for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error("run_gc_for_active_users: user listing failed: %s", e)
+        return
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    for user_id in user_ids:
+        if stop_flag and stop_flag():
+            break
+        try:
+            result = gc_daemon.run_gc(user_id)
+            deleted = result.get("episodic_deleted", 0)
+            if deleted:
+                logger.info(
+                    "GC user=%s: %d episodic pruned, budget_enforced=%s",
+                    user_id, deleted, result.get("budget_enforced", False),
+                )
+        except Exception as e:
+            logger.error("run_gc_for_active_users: run_gc failed for %s: %s", user_id, e)
+        await asyncio.sleep(0)
+
+
+__all__ = ["GCDaemon", "run_gc_for_active_users"]

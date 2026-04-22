@@ -16,6 +16,7 @@ from typing import Optional, List
 from .router import CLIRouter
 from .output import print_banner, print_modules_table, print_status, print_error
 from .config import NexeConfig
+from .i18n import t
 from core.version import __version__
 
 class DynamicGroup(click.Group):
@@ -111,7 +112,7 @@ def app(ctx: click.Context, version: bool, no_banner: bool):
   ctx.obj['no_banner'] = no_banner
 
   if version:
-    click.echo(f"Nexe CLI v{__version__}")
+    click.echo(t("cli.version_banner", version=__version__))
     ctx.exit(0)
 
   if ctx.invoked_subcommand is None:
@@ -168,12 +169,12 @@ def _start_nexe(ctx: click.Context):
 
   # Item 14.bis — explicit SIGTERM handler
   def _term_handler(signum, frame):
-    click.echo("\n👋 Stopping (SIGTERM)...")
+    click.echo(t("cli.go.stopping_sigterm"))
     sys.exit(0)
 
   signal.signal(signal.SIGTERM, _term_handler)
 
-  click.echo("Starting Nexe Server...")
+  click.echo(t("cli.go.starting_server"))
   try:
     result = subprocess.run(
       [sys.executable, "-m", "core.app"],
@@ -182,7 +183,7 @@ def _start_nexe(ctx: click.Context):
     )
     ctx.exit(result.returncode)
   except KeyboardInterrupt:
-    click.echo("\n👋 Stopping...")
+    click.echo(t("cli.go.stopping"))
     ctx.exit(0)
 
 @app.command()
@@ -243,29 +244,29 @@ def stop(ctx: click.Context, force: bool):
       pass
 
   if not found:
-    click.echo("ℹ️  No Nexe services are running.")
+    click.echo(t("cli.stop.no_services"))
     return
 
-  click.echo("Detected services:")
+  click.echo(t("cli.stop.detected_services"))
   for name, _, pids in found:
     click.echo(f"  - {name} (PID: {', '.join(str(p) for p in pids)})")
 
   if not force:
     if not click.confirm("\nStop all services?", default=True):
-      click.echo("Cancelled.")
+      click.echo(t("cli.stop.cancelled"))
       return
 
   for name, _, pids in found:
     for pid in pids:
       try:
         os.kill(pid, signal.SIGTERM)
-        click.echo(f"  ✓ {name} stopped (PID {pid})")
+        click.echo(t("cli.stop.stopped_ok", name=name, pid=pid))
       except ProcessLookupError:
-        click.echo(f"  - {name} no longer exists (PID {pid})")
+        click.echo(t("cli.stop.no_longer_exists", name=name, pid=pid))
       except PermissionError:
-        click.echo(f"  ✗ {name} — permission denied (PID {pid})")
+        click.echo(t("cli.stop.permission_denied", name=name, pid=pid))
 
-  click.echo("\n✅ Services stopped.")
+  click.echo(t("cli.stop.services_stopped"))
 
 @app.command()
 @click.option('--json', 'as_json', is_flag=True, help='Output JSON')
@@ -284,11 +285,17 @@ def health(ctx: click.Context, as_json: bool):
     click.echo(json.dumps(data, indent=2, default=str))
   else:
     if data.get("error"):
-      click.echo(click.style(f"✗ Server offline: {data.get('message', 'unreachable')}", fg="red"))
+      click.echo(click.style(
+        t("cli.server_status.offline", msg=data.get('message', 'unreachable')),
+        fg="red",
+      ))
     elif data.get("status") == "healthy":
-      click.echo(click.style("✓ Server is healthy", fg="green"))
+      click.echo(click.style(t("cli.server_status.healthy"), fg="green"))
     else:
-      click.echo(click.style(f"⚠ Server status: {data.get('status', 'unknown')}", fg="yellow"))
+      click.echo(click.style(
+        t("cli.server_status.unknown_status", st=data.get('status', 'unknown')),
+        fg="yellow",
+      ))
 
 @app.command()
 @click.option('--json', 'as_json', is_flag=True, help='Output JSON')
@@ -317,7 +324,7 @@ def setup_models(ctx: click.Context, apply: bool):
     from pathlib import Path
     import toml
     
-    click.echo("Analyzing hardware...")
+    click.echo(t("cli.hardware.analyzing"))
     selector = ModelSelector()
     hw_info = selector.analyze()
     click.echo(f"  - System: {hw_info.system} {hw_info.machine}")
@@ -407,10 +414,10 @@ def main():
     e.show()
     sys.exit(e.exit_code)
   except click.Abort:
-    click.echo("\nAborted.", err=True)
+    click.echo(t("cli.common.aborted"), err=True)
     sys.exit(1)
   except KeyboardInterrupt:
-    click.echo("\nInterrupted.", err=True)
+    click.echo(t("cli.common.interrupted"), err=True)
     sys.exit(130)
   except SystemExit:
     raise

@@ -226,13 +226,36 @@ async def start_memory_service_v1(app, server_state):
         if ms:
             try:
                 from memory.memory.workers.dreaming_cycle import DreamingCycle
+                # Embedder is required for _sync_vector_index — without one
+                # DreamingCycle runs but episodic entries never reach Qdrant.
+                # SimpleEmbedder is a singleton, so this reuses any instance
+                # that might already have been warmed up elsewhere.
+                # Load in a thread: first-use TextEmbedding download + ONNX
+                # init can block the event loop 5-30 s on slow networks /
+                # cold caches, which would stall the lifespan startup.
+                embedder = None
+                try:
+                    from memory.embeddings.simple_embedder import get_embedder
+                    from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
+                    embedder = await asyncio.to_thread(
+                        get_embedder, DEFAULT_EMBEDDING_MODEL
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "DreamingCycle embedder unavailable — vector sync "
+                        "will be skipped (non-fatal): %s", e,
+                    )
                 dreaming = DreamingCycle(
                     store=ms._store,
                     vector_index=ms._vector_index,
+                    embedder=embedder,
                 )
                 server_state._dreaming_task = asyncio.create_task(dreaming.run())
                 server_state._dreaming_cycle = dreaming
-                logger.info("DreamingCycle background task started")
+                logger.info(
+                    "DreamingCycle background task started (embedder=%s)",
+                    "ready" if embedder is not None else "missing",
+                )
             except Exception as e:
                 logger.warning("DreamingCycle not started (non-fatal): %s", e)
 

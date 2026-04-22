@@ -329,7 +329,12 @@ class TestMLXExecuteBifurcation:
 
     @pytest.mark.asyncio
     async def test_images_with_vlm_uses_generate_vlm(self):
-        """Amb imatges i VLM actiu → _generate_vlm."""
+        """Amb imatges i VLM actiu → _generate_vlm.
+
+        execute() uses _detect_vlm_capability(config.model_path) as the
+        source of truth (not the _is_vlm singleton — can go stale when
+        switching VLM→text models). Mock the detector to True.
+        """
         self._reset_singleton()
 
         from plugins.mlx_module.core.config import MLXConfig
@@ -337,7 +342,7 @@ class TestMLXExecuteBifurcation:
 
         config = MLXConfig(model_path="/fake/vlm_model")
         node = MLXChatNode(config=config)
-        MLXChatNode._is_vlm = True  # Simula VLM carregat
+        MLXChatNode._is_vlm = True  # Singleton state (secondary; not used by execute)
 
         vlm_result = {
             "text": "Veig un gat.", "tokens": 4,
@@ -350,7 +355,8 @@ class TestMLXExecuteBifurcation:
             "vlm": True,
         }
 
-        with patch("asyncio.to_thread") as mock_thread:
+        with patch("plugins.mlx_module.core.chat._detect_vlm_capability", return_value=True), \
+             patch("asyncio.to_thread") as mock_thread:
             mock_thread.return_value = vlm_result
             result = await node.execute({
                 "system": "",

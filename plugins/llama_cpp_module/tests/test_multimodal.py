@@ -53,8 +53,10 @@ class TestModelPoolMmproj:
         config = self._config(mmproj="")
         pool = ModelPool(config)
 
+        # Patch at the source module: model_pool does `from llama_cpp import Llama`
+        # lazily inside _create_instance, so the name never lives on model_pool.
         mock_llama_cls = MagicMock(return_value=MagicMock())
-        with patch("plugins.llama_cpp_module.core.model_pool.Llama", mock_llama_cls):
+        with patch("llama_cpp.Llama", mock_llama_cls):
             pool._create_instance()
 
         call_kwargs = mock_llama_cls.call_args.kwargs
@@ -71,7 +73,7 @@ class TestModelPoolMmproj:
         pool = ModelPool(config)
 
         mock_llama_cls = MagicMock(return_value=MagicMock())
-        with patch("plugins.llama_cpp_module.core.model_pool.Llama", mock_llama_cls):
+        with patch("llama_cpp.Llama", mock_llama_cls):
             pool._create_instance()
 
         call_kwargs = mock_llama_cls.call_args.kwargs

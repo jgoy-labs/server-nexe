@@ -14,6 +14,8 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
+from plugins.web_ui_module.manifest import get_module_instance
+
 
 @pytest.fixture(autouse=True)
 def set_api_key(monkeypatch):
@@ -23,12 +25,33 @@ def set_api_key(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _ensure_module_initialized():
+    """Post-fix 5abd171 (session_manager late-init).
+
+    WebUIModule.__init__ no longer builds a SessionManager; initialize()
+    does. In production the lifespan calls initialize() before any
+    request hits the router. In tests we need to do the same, otherwise
+    _SessionManagerProxy raises "accessed before initialize()" on the
+    first endpoint call.
+    """
+    inst = get_module_instance()
+    if not inst._initialized:
+        asyncio.run(inst.initialize({"config": {}}))
+
+
+@pytest.fixture(autouse=True)
 def disable_rate_limiter():
-    """Disable rate limiter during tests to avoid 429s."""
+    """Disable rate limiter during tests to avoid 429s.
+
+    Save the previous state and restore it on teardown, so this fixture
+    does not silently re-enable the limiter for tests run afterwards
+    that expected it disabled.
+    """
     from core.dependencies import limiter
+    previous = limiter.enabled
     limiter.enabled = False
     yield
-    limiter.enabled = True
+    limiter.enabled = previous
 
 
 @pytest.fixture

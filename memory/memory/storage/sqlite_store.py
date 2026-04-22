@@ -63,6 +63,21 @@ class SQLiteStore:
 
         We detect this by attempting a lightweight no-op against the
         connection.  On failure we discard it and create a fresh one.
+
+        ⚠️ THREAD-SAFETY WARNING: this connection is created without
+        ``check_same_thread=False`` and is cached in ``self._conn``. Any
+        caller that offloads work via ``asyncio.to_thread`` /
+        ``run_in_executor`` MUST either (a) create its own connection
+        inside the worker (see engines/persistence_sqlite.py which uses
+        a per-call ``with self._connect_sqlite() as conn``), or (b)
+        avoid calling ``_connect()`` from the worker thread. Crossing
+        threads on the cached connection raises
+        ``sqlite3.ProgrammingError: SQLite objects created in a thread
+        can only be used in that same thread`` — which, if the caller
+        swallows exceptions (as GCDaemon.run_gc does), silently turns
+        the whole code path into a no-op. See
+        ``memory/workers/gc_daemon.run_gc_for_active_users`` for the
+        canonical "run synchronously on the loop thread" pattern.
         """
         if self._conn is not None:
             try:
