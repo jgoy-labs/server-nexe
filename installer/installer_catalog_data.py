@@ -5,8 +5,18 @@ Location: installer/installer_catalog_data.py
 Description: Model catalog data (MODEL_CATALOG).
              4 tiers: small (8 GB), medium (16 GB), large (24 GB), xlarge (32 GB).
              Revised 2026-04-16 after empirical testing of 24 models.
+
+             2026-04-23 (F4.1 audit DoD-AUD-SX-0423 §2.7): added
+             MODEL_WEIGHT_SHA256 map and get_expected_sha256() helper for
+             post-download integrity verification. Kept as a separate map
+             so the Swift wizard models.json contract stays unchanged and
+             refresh scripts only touch a single structure.
 ────────────────────────────────────
 """
+
+from __future__ import annotations
+
+from typing import Optional
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MODEL CATALOG - 16 models across 4 RAM tiers
@@ -308,3 +318,126 @@ MODEL_CATALOG = {
         },
     ],
 }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# INTEGRITY — SHA256 pins for downloaded model weights (F4.1 audit DoD-AUD-SX-0423)
+# ═══════════════════════════════════════════════════════════════════════════
+# Map: (engine, model_id) → sha256 expected hex digest (64 chars) or None.
+#
+#   - engine: "mlx" | "ollama" | "gguf"
+#   - model_id: the exact string stored in MODEL_CATALOG[_]["mlx"/"ollama"/"gguf"]
+#
+# A ``None`` entry means the hash has not been pinned yet. The installer
+# logs a visible warning and proceeds (legacy mode). When a concrete
+# digest is present the installer aborts hard on mismatch — see
+# :func:`core.integrity.hashing.verify_sha256`.
+#
+# Hash formats by engine:
+#   - "mlx":    sha256 of the local snapshot_download directory, computed
+#               with ``core.integrity.hashing.sha256_of_dir`` (dotfile
+#               filter applied to skip HF cache .lock / .no_exist noise).
+#   - "ollama": sha256 reported by ``ollama show <model> --json`` under
+#               ``details.digest`` (hex, 64 lowercase chars).
+#   - "gguf":   sha256 of the downloaded .gguf file, single-shot
+#               ``core.integrity.hashing.sha256_of_file``.
+#
+# Keep this map in sync with MODEL_CATALOG: any new entry there MUST
+# ship an entry here (value may be None). The smoke test in
+# ``tests/test_installer_sha256_catalog.py`` enforces this.
+#
+# Refresh the values with ``scripts/refresh_model_hashes.py`` (optional
+# F4.1.b tool — regenerates from HF Hub API + local ollama daemon).
+# ═══════════════════════════════════════════════════════════════════════════
+MODEL_WEIGHT_SHA256: dict[tuple[str, str], Optional[str]] = {
+    # ── MLX snapshots (dir hash) ──────────────────────────────────────────
+    ("mlx", "mlx-community/gemma-3-4b-it-4bit"): None,
+    ("mlx", "mlx-community/Qwen3-4B-4bit"): None,
+    ("mlx", "mlx-community/gemma-4-e4b-it-4bit"): None,
+    ("mlx", "mlx-community/gemma-3-12b-it-4bit"): None,
+    ("mlx", "mlx-community/gemma-4-31b-it-8bit"): None,
+    ("mlx", "mlx-community/Qwen3-14B-MLX-4bit"): None,
+    ("mlx", "lmstudio-community/gpt-oss-20b-MLX-8bit"): None,
+    ("mlx", "mlx-community/gemma-3-27b-it-qat-4bit"): None,
+    # ── Ollama manifest digests (ollama show --json) ──────────────────────
+    ("ollama", "gemma3:4b"): None,
+    ("ollama", "qwen3.5:4b"): None,
+    ("ollama", "qwen3:4b"): None,
+    ("ollama", "gemma4:e4b"): None,
+    ("ollama", "hdnh2006/salamandra-7b-instruct:q4_K_M"): None,
+    ("ollama", "qwen3.5:9b"): None,
+    ("ollama", "gemma3:12b"): None,
+    ("ollama", "gemma4:31b"): None,
+    ("ollama", "qwen3:14b"): None,
+    ("ollama", "gpt-oss:20b"): None,
+    ("ollama", "qwen3.5:27b"): None,
+    ("ollama", "deepseek-r1:32b"): None,
+    ("ollama", "qwen3.5:35b-a3b"): None,
+    ("ollama", "csala/ALIA-40B:Q8_0"): None,
+    # ── GGUF direct downloads (single-file hash) ──────────────────────────
+    (
+        "gguf",
+        "https://huggingface.co/hdnh2006/BSC-LT-salamandra-7b-instruct-gguf/resolve/main/salamandra-7b-instruct-Q4_K_M.gguf",
+    ): None,
+    (
+        "gguf",
+        "https://huggingface.co/bartowski/gemma-3-27b-it-GGUF/resolve/main/gemma-3-27b-it-Q4_K_M.gguf",
+    ): None,
+    (
+        "gguf",
+        "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-32B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf",
+    ): None,
+    (
+        "gguf",
+        "https://huggingface.co/BSC-LT/ALIA-40b-instruct-2601-GGUF/resolve/main/ALIA-40b-instruct-2601-Q8_0.gguf",
+    ): None,
+}
+
+# Canonical engines recognised by ``get_expected_sha256``. Extending the
+# installer with a new engine (e.g. MLX-VLM) requires adding it here and
+# seeding MODEL_WEIGHT_SHA256 with the relevant ids.
+VALID_SHA256_ENGINES: frozenset[str] = frozenset({"mlx", "ollama", "gguf"})
+
+
+def get_expected_sha256(engine: str, model_id: str) -> Optional[str]:
+    """Return the pinned SHA256 for ``(engine, model_id)``.
+
+    Returns ``None`` when:
+    * the ``(engine, model_id)`` pair exists in MODEL_WEIGHT_SHA256 but
+      is still unpinned (legacy mode), or
+    * the pair is absent altogether — e.g. a local dev tag the user added
+      to Ollama. The installer treats "absent" and "pinned as None"
+      identically: a warning plus continue.
+
+    Raises
+    ------
+    ValueError
+        ``engine`` is not one of ``VALID_SHA256_ENGINES``. Callers that
+        introduce a new engine must update both the catalog and this
+        helper together, so an unknown engine is a coding bug, not a
+        legacy condition to swallow.
+    """
+    if engine not in VALID_SHA256_ENGINES:
+        raise ValueError(
+            f"Unknown engine {engine!r} for SHA256 lookup. "
+            f"Expected one of: {sorted(VALID_SHA256_ENGINES)}"
+        )
+    return MODEL_WEIGHT_SHA256.get((engine, model_id))
+
+
+def iter_catalog_model_ids() -> list[tuple[str, str]]:
+    """List every ``(engine, model_id)`` pair referenced by MODEL_CATALOG.
+
+    Used by the smoke test to enforce that every downloadable artefact in
+    the catalog has an entry in ``MODEL_WEIGHT_SHA256`` (value may be
+    ``None``). New models without an entry would otherwise silently bypass
+    the integrity check.
+    """
+    pairs: list[tuple[str, str]] = []
+    for category in MODEL_CATALOG.values():
+        for model in category:
+            for engine_key in ("mlx", "ollama", "gguf"):
+                value = model.get(engine_key)
+                if value:
+                    pairs.append((engine_key, value))
+    return pairs
