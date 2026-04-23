@@ -211,6 +211,13 @@ def _seed_fastembed_cache(bundle_embeddings_dir, cache_dir):
     `install.py`) troba el model ja present i no descarrega res de HuggingFace.
     RAG funciona offline des del primer boot.
 
+    F4.1 (audit DoD-AUD-SX-0423 §2.7): before copying, validate the bundle's
+    integrity manifest (``embeddings.manifest.json``). On mismatch,
+    ``DownloadIntegrityError`` propagates so the installer aborts before
+    poisoning the user's fastembed cache. Legacy DMGs (built before F4.1)
+    do not ship a manifest — the verifier logs a WARNING and we copy the
+    bundle as-is to stay compatible with existing 1.0.2-beta installs.
+
     Retorna True si s'ha sembrat, False si el bundle no és usable (inexistent,
     no és dir, o està buit). Idempotent: es pot cridar múltiples vegades.
     """
@@ -220,6 +227,17 @@ def _seed_fastembed_cache(bundle_embeddings_dir, cache_dir):
         return False
     if not any(bundle_embeddings_dir.iterdir()):
         return False
+
+    from installer.download_verify import verify_embedding_bundle
+    # The verifier returns True (pin matches), False (legacy DMG without
+    # manifest), or raises DownloadIntegrityError (tampered bundle). We
+    # surface the False case to stdout so the operator sees the gap
+    # instead of having it buried in a logger-only warning.
+    pinned = verify_embedding_bundle(bundle_embeddings_dir)
+    if not pinned:
+        print("  ⚠️  Embedding bundle: no SHA256 manifest "
+              "(legacy DMG) — proceeding without integrity enforcement")
+
     cache_dir.mkdir(parents=True, exist_ok=True)
     _shutil.copytree(
         str(bundle_embeddings_dir),

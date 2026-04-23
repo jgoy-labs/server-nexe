@@ -113,7 +113,72 @@ if [ "$SIZE_MB" -gt 800 ]; then
     echo "WARN: Embedding bundle is ${SIZE_MB} MB — larger than expected (~470 MB)" >&2
 fi
 
-# ── Step 6: Report ─────────────────────────────────────────────────────
+# ── Step 6: Integrity manifest (F4.1 audit DoD-AUD-SX-0423 §2.7) ───────
+# Emit `embeddings.manifest.json` alongside the downloaded model with the
+# SHA256 digests of the three critical files (model*.onnx, tokenizer.json,
+# config.json). The client installer (`installer/download_verify.py`:
+# `verify_embedding_bundle`) re-hashes these files at copy time and aborts
+# if any digest does not match — protecting against tampering on the
+# distribution channel or corruption during DMG build.
+#
+# The hashes are computed via sha256sum / shasum (both available on
+# macOS 14+ and any Linux host we build from). `find -L` follows the HF
+# hub cache symlinks so the digest is of the real blob bytes, not the
+# symlink target path.
+echo "==> Writing integrity manifest..."
+
+MANIFEST="$EMBEDDINGS_DIR/embeddings.manifest.json"
+
+# Locate the three critical files (first match — there should be only one).
+MODEL_ONNX=$(find -L "$EMBEDDINGS_DIR" -type f -name 'model*.onnx' -print -quit)
+TOKENIZER_JSON=$(find -L "$EMBEDDINGS_DIR" -type f -name 'tokenizer.json' -print -quit)
+CONFIG_JSON=$(find -L "$EMBEDDINGS_DIR" -type f -name 'config.json' -print -quit)
+
+if [ -z "$MODEL_ONNX" ] || [ -z "$TOKENIZER_JSON" ] || [ -z "$CONFIG_JSON" ]; then
+    echo "ERROR: Cannot locate the three critical files under $EMBEDDINGS_DIR" >&2
+    exit 6
+fi
+
+# Cross-platform sha256: prefer GNU sha256sum, fall back to BSD shasum.
+_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+MODEL_ONNX_HASH=$(_sha256 "$MODEL_ONNX")
+TOKENIZER_JSON_HASH=$(_sha256 "$TOKENIZER_JSON")
+CONFIG_JSON_HASH=$(_sha256 "$CONFIG_JSON")
+
+# We record the basename (stable across HF cache layouts) — the runtime
+# verifier locates the file by basename anywhere under the bundle root.
+MODEL_ONNX_NAME=$(basename "$MODEL_ONNX")
+TOKENIZER_JSON_NAME=$(basename "$TOKENIZER_JSON")
+CONFIG_JSON_NAME=$(basename "$CONFIG_JSON")
+
+GENERATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+cat > "$MANIFEST" <<EOF_MANIFEST
+{
+  "schema_version": 1,
+  "model_name": "$EMBEDDING_MODEL",
+  "generated_at": "$GENERATED_AT",
+  "files": {
+    "$MODEL_ONNX_NAME": "$MODEL_ONNX_HASH",
+    "$TOKENIZER_JSON_NAME": "$TOKENIZER_JSON_HASH",
+    "$CONFIG_JSON_NAME": "$CONFIG_JSON_HASH"
+  }
+}
+EOF_MANIFEST
+
+echo "    Manifest: $MANIFEST"
+echo "    $MODEL_ONNX_NAME: ${MODEL_ONNX_HASH:0:12}…"
+echo "    $TOKENIZER_JSON_NAME: ${TOKENIZER_JSON_HASH:0:12}…"
+echo "    $CONFIG_JSON_NAME: ${CONFIG_JSON_HASH:0:12}…"
+
+# ── Step 7: Report ─────────────────────────────────────────────────────
 echo ""
 echo "==> Embedding bundle ready"
 echo "    Location: $EMBEDDINGS_DIR"

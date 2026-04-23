@@ -231,6 +231,39 @@ cp /ruta/al/model.gguf storage/models/
 
 Reinicia el servidor per aplicar els canvis: `./nexe restart`
 
+## Verificacio d'integritat (SHA256)
+
+Des de la remediacio de l'audit `DoD-AUD-SX-0423` (§2.7), tots els pesos descarregats durant la instal·lacio es verifiquen amb SHA256 contra un cataleg intern (`installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256`). El check aplica a tres superficies de descarrega:
+
+| Backend | Que es verifica | Com |
+|---------|-----------------|-----|
+| **Hugging Face MLX** | SHA256 del directori del snapshot local (`local_dir` de `snapshot_download`) | `core.integrity.sha256_of_dir` ignorant dotfiles (`.lock`, `.no_exist`, ...) |
+| **GGUF** | SHA256 del fitxer `.gguf` descarregat via `curl` | `core.integrity.sha256_of_file` (stream 64 KB chunks) |
+| **Ollama** | Digest del manifest retornat per `ollama show --json <model>` | Parseja `details.digest` (o `digest` en schemes antics); normalitza el prefix `sha256:` |
+| **fastembed (bundle DMG)** | SHA256 de `model*.onnx`, `tokenizer.json` i `config.json` llegits del manifest `embeddings.manifest.json` generat per `build-embedding-bundle.sh` | `core.integrity.sha256_of_file` via `installer.download_verify.verify_embedding_bundle` |
+
+### Politica en cas de mismatch
+
+Quan el cataleg porta un pin (SHA256 concret) i el valor observat no coincideix, la instal·lacio aborta **hard** amb una excepcio `DownloadIntegrityError`. El fitxer descarregat es **preserva a disc** per a inspeccio post-mortem (l'installer no esborra mai descarregues parcials automaticament). El missatge d'error inclou:
+
+- Hash esperat vs hash observat (complet, 64 chars).
+- Ruta del fitxer o directori descarregat.
+- Instruccions de reintent especifiques per backend (`ollama rm && ollama pull`, `rm storage/models/<file> && ./nexe model pull`, etc.).
+
+### Mode legacy
+
+Les entrades del cataleg amb pin `None` (per exemple models afegits despres d'un DMG ja publicat) **no aborten**. L'installer emet un `WARNING` visible (`⚠️ <model>: SHA256 not pinned in catalog`) i continua. Aixo preserva compatibilitat amb instal·lacions creades amb DMG anteriors a la v1.0.3-beta.
+
+Per a l'embedding bundle, un DMG sense `embeddings.manifest.json` (build anterior a F4.1) també continua en mode legacy amb un warning a stdout.
+
+### Protecció extra: escapament per symlinks
+
+`verify_embedding_bundle` refusa seguir symlinks que apunten fora del directori del bundle, fins i tot si el hash del fitxer target coincidiria amb el pin. Impedeix que un DMG tampered apunti `model.onnx` a un fitxer extern amb hash conegut.
+
+### Refresc dels hashes
+
+Quan un model publica una revisio nova a Hugging Face o Ollama, cal actualitzar `MODEL_WEIGHT_SHA256` amb el nou digest. El metode manual es baixar el model, executar `sha256sum` (GGUF), `sha256_of_dir` (MLX) o `ollama show --json` (Ollama) i editar el dict al `installer_catalog_data.py`. El test `tests/test_installer_sha256_catalog.py` valida que cada artefacte del cataleg te una entrada al dict (encara que sigui `None`).
+
 ## Verificacio post-instal·lacio
 
 ```bash

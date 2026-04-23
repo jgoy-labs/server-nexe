@@ -2,37 +2,39 @@
 ────────────────────────────────────
 Server Nexe
 Location: installer/installer_setup_models.py
-Description: Model downloads (Ollama/GGUF/MLX) and Ollama installation.
+Description: Model downloads (Ollama / GGUF / MLX) with post-download
+             SHA256 verification (F4.1 audit DoD-AUD-SX-0423 §2.7).
+
+Ollama runtime installation (app bundle + install script) moved to
+``installer.installer_ollama_install`` on 2026-04-23. ``ensure_ollama_installed``
+is re-exported from here for backwards compatibility with the existing
+``install_headless.py`` / ``install.py`` imports.
 ────────────────────────────────────
 """
 
 import os
 import sys
-import shutil
 import subprocess
+from pathlib import Path
 
+from .download_verify import DownloadIntegrityError, verify_download_integrity
 from .installer_display import (
     APP_LOGO, clear,
     GREEN, RED, YELLOW, CYAN, BOLD, DIM, RESET,
-    print_step, print_success, print_warn,
+    print_success, print_warn,
 )
 from .installer_i18n import t
+from .installer_ollama_install import (  # re-exported — see docstring
+    _find_ollama,
+    ensure_ollama_installed,
+)
 
-
-def _find_ollama() -> str:
-    """Find ollama binary — app bundles have minimal PATH."""
-    found = shutil.which("ollama")
-    if found:
-        return found
-    for path in [
-        "/usr/local/bin/ollama",
-        "/opt/homebrew/bin/ollama",
-        os.path.expanduser("~/bin/ollama"),
-        "/Applications/Ollama.app/Contents/Resources/ollama",
-    ]:
-        if os.path.isfile(path) and os.access(path, os.X_OK):
-            return path
-    return "ollama"  # fallback, let subprocess raise FileNotFoundError
+__all__ = [
+    "ensure_ollama_installed",
+    "_download_ollama_model",
+    "_download_gguf_model",
+    "_download_mlx_model",
+]
 
 
 def _show_manual_instructions(model, engine):
@@ -57,182 +59,6 @@ def _show_manual_instructions(model, engine):
     print(f"  {CYAN}./nexe chat{RESET}\n")
 
     print(f"{DIM}💡 {t('manual_install_note')}{RESET}")
-
-
-def ensure_ollama_installed(headless=False):
-    """
-    Ensure Ollama is installed (universal fallback for LLM inference).
-
-    In headless/GUI mode (headless=True), skips the interactive confirmation
-    and proceeds directly with the install — the user already chose a model
-    that requires Ollama via the wizard UI.
-
-    On macOS: downloads Ollama-darwin.zip, extracts Ollama.app to /Applications/,
-    and launches it (which registers the CLI at /usr/local/bin/ollama).
-    On Linux: uses the official install.sh script.
-    """
-    import platform
-
-    ollama_bin = _find_ollama()
-    if os.path.isfile(ollama_bin):
-        print_success(t('ollama_installed'))
-        return True
-
-    print_step(f"{BOLD}{t('installing_ollama')}{RESET}")
-
-    if not headless:
-        confirm = input(f"{t('ollama_install_confirm')} {t('yes_no')}: ").lower()
-        if confirm == 'n':
-            print_warn(t('ollama_install_skipped'))
-            print(f"  {DIM}{t('ollama_install_manual')}{RESET}")
-            return False
-
-    system = platform.system().lower()
-
-    if system == "darwin":
-        return _install_ollama_macos()
-    elif system == "linux":
-        return _install_ollama_linux()
-    else:
-        print_warn(f"Ollama auto-install not supported on {system}")
-        print(f"  {DIM}{t('ollama_install_manual')}{RESET}")
-        return False
-
-
-def _install_ollama_macos():
-    """Install Ollama.app on macOS from bundle (offline) or download (online).
-
-    Lookup order:
-    1. Bundled zip at InstallNexe.app/Contents/Resources/ollama/Ollama-darwin.zip
-       (placed there by build-ollama-bundle.sh → DMG install is 100% offline).
-    2. Online download from ollama.com/download/Ollama-darwin.zip.
-
-    Extracts to /Applications/Ollama.app, removes quarantine, launches the app
-    (which registers the CLI at /usr/local/bin/ollama on first run).
-    """
-    import tempfile
-    import zipfile
-
-    url = "https://ollama.com/download/Ollama-darwin.zip"
-    dest = Path("/Applications/Ollama.app")
-
-    try:
-        # 1. Try bundled zip (offline install from DMG)
-        bundle_zip = _find_bundle_ollama_zip()
-        if bundle_zip:
-            print(f"  📦 Ollama offline: instal·lant des del bundle...")
-            zip_path = str(bundle_zip)
-        else:
-            # 2. Download from internet
-            print(f"  📥 Downloading Ollama for macOS...")
-            tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
-            zip_path = tmp.name
-            tmp.close()
-            result = subprocess.run(
-                ["curl", "-fSL", "-o", zip_path, url],
-                timeout=300, capture_output=True,
-            )
-            if result.returncode != 0:
-                print_warn(t('ollama_install_failed'))
-                print(f"  {CYAN}Download: {url}{RESET}")
-                return False
-
-        # Extract to /Applications/
-        print(f"  📦 Installing to /Applications/Ollama.app...")
-        with zipfile.ZipFile(zip_path, 'r') as zf:
-            zf.extractall("/Applications/")
-
-        # Clean up downloaded zip (not the bundled one)
-        if not bundle_zip and os.path.isfile(zip_path):
-            os.unlink(zip_path)
-
-        # Remove quarantine so Gatekeeper doesn't block it
-        subprocess.run(
-            ["xattr", "-rd", "com.apple.quarantine", str(dest)],
-            capture_output=True,
-        )
-
-        # Launch Ollama.app — registers CLI at /usr/local/bin/ollama
-        print(f"  🚀 Starting Ollama...")
-        subprocess.run(["open", "-a", "Ollama"], capture_output=True)
-
-        # Wait for CLI to become available (first launch setup)
-        import time
-        for _ in range(15):
-            time.sleep(2)
-            ollama_bin = _find_ollama()
-            if os.path.isfile(ollama_bin):
-                print_success(t('ollama_installed'))
-                return True
-
-        # App installed but CLI not yet — still counts as success
-        print_warn("Ollama.app installed but CLI not yet available — try again in a moment")
-        return True
-
-    except subprocess.TimeoutExpired:
-        print_warn("Ollama download timed out (>5 min)")
-        return False
-    except Exception as e:
-        print_warn(f"{t('ollama_install_failed')}: {e}")
-        print(f"  {CYAN}{url}{RESET}")
-        return False
-
-
-def _find_bundle_ollama_zip():
-    """Find Ollama-darwin.zip in the DMG bundle resources.
-
-    Same lookup logic as _find_bundle_resources() in installer_setup_env.py:
-    1. NEXE_BUNDLE_RESOURCES env var
-    2. Co-located InstallNexe.app (dev/gitoss)
-    3. Mounted DMG volumes (/Volumes/*)
-    """
-    candidates = []
-
-    env_path = os.environ.get("NEXE_BUNDLE_RESOURCES")
-    if env_path:
-        candidates.append(Path(env_path) / "ollama" / "Ollama-darwin.zip")
-
-    # Co-located (dev mode)
-    project_root = Path(__file__).parent.parent
-    candidates.append(project_root / "InstallNexe.app" / "Contents" / "Resources" / "ollama" / "Ollama-darwin.zip")
-
-    # Mounted DMG volumes
-    volumes = Path("/Volumes")
-    if volumes.is_dir():
-        try:
-            for vol in volumes.iterdir():
-                candidates.append(vol / "InstallNexe.app" / "Contents" / "Resources" / "ollama" / "Ollama-darwin.zip")
-        except PermissionError:
-            pass
-
-    for c in candidates:
-        if c.is_file():
-            return c
-    return None
-
-
-def _install_ollama_linux():
-    """Install Ollama on Linux via official install script."""
-    try:
-        print(f"  {DIM}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
-        result = subprocess.run(
-            ["bash", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
-            timeout=180,
-        )
-        if result.returncode == 0:
-            print_success(t('ollama_installed'))
-            return True
-        else:
-            print_warn(t('ollama_install_failed'))
-            print(f"  {CYAN}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
-            return False
-    except subprocess.TimeoutExpired:
-        print_warn("Ollama install timed out (>3 min)")
-        return False
-    except Exception as e:
-        print_warn(f"{t('ollama_install_failed')}: {e}")
-        print(f"  {CYAN}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
-        return False
 
 
 def _download_ollama_model(model_config, headless=False):
@@ -297,7 +123,27 @@ def _download_ollama_model(model_config, headless=False):
             result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)
             model_base = model_id.split(":")[0]
             if model_base in result.stdout or model_id in result.stdout:
-                print_success(t('model_downloaded_ok').format(id=model_id))
+                # F4.1 (audit DoD-AUD-SX-0423 §2.7): compare the manifest
+                # digest reported by Ollama against the catalog pin. On
+                # mismatch the call raises DownloadIntegrityError, which
+                # bubbles up to the caller (CLI exits non-zero, GUI marks
+                # step 3 as error). Legacy entries (expected=None) return
+                # False here and we surface a not-pinned notice.
+                try:
+                    matched = verify_download_integrity(
+                        "ollama", model_id, Path("."),
+                        ollama_bin=ollama_bin,
+                    )
+                except DownloadIntegrityError as exc:
+                    print_warn(f"✗ Integrity check failed for {model_id}")
+                    print(str(exc))
+                    raise
+                if matched:
+                    print_success(t('model_downloaded_ok').format(id=model_id))
+                else:
+                    print(f"{YELLOW}⚠️  {model_id}: SHA256 not pinned in catalog "
+                          f"— install proceeded without integrity check{RESET}")
+                    print_success(t('model_downloaded_ok').format(id=model_id))
             else:
                 print_warn(t('model_not_in_list'))
                 print(f"  {DIM}{t('run_ollama_list')}{RESET}")
@@ -385,9 +231,31 @@ def _download_gguf_model(model_config, project_root, headless=False):
             if not output_path.exists() or output_path.stat().st_size == 0:
                 raise RuntimeError(f"Downloaded file is empty or missing: {output_path}")
 
+            # F4.1 (audit DoD-AUD-SX-0423 §2.7): SHA256 integrity check.
+            try:
+                matched = verify_download_integrity(
+                    "gguf", model_config['id'], output_path,
+                )
+            except DownloadIntegrityError as exc:
+                print_warn(f"✗ Integrity check failed for {filename}")
+                print(str(exc))
+                raise
+            if not matched:
+                print(f"{YELLOW}⚠️  {filename}: SHA256 not pinned in catalog "
+                      f"— install proceeded without integrity check{RESET}")
+
             print_success(t('download_success'))
             print(f"  📁 {output_path}")
-        except subprocess.CalledProcessError as e:
+        except DownloadIntegrityError:
+            # Already printed as "✗ Integrity check failed …" above.
+            # Propagate unconditionally (interactive and headless alike).
+            # A SHA256 mismatch is never a "try these manual commands"
+            # situation — the file is still on disk, the pin is wrong, or
+            # the download is poisoned. Downgrading to _show_manual_instructions
+            # would turn a security control into a warning the user can click
+            # past, which defeats the entire point of F4.1.
+            raise
+        except subprocess.CalledProcessError:
             print_warn(t('download_failed'))
             if headless:
                 raise
@@ -502,16 +370,41 @@ for attempt in range(max_retries):
             if return_code == 0:
                 print_success(t('mlx_downloaded_ok').format(path=local_model_path))
 
-                print(f"\n{CYAN}[2/2]{RESET} {t('mlx_validating')}")
+                print(f"\n{CYAN}[2/3]{RESET} {t('mlx_validating')}")
                 config_file = local_model_path / "config.json"
                 if not config_file.exists():
                     print_warn(t('mlx_config_missing').format(path=local_model_path))
                     print(f"{DIM}{t('mlx_may_have_issues')}{RESET}")
                 else:
                     print(f"{GREEN}✓{RESET} {t('mlx_validated_ok')}")
+
+                # F4.1 (audit DoD-AUD-SX-0423 §2.7): SHA256 check of the
+                # whole snapshot dir against the catalog pin. Legacy
+                # entries (expected=None) surface a not-pinned notice.
+                print(f"\n{CYAN}[3/3]{RESET} Integrity verification (SHA256)")
+                try:
+                    matched = verify_download_integrity(
+                        "mlx", model_id, local_model_path,
+                    )
+                except DownloadIntegrityError as exc:
+                    print_warn(f"✗ Integrity check failed for {model_id}")
+                    print(str(exc))
+                    raise
+                if matched:
+                    print(f"{GREEN}✓{RESET} SHA256 pin verified")
+                else:
+                    print(f"{YELLOW}⚠️  {model_id}: SHA256 not pinned in catalog "
+                          f"— install proceeded without integrity check{RESET}")
             else:
                 raise subprocess.CalledProcessError(return_code, "mlx_download")
 
+        except DownloadIntegrityError:
+            # Already printed as "✗ Integrity check failed …" above.
+            # Propagate without wrapping it in the generic "download
+            # interrupted, resume later" banner — that message is for
+            # network / IO failures, not for an integrity mismatch, and
+            # showing both at once confuses the user.
+            raise
         except Exception as e:
             print(f"\n{YELLOW}{t('download_failed_resume')}{RESET}")
             print(f"{DIM}Error: {str(e)[:200]}{RESET}")

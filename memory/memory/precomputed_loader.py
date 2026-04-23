@@ -22,14 +22,23 @@ www.jgoy.net · https://server-nexe.org
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
+
+# SHA256 helpers live at `core.integrity.hashing` — a single implementation
+# shared between the KB loader, the installer (model weight pinning) and the
+# build-time manifests. Re-exported below for backward compatibility with
+# existing call-sites (`from memory.memory.precomputed_loader import …`).
+from core.integrity.hashing import (
+    sha256_of_bytes,
+    sha256_of_dir,
+    sha256_of_file,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,34 +61,26 @@ METADATA_FILENAME = "metadata-{lang}.jsonl"
 # --------------------------------------------------------------------------- #
 # Fingerprinting helpers                                                       #
 # --------------------------------------------------------------------------- #
-
-def sha256_of_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
-def sha256_of_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            h.update(chunk)
-    return h.hexdigest()
+# `sha256_of_bytes` and `sha256_of_file` are imported from `core.integrity`
+# above. `sha256_of_source_dir` keeps the original filter semantics (only
+# the file basename is checked for a leading dot, not every path component)
+# so KB layouts that intentionally place MD files inside dot-prefixed
+# directories continue to hash identically.
 
 
 def sha256_of_source_dir(lang_dir: Path) -> str:
-    """Hash the sorted list of (relative_path, content) pairs for a lang dir.
+    """Hash a ``knowledge/<lang>/`` tree deterministically.
 
-    Deterministic across machines: same inputs → same hash. Ignores OS
-    metadata (mtime, permissions).
+    Same contract as before the 2026-04-23 refactor: hashes the sorted
+    ``(relative_path, content)`` pairs and skips files whose basename
+    starts with a dot. Ignores OS metadata (mtime, permissions). Backed by
+    :func:`core.integrity.hashing.sha256_of_dir` with a filter that matches
+    the pre-refactor behaviour exactly (basename-level, not component).
     """
-    h = hashlib.sha256()
-    entries = sorted(p for p in lang_dir.rglob("*") if p.is_file() and not p.name.startswith("."))
-    for p in entries:
-        rel = p.relative_to(lang_dir).as_posix()
-        h.update(rel.encode("utf-8"))
-        h.update(b"\0")
-        h.update(p.read_bytes())
-        h.update(b"\0")
-    return h.hexdigest()
+    return sha256_of_dir(
+        lang_dir,
+        include_filter=lambda rel: not Path(rel).name.startswith("."),
+    )
 
 
 def read_hf_model_commit(model_name: str) -> Optional[str]:
@@ -382,4 +383,5 @@ __all__ = [
     "read_hf_model_commit",
     "sha256_of_source_dir",
     "sha256_of_file",
+    "sha256_of_bytes",
 ]
