@@ -13,6 +13,13 @@ import re
 import unicodedata
 from typing import Any
 
+# Depth guard for detect_nosql_injection. Legitimate API payloads never nest
+# hundreds of levels; anything that does is either malicious (DoS via stack
+# exhaustion) or broken. We flag suspicious and return early instead of
+# recursing until Python's C-stack trips RecursionError.
+MAX_NOSQL_DEPTH = 100
+
+
 def detect_xss_attempt(text: str) -> bool:
   """
   Detect potential XSS attack patterns in input.
@@ -88,12 +95,13 @@ def detect_sql_injection(text: str) -> bool:
 
   return False
 
-def detect_nosql_injection(data: Any) -> bool:
+def detect_nosql_injection(data: Any, _depth: int = 0) -> bool:
   """
   Detect potential NoSQL injection patterns in input data.
 
   Args:
     data: Input data (dict, str, or other)
+    _depth: internal recursion depth tracker. Callers should not pass this.
 
   Returns:
     True if NoSQL injection pattern detected, False otherwise
@@ -101,7 +109,15 @@ def detect_nosql_injection(data: Any) -> bool:
   Patterns checked:
     - MongoDB operators ($where, $regex, $ne, etc.)
     - JavaScript code in strings
+
+  Depth guard:
+    Inputs nested deeper than MAX_NOSQL_DEPTH are flagged suspicious (True)
+    instead of recursing further. This prevents DoS via stack exhaustion
+    from pathologically-nested JSON payloads.
   """
+  if _depth > MAX_NOSQL_DEPTH:
+    return True
+
   if isinstance(data, str):
     data = unicodedata.normalize('NFKC', data)
   if isinstance(data, dict):
@@ -109,7 +125,7 @@ def detect_nosql_injection(data: Any) -> bool:
       if isinstance(key, str) and key.startswith('$'):
         return True
 
-      if detect_nosql_injection(data[key]):
+      if detect_nosql_injection(data[key], _depth + 1):
         return True
 
   elif isinstance(data, str):
@@ -127,7 +143,7 @@ def detect_nosql_injection(data: Any) -> bool:
 
   elif isinstance(data, list):
     for item in data:
-      if detect_nosql_injection(item):
+      if detect_nosql_injection(item, _depth + 1):
         return True
 
   return False

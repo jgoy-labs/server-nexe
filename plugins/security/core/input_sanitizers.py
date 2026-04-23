@@ -161,12 +161,17 @@ def validate_string_input(
   Raises:
     HTTPException: If validation fails
   """
-  # In chat context, skip detectors prone to false positives with code snippets
-  # Path traversal (`..`) triggers on normal ellipsis ("vei..." = HTTP 400)
+  # In chat context, skip detectors prone to false positives on free-form
+  # text. XSS stays active because rendered chat output can reach the browser.
+  #   - path traversal: "..." ellipsis trips `\.\.` ("vei..." = HTTP 400)
+  #   - command: `;`, `|`, `` ` ``, `<`, `>` are normal in writing
+  #   - LDAP: `(` and `)` unavoidable in prose
+  #   - SQL: discussing "UNION SELECT * FROM logs" is legitimate tech talk
   if context == "chat":
     check_command = False
     check_ldap = False
     check_path_traversal = False
+    check_sql = False
   if not isinstance(text, str):
     raise HTTPException(
       400,

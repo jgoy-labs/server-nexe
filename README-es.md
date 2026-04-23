@@ -76,7 +76,7 @@ Lo que empezó como un prototipo se ha convertido en un producto genuinamente ú
 
 No intenta competir con ChatGPT ni Claude. Pero sí puede ser complementario para tareas menos pesadas. Es una herramienta open-source para gente que quiere ser propietaria de su infraestructura de IA. Construido por una persona en Barcelona, con IA como copiloto, música, y tozudez.
 
-Más técnicamente: lo que era un **monstruo de espagueti gigante** acabó destilándose, refactor tras refactor, hacia un **núcleo mínimo, agnóstico y modular** — donde la seguridad y la memoria están resueltas en la base para que construir encima sea rápido y cómodo, en colaboración humano–IA. Si se ha conseguido, lo tiene que decir la comunidad (la IA dice que sí, pero qué quieres que diga 🤪).
+Más técnicamente: lo que era un **monstruo de espagueti gigante** acabó destilándose, refactor tras refactor, hacia un **núcleo mínimo, agnóstico de backend (MLX / llama.cpp / Ollama) y modular** — donde la seguridad y la memoria están resueltas en la base para que construir encima sea rápido y cómodo, en colaboración humano–IA. Si se ha conseguido, lo tiene que decir la comunidad (la IA dice que sí, pero qué quieres que diga 🤪).
 
 ## Capturas
 
@@ -112,7 +112,7 @@ Tus conversaciones, documentos, embeddings y pesos de los modelos se quedan en t
 <td width="50%">
 
 ### Local y Privado
-Cada conversación, documento y embedding se queda en tu dispositivo. Sin telemetría, sin llamadas externas, sin dependencia de la nube. Ni siquiera un servidor que te espíe.
+Cada conversación, documento y embedding se queda en tu dispositivo durante la ejecución. Sin telemetría, sin llamadas a la nube durante la operación, ni servidor que te espíe. La instalación inicial descarga el LLM elegido y el modelo de embeddings `fastembed` desde Hugging Face u Ollama — después, ningún dato sale del dispositivo.
 
 </td>
 <td width="50%">
@@ -306,7 +306,7 @@ Apunta cualquier asistente de IA a este repo y puede entender la arquitectura co
 Server Nexe incluye un módulo de seguridad activado por defecto:
 
 - **Autenticación por clave API** en todos los endpoints
-- **Cabeceras CSP** (`script-src 'self'`, sin `unsafe-inline`)
+- **Cabeceras CSP** (`script-src 'self'` sin `unsafe-inline`; `style-src 'self' 'unsafe-inline'` para la Web UI)
 - **Protección CSRF** con validación de token
 - **Rate limiting** por endpoint (20/min chat, 5/min upload)
 - **Sanitización de input** — 6 detectores de inyección + normalización Unicode (NFKC)
@@ -314,7 +314,7 @@ Server Nexe incluye un módulo de seguridad activado por defecto:
 - **Denylist de subidas** — bloquea subida accidental de claves API, claves PEM (v0.9.1)
 - **Protección de inyección de memoria** — stripping de tags en todos los caminos de entrada (v0.9.1)
 - **Enforcement de pipeline** — todo el chat pasa por los endpoints canónicos (v0.9.1)
-- **Encriptación at-rest** — AES-256-GCM, SQLCipher, fail-closed (v0.9.1)
+- **Encriptación at-rest** — AES-256-GCM, SQLCipher. Default `auto`: encriptado cuando `sqlcipher3` está disponible (el DMG lo incluye); texto plano con `WARNING` al arrancar en caso contrario. Establece `NEXE_ENCRYPTION_ENABLED=true` para modo fail-closed estricto (v0.9.2+)
 - **Trusted host middleware**
 
 > **Nota:** Este proyecto no ha sido testeado en producción con usuarios reales. Las auditorías de seguridad han sido hechas por IA, no por auditores profesionales. Consulta [SECURITY.md](SECURITY.md) para el disclosure completo y el informe de vulnerabilidades.
@@ -360,7 +360,7 @@ NEXE_AUTOSTART_OLLAMA=true pytest -m "integration" -q
 Server Nexe está en desarrollo activo. Próximamente:
 
 - [x] Memoria persistente con RAG (v0.9.0)
-- [x] Encriptación at-rest — AES-256-GCM, default `auto` (v0.9.0, fail-closed v0.9.2)
+- [x] Encriptación at-rest — AES-256-GCM, default `auto`; fail-closed estricto vía `NEXE_ENCRYPTION_ENABLED=true` (v0.9.0/v0.9.2)
 - [x] Firma de código macOS y notarización (v0.9.0)
 - [x] Hardening de seguridad — detección jailbreak, denylist uploads, enforcement pipeline (v0.9.1)
 - [x] Embeddings `fastembed` ONNX — PyTorch eliminado (v0.9.3)
@@ -385,7 +385,7 @@ Disclosure honesto de lo que server Nexe **no** hace o no hace bien:
 - **API parcialmente compatible con OpenAI** — `/v1/chat/completions` funciona. Faltan `/v1/embeddings`, `/v1/models`, function calling, y multimodal.
 - **Un solo usuario** — Diseño mono-usuario por arquitectura. Sin multi-device sync, sin cuentas.
 - **Sin fine-tuning** — No se pueden entrenar ni ajustar modelos.
-- **Encriptación nueva** — Añadida en v0.9.0 (default `auto` desde v0.9.2, fail-closed). No probada en batalla. Si pierdes la clave maestra, los datos no se recuperan (ver fallback MEK: file → keyring → env → generate).
+- **Encriptación nueva** — Añadida en v0.9.0 (default `auto` desde v0.9.2; fail-closed estricto solo cuando `NEXE_ENCRYPTION_ENABLED=true`). No probada en batalla. Si pierdes la clave maestra, los datos no se recuperan (ver fallback MEK: file → keyring → env → generate).
 - **Un solo desarrollador, un solo usuario real** — Proyecto personal open-source, no producto enterprise.
 
 Consulta [knowledge/es/LIMITATIONS.md](knowledge/es/LIMITATIONS.md) para el detalle completo.

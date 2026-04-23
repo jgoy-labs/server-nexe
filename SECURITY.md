@@ -58,7 +58,7 @@ It does **not** defend against:
 
 ### Transport and headers
 - CSRF protection
-- CSP headers (`script-src 'self'`, no `unsafe-inline`)
+- CSP headers (`script-src 'self'` without `unsafe-inline`; `style-src 'self' 'unsafe-inline'` allowed for Web UI inline styles — documented trade-off)
 - Trusted host middleware
 - No inline scripts — language injection via `data-` HTML attributes
 

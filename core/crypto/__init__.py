@@ -11,7 +11,39 @@ www.jgoy.net · https://server-nexe.org
 
 from .provider import CryptoProvider
 
-__all__ = ["CryptoProvider", "check_encryption_status"]
+__all__ = [
+    "CryptoProvider",
+    "check_encryption_status",
+    "format_plaintext_startup_banner",
+]
+
+
+def format_plaintext_startup_banner() -> str:
+    """Return a multi-line banner announcing that encryption at rest is off.
+
+    Single-line `logger.warning(...)` lines get buried in startup logs.
+    This banner is loud on purpose: when `NEXE_ENCRYPTION_ENABLED=auto`
+    and `sqlcipher3` is not installed, server-nexe falls back to plaintext
+    storage (memory DB, session `.enc`→`.json`, RAG text). Operators who
+    store sensitive data deserve to notice.
+    """
+    sep = "═" * 66
+    return (
+        "\n"
+        f"{sep}\n"
+        "⚠️  PLAINTEXT MODE — ENCRYPTION AT REST IS DISABLED\n"
+        f"{sep}\n"
+        "  sqlcipher3 is not installed. All stored data (memories,\n"
+        "  sessions, RAG documents) is written UNENCRYPTED to disk.\n"
+        "\n"
+        "  Require encryption (server refuses to start without it):\n"
+        "      pip install sqlcipher3-binary\n"
+        "      export NEXE_ENCRYPTION_ENABLED=true\n"
+        "\n"
+        "  Silence this notice for dev/CI (stay plaintext intentionally):\n"
+        "      export NEXE_ENCRYPTION_ENABLED=false\n"
+        f"{sep}\n"
+    )
 
 
 def check_encryption_status(storage_path=None):

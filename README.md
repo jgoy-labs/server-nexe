@@ -76,7 +76,7 @@ What began as a prototype has turned into a genuinely useful product: 4842 tests
 
 This is not trying to compete with ChatGPT or Claude. But it can be complementary for less demanding tasks. It's an open-source tool for people who want to own their AI infrastructure. Built by one person in Barcelona, with AI as co-pilot, music, and stubbornness.
 
-More technically: what was a **giant spaghetti monster** ended up distilling, refactor after refactor, into a **minimal, agnostic, modular core** — where security and memory are solved at the base so building on top is fast and comfortable, in human–AI collaboration. Whether that worked is for the community to say (the AI says yes, but what did you expect 🤪).
+More technically: what was a **giant spaghetti monster** ended up distilling, refactor after refactor, into a **minimal, backend-agnostic (MLX / llama.cpp / Ollama), modular core** — where security and memory are solved at the base so building on top is fast and comfortable, in human–AI collaboration. Whether that worked is for the community to say (the AI says yes, but what did you expect 🤪).
 
 ## Screenshots
 
@@ -112,7 +112,7 @@ Your conversations, documents, embeddings, and model weights stay on your machin
 <td width="50%">
 
 ### Local & Private
-Every conversation, document, and embedding stays on your device. No telemetry, no external calls, no cloud dependency. Not even a server to spy on you.
+Every conversation, document, and embedding stays on your device at runtime. No telemetry, no cloud calls during operation, no server that phones home. Initial install downloads the chosen LLM and the `fastembed` embedding model from Hugging Face or Ollama — after that, zero data leaves your device.
 
 </td>
 <td width="50%">
@@ -306,7 +306,7 @@ Point any AI assistant at this repo and it can understand the complete architect
 Server Nexe includes a security module enabled by default:
 
 - **API key authentication** on all endpoints
-- **CSP headers** (script-src 'self', no unsafe-inline)
+- **CSP headers** (`script-src 'self'` without `unsafe-inline`; `style-src 'self' 'unsafe-inline'` for Web UI)
 - **CSRF protection** with token validation
 - **Rate limiting** per IP
 - **Input sanitization** — 6 injection detectors + Unicode normalization
@@ -315,7 +315,7 @@ Server Nexe includes a security module enabled by default:
 - **Memory injection protection** — tag stripping on all input paths
 - **RAG injection sanitization** — `[MEM_SAVE:]`, `[MEM_DELETE:]`, `[OLVIDA|OBLIT|FORGET:]`, `[MEMORIA:]` neutralized at ingest and retrieval (v0.9.9)
 - **Pipeline enforcement** — all chat through canonical endpoints only
-- **Encryption at rest** — AES-256-GCM, SQLCipher, `auto` default, fail-closed (v0.9.2+)
+- **Encryption at rest** — AES-256-GCM, SQLCipher. Default `auto`: encrypted when `sqlcipher3` is available (the DMG bundles it), otherwise plaintext with a startup `WARNING`. Set `NEXE_ENCRYPTION_ENABLED=true` for strict fail-closed mode (v0.9.2+)
 - **Trusted host middleware**
 
 > **Note:** This project has not been tested in production with real users. Security testing has been performed by AI, not by professional auditors. See [SECURITY.md](SECURITY.md) for full disclosure and vulnerability reporting.
@@ -368,7 +368,7 @@ Server Nexe is actively developed. Here's what's coming:
 - [x] Encryption at rest — AES-256-GCM (v0.9.0)
 - [x] macOS code signing & notarization (v0.9.0)
 - [x] Security hardening — jailbreak detection, upload denylist, pipeline enforcement (v0.9.1)
-- [x] Encryption default `auto`, fail-closed (v0.9.2)
+- [x] Encryption default `auto`; strict fail-closed via `NEXE_ENCRYPTION_ENABLED=true` (v0.9.2)
 - [x] Embeddings on ONNX (`fastembed`), PyTorch removed (v0.9.3)
 - [x] Multimodal VLM — 4 backends (Ollama, MLX, llama.cpp, Web UI) (v0.9.7)
 - [x] Precomputed KB embeddings (~10.7x faster startup) (v0.9.8)
@@ -390,7 +390,7 @@ Honest disclosure of what server Nexe **does not** do or does not do well:
 - **Partially OpenAI-compatible API** — `/v1/chat/completions` works. Missing: `/v1/embeddings`, `/v1/models`, function calling, and multimodal.
 - **Single user** — Mono-user by design. No multi-device sync, no accounts.
 - **No fine-tuning** — You cannot train or fine-tune models.
-- **New encryption** — Added in v0.9.0 (default `auto` since v0.9.2, fail-closed). Not battle-tested. If you lose the master key, data cannot be recovered (see MEK fallback: file → keyring → env → generate).
+- **New encryption** — Added in v0.9.0 (default `auto` since v0.9.2; strict fail-closed only when `NEXE_ENCRYPTION_ENABLED=true`). Not battle-tested. If you lose the master key, data cannot be recovered (see MEK fallback: file → keyring → env → generate).
 - **Single developer, single real user** — Personal open-source project, not an enterprise product.
 
 See [knowledge/en/LIMITATIONS.md](knowledge/en/LIMITATIONS.md) for full detail.

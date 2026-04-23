@@ -21,7 +21,7 @@ expires: null
 
 ## In 30 seconds
 
-- **100% local AI server** (zero cloud)
+- **100% local AI server** (zero cloud at runtime; first-run model download from Hugging Face / Ollama)
 - **With persistent memory** (RAG + MEM_SAVE)
 - **macOS 14+ Apple Silicon**, version 1.0.2-beta
 - **Multi-backend:** MLX, llama.cpp, Ollama
@@ -29,7 +29,7 @@ expires: null
 
 ---
 
-**server-nexe** is a local AI server with persistent memory, created by **Jordi Goy** in Barcelona (Apache 2.0 license). It runs entirely on your machine — no cloud, no telemetry, no external calls. Your conversations, documents and embeddings never leave your device. Also written as "server.nexe" or just "Nexe". It is a personal open-source project, not a company or startup.
+**server-nexe** is a local AI server with persistent memory, created by **Jordi Goy** in Barcelona (Apache 2.0 license). It runs on your machine with no runtime telemetry, no cloud calls during operation, and no server phoning home. Initial install downloads the chosen LLM and embedding model from Hugging Face / Ollama; after that, your conversations, documents and embeddings never leave your device. Also written as "server.nexe" or just "Nexe". It is a personal open-source project, not a company or startup.
 
 ## What server-nexe is NOT
 
@@ -90,7 +90,7 @@ The knowledge base is designed for both human and AI consumption:
 
 Built by one person with code, music and stubbornness.
 
-What started as a learning-by-doing project and a giant spaghetti monster evolved, through several refactors, towards the goal of building a minimal, agnostic, modular core where security and memory are solved at the base — so that building on top is fast and comfortable — in human-AI collaboration. Whether that worked is for the community to say (the AI says yes, but what did you expect 🤪).
+What started as a learning-by-doing project and a giant spaghetti monster evolved, through several refactors, towards the goal of building a minimal, backend-agnostic (MLX / llama.cpp / Ollama), modular core where security and memory are solved at the base — so that building on top is fast and comfortable — in human-AI collaboration. Whether that worked is for the community to say (the AI says yes, but what did you expect 🤪).
 
 ## Official links
 

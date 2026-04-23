@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_utc": "2026-04-21T21:46:03Z",
+  "generated_utc": "2026-04-23T20:48:43Z",
   "prefix_format_version": "1.0",
   "vector_dim": 768,
   "vector_dtype": "float32",
@@ -12,21 +12,21 @@
   "langs": {
     "ca": {
       "chunks": 257,
-      "source_sha256": "b5d023d86ba2373fcf8c570aeb857a356059b65feba5b7b91d06974f4962fe33",
-      "vectors_sha256": "d501621bf26eb62ab4ba9af1b95df508ab944f04f09ddb9d3f51dcf1a9d6b013",
-      "metadata_sha256": "9cc63b5be54813568c5b8aac18e01bce546df7f94da8fb13c0264335775dbd9c"
+      "source_sha256": "c1e9d36f3c09d7f9f0245a0e5f62b854003d978f7fb0236b93d2f6a1141ba8e6",
+      "vectors_sha256": "106991f44ec2afc37a12092da8863ae2c15c39c10fd597ee713b9eb4c1a534fa",
+      "metadata_sha256": "42ccdb75c5822bd55797c6bfdfcbf46f6499f317d8bdece130c914ce7665b521"
     },
     "en": {
       "chunks": 260,
-      "source_sha256": "8046d5ffa078e1924b869bc5c81db3236bea7ba4a4a9d665a019da3238ea8d88",
-      "vectors_sha256": "83ea3fa76ce765039a74eb36f6a4b3dd54f8fa4a998db137f3ad59f4775322aa",
-      "metadata_sha256": "c0442365215b5362517f78c260c621d5738193195ec10eae7c14e165d9a5ea79"
+      "source_sha256": "42494b1fa159ac949e23bcb371952135927b5017ad154200ac4f134eaba2b128",
+      "vectors_sha256": "4c4aa51741fd27b778cadd2ef87ebc18e00900406e55f2b34e34e7963ed977b6",
+      "metadata_sha256": "ae1baaab9a5186adf4cd5c55f4c11f94f570625014f673f41bba37e54e406e15"
     },
     "es": {
-      "chunks": 261,
-      "source_sha256": "162ade3749da5ac53bfa3cd435f209dbb5f436a9b6e1047415283c2f8f5758db",
-      "vectors_sha256": "161b861bd8c2f672a8a10fde63adceab2d886ebc0a54cd443107ffd822e19e5b",
-      "metadata_sha256": "fdb463bcd748876b58159e4268f24aacf27ef7098b248439d798b179614f1cbd"
+      "chunks": 262,
+      "source_sha256": "8676f0fbd9337fc264eb17c682dd61c5113a17972913ef6d501be6e32945dffd",
+      "vectors_sha256": "b4e8652bb5bb74d8e86dfaff9d0245ba5cf86260da2948f2eb5d2e2cac4447a7",
+      "metadata_sha256": "4f8dd802d4facedb434040b91a9cb553914eab960029053ac3c56ed8f075b453"
     }
   }
 }
