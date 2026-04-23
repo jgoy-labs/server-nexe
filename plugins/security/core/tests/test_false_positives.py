@@ -132,12 +132,25 @@ def test_html_sanitized_not_blocked(message, description):
 @pytest.mark.parametrize("message,description", [
     ("<script>alert('xss')</script>", "XSS script tag"),
     ("<img onerror='alert(1)' src=x>", "XSS img onerror"),
+])
+def test_real_attacks_still_blocked_in_chat(message, description):
+    """En context=chat, XSS continua blocat perquè el text renderitzat pot arribar
+    al navegador. SQL / command / LDAP / path-traversal es desactiven en chat per
+    evitar falsos positius en conversa natural — aquests atacs no arriben a cap
+    DB / shell / LDAP via chat (veure test_real_sql_attacks_still_blocked_in_param)."""
+    with pytest.raises(HTTPException) as exc_info:
+        validate_string_input(message, context=CONTEXT)
+    assert exc_info.value.status_code == 400, f"Atac no bloquejat: {description}"
+
+
+@pytest.mark.parametrize("message,description", [
     ("' OR '1'='1' --", "SQL injection clàssic"),
     ("'; DROP TABLE users; --", "SQL DROP TABLE"),
     ("1 UNION SELECT * FROM passwords", "SQL UNION SELECT"),
 ])
-def test_real_attacks_still_blocked(message, description):
-    """Atacs reals SÍ han de ser bloquejats — no hem trencat la seguretat."""
+def test_real_sql_attacks_still_blocked_in_param(message, description):
+    """En context=param (default), el detector SQL continua actiu per endpoints
+    que accepten identificadors estructurats, filtres, ordres, etc."""
     with pytest.raises(HTTPException) as exc_info:
-        validate_string_input(message, context=CONTEXT)
-    assert exc_info.value.status_code == 400, f"Atac no bloquejat: {description}"
+        validate_string_input(message, context="param")
+    assert exc_info.value.status_code == 400, f"Atac SQL no bloquejat en param: {description}"

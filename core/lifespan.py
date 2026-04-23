@@ -311,11 +311,8 @@ async def lifespan(app: FastAPI):
         server_state.crypto_provider = CryptoProvider()
         logger.info("Encryption at rest: ENABLED (AES-256-GCM)")
       elif normalized_env in ('', 'auto') and not SQLCIPHER_AVAILABLE:
-        logger.warning(
-            "Encryption not available (sqlcipher3 not installed). "
-            "Data stored in plain text. "
-            "Set NEXE_ENCRYPTION_ENABLED=false to suppress this warning."
-        )
+        from core.crypto import format_plaintext_startup_banner
+        logger.warning(format_plaintext_startup_banner())
       else:
         logger.info("Encryption at rest: disabled")
 

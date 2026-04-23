@@ -90,11 +90,19 @@ def _try_file_set(key: bytes, path: Path = KEY_FILE_PATH) -> bool:
     """
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        # Restrict directory permissions too (700) — best effort
+        # Restrict directory permissions too (700) — best effort. On noexec
+        # mounts, ACL-restricted filesystems, or sandboxed runtimes the chmod
+        # can fail. The file itself is still created 0o600 via os.open below,
+        # so we don't abort — but we log a WARNING so operators notice that
+        # the enclosing directory may have broader permissions than expected.
         try:
             path.parent.chmod(stat.S_IRWXU)  # 0o700
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "chmod 0o700 failed on key dir %s: %s (key file perms still 0o600)",
+                path.parent,
+                e,
+            )
 
         # Write atomically to a sibling temp file with restrictive mode,
         # so we never expose the key with relaxed permissions. `mkstemp`

@@ -76,7 +76,7 @@ El que va començar com un prototip s'ha convertit en un producte genuïnament �
 
 No intenta competir amb ChatGPT ni Claude. Però sí pot ser complementari per a feines menys feixugues. És una eina open-source per a gent que vol ser propietària de la seva infraestructura d'IA. Construït per una persona a Barcelona, amb IA com a copilot, música, i tossuderia.
 
-Més tècnicament: el que era un **monstre d'espagueti gegant** va acabar destil·lant-se, refactor rere refactor, cap a un **nucli mínim, agnòstic i modular** — on la seguretat i la memòria estan resoltes a la base perquè construir a sobre sigui ràpid i còmode, en col·laboració humà–IA. Si s'ha aconseguit, ho ha de dir la comunitat (la IA diu que sí, però què vols que digui 🤪).
+Més tècnicament: el que era un **monstre d'espagueti gegant** va acabar destil·lant-se, refactor rere refactor, cap a un **nucli mínim, agnòstic de backend (MLX / llama.cpp / Ollama) i modular** — on la seguretat i la memòria estan resoltes a la base perquè construir a sobre sigui ràpid i còmode, en col·laboració humà–IA. Si s'ha aconseguit, ho ha de dir la comunitat (la IA diu que sí, però què vols que digui 🤪).
 
 ## Captures
 
@@ -112,7 +112,7 @@ Les teves converses, documents, embeddings i pesos dels models es queden a la te
 <td width="50%">
 
 ### Local i Privat
-Cada conversa, document i embedding es queda al teu dispositiu. Sense telemetria, sense crides externes, sense dependència del núvol. Ni tan sols un servidor que t'espiï.
+Cada conversa, document i embedding es queda al teu dispositiu durant l'execució. Sense telemetria, sense crides al núvol durant l'operació, cap servidor que t'espiï. La instal·lació inicial descarrega l'LLM triat i el model d'embeddings `fastembed` des de Hugging Face o Ollama — després, cap dada surt del dispositiu.
 
 </td>
 <td width="50%">
@@ -306,7 +306,7 @@ Apunta qualsevol assistent d'IA a aquest repo i pot entendre l'arquitectura comp
 Server Nexe inclou un mòdul de seguretat activat per defecte:
 
 - **Autenticació per clau API** a tots els endpoints
-- **Capçaleres CSP** (`script-src 'self'`, sense `unsafe-inline`)
+- **Capçaleres CSP** (`script-src 'self'` sense `unsafe-inline`; `style-src 'self' 'unsafe-inline'` per a la Web UI)
 - **Protecció CSRF** amb validació de token
 - **Rate limiting** per endpoint (20/min xat, 5/min upload)
 - **Sanitització d'input** — 6 detectors d'injecció + normalització Unicode (NFKC)
@@ -314,7 +314,7 @@ Server Nexe inclou un mòdul de seguretat activat per defecte:
 - **Denylist de pujades** — bloqueja pujada accidental de claus API, claus PEM (v0.9.1)
 - **Protecció d'injecció de memòria** — stripping de tags a tots els camins d'entrada (v0.9.1)
 - **Enforcement de pipeline** — tot el xat passa pels endpoints canònics (v0.9.1)
-- **Encriptació at-rest** — AES-256-GCM, SQLCipher, fail-closed (v0.9.1)
+- **Encriptació at-rest** — AES-256-GCM, SQLCipher. Default `auto`: encriptat quan `sqlcipher3` és disponible (el DMG l'inclou), text pla amb `WARNING` a l'arrencada en cas contrari. Estableix `NEXE_ENCRYPTION_ENABLED=true` per mode fail-closed estricte (v0.9.2+)
 - **Trusted host middleware**
 
 > **Nota:** Aquest projecte no ha estat testejat en producció amb usuaris reals. Les auditories de seguretat han estat fetes per IA, no per auditors professionals. Consulta [SECURITY.md](SECURITY.md) per al disclosure complet i l'informe de vulnerabilitats.
@@ -360,7 +360,7 @@ NEXE_AUTOSTART_OLLAMA=true pytest -m "integration" -q
 Server Nexe està en desenvolupament actiu. Pròximament:
 
 - [x] Memòria persistent amb RAG (v0.9.0)
-- [x] Encriptació at-rest — AES-256-GCM, default `auto` (v0.9.0, fail-closed v0.9.2)
+- [x] Encriptació at-rest — AES-256-GCM, default `auto`; fail-closed estricte via `NEXE_ENCRYPTION_ENABLED=true` (v0.9.0/v0.9.2)
 - [x] Signatura de codi macOS i notarització (v0.9.0)
 - [x] Hardening de seguretat — detecció jailbreak, denylist uploads, enforcement pipeline (v0.9.1)
 - [x] Embeddings `fastembed` ONNX — PyTorch eliminat (v0.9.3)
@@ -385,7 +385,7 @@ Disclosure honest del que server Nexe **no** fa o no fa bé:
 - **API parcialment compatible amb OpenAI** — `/v1/chat/completions` funciona. Falten `/v1/embeddings`, `/v1/models`, function calling, i multimodal.
 - **Un sol usuari** — Disseny mono-usuari per arquitectura. Sense multi-device sync, sense comptes.
 - **Sense fine-tuning** — No es poden entrenar ni ajustar models.
-- **Encriptació nova** — Afegida a v0.9.0 (default `auto` des de v0.9.2, fail-closed). No provada en batalla. Si perds la clau mestra, les dades no es recuperen (veure fallback MEK: file → keyring → env → generate).
+- **Encriptació nova** — Afegida a v0.9.0 (default `auto` des de v0.9.2; fail-closed estricte només quan `NEXE_ENCRYPTION_ENABLED=true`). No provada en batalla. Si perds la clau mestra, les dades no es recuperen (veure fallback MEK: file → keyring → env → generate).
 - **Un sol desenvolupador, un sol usuari real** — Projecte personal open-source, no producte enterprise.
 
 Consulta [knowledge/ca/LIMITATIONS.md](knowledge/ca/LIMITATIONS.md) per al detall complet.

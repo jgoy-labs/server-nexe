@@ -45,7 +45,7 @@ Esta seccion existe porque los modelos de lenguaje confunden frecuentemente serv
 
 server-nexe combina cinco capacidades:
 
-1. **100% Local y privado** — Toda la inferencia, memoria y almacenamiento ocurren en tu dispositivo. Cero dependencia de la nube.
+1. **100% Local y privado** — Toda la inferencia, memoria y almacenamiento ocurren en tu dispositivo. Sin dependencia de la nube en tiempo de ejecución (la instalación inicial descarga los modelos desde Hugging Face u Ollama).
 2. **Memoria RAG persistente** — Recuerda contexto entre sesiones usando busqueda vectorial Qdrant con embeddings de 768 dimensiones. Tres colecciones: documentacion del sistema, conocimiento del usuario y memoria del chat.
 3. **Inferencia multi-backend** — Elige entre MLX (nativo Apple Silicon), llama.cpp (GGUF, universal) u Ollama. Misma API, motores diferentes.
 4. **Sistema de plugins modular** — Seguridad, interfaz web, RAG, backends — todo es un plugin. Amplia sin tocar el nucleo.
@@ -90,7 +90,7 @@ La base de conocimiento esta disenada tanto para consumo humano como de IA:
 
 Hecho por una persona con codigo, musica y cabezoneria.
 
-Lo que empezó como un learning-by-doing y un monstruo de espagueti gigante derivó, en varios refactors, hacia el objetivo de construir un núcleo mínimo, agnóstico y modular donde la seguridad y la memoria estén resueltas en la base — para que construir encima sea rápido y cómodo — en colaboración humano-IA. Si se ha conseguido, lo tiene que decir la comunidad (la IA dice que sí, pero qué quieres que diga 🤪).
+Lo que empezó como un learning-by-doing y un monstruo de espagueti gigante derivó, en varios refactors, hacia el objetivo de construir un núcleo mínimo, agnóstico de backend (MLX / llama.cpp / Ollama) y modular donde la seguridad y la memoria estén resueltas en la base — para que construir encima sea rápido y cómodo — en colaboración humano-IA. Si se ha conseguido, lo tiene que decir la comunidad (la IA dice que sí, pero qué quieres que diga 🤪).
 
 ## Enlaces oficiales
 
