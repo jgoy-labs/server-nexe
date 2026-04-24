@@ -39,7 +39,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `memory/memory/tests/test_dreaming_gc_integration.py` — 8 tests covering GCDaemon invocation, no-users fastpath, throttling, logging, exception isolation, cooperative stop, default daemon build, and full `run_cycle` wiring.
 - `core/tests/test_lifespan_dreaming_embedder.py` — 2 tests verifying that `start_memory_service_v1` passes an embedder to `DreamingCycle` and survives embedder load failures.
 
-## [1.0.2-beta] - 2026-04-21
+### Documentation
+
+- **Formal STRIDE threat model** (new `THREAT_MODEL.md` at repo root + `knowledge/{en,ca,es}/THREAT_MODEL.md`; `SECURITY.md:86` now points to it; `README.md`, `README-ca.md`, `README-es.md` "AI-Ready Documentation" section bumped from 13 to 14 thematic documents; `knowledge/{en,ca,es}/README.md` "Related documentation" list extended). Addresses DoD audit finding `DoD-AUD-SX-0423 §2.11`: the informal threat model at `SECURITY.md:3-15` is now a reviewed artefact — 8 trust boundaries (browser / CLI / Qdrant embedded / Ollama daemon / Hugging Face / filesystem / macOS Keyring / LAN-bootstrap), 6 asset categories, full STRIDE matrix with per-boundary mitigations citing `file:line` against the current codebase (post-F4.1), explicit out-of-scope enumeration (shell access, nation-state, multi-tenant, Python supply-chain pre-bundle, Apple firmware, malicious IDE extensions, offline `storage/` copies), honest residual-risks section (jailbreak speed-bump is not a safety classifier, `/ui/*` CSRF exemption trades cookie-CSRF for `X-API-Key`, loopback TLS is not enforced, no automated CVE tracking between releases, no external pen-test), and a LINDDUN privacy appendix covering MEM_SAVE exfiltration via prompt injection. Doc-only change — no code, no tests, no behaviour modification.
 
 ### Fixed
 

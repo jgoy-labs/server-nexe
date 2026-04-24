@@ -209,6 +209,7 @@ Altres documents de coneixement en aquesta carpeta:
 - PLUGINS.md — Sistema de plugins
 - API.md — Referencia de l'API REST
 - SECURITY.md — Seguretat i autenticacio
+- THREAT_MODEL.md — Threat model formal STRIDE (boundaries, mitigacions, riscos residuals, apendix LINDDUN de privacitat)
 - LIMITATIONS.md — Limitacions tecniques
 - ERRORS.md — Errors comuns i solucions
 - TESTING.md — Estrategia de tests i cobertura
