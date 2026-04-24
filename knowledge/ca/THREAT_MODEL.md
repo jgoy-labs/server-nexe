@@ -24,13 +24,13 @@ expires: null
 **Estat:** Actiu, revisat a cada minor release.
 **Substitueix:** `SECURITY.md` §"Scope and threat model" (informal, linies 3–15 i 80–90). Aquella seccio es queda com a resum d'un paragraf i apunta aqui per al detall.
 
-Aquest document formalitza el threat model que fins a la v1.0.2-beta estava implicit al codi. Es l'artefacte referenciat per l'auditoria externa `DoD-AUD-SX-0423-NXE-01` §2.11. No es un informe de pen-test: descriu **de que defensa server-nexe, de que no defensa, i quins controls avalen cada afirmacio**, amb cada control citant el fitxer:linia on esta implementat.
+Aquest document formalitza el threat model que fins a la v1.0.3-beta estava implicit al codi. Es l'artefacte referenciat per l'auditoria externa `DoD-AUD-SX-0423-NXE-01` §2.11. No es un informe de pen-test: descriu **de que defensa server-nexe, de que no defensa, i quins controls avalen cada afirmacio**, amb cada control citant el fitxer:linia on esta implementat.
 
 ---
 
 ## 1. Proposit i abast
 
-server-nexe es un **servidor d'IA local, mono-usuari** amb memoria RAG persistent. S'executa a la maquina de l'usuari, bind a `127.0.0.1:9119` per defecte, i assumeix un usuari local de confiança. Aquest threat model cobreix la release 1.0.2-beta mes el hardening `[Unreleased]` a `main` (F1–F4.2).
+server-nexe es un **servidor d'IA local, mono-usuari** amb memoria RAG persistent. S'executa a la maquina de l'usuari, bind a `127.0.0.1:9119` per defecte, i assumeix un usuari local de confiança. Aquest threat model cobreix la release 1.0.3-beta mes el hardening `[Unreleased]` a `main` (F1–F4.2).
 
 Dins l'abast:
 
@@ -216,7 +216,7 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 **Cos de peticio sobredimensionat.** Rebutjat per `RequestSizeLimiterMiddleware` abans d'arribar als handlers (`core/request_size_limiter.py`).
 
-**OOM via carrega de model gegant.** Fora d'abast: l'usuari escull el tier explicitament a l'installer. L'HardwareDetector (fixat v1.0.2-beta, `installer/swift-wizard/Sources/InstallNexe/HardwareDetector.swift`) avisa quan un tier supera la RAM.
+**OOM via carrega de model gegant.** Fora d'abast: l'usuari escull el tier explicitament a l'installer. L'HardwareDetector (fixat v1.0.3-beta, `installer/swift-wizard/Sources/InstallNexe/HardwareDetector.swift`) avisa quan un tier supera la RAM.
 
 ### 6.6 Elevacio de privilegi
 
@@ -279,4 +279,4 @@ Aquest document es revisa:
 
 ---
 
-*server-nexe 1.0.2-beta+ · Apache 2.0 · Jordi Goy · vegeu [SECURITY.md](../../SECURITY.md) per informar de vulnerabilitats.*
+*server-nexe 1.0.3-beta+ · Apache 2.0 · Jordi Goy · vegeu [SECURITY.md](../../SECURITY.md) per informar de vulnerabilitats.*
