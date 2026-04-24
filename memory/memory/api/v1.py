@@ -60,8 +60,14 @@ async def get_memory_api():
     global _memory_api
     if _memory_api is None:
         from . import MemoryAPI
-        _memory_api = MemoryAPI()
-        await _memory_api.initialize()
+        # Bug fix: create the API object in a local variable and only assign to
+        # the global AFTER initialize() succeeds. Previously _memory_api was set
+        # before initialize(), so a failed initialize() left the global pointing
+        # to an uninitialized object. Subsequent callers received this broken
+        # object without any exception, leading to a silent init-failed state in
+        # memory_helper and permanently disabled RAG recalls.
+        _new_api = MemoryAPI()
+        await _new_api.initialize()
         # Les 3 col·leccions canòniques ("passadissos de la biblioteca RAG"):
         # - nexe_documentation: knowhow del propi nexe (knowledge/ folder auto-ingest)
         # - user_knowledge: documents ad-hoc que l'usuari puja al chat
@@ -82,11 +88,12 @@ async def get_memory_api():
         )
         for col in canonical_collections:
             try:
-                if not await _memory_api.collection_exists(col):
-                    await _memory_api.create_collection(col, vector_size=DEFAULT_VECTOR_SIZE)
+                if not await _new_api.collection_exists(col):
+                    await _new_api.create_collection(col, vector_size=DEFAULT_VECTOR_SIZE)
                     logger.info("Created canonical collection: %s", col)
             except Exception as e:
                 logger.warning("Could not create canonical collection %s: %s", col, e)
+        _memory_api = _new_api  # only assigned after successful initialization
     return _memory_api
 
 @router.post("/store", response_model=MemoryStoreResponse, dependencies=[Depends(require_api_key)], summary="Store content in semantic memory (API key required)")
