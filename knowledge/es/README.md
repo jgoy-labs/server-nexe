@@ -209,6 +209,7 @@ Otros documentos de knowledge en esta carpeta:
 - PLUGINS.md — Sistema de plugins
 - API.md — Referencia de la REST API
 - SECURITY.md — Seguridad y autenticacion
+- THREAT_MODEL.md — Threat model formal STRIDE (boundaries, mitigaciones, riesgos residuales, apendice LINDDUN de privacidad)
 - LIMITATIONS.md — Limitaciones tecnicas
 - ERRORS.md — Errores comunes y soluciones
 - TESTING.md — Estrategia de pruebas y cobertura

@@ -289,9 +289,9 @@ Server Nexe utiliza un protocolo de duck typing (NexeModule Protocol) — sin he
 
 ## Documentación AI-Ready
 
-La carpeta `knowledge/` contiene 13 documentos temáticos × 3 idiomas = 39 archivos, estructurados con frontmatter YAML para ingestión RAG:
+La carpeta `knowledge/` contiene 14 documentos temáticos × 3 idiomas = 42 archivos, estructurados con frontmatter YAML para ingestión RAG:
 
-API, Arquitectura, Casos de uso, Errores, Identidad, Instalación, Limitaciones, Plugins, RAG, README, Seguridad, Testing, Uso.
+API, Arquitectura, Casos de uso, Errores, Identidad, Instalación, Limitaciones, Plugins, RAG, README, Seguridad, Testing, Threat Model, Uso.
 
 Apunta cualquier asistente de IA a este repo y puede entender la arquitectura completa.
 

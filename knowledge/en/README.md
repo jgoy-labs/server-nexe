@@ -209,6 +209,7 @@ Other knowledge documents in this folder:
 - PLUGINS.md — Plugin system
 - API.md — REST API reference
 - SECURITY.md — Security and authentication
+- THREAT_MODEL.md — Formal STRIDE threat model (boundaries, mitigations, residual risks, LINDDUN privacy appendix)
 - LIMITATIONS.md — Technical limitations
 - ERRORS.md — Common errors and solutions
 - TESTING.md — Test strategy and coverage

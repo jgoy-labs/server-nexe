@@ -83,7 +83,7 @@ Honest disclosure:
 
 - **Not tested in production.** Server Nexe has not been deployed in a production environment with real users. All testing has been done in development by the author. The 4842 automated tests cover code correctness, not real-world adversarial conditions.
 - **No human security audit.** All security testing has been performed by AI (Claude). AI can find patterns and run systematic checks, but it is not a substitute for a professional penetration test.
-- **No formal threat model document.** The threat model above is implicit in the code, not a reviewed artifact.
+- **Formal threat model** — the implicit threat model described above is now formalized in [THREAT_MODEL.md](THREAT_MODEL.md) (STRIDE, 8 trust boundaries, 6 asset categories, out-of-scope enumerated, residual risks declared). The summary above remains; see the formal document for the detail, mitigations and file:line citations.
 - **No bug bounty program.** This is a personal project with no budget for bounties.
 - **No CVE tracking process.** If a vulnerability is found, it will be fixed in the next release.
 - **No SOC 2, ISO 27001, or similar certification.** This is a local tool, not a SaaS.
