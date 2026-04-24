@@ -11,6 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import re
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple, List
 
@@ -258,17 +259,38 @@ class MemoryHelper:
 
     async def get_memory_api(self):
         """Get or initialize Memory API instance (module-level singleton, thread-safe)."""
-        global _memory_api_instance, _memory_api_init_failed
+        global _memory_api_instance, _memory_api_init_failed, _memory_api_last_failure_ts
         if _memory_api_instance is not None:
             self._memory_api = _memory_api_instance
             return _memory_api_instance
         if _memory_api_init_failed:
-            return None
+            # F3: check whether the retry interval has elapsed. If not, skip.
+            # elapsed=None means no timestamp recorded (should not happen in production
+            # since L317 always sets it, but treat as "eligible for retry" to avoid
+            # permanent silence when the flag is set without a timestamp).
+            elapsed = time.monotonic() - _memory_api_last_failure_ts if _memory_api_last_failure_ts else None
+            if elapsed is not None and elapsed < _MEMORY_API_RETRY_INTERVAL_S:
+                return None
         async with _memory_init_lock:
-            # Double-check after acquiring lock
+            # Double-check after acquiring lock (handles concurrent callers and the
+            # F3 retry case: reset the failure flags here so only one coroutine resets
+            # them, avoiding a race where two callers both see elapsed>=60s and both
+            # attempt a double-init in sequence).
             if _memory_api_instance is not None:
                 self._memory_api = _memory_api_instance
                 return _memory_api_instance
+            if _memory_api_init_failed:
+                # Still failed after acquiring lock — we are the retry caller.
+                elapsed = time.monotonic() - _memory_api_last_failure_ts if _memory_api_last_failure_ts else None
+                if elapsed is not None and elapsed < _MEMORY_API_RETRY_INTERVAL_S:
+                    return None
+                logger.warning(
+                    "MemoryAPI: retrying initialization after %.0fs (previous failure %.0fs ago)",
+                    _MEMORY_API_RETRY_INTERVAL_S,
+                    elapsed if elapsed is not None else 0,
+                )
+                _memory_api_init_failed = False
+                _memory_api_last_failure_ts = None
             try:
                 # Reutilitzar el singleton de v1.py si ja existeix (evita duplicar fastembed TextEmbedding)
                 try:
@@ -276,7 +298,7 @@ class MemoryHelper:
                     api = await _get_v1_api()
                     logger.info("MemoryAPI singleton reused from v1.py")
                 except Exception as _v1_err:
-                    logger.debug("Could not reuse v1 singleton (%s), creating new MemoryAPI", _v1_err)
+                    logger.warning("Could not reuse v1 singleton (%s), creating new MemoryAPI", _v1_err)
                     from memory.memory.api import MemoryAPI
                     api = MemoryAPI()
                     await api.initialize()
@@ -298,8 +320,9 @@ class MemoryHelper:
                 _memory_api_instance = api
                 logger.info("MemoryAPI singleton initialized and cached")
             except Exception as e:
-                logger.error(f"Failed to initialize Memory API: {e}")
+                logger.error("Failed to initialize Memory API: %s", e)
                 _memory_api_init_failed = True
+                _memory_api_last_failure_ts = time.monotonic()
                 return None
         self._memory_api = _memory_api_instance
         return _memory_api_instance
@@ -1006,10 +1029,16 @@ class MemoryHelper:
             return {"success": False, "message": str(e)}
 
 
+# Retry interval for MemoryAPI initialization after a transient failure (F3).
+# 60s balances recovery speed with request overhead: a failed retry costs one
+# fastembed/Qdrant connect attempt per minute, acceptable vs permanent silence.
+_MEMORY_API_RETRY_INTERVAL_S: float = 60.0
+
 # Global instances (module-level singletons)
 _memory_helper = MemoryHelper()
 _memory_api_instance = None  # Singleton to avoid re-creating the model on each request
-_memory_api_init_failed = False  # Prevent infinite retry on init failure
+_memory_api_init_failed = False  # True after a failed init; reset by F3 retry logic
+_memory_api_last_failure_ts: Optional[float] = None  # monotonic timestamp of last init failure
 
 import asyncio as _asyncio
 _memory_init_lock = _asyncio.Lock()  # Prevent concurrent double-init (race condition fix)
