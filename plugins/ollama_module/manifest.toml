@@ -57,6 +57,7 @@ external_services = ["Ollama (configurable host)"]
 router_prefix = "/ollama"
 public_routes = ["/health", "/info", "/api/models", "/ui"]
 protected_routes = ["/api/pull", "/api/chat", "/api/models/{name}"]
+removed_direct_routes = ["/api/chat"]
 
 # ───────────────────────────────────────────
 # [module.entry]

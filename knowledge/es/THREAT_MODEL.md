@@ -222,7 +222,7 @@ Leyenda: ● = amenaza activa con mitigacion, ◐ = parcial / solo defensa-en-pr
 
 **Dev-mode bypass desde un origen no-loopback.** Bloqueado en la linea 100 de `auth_dependencies.py`: `NEXE_DEV_MODE=true` da bypass solo cuando la IP cliente es loopback y `NEXE_DEV_MODE_ALLOW_REMOTE` esta explicitamente set.
 
-**Bypass del pipeline canonico de chat.** Los endpoints por-backend de chat (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) no estan expuestos en los routers de los plugins — vease §6.1 para el detalle. Todo chat debe pasar por `/ui/chat` o `/v1/chat/completions` para que corra el pipeline completo (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip).
+**Bypass del pipeline canonico de chat.** Mitigado por el middleware `RemovedDirectRoutesGuard` (`core/middleware.py`): cualquier peticion a `/mlx/chat`, `/llama-cpp/chat` o `/ollama/api/chat` devuelve HTTP 403 con codigo de error `direct_plugin_endpoint_disabled` antes de llegar a ningun handler (se ejecuta antes de SlowAPI, CORS y el dispatch de rutas). Las rutas se declaran como `removed_direct_routes` en el `manifest.toml` de cada plugin y se aplican tanto en tiempo de peticion como en tiempo de carga — un plugin que declara una ruta como eliminada y al mismo tiempo la registra lanza `PluginLoadError` y es rechazado. Todo chat debe pasar por `/ui/chat` o `/v1/chat/completions` para que corra el pipeline completo (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip). Cierra el seguimiento de la auditoria DoD §2.11.
 
 **Path traversal en session IDs o filenames.** `validate_string_input(context="path")` corre el detector de path-traversal en inputs tipo path (el contexto chat lo omite, vease trade-off F1.3). La validacion de filename en uploads se fuerza en servidor.
 

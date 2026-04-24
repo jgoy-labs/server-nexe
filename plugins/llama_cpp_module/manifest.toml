@@ -38,6 +38,7 @@ external_services = []
 router_prefix = "/llama-cpp"
 public_routes = ["/health", "/info"]
 protected_routes = ["/chat"]
+removed_direct_routes = ["/chat"]
 
 [module.entry]
 module = "plugins.llama_cpp_module.module"

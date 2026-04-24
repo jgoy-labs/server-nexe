@@ -24,6 +24,7 @@ def create_lazy_manifest(
     module_class: str,
     tags: List[str],
     *,
+    removed_direct_routes: Optional[List[str]] = None,
     compat_aliases: Optional[Dict[str, str]] = None,
     on_create: Optional[Callable] = None,
     on_get_instance: Optional[Callable] = None,
@@ -41,8 +42,15 @@ def create_lazy_manifest(
 
     Returns:
         Dict amb _get_module, get_router, get_metadata,
-        get_module_instance, __getattr__
+        get_module_instance, __getattr__, removed_direct_routes
     """
+    _removed: List[str] = list(removed_direct_routes or [])
+    for _r in _removed:
+        if not _r.startswith("/"):
+            raise ValueError(
+                f"removed_direct_routes: every entry must start with '/': {_r!r}"
+            )
+
     _state: Dict[str, Any] = {"module": None, "router": None}
 
     def _get_module():
@@ -93,6 +101,7 @@ def create_lazy_manifest(
         "get_metadata": get_metadata,
         "get_module_instance": get_module_instance,
         "__getattr__": __getattr__,
+        "removed_direct_routes": _removed,
     }
 
 
@@ -145,6 +154,7 @@ def install_lazy_manifest(caller_name: str, manifest_dict: dict, extra_attrs: Op
     wrapper.__dict__["get_router"] = manifest_dict["get_router"]
     wrapper.__dict__["get_metadata"] = manifest_dict["get_metadata"]
     wrapper.__dict__["get_module_instance"] = manifest_dict["get_module_instance"]
+    wrapper.__dict__["removed_direct_routes"] = manifest_dict.get("removed_direct_routes", [])
     # Atributs extra (retrocompat, constants, etc.)
     if extra_attrs:
         wrapper.__dict__.update(extra_attrs)

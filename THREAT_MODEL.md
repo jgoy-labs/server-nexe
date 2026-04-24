@@ -203,7 +203,7 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 **Dev-mode bypass from a non-loopback origin.** Blocked at line 100 of `auth_dependencies.py`: `NEXE_DEV_MODE=true` grants bypass only when the client IP is loopback and `NEXE_DEV_MODE_ALLOW_REMOTE` is explicitly set.
 
-**Bypass of the canonical chat pipeline.** Per-backend chat endpoints (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) are not exposed on the plugin routers — see §6.1 for detail. All chat must flow through `/ui/chat` or `/v1/chat/completions` so the full pipeline (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip) runs.
+**Bypass of the canonical chat pipeline.** Mitigated by the `RemovedDirectRoutesGuard` middleware (`core/middleware.py`): any request to `/mlx/chat`, `/llama-cpp/chat`, or `/ollama/api/chat` returns HTTP 403 with error code `direct_plugin_endpoint_disabled` before reaching any handler (runs before SlowAPI, CORS, and route dispatch). The routes are declared as `removed_direct_routes` in each plugin's `manifest.toml` (see `plugins/{mlx,llama_cpp,ollama}_module/manifest.toml`) and enforced both at request time and at plugin load time — a plugin that simultaneously declares a route as removed and registers it raises `PluginLoadError` and is rejected. All chat must flow through `/ui/chat` or `/v1/chat/completions` so the full pipeline (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip) runs. Closes DoD audit §2.11 follow-up.
 
 **Path traversal in session IDs or filenames.** `validate_string_input(context="path")` runs the path-traversal detector on path-like inputs (chat context skips it, see F1.3 trade-off). Filename validation on uploads is enforced server-side.
 

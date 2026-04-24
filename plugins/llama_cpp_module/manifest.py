@@ -16,6 +16,7 @@ _m = create_lazy_manifest(
     module_path="plugins.llama_cpp_module.module",
     module_class="LlamaCppModule",
     tags=["llama-cpp", "gguf", "llm"],
+    removed_direct_routes=["/chat"],
 )
 
 install_lazy_manifest(__name__, _m)

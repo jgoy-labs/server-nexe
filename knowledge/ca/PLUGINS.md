@@ -137,7 +137,19 @@ prefix = "/my-plugin"
 router_prefix = "/my-plugin"
 public_routes = ["/health", "/info"]
 protected_routes = ["/process"]
+removed_direct_routes = []   # Opcional. Rutes que NO han d'existir a la superficie HTTP.
 ```
+
+### Camp `removed_direct_routes` (opcional)
+
+Declara rutes que **no han d'estar registrades** al router del plugin. Semantica: "si algu registra aquesta ruta, es un error; si algu la crida, rep 403".
+
+- Tipus: llista de strings, cada entrada ha de comenar per `/` (ex: `["/chat"]`)
+- S'aplica en **temps de request**: `RemovedDirectRoutesGuard` middleware retorna 403 amb codi `direct_plugin_endpoint_disabled` abans de qualsevol handler
+- S'aplica en **temps de carrega**: si el router del plugin registra una ruta declarada com a `removed_direct_routes`, el plugin no es carrega (`PluginLoadError`)
+- **Diferencia amb `protected_routes`**: `protected_routes` te semantica ambigua entre plugins (en alguns significa "ruta fantasma", en d'altres "ruta sensible que requereix auth"). `removed_direct_routes` te semantica unica i executable: la ruta no ha d'existir a la superficie HTTP mai.
+
+Exemple (plugin `mlx_module`): `removed_direct_routes = ["/chat"]` → qualsevol `POST /mlx/chat` retorna 403. Els endpoints de pipeline canonics (`/ui/chat`, `/v1/chat/completions`) segueixen funcionant normalment.
 
 ### Regles clau
 - Totes les seccions sota `[module.*]` — mai seccions de primer nivell

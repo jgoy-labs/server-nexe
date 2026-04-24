@@ -222,7 +222,7 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 **Dev-mode bypass des d'un origen no-loopback.** Bloquejat a la linia 100 de `auth_dependencies.py`: `NEXE_DEV_MODE=true` dona bypass nomes quan la IP client es loopback i `NEXE_DEV_MODE_ALLOW_REMOTE` esta explicitament set.
 
-**Bypass del pipeline canonic de xat.** Els endpoints per-backend de xat (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) no estan exposats als routers dels plugins — vegeu §6.1 per al detall. Tot xat ha de passar per `/ui/chat` o `/v1/chat/completions` perque corri el pipeline complet (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip).
+**Bypass del pipeline canonic de xat.** Mitigat pel middleware `RemovedDirectRoutesGuard` (`core/middleware.py`): qualsevol peticio a `/mlx/chat`, `/llama-cpp/chat` o `/ollama/api/chat` retorna HTTP 403 amb codi d'error `direct_plugin_endpoint_disabled` abans d'arribar a cap handler (s'executa abans de SlowAPI, CORS i el dispatch de rutes). Les rutes estan declarades com a `removed_direct_routes` al `manifest.toml` de cada plugin i s'aplica tant en temps de peticio com en temps de carrega — un plugin que declara una ruta com a eliminada i alhora la registra llanca `PluginLoadError` i es rebutjat. Tot xat ha de passar per `/ui/chat` o `/v1/chat/completions` perque corri el pipeline complet (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip). Tanca el seguiment de l'auditoria DoD §2.11.
 
 **Path traversal en session IDs o filenames.** `validate_string_input(context="path")` corre el detector de path-traversal en inputs de tipus path (el context chat l'omet, vegeu trade-off F1.3). La validacio de filename en uploads es forçada a servidor.
 

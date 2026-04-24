@@ -16,6 +16,7 @@ _m = create_lazy_manifest(
     module_path="plugins.ollama_module.module",
     module_class="OllamaModule",
     tags=["ollama", "llm", "chat", "local"],
+    removed_direct_routes=["/api/chat"],
     compat_aliases={
         "_ollama_module": "instance",
         "get_ollama_module": "instance",

@@ -20,6 +20,7 @@ _m = create_lazy_manifest(
     module_path="plugins.mlx_module.module",
     module_class="MLXModule",
     tags=["mlx", "apple_silicon", "llm"],
+    removed_direct_routes=["/chat"],
     on_create=lambda inst: (
         logger.info("MLX manifest: Creating MLXModule instance..."),
         logger.info("MLX manifest: MLXModule instance created"),

@@ -45,7 +45,7 @@ It does **not** defend against:
 
 ### Pipeline enforcement (v0.9.1+)
 - All chat goes through two canonical endpoints: `/ui/chat` (Web UI) and `/v1/chat/completions` (OpenAI-compatible API)
-- Direct plugin endpoints (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) removed — return 403
+- Direct plugin endpoints (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) are blocked by the `RemovedDirectRoutesGuard` middleware — any direct call returns 403. Declared in each plugin's `manifest.toml:removed_direct_routes` and enforced at both request time and plugin load time (a plugin that simultaneously declares and registers a removed route fails to load).
 - Ensures all requests pass through the full security pipeline (auth, rate limiting, input validation, jailbreak detection, memory tag stripping)
 
 ### Rate limiting
