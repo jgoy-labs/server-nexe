@@ -543,7 +543,7 @@ class ModuleManager:
       if hasattr(app.state, 'security_logger'):
         app.state.security_logger.log_module_rejected(
           module_name=module_name,
-          reason=f"Not in NEXE_APPROVED_MODULES allowlist"
+          reason="Not in NEXE_APPROVED_MODULES allowlist"
         )
       return False
 
@@ -577,22 +577,69 @@ class ModuleManager:
 
     return manifest_module
 
+  def _check_removed_routes_collision(self, router, removed_routes: list, module_name: str) -> None:
+    """Fail-fast if router registers a route declared as removed.
+
+    Compares each route.path (which already includes the router prefix, e.g.
+    '/mlx/chat') against prefix+manifest_route. Raises PluginLoadError on
+    collision so the plugin is rejected at load time, not silently bypassed.
+    """
+    if not removed_routes:
+      return
+    from core.loader.protocol import PluginLoadError
+    prefix = getattr(router, 'prefix', '') or ''
+    for route in router.routes:
+      route_path = getattr(route, 'path', '')
+      for manifest_route in removed_routes:
+        if route_path == (prefix + manifest_route):
+          raise PluginLoadError(
+            f"Plugin '{module_name}' declares removed_direct_routes={removed_routes!r} "
+            f"but also registers route '{manifest_route}' (full path: '{route_path}'). "
+            f"Action: remove the @router.*(\"{manifest_route}\") decorator from {module_name}.",
+            plugin_name=module_name,
+            colliding_route=manifest_route,
+          )
+
+  def _register_removed_routes(self, router, removed_routes: list, module_name: str) -> None:
+    """Register removed routes in the guard middleware registry.
+
+    Called after collision check passes. Idempotent via register_removed_route.
+    """
+    if not removed_routes:
+      return
+    from core.middleware import register_removed_route
+    prefix = getattr(router, 'prefix', '') or ''
+    for manifest_route in removed_routes:
+      register_removed_route(module_name, manifest_route, prefix)
+
   def _load_plugin_routers_from_manifest(self, app, manifest_module, module_name: str, i18n) -> bool:
     """Load routers from manifest module into FastAPI app."""
+    from core.loader.protocol import PluginLoadError
+
+    removed_routes = getattr(manifest_module, 'removed_direct_routes', [])
     routers_loaded = False
 
     if hasattr(manifest_module, 'router_public'):
-      app.include_router(manifest_module.router_public)
+      router = manifest_module.router_public
+      self._check_removed_routes_collision(router, removed_routes, module_name)
+      self._register_removed_routes(router, removed_routes, module_name)
+      app.include_router(router)
       logger.info(f"Loaded router_public from {module_name}")
       routers_loaded = True
 
     if hasattr(manifest_module, 'router_admin'):
-      app.include_router(manifest_module.router_admin)
+      router = manifest_module.router_admin
+      self._check_removed_routes_collision(router, removed_routes, module_name)
+      self._register_removed_routes(router, removed_routes, module_name)
+      app.include_router(router)
       logger.info(f"Loaded router_admin from {module_name}")
       routers_loaded = True
 
     if hasattr(manifest_module, 'router_ui'):
-      app.include_router(manifest_module.router_ui)
+      router = manifest_module.router_ui
+      self._check_removed_routes_collision(router, removed_routes, module_name)
+      self._register_removed_routes(router, removed_routes, module_name)
+      app.include_router(router)
       logger.info(f"Loaded router_ui from {module_name}")
       routers_loaded = True
 
@@ -600,9 +647,13 @@ class ModuleManager:
       try:
         router = manifest_module.get_router()
         if router:
+          self._check_removed_routes_collision(router, removed_routes, module_name)
+          self._register_removed_routes(router, removed_routes, module_name)
           app.include_router(router)
           logger.info(f"Loaded router via get_router() from {module_name}")
           routers_loaded = True
+      except PluginLoadError:
+        raise  # collision is a hard error — propagate to load_plugin_routers
       except Exception as e:
         logger.warning(f"Failed to get router from {module_name} via get_router(): {e}")
 

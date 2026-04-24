@@ -234,6 +234,27 @@ class NexeModuleWithSpecialists(NexeModule, Protocol):
     """
     ...
 
+class PluginLoadError(Exception):
+  """Raised when a plugin cannot be loaded due to a configuration conflict.
+
+  Specifically: a plugin declares a route in removed_direct_routes AND
+  simultaneously registers that same route on its router — a contradiction
+  that would leave the guard bypassed. Fail-fast at load time, not at
+  request time.
+  """
+
+  def __init__(self, message: str, *, plugin_name: str, colliding_route: str):
+    super().__init__(message)
+    self.plugin_name = plugin_name
+    self.colliding_route = colliding_route
+
+  def __str__(self) -> str:
+    return (
+      f"PluginLoadError: plugin='{self.plugin_name}' "
+      f"colliding_route='{self.colliding_route}' — {self.args[0]}"
+    )
+
+
 def validate_module(module: Any) -> bool:
   """
   Validate that an object implements the NexeModule protocol.

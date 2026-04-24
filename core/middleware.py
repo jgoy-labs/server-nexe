@@ -9,14 +9,18 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.requests import Request
 import logging
+import re
 
 from core.dependencies import (
   limiter,
@@ -32,7 +36,6 @@ logger = logging.getLogger(__name__)
 # CSRF EXEMPT PATTERNS - Pre-compiled at module load (not per-request)
 # Using simple prefix patterns that starlette-csrf can match efficiently
 # ═══════════════════════════════════════════════════════════════════════════
-import re
 _CSRF_EXEMPT_PATTERNS = [
     re.compile(r"^/v1/chat/completions"),
     re.compile(r"^/v1/memory/"),  # Memory API (CLI calls)
@@ -45,7 +48,114 @@ _CSRF_EXEMPT_PATTERNS = [
     re.compile(r"^/ui/"),  # UI uses X-API-Key auth (works for local + Tailscale)
 ]
 
-from core.server.helpers import translate as _translate
+from core.server.helpers import translate as _translate  # noqa: E402
+
+# ═══════════════════════════════════════════════════════════════════════════
+# REMOVED DIRECT ROUTES GUARD
+#
+# Routes declared in manifest.removed_direct_routes are registered here at
+# plugin load time (by personality/module_manager/module_manager.py).
+# The middleware checks every incoming request against this registry and
+# returns 403 before any other processing.
+#
+# Design notes:
+# - Registry is module-level (mutable) and populated at startup. By the
+#   time the first request arrives all plugins are already loaded → safe.
+# - Guard is positioned second-to-outermost (just inside TrustedHostMiddleware)
+#   so blocked requests bypass CORS, SlowAPI, CSRF, and handlers entirely.
+#   Consequence: 403 responses do NOT include CORS headers. This is intentional
+#   — an attacker attempting a direct-endpoint bypass gets no extra info.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# {full_route: (plugin_name, manifest_route)}
+_REMOVED_ROUTE_REGISTRY: Dict[str, Tuple[str, str]] = {}
+
+# [(compiled_pattern, plugin_name, manifest_route, full_route), ...]
+_REMOVED_ROUTE_PATTERNS: List[Tuple[re.Pattern, str, str, str]] = []
+
+
+def _build_route_pattern(route: str) -> re.Pattern:
+    """Compile a FastAPI route pattern to a regex.
+
+    Handles {param} (single segment) and {param:path} (multi-segment).
+    """
+    parts = re.split(r"\{[^}]+\}", route)
+    params = re.findall(r"\{([^}]+)\}", route)
+    result = re.escape(parts[0])
+    for i, param in enumerate(params):
+        result += (".+" if ":path" in param else "[^/]+")
+        result += re.escape(parts[i + 1])
+    return re.compile(f"^{result}$")
+
+
+def register_removed_route(plugin_name: str, manifest_route: str, prefix: str) -> None:
+    """Register a removed direct route in the guard registry.
+
+    Called from module_manager._load_plugin_routers_from_manifest at plugin
+    load time. Idempotent: re-registering the same full_route is a no-op.
+
+    Args:
+        plugin_name:    Plugin module name (e.g. "mlx_module").
+        manifest_route: Relative route from removed_direct_routes (e.g. "/chat").
+        prefix:         Router prefix (e.g. "/mlx"). Comes from router.prefix.
+    """
+    full_route = (prefix.rstrip("/") + manifest_route) if prefix else manifest_route
+    if full_route in _REMOVED_ROUTE_REGISTRY:
+        return
+    _REMOVED_ROUTE_REGISTRY[full_route] = (plugin_name, manifest_route)
+    _REMOVED_ROUTE_PATTERNS.append((
+        _build_route_pattern(full_route),
+        plugin_name,
+        manifest_route,
+        full_route,
+    ))
+    logger.info("RemovedDirectRoutesGuard: registered %s (plugin=%s)", full_route, plugin_name)
+
+
+class RemovedDirectRoutesGuard(BaseHTTPMiddleware):
+    """Block HTTP requests to routes declared as removed in plugin manifests.
+
+    Returns 403 with error code 'direct_plugin_endpoint_disabled' for any
+    request whose path matches a route in _REMOVED_ROUTE_PATTERNS. Runs
+    before SlowAPI, CORS, CSRF, and route handlers.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        for pattern, plugin_name, manifest_route, full_route in _REMOVED_ROUTE_PATTERNS:
+            if pattern.match(path):
+                client_ip = request.client.host if request.client else "unknown"
+                user_agent = request.headers.get("user-agent", "unknown")
+                logger.warning(
+                    "security.plugin.direct_access_blocked",
+                    extra={
+                        "event": "security.plugin.direct_access_blocked",
+                        "plugin_name": plugin_name,
+                        "route": manifest_route,
+                        "full_route": full_route,
+                        "client_ip": client_ip,
+                        "user_agent": user_agent,
+                    },
+                )
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "error": "direct_plugin_endpoint_disabled",
+                        "message": (
+                            "Direct plugin endpoint access is disabled. "
+                            "Use /ui/chat or /v1/chat/completions."
+                        ),
+                        "removed_route": full_route,
+                    },
+                )
+        return await call_next(request)
+
+
+def setup_removed_direct_routes_guard(app: FastAPI) -> None:
+    """Add RemovedDirectRoutesGuard to the middleware stack."""
+    app.add_middleware(RemovedDirectRoutesGuard)
+    logger.info("RemovedDirectRoutesGuard middleware registered")
+
 
 def setup_rate_limiting(app: FastAPI, i18n = None) -> None:
   """
@@ -292,10 +402,11 @@ def setup_all_middleware(app: FastAPI, config: Dict[str, Any], i18n = None) -> N
   """
   # Starlette: last added = outermost (first to see request, last to see response)
   # Order below: innermost → outermost
-  setup_prometheus_metrics(app)        # innermost — metrics collection
-  setup_cors(app, config, i18n)        # CORS headers
-  setup_rate_limiting(app, i18n)       # rate limiting
-  setup_request_size_limit(app, config) # request size check
-  setup_csrf_protection(app, config)   # CSRF validation
-  app.add_middleware(SecurityHeadersMiddleware)  # security headers on responses
-  setup_trusted_hosts(app, config)     # outermost — host validation first
+  setup_prometheus_metrics(app)           # innermost — metrics collection
+  setup_cors(app, config, i18n)           # CORS headers
+  setup_rate_limiting(app, i18n)          # rate limiting
+  setup_request_size_limit(app, config)   # request size check
+  setup_csrf_protection(app, config)      # CSRF validation
+  app.add_middleware(SecurityHeadersMiddleware)   # security headers on responses
+  setup_removed_direct_routes_guard(app)  # blocks removed plugin routes (before TrustedHost)
+  setup_trusted_hosts(app, config)        # outermost — host validation first
