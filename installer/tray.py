@@ -168,7 +168,7 @@ class NexeTray(rumps.App):
         self.strings = T.get(self.lang, T["ca"])
 
         # Read version from pyproject.toml (single source of truth)
-        _version = "0.9"
+        _version = "0.0.0-unknown"
         try:
             import tomllib
             _toml_path = PROJECT_ROOT / "pyproject.toml"
