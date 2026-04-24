@@ -201,7 +201,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
             if not model_name:
                 model_name = "nexe"
         except Exception:
-            version = "0.9"
+            version = "0.0.0-unknown"
             if not model_name:
                 model_name = os.getenv("NEXE_OLLAMA_MODEL", "") or "nexe"
         lang = get_server_lang()
