@@ -32,7 +32,19 @@ class PluginAgent(BaseAgent):
                 "resolved_issues": 0,
             }
 
-        plugins = [d for d in plugins_dir.iterdir() if d.is_dir() and not d.name.startswith('_')]
+        try:
+            plugins = [d for d in plugins_dir.iterdir() if d.is_dir() and not d.name.startswith('_')]
+        except OSError:
+            return {
+                "status": "DEGRADED",
+                "findings": [],
+                "reasoning": f"No he pogut llegir {plugins_dir}: error de permisos.",
+                "top_offenders": [],
+                "recommendations": [],
+                "memory_used": False,
+                "new_issues": 0,
+                "resolved_issues": 0,
+            }
         findings: List[Dict] = []
         top_offenders: List[str] = []
 
