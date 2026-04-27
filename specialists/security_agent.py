@@ -3,7 +3,6 @@ SecurityAgent — Agent de seguretat per a server-nexe.
 Detecta secrets exposats, patterns JWT i problemes d'autenticació.
 Read-only absolut: no modifica cap fitxer del target.
 """
-import ast
 import re
 from pathlib import Path
 from typing import Any, Dict, List
@@ -15,7 +14,7 @@ _SECRET_PATTERNS = re.compile(
     r'\s*=\s*["\'][^"\']{8,}["\']'
 )
 
-_EXCLUDE_DIRS = {'.venv', 'venv', '__pycache__', '.git', 'node_modules', '.muthur', 'dist', 'build', 'bench'}
+_EXCLUDE_DIRS = {'.venv', 'venv', '__pycache__', '.git', 'node_modules', '.muthur', 'dist', 'build', 'bench', 'test', 'tests'}
 
 
 class SecurityAgent(BaseAgent):
@@ -49,8 +48,8 @@ class SecurityAgent(BaseAgent):
             total = sum(1 for _ in self._iter_python_files())
             if total != py_files_scanned:
                 skipped_note = f" ({total - py_files_scanned} fitxers saltats per errors)"
-        except Exception:
-            pass
+        except OSError:
+            pass  # Iteració de seguretat pel reasoning — no crítica
 
         reasoning = (
             f"He analitzat {py_files_scanned} fitxers Python via regex de patterns secrets/JWT/auth"

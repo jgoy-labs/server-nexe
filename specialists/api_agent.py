@@ -4,7 +4,6 @@ Detecta endpoints FastAPI via AST i avisa de breaking changes respecte al baseli
 Read-only absolut.
 """
 import ast
-from pathlib import Path
 from typing import Any, Dict, List, Set
 
 from muthur.doctor.specialists.base_agent import BaseAgent
@@ -66,7 +65,7 @@ class ApiAgent(BaseAgent):
             })
 
         new_issues = len(findings)
-        resolved_issues = len(added)  # Endpoints nous no son problemes, son features
+        resolved_issues = 0  # Endpoints nous (added) no son problemes resolts — son features
 
         status = "UNHEALTHY" if findings else "HEALTHY"
 
