@@ -126,4 +126,8 @@ class TestStopFallbackPgrep:
 
             result = runner.invoke(app, ["stop", "--force"])
 
-            assert "No Nexe services are running" in result.output
+            # NEXE_LANG-aware: accepta sortida en català o anglès (auditoria r1 P1).
+            assert (
+                "No Nexe services are running" in result.output
+                or "Cap servei Nexe actiu" in result.output
+            ), f"Output inesperat: {result.output!r}"
