@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+
+- **`strip_memory_tags` neutralitza variants Unicode de brackets** (`plugins/security/core/input_sanitizers.py`). El regex original només cobria `[` ASCII (U+005B), permetent bypass amb fullwidth `［MEM_SAVE］` (U+FF3B/U+FF3D), CJK `「」 『』 〔〕 ｢｣` i mathematical `⟦⟧`. Fix defense-in-depth: `unicodedata.normalize("NFKC", text)` abans del regex match (neutralitza fullwidth + halfwidth + lletres fullwidth + espais fullwidth) + regex extension explícita per brackets CJK i mathematical (no NFKC-normalitzables). **Breaking-change menor:** la funció ara retorna text NFKC-normalitzat; documentat al docstring. Tests nous a `tests/test_input_sanitizers_unicode.py` (17 casos: parametrize fullwidth + CJK + preserva normal + anchor + idempotent + homoglyph negatiu). Auditoria r4 B3.
+
 ### Fixed
 
 - **Plists `Nexe.app` i `NexeTray.app` desincronitzats** (`Nexe.app/Contents/Info.plist`, `installer/NexeTray.app/Contents/Info.plist`). Els bundles anaven amb `1.0.2-beta` mentre `pyproject.toml` ja era `1.0.3-beta`, fent fallar `core/tests/test_plist_versions.py::test_synced_plists_match_pyproject`. Resolt amb `python -m installer.sync_plist_versions` (eina ja existent al projecte). Auditoria r1 P0.2 (DeepSeek V3 / Turing).

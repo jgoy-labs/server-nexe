@@ -11,6 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import html
 import re
+import unicodedata
 from typing import Optional, Dict, Any
 from fastapi import HTTPException
 
@@ -26,7 +27,14 @@ from .injection_detectors import (
 from .messages import get_message
 
 _MEM_TAG_RE = re.compile(
-  r'(^|\n)\s*\[(?:MEM_SAVE|MEMORIA|MEM|MEMORY|SYSTEM|ASSISTANT|TOOL|FUNCTION|USER)(?:\s*[:=][^\]]*?)?\]',
+  # B3 r4: ASCII brackets after NFKC normalize.
+  # NFKC converts fullwidth ［］, halfwidth ｢｣ → 「」, fullwidth letters → ASCII.
+  # Non-NFKC-normalizable brackets (CJK 「『〔, mathematical ⟦) covered explicitly.
+  # Inner \s* allowances catch fullwidth whitespace bypass: ［　MEM_SAVE　］ → [ MEM_SAVE ].
+  r'(^|\n)\s*[\[「『〔｢⟦]\s*'
+  r'(?:MEM_SAVE|MEMORIA|MEM|MEMORY|SYSTEM|ASSISTANT|TOOL|FUNCTION|USER)'
+  r'(?:\s*[:=][^\]」』〕｣⟧]*?)?'
+  r'\s*[\]」』〕｣⟧]',
   re.IGNORECASE,
 )
 
@@ -89,6 +97,15 @@ def strip_memory_tags(text: str) -> str:
   false positives on inline brackets like `[USER: Jordi]` or `[memoria]`
   used in normal writing.
 
+  B3 r4: applies NFKC Unicode normalization before regex match to neutralize
+  fullwidth (`［］`), fullwidth-letter (`ＭＥＭ_ＳＡＶＥ`) and halfwidth-fullwidth
+  bypasses. Additional CJK brackets (`「」 『』 〔〕 ｢｣`) and mathematical
+  brackets (`⟦⟧`) are covered explicitly by the extended regex.
+
+  IMPORTANT: NFKC normalize MODIFIES the returned text. Fullwidth characters
+  are converted to their compatibility ASCII/half-width equivalents. Callers
+  that need the unmodified original string must keep their own copy.
+
   Covered tags (all case-insensitive):
     MEM_SAVE, MEMORIA, MEM, MEMORY, SYSTEM, ASSISTANT, TOOL, FUNCTION, USER
 
@@ -99,6 +116,11 @@ def strip_memory_tags(text: str) -> str:
 
   Newlines are preserved via capture group 1 (the matched `^` or `\\n`).
   """
+  if not text:
+    return text
+  # NFKC: fullwidth → ASCII, compat decompositions, halfwidth ｢｣ → 「」.
+  # MUST happen before regex match so the ASCII branch catches normalized input.
+  text = unicodedata.normalize("NFKC", text)
   return _MEM_TAG_RE.sub(lambda m: m.group(1), text).strip()
 
 def sanitize_html(text: str) -> str:
