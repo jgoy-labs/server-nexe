@@ -8,7 +8,7 @@ Suport GPU (Metal/CUDA) i CPU amb gestio de sessions via ModelPool i prefix cach
 | Metode | Ruta | Descripcio |
 |--------|------|------------|
 | GET | /llama-cpp/info | Info del modul |
-| POST | /llama-cpp/chat | Chat amb model GGUF |
+| ~~POST~~ | ~~/llama-cpp/chat~~ | **Removed v1.0.3-beta** — returns 403 via `RemovedDirectRoutesGuard`. Use `POST /v1/chat/completions` (OpenAI-compatible). |
 
 ## CLI
 

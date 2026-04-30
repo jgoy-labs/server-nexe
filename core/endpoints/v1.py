@@ -12,6 +12,7 @@ www.jgoy.net · https://server-nexe.org
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 import logging
+from core.version import __version__
 from .chat import router as chat_router
 from .workflows import router_workflows
 
@@ -33,7 +34,7 @@ async def v1_root(request: Request):
   return JSONResponse({
     "api_version": "v1",
     "status": "operational",
-    "description": "Nexe 0.9.0 Versioned API",
+    "description": f"Nexe {__version__} Versioned API",
     "endpoints": {
       "workflows": {
         "base": "/v1/workflows",
@@ -47,18 +48,18 @@ async def v1_root(request: Request):
       },
       "rag": {
         "base": "/v1/rag",
-        "status": "implemented",
-        "description": "RAG search endpoints",
+        "status": "not-implemented",
+        "description": "RAG search endpoints (handlers return 501)",
       },
       "embeddings": {
         "base": "/v1/embeddings",
-        "status": "implemented",
-        "description": "Text embeddings endpoints",
+        "status": "not-implemented",
+        "description": "Text embeddings endpoints (handlers return 501)",
       },
       "documents": {
         "base": "/v1/documents",
-        "status": "implemented",
-        "description": "Document processing endpoints",
+        "status": "not-implemented",
+        "description": "Document processing endpoints (handlers return 501)",
       },
       "memory": {
         "base": "/v1/memory",
