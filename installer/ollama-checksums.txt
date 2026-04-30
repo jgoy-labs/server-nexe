@@ -1,0 +1,40 @@
+# Ollama macOS bundle checksums — pinned for offline DMG build (B8 r4)
+#
+# Format: <sha256-hex>  <relative-filename>   (consumed by `shasum -a 256 -c`)
+#
+# Source URL (primary):   https://ollama.com/download/Ollama-darwin.zip
+#                         (redirects to GitHub releases/latest/download/Ollama-darwin.zip)
+# Source URL (secondary): https://github.com/ollama/ollama/releases/download/<version>/Ollama-darwin.zip
+# Source of truth:        https://github.com/ollama/ollama/releases/download/<version>/sha256sum.txt
+#                         (published and signed by the Ollama maintainers at release time)
+#
+# Last updated:           2026-05-01 (B8 r4)
+# Ollama version pinned:  v0.22.0 (released 2026-04-28)
+# File size:              164167759 bytes (~156 MB)
+#
+# Cross-validation performed at pin time (2026-05-01):
+#   1. Downloaded zip via ollama.com (latest CDN redirect)        → SHA_A
+#   2. Downloaded zip via GitHub releases/download/v0.22.0/...    → SHA_B
+#   3. Fetched sha256sum.txt published by Ollama at the release   → SHA_OFFICIAL
+#   4. SHA_A == SHA_B == SHA_OFFICIAL  ✓ (binary diff also clean)
+#
+# Update procedure (when Ollama releases a new version):
+#   1. Verify the new release tag at https://github.com/ollama/ollama/releases
+#   2. Fetch the official sha256sum.txt for that tag:
+#         curl -fsSL https://github.com/ollama/ollama/releases/download/<TAG>/sha256sum.txt
+#      and read the SHA256 for `./Ollama-darwin.zip` → call it SHA_OFFICIAL
+#   3. Download the zip from BOTH sources and compute SHA locally:
+#         curl -fsSL -o /tmp/A.zip https://ollama.com/download/Ollama-darwin.zip
+#         curl -fsSL -o /tmp/B.zip https://github.com/ollama/ollama/releases/download/<TAG>/Ollama-darwin.zip
+#         shasum -a 256 /tmp/A.zip /tmp/B.zip
+#   4. If SHA(/tmp/A.zip) == SHA(/tmp/B.zip) == SHA_OFFICIAL → safe to pin
+#      (replace the line below; bump `Last updated` and `Ollama version pinned`).
+#   5. If ANY of the three diverge → STOP. Possible MITM, CDN cache divergence,
+#      or upstream tampering. Verify from a clean network (different ISP / VPN /
+#      tethering) before committing the new pin. Do NOT bypass.
+#   6. As an additional safety net for future reviewers, you may also run:
+#         codesign --verify --deep --strict <extracted Ollama.app>
+#      to confirm Apple Developer ID signature integrity.
+#
+# ── pinned checksum (one entry per line, format: <sha256>  <filename>) ──
+a410e2f722fb25d6f87ad2ac23a9d44e330b078762e19bfe5a3b0162d236b278  Ollama-darwin.zip
