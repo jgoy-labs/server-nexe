@@ -50,14 +50,14 @@ def create_router(module_instance) -> APIRouter:
     router = APIRouter(prefix="/security")
 
     @router.get("/health")
-    async def health():
-        """Health check per security module"""
+    async def health(_: str = Depends(require_api_key)):
+        """Health check per security module. PROTECTED: Requires API key."""
         result = await module_instance.health_check()
         return result.to_dict()
 
     @router.get("/info")
-    async def info():
-        """Informacio del modul security"""
+    async def info(_: str = Depends(require_api_key)):
+        """Informacio del modul security. PROTECTED: Requires API key."""
         return module_instance.get_info()
 
     @router.post("/scan")

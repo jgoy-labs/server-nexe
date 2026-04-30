@@ -138,10 +138,14 @@ def test_get_info_without_node():
     assert info["pool_stats"] == {}
 
 
-def test_info_endpoint():
-    """Line 80: info endpoint."""
+def test_info_endpoint(monkeypatch):
+    """Line 80: info endpoint. Auditoria r4 B2: ara requereix X-API-Key."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
+
+    monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-llamacpp-key")
+    monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
+    monkeypatch.delenv("NEXE_DEV_MODE", raising=False)
 
     module = LlamaCppModule()
     module._init_router()
@@ -150,6 +154,6 @@ def test_info_endpoint():
     app.include_router(module.get_router())
 
     client = TestClient(app, raise_server_exceptions=False)
-    r = client.get("/llama-cpp/info")
+    r = client.get("/llama-cpp/info", headers={"X-API-Key": "test-llamacpp-key"})
     assert r.status_code == 200
     assert r.json()["name"] == "llama_cpp_module"

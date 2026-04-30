@@ -11,7 +11,9 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from plugins.security.core.auth import require_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +33,8 @@ def create_router(module_instance) -> APIRouter:
         return module_instance
 
     @router.get("/info")
-    async def get_info():
-        """Informacio del modul MLX."""
+    async def get_info(_: str = Depends(require_api_key)):
+        """Informacio del modul MLX. PROTECTED: Requires API key."""
         module = _get_module()
         return module.get_info()
 

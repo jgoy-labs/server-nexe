@@ -69,33 +69,33 @@ class TestSecurityModule:
 
 
 class TestSecurityHealthEndpoint:
-    """Tests per GET /security/health."""
+    """Tests per GET /security/health. Auditoria r4 B2: requereix X-API-Key."""
 
-    def test_health_returns_200(self, client):
-        response = client.get("/security/health")
+    def test_health_returns_200(self, client, auth_headers):
+        response = client.get("/security/health", headers=auth_headers)
         assert response.status_code == 200
 
-    def test_health_returns_status(self, client):
-        response = client.get("/security/health")
+    def test_health_returns_status(self, client, auth_headers):
+        response = client.get("/security/health", headers=auth_headers)
         data = response.json()
         assert data["status"] in ("healthy", "unknown", "degraded")
         assert "message" in data
 
 
 class TestSecurityInfoEndpoint:
-    """Tests per GET /security/info."""
+    """Tests per GET /security/info. Auditoria r4 B2: requereix X-API-Key."""
 
-    def test_info_returns_200(self, client):
-        response = client.get("/security/info")
+    def test_info_returns_200(self, client, auth_headers):
+        response = client.get("/security/info", headers=auth_headers)
         assert response.status_code == 200
 
-    def test_info_returns_module_name(self, client):
-        response = client.get("/security/info")
+    def test_info_returns_module_name(self, client, auth_headers):
+        response = client.get("/security/info", headers=auth_headers)
         data = response.json()
         assert data["name"] == "security"
 
-    def test_info_returns_endpoints_list(self, client):
-        response = client.get("/security/info")
+    def test_info_returns_endpoints_list(self, client, auth_headers):
+        response = client.get("/security/info", headers=auth_headers)
         data = response.json()
         assert "endpoints" in data
         assert len(data["endpoints"]) > 0
