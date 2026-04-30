@@ -348,6 +348,14 @@ MODEL_CATALOG = {
 #
 # Refresh the values with ``scripts/refresh_model_hashes.py`` (optional
 # F4.1.b tool — regenerates from HF Hub API + local ollama daemon).
+#
+# ───────────────────────────────────────────────────────────────────────────
+# STATUS v1.0.3-beta: ALL VALUES BELOW ARE None.
+# This is INTENTIONAL legacy-friendly bootstrap (CHANGELOG F4.1).
+# Population of real digests is tracked as v1.0.4-beta backlog item C19.
+# Until populated, ``verify_download_integrity`` logs a WARNING per download
+# and returns False (degraded path) — installs proceed, security gap visible.
+# ───────────────────────────────────────────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════
 MODEL_WEIGHT_SHA256: dict[tuple[str, str], Optional[str]] = {
     # ── MLX snapshots (dir hash) ──────────────────────────────────────────
