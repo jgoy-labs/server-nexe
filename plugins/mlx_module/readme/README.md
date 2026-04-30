@@ -8,7 +8,7 @@ Inclou prefix caching real amb TTFT instantani en converses llargues.
 | Metode | Ruta | Descripcio |
 |--------|------|------------|
 | GET | /mlx/info | Info del modul |
-| POST | /mlx/chat | Chat amb model MLX |
+| ~~POST~~ | ~~/mlx/chat~~ | **Removed v1.0.3-beta** — returns 403 via `RemovedDirectRoutesGuard`. Use `POST /v1/chat/completions` (OpenAI-compatible). |
 
 ## CLI
 

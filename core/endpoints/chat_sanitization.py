@@ -71,11 +71,16 @@ def _filter_rag_injection(text: str) -> str:
     truncation should only be applied at RETRIEVAL time (chat endpoint).
 
     B6 r4: applies NFKC Unicode normalization before regex match to neutralize
-    fullwidth (`［］`), mathematical brackets (`⟦⟧`), halfwidth-fullwidth and
-    similar bypass attempts. The returned text reflects the normalized form
-    (RAG indexing is a one-way pipeline — callers must accept this).
+    fullwidth (`［］`), halfwidth-fullwidth letters and similar compatibility
+    bypass attempts. The returned text reflects the normalized form (RAG
+    indexing is a one-way pipeline — callers must accept this).
 
     Known gaps:
+        - Mathematical brackets (`⟦⟧`, U+27E6 / U+27E7) are NOT covered. NFKC
+          leaves them unchanged (verified empirically); B3's
+          `strip_memory_tags` handles them via an explicit regex extension,
+          but `_filter_rag_injection` does not. Tracked alongside C23 for the
+          v1.0.4-beta backlog.
         - CJK brackets (`「」 『』 〔〕`) are NOT covered. NFKC does not collapse
           them to ASCII. Tracked as C23 in v1.0.4-beta backlog.
         - Homoglyph attacks (Cyrillic М vs Latin M) are out of scope — would

@@ -72,6 +72,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Knowledge-base embeddings regenerated** (`knowledge/.embeddings/`) to close two accumulated stale cases (FUNDING.yml ko-fi URL update from 2026-04-17 and the `[IMAGEN ADJUNTA] → [IMATGE ADJUNTA]` marker fix from 2026-04-20). Version references inside the knowledge base bumped to `1.0.2-beta` and re-embedded in the same pass.
 
+## [1.0.2-beta] - 2026-04-21
+
+End-of-line for the 1.0.x knowledge-base regeneration cycle. See `[1.0.3-beta]`
+above for the F4.1 SHA256 pinning, F4.2 STRIDE threat model, specialists
+Onada 5, security DoD F1-F4, and the auditoria r1 fixes that landed since.
+
+### Documentation
+
+- Knowledge-base embeddings regenerated (778 chunks × 3 languages) to close
+  two accumulated stale cases (FUNDING.yml ko-fi URL update from 2026-04-17
+  and the `[IMAGEN ADJUNTA] → [IMATGE ADJUNTA]` marker fix from 2026-04-20).
+- Version metadata bumped from `1.0.1-beta` to `1.0.2-beta` across `pyproject.toml`,
+  `personality/server.toml`, READMEs, `SECURITY.md`, `CONTRIBUTING.md`, the
+  installer `Info.plist` files, and the knowledge base.
+
+### Notes
+
+- No public release tag was cut for 1.0.2-beta; the version was used internally
+  during the F4.1 / F4.2 work and is documented here for chronological
+  completeness so consumers comparing `pyproject.toml` against this changelog
+  can trace the missing intermediate bump.
+
 ## [1.0.1-beta] - 2026-04-20
 
 ### Added

@@ -10,7 +10,7 @@ Chat amb streaming, gestio de models, download, embeddings locals.
 | GET | /ollama/health | No | Health check |
 | GET | /ollama/info | No | Info del modul |
 | GET | /ollama/api/models | No | Llistar models |
-| POST | /ollama/api/chat | Si | Chat streaming |
+| ~~POST~~ | ~~/ollama/api/chat~~ | — | **Removed v1.0.3-beta** — returns 403 via `RemovedDirectRoutesGuard`. Use `POST /v1/chat/completions` (OpenAI-compatible). |
 | POST | /ollama/api/pull | Si | Descarregar model |
 | DELETE | /ollama/api/models/{name} | Si | Eliminar model |
 | GET | /ollama/ui | No | Status page |

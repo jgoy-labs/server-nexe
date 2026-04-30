@@ -7,7 +7,7 @@ Modul de seguretat core per server-nexe.
 - **Autenticacio dual-key** — Primary + secondary amb `secrets.compare_digest` (contra timing attacks)
 - **6 detectors d'injeccio** — XSS, SQL, NoSQL, command, path traversal, LDAP
 - **Rate limiting** — Per IP i per API key via slowapi + RateLimitTracker
-- **Sanitizer** — 69 patrons de jailbreak multiidioma (submodul)
+- **Sanitizer** — 47 patrons de jailbreak + 18 patrons d'injection multiidioma (submodul `sanitizer/`)
 - **Security logging** — RFC5424-compliant IRONCLAD (submodul security_logger)
 - **Scanning** — Checks automatitzats: auth, web security, rate limiting
 
