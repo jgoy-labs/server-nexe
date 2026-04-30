@@ -291,19 +291,39 @@ class SessionManager:
             if self._crypto:
                 for file_path in self._storage_path.glob("*.enc"):
                     try:
-                        data_bytes = self._crypto.decrypt(file_path.read_bytes())
+                        # B4 r4: AAD = filename stem binds ciphertext to its
+                        # location. A swap attack (A.enc renamed to B.enc) makes
+                        # the AAD passed here differ from the one used at
+                        # encrypt() → AESGCM raises InvalidTag, caught below.
+                        session_id = file_path.stem
+                        aad = session_id.encode("utf-8")
+                        data_bytes = self._crypto.decrypt(file_path.read_bytes(), aad=aad)
                         data = json.loads(data_bytes)
                         session = ChatSession.from_dict(data)
+                        # Defense-in-depth: filename stem must match session.id
+                        # in the payload. AAD already enforces this cryptographically
+                        # for files written by 1.0.3-beta+, but the explicit check
+                        # protects against future call-sites that forget to pass AAD.
+                        if session.id != session_id:
+                            self._corrupted_sessions_count += 1
+                            logger.error(
+                                "Session file %s contains session.id %s "
+                                "(filename↔payload mismatch — possible swap attack)",
+                                file_path.name, session.id,
+                            )
+                            continue
                         self._sessions[session.id] = session
                         count += 1
                     except Exception as e:
                         # Bug #19b: this is user data becoming invisible,
                         # not a routine warning. Escalate to ERROR and
                         # keep a counter for health observability.
+                        # B4 r4: also catches AAD mismatch (swap attack or
+                        # pre-1.0.3-beta sessions encrypted without AAD).
                         self._corrupted_sessions_count += 1
                         logger.error(
                             "Error loading encrypted session %s: %s "
-                            "(MEK mismatch or file corruption)",
+                            "(MEK mismatch, AAD mismatch, or file corruption)",
                             file_path.name, e,
                         )
 
@@ -343,7 +363,11 @@ class SessionManager:
             if self._crypto:
                 file_path = self._storage_path / f"{session.id}.enc"
                 plaintext = json.dumps(session.to_dict(), ensure_ascii=False).encode('utf-8')
-                file_path.write_bytes(self._crypto.encrypt(plaintext))
+                # B4 r4: AAD = session.id binds the ciphertext to its filename.
+                # _load_sessions() supplies file_path.stem as AAD; mismatch (swap
+                # attack) raises InvalidTag and is logged as corrupted.
+                aad = session.id.encode("utf-8")
+                file_path.write_bytes(self._crypto.encrypt(plaintext, aad=aad))
             else:
                 file_path = self._storage_path / f"{session.id}.json"
                 with open(file_path, 'w', encoding='utf-8') as f:

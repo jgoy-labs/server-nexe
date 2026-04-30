@@ -72,7 +72,12 @@ class CryptoProvider:
         self._derived_cache[purpose] = derived
         return derived
 
-    def encrypt(self, plaintext: bytes, purpose: str = "sessions") -> bytes:
+    def encrypt(
+        self,
+        plaintext: bytes,
+        purpose: str = "sessions",
+        aad: bytes | None = None,
+    ) -> bytes:
         """
         Encrypt with AES-256-GCM.
 
@@ -81,6 +86,13 @@ class CryptoProvider:
         Args:
             plaintext: Data to encrypt
             purpose: Key purpose for derivation
+            aad: Additional Authenticated Data — binds ciphertext to a context
+                 (e.g. session_id). The same value MUST be supplied to decrypt(),
+                 otherwise AESGCM raises InvalidTag. Required for purpose="sessions"
+                 to prevent swap attacks (an attacker with disk access renaming
+                 A.enc ↔ B.enc would otherwise go undetected). None retained as
+                 default for backward compat with non-session purposes
+                 (text_store, persistence, memory_api, CLI).
 
         Returns:
             Encrypted bytes (nonce + ciphertext + tag)
@@ -88,23 +100,31 @@ class CryptoProvider:
         key = self.derive_key(purpose)
         nonce = os.urandom(NONCE_SIZE)
         aesgcm = AESGCM(key)
-        ciphertext = aesgcm.encrypt(nonce, plaintext, None)
+        ciphertext = aesgcm.encrypt(nonce, plaintext, aad)
         return nonce + ciphertext
 
-    def decrypt(self, data: bytes, purpose: str = "sessions") -> bytes:
+    def decrypt(
+        self,
+        data: bytes,
+        purpose: str = "sessions",
+        aad: bytes | None = None,
+    ) -> bytes:
         """
         Decrypt AES-256-GCM data.
 
         Args:
             data: nonce (12 bytes) || ciphertext || tag (16 bytes)
             purpose: Key purpose for derivation
+            aad: Additional Authenticated Data used at encrypt time. Must match
+                 byte-for-byte or AESGCM raises InvalidTag.
 
         Returns:
             Decrypted plaintext
 
         Raises:
             ValueError: If data is too short
-            cryptography.exceptions.InvalidTag: If decryption fails (wrong key or tampered data)
+            cryptography.exceptions.InvalidTag: If decryption fails (wrong key,
+                tampered data, or AAD mismatch — incl. file rename/swap attack)
         """
         if len(data) < NONCE_SIZE + 16:  # nonce + minimum tag
             raise ValueError(f"Encrypted data too short ({len(data)} bytes)")
@@ -112,7 +132,7 @@ class CryptoProvider:
         nonce = data[:NONCE_SIZE]
         ciphertext = data[NONCE_SIZE:]
         aesgcm = AESGCM(key)
-        return aesgcm.decrypt(nonce, ciphertext, None)
+        return aesgcm.decrypt(nonce, ciphertext, aad)
 
     def derive_key_hex(self, purpose: str) -> str:
         """Derive key and return as hex string (useful for SQLCipher PRAGMA key)."""
