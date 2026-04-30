@@ -11,7 +11,9 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from plugins.security.core.auth import require_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,8 @@ def create_router(module_instance) -> APIRouter:
     router = APIRouter(prefix="/llama-cpp")
 
     @router.get("/info")
-    async def get_info():
+    async def get_info(_: str = Depends(require_api_key)):
+        """PROTECTED: Requires API key."""
         return module_instance.get_info()
 
     return router

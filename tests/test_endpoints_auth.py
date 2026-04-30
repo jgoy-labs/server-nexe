@@ -31,6 +31,11 @@ PROTECTED_ENDPOINTS = [
     "/rag/health",
     "/rag/info",
     "/rag/files/stats",
+    # Auditoria r4 B2: info/health de mlx, llama-cpp, security
+    "/mlx/info",
+    "/llama-cpp/info",
+    "/security/info",
+    "/security/health",
 ]
 
 # Fix Consultor passada 1 — Finding 3: coverage Bug 22 incomplet.

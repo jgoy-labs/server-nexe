@@ -153,14 +153,16 @@ class TestInfoEndpoints:
 class TestSecurityEndpoints:
     """Endpoints del mòdul de seguretat."""
 
-    def test_security_health(self, client):
-        r = client.get("/security/health")
+    def test_security_health(self, client, headers):
+        # Auditoria r4 B2: ara requereix X-API-Key
+        r = client.get("/security/health", headers=headers)
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "healthy"
 
-    def test_security_info(self, client):
-        r = client.get("/security/info")
+    def test_security_info(self, client, headers):
+        # Auditoria r4 B2: ara requereix X-API-Key
+        r = client.get("/security/info", headers=headers)
         assert r.status_code == 200
 
     def test_security_scan_requires_csrf(self, client, headers):

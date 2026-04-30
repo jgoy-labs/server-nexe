@@ -185,10 +185,14 @@ def test_get_info_not_initialized():
     assert info["cache_stats"] == {}
 
 
-def test_info_endpoint():
-    """Line 81: info endpoint returns get_info()."""
+def test_info_endpoint(monkeypatch):
+    """Line 81: info endpoint returns get_info(). Auditoria r4 B2: ara requereix X-API-Key."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
+
+    monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-mlx-key")
+    monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
+    monkeypatch.delenv("NEXE_DEV_MODE", raising=False)
 
     module = MLXModule()
     module._init_router()
@@ -197,6 +201,6 @@ def test_info_endpoint():
     app.include_router(module.get_router())
 
     client = TestClient(app, raise_server_exceptions=False)
-    r = client.get("/mlx/info")
+    r = client.get("/mlx/info", headers={"X-API-Key": "test-mlx-key"})
     assert r.status_code == 200
     assert r.json()["name"] == "mlx_module"
