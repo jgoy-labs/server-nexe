@@ -12,6 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 import os
 import re
+import unicodedata
 
 logger = logging.getLogger(__name__)
 
@@ -69,16 +70,30 @@ def _filter_rag_injection(text: str) -> str:
     would cause data loss. The full sanitization (_sanitize_rag_context) with
     truncation should only be applied at RETRIEVAL time (chat endpoint).
 
+    B6 r4: applies NFKC Unicode normalization before regex match to neutralize
+    fullwidth (`［］`), mathematical brackets (`⟦⟧`), halfwidth-fullwidth and
+    similar bypass attempts. The returned text reflects the normalized form
+    (RAG indexing is a one-way pipeline — callers must accept this).
+
+    Known gaps:
+        - CJK brackets (`「」 『』 〔〕`) are NOT covered. NFKC does not collapse
+          them to ASCII. Tracked as C23 in v1.0.4-beta backlog.
+        - Homoglyph attacks (Cyrillic М vs Latin M) are out of scope — would
+          require a transliteration layer (over-engineering for current threat).
+
     Args:
         text: Raw text to filter
 
     Returns:
-        Text with injection patterns removed but full length preserved
+        Text NFKC-normalized with injection patterns removed but full length preserved
     """
     if not text:
         return ""
 
-    filtered = text
+    # NFKC: collapses fullwidth/compat variants to ASCII canonical forms.
+    # Example: ［ (U+FF3B) → [ (U+005B). MUST happen before regex match —
+    # patterns are ASCII-only and would miss fullwidth bypasses otherwise.
+    filtered = unicodedata.normalize("NFKC", text)
     for pattern in _RAG_INJECTION_PATTERNS:
         filtered = pattern.sub('[FILTERED]', filtered)
 
