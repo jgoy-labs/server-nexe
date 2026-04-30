@@ -92,6 +92,14 @@ ENV/
 .coverage.*
 coverage.xml
 htmlcov/
+*,cover
+
+# MUTHUR (auditor intern)
+.muthur/
+.muthur.toml
+
+# Caches temporals
+tmp/
 
 # =====================
 # DEV TOOLS I IDE
