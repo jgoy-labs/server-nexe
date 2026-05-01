@@ -37,9 +37,9 @@ class VectorSearchRequest(BaseModel):
   )
   top_k: int = Field(
     default=10,
-    description="Maximum number of results to return",
+    description="Maximum number of results to return (capped at 100 to prevent DoS)",
     ge=1,
-    le=1000
+    le=100
   )
   filters: Optional[Dict[str, Any]] = Field(
     default=None,
