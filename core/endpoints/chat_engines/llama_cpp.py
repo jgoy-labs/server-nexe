@@ -110,7 +110,7 @@ async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionReq
                 "index": 0,
                 "message": {
                     "role": "assistant",
-                    "content": result.get("response", "")
+                    "content": _sanitize_sse_token(result.get("response", ""))
                 },
                 "finish_reason": "stop"
             }],
