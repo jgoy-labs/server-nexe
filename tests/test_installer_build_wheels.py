@@ -95,6 +95,53 @@ def test_build_wheels_includes_inference_engines(script_content: str) -> None:
     assert "mlx-vlm==0.4.4" in script_content
 
 
+def test_build_wheels_includes_pytorch_torchvision(script_content: str) -> None:
+    """torch + torchvision must be in the engines list with EXACT version pins.
+    They are required at runtime by Qwen3 VL and other multimodal models
+    (Qwen3VLVideoProcessor needs torchvision for image preprocessing).
+    The compat matrix is tight: torchvision pins torch via Requires-Dist exactly,
+    so bumping torch ALWAYS requires bumping torchvision in lockstep — empirical
+    pin policy, not just a coincidence (v1.0.4-beta TODO 1.3)."""
+    assert "torch==2.11.0" in script_content, (
+        "torch must be pinned EXACTLY (no `>=`, no `~=`) in the ENGINES list — "
+        "supply chain stability requires reproducible builds."
+    )
+    assert "torchvision==0.26.0" in script_content, (
+        "torchvision must be pinned EXACTLY to the version that pairs with the "
+        "torch pin (Requires-Dist: torch (==2.11.0) in torchvision METADATA)."
+    )
+
+
+def test_build_wheels_expected_substrings_includes_pytorch(script_content: str) -> None:
+    """Post-download sanity check must verify torch/torchvision wheels landed.
+    This catches platform/ABI mismatches that would otherwise surface only at
+    client install (when pip --no-index --find-links could not resolve them)."""
+    assert '"torch-"' in script_content, (
+        "EXPECTED_SUBSTRINGS must include 'torch-' so missing torch wheel "
+        "is caught at build time, not on the user's first install."
+    )
+    assert '"torchvision-"' in script_content, (
+        "EXPECTED_SUBSTRINGS must include 'torchvision-'."
+    )
+
+
+def test_build_wheels_invokes_sha256_verification(script_content: str) -> None:
+    """Step 4b (B8 supply chain check) must be wired in: the script must
+    define _sha256(), reference wheels-checksums.txt, and contain the abort
+    branches exit 7 (missing pinned wheel) and exit 8 (SHA mismatch)."""
+    code_only = "\n".join(
+        line for line in script_content.splitlines() if not line.lstrip().startswith("#")
+    )
+    assert "_sha256()" in script_content, "_sha256() helper definition missing"
+    assert "_sha256" in code_only, "_sha256 not invoked outside comments"
+    assert "wheels-checksums.txt" in code_only, (
+        "wheels-checksums.txt not referenced in executable code — "
+        "the supply chain check is missing or commented out."
+    )
+    assert "exit 7" in code_only, "exit 7 (missing pinned wheel) branch missing"
+    assert "exit 8" in code_only, "exit 8 (SHA256 mismatch) branch missing"
+
+
 def test_build_wheels_reads_requirements(script_content: str) -> None:
     """Both requirements files must be pip download sources."""
     assert "requirements.txt" in script_content
@@ -110,9 +157,25 @@ def test_build_wheels_target_dir_inside_app_bundle(script_content: str) -> None:
 
 def test_build_wheels_has_size_sanity_check(script_content: str) -> None:
     """Script must fail if the bundle is obviously too small — catches
-    silent pip failures (e.g. all deps already cached, nothing downloaded)."""
+    silent pip failures (e.g. all deps already cached, nothing downloaded).
+
+    Floor was raised from 100 MB → 250 MB after v1.0.4-beta TODO 1.3 added
+    torch + torchvision (~92 MB net delta); the new floor catches a silent
+    failure that leaves only the original ~220 MB worth of wheels (i.e.
+    torch+torchvision did NOT download). Ceiling raised 500 → 600 MB to
+    avoid a false-positive WARN against the new ~330 MB baseline while
+    still catching an accidental Linux/CUDA transitive."""
     assert "SIZE_MB" in script_content
-    assert "-lt 100" in script_content  # fail if <100 MB
+    assert "-lt 250" in script_content, (
+        "Bundle floor must be 250 MB (post torch+torchvision baseline ~330 MB)"
+    )
+    assert "-gt 600" in script_content, (
+        "Bundle ceiling must be 600 MB to avoid false-positive WARN"
+    )
+    assert "-lt 100" not in script_content, (
+        "Old 100 MB floor must be removed — would no longer catch the case "
+        "where torch+torchvision silently failed to download (bundle 220 MB)."
+    )
 
 
 def test_build_wheels_verifies_critical_wheels_present(script_content: str) -> None:
@@ -122,6 +185,8 @@ def test_build_wheels_verifies_critical_wheels_present(script_content: str) -> N
         "llama_cpp_python-",
         "mlx_lm-",
         "mlx_vlm-",
+        "torch-",          # v1.0.4-beta TODO 1.3 — Qwen3 VL multimodal runtime
+        "torchvision-",    # paired with torch — image preprocessing
         "fastapi-",
         "pydantic-",
         "fastembed-",

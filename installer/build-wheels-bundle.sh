@@ -10,7 +10,9 @@
 # (macOS 13 Ventura was dropped 2026-04-16: mlx 0.30.4+ — required by our
 # pinned mlx-lm 0.31.2 — ships wheels only for macosx_14_0_arm64+.)
 # Requires: network access + recent pip at build time (dev Mac).
-# Produces: ~220 MB of wheels. Fails clearly if any wheel is missing.
+# Produces: ~330 MB of wheels (post v1.0.4-beta TODO 1.3 — torch + torchvision
+# included for VL/multimodal model support). Fails clearly if any wheel is
+# missing or if any pinned wheel SHA256 mismatches (B8 supply chain check).
 # ────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -33,6 +35,17 @@ ENGINES=(
     "llama-cpp-python==0.3.19"  # 0.3.20 has corrupt wheel on abetlen Metal index (Bad CRC-32)
     "mlx-lm==0.31.2"
     "mlx-vlm==0.4.4"
+    # PyTorch + torchvision — required at runtime by Qwen3 VL and other multimodal
+    # models (Qwen3VLVideoProcessor needs torchvision for image preprocessing).
+    # Wheels are macosx_11_0_arm64 (NOT macosx_14_0_arm64) — pip resolves upward
+    # since 11.0 is the wheel's MIN macOS version, fully compat with macOS 14+
+    # hosts. Verified empirically 2026-05-01: torch 2.11.0 macOS arm64 wheel
+    # does NOT include CUDA/cuDNN libs (Linux-only Requires-Dist), so the bundle
+    # delta is ~92 MB net (not the ~600 MB feared in the v1.0.4-beta master plan).
+    # SHA256 cross-validated 3 sources (PyPI download, PyPI JSON Warehouse API,
+    # pip hash) at pin time — see installer/wheels-checksums.txt.
+    "torch==2.11.0"
+    "torchvision==0.26.0"  # pairs exactly with torch 2.11.0 (Requires-Dist: torch (==2.11.0))
 )
 
 # ── Step 1: Validate inputs ────────────────────────────────────────────
@@ -163,11 +176,138 @@ if [ "$WHEEL_COUNT" -lt 30 ]; then
     exit 2
 fi
 
+# ── Step 4b: SHA256 supply chain verification (B8 pattern, TODO 1.3 v1.0.4) ─
+# Verifies that the wheels we just pulled from PyPI match the SHA256 hashes
+# pinned in installer/wheels-checksums.txt. Same threat model as the Ollama
+# bundle pin (B8 r4): a build-time MITM (proxy, DNS hijack, malicious Wi-Fi)
+# could substitute a same-shape backdoored wheel; the size and pip resolver
+# would not catch it. Hashes were cross-validated from 3 independent sources
+# at pin time (PyPI download, PyPI JSON Warehouse API, pip hash) — see the
+# checksums file header for the procedure on bumping pinned versions.
+#
+# Why the verification lives HERE (after Step 3c, before Step 4 size sanity):
+#   - Step 3+3b+3c finished downloading every wheel — the pinned files MUST
+#     be present on disk by now (else exit 7 = pin in checksums but wheel
+#     vanished).
+#   - Failing fast (before size/sanity checks) gives a clearer error: a
+#     mismatched SHA is far more diagnostic than "bundle is wrong size".
+#
+# Why we use a manual loop with _sha256 instead of `shasum -a 256 -c`:
+#   - The Ollama bundle (single file Ollama-darwin.zip) uses `shasum -c`,
+#     but here the entries reference wheels in $WHEELS_DIR (not CWD), and
+#     embedding the cross-validation provenance + per-wheel diagnostics in
+#     the loop body keeps the supply chain audit trail visible.
+#   - Reuses the same _sha256() helper as build-embedding-bundle.sh (F4.1
+#     audit DoD-AUD-SX-0423 §2.7) — single behaviour, two scripts.
+#
+# Why we do NOT do a tamper test against the live bundle in CI: this script
+# starts with `rm -rf "$WHEELS_DIR"` at Step 2 and re-downloads, so any
+# byte-flip on a wheel is wiped on the next run. The tamper coverage lives
+# in tests/test_installer_wheels_checksum.py:test_shasum_check_rejects_corrupt_wheels
+# (sandbox with random-bytes files at the pinned filenames) — equivalent
+# adversarial coverage, reproducible, runs in CI without network.
+
+# Cross-platform sha256: prefer GNU sha256sum, fall back to BSD shasum.
+# (Same helper as build-embedding-bundle.sh; bash scripts are self-contained,
+# no shared lib — duplication accepted, refactor only if a 3rd script needs it.)
+_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+CHECKSUMS_FILE="$PROJECT_ROOT/installer/wheels-checksums.txt"
+# Hard-fail if the checksums file is missing. A supply-chain defense that
+# silently disappears when its config file disappears is not a defense —
+# either by accident (bad rebase / clean-room checkout) or intent (someone
+# deletes it to ship faster). Post-TODO 1.3 the file is mandatory; an older
+# checkout that legitimately lacks it should not be calling this build
+# script either way.
+if [ ! -f "$CHECKSUMS_FILE" ]; then
+    echo "ERROR: $CHECKSUMS_FILE not found." >&2
+    echo "       The B8 supply-chain check (TODO 1.3 v1.0.4-beta) is mandatory" >&2
+    echo "       for every build — DO NOT bypass by deleting this file. If you" >&2
+    echo "       are bumping pinned versions, follow the procedure in the file" >&2
+    echo "       header (3-source cross-validation)." >&2
+    exit 6
+fi
+
+echo "==> Verifying pinned wheels SHA256 (supply chain — B8 pattern)..."
+
+# Counter ensures the loop did real work. An empty-or-comments-only checksums
+# file would otherwise pass with zero verifications and exit 0 — bypass.
+verified_count=0
+
+# `|| [ -n "$line" ]` covers the case where the last line lacks a trailing
+# newline: `read` returns 1 on EOF but $line still holds the partial last
+# line. Without this guard, the FINAL pinned wheel would be silently skipped.
+while IFS= read -r line || [ -n "$line" ]; do
+    # Skip comments and empty lines.
+    case "$line" in '#'*|'') continue ;; esac
+
+    # Format: "<sha256-hex>  <wheel-filename>" (two spaces — `shasum -c`
+    # compatible). awk handles both the canonical 2-space separator and
+    # any longer run of whitespace as a defensive fallback.
+    expected_hash=$(printf '%s\n' "$line" | awk '{print $1}')
+    wheel_name=$(printf '%s\n' "$line" | awk '{print $2}')
+    [ -n "$expected_hash" ] && [ -n "$wheel_name" ] || continue
+
+    # Defense-in-depth: reject path components that escape $WHEELS_DIR.
+    # Per threat model (in-repo file, build-time supply chain), this is not
+    # exploitable, but rejecting `..` / `/` keeps any future use of the loop
+    # over an attacker-influenced source (e.g. a downloaded pin file) honest.
+    case "$wheel_name" in
+        */*|*..*)
+            echo "ERROR: invalid wheel name (path component): $wheel_name" >&2
+            exit 9
+            ;;
+    esac
+
+    wheel_path="$WHEELS_DIR/$wheel_name"
+    if [ ! -f "$wheel_path" ]; then
+        echo "ERROR: pinned wheel missing from bundle: $wheel_name" >&2
+        echo "       (listed in $CHECKSUMS_FILE but not downloaded)" >&2
+        exit 7
+    fi
+    actual_hash=$(_sha256 "$wheel_path")
+    if [ "$actual_hash" != "$expected_hash" ]; then
+        echo "ERROR: SHA256 mismatch for $wheel_name" >&2
+        echo "  expected: $expected_hash" >&2
+        echo "  actual:   $actual_hash" >&2
+        echo "" >&2
+        echo "Possible causes (in order of likelihood):" >&2
+        echo "  1. Upstream wheel re-published at the same version (rare but" >&2
+        echo "     happens — re-validate from 3 sources before bumping the pin)." >&2
+        echo "  2. MITM / DNS hijack / proxy injecting backdoored wheel." >&2
+        echo "  3. PyPI CDN cache divergence (try a different network path)." >&2
+        echo "Do NOT bypass — see installer/wheels-checksums.txt header for" >&2
+        echo "the cross-validation procedure on legitimate version bumps." >&2
+        exit 8
+    fi
+    echo "  ✓ $wheel_name (${actual_hash:0:12}…)"
+    verified_count=$((verified_count + 1))
+done < "$CHECKSUMS_FILE"
+
+# An empty or comments-only checksums file would otherwise sail through the
+# loop with zero iterations and exit 0. Refuse to ship a build with no
+# verifications performed.
+if [ "$verified_count" -lt 1 ]; then
+    echo "ERROR: $CHECKSUMS_FILE has no active pin lines — zero wheels verified." >&2
+    echo "       The B8 check is mandatory; an empty/comments-only file is not" >&2
+    echo "       a valid configuration." >&2
+    exit 10
+fi
+echo "    ($verified_count pinned wheel(s) verified.)"
+
 # Expected critical wheels (substring match on filename)
 EXPECTED_SUBSTRINGS=(
     "llama_cpp_python-"
     "mlx_lm-"
     "mlx_vlm-"
+    "torch-"          # PyTorch (v1.0.4-beta TODO 1.3) — Qwen3 VL multimodal runtime
+    "torchvision-"    # paired with torch — image preprocessing for VL models
     "fastapi-"
     "pydantic-"
     "numpy-"
@@ -196,14 +336,19 @@ if [ "${#MISSING[@]}" -gt 0 ]; then
     exit 3
 fi
 
-# Check size range (target ~200-300 MB; fail if obviously wrong)
+# Check size range. Floor and ceiling were re-baselined for v1.0.4-beta
+# TODO 1.3 (torch + torchvision added — empirical bundle ~330 MB, NOT the
+# 750-900 MB the master plan feared: macOS arm64 torch wheels do not ship
+# CUDA/cuDNN libs). Floor 250 catches a silent pip download failure (almost
+# nothing landed); ceiling 600 catches an accidental Linux/CUDA transitive
+# pulled in by a future ENGINES bump.
 SIZE_MB=$(du -sm "$WHEELS_DIR" | cut -f1)
-if [ "$SIZE_MB" -lt 100 ]; then
-    echo "ERROR: Wheels bundle is only ${SIZE_MB} MB — expected >100 MB" >&2
+if [ "$SIZE_MB" -lt 250 ]; then
+    echo "ERROR: Wheels bundle is only ${SIZE_MB} MB — expected >250 MB (post torch+torchvision)" >&2
     exit 4
 fi
-if [ "$SIZE_MB" -gt 500 ]; then
-    echo "WARN: Wheels bundle is ${SIZE_MB} MB — larger than expected (~220 MB)" >&2
+if [ "$SIZE_MB" -gt 600 ]; then
+    echo "WARN: Wheels bundle is ${SIZE_MB} MB — larger than expected (~330 MB)" >&2
 fi
 
 # ── Step 5: Report ─────────────────────────────────────────────────────
