@@ -8,15 +8,23 @@
 # Source of truth:        https://github.com/ollama/ollama/releases/download/<version>/sha256sum.txt
 #                         (published and signed by the Ollama maintainers at release time)
 #
-# Last updated:           2026-05-01 (B8 r4)
-# Ollama version pinned:  v0.22.0 (released 2026-04-28)
-# File size:              164167759 bytes (~156 MB)
+# Last updated:           2026-05-01 13:50 (B8 bump v0.22.0 → v0.22.1)
+# Ollama version pinned:  v0.22.1 (released 2026-04-28T20:30:57Z, ~8h after v0.22.0)
+# File size:              164249113 bytes (~156 MB)
 #
-# Cross-validation performed at pin time (2026-05-01):
+# Cross-validation performed at pin time (2026-05-01 13:46):
 #   1. Downloaded zip via ollama.com (latest CDN redirect)        → SHA_A
-#   2. Downloaded zip via GitHub releases/download/v0.22.0/...    → SHA_B
+#   2. Downloaded zip via GitHub releases/download/v0.22.1/...    → SHA_B
 #   3. Fetched sha256sum.txt published by Ollama at the release   → SHA_OFFICIAL
 #   4. SHA_A == SHA_B == SHA_OFFICIAL  ✓ (binary diff also clean)
+#
+# Bump history:
+#   2026-05-01 02:22  v0.22.0 pinned (a410e2f722fb…b278)  — initial B8 landing
+#   2026-05-01 13:50  v0.22.1 pinned (387536bd3462…065b)  — auto-bump after first
+#                                                            real-world block at
+#                                                            DMG build (B8 fix
+#                                                            caught upstream rev,
+#                                                            triple cross-val OK)
 #
 # Update procedure (when Ollama releases a new version):
 #   1. Verify the new release tag at https://github.com/ollama/ollama/releases
@@ -37,4 +45,4 @@
 #      to confirm Apple Developer ID signature integrity.
 #
 # ── pinned checksum (one entry per line, format: <sha256>  <filename>) ──
-a410e2f722fb25d6f87ad2ac23a9d44e330b078762e19bfe5a3b0162d236b278  Ollama-darwin.zip
+387536bd3462fbf8a976932eefd97005d4917d284137bf9de5ad5006c061065b  Ollama-darwin.zip
