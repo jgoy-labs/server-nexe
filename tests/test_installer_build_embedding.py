@@ -124,9 +124,14 @@ def test_build_embedding_validates_artefacts(script_content: str) -> None:
 
 
 def test_build_embedding_has_size_sanity_check(script_content: str) -> None:
-    """Fail if bundle is obviously too small (download failed silently)."""
+    """Fail if bundle is obviously too small (download failed silently).
+
+    Threshold tracks the active variant: int8 quantized bundle is ~283 MB,
+    so the sanity floor is 200 MB. If we ever switch back to FP16/FP32 the
+    floor goes up and this assertion is updated alongside the script.
+    """
     assert "SIZE_MB" in script_content
-    assert "-lt 300" in script_content  # fail if <300 MB
+    assert "-lt 200" in script_content  # fail if <200 MB (int8 bundle ≈ 283 MB)
 
 
 def test_build_embedding_has_safe_bash_flags(script_content: str) -> None:
