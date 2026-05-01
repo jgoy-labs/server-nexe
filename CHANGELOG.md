@@ -25,6 +25,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Test SQLi al chat: contracte ajustat al disseny** (`tests/test_chat_v1_validation.py`). `test_sql_injection_in_message_content_rejected` renombrat a `test_sql_injection_in_chat_passes_through_to_llm`: en `context="chat"` el sanitizer delega `check_sql` al LLM (Ollama), perquè el pipeline no toca cap SQL DB (RAG = Qdrant vector DB). Discutir "UNION SELECT" és tech talk legítim. El rebuig estricte de SQLi es manté a `context="param"` (model, engine), cobert per `test_sql_injection_in_model_field_rejected`. Cap canvi a `plugins/security/core/input_sanitizers.py` — la decisió `check_sql=False` en chat ja era intencionada i documentada (línies 153-156, 164-169). Auditoria r1 P0.1 (DeepSeek V3 / Turing).
 - **Test `nexe stop` accepta sortida en català o anglès** (`tests/test_cli_stop_pid.py`). `test_stop_no_services_running` només verificava l'output anglès "No Nexe services are running"; quan `NEXE_LANG=ca` (per defecte al Mac de dev) el CLI imprimeix "Cap servei Nexe actiu" i el test fallava. Assert ampliat amb `or` per cobrir ambdós idiomes. Auditoria r1 P1 (DeepSeek V3 / Turing).
 
+## [1.0.4-beta] - in progress
+
+### Added
+
+- (pendent: completar al final del sprint)
+
 ## [1.0.3-beta] — 2026-04-24
 
 ### Security
