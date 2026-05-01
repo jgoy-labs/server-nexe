@@ -24,7 +24,25 @@ logger = logging.getLogger(__name__)
 _CONTROL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
 
 def _sanitize_sse_token(token: str) -> str:
-    """Remove null bytes and control characters from SSE token content."""
+    """Remove null bytes and control characters from SSE token content.
+
+    Strips C0 control range except \\n (\\x0a), \\t (\\x09), \\r (\\x0d) which
+    are valid in text. Defends against malicious model output that injects
+    control bytes into the streamed `delta.content` field.
+
+    SCOPE: this function targets ONLY the user-untrusted text path — the model
+    output token. All three backends (mlx, llama_cpp, ollama) pipe model
+    `content` through here before placing it in the SSE chunk dict. Other
+    chunk fields (`finish_reason`, `delta={}`, error strings, model name) are
+    Python-controlled trusted values and need not be sanitized; JSON
+    serialization escapes any C0 bytes there as `\\uXXXX` automatically.
+
+    If a future chunk path adds a NEW user-untrusted field (e.g. tool-call
+    arguments echoed back, reasoning_content from thinking models), pass it
+    through this function before json.dumps. The regression test
+    `tests/test_sse_sanitize_coverage.py` enforces that `delta.content` is
+    always sanitized in the three backends to prevent silent drift.
+    """
     if not token:
         return token
     return _CONTROL_CHAR_RE.sub('', token)
