@@ -436,6 +436,14 @@ class MemoryAPI:
     """
     self._ensure_initialized()
 
+    # Defensive top_k clamp (auditoria r4 R6-07): unbounded values upstream
+    # let an attacker request 10k+ results and exhaust memory/Qdrant. Mirror
+    # of the Pydantic le=100 cap on VectorSearchRequest at the lower layer.
+    if top_k < 1:
+      top_k = 1
+    elif top_k > 100:
+      top_k = 100
+
     if not await self.collection_exists(collection):
       raise CollectionNotFoundError(f"Collection '{collection}' does not exist.")
 
