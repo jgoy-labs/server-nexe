@@ -10,6 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
+import re
 import uuid
 
 from fastapi import FastAPI, HTTPException, Request
@@ -20,6 +21,25 @@ from slowapi.errors import RateLimitExceeded
 from .helpers import translate
 
 logger = logging.getLogger(__name__)
+
+_RETRY_AFTER_DEFAULT = 60
+_UNIT_SECONDS = {"second": 1, "minute": 60, "hour": 3600, "day": 86400}
+_LIMIT_RE = re.compile(r"per\s+(\d+)\s*(second|minute|hour|day)", re.IGNORECASE)
+
+
+def _retry_after_seconds(detail: str | None) -> int:
+  """Best-effort parse of slowapi limit detail (`'<n> per <m> <unit>'`) → secs.
+
+  Falls back to 60 when the detail string is missing or unparseable. Compliant
+  with RFC 7231 §7.1.3: `Retry-After: <delay-seconds>` (integer).
+  """
+  if not detail:
+    return _RETRY_AFTER_DEFAULT
+  match = _LIMIT_RE.search(detail)
+  if not match:
+    return _RETRY_AFTER_DEFAULT
+  multiplier_seconds = _UNIT_SECONDS[match.group(2).lower()]
+  return int(match.group(1)) * multiplier_seconds
 
 def register_exception_handlers(app: FastAPI, i18n) -> None:
   """Register global exception handlers for the application."""
@@ -44,6 +64,11 @@ def register_exception_handlers(app: FastAPI, i18n) -> None:
       response = request.app.state.limiter._inject_headers(
         response, request.state.view_rate_limit
       )
+
+    # RFC 7231 §7.1.3: 429 SHOULD carry Retry-After. slowapi's _inject_headers
+    # emits X-RateLimit-* (de-facto) but not the standard header — add it
+    # explicitly so well-behaved clients can back off correctly (auditoria r4 C13).
+    response.headers["Retry-After"] = str(_retry_after_seconds(exc.detail))
 
     return response
 
