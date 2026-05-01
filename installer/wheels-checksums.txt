@@ -1,0 +1,101 @@
+# Python wheels checksums — pinned for offline DMG build (B8 pattern, TODO 1.3 v1.0.4-beta)
+#
+# Format: <sha256-hex>  <wheel-filename>
+#   (two spaces between fields — keeps the file `shasum -a 256 -c` compatible
+#   if a future maintainer prefers that helper, even though the build script
+#   currently uses a manual loop with the local _sha256() function for
+#   richer per-wheel diagnostics; see installer/build-wheels-bundle.sh
+#   Step 4b for the rationale.)
+#
+# Pinned packages:
+#   torch        2.11.0  — Required at runtime by Qwen3 VL and other multimodal
+#                          models (Qwen3VLVideoProcessor needs torchvision for
+#                          image preprocessing). NOT a direct import in the
+#                          server-nexe codebase — it is an indirect engine dep
+#                          that mlx-vlm pulls in when the user selects a VL
+#                          model. Pinned exact version (no `>=`) for build
+#                          reproducibility and supply chain stability.
+#   torchvision  0.26.0  — Pairs exactly with torch 2.11.0 per upstream
+#                          (`Requires-Dist: torch (==2.11.0)` in torchvision's
+#                          METADATA). Bumping torch ALWAYS requires bumping
+#                          torchvision too — the compat matrix is exact.
+#
+# Platform target:  cp312, macosx_11_0_arm64
+#   (NOT macosx_14_0_arm64 — verified empirically 2026-05-01: PyTorch publishes
+#   wheels with min macOS version 11.0 on arm64. pip resolves 11_0_arm64 wheels
+#   for macOS 14+ hosts via upward compat. Pinning the literal filename means
+#   any unexpected upstream re-cut to a different platform tag — `13_0`, `14_0`,
+#   universal2 — would be caught immediately as a missing pinned wheel, exit 7.)
+#
+# Cross-validation performed at pin time (2026-05-01 21:15 CEST):
+#   1. PyPI download via `pip download --only-binary=:all:` then `sha256sum`
+#      of the local .whl file → SHA_PIP
+#   2. PyPI JSON Warehouse API:
+#         curl -fsSL https://pypi.org/pypi/torch/2.11.0/json
+#         curl -fsSL https://pypi.org/pypi/torchvision/0.26.0/json
+#      Read `urls[].digests.sha256` for the cp312 macosx arm64 wheel → SHA_API
+#   3. `pip hash --algorithm sha256 <wheel.whl>` of the local wheel → SHA_HASH
+#   4. SHA_PIP == SHA_API == SHA_HASH for both packages — independent channels
+#      (CDN download path vs JSON metadata API vs local hash recomputation)
+#      all agree, so a same-version substitution at the CDN edge is highly
+#      unlikely. (Note: PyTorch does not publish macOS arm64 wheels on the
+#      GitHub releases page — only source — so we cannot add a github.com
+#      cross-source as we do for the Ollama bundle. The PyPI JSON API + pip
+#      hash + local sha256sum are independent enough for this threat model.)
+#
+# Bump procedure (when bumping torch and/or torchvision):
+#   1. Verify the target torch X.Y.Z exists at https://pypi.org/project/torch/
+#      and check the official compat matrix at
+#      https://pytorch.org/get-started/previous-versions/ — torchvision is
+#      ALWAYS pinned exactly to a torch version (Requires-Dist: torch (==X.Y.Z)).
+#   2. Empirical compat probe (do NOT trust release notes alone — see
+#      memory/feedback_verificacio_empirica_repos_hf.md):
+#         pip download \
+#             --only-binary=:all: \
+#             --platform macosx_14_0_arm64 \
+#             --python-version 3.12 \
+#             --implementation cp \
+#             --abi cp312 \
+#             --dest /tmp/torch-test \
+#             "torch==X.Y.Z" "torchvision==A.B.C"
+#         ls -lah /tmp/torch-test/torch-*.whl /tmp/torch-test/torchvision-*.whl
+#      Note: pip will write `macosx_11_0_arm64` filenames even with
+#      `--platform macosx_14_0_arm64` because that is the wheel's own min
+#      macOS tag. The literal filename matters here — pin it as published.
+#   3. Compute SHA from 3 sources:
+#         shasum -a 256 /tmp/torch-test/torch-*.whl
+#         curl -fsSL https://pypi.org/pypi/torch/X.Y.Z/json | \
+#             python3 -c "import json,sys; d=json.load(sys.stdin); \
+#             [print(f['filename'], f['digests']['sha256']) for f in d['urls'] \
+#              if 'cp312' in f['filename'] and 'arm64' in f['filename']]"
+#         pip hash --algorithm sha256 /tmp/torch-test/torch-*.whl
+#   4. If SHA_PIP == SHA_API == SHA_HASH for BOTH wheels → safe to bump.
+#      Replace the two lines below; bump `Last updated` and the bump history.
+#   5. If ANY of the three diverge → STOP. Possible MITM, CDN cache divergence,
+#      or upstream re-publication. Verify from a clean network (different
+#      ISP / VPN / tethering) before committing the new pins. Do NOT bypass.
+#   6. After committing, run `bash installer/build-wheels-bundle.sh` and
+#      confirm `✓ torch-...whl` and `✓ torchvision-...whl` lines appear.
+#   7. Run the runtime smoke test (separate venv against the bundle wheels):
+#         python3 -m pip install --no-index \
+#             --find-links InstallNexe.app/Contents/Resources/wheels \
+#             "torch==X.Y.Z" "torchvision==A.B.C"
+#         python3 -c "import torch, torchvision; \
+#             print(torch.__version__, torchvision.__version__, \
+#                   torch.backends.mps.is_available())"
+#      Expected: prints the bumped versions and MPS=True on Apple Silicon.
+#
+# Last updated:           2026-05-01 21:15 CEST (initial pin — TODO 1.3)
+# Sprint:                 v1.0.4-beta TODO 1.3
+# File sizes (informational, not enforced — exit 7 catches missing wheels):
+#   torch        2.11.0:  77 MB (80565168 bytes)
+#   torchvision  0.26.0:   2 MB
+#
+# Bump history:
+#   2026-05-01 21:15  Initial pin — torch 2.11.0 + torchvision 0.26.0
+#                     (sprint v1.0.4-beta TODO 1.3, B8 pattern landing on
+#                      Python wheels after Ollama bundle pin in r4)
+#
+# ── pinned checksums (one entry per line, format: <sha256>  <filename>) ──
+4b5866312ee6e52ea625cd211dcb97d6a2cdc1131a5f15cc0d87eec948f6dd34  torch-2.11.0-cp312-cp312-macosx_11_0_arm64.whl
+c409e1c3fdebec7a3834465086dbda8bf7680eff79abf7fd2f10c6b59520a7a4  torchvision-0.26.0-cp312-cp312-macosx_11_0_arm64.whl
