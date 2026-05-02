@@ -31,11 +31,6 @@ REQ_MACOS="$PROJECT_ROOT/requirements-macos.txt"
 
 # Inference engines installed dynamically by installer_setup_env.py.
 # We must bundle their wheels here so the client install stays offline.
-# NOTE: mlx-lm and mlx-vlm pins MUST stay in sync with requirements.txt
-# (PEP 508 markers ensure CI Ubuntu skips them, but the version numbers
-# themselves are duplicated here and there — bump both files together).
-# llama-cpp-python is NOT in requirements.txt because it's installed via
-# the abetlen Metal index URL (extra-index) only at build time.
 ENGINES=(
     "llama-cpp-python==0.3.19"  # 0.3.20 has corrupt wheel on abetlen Metal index (Bad CRC-32)
     "mlx-lm==0.31.2"
