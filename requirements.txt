@@ -43,9 +43,11 @@ pytest-asyncio>=1.0.0,<2.0.0
 pytest-cov>=7.0.0,<8.0.0
 
 # --- Inference Engines (Apple Silicon / MLX) ---
-# Note: Install only on Mac ARM64 — handled dynamically by install_nexe.py
-# mlx-lm==0.31.2        # Text LLMs (compatible amb mlx-vlm 0.4.x)
-# mlx-vlm==0.4.4        # Multimodal VLM (gemma4, qwen3_5_moe, qwen3_vl, llava, …)
+# Note: PEP 508 markers limit install to darwin+arm64 (mlx wheels exist only
+# for macosx_14_0_arm64+). CI Ubuntu and other platforms skip these lines.
+# SSOT: versions MUST match installer/build-wheels-bundle.sh ENGINES.
+mlx-lm==0.31.2; sys_platform == 'darwin' and platform_machine == 'arm64'    # Text LLMs (compatible amb mlx-vlm 0.4.x)
+mlx-vlm==0.4.4; sys_platform == 'darwin' and platform_machine == 'arm64'    # Multimodal VLM (gemma4, qwen3_5_moe, qwen3_vl, llava, …)
 
 # --- Inference Engines (Llama.cpp / GGUF) ---
 # llama-cpp-python  # Installed dynamically with GPU flags by install_nexe.py
