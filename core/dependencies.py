@@ -42,8 +42,8 @@ except ImportError:
   limiter_by_key = None
   limiter_composite = None
   limiter_by_endpoint = None
-  rate_limit_tracker: Optional[Any] = None
-  start_rate_limit_cleanup_task: Optional[Any] = None
+  rate_limit_tracker: Optional[Any] = None  # type: ignore[no-redef]  # ImportError fallback for the optional advanced rate limiter
+  start_rate_limit_cleanup_task: Optional[Any] = None  # type: ignore[no-redef]  # ImportError fallback for the optional advanced rate limiter
   ADVANCED_RATE_LIMITING = False
 
 limiter = limiter_global
