@@ -26,14 +26,6 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Bug bloquejat pre-Dev#2 (Cluster 1). Pre-fix close() llança AttributeError opaca, "
-        "post-fix _require_client() ha de llançar RuntimeError explícit. "
-        "Dev#2 treurà aquesta marca al commit cluster 1."
-    ),
-)
 def test_qdrant_adapter_post_close_raises_runtime_error() -> None:
     """Pina contracte post-fix: `add_vectors` post-`close()` llança `RuntimeError`."""
     from memory.embeddings.adapters.qdrant_adapter import QdrantAdapter

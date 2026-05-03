@@ -69,6 +69,18 @@ class QdrantAdapter:
         if self._client is None:
             self._client = self._create_client()
 
+    def _require_client(self) -> Any:
+        """Retorna self._client o llança RuntimeError si l'adapter està tancat.
+
+        Helper Cluster 1 (Onada 4.2 — DUBTE 1 opció A): substitueix
+        `self._require_client().X()` per `self._require_client().X()` als 23 callsites
+        per donar error semànticament correcte (RuntimeError "closed") quan
+        algú reusa l'adapter post-`close()` enlloc de propagar AttributeError.
+        """
+        if self._client is None:
+            raise RuntimeError("QdrantAdapter is closed")
+        return self._client
+
     def _create_client(self) -> Any:
         """Crea el QdrantClient intern via el pool compartit."""
         from core.qdrant_pool import get_qdrant_client
@@ -120,7 +132,7 @@ class QdrantAdapter:
             for i in range(len(vectors))
         ]
 
-        self._client.upsert(
+        self._require_client().upsert(
             collection_name=self._collection_name,
             points=points,
         )
@@ -139,7 +151,7 @@ class QdrantAdapter:
         from memory.embeddings.core.vectorstore import VectorSearchHit
 
         try:
-            results = self._client.search(
+            results = self._require_client().search(
                 collection_name=self._collection_name,
                 query_vector=request.query_vector,
                 limit=request.top_k,
@@ -147,7 +159,7 @@ class QdrantAdapter:
             )
         except Exception:
             # Fallback per qdrant-client moderns (1.11+)
-            res = self._client.query_points(
+            res = self._require_client().query_points(
                 collection_name=self._collection_name,
                 query=request.query_vector,
                 limit=request.top_k,
@@ -178,7 +190,7 @@ class QdrantAdapter:
         if not ids:
             return 0
 
-        self._client.delete(
+        self._require_client().delete(
             collection_name=self._collection_name,
             points_selector=PointIdsList(points=ids),
         )
@@ -195,7 +207,7 @@ class QdrantAdapter:
             Dict amb status, num_vectors, collection
         """
         try:
-            info = self._client.get_collection(self._collection_name)
+            info = self._require_client().get_collection(self._collection_name)
             return {
                 "status": "healthy",
                 "num_vectors": info.points_count or 0,
@@ -217,26 +229,26 @@ class QdrantAdapter:
 
     def get_collections(self) -> Any:
         """Llista de totes les col·leccions."""
-        return self._client.get_collections()
+        return self._require_client().get_collections()
 
     def create_collection(self, collection_name: str, vectors_config: Any) -> None:
         """Crea una nova col·lecció."""
-        self._client.create_collection(
+        self._require_client().create_collection(
             collection_name=collection_name,
             vectors_config=vectors_config,
         )
 
     def delete_collection(self, collection_name: str) -> None:
         """Elimina una col·lecció."""
-        self._client.delete_collection(collection_name=collection_name)
+        self._require_client().delete_collection(collection_name=collection_name)
 
     def get_collection(self, collection_name: str) -> Any:
         """Informació d'una col·lecció."""
-        return self._client.get_collection(collection_name)
+        return self._require_client().get_collection(collection_name)
 
     def upsert(self, collection_name: str, points: List[Any]) -> None:
         """Afegir o actualitzar punts en una col·lecció."""
-        self._client.upsert(collection_name=collection_name, points=points)
+        self._require_client().upsert(collection_name=collection_name, points=points)
 
     def client_search(
         self,
@@ -248,7 +260,7 @@ class QdrantAdapter:
     ) -> List[Any]:
         """Cerca en una col·lecció específica (API legacy)."""
         try:
-            return self._client.search(
+            return self._require_client().search(
                 collection_name=collection_name,
                 query_vector=query_vector,
                 query_filter=query_filter,
@@ -256,7 +268,7 @@ class QdrantAdapter:
                 score_threshold=score_threshold,
             )
         except Exception:
-            res = self._client.query_points(
+            res = self._require_client().query_points(
                 collection_name=collection_name,
                 query=query_vector,
                 limit=limit,
@@ -266,19 +278,19 @@ class QdrantAdapter:
     def client_delete(self, collection_name: str, points_selector: Any) -> None:
         """Elimina punts d'una col·lecció específica."""
         try:
-            self._client.delete(
+            self._require_client().delete(
                 collection_name=collection_name,
                 points_selector=points_selector,
             )
         except Exception:
-            self._client.delete(
+            self._require_client().delete(
                 collection_name=collection_name,
                 points_selector=points_selector,
             )
 
     def retrieve(self, collection_name: str, ids: List[str], with_payload: bool = True) -> List[Any]:
         """Recupera punts per ID d'una col·lecció."""
-        return self._client.retrieve(
+        return self._require_client().retrieve(
             collection_name=collection_name,
             ids=ids,
             with_payload=with_payload,
@@ -304,11 +316,11 @@ class QdrantAdapter:
             kwargs["offset"] = offset
         if scroll_filter is not None:
             kwargs["scroll_filter"] = scroll_filter
-        return self._client.scroll(**kwargs)
+        return self._require_client().scroll(**kwargs)
 
     def query_points(self, collection_name: str, query: List[float], limit: int = 10) -> Any:
         """API moderna de cerca (qdrant-client 1.11+)."""
-        return self._client.query_points(
+        return self._require_client().query_points(
             collection_name=collection_name,
             query=query,
             limit=limit,
@@ -316,7 +328,7 @@ class QdrantAdapter:
 
     def close(self) -> None:
         """Tanca el client intern. No usar si el client ve del pool compartit."""
-        if self._client:
+        if self._client is not None:
             try:
                 self._client.close()
             except Exception:  # nosec B110: best-effort QdrantClient close; cleanup is the caller's responsibility either way
@@ -348,7 +360,7 @@ class QdrantAdapter:
         """
         from qdrant_client.models import Distance, VectorParams
 
-        collections = self._client.get_collections().collections
+        collections = self._require_client().get_collections().collections
         if collection_name in [c.name for c in collections]:
             return False
 
@@ -357,7 +369,7 @@ class QdrantAdapter:
             "euclid": Distance.EUCLID,
             "dot": Distance.DOT,
         }
-        self._client.create_collection(
+        self._require_client().create_collection(
             collection_name=collection_name,
             vectors_config=VectorParams(
                 size=vector_size,
@@ -384,7 +396,7 @@ class QdrantAdapter:
             PointStruct(id=p["id"], vector=p["vector"], payload=p.get("payload", {}))
             for p in points_data
         ]
-        self._client.upsert(collection_name=collection_name, points=points)
+        self._require_client().upsert(collection_name=collection_name, points=points)
 
     def search_with_filter(
         self,
@@ -418,7 +430,7 @@ class QdrantAdapter:
             qdrant_filter = Filter(must=must)
 
         try:
-            return self._client.search(
+            return self._require_client().search(
                 collection_name=collection_name,
                 query_vector=query_vector,
                 query_filter=qdrant_filter,
@@ -426,7 +438,7 @@ class QdrantAdapter:
                 score_threshold=score_threshold,
             )
         except Exception:
-            res = self._client.query_points(
+            res = self._require_client().query_points(
                 collection_name=collection_name,
                 query=query_vector,
                 limit=limit,
@@ -448,7 +460,7 @@ class QdrantAdapter:
 
         if not ids:
             return 0
-        self._client.delete(
+        self._require_client().delete(
             collection_name=collection_name,
             points_selector=PointIdsList(points=ids),
         )
