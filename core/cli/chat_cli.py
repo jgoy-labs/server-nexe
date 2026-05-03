@@ -96,7 +96,7 @@ def _format_rag_bar(score: float, width: int = 8) -> str:
     return "█" * filled + "░" * (width - filled)
 
 
-def _format_stats_line(elapsed: float, char_count: int, model_name: str = None,
+def _format_stats_line(elapsed: float, char_count: int, model_name: Optional[str] = None,
                        rag_count: int = 0, rag_avg: float = 0.0, mem_saved: bool = False,
                        compact_count: int = 0) -> str:
     """Build the stats line displayed after each response."""

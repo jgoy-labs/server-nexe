@@ -13,7 +13,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 import os
 import time
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
@@ -64,7 +64,7 @@ router = APIRouter(tags=["chat"])
 
 # --- System Prompt ---
 
-def _get_system_prompt(app_state: Any, lang: str = None) -> str:
+def _get_system_prompt(app_state: Any, lang: Optional[str] = None) -> str:
     """
     Selecciona el system prompt per idioma i tier de model.
 

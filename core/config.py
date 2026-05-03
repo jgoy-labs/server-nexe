@@ -258,7 +258,7 @@ def reset_config() -> None:
     _config_path = None
 
 
-def get_module_allowlist(config: Dict[str, Any] = None) -> Optional[set]:
+def get_module_allowlist(config: Optional[Dict[str, Any]] = None) -> Optional[set]:
     """
     Single source of truth for module allowlist.
 
