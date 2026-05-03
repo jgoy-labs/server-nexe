@@ -116,21 +116,21 @@ class RamMonitor:
     def _read_ram(self):
         """Read RSS of process + children. Runs in background thread only."""
         try:
-            result = subprocess.run(  # nosec B603,B607: self._pid is the tray's own monitored server PID (int); ps via PATH
+            result = subprocess.run(  # nosec B603 B607: self._pid is the tray's own monitored server PID (int); ps via PATH
                 ["ps", "-o", "rss=", "-p", str(self._pid)],
                 capture_output=True, text=True, timeout=2,
             )
             if result.returncode != 0 or not result.stdout.strip():
                 return 0
             rss_kb = int(result.stdout.strip())
-            children = subprocess.run(  # nosec B603,B607: self._pid is the tray's own monitored server PID (int); pgrep via PATH
+            children = subprocess.run(  # nosec B603 B607: self._pid is the tray's own monitored server PID (int); pgrep via PATH
                 ["pgrep", "-P", str(self._pid)],
                 capture_output=True, text=True, timeout=2,
             )
             if children.returncode == 0:
                 for child_pid in children.stdout.strip().split("\n"):
                     if child_pid.strip():
-                        child_rss = subprocess.run(  # nosec B603,B607: child_pid is the int output of pgrep -P (own children); ps via PATH
+                        child_rss = subprocess.run(  # nosec B603 B607: child_pid is the int output of pgrep -P (own children); ps via PATH
                             ["ps", "-o", "rss=", "-p", child_pid.strip()],
                             capture_output=True, text=True, timeout=2,
                         )

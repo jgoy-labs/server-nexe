@@ -233,7 +233,7 @@ def stop(ctx: click.Context, force: bool):
   # Fallback: pgrep si no hi havia PID file vàlid
   if not found:
     try:
-      result = subprocess.run(  # nosec B603,B607: pgrep on hardcoded literal pattern; system tool resolved via PATH (mono-user local)
+      result = subprocess.run(  # nosec B603 B607: pgrep on hardcoded literal pattern; system tool resolved via PATH (mono-user local)
         ["pgrep", "-f", "uvicorn.*nexe"],
         capture_output=True, text=True
       )
@@ -511,7 +511,7 @@ def install_model(name: str, engine: Optional[str]):
         tag = entry.ollama_tag
         click.echo(f"   Running: ollama pull {tag}")
         try:
-            subprocess.run(["ollama", "pull", tag], check=True)  # nosec B603,B607: tag from registry catalog (entry.ollama_tag); ollama via PATH (mono-user local)
+            subprocess.run(["ollama", "pull", tag], check=True)  # nosec B603 B607: tag from registry catalog (entry.ollama_tag); ollama via PATH (mono-user local)
             click.echo(f"\n✅ {click.style('Model downloaded to Ollama!', fg='green')}")
 
              # Ask to set as primary

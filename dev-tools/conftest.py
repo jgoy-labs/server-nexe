@@ -180,7 +180,7 @@ def ensure_ollama_running():
     # Start Ollama
     print("\n[pytest] Ollama: Starting for tests...")
     try:
-        _ollama_process = subprocess.Popen(  # nosec B603,B607: literal `ollama serve` for pytest session fixture; ollama via PATH (test infra)
+        _ollama_process = subprocess.Popen(  # nosec B603 B607: literal `ollama serve` for pytest session fixture; ollama via PATH (test infra)
             ["ollama", "serve"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL

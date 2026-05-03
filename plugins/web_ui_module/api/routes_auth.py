@@ -478,7 +478,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                 # perquè això llançaria la GUI completa al Dock i la finestra).
                 if shutil.which("ollama"):
                     try:
-                        subprocess.Popen(  # nosec B603,B607: literal `ollama serve` argv inside set_backend endpoint gated by require_ui_auth; mono-user local — equivalent to user running it directly
+                        subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv inside set_backend endpoint gated by require_ui_auth; mono-user local — equivalent to user running it directly
                             ["ollama", "serve"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                             start_new_session=True,

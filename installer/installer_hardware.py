@@ -24,7 +24,7 @@ HW_INFO = {}
 
 def get_sysctl(key):
     try:
-        return subprocess.check_output(["sysctl", "-n", key]).decode().strip()  # nosec B603,B607: key is literal arg passed only by callers in this module ("hw.memsize", "machdep.cpu.brand_string"); sysctl via PATH
+        return subprocess.check_output(["sysctl", "-n", key]).decode().strip()  # nosec B603 B607: key is literal arg passed only by callers in this module ("hw.memsize", "machdep.cpu.brand_string"); sysctl via PATH
     except Exception:
         return None
 

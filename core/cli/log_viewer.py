@@ -36,7 +36,7 @@ def tail_file(filepath: Path, last: int = 50):
     try:
         # Prioritza `tail` del sistema si està disponible (més eficient).
         if shutil.which("tail"):
-            subprocess.run(["tail", "-n", str(last), "-f", str(filepath)])  # nosec B603,B607: filepath validated via validate_safe_path against logs_dir; last is int CLI option; tail via PATH
+            subprocess.run(["tail", "-n", str(last), "-f", str(filepath)])  # nosec B603 B607: filepath validated via validate_safe_path against logs_dir; last is int CLI option; tail via PATH
         else:
             # Fallback Python pur.
             with open(filepath, "r") as f:

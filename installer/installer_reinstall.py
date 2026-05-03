@@ -399,7 +399,7 @@ def _regenerate_env_for_overwrite(project_root: Path) -> bool:
 
 def _kill_existing_tray() -> None:
     """Matar el procés nexe-tray existent abans de substituir el venv (B10)."""
-    result = subprocess.run(["pgrep", "-f", "nexe-tray"], capture_output=True, text=True)  # nosec B603,B607: literal pgrep pattern; system tool via PATH (mono-user local)
+    result = subprocess.run(["pgrep", "-f", "nexe-tray"], capture_output=True, text=True)  # nosec B603 B607: literal pgrep pattern; system tool via PATH (mono-user local)
     for pid_str in result.stdout.strip().splitlines():
         try:
             os.kill(int(pid_str), signal.SIGTERM)

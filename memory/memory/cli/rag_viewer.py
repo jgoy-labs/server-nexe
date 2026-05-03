@@ -170,7 +170,7 @@ def main():
   print()
 
   try:
-    subprocess.run(  # nosec B603,B607: args.lines is int CLI option, log_path is local Path file; tail via PATH
+    subprocess.run(  # nosec B603 B607: args.lines is int CLI option, log_path is local Path file; tail via PATH
       ["tail", "-n", str(args.lines), "-f", str(log_path)],
       check=True
     )
