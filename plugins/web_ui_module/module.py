@@ -134,9 +134,22 @@ class WebUIModule:
     # --- Router setup ---
 
     def _init_router(self):
-        """Crea router delegant a api/routes.py"""
+        """Crea router delegant a api/routes.py.
+
+        R6-15 v1.0.4: graceful degradation when the security plugin is absent.
+        routes_auth.py exposes ``_SECURITY_AVAILABLE`` so the dependency
+        ``require_ui_auth`` returns 503 for protected endpoints (FAIL CLOSED).
+        Public endpoints (HTML at ``/``, ``/static/{path}``, ``/health``)
+        continue to serve so the user can still see *why* the UI is degraded.
+        """
         from .api.routes import create_router
         self._router = create_router(self)
+        from .api.routes_auth import _SECURITY_AVAILABLE
+        if not _SECURITY_AVAILABLE:
+            logger.warning(
+                "web_ui_module: security plugin missing, running in degraded "
+                "mode (no auth on protected endpoints — they return 503)"
+            )
 
     # --- Metodes publics ---
 

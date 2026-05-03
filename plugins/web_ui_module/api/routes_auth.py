@@ -17,7 +17,20 @@ import secrets
 import time as _time
 from fastapi import APIRouter, HTTPException, Depends, Header, Request
 
-from plugins.security.core.auth_config import get_admin_api_key
+# R6-15 v1.0.4: tolerate absent security plugin so the web UI can serve its
+# public surface (HTML, static, health) even when the user has disabled the
+# security plugin. Protected endpoints fail closed via _SECURITY_AVAILABLE
+# below — they return 503, never 200 without auth.
+try:
+    from plugins.security.core.auth_config import get_admin_api_key
+    _SECURITY_AVAILABLE = True
+except ImportError:
+    _SECURITY_AVAILABLE = False
+
+    def get_admin_api_key() -> Optional[str]:  # type: ignore[no-redef]
+        """Stub: degraded mode — protected endpoints return 503 via require_ui_auth."""
+        return None
+
 from plugins.web_ui_module.messages import get_message, get_i18n
 
 logger = logging.getLogger(__name__)
@@ -62,12 +75,23 @@ def make_require_ui_auth():
     peticions UI son rebutjades amb 503. Mai mode permissive (que era el
     bug Codex P1: si NEXE_PRIMARY_API_KEY/NEXE_ADMIN_API_KEY estaven
     buides, les rutes UI quedaven obertes a tothom).
+
+    R6-15 v1.0.4: same FAIL CLOSED behaviour applies when the security plugin
+    itself is absent — protected endpoints return 503, never 200 unauthorized.
     """
     async def _require_ui_auth(
         request: Request,
         x_api_key: Optional[str] = Header(None),
     ):
         """Valida API key per a endpoints de la Web UI (FAIL CLOSED)"""
+        if not _SECURITY_AVAILABLE:
+            # Degraded mode: security plugin missing. Public endpoints (UI
+            # static, /health) bypass this dependency; protected endpoints
+            # land here and must fail closed.
+            raise HTTPException(
+                status_code=503,
+                detail="security plugin missing — protected endpoints unavailable",
+            )
         expected = get_admin_api_key()
         if not expected:
             # FAIL CLOSED: no key configured = no UI access
