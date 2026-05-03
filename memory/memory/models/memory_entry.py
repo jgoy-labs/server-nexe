@@ -19,8 +19,8 @@ from .memory_types import MemoryType, TrustLevel, ValidatorDecision
 class MemoryEntry(BaseModel):
   """Memory entry with basic metadata support."""
 
-  id: Optional[str] = Field(
-    default=None,
+  id: str = Field(
+    default="",
     description="Deterministic unique ID (SHA256(content)[:16]) - auto-generated"
   )
 
