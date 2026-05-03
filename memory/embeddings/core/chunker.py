@@ -263,7 +263,7 @@ class SmartChunker:
       List of ChunkMetadata
     """
     sentences = re.split(r'(?<=[.!?])\s+', content)
-    chunks = []
+    chunks: List[ChunkMetadata] = []
     current_chunk = ""
     chunk_start = 0
 

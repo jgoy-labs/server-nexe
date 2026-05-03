@@ -10,6 +10,8 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import time
+from typing import List, Optional
+
 import structlog
 
 from memory.shared.cache import MultiLevelCache
@@ -91,6 +93,7 @@ class CachedEmbedder:
     self.model_name = encoder.model_name
     self.cache_enabled = cache_enabled
 
+    self.cache: Optional[MultiLevelCache]
     if cache_enabled:
       self.cache = MultiLevelCache(
         l1_max_size=l1_max_size,
@@ -102,7 +105,7 @@ class CachedEmbedder:
 
     self._total_requests = 0
     self._cache_hits = 0
-    self._latencies = []
+    self._latencies: List[float] = []
 
     logger.info(
       "cached_embedder_initialized",
@@ -134,8 +137,9 @@ class CachedEmbedder:
     start = time.time()
     cache_hit = False
 
-    if self.cache_enabled and request.use_cache:
-      cached = await self.cache.get(
+    if self.cache_enabled and self.cache is not None and request.use_cache:
+      cache = self.cache
+      cached = await cache.get(
         text=request.text,
         model=request.model,
         version=request.cache_version
@@ -155,7 +159,7 @@ class CachedEmbedder:
           normalize=request.normalize
         )
 
-        await self.cache.put(
+        await cache.put(
           text=request.text,
           model=request.model,
           embedding=embedding,
@@ -223,12 +227,13 @@ class CachedEmbedder:
     embeddings = []
     cache_hits = 0
 
-    if self.cache_enabled and request.use_cache:
+    if self.cache_enabled and self.cache is not None and request.use_cache:
+      cache = self.cache
       to_generate = []
       cached_embeddings = {}
 
       for i, text in enumerate(request.texts):
-        cached = await self.cache.get(
+        cached = await cache.get(
           text=text,
           model=request.model,
           version="v1"
@@ -249,7 +254,7 @@ class CachedEmbedder:
         )
 
         for (idx, text), embedding in zip(to_generate, new_embeddings):
-          await self.cache.put(
+          await cache.put(
             text=text,
             model=request.model,
             embedding=embedding,

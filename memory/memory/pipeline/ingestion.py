@@ -13,7 +13,7 @@ import asyncio
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from memory.embeddings.constants import DEFAULT_VECTOR_SIZE
 from ..models.memory_entry import MemoryEntry
@@ -234,17 +234,19 @@ class IngestionPipeline:
     if not text.strip():
       raise ValueError("Text no pot estar buit")
 
-    if not hasattr(self, '_fe_model') or self._fe_model is None:
+    fe_model: Optional[Any] = getattr(self, '_fe_model', None)
+    if fe_model is None:
       logger.info("Loading fastembed model: %s", self.embedding_model)
       try:
-        self._fe_model = TextEmbedding(self.embedding_model)
+        fe_model = TextEmbedding(self.embedding_model)
+        self._fe_model = fe_model
       except Exception as e:
         raise RuntimeError(
             f"Embedding model '{self.embedding_model}' not available locally. "
             f"Run the installer to download it. Error: {e}"
         ) from e
 
-    embedding = list(self._fe_model.embed([text]))[0]
+    embedding = list(fe_model.embed([text]))[0]
     arr = np.array(embedding)
     norm = np.linalg.norm(arr)
     if norm > 0:

@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
+    from .text_store import TextStore
 
 from ..constants import DEFAULT_EMBEDDING_MODEL, DEFAULT_VECTOR_SIZE
 from ..config import IngestConfig
@@ -113,7 +114,7 @@ class MemoryAPI:
 
     self._crypto = crypto_provider
     self._text_store_path = text_store_path
-    self._text_store = None
+    self._text_store: Optional["TextStore"] = None
     self._qdrant: Optional[QdrantClient] = None
     self._embedder = None
     self._executor = ThreadPoolExecutor(max_workers=4)
