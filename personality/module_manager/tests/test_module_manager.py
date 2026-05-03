@@ -324,7 +324,8 @@ class TestModuleManagerEventListener:
       mock_events = MagicMock()
       manager.events = mock_events
 
-      callback = lambda x: x
+      def callback(x):
+        return x
       manager.add_event_listener(callback, "test_event")
 
       mock_events.add_event_listener.assert_called_once_with(callback, "test_event")

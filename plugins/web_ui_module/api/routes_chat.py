@@ -128,7 +128,7 @@ async def _atomize_fact_llm(fact: str, engine, model_name: str, sig, lang: str =
                 raw += chunk.get("content", chunk.get("response", ""))
             elif isinstance(chunk, str):
                 raw += chunk
-        lines = [l.strip() for l in raw.strip().splitlines() if l.strip() and len(l.strip()) >= 5]
+        lines = [ln.strip() for ln in raw.strip().splitlines() if ln.strip() and len(ln.strip()) >= 5]
         if lines:
             logger.info("Atomizer split '%s' → %d facts", fact[:60], len(lines))
             return lines

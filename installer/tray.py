@@ -51,11 +51,16 @@ def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_
         from AppKit import NSAlert, NSAlertStyleWarning
     except Exception:
         kwargs = {}
-        if title is not None: kwargs["title"] = title
-        if message is not None: kwargs["message"] = message
-        if ok is not None: kwargs["ok"] = ok
-        if cancel is not None: kwargs["cancel"] = cancel
-        if other is not None: kwargs["other"] = other
+        if title is not None:
+            kwargs["title"] = title
+        if message is not None:
+            kwargs["message"] = message
+        if ok is not None:
+            kwargs["ok"] = ok
+        if cancel is not None:
+            kwargs["cancel"] = cancel
+        if other is not None:
+            kwargs["other"] = other
         return rumps.alert(**kwargs)
 
     alert = NSAlert.alloc().init()

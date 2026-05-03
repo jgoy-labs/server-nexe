@@ -172,7 +172,8 @@ class BootstrapTokenManager:
       cursor = conn.cursor()
       cursor.execute("SELECT value, expires FROM bootstrap_config WHERE key = 'master_token'")
       row = cursor.fetchone()
-      if not row: return None
+      if not row:
+        return None
       
       cursor.execute("SELECT value FROM bootstrap_config WHERE key = 'token_used'")
       used_row = cursor.fetchone()

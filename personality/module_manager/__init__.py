@@ -160,6 +160,6 @@ def create_validated_module_manager(config_path=None, validate_config=True):
     errors = validator.validate(config_path)
 
     if errors:
-      raise ValueError(f"Configuration validation failed:\n" + "\n".join(errors))
+      raise ValueError("Configuration validation failed:\n" + "\n".join(errors))
 
   return ModuleManager(config_path)

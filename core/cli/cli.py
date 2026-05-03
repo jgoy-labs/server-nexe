@@ -392,7 +392,7 @@ def setup_models(ctx: click.Context, apply: bool):
                     
                 except ImportError:
                      click.echo(click.style("   ⚠️ huggingface_hub not installed. Cannot auto-download.", fg="yellow"))
-                     click.echo(f"   Run: pip install huggingface_hub")
+                     click.echo("   Run: pip install huggingface_hub")
                 except Exception as e:
                      click.echo(click.style(f"   ❌ Error downloading model: {e}", fg="red"))
             
@@ -466,7 +466,8 @@ def install_model(name: str, engine: Optional[str]):
         if config_path.exists():
              config = toml.load(config_path)
              engine = config.get("plugins", {}).get("models", {}).get("preferred_engine", "ollama")
-             if engine == "auto": engine = "ollama" # Default safe
+             if engine == "auto":
+                 engine = "ollama"  # Default safe
         else:
              engine = "ollama"
     
@@ -588,9 +589,9 @@ def knowledge_status():
 
             if await memory.collection_exists("user_knowledge"):
                 count = await memory.count("user_knowledge")
-                click.echo(f"📊 Collection 'user_knowledge':")
+                click.echo("📊 Collection 'user_knowledge':")
                 click.echo(f"   - Documents: {count} fragments")
-                click.echo(f"   - Status: ✅ Active")
+                click.echo("   - Status: ✅ Active")
             else:
                 click.echo(click.style("ℹ️  Collection 'user_knowledge' does not exist.", fg="yellow"))
                 click.echo("   Run: ./nexe knowledge ingest")

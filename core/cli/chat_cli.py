@@ -387,22 +387,30 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                     if "MODEL" in chunk:
                         _model_name = chunk["MODEL"]
                     if "RAG" in chunk:
-                        try: _rag_count = int(chunk["RAG"])
-                        except (ValueError, TypeError): pass
+                        try:
+                            _rag_count = int(chunk["RAG"])
+                        except (ValueError, TypeError):
+                            pass
                     if "RAG_AVG" in chunk:
-                        try: _rag_avg = float(chunk["RAG_AVG"])
-                        except (ValueError, TypeError): pass
+                        try:
+                            _rag_avg = float(chunk["RAG_AVG"])
+                        except (ValueError, TypeError):
+                            pass
                     if "RAG_ITEM" in chunk:
                         # Format: "collection|score"
                         parts = chunk["RAG_ITEM"].split("|", 1)
                         if len(parts) == 2:
-                            try: _rag_items.append((parts[0], float(parts[1])))
-                            except (ValueError, TypeError): pass
+                            try:
+                                _rag_items.append((parts[0], float(parts[1])))
+                            except (ValueError, TypeError):
+                                pass
                     if "MEM" in chunk:
                         _mem_saved = True
                     if "COMPACT" in chunk:
-                        try: _compact_count = int(chunk["COMPACT"])
-                        except (ValueError, TypeError): pass
+                        try:
+                            _compact_count = int(chunk["COMPACT"])
+                        except (ValueError, TypeError):
+                            pass
                     continue
 
                 if first:

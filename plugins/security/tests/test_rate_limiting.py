@@ -253,7 +253,8 @@ class TestAddRateLimitHeaders:
         async def mock_call_next(req):
             return mock_response
 
-        custom_func = lambda r: "custom-id"
+        def custom_func(r):
+            return "custom-id"
         asyncio.run(add_rate_limit_headers(
             request, mock_call_next,
             identifier_func=custom_func,

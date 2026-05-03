@@ -213,7 +213,8 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
                     return
 
                 async for line in resp.aiter_lines():
-                    if not line: continue
+                    if not line:
+                        continue
                     try:
                         # Ollama retorna JSON lines
                         data = json.loads(line)
