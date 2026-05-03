@@ -16,6 +16,7 @@ import asyncio
 import json
 import logging
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -43,6 +44,10 @@ class SqliteStorageMixin:
         _encrypted: bool — si la DB és encriptada
         executor: ThreadPoolExecutor — per operacions sync
     """
+
+    # Mixin contract: PersistenceManager.__init__ assigna executor; declarem
+    # només per tipar accessos del mixin (cap valor: el setteja el consumidor).
+    executor: ThreadPoolExecutor
 
     # ── Helpers de comprovació ────────────────────────────────────────────────
 
