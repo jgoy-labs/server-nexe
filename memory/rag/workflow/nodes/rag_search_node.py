@@ -54,12 +54,12 @@ class RAGSearchNode(Node):
     }
   """
 
-  def __init__(self):
+  def __init__(self) -> None:
     """Inicialitza el node RAGSearch."""
     super().__init__()
 
     self._rag_source: Optional[FileRAGSource] = None
-    self.config = {}
+    self.config: Dict[str, Any] = {}
 
     logger.info("rag_search_node_initialized")
 

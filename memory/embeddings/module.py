@@ -73,7 +73,7 @@ class EmbeddingsModule:
   _initialized: bool = False
   _singleton_lock = threading.Lock()
 
-  def __init__(self):
+  def __init__(self) -> None:
     """Private constructor. Use get_instance()"""
     if EmbeddingsModule._instance is not None:
       raise RuntimeError(

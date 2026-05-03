@@ -108,7 +108,7 @@ class PersistenceManager(SqliteStorageMixin):
         padded = hex_id.ljust(32, "0")
         return str(uuid.UUID(padded))
 
-    def _init_qdrant(self):
+    def _init_qdrant(self) -> None:
         """
         Inicialitza el QdrantAdapter.
 

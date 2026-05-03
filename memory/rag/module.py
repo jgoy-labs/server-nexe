@@ -45,7 +45,7 @@ class RAGModule:
   _initialized: bool = False
   _singleton_lock = threading.Lock()
 
-  def __init__(self):
+  def __init__(self) -> None:
     """Private constructor. Use get_instance()."""
     if RAGModule._instance is not None:
       i18n = get_i18n()

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class PersonalityRAG:
     """Font de coneixement basada en la identitat del sistema."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "personality_core"
         self._documents: List[Dict[str, Any]] = []
         logger.info("PersonalityRAG source initialized")
