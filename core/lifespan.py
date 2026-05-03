@@ -241,7 +241,7 @@ async def lifespan(app: FastAPI):
       "Nexe 0.9 - Modular AI System")
     logger.info(msg)
 
-    reload_trigger = server_state.project_root / ".nexe_reload_trigger.py"
+    reload_trigger = server_state.project_root / ".nexe_reload_trigger.py"  # type: ignore[operator]  # project_root is initialised by factory_state before lifespan runs
     if reload_trigger.exists():
       try:
         reload_trigger.unlink()
@@ -342,7 +342,7 @@ async def lifespan(app: FastAPI):
     # B09: timeout per evitar penjades indefinides si Qdrant/Ollama no arranquen
     try:
       await asyncio.wait_for(
-        _auto_start_services(server_state.config, server_state.project_root, server_state),
+        _auto_start_services(server_state.config, server_state.project_root, server_state),  # type: ignore[arg-type]  # project_root is initialised by factory_state before lifespan runs
         timeout=STARTUP_TIMEOUT,
       )
     except asyncio.TimeoutError:
@@ -504,7 +504,7 @@ async def lifespan(app: FastAPI):
           "Auto-Clean error: {error}", error=str(e))
         logger.warning(msg)
 
-    if hasattr(server_state, 'configure_modules_callback'):
+    if hasattr(server_state, 'configure_modules_callback') and server_state.configure_modules_callback is not None:
       server_state.configure_modules_callback(server_state.api_integrator, server_state.i18n)
 
     # Session cleanup background task (N-5 / N04)
@@ -553,7 +553,7 @@ async def lifespan(app: FastAPI):
     logger.info(msg)
 
     # === PID FILE CLEANUP (B10) — sempre, fins i tot si startup ha fallat ===
-    _remove_pid_file(server_state.project_root)
+    _remove_pid_file(server_state.project_root)  # type: ignore[arg-type]  # project_root is initialised by factory_state before lifespan runs
 
     try:
       # Bug 11: stop bootstrap token auto-renewal task net
