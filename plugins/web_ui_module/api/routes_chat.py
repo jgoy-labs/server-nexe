@@ -22,11 +22,24 @@ from fastapi.responses import StreamingResponse
 from core.dependencies import limiter
 
 from plugins.web_ui_module.messages import get_message, get_i18n
-from plugins.security.core.input_sanitizers import (
-    validate_string_input,
-    strip_memory_tags,
-    detect_jailbreak_attempt,
-)
+# R6-15 v1.0.4: tolerate absent security plugin. The endpoints in this module
+# all depend on require_ui_auth, which returns 503 in degraded mode, so these
+# stubs never run in practice — they exist only to keep the module importable.
+try:
+    from plugins.security.core.input_sanitizers import (
+        validate_string_input,
+        strip_memory_tags,
+        detect_jailbreak_attempt,
+    )
+except ImportError:
+    def validate_string_input(s, *a, **k):  # type: ignore[no-redef]
+        return s
+
+    def strip_memory_tags(s, *a, **k):  # type: ignore[no-redef]
+        return s
+
+    def detect_jailbreak_attempt(s, *a, **k):  # type: ignore[no-redef]
+        return False
 from core.endpoints.chat_sanitization import _sanitize_rag_context
 from plugins.web_ui_module.core.latex_sanitizer import LatexStreamBuffer, latex_to_unicode
 

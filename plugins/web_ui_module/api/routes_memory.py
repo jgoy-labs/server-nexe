@@ -14,7 +14,12 @@ import logging
 from fastapi import APIRouter, HTTPException, Depends, Request
 
 from plugins.web_ui_module.messages import get_message, get_i18n
-from plugins.security.core.input_sanitizers import validate_string_input
+# R6-15 v1.0.4: tolerate absent security plugin (endpoints gated by require_ui_auth).
+try:
+    from plugins.security.core.input_sanitizers import validate_string_input
+except ImportError:
+    def validate_string_input(s, *a, **k):  # type: ignore[no-redef]
+        return s
 from core.dependencies import limiter
 
 def _get_memory_helper():
