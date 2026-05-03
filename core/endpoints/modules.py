@@ -27,7 +27,7 @@ def get_api_integrator(request: Request):
   server_state = get_server_state()
   return server_state.api_integrator
 
-def configure_dependencies(api_integrator_instance, i18n_manager):
+def configure_dependencies(_api_integrator_instance, _i18n_manager):
   """Legacy compatibility - dependencies now injected via app.state"""
 
 @router.get(

@@ -222,7 +222,7 @@ class NexeModuleWithSpecialists(NexeModule, Protocol):
     """
     ...
 
-  async def register_specialist(self, specialist: Any) -> bool:
+  async def register_specialist(self, _specialist: Any) -> bool:
     """
     Register an incoming specialist with the module.
 
