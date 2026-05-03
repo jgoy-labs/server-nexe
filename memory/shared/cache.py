@@ -59,7 +59,8 @@ class MultiLevelCache:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.cache_dir / "embeddings_l2.db"
-        
+
+        self.conn: Optional[sqlite3.Connection] = None
         self._init_l2()
 
     # Backward-compatible alias used by some tests/legacy code
@@ -78,9 +79,10 @@ class MultiLevelCache:
         new_dir.mkdir(parents=True, exist_ok=True)
 
         # Close existing connection to avoid locks on old path
-        if getattr(self, "conn", None):
+        existing_conn = getattr(self, "conn", None)
+        if existing_conn is not None:
             try:
-                self.conn.close()
+                existing_conn.close()
             except Exception as e:
                 logger.debug("Cache close failed: %s", e)
             finally:
@@ -90,7 +92,7 @@ class MultiLevelCache:
         self.db_path = self.cache_dir / "embeddings_l2.db"
         self._init_l2()
 
-    def _init_l2(self):
+    def _init_l2(self) -> None:
         """Initialize the SQLite connection and schema."""
         try:
             self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
