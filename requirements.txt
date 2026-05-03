@@ -4,43 +4,43 @@
 # ─────────────────────────────────────────────────────────────
 
 # --- Core Server ---
-fastapi==0.128.8
-starlette>=0.49.1,<1.0.0  # explicit pin for CVE-2025-54121 / CVE-2025-62727
-uvicorn[standard]==0.34.3
-pydantic==2.10.6
-pydantic-settings>=2.4,<3.0
-python-multipart==0.0.26  # CVE-2026-40347
+fastapi==0.136.1
+starlette>=1.0.0,<2.0.0  # explicit pin for CVE-2025-54121 / CVE-2025-62727
+uvicorn[standard]==0.46.0
+pydantic==2.13.3
+pydantic-settings>=2.14.0,<3.0
+python-multipart==0.0.27  # CVE-2026-40347
 starlette-csrf==3.0.0
-httpx==0.27.2
-qdrant-client==1.16.1
+httpx==0.28.1
+qdrant-client==1.17.1
 toml==0.10.2
 structlog==25.5.0
-click==8.1.7
-rich==13.7.0
-typer==0.9.0
-python-dotenv==1.2.1
-pyyaml>=6.0.2
-numpy==1.26.4
+click==8.3.3
+rich==15.0.0
+typer==0.25.1
+python-dotenv==1.2.2
+pyyaml>=6.0.3
+numpy==2.4.4
 slowapi==0.1.9
-prometheus-client==0.19.0
-tenacity==9.1.2
-psutil==5.9.8
-huggingface_hub==0.36.2
+prometheus-client==0.25.0
+tenacity==9.1.4
+psutil==7.2.2
+huggingface_hub==1.13.0
 # macOS-only deps (tray app) → requirements-macos.txt
 
 # --- Memory & RAG ---
-fastembed>=0.3.6
-pypdf>=6.9.2  # PDF support for knowledge ingestion (CVE-2026-31826, CVE-2026-33123, CVE-2026-33699 fixed)
+fastembed>=0.8.0
+pypdf>=6.10.2  # PDF support for knowledge ingestion (CVE-2026-31826, CVE-2026-33123, CVE-2026-33699 fixed)
 
 # --- Encryption at rest ---
-cryptography>=44.0.0
-keyring>=25.0.0
-sqlcipher3>=0.5.0
+cryptography>=47.0.0
+keyring>=25.7.0
+sqlcipher3>=0.6.2
 
 # --- Testing ---
 pytest>=9.0.3,<10.0.0  # CVE-2025-71176
-pytest-asyncio>=1.0.0,<2.0.0
-pytest-cov>=7.0.0,<8.0.0
+pytest-asyncio>=1.3.0,<2.0.0
+pytest-cov>=7.1.0,<8.0.0
 
 # --- Inference Engines (Apple Silicon / MLX) ---
 # Note: Install only on Mac ARM64 — handled dynamically by install_nexe.py
