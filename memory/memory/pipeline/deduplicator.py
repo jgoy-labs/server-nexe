@@ -70,7 +70,7 @@ class Deduplicator:
   - Check contra Persistence per duplicats existents
   """
 
-  def __init__(self):
+  def __init__(self) -> None:
     self._seen_ids: Set[str] = set()
     self._seen_semantic: Dict[str, str] = {}  # "attr:normalized_value" -> first entry_id
     logger.info("Deduplicator initialized")
