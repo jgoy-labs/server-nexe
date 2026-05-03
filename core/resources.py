@@ -12,6 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import sys
 import logging
 from pathlib import Path
+from typing import Any, cast
 
 if sys.version_info >= (3, 9):
   from importlib.resources import files
@@ -107,7 +108,7 @@ def _get_resource_via_importlib(package: str, resource: str) -> Path:
   resource_path = package_files / resource
 
   if hasattr(resource_path, '__fspath__'):
-    path = Path(resource_path)
+    path = Path(cast(Any, resource_path))
   else:
     path = Path(str(resource_path))
 

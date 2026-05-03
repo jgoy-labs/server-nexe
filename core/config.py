@@ -109,6 +109,7 @@ def load_config(
         Dict with configuration data (merged with defaults)
     """
     # Find config file
+    found_path: Optional[Path]
     if config_path and config_path.exists():
         found_path = config_path
     else:

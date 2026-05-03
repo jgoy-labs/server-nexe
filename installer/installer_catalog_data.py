@@ -16,7 +16,7 @@ Description: Model catalog data (MODEL_CATALOG).
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, cast
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MODEL CATALOG - 16 models across 4 RAM tiers
@@ -447,5 +447,5 @@ def iter_catalog_model_ids() -> list[tuple[str, str]]:
             for engine_key in ("mlx", "ollama", "gguf"):
                 value = model.get(engine_key)
                 if value:
-                    pairs.append((engine_key, value))
+                    pairs.append((engine_key, cast(str, value)))
     return pairs

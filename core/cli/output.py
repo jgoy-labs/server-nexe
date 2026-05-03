@@ -22,6 +22,7 @@ except ImportError:
 
 from .router import CLIInfo
 
+console: Any
 if RICH_AVAILABLE:
   console = Console()
 else:
