@@ -26,7 +26,7 @@ class NexeAPIClient:
     """Client to interact with the Nexe Server API."""
     
     
-    def __init__(self, base_url: str = None):
+    def __init__(self, base_url: Optional[str] = None):
         if base_url is None:
             from core.config import get_server_url
             base_url = os.environ.get("NEXE_API_BASE_URL", get_server_url())
