@@ -41,7 +41,7 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
                 try:
                     from core.metrics.registry import MEMORY_OPERATIONS
                     MEMORY_OPERATIONS.labels(operation="autosave").inc()
-                except Exception:
+                except Exception:  # nosec B110: best-effort Prometheus metric increment; metric absence must not fail the autosave path
                     pass
                 return
         except ImportError:

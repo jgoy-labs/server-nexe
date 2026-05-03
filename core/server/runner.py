@@ -244,7 +244,7 @@ def _maybe_launch_tray(_project_root: "Path | None" = None):
                     pass
             time.sleep(0.3)
             logger.debug("Killed stale tray process(es) — launching fresh one")
-    except Exception:
+    except Exception:  # nosec B110: best-effort cleanup of stale tray processes; if it fails the fresh tray launch below still proceeds
         pass
 
     # Launch tray in --attach mode.

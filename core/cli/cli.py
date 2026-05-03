@@ -227,7 +227,7 @@ def stop(ctx: click.Context, force: bool):
     except (ProcessLookupError, OSError):
       # PID file obsolet: el procés ja no existeix
       pid_file.unlink(missing_ok=True)
-    except Exception:
+    except Exception:  # nosec B110: PID file unreadable/corrupt → fallback to pgrep (comment below documents intent)
       pass  # JSON malformat o altre error: fallback a pgrep
 
   # Fallback: pgrep si no hi havia PID file vàlid
@@ -240,7 +240,7 @@ def stop(ctx: click.Context, force: bool):
       pids = [int(p) for p in result.stdout.strip().split('\n') if p.strip()]
       if pids:
         found.append(("Nexe Server", "uvicorn.*nexe", pids))
-    except Exception:
+    except Exception:  # nosec B110: best-effort pgrep fallback for stop command; if it fails the empty `found` list is reported to the user
       pass
 
   if not found:

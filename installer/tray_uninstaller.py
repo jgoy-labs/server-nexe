@@ -89,7 +89,7 @@ class _ForegroundContext:
             self.old_policy = NSApp.activationPolicy()
             NSApp.setActivationPolicy_(NSApplicationActivationPolicyRegular)
             NSApp.activateIgnoringOtherApps_(True)
-        except Exception:
+        except Exception:  # nosec B110: best-effort AppKit activation policy promotion; non-fatal if AppKit unavailable
             pass
         return self
 
@@ -98,7 +98,7 @@ class _ForegroundContext:
             try:
                 from AppKit import NSApp
                 NSApp.setActivationPolicy_(self.old_policy)
-            except Exception:
+            except Exception:  # nosec B110: best-effort AppKit activation policy restore on context exit; non-fatal
                 pass
 
 

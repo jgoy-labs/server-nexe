@@ -31,7 +31,7 @@ def show_final_summary(model_config, project_root, global_symlink_created, lang)
             if line.startswith("NEXE_PRIMARY_API_KEY="):
                 api_key = line.split("=", 1)[1].strip()
                 break
-    except Exception:
+    except Exception:  # nosec B110: best-effort .env read for the final summary; missing key just suppresses the API key reminder
         pass
     if api_key:
         print(f"\n{'─'*65}")

@@ -186,7 +186,7 @@ class GCDaemon:
                             content_hash=eid,
                             reason="gc_decay",
                         )
-                    except Exception:
+                    except Exception:  # nosec B110: best-effort tombstone insertion during GC; failure logged elsewhere via outer error path (BACKLOG-v1.0.5 M5-02 review for log.debug upgrade)
                         pass
 
             # 3. Expire old tombstones
@@ -272,7 +272,7 @@ async def run_gc_for_active_users(
         if conn is not None:
             try:
                 conn.close()
-            except Exception:
+            except Exception:  # nosec B110: best-effort SQLite conn.close() inside finally; no-op if already closed
                 pass
 
     for user_id in user_ids:

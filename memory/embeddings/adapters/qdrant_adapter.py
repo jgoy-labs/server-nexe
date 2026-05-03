@@ -319,7 +319,7 @@ class QdrantAdapter:
         if self._client:
             try:
                 self._client.close()
-            except Exception:
+            except Exception:  # nosec B110: best-effort QdrantClient close; cleanup is the caller's responsibility either way
                 pass
             self._client = None
 

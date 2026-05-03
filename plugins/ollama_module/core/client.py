@@ -107,7 +107,7 @@ class OllamaClient:
                 if resp.status_code == 200:
                     logger.info("Ollama already running at %s", self.base_url)
                     return
-        except Exception:
+        except Exception:  # nosec B110: best-effort connection probe; on failure fall through to start-Ollama path
             pass
 
         # No corre — intentar arrencar
@@ -152,7 +152,7 @@ class OllamaClient:
                     if resp.status_code == 200:
                         logger.info("Ollama ready after %ds", i + 1)
                         return
-            except Exception:
+            except Exception:  # nosec B110: best-effort readiness retry loop; loop exit logs the warning below
                 pass
         logger.warning("Ollama started but not responding after 15s")
 

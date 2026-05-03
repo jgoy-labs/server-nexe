@@ -386,7 +386,7 @@ def _run_headless_inner(config):
                 if line.startswith("NEXE_PRIMARY_API_KEY="):
                     api_key = line.split("=", 1)[1].strip()
                     break
-        except Exception:
+        except Exception:  # nosec B110: best-effort .env read for GUI report; missing key is tolerated (logged below as 'not found')
             pass
         if api_key:
             print(f"[API_KEY] {api_key}", flush=True)
@@ -428,7 +428,7 @@ def _run_headless_inner(config):
             symlink_path.unlink()
         symlink_path.symlink_to(nexe_wrapper)
         global_symlink_created = True
-    except Exception:
+    except Exception:  # nosec B110: /usr/local/bin symlink failure (typically PermissionError) is non-fatal — the local ./nexe wrapper still works
         pass
 
     nexe_cmd = "nexe" if global_symlink_created else "./nexe"
@@ -447,7 +447,7 @@ def _run_headless_inner(config):
             import toml as _toml
             _srv_cfg = _toml.load(PROJECT_ROOT / "personality" / "server.toml")
             _emb_model = _srv_cfg.get("plugins", {}).get("models", {}).get("embedding", _emb_model)
-        except Exception:
+        except Exception:  # nosec B110: best-effort server.toml read; on failure keep default embedding model literal
             pass
         emb_env = {**os.environ, "TRANSFORMERS_VERBOSITY": "error"}
         subprocess.run([  # nosec B603: python_path absolute venv Path; -c is literal headless probe; _emb_model from server.toml

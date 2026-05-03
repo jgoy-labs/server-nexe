@@ -159,7 +159,7 @@ async def _stream_with_spinner(gen: AsyncGenerator) -> AsyncGenerator:
             stop.set()
             try:
                 await task
-            except Exception:
+            except Exception:  # nosec B110: best-effort spinner task cancellation; failure here is benign UI cleanup
                 pass
         print(f"\r{' ' * 20}\r", end="", flush=True)
 
@@ -238,7 +238,7 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                 actual_engine = status.get("engine", engine)
                 if actual_engine != engine:
                     engine = f"{actual_engine} (fallback)"
-    except Exception:
+    except Exception:  # nosec B110: best-effort engine status fetch; on failure keep the engine value from CLI/.env
         pass
 
     # Create UI session (same pipeline as web UI)

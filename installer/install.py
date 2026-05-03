@@ -378,7 +378,7 @@ def run_installer():
             import toml as _toml
             _srv_cfg = _toml.load(project_root / "personality" / "server.toml")
             _emb_model = _srv_cfg.get("plugins", {}).get("models", {}).get("embedding", _emb_model)
-        except Exception:
+        except Exception:  # nosec B110: best-effort server.toml read; on failure keep default embedding model literal
             pass
         print_step(f"{BOLD}{t('downloading_embeddings_step')} ({_emb_model})...{RESET}")
         print(f"  {DIM}{t('downloading_model_progress')}{RESET}\n")

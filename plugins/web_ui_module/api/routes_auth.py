@@ -306,7 +306,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                                         if entry["name"] == loaded_name:
                                             entry["size_gb"] = loaded_gb
                                             break
-                        except Exception:
+                        except Exception:  # nosec B110: ollama ps probe failure → keep disk-based sizes (comment below documents intent)
                             pass  # ollama ps unavailable — keep disk sizes
                     except Exception:
                         ollama_connected = False
