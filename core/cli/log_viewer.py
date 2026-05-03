@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404: subprocess required to invoke system `tail` for log following; usage validated below
 import time
 from pathlib import Path
 from typing import Optional
@@ -36,7 +36,7 @@ def tail_file(filepath: Path, last: int = 50):
     try:
         # Prioritza `tail` del sistema si està disponible (més eficient).
         if shutil.which("tail"):
-            subprocess.run(["tail", "-n", str(last), "-f", str(filepath)])
+            subprocess.run(["tail", "-n", str(last), "-f", str(filepath)])  # nosec B603,B607: filepath validated via validate_safe_path against logs_dir; last is int CLI option; tail via PATH
         else:
             # Fallback Python pur.
             with open(filepath, "r") as f:

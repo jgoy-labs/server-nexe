@@ -143,7 +143,7 @@ def _start_nexe(ctx: click.Context):
   import json
   import os
   import signal
-  import subprocess
+  import subprocess  # nosec B404: subprocess required to run `python -m core.app`; usage validated below
   from pathlib import Path
 
   project_root = Path(__file__).parent.parent.parent
@@ -206,7 +206,7 @@ def stop(ctx: click.Context, force: bool):
   import json
   import os
   import signal
-  import subprocess
+  import subprocess  # nosec B404: subprocess required for pgrep fallback to find Nexe processes; usage validated below
   from pathlib import Path
 
   project_root = Path(__file__).parent.parent.parent
@@ -233,7 +233,7 @@ def stop(ctx: click.Context, force: bool):
   # Fallback: pgrep si no hi havia PID file vàlid
   if not found:
     try:
-      result = subprocess.run(
+      result = subprocess.run(  # nosec B603,B607: pgrep on hardcoded literal pattern; system tool resolved via PATH (mono-user local)
         ["pgrep", "-f", "uvicorn.*nexe"],
         capture_output=True, text=True
       )
@@ -506,12 +506,12 @@ def install_model(name: str, engine: Optional[str]):
              click.echo(click.style(f"❌ Error downloading: {e}", fg="red"))
 
     elif engine == "ollama":
-        # Ollama Pull 
-        import subprocess
+        # Ollama Pull
+        import subprocess  # nosec B404: subprocess required to invoke `ollama pull`; tag is from registry catalog
         tag = entry.ollama_tag
         click.echo(f"   Running: ollama pull {tag}")
         try:
-            subprocess.run(["ollama", "pull", tag], check=True)
+            subprocess.run(["ollama", "pull", tag], check=True)  # nosec B603,B607: tag from registry catalog (entry.ollama_tag); ollama via PATH (mono-user local)
             click.echo(f"\n✅ {click.style('Model downloaded to Ollama!', fg='green')}")
 
              # Ask to set as primary

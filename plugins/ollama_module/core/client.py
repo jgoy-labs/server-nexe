@@ -93,7 +93,7 @@ class OllamaClient:
     async def ensure_ollama_running(self):
         """Start Ollama if it is installed but not running. macOS + Linux."""
         import shutil
-        import subprocess
+        import subprocess  # nosec B404: subprocess required to start `ollama serve` headless when not running; usage validated below (literal argv)
         import platform
 
         httpx = _parent().httpx
@@ -130,7 +130,7 @@ class OllamaClient:
                 logger.warning("Could not start ollama serve from bundle: %s", e)
         elif shutil.which("ollama"):
             try:
-                subprocess.Popen(
+                subprocess.Popen(  # nosec B603,B607: literal `ollama serve` argv; ollama via PATH (mono-user local — equivalent to running it manually)
                     ["ollama", "serve"],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     start_new_session=True  # No morir amb el parent process

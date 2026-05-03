@@ -13,7 +13,7 @@ import asyncio
 import logging
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404: subprocess required to start `ollama serve` at server startup; usage validated below
 from pathlib import Path
 from typing import Any, Dict
 
@@ -75,7 +75,7 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path, serve
       if ollama_path or shutil.which("ollama"):
         logger.info("Ollama: Starting...")
         try:
-          process = subprocess.Popen(
+          process = subprocess.Popen(  # nosec B603,B607: literal `ollama serve` argv; system tool resolved via PATH (mono-user local)
             ["ollama", "serve"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL

@@ -11,7 +11,7 @@ Description: macOS menu bar app for controlling the Nexe server.
 
 import json
 import os
-import subprocess
+import subprocess  # nosec B404: subprocess required to spawn the server (`python -m core.app`), open log paths, pkill stale trays; argv built from PROJECT_ROOT-derived Paths
 import sys
 import threading
 import time
@@ -516,11 +516,11 @@ class NexeTray(rumps.App):
 
     def _open_logs(self, _sender):
         if self._server_log_path.exists():
-            subprocess.Popen(["open", str(self._server_log_path)])
+            subprocess.Popen(["open", str(self._server_log_path)])  # nosec B603,B607: server_log_path is PROJECT_ROOT-derived Path; macOS open via PATH
         else:
             log_dir = PROJECT_ROOT / "storage" / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
-            subprocess.Popen(["open", str(log_dir)])
+            subprocess.Popen(["open", str(log_dir)])  # nosec B603,B607: log_dir is PROJECT_ROOT-derived Path; macOS open via PATH
 
     def _open_website(self, _sender):
         webbrowser.open("https://server-nexe.com")
@@ -573,7 +573,7 @@ class NexeTray(rumps.App):
         # Matar qualsevol altre nexe-tray/installer.tray orfe (no tocar PIDs
         # del servidor — stop_server_func ja els ha aturat).
         try:
-            subprocess.Popen(
+            subprocess.Popen(  # nosec B603,B607: literal pkill pattern targeting our own tray processes; pkill via PATH
                 ["pkill", "-f", "nexe-tray|installer.tray"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )

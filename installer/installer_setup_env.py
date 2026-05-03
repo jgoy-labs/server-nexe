@@ -9,7 +9,7 @@ Description: Virtual environment setup and inference engine installation.
 import os
 import platform
 import sys
-import subprocess
+import subprocess  # nosec B404: subprocess required for venv creation, codesign, xattr, pip install; argv built from PROJECT_ROOT-derived Paths and pinned version literals
 from pathlib import Path
 
 from .installer_display import (
@@ -117,18 +117,18 @@ def _make_venv_standalone(venv_path):
     for name in ("python3.12", "python3", "python"):
         venv_bin = venv_path / "bin" / name
         if venv_bin.exists() and not venv_bin.is_symlink():
-            subprocess.run(
+            subprocess.run(  # nosec B603,B607: venv_bin is project_root-derived Path; codesign via PATH (macOS-only, ad-hoc sign of venv python)
                 ["codesign", "--force", "--sign", "-", str(venv_bin)],
                 capture_output=True,
             )
-            subprocess.run(
+            subprocess.run(  # nosec B603,B607: venv_bin is project_root-derived Path; xattr via PATH (strip quarantine)
                 ["xattr", "-rd", "com.apple.quarantine", str(venv_bin)],
                 capture_output=True,
             )
 
     # Treure quarantine de libpython copiat
     if venv_lib.exists():
-        subprocess.run(
+        subprocess.run(  # nosec B603,B607: venv_lib is project_root-derived Path; xattr via PATH
             ["xattr", "-rd", "com.apple.quarantine", str(venv_lib)],
             capture_output=True,
         )
