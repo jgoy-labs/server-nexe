@@ -61,7 +61,7 @@ class WorkingMemory:
         Returns entry ID. Auto-flushes every flush_interval adds.
         """
         key = self._session_key(user_id, session_id)
-        entry = {
+        entry: Dict[str, Any] = {
             "id": f"wm-{len(self._entries.get(key, []))}",
             "user_id": user_id,
             "session_id": session_id,

@@ -19,7 +19,7 @@ from personality.i18n import get_i18n
 logger = structlog.get_logger(__name__)
 
 try:
-  from memory.rag_sources.file import FileRAGSource
+  from memory.rag_sources.file import FileRAGSource  # type: ignore[attr-defined]  # FP: import defensive sota try/except (FileRAGSource és símbol latent, RAG_AVAILABLE en gestiona absència)
   RAG_AVAILABLE = True
 except ImportError as e:
   RAG_AVAILABLE = False

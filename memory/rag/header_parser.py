@@ -224,7 +224,7 @@ class RAGHeaderParser:
 
     def _parse_yaml_like(self, text: str) -> Dict[str, Any]:
         """Parse simplified YAML format"""
-        result = {}
+        result: Dict[str, Any] = {}
 
         for line in text.split('\n'):
             line = line.strip()
