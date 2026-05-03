@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import os
 import platform
-import subprocess
+import subprocess  # nosec B404: subprocess required for Ollama macOS app install (curl + xattr + open) and Linux install script; usage validated below
 import time
 import shutil
 from pathlib import Path
@@ -147,7 +147,7 @@ def _install_ollama_macos() -> bool:
             tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
             zip_path = tmp.name
             tmp.close()
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603,B607: url is literal "https://ollama.com/download/Ollama-darwin.zip"; zip_path is tempfile mktemp; curl via PATH
                 ["curl", "-fSL", "-o", zip_path, url],
                 timeout=300, capture_output=True,
             )
@@ -163,13 +163,13 @@ def _install_ollama_macos() -> bool:
         if not bundle_zip and os.path.isfile(zip_path):
             os.unlink(zip_path)
 
-        subprocess.run(
+        subprocess.run(  # nosec B603,B607: dest is hardcoded /Applications/Ollama.app Path; xattr via PATH
             ["xattr", "-rd", "com.apple.quarantine", str(dest)],
             capture_output=True,
         )
 
         print("  🚀 Starting Ollama...")
-        subprocess.run(["open", "-a", "Ollama"], capture_output=True)
+        subprocess.run(["open", "-a", "Ollama"], capture_output=True)  # nosec B603,B607: literal `open -a Ollama`; macOS open via PATH
 
         for _ in range(15):
             time.sleep(2)
@@ -194,7 +194,7 @@ def _install_ollama_linux() -> bool:
     """Install Ollama on Linux via the official install script."""
     try:
         print(f"  {DIM}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603,B607: literal Ollama install command per upstream docs (supply chain trust = ollama.com); bash via PATH
             ["bash", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
             timeout=180,
         )

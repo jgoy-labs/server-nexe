@@ -446,7 +446,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     async def set_backend(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Canvia el backend i/o model actiu en runtime. Arrenca Ollama si cal."""
         import os
-        import subprocess
+        import subprocess  # nosec B404: subprocess required to start Ollama (literal argv) inside set_backend endpoint, gated by require_ui_auth; mono-user local
         import shutil
         raw_backend = request.get("backend", "")
         model = request.get("model", "")
@@ -478,7 +478,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                 # perquè això llançaria la GUI completa al Dock i la finestra).
                 if shutil.which("ollama"):
                     try:
-                        subprocess.Popen(
+                        subprocess.Popen(  # nosec B603,B607: literal `ollama serve` argv inside set_backend endpoint gated by require_ui_auth; mono-user local — equivalent to user running it directly
                             ["ollama", "serve"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                             start_new_session=True,

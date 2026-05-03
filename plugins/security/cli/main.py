@@ -52,7 +52,7 @@ def health():
 @app.command()
 def test():
     """Executa tests del modul security."""
-    import subprocess
+    import subprocess  # nosec B404: subprocess required for `python -m pytest` test runner inside this plugin; usage validated below
     import sys
     from pathlib import Path
 

@@ -13,7 +13,7 @@ import json
 import logging
 import os
 import platform
-import subprocess
+import subprocess  # nosec B404: subprocess required for headless installer venv setup, embeddings download, knowledge ingest; argv built from internal Path/catalog
 import sys
 import time
 import threading
@@ -568,7 +568,7 @@ def _run_headless_inner(config):
             _log.info("Login Items: skipped (managed by GUI wizard)")
         elif nexe_app_ready:
             try:
-                subprocess.run([
+                subprocess.run([  # nosec B603,B607: install_nexe_app is project_root-derived Path (controlled); osascript via PATH (macOS-only headless installer)
                     "osascript", "-e",
                     f'tell application "System Events" to make login item at end '
                     f'with properties {{path:"{install_nexe_app}", hidden:true}}'

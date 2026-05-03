@@ -9,7 +9,7 @@ Description: Hardware detection and model size recommendation.
 import os
 import platform
 import re
-import subprocess
+import subprocess  # nosec B404: subprocess required for sysctl probe (hw.memsize / machdep.cpu.brand_string); usage validated below
 from pathlib import Path
 
 from .installer_display import (
@@ -24,7 +24,7 @@ HW_INFO = {}
 
 def get_sysctl(key):
     try:
-        return subprocess.check_output(["sysctl", "-n", key]).decode().strip()
+        return subprocess.check_output(["sysctl", "-n", key]).decode().strip()  # nosec B603,B607: key is literal arg passed only by callers in this module ("hw.memsize", "machdep.cpu.brand_string"); sysctl via PATH
     except Exception:
         return None
 

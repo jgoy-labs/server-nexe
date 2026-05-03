@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 import os
 import sys
-import subprocess
+import subprocess  # nosec B404: subprocess required to dispatch module CLIs via `python -m <entry_point>`; entry_point comes from manifest.toml inside repo
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional

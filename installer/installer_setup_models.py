@@ -14,7 +14,7 @@ is re-exported from here for backwards compatibility with the existing
 
 import os
 import sys
-import subprocess
+import subprocess  # nosec B404: subprocess required for `ollama list/serve/pull`, curl GGUF download, MLX snapshot_download child process; argv built from internal catalog
 from pathlib import Path
 
 from .download_verify import DownloadIntegrityError, verify_download_integrity
@@ -221,7 +221,7 @@ def _download_gguf_model(model_config, project_root, headless=False):
             print(f"\n{CYAN}[...]{RESET} {t('downloading_file').format(filename=filename)}")
             print(f"   {DIM}{model_config['id']}{RESET}")
 
-            subprocess.run([
+            subprocess.run([  # nosec B603,B607: output_path is project_root-derived Path; model_config['id'] is GGUF URL from internal MODEL_CATALOG (supply chain); curl via PATH
                 "curl", "-L", "--progress-bar",
                 "-o", str(output_path),
                 model_config['id']

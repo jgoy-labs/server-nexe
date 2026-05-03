@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import argparse
 import os
-import subprocess
+import subprocess  # nosec B404: subprocess required to invoke system `tail -f` on the RAG log; usage validated below (Path is local file)
 from pathlib import Path
 
 from core.cli.output import NEXE_LOGO
@@ -170,7 +170,7 @@ def main():
   print()
 
   try:
-    subprocess.run(
+    subprocess.run(  # nosec B603,B607: args.lines is int CLI option, log_path is local Path file; tail via PATH
       ["tail", "-n", str(args.lines), "-f", str(log_path)],
       check=True
     )

@@ -7,7 +7,7 @@ Description: Uninstall logic for the tray app.
 """
 
 import shutil
-import subprocess
+import subprocess  # nosec B404: subprocess required for Dock cleanup, Login Items removal, detached install-dir rm; argv built from internal Path/literals
 from pathlib import Path
 
 
@@ -53,7 +53,7 @@ if len(pl['persistent-apps']) < before:
     subprocess.run(['defaults', 'import', 'com.apple.dock', '-'], input=out)
     subprocess.run(['killall', 'Dock'])
 "
-"""], capture_output=True, timeout=15)
+"""], capture_output=True, timeout=15)  # nosec B603,B607: literal heredoc bash script with no external interpolation; bash via PATH (Dock cleanup, macOS-only)
         return True
     except Exception:
         return False
@@ -62,7 +62,7 @@ if len(pl['persistent-apps']) < before:
 def remove_login_items() -> bool:
     """Remove Nexe from macOS Login Items."""
     try:
-        subprocess.run([
+        subprocess.run([  # nosec B603,B607: literal osascript command targeting our own Login Item; osascript via PATH (macOS-only)
             "osascript", "-e",
             'tell application "System Events" to delete login item "Nexe"'
         ], capture_output=True, timeout=10)
@@ -276,7 +276,7 @@ sleep 2
 rm -rf "{install_dir}" && touch /tmp/nexe_uninstall_ok || touch /tmp/nexe_uninstall_failed
 """
     try:
-        subprocess.Popen(
+        subprocess.Popen(  # nosec B603,B607: install_dir is resolved Path derived from PROJECT_ROOT (controlled by tray app); mono-user can rm directly; bash via PATH
             ["bash", "-c", cleanup_script],
             start_new_session=True,
             stdout=subprocess.DEVNULL,

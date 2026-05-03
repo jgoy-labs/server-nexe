@@ -14,7 +14,7 @@ import os
 import pytest
 import secrets
 import shutil
-import subprocess
+import subprocess  # nosec B404: subprocess required to start `ollama serve` for the test session fixture; usage validated below
 import time
 
 # Configure environment for tests
@@ -180,7 +180,7 @@ def ensure_ollama_running():
     # Start Ollama
     print("\n[pytest] Ollama: Starting for tests...")
     try:
-        _ollama_process = subprocess.Popen(
+        _ollama_process = subprocess.Popen(  # nosec B603,B607: literal `ollama serve` for pytest session fixture; ollama via PATH (test infra)
             ["ollama", "serve"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
