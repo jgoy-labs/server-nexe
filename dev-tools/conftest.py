@@ -40,7 +40,7 @@ def _get_test_api_key() -> str:
         env_path = Path(__file__).parent / ".env"
         if env_path.exists():
             load_dotenv(env_path)
-    except Exception:
+    except Exception:  # nosec B110: dotenv import or read failure — comment below documents fallback to env vars
         pass  # Ignore dotenv errors, rely on env vars
 
     # Get existing key or generate a new one
@@ -167,7 +167,7 @@ def ensure_ollama_running():
         print("\n[pytest] Ollama: Already running ✓")
         yield
         return
-    except Exception:
+    except Exception:  # nosec B110: Ollama probe failed → fall through to install check + auto-start
         pass
 
     # Check if Ollama is installed
@@ -193,7 +193,7 @@ def ensure_ollama_running():
                 httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
                 print(f"[pytest] Ollama: Ready ✓ (took {(i+1)*0.5:.1f}s)")
                 break
-            except Exception:
+            except Exception:  # nosec B110: best-effort readiness probe inside retry loop; loop falls through to "failed to start" message
                 pass
         else:
             print("[pytest] Ollama: Failed to start within 15s ⚠")
@@ -232,7 +232,7 @@ def ollama_available():
         response = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
         if response.status_code == 200:
             return True
-    except Exception:
+    except Exception:  # nosec B110: Ollama unavailable → pytest.skip below (intentional)
         pass
 
     pytest.skip("Ollama not available - skipping test")

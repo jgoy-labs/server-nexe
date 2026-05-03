@@ -113,7 +113,7 @@ def _detect_vlm_capability(model_path: str) -> bool:
             for key in wm:
                 if any(p in key for p in _VLM_WEIGHT_PATTERNS):
                     return True
-    except Exception:
+    except Exception:  # nosec B110: optional VLM inspection — comment below documents intent (do not block decision on JSON failure)
         # inspecció opcional; no bloquejar decisió si el JSON falla
         pass
 

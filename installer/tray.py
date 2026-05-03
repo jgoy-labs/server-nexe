@@ -102,7 +102,7 @@ class _ForegroundContext:
             self.old_policy = NSApp.activationPolicy()
             NSApp.setActivationPolicy_(NSApplicationActivationPolicyRegular)
             NSApp.activateIgnoringOtherApps_(True)
-        except Exception:
+        except Exception:  # nosec B110: best-effort AppKit activation policy promotion; non-fatal if AppKit unavailable
             pass
         return self
 
@@ -111,7 +111,7 @@ class _ForegroundContext:
             try:
                 from AppKit import NSApp
                 NSApp.setActivationPolicy_(self.old_policy)
-            except Exception:
+            except Exception:  # nosec B110: best-effort AppKit activation policy restore on context exit; non-fatal
                 pass
 
 
@@ -180,7 +180,7 @@ class NexeTray(rumps.App):
             if _toml_path.exists():
                 with open(_toml_path, "rb") as f:
                     _version = tomllib.load(f).get("project", {}).get("version", _version)
-        except Exception:
+        except Exception:  # nosec B110: best-effort version read from pyproject.toml; on failure keep "0.0.0-unknown" default
             pass
         self._version = _version
 
@@ -429,13 +429,13 @@ class NexeTray(rumps.App):
             try:
                 self.server_process.kill()
                 self.server_process.wait(timeout=5)
-            except Exception:
+            except Exception:  # nosec B110: best-effort wait after force kill; tray is shutting down anyway
                 pass
 
         if self._server_log_fh:
             try:
                 self._server_log_fh.close()
-            except Exception:
+            except Exception:  # nosec B110: best-effort log file handle close on stop; OS cleans on process exit
                 pass
             self._server_log_fh = None
 
@@ -568,7 +568,7 @@ class NexeTray(rumps.App):
         # Fem sortida explícita: quit rumps + pkill totes les trays + os._exit.
         try:
             rumps.quit_application()
-        except Exception:
+        except Exception:  # nosec B110: best-effort rumps shutdown; if it raises we still proceed to pkill + os._exit below
             pass
         # Matar qualsevol altre nexe-tray/installer.tray orfe (no tocar PIDs
         # del servidor — stop_server_func ja els ha aturat).
@@ -577,7 +577,7 @@ class NexeTray(rumps.App):
                 ["pkill", "-f", "nexe-tray|installer.tray"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
-        except Exception:
+        except Exception:  # nosec B110: best-effort pkill of orphan trays; if it fails we still os._exit below
             pass
         # Sortir de veritat (bypass de qualsevol run loop pendent)
         import os as _os
@@ -596,7 +596,7 @@ class NexeTray(rumps.App):
         if self._server_log_fh:
             try:
                 self._server_log_fh.close()
-            except Exception:
+            except Exception:  # nosec B110: best-effort log file handle close on quit; OS cleans on process exit
                 pass
             self._server_log_fh = None
         rumps.quit_application()

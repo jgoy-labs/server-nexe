@@ -71,7 +71,7 @@ def check_encryption_status(storage_path=None):
                 header = f.read(16)
             if header == b'SQLite format 3\x00':
                 warnings.append("memories.db is unencrypted")
-        except Exception:
+        except Exception:  # nosec B110: best-effort SQLite header probe at startup; unreadable file → skip warning (BACKLOG-v1.0.5 M5-02 review for log.debug upgrade)
             pass
 
     # Check sessions

@@ -304,7 +304,7 @@ async def lifespan(app: FastAPI):
                     "Run 'nexe encryption encrypt-all' to migrate data, then restart. "
                     "Set NEXE_ENCRYPTION_ENABLED=false to suppress this warning."
                 )
-            except Exception:
+            except Exception:  # nosec B110: SQLite header probe at startup; unreadable → fall through to _resolve_encryption_enabled (comment documents intent)
               pass  # no podem llegir la DB — continuem amb el resultat de _resolve_encryption_enabled
 
       if crypto_enabled:

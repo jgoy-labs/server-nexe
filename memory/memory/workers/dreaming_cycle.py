@@ -163,7 +163,7 @@ class DreamingCycle:
             if conn is not None:
                 try:
                     conn.close()
-                except Exception:
+                except Exception:  # nosec B110: best-effort SQLite conn.close() inside finally (Bug 10 fix); no-op if already closed
                     pass
 
     async def _recover_stuck_leases(self):
@@ -191,7 +191,7 @@ class DreamingCycle:
             if conn is not None:
                 try:
                     conn.close()
-                except Exception:
+                except Exception:  # nosec B110: best-effort SQLite conn.close() inside finally (Bug 10 fix); no-op if already closed
                     pass
 
     async def _process_staging(self):
@@ -240,7 +240,7 @@ class DreamingCycle:
             if conn is not None:
                 try:
                     conn.close()
-                except Exception:
+                except Exception:  # nosec B110: best-effort SQLite conn.close() inside finally (Bug 10 fix); no-op if already closed
                     pass
 
     async def _process_one(self, entry: Dict[str, Any]):
@@ -374,7 +374,7 @@ class DreamingCycle:
             if conn is not None:
                 try:
                     conn.close()
-                except Exception:
+                except Exception:  # nosec B110: best-effort SQLite conn.close() inside finally (Bug 10 fix); no-op if already closed
                     pass
 
     async def _sync_vector_index(self):
@@ -435,7 +435,7 @@ class DreamingCycle:
             if conn is not None:
                 try:
                     conn.close()
-                except Exception:
+                except Exception:  # nosec B110: best-effort SQLite conn.close() inside finally (Bug 10 fix); no-op if already closed
                     pass
 
     async def _gc_heavy(self):
@@ -485,7 +485,7 @@ class DreamingCycle:
             if conn is not None:
                 try:
                     conn.close()
-                except Exception:
+                except Exception:  # nosec B110: best-effort SQLite conn.close() inside finally (Bug 10 fix); no-op if already closed
                     pass
 
 
