@@ -347,10 +347,8 @@ class SQLiteStore:
 
         def _count(table: str) -> int:
             safe_table = _validate_table(table)
-            cursor = conn.execute(
-                f"SELECT COUNT(*) FROM {safe_table} WHERE user_id = ?",
-                (user_id,),
-            )
+            sql = f"SELECT COUNT(*) FROM {safe_table} WHERE user_id = ?"  # nosec B608: safe_table comes from VALID_TABLES frozenset whitelist, not user input
+            cursor = conn.execute(sql, (user_id,))
             return cursor.fetchone()[0]
 
         return {

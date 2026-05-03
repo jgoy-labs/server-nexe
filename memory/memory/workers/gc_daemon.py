@@ -167,11 +167,8 @@ class GCDaemon:
             if not dry_run and to_delete:
                 # Delete from RDBMS
                 placeholders = ",".join("?" for _ in to_delete)
-                conn.execute(
-                    f"UPDATE episodic SET state = 'archived' "
-                    f"WHERE id IN ({placeholders})",
-                    to_delete,
-                )
+                sql = f"UPDATE episodic SET state = 'archived' WHERE id IN ({placeholders})"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
+                conn.execute(sql, to_delete)
                 conn.commit()
 
                 # Delete from vector index

@@ -384,7 +384,7 @@ def setup_trusted_hosts(app: FastAPI, config: Dict[str, Any]) -> None:
   allowed = set(get_localhost_aliases())
 
   # If server binds to a custom host/domain, allow it too
-  if host and host not in ("0.0.0.0", ""):
+  if host and host not in ("0.0.0.0", ""):  # nosec B104: comparing to "0.0.0.0" string, not binding to it (allow-list construction for TrustedHostMiddleware)
     allowed.add(host)
 
   app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed))
