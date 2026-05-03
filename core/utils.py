@@ -11,4 +11,7 @@ def compute_system_hash(system: str) -> str:
     
     # Normalize (optional but recommended to avoid mismatches due to whitespace)
     normalized = system.strip()
-    return hashlib.md5(normalized.encode("utf-8")).hexdigest()[:8]
+    # MD5 used as a non-cryptographic cache key (8-char prefix for inference
+    # prefix-cache lookup), not for authentication or integrity. usedforsecurity=False
+    # also makes this safe under FIPS-only Python builds.
+    return hashlib.md5(normalized.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]

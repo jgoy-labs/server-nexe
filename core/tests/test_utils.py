@@ -40,3 +40,10 @@ class TestComputeSystemHash:
         long_text = "x" * 10000
         result = compute_system_hash(long_text)
         assert len(result) == 8
+
+    def test_known_hash_value_stability(self):
+        """B324 regression: md5(usedforsecurity=False) must keep producing the
+        same 8-char prefix as the legacy security-flagged call. A switch to
+        blake2b/sha256 would silently invalidate every existing prefix cache."""
+        # md5("hello").hexdigest()[:8] == "5d41402a" (deterministic across builds)
+        assert compute_system_hash("hello") == "5d41402a"
