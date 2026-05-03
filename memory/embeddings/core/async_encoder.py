@@ -13,7 +13,7 @@ import asyncio
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import numpy as np
 import structlog
 
@@ -92,7 +92,7 @@ class AsyncEmbedder:
       max_workers=max_workers,
       thread_name_prefix=f"embedding_{model_name[:20]}"
     )
-    self._model: Optional[object] = None
+    self._model: Optional[Any] = None
     self._load_lock = asyncio.Lock()
     self._initialized = True
 
