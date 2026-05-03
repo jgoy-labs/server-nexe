@@ -18,7 +18,7 @@ import logging
 import asyncio
 import click
 from pathlib import Path
-from typing import Optional, AsyncGenerator
+from typing import Any, Optional, AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +256,7 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
     if rag_threshold is not None:
         click.echo(click.style(f"  RAG threshold: {rag_threshold}", fg="cyan"))
 
-    _stream_kwargs = {}
+    _stream_kwargs: dict[str, Any] = {}
     if rag_threshold is not None:
         _stream_kwargs['rag_threshold'] = rag_threshold
     if _rag_collections is not None:
