@@ -175,7 +175,7 @@ class MetricsTimer:
     self.start_time = time.time()
     return self
 
-  def __exit__(self, exc_type, exc_val, exc_tb):
+  def __exit__(self, _exc_type, _exc_val, _exc_tb):
     """Stop timer and record duration"""
     duration = time.time() - self.start_time
     self.metrics.observe_histogram(self.metric_name, duration)
