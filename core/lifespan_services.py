@@ -75,7 +75,7 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path, serve
       if ollama_path or shutil.which("ollama"):
         logger.info("Ollama: Starting...")
         try:
-          process = subprocess.Popen(  # nosec B603,B607: literal `ollama serve` argv; system tool resolved via PATH (mono-user local)
+          process = subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv; system tool resolved via PATH (mono-user local)
             ["ollama", "serve"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL

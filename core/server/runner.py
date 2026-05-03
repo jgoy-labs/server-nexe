@@ -50,7 +50,7 @@ def kill_process_on_port(port: int) -> bool:
   """
   try:
     # Find PID using lsof
-    result = subprocess.run(  # nosec B603,B607: port is typed int (kill_process_on_port signature); lsof via PATH (mono-user local)
+    result = subprocess.run(  # nosec B603 B607: port is typed int (kill_process_on_port signature); lsof via PATH (mono-user local)
       ["lsof", "-ti", f":{port}"],
       capture_output=True,
       text=True
@@ -222,7 +222,7 @@ def _maybe_launch_tray(_project_root: "Path | None" = None):
     try:
         stale_pids: list[int] = []
         for pattern in ("installer.tray", "nexe-tray", "NexeTray"):
-            result = subprocess.run(  # nosec B603,B607: pattern from local literal tuple ("installer.tray", "nexe-tray", "NexeTray"); pgrep via PATH
+            result = subprocess.run(  # nosec B603 B607: pattern from local literal tuple ("installer.tray", "nexe-tray", "NexeTray"); pgrep via PATH
                 ["pgrep", "-f", pattern],
                 capture_output=True, text=True, timeout=5,
             )

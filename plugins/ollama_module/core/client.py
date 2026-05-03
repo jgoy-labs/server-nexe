@@ -130,7 +130,7 @@ class OllamaClient:
                 logger.warning("Could not start ollama serve from bundle: %s", e)
         elif shutil.which("ollama"):
             try:
-                subprocess.Popen(  # nosec B603,B607: literal `ollama serve` argv; ollama via PATH (mono-user local — equivalent to running it manually)
+                subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv; ollama via PATH (mono-user local — equivalent to running it manually)
                     ["ollama", "serve"],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     start_new_session=True  # No morir amb el parent process
