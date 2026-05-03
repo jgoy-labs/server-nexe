@@ -31,12 +31,14 @@ class BootstrapTokenManager:
 
   _instance: Optional['BootstrapTokenManager'] = None
   _lock = threading.Lock()
+  _db_path: Optional[Path] = None
+  _initialized: bool = False
 
-  def __new__(cls):
+  def __new__(cls) -> 'BootstrapTokenManager':
     with cls._lock:
       if cls._instance is None:
         cls._instance = super().__new__(cls)
-        cls._instance._db_path: Optional[Path] = None
+        cls._instance._db_path = None
         cls._instance._initialized = False
     return cls._instance
 

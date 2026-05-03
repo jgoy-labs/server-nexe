@@ -40,7 +40,7 @@ def _load(lang_code: str) -> Dict[str, Any]:
 
 def _resolve_lang(lang: Optional[str]) -> str:
     """Determina l'idioma actiu: param explícit > NEXE_LANG > fallback ca-ES."""
-    return lang or os.getenv("NEXE_LANG", _FALLBACK_LANG)
+    return lang or os.getenv("NEXE_LANG", _FALLBACK_LANG)  # type: ignore[return-value]  # FP: mypy or-narrowing limitation; os.getenv(name, default=str) returns str, so Optional[str] or str is always str
 
 
 def _lookup(data: Dict[str, Any], key: str) -> Optional[str]:

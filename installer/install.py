@@ -375,7 +375,7 @@ def run_installer():
         # Read embedding model from server.toml (SSOT)
         _emb_model = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
         try:
-            import toml as _toml
+            import toml as _toml  # type: ignore[import-untyped]  # toml lacks stubs (deprecated); kept for write path
             _srv_cfg = _toml.load(project_root / "personality" / "server.toml")
             _emb_model = _srv_cfg.get("plugins", {}).get("models", {}).get("embedding", _emb_model)
         except Exception:  # nosec B110: best-effort server.toml read; on failure keep default embedding model literal

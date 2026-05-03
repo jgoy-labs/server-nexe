@@ -444,7 +444,7 @@ def _run_headless_inner(config):
         # Read embedding model from server.toml (SSOT)
         _emb_model = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
         try:
-            import toml as _toml
+            import toml as _toml  # type: ignore[import-untyped]  # toml lacks stubs (deprecated); kept for write path
             _srv_cfg = _toml.load(PROJECT_ROOT / "personality" / "server.toml")
             _emb_model = _srv_cfg.get("plugins", {}).get("models", {}).get("embedding", _emb_model)
         except Exception:  # nosec B110: best-effort server.toml read; on failure keep default embedding model literal

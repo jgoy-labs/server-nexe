@@ -240,7 +240,7 @@ async def ingest_knowledge(
         return True
 
     # Find all supported files
-    files = []
+    files: list[Path] = []
     for ext in SUPPORTED_EXTENSIONS:
         files.extend(knowledge_path.glob(f"**/*{ext}"))
 

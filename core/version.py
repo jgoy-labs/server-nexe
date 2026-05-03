@@ -6,7 +6,7 @@ from pathlib import Path
 try:
     import tomllib
 except ModuleNotFoundError:
-    import tomli as tomllib  # Python < 3.11 fallback
+    import tomli as tomllib  # type: ignore[no-redef]  # Python < 3.11 fallback (tomli ships the same API as stdlib tomllib)
 
 _PYPROJECT = Path(__file__).resolve().parents[1] / "pyproject.toml"
 

@@ -18,9 +18,9 @@ from typing import Optional, Dict, Any
 logger = logging.getLogger(__name__)
 
 try:
-  import yaml
+  import yaml  # type: ignore[import-untyped]  # PyYAML stubs available via types-PyYAML; deferred to v1.1
 except ImportError:
-  yaml = None
+  yaml = None  # type: ignore[assignment]  # fallback when PyYAML not installed
 
 def _default_server_url() -> str:
     """Compute default server URL from core.config (Q4.2 fix).
