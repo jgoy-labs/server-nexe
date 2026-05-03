@@ -120,7 +120,7 @@ class OllamaClient:
         macos_ollama_bin = "/Applications/Ollama.app/Contents/Resources/ollama"
         if is_macos and os.path.exists(macos_ollama_bin):
             try:
-                subprocess.Popen(
+                subprocess.Popen(  # nosec B603: macos_ollama_bin is hardcoded absolute path "/Applications/Ollama.app/Contents/Resources/ollama"; literal `serve`
                     [macos_ollama_bin, "serve"],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     start_new_session=True,  # No morir amb el parent process

@@ -450,7 +450,7 @@ def _run_headless_inner(config):
         except Exception:
             pass
         emb_env = {**os.environ, "TRANSFORMERS_VERBOSITY": "error"}
-        subprocess.run([
+        subprocess.run([  # nosec B603: python_path absolute venv Path; -c is literal headless probe; _emb_model from server.toml
             str(python_path), "-c",
             "import sys; "
             "from fastembed import TextEmbedding; "
@@ -487,7 +487,7 @@ def _run_headless_inner(config):
             # CalledProcessError genèric. Capturem stdout/stderr i els escrivim
             # al log de l'installer per visibilitat (bug 2026-04-14: ingest
             # només processava IDENTITY.md i sortia 0 sense cap traça).
-            result = subprocess.run([
+            result = subprocess.run([  # nosec B603: python_path absolute venv Path; project_root is Path(__file__)-derived embedded as literal in -c script
                 str(python_path), "-c",
                 f"import sys; sys.path.insert(0, '{project_root}'); "
                 "import asyncio; "

@@ -57,7 +57,7 @@ APP_LOGO = f"""{RED}
 def clear():
     """Clear terminal screen safely (no shell injection risk)."""
     cmd = ['cls'] if os.name == 'nt' else ['clear']
-    subprocess.run(cmd, shell=False, check=False)
+    subprocess.run(cmd, shell=False, check=False)  # nosec B603: literal cmd ['cls'] or ['clear']; shell=False (no shell injection risk per docstring)
 
 
 def print_step(msg):

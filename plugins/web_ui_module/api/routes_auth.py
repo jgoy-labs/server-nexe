@@ -489,7 +489,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                         logger.warning(f"Could not start Ollama: {e}")
                 elif _os.path.exists("/Applications/Ollama.app/Contents/Resources/ollama"):
                     try:
-                        subprocess.Popen(
+                        subprocess.Popen(  # nosec B603: absolute path to Ollama.app bundled binary + literal `serve` argv; gated by require_ui_auth (mono-user local)
                             ["/Applications/Ollama.app/Contents/Resources/ollama", "serve"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                             start_new_session=True,

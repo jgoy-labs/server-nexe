@@ -345,7 +345,7 @@ class NexeTray(rumps.App):
         self._server_log_path = log_dir / "server.log"
         self._server_log_fh = open(self._server_log_path, "a")
 
-        self.server_process = subprocess.Popen(
+        self.server_process = subprocess.Popen(  # nosec B603: venv_python is PROJECT_ROOT-derived absolute Path (venv/bin/python); literal `-m core.app`
             [str(venv_python), "-m", "core.app"],
             cwd=str(PROJECT_ROOT),
             env=env,

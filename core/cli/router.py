@@ -249,7 +249,7 @@ class CLIRouter:
       env["PYTHONPATH"] = str(self._project_root)
 
     try:
-      result = subprocess.run(
+      result = subprocess.run(  # nosec B603: cmd[0] is sys.executable, cmd[2] is cli_info.entry_point from manifest.toml inside repo, args from CLI dispatch
         cmd,
         cwd=str(self._project_root),
         env=env,

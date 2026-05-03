@@ -44,7 +44,7 @@ def test():
     import sys
     from pathlib import Path
     test_dir = Path(__file__).parent / "tests"
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603: sys.executable + literal pytest invocation; test_dir is Path(__file__)-derived
         [sys.executable, "-m", "pytest", str(test_dir), "-v", "--tb=short"],
         cwd=str(Path(__file__).parent.parent.parent)
     )

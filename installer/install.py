@@ -261,7 +261,7 @@ def run_installer():
         # Verify Metal is actually available after installing mlx-lm
         metal_available = False
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603: python_path is venv-derived absolute Path; -c argument is hardcoded literal Metal probe
                 [str(python_path), "-c", "import mlx.core as mx; print(mx.metal.is_available())"],
                 capture_output=True,
                 text=True,
@@ -387,7 +387,7 @@ def run_installer():
             msg_start = t('embeddings_starting').replace("'", "\\'")
             msg_done = t('embeddings_done').replace("'", "\\'")
             emb_env = {**os.environ, "TRANSFORMERS_VERBOSITY": "error"}
-            result = subprocess.run([
+            result = subprocess.run([  # nosec B603: python_path absolute venv Path; msg_start/msg_done are repo-owned i18n strings escaped via .replace; _emb_model from server.toml
                 str(python_path), "-c",
                 f"from fastembed import TextEmbedding; "
                 f"import sys; "
@@ -417,7 +417,7 @@ def run_installer():
             # core/qdrant_pool.py a 'storage/vectors/'), deixant residu mort.
             # Ara la ingestió va directament per embedded.
             ingest_env = {**os.environ, "NEXE_LANG": lang, "TRANSFORMERS_VERBOSITY": "error"}
-            result = subprocess.run([
+            result = subprocess.run([  # nosec B603: python_path absolute venv Path; project_root is Path(__file__)-derived embedded as literal in -c script
                 str(python_path), "-c",
                 f"import sys; sys.path.insert(0, '{project_root}'); "
                 "import asyncio; "
@@ -459,7 +459,7 @@ def add_login_item(app_path: str = "/Applications/Nexe.app") -> bool:
         f'tell application "System Events" to make login item at end '
         f'with properties {{path:"{app_path}", hidden:true}}'
     )
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603: absolute path to system osascript; script built from app_path parameter (default /Applications/Nexe.app, no external caller)
         ["/usr/bin/osascript", "-e", script],
         capture_output=True,
         text=True,
