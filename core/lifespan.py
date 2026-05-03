@@ -17,7 +17,7 @@ import warnings as _warnings
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Callable
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Environment setup — ha d'anar ABANS de qualsevol import que pogui carregar
@@ -184,16 +184,20 @@ def _remove_pid_file(project_root: Path) -> None:
 
 class ServerState:
   """Holds server global state"""
-  def __init__(self):
+  def __init__(self) -> None:
     self.config: Dict[str, Any] = {}
-    self.api_integrator: APIIntegrator = None
-    self.project_root: Path = None
-    self.i18n = None
-    self.module_manager = None
-    self.registry = None
-    self.ollama_process = None
+    self.api_integrator: Optional[APIIntegrator] = None
+    self.project_root: Optional[Path] = None
+    self.i18n: Optional[Any] = None
+    self.module_manager: Optional[Any] = None
+    self.registry: Optional[Any] = None
+    self.ollama_process: Optional[Any] = None
     self.qdrant_available: bool = False
-    self.crypto_provider = None
+    self.crypto_provider: Optional[Any] = None
+    self._cleanup_task: Optional[asyncio.Task[Any]] = None
+    self._prewarm_task: Optional[asyncio.Task[Any]] = None
+    self._session_cleanup_task: Optional[asyncio.Task[Any]] = None
+    self.configure_modules_callback: Optional[Callable[..., None]] = None
 
 server_state = ServerState()
 
