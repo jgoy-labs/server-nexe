@@ -3,9 +3,65 @@ name = "server-nexe"
 version = "1.0.4-beta"
 requires-python = ">=3.11"
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Static analysis tooling — baseline config (MUTHUR-aware)
+# ═══════════════════════════════════════════════════════════════════════════
+# Rationale: tests/ uses patterns that are idiomatic in pytest but flagged by
+# bandit/ruff defaults (assert, unused fixtures, mock fixtures with hardcoded
+# tokens). To keep the signal-to-noise ratio useful, tests/ is silenced for
+# style/security rules that don't translate; production code keeps every rule.
+#
+# This config is read by ruff, bandit, vulture, mypy when invoked at the
+# project root (e.g. by `muthur run`).
+
 [tool.ruff]
 target-version = "py311"
 line-length = 120
+
+[tool.ruff.lint.per-file-ignores]
+# Tests legitimately use unused-import (re-export pattern), unused-variable
+# (fixture binding), == True (explicit truthy assert), one-liners (concise
+# expectation tables), f-string without placeholders (test-name strings).
+"tests/**/*.py" = ["F401", "F841", "E712", "E701", "E702", "F541", "E741"]
+"**/test_*.py" = ["F401", "F841", "E712", "E701", "E702", "F541", "E741"]
+"**/tests/**/*.py" = ["F401", "F841", "E712", "E701", "E702", "F541", "E741"]
+"**/conftest.py" = ["F401", "F841"]
+
+[tool.bandit]
+# Tests are excluded entirely: B101 (assert) is the canonical pytest pattern,
+# B105/B106 (hardcoded passwords) are mock fixtures, B603/B604 (subprocess)
+# are integration test invocations. Production code is scanned in full.
+exclude_dirs = [
+    "tests",
+    "*/tests",
+    "*/tests/*",
+    ".venv",
+    "InstallNexe.app",
+    "__pycache__",
+]
+
+[tool.vulture]
+# 60% confidence floods the report with false positives from indirect dispatch
+# (plugin loader, FastAPI router decoration, slowapi limit tags). 80%+ catches
+# the real dead code: 90%-confidence unused imports are essentially always real.
+exclude = ["tests/", ".venv/", "InstallNexe.app/", "__pycache__/"]
+min_confidence = 80
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+# 8 conftest.py exist at different paths — explicit_package_bases lets mypy
+# distinguish them by their containing package instead of treating same-named
+# files as duplicates.
+explicit_package_bases = true
+namespace_packages = true
+exclude = [
+    "InstallNexe\\.app/",
+    "\\.venv/",
+    "tests/",
+    "__pycache__/",
+    "conftest\\.py",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
