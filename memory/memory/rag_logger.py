@@ -11,6 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import logging
 from datetime import datetime, timezone
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -117,12 +118,27 @@ class RAGLogger:
     return primary_path
 
   def _setup_logger(self):
-    """Configura el logger per escriure al fitxer"""
+    """Configura el logger per escriure al fitxer.
+
+    R6-11 v1.0.4: rotate at midnight, keep 14 days. Each chat exchange writes
+    several DEBUG lines through this logger; without rotation the file grew
+    unbounded — a long-running local install could fill the disk in weeks.
+    14 days covers typical post-incident debug windows; older snapshots aged
+    out automatically. Files are named ``rag.log``, ``rag.log.YYYY-MM-DD``
+    (suffix added by the handler), which is friendlier for support than the
+    sequential numbering of RotatingFileHandler.
+    """
     self.logger = logging.getLogger("nexe.rag")
     self.logger.setLevel(logging.DEBUG)
 
     if not self.logger.handlers:
-      fh = logging.FileHandler(self.log_path, mode='a')
+      fh = TimedRotatingFileHandler(
+        self.log_path,
+        when="midnight",
+        interval=1,
+        backupCount=14,
+        encoding="utf-8",
+      )
       fh.setLevel(logging.DEBUG)
       formatter = logging.Formatter('%(message)s')
       fh.setFormatter(formatter)
