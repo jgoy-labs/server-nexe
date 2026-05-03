@@ -30,6 +30,17 @@ class RAGCLI:
   def __init__(self) -> None:
     self.module: Optional[RAGModule] = None
 
+  def _require_module(self) -> RAGModule:
+    """Retorna self.module o llança RuntimeError si no inicialitzat.
+
+    Helper Cluster 6 (Onada 4.2): substitueix `self.module.X()` per
+    `self._require_module().X()` als cmd_* per donar error explícit en
+    lloc d'AttributeError opaca quan algú crida un cmd sense initialize().
+    """
+    if self.module is None:
+      raise RuntimeError("RAG not initialized — cal await RAGCLI.initialize() abans d'invocar cmd_*")
+    return self.module
+
   async def initialize(self) -> bool:
     """Initialize RAG module"""
     try:
@@ -56,7 +67,7 @@ class RAGCLI:
       0 if success, 1 if error
     """
     try:
-      info = self.module.get_info()
+      info = self._require_module().get_info()
 
       logger.info("")
       logger.info("RAG Module Info")
@@ -105,7 +116,7 @@ class RAGCLI:
       0 if healthy, 1 if unhealthy
     """
     try:
-      health = self.module.get_health()
+      health = self._require_module().get_health()
 
       status = health.get("status", "unknown")
       status_icon = {
@@ -182,7 +193,7 @@ class RAGCLI:
       logger.info("")
 
       request = SearchRequest(query=query, top_k=top_k)
-      results = await self.module.search(request, source=source)
+      results = await self._require_module().search(request, source=source)
 
       if not results:
         logger.info("No results found.")
@@ -214,7 +225,8 @@ class RAGCLI:
       0 if success, 1 if error
     """
     try:
-      sources = self.module.list_sources()
+      module = self._require_module()
+      sources = module.list_sources()
 
       logger.info("")
       logger.info("RAG Sources")
@@ -226,7 +238,7 @@ class RAGCLI:
 
       for source_name in sources:
         try:
-          source = self.module.get_source(source_name)
+          source = module.get_source(source_name)
           health = source.health() if hasattr(source, 'health') else {}
           status = health.get("status", "unknown")
           status_icon = {
