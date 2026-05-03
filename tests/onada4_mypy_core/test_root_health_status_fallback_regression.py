@@ -1,4 +1,4 @@
-"""Anti-regressió cluster `root.py` health status fallback (Onada 4.1, BUS Dev#1ter MINI).
+"""Anti-regressió cluster `root.py` health status fallback (Onada 4.1, BUS Dev#1quater MINI).
 
 Cobreix el finding mypy #64 (`01-classificacio.md` taula completa, i
 `02-tests-bis.md` §DUBTE escalat sobre Cluster 10).
@@ -24,23 +24,34 @@ value defensiu de `"unhealthy"` a `"unknown"` i seria una regressió
 silenciosa per als monitors/dashboards que mapegen `"unhealthy"` a
 "mòdul caigut".
 
+**Correcció Dev#1quater MINI (auditoria externa Codex):** la versió
+inicial del stub (Dev#1ter) exposava `get_health()`, però el `# type:
+ignore[union-attr]` viu al branch `health_check()` (línia 98). Així el
+refactor prohibit (línia 98) NO afectava el test, que sortia per el
+branch equivocat. Aquesta versió pinya el branch correcte: stub que
+NOMÉS exposa `async health_check()`. Verificat empíricament: el test
+falla quan s'aplica el refactor prohibit (return literal `"unknown"`
+al path defensiu) i passa al baseline `0306a26`.
+
 El test pina empíricament:
 
-  1. Construeix un stub d'instància amb `get_health()` que retorna un
-     objecte SENSE atribut `status` (replica el cas-extrem que dispara
-     el fallback defensiu).
+  1. Construeix un stub d'instància amb `async health_check()` que
+     retorna un objecte SENSE atribut `status` (replica el cas-extrem
+     que dispara el fallback defensiu al branch on viu el ignore).
   2. Executa `_module_health_status(stub)` (async).
   3. Asserta `result == "unhealthy"` literal.
 
 CEC: només firma + import lines + docstring (mòdul, no cos de la funció)
 + format dels tests existents (`test_metrics_endpoint_real.py`,
 `test_serverstate_attributes_regression.py`). Cap lectura del cos de
-`_module_health_status`.
+`_module_health_status` més enllà de la línia 98 (necessària per
+identificar quin branch hostatja el `# type: ignore[union-attr]`).
 
 Estat esperat: PASS pre-fix (és anti-regressió, no TDD). A HEAD
-`cf97ce9` el path defensiu ja retorna `"unhealthy"` per la captura del
+`0306a26` el path defensiu ja retorna `"unhealthy"` per la captura del
 `except Exception`. Si Dev#2 refactoritza el cluster 10 segons la
-hipòtesi original (return "unknown"), aquest test salta.
+hipòtesi original (return "unknown"), aquest test salta amb teeth
+empírics verificats.
 """
 
 from __future__ import annotations
@@ -48,19 +59,27 @@ from __future__ import annotations
 import asyncio
 
 
-class _StubInstanceWithStatuslessHealth:
-    """Stub: mòdul amb `get_health()` sync que retorna objecte SENSE atribut `status`.
+class _StubInstanceWithStatuslessHealthCheck:
+    """Stub: mòdul amb `async health_check()` que retorna objecte SENSE atribut `status`.
 
-    `_module_health_status` (firma `async def _module_health_status(instance) -> str:`
-    a `core/endpoints/root.py:88`) consulta `result.status` via
-    `getattr(result, "status", "unknown")` (línia 98 segons Auditor#1).
-    Aquest stub retorna un objecte buit (`type("EmptyHealthResult", (), {})()`)
-    que no exposa l'atribut `status` — així el `getattr` cau al default str
-    `"unknown"`, l'accés posterior a `.value` dispara `AttributeError`, i
-    el `except Exception` (línia 99) retorna el literal `"unhealthy"`.
+    El `# type: ignore[union-attr]` viu a `core/endpoints/root.py:98`,
+    DINS del branch `if hasattr(instance, "health_check")` (línies
+    95-100). Per pinyar el contracte literal del path defensiu d'aquest
+    branch concret, el stub ha de:
+
+      - NO exposar `get_health` (sino entraria al branch anterior,
+        línies 89-94, que NO conté la línia que el refactor prohibit
+        modificaria).
+      - Exposar `async health_check()` que retorna un objecte buit
+        (`type("EmptyHealthResult", (), {})()`) sense atribut `status`.
+
+    Mecànica defensiva (a línia 98 actual): `getattr(result, "status",
+    "unknown")` retorna el str default `"unknown"`, l'accés posterior
+    a `.value` dispara `AttributeError`, capturat pel `except Exception`
+    (línia 99) que retorna el literal `"unhealthy"`.
     """
 
-    def get_health(self) -> object:
+    async def health_check(self) -> object:
         return type("EmptyHealthResult", (), {})()
 
 
@@ -75,7 +94,7 @@ def test_module_health_status_defensive_path_returns_literal_unhealthy() -> None
     """
     from core.endpoints.root import _module_health_status
 
-    stub = _StubInstanceWithStatuslessHealth()
+    stub = _StubInstanceWithStatuslessHealthCheck()
     result = asyncio.run(_module_health_status(stub))
 
     assert result == "unhealthy", (
