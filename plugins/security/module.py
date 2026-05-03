@@ -109,7 +109,8 @@ class SecurityModule:
             try:
                 from .sanitizer.module import get_sanitizer
                 sanitizer = get_sanitizer()
-                result = sanitizer.is_safe("test input")
+                # Side-effect: probe call ensures the sanitizer responds.
+                sanitizer.is_safe("test input")
                 checks.append({
                     "name": "sanitizer",
                     "status": "ok",
@@ -125,7 +126,8 @@ class SecurityModule:
             # Check 3: security_logger
             try:
                 from .security_logger import get_security_logger
-                sl = get_security_logger()
+                # Side-effect: lookup confirms the logger is registered.
+                get_security_logger()
                 checks.append({
                     "name": "security_logger",
                     "status": "ok",

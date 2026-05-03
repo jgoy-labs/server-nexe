@@ -9,8 +9,8 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+from pathlib import Path  # noqa: F401  # patched by tests via patch("memory.rag.health.Path")
 from typing import Dict, Any, List
-from pathlib import Path
 import psutil
 import structlog
 

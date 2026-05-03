@@ -14,7 +14,6 @@ import logging
 from fastembed import TextEmbedding
 import numpy as np
 
-from .constants import DEFAULT_EMBEDDING_MODEL
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from . import registry
+from . import registry  # noqa: F401  # side-effect: registers workflow node types
 
 try:
   from .nodes.rag_search_node import RAGSearchNode

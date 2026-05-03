@@ -11,7 +11,6 @@ import re
 import shutil
 import sys
 import subprocess
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -398,7 +397,7 @@ def run_installer():
                 _emb_model,
             ], check=True, capture_output=False, env=emb_env)
             print(f"\n  {t('embeddings_downloaded_ok')}")
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError:
             print(f"  {YELLOW}{t('embeddings_download_error')}{RESET}")
             print(f"  {DIM}{t('embeddings_auto_download')}{RESET}")
 

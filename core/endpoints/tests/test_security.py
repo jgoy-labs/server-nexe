@@ -15,8 +15,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch, AsyncMock
 
-import pytest
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Upload — Path Traversal & Extension Whitelist

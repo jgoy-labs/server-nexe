@@ -45,22 +45,22 @@ _warnings.filterwarnings("ignore", message=".*position_ids.*", category=UserWarn
 _warnings.filterwarnings("ignore", message=".*Some weights of.*", category=UserWarning)
 _warnings.filterwarnings("ignore", category=UserWarning, module="fastembed")
 
-from fastapi import FastAPI
+from fastapi import FastAPI  # noqa: E402  # after warnings filter (line 44-46) so it applies to transitive imports
 
-from personality.integration import APIIntegrator
-from .config import load_config
-from .lifespan_services import (
+from personality.integration import APIIntegrator  # noqa: E402  # after warnings filter
+from .config import load_config  # noqa: E402  # after warnings filter
+from .lifespan_services import (  # noqa: E402  # after warnings filter
     _auto_start_services,
     OLLAMA_HEALTH_TIMEOUT,
     OLLAMA_UNLOAD_TIMEOUT,
 )
-from .lifespan_tokens import (
+from .lifespan_tokens import (  # noqa: E402  # after warnings filter
     setup_bootstrap_tokens,
     start_bootstrap_token_renewal,
     stop_bootstrap_token_renewal,
 )
-from .lifespan_ollama import cleanup_ollama_startup, cleanup_ollama_shutdown
-from .lifespan_modules import (
+from .lifespan_ollama import cleanup_ollama_startup, cleanup_ollama_shutdown  # noqa: E402  # after warnings filter
+from .lifespan_modules import (  # noqa: E402  # after warnings filter
     load_memory_modules,
     initialize_plugin_modules,
     auto_ingest_knowledge,
@@ -70,7 +70,7 @@ from .lifespan_modules import (
 logger = logging.getLogger(__name__)
 
 
-from core.server.helpers import translate as _translate
+from core.server.helpers import translate as _translate  # noqa: E402  # after warnings filter
 
 # Timeout per fase d'arrencada (B09). Configurable via NEXE_STARTUP_TIMEOUT.
 STARTUP_TIMEOUT = float(os.getenv("NEXE_STARTUP_TIMEOUT", "30"))

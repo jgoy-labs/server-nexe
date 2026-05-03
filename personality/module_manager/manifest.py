@@ -53,7 +53,8 @@ async def module_manager_health():
   """
   try:
     from . import __version__
-    from .module_manager import ModuleManager
+    # Availability probe: importing the class confirms the package can load.
+    from .module_manager import ModuleManager  # noqa: F401
 
     return JSONResponse(content={
       "name": "module_manager",

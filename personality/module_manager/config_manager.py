@@ -16,7 +16,6 @@ import toml
 
 from core.config import (
     load_config as core_load_config,
-    find_config_path as core_find_config_path,
     save_config as core_save_config,
     is_production,
     is_development,

@@ -375,7 +375,7 @@ def setup_environment(project_root, hw, engine="auto"):
         for engine_spec in ("mlx-lm==0.31.2", "mlx-vlm==0.4.4"):
             try:
                 subprocess.run([str(pip_path), "install", engine_spec], check=True, capture_output=True)
-            except subprocess.CalledProcessError as e:
+            except subprocess.CalledProcessError:
                 pip_conf_path = venv_path / "pip.conf"
                 if pip_conf_path.exists():
                     print(f"  ⚠️ Offline install failed for {engine_spec} — fallback to PyPI...")
@@ -395,7 +395,7 @@ def setup_environment(project_root, hw, engine="auto"):
             check=True,
             capture_output=True,
         )
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         pip_conf_path = venv_path / "pip.conf"
         if pip_conf_path.exists():
             print("  ⚠️ Offline install failed for llama-cpp-python — fallback to PyPI...")

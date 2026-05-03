@@ -2,8 +2,10 @@
 Tests unitaris per SessionManager i ChatSession.
 Sense GPU — tota la lògica és en memòria + disc (tmp_path).
 """
-import pytest
+import json
 from datetime import datetime, timezone, timedelta
+
+import pytest
 
 from plugins.web_ui_module.core.session_manager import ChatSession, SessionManager
 
@@ -398,7 +400,10 @@ class TestSessionManagerEncrypted:
 
         enc_file = tmp_path / "opaque.enc"
         raw = enc_file.read_bytes()
-        with pytest.raises(Exception):
+        # AES-GCM ciphertext is pseudo-random bytes: json.loads raises
+        # UnicodeDecodeError if UTF-8 invalid, JSONDecodeError if UTF-8 valid
+        # but not JSON. Both must reject — narrowed from Exception.
+        with pytest.raises((json.JSONDecodeError, UnicodeDecodeError)):
             json.loads(raw)
 
     def test_migrate_json_to_enc(self, tmp_path, crypto):

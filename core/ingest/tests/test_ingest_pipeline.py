@@ -50,7 +50,7 @@ def _mlx_available():
 # Unitaris — chunk_text (de ingest_knowledge.py)
 # ═══════════════════════════════════════════════════════════════
 
-from core.ingest.ingest_knowledge import chunk_text, read_file, CHUNK_SIZE, CHUNK_OVERLAP
+from core.ingest.ingest_knowledge import chunk_text, read_file, CHUNK_SIZE, CHUNK_OVERLAP  # noqa: E402  # grouped with the test class below
 
 
 class TestChunkText:

@@ -175,7 +175,6 @@ class CodeChunker(BaseChunker):
     - Classes amb decoradors
     - Imports (opcionals al primer chunk)
     """
-    chunks: List[Tuple[str, Dict[str, Any]]] = []
     lines = text.split("\n")
 
     imports: List[str] = []

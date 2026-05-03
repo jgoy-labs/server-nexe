@@ -331,6 +331,42 @@ class TestSchemaEnforcer:
         canonical, method = self.schema.resolve(None)
         assert canonical is None
 
+    def test_pais_resolves_to_nationality(self):
+        # Guard for the F601 fix: 'pais' was duplicated in DEFAULT_ALIASES
+        # (Catalan + Spanish blocks, identical value). Resolving must keep
+        # mapping to "nationality" regardless of duplicate-removal order.
+        canonical, method = self.schema.resolve("pais")
+        assert canonical == "nationality"
+        assert method == "alias"
+
+    def test_default_aliases_no_duplicate_keys(self):
+        # Guardrail against silently overwriting alias mappings (F601
+        # regression). Python dict literals collapse duplicates, so we
+        # parse the source AST to detect them at the literal level.
+        import ast
+        import inspect
+
+        from memory.memory.pipeline import schema_enforcer
+
+        tree = ast.parse(inspect.getsource(schema_enforcer))
+        for node in ast.walk(tree):
+            target_id = None
+            if isinstance(node, ast.Assign):
+                target_id = next(
+                    (getattr(t, "id", None) for t in node.targets if getattr(t, "id", None)),
+                    None,
+                )
+            elif isinstance(node, ast.AnnAssign):
+                target_id = getattr(node.target, "id", None)
+            if target_id != "DEFAULT_ALIASES":
+                continue
+            assert isinstance(node.value, ast.Dict)
+            keys = [k.value for k in node.value.keys if isinstance(k, ast.Constant)]
+            duplicates = sorted({k for k in keys if keys.count(k) > 1})
+            assert not duplicates, f"Duplicate alias keys: {duplicates}"
+            return
+        raise AssertionError("DEFAULT_ALIASES literal not found")
+
 
 # ──────────────────────────────────────────
 # Coverage extra: Extractor health, preferences, _looks_factual

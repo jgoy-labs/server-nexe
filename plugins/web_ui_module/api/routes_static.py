@@ -13,10 +13,10 @@ import logging
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse, Response
 
+from plugins.web_ui_module.messages import get_message, get_i18n
+
 # Cache-bust: changes every time the server restarts
 _BOOT_TS = str(int(_time.time()))
-
-from plugins.web_ui_module.messages import get_message, get_i18n
 
 logger = logging.getLogger(__name__)
 

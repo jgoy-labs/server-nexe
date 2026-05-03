@@ -87,7 +87,9 @@ DEFAULT_ALIASES: Dict[str, str] = {
     "edad": "birth_year",
     "ciudad": "location",
     "localidad": "location",
-    "pais": "nationality",
+    # NOTE: "pais" → "nationality" already mapped from the Catalan block above
+    # (CA/ES homograph without accent). See backlog v1.0.5 for "país" (ES with
+    # acute accent) which is not currently captured.
     "trabajo": "occupation",
     "profesion": "occupation",
     "programacion": "programming_languages",

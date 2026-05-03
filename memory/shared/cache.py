@@ -14,7 +14,7 @@ import sqlite3
 import json
 import time
 from pathlib import Path
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any, Dict
 import hashlib
 import asyncio
 

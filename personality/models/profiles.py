@@ -10,7 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 from enum import Enum
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from typing import Optional
 
 from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
 

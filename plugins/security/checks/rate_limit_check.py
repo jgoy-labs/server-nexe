@@ -60,7 +60,8 @@ class RateLimitCheck:
         # Check 3: Rate limit tracker funcional?
         try:
             from plugins.security.core.rate_limiting import RateLimitTracker
-            tracker = RateLimitTracker()
+            # Side-effect: instantiation verifies the tracker can be constructed.
+            RateLimitTracker()
             findings.append({
                 "check": "rate_limiting",
                 "severity": "LOW",
