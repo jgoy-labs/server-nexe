@@ -9,7 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from typing import List
+from typing import Dict, List
 import logging
 from fastembed import TextEmbedding
 import numpy as np
@@ -37,7 +37,8 @@ class SimpleEmbedder:
     model: TextEmbedding instance
   """
 
-  _instances = {}
+  _instances: Dict[str, "SimpleEmbedder"] = {}
+  _initialized: bool = False
 
   def __new__(cls, model_name: str, **kwargs):
     """Singleton to avoid loading model multiple times."""

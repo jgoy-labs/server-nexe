@@ -13,7 +13,7 @@ import asyncio
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Optional
+from typing import Dict, List, Optional
 import numpy as np
 import structlog
 
@@ -50,8 +50,9 @@ class AsyncEmbedder:
     executor: ThreadPoolExecutor per encoding async
   """
 
-  _instances = {}
+  _instances: Dict[str, "AsyncEmbedder"] = {}
   _instances_lock = threading.Lock()  # Thread-safe singleton creation across workers
+  _initialized: bool = False
 
   def __new__(cls, model_name: str, **kwargs):
     """
