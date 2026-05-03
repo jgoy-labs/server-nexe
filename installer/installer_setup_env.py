@@ -280,16 +280,16 @@ def setup_environment(project_root, hw, engine="auto"):
             # macOS: --copies --without-pip per evitar SIGABRT del binari copiat
             # (necessita libpython copiada ABANS de poder executar ensurepip)
             python_for_venv = _get_python_for_venv(project_root)
-            subprocess.run(
+            subprocess.run(  # nosec B603: python_for_venv from _get_python_for_venv (sys.executable or bundled Python copy); literal venv module args
                 [python_for_venv, "-m", "venv", "--copies", "--without-pip", "venv"],
                 check=True, capture_output=True,
             )
             _make_venv_standalone(venv_path)
             # Ara el Python del venv funciona — instal·lar pip
             venv_python = str(venv_path / "bin" / "python3")
-            subprocess.run([venv_python, "-m", "ensurepip", "--upgrade"], check=True, capture_output=True)
+            subprocess.run([venv_python, "-m", "ensurepip", "--upgrade"], check=True, capture_output=True)  # nosec B603: venv_python is venv_path-derived absolute Path; literal ensurepip args
         else:
-            subprocess.run([sys.executable, "-m", "venv", "venv"], check=True, capture_output=True)
+            subprocess.run([sys.executable, "-m", "venv", "venv"], check=True, capture_output=True)  # nosec B603: sys.executable + literal venv module args
 
     # Path to pip/python based on OS
     if os.name == 'nt':
@@ -303,7 +303,7 @@ def setup_environment(project_root, hw, engine="auto"):
     # pip cannot upgrade itself (it's not in the wheels bundle). Running
     # the upgrade first lets pip use PyPI if available, or silently keep
     # the ensurepip version if offline — both are fine for our needs.
-    subprocess.run([str(pip_path), "install", "--upgrade", "pip"], capture_output=True)
+    subprocess.run([str(pip_path), "install", "--upgrade", "pip"], capture_output=True)  # nosec B603: pip_path absolute venv Path; literal pip args
 
     # Offline install: if the DMG bundle shipped wheels + embedding model,
     # wire them in now. pip.conf with no-index=true is written AFTER the
@@ -325,7 +325,7 @@ def setup_environment(project_root, hw, engine="auto"):
         print(f"  📥 {t('installing_deps')}")
         pip_conf_path = venv_path / "pip.conf"
         try:
-            subprocess.run([str(pip_path), "install", "-r", str(req_file)], check=True, capture_output=True)
+            subprocess.run([str(pip_path), "install", "-r", str(req_file)], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; req_file is project_root/requirements.txt
         except subprocess.CalledProcessError as e:
             if pip_conf_path.exists():
                 # Offline install failed — a wheel is probably missing from
@@ -336,7 +336,7 @@ def setup_environment(project_root, hw, engine="auto"):
                     for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-10:]:
                         print(f"     {line}")
                 pip_conf_path.unlink()
-                subprocess.run([str(pip_path), "install", "-r", str(req_file)], check=True, capture_output=True)
+                subprocess.run([str(pip_path), "install", "-r", str(req_file)], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; req_file is project_root/requirements.txt (PyPI fallback)
                 print("  ✅ Fallback to PyPI succeeded")
             else:
                 # No pip.conf means we were already in online mode — real failure.
@@ -354,7 +354,7 @@ def setup_environment(project_root, hw, engine="auto"):
         req_macos = project_root / "requirements-macos.txt"
         if req_macos.exists():
             try:
-                subprocess.run([str(pip_path), "install", "-r", str(req_macos)], check=True, capture_output=True)
+                subprocess.run([str(pip_path), "install", "-r", str(req_macos)], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; req_macos is project_root/requirements-macos.txt
             except subprocess.CalledProcessError as e:
                 if pip_conf_path.exists():
                     print("  ⚠️ Offline install incomplete (macOS deps) — falling back to PyPI...")
@@ -362,7 +362,7 @@ def setup_environment(project_root, hw, engine="auto"):
                         for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-5:]:
                             print(f"     {line}")
                     pip_conf_path.unlink(missing_ok=True)
-                    subprocess.run([str(pip_path), "install", "-r", str(req_macos)], check=True, capture_output=True)
+                    subprocess.run([str(pip_path), "install", "-r", str(req_macos)], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; req_macos is project_root/requirements-macos.txt (PyPI fallback)
                 else:
                     raise
 
@@ -374,13 +374,13 @@ def setup_environment(project_root, hw, engine="auto"):
         print(f"   {DIM}{t('mlx_dep_warning_title')} {t('mlx_dep_warning_body')}{RESET}")
         for engine_spec in ("mlx-lm==0.31.2", "mlx-vlm==0.4.4"):
             try:
-                subprocess.run([str(pip_path), "install", engine_spec], check=True, capture_output=True)
+                subprocess.run([str(pip_path), "install", engine_spec], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; engine_spec from local literal tuple (pinned versions)
             except subprocess.CalledProcessError:
                 pip_conf_path = venv_path / "pip.conf"
                 if pip_conf_path.exists():
                     print(f"  ⚠️ Offline install failed for {engine_spec} — fallback to PyPI...")
                     pip_conf_path.unlink(missing_ok=True)
-                    subprocess.run([str(pip_path), "install", engine_spec], check=True, capture_output=True)
+                    subprocess.run([str(pip_path), "install", engine_spec], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; engine_spec from local literal tuple (PyPI fallback)
                 else:
                     raise
 
@@ -390,7 +390,7 @@ def setup_environment(project_root, hw, engine="auto"):
     # source build and no Xcode Command Line Tools are required.
     print(f"  🏗️ {t('installing_universal')} {CYAN}llama-cpp-python{RESET}...")
     try:
-        subprocess.run(
+        subprocess.run(  # nosec B603: pip_path absolute venv Path; literal pinned llama-cpp-python version
             [str(pip_path), "install", "llama-cpp-python==0.3.19"],
             check=True,
             capture_output=True,
@@ -400,7 +400,7 @@ def setup_environment(project_root, hw, engine="auto"):
         if pip_conf_path.exists():
             print("  ⚠️ Offline install failed for llama-cpp-python — fallback to PyPI...")
             pip_conf_path.unlink(missing_ok=True)
-            subprocess.run(
+            subprocess.run(  # nosec B603: pip_path absolute venv Path; literal pinned llama-cpp-python version (PyPI fallback)
                 [str(pip_path), "install", "llama-cpp-python==0.3.19"],
                 check=True,
                 capture_output=True,

@@ -145,7 +145,7 @@ def get_ollama_digest(
         return None
 
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603: resolved is validated via shutil.which/Path.is_file; model_id is from internal MODEL_CATALOG (supply chain trust)
             [resolved, "show", "--json", model_id],
             capture_output=True,
             text=True,

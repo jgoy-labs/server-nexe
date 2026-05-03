@@ -268,7 +268,7 @@ def _maybe_launch_tray(_project_root: "Path | None" = None):
     try:
         if tray_binary.exists():
             # App bundle path: Gatekeeper-safe, correct CFBundleName in Force Quit
-            subprocess.Popen(
+            subprocess.Popen(  # nosec B603: tray_binary is project_root-derived absolute Path (NexeTray.app/Contents/MacOS/NexeTray); tray_args is local literal list
                 [str(tray_binary)] + tray_args,
                 cwd=str(project_root),
                 stdout=subprocess.DEVNULL,
@@ -278,7 +278,7 @@ def _maybe_launch_tray(_project_root: "Path | None" = None):
             logger.info("Tray launched via bundle (server PID %d)", server_pid)
         else:
             # Fallback for dev environments without the app bundle
-            subprocess.Popen(
+            subprocess.Popen(  # nosec B603: python_exe is venv_python absolute Path or sys.executable fallback; tray_args is local literal list
                 [python_exe, "-m", "installer.tray"] + tray_args,
                 cwd=str(project_root),
                 stdout=subprocess.DEVNULL,

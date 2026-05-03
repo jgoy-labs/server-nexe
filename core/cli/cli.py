@@ -176,7 +176,7 @@ def _start_nexe(ctx: click.Context):
 
   click.echo(t("cli.go.starting_server"))
   try:
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603: sys.executable + literal module path; project_root is Path(__file__)-derived
       [sys.executable, "-m", "core.app"],
       cwd=str(project_root),
       env={**os.environ, "PYTHONPATH": str(project_root)}

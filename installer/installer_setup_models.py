@@ -90,10 +90,10 @@ def _download_ollama_model(model_config, headless=False):
         try:
             ollama_bin = _find_ollama()
             print(f"\n{CYAN}[1/3]{RESET} {t('ollama_checking')}")
-            result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)
+            result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)  # nosec B603: ollama_bin from _find_ollama (whitelisted absolute paths or PATH-resolved); literal subcommand
             if result.returncode != 0:
                 print(f"{YELLOW}[...]{RESET} {t('starting_ollama')}")
-                subprocess.Popen([ollama_bin, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen([ollama_bin, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal `serve` subcommand
                 # Wait for Ollama to be ready (max 15s)
                 import time
                 import socket
@@ -109,7 +109,7 @@ def _download_ollama_model(model_config, headless=False):
             print(f"\n{CYAN}[2/3]{RESET} {t('downloading_model_progress')}")
             print(f"      {DIM}{ollama_bin} pull {model_id}{RESET}\n")
 
-            process = subprocess.Popen(
+            process = subprocess.Popen(  # nosec B603: ollama_bin from _find_ollama (whitelisted); model_id from internal MODEL_CATALOG (supply chain trust)
                 [ollama_bin, "pull", model_id],
                 stdout=sys.stdout,
                 stderr=sys.stderr
@@ -120,7 +120,7 @@ def _download_ollama_model(model_config, headless=False):
                 raise subprocess.CalledProcessError(return_code, "ollama pull")
 
             print(f"\n{CYAN}[3/4]{RESET} {t('verifying_download')}")
-            result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)
+            result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal subcommand (post-download verification)
             model_base = model_id.split(":")[0]
             if model_base in result.stdout or model_id in result.stdout:
                 # F4.1 (audit DoD-AUD-SX-0423 §2.7): compare the manifest
@@ -151,7 +151,7 @@ def _download_ollama_model(model_config, headless=False):
             print(f"\n{CYAN}[4/4]{RESET} {t('downloading_embeddings_step')}")
             print(f"      {DIM}{ollama_bin} pull nomic-embed-text{RESET}\n")
 
-            embed_process = subprocess.Popen(
+            embed_process = subprocess.Popen(  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal model name "nomic-embed-text"
                 [ollama_bin, "pull", "nomic-embed-text"],
                 stdout=sys.stdout,
                 stderr=sys.stderr
@@ -359,7 +359,7 @@ for attempt in range(max_retries):
         else:
             raise e
 '''
-            process = subprocess.Popen(
+            process = subprocess.Popen(  # nosec B603: python_path absolute venv Path; download_script is f-string with model_id from MODEL_CATALOG + project_root-derived local_model_path
                 [str(python_path), "-c", download_script],
                 stdout=sys.stdout,
                 stderr=sys.stderr,
