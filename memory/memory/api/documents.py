@@ -15,7 +15,7 @@ import logging
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from .models import Document, SearchResult
 
@@ -59,7 +59,7 @@ def _delete_points(qdrant: Any, collection: str, point_ids: List[str]) -> None:
 async def store_document(
   qdrant: Any,
   executor: ThreadPoolExecutor,
-  generate_embedding: Callable[[str], List[float]],
+  generate_embedding: Callable[[str], Awaitable[List[float]]],
   text: str,
   collection: str,
   metadata: Optional[Dict[str, Any]] = None,
@@ -148,7 +148,7 @@ async def store_document(
 async def store_documents_batch(
   qdrant: Any,
   executor: ThreadPoolExecutor,
-  generate_embeddings_batch: Callable[[List[str]], List[List[float]]],
+  generate_embeddings_batch: Callable[[List[str]], Awaitable[List[List[float]]]],
   items: List[Dict[str, Any]],
   collection: str,
   text_store=None,
@@ -238,7 +238,7 @@ async def store_documents_batch(
 async def search_documents(
   qdrant: Any,
   executor: ThreadPoolExecutor,
-  generate_embedding: Callable[[str], List[float]],
+  generate_embedding: Callable[[str], Awaitable[List[float]]],
   query: str,
   collection: str,
   top_k: int = 5,
