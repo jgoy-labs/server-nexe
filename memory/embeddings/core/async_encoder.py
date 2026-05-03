@@ -205,6 +205,8 @@ class AsyncEmbedder:
     Returns:
       Embedding com a llista de floats
     """
+    if self._model is None:
+      raise RuntimeError("AsyncEmbedder._model not loaded — cal await _ensure_loaded() abans d'invocar _encode_sync")
     embedding = list(self._model.embed([text]))[0]
 
     if normalize:
@@ -281,6 +283,8 @@ class AsyncEmbedder:
     Returns:
       Llista d'embeddings
     """
+    if self._model is None:
+      raise RuntimeError("AsyncEmbedder._model not loaded — cal await _ensure_loaded() abans d'invocar _encode_batch_sync")
     embeddings = list(self._model.embed(texts, batch_size=batch_size))
 
     if normalize:
