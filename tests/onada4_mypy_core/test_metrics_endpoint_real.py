@@ -51,14 +51,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-@pytest.mark.xfail(
-    reason=(
-        "REAL Onada 4.1 #38 — core/metrics/endpoint.py:125 itera .items() "
-        "sobre List[ModuleInfo]. Dev#2 fixarà la iteració; aquest test "
-        "passarà (XPASS) un cop arreglat i s'haurà de retirar el xfail."
-    ),
-    strict=True,
-)
 def test_update_module_health_does_not_swallow_attributeerror_on_list_modules():
     """Pin-test contracte: list_modules() retorna llista i la iteració no
     pot empassar AttributeError silenciosament. Veure docstring del mòdul."""
