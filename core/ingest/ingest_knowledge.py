@@ -24,6 +24,7 @@ import logging
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 # Add project root to path
 from core.paths import get_repo_root
@@ -201,7 +202,7 @@ async def _ingest_from_precomputed(
 
 
 async def ingest_knowledge(
-    folder: Path = None,
+    folder: Optional[Path] = None,
     quiet: bool = False,
     target_collection: str = DOCUMENTATION_COLLECTION,
 ):
