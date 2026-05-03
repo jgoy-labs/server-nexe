@@ -236,9 +236,12 @@ class CodeChunker(BaseChunker):
           if match_func:
             name = match_func.group(2)
             chunk_type = "function"
-          else:
+          elif match_class:
             name = match_class.group(1)
             chunk_type = "class"
+          else:
+            i += 1
+            continue
 
           definitions.append((chunk_text, {"name": name, "type": chunk_type}))
           i = j
@@ -305,9 +308,12 @@ class CodeChunker(BaseChunker):
         elif is_class:
           name = is_class.group(1)
           chunk_type = "class"
-        else:
+        elif is_arrow:
           name = is_arrow.group(3)
           chunk_type = "arrow_function"
+        else:
+          i += 1
+          continue
 
         chunks.append((chunk_text, {"name": name, "type": chunk_type}))
         i = j
