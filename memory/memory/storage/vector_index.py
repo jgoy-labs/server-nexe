@@ -34,11 +34,11 @@ class VectorIndex:
 
     def __init__(self, qdrant_path: str = "storage/vectors"):
         self._qdrant_path = Path(qdrant_path)
-        self._client = None
+        self._client: Optional[QdrantAdapter] = None
         self._available = False
         self._init_client()
 
-    def _init_client(self):
+    def _init_client(self) -> None:
         """Initialize the QdrantAdapter embedded client."""
         try:
             self._qdrant_path.mkdir(parents=True, exist_ok=True)
@@ -86,7 +86,7 @@ class VectorIndex:
         Returns:
             Number of entries indexed
         """
-        if not self._available or not entries:
+        if not self._available or self._client is None or not entries:
             return 0
 
         points_data = [
@@ -134,7 +134,7 @@ class VectorIndex:
         Returns:
             List of results with id, score, and payload
         """
-        if not self._available:
+        if not self._available or self._client is None:
             return []
 
         # search_with_filter oculta Filter/FieldCondition/MatchValue al caller
@@ -164,7 +164,7 @@ class VectorIndex:
 
     def delete(self, ids: List[str]) -> int:
         """Delete entries from the index."""
-        if not self._available or not ids:
+        if not self._available or self._client is None or not ids:
             return 0
 
         # delete_by_ids oculta PointIdsList al caller
@@ -175,7 +175,7 @@ class VectorIndex:
 
     def count(self) -> int:
         """Count total entries in the index."""
-        if not self._available:
+        if not self._available or self._client is None:
             return 0
         info = self._client.get_collection(COLLECTION_NAME)
         return info.points_count
