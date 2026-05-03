@@ -166,9 +166,7 @@ class APIIntegrator:
       try:
         if module_name not in self._integrated_modules:
           return True
-        
-        module_info = self._integrated_modules[module_name]
-        
+
         removed_count = self.route_manager.remove_module_routes(module_name)
         
         self.openapi_merger.remove_module_openapi(module_name)

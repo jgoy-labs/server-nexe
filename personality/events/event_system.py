@@ -88,7 +88,8 @@ class EventSystem:
     import asyncio
 
     try:
-      loop = asyncio.get_running_loop()
+      # Side-effect call: raises RuntimeError if no running loop (caught below).
+      asyncio.get_running_loop()
       msg = self.i18n.t('sync.called_from_active_loop') if self.i18n else "emit_event_sync() called from active event loop"
       logger.warning(msg, component="event_system")
       self._add_to_history(event)

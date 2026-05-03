@@ -35,12 +35,12 @@ CYAN = "\033[1;36m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 
-import uvicorn
+import uvicorn  # noqa: E402  # after load_dotenv() so env vars apply to transitive imports
 
 logger = logging.getLogger(__name__)
 
-from .helpers import setup_signal_handlers, is_port_in_use, translate
-from .factory import create_app
+from .helpers import setup_signal_handlers, is_port_in_use, translate  # noqa: E402  # after load_dotenv()
+from .factory import create_app  # noqa: E402  # after load_dotenv()
 
 
 def kill_process_on_port(port: int) -> bool:

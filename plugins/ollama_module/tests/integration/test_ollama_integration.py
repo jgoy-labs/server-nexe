@@ -14,8 +14,8 @@ import pytest
 # Skip - Tests d'integració pendents de migració completa a nexe_flow
 pytest.skip("Integration tests pending full nexe_flow migration", allow_module_level=True)
 
-from plugins.ollama_module.workflow.nodes.ollama_node import OllamaNode
-from nexe_flow.core import (
+from plugins.ollama_module.workflow.nodes.ollama_node import OllamaNode  # noqa: E402  # after pytest.skip(allow_module_level=True)
+from nexe_flow.core import (  # noqa: E402  # after pytest.skip(allow_module_level=True)
   Flow as WorkflowDefinition,
   NodeRegistry,
   FlowExecutor as SequentialExecutor,

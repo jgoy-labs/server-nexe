@@ -76,9 +76,9 @@ class TestV1Health:
 # ═══════════════════════════════════════════════════════════════════════════
 # Tests for ImportError branches (lines 94-95, 100-101, 106-107, 112-113)
 # ═══════════════════════════════════════════════════════════════════════════
-from unittest.mock import patch, MagicMock
-import importlib
-import logging
+from unittest.mock import patch, MagicMock  # noqa: E402  # grouped with the test class below
+import importlib  # noqa: E402  # grouped with the test class below
+import logging  # noqa: E402  # grouped with the test class below
 
 
 class TestV1ImportErrors:

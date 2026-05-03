@@ -270,7 +270,7 @@ class PathDiscovery:
                      name=module_name, path=str(item))
           logger.debug(msg, component="path_discovery")
             
-    except PermissionError as e:
+    except PermissionError:
       msg = self._get_message('path_discovery.permission_denied', path=str(path))
       logger.warning(msg, component="path_discovery")
     

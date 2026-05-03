@@ -51,9 +51,6 @@ def validate_production_security(i18n: Any, config: Any = None) -> None:
   from core.config import get_module_allowlist
 
   core_env = os.getenv("NEXE_ENV", "development").lower()
-  # Also check server.toml config for environment mode
-  config_mode = config.get("core", {}).get("environment", {}).get("mode", "").lower() if config else ""
-  is_production = core_env == "production" or config_mode == "production"
   approved_modules = os.getenv("NEXE_APPROVED_MODULES", "").strip()
 
   try:

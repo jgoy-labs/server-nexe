@@ -131,9 +131,8 @@ def get_model_entry(name: str) -> Optional[ModelEntry]:
 
 def list_models_table() -> str:
     """Retorna una taula formatada dels models disponibles."""
-    headers = ["Nom Curt", "Mida", "Descripció"]
     rows = []
     for m in MODEL_REGISTRY.values():
         rows.append(f"{m.short_name:<15} {m.size_gb:>4.1f}GB  {m.description}")
-    
+
     return "\n".join(rows)

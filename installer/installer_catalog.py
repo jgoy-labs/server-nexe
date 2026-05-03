@@ -11,7 +11,6 @@ from .installer_display import (
     CYAN, MAGENTA, GREEN, RED, YELLOW, BOLD, DIM, RESET,
 )
 from .installer_i18n import t, get_lang
-from .installer_hardware import get_recommended_size
 from .installer_catalog_data import MODEL_CATALOG  # noqa: F401 (re-exported)
 
 
@@ -23,7 +22,6 @@ def select_model(hw):
     lang = get_lang()
     ram = hw["ram"]
     usable_ram = int(ram * 0.55)
-    recommended_size = get_recommended_size(ram)
     has_metal = hw["has_metal"]
 
     # Didactic explanation

@@ -18,8 +18,6 @@ import asyncio
 import logging
 from functools import wraps
 
-T = TypeVar("T")
-
 from tenacity import (
   retry,
   stop_after_attempt,
@@ -27,6 +25,8 @@ from tenacity import (
   retry_if_exception_type,
   before_sleep_log,
 )
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 

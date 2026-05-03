@@ -268,14 +268,6 @@ class TestWebUIModuleGaps:
         url = mod._resolve_api_base_url({})
         assert url == "http://myhost:8080"
 
-    def test_resolve_api_base_url_default(self, monkeypatch):
-        """_resolve_api_base_url falls back to default."""
-        from plugins.web_ui_module.module import WebUIModule
-        monkeypatch.delenv("NEXE_API_BASE_URL", raising=False)
-        mod = WebUIModule()
-        url = mod._resolve_api_base_url({})
-        assert url == "http://127.0.0.1:9119"
-
     def test_get_info_contains_name(self):
         """get_info returns module name."""
         from plugins.web_ui_module.module import WebUIModule

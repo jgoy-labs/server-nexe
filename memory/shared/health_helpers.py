@@ -10,7 +10,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from typing import Dict, Any, List, Callable
+from typing import Dict, Any, List
 import structlog
 
 from personality.i18n import get_i18n

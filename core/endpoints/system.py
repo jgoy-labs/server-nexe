@@ -10,13 +10,13 @@ www.jgoy.net · https://server-nexe.org
 """
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
-from pathlib import Path
 import os
 import signal
 import asyncio
 import logging
 from typing import Dict, Any
 
+from core.paths import get_logs_dir
 from core.version import __version__
 from plugins.security.core.auth import require_api_key
 
@@ -44,7 +44,6 @@ def _t(key: str, fallback: str, **kwargs) -> str:
   except Exception:
     return fallback.format(**kwargs) if kwargs else fallback
 
-from core.paths import get_logs_dir
 _logs_dir = get_logs_dir()
 SUPERVISOR_PID_FILE = _logs_dir / 'core_supervisor.pid'
 

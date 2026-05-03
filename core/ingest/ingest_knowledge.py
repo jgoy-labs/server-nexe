@@ -36,9 +36,9 @@ from core.endpoints.chat_sanitization import _filter_rag_injection  # noqa: E402
 from memory.memory.constants import DEFAULT_VECTOR_SIZE  # noqa: E402
 from memory.memory.config import resolve_ingest_config  # noqa: E402
 from memory.memory.precomputed_loader import PrecomputedKB  # noqa: E402
-from memory.rag.header_parser import parse_rag_header, VALID_PRIORITIES
+from memory.rag.header_parser import parse_rag_header, VALID_PRIORITIES  # noqa: E402  # after sys.path setup
 
-import os as _os
+import os as _os  # noqa: E402  # after sys.path setup
 _LANG = _os.environ.get("NEXE_LANG", "ca")
 _I18N = {
     "title":          {"ca": "NEXE KNOWLEDGE INGESTION", "es": "NEXE KNOWLEDGE INGESTION", "en": "NEXE KNOWLEDGE INGESTION"},
@@ -97,7 +97,7 @@ DEFAULT_OVERLAP_FLOOR = 50
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".markdown", ".text"}
 
 
-from core.ingest.chunking import chunk_text
+from core.ingest.chunking import chunk_text  # noqa: E402  # after sys.path setup
 
 
 def _read_text_with_fallback(file_path: Path) -> str:

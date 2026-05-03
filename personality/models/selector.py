@@ -13,7 +13,6 @@ import psutil
 import platform
 import logging
 import shutil
-from typing import Tuple
 
 from .profiles import PROFILES, HardwareTier, ModelProfile, EngineType
 

@@ -41,18 +41,18 @@ if _import_root not in sys.path:
 _env_root = os.environ.get("NEXE_PROJECT_ROOT")
 PROJECT_ROOT = Path(_env_root).resolve() if _env_root else Path(__file__).parent.parent.resolve()
 
-from installer.installer_hardware import detect_hardware
-from installer.installer_catalog_data import MODEL_CATALOG
-from installer.installer_setup_env import setup_environment
-from installer.installer_setup_config import generate_env_file
-from installer.installer_setup_models import (
+from installer.installer_hardware import detect_hardware  # noqa: E402  # after sys.path setup
+from installer.installer_catalog_data import MODEL_CATALOG  # noqa: E402  # after sys.path setup
+from installer.installer_setup_env import setup_environment  # noqa: E402  # after sys.path setup
+from installer.installer_setup_config import generate_env_file  # noqa: E402  # after sys.path setup
+from installer.installer_setup_models import (  # noqa: E402  # after sys.path setup
     ensure_ollama_installed,
     _download_ollama_model,
     _download_gguf_model,
     _download_mlx_model,
 )
-from installer.installer_finalize import _write_commands_file
-from installer.installer_reinstall import (
+from installer.installer_finalize import _write_commands_file  # noqa: E402  # after sys.path setup
+from installer.installer_reinstall import (  # noqa: E402  # after sys.path setup
     DEFAULT_REINSTALL_MODE,
     VALID_REINSTALL_MODES,
     apply_reinstall_mode,

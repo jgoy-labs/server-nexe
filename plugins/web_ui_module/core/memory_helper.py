@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import asyncio as _asyncio
 import re
 import logging
 import time
@@ -1040,7 +1041,6 @@ _memory_api_instance = None  # Singleton to avoid re-creating the model on each 
 _memory_api_init_failed = False  # True after a failed init; reset by F3 retry logic
 _memory_api_last_failure_ts: Optional[float] = None  # monotonic timestamp of last init failure
 
-import asyncio as _asyncio
 _memory_init_lock = _asyncio.Lock()  # Prevent concurrent double-init (race condition fix)
 
 def get_memory_helper() -> MemoryHelper:

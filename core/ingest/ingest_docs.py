@@ -25,7 +25,7 @@ from memory.memory.constants import DEFAULT_VECTOR_SIZE  # noqa: E402
 logger = logging.getLogger(__name__)
 
 
-from core.ingest.chunking import chunk_text
+from core.ingest.chunking import chunk_text  # noqa: E402  # after sys.path setup (line 20)
 
 DOCS_COLLECTION = "nexe_documentation"
 CHUNK_SIZE = 500  # characters per chunk

@@ -82,11 +82,11 @@ def encrypt_all(force):
         if json_files:
             click.echo(f"Encrypting {len(json_files)} session file(s)...")
             from plugins.web_ui_module.core.session_manager import SessionManager
-            sm = SessionManager(
+            # SessionManager auto-migrates .json → .enc on init.
+            SessionManager(
                 storage_path=str(sessions_path),
                 crypto_provider=crypto,
             )
-            # SessionManager auto-migrates .json → .enc on init
             click.echo(f"  Sessions encrypted ({len(json_files)} migrated).")
         else:
             click.echo("  No plain .json sessions found.")
