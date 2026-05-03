@@ -13,6 +13,7 @@ import sys
 import asyncio
 import argparse
 import json
+from typing import Optional
 from pathlib import Path
 
 from personality.i18n import get_i18n
@@ -35,7 +36,7 @@ async def cmd_health():
   result = check_health(module)
   print(json.dumps(result, indent=2, default=str))
 
-async def cmd_encode(text: str, model: str = None):
+async def cmd_encode(text: str, model: Optional[str] = None):
   """Generate embedding for a text"""
   from memory.embeddings.module import EmbeddingsModule
   from memory.embeddings.core.interfaces import EmbeddingRequest
@@ -62,7 +63,7 @@ async def cmd_encode(text: str, model: str = None):
     "embedding": response.embedding[:5] + ["..."]
   }, indent=2))
 
-async def cmd_chunk(file_path: str, doc_id: str = None):
+async def cmd_chunk(file_path: str, doc_id: Optional[str] = None):
   """Split document into chunks"""
   from memory.embeddings.module import EmbeddingsModule
 
