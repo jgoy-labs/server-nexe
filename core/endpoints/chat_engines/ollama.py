@@ -59,7 +59,7 @@ async def _forward_to_ollama(
     messages: List[Dict],
     request: ChatCompletionRequest,
     app_state=None,
-    user_msg: str = None,
+    user_msg: Optional[str] = None,
     fallback_from: Optional[str] = None,
     fallback_reason: Optional[str] = None,
 ):
@@ -199,7 +199,7 @@ async def _forward_to_ollama(
                 detail=_core_msg(None, "core.ollama.not_responding")
             )
 
-async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user_msg: str = None):
+async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user_msg: Optional[str] = None):
     """OpenAI-compatible streaming generator from Ollama with Auto-Save support."""
     response_parts = []
 

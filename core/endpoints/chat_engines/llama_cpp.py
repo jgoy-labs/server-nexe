@@ -139,7 +139,7 @@ async def _llama_cpp_stream_generator(
     system_msg: str,
     model_name: str,
     app_state=None,
-    user_msg: str = None,
+    user_msg: Optional[str] = None,
     session_id: str = "chat_session",
     max_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
