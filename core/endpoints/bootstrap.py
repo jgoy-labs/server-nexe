@@ -175,7 +175,7 @@ async def bootstrap_session(
     "timestamp": datetime.now(timezone.utc).isoformat(),
     "client_ip": client_ip,
     "user_agent": request.headers.get('user-agent', 'Unknown'),
-    "session_token_created": True
+    "session_token_created": True  # nosec B105: log dict key contains 'token' but value is bool True (event flag, not credential)
   }
   logger.info("Nexe Framework initialized: %s", log_data)
 
