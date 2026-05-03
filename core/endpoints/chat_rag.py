@@ -12,6 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import hashlib
 import logging
 import os
+import unicodedata
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,13 @@ async def build_rag_context(
         Context text string (empty if no results)
     """
     from memory.rag_sources.base import SearchRequest
+
+    # R1 v1.0.4: NFKC-normalize the query to mirror the index path. Documents
+    # are NFKC-normalized at ingest time (chat_sanitization._filter_rag_injection
+    # and the security input sanitizers), so a query carrying fullwidth or
+    # compat variants would otherwise miss the indexed canonical form. Single
+    # normalization here covers the three downstream memory.search() calls.
+    last_user_msg = unicodedata.normalize("NFKC", last_user_msg)
 
     context_text = ""
 

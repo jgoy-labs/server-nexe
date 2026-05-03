@@ -9,10 +9,13 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import logging
+import unicodedata
+from typing import Optional, Dict, Any, List
+
 from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
-import logging
+
 from core.dependencies import limiter
 from plugins.security.core.auth_dependencies import require_api_key
 from ..constants import DEFAULT_VECTOR_SIZE
@@ -188,6 +191,13 @@ async def memory_search(request: Request, body: MemorySearchRequest):
                 validate_collection_name(col)
 
         memory = await get_memory_api()
+
+        # R1 v1.0.4: NFKC-normalize the query to mirror the index path.
+        # Documents are NFKC-normalized at ingest, so a fullwidth or compat
+        # variant in body.query would otherwise miss the canonical indexed
+        # form. Pydantic v1/v2 BaseModel fields are mutable; assigning back
+        # also keeps the truncated debug log (line below) in sync.
+        body.query = unicodedata.normalize("NFKC", body.query)
 
         # Determinar col·leccions a cercar
         if body.collections:
