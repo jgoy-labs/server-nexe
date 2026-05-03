@@ -30,18 +30,26 @@ def _sanitize_sse_token(token: str) -> str:
     are valid in text. Defends against malicious model output that injects
     control bytes into the streamed `delta.content` field.
 
-    SCOPE: this function targets ONLY the user-untrusted text path — the model
-    output token. All three backends (mlx, llama_cpp, ollama) pipe model
-    `content` through here before placing it in the SSE chunk dict. Other
-    chunk fields (`finish_reason`, `delta={}`, error strings, model name) are
-    Python-controlled trusted values and need not be sanitized; JSON
-    serialization escapes any C0 bytes there as `\\uXXXX` automatically.
+    SCOPE: this function targets the user-untrusted text path — the model
+    output token — AND any string carried in an `error` SSE chunk (R6-04 part
+    2, v1.0.4-beta). All three backends (mlx, llama_cpp, ollama) pipe model
+    `content` and `error` strings through here before placing them in the SSE
+    chunk dict. Other chunk fields (`finish_reason`, `delta={}`, model name)
+    are Python-controlled trusted values and need not be sanitized.
+
+    Why also `error`: while `json.dumps` escapes C0 bytes on the wire as
+    `\\uXXXX`, `JSON.parse` on the client side reverses the escape and yields
+    the raw null byte. `str(e)` from MLX or llama-cpp can carry model-tainted
+    text in the exception chain (token text echoed back in the message), so
+    the same defense applies. Ollama error strings are i18n constants but are
+    sanitized for uniformity (defense-in-depth).
 
     If a future chunk path adds a NEW user-untrusted field (e.g. tool-call
     arguments echoed back, reasoning_content from thinking models), pass it
     through this function before json.dumps. The regression test
-    `tests/test_sse_sanitize_coverage.py` enforces that `delta.content` is
-    always sanitized in the three backends to prevent silent drift.
+    `tests/test_sse_sanitize_coverage.py` enforces that `delta.content` and
+    `error` chunks are always sanitized in the three backends to prevent
+    silent drift.
     """
     if not token:
         return token

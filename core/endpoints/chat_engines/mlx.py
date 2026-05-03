@@ -157,7 +157,7 @@ async def _mlx_stream_generator(
         return
     except Exception as e:
         logger.exception("MLX streaming failed")
-        error_chunk = {"error": str(e)}
+        error_chunk = {"error": _sanitize_sse_token(str(e))}
         yield f"data: {json.dumps(error_chunk)}\n\n"
     finally:
         if not mlx_task.done():
