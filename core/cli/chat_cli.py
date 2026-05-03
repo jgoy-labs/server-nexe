@@ -276,8 +276,9 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                 break
 
             if user_input.lower() == "clear":
-                session_id = await client.create_ui_session()
-                if session_id:
+                new_session_id = await client.create_ui_session()
+                if new_session_id:
+                    session_id = new_session_id
                     click.echo("🧹 History cleared.")
                 else:
                     click.echo(click.style("❌ Error reiniciant sessió.", fg="red"))
