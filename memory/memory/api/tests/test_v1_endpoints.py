@@ -288,6 +288,51 @@ class TestMemorySearchEndpoint:
         assert data["results"][0]["metadata"]["source_collection"] == "nexe_documentation"
 
 
+class TestMemorySearchRateLimit:
+    """R6-08 v1.0.4: /v1/memory/search must carry @limiter.limit("60/minute").
+
+    Without it, the endpoint can be abused for local DoS — an attacker who
+    holds an API key can fire unbounded vector queries (each search hits the
+    embedder + Qdrant). 60/min matches the chat-rate-limit family and is well
+    above any honest interactive usage.
+
+    The guard is static (source inspection) because the slowapi limiter in
+    make_app() above is a fresh instance per test — it does not know about
+    decorators bound to the global limiter from core.dependencies. A static
+    grep is the most robust shape here: if a future maintainer removes the
+    decorator, this test breaks loudly.
+    """
+
+    def test_search_endpoint_has_rate_limit_decorator(self):
+        import inspect
+        import memory.memory.api.v1 as v1_module
+        src = inspect.getsource(v1_module)
+        # Must precede the function definition (any whitespace tolerated).
+        assert '@limiter.limit("60/minute")' in src, (
+            "memory/memory/api/v1.py is missing @limiter.limit on memory_search. "
+            "R6-08 requires rate limit on /v1/memory/search."
+        )
+        # And it must be on memory_search specifically, not some other handler.
+        # Find the memory_search def and check the line above it carries the limit.
+        lines = src.splitlines()
+        for i, line in enumerate(lines):
+            if line.startswith("async def memory_search"):
+                # Walk upward over decorators until we hit the @router or non-decorator line.
+                window = "\n".join(lines[max(0, i - 5): i])
+                assert '@limiter.limit("60/minute")' in window, (
+                    f"@limiter.limit decorator not adjacent to memory_search. "
+                    f"Decorators above:\n{window}"
+                )
+                return
+        pytest.fail("memory_search function not found in module source")
+
+    def test_limiter_imported_from_core_dependencies(self):
+        """Sanity: the limiter symbol is the project-wide one, not a local stub."""
+        import memory.memory.api.v1 as v1_module
+        from core.dependencies import limiter as core_limiter
+        assert v1_module.limiter is core_limiter
+
+
 class TestMemoryHealthEndpoint:
 
     def test_health_healthy(self):

@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import logging
+from core.dependencies import limiter
 from plugins.security.core.auth_dependencies import require_api_key
 from ..constants import DEFAULT_VECTOR_SIZE
 from .models import validate_collection_name, InvalidCollectionNameError
@@ -165,6 +166,7 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
         )
 
 @router.post("/search", response_model=MemorySearchResponse, dependencies=[Depends(require_api_key)], summary="Search semantic memory by vector similarity (API key required)")
+@limiter.limit("60/minute")
 async def memory_search(request: Request, body: MemorySearchRequest):
     """
     Search semantic memory (RAG).
