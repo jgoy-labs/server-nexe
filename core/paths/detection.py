@@ -13,7 +13,7 @@ import os
 import logging
 import threading
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from functools import lru_cache
 from enum import Enum
 
@@ -41,7 +41,7 @@ OPTIONAL_MARKERS = [
 NEXE_CORE_DIRS = ["plugins", "core", "memory", "storage"]
 
 _cache_lock = threading.Lock()
-_detection_history = []
+_detection_history: list[dict[str, Any]] = []
 
 def reset_repo_root_cache():
   """

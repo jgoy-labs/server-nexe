@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 try:
   import tomllib
 except ImportError:
-  import tomli as tomllib
+  import tomli as tomllib  # type: ignore[no-redef]  # Python < 3.11 fallback (tomli ships the same API as stdlib tomllib)
 
 @dataclass
 class CLIInfo:

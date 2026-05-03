@@ -322,7 +322,7 @@ def setup_models(ctx: click.Context, apply: bool):
     """Detect hardware and configure recommended models."""
     from personality.models import ModelSelector
     from pathlib import Path
-    import toml
+    import toml  # type: ignore[import-untyped]  # toml lacks stubs (deprecated); kept for write path
     
     click.echo(t("cli.hardware.analyzing"))
     selector = ModelSelector()

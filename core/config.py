@@ -14,7 +14,7 @@ import copy
 from pathlib import Path
 from typing import Dict, Any, Optional
 import tomllib
-import toml
+import toml  # type: ignore[import-untyped]  # toml lacks stubs (deprecated); kept for write path (tomllib stdlib is read-only)
 import logging
 import os
 
