@@ -130,10 +130,11 @@ class TestUpdateModuleHealth:
     import asyncio
 
     mock_module = MagicMock()
+    mock_module.name = "test_mod"
     mock_module.get_health.return_value = {"status": "healthy"}
 
     mock_mm = MagicMock()
-    mock_mm.list_modules.return_value = {"test_mod": mock_module}
+    mock_mm.list_modules.return_value = [mock_module]
 
     with patch("personality.module_manager.module_manager.ModuleManager", return_value=mock_mm):
       asyncio.run(_update_module_health())
@@ -146,10 +147,11 @@ class TestUpdateModuleHealth:
     import asyncio
 
     mock_module = MagicMock()
+    mock_module.name = "broken_mod"
     mock_module.get_health.side_effect = RuntimeError("fail")
 
     mock_mm = MagicMock()
-    mock_mm.list_modules.return_value = {"broken_mod": mock_module}
+    mock_mm.list_modules.return_value = [mock_module]
 
     with patch("personality.module_manager.module_manager.ModuleManager", return_value=mock_mm), \
          patch("core.metrics.endpoint.set_module_health") as mock_set:

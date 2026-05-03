@@ -122,7 +122,8 @@ async def _update_module_health() -> None:
     mm = ModuleManager()
     modules = mm.list_modules()
 
-    for module_name, module_info in modules.items():
+    for module_info in modules:
+      module_name = module_info.name
       if hasattr(module_info, "get_health"):
         try:
           health = module_info.get_health()
