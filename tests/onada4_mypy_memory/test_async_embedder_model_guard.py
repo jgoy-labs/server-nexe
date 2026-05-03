@@ -79,14 +79,6 @@ def test_async_embedder_model_starts_none() -> None:
         AsyncEmbedder._instances.pop(embedder.model_name, None)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Bug bloquejat pre-Dev#2 (Cluster 8). Pre-fix _encode_sync amb _model=None "
-        "llança AttributeError opaca; post-fix ha de llançar RuntimeError explícit. "
-        "Dev#2 treurà aquesta marca al commit cluster 8."
-    ),
-)
 def test_encode_sync_raises_runtime_error_when_model_none() -> None:
     """TDD post-fix: `_encode_sync` amb `_model=None` llança `RuntimeError`."""
     embedder = _fresh_embedder()
