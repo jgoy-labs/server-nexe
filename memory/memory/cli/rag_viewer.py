@@ -23,7 +23,7 @@ CLI_QDRANT_TIMEOUT = float(os.getenv('NEXE_CLI_QDRANT_TIMEOUT', '5.0'))
 RAG_LOG_PATH = Path(os.environ.get("NEXE_LOGS_DIR", str(Path.home() / "Nexe-Logs"))) / "rag.log"
 FALLBACK_PATHS = [
   Path(__file__).parent.parent.parent.parent.parent / "storage" / "logs" / "rag.log",
-  Path("/tmp/nexe-logs/rag.log"),
+  Path("/tmp/nexe-logs/rag.log"),  # nosec B108: read-only fallback lookup, not a file the viewer creates
 ]
 
 def find_log_path() -> Path:

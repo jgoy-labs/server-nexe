@@ -113,13 +113,9 @@ class TextStore:
         if not doc_ids:
             return {}
         placeholders = ",".join(["?" for _ in doc_ids])
+        sql = f"SELECT doc_id, text, metadata_json, created_at, expires_at FROM document_texts WHERE doc_id IN ({placeholders}) AND collection = ?"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
         with self._connect() as conn:
-            rows = conn.execute(
-                f"""SELECT doc_id, text, metadata_json, created_at, expires_at
-                    FROM document_texts
-                    WHERE doc_id IN ({placeholders}) AND collection = ?""",
-                (*doc_ids, collection)
-            ).fetchall()
+            rows = conn.execute(sql, (*doc_ids, collection)).fetchall()
         result = {}
         for doc_id, text, meta_json, created_at, expires_at in rows:
             result[doc_id] = {

@@ -295,7 +295,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                         try:
                             import urllib.request
                             import json as _json
-                            req = urllib.request.urlopen("http://localhost:11434/api/ps", timeout=2)
+                            req = urllib.request.urlopen("http://localhost:11434/api/ps", timeout=2)  # nosec B310: hardcoded localhost Ollama URL, no scheme injection possible
                             ps_data = _json.loads(req.read())
                             for loaded in ps_data.get("models", []):
                                 loaded_name = loaded.get("name", "")

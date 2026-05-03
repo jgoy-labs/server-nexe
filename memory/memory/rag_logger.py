@@ -107,7 +107,7 @@ class RAGLogger:
     except (PermissionError, OSError):
       pass
 
-    tmp_path = Path("/tmp/nexe-logs/rag.log")
+    tmp_path = Path("/tmp/nexe-logs/rag.log")  # nosec B108: ACCEPT — last-resort fallback in mono-user local install when both ~/Nexe-Logs and project storage/logs are unwritable; predictable path race accepted vs. silently disabling RAG telemetry
     try:
       tmp_path.parent.mkdir(parents=True, exist_ok=True)
       return tmp_path

@@ -84,7 +84,7 @@ def _resolve_install_root(project_root: Path) -> Path:
     home = Path.home()
     suspect_parents = [
         home / "Baixades", home / "Downloads", home / "Descargas",
-        home / "Téléchargements", home / "tmp", Path("/tmp"),
+        home / "Téléchargements", home / "tmp", Path("/tmp"),  # nosec B108: not a temp file destination — element of an allow-list to detect a bad install location
     ]
     if not any(_is_relative_to(project_root, p) for p in suspect_parents):
         return project_root
@@ -178,7 +178,7 @@ def run_installer():
         try:
             import json as _json
             import urllib.request as _urlreq
-            with _urlreq.urlopen("http://localhost:11434/api/tags", timeout=2) as _resp:
+            with _urlreq.urlopen("http://localhost:11434/api/tags", timeout=2) as _resp:  # nosec B310: hardcoded localhost Ollama URL, no scheme injection possible
                 _data = _json.loads(_resp.read().decode("utf-8"))
                 _models = _data.get("models", [])
                 if _models:

@@ -172,6 +172,6 @@ class WebUIModule:
         server_config = config.get("core", {}).get("server", {})
         host = server_config.get("host", DEFAULT_HOST)
         port = server_config.get("port", DEFAULT_PORT)
-        if host in ("0.0.0.0", "::"):
+        if host in ("0.0.0.0", "::"):  # nosec B104: comparing to wildcard strings, not binding to them (rewriting to DEFAULT_HOST for client-side URL construction)
             host = DEFAULT_HOST
         return f"http://{host}:{port}"

@@ -60,7 +60,7 @@ def request(method, url, headers=None, body=None, timeout=30):
     h = {"Content-Type": "application/json", **(headers or {})}
     req = urllib.request.Request(url, data=data, headers=h, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:  # nosec B310: dev smoke-test against operator-provided localhost server URL, no untrusted input
             return r.status, json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         try:
@@ -318,7 +318,7 @@ def main():
         method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:
+        with urllib.request.urlopen(req, timeout=10) as r:  # nosec B310: dev smoke-test against operator-provided localhost server URL, no untrusted input
             status = r.status
     except urllib.error.HTTPError as e:
         status = e.code

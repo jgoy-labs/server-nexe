@@ -79,11 +79,8 @@ class SyncWorker:
             if indexed > 0:
                 ids = [r["id"] for r in rows]
                 placeholders = ",".join("?" for _ in ids)
-                conn.execute(
-                    f"UPDATE episodic SET vector_synced = 1 "
-                    f"WHERE id IN ({placeholders})",
-                    ids,
-                )
+                sql = f"UPDATE episodic SET vector_synced = 1 WHERE id IN ({placeholders})"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
+                conn.execute(sql, ids)
                 conn.commit()
                 logger.debug("SyncWorker: synced %d entries", indexed)
 

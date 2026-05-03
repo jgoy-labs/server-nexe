@@ -67,7 +67,7 @@ def main(argv: list[str]) -> int:
     print(f"coverage file not found: {in_path}", file=sys.stderr)
     return 1
 
-  root = ET.parse(in_path).getroot()
+  root = ET.parse(in_path).getroot()  # nosec B314: CI tooling parsing trusted coverage.xml emitted by pytest-cov in the same workflow run
   line_rate = float(root.attrib.get("line-rate", "0") or 0)
   pct = int(round(line_rate * 100))
 

@@ -285,7 +285,7 @@ class SqliteStorageMixin:
                 WHERE entry_type IN ({placeholders})
                 ORDER BY timestamp DESC
                 LIMIT ?
-            """
+            """  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
             cursor.execute(query, (*types_filter, limit * 2))
             rows = cursor.fetchall()
             conn.close()

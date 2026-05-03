@@ -375,7 +375,7 @@ def setup_models(ctx: click.Context, apply: bool):
                     local_dir = Path("storage/models") / profile.mlx_model_id.split("/")[-1]
                     click.echo(f"   Destination: {local_dir}")
 
-                    snapshot_download(
+                    snapshot_download(  # nosec B615: ACCEPT — revision pinning tracked via MODEL_WEIGHT_SHA256 in installer/installer_catalog_data.py (legacy backlog C19); CLI pull path realignment scheduled for v1.0.5
                         repo_id=profile.mlx_model_id,
                         local_dir=local_dir,
                         local_dir_use_symlinks=False
@@ -482,7 +482,7 @@ def install_model(name: str, engine: Optional[str]):
             click.echo(f"   Source: {repo_id}")
             click.echo(f"   Destination: {local_dir}")
             
-            snapshot_download(
+            snapshot_download(  # nosec B615: ACCEPT — revision pinning tracked via MODEL_WEIGHT_SHA256 in installer/installer_catalog_data.py (legacy backlog C19); CLI pull path realignment scheduled for v1.0.5
                 repo_id=repo_id,
                 local_dir=local_dir,
                 local_dir_use_symlinks=False
