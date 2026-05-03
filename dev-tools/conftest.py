@@ -16,7 +16,6 @@ import secrets
 import shutil
 import subprocess
 import time
-from typing import Generator
 
 # Configure environment for tests
 os.environ.setdefault("NEXE_ENV", "test")
