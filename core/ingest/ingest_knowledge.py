@@ -24,7 +24,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 # Add project root to path
 from core.paths import get_repo_root
@@ -375,7 +375,7 @@ async def ingest_knowledge(
     # is preserved bit-for-bit — parity is covered by
     # test_ingest_knowledge_mega_batch.py.
     mega_batch_on = bool(ingest_cfg.mega_batch)
-    mega_items_by_collection: dict[str, list[dict]] = {}
+    mega_items_by_collection: dict[str, list[dict[str, Any]]] = {}
 
     for idx, file_path in enumerate(files, 1):
         try:
@@ -436,7 +436,7 @@ async def ingest_knowledge(
             # Bug #16: BATCH_SIZE was hardcoded to 50 here. Now sourced from
             # the IngestConfig SSOT (default still 50 → behaviour-preserving).
             BATCH_SIZE = ingest_cfg.store_batch_size
-            batch_items = []
+            batch_items: list[dict[str, Any]] = []
             for i, chunk in enumerate(chunks):
                 chunk = _filter_rag_injection(chunk)
                 batch_items.append({
