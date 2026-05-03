@@ -207,7 +207,8 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
         async with httpx.AsyncClient(timeout=_OLLAMA_STREAM_TIMEOUT) as client:
             async with client.stream("POST", url, json=payload) as resp:
                 if resp.status_code != 200:
-                    yield f"data: {json.dumps({'error': f'Ollama stream failed with status {resp.status_code}'})}\n\n"
+                    err_str = _sanitize_sse_token(f"Ollama stream failed with status {resp.status_code}")
+                    yield f"data: {json.dumps({'error': err_str})}\n\n"
                     yield "data: [DONE]\n\n"
                     return
 
@@ -255,6 +256,6 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
         return
     except httpx.ConnectError:
         _lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
-        error_msg = {"error": _OLLAMA_ERRORS.get(_lang, _OLLAMA_ERRORS["en"])["stream_unavailable"]}
+        error_msg = {"error": _sanitize_sse_token(_OLLAMA_ERRORS.get(_lang, _OLLAMA_ERRORS["en"])["stream_unavailable"])}
         yield f"data: {json.dumps(error_msg)}\n\n"
         yield "data: [DONE]\n\n"

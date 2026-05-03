@@ -103,6 +103,71 @@ def test_backend_content_assignments_use_sanitize(backend_file):
 
 
 @pytest.mark.parametrize("backend_file", BACKEND_FILES, ids=lambda p: p.name)
+def test_backend_error_chunks_use_sanitize(backend_file):
+  """Every `"error": <expr>` SSE chunk placement must wrap <expr> in _sanitize_sse_token(...).
+
+  R6-04 part 2 (v1.0.4-beta): error chunks were previously trusted as
+  Python-controlled, but `str(e)` from MLX/llama-cpp can carry model-tainted
+  text and the client's JSON.parse reverses the wire-escape, yielding raw
+  null bytes. Defense-in-depth: sanitize all error placements uniformly.
+
+  Tolerated forms:
+    "error": _sanitize_sse_token(...)
+    "error": err_str   # local var assigned from _sanitize_sse_token() earlier
+    "error": error_msg # same pattern
+  """
+  text = backend_file.read_text()
+  pattern = re.compile(r'["\']error["\']\s*:\s*([^,\n}]+)')
+  matches = pattern.findall(text)
+  if not matches:
+    return  # backend has no error chunks (unlikely but tolerated)
+
+  unsafe = []
+  for expr in matches:
+    expr = expr.strip()
+    if "_sanitize_sse_token" in expr:
+      continue
+    # Local var names whose assignment is verified separately
+    if expr in ("err_str", "err_str,", "error_msg", "error_msg,",
+                '"Unknown Ollama error"', "'Unknown Ollama error'",
+                "None", "None,"):
+      # `None` is internal result_holder init, not an SSE chunk yield
+      continue
+    # Detail vars that route into a sanitized chunk later (HTTPException pieces)
+    if expr in ("error_detail", "error_detail,", "str(e)", "str(e),"):
+      # str(e) without sanitize is a finding — the wrapping context decides
+      unsafe.append(expr)
+      continue
+    unsafe.append(expr)
+
+  if unsafe:
+    pytest.fail(
+      f"{backend_file.name} has unsanitized 'error' SSE chunk placements: {unsafe}. "
+      f"Wrap them in _sanitize_sse_token(...) per R6-04 part 2."
+    )
+
+
+def test_sanitize_handles_typical_exception_messages():
+  """Smoke: real-world exception strings stay readable after sanitize."""
+  cases = [
+    "Connection refused: [Errno 61]",
+    "MLX OOM: requested 24576MB, available 8192MB",
+    "Llama.cpp streaming failed: invalid token id 999999",
+    "Ollama stream failed with status 503",
+  ]
+  for msg in cases:
+    out = _sanitize_sse_token(msg)
+    assert out == msg, f"Clean error message got mutated: {msg!r} -> {out!r}"
+
+  # Adversarial: null byte inside an error string survives wire encode but is
+  # stripped by sanitize.
+  tainted = "MLX error: token '\x00\x01\x02' rejected"
+  cleaned = _sanitize_sse_token(tainted)
+  assert "\x00" not in cleaned and "\x01" not in cleaned and "\x02" not in cleaned
+  assert "MLX error: token '' rejected" == cleaned
+
+
+@pytest.mark.parametrize("backend_file", BACKEND_FILES, ids=lambda p: p.name)
 def test_backend_local_content_var_is_sanitized(backend_file):
   """When a backend uses `content = ...` as a local var before placing it in a chunk,
   that assignment must also pipe through _sanitize_sse_token."""
