@@ -293,7 +293,7 @@ class NexeTray(rumps.App):
 
     # ── Server control ────────────────────────────────────────────────────
 
-    def _toggle_server(self, sender):
+    def _toggle_server(self, _sender):
         if self.server_process and self.server_process.poll() is None:
             self._stop_server()
         else:

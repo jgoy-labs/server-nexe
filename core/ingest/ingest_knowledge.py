@@ -156,7 +156,6 @@ async def _ingest_from_precomputed(
     memory,
     kb: "PrecomputedKB",
     lang: str,
-    default_collection: str,
     log,
 ) -> bool:
     """Bug #16 fast path: upsert pre-computed KB entries grouped by
@@ -321,7 +320,6 @@ async def ingest_knowledge(
                         memory=memory,
                         kb=_kb,
                         lang=_LANG,
-                        default_collection=target_collection,
                         log=log,
                     )
                 elif not _outcome.ok:

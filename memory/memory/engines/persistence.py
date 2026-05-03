@@ -245,7 +245,6 @@ class PersistenceManager(SqliteStorageMixin):
         self,
         query_vector: List[float],
         limit: int = 10,
-        filter_type: Optional[str] = None,
     ) -> List[tuple]:
         """
         Cerca semàntica via QdrantAdapter.

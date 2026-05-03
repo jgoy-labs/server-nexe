@@ -210,7 +210,6 @@ class MemoryService:
         user_id: str,
         query: str,
         session_id: Optional[str] = None,
-        namespaces: Optional[List[str]] = None,
         limit: int = 5,
         mode: str = "normal",
     ) -> List[MemoryCard]:

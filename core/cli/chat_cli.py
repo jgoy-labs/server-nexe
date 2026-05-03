@@ -164,15 +164,6 @@ async def _stream_with_spinner(gen: AsyncGenerator) -> AsyncGenerator:
         print(f"\r{' ' * 20}\r", end="", flush=True)
 
 
-async def get_response_stream(engine: str, prompt: str, system: str, history: list, use_rag: bool):
-    """Get a streaming response from the configured engine."""
-    # Note: This is where real dispatch to modules would happen.
-    # For CLI simplicity, we call the local API if the server is up,
-    # or instantiate the node directly for "offline chat".
-
-    # At this stage, we delegate to the corresponding module if loaded.
-    pass
-
 @click.command()
 @click.option('--engine', '-e', type=click.Choice(['mlx', 'llama_cpp', 'ollama']), help='Inference engine')
 @click.option('--system', '-s', default=None, help='System prompt / Identity')
