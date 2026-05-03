@@ -262,7 +262,7 @@ class IngestionPipeline:
       raise ValueError("Text no pot estar buit")
 
     seed = int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:16], 16)
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # nosec B311: deterministic test embedding from SHA256 seed (reproducibility, not security/cryptography)
     return [rng.uniform(-1.0, 1.0) for _ in range(size)]
 
   async def cleanup_expired(self) -> int:

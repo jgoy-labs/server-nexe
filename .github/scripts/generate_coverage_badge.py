@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import sys
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405: CI tooling parsing trusted coverage.xml emitted by pytest-cov in the same workflow run (consistent with B314 at line 70; defusedxml migration tracked at BACKLOG-v1.0.5 M5-01)
 from pathlib import Path
 
 

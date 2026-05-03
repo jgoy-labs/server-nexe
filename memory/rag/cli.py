@@ -125,7 +125,7 @@ class RAGCLI:
       for check in checks:
         check_status = check.get("status", "unknown")
         check_icon = {
-          "pass": "[OK]",
+          "pass": "[OK]",  # nosec B105: dict key 'pass' is health-check status keyword (verb), not a password literal
           "warn": "[WARN]",
           "fail": "[FAIL]"
         }.get(check_status, "[??]")

@@ -61,7 +61,7 @@ class RAGEmojis:
   WARNING = "⚠️"
 
   CLOCK = "⏱️"
-  TOKEN = "🎫"
+  TOKEN = "🎫"  # nosec B105: TOKEN is a unicode ticket emoji for RAGEmojis visualization, not a credential
   VECTOR = "📊"
   SCORE = "📈"
 
