@@ -271,7 +271,7 @@ def setup_environment(project_root, hw, engine="auto"):
     if venv_path.exists():
         pip3 = venv_path / "bin" / "pip3"
         if not pip3.exists():
-            print(f"  ⚠️  Venv trencat detectat, recreant...")
+            print("  ⚠️  Venv trencat detectat, recreant...")
             _shutil.rmtree(venv_path)
 
     if not venv_path.exists():
@@ -331,13 +331,13 @@ def setup_environment(project_root, hw, engine="auto"):
                 # Offline install failed — a wheel is probably missing from
                 # the bundle. Show what pip complained about, remove pip.conf
                 # (which had no-index=true), and retry with PyPI as fallback.
-                print(f"  ⚠️ Offline install incomplete — falling back to PyPI...")
+                print("  ⚠️ Offline install incomplete — falling back to PyPI...")
                 if e.stderr:
                     for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-10:]:
                         print(f"     {line}")
                 pip_conf_path.unlink()
                 subprocess.run([str(pip_path), "install", "-r", str(req_file)], check=True, capture_output=True)
-                print(f"  ✅ Fallback to PyPI succeeded")
+                print("  ✅ Fallback to PyPI succeeded")
             else:
                 # No pip.conf means we were already in online mode — real failure.
                 print(f"  ❌ pip install -r requirements.txt failed (exit {e.returncode}):")
@@ -357,7 +357,7 @@ def setup_environment(project_root, hw, engine="auto"):
                 subprocess.run([str(pip_path), "install", "-r", str(req_macos)], check=True, capture_output=True)
             except subprocess.CalledProcessError as e:
                 if pip_conf_path.exists():
-                    print(f"  ⚠️ Offline install incomplete (macOS deps) — falling back to PyPI...")
+                    print("  ⚠️ Offline install incomplete (macOS deps) — falling back to PyPI...")
                     if e.stderr:
                         for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-5:]:
                             print(f"     {line}")
@@ -398,7 +398,7 @@ def setup_environment(project_root, hw, engine="auto"):
     except subprocess.CalledProcessError as e:
         pip_conf_path = venv_path / "pip.conf"
         if pip_conf_path.exists():
-            print(f"  ⚠️ Offline install failed for llama-cpp-python — fallback to PyPI...")
+            print("  ⚠️ Offline install failed for llama-cpp-python — fallback to PyPI...")
             pip_conf_path.unlink(missing_ok=True)
             subprocess.run(
                 [str(pip_path), "install", "llama-cpp-python==0.3.19"],

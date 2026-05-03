@@ -90,8 +90,8 @@ def validate_ollama_prompt(prompt: str) -> None:
         f"prompt_preview='{prompt[:100]}...'"
       )
       raise ValueError(
-        f"Prompt rejected: contains suspicious pattern that may attempt "
-        f"to override system behavior or extract secrets"
+        "Prompt rejected: contains suspicious pattern that may attempt "
+        "to override system behavior or extract secrets"
       )
 
 def validate_ollama_model(model: str) -> None:

@@ -108,9 +108,9 @@ def get_repo_root(start_path: Optional[Path] = None) -> Path:
       raise RuntimeError(
         f"NEXE_HOME points to invalid root: {core_home}\n"
         f"Reasons:\n" + "\n".join(f" {r}" for r in reasons) + "\n\n"
-        f"Solutions:\n"
-        f" 1. Fix NEXE_HOME: export NEXE_HOME=/correct/path\n"
-        f" 2. Remove NEXE_HOME: unset NEXE_HOME\n"
+        "Solutions:\n"
+        " 1. Fix NEXE_HOME: export NEXE_HOME=/correct/path\n"
+        " 2. Remove NEXE_HOME: unset NEXE_HOME\n"
       )
 
   if start_path:

@@ -35,8 +35,8 @@ def generate_env_file(project_root, model_config=None):
             with open(env_tmp, "w") as f:
                 f.write(f"NEXE_PRIMARY_API_KEY={secure_key}\n")
                 f.write(f"NEXE_CSRF_SECRET={csrf_secret}\n")
-                f.write(f"NEXE_ENV=production\n")
-                f.write(f"NEXE_LOG_LEVEL=INFO\n")
+                f.write("NEXE_ENV=production\n")
+                f.write("NEXE_LOG_LEVEL=INFO\n")
                 # Approve all 3 inference backends so users can switch engines
                 # from the UI (Motor dropdown) without re-running the installer.
                 # Previously gated on wizard choice — left the dropdown with
@@ -47,7 +47,7 @@ def generate_env_file(project_root, model_config=None):
                 approved_modules = "security,web_ui_module,ollama_module,mlx_module,llama_cpp_module"
                 f.write(f"NEXE_APPROVED_MODULES={approved_modules}\n")
                 f.write(f"NEXE_LANG={lang}\n")
-                f.write(f"# Model configuration\n")
+                f.write("# Model configuration\n")
                 if model_config:
                     f.write(f"NEXE_DEFAULT_MODEL={model_config['id']}\n")
                     f.write(f"NEXE_MODEL_ENGINE={model_config['engine']}\n")
@@ -65,9 +65,9 @@ def generate_env_file(project_root, model_config=None):
                         f.write(f"NEXE_OLLAMA_MODEL={model_config['id']}\n")
                 else:
                     # No model selected — instal·la sense model, l'usuari afegirà un model manualment
-                    f.write(f"# NEXE_DEFAULT_MODEL=  (configura via 'nexe model pull <name>')\n")
-                    f.write(f"NEXE_MODEL_ENGINE=ollama\n")
-                    f.write(f"NEXE_PROMPT_TIER=small\n")
+                    f.write("# NEXE_DEFAULT_MODEL=  (configura via 'nexe model pull <name>')\n")
+                    f.write("NEXE_MODEL_ENGINE=ollama\n")
+                    f.write("NEXE_PROMPT_TIER=small\n")
                 f.write("NEXE_QDRANT_PATH=storage/vectors\n")
                 f.write("# Optional: external Qdrant (Docker, cluster)\n")
                 f.write("# NEXE_QDRANT_URL=http://localhost:6333\n")
@@ -187,7 +187,7 @@ def _update_env_model_config(env_file, model_config):
     if not found_csrf:
         new_lines.append(f"NEXE_CSRF_SECRET={secrets.token_hex(32)}\n")
 
-    if not any('# Model configuration' in l for l in new_lines):
+    if not any('# Model configuration' in line for line in new_lines):
         new_lines.append("# Model configuration\n")
     if not found_model:
         new_lines.append(f"NEXE_DEFAULT_MODEL={model_id}\n")

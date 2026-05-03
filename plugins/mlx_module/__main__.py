@@ -40,7 +40,8 @@ def health():
 @app.command()
 def test():
     """Executa tests del modul."""
-    import subprocess, sys
+    import subprocess
+    import sys
     from pathlib import Path
     test_dir = Path(__file__).parent / "tests"
     result = subprocess.run(
