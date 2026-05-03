@@ -302,7 +302,6 @@ def main():
     section("7. Upload de fitxers")
 
     # Extensió invàlida
-    import io
     boundary = "----SmokeTestBoundary"
     body_bytes = (
         f"--{boundary}\r\n"
