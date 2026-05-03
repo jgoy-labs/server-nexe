@@ -9,6 +9,8 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+from typing import Any, Optional
+
 from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -40,8 +42,8 @@ except ImportError:
   limiter_by_key = None
   limiter_composite = None
   limiter_by_endpoint = None
-  rate_limit_tracker = None
-  start_rate_limit_cleanup_task = None
+  rate_limit_tracker: Optional[Any] = None
+  start_rate_limit_cleanup_task: Optional[Any] = None
   ADVANCED_RATE_LIMITING = False
 
 limiter = limiter_global

@@ -73,7 +73,7 @@ class CircuitBreaker:
     self.config = config or CircuitBreakerConfig()
     self._state = CircuitBreakerState()
     self.__lock: Optional[asyncio.Lock] = None
-    self.__lock_loop = None
+    self.__lock_loop: Optional[asyncio.AbstractEventLoop] = None
 
   @property
   def _lock(self) -> asyncio.Lock:

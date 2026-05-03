@@ -38,12 +38,11 @@ class NexeClient:
     """
     self.config = config or NexeConfig()
 
+    self._ssl_context: Optional[ssl.SSLContext] = None
     if not self.config.verify_ssl:
       self._ssl_context = ssl.create_default_context()
       self._ssl_context.check_hostname = False
       self._ssl_context.verify_mode = ssl.CERT_NONE
-    else:
-      self._ssl_context = None
 
   def _request(
     self,

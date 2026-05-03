@@ -212,7 +212,7 @@ def stop(ctx: click.Context, force: bool):
   project_root = Path(__file__).parent.parent.parent
   pid_file = project_root / "storage" / "run" / "server.pid"
 
-  found = []
+  found: list[tuple[str, Optional[str], list[int]]] = []
 
   # F4 fix: llegir PID file canònic primer (storage/run/server.pid)
   pid_from_file = None
