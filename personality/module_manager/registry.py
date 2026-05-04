@@ -26,7 +26,7 @@ class ModuleRegistry:
   and metadata to facilitate discovery and coordination.
   """
   
-  def __init__(self, i18n_manager=None):
+  def __init__(self, i18n_manager=None) -> None:
     """
     Initialize module registry.
     
@@ -257,7 +257,7 @@ class ModuleRegistry:
   def get_registry_stats(self) -> Dict[str, Any]:
     """Get registry statistics"""
     with self._lock:
-      categories = {}
+      categories: dict[str, int] = {}
       total_endpoints = len(self._endpoints)
       
       for registration in self._modules.values():
@@ -274,7 +274,7 @@ class ModuleRegistry:
   
   def export_openapi_spec(self) -> Dict[str, Any]:
     """Export OpenAPI specification of all endpoints"""
-    spec = {
+    spec: Dict[str, Any] = {
       'openapi': '3.0.0',
       'info': {
         'title': 'Nexe 0.9 Modular API',
