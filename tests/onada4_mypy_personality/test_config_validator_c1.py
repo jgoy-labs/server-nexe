@@ -17,7 +17,6 @@ import pytest
 import toml
 
 
-@pytest.mark.xfail(strict=True, reason="Bug bloquejat pre-Dev#2: _get_message conflict keyword 'key' (Cluster 1 Onada 4.3)")
 def test_cluster1_missing_required_key_returns_validation_error(tmp_path):
     """TDD: validate() amb meta sense 'version' retorna ValidationResult(valid=False), NO TypeError.
 
@@ -44,7 +43,6 @@ def test_cluster1_missing_required_key_returns_validation_error(tmp_path):
     assert len(result.errors) > 0
 
 
-@pytest.mark.xfail(strict=True, reason="Bug bloquejat pre-Dev#2: _get_message conflict keyword 'key' (Cluster 1 Onada 4.3)")
 def test_cluster1_port_string_type_returns_validation_error(tmp_path):
     """TDD: validate() amb port com a string retorna ValidationResult(valid=False), NO TypeError.
 
@@ -79,7 +77,6 @@ level = "INFO"
     assert len(result.errors) > 0
 
 
-@pytest.mark.xfail(strict=True, reason="Bug bloquejat pre-Dev#2: _get_message conflict keyword 'key' (Cluster 1 Onada 4.3)")
 def test_cluster1_temperature_out_of_range_returns_validation_error(tmp_path):
     """TDD: validate() amb temperature=3.0 retorna ValidationResult(valid=False), NO TypeError.
 

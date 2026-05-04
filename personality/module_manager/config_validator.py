@@ -48,11 +48,11 @@ class ConfigValidator:
     """
     self.i18n = i18n_manager
   
-  def _get_message(self, key: str, **kwargs) -> str:
+  def _get_message(self, msg_key: str, **kwargs) -> str:
     """Get translated message or fallback"""
     if self.i18n:
-      return self.i18n.t(key, **kwargs)
-    
+      return self.i18n.t(msg_key, **kwargs)
+
     fallbacks = {
       'validation.config_section_missing': f"Missing required section: [{kwargs.get('section', 'unknown')}]",
       'validation.required_missing': f"Missing required key: {kwargs.get('key', 'unknown')}",
@@ -64,8 +64,8 @@ class ConfigValidator:
       'validation.invalid_format': f"Invalid format for {kwargs.get('field', 'unknown')}",
       'validation.schema_valid': "Configuration schema valid"
     }
-    
-    return fallbacks.get(key, key)
+
+    return fallbacks.get(msg_key, msg_key)
   
   def validate(self, config_path: Path) -> ValidationResult:
     """
