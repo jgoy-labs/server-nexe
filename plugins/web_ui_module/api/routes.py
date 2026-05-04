@@ -23,7 +23,7 @@ from plugins.web_ui_module.core.rag_handler import generate_rag_metadata  # noqa
 try:
     from memory.rag.header_parser import parse_rag_header  # noqa: F401
 except ImportError:
-    parse_rag_header = None  # noqa: F841
+    parse_rag_header = None  # type: ignore[assignment]  # noqa: F841
 
 from .routes_auth import make_require_ui_auth, register_auth_routes
 from .routes_static import register_static_routes

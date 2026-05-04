@@ -38,7 +38,7 @@ class WebUIModule:
     - Context compacting per sessions llargues
     """
 
-    def __init__(self):
+    def __init__(self):  # type: ignore[annotation-unchecked]
         self._initialized = False
         self._router = None
         # SessionManager es crea a initialize() un cop crypto_provider esta
@@ -118,7 +118,7 @@ class WebUIModule:
             status=HealthStatus.HEALTHY,
             message="Web UI active",
             details={
-                "sessions": len(self.session_manager.list_sessions()),
+                "sessions": len(self.session_manager.list_sessions()),  # type: ignore[union-attr]  # invariant: _initialized=True ⟹ session_manager set (initialize L84 abans de L96)
                 "ui_dir": str(self.ui_dir)
             }
         )
