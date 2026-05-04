@@ -27,7 +27,7 @@ try:
 except ImportError:
     _SECURITY_AVAILABLE = False
 
-    def get_admin_api_key() -> Optional[str]:  # type: ignore[no-redef]
+    def get_admin_api_key() -> Optional[str]:  # type: ignore[misc, no-redef]
         """Stub: degraded mode — protected endpoints return 503 via require_ui_auth."""
         return None
 
