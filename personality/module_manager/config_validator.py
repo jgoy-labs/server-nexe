@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-import toml
+import toml  # type: ignore[import-untyped]  # FP: types-toml disponible però no instal·lat
 import re
 
 @dataclass
@@ -145,8 +145,8 @@ class ConfigValidator:
   
   def _validate_types_and_values(self, config: Dict[str, Any]) -> tuple[List[str], List[str]]:
     """Validate data types and value ranges"""
-    errors = []
-    warnings = []
+    errors: list[str] = []
+    warnings: list[str] = []
     
     if 'meta' in config:
       meta = config['meta']
@@ -183,7 +183,7 @@ class ConfigValidator:
   
   def _validate_core_section(self, config: Dict[str, Any]) -> List[str]:
     """Validate core section specifics"""
-    errors = []
+    errors: list[str] = []
     
     if 'core' not in config:
       return errors
@@ -215,7 +215,7 @@ class ConfigValidator:
   
   def _validate_plugins_section(self, config: Dict[str, Any]) -> List[str]:
     """Validate plugins section specifics"""
-    errors = []
+    errors: list[str] = []
     
     if 'plugins' not in config:
       return errors
@@ -241,7 +241,7 @@ class ConfigValidator:
   
   def _validate_storage_section(self, config: Dict[str, Any]) -> List[str]:
     """Validate storage section specifics"""
-    errors = []
+    errors: list[str] = []
     
     if 'storage' not in config:
       return errors
@@ -281,7 +281,7 @@ class ConfigValidator:
   
   def _validate_paths(self, config: Dict[str, Any]) -> List[str]:
     """Validate that specified paths exist"""
-    warnings = []
+    warnings: list[str] = []
     
     paths_to_check = [
       ('personality.orchestrator.modules_path', 'personality', 'orchestrator', 'modules_path'),
@@ -290,7 +290,7 @@ class ConfigValidator:
     ]
     
     for path_desc, *path_parts in paths_to_check:
-      section = config
+      section: Any = config
       for part in path_parts:
         if isinstance(section, dict) and part in section:
           section = section[part]
@@ -350,10 +350,10 @@ class ConfigValidator:
         warnings=[],
         section=section_name
       )
-    
-    errors = []
-    warnings = []
-    
+
+    errors: list[str] = []
+    warnings: list[str] = []
+
     if section_name == 'core':
       errors.extend(self._validate_core_section(config))
     elif section_name == 'plugins':
