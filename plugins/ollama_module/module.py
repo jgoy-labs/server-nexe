@@ -17,7 +17,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 try:
     import httpx
 except ImportError:
-    httpx = None
+    httpx = None  # type: ignore[assignment]  # Module|None, httpx absent en entorns sense dependència
 
 from fastapi import APIRouter
 

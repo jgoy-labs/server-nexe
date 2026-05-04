@@ -655,7 +655,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         from plugins.llama_cpp_module.core.config import LlamaCppConfig
                                         from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
                                         from plugins.llama_cpp_module.core.model_pool import ModelPool
-                                        new_config = LlamaCppConfig.from_env()
+                                        new_config = LlamaCppConfig.from_env()  # type: ignore[assignment]  # cross-branch: new_config prèviament MLXConfig al branch mlx, reclassificada LlamaCppConfig al branch llama_cpp
                                     finally:
                                         if _prev_llama is None:
                                             os.environ.pop("NEXE_LLAMA_CPP_MODEL", None)
@@ -668,7 +668,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             if LlamaCppChatNode._pool is not None:
                                                 LlamaCppChatNode._pool.destroy_all()
                                             engine._node.config = new_config  # type: ignore[assignment]  # cross-branch: mypy unifica new_config MLXConfig|LlamaCppConfig; en context llama_cpp_module és LlamaCppConfig
-                                            LlamaCppChatNode._config = new_config
+                                            LlamaCppChatNode._config = new_config  # type: ignore[assignment]  # cross-branch: MLXConfig|LlamaCppConfig unificat; en context llama_cpp_module és LlamaCppConfig
                                             LlamaCppChatNode._pool = ModelPool(new_config)  # type: ignore[arg-type]  # new_config: MLXConfig|LlamaCppConfig cross-branch; en context llama_cpp branch és LlamaCppConfig
                                             logger.info(f"Llama.cpp model switched to: {new_config.model_path}")
 

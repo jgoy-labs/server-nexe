@@ -18,7 +18,7 @@ from typing import Dict, Any
 try:
     import httpx
 except ImportError:
-    httpx = None
+    httpx = None  # type: ignore[assignment]  # Module|None, httpx absent en entorns sense dependència
 
 logger = logging.getLogger(__name__)
 
