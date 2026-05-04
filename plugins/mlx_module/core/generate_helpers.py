@@ -37,7 +37,7 @@ def sanitize_messages_for_alternation(messages: List[Dict]) -> List[Dict]:
         return []
 
     # Fusionar missatges consecutius del mateix rol
-    merged = []
+    merged: list = []
     for msg in filtered:
         role = msg.get("role", "user")
         content = msg.get("content", "")
