@@ -64,7 +64,7 @@ def get_health() -> Dict[str, Any]:
 
     checks["sanitizer_functional"] = {
       "status": "ok" if result.is_safe else "warning",
-      "latency_ms": round(elapsed_ms, 3),
+      "latency_ms": round(elapsed_ms, 3),  # type: ignore[dict-item]  # float per round() — dict espera int|str però float és vàlid al context
       "patterns_version": sanitizer.get_patterns_version(),
     }
 
