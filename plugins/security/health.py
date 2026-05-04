@@ -20,7 +20,7 @@ def get_health() -> Dict[str, Any]:
     Retorna dict amb status, message, details, checks.
     Delega a SecurityModule.health_check() (async).
     """
-    from .manifest import get_module_instance
+    from .manifest import get_module_instance  # type: ignore[attr-defined]  # FP: install_lazy_manifest() injecta get_module_instance() dinàmicament al namespace del mòdul
 
     module = get_module_instance()
 
