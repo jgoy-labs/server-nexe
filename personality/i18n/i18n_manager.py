@@ -12,16 +12,16 @@ www.jgoy.net · https://server-nexe.org
 import json
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-import toml
+import toml  # type: ignore[import-untyped]  # FP: types-toml disponible però no instal·lat
 
 __all__ = ['I18nManager']
 
 class I18nManager:
   """Global internationalization manager for Nexe 0.9 system"""
   
-  def __init__(self, config_path: Path = None, base_path: Path = None):
+  def __init__(self, config_path: Optional[Path] = None, base_path: Optional[Path] = None):
     """
     Initialize i18n manager.
     
@@ -31,8 +31,8 @@ class I18nManager:
     """
     self.config_path = self._find_config_path(config_path)
     self.base_path = base_path or self.config_path.parent
-    self.config = {}
-    self.translations = {}
+    self.config: Dict[str, Any] = {}
+    self.translations: Dict[str, Any] = {}
     _default_lang = os.getenv("NEXE_LANG", "ca-ES")
     self.current_language = _default_lang
     self.fallback_language = _default_lang
