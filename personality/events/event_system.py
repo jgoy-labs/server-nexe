@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import inspect
 import traceback
-from typing import List, Callable, Any, Dict, Set
+from typing import List, Callable, Any, Dict, Optional, Set
 from datetime import datetime, timezone
 
 from ..data.models import SystemEvent
@@ -24,7 +24,7 @@ __all__ = ['EventSystem']
 class EventSystem:
   """Global event management system for Nexe 0.9"""
   
-  def __init__(self, i18n_manager=None):
+  def __init__(self, i18n_manager=None) -> None:
     """
     Initialize event system.
     
@@ -143,7 +143,7 @@ class EventSystem:
       self._event_history.pop(0)
   
   def add_event_listener(self, callback: Callable[[SystemEvent], None], 
-             event_type: str = None) -> None:
+             event_type: Optional[str] = None) -> None:
     """
     Register callback for system events.
     
@@ -169,7 +169,7 @@ class EventSystem:
     )
   
   def remove_event_listener(self, callback: Callable[[SystemEvent], None], 
-              event_type: str = None) -> bool:
+              event_type: Optional[str] = None) -> bool:
     """
     Remove a registered callback.
     
@@ -201,7 +201,7 @@ class EventSystem:
     except ValueError:
       return False
   
-  def clear_event_listeners(self, event_type: str = None) -> int:
+  def clear_event_listeners(self, event_type: Optional[str] = None) -> int:
     """
     Clear event listeners.
     
@@ -227,7 +227,7 @@ class EventSystem:
     
     return count
   
-  def get_callback_count(self, event_type: str = None) -> int:
+  def get_callback_count(self, event_type: Optional[str] = None) -> int:
     """
     Get number of registered callbacks.
     
@@ -245,7 +245,7 @@ class EventSystem:
         total += len(type_list)
       return total
   
-  def get_event_history(self, event_type: str = None, limit: int = 100) -> List[SystemEvent]:
+  def get_event_history(self, event_type: Optional[str] = None, limit: int = 100) -> List[SystemEvent]:
     """
     Get event history.
     
@@ -293,7 +293,7 @@ class EventSystem:
   
   def get_event_stats(self) -> Dict[str, Any]:
     """Get event system statistics"""
-    event_type_counts = {}
+    event_type_counts: dict[str, int] = {}
     for event in self._event_history:
       event_type_counts[event.event_type] = event_type_counts.get(event.event_type, 0) + 1
     
