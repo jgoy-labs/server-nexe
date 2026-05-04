@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class RateLimitCheck:
     """Valida la configuracio de rate limiting."""
 
-    def __init__(self, project_root: Path = None):
+    def __init__(self, project_root: Path = None):  # type: ignore[assignment]  # no_implicit_optional
         self.project_root = project_root or Path(__file__).parent.parent.parent.parent
 
     def run(self) -> List[Dict[str, Any]]:

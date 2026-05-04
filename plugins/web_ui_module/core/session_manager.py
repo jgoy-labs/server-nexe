@@ -17,7 +17,7 @@ import logging
 import threading
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -30,21 +30,21 @@ class ChatSession:
     COMPACT_KEEP = 6
     MAX_CONTEXT_CHARS = 12000   # ~3000 tokens, safe per 4K-8K context models
 
-    def __init__(self, session_id: str = None):
+    def __init__(self, session_id: str = None):  # type: ignore[assignment]  # no_implicit_optional
         self.id = session_id or str(uuid.uuid4())
         self.created_at = datetime.now(timezone.utc)
         self.last_activity = datetime.now(timezone.utc)
         self.messages: List[Dict[str, str]] = []
         self.context_files: List[str] = []
-        self.attached_document: Optional[Dict[str, str]] = None  # {"filename": "...", "content": "..."}
+        self.attached_document: Optional[Dict[str, Any]] = None  # {"filename": "...", "content": "..."}
         self.context_summary: Optional[str] = None  # Resum dels missatges compactats
         self.compaction_count: int = 0  # Quantes vegades s'ha compactat
         self.custom_name: Optional[str] = None  # User-defined session name
         self.thinking_enabled: bool = False  # Per-session thinking toggle (default OFF)
         self._recently_deleted_facts: list = []  # Transient, not persisted to disk
 
-    def add_message(self, role: str, content: str, stats: dict = None,
-                    image_b64: str = None, image_type: str = None):
+    def add_message(self, role: str, content: str, stats: dict = None,  # type: ignore[assignment]  # no_implicit_optional
+                    image_b64: str = None, image_type: str = None):  # type: ignore[assignment]  # no_implicit_optional
         """Afegir missatge a l'historial.
 
         `image_b64` (bug #19c): si l'usuari adjunta una imatge al missatge,
@@ -58,7 +58,7 @@ class ChatSession:
         alguns navigators no infereixen el format del b64 i la imatge
         no es pinta.
         """
-        msg = {
+        msg: Dict[str, Any] = {
             "role": role,
             "content": content,
             "timestamp": datetime.now(timezone.utc).isoformat()
@@ -77,7 +77,7 @@ class ChatSession:
         if filename not in self.context_files:
             self.context_files.append(filename)
 
-    def attach_document(self, filename: str, content: str, chunks: List[str] = None, total_chunks: int = None):
+    def attach_document(self, filename: str, content: str, chunks: List[str] = None, total_chunks: int = None):  # type: ignore[assignment]  # no_implicit_optional
         """Attach a document to the session.
 
         The document persists for the entire session for follow-up questions.
@@ -94,12 +94,12 @@ class ChatSession:
         }
         self.last_activity = datetime.now(timezone.utc)
 
-    def get_next_chunk(self) -> Optional[Dict[str, any]]:
+    def get_next_chunk(self) -> Optional[Dict[str, Any]]:
         """Get the next chunk from the attached document"""
         if not self.attached_document:
             return None
 
-        chunks = self.attached_document.get("chunks", [])
+        chunks: List[str] = self.attached_document.get("chunks", [])
         current = self.attached_document.get("current_chunk", 0)
 
         if current >= len(chunks):
@@ -177,7 +177,7 @@ class ChatSession:
             })
         msgs.extend(self.messages)
         # Sanity check: drop consecutive duplicate roles to prevent VLM errors
-        cleaned = []
+        cleaned: List[Dict[str, str]] = []
         for m in msgs:
             if cleaned and cleaned[-1]["role"] == m["role"]:
                 continue  # skip duplicate role
@@ -388,7 +388,7 @@ class SessionManager:
         except Exception as e:
             logger.error("Failed to delete session file %s: %s", session_id, e)
 
-    def create_session(self, session_id: str = None) -> ChatSession:
+    def create_session(self, session_id: str = None) -> ChatSession:  # type: ignore[assignment]  # no_implicit_optional
         """Create a new chat session. (Bug 16: protegit per RLock)"""
         if session_id:
             self._validate_session_id(session_id)
@@ -411,7 +411,7 @@ class SessionManager:
             if session:
                 self._save_session_to_disk(session)
 
-    def get_or_create_session(self, session_id: str = None) -> ChatSession:
+    def get_or_create_session(self, session_id: str = None) -> ChatSession:  # type: ignore[assignment]  # no_implicit_optional
         """Get an existing session or create a new one.
 
         Bug 16: tot el check + create dins el mateix RLock per evitar

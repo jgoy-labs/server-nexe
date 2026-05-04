@@ -252,7 +252,7 @@ async def add_rate_limit_headers(
 
   return response
 
-def rate_limit_public(limit: str = None):
+def rate_limit_public(limit: str = None):  # type: ignore[assignment]  # no_implicit_optional
   """
   Rate limit for public endpoints (no auth)
 
@@ -264,7 +264,7 @@ def rate_limit_public(limit: str = None):
   """
   return limiter_global.limit(limit or DEFAULT_RATE_LIMITS["public"])
 
-def rate_limit_authenticated(limit: str = None):
+def rate_limit_authenticated(limit: str = None):  # type: ignore[assignment]  # no_implicit_optional
   """
   Rate limit for authenticated endpoints
 
@@ -278,7 +278,7 @@ def rate_limit_authenticated(limit: str = None):
   """
   return limiter_by_key.limit(limit or DEFAULT_RATE_LIMITS["authenticated"])
 
-def rate_limit_admin(limit: str = None):
+def rate_limit_admin(limit: str = None):  # type: ignore[assignment]  # no_implicit_optional
   """
   Rate limit for admin operations
 
@@ -290,7 +290,7 @@ def rate_limit_admin(limit: str = None):
   """
   return limiter_composite.limit(limit or DEFAULT_RATE_LIMITS["admin"])
 
-def rate_limit_health(limit: str = None):
+def rate_limit_health(limit: str = None):  # type: ignore[assignment]  # no_implicit_optional
   """
   Rate limit for health check endpoints
 
