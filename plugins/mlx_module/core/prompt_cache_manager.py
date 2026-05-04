@@ -108,7 +108,7 @@ class MLXPromptCacheManager:
         common_prefix = index
         if index > 0 and last_cache_index < 0:
             best = None
-            stack = [(current, [])]
+            stack: list = [(current, [])]
             while stack:
                 curr, extra = stack.pop()
                 if "cache" in curr:

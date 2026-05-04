@@ -22,12 +22,12 @@ _m = create_lazy_manifest(
     tags=["mlx", "apple_silicon", "llm"],
     removed_direct_routes=["/chat"],
     on_create=lambda inst: (
-        logger.info("MLX manifest: Creating MLXModule instance..."),
-        logger.info("MLX manifest: MLXModule instance created"),
+        logger.info("MLX manifest: Creating MLXModule instance..."),  # type: ignore[func-returns-value]  # tuple trick lambda: logger.info retorna None, tuple expression vàlid
+        logger.info("MLX manifest: MLXModule instance created"),  # type: ignore[func-returns-value]  # tuple trick lambda: logger.info retorna None, tuple expression vàlid
     ),
     on_get_instance=lambda inst: (
-        logger.info("MLX manifest: get_module_instance() called"),
-        logger.info(f"MLX manifest: Returning instance: {inst}"),
+        logger.info("MLX manifest: get_module_instance() called"),  # type: ignore[func-returns-value]  # tuple trick lambda: logger.info retorna None, tuple expression vàlid
+        logger.info(f"MLX manifest: Returning instance: {inst}"),  # type: ignore[func-returns-value]  # tuple trick lambda: logger.info retorna None, tuple expression vàlid
     ),
 )
 
