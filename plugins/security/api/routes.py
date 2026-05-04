@@ -88,10 +88,10 @@ def create_router(module_instance) -> APIRouter:
             ]
             for check in checks:
                 try:
-                    if asyncio.iscoroutinefunction(check.run):
-                        check_results = await check.run()
+                    if asyncio.iscoroutinefunction(check.run):  # type: ignore[attr-defined]  # checks: toutes les classes tenen .run() — list[object] per inferència
+                        check_results = await check.run()  # type: ignore[attr-defined]
                     else:
-                        check_results = check.run()
+                        check_results = check.run()  # type: ignore[attr-defined]
                     if isinstance(check_results, list):
                         results.extend(check_results)
                     elif check_results:
