@@ -210,9 +210,11 @@ class ChatSession:
     @classmethod
     def from_dict(cls, data: dict) -> 'ChatSession':
         """Create a session from a dict."""
-        session = cls(session_id=data.get("id"))
-        session.created_at = datetime.fromisoformat(data.get("created_at"))
-        session.last_activity = datetime.fromisoformat(data.get("last_activity"))
+        session = cls(session_id=data.get("id"))  # type: ignore[arg-type]  # Any|None; session_id=None → UUID autogenerat (L34)
+        _ca = data.get("created_at")
+        session.created_at = datetime.fromisoformat(_ca) if _ca else datetime.now(timezone.utc)
+        _la = data.get("last_activity")
+        session.last_activity = datetime.fromisoformat(_la) if _la else datetime.now(timezone.utc)
         session.messages = data.get("messages", [])
         session.context_files = data.get("context_files", [])
         session.attached_document = data.get("attached_document")
