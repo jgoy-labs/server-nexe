@@ -27,7 +27,7 @@ class SecurityLoggerHelpers:
   NOTE: Methods assume the subclass has the log_event() method.
   """
 
-  def log_auth_failure(
+  def log_auth_failure(  # type: ignore[misc]  # FP: mixin, self és SecurityEventLogger per invariant d'herència (SecurityEventLogger(SecurityLoggerHelpers))
     self: "SecurityEventLogger",
     reason: str,
     ip_address: Optional[str] = None,
@@ -49,7 +49,7 @@ class SecurityLoggerHelpers:
       details=details,
     )
 
-  def log_path_traversal(
+  def log_path_traversal(  # type: ignore[misc]  # FP: mixin, self és SecurityEventLogger per invariant d'herència (SecurityEventLogger(SecurityLoggerHelpers))
     self: "SecurityEventLogger",
     attempted_path: str,
     ip_address: Optional[str] = None,
@@ -70,7 +70,7 @@ class SecurityLoggerHelpers:
       details={"attempted_path": attempted_path},
     )
 
-  def log_rate_limit_exceeded(
+  def log_rate_limit_exceeded(  # type: ignore[misc]  # FP: mixin, self és SecurityEventLogger per invariant d'herència (SecurityEventLogger(SecurityLoggerHelpers))
     self: "SecurityEventLogger",
     ip_address: Optional[str] = None,
     endpoint: Optional[str] = None,
@@ -99,7 +99,7 @@ class SecurityLoggerHelpers:
       details={"limit": limit} if limit else None,
     )
 
-  def log_module_rejected(
+  def log_module_rejected(  # type: ignore[misc]  # FP: mixin, self és SecurityEventLogger per invariant d'herència (SecurityEventLogger(SecurityLoggerHelpers))
     self: "SecurityEventLogger",
     module_name: str,
     reason: str,
@@ -118,7 +118,7 @@ class SecurityLoggerHelpers:
       details={"module": module_name, "reason": reason},
     )
 
-  def log_config_validation_failed(
+  def log_config_validation_failed(  # type: ignore[misc]  # FP: mixin, self és SecurityEventLogger per invariant d'herència (SecurityEventLogger(SecurityLoggerHelpers))
     self: "SecurityEventLogger",
     config_key: str,
     reason: str,
@@ -142,7 +142,7 @@ class SecurityLoggerHelpers:
       },
     )
 
-  def log_xss_attempt(
+  def log_xss_attempt(  # type: ignore[misc]  # FP: mixin, self és SecurityEventLogger per invariant d'herència (SecurityEventLogger(SecurityLoggerHelpers))
     self: "SecurityEventLogger",
     input_data: str,
     ip_address: Optional[str] = None,
@@ -164,7 +164,7 @@ class SecurityLoggerHelpers:
       details={"parameter": parameter, "input_preview": input_data[:200]},
     )
 
-  def log_sql_injection_attempt(
+  def log_sql_injection_attempt(  # type: ignore[misc]  # FP: mixin, self és SecurityEventLogger per invariant d'herència (SecurityEventLogger(SecurityLoggerHelpers))
     self: "SecurityEventLogger",
     input_data: str,
     ip_address: Optional[str] = None,
@@ -186,7 +186,7 @@ class SecurityLoggerHelpers:
       details={"parameter": parameter, "input_preview": input_data[:200]},
     )
 
-  def log_command_injection_attempt(
+  def log_command_injection_attempt(  # type: ignore[misc]  # FP: mixin, self és SecurityEventLogger per invariant d'herència (SecurityEventLogger(SecurityLoggerHelpers))
     self: "SecurityEventLogger",
     input_data: str,
     ip_address: Optional[str] = None,
@@ -208,7 +208,7 @@ class SecurityLoggerHelpers:
       details={"parameter": parameter, "input_preview": input_data[:200]},
     )
 
-  def log_invalid_content_type(
+  def log_invalid_content_type(  # type: ignore[misc]  # FP: mixin, self és SecurityEventLogger per invariant d'herència (SecurityEventLogger(SecurityLoggerHelpers))
     self: "SecurityEventLogger",
     content_type: str,
     ip_address: Optional[str] = None,
@@ -229,7 +229,7 @@ class SecurityLoggerHelpers:
       details={"content_type": content_type},
     )
 
-  def log_request_too_large(
+  def log_request_too_large(  # type: ignore[misc]  # FP: mixin, self és SecurityEventLogger per invariant d'herència (SecurityEventLogger(SecurityLoggerHelpers))
     self: "SecurityEventLogger",
     size: int,
     max_size: int,
