@@ -22,15 +22,6 @@ import pytest
 from datetime import datetime, timezone
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Bug pre-fix Cluster 6: datetime.fromisoformat(data.get('created_at')) "
-        "→ fromisoformat(None) → TypeError quan 'created_at' absent del dict. "
-        "Dev#2 ha d'afegir guard: session.created_at = datetime.fromisoformat(v) "
-        "if (v := data.get('created_at')) else datetime.now(timezone.utc)."
-    ),
-)
 def test_from_dict_missing_created_at_does_not_raise():
     """TDD Cluster 6: from_dict() amb 'created_at' absent NO ha de petar.
 
@@ -54,14 +45,6 @@ def test_from_dict_missing_created_at_does_not_raise():
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Bug pre-fix Cluster 6: datetime.fromisoformat(data.get('last_activity')) "
-        "→ fromisoformat(None) → TypeError quan 'last_activity' absent del dict. "
-        "Dev#2 ha d'afegir guard idèntic al de created_at."
-    ),
-)
 def test_from_dict_missing_last_activity_does_not_raise():
     """TDD Cluster 6: from_dict() amb 'last_activity' absent NO ha de petar.
 
