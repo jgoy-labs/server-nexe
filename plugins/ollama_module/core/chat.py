@@ -74,7 +74,7 @@ class OllamaChat:
         else:
             # Per-session thinking intersected with model capability (safety belt)
             effective_think = thinking_enabled and can_think(model)
-        payload = {
+        payload: Dict[str, Any] = {
             "model": model,
             "messages": messages,
             "stream": stream,
