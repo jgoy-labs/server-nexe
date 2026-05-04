@@ -301,7 +301,7 @@ class ModuleManager:
     """
     import importlib
 
-    loaded_modules = {}
+    loaded_modules: Dict[str, Any] = {}
     memory_path = self.path_discovery.base_path / "memory"
 
     if not memory_path.exists():
@@ -426,7 +426,7 @@ class ModuleManager:
     import traceback
     from personality.data.models import SystemEvent, ModuleState
 
-    result = {
+    result: Dict[str, Any] = {
       'loaded': [],
       'skipped': [],
       'failed': [],
