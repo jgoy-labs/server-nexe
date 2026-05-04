@@ -38,7 +38,7 @@ class WebUIModule:
     - Context compacting per sessions llargues
     """
 
-    def __init__(self):  # type: ignore[annotation-unchecked]
+    def __init__(self) -> None:
         self._initialized = False
         self._router = None
         # SessionManager es crea a initialize() un cop crypto_provider esta
