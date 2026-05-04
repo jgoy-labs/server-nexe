@@ -10,7 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 from pathlib import Path
-from typing import List, Set, Dict, Any
+from typing import List, Optional, Set, Dict, Any
 import json
 
 import logging
@@ -31,7 +31,7 @@ class PathDiscovery:
   - strict=False (DEV): Also auto-discovers folders with 'modul' in name
   """
 
-  def __init__(self, config: Dict[str, Any] = None, i18n_manager=None, strict: bool = None):
+  def __init__(self, config: Optional[Dict[str, Any]] = None, i18n_manager=None, strict: Optional[bool] = None):
     """
     Initialize path discovery.
 
@@ -312,7 +312,7 @@ class PathDiscovery:
 
     return False
   
-  def find_module_path(self, module_name: str) -> Path:
+  def find_module_path(self, module_name: str) -> Optional[Path]:
     """
     Find the path of a specific module.
     
@@ -339,7 +339,7 @@ class PathDiscovery:
       'modules': list(self._module_locations.keys())
     }
   
-  def save_cache(self, cache_file: Path = None) -> None:
+  def save_cache(self, cache_file: Optional[Path] = None) -> None:
     """
     Save cache of discovered paths and modules.
     
@@ -365,7 +365,7 @@ class PathDiscovery:
       msg = self._get_message('path_discovery.errors.cache_save_failed', error=str(e))
       logger.warning(msg, component="path_discovery")
   
-  def load_cache(self, cache_file: Path = None) -> bool:
+  def load_cache(self, cache_file: Optional[Path] = None) -> bool:
     """
     Load cache of paths and modules.
     
