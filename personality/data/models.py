@@ -320,7 +320,7 @@ def create_module_info(name: str, path: Union[str, Path], **kwargs) -> ModuleInf
     **kwargs
   )
 
-def create_system_event(source: str, event_type: str, level: str = None, **details) -> SystemEvent:
+def create_system_event(source: str, event_type: str, level: Optional[str] = None, **details) -> SystemEvent:
   """
   Helper function to create SystemEvent.
   

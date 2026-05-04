@@ -60,7 +60,7 @@ class RouteManager:
       Llista de rutes registrades
     """
     with self._lock:
-      registered_routes = []
+      registered_routes: List[Dict[str, Any]] = []
       
       try:
         if component_type == 'router' and isinstance(api_component, APIRouter):
@@ -102,7 +102,7 @@ class RouteManager:
   def _register_router_routes(self, module_name: str, router: APIRouter, 
                prefix: str) -> List[Dict[str, Any]]:
     """Registra rutes d'un APIRouter"""
-    registered_routes = []
+    registered_routes: List[Dict[str, Any]] = []
     
     try:
       prefixed_router = APIRouter(prefix=prefix)
@@ -141,7 +141,7 @@ class RouteManager:
   def _register_app_routes(self, module_name: str, app: FastAPI, 
               prefix: str) -> List[Dict[str, Any]]:
     """Registra rutes d'una FastAPI app"""
-    registered_routes = []
+    registered_routes: List[Dict[str, Any]] = []
     
     try:
       self.main_app.mount(prefix, app)
@@ -173,7 +173,7 @@ class RouteManager:
   def _register_endpoint_routes(self, module_name: str, endpoints: List[Any], 
                 prefix: str) -> List[Dict[str, Any]]:
     """Registra endpoints individuals"""
-    registered_routes = []
+    registered_routes: List[Dict[str, Any]] = []
     
     return registered_routes
   

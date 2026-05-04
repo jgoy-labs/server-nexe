@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 
 from pathlib import Path
 from typing import Dict, Any, Optional
-import toml
+import toml  # type: ignore[import-untyped]  # FP: types-toml disponible però no instal·lat
 
 from core.config import (
     load_config as core_load_config,
@@ -47,7 +47,7 @@ class ConfigManager:
     self.manifests_path = self.config_path.parent / get_message(
       self.i18n, 'paths.manifests_dir'
     )
-    self._config = {}
+    self._config: Dict[str, Any] = {}
     self._load_config()
 
     # Environment helpers
