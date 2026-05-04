@@ -66,7 +66,7 @@ class ModuleManager:
   See: docs/NEXE_ARCHITECTURAL_DECISIONS.md (ADR-001)
   """
 
-  def __init__(self, config_path: Path = None):
+  def __init__(self, config_path: Optional[Path] = None):
     """
     Inicialitza module manager amb tots els components.
 
@@ -197,19 +197,19 @@ class ModuleManager:
   async def start_system(self) -> bool:
     """Inicia el sistema complet."""
     original_get_lock = self.system_lifecycle._get_lock
-    self.system_lifecycle._get_lock = lambda: self._lock
+    self.system_lifecycle._get_lock = lambda: self._lock  # type: ignore[method-assign]  # lock injection: shares self._lock with system_lifecycle temporarily
     result = await self.system_lifecycle.start_system()
     self._running = self.system_lifecycle.is_running()
-    self.system_lifecycle._get_lock = original_get_lock
+    self.system_lifecycle._get_lock = original_get_lock  # type: ignore[method-assign]  # restore original _get_lock after lock sharing
     return result
 
   async def shutdown_system(self) -> None:
     """Atura el sistema."""
     original_get_lock = self.system_lifecycle._get_lock
-    self.system_lifecycle._get_lock = lambda: self._lock
+    self.system_lifecycle._get_lock = lambda: self._lock  # type: ignore[method-assign]  # lock injection: shares self._lock with system_lifecycle temporarily
     await self.system_lifecycle.shutdown_system()
     self._running = self.system_lifecycle.is_running()
-    self.system_lifecycle._get_lock = original_get_lock
+    self.system_lifecycle._get_lock = original_get_lock  # type: ignore[method-assign]  # restore original _get_lock after lock sharing
 
   def get_module_info(self, module_name: str) -> Optional[ModuleInfo]:
     """Get information about a module."""
@@ -257,7 +257,7 @@ class ModuleManager:
       "uptime_seconds": (datetime.now(timezone.utc) - self._system_start_time).total_seconds()
     }
 
-  def add_event_listener(self, callback, event_type: str = None) -> None:
+  def add_event_listener(self, callback, event_type: Optional[str] = None) -> None:
     """Afegeix listener d'events."""
     self.events.add_event_listener(callback, event_type)
 
@@ -277,7 +277,7 @@ class ModuleManager:
     self.module_lifecycle.set_api_integrator(api_integrator)
     logger.info(get_message(self.i18n, 'api.integrator.set'))
 
-  async def load_memory_modules(self, config: dict = None) -> Dict[str, Any]:
+  async def load_memory_modules(self, config: Optional[Dict[Any, Any]] = None) -> Dict[str, Any]:
     """
     Load and initialize memory subsystem modules.
 
@@ -392,7 +392,7 @@ class ModuleManager:
     logger.info("Memory modules loaded: %d (%s)", len(loaded_modules), list(loaded_modules.keys()))
     return loaded_modules
 
-  def load_memory_modules_sync(self, config: dict = None) -> Dict[str, Any]:
+  def load_memory_modules_sync(self, config: Optional[Dict[Any, Any]] = None) -> Dict[str, Any]:
     """Synchronous wrapper for load_memory_modules."""
     return self.sync_wrapper.run_sync(
       self.load_memory_modules(config),
@@ -403,7 +403,7 @@ class ModuleManager:
     self,
     app,
     project_root: Path,
-    discovered: List[str] = None
+    discovered: Optional[List[str]] = None
   ) -> Dict[str, Any]:
     """
     Load plugin routers into FastAPI application with security checks.
