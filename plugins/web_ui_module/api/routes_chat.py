@@ -565,6 +565,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 import os
 
                 module_manager = get_server_state().module_manager
+                if module_manager is None:
+                    raise HTTPException(status_code=503, detail="Service unavailable: module manager not initialized")
                 # Prioritzar model/backend del request (selector UI) sobre env vars
                 model_name = body.get("model") or os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
                 if len(model_name) > 100:
