@@ -23,7 +23,7 @@ __all__ = ['MetricsCollector']
 class MetricsCollector:
   """Global metrics collection and management system for Nexe 0.9"""
   
-  def __init__(self, i18n_manager=None):
+  def __init__(self, i18n_manager=None) -> None:
     """
     Initialize metrics collector.
     
@@ -72,9 +72,9 @@ class MetricsCollector:
         module_info.last_activity = datetime.now(timezone.utc)
       
       msg = self._get_message('metrics.updated', module=module_name)
-      logger.debug(msg, 
-            component="metrics", 
-            module=module_name, 
+      logger.debug(msg,  # type: ignore[arg-type]  # FP: LoggerAdapter stub rebutja **kwargs custom (component, module, etc.); runtime ok
+            component="metrics",
+            module=module_name,
             **{k: v for k, v in metrics.items() if isinstance(v, (int, float, str))})
   
   def get_system_metrics(self, modules: Dict[str, ModuleInfo]) -> SystemMetrics:
@@ -94,7 +94,7 @@ class MetricsCollector:
       avg_cpu = sum(m.cpu_usage for m in modules.values()) / max(len(modules), 1)
       
       running_modules = [m for m in modules.values() if m.state == ModuleState.RUNNING]
-      avg_load_time = 0
+      avg_load_time: float = 0
       if running_modules:
         load_times = [m.load_duration_ms for m in running_modules if m.load_duration_ms]
         avg_load_time = sum(load_times) / len(load_times) if load_times else 0
