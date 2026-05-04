@@ -18,7 +18,7 @@ from plugins.web_ui_module.messages import get_message, get_i18n
 try:
     from plugins.security.core.input_sanitizers import validate_string_input
 except ImportError:
-    def validate_string_input(s, *a, **k):  # type: ignore[no-redef]
+    def validate_string_input(s, *a, **k):  # type: ignore[misc, no-redef]
         return s
 from core.dependencies import limiter
 
