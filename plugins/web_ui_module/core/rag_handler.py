@@ -39,6 +39,8 @@ async def generate_rag_metadata(body_content: str, filename: str) -> dict:
     try:
         from core.lifespan import get_server_state
         module_manager = get_server_state().module_manager
+        if module_manager is None:
+            return _fallback()
         model_name = _os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
 
         sample = body_content[:3000].strip()

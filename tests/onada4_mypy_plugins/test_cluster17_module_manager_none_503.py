@@ -92,14 +92,6 @@ def _build_minimal_chat_app():
 # Test 2 — xfail TDD: POST /chat module_manager=None → 503
 # ──────────────────────────────────────────────────────────────────────────────
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Bug pre-fix Cluster 17: module_manager=None → AttributeError absorbida "
-        "per except Exception → response_text 'Error: ...' → HTTP 200. "
-        "Dev#2 ha d'afegir guard: if module_manager is None: raise HTTPException(503)."
-    ),
-)
 def test_chat_endpoint_module_manager_none_returns_503():
     """TDD Cluster 17: POST /chat amb module_manager=None ha de retornar HTTP 503.
 
@@ -108,6 +100,8 @@ def test_chat_endpoint_module_manager_none_returns_503():
     Post-fix (Dev#2): guard explícit → HTTPException(503, 'Service unavailable').
     """
     from fastapi.testclient import TestClient
+
+    from core.dependencies import limiter as _nexe_limiter
 
     mock_state = MagicMock()
     mock_state.module_manager = None
@@ -124,6 +118,7 @@ def test_chat_endpoint_module_manager_none_returns_503():
             "plugins.web_ui_module.api.routes_chat._get_memory_helper",
             return_value=mock_memory_helper,
         ),
+        patch.object(_nexe_limiter, "_check_request_limit"),  # bypass @limiter.limit("20/min") cross-test accumulation
     ):
         with TestClient(app, raise_server_exceptions=False) as client:
             r = client.post("/chat", json={"message": "hola"})
