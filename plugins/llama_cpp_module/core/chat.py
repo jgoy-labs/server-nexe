@@ -59,7 +59,7 @@ class LlamaCppChatNode:
         if not session_id:
             session_id = "default"
 
-        return LlamaCppChatNode._pool.get_or_create(session_id, system_hash)
+        return LlamaCppChatNode._pool.get_or_create(session_id, system_hash)  # type: ignore[union-attr]  # invariant: __init__ L42 sempre inicialitza _pool = ModelPool(config)
 
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -310,7 +310,7 @@ class LlamaCppChatNode:
                         "type": "image_url",
                         "image_url": {"url": f"data:image/png;base64,{b64}"},
                     })
-                all_messages.append({"role": "user", "content": content_parts})
+                all_messages.append({"role": "user", "content": content_parts})  # type: ignore[dict-item]  # VLM: content_parts és list[dict], all_messages espera list[str] però accepta VLM format
                 # Only inject images into the first user message
                 images = []
             else:
