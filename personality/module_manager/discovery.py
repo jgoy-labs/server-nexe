@@ -39,7 +39,7 @@ class ModuleDiscovery:
     config_manager,
     events,
     i18n
-  ):
+  ) -> None:
     """
     Inicialitza el component de descobriment.
 

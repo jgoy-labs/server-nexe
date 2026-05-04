@@ -64,7 +64,7 @@ class ModuleValidator:
     Raises:
       ModuleValidationError: If validation fails
     """
-    validations = []
+    validations: list[str] = []
 
     self._validate_manifest_integrity(module_info, validations)
 
