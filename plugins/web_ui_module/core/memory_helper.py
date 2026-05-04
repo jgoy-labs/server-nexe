@@ -888,8 +888,8 @@ class MemoryHelper:
         self,
         query: str,
         limit: int = 5,
-        collections: list = None,
-        session_id: str = None
+        collections: list = None,  # type: ignore[assignment]  # no_implicit_optional
+        session_id: str = None  # type: ignore[assignment]  # no_implicit_optional
     ) -> Dict[str, Any]:
         """
         Search memory with temporal decay and access tracking.

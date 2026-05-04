@@ -23,7 +23,7 @@ class OllamaSemanticError(Exception):
 class ModelNotFoundError(OllamaSemanticError):
     """El model demanat no existeix a la instancia Ollama (HTTP 404)."""
 
-    def __init__(self, model_name: str, message: str = None):
+    def __init__(self, model_name: str, message: str = None):  # type: ignore[assignment]  # no_implicit_optional
         self.model_name = model_name
         super().__init__(
             message or f"Ollama model not found: {model_name}",
