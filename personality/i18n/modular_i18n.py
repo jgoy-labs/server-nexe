@@ -11,8 +11,8 @@ www.jgoy.net · https://server-nexe.org
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
-import toml
+from typing import Any, Dict, List, Optional
+import toml  # type: ignore[import-untyped]  # FP: types-toml disponible però no instal·lat
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ __all__ = ['ModularI18nManager']
 class ModularI18nManager:
   """Modular internationalisation manager for Nexe 0.9."""
   
-  def __init__(self, config_path: Path = None, base_path: Path = None):
+  def __init__(self, config_path: Optional[Path] = None, base_path: Optional[Path] = None):
     """
     Initialize modular i18n manager.
     
@@ -32,8 +32,8 @@ class ModularI18nManager:
     """
     self.config_path = self._find_config_path(config_path)
     self.base_path = base_path or self.config_path.parent.parent
-    self.config = {}
-    self.translations = {}
+    self.config: Dict[str, Any] = {}
+    self.translations: Dict[str, Any] = {}
     self.current_language = "en-US"
     self.fallback_language = "en-US"
     self._load_config()
@@ -95,7 +95,7 @@ class ModularI18nManager:
         f"**/languages/{self.fallback_language}/messages_*.json",
         f"**/**/languages/{self.fallback_language}/messages_*.json",
       ]
-      fallback_files = []
+      fallback_files: list[Path] = []
       for pattern in fallback_patterns:
         fallback_files.extend(self.base_path.glob(pattern))
       fallback_files = list(set(fallback_files))
@@ -248,7 +248,7 @@ class ModularI18nManager:
           count += 1
       return count
     
-    stats = {
+    stats: Dict[str, Any] = {
       'current_language': self.current_language,
       'fallback_language': self.fallback_language,
       'components': len(self.get_available_components()),
