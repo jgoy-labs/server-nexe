@@ -72,10 +72,10 @@ class MetricsCollector:
         module_info.last_activity = datetime.now(timezone.utc)
       
       msg = self._get_message('metrics.updated', module=module_name)
-      logger.debug(msg,  # type: ignore[arg-type]  # FP: LoggerAdapter stub rebutja **kwargs custom (component, module, etc.); runtime ok
+      logger.debug(msg,
             component="metrics",
             module=module_name,
-            **{k: v for k, v in metrics.items() if isinstance(v, (int, float, str))})
+            **{k: v for k, v in metrics.items() if isinstance(v, (int, float, str))})  # type: ignore[arg-type]  # FP: LoggerAdapter stub rebutja **kwargs custom; runtime ok
   
   def get_system_metrics(self, modules: Dict[str, ModuleInfo]) -> SystemMetrics:
     """
