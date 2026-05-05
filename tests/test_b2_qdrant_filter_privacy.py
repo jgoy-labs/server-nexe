@@ -32,14 +32,6 @@ def _make_point(user_id: str, content: str) -> MagicMock:
     return pt
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "B2: fallback query_points() drops user_id filter — privacy leak P0. "
-        "Quan search() falla (qdrant ≥1.11), el fallback no passa query_filter "
-        "i retorna vectors de tots els usuaris. (Onada 4.6b, pre-fix)"
-    ),
-)
 def test_search_with_filter_user_id_drop_in_fallback():
     """Fallback query_points() ha de respectar el user_id filter.
 
@@ -79,13 +71,6 @@ def test_search_with_filter_user_id_drop_in_fallback():
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Anti-reg B2: el bloc except de search_with_filter no conté query_filter= "
-        "— guard estructural per detectar eliminació silenciosa del fix. (Onada 4.6b, pre-fix)"
-    ),
-)
 def test_qdrant_adapter_fallback_passes_filter():
     """Anti-regressió B2: el bloc except de search_with_filter conté query_filter=.
 
