@@ -12,6 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import hashlib
 import json
 import logging
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -101,6 +102,8 @@ class MemoryService:
         Returns staging entry ID if accepted, None if rejected.
         If force=True, bypass the Gate heuristic.
         """
+        text = unicodedata.normalize("NFKC", text)
+
         # Gate (skip if force=True)
         if not force:
             is_user = source in ("user_message", "cli", "web_ui")

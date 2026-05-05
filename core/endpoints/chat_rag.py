@@ -73,11 +73,10 @@ async def build_rag_context(
     """
     from memory.rag_sources.base import SearchRequest
 
-    # R1 v1.0.4: NFKC-normalize the query to mirror the index path. Documents
-    # are NFKC-normalized at ingest time (chat_sanitization._filter_rag_injection
-    # and the security input sanitizers), so a query carrying fullwidth or
-    # compat variants would otherwise miss the indexed canonical form. Single
-    # normalization here covers the three downstream memory.search() calls.
+    # R1 v1.0.4: NFKC-normalize the query to mirror the ingest path.
+    # Documents are NFKC-normalized at ingest via MemoryService.remember() (fix B3
+    # Onada 4.6b). Single normalization here covers the three downstream
+    # memory.search() calls.
     last_user_msg = unicodedata.normalize("NFKC", last_user_msg)
 
     context_text = ""
