@@ -441,6 +441,7 @@ class QdrantAdapter:
             res = self._require_client().query_points(
                 collection_name=collection_name,
                 query=query_vector,
+                query_filter=qdrant_filter,
                 limit=limit,
             )
             return res.points
