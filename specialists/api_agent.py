@@ -118,6 +118,8 @@ class ApiAgent(BaseAgent):
             return ""
         if decorator.args and isinstance(decorator.args[0], ast.Constant):
             path = decorator.args[0].value
+            if not isinstance(path, str):
+                return ""
             return f"{method.upper()} {path}"
         return ""
 
