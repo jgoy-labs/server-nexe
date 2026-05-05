@@ -32,6 +32,13 @@ except ImportError:
         return None
 
 from plugins.web_ui_module.messages import get_message, get_i18n
+try:
+    from plugins.ollama_module.core.client import resolve_base_url
+except ImportError:
+    def resolve_base_url() -> str:  # type: ignore[misc]
+        import os as _os
+        base = _os.getenv("NEXE_OLLAMA_HOST") or _os.getenv("OLLAMA_HOST") or ("http://localhost:" "11434")
+        return base.rstrip("/")
 
 logger = logging.getLogger(__name__)
 
@@ -295,7 +302,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                         try:
                             import urllib.request
                             import json as _json
-                            req = urllib.request.urlopen("http://localhost:11434/api/ps", timeout=2)  # nosec B310: hardcoded localhost Ollama URL, no scheme injection possible
+                            req = urllib.request.urlopen(f"{resolve_base_url()}/api/ps", timeout=2)  # nosec B310
                             ps_data = _json.loads(req.read())
                             for loaded in ps_data.get("models", []):
                                 loaded_name = loaded.get("name", "")
@@ -415,7 +422,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
             try:
                 import httpx
                 async with httpx.AsyncClient(timeout=3.0) as client:
-                    resp = await client.get("http://localhost:11434/api/tags")
+                    resp = await client.get(f"{resolve_base_url()}/api/tags")
                     if resp.status_code != 200:
                         # Ollama no accessible — no podem verificar, accepta
                         logger.warning(
@@ -468,7 +475,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
             try:
                 import httpx
                 async with httpx.AsyncClient(timeout=3.0) as client:
-                    resp = await client.get("http://localhost:11434/api/tags")
+                    resp = await client.get(f"{resolve_base_url()}/api/tags")
                     if resp.status_code != 200:
                         raise ConnectionError()
             except Exception:
@@ -521,7 +528,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                 import httpx as _httpx
                 async with _httpx.AsyncClient(timeout=5.0) as _uc:
                     await _uc.post(
-                        "http://localhost:11434/api/chat",
+                        f"{resolve_base_url()}/api/chat",
                         json={"model": old_model, "keep_alive": 0}
                     )
                     logger.info(f"Unloaded previous model from Ollama VRAM: {old_model}")
