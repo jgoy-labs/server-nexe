@@ -56,10 +56,10 @@ class SystemLifecycleManager:
       for module_info in self.list_modules_func():
         if module_info.auto_start and module_info.enabled:
           if await self.module_lifecycle.load_module(
-            module_info.name, self._get_lock()
+            module_info.name
           ):
             if await self.module_lifecycle.start_module(
-              module_info.name, self._get_lock()
+              module_info.name
             ):
               started += 1
 
@@ -86,7 +86,7 @@ class SystemLifecycleManager:
     running = self.list_modules_func(state_filter=ModuleState.RUNNING)
     for module_info in running:
       await self.module_lifecycle.stop_module(
-        module_info.name, self._get_lock()
+        module_info.name
       )
 
     msg = get_message(self.i18n, 'system.shutdown.completed')
