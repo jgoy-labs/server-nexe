@@ -142,10 +142,6 @@ class TestB5GetHealthHashattrGuard:
 
 class TestB6StopModuleStateErrorLeak:
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="B6: stop_module no fa state=ERROR quan shutdown llança — mòdul queda STOPPING indefinidament",
-    )
     def test_b6_stop_module_error_sets_state_error(self, lm):
         """xfail: state hauria de ser ERROR quan stop() llança excepció.
 

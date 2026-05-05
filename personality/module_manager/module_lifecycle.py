@@ -310,4 +310,7 @@ class ModuleLifecycleManager:
               module=module_name, error=str(e))
       logger.error(msg, component="module_lifecycle", exc_info=True)
 
+      async with self._async_lock:
+        module_info.state = ModuleState.ERROR
+
       return False
