@@ -19,23 +19,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Onada 4.5-residual cluster B — REAL: "
-        "chunk.content no existeix a ChunkMetadata "
-        "→ AttributeError garantit a __main__.py:95"
-    ),
-)
 def test_cmd_chunk_raises_attribute_error_content_missing(tmp_path) -> None:
-    """Pre-fix: cmd_chunk llança AttributeError perquè chunk.content no existeix.
+    """Post-fix B-LOCAL: cmd_chunk no llança AttributeError.
 
-    ChunkMetadata (interfaces.py:214) no té cap camp 'content'. L'accés a
-    chunk.content[:100] a __main__.py:95 és directe, sense try/except ni guard.
-    L'excepció és garantida per qualsevol invocació de cmd_chunk amb ≥1 chunk.
-
-    Post-fix (B-LOCAL): cmd_chunk llegirà text[char_start:char_end] del fitxer
-    original. El test XPASSARÀ i cal eliminar el marker xfail.
+    Fix B-LOCAL: __main__.py:95 usa content[char_start:char_end] en lloc de
+    chunk.content. El text original ja llegit a la mateixa funció s'usa per
+    generar el preview — sense accés a cap atribut inexistent.
     """
     from memory.embeddings.core.interfaces import ChunkMetadata, ChunkedDocument
 

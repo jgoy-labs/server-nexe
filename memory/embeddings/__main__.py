@@ -92,7 +92,7 @@ async def cmd_chunk(file_path: str, doc_id: Optional[str] = None):
       {
         "index": chunk.chunk_index,
         "section_title": chunk.section_title,
-        "content_preview": chunk.content[:100] + "...",
+        "content_preview": content[chunk.char_start:chunk.char_end][:100] + "...",
         "char_range": f"{chunk.char_start}-{chunk.char_end}"
       }
       for chunk in result.chunks
