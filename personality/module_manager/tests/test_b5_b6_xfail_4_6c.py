@@ -56,10 +56,6 @@ def mm(tmp_path):
 
 class TestB5GetHealthHashattrGuard:
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="B5: instance.get_health() sense hasattr guard — mòdul sense get_health() és descartat silenciosament",
-    )
     def test_b5_module_without_get_health_is_registered(self, mm, tmp_path):
         """xfail: mòdul sense get_health() hauria de registrar-se amb default health.
 

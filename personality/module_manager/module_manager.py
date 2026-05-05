@@ -357,8 +357,11 @@ class ModuleManager:
           continue
 
         # Health check
-        health = instance.get_health()
-        health_status = health.get("status", "unhealthy")
+        if hasattr(instance, 'get_health'):
+          health = instance.get_health()
+          health_status = health.get("status", "unhealthy")
+        else:
+          health_status = "healthy"
 
         logger.info(
           "Memory module loaded: %s (ID: %s, health: %s)",
