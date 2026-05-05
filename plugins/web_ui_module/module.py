@@ -10,6 +10,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -40,6 +41,7 @@ class WebUIModule:
 
     def __init__(self) -> None:
         self._initialized = False
+        self._init_lock = asyncio.Lock()
         self._router = None
         # SessionManager es crea a initialize() un cop crypto_provider esta
         # disponible. Crear-lo aqui sense crypto seguit d'un reemplacament mes
@@ -72,34 +74,37 @@ class WebUIModule:
         """Inicialitzacio del plugin"""
         if self._initialized:
             return True
+        async with self._init_lock:
+            if self._initialized:
+                return True
 
-        try:
-            # Create the one and only SessionManager, with crypto if available.
-            crypto = None
             try:
-                from core.lifespan import get_server_state
-                crypto = get_server_state().crypto_provider
-            except Exception:
+                # Create the one and only SessionManager, with crypto if available.
                 crypto = None
-            self.session_manager = SessionManager(crypto_provider=crypto)
+                try:
+                    from core.lifespan import get_server_state
+                    crypto = get_server_state().crypto_provider
+                except Exception:
+                    crypto = None
+                self.session_manager = SessionManager(crypto_provider=crypto)
 
-            # Resolve API base URL
-            self.api_base_url = self._resolve_api_base_url(context)
+                # Resolve API base URL
+                self.api_base_url = self._resolve_api_base_url(context)
 
-            # Ensure directories exist
-            self.ui_dir.mkdir(parents=True, exist_ok=True)
-            self.upload_dir.mkdir(parents=True, exist_ok=True)
+                # Ensure directories exist
+                self.ui_dir.mkdir(parents=True, exist_ok=True)
+                self.upload_dir.mkdir(parents=True, exist_ok=True)
 
-            # Initialize router
-            self._init_router()
+                # Initialize router
+                self._init_router()
 
-            self._initialized = True
-            logger.info("WebUIModule initialized successfully")
-            return True
+                self._initialized = True
+                logger.info("WebUIModule initialized successfully")
+                return True
 
-        except Exception as e:
-            logger.error(f"Failed to initialize WebUIModule: {e}")
-            return False
+            except Exception as e:
+                logger.error(f"Failed to initialize WebUIModule: {e}")
+                return False
 
     async def shutdown(self) -> None:
         """Cleanup — idempotent"""

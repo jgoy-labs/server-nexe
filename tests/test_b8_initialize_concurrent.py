@@ -93,64 +93,6 @@ def test_ollama_module_initialize_uses_lock():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Test 2 — race demo standalone (patró pre-fix, sempre falla — xfail strict)
-# ──────────────────────────────────────────────────────────────────────────────
-
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "B8 race demo: el patró actual `if self._initialized / await / _initialized=True` "
-        "SENSE Lock permet que >1 coroutines superin el guard. "
-        "Quan Dev#2 apliqui el Lock, el test XPASS → retirar el marker xfail."
-    ),
-)
-async def test_initialize_concurrent_race_demo_pattern():
-    """Demostra el race del patró pre-fix d'initialize() sense Lock.
-
-    Replica exactament el patró actual d'OllamaModule.initialize():
-      if self._initialized: return True
-      await ensure_running()          ← window race entre guard i set
-      self._initialized = True
-
-    asyncio.gather(10) → totes 10 superen el guard → call_count > 1.
-    Aquest test XFAIL (sempre falla pre-fix). Quan el Lock s'apliqui a
-    OllamaModule, la demo del patró en l'aïllament SEGUIRÀ fallant (perquè
-    la classe _BuggyPatternModule no s'actualitza). En aquell moment:
-      - Retirar marker xfail d'aquest test (o eliminar el test).
-      - Afegir test funcional si OllamaModule és importable.
-    """
-
-    class _BuggyPatternModule:
-        """Replica exacta del patró current d'OllamaModule.initialize() pre-fix."""
-        def __init__(self):
-            self._initialized = False
-
-        async def initialize(self, ctx):
-            if self._initialized:
-                return True
-            await asyncio.sleep(0)   # simula ensure_ollama_running()
-            self._initialized = True
-            return True
-
-    module = _BuggyPatternModule()
-    call_count = 0
-    _original_init = module.initialize
-
-    async def _counted(ctx):
-        nonlocal call_count
-        if not module._initialized:
-            call_count += 1
-        return await _original_init(ctx)
-
-    await asyncio.gather(*[_counted({}) for _ in range(10)])
-
-    assert call_count == 1, (
-        f"B8 race: {call_count} entrades al bloc init (esperada: 1). "
-        "Patró pre-fix sense Lock → race concurrent confirmada."
-    )
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 # Test 3 — anti-reg concurrent amb patró corregit (ha de PASSAR sempre)
 # ──────────────────────────────────────────────────────────────────────────────
 

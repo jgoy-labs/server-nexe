@@ -10,6 +10,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import asyncio
 import logging
 import os
 from typing import Any, AsyncIterator, Dict, List, Optional
@@ -64,6 +65,7 @@ class OllamaModule:
         self.timeout = float(os.getenv("NEXE_OLLAMA_CHAT_TIMEOUT", "600.0"))
         self.pull_timeout = float(os.getenv("NEXE_OLLAMA_PULL_TIMEOUT", "600.0"))
         self._initialized = False
+        self._init_lock = asyncio.Lock()
         self._router = None
 
         # Components extrets
@@ -92,18 +94,21 @@ class OllamaModule:
         """Inicialitzacio via Nexe Launcher"""
         if self._initialized:
             return True
-        self._init_router()
-        try:
-            services = context.get("services", {})
-            if services and "i18n" in services:
-                self.i18n = services["i18n"]
-            await self.client.ensure_ollama_running()
-            self._initialized = True
-            logger.info("OllamaModule initialized - base_url=%s", self.base_url)
-            return True
-        except Exception as e:
-            logger.error("Failed to initialize OllamaModule: %s", e)
-            return False
+        async with self._init_lock:
+            if self._initialized:
+                return True
+            self._init_router()
+            try:
+                services = context.get("services", {})
+                if services and "i18n" in services:
+                    self.i18n = services["i18n"]
+                await self.client.ensure_ollama_running()
+                self._initialized = True
+                logger.info("OllamaModule initialized - base_url=%s", self.base_url)
+                return True
+            except Exception as e:
+                logger.error("Failed to initialize OllamaModule: %s", e)
+                return False
 
     async def shutdown(self) -> None:
         """Cleanup — descarrega models d'Ollama i allibera VRAM."""

@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import asyncio
 import logging
 from typing import Dict, Any, List
 
@@ -28,6 +29,7 @@ class LlamaCppModule:
     def __init__(self):
         self._node = None
         self._initialized = False
+        self._init_lock = asyncio.Lock()
         self._router = None
 
     @property
@@ -45,49 +47,52 @@ class LlamaCppModule:
         """Initialize via Nexe Launcher."""
         if self._initialized:
             return True
+        async with self._init_lock:
+            if self._initialized:
+                return True
 
-        # Verify native lib available BEFORE anything else (P0-2.a)
-        # If llama-cpp-python is not installed, fail fast so the loader
-        # (core/lifespan_modules.py, fixed in P0-2.b) removes us from
-        # app.state.modules and /status reports llama_cpp as unavailable.
-        try:
-            import llama_cpp  # noqa: F401
-        except ImportError:
-            logger.error(
-                "LlamaCppModule: llama-cpp-python not installed. "
-                "Module will NOT be available. "
-                "Reinstall the Nexe DMG (recommended), or from the venv run: "
-                "pip install llama-cpp-python "
-                "(the arm64 macOS PyPI wheel already ships with Metal — "
-                "forcing a source build is NOT necessary and will fail on "
-                "clean Macs without Xcode Command Line Tools)."
-            )
-            self._initialized = False
-            return False
+            # Verify native lib available BEFORE anything else (P0-2.a)
+            # If llama-cpp-python is not installed, fail fast so the loader
+            # (core/lifespan_modules.py, fixed in P0-2.b) removes us from
+            # app.state.modules and /status reports llama_cpp as unavailable.
+            try:
+                import llama_cpp  # noqa: F401
+            except ImportError:
+                logger.error(
+                    "LlamaCppModule: llama-cpp-python not installed. "
+                    "Module will NOT be available. "
+                    "Reinstall the Nexe DMG (recommended), or from the venv run: "
+                    "pip install llama-cpp-python "
+                    "(the arm64 macOS PyPI wheel already ships with Metal — "
+                    "forcing a source build is NOT necessary and will fail on "
+                    "clean Macs without Xcode Command Line Tools)."
+                )
+                self._initialized = False
+                return False
 
-        # Always initialize router to allow diagnostics
-        self._init_router()
+            # Always initialize router to allow diagnostics
+            self._init_router()
 
-        try:
-            # Load config from env or context
-            llama_config = LlamaCppConfig.from_env()
-            
-            # Intentar validar si el model existeix abans d'arrancar
-            if not llama_config.validate():
-                logger.warning("LlamaCppModule: Configuration validation failed. Module started in degraded mode.")
+            try:
+                # Load config from env or context
+                llama_config = LlamaCppConfig.from_env()
+
+                # Intentar validar si el model existeix abans d'arrancar
+                if not llama_config.validate():
+                    logger.warning("LlamaCppModule: Configuration validation failed. Module started in degraded mode.")
+                    self._initialized = True
+                    return True  # Allow startup for diagnostics
+
+                self._node = LlamaCppChatNode(config=llama_config)
                 self._initialized = True
-                return True # Allow startup for diagnostics
 
-            self._node = LlamaCppChatNode(config=llama_config)
-            self._initialized = True
-            
-            logger.info("LlamaCppModule initialized successfully")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to initialize LlamaCppModule: {e}")
-            # On catastrophic error, keep initialized=False
-            # but the router should already have been created if it didn't fail earlier
-            return False
+                logger.info("LlamaCppModule initialized successfully")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to initialize LlamaCppModule: {e}")
+                # On catastrophic error, keep initialized=False
+                # but the router should already have been created if it didn't fail earlier
+                return False
 
     def _init_router(self):
         from .api.routes import create_router

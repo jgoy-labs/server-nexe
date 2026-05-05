@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import asyncio
 import logging
 from typing import Dict, Any, List
 
@@ -28,6 +29,7 @@ class MLXModule:
     def __init__(self):
         self._node = None
         self._initialized = False
+        self._init_lock = asyncio.Lock()
         self._router = None
 
     @property
@@ -45,31 +47,34 @@ class MLXModule:
         """Initialize via Nexe Launcher."""
         if self._initialized:
             return True
+        async with self._init_lock:
+            if self._initialized:
+                return True
 
-        # Inicialitzar router sempre
-        self._init_router()
+            # Inicialitzar router sempre
+            self._init_router()
 
-        if not MLXConfig.is_metal_available():
-            logger.error("MLXModule: Metal is not available. Cannot initialize MLX.")
-            logger.info("To use MLX: Ensure you're running on Apple Silicon with Metal support")
-            return False
-
-        try:
-            mlx_config = MLXConfig.from_env()
-
-            if not mlx_config.validate():
-                logger.error("MLXModule: Configuration invalid. Check NEXE_MLX_MODEL.")
-                logger.info("Expected: NEXE_MLX_MODEL should point to a valid MLX model directory")
+            if not MLXConfig.is_metal_available():
+                logger.error("MLXModule: Metal is not available. Cannot initialize MLX.")
+                logger.info("To use MLX: Ensure you're running on Apple Silicon with Metal support")
                 return False
 
-            self._node = MLXChatNode(config=mlx_config)
-            self._initialized = True
+            try:
+                mlx_config = MLXConfig.from_env()
 
-            logger.info("MLXModule initialized successfully")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to initialize MLXModule: {e}")
-            return False
+                if not mlx_config.validate():
+                    logger.error("MLXModule: Configuration invalid. Check NEXE_MLX_MODEL.")
+                    logger.info("Expected: NEXE_MLX_MODEL should point to a valid MLX model directory")
+                    return False
+
+                self._node = MLXChatNode(config=mlx_config)
+                self._initialized = True
+
+                logger.info("MLXModule initialized successfully")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to initialize MLXModule: {e}")
+                return False
 
     def _init_router(self):
         from .api.routes import create_router
