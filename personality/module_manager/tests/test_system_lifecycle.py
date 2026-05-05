@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock
 
 from personality.module_manager.system_lifecycle import SystemLifecycleManager
+from personality.module_manager.module_lifecycle import ModuleLifecycleManager
 
 
 def _make_module_info(name="mod", auto_start=True, enabled=True, state=None):
@@ -27,7 +28,7 @@ class TestStartSystem:
         mod_info = _make_module_info()
         discovery = AsyncMock(return_value=["mod"])
         list_modules = MagicMock(return_value=[mod_info])
-        lifecycle = MagicMock()
+        lifecycle = MagicMock(spec=ModuleLifecycleManager)
         lifecycle.load_module = AsyncMock(return_value=True)
         lifecycle.start_module = AsyncMock(return_value=True)
 
@@ -47,7 +48,7 @@ class TestStartSystem:
         mod_info = _make_module_info(auto_start=False, enabled=True)
         discovery = AsyncMock(return_value=[])
         list_modules = MagicMock(return_value=[mod_info])
-        lifecycle = MagicMock()
+        lifecycle = MagicMock(spec=ModuleLifecycleManager)
         lifecycle.load_module = AsyncMock(return_value=True)
         lifecycle.start_module = AsyncMock(return_value=True)
 
@@ -66,7 +67,7 @@ class TestStartSystem:
         mod_info = _make_module_info()
         discovery = AsyncMock(return_value=["mod"])
         list_modules = MagicMock(return_value=[mod_info])
-        lifecycle = MagicMock()
+        lifecycle = MagicMock(spec=ModuleLifecycleManager)
         lifecycle.load_module = AsyncMock(return_value=False)
         lifecycle.start_module = AsyncMock(return_value=True)
 
@@ -86,7 +87,7 @@ class TestStartSystem:
         list_modules = MagicMock(return_value=[])
 
         mgr = SystemLifecycleManager(
-            modules={}, module_lifecycle=MagicMock(),
+            modules={}, module_lifecycle=MagicMock(spec=ModuleLifecycleManager),
             discovery_func=discovery, list_modules_func=list_modules
         )
 
@@ -103,7 +104,7 @@ class TestShutdownSystem:
         """Lines 86-100: stops all running modules"""
         from personality.data.models import ModuleState
         mod_info = _make_module_info(state=ModuleState.RUNNING)
-        lifecycle = MagicMock()
+        lifecycle = MagicMock(spec=ModuleLifecycleManager)
         lifecycle.stop_module = AsyncMock()
         list_modules = MagicMock(return_value=[mod_info])
 
@@ -120,7 +121,7 @@ class TestShutdownSystem:
     @pytest.mark.asyncio
     async def test_shutdown_no_running_modules(self):
         """Lines 86-100: no running modules"""
-        lifecycle = MagicMock()
+        lifecycle = MagicMock(spec=ModuleLifecycleManager)
         lifecycle.stop_module = AsyncMock()
         list_modules = MagicMock(return_value=[])
 
@@ -141,7 +142,7 @@ class TestIsRunningAndGetLock:
     def test_is_running_default_false(self):
         """Line 104"""
         mgr = SystemLifecycleManager(
-            modules={}, module_lifecycle=MagicMock(),
+            modules={}, module_lifecycle=MagicMock(spec=ModuleLifecycleManager),
             discovery_func=MagicMock(), list_modules_func=MagicMock()
         )
         assert mgr.is_running() is False
@@ -149,7 +150,7 @@ class TestIsRunningAndGetLock:
     def test_get_lock_returns_none(self):
         """Line 108"""
         mgr = SystemLifecycleManager(
-            modules={}, module_lifecycle=MagicMock(),
+            modules={}, module_lifecycle=MagicMock(spec=ModuleLifecycleManager),
             discovery_func=MagicMock(), list_modules_func=MagicMock()
         )
         assert mgr._get_lock() is None

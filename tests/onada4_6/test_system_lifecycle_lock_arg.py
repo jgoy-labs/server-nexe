@@ -11,10 +11,6 @@ from personality.module_manager.system_lifecycle import SystemLifecycleManager
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    strict=True,
-    reason="Onada 4.6a B1 — system_lifecycle passa arg `lock` obsolet a ModuleLifecycleManager",
-)
 async def test_start_system_typeerror_lock_arg_obsolet():
     """REAL ModuleLifecycleManager. start_system() crida load_module(name, lock) però
     la signatura és load_module(name) → TypeError → start_system retorna False.
