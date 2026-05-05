@@ -37,14 +37,6 @@ def _has_nfkc(src: str) -> bool:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "B3: MemoryService.remember() no aplica NFKC al text — asimetria amb query path. "
-        "Commit 3469964 va arreglar query, NO ingest memory-API. "
-        "Fix: afegir NFKC a remember() (additiu, Opció b Director). (Onada 4.6b, pre-fix)"
-    ),
-)
 def test_memory_store_nfkc_fullwidth_to_halfwidth():
     """MemoryService.remember() ha d'aplicar NFKC al text d'ingest.
 
@@ -59,14 +51,6 @@ def test_memory_store_nfkc_fullwidth_to_halfwidth():
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "B3 anti-reg: ingest path sense NFKC — simetria bidireccional no garantida fins post-fix. "
-        "Guard estructural: query path (commit 3469964) + ingest path (fix B3) han de tenir NFKC. "
-        "(Onada 4.6b, pre-fix)"
-    ),
-)
 def test_memory_store_nfkc_bidirectional():
     """Anti-regressió B3: simetria NFKC bidireccional ingest↔query.
 
