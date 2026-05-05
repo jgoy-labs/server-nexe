@@ -61,17 +61,24 @@ DEFAULT_CONFIG = {
     }
 }
 
-# Standard search paths for config
+# Standard search paths for config — kept for find_config_path() backward compat
 CONFIG_SEARCH_PATHS = [
     "server.toml",
     "personality/server.toml",
     "config/server.toml"
 ]
 
+# Priority order: DEFAULT < personality/server.toml (BASE) < root/config server.toml (OVERRIDE) < ENV vars
+_BASE_CONFIG_FILES = ["personality/server.toml"]
+_OVERRIDE_CONFIG_FILES = ["server.toml", "config/server.toml"]
+
 
 def find_config_path(project_root: Optional[Path] = None) -> Optional[Path]:
     """
-    Find the configuration file path.
+    Find the primary configuration file path (first-wins, for logging).
+
+    Returns the first file found in CONFIG_SEARCH_PATHS.
+    Note: load_config() uses multi-file merge logic; this helper is for logging/compat.
 
     Args:
         project_root: Optional project root directory
@@ -95,60 +102,80 @@ def load_config(
     config_path: Optional[Path] = None
 ) -> Dict[str, Any]:
     """
-    Load configuration from server.toml.
+    Load configuration with multi-file deep-merge.
 
-    This is the UNIFIED config loading function. Use this instead of
-    loading config directly from files.
+    Priority (low → high): DEFAULT < personality/server.toml < root server.toml < ENV vars
+
+    When config_path is given, uses that single file (backward compat for direct overrides).
+    When searching by project_root, applies the full BASE + OVERRIDE merge pattern.
 
     Args:
         project_root: Path to project root directory
         i18n: I18n manager for translated messages (optional)
-        config_path: Direct path to config file (overrides search)
+        config_path: Direct path to config file (skips multi-file search)
 
     Returns:
-        Dict with configuration data (merged with defaults)
+        Dict with configuration data
     """
-    # Find config file
-    found_path: Optional[Path]
-    if config_path and config_path.exists():
-        found_path = config_path
-    else:
-        found_path = find_config_path(project_root)
+    # Direct path: single file, no multi-file logic (backward compat)
+    if config_path and Path(config_path).exists():
+        found_path = Path(config_path)
+        try:
+            if i18n:
+                logger.info(i18n.t("server_core.startup.loading_config", path=str(found_path)))
+            else:
+                logger.info("Loading config from: %s", found_path)
+            with open(found_path, 'rb') as f:
+                raw = tomllib.load(f)
+            merged = _deep_merge(copy.deepcopy(DEFAULT_CONFIG), raw)
+            if i18n:
+                logger.info(i18n.t("server_core.startup.config_loaded"))
+            else:
+                logger.info("Config loaded successfully")
+            return _apply_env_overrides(merged)
+        except Exception as e:
+            if i18n:
+                logger.error(i18n.t("server_core.startup.config_error",
+                                    path=str(found_path), error=str(e)))
+            else:
+                logger.error("Error loading config from %s: %s", found_path, e)
+            return _apply_env_overrides(copy.deepcopy(DEFAULT_CONFIG))
 
-    if not found_path:
+    # Multi-file merge: DEFAULT < personality/server.toml < root server.toml < ENV vars
+    base = Path(project_root) if project_root else Path.cwd()
+    merged = copy.deepcopy(DEFAULT_CONFIG)
+    loaded_any = False
+
+    for rel in _BASE_CONFIG_FILES:
+        path = base / rel
+        if path.exists():
+            try:
+                with open(path, 'rb') as f:
+                    merged = _deep_merge(merged, tomllib.load(f))
+                loaded_any = True
+                logger.info("Config base loaded from: %s", path)
+            except Exception as e:
+                logger.error("Error loading base config %s: %s", path, e)
+
+    for rel in _OVERRIDE_CONFIG_FILES:
+        path = base / rel
+        if path.exists():
+            try:
+                with open(path, 'rb') as f:
+                    merged = _deep_merge(merged, tomllib.load(f))
+                loaded_any = True
+                logger.info("Config override loaded from: %s", path)
+            except Exception as e:
+                logger.error("Error loading override config %s: %s", path, e)
+            break  # Only first override wins
+
+    if not loaded_any:
         if i18n:
             logger.warning(i18n.t("server_core.startup.config_not_found"))
         else:
             logger.warning("No config file found, using defaults")
-        return _apply_env_overrides(copy.deepcopy(DEFAULT_CONFIG))
 
-    # Load config
-    try:
-        if i18n:
-            logger.info(i18n.t("server_core.startup.loading_config", path=str(found_path)))
-        else:
-            logger.info("Loading config from: %s", found_path)
-
-        with open(found_path, 'rb') as f:
-            config = tomllib.load(f)
-
-        # Merge with defaults (config overrides defaults)
-        merged = _deep_merge(copy.deepcopy(DEFAULT_CONFIG), config)
-
-        if i18n:
-            logger.info(i18n.t("server_core.startup.config_loaded"))
-        else:
-            logger.info("Config loaded successfully")
-
-        return _apply_env_overrides(merged)
-
-    except Exception as e:
-        if i18n:
-            logger.error(i18n.t("server_core.startup.config_error",
-                                path=str(found_path), error=str(e)))
-        else:
-            logger.error("Error loading config from %s: %s", found_path, e)
-        return _apply_env_overrides(copy.deepcopy(DEFAULT_CONFIG))
+    return _apply_env_overrides(merged)
 
 
 def save_config(config: Dict[str, Any], config_path: Path) -> bool:
@@ -229,6 +256,8 @@ def get_config(reload: bool = False) -> Dict[str, Any]:
     """
     Get the global configuration singleton.
 
+    Uses multi-file merge (DEFAULT < personality/server.toml < root server.toml < ENV vars).
+
     Args:
         reload: Force reload from file
 
@@ -238,8 +267,8 @@ def get_config(reload: bool = False) -> Dict[str, Any]:
     global _config, _config_path
 
     if _config is None or reload:
-        _config_path = find_config_path()
-        _config = load_config(config_path=_config_path)
+        _config_path = find_config_path()  # For get_config_path() / logging only
+        _config = load_config()  # Multi-file merge from cwd
 
     return _config
 
