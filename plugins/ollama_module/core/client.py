@@ -57,6 +57,7 @@ class OllamaClient:
 
     def __init__(self, base_url: str):
         self.base_url = base_url
+        self._ollama_process = None  # Popen ref per reap al shutdown (evita zombis)
 
     async def check_connection(self) -> bool:
         """Verifica si Ollama esta accessible."""
@@ -120,7 +121,7 @@ class OllamaClient:
         macos_ollama_bin = "/Applications/Ollama.app/Contents/Resources/ollama"
         if is_macos and os.path.exists(macos_ollama_bin):
             try:
-                subprocess.Popen(  # nosec B603: macos_ollama_bin is hardcoded absolute path "/Applications/Ollama.app/Contents/Resources/ollama"; literal `serve`
+                self._ollama_process = subprocess.Popen(  # nosec B603: macos_ollama_bin is hardcoded absolute path "/Applications/Ollama.app/Contents/Resources/ollama"; literal `serve`
                     [macos_ollama_bin, "serve"],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     start_new_session=True,  # No morir amb el parent process
@@ -130,7 +131,7 @@ class OllamaClient:
                 logger.warning("Could not start ollama serve from bundle: %s", e)
         elif shutil.which("ollama"):
             try:
-                subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv; ollama via PATH (mono-user local — equivalent to running it manually)
+                self._ollama_process = subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv; ollama via PATH (mono-user local — equivalent to running it manually)
                     ["ollama", "serve"],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     start_new_session=True  # No morir amb el parent process
@@ -155,6 +156,15 @@ class OllamaClient:
             except Exception:  # nosec B110: best-effort readiness retry loop; loop exit logs the warning below
                 pass
         logger.warning("Ollama started but not responding after 15s")
+
+    def reap_process(self) -> None:
+        """Reap no-bloquejant del procés Ollama iniciat per nosaltres.
+
+        .poll() retorna None si el procés segueix en marxa (daemon, OK),
+        o el codi de sortida si ja ha acabat (el reap evita el zombie).
+        """
+        if self._ollama_process is not None:
+            self._ollama_process.poll()
 
     async def unload_all_models(self):
         """Descarrega tots els models d'Ollama de la VRAM (shutdown helper)."""
