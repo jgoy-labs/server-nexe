@@ -1,7 +1,7 @@
 """
 Tests for plugins/mlx_module/config.py - targeting uncovered lines.
-Lines: 28 (dotenv ImportError), 53-54 (auto_max_kv fallback), 87 (tilde expand),
-       107-125 (from_env toml fallback), 162-163/168-172/176-180/185 (validate),
+Lines: 28 (dotenv ImportError), 53-54 (auto_max_kv fallback), 57-70 (detect_hardware_tier),
+       87 (tilde expand), 107-125 (from_env toml fallback), 162-163/168-172/176-180/185 (validate),
        192-193/196-197/200/206-207 (validate ranges), 221/225-227 (is_metal_available).
 """
 
@@ -267,3 +267,43 @@ class TestIsMetalAvailable:
                 sys.modules['mlx.core'] = orig_mlx_core
             else:
                 sys.modules.pop('mlx.core', None)
+
+
+class TestDetectHardwareTier:
+    """Tests for detect_hardware_tier() — 4 tiers mocked via psutil."""
+
+    def _mock_ram(self, total_gb: float):
+        """Helper: retorna un mock de psutil.virtual_memory amb total_gb."""
+        mock_vm = MagicMock()
+        mock_vm.total = int(total_gb * (1024 ** 3))
+        return mock_vm
+
+    def test_low_tier(self):
+        """<16 GB → 'low'."""
+        from plugins.mlx_module.core.config import detect_hardware_tier
+        with patch("psutil.virtual_memory", return_value=self._mock_ram(8)):
+            assert detect_hardware_tier() == "low"
+
+    def test_mid_tier(self):
+        """16-32 GB → 'mid'."""
+        from plugins.mlx_module.core.config import detect_hardware_tier
+        with patch("psutil.virtual_memory", return_value=self._mock_ram(24)):
+            assert detect_hardware_tier() == "mid"
+
+    def test_high_tier(self):
+        """32-64 GB → 'high'."""
+        from plugins.mlx_module.core.config import detect_hardware_tier
+        with patch("psutil.virtual_memory", return_value=self._mock_ram(48)):
+            assert detect_hardware_tier() == "high"
+
+    def test_ultra_tier(self):
+        """64+ GB → 'ultra'."""
+        from plugins.mlx_module.core.config import detect_hardware_tier
+        with patch("psutil.virtual_memory", return_value=self._mock_ram(96)):
+            assert detect_hardware_tier() == "ultra"
+
+    def test_psutil_exception_returns_low(self):
+        """Excepció a psutil → fallback 'low'."""
+        from plugins.mlx_module.core.config import detect_hardware_tier
+        with patch("psutil.virtual_memory", side_effect=RuntimeError("psutil error")):
+            assert detect_hardware_tier() == "low"
