@@ -369,3 +369,34 @@ class TestGetPoolStats:
 
         assert stats["model_loaded"] is False
         assert stats["cache_manager"] == {}
+
+
+class TestRequireTorch:
+    """Tests per _require_torch() — guard VLM sense PyTorch."""
+
+    def test_require_torch_raises_missing_dep_when_no_torch(self):
+        """Si torch no es pot importar → MissingDependencyError amb missatge clar."""
+        from plugins.mlx_module.core.chat import _require_torch
+        from plugins.mlx_module.exceptions import MissingDependencyError
+
+        import builtins
+        original_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "torch":
+                raise ImportError("No module named 'torch'")
+            return original_import(name, *args, **kwargs)
+
+        with patch.object(builtins, "__import__", side_effect=fake_import):
+            with pytest.raises(MissingDependencyError) as exc_info:
+                _require_torch()
+
+        assert "PyTorch" in str(exc_info.value)
+        assert "Reinstal" in str(exc_info.value)
+
+    def test_require_torch_ok_when_importable(self):
+        """Si torch importa sense error → no llança cap excepció."""
+        from plugins.mlx_module.core.chat import _require_torch
+        mock_torch = MagicMock()
+        with patch.dict(sys.modules, {"torch": mock_torch}):
+            _require_torch()  # no ha de llançar

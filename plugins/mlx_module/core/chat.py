@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from .config import MLXConfig
+from ..exceptions import MissingDependencyError
 from .generate_helpers import (
     prepare_tokens,
     lookup_prefix_cache,
@@ -73,6 +74,17 @@ _VLM_WEIGHT_PATTERNS = (
     "image_newline",
     "patch_embed",
 )
+
+
+def _require_torch() -> None:
+    """Verifica que torch està disponible; llança MissingDependencyError si no."""
+    try:
+        import torch  # noqa: F401
+    except ImportError as exc:
+        raise MissingDependencyError(
+            "Aquest model VL requereix PyTorch. "
+            "Reinstal·la server-nexe per obtenir el bundle complet."
+        ) from exc
 
 
 def _detect_vlm_capability(model_path: str) -> bool:
@@ -179,6 +191,7 @@ class MLXChatNode:
             )
 
             if is_vlm:
+                _require_torch()
                 from mlx_vlm import load
                 MLXChatNode._model, MLXChatNode._tokenizer = load(self.config.model_path)
             else:
