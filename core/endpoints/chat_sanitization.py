@@ -72,6 +72,16 @@ def _estimate_tokens(text: str) -> int:
     return len(text) // CHARS_PER_TOKEN_ESTIMATE
 
 # Patterns that could indicate prompt injection attempts in retrieved content
+# C23 v1.0.4: CJK and mathematical brackets not collapsed by NFKC — map explicitly
+# so that _RAG_INJECTION_PATTERNS (ASCII-only) capture them after normalization.
+# Pairs: open → [,  close → ]
+_NON_NFKC_BRACKET_MAP = str.maketrans({
+    "「": "[", "」": "]",   # CJK corner bracket
+    "『": "[", "』": "]",   # CJK white corner bracket
+    "〔": "[", "〕": "]",   # TORTOISE SHELL bracket
+    "⟦": "[", "⟧": "]",   # MATHEMATICAL WHITE SQUARE bracket (U+27E6/U+27E7)
+})
+
 _RAG_INJECTION_PATTERNS = [
     re.compile(r'\[/?INST\]', re.IGNORECASE),           # Instruction markers
     re.compile(r'<\|/?system\|>', re.IGNORECASE),       # System role markers
@@ -102,13 +112,6 @@ def _filter_rag_injection(text: str) -> str:
     indexing is a one-way pipeline — callers must accept this).
 
     Known gaps:
-        - Mathematical brackets (`⟦⟧`, U+27E6 / U+27E7) are NOT covered. NFKC
-          leaves them unchanged (verified empirically); B3's
-          `strip_memory_tags` handles them via an explicit regex extension,
-          but `_filter_rag_injection` does not. Tracked alongside C23 for the
-          v1.0.4-beta backlog.
-        - CJK brackets (`「」 『』 〔〕`) are NOT covered. NFKC does not collapse
-          them to ASCII. Tracked as C23 in v1.0.4-beta backlog.
         - Homoglyph attacks (Cyrillic М vs Latin M) are out of scope — would
           require a transliteration layer (over-engineering for current threat).
 
@@ -125,6 +128,8 @@ def _filter_rag_injection(text: str) -> str:
     # Example: ［ (U+FF3B) → [ (U+005B). MUST happen before regex match —
     # patterns are ASCII-only and would miss fullwidth bypasses otherwise.
     filtered = unicodedata.normalize("NFKC", text)
+    # C23: CJK/mathematical brackets not normalised by NFKC — map explicitly.
+    filtered = filtered.translate(_NON_NFKC_BRACKET_MAP)
     for pattern in _RAG_INJECTION_PATTERNS:
         filtered = pattern.sub('[FILTERED]', filtered)
 

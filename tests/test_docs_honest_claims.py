@@ -97,39 +97,35 @@ def test_no_phantom_versions_in_v1_py():
 
 
 def test_filter_rag_injection_docstring_no_overclaim_brackets():
-    """B7 / B6 audit (claim 8): docstring no afirma que NFKC neutralitzi
-    mathematical brackets ⟦⟧ (U+27E6/U+27E7) — empíricament NO ho fa.
+    """C23 resolt: NFKC no normalitza ⟦⟧ — però _NON_NFKC_BRACKET_MAP sí.
+
+    Verifica que el codi conté la taula de substitució explícita per a brackets
+    CJK i matemàtics (C23 v1.0.4), i que el gap ja no apareix als 'Known gaps'.
     """
     import unicodedata
 
+    # NFKC segueix sense normalitzar ⟦⟧ (invariant de Python, no del nostre codi)
     assert unicodedata.normalize("NFKC", "⟦") == "⟦"
     assert unicodedata.normalize("NFKC", "⟧") == "⟧"
 
     text = (REPO / "core/endpoints/chat_sanitization.py").read_text(encoding="utf-8")
-    docstring_match = re.search(
-        r'def _filter_rag_injection.*?(?=\n\s*if not text|\Z)',
+
+    # C23: la taula de substitució explícita ha d'existir al mòdul
+    assert "_NON_NFKC_BRACKET_MAP" in text, (
+        "_NON_NFKC_BRACKET_MAP no trobat — C23 no implementat"
+    )
+    assert "「" in text and "⟦" in text, (
+        "Brackets CJK/matemàtics no a la taula de substitució"
+    )
+
+    # El gap CJK/matemàtic ja NO hauria d'aparèixer com a pendent als Known gaps
+    known_gaps_section = re.search(
+        r"Known gaps:.*?(?=Args:|Returns:|\"\"\")",
         text,
         re.DOTALL,
     )
-    assert docstring_match, "No s'ha trobat la signatura de _filter_rag_injection"
-    docstring = docstring_match.group(0)
-
-    neutralize_section = re.search(
-        r"neutralize.*?(?=Known gaps|Args:|Returns:)",
-        docstring,
-        re.DOTALL | re.IGNORECASE,
-    )
-    if neutralize_section:
-        assert "⟦" not in neutralize_section.group(0), (
-            "Docstring afirma neutralitzar ⟦⟧ però NFKC NO les normalitza"
+    if known_gaps_section:
+        gap_text = known_gaps_section.group(0)
+        assert "CJK" not in gap_text, (
+            "C23 resolt però el docstring segueix llistant-lo com a gap"
         )
-
-    known_gaps_section = re.search(
-        r"Known gaps:.*?(?=Args:|Returns:|\"\"\")",
-        docstring,
-        re.DOTALL,
-    )
-    assert known_gaps_section, "Docstring no té secció 'Known gaps:'"
-    assert "⟦" in known_gaps_section.group(0), (
-        "Mathematical brackets ⟦⟧ haurien d'aparèixer a 'Known gaps' (NFKC NO les normalitza)"
-    )
