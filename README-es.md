@@ -72,7 +72,7 @@ Server Nexe empezó como un experimento de learning-by-doing: *"¿Qué haría fa
 
 **Todo este proyecto — código, tests, auditorías, documentación — ha sido construido por una persona orquestando diferentes modelos de IA**, tanto locales (MLX, Ollama) como en la nube (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), como colaboradores. El humano decide qué construir, diseña la arquitectura, revisa línea a línea y ejecuta tests. Las IAs escriben, auditan y hacen stress-test bajo dirección humana.
 
-Lo que empezó como un prototipo se ha convertido en un producto genuinamente útil: 5109 tests, auditorías de seguridad, encriptación at-rest, un instalador macOS con detección de hardware, y un sistema de plugins. No está acabado — hay una hoja de ruta llena de ideas — pero ya hace lo que se proponía: **ejecutar un servidor de IA en tu máquina, con memoria que persiste, y cero datos saliendo de tu dispositivo.**
+Lo que empezó como un prototipo se ha convertido en un producto genuinamente útil: 5291 tests, auditorías de seguridad, encriptación at-rest, un instalador macOS con detección de hardware, y un sistema de plugins. No está acabado — hay una hoja de ruta llena de ideas — pero ya hace lo que se proponía: **ejecutar un servidor de IA en tu máquina, con memoria que persiste, y cero datos saliendo de tu dispositivo.**
 
 No intenta competir con ChatGPT ni Claude. Pero sí puede ser complementario para tareas menos pesadas. Es una herramienta open-source para gente que quiere ser propietaria de su infraestructura de IA. Construido por una persona en Barcelona, con IA como copiloto, música, y tozudez.
 
@@ -160,7 +160,7 @@ Sube .txt, .md o .pdf y se indexan automáticamente para RAG. Cada documento sol
 <td width="50%">
 
 ### Construido para Crecer
-5109 tests (~85% cobertura), auditoría de seguridad, i18n en 3 idiomas, API completa. Lo que empezó como un experimento se construye con prácticas de producción.
+5291 tests (~85% cobertura), auditoría de seguridad, i18n en 3 idiomas, API completa. Lo que empezó como un experimento se construye con prácticas de producción.
 
 </td>
 </tr>
@@ -343,7 +343,7 @@ Server Nexe incluye un módulo de seguridad activado por defecto:
 
 ## Testing
 
-5109 tests (~85% cobertura honesta). El CI ejecuta la suite completa en cada push.
+5291 tests (~85% cobertura honesta). El CI ejecuta la suite completa en cada push.
 
 ```bash
 # Tests unitarios
