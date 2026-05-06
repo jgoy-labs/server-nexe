@@ -437,3 +437,46 @@ class TestWebUIManifestGaps:
         """start_session_cleanup_task is callable (now in api/routes.py)."""
         from plugins.web_ui_module.api.routes import start_session_cleanup_task
         assert callable(start_session_cleanup_task)
+
+
+class TestSessionEncFilePermissions:
+    """C16: fitxers .enc creats amb permisos 0o600."""
+
+    def test_enc_file_has_chmod_600(self, tmp_path):
+        """Fitxer .enc escrit per SessionManager ha de tenir permisos 0o600."""
+        from unittest.mock import MagicMock
+        from plugins.web_ui_module.core.session_manager import SessionManager
+
+        mock_crypto = MagicMock()
+        mock_crypto.encrypt.return_value = b"encrypted_data"
+
+        sm = SessionManager(storage_path=str(tmp_path), crypto_provider=mock_crypto)
+        sm.create_session(session_id="perm-test")
+
+        enc_file = tmp_path / "perm-test.enc"
+        assert enc_file.exists(), "Fitxer .enc hauria d'existir"
+
+        stat = enc_file.stat()
+        # mode & 0o777 → permisos sense bits especials
+        assert (stat.st_mode & 0o777) == 0o600, (
+            f"Permisos esperats 0o600, obtinguts {oct(stat.st_mode & 0o777)}"
+        )
+
+    def test_enc_file_chmod_oserror_no_crash(self, tmp_path):
+        """Si chmod llança OSError → no es propaga (log warning, continua)."""
+        from unittest.mock import MagicMock, patch
+        from plugins.web_ui_module.core.session_manager import SessionManager
+        from pathlib import Path
+
+        mock_crypto = MagicMock()
+        mock_crypto.encrypt.return_value = b"encrypted_data"
+
+        sm = SessionManager(storage_path=str(tmp_path), crypto_provider=mock_crypto)
+
+        orig_chmod = Path.chmod
+
+        def chmod_fail(self_path, mode):
+            raise OSError("chmod not supported")
+
+        with patch.object(Path, "chmod", chmod_fail):
+            sm.create_session(session_id="chmod-fail")  # no ha de llançar
