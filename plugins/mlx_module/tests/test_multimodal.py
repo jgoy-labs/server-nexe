@@ -283,7 +283,8 @@ class TestGetModelBifurcation:
         mock_load = MagicMock(return_value=(MagicMock(), MagicMock()))
         mock_mlx_vlm = MagicMock()
         mock_mlx_vlm.load = mock_load
-        with patch.dict('sys.modules', {'mlx_vlm': mock_mlx_vlm}):
+        mock_torch = MagicMock()
+        with patch.dict('sys.modules', {'mlx_vlm': mock_mlx_vlm, 'torch': mock_torch}):
             node._get_model()
 
         mock_load.assert_called_once_with(str(tmp_path))
