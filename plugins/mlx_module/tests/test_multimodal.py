@@ -55,6 +55,12 @@ class TestDetectVlmCapability:
         from plugins.mlx_module.core.chat import _detect_vlm_capability
         assert _detect_vlm_capability(path) is True
 
+    def test_vlm_qwen3_vl_returns_true(self, tmp_path):
+        """Qwen3VLForConditionalGeneration — arquitectura VLM Qwen3 directa."""
+        path = self._write_config(tmp_path, ["Qwen3VLForConditionalGeneration"])
+        from plugins.mlx_module.core.chat import _detect_vlm_capability
+        assert _detect_vlm_capability(path) is True
+
     def test_vlm_minicpmv_returns_true(self, tmp_path):
         path = self._write_config(tmp_path, ["MiniCPMV"])
         from plugins.mlx_module.core.chat import _detect_vlm_capability
