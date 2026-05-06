@@ -114,6 +114,7 @@ class OllamaModule:
         """Cleanup — descarrega models d'Ollama i allibera VRAM."""
         if self._initialized:
             await self.client.unload_all_models()
+        self.client.reap_process()
         self._initialized = False
 
     async def health_check(self) -> HealthResult:
