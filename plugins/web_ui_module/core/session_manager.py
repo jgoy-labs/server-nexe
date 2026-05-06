@@ -370,6 +370,10 @@ class SessionManager:
                 # attack) raises InvalidTag and is logged as corrupted.
                 aad = session.id.encode("utf-8")
                 file_path.write_bytes(self._crypto.encrypt(plaintext, aad=aad))
+                try:
+                    file_path.chmod(0o600)
+                except OSError:
+                    logger.warning("chmod 600 failed on session file %s", file_path)
             else:
                 file_path = self._storage_path / f"{session.id}.json"
                 with open(file_path, 'w', encoding='utf-8') as f:
