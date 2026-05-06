@@ -54,6 +54,22 @@ def _auto_max_kv_size() -> int:
         return 65536  # Fallback conservador
 
 
+def detect_hardware_tier() -> str:
+    """Returns 'low' (<16 GB), 'mid' (16-32 GB), 'high' (32-64 GB), 'ultra' (64+ GB)."""
+    try:
+        import psutil
+        total_gb = psutil.virtual_memory().total / (1024 ** 3)
+        if total_gb < 16:
+            return "low"
+        elif total_gb < 32:
+            return "mid"
+        elif total_gb < 64:
+            return "high"
+        return "ultra"
+    except Exception:
+        return "low"
+
+
 @dataclass
 class MLXConfig:
     """
