@@ -398,49 +398,47 @@ MODEL_CATALOG = {
 # F4.1.b tool — regenerates from HF Hub API + local ollama daemon).
 #
 # ───────────────────────────────────────────────────────────────────────────
-# STATUS v1.0.3-beta: ALL VALUES BELOW ARE None.
-# This is INTENTIONAL legacy-friendly bootstrap (CHANGELOG F4.1).
-# Population of real digests is tracked as v1.0.4-beta backlog item C19.
-# Until populated, ``verify_download_integrity`` logs a WARNING per download
-# and returns False (degraded path) — installs proceed, security gap visible.
+# STATUS v1.0.4-beta (C19, 2026-05-06): Ollama config digests + Salamandra GGUF
+# poblats. MLX dir-hashes poblats per als models disponibles a Wintermute.
+# Valors None restants: models no descarregats localment en el moment del pin.
 # ───────────────────────────────────────────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════
 MODEL_WEIGHT_SHA256: dict[tuple[str, str], Optional[str]] = {
     # ── MLX snapshots (dir hash) ──────────────────────────────────────────
     ("mlx", "mlx-community/gemma-3-4b-it-4bit"): None,
     ("mlx", "mlx-community/Qwen3-4B-4bit"): None,
-    ("mlx", "mlx-community/gemma-4-e4b-it-4bit"): None,
-    ("mlx", "mlx-community/gemma-3-12b-it-4bit"): None,
-    ("mlx", "mlx-community/gemma-4-31b-it-8bit"): None,
-    ("mlx", "mlx-community/Qwen3-14B-MLX-4bit"): None,
-    ("mlx", "lmstudio-community/gpt-oss-20b-MLX-8bit"): None,
-    ("mlx", "mlx-community/gemma-3-27b-it-qat-4bit"): None,
+    ("mlx", "mlx-community/gemma-4-e4b-it-4bit"): "950d9dea946fb1e85a4e99fd25bdd1fbf0cbc6cfc83298f69bb20190aa9aad72",
+    ("mlx", "mlx-community/gemma-3-12b-it-4bit"): "7bd7a65af1fe3b1b2e1f67c6ac7131c8e3fae2bc038100a11762a16ed330076f",
+    ("mlx", "mlx-community/gemma-4-31b-it-8bit"): "d4cc8cfd30ce9169e9ae6367deff2f8cb93ae28f4991f72e4e2e58f03c6eb0bd",
+    ("mlx", "mlx-community/Qwen3-14B-MLX-4bit"): "c557fee4d7cde6e905b497dc534808ed308bb927ef27f067aeabb32340d77b41",
+    ("mlx", "lmstudio-community/gpt-oss-20b-MLX-8bit"): "b9c812af1572191e123c19cd0ad3bf726867e5a86dd09ee2fab62e6efdc4ef0f",
+    ("mlx", "mlx-community/gemma-3-27b-it-qat-4bit"): "50cd9ec15dc6c57888d0df6442e645d726dd7857f1fb2aaf9653fc1f585c7d99",
     ("mlx", "mlx-community/Qwen3-VL-4B-Instruct-4bit"): None,
     ("mlx", "mlx-community/Qwen3-VL-8B-Instruct-4bit"): None,
     ("mlx", "mlx-community/Qwen3-VL-30B-A3B-Instruct-4bit"): None,
     ("ollama", "qwen3-vl:4b"): None,
     ("ollama", "qwen3-vl:8b"): None,
     ("ollama", "qwen3-vl:30b-a3b"): None,
-    # ── Ollama manifest digests (ollama show --json) ──────────────────────
-    ("ollama", "gemma3:4b"): None,
-    ("ollama", "qwen3.5:4b"): None,
-    ("ollama", "qwen3:4b"): None,
-    ("ollama", "gemma4:e4b"): None,
-    ("ollama", "hdnh2006/salamandra-7b-instruct:q4_K_M"): None,
-    ("ollama", "qwen3.5:9b"): None,
+    # ── Ollama manifest digests (config digest, verified 2026-05-06) ────────
+    ("ollama", "gemma3:4b"): "b6ae5839783f2ba248e65e4b960ab15f9c4b7118db285827dba6cba9754759e2",
+    ("ollama", "qwen3.5:4b"): "de9fed2251b37295b763727a59ca35cf5cfe5c7379bc3e2104b2ce3c145aa887",
+    ("ollama", "qwen3:4b"): "e18a783aae5525fd2852fc94c985541a77e791e034abc2d3056474d59de336fc",
+    ("ollama", "gemma4:e4b"): "f0988ff50a2458c598ff6b1b87b94d0f5c44d73061c2795391878b00b2285e11",
+    ("ollama", "hdnh2006/salamandra-7b-instruct:q4_K_M"): "b7c01a6aaa23015739006a60492f84ae5931712c32e42638c4022b5c5a175d73",
+    ("ollama", "qwen3.5:9b"): "be595b49fe22012bd1f5605ec14c7ffa58331783a88a4fd8c22e5fc8ec42cf9f",
     ("ollama", "gemma3:12b"): None,
-    ("ollama", "gemma4:31b"): None,
-    ("ollama", "qwen3:14b"): None,
+    ("ollama", "gemma4:31b"): "0940386273ff9ddd5ede7c5ddaa0e925b50154e198ea977fb64aa1ca94a3a137",
+    ("ollama", "qwen3:14b"): "78b3b822087d5199783c8203553a5a92ce5eb7b683a5a81003f8efea9b399d74",
     ("ollama", "gpt-oss:20b"): None,
-    ("ollama", "qwen3.5:27b"): None,
+    ("ollama", "qwen3.5:27b"): "ba0915cbf15878a68d300f640d3d575f5805cac42dd8f83746eb31a0e8afec22",
     ("ollama", "deepseek-r1:32b"): None,
-    ("ollama", "qwen3.5:35b-a3b"): None,
+    ("ollama", "qwen3.5:35b-a3b"): "606ad9f1ecbcd0d400a89572f49d9a8e80b11a346be74883245e24ecbbc3ac81",
     ("ollama", "csala/ALIA-40B:Q8_0"): None,
     # ── GGUF direct downloads (single-file hash) ──────────────────────────
     (
         "gguf",
         "https://huggingface.co/hdnh2006/BSC-LT-salamandra-7b-instruct-gguf/resolve/main/salamandra-7b-instruct-Q4_K_M.gguf",
-    ): None,
+    ): "da90a4badcb493ddf7a213b6775732c775f75347a0560f8e1c586ba6ed07596c",
     (
         "gguf",
         "https://huggingface.co/bartowski/gemma-3-27b-it-GGUF/resolve/main/gemma-3-27b-it-Q4_K_M.gguf",
