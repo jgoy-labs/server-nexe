@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: plugins/security/tests/test_module_allowlist.py
-Description: Tests per module allowlist fail-fast security. Valida que sistema falla si NEXE_APPROVED_MODULES no està en producció.
+Description: Tests for module allowlist fail-fast security. Validates that the system fails if NEXE_APPROVED_MODULES is not set in production.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -28,9 +28,9 @@ def ensure_event_loop():
 
 def test_module_allowlist_required_in_production(monkeypatch):
   """
-  Test que sistema falla si NEXE_APPROVED_MODULES no està definit en producció.
+  Test that system fails if NEXE_APPROVED_MODULES is not defined in production.
 
-  H-1: BLOCKER - Fail-fast condicionat a NEXE_ENV=production
+  H-1: BLOCKER - Fail-fast conditioned on NEXE_ENV=production
   """
   monkeypatch.delenv("NEXE_APPROVED_MODULES", raising=False)
   monkeypatch.setenv("NEXE_ENV", "production")
@@ -43,7 +43,7 @@ def test_module_allowlist_required_in_production(monkeypatch):
 
 def test_module_allowlist_dev_allows_all(monkeypatch):
   """
-  Test que NEXE_ENV=development permet mode permissiu sense allowlist.
+  Test that NEXE_ENV=development allows permissive mode without allowlist.
 
   NOTE: server.toml has environment="production", so we must also mock config
   to truly test dev mode. With server.toml present, config_mode always wins.
@@ -58,7 +58,7 @@ def test_module_allowlist_dev_allows_all(monkeypatch):
 
 def test_module_allowlist_staging_allows_all_with_warning(monkeypatch, caplog):
   """
-  Test que amb allowlist definit, staging funciona sense error.
+  Test that with allowlist defined, staging works without error.
 
   NOTE: server.toml has environment="production", so config_mode always triggers
   production check. We provide an allowlist to satisfy both paths.
@@ -71,9 +71,9 @@ def test_module_allowlist_staging_allows_all_with_warning(monkeypatch, caplog):
 
 def test_module_allowlist_with_approved_list(monkeypatch):
   """
-  Test que allowlist funciona correctament quan està definit.
+  Test that allowlist works correctly when defined.
 
-  Amb NEXE_APPROVED_MODULES definit, sistema carrega només mòduls aprovats.
+  With NEXE_APPROVED_MODULES defined, system loads only approved modules.
   """
   monkeypatch.setenv("NEXE_APPROVED_MODULES", "security,security,observability")
   monkeypatch.setenv("NEXE_ENV", "production")
@@ -83,7 +83,7 @@ def test_module_allowlist_with_approved_list(monkeypatch):
 
 def test_module_allowlist_default_env_is_development(monkeypatch):
   """
-  Test que amb allowlist definit, el sistema arrenca correctament.
+  Test that with allowlist defined, the system starts correctly.
 
   NOTE: server.toml forces production mode, so we always need NEXE_APPROVED_MODULES.
   """
@@ -95,9 +95,9 @@ def test_module_allowlist_default_env_is_development(monkeypatch):
 
 def test_module_allowlist_case_insensitive(monkeypatch):
   """
-  Test que NEXE_ENV=Production (majúscules) també activa fail-fast.
+  Test that NEXE_ENV=Production (uppercase) also triggers fail-fast.
 
-  Case-insensitive per evitar errors de configuració.
+  Case-insensitive to avoid configuration errors.
   """
   monkeypatch.delenv("NEXE_APPROVED_MODULES", raising=False)
   monkeypatch.setenv("NEXE_ENV", "Production")
@@ -109,7 +109,7 @@ def test_module_allowlist_case_insensitive(monkeypatch):
 
 def test_module_allowlist_whitespace_handling(monkeypatch):
   """
-  Test que allowlist maneja espais correctament.
+  Test that allowlist handles spaces correctly.
 
   Format: "security, security, observability" → ["security", "security", "observability"]
   """
@@ -121,9 +121,9 @@ def test_module_allowlist_whitespace_handling(monkeypatch):
 
 def test_module_allowlist_empty_string_treated_as_undefined(monkeypatch):
   """
-  Test que NEXE_APPROVED_MODULES="" es tracta com a no definit.
+  Test that NEXE_APPROVED_MODULES="" is treated as undefined.
 
-  String buit hauria d'activar fail-fast en producció.
+  Empty string should trigger fail-fast in production.
   """
   monkeypatch.setenv("NEXE_APPROVED_MODULES", "")
   monkeypatch.setenv("NEXE_ENV", "production")
@@ -135,9 +135,9 @@ def test_module_allowlist_empty_string_treated_as_undefined(monkeypatch):
 
 def test_module_allowlist_logs_error_before_raising(monkeypatch, caplog):
   """
-  Test que sistema loggeja error abans de raise (debugging).
+  Test that system logs error before raising (debugging).
 
-  IMPORTANT: logger.error() ha d'estar DINS del bloc if abans del raise.
+  IMPORTANT: logger.error() must be INSIDE the if block before the raise.
   """
   import logging
   caplog.set_level(logging.ERROR)
@@ -153,7 +153,7 @@ def test_module_allowlist_logs_error_before_raising(monkeypatch, caplog):
   assert any("SECURITY ERROR" in record.message for record in error_logs)
 
 def test_module_allowlist_with_single_module(monkeypatch):
-  """Test allowlist amb un sol mòdul"""
+  """Test allowlist with a single module"""
   monkeypatch.setenv("NEXE_APPROVED_MODULES", "security")
   monkeypatch.setenv("NEXE_ENV", "production")
 
@@ -162,7 +162,7 @@ def test_module_allowlist_with_single_module(monkeypatch):
 
 def test_module_allowlist_unknown_env_treated_as_dev(monkeypatch):
   """
-  Test que amb allowlist definit i env desconegut, funciona correctament.
+  Test that with allowlist defined and unknown env, it works correctly.
 
   NOTE: server.toml forces production mode, so allowlist is always required.
   """

@@ -25,10 +25,10 @@ logger = logging.getLogger(__name__)
 class ChatSession:
     """Individual chat session with message history and automatic compaction."""
 
-    # Compacting: cada COMPACT_EVERY missatges, resumeix els antics
-    COMPACT_EVERY = 10          # Fallback: per nombre de missatges
+    # Compacting: every COMPACT_EVERY messages, summarize the older ones
+    COMPACT_EVERY = 10          # Fallback: by number of messages
     COMPACT_KEEP = 6
-    MAX_CONTEXT_CHARS = 12000   # ~3000 tokens, safe per 4K-8K context models
+    MAX_CONTEXT_CHARS = 12000   # ~3000 tokens, safe for 4K-8K context models
 
     def __init__(self, session_id: str = None):  # type: ignore[assignment]  # no_implicit_optional
         self.id = session_id or str(uuid.uuid4())
@@ -37,26 +37,26 @@ class ChatSession:
         self.messages: List[Dict[str, str]] = []
         self.context_files: List[str] = []
         self.attached_document: Optional[Dict[str, Any]] = None  # {"filename": "...", "content": "..."}
-        self.context_summary: Optional[str] = None  # Resum dels missatges compactats
-        self.compaction_count: int = 0  # Quantes vegades s'ha compactat
+        self.context_summary: Optional[str] = None  # Summary of compacted messages
+        self.compaction_count: int = 0  # How many times it has been compacted
         self.custom_name: Optional[str] = None  # User-defined session name
         self.thinking_enabled: bool = False  # Per-session thinking toggle (default OFF)
         self._recently_deleted_facts: list = []  # Transient, not persisted to disk
 
     def add_message(self, role: str, content: str, stats: dict = None,  # type: ignore[assignment]  # no_implicit_optional
                     image_b64: str = None, image_type: str = None):  # type: ignore[assignment]  # no_implicit_optional
-        """Afegir missatge a l'historial.
+        """Add message to the history.
 
-        `image_b64` (bug #19c): si l'usuari adjunta una imatge al missatge,
-        es persisteix al mateix dict que el text per tal que reapareixi en
-        recarregar la sessió. Es guarda NOMÉS si té valor — missatges de
-        només text mantenen el format original al disc (backward compat).
+        `image_b64` (bug #19c): if the user attaches an image to the message,
+        it is persisted in the same dict as the text so that it reappears when
+        reloading the session. Saved ONLY if it has a value — text-only
+        messages keep the original format on disk (backward compat).
 
-        `image_type` (fix 2026-04-22): el MIME (`image/jpeg`, `image/png`…)
-        és necessari per reconstruir un `data:<mime>;base64,<b64>` vàlid
-        al frontend quan es recarrega la sessió. Sense ell, Safari i
-        alguns navigators no infereixen el format del b64 i la imatge
-        no es pinta.
+        `image_type` (fix 2026-04-22): the MIME (`image/jpeg`, `image/png`…)
+        is needed to reconstruct a valid `data:<mime>;base64,<b64>`
+        in the frontend when the session is reloaded. Without it, Safari
+        and some browsers cannot infer the format from the b64 and the
+        image is not rendered.
         """
         msg: Dict[str, Any] = {
             "role": role,
@@ -88,7 +88,7 @@ class ChatSession:
             "filename": filename,
             "content": content[:3000],  # Preview
             "chunks": all_chunks,
-            "total_chunks": total_chunks or len(all_chunks),  # Total real (pot diferir de len(chunks))
+            "total_chunks": total_chunks or len(all_chunks),  # Real total (may differ from len(chunks))
             "total_chars": len(content),
             "current_chunk": 0
         }
@@ -119,11 +119,11 @@ class ChatSession:
         return self.attached_document
 
     def has_attached_document(self) -> bool:
-        """Comprovar si hi ha document adjuntat"""
+        """Check if there is an attached document"""
         return self.attached_document is not None
 
     def clear_context_files(self):
-        """Netejar tots els fitxers del context"""
+        """Clear all files from the context"""
         self.context_files.clear()
         self.attached_document = None
 
@@ -146,7 +146,7 @@ class ChatSession:
         return self.messages[:-self.COMPACT_KEEP]
 
     def apply_compaction(self, summary: str):
-        """Aplica compacting: guarda resum i elimina missatges antics"""
+        """Apply compacting: save summary and remove old messages"""
         keep = self.messages[-self.COMPACT_KEEP:]
         # Ensure keep starts with user (summary prepend adds user+assistant, so
         # if keep[0] is assistant we'd get two consecutive assistant → VLM error)
@@ -162,8 +162,8 @@ class ChatSession:
         )
 
     def get_context_messages(self) -> List[Dict[str, str]]:
-        """Obtenir missatges per enviar al model (amb resum si existeix).
-        Garanteix que la seqüència de rols alterna user/assistant correctament.
+        """Get messages to send to the model (with summary if it exists).
+        Guarantees that the role sequence alternates user/assistant correctly.
         """
         msgs = []
         if self.context_summary:
@@ -185,7 +185,7 @@ class ChatSession:
         return cleaned
 
     def get_history(self) -> List[Dict[str, str]]:
-        """Obtenir historial complet de missatges (per UI)"""
+        """Get complete message history (for UI)"""
         return self.messages.copy()
 
     def to_dict(self) -> dict:
@@ -254,17 +254,17 @@ class SessionManager:
         # Non-zero means the MEK has changed since those sessions were written
         # (Keychain reset, key rotation without migration, disk corruption).
         self._corrupted_sessions_count: int = 0
-        # Bug 16: protegir accessos concurrents al dict _sessions.
-        # Usem RLock (reentrant) perque alguns metodes en criden d'altres
-        # tambe protegits (e.g. get_or_create_session -> create_session)
-        # i aixi evitem deadlock per re-acquisicio.
-        # Tot i que els metodes son sincrons, varies coroutines poden
-        # cridar-los des de threadpools (FastAPI run_in_threadpool) i el
-        # GIL no garanteix atomicity entre check + mutate (e.g.
+        # Bug 16: protect concurrent accesses to the _sessions dict.
+        # We use RLock (reentrant) because some methods call others
+        # that are also protected (e.g. get_or_create_session -> create_session)
+        # and this avoids deadlock from re-acquisition.
+        # Even though the methods are synchronous, multiple coroutines can
+        # call them from threadpools (FastAPI run_in_threadpool) and the
+        # GIL does not guarantee atomicity between check + mutate (e.g.
         # `if id in dict: del dict[id]`).
         self._sessions_lock = threading.RLock()
-        # Lock asyncio lazy: instanciat el primer cop que es necessita
-        # (al __init__ pot no haver-hi loop encara, e.g. tests sync).
+        # Lazy asyncio lock: instantiated the first time it is needed
+        # (in __init__ there may not be a loop yet, e.g. sync tests).
         self._sessions_alock: Optional[asyncio.Lock] = None
         with self._sessions_lock:
             self._load_sessions()
@@ -279,7 +279,7 @@ class SessionManager:
         return self._corrupted_sessions_count
 
     def _get_async_lock(self) -> asyncio.Lock:
-        """Lazy-init de l'asyncio.Lock per evitar requerir un loop al __init__."""
+        """Lazy-init of the asyncio.Lock to avoid requiring a loop in __init__."""
         if self._sessions_alock is None:
             self._sessions_alock = asyncio.Lock()
         return self._sessions_alock
@@ -393,7 +393,7 @@ class SessionManager:
             logger.error("Failed to delete session file %s: %s", session_id, e)
 
     def create_session(self, session_id: str = None) -> ChatSession:  # type: ignore[assignment]  # no_implicit_optional
-        """Create a new chat session. (Bug 16: protegit per RLock)"""
+        """Create a new chat session. (Bug 16: protected by RLock)"""
         if session_id:
             self._validate_session_id(session_id)
         session = ChatSession(session_id)
@@ -403,13 +403,13 @@ class SessionManager:
         return session
 
     def get_session(self, session_id: str) -> Optional[ChatSession]:
-        """Get an existing session. (Bug 16: protegit per RLock)"""
+        """Get an existing session. (Bug 16: protected by RLock)"""
         self._validate_session_id(session_id)
         with self._sessions_lock:
             return self._sessions.get(session_id)
 
     def save_session(self, session_id: str):
-        """Persist a session to disk. (Bug 16: protegit per RLock)"""
+        """Persist a session to disk. (Bug 16: protected by RLock)"""
         with self._sessions_lock:
             session = self._sessions.get(session_id)
             if session:
@@ -418,20 +418,20 @@ class SessionManager:
     def get_or_create_session(self, session_id: str = None) -> ChatSession:  # type: ignore[assignment]  # no_implicit_optional
         """Get an existing session or create a new one.
 
-        Bug 16: tot el check + create dins el mateix RLock per evitar
-        race condition entre dues peticions concurrents que crearien
-        dues sessions amb el mateix id.
+        Bug 16: all the check + create within the same RLock to avoid
+        race condition between two concurrent requests that would create
+        two sessions with the same id.
         """
         if session_id:
             self._validate_session_id(session_id)
         with self._sessions_lock:
             if session_id and session_id in self._sessions:
                 return self._sessions[session_id]
-            # create_session reentra el lock (RLock) sense problema
+            # create_session re-enters the lock (RLock) without problems
             return self.create_session(session_id)
 
     def delete_session(self, session_id: str) -> bool:
-        """Delete a session. (Bug 16: protegit per RLock)"""
+        """Delete a session. (Bug 16: protected by RLock)"""
         self._validate_session_id(session_id)
         with self._sessions_lock:
             if session_id in self._sessions:
@@ -441,7 +441,7 @@ class SessionManager:
             return False
 
     def list_sessions(self) -> List[dict]:
-        """List all sessions (metadata only). (Bug 16: snapshot dins RLock)"""
+        """List all sessions (metadata only). (Bug 16: snapshot within RLock)"""
         sessions = []
         with self._sessions_lock:
             sessions_snapshot = list(self._sessions.values())

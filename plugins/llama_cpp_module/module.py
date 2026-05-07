@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 class LlamaCppModule:
     """
-    Motor Nexe per a Llama.cpp.
-    Implementa el NexeModule Protocol per a la càrrega dinàmica al kernel.
+    Nexe engine for Llama.cpp.
+    Implements the NexeModule Protocol for dynamic loading in the kernel.
     """
 
     def __init__(self):
@@ -77,7 +77,7 @@ class LlamaCppModule:
                 # Load config from env or context
                 llama_config = LlamaCppConfig.from_env()
 
-                # Intentar validar si el model existeix abans d'arrancar
+                # Try to validate that the model exists before starting
                 if not llama_config.validate():
                     logger.warning("LlamaCppModule: Configuration validation failed. Module started in degraded mode.")
                     self._initialized = True
@@ -105,7 +105,7 @@ class LlamaCppModule:
         return "/llama-cpp"
 
     async def is_model_loaded(self, model_name: str = "") -> bool:
-        """Comprova si el model llama.cpp esta carregat al pool."""
+        """Check whether the llama.cpp model is loaded in the pool."""
         if not self._node:
             return False
         try:

@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/web_ui_module/module.py
-Description: Modul Web UI — NexeModule + NexeModuleWithRouter Protocol.
-             Interficie web per demostrar sistema modular de Nexe.
+Description: Web UI Module — NexeModule + NexeModuleWithRouter Protocol.
+             Web interface to demonstrate Nexe's modular system.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -27,29 +27,29 @@ logger = logging.getLogger(__name__)
 
 class WebUIModule:
     """
-    Plugin UI web per Nexe.
-    Implementa NexeModule + NexeModuleWithRouter.
+    Web UI plugin for Nexe.
+    Implements NexeModule + NexeModuleWithRouter.
 
-    Funcionalitats:
-    - Interficie web estil Ollama
-    - Sessions de xat amb historial i compactacio
-    - Upload de fitxers amb ingesta RAG automatica
-    - Streaming de respostes multi-engine (Ollama, MLX, Llama.cpp)
+    Features:
+    - Ollama-style web interface
+    - Chat sessions with history and compaction
+    - File upload with automatic RAG ingestion
+    - Multi-engine response streaming (Ollama, MLX, Llama.cpp)
     - Intent detection (save/recall/chat)
-    - Context compacting per sessions llargues
+    - Context compacting for long sessions
     """
 
     def __init__(self) -> None:
         self._initialized = False
         self._init_lock = asyncio.Lock()
         self._router = None
-        # SessionManager es crea a initialize() un cop crypto_provider esta
-        # disponible. Crear-lo aqui sense crypto seguit d'un reemplacament mes
-        # tard generava dues instancies divergents (bug: el router podia
-        # capturar la referencia vella sense crypto, deixant sessions .enc
-        # invisibles al UI i guardant les noves sense encriptar).
+        # SessionManager is created in initialize() once crypto_provider is
+        # available. Creating it here without crypto followed by a replacement
+        # later generated two divergent instances (bug: the router could
+        # capture the old reference without crypto, leaving .enc sessions
+        # invisible in the UI and saving new ones unencrypted).
         self.session_manager: Optional[SessionManager] = None
-        # Paths — disponibles immediatament per create_router
+        # Paths — available immediately for create_router
         self._plugin_dir = Path(__file__).parent
         self.ui_dir = self._plugin_dir / "ui"
         self.upload_dir = self.ui_dir / "uploads"
@@ -71,7 +71,7 @@ class WebUIModule:
         )
 
     async def initialize(self, context: Dict[str, Any]) -> bool:
-        """Inicialitzacio del plugin"""
+        """Plugin initialization"""
         if self._initialized:
             return True
         async with self._init_lock:
@@ -112,7 +112,7 @@ class WebUIModule:
         self._initialized = False
 
     async def health_check(self) -> HealthResult:
-        """Health check del modul"""
+        """Module health check"""
         if not self._initialized:
             return HealthResult(
                 status=HealthStatus.UNKNOWN,
@@ -139,7 +139,7 @@ class WebUIModule:
     # --- Router setup ---
 
     def _init_router(self):
-        """Crea router delegant a api/routes.py.
+        """Creates router delegating to api/routes.py.
 
         R6-15 v1.0.4: graceful degradation when the security plugin is absent.
         routes_auth.py exposes ``_SECURITY_AVAILABLE`` so the dependency
@@ -156,7 +156,7 @@ class WebUIModule:
                 "mode (no auth on protected endpoints — they return 503)"
             )
 
-    # --- Metodes publics ---
+    # --- Public methods ---
 
     def get_info(self) -> Dict[str, Any]:
         return {

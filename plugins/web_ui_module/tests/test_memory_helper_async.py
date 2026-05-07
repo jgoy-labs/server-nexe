@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/web_ui_module/tests/test_memory_helper_async.py
-Description: Tests async per MemoryHelper (get_memory_api, save, recall, stats, clear, prune).
+Description: Async tests for MemoryHelper (get_memory_api, save, recall, stats, clear, prune).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -27,7 +27,7 @@ from plugins.web_ui_module.core.memory_helper import (
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def make_result(text="content", score=0.5, rid="id-1", metadata=None):
-    """Crea un resultat de cerca mock."""
+    """Creates a mock search result."""
     r = MagicMock()
     r.text = text
     r.score = score
@@ -42,7 +42,7 @@ def make_memory_mock(
     store_return="doc-id-123",
     count=None,
 ):
-    """Crea un mock complet de MemoryAPI."""
+    """Creates a complete MemoryAPI mock."""
     mem = MagicMock()
     mem.initialize = AsyncMock()
     mem.collection_exists = AsyncMock(return_value=collection_exists)
@@ -56,11 +56,11 @@ def make_memory_mock(
     return mem
 
 
-# ─── Fixture per reset del singleton ──────────────────────────────────────────
+# ─── Fixture to reset the singleton ──────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
 def reset_singleton():
-    """Reseteja el singleton global entre tests (instance + init_failed flag)."""
+    """Resets the global singleton between tests (instance + init_failed flag)."""
     original = mh_module._memory_api_instance
     original_failed = mh_module._memory_api_init_failed
     mh_module._memory_api_instance = None
@@ -79,7 +79,7 @@ class TestGetMemoryApi:
         helper = MemoryHelper()
 
         # MemoryAPI is imported inside the function: patch the source module.
-        # També forcem v1 a fallar perquè caigui a la branca legacy on viu el mock.
+        # We also force v1 to fail so it falls into the legacy branch where the mock lives.
         with patch("memory.memory.api.v1.get_memory_api", side_effect=ImportError("force fallback")):
             with patch("memory.memory.api.MemoryAPI", return_value=mem):
                 result = asyncio.run(helper.get_memory_api())
@@ -176,7 +176,7 @@ class TestCheckDuplicate:
 class TestPruneOldEntries:
 
     def test_no_prune_when_below_limit(self):
-        # MAX_MEMORY_ENTRIES = 500, retornem 5 resultats — no cal poda
+        # MAX_MEMORY_ENTRIES = 500, we return 5 results — no pruning needed
         entries = [make_result(rid=f"id-{i}") for i in range(5)]
         mem = make_memory_mock(collection_exists=True, search_results=entries)
         helper = MemoryHelper()
@@ -186,7 +186,7 @@ class TestPruneOldEntries:
         mem.delete.assert_not_called()
 
     def test_prunes_when_above_limit(self):
-        # Crear MAX_MEMORY_ENTRIES + PRUNE_BATCH_SIZE + 1 entrades
+        # Create MAX_MEMORY_ENTRIES + PRUNE_BATCH_SIZE + 1 entries
         count = MAX_MEMORY_ENTRIES + PRUNE_BATCH_SIZE + 1
         entries = []
         for i in range(count):
@@ -220,12 +220,12 @@ class TestPruneOldEntries:
         assert deleted == 0
 
     def test_entry_without_id_skipped(self):
-        # Creem MAX_MEMORY_ENTRIES + 1 entrades on algunes no tenen id
+        # Create MAX_MEMORY_ENTRIES + 1 entries where some have no id
         count = MAX_MEMORY_ENTRIES + PRUNE_BATCH_SIZE + 1
         entries = []
         for i in range(count):
             e = MagicMock()
-            e.id = None  # sense id — no s'hauria d'esborrar
+            e.id = None  # no id — should not be deleted
             e.text = f"text {i}"
             e.metadata = {"type": "conversation", "access_count": 0, "saved_at": ""}
             entries.append(e)
@@ -234,7 +234,7 @@ class TestPruneOldEntries:
         helper = MemoryHelper()
 
         deleted = asyncio.run(helper._prune_old_entries(mem))
-        assert deleted == 0  # hasattr(entry, 'id') és True però id és None
+        assert deleted == 0  # hasattr(entry, 'id') is True but id is None
 
     def test_delete_exception_doesnt_crash(self):
         count = MAX_MEMORY_ENTRIES + PRUNE_BATCH_SIZE + 1
@@ -252,7 +252,7 @@ class TestPruneOldEntries:
         mem.delete = AsyncMock(side_effect=Exception("delete failed"))
         helper = MemoryHelper()
 
-        # No ha de llançar excepció
+        # Must not raise exception
         deleted = asyncio.run(helper._prune_old_entries(mem))
         assert deleted == 0
 
@@ -454,7 +454,7 @@ class TestSaveDocumentChunks:
                 session_id="s"
             ))
 
-        # 2 guardats (c1, c3), 1 fallat (c2)
+        # 2 saved (c1, c3), 1 failed (c2)
         assert result["chunks_saved"] == 2
 
     def test_metadata_includes_chunk_info(self):
@@ -482,7 +482,7 @@ class TestSaveDocumentChunks:
         assert meta["session_id"] == "sess-99"
 
     def test_progress_log_at_25_chunks(self):
-        """Comprova que no crasha amb 26 chunks (log cada 25)."""
+        """Verifies it does not crash with 26 chunks (log every 25)."""
         mem = make_memory_mock(collection_exists=True)
         helper = MemoryHelper()
         chunks = [f"chunk {i}" for i in range(26)]
@@ -543,7 +543,7 @@ class TestRecallFromMemory:
         assert result["success"] is False
 
     def test_search_collection_exception_continues(self):
-        """Error en una col·lecció no atura les altres."""
+        """Error in one collection does not stop the others."""
         mem = MagicMock()
         call_count = 0
 
@@ -564,7 +564,7 @@ class TestRecallFromMemory:
         with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
             result = asyncio.run(helper.recall_from_memory("query"))
 
-        # user_knowledge hauria retornat 1 resultat
+        # user_knowledge should have returned 1 result
         assert result["success"] is True
         assert len(result["results"]) >= 0  # user_knowledge returned 1
 
@@ -608,7 +608,7 @@ class TestRecallFromMemory:
             assert "metadata" in item
 
     def test_temporal_decay_applied(self):
-        """Verifica que _apply_temporal_decay es crida."""
+        """Verifies that _apply_temporal_decay is called."""
         meta_recent = {"saved_at": datetime.now(timezone.utc).isoformat()}
         r = make_result("recent text", score=0.6, rid="r1", metadata=meta_recent)
         mem = make_memory_mock(collection_exists=True, search_results=[r])
@@ -618,7 +618,7 @@ class TestRecallFromMemory:
              patch.object(helper, "_apply_temporal_decay", wraps=helper._apply_temporal_decay) as spy:
             asyncio.run(helper.recall_from_memory("query"))
 
-        # Ha de ser cridat almenys una vegada per la col·lecció personal_memory
+        # Must be called at least once for the personal_memory collection
         assert spy.call_count >= 1
 
 

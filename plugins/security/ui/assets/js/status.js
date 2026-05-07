@@ -2,7 +2,7 @@
  * Security Module — Status Page JS
  * Server Nexe 0.9.0
  *
- * Fetch /security/info i /security/health per mostrar estat.
+ * Fetch /security/info and /security/health to display status.
  */
 
 (function() {
@@ -65,6 +65,6 @@
 
   loadInfo();
   loadHealth();
-  // Refresh health cada 30s
+  // Refresh health every 30s
   setInterval(loadHealth, 30000);
 })();

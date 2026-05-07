@@ -1,6 +1,6 @@
 """
-Tests processament d'imatge (VLM) a routes_chat.py.
-Verifica extracció, validació i pas al backend — sense iniciar servidor.
+Tests for image processing (VLM) in routes_chat.py.
+Verifies extraction, validation and passing to backend — without starting a server.
 """
 
 import base64
@@ -15,7 +15,7 @@ VALID_JPEG_B64 = _b64(b"\xff\xd8\xff" + b"\x00" * 100)   # JPEG magic + padding
 VALID_PNG_B64  = _b64(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
 
 
-# ── Helpers d'extracció inline (evita importar tot el mòdul) ─────────────────
+# ── Inline extraction helpers (avoids importing the whole module) ─────────────────
 
 def _extract_image(body: dict):
     """Reimplementa la lògica d'extracció de routes_chat per testar-la aïllada."""
@@ -88,7 +88,7 @@ class TestImageExtraction:
             _extract_image({"image_b64": VALID_JPEG_B64})  # image_type = ""
 
 
-# ── Test integració: el body JSON arriba complet al backend ──────────────────
+# ── Integration test: the JSON body arrives complete at the backend ──────────────────
 
 class TestChatBodyStructure:
 

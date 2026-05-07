@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/ollama_module/core/errors.py
-Description: Excepcions semantiques d'Ollama (Bug 15).
-             Errors 4xx (404 model, 400 bad request, 422 validation) NO han
-             d'obrir el circuit breaker. Nomes 5xx + errors connexio.
+Description: Ollama semantic exceptions (Bug 15).
+             4xx errors (404 model, 400 bad request, 422 validation) must NOT
+             open the circuit breaker. Only 5xx + connection errors should.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -13,7 +13,7 @@ www.jgoy.net · https://server-nexe.org
 
 
 class OllamaSemanticError(Exception):
-    """Base d'errors semantics Ollama (4xx no infraestructura)."""
+    """Base class for Ollama semantic errors (4xx non-infrastructure)."""
 
     def __init__(self, message: str, status_code: int):
         super().__init__(message)
@@ -21,7 +21,7 @@ class OllamaSemanticError(Exception):
 
 
 class ModelNotFoundError(OllamaSemanticError):
-    """El model demanat no existeix a la instancia Ollama (HTTP 404)."""
+    """The requested model does not exist in the Ollama instance (HTTP 404)."""
 
     def __init__(self, model_name: str, message: str = None):  # type: ignore[assignment]  # no_implicit_optional
         self.model_name = model_name
@@ -32,11 +32,11 @@ class ModelNotFoundError(OllamaSemanticError):
 
 
 def is_semantic_http_error(exc: BaseException, httpx_module) -> bool:
-    """Retorna True si l'excepcio es un error semantic 4xx (no infra) que NO
-    hauria d'obrir el circuit breaker. 5xx i errors de connexio si l'obren.
+    """Returns True if the exception is a semantic 4xx error (non-infra) that should NOT
+    open the circuit breaker. 5xx and connection errors do open it.
 
-    `httpx_module` s'injecta perque els tests fan patch de httpx al modul
-    parent (plugins.ollama_module.module.httpx).
+    `httpx_module` is injected because tests patch httpx on the parent module
+    (plugins.ollama_module.module.httpx).
     """
     if httpx_module is None:
         return False

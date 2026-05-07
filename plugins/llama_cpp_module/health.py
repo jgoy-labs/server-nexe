@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/llama_cpp_module/health.py
-Description: Facade get_health() per al modul llama_cpp.
+Description: Facade get_health() for the llama_cpp module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -14,8 +14,8 @@ from typing import Dict, Any
 
 
 def get_health() -> Dict[str, Any]:
-    """Facade sincrona per obtenir health del modul llama_cpp."""
-    from .manifest import get_module_instance  # type: ignore[attr-defined]  # FP: install_lazy_manifest() injecta get_module_instance() dinàmicament al namespace del mòdul
+    """Synchronous facade to get health of the llama_cpp module."""
+    from .manifest import get_module_instance  # type: ignore[attr-defined]  # FP: install_lazy_manifest() injects get_module_instance() dynamically into the module namespace
 
     module = get_module_instance()
 

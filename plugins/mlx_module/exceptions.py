@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-"""Excepcions del mòdul MLX."""
+"""Exceptions for the MLX module."""
 
 
 class MissingDependencyError(RuntimeError):
-    """Dependència requerida no disponible en l'entorn d'execució actual."""
+    """Required dependency not available in the current runtime environment."""

@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/llama_cpp_module/api/routes.py
-Description: Endpoints FastAPI del modul Llama.cpp.
-             Separat de module.py durant normalitzacio (factory pattern).
+Description: FastAPI endpoints for the Llama.cpp module.
+             Separated from module.py during normalisation (factory pattern).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def create_router(module_instance) -> APIRouter:
     """
-    Crea el router FastAPI amb tots els endpoints del modul Llama.cpp.
+    Create the FastAPI router with all Llama.cpp module endpoints.
 
     Args:
         module_instance: LlamaCppModule instance

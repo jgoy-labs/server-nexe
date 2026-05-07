@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/ollama_module/__main__.py
-Description: Entry point CLI per al modul Ollama.
+Description: Entry point CLI for the Ollama module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

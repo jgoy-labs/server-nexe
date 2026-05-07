@@ -19,15 +19,15 @@ from .patterns import (
 
 def detect_jailbreak(text: str) -> Tuple[bool, Optional[str]]:
   """
-  Detecta patrons de jailbreak en el text.
+  Detects jailbreak patterns in the text.
 
   Args:
-    text: Text a analitzar
+    text: Text to analyze
 
   Returns:
-    Tuple[bool, Optional[str]]: (detectat, patró_trobat)
+    Tuple[bool, Optional[str]]: (detected, matched_pattern)
 
-  Temps objectiu: <0.5ms
+  Target time: <0.5ms
   """
   if not text:
     return False, None
@@ -45,15 +45,15 @@ def detect_jailbreak(text: str) -> Tuple[bool, Optional[str]]:
 
 def detect_prompt_injection(text: str) -> Tuple[bool, Optional[str]]:
   """
-  Detecta patrons de prompt injection en el text.
+  Detects prompt injection patterns in the text.
 
   Args:
-    text: Text a analitzar
+    text: Text to analyze
 
   Returns:
-    Tuple[bool, Optional[str]]: (detectat, patró_trobat)
+    Tuple[bool, Optional[str]]: (detected, matched_pattern)
 
-  Temps objectiu: <0.5ms
+  Target time: <0.5ms
   """
   if not text:
     return False, None
@@ -71,10 +71,10 @@ def detect_prompt_injection(text: str) -> Tuple[bool, Optional[str]]:
 
 def get_severity(threats: List[str]) -> str:
   """
-  Calcula la severitat basada en les amenaces detectades.
+  Calculates severity based on detected threats.
 
   Args:
-    threats: Llista de patrons/amenaces detectades (el text matchejat)
+    threats: List of detected patterns/threats (the matched text)
 
   Returns:
     str: "none" | "low" | "medium" | "high" | "critical"
@@ -98,13 +98,13 @@ def get_severity(threats: List[str]) -> str:
 
 def detect_all(text: str) -> Tuple[List[str], str]:
   """
-  Detecta totes les amenaces i calcula severitat.
+  Detects all threats and calculates severity.
 
   Args:
-    text: Text a analitzar
+    text: Text to analyze
 
   Returns:
-    Tuple[List[str], str]: (llista_amenaces, severitat)
+    Tuple[List[str], str]: (threats_list, severity)
   """
   threats = []
 

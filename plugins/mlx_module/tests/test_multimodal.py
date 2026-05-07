@@ -1,6 +1,6 @@
 """
-Tests suport multimodal (VLM) a mlx_module.
-No requereix mlx, mlx_lm ni mlx_vlm instal·lats — tot mockejat.
+Tests for multimodal (VLM) support in mlx_module.
+Does not require mlx, mlx_lm or mlx_vlm installed — everything is mocked.
 """
 
 import json
@@ -42,7 +42,7 @@ class TestDetectVlmCapability:
         from plugins.mlx_module.core.chat import _detect_vlm_capability
         assert _detect_vlm_capability("") is False
 
-    # ── Detector ampliat: arquitectures VLM noves ─────────────────────────
+    # ── Extended detector: new VLM architectures ──────────────────────────
 
     def test_vlm_qwen25_vl_returns_true(self, tmp_path):
         path = self._write_config(tmp_path, ["Qwen2_5_VLForConditionalGeneration"])
@@ -50,13 +50,13 @@ class TestDetectVlmCapability:
         assert _detect_vlm_capability(path) is True
 
     def test_vlm_qwen35_moe_returns_true(self, tmp_path):
-        """Qwen3.5 MoE VLM (cas real detectat 2026-04-15)."""
+        """Qwen3.5 MoE VLM (real case detected 2026-04-15)."""
         path = self._write_config(tmp_path, ["Qwen3_5MoeForConditionalGeneration"])
         from plugins.mlx_module.core.chat import _detect_vlm_capability
         assert _detect_vlm_capability(path) is True
 
     def test_vlm_qwen3_vl_returns_true(self, tmp_path):
-        """Qwen3VLForConditionalGeneration — arquitectura VLM Qwen3 directa."""
+        """Qwen3VLForConditionalGeneration — direct Qwen3 VLM architecture."""
         path = self._write_config(tmp_path, ["Qwen3VLForConditionalGeneration"])
         from plugins.mlx_module.core.chat import _detect_vlm_capability
         assert _detect_vlm_capability(path) is True
@@ -66,10 +66,10 @@ class TestDetectVlmCapability:
         from plugins.mlx_module.core.chat import _detect_vlm_capability
         assert _detect_vlm_capability(path) is True
 
-    # ── Detector secundari: vision_config al config.json ──────────────────
+    # ── Secondary detector: vision_config in config.json ─────────────────
 
     def test_vision_config_present_returns_true(self, tmp_path):
-        """Architecture desconeguda però config.json té vision_config → VLM."""
+        """Unknown architecture but config.json has vision_config → VLM."""
         config = {
             "architectures": ["UnknownFutureVLM"],
             "vision_config": {"hidden_size": 1024},
@@ -79,13 +79,13 @@ class TestDetectVlmCapability:
         assert _detect_vlm_capability(str(tmp_path)) is True
 
     def test_vision_config_empty_dict_ignored(self, tmp_path):
-        """vision_config buit {} NO compta com a VLM."""
+        """Empty vision_config {} does NOT count as VLM."""
         config = {"architectures": ["Qwen2ForCausalLM"], "vision_config": {}}
         (tmp_path / "config.json").write_text(json.dumps(config))
         from plugins.mlx_module.core.chat import _detect_vlm_capability
         assert _detect_vlm_capability(str(tmp_path)) is False
 
-    # ── Detector terciari: safetensors weight map ──────────────────────────
+    # ── Tertiary detector: safetensors weight map ──────────────────────────
 
     def _write_index(self, tmp_path, weight_keys):
         (tmp_path / "model.safetensors.index.json").write_text(
@@ -93,7 +93,7 @@ class TestDetectVlmCapability:
         )
 
     def test_weight_map_vision_tower_returns_true(self, tmp_path):
-        """Architecture desconeguda + vision_tower al safetensors → VLM."""
+        """Unknown architecture + vision_tower in safetensors → VLM."""
         self._write_config(tmp_path, ["UnknownArchForCausalLM"])
         self._write_index(tmp_path, [
             "model.layers.0.self_attn.q_proj.weight",
@@ -109,7 +109,7 @@ class TestDetectVlmCapability:
         assert _detect_vlm_capability(str(tmp_path)) is True
 
     def test_weight_map_no_vision_keys_returns_false(self, tmp_path):
-        """Text-only real: arquitectura desconeguda + cap key vision → False."""
+        """Real text-only: unknown architecture + no vision keys → False."""
         self._write_config(tmp_path, ["Qwen3NextForCausalLM"])
         self._write_index(tmp_path, [
             "model.layers.0.self_attn.q_proj.weight",
@@ -119,14 +119,14 @@ class TestDetectVlmCapability:
         assert _detect_vlm_capability(str(tmp_path)) is False
 
     def test_malformed_index_falls_through_to_false(self, tmp_path):
-        """Index JSON corrupte no ha de fer petar el detector."""
+        """Corrupted index JSON must not crash the detector."""
         self._write_config(tmp_path, ["Qwen2ForCausalLM"])
         (tmp_path / "model.safetensors.index.json").write_text("{broken json")
         from plugins.mlx_module.core.chat import _detect_vlm_capability
         assert _detect_vlm_capability(str(tmp_path)) is False
 
     def test_vlm_gemma4_returns_true(self, tmp_path):
-        """Gemma4 (imatge, sense vídeo) — cas real default VLM server-nexe."""
+        """Gemma4 (image, no video) — real default VLM case for server-nexe."""
         path = self._write_config(tmp_path, ["Gemma4ForConditionalGeneration"])
         from plugins.mlx_module.core.chat import _detect_vlm_capability
         assert _detect_vlm_capability(path) is True
@@ -135,10 +135,10 @@ class TestDetectVlmCapability:
 # ── _generate_vlm compatibilitat mlx-vlm 0.4.x ──────────────────────────────
 
 class TestGenerateVlm04Api:
-    """Verifica que el flux VLM és compatible amb mlx-vlm ≥ 0.4:
-    - image passat com a path (str), no PIL.Image
-    - result.text extret de GenerationResult, no string pelat
-    - mètriques reals (prompt_tokens, generation_tps, peak_memory)
+    """Verifies that the VLM flow is compatible with mlx-vlm >= 0.4:
+    - image passed as path (str), not PIL.Image
+    - result.text extracted from GenerationResult, not a bare string
+    - real metrics (prompt_tokens, generation_tps, peak_memory)
     """
 
     def _reset_singleton(self):
@@ -149,14 +149,14 @@ class TestGenerateVlm04Api:
         MLXChatNode._is_vlm = False
 
     def test_generate_vlm_passes_path_not_pil(self, tmp_path):
-        """mlx-vlm 0.4 exigeix path (str); no acceptem PIL.Image."""
+        """mlx-vlm 0.4 requires path (str); we do not accept PIL.Image."""
         self._reset_singleton()
         from plugins.mlx_module.core.config import MLXConfig
         from plugins.mlx_module.core.chat import MLXChatNode
 
         config = MLXConfig(model_path="/fake/vlm_model")
         node = MLXChatNode(config=config)
-        # Simular model ja carregat (bypass _get_model)
+        # Simulate model already loaded (bypass _get_model)
         MLXChatNode._is_vlm = True
         MLXChatNode._model = MagicMock()
         MLXChatNode._tokenizer = MagicMock()
@@ -189,24 +189,24 @@ class TestGenerateVlm04Api:
                 images=[b"\xff\xd8\xff" + b"\x00" * 100],  # JPEG magic
             )
 
-        # Verifica que l'argument image és str (path de tempfile), no PIL
+        # Verify that the image argument is str (tempfile path), not PIL
         call = mock_generate.call_args
         image_arg = call.kwargs["image"]
         assert isinstance(image_arg, str)
         assert image_arg.endswith(".img")
 
-        # Verifica extracció de .text del GenerationResult
+        # Verify extraction of .text from GenerationResult
         assert out["text"] == "Veig un gat a la imatge."
         assert out["vlm"] is True
 
-        # Mètriques reals mlx-vlm 0.4 (no zeros com abans)
+        # Real metrics from mlx-vlm 0.4 (no zeros as before)
         assert out["prompt_tokens"] == 42
         assert out["tokens"] == 7
         assert out["prompt_tps"] == 120.0
         assert out["peak_memory_mb"] == 3400.0
 
     def test_generate_vlm_handles_legacy_string_result(self, tmp_path):
-        """Robustesa: si mlx_vlm retornés str (versió antiga), no peta."""
+        """Robustness: if mlx_vlm returned str (old version), it should not crash."""
         self._reset_singleton()
         from plugins.mlx_module.core.config import MLXConfig
         from plugins.mlx_module.core.chat import MLXChatNode
@@ -232,11 +232,11 @@ class TestGenerateVlm04Api:
                 system="", messages=[{"role": "user", "content": "x"}],
                 images=[b"\xff\xd8\xff"],
             )
-        # Fallback: si no té .text, str(result)
+        # Fallback: if it has no .text, str(result)
         assert "response str legacy" in out["text"]
 
 
-# ── _get_model bifurcació ────────────────────────────────────────────────────
+# ── _get_model branching ─────────────────────────────────────────────────────
 
 class TestGetModelBifurcation:
 
@@ -248,7 +248,7 @@ class TestGetModelBifurcation:
         MLXChatNode._is_vlm = False
 
     def test_text_model_uses_mlx_lm(self, tmp_path):
-        """Model text-only → mlx_lm.load()."""
+        """Text-only model → mlx_lm.load()."""
         (tmp_path / "config.json").write_text(json.dumps({"architectures": ["Qwen2ForCausalLM"]}))
         self._reset_singleton()
 
@@ -268,7 +268,7 @@ class TestGetModelBifurcation:
         assert MLXChatNode._is_vlm is False
 
     def test_vlm_model_uses_mlx_vlm(self, tmp_path):
-        """Model VLM → mlx_vlm.load()."""
+        """VLM model → mlx_vlm.load()."""
         (tmp_path / "config.json").write_text(
             json.dumps({"architectures": ["Qwen2VLForConditionalGeneration"]})
         )
@@ -291,7 +291,7 @@ class TestGetModelBifurcation:
         assert MLXChatNode._is_vlm is True
 
 
-# ── execute() bifurcació ─────────────────────────────────────────────────────
+# ── execute() branching ──────────────────────────────────────────────────────
 
 class TestMLXExecuteBifurcation:
 
@@ -304,7 +304,7 @@ class TestMLXExecuteBifurcation:
 
     @pytest.mark.asyncio
     async def test_text_only_uses_generate_blocking(self):
-        """Sense imatges → _generate_blocking (path normal)."""
+        """Without images → _generate_blocking (normal path)."""
         self._reset_singleton()
 
         from plugins.mlx_module.core.config import MLXConfig
@@ -330,13 +330,13 @@ class TestMLXExecuteBifurcation:
                 "messages": [{"role": "user", "content": "Hola"}],
             })
 
-        # Comprova que s'ha cridat _generate_blocking (no _generate_vlm)
+        # Verify that _generate_blocking was called (not _generate_vlm)
         call_args = mock_thread.call_args
         assert call_args[0][0] == node._generate_blocking
 
     @pytest.mark.asyncio
     async def test_images_with_vlm_uses_generate_vlm(self):
-        """Amb imatges i VLM actiu → _generate_vlm.
+        """With images and VLM active → _generate_vlm.
 
         execute() uses _detect_vlm_capability(config.model_path) as the
         source of truth (not the _is_vlm singleton — can go stale when
@@ -371,8 +371,8 @@ class TestMLXExecuteBifurcation:
                 "images": [b"\xff\xd8\xff" + b"\x00" * 100],
             })
 
-        # Comprova que s'ha cridat _generate_vlm (no _generate_blocking)
+        # Verify that _generate_vlm was called (not _generate_blocking)
         call_args = mock_thread.call_args
         assert call_args[0][0] == node._generate_vlm
-        # La resposta és vàlida
+        # The response is valid
         assert result.get("response") == "Veig un gat."

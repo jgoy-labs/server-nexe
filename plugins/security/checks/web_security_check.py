@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/checks/web_security_check.py
-Description: Security check per validar proteccions web (CORS, headers, injeccions).
+Description: Security check to validate web protections (CORS, headers, injections).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -18,16 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 class WebSecurityCheck:
-    """Valida proteccions web del sistema."""
+    """Validates web protections of the system."""
 
     def __init__(self, project_root: Path = None):  # type: ignore[assignment]  # no_implicit_optional
         self.project_root = project_root or Path(__file__).parent.parent.parent.parent
 
     def run(self) -> List[Dict[str, Any]]:
-        """Executa els checks de seguretat web."""
+        """Runs the web security checks."""
         findings = []
 
-        # Check 1: CORS origins configurats?
+        # Check 1: CORS origins configured?
         cors_origins = os.getenv("NEXE_CORS_ORIGINS", "").strip()
         if not cors_origins:
             findings.append({
@@ -46,7 +46,7 @@ class WebSecurityCheck:
                 "recommendation": "Restrict CORS to specific origins"
             })
 
-        # Check 2: Detectors d'injeccio disponibles?
+        # Check 2: Injection detectors available?
         # Defensive imports: validate availability via try/except, F401 noqa.
         try:
             from plugins.security.core.injection_detectors import (  # noqa: F401
@@ -59,7 +59,7 @@ class WebSecurityCheck:
                 "severity": "LOW",
                 "title": "Injection detectors operational",
                 "description": "XSS, SQL, and command injection detectors are loaded correctly.",
-                "recommendation": None  # type: ignore[dict-item]  # "recommendation": None és vàlid — dict espera str però Optional[str] per disseny
+                "recommendation": None  # type: ignore[dict-item]  # "recommendation": None is valid — dict expects str but Optional[str] by design
             })
         except ImportError as e:
             findings.append({
@@ -70,7 +70,7 @@ class WebSecurityCheck:
                 "recommendation": "Check plugins/security/core/injection_detectors.py"
             })
 
-        # Check 3: Sanitizer operatiu?
+        # Check 3: Sanitizer operational?
         try:
             from plugins.security.sanitizer.module import get_sanitizer
             sanitizer = get_sanitizer()
@@ -80,7 +80,7 @@ class WebSecurityCheck:
                 "severity": "LOW",
                 "title": "Sanitizer operational",
                 "description": "Jailbreak and injection sanitizer is functional.",
-                "recommendation": None  # type: ignore[dict-item]  # "recommendation": None és vàlid — dict espera str però Optional[str] per disseny
+                "recommendation": None  # type: ignore[dict-item]  # "recommendation": None is valid — dict expects str but Optional[str] by design
             })
         except Exception as e:
             findings.append({
@@ -91,7 +91,7 @@ class WebSecurityCheck:
                 "recommendation": "Check plugins/security/sanitizer/"
             })
 
-        # Check 4: HTTPS en produccio?
+        # Check 4: HTTPS in production?
         nexe_env = os.getenv("NEXE_ENV", "development").lower()
         ssl_cert = os.getenv("NEXE_SSL_CERT", "").strip()
         if nexe_env == "production" and not ssl_cert:

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/mlx_module/health.py
-Description: Facade get_health() per al modul mlx.
+Description: get_health() facade for the mlx module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -14,8 +14,8 @@ from typing import Dict, Any
 
 
 def get_health() -> Dict[str, Any]:
-    """Facade sincrona per obtenir health del modul mlx."""
-    from .manifest import get_module_instance  # type: ignore[attr-defined]  # FP: install_lazy_manifest() injecta get_module_instance() dinàmicament al namespace del mòdul
+    """Synchronous facade to get the health of the mlx module."""
+    from .manifest import get_module_instance  # type: ignore[attr-defined]  # FP: install_lazy_manifest() injects get_module_instance() dynamically into the module namespace
 
     module = get_module_instance()
 

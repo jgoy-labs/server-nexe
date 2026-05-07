@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/tests/test_validators.py
-Description: Tests per validate_safe_path, validate_command, validate_filename, validate_api_endpoint_path.
+Description: Tests for validate_safe_path, validate_command, validate_filename, validate_api_endpoint_path.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -23,7 +23,7 @@ from plugins.security.core.validators import (
 
 
 class TestValidateSafePath:
-    """Tests per validate_safe_path."""
+    """Tests for validate_safe_path."""
 
     def setup_method(self):
         self.tmpdir = tempfile.mkdtemp()
@@ -64,13 +64,13 @@ class TestValidateSafePath:
 
 
 class TestValidateCommand:
-    """Tests per validate_command."""
+    """Tests for validate_command."""
 
     def test_valid_command_returns_parts(self):
         result = validate_command("ls -la", allowed_commands=["ls"])
         assert result == ["ls", "-la"]
 
-    def test_command_not_in_whitelist_raises_403(self):
+    def test_command_not_in_allowlist_raises_403(self):
         with pytest.raises(HTTPException) as exc:
             validate_command("rm -rf /", allowed_commands=["ls", "cat"])
         assert exc.value.status_code == 403
@@ -96,7 +96,7 @@ class TestValidateCommand:
 
 
 class TestValidateFilename:
-    """Tests per validate_filename."""
+    """Tests for validate_filename."""
 
     def test_valid_filename(self):
         result = validate_filename("document.pdf")
@@ -168,7 +168,7 @@ class TestValidateFilename:
 
 
 class TestValidateApiEndpointPath:
-    """Tests per validate_api_endpoint_path."""
+    """Tests for validate_api_endpoint_path."""
 
     def test_valid_prefix_returns_path(self):
         result = validate_api_endpoint_path("/security/report", ["/security"])

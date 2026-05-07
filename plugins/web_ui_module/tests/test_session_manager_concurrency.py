@@ -1,10 +1,10 @@
 """
-Bug 16 — SessionManager._sessions modificat sense lock.
-Tests de race conditions amb crides concurrents.
+Bug 16 — SessionManager._sessions modified without lock.
+Race condition tests with concurrent calls.
 
-Els metodes son sincrons pero es criden des de threadpools (FastAPI
-run_in_threadpool) i tambe potencialment desde varies coroutines amb
-context switches. Els protegim amb threading.RLock.
+The methods are synchronous but are called from threadpools (FastAPI
+run_in_threadpool) and also potentially from multiple coroutines with
+context switches. We protect them with threading.RLock.
 """
 import asyncio
 import threading
@@ -19,7 +19,7 @@ def sm(tmp_path):
 
 
 class TestConcurrentCreateThreads:
-    """N threads creant sessions amb ids diferents en paral·lel."""
+    """N threads creating sessions with different ids in parallel."""
 
     def test_create_many_sessions_threads(self, sm):
         N = 50
@@ -34,7 +34,7 @@ class TestConcurrentCreateThreads:
         for t in threads:
             t.join()
 
-        # Totes les sessions s'han creat
+        # All sessions have been created
         listed = {s["id"] for s in sm.list_sessions()}
         for sid in ids:
             assert sid in listed

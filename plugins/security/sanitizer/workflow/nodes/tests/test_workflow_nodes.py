@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/sanitizer/workflow/nodes/tests/test_workflow_nodes.py
-Description: Tests per InterventionNode i SanitizerNode (workflow nodes del sanitizer).
+Description: Tests for InterventionNode and SanitizerNode (sanitizer workflow nodes).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -23,7 +23,7 @@ from plugins.security.sanitizer.workflow.nodes import SanitizerNode as Sanitizer
 
 
 class TestInterventionNode:
-    """Tests per al node d'intervenció (resistència a jailbreaks)."""
+    """Tests for the intervention node (resistance to jailbreaks)."""
 
     def setup_method(self):
         self.node = InterventionNode()
@@ -93,7 +93,7 @@ class TestInterventionNode:
 
 
 class TestSanitizerNode:
-    """Tests per al node sanitizer."""
+    """Tests for the sanitizer node."""
 
     def setup_method(self):
         self.node = SanitizerNode()
@@ -168,7 +168,7 @@ class TestSanitizerNode:
 
 
 class TestSanitizerNodeInit:
-    """Tests per al __init__ del mòdul de nodes."""
+    """Tests for the __init__ of the nodes module."""
 
     def test_import_sanitizer_node(self):
         assert SanitizerNodeImport is SanitizerNode

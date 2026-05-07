@@ -1,14 +1,14 @@
 """
-Tests d'integració per als endpoints Web UI.
+Integration tests for Web UI endpoints.
 
-Endpoints sense GPU (sessions, upload, fitxers):
-  pytest -m integration  (sempre executables)
+Endpoints without GPU (sessions, upload, files):
+  pytest -m integration  (always runnable)
 
-Endpoints amb GPU (chat):
-  pytest -m "integration and gpu"  (requereix backend actiu)
+Endpoints with GPU (chat):
+  pytest -m "integration and gpu"  (requires active backend)
 
-Variables d'entorn:
-  NEXE_PRIMARY_API_KEY  — clau d'accés
+Environment variables:
+  NEXE_PRIMARY_API_KEY  — access key
   NEXE_MODEL_ENGINE     — ollama | mlx | llama_cpp
 """
 import io
@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from core.app import app
 
 # ─────────────────────────────────────────────────────────────
-# Fixtures globals
+# Global fixtures
 # ─────────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
@@ -42,7 +42,7 @@ def headers(api_key):
 
 
 # ─────────────────────────────────────────────────────────────
-# Health endpoint (sense GPU)
+# Health endpoint (without GPU)
 # ─────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -59,7 +59,7 @@ class TestWebUIHealth:
 
 
 # ─────────────────────────────────────────────────────────────
-# Sessions (sense GPU)
+# Sessions (without GPU)
 # ─────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -119,7 +119,7 @@ class TestSessionEndpoints:
 
 
 # ─────────────────────────────────────────────────────────────
-# Upload (sense GPU)
+# Upload (without GPU)
 # ─────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -171,7 +171,7 @@ class TestUploadEndpoints:
 
 
 # ─────────────────────────────────────────────────────────────
-# Chat — empty message (sense GPU)
+# Chat — empty message (without GPU)
 # ─────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -195,7 +195,7 @@ class TestChatValidation:
 
 
 # ─────────────────────────────────────────────────────────────
-# Chat — amb GPU real (Ollama)
+# Chat — with real GPU (Ollama)
 # ─────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -203,8 +203,8 @@ class TestChatValidation:
 @pytest.mark.slow
 class TestChatOllama:
     """
-    Requereix Ollama actiu amb el model configurat a NEXE_OLLAMA_MODEL.
-    Executar amb: pytest -m "integration and gpu"
+    Requires active Ollama with the model configured in NEXE_OLLAMA_MODEL.
+    Run with: pytest -m "integration and gpu"
     """
 
     @pytest.fixture(autouse=True)
@@ -268,7 +268,7 @@ class TestChatOllama:
 
 
 # ─────────────────────────────────────────────────────────────
-# Chat — amb GPU real (MLX)
+# Chat — with real GPU (MLX)
 # ─────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -276,8 +276,8 @@ class TestChatOllama:
 @pytest.mark.slow
 class TestChatMLX:
     """
-    Requereix Apple Silicon + mlx_lm + model configurat a NEXE_MLX_MODEL.
-    Executar amb: pytest -m "integration and gpu"
+    Requires Apple Silicon + mlx_lm + model configured in NEXE_MLX_MODEL.
+    Run with: pytest -m "integration and gpu"
     """
 
     @pytest.fixture(autouse=True)
@@ -302,7 +302,7 @@ class TestChatMLX:
         assert r.status_code == 200
 
     def test_chat_mlx_prefix_cache(self, client, headers):
-        """Doble petició en la mateixa sessió — comprova que el prefix cache funciona."""
+        """Double request in the same session — verifies that prefix cache works."""
         r1 = client.post("/ui/session/new", headers=headers)
         sid = r1.json()["session_id"]
 
@@ -317,7 +317,7 @@ class TestChatMLX:
 
 
 # ─────────────────────────────────────────────────────────────
-# Memory endpoints — validació (sense GPU ni Qdrant)
+# Memory endpoints — validation (without GPU or Qdrant)
 # ─────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -345,7 +345,7 @@ class TestMemoryValidation:
             headers=headers,
             json={"content": "Test content that should be saved to memory", "session_id": "test-val"}
         )
-        # 200 (Qdrant disponible) o error de backend (503/500) — sempre JSON
+        # 200 (Qdrant available) or backend error (503/500) — always JSON
         assert r.headers["content-type"].startswith("application/json")
 
     def test_recall_returns_json(self, client, headers):
@@ -358,7 +358,7 @@ class TestMemoryValidation:
 
 
 # ─────────────────────────────────────────────────────────────
-# Memory — save + recall round-trip (requereix Qdrant)
+# Memory — save + recall round-trip (requires Qdrant)
 # ─────────────────────────────────────────────────────────────
 
 def _qdrant_available():
@@ -385,8 +385,8 @@ def _memory_api_available():
 @pytest.mark.slow
 class TestMemoryRoundTrip:
     """
-    Requereix Qdrant actiu (localhost:6333).
-    Executar amb: pytest -m "integration and slow"
+    Requires active Qdrant (localhost:6333).
+    Run with: pytest -m "integration and slow"
     """
 
     @pytest.fixture(autouse=True)
@@ -419,7 +419,7 @@ class TestMemoryRoundTrip:
                 "metadata": {"type": "fact"}
             }
         )
-        # Després cercar
+        # Then search
         r = client.post(
             "/ui/memory/recall",
             headers=headers,
@@ -450,13 +450,13 @@ class TestMemoryRoundTrip:
                          json={"content": content, "session_id": "dedup-test"})
         assert r1.status_code == 200
         assert r2.status_code == 200
-        # El segon ha de dir que ja existeix (duplicate) o success
+        # The second should say it already exists (duplicate) or success
         body2 = r2.json()
         assert body2.get("success") is True
 
 
 # ─────────────────────────────────────────────────────────────
-# Memory — intenció de guardar via chat (requereix GPU + Qdrant)
+# Memory — save intent via chat (requires GPU + Qdrant)
 # ─────────────────────────────────────────────────────────────
 
 @pytest.mark.integration
@@ -464,9 +464,9 @@ class TestMemoryRoundTrip:
 @pytest.mark.slow
 class TestChatMemoryIntentOllama:
     """
-    Prova el flux complet: missatge amb intent de guardar →
-    el model respon + es guarda a Qdrant.
-    Requereix Ollama + Qdrant actius.
+    Tests the complete flow: message with save intent →
+    model responds + saves to Qdrant.
+    Requires active Ollama + Qdrant.
     """
 
     @pytest.fixture(autouse=True)
@@ -497,18 +497,18 @@ class TestChatMemoryIntentOllama:
         )
         assert r.status_code == 200
         body = r.json()
-        # memory_action ha de ser "save"
+        # memory_action should be "save"
         assert body.get("memory_action") == "save"
 
     def test_recall_intent_via_chat(self, client, headers):
         r1 = client.post("/ui/session/new", headers=headers)
         sid = r1.json()["session_id"]
 
-        # Primer guardar directament
+        # First save directly
         client.post("/ui/memory/save", headers=headers,
                     json={"content": "L'usuari es diu Recall_Test_User", "session_id": sid})
 
-        # Després preguntar
+        # Then ask
         r = client.post(
             "/ui/chat",
             headers=headers,
@@ -518,11 +518,11 @@ class TestChatMemoryIntentOllama:
         assert r.status_code == 200
 
     def test_full_memory_round_trip_via_chat(self, client, headers):
-        """Guardar informació via chat → recuperar-la en la mateixa sessió."""
+        """Save information via chat → retrieve it in the same session."""
         r1 = client.post("/ui/session/new", headers=headers)
         sid = r1.json()["session_id"]
 
-        # Guardar
+        # Save
         client.post(
             "/ui/chat",
             headers=headers,
@@ -530,7 +530,7 @@ class TestChatMemoryIntentOllama:
             timeout=60
         )
 
-        # Recall explícit per API
+        # Explicit recall via API
         r = client.post(
             "/ui/memory/recall",
             headers=headers,
@@ -544,7 +544,7 @@ class TestChatMemoryIntentOllama:
 @pytest.mark.slow
 class TestChatMemoryIntentMLX:
     """
-    Mateix flux que TestChatMemoryIntentOllama però amb MLX.
+    Same flow as TestChatMemoryIntentOllama but with MLX.
     """
 
     @pytest.fixture(autouse=True)
@@ -592,7 +592,7 @@ class TestChatMemoryIntentMLX:
 
 
 # ─────────────────────────────────────────────────────────────
-# Static files (sense GPU)
+# Static files (without GPU)
 # ─────────────────────────────────────────────────────────────
 
 @pytest.mark.integration

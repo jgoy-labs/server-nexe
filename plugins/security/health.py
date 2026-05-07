@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/health.py
-Description: Facade get_health() per al modul security.
+Description: get_health() facade for the security module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -15,12 +15,12 @@ from typing import Dict, Any
 
 def get_health() -> Dict[str, Any]:
     """
-    Facade sincrona per obtenir health del modul security.
+    Synchronous facade to get the security module health.
 
-    Retorna dict amb status, message, details, checks.
-    Delega a SecurityModule.health_check() (async).
+    Returns dict with status, message, details, checks.
+    Delegates to SecurityModule.health_check() (async).
     """
-    from .manifest import get_module_instance  # type: ignore[attr-defined]  # FP: install_lazy_manifest() injecta get_module_instance() dinàmicament al namespace del mòdul
+    from .manifest import get_module_instance  # type: ignore[attr-defined]  # FP: install_lazy_manifest() dynamically injects get_module_instance() into the module namespace
 
     module = get_module_instance()
 
@@ -30,8 +30,8 @@ def get_health() -> Dict[str, Any]:
         loop = None
 
     if loop and loop.is_running():
-        # Ja dins event loop (ex: FastAPI) — no podem fer asyncio.run()
-        # Retornem un resultat basic sincron
+        # Already inside event loop (e.g. FastAPI) — cannot call asyncio.run()
+        # Return a basic synchronous result
         return {
             "status": "healthy" if module._initialized else "unknown",
             "module": module.metadata.name,
@@ -39,6 +39,6 @@ def get_health() -> Dict[str, Any]:
             "initialized": module._initialized,
         }
 
-    # Fora event loop — podem executar l'async health_check
+    # Outside event loop — can run the async health_check
     result = asyncio.run(module.health_check())
     return result.to_dict()

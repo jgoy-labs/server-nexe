@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/ollama_module/core/chat.py
-Description: Chat Ollama — inference amb streaming i directa.
-             Extret de module.py durant normalitzacio BUS 2026-04-06.
+Description: Ollama Chat — streaming and direct inference.
+             Extracted from module.py during BUS normalisation 2026-04-06.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -45,17 +45,17 @@ def can_think(model: str) -> bool:
 
 
 def _parent():
-    """Lazy import del modul parent (tests patchen httpx/ollama_breaker alla).
+    """Lazy import of the parent module (tests patch httpx/ollama_breaker there).
 
     FIXME (post-release): Refactor tests to patch core/ instead of module/.
-    Veure plugins/ollama_module/core/client.py per a la justificacio completa.
+    See plugins/ollama_module/core/client.py for the full justification.
     """
     from plugins.ollama_module import module as _m
     return _m
 
 
 class OllamaChat:
-    """Motor de chat Ollama (streaming + directa)."""
+    """Ollama chat engine (streaming + direct)."""
 
     def __init__(self, client):
         self.client = client
@@ -66,7 +66,7 @@ class OllamaChat:
 
     def _build_payload(self, model: str, messages: List[Dict[str, str]], stream: bool,
                        images: Optional[List[str]] = None, thinking_enabled: bool = False) -> Dict[str, Any]:
-        """Construeix el payload /api/chat."""
+        """Builds the /api/chat payload."""
         # Env var override (global) takes precedence if explicitly set
         env_think = os.getenv("NEXE_OLLAMA_THINK")
         if env_think is not None:
@@ -86,8 +86,8 @@ class OllamaChat:
             },
         }
         if images:
-            # Ollama /api/chat: images han d'anar dins el darrer missatge de l'usuari
-            # (no al top-level — que és el format de /api/generate, no /api/chat)
+            # Ollama /api/chat: images must go inside the last user message
+            # (not at the top-level — that is the format of /api/generate, not /api/chat)
             for i in range(len(payload["messages"]) - 1, -1, -1):
                 if payload["messages"][i].get("role") == "user":
                     payload["messages"][i] = dict(payload["messages"][i])
@@ -99,7 +99,7 @@ class OllamaChat:
         self, model: str, messages: List[Dict[str, str]], stream: bool = True,
         images: Optional[List[str]] = None, thinking_enabled: bool = False,
     ) -> AsyncIterator[Dict[str, Any]]:
-        """Chat amb model Ollama (streaming o directe). images: base64 strings opcionals."""
+        """Chat with Ollama model (streaming or direct). images: optional base64 strings."""
         p = _parent()
         httpx = p.httpx
         ollama_breaker = p.ollama_breaker
@@ -126,7 +126,7 @@ class OllamaChat:
                                     data = json.loads(line)
                                     yield data
                                 except json.JSONDecodeError:
-                                    logger.warning("JSON invalid a chat: %s", line)
+                                    logger.warning("Invalid JSON in chat: %s", line)
                 else:
                     response = await client.post(
                         f"{self.base_url}/api/chat", json=payload
@@ -168,16 +168,16 @@ class OllamaChat:
                 logger.warning("Ollama chat semantic error %d for %s", e.response.status_code, model)
                 raise OllamaSemanticError(str(e), e.response.status_code) from e
             await ollama_breaker.record_failure(e)
-            logger.error("Chat fallida amb model %s: %s", model, repr(e))
+            logger.error("Chat failed with model %s: %s", model, repr(e))
             raise
         except (httpx.HTTPError, ConnectionError, TimeoutError) as e:
             await ollama_breaker.record_failure(e)
-            logger.error("Chat fallida amb model %s: %s", model, repr(e))
+            logger.error("Chat failed with model %s: %s", model, repr(e))
             raise
 
     @property
     def _timeout(self):
-        httpx = _parent().httpx  # lazy-import pattern mantingut per a tests patch
+        httpx = _parent().httpx  # lazy-import pattern maintained for tests patch
         owner = getattr(self, "_owner", None)
         if owner is not None and getattr(owner, "timeout", None) is not None:
             return owner.timeout

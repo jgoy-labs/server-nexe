@@ -49,26 +49,26 @@ async def require_api_key(
   x_api_key: Optional[str] = Header(None, description="Admin API Key")
 ) -> str:
   """
-  FastAPI Dependency per validar API key obligatòria.
-  Suport dual-key amb validació d'expiració.
-  Fail-closed per defecte (no bypàs sense configuració explícita).
+  FastAPI Dependency to validate mandatory API key.
+  Dual-key support with expiry validation.
+  Fail-closed by default (no bypass without explicit configuration).
 
-  Retorna l'API key si és vàlida, sinó HTTPException 401/500
+  Returns the API key if valid, otherwise HTTPException 401/500
 
-  Usage en routers:
+  Usage in routers:
 
     @router.post("/admin/endpoint")
     async def protected_endpoint(api_key: str = Depends(require_api_key)):
       return {"status": "authenticated"}
 
-  Configuració (dual-key recomanat):
+  Configuration (dual-key recommended):
     NEXE_PRIMARY_API_KEY, NEXE_PRIMARY_KEY_EXPIRES
     NEXE_SECONDARY_API_KEY, NEXE_SECONDARY_KEY_EXPIRES
 
-  Configuració (llegat, un sol camp):
+  Configuration (legacy, single field):
     NEXE_ADMIN_API_KEY
 
-  Mode dev (opcional):
+  Dev mode (optional):
     NEXE_DEV_MODE=true
   """
   keys_config = load_api_keys()
@@ -111,8 +111,8 @@ async def require_api_key(
         security_logger.log_event(
           event_type=SecurityEventType.AUTH_SUCCESS,
           severity=SecuritySeverity.WARNING,
-          message="MODE DEV: Clau API bypassed",
-          details={"warning": "NO per producció!"}
+          message="DEV MODE: API key bypassed",
+          details={"warning": "NOT for production!"}
         )
       except ImportError:
         pass
@@ -204,9 +204,9 @@ async def optional_api_key(
   x_api_key: Optional[str] = Header(None, description="Optional API Key")
 ) -> Optional[str]:
   """
-  Dependency opcional: valida si key present, però no bloqueja si absent
+  Optional dependency: validates key if present, but does not block if absent
 
-  Retorna l'API key si és vàlida, None si absent/invàlida
+  Returns the API key if valid, None if absent/invalid
 
   Usage:
     @router.get("/endpoint")

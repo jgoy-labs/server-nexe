@@ -3,14 +3,14 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/specialists/test_specialist.py
-Description: Specialist per test_manager — reporta tests del modul security.
+Description: Specialist for test_manager — reports tests of the security module.
 
-STUB — Funcional a Part 2 quan arribi test_manager de NAT7.
+STUB — Functional in Part 2 when test_manager arrives from NAT7.
 
-Contracte:
-  - test_manager crida get_test_report()
-  - Retorna dict amb test_count, passed, failed, coverage
-  - El plugin no sap qui el pregunta, nomes respon
+Contract:
+  - test_manager calls get_test_report()
+  - Returns dict with test_count, passed, failed, coverage
+  - The plugin does not know who is asking, it only responds
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -18,8 +18,8 @@ www.jgoy.net · https://server-nexe.org
 
 
 class SecurityTestSpecialist:
-    """Specialist per test_manager. Stub fins Part 2."""
+    """Specialist for test_manager. Stub until Part 2."""
 
     def get_test_report(self):
-        """Retorna informe de tests per test_manager."""
-        raise NotImplementedError("Stub — funcional a Part 2")
+        """Returns test report for test_manager."""
+        raise NotImplementedError("Stub — functional in Part 2")

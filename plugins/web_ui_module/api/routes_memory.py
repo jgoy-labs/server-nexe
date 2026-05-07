@@ -2,8 +2,8 @@
 ------------------------------------
 Server Nexe
 Location: plugins/web_ui_module/api/routes_memory.py
-Description: Endpoints de memoria (save/recall explicit).
-             Extret de routes.py durant refactoring de tech debt.
+Description: Memory endpoints (explicit save/recall).
+             Extracted from routes.py during tech debt refactoring.
 
 www.jgoy.net · https://server-nexe.org
 ------------------------------------
@@ -31,14 +31,14 @@ logger = logging.getLogger(__name__)
 
 
 def register_memory_routes(router: APIRouter, *, require_ui_auth):
-    """Registra endpoints: POST /memory/save, POST /memory/recall, POST /memory/confirm-delete"""
+    """Registers endpoints: POST /memory/save, POST /memory/recall, POST /memory/confirm-delete"""
 
     # -- POST /memory/save --
 
     @router.post("/memory/save", operation_id="webui_memory_save")
     @limiter.limit("10/minute")
     async def memory_save(request: Request, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
-        """Guardar contingut explicitament a la memoria (via MemoryService if available)"""
+        """Explicitly save content to memory (via MemoryService if available)"""
         content = body.get("content", "")
         session_id = body.get("session_id", "unknown")
         metadata = body.get("metadata", {})
@@ -64,7 +64,7 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
     @router.post("/memory/recall", operation_id="webui_memory_recall")
     @limiter.limit("30/minute")
     async def memory_recall(request: Request, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
-        """Cercar a la memoria"""
+        """Search in memory"""
         query = body.get("query", "")
         limit = body.get("limit", 5)
 
@@ -86,7 +86,7 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
     @router.post("/memory/confirm-delete", operation_id="webui_memory_confirm_delete")
     @limiter.limit("10/minute")
     async def memory_confirm_delete(request: Request, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
-        """Esborra un fet de memòria un cop l'usuari l'ha confirmat al frontend."""
+        """Deletes a memory fact once the user has confirmed it in the frontend."""
         fact = body.get("fact", "").strip()
         if not fact:
             raise HTTPException(status_code=400, detail="fact required")

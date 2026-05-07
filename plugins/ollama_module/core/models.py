@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/ollama_module/core/models.py
-Description: Gestor de models Ollama — list, pull, info, delete.
-             Extret de module.py durant normalitzacio BUS 2026-04-06.
+Description: Ollama model manager — list, pull, info, delete.
+             Extracted from module.py during BUS normalisation 2026-04-06.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -23,17 +23,17 @@ logger = logging.getLogger(__name__)
 
 
 def _parent():
-    """Lazy import del modul parent (tests patchen httpx/ollama_breaker alla).
+    """Lazy import of the parent module (tests patch httpx/ollama_breaker there).
 
     FIXME (post-release): Refactor tests to patch core/ instead of module/.
-    Veure plugins/ollama_module/core/client.py per a la justificacio completa.
+    See plugins/ollama_module/core/client.py for the full justification.
     """
     from plugins.ollama_module import module as _m
     return _m
 
 
 class OllamaModels:
-    """Gestio de models Ollama locals."""
+    """Management of local Ollama models."""
 
     def __init__(self, client):
         self.client = client
@@ -45,9 +45,9 @@ class OllamaModels:
     async def list_models(self) -> List[Dict[str, Any]]:
         """List all available local models.
 
-        Bug 15: ja no usa @ollama_breaker.protect directament perque aquest
-        decorator registra qualsevol Exception com a failure. Fem el control
-        manual per filtrar errors semantics 4xx (no infra) abans del breaker.
+        Bug 15: no longer uses @ollama_breaker.protect directly because that
+        decorator records any Exception as a failure. We do manual control
+        to filter semantic 4xx errors (non-infra) before the breaker.
         """
         p = _parent()
         httpx = p.httpx
@@ -69,7 +69,7 @@ class OllamaModels:
                 return models
         except httpx.HTTPStatusError as e:
             if p._is_semantic_http_error(e):
-                # No tocar breaker — error d'aplicacio
+                # Do not touch breaker — application error
                 raise
             await ollama_breaker.record_failure(e)
             raise
@@ -101,7 +101,7 @@ class OllamaModels:
                                 data = json.loads(line)
                                 yield data
                             except json.JSONDecodeError:
-                                logger.warning("JSON invalid a pull: %s", line)
+                                logger.warning("Invalid JSON in pull: %s", line)
         except httpx.HTTPStatusError as e:
             if p._is_semantic_http_error(e):
                 logger.warning("Ollama pull semantic error %d for %s", e.response.status_code, model_name)
@@ -109,20 +109,20 @@ class OllamaModels:
                     raise ModelNotFoundError(model_name) from e
                 raise OllamaSemanticError(str(e), e.response.status_code) from e
             await ollama_breaker.record_failure(e)
-            logger.error("Error descarregant model %s: %s", model_name, repr(e))
+            logger.error("Error downloading model %s: %s", model_name, repr(e))
             raise
         except (httpx.HTTPError, ConnectionError, TimeoutError) as e:
             await ollama_breaker.record_failure(e)
-            logger.error("Error descarregant model %s: %s", model_name, repr(e))
+            logger.error("Error downloading model %s: %s", model_name, repr(e))
             raise
 
     async def get_model_info(self, model_name: str) -> Dict[str, Any]:
-        """Obte informacio detallada d'un model.
+        """Retrieves detailed information about a model.
 
-        Bug 15: gestio manual del circuit breaker per distingir 404 (model
-        no trobat, error semantic) d'errors d'infraestructura. Un 404 NO ha
-        d'obrir el breaker — re-llancem ModelNotFoundError perque el caller
-        ho gestioni separadament.
+        Bug 15: manual circuit breaker management to distinguish 404 (model
+        not found, semantic error) from infrastructure errors. A 404 must NOT
+        open the breaker — we re-raise ModelNotFoundError so the caller
+        can handle it separately.
         """
         p = _parent()
         httpx = p.httpx
@@ -154,10 +154,10 @@ class OllamaModels:
             raise
 
     async def delete_model(self, model_name: str) -> bool:
-        """Elimina un model local.
+        """Deletes a local model.
 
-        Bug 15: gestio manual del breaker per filtrar 404 (model inexistent)
-        com a error semantic, no infraestructura.
+        Bug 15: manual breaker management to filter 404 (non-existent model)
+        as a semantic error, not infrastructure.
         """
         p = _parent()
         httpx = p.httpx
@@ -173,7 +173,7 @@ class OllamaModels:
                     f"{self.base_url}/api/delete", json={"name": model_name}
                 )
                 response.raise_for_status()
-                logger.info("Model %s eliminat correctament", model_name)
+                logger.info("Model %s deleted successfully", model_name)
                 await ollama_breaker.record_success()
                 return True
         except httpx.HTTPStatusError as e:
@@ -187,10 +187,10 @@ class OllamaModels:
             await ollama_breaker.record_failure(e)
             raise
 
-    # --- Helpers injectats pel OllamaModule parent ---
+    # --- Helpers injected by the parent OllamaModule ---
 
     def _t(self, key: str, fallback: str, **kwargs) -> str:
-        # Redirigit al modul pare si hi es, altrament fallback directe.
+        # Delegated to the parent module if present, otherwise direct fallback.
         owner = getattr(self, "_owner", None)
         if owner is not None:
             return owner._t(key, fallback, **kwargs)
@@ -198,7 +198,7 @@ class OllamaModels:
 
     @property
     def _timeout(self):
-        httpx = _parent().httpx  # lazy-import pattern mantingut per a tests patch
+        httpx = _parent().httpx  # lazy-import pattern maintained for tests patch
         owner = getattr(self, "_owner", None)
         if owner is not None and getattr(owner, "timeout", None) is not None:
             return owner.timeout

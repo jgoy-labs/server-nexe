@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/web_ui_module/core/compactor.py
-Description: Context compacting per sessions llargues.
-             Extret de manifest.py durant normalitzacio.
+Description: Context compacting for long sessions.
+             Extracted from manifest.py during normalization.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -20,26 +20,26 @@ _SYSTEM_MSG = "Ets un assistent que fa resums breus i precisos de converses."
 
 
 def _clean_for_compact(txt: str) -> str:
-    """Neteja tags de thinking per compactar."""
+    """Cleans thinking tags for compaction."""
     txt = _re.sub(r'<think>.*?</think>', '', txt, flags=_re.DOTALL)
     txt = _re.sub(r'<\|thinking\|>.*?<\|/thinking\|>', '', txt, flags=_re.DOTALL)
     return txt.strip()
 
 
 def _is_ollama_engine(engine) -> bool:
-    """Detecta si l'engine es OllamaModule (necessita model + messages, no system kwarg)."""
+    """Detects if the engine is OllamaModule (needs model + messages, no system kwarg)."""
     cls_name = type(engine).__name__
     module_name = type(engine).__module__ or ""
     return "ollama" in cls_name.lower() or "ollama" in module_name.lower()
 
 
 async def _call_engine(engine, messages, system_msg):
-    """Crida engine.chat() adaptant-se al tipus d'engine (Ollama vs MLX/LlamaCpp)."""
+    """Calls engine.chat() adapting to the engine type (Ollama vs MLX/LlamaCpp)."""
     if _is_ollama_engine(engine):
         model_name = _os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
         full_messages = [{"role": "system", "content": system_msg}] + messages
         result = engine.chat(model=model_name, messages=full_messages, stream=False)
-        # OllamaModule.chat() es un async generator — consumir-lo
+        # OllamaModule.chat() is an async generator — consume it
         summary = ""
         async for chunk in result:
             if isinstance(chunk, dict):
@@ -52,7 +52,7 @@ async def _call_engine(engine, messages, system_msg):
                 summary += chunk
         return summary
     else:
-        # MLX/LlamaCpp accepten system= kwarg
+        # MLX/LlamaCpp accept system= kwarg
         summary_result = await engine.chat(messages=messages, system=system_msg)
         if isinstance(summary_result, dict):
             if "message" in summary_result and isinstance(summary_result["message"], dict):
@@ -72,12 +72,12 @@ async def _call_engine(engine, messages, system_msg):
 
 async def compact_session(session, engine, session_manager):
     """
-    Compacta una sessio amb massa missatges usant un resum LLM.
+    Compacts a session with too many messages using an LLM summary.
 
     Args:
         session: ChatSession instance
-        engine: LLM engine amb metode chat()
-        session_manager: SessionManager per save_to_disk
+        engine: LLM engine with chat() method
+        session_manager: SessionManager for save_to_disk
     """
     if not session.needs_compaction():
         return

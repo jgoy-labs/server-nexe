@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/module.py
-Description: Modul Security — NexeModule + NexeModuleWithRouter Protocol.
-             Gestiona autenticacio, rate limiting, deteccio d'injeccions i escaneig.
+Description: Security Module — NexeModule + NexeModuleWithRouter Protocol.
+             Manages authentication, rate limiting, injection detection and scanning.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -24,14 +24,14 @@ MODULE_PATH = Path(__file__).parent
 
 class SecurityModule:
     """
-    Plugin Nexe — Seguretat core.
-    Implementa NexeModule + NexeModuleWithRouter.
+    Nexe Plugin — Core security.
+    Implements NexeModule + NexeModuleWithRouter.
 
-    Funcionalitats:
-    - Autenticacio dual-key (primary + secondary) amb secrets.compare_digest
-    - 6 detectors d'injeccio (XSS, SQL, NoSQL, command, path, LDAP)
-    - Rate limiting avancat amb RateLimitTracker
-    - Sanitizer subplugin amb 69 patrons de jailbreak multiidioma
+    Features:
+    - Dual-key authentication (primary + secondary) with secrets.compare_digest
+    - 6 injection detectors (XSS, SQL, NoSQL, command, path, LDAP)
+    - Advanced rate limiting with RateLimitTracker
+    - Sanitizer subplugin with 69 multilingual jailbreak patterns
     - Security logging RFC5424 (IRONCLAD)
     """
 
@@ -55,15 +55,15 @@ class SecurityModule:
         )
 
     async def initialize(self, context: Dict[str, Any]) -> bool:
-        """Inicialitzacio via Nexe Launcher"""
+        """Initialization via Nexe Launcher"""
         if self._initialized:
             return True
 
-        # Router sempre primer (permet diagnostics encara que falli)
+        # Router always first (allows diagnostics even if it fails)
         self._init_router()
 
         try:
-            # Crear directori logs si no existeix
+            # Create logs directory if it doesn't exist
             log_path = MODULE_PATH.parent.parent / "storage" / "system-logs" / "security"
             log_path.mkdir(parents=True, exist_ok=True)
 
@@ -176,12 +176,12 @@ class SecurityModule:
     # --- Router setup ---
 
     def _init_router(self):
-        """Inicialitza router amb endpoints basics (info, health).
-        Els endpoints complets es registren a api/routes.py."""
+        """Initializes router with basic endpoints (info, health).
+        Full endpoints are registered in api/routes.py."""
         from .api.routes import create_router
         self._router = create_router(self)
 
-    # --- Metodes publics ---
+    # --- Public methods ---
 
     def get_info(self) -> Dict[str, Any]:
         return {

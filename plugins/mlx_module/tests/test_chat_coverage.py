@@ -372,10 +372,10 @@ class TestGetPoolStats:
 
 
 class TestRequireTorch:
-    """Tests per _require_torch() — guard VLM sense PyTorch."""
+    """Tests for _require_torch() — VLM guard without PyTorch."""
 
     def test_require_torch_raises_missing_dep_when_no_torch(self):
-        """Si torch no es pot importar → MissingDependencyError amb missatge clar."""
+        """If torch cannot be imported → MissingDependencyError with a clear message."""
         from plugins.mlx_module.core.chat import _require_torch
         from plugins.mlx_module.exceptions import MissingDependencyError
 
@@ -395,8 +395,8 @@ class TestRequireTorch:
         assert "Reinstal" in str(exc_info.value)
 
     def test_require_torch_ok_when_importable(self):
-        """Si torch importa sense error → no llança cap excepció."""
+        """If torch imports without error → no exception is raised."""
         from plugins.mlx_module.core.chat import _require_torch
         mock_torch = MagicMock()
         with patch.dict(sys.modules, {"torch": mock_torch}):
-            _require_torch()  # no ha de llançar
+            _require_torch()  # should not raise

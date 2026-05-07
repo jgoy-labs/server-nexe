@@ -2,8 +2,8 @@
 ------------------------------------
 Server Nexe
 Location: plugins/web_ui_module/api/routes_sessions.py
-Description: Endpoints de gestio de sessions (CRUD + llistat).
-             Extret de routes.py durant refactoring de tech debt.
+Description: Session management endpoints (CRUD + listing).
+             Extracted from routes.py during tech debt refactoring.
 
 www.jgoy.net · https://server-nexe.org
 ------------------------------------
@@ -26,14 +26,14 @@ logger = logging.getLogger(__name__)
 
 
 def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
-    """Registra endpoints: POST /session/new, GET /session/{id},
+    """Registers endpoints: POST /session/new, GET /session/{id},
     DELETE /session/{id}, GET /session/{id}/history, GET /sessions"""
 
     # -- POST /session/new --
 
     @router.post("/session/new", operation_id="webui_create_session")
     async def create_session(request: Optional[Dict[str, Any]] = None, _auth=Depends(require_ui_auth)):
-        """Crear nova sessio"""
+        """Create a new session"""
         session = session_mgr.create_session()
         return {
             "session_id": session.id,
@@ -45,7 +45,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     @router.get("/session/{session_id}", operation_id="webui_get_session")
     @limiter.limit("30/minute")
     async def get_session_info(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
-        """Obtenir info de sessio"""
+        """Get session info"""
         session_id = validate_string_input(session_id, max_length=100, context="path")
         session = session_mgr.get_session(session_id)
         if not session:
@@ -57,7 +57,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     @router.get("/session/{session_id}/history", operation_id="webui_session_history")
     @limiter.limit("30/minute")
     async def get_session_history(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
-        """Obtenir historial de sessio"""
+        """Get session history"""
         session_id = validate_string_input(session_id, max_length=100, context="path")
         session = session_mgr.get_session(session_id)
         if not session:
@@ -69,7 +69,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     @router.delete("/session/{session_id}", operation_id="webui_delete_session")
     @limiter.limit("10/minute")
     async def delete_session(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
-        """Eliminar sessio"""
+        """Delete session"""
         session_id = validate_string_input(session_id, max_length=100, context="path")
         deleted = session_mgr.delete_session(session_id)
         if not deleted:
@@ -116,7 +116,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
     @router.post("/session/{session_id}/clear-document", operation_id="webui_clear_document")
     async def clear_document(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
-        """Netejar document adjuntat d'una sessio"""
+        """Clear attached document from a session"""
         session_id = validate_string_input(session_id, max_length=100, context="path")
         session = session_mgr.get_session(session_id)
         if not session:
@@ -129,5 +129,5 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
     @router.get("/sessions", operation_id="webui_list_sessions")
     async def list_sessions(_auth=Depends(require_ui_auth)):
-        """Llistar totes les sessions"""
+        """List all sessions"""
         return {"sessions": session_mgr.list_sessions()}

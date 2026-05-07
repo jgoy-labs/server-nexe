@@ -1,8 +1,8 @@
 """
-Tests per SC08 — POST /ui/lang ha de propagar l'idioma via i18n.current_language.
+Tests for SC08 — POST /ui/lang must propagate the language via i18n.current_language.
 
-Verifica que routes_auth.py::set_language actualitza os.environ["NEXE_LANG"] i
-assigna i18n.current_language amb el format BCP-47 (ca-ES, es-ES, en-US).
+Verifies that routes_auth.py::set_language updates os.environ["NEXE_LANG"] and
+assigns i18n.current_language with BCP-47 format (ca-ES, es-ES, en-US).
 """
 
 import os
@@ -14,7 +14,7 @@ import plugins.web_ui_module.api.routes_auth as _mod
 
 
 def _make_i18n_mock():
-    """Crea un mock d'instància i18n amb set_language."""
+    """Creates a mock i18n instance with set_language."""
     mock = MagicMock()
     mock.set_language = MagicMock(return_value=True)
     return mock
@@ -22,8 +22,8 @@ def _make_i18n_mock():
 
 def _make_set_language_fn(i18n_mock=None):
     """
-    Extreu la funció set_language del router registrat.
-    Retorna la coroutine directament per poder cridar-la en tests.
+    Extracts the set_language function from the registered router.
+    Returns the coroutine directly so it can be called in tests.
     """
     from fastapi import APIRouter
     router = APIRouter()
@@ -34,7 +34,7 @@ def _make_set_language_fn(i18n_mock=None):
     with patch("plugins.web_ui_module.api.routes_auth.get_i18n", return_value=i18n_mock):
         _mod.register_auth_routes(router, require_ui_auth=require_ui_auth, session_mgr=session_mgr)
 
-    # La funció inner és accessible al router com a route endpoint
+    # The inner function is accessible from the router as a route endpoint
     for route in router.routes:
         if hasattr(route, "path") and route.path == "/lang":
             return route.endpoint

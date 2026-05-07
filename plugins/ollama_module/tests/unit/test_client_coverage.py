@@ -1,6 +1,6 @@
 """
-Tests per plugins/ollama_module/core/client.py — cobertura reap_process.
-C2: subprocess zombi cleanup al shutdown.
+Tests for plugins/ollama_module/core/client.py — reap_process coverage.
+C2: subprocess zombie cleanup at shutdown.
 """
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
@@ -10,10 +10,10 @@ from plugins.ollama_module.module import OllamaModule
 
 
 class TestReapProcess:
-    """Tests per OllamaClient.reap_process() — evita zombis de subprocess."""
+    """Tests for OllamaClient.reap_process() — avoids subprocess zombies."""
 
     def test_reap_calls_poll_on_existing_process(self):
-        """Si _ollama_process existeix → .poll() és cridat una vegada."""
+        """If _ollama_process exists → .poll() is called once."""
         client = OllamaClient("http://localhost:11434")
         mock_proc = MagicMock()
         client._ollama_process = mock_proc
@@ -23,10 +23,10 @@ class TestReapProcess:
         mock_proc.poll.assert_called_once()
 
     def test_reap_does_nothing_if_no_process(self):
-        """Si _ollama_process és None → no llança cap error."""
+        """If _ollama_process is None → raises no error."""
         client = OllamaClient("http://localhost:11434")
         assert client._ollama_process is None
-        client.reap_process()  # no ha de llançar
+        client.reap_process()  # must not raise
 
 
 class TestModuleShutdownReapsProcess:
@@ -34,7 +34,7 @@ class TestModuleShutdownReapsProcess:
 
     @pytest.mark.asyncio
     async def test_shutdown_calls_reap_process(self):
-        """Al shutdown, reap_process() sempre es crida (tant si initialized com si no)."""
+        """At shutdown, reap_process() is always called (whether initialized or not)."""
         module = OllamaModule()
         module._initialized = True
         mock_proc = MagicMock()
@@ -48,7 +48,7 @@ class TestModuleShutdownReapsProcess:
 
     @pytest.mark.asyncio
     async def test_shutdown_reaps_even_when_not_initialized(self):
-        """reap_process() també es crida quan _initialized=False."""
+        """reap_process() is also called when _initialized=False."""
         module = OllamaModule()
         module._initialized = False
         mock_proc = MagicMock()

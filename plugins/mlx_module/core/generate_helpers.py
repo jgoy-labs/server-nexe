@@ -2,7 +2,7 @@
 """
 MLX Generation Helper Functions.
 
-Funcions auxiliars per la generació MLX amb prefix caching.
+Helper functions for MLX generation with prefix caching.
 """
 import logging
 import re
@@ -13,37 +13,37 @@ logger = logging.getLogger(__name__)
 
 def sanitize_messages_for_alternation(messages: List[Dict]) -> List[Dict]:
     """
-    Sanititza missatges per assegurar alternança estricta user/assistant.
+    Sanitizes messages to ensure strict user/assistant alternation.
 
-    Alguns models (Gemma, etc.) requereixen rols estrictament alternats.
-    Aquesta funció:
-    - Fusiona missatges consecutius del mateix rol
-    - Assegura que comença amb "user" (afegeix placeholder si cal)
-    - Assegura alternança user/assistant/user/assistant/...
+    Some models (Gemma, etc.) require strictly alternating roles.
+    This function:
+    - Merges consecutive messages from the same role
+    - Ensures it starts with "user" (adds placeholder if needed)
+    - Ensures user/assistant/user/assistant/... alternation
 
     Args:
-        messages: Llista de missatges [{role, content}, ...]
+        messages: List of messages [{role, content}, ...]
 
     Returns:
-        Llista sanititzada amb rols alternats
+        Sanitized list with alternating roles
     """
     if not messages:
         return []
 
-    # Filtrar system messages (ja s'afegeix separat)
+    # Filter system messages (added separately)
     filtered = [m for m in messages if m.get("role") != "system"]
 
     if not filtered:
         return []
 
-    # Fusionar missatges consecutius del mateix rol
+    # Merge consecutive messages from the same role
     merged: list = []
     for msg in filtered:
         role = msg.get("role", "user")
         content = msg.get("content", "")
 
         if merged and merged[-1]["role"] == role:
-            # Fusionar amb l'anterior
+            # Merge with the previous
             merged[-1]["content"] += "\n\n" + content
         else:
             merged.append({"role": role, "content": content})
@@ -62,7 +62,7 @@ def sanitize_messages_for_alternation(messages: List[Dict]) -> List[Dict]:
             sanitized.append(msg)
             expected_role = "assistant" if expected_role == "user" else "user"
         elif msg["role"] == "assistant" and expected_role == "user":
-            # Falta un user, inserir placeholder
+            # Missing a user turn, insert placeholder
             sanitized.append({"role": "user", "content": "(continua)"})
             sanitized.append(msg)
             expected_role = "user"
@@ -82,13 +82,13 @@ def prepare_tokens(
     tokenizer: Any,
 ) -> Tuple[List[int], List[int], List[Dict], List[Dict]]:
     """
-    Prepara i tokenitza els missatges per generació i cache.
+    Prepares and tokenizes messages for generation and cache.
 
     Args:
         system: System prompt
-        messages: Missatges per generació (amb memòria)
-        messages_for_cache: Missatges nets per cache (sense memòria)
-        tokenizer: Tokenizer MLX
+        messages: Messages for generation (with memory)
+        messages_for_cache: Clean messages for cache (without memory)
+        tokenizer: MLX tokenizer
 
     Returns:
         Tuple: (full_tokens, cache_lookup_tokens, all_messages, all_cache_messages)
@@ -97,7 +97,7 @@ def prepare_tokens(
     sanitized_messages = sanitize_messages_for_alternation(messages)
     sanitized_cache_messages = sanitize_messages_for_alternation(messages_for_cache)
 
-    # Construir missatges format OpenAI
+    # Build OpenAI-format messages
     all_messages = [{"role": "system", "content": system}] + sanitized_messages
     all_cache_messages = [{"role": "system", "content": system}] + sanitized_cache_messages
 
@@ -134,14 +134,14 @@ def lookup_prefix_cache(
     max_kv_size: int,
 ) -> Tuple[Any, int, bool]:
     """
-    Busca al cache el prefix més llarg que coincideix.
+    Searches the cache for the longest matching prefix.
 
     Args:
         cache_manager: MLXPromptCacheManager
-        model_key: Clau del model (path + hash + session)
-        cache_lookup_tokens: Tokens nets per lookup
-        model: Model MLX
-        max_kv_size: Mida màxima KV cache
+        model_key: Model key (path + hash + session)
+        cache_lookup_tokens: Clean tokens for lookup
+        model: MLX model
+        max_kv_size: Maximum KV cache size
 
     Returns:
         Tuple: (cached_kv, cached_token_count, prefix_reused)
@@ -152,11 +152,11 @@ def lookup_prefix_cache(
         model_key, cache_lookup_tokens
     )
 
-    # Si no hi ha cache, crear-ne un de nou
+    # If there is no cache, create a new one
     if cached_kv is None:
         cached_kv = make_prompt_cache(model, max_kv_size=max_kv_size)
 
-    # Calcular quants tokens del prefix estan cached
+    # Calculate how many prefix tokens are cached
     cached_token_count = len(cache_lookup_tokens) - len(remaining_tokens)
     prefix_reused = cached_token_count > 0
 
@@ -169,12 +169,12 @@ def determine_tokens_to_process(
     prefix_reused: bool,
 ) -> Tuple[Any, List[int]]:
     """
-    Determina quins tokens processar basant-se en el cache.
+    Determines which tokens to process based on the cache.
 
     Args:
-        full_tokens: Tots els tokens (amb memòria)
-        cached_token_count: Tokens ja cached
-        prefix_reused: Si s'ha reutilitzat prefix
+        full_tokens: All tokens (with memory)
+        cached_token_count: Tokens already cached
+        prefix_reused: Whether a prefix was reused
 
     Returns:
         Tuple: (tokens_to_process_mx, new_tokens_list)
@@ -195,7 +195,7 @@ def determine_tokens_to_process(
             len(new_tokens)
         )
     else:
-        # No match: processar tot
+        # No match: process everything
         tokens_to_process = mx.array(full_tokens)
 
     return tokens_to_process, new_tokens
@@ -215,19 +215,19 @@ def run_streaming_generation(
     model_path: str = "",
 ) -> Tuple[str, Any, List[int]]:
     """
-    Executa la generació amb streaming.
+    Executes generation with streaming.
 
     Args:
-        model: Model MLX
+        model: MLX model
         tokenizer: Tokenizer
-        tokens_to_process: Tokens a processar (mx.array)
-        max_tokens: Màxim tokens a generar
-        sampler: Sampler per generació
-        cached_kv: Cache KV
-        stream_callback: Callback per streaming
-        cache_manager: Cache manager per guardar post-prefill
-        model_key: Clau del model
-        cache_lookup_tokens: Tokens per guardar al cache
+        tokens_to_process: Tokens to process (mx.array)
+        max_tokens: Maximum tokens to generate
+        sampler: Sampler for generation
+        cached_kv: KV cache
+        stream_callback: Callback for streaming
+        cache_manager: Cache manager for saving post-prefill
+        model_key: Model key
+        cache_lookup_tokens: Tokens to store in cache
 
     Returns:
         Tuple: (text, last_response, generated_tokens)
@@ -238,8 +238,8 @@ def run_streaming_generation(
     last_response = None
     generated_tokens = []
 
-    # Stop tokens comuns per diferents models
-    # Post-processarem la resposta per tallar quan apareguin
+    # Common stop tokens for different models
+    # Post-process the response to truncate when they appear
     _is_gpt_oss = "gpt-oss" in model_path.lower()
     if _is_gpt_oss:
         # GPT-OSS: only real EOS — <|...|> tags are internal channels
@@ -287,7 +287,7 @@ def run_streaming_generation(
             generated_tokens.append(first_response.token)
         last_response = first_response
 
-        # GUARDAR CACHE POST-PREFILL (abans que la resta faci timeout!)
+        # SAVE CACHE POST-PREFILL (before the rest times out!)
         cache_manager.insert_cache(model_key, cache_lookup_tokens, cached_kv)
         logger.info(
             "MLXChatNode: cache saved post-prefill (%d tokens, key=%s)",
@@ -336,26 +336,26 @@ def save_cache_post_generation(
     full_tokens_count: int,
 ) -> None:
     """
-    Guarda el cache després de la generació (messages nets, sense context de memòria).
+    Saves the cache after generation (clean messages, without memory context).
 
     Args:
         cache_manager: Cache manager
-        model_key: Clau del model
-        all_cache_messages: Missatges nets (sense memòria)
-        text: Text generat
+        model_key: Model key
+        all_cache_messages: Clean messages (without memory)
+        text: Generated text
         tokenizer: Tokenizer
-        cached_kv: Cache KV
-        full_tokens_count: Nombre de tokens del prompt complet
+        cached_kv: KV cache
+        full_tokens_count: Number of tokens in the full prompt
     """
     if not text.strip():
         return
 
-    # Netejar tags especials de GPT-OSS (<|channel|>, ◁...▷) abans de cache
+    # Clean GPT-OSS special tags (<|channel|>, ◁...▷) before caching
     text = re.sub(r'<\|[^|]+\|>', '', text)
     text = re.sub(r'[◁◀][^▷▶]*[▷▶]', '', text)
 
     try:
-        # Verificar si ja acaba amb assistant (pels placeholders)
+        # Check if it already ends with assistant (for placeholders)
         if all_cache_messages and all_cache_messages[-1].get("role") == "assistant":
             # Merge with the last assistant message
             cache_messages_with_response = all_cache_messages[:-1] + [{
@@ -364,7 +364,7 @@ def save_cache_post_generation(
             }]
             logger.debug("MLXChatNode: merged response with last assistant (cache)")
         else:
-            # Afegir normalment
+            # Add normally
             cache_messages_with_response = all_cache_messages + [{"role": "assistant", "content": text}]
 
         # Tokenize WITHOUT generation_prompt (the next turn will have it)
@@ -377,11 +377,11 @@ def save_cache_post_generation(
 
         cache_manager.insert_cache(model_key, cache_tokens, cached_kv)
         logger.debug(
-            "MLXChatNode: saved cache (messages nets, %d tokens → %d with response)",
+            "MLXChatNode: saved cache (clean messages, %d tokens → %d with response)",
             full_tokens_count, len(cache_tokens)
         )
     except Exception as e:
-        # Si falla el cache, no bloquegem la resposta
+        # If the cache fails, do not block the response
         logger.warning(
             "MLXChatNode: cache save failed (non-blocking): %s",
             str(e)[:100]
@@ -398,22 +398,22 @@ def extract_metrics(
     identity_hash: str,
 ) -> Dict[str, Any]:
     """
-    Extreu mètriques de la resposta de generació.
+    Extracts metrics from the generation response.
 
     Args:
-        last_response: Última resposta del generador
-        text: Text generat
-        prefix_reused: Si s'ha reutilitzat prefix
-        cached_token_count: Tokens cached
-        total_tokens: Total tokens del prompt
-        new_tokens: Tokens nous processats
-        identity_hash: Hash del system prompt
+        last_response: Last response from the generator
+        text: Generated text
+        prefix_reused: Whether a prefix was reused
+        cached_token_count: Cached tokens
+        total_tokens: Total prompt tokens
+        new_tokens: New tokens processed
+        identity_hash: System prompt hash
 
     Returns:
-        Dict amb mètriques
+        Dict with metrics
     """
     if last_response:
-        # actual_prefill = tokens realment processats (no cached)
+        # actual_prefill = tokens actually processed (not cached)
         if prefix_reused and len(new_tokens) == 0:
             actual_prefill_tokens = 1  # Exact match: BOS token only
         elif prefix_reused:
@@ -430,7 +430,7 @@ def extract_metrics(
             "peak_memory_mb": (last_response.peak_memory / (1024 * 1024))
                               if last_response.peak_memory else 0,
             "prefix_reused": prefix_reused,
-            "cache_active": prefix_reused,  # Alias per compatibilitat
+            "cache_active": prefix_reused,  # Alias for compatibility
             "cached_tokens": cached_token_count,
             "actual_prefill_tokens": actual_prefill_tokens,
             "identity_hash": identity_hash,

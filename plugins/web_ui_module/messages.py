@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/web_ui_module/messages.py
-Description: Missatges i18n per al modul web_ui.
+Description: i18n messages for the web_ui module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

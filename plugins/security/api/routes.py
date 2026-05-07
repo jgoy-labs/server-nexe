@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/api/routes.py
-Description: Endpoints FastAPI del modul security.
-             Separat de manifest.py per seguir l'estructura canonica.
+Description: FastAPI endpoints for the security module.
+             Separated from manifest.py to follow the canonical structure.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -39,25 +39,25 @@ UI_PATH = MODULE_PATH / "ui"
 
 def create_router(module_instance) -> APIRouter:
     """
-    Crea el router FastAPI amb tots els endpoints de security.
+    Creates the FastAPI router with all security endpoints.
 
     Args:
-        module_instance: SecurityModule instance (per accedir a health_check, get_info)
+        module_instance: SecurityModule instance (to access health_check, get_info)
 
     Returns:
-        APIRouter configurat
+        Configured APIRouter
     """
     router = APIRouter(prefix="/security")
 
     @router.get("/health", operation_id="security_health")
     async def health(_: str = Depends(require_api_key)):
-        """Health check per security module. PROTECTED: Requires API key."""
+        """Health check for the security module. PROTECTED: Requires API key."""
         result = await module_instance.health_check()
         return result.to_dict()
 
     @router.get("/info", operation_id="security_info")
     async def info(_: str = Depends(require_api_key)):
-        """Informacio del modul security. PROTECTED: Requires API key."""
+        """Security module information. PROTECTED: Requires API key."""
         return module_instance.get_info()
 
     @router.post("/scan", operation_id="security_scan")
@@ -67,8 +67,8 @@ def create_router(module_instance) -> APIRouter:
         _: str = Depends(require_api_key)
     ):
         """
-        Executa scan de seguretat complet.
-        Descobreix i executa tots els checks del modul.
+        Runs a full security scan.
+        Discovers and runs all module checks.
 
         PROTECTED: Requires API key (X-API-Key header)
         Rate limited: 2 requests/minute
@@ -88,7 +88,7 @@ def create_router(module_instance) -> APIRouter:
             ]
             for check in checks:
                 try:
-                    if asyncio.iscoroutinefunction(check.run):  # type: ignore[attr-defined]  # checks: toutes les classes tenen .run() — list[object] per inferència
+                    if asyncio.iscoroutinefunction(check.run):  # type: ignore[attr-defined]  # checks: all classes have .run() — list[object] by inference
                         check_results = await check.run()  # type: ignore[attr-defined]
                     else:
                         check_results = check.run()  # type: ignore[attr-defined]
@@ -131,7 +131,7 @@ def create_router(module_instance) -> APIRouter:
         _: str = Depends(require_api_key)
     ):
         """
-        Retorna ultim informe de seguretat.
+        Returns the latest security report.
 
         PROTECTED: Requires API key (X-API-Key header)
         Rate limited: 10 requests/minute
@@ -152,14 +152,14 @@ def create_router(module_instance) -> APIRouter:
 
     @router.get("/ui/assets/{path:path}", operation_id="security_serve_assets")
     async def serve_security_assets(path: str):
-        """Serveix els assets estatics (CSS, JS, fonts)"""
+        """Serves static assets (CSS, JS, fonts)"""
         assets_base = UI_PATH / "assets"
         safe_path = validate_safe_path(assets_base / path, assets_base)
         return FileResponse(safe_path)
 
     @router.get("/ui", operation_id="security_serve_ui")
     async def serve_security_ui():
-        """Serveix UI del modul security"""
+        """Serves the security module UI"""
         ui_file = UI_PATH / "index.html"
 
         if not ui_file.exists():

@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 class MLXModule:
     """
-    Motor Nexe per a MLX.
-    Implementa el NexeModule Protocol per a Apple Silicon.
+    Nexe engine for MLX.
+    Implements the NexeModule Protocol for Apple Silicon.
     """
 
     def __init__(self):
@@ -51,7 +51,7 @@ class MLXModule:
             if self._initialized:
                 return True
 
-            # Inicialitzar router sempre
+            # Always initialize router
             self._init_router()
 
             if not MLXConfig.is_metal_available():
@@ -87,7 +87,7 @@ class MLXModule:
         return "/mlx"
 
     async def is_model_loaded(self, model_name: str = "") -> bool:
-        """Comprova si el model MLX esta carregat a memoria."""
+        """Checks whether the MLX model is loaded in memory."""
         if not self._node:
             return False
         try:

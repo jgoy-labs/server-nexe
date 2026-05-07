@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/ollama_module/tests/integration/test_ollama_integration.py
-Description: Tests d'integració per mòdul Ollama. Valida workflow complet amb Ollama server, streaming, retries i timeouts.
+Description: Integration tests for the Ollama module. Validates the full workflow with the Ollama server, streaming, retries and timeouts.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import pytest
 
-# Skip - Tests d'integració pendents de migració completa a nexe_flow
+# Skip - Integration tests pending full migration to nexe_flow
 pytest.skip("Integration tests pending full nexe_flow migration", allow_module_level=True)
 
 from plugins.ollama_module.workflow.nodes.ollama_node import OllamaNode  # noqa: E402  # after pytest.skip(allow_module_level=True)
@@ -23,7 +23,7 @@ from nexe_flow.core import (  # noqa: E402  # after pytest.skip(allow_module_lev
   FlowStatus as ExecutionStatus,
 )
 
-# PrintNode no existeix en nexe_flow base
+# PrintNode does not exist in nexe_flow base
 class PrintNode:
   pass
 
@@ -96,7 +96,7 @@ class TestOllamaWorkflow:
 
   @pytest.mark.asyncio
   async def test_single_llm_node_workflow(self, executor_with_ollama):
-    """Test workflow amb només OllamaNode."""
+    """Test workflow with only OllamaNode."""
     workflow = WorkflowDefinition(
       name="simple-llm-test",
       nodes=[
@@ -172,7 +172,7 @@ class TestOllamaWorkflow:
 
   @pytest.mark.asyncio
   async def test_multiple_llm_calls(self, executor_with_ollama):
-    """Test workflow amb múltiples crides LLM."""
+    """Test workflow with multiple LLM calls."""
     workflow = WorkflowDefinition(
       name="multi-llm-test",
       nodes=[

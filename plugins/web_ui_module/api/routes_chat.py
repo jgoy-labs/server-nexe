@@ -2,9 +2,9 @@
 ------------------------------------
 Server Nexe
 Location: plugins/web_ui_module/api/routes_chat.py
-Description: Endpoint POST /chat (~500 lines).
+Description: POST /chat endpoint (~500 lines).
              Intent detection, RAG, compaction, multi-engine, streaming.
-             Extret de routes.py durant refactoring de tech debt.
+             Extracted from routes.py during tech debt refactoring.
 
 www.jgoy.net · https://server-nexe.org
 ------------------------------------
@@ -57,40 +57,40 @@ logger = logging.getLogger(__name__)
 
 
 # ─── Bug 17 — Hardened MEM_SAVE extractor ────────────────────────────────────
-# El format estricte que acceptem és: [MEM_SAVE: <text>]
-# - <text> ha de tenir entre 5 i MEM_SAVE_MAX_LEN caracters
-# - No pot contenir newlines, tabs, brackets ([]), brackets HTML, ni control chars
-# - Només lletres (incloent accents/cyrillic), digits, espai i puntuació segura
-# - Es rebutgen explicitament: <, >, [, ], {, }, |, `, \x00-\x1f
-# - Es rebutgen MEM_SAVE niats (un MEM_SAVE dins l'altre)
+# The strict format we accept is: [MEM_SAVE: <text>]
+# - <text> must be between 5 and MEM_SAVE_MAX_LEN characters
+# - Must not contain newlines, tabs, brackets ([]), HTML brackets, or control chars
+# - Only letters (including accents/cyrillic), digits, spaces, and safe punctuation
+# - Explicitly rejected: <, >, [, ], {, }, |, `, \x00-\x1f
+# - Nested MEM_SAVE rejected (one MEM_SAVE inside another)
 MEM_SAVE_MAX_LEN = 200
 MEM_SAVE_MIN_LEN = 5
 
-# Whitelist: lletres unicode, digits, espai i puntuació safe ( . , ; : ! ? ' " - + / = % $ € @ # & ( ) )
+# Whitelist: unicode letters, digits, spaces, and safe punctuation ( . , ; : ! ? ' " - + / = % $ € @ # & ( ) )
 _MEM_SAVE_ALLOWED_CHARS = _re.compile(
     r"^[\w\s\.\,\;\:\!\?\'\"\-\+\/\=\%\$\€\@\#\&\(\)]+$",
     _re.UNICODE,
 )
-# Caracters forbidden explicits (defensa addicional)
+# Explicit forbidden characters (additional defense)
 _MEM_SAVE_FORBIDDEN = _re.compile(r"[\x00-\x1f\x7f<>\[\]\{\}\|`\\]")
-# Format estricte: ha de començar amb [MEM_SAVE: i acabar amb ] sense bracket nestat
+# Strict format: must start with [MEM_SAVE: and end with ] without nested bracket
 _MEM_SAVE_STRICT_RE = _re.compile(r'\[MEM_SAVE:\s*([^\[\]\n\r\t]{1,250})\]')
-# Bug B-mem-visible: gpt-oss:20b emet [MEMORIA: ...] en lloc de [MEM_SAVE: ...].
-# Normalitzem [MEMORIA: ...] → [MEM_SAVE: ...] a clean_response per processar-los
-# com a MEM_SAVE normals, i els strippem del visible per no mostrar-los a l'usuari.
+# Bug B-mem-visible: gpt-oss:20b emits [MEMORIA: ...] instead of [MEM_SAVE: ...].
+# We normalize [MEMORIA: ...] → [MEM_SAVE: ...] in clean_response to process them
+# as normal MEM_SAVEs, and strip them from visible output so the user doesn't see them.
 _MEMORIA_RE = _re.compile(r'\[MEMORIA:\s*([^\[\]\n\r\t]{1,250})\]', _re.IGNORECASE)
 
 # ─── Bug 18 — MEM_DELETE tag extractor ────────────────────────────────────────
-# Format: [MEM_DELETE: <text>] — el model emet aquest tag quan l'usuari demana
-# oblidar un fet. El pipeline l'extreu, crida delete_from_memory(), i el stripeja
-# de la resposta visible. Fallback si la detecció d'intent des del missatge falla.
+# Format: [MEM_DELETE: <text>] — the model emits this tag when the user asks
+# to forget a fact. The pipeline extracts it, calls delete_from_memory(), and strips
+# it from the visible response. Fallback if intent detection from the message fails.
 _MEM_DELETE_RE = _re.compile(r'\[MEM_DELETE:\s*([^\[\]\n\r\t]{1,250})\]')
-# Normalitzar variants: [OLVIDA: ...], [OBLIT: ...] → [MEM_DELETE: ...]
+# Normalize variants: [OLVIDA: ...], [OBLIT: ...] → [MEM_DELETE: ...]
 _OBLIT_RE = _re.compile(r'\[(OLVIDA|OBLIT|FORGET):\s*([^\[\]\n\r\t]{1,250})\]', _re.IGNORECASE)
 
 # ─── Re-prompt override ─────────────────────────────────────────────────────
-# Quan un model emet NOMÉS [MEM_SAVE: ...] sense resposta conversacional,
-# re-enviem el missatge amb aquest override afegit al system prompt.
+# When a model emits ONLY [MEM_SAVE: ...] without a conversational response,
+# we resend the message with this override added to the system prompt.
 _REPROMPT_OVERRIDE = {
     "ca": "\n\nIMPORTANT: La memòria ja s'ha guardat correctament. Ara respon de forma natural al missatge de l'usuari. NO emetis [MEM_SAVE:] — ja està fet. Simplement conversa.",
     "es": "\n\nIMPORTANTE: La memoria ya se ha guardado correctamente. Ahora responde de forma natural al mensaje del usuario. NO emitas [MEM_SAVE:] — ya está hecho. Simplemente conversa.",
@@ -140,7 +140,7 @@ async def _atomize_fact_llm(fact: str, engine, model_name: str, sig, lang: str =
 _ATOMIC_SUBJECT_CA = _re.compile(r"^(L'usuari[a]?|El usuari[a]?)\s+", _re.IGNORECASE)
 _ATOMIC_SUBJECT_ES = _re.compile(r"^(El usuario|La usuaria)\s+", _re.IGNORECASE)
 _ATOMIC_SUBJECT_EN = _re.compile(r"^(The user|User)\s+", _re.IGNORECASE)
-# Verbs que inicien un PREDICAT NOU — discriminen "i té 8 anys" (split) de "i els macarrons" (llista)
+# Verbs that start a NEW PREDICATE — distinguish "i té 8 anys" (split) from "i els macarrons" (list)
 _ATOMIC_SPLIT_CA = _re.compile(
     r"\s+i\s+(?=(?:té|es diu|li agrada|li agraden|viu|treballa|estudia|és|fa|ha|parla|prefereix|utilitza|coneix|vol|sap|necessita|juga|llegeix|escriu|porta)\b)",
     _re.IGNORECASE,
@@ -189,15 +189,15 @@ def _split_atomic_fact(fact: str) -> list:
 
 def _is_valid_mem_save_text(text: str, user_input: str = "") -> bool:
     """
-    Bug 17 — Valida estrictament el text d'un MEM_SAVE extret del LLM.
+    Bug 17 — Strictly validates the text of a MEM_SAVE extracted from the LLM.
 
     Args:
-        text: contingut entre [MEM_SAVE: ...]
-        user_input: missatge usuari original — si MEM_SAVE és exactament el mateix
-                    l'extractem com a sospitós (probable echo/injection)
+        text: content between [MEM_SAVE: ...]
+        user_input: original user message — if MEM_SAVE is exactly the same
+                    we treat it as suspicious (probable echo/injection)
 
     Returns:
-        True si és segur per guardar, False si s'ha de rebutjar.
+        True if safe to save, False if it should be rejected.
     """
     if not isinstance(text, str):
         return False
@@ -206,13 +206,13 @@ def _is_valid_mem_save_text(text: str, user_input: str = "") -> bool:
         return False
     if len(text) < MEM_SAVE_MIN_LEN or len(text) > MEM_SAVE_MAX_LEN:
         return False
-    # Cap newline, tab, control char ni bracket
+    # No newline, tab, control char or bracket
     if _MEM_SAVE_FORBIDDEN.search(text):
         return False
-    # Whitelist de caracters
+    # Character whitelist
     if not _MEM_SAVE_ALLOWED_CHARS.match(text):
         return False
-    # No permetre paraules-clau d'injecció (case-insensitive)
+    # Do not allow injection keywords (case-insensitive)
     _lowered = text.lower()
     _bad_keywords = (
         'mem_save', 'system prompt', 'ignore previous',
@@ -222,8 +222,8 @@ def _is_valid_mem_save_text(text: str, user_input: str = "") -> bool:
     for kw in _bad_keywords:
         if kw in _lowered:
             return False
-    # Si el MEM_SAVE és exactament el missatge usuari (o el conté literal),
-    # és sospitós: el LLM ha "fet eco" del prompt.
+    # If MEM_SAVE is exactly the user message (or contains it literally),
+    # it is suspicious: the LLM has "echoed" the prompt.
     if user_input:
         _user_clean = user_input.strip().lower()
         if _user_clean and (_lowered == _user_clean or (len(_user_clean) > 10 and _user_clean in _lowered)):
@@ -241,34 +241,34 @@ def compute_context_budget(
     response_buffer: int = 500,
 ):
     """
-    Bug 32 — Calcula el budget de context preservant un mínim per l'historial.
+    Bug 32 — Calculates the context budget preserving a minimum for history.
 
     Args:
-        max_context_chars: capacitat total del context window (en chars).
-        system_chars: caràcters del system prompt.
-        history_chars: caràcters reals de l'historial actual.
-        message_chars: caràcters del missatge user actual.
-        document_chars: caràcters del document a injectar (0 si no n'hi ha).
-        history_ratio: fracció del context reservada com a mínim per historial (0..0.9).
-        response_buffer: chars reservats per la resposta del model.
+        max_context_chars: total context window capacity (in chars).
+        system_chars: characters in the system prompt.
+        history_chars: actual characters in the current history.
+        message_chars: characters in the current user message.
+        document_chars: characters of the document to inject (0 if none).
+        history_ratio: fraction of context reserved as minimum for history (0..0.9).
+        response_buffer: chars reserved for the model response.
 
     Returns:
-        dict amb:
-          - history_reserve: mínim de chars reservats per historial
-          - history_effective: chars reals que ocuparà l'historial (no es trunca)
-          - available_chars: chars disponibles per document/RAG
-          - doc_truncated_pct: % del document que s'ha tallat (0 si cap)
-          - doc_kept_chars: chars del document que s'envien
+        dict with:
+          - history_reserve: minimum chars reserved for history
+          - history_effective: actual chars the history will occupy (not truncated)
+          - available_chars: chars available for document/RAG
+          - doc_truncated_pct: % of the document that was cut (0 if none)
+          - doc_kept_chars: chars of the document that are sent
     """
     history_ratio = max(0.0, min(0.9, history_ratio))
-    # Fix Consultor passada 1 — Finding 5: `history_reserve` es en realitat
-    # el "sol minim" (floor) reservat per a l'historial. El historial real
-    # (`history_effective`) pot creixer per damunt d'aquest sol si els
-    # missatges son llargs. Mantenim el nom public (env var
-    # NEXE_HISTORY_CONTEXT_RATIO i clau del dict retornat) pero
-    # documentem el significat exacte aqui per evitar confusions futures.
+    # Fix Consultant pass 1 — Finding 5: `history_reserve` is actually
+    # the "minimum floor" reserved for history. The real history
+    # (`history_effective`) can grow above this floor if messages
+    # are long. We keep the public name (env var
+    # NEXE_HISTORY_CONTEXT_RATIO and returned dict key) but
+    # document the exact meaning here to avoid future confusion.
     history_floor = int(max_context_chars * history_ratio)
-    history_reserve = history_floor  # alias per retrocompatibilitat
+    history_reserve = history_floor  # alias for backwards compatibility
     history_effective = max(history_chars, history_floor)
     available_chars = max_context_chars - system_chars - history_effective - message_chars - response_buffer
 
@@ -292,11 +292,11 @@ def compute_context_budget(
 
 def _extract_safe_mem_saves(text: str, user_input: str = "") -> list:
     """
-    Bug 17 — Extreu i valida tots els [MEM_SAVE: ...] d'un text de manera segura.
-    Aplica atomicity splitting: [MEM_SAVE: X i Y] → [X, Y] quan Y és un predicat nou.
+    Bug 17 — Safely extracts and validates all [MEM_SAVE: ...] from a text.
+    Applies atomicity splitting: [MEM_SAVE: X i Y] → [X, Y] when Y is a new predicate.
 
     Returns:
-        Llista de strings vàlids per guardar (potencialment buida).
+        List of valid strings to save (potentially empty).
     """
     if not isinstance(text, str) or not text:
         return []
@@ -316,7 +316,7 @@ def _validate_chat_input(body: dict, request: FastAPIRequest) -> tuple[Optional[
     """Returns (image_bytes, message). Raises HTTPException on validation error."""
     message = body.get("message", "")
 
-    # VLM: imatge opcional (base64 en JSON, max 10MB, formats segurs)
+    # VLM: optional image (base64 in JSON, max 10MB, safe formats)
     _ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
     _MAX_IMAGE_BYTES = 10 * 1024 * 1024
     image_bytes: Optional[bytes] = None
@@ -427,7 +427,7 @@ async def _handle_memory_intent(
                     f"Deleted {result['deleted']} memory(ies){facts_detail}. "
                     f"I won't remember this anymore."
                 )
-                # Guardar fets esborrats per evitar re-save al torn següent
+                # Save deleted facts to avoid re-saving on the next turn
                 if deleted_facts:
                     session._recently_deleted_facts = [f["text"] for f in deleted_facts]
                 # Emit delete token for frontend badge
@@ -523,19 +523,19 @@ async def _handle_nonstreaming_response(
     Strips think/GPT-OSS tags, extracts and saves MEM_SAVE facts, processes
     MEM_DELETE tags. Runs on the non-streaming chat path only.
     """
-    # Netejar thinking tags
+    # Clean thinking tags
     response_text = _re.sub(r"<think>[\s\S]*?</think>\s*", "", response_text)
     response_text = _re.sub(r'<\|[^|]+\|>', '', response_text)
-    # GPT-OSS: extreure nomes la part "final"
+    # GPT-OSS: extract only the "final" part
     _m_ns = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', response_text, _re.IGNORECASE)
     if _m_ns:
         response_text = _m_ns.group(1).strip()
     else:
         response_text = _re.sub(r'^analysis\s*', '', response_text, flags=_re.IGNORECASE).strip()
-    # Bug 17: Extreure [MEM_SAVE: ...] fets amb validacio estricta abans de strip
+    # Bug 17: Extract [MEM_SAVE: ...] facts with strict validation before strip
     _mem_saves_ns = _extract_safe_mem_saves(response_text, user_input=message)
     response_text = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', response_text).strip()
-    # F1 fix: si el model ha generat MEM_SAVE inline, reflectir-ho a memory_action
+    # F1 fix: if the model generated inline MEM_SAVE, reflect it in memory_action
     if _mem_saves_ns:
         memory_action = "mem_save_inline"
     # Save extracted facts to memory
@@ -550,7 +550,7 @@ async def _handle_nonstreaming_response(
             r'l.usuari\s+es\s+diu)',
         )
         # Anti-hallucination: skip MEM_SAVEs on first interaction
-        _prior_msgs = [m for m in session.messages if m.get("role") == "user"]
+        _prior_msgs = [msg for msg in session.messages if msg.get("role") == "user"]
         _is_first_turn = len(_prior_msgs) <= 1
         for _fact in _mem_saves_ns:
             _fact = _fact.strip()
@@ -573,7 +573,7 @@ async def _handle_nonstreaming_response(
             except Exception as e:
                 logger.debug("MEM_SAVE failed (no-stream): %s", e)
 
-    # Bug 18: Extreure [MEM_DELETE: ...] i [OLVIDA/OBLIT/FORGET: ...] (non-streaming)
+    # Bug 18: Extract [MEM_DELETE: ...] and [OLVIDA/OBLIT/FORGET: ...] (non-streaming)
     response_text = _OBLIT_RE.sub(
         lambda m: f'[MEM_DELETE: {m.group(2)}]', response_text
     )
@@ -602,7 +602,7 @@ async def _handle_nonstreaming_response(
 
 
 def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
-    """Registra endpoint: POST /chat"""
+    """Registers endpoint: POST /chat"""
 
     # Concurrency limiter: max 2 simultaneous chat requests to avoid Ollama overload
     _chat_semaphore = asyncio.Semaphore(2)
@@ -654,7 +654,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             module_manager = get_server_state().module_manager
             if module_manager is None:
                 raise HTTPException(status_code=503, detail="Service unavailable: module manager not initialized")
-            # Prioritzar model/backend del request (selector UI) sobre env vars
+            # Prioritize model/backend from request (UI selector) over env vars
             model_name = body.get("model") or os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
             if len(model_name) > 100:  # type: ignore[arg-type]  # model_name: Any|str|None; os.getenv default impedeix None en pràctica
                 raise HTTPException(status_code=400, detail="Model name too long (max 100 chars)")
@@ -701,14 +701,14 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     continue
 
                 try:
-                    # Resoldre ruta local del model si ve del selector UI.
-                    # _MODEL_SWITCH_LOCK serialitza mutacions concurrents de
-                    # `body.model` sobre els singletons de classe. A més,
-                    # l'env (`NEXE_MLX_MODEL` / `NEXE_LLAMA_CPP_MODEL`) es
-                    # muta només el temps mínim per construir el nou config
-                    # via `from_env()` i es restaura al `finally` per evitar
-                    # que la propera request que no especifiqui `body.model`
-                    # hereti el valor de l'anterior switch (P0-3 env leak).
+                    # Resolve local model path if coming from the UI selector.
+                    # _MODEL_SWITCH_LOCK serializes concurrent mutations of
+                    # `body.model` on class-level singletons. Also,
+                    # the env (`NEXE_MLX_MODEL` / `NEXE_LLAMA_CPP_MODEL`) is
+                    # mutated only for the minimum time to build the new config
+                    # via `from_env()` and restored in `finally` to prevent
+                    # the next request that doesn't specify `body.model`
+                    # from inheriting the value from the previous switch (P0-3 env leak).
                     if body.get("model"):
                         async with _MODEL_SWITCH_LOCK:
                             from core.lifespan import get_server_state as _gss
@@ -742,7 +742,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     from plugins.llama_cpp_module.core.config import LlamaCppConfig
                                     from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
                                     from plugins.llama_cpp_module.core.model_pool import ModelPool
-                                    new_config = LlamaCppConfig.from_env()  # type: ignore[assignment]  # cross-branch: new_config prèviament MLXConfig al branch mlx, reclassificada LlamaCppConfig al branch llama_cpp
+                                    new_config = LlamaCppConfig.from_env()  # type: ignore[assignment]  # cross-branch: new_config previously MLXConfig in mlx branch, reclassified LlamaCppConfig in llama_cpp branch
                                 finally:
                                     if _prev_llama is None:
                                         os.environ.pop("NEXE_LLAMA_CPP_MODEL", None)
@@ -751,12 +751,12 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 if hasattr(engine, '_node') and engine._node:
                                     old_path = engine._node.config.model_path
                                     if old_path != new_config.model_path:
-                                        # Destruir pool antic i recrear amb nou config
+                                        # Destroy old pool and recreate with new config
                                         if LlamaCppChatNode._pool is not None:
                                             LlamaCppChatNode._pool.destroy_all()
-                                        engine._node.config = new_config  # type: ignore[assignment]  # cross-branch: mypy unifica new_config MLXConfig|LlamaCppConfig; en context llama_cpp_module és LlamaCppConfig
-                                        LlamaCppChatNode._config = new_config  # type: ignore[assignment]  # cross-branch: MLXConfig|LlamaCppConfig unificat; en context llama_cpp_module és LlamaCppConfig
-                                        LlamaCppChatNode._pool = ModelPool(new_config)  # type: ignore[arg-type]  # new_config: MLXConfig|LlamaCppConfig cross-branch; en context llama_cpp branch és LlamaCppConfig
+                                        engine._node.config = new_config  # type: ignore[assignment]  # cross-branch: mypy unifies new_config MLXConfig|LlamaCppConfig; in llama_cpp_module context it is LlamaCppConfig
+                                        LlamaCppChatNode._config = new_config  # type: ignore[assignment]  # cross-branch: MLXConfig|LlamaCppConfig unified; in llama_cpp_module context it is LlamaCppConfig
+                                        LlamaCppChatNode._pool = ModelPool(new_config)  # type: ignore[arg-type]  # new_config: MLXConfig|LlamaCppConfig cross-branch; in llama_cpp branch context it is LlamaCppConfig
                                         logger.info(f"Llama.cpp model switched to: {new_config.model_path}")
 
                     # Per-session thinking toggle
@@ -765,7 +765,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     logger.info(f"Calling {engine_name}.chat with model={model_name} thinking={thinking_enabled}")
 
                     # --- Context Compacting ---
-                    # Si la sessio te massa missatges, compactar amb resum LLM
+                    # If the session has too many messages, compact with LLM summary
                     await _compact_session(session, engine, session_mgr)
 
                     # --- Build Context ---
@@ -809,7 +809,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         document_context = _sanitize_rag_context(document_context)
                         logger.info(f"Using attached document: {attached_doc['filename']} (parts {shown}/{total_chunks}, {len(doc_content)} chars)")
 
-                    # 3. Get Memory Context (RAG) - SEMPRE buscar, no nomes amb patterns
+                    # 3. Get Memory Context (RAG) - ALWAYS search, not just with patterns
                     rag_context = ""
                     rag_count = 0
                     _rag_items = []  # (collection, score) tuples for weight display
@@ -830,7 +830,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     doc_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'nexe_documentation']
                                     knowledge_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'user_knowledge']
                                     memory_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') not in ('user_knowledge', 'nexe_documentation')]
-                                    # RAG context labels per idioma (coincideixen amb system prompt)
+                                    # RAG context labels per language (match with system prompt)
                                     _rag_labels = {
                                         "ca": ("DOCUMENTACIO DEL SISTEMA", "DOCUMENTACIO TECNICA", "MEMORIA DE L'USUARI"),
                                         "es": ("DOCUMENTACION DEL SISTEMA", "DOCUMENTACION TECNICA", "MEMORIA DEL USUARIO"),
@@ -867,7 +867,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             logger.warning(f"RAG lookup failed: {e}")
 
                     # 4. Construct Final System Prompt
-                    # Llegir el prompt de server.toml via app_state (llengua + tier)
+                    # Read the prompt from server.toml via app_state (language + tier)
                     try:
                         from core.lifespan import get_server_state
                         from core.endpoints.chat import _get_system_prompt
@@ -877,9 +877,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         base_system_prompt = _get_system_prompt(_state, _lang)
                     except Exception:
                         base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
-                    # Injecta data + hora (amb segons + zona horària local) al
-                    # system prompt perquè el model pugui resoldre consultes
-                    # sensibles al temps ("quina hora és?", "quant fa que…").
+                    # Inject date + time (with seconds + local timezone) into
+                    # the system prompt so the model can resolve time-sensitive
+                    # queries ("what time is it?", "how long ago was…").
                     from datetime import datetime as _dt
                     _now = _dt.now().astimezone()
                     system_prompt = (
@@ -918,7 +918,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     )
                     available_chars = _budget["available_chars"]
 
-                    # Injectar context als messages (no al system prompt -> MLX pot cachear el prefix)
+                    # Inject context into messages (not system prompt -> MLX can cache the prefix)
                     _doc_truncated_pct = _budget["doc_truncated_pct"]
                     if document_context and _budget["doc_kept_chars"] > 0:
                         _original_doc_len = len(document_context)
@@ -930,7 +930,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 _doc_truncated_pct, history_chars, _budget["history_reserve"],
                                 _original_doc_len, _budget["doc_kept_chars"],
                             )
-                        # Document adjuntat: va davant del missatge de l'usuari
+                        # Attached document: goes before the user message
                         doc_block = (
                             "[DOCUMENT ADJUNTAT]\n"
                             f"{document_context}\n"
@@ -941,7 +941,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         )
                         engine_messages.append({"role": "user", "content": doc_block})
                     elif document_context and _budget["doc_kept_chars"] == 0:
-                        # Bug 32: no queda espai pel document; descartem perquè l'historial té prioritat.
+                        # Bug 32: no space left for document; we discard because history has priority.
                         logger.warning(
                             "Bug 32: dropping document (history reserved fully) — history=%s, reserve=%s",
                             history_chars, _budget["history_reserve"],
@@ -950,7 +950,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         engine_messages.append({"role": "user", "content": message})
                     elif rag_context and available_chars > 0:
                         rag_context = rag_context[:available_chars]
-                        # Context RAG: docs sistema, docs tecnics, memoria
+                        # RAG context: system docs, technical docs, memory
                         _rag_instruction = {
                             "ca": (
                                 "INFORMACIO RECUPERADA. UTILITZA-LA per respondre. "
@@ -1025,7 +1025,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     import inspect
                     sig = inspect.signature(engine.chat)
 
-                    # Ollama/MLX/LlamaCpp esperen base64 strings, no bytes
+                    # Ollama/MLX/LlamaCpp expect base64 strings, not bytes
                     _images_arg = [image_b64] if image_b64 else None
 
                     if 'model' in sig.parameters:
@@ -1085,7 +1085,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                       images=_images_arg,
                                                       thinking_enabled=thinking_enabled)
 
-                    # Flag si s'ha compactat per avisar al client
+                    # Flag if compacted to notify the client
                     _compacted = session.compaction_count > 0 and session.context_summary is not None
 
                     if stream:
@@ -1144,7 +1144,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         elif isinstance(chunk, str):
                                             content = chunk
 
-                                        # Model carregat — qualsevol chunk = model respon
+                                        # Model loaded — any chunk = model is responding
                                         if _first_chunk:
                                             _first_chunk = False
                                             yield "\x00[MODEL_READY]\x00"
@@ -1167,20 +1167,20 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         if content:
                                             _is_gpt_oss = "gpt-oss" in model_name.lower()
                                             if _is_gpt_oss:
-                                                # GPT-OSS: normalitzar analysis/assistant → think tags
-                                                # perquè el client detecti thinking en temps real
+                                                # GPT-OSS: normalize analysis/assistant → think tags
+                                                # so the client detects thinking in real time
                                                 content = content.replace('<|analysis|>', '<think>')
                                                 content = content.replace('<|assistant|>', '</think>')
                                                 content = _re.sub(r'<\|[^|]+\|>', '', content)
                                                 content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
                                             else:
-                                                # Models normals: normalitzar thinking tags
+                                                # Normal models: normalize thinking tags
                                                 content = content.replace('<|thinking|>', '<think>')
                                                 content = content.replace('<|/thinking|>', '</think>')
                                                 content = _re.sub(r'<\|[^|]+\|>', '', content)
                                                 content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
                                             full_response += content
-                                            # Separar <think> blocks incrustats al content (qwq:32b, etc.)
+                                            # Separate embedded <think> blocks in content (qwq:32b, etc.)
                                             if '<think>' in content or '</think>' in content or _in_content_think:
                                                 _vis_parts = []
                                                 _sc = 0
@@ -1209,8 +1209,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             # [MEM_SAVE: ...] tags pass through to client
                                             # Client handles them like <think> blocks (blue collapsible)
                                             # Bug B-mem-visible: strip [MEMORIA: ...] from visible output —
-                                            # gpt-oss:20b emet aquest tag en lloc de [MEM_SAVE: ...].
-                                            # El processem a clean_response; aqui l'ocultem a l'usuari.
+                                            # gpt-oss:20b emits this tag instead of [MEM_SAVE: ...].
+                                            # We process it in clean_response; here we hide it from the user.
                                             if visible and _MEMORIA_RE.search(visible):
                                                 visible = _MEMORIA_RE.sub('', visible)
                                             if visible:
@@ -1253,25 +1253,25 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", clean_response)
                             clean_response = _re.sub(r'<\|[^|]+\|>', '', clean_response)
                             clean_response = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', clean_response)
-                            # GPT-OSS: extreure nomes la part "final" (resposta real)
+                            # GPT-OSS: extract only the "final" part (real response)
                             _m = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', clean_response, _re.IGNORECASE)
                             if _m:
                                 clean_response = _m.group(1).strip()
                             else:
-                                # Fallback: treure prefix "analysis..." si hi es
+                                # Fallback: remove "analysis..." prefix if present
                                 clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
-                            # Bug B-mem-visible: normalitzar [MEMORIA: ...] → [MEM_SAVE: ...] abans
-                            # d'extreure i strippear, perquè gpt-oss:20b emet [MEMORIA: ...].
+                            # Bug B-mem-visible: normalize [MEMORIA: ...] → [MEM_SAVE: ...] before
+                            # extracting and stripping, because gpt-oss:20b emits [MEMORIA: ...].
                             clean_response = _MEMORIA_RE.sub(
                                 lambda m: f'[MEM_SAVE: {m.group(1)}]', clean_response
                             )
-                            # Bug 18: Normalitzar [OLVIDA/OBLIT/FORGET: ...] → [MEM_DELETE: ...]
+                            # Bug 18: Normalize [OLVIDA/OBLIT/FORGET: ...] → [MEM_DELETE: ...]
                             clean_response = _OBLIT_RE.sub(
                                 lambda m: f'[MEM_DELETE: {m.group(2)}]', clean_response
                             )
-                            # Bug 18: Extract [MEM_DELETE: ...] — no esborrem immediatament.
-                            # Emitem PENDING_DELETE perquè el frontend mostri confirmació.
-                            # L'esborrat real passa a POST /ui/memory/confirm-delete.
+                            # Bug 18: Extract [MEM_DELETE: ...] — we don't delete immediately.
+                            # We emit PENDING_DELETE so the frontend shows a confirmation.
+                            # The actual deletion happens at POST /ui/memory/confirm-delete.
                             _mem_deletes = _MEM_DELETE_RE.findall(clean_response)
                             if _mem_deletes:
                                 clean_response = _re.sub(r'\[MEM_DELETE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
@@ -1305,17 +1305,17 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     _extracted = _rm.group(1).strip().rstrip('.,!?')
                                     if _extracted and _is_valid_mem_save_text(_extracted):
                                         _mem_saves.append(_extracted)
-                            # Bug 17: Extract [MEM_SAVE: ...] facts amb validacio estricta.
-                            # _extract_safe_mem_saves filtra per format/longitud/whitelist
-                            # i rebutja MEM_SAVE que copien el missatge usuari.
+                            # Bug 17: Extract [MEM_SAVE: ...] facts with strict validation.
+                            # _extract_safe_mem_saves filters by format/length/whitelist
+                            # and rejects MEM_SAVEs that copy the user message.
                             _mem_saves = _extract_safe_mem_saves(clean_response, user_input=message)
-                            # Tot i així, el strip del cos visible s'aplica al patró ampli per
-                            # eliminar QUALSEVOL [MEM_SAVE: ...] (vàlid o no) de la resposta.
+                            # Even so, the visible body strip applies to the broad pattern to
+                            # eliminate ANY [MEM_SAVE: ...] (valid or not) from the response.
                             clean_response = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
 
-                            # Re-prompt: si el model ha emès NOMÉS [MEM_SAVE: ...] sense
-                            # resposta conversacional, re-enviem amb system prompt sense
-                            # instruccions MEM_SAVE perquè generi una resposta natural.
+                            # Re-prompt: if the model emitted ONLY [MEM_SAVE: ...] without
+                            # a conversational response, resend with system prompt without
+                            # MEM_SAVE instructions so it generates a natural response.
                             if not clean_response and _mem_saves:
                                 _fallback_facts = [f.strip() for f in _mem_saves if f and f.strip()]
                                 if _fallback_facts:
@@ -1402,7 +1402,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     fact = fact.strip()
                                     if not fact or len(fact) < 5:
                                         continue
-                                    # No re-guardar fets recentment esborrats
+                                    # Do not re-save recently deleted facts
                                     _deleted = getattr(session, '_recently_deleted_facts', [])
                                     if _deleted:
                                         _skip = False
@@ -1413,7 +1413,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                 break
                                         if _skip:
                                             continue
-                                    # Filtrar fets negatius/brossa
+                                    # Filter negative/junk facts
                                     if _junk_patterns.search(fact):
                                         logger.debug("MEM_SAVE skip (junk): '%s'", fact[:80])
                                         continue
@@ -1423,7 +1423,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             session_id=session.id,
                                             metadata={"type": "user_fact", "source": "llm_extract", "is_mem_save": True}
                                         )
-                                        # Comptar nomes si realment s'ha guardat (no duplicat)
+                                        # Count only if actually saved (not duplicate)
                                         if result.get("document_id"):
                                             _mem_saved_count += 1
                                             logger.info("MEM_SAVE: '%s'", fact[:80])
@@ -1512,7 +1512,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             logger.error(f"Error calling LLM: {e}")
             response_text = f"Error: {str(e)}"
 
-    # Strip MEM_SAVE tags i extreure fets (non-streaming path)
+    # Strip MEM_SAVE tags and extract facts (non-streaming path)
         return response_text or "", model_name, None
 
 

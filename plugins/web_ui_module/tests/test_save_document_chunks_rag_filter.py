@@ -3,10 +3,10 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/web_ui_module/tests/test_save_document_chunks_rag_filter.py
-Description: Verifica que `MemoryHelper.save_document_chunks` aplica
-             `_filter_rag_injection` a cada chunk abans d'indexar-lo a
-             `user_knowledge` (defense-in-depth a ingest, complementant
-             el `_sanitize_rag_context` que ja fa a retrieval).
+Description: Verifies that `MemoryHelper.save_document_chunks` applies
+             `_filter_rag_injection` to each chunk before indexing it to
+             `user_knowledge` (defense-in-depth at ingest, complementing
+             the `_sanitize_rag_context` already applied at retrieval).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -67,13 +67,13 @@ class TestSaveDocumentChunksFilter:
         assert "[MEM_SAVE:" not in texts[0]
         assert "[FILTERED]" in texts[0]
         assert "Important fact: X happened." in texts[0]
-        # El chunk innocent passa sense tocar.
+        # The innocent chunk passes untouched.
         assert texts[1] == "Normal chunk without any injection patterns."
 
     def test_filters_context_tag(self):
-        """Un `[CONTEXT ...]` tancat és reemplaçat per `[FILTERED]` per la
-        regex de `_RAG_INJECTION_PATTERNS`. Un `[CONTEXT` obert (sense
-        tancament) s'escapa a `[CONTEXT_ESCAPED` al pas posterior."""
+        """A closed `[CONTEXT ...]` is replaced by `[FILTERED]` by the
+        `_RAG_INJECTION_PATTERNS` regex. An open `[CONTEXT` (without
+        closing) is escaped to `[CONTEXT_ESCAPED` in the next step."""
         mem = _make_memory_mock()
         mh_module._memory_api_instance = mem
         helper = MemoryHelper()

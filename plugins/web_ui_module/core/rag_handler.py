@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/web_ui_module/core/rag_handler.py
-Description: Funcions RAG per al modul web_ui.
-             Extret de manifest.py durant normalitzacio.
+Description: RAG functions for the web_ui module.
+             Extracted from manifest.py during normalization.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 async def generate_rag_metadata(body_content: str, filename: str) -> dict:
     """
-    Usa el LLM per generar abstract i tags consistents amb el contingut real del document.
-    Fa servir els primers 3000 chars com a mostra. Fallback a extraccio simple si falla.
+    Uses the LLM to generate an abstract and tags consistent with the actual document content.
+    Uses the first 3000 chars as a sample. Falls back to simple extraction if it fails.
     """
     stem = Path(filename).stem.replace("_", " ").replace("-", " ")
     _lang = _os.getenv("NEXE_LANG", "ca").split("-")[0].lower()

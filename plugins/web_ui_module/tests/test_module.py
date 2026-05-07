@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/web_ui_module/tests/test_module.py
-Description: Tests per WebUIModule: inicialització, endpoints i helpers.
+Description: Tests for WebUIModule: initialization, endpoints and helpers.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -40,7 +40,7 @@ def module():
 
 @pytest.fixture
 def initialized_module(tmp_path, monkeypatch):
-    """Module inicialitzat amb directori temporal."""
+    """Module initialized with a temporary directory."""
     monkeypatch.setenv("NEXE_API_BASE_URL", "http://127.0.0.1:9119")
     mod = WebUIModule()
     context = {"config": {"core": {"server": {"host": "127.0.0.1", "port": 9119}}}}
@@ -51,7 +51,7 @@ def initialized_module(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client(initialized_module, monkeypatch):
-    """TestClient amb el router inicialitzat."""
+    """TestClient with initialized router."""
     monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-webui-key")
     monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
     from core.dependencies import limiter
@@ -69,10 +69,10 @@ def auth_headers():
     return {"X-API-Key": "test-webui-key"}
 
 
-# ─── Tests per WebUIModule ────────────────────────────────────────────────────
+# ─── Tests for WebUIModule ────────────────────────────────────────────────────
 
 class TestWebUIModuleInit:
-    """Tests per la inicialització del mòdul."""
+    """Tests for module initialization."""
 
     def test_initial_state_not_initialized(self, module):
         assert module._initialized is False

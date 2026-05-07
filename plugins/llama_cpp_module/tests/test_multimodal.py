@@ -1,6 +1,6 @@
 """
-Tests suport multimodal (imatges) a llama_cpp_module.
-No requereix llama-cpp-python instal·lat — tot és mockejat.
+Tests for multimodal support (images) in llama_cpp_module.
+Does not require llama-cpp-python to be installed — everything is mocked.
 """
 
 import importlib.util
@@ -13,13 +13,13 @@ from unittest.mock import MagicMock, patch
 class TestLlamaCppConfigMmproj:
 
     def test_mmproj_default_empty(self):
-        """Per defecte mmproj_path és buit."""
+        """By default mmproj_path is empty."""
         from plugins.llama_cpp_module.core.config import LlamaCppConfig
         config = LlamaCppConfig(model_path="/fake/model.gguf")
         assert config.mmproj_path == ""
 
     def test_mmproj_from_env(self, monkeypatch):
-        """LLAMA_MMPROJ_PATH es llegeix de l'entorn."""
+        """LLAMA_MMPROJ_PATH is read from the environment."""
         monkeypatch.setenv("LLAMA_MMPROJ_PATH", "/path/to/mmproj.gguf")
         monkeypatch.setenv("NEXE_LLAMA_CPP_MODEL", "/path/to/model.gguf")
         from plugins.llama_cpp_module.core.config import LlamaCppConfig
@@ -27,7 +27,7 @@ class TestLlamaCppConfigMmproj:
         assert config.mmproj_path == "/path/to/mmproj.gguf"
 
     def test_mmproj_not_set_means_empty(self, monkeypatch):
-        """Sense env var, mmproj_path és buit."""
+        """Without the env var, mmproj_path is empty."""
         monkeypatch.delenv("LLAMA_MMPROJ_PATH", raising=False)
         monkeypatch.setenv("NEXE_LLAMA_CPP_MODEL", "/path/to/model.gguf")
         from plugins.llama_cpp_module.core.config import LlamaCppConfig
@@ -48,7 +48,7 @@ class TestModelPoolMmproj:
         reason="llama_cpp not installed"
     )
     def test_create_instance_without_mmproj(self):
-        """Sense mmproj, Llama() es crida sense clip_model_path."""
+        """Without mmproj, Llama() is called without clip_model_path."""
         from plugins.llama_cpp_module.core.model_pool import ModelPool
         config = self._config(mmproj="")
         pool = ModelPool(config)
@@ -67,7 +67,7 @@ class TestModelPoolMmproj:
         reason="llama_cpp not installed"
     )
     def test_create_instance_with_mmproj(self):
-        """Amb mmproj, Llama() rep clip_model_path."""
+        """With mmproj, Llama() receives clip_model_path."""
         from plugins.llama_cpp_module.core.model_pool import ModelPool
         config = self._config(mmproj="/path/mmproj.gguf")
         pool = ModelPool(config)
@@ -87,7 +87,7 @@ class TestLlamaCppChatNodeImages:
     def _node(self, mmproj=""):
         from plugins.llama_cpp_module.core.config import LlamaCppConfig
         from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
-        # Reset singleton per cada test
+        # Reset singleton for each test
         LlamaCppChatNode._pool = None
         LlamaCppChatNode._config = None
         config = LlamaCppConfig(model_path="/fake/model.gguf", mmproj_path=mmproj)
@@ -95,12 +95,12 @@ class TestLlamaCppChatNodeImages:
 
     @pytest.mark.asyncio
     async def test_image_without_mmproj_logs_warning(self, caplog):
-        """Imatge sense mmproj → warning i fallback text-only."""
+        """Image without mmproj → warning and text-only fallback."""
         import logging
 
         node = self._node(mmproj="")
 
-        # Mock del pool i la generació
+        # Mock for the pool and generation
         mock_model = MagicMock()
         mock_result = {
             "choices": [{"message": {"content": "Resposta"}}],
@@ -130,7 +130,7 @@ class TestLlamaCppChatNodeImages:
 
     @pytest.mark.asyncio
     async def test_text_only_no_regression(self):
-        """Text-only sense imatge: funciona igual que abans."""
+        """Text-only without image: works the same as before."""
         node = self._node(mmproj="")
         mock_model = MagicMock()
         node._get_model = MagicMock(return_value=(mock_model, False))
@@ -154,7 +154,7 @@ class TestLlamaCppChatNodeImages:
 
     @pytest.mark.asyncio
     async def test_vlm_images_passed_to_generate_vlm(self):
-        """Amb images + mmproj, execute() ha de cridar _generate_vlm."""
+        """With images + mmproj, execute() must call _generate_vlm."""
         node = self._node(mmproj="/path/mmproj.gguf")
         mock_model = MagicMock()
         node._get_model = MagicMock(return_value=(mock_model, False))
@@ -181,7 +181,7 @@ class TestLlamaCppChatNodeImages:
 
     @pytest.mark.asyncio
     async def test_vlm_streaming_images_passed(self):
-        """Amb images + mmproj + stream_callback, execute() ha de cridar _generate_vlm_streaming."""
+        """With images + mmproj + stream_callback, execute() must call _generate_vlm_streaming."""
         node = self._node(mmproj="/path/mmproj.gguf")
         mock_model = MagicMock()
         node._get_model = MagicMock(return_value=(mock_model, False))
@@ -210,7 +210,7 @@ class TestLlamaCppChatNodeImages:
 
     @pytest.mark.asyncio
     async def test_vlm_format_messages_with_image(self):
-        """_generate_vlm formata missatges amb data URI base64 per llama-cpp-python."""
+        """_generate_vlm formats messages with base64 data URIs for llama-cpp-python."""
         node = self._node(mmproj="/path/mmproj.gguf")
         mock_model = MagicMock()
 

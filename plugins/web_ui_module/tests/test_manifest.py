@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/web_ui_module/tests/test_manifest.py
-Description: Tests per router_public del manifest.py (endpoints UI, session, upload, chat, memory).
+Description: Tests for manifest.py router_public (UI, session, upload, chat, memory endpoints).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -126,11 +126,11 @@ class TestServeUI:
 
     def test_no_html_returns_404(self, client):
         r = client.get("/ui/")
-        # index.html no existeix en entorn de test
+        # index.html does not exist in test environment
         assert r.status_code in (200, 404)
 
     def test_with_existing_html(self, client, tmp_path):
-        """Simula existència de index.html patchejant ui_dir del module."""
+        """Simulates existence of index.html by patching ui_dir of the module."""
         module = get_module_instance()
         fake_html = tmp_path / "index.html"
         fake_html.write_text('<html lang="ca"><head></head></html>')
@@ -327,13 +327,13 @@ class TestUploadEndpoint:
 class TestChatEndpoint:
 
     def _make_mock_engine(self, response_text="Hello from engine"):
-        """Crea un engine mock que retorna resposta directa."""
+        """Creates a mock engine that returns a direct response."""
         engine = MagicMock()
         engine.chat = MagicMock(return_value={"response": response_text})
         return engine
 
     def _make_mock_module_manager(self, engine=None):
-        """Crea un ModuleManager mock amb un engine registrat."""
+        """Creates a mock ModuleManager with a registered engine."""
         if engine is None:
             engine = self._make_mock_engine()
 
@@ -379,7 +379,7 @@ class TestChatEndpoint:
         assert "response" in data
 
     def test_save_intent_empty_content(self, client, auth):
-        """Quan extracted_content és buit, usa el missatge original."""
+        """When extracted_content is empty, uses the original message."""
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
@@ -422,7 +422,7 @@ class TestChatEndpoint:
         sid = r1.json()["session_id"]
 
         registry = MagicMock()
-        registry.get_module = MagicMock(return_value=None)  # cap engine
+        registry.get_module = MagicMock(return_value=None)  # no engine
         registry.list_modules = MagicMock(return_value=[])
         mm = MagicMock()
         mm.registry = registry
@@ -442,7 +442,7 @@ class TestChatEndpoint:
                 json={"message": "Hola com estàs?", "session_id": sid}
             )
         assert r.status_code == 200
-        # Hauria de retornar missatge d'error sobre cap motor disponible
+        # Should return error message about no engine available
         assert "response" in r.json()
 
     def test_chat_engine_returns_string(self, client, auth):
@@ -494,7 +494,7 @@ class TestChatEndpoint:
         assert r.status_code == 200
 
     def test_chat_rag_context_used(self, client, auth):
-        """Comprova que RAG results s'injecten al context."""
+        """Verifies that RAG results are injected into the context."""
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
         engine = self._make_mock_engine()
@@ -530,7 +530,7 @@ class TestChatEndpoint:
         assert r.status_code == 200
 
     def test_chat_stream_mode(self, client, auth):
-        """Chat en mode stream retorna StreamingResponse."""
+        """Chat in stream mode returns StreamingResponse."""
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
@@ -553,7 +553,7 @@ class TestChatEndpoint:
         assert r.status_code == 200
 
     def test_chat_without_session_creates_one(self, client, auth):
-        """Chat sense session_id crea sessió automàticament."""
+        """Chat without session_id creates a session automatically."""
         with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
@@ -621,7 +621,7 @@ class TestMemoryEndpoints:
 class TestStartSessionCleanup:
 
     def test_start_cleanup_task(self):
-        """start_session_cleanup_task crea un asyncio.Task."""
+        """start_session_cleanup_task creates an asyncio.Task."""
         from plugins.web_ui_module.api.routes import start_session_cleanup_task
 
         async def run():
@@ -645,7 +645,7 @@ class TestGetModuleInstance:
 # ─── TestGenerateRagMetadata ──────────────────────────────────────────────────
 
 class TestGenerateRagMetadata:
-    """Tests per _generate_rag_metadata (fallback path)."""
+    """Tests for _generate_rag_metadata (fallback path)."""
 
     def test_fallback_when_no_module_manager(self):
         from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata

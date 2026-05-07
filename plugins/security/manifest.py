@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/manifest.py
-Description: Router FastAPI per modul security.
+Description: FastAPI router for the security module.
              Lazy initialization to avoid side effects at import.
 
 www.jgoy.net · https://server-nexe.org
@@ -21,9 +21,9 @@ _m = create_lazy_manifest(
     },
 )
 
-# ─── Retrocompatibilitat amb codi i tests existents ───
-# El manifest.py antic exportava aquests noms directament.
-# Els mantenim com a facades lazy per no trencar imports existents.
+# ─── Backward compatibility with existing code and tests ───
+# The old manifest.py exported these names directly.
+# We keep them as lazy facades to avoid breaking existing imports.
 
 from .module import SecurityModule  # noqa: E402,F401
 
@@ -45,7 +45,7 @@ except ImportError:
 
 
 def init_security_module():
-    """Retrocompat: inicialitza el modul security."""
+    """Retrocompat: initializes the security module."""
     import logging
     from pathlib import Path
     _logger = logging.getLogger(__name__)

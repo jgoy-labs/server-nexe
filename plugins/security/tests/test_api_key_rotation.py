@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: plugins/security/tests/test_api_key_rotation.py
-Description: Tests per rotació d'API keys amb suport dual-key. Valida expiracions, prioritats, backward compatibility i zero-downtime rotation.
+Description: Tests for API key rotation with dual-key support. Validates expirations, priorities, backward compatibility and zero-downtime rotation.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -210,7 +210,7 @@ def test_load_api_keys_no_keys_configured(monkeypatch):
   assert config.has_any_valid_key is False
 
 def _make_auth_test_app():
-  """Crea mini-app amb endpoint protegit per testar auth."""
+  """Creates a mini-app with a protected endpoint for testing auth."""
   from fastapi import FastAPI, Depends
   from plugins.security.core.auth_dependencies import require_api_key
   test_app = FastAPI()
@@ -221,7 +221,7 @@ def _make_auth_test_app():
 
 @pytest.fixture
 def client():
-  """Test client amb mini-app protegida."""
+  """Test client with a protected mini-app."""
   return TestClient(_make_auth_test_app(), base_url="http://localhost")
 
 def test_require_api_key_with_valid_primary(client, monkeypatch):

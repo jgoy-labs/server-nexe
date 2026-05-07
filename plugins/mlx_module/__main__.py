@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/mlx_module/__main__.py
-Description: Entry point CLI per al modul mlx.
+Description: CLI entry point for the mlx module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -21,7 +21,7 @@ app = typer.Typer(help="MLX module CLI — Server Nexe")
 
 @app.command()
 def info():
-    """Mostra informacio del modul mlx."""
+    """Shows information about the mlx module."""
     from .manifest import get_module_instance
     module = get_module_instance()
     data = module.get_info()
@@ -31,7 +31,7 @@ def info():
 
 @app.command()
 def health():
-    """Mostra l'estat de salut."""
+    """Shows the health status."""
     from .health import get_health
     result = get_health()
     typer.echo(f"Status: {result.get('status', 'unknown')}")
@@ -39,7 +39,7 @@ def health():
 
 @app.command()
 def test():
-    """Executa tests del modul."""
+    """Runs module tests."""
     import subprocess  # nosec B404: subprocess required for `python -m pytest` test runner inside this plugin; usage validated below
     import sys
     from pathlib import Path
@@ -53,7 +53,7 @@ def test():
 
 @app.command()
 def workflow():
-    """Info de workflow nodes."""
+    """Workflow node info."""
     typer.echo("MLX workflow nodes: (stub — Part 2)")
 
 

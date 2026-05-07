@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/ollama_module/tests/unit/test_ollama_node.py
-Description: Tests unitaris per OllamaNode. Valida integració amb Ollama API, prompt handling, response parsing i error cases.
+Description: Unit tests for OllamaNode. Validates integration with Ollama API, prompt handling, response parsing and error cases.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import pytest
 from unittest.mock import patch, MagicMock
 
-# Skip si el path no és correcte
+# Skip if the path is not correct
 try:
   from plugins.ollama_module.workflow.nodes.ollama_node import OllamaNode
 except ImportError:

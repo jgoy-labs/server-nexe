@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/mlx_module/api/routes.py
-Description: Endpoints FastAPI del modul MLX (Apple Silicon).
-             Separat de module.py durant normalitzacio.
+Description: FastAPI endpoints for the MLX module (Apple Silicon).
+             Separated from module.py during normalization.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def create_router(module_instance) -> APIRouter:
     """
-    Crea el router FastAPI amb tots els endpoints d'MLX.
+    Creates the FastAPI router with all MLX endpoints.
 
     Args:
         module_instance: MLXModule instance
@@ -34,7 +34,7 @@ def create_router(module_instance) -> APIRouter:
 
     @router.get("/info", operation_id="mlx_info")
     async def get_info(_: str = Depends(require_api_key)):
-        """Informacio del modul MLX. PROTECTED: Requires API key."""
+        """MLX module information. PROTECTED: Requires API key."""
         module = _get_module()
         return module.get_info()
 

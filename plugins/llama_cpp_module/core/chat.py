@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-LlamaCppChatNode - Node llama-cpp-python amb cache.
+LlamaCppChatNode - llama-cpp-python node with cache.
 
-Usa ModelPool per gestió de sessions amb LRU.
-llama.cpp té prefix caching automàtic quan el prefix és idèntic.
+Uses ModelPool for session management with LRU.
+llama.cpp has automatic prefix caching when the prefix is identical.
 
 """
 import asyncio
@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 
 class LlamaCppChatNode:
     """
-    Motor d'inferència per a Llama.cpp adaptat per a Nexe 0.9.
+    Inference engine for Llama.cpp adapted for Nexe 0.9.
 
-    Usa ModelPool per gestionar instàncies Llama amb LRU eviction.
-    Cada sessió pot tenir la seva pròpia instància (si max_sessions > 1).
-    El prefix caching de llama.cpp s'aprofita quan system_hash és idèntic.
+    Uses ModelPool to manage Llama instances with LRU eviction.
+    Each session can have its own instance (if max_sessions > 1).
+    llama.cpp prefix caching is leveraged when system_hash is identical.
     """
 
     # Singleton pool shared across all node instances
@@ -47,19 +47,19 @@ class LlamaCppChatNode:
 
     def _get_model(self, session_id: str, system_hash: str) -> tuple[Any, bool]:
         """
-        Obtenir model del pool per aquesta sessió.
+        Get model from the pool for this session.
 
         Args:
-            session_id: ID de sessió (usa "default" si buit)
-            system_hash: Hash del system prompt (normalitzat)
+            session_id: Session ID (uses "default" if empty)
+            system_hash: Hash of the system prompt (normalised)
 
         Returns:
-            Tuple (instància Llama, cache_hit: bool)
+            Tuple (Llama instance, cache_hit: bool)
         """
         if not session_id:
             session_id = "default"
 
-        return LlamaCppChatNode._pool.get_or_create(session_id, system_hash)  # type: ignore[union-attr]  # invariant: __init__ L42 sempre inicialitza _pool = ModelPool(config)
+        return LlamaCppChatNode._pool.get_or_create(session_id, system_hash)  # type: ignore[union-attr]  # invariant: __init__ L42 always initialises _pool = ModelPool(config)
 
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -74,7 +74,7 @@ class LlamaCppChatNode:
         temperature_override = inputs.get("temperature")
         images = inputs.get("images")  # Optional[List[bytes]] — VLM support
 
-        # Graceful fallback: si hi ha imatge però no mmproj, advertim i ignoriem imatge
+        # Graceful fallback: if there is an image but no mmproj, warn and ignore the image
         if images and not self.config.mmproj_path:
             logger.warning(
                 "LlamaCppChatNode: images provided but LLAMA_MMPROJ_PATH not set. "
@@ -93,7 +93,7 @@ class LlamaCppChatNode:
             len(messages)
         )
 
-        # Capturar event loop per streaming thread-safe
+        # Capture event loop for thread-safe streaming
         loop = asyncio.get_running_loop()
 
         def threadsafe_callback(piece: str):
@@ -104,9 +104,9 @@ class LlamaCppChatNode:
             # Get model from pool (handles cache/reset automatically)
             model, cache_hit = self._get_model(session_id, system_hash)
 
-            # Executar amb create_chat_completion — bifurcació VLM/text
+            # Execute with create_chat_completion — VLM/text branch
             if images and self.config.mmproj_path:
-                # VLM path: imatges + clip model configurat
+                # VLM path: images + clip model configured
                 if stream_callback:
                     result = await asyncio.to_thread(
                         self._generate_vlm_streaming,
@@ -141,7 +141,7 @@ class LlamaCppChatNode:
             context_used = result["prompt_tokens"] + result["tokens"]
             system_tokens = len(system) // 4  # Estimate
 
-            # Obtenir timing del resultat
+            # Get timing from the result
             timing = result.get("timing", {})
 
             logger.info(
@@ -166,7 +166,7 @@ class LlamaCppChatNode:
                 "system_tokens": system_tokens,
                 "system_prompt": system,
                 "session_id": session_id,
-                "cache_hit": cache_hit,  # Restaurat per compatibilitat
+                "cache_hit": cache_hit,  # Restored for compatibility
                 "timing": timing,
             }
 
@@ -204,7 +204,7 @@ class LlamaCppChatNode:
             "tokens": response["usage"]["completion_tokens"],
             "prompt_tokens": response["usage"]["prompt_tokens"],
             "timing": {
-                "prefill_ms": 0,  # No mesurable sense streaming
+                "prefill_ms": 0,  # Not measurable without streaming
                 "generation_ms": total_ms,
                 "overhead_ms": 0,
                 "prefill_available": False,  # TTFT not measurable without streaming
@@ -243,7 +243,7 @@ class LlamaCppChatNode:
             content = delta.get("content", "")
 
             if content:
-                # Marcar TTFT (Time To First Token)
+                # Mark TTFT (Time To First Token)
                 if first_token_time is None:
                     first_token_time = time.time()
 
@@ -261,7 +261,7 @@ class LlamaCppChatNode:
         if completion_tokens == 0:
             completion_tokens = len(text) // 4
 
-        # Calcular timing breakdown
+        # Calculate timing breakdown
         if first_token_time:
             prefill_ms = int((first_token_time - start_time) * 1000)
             generation_ms = int((end_time - first_token_time) * 1000)
@@ -310,7 +310,7 @@ class LlamaCppChatNode:
                         "type": "image_url",
                         "image_url": {"url": f"data:image/png;base64,{b64}"},
                     })
-                all_messages.append({"role": "user", "content": content_parts})  # type: ignore[dict-item]  # VLM: content_parts és list[dict], all_messages espera list[str] però accepta VLM format
+                all_messages.append({"role": "user", "content": content_parts})  # type: ignore[dict-item]  # VLM: content_parts is list[dict], all_messages expects list[str] but accepts VLM format
                 # Only inject images into the first user message
                 images = []
             else:

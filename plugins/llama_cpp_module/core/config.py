@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-LlamaCppConfig - Configuració centralitzada per llama-cpp-python.
+LlamaCppConfig - Centralised configuration for llama-cpp-python.
 
-Totes les opcions es poden configurar via variables d'entorn:
-- NEXE_LLAMA_CPP_MODEL: Ruta al fitxer .gguf
+All options can be configured via environment variables:
+- NEXE_LLAMA_CPP_MODEL: Path to the .gguf file
 - NEXE_LLAMA_CPP_N_CTX: Context window (default: 8192)
-- NEXE_LLAMA_CPP_N_BATCH: Batch size per generació (default: 512) - MÉS ALT = MÉS RÀPID
-- NEXE_LLAMA_CPP_GPU_LAYERS: Capes a GPU, -1=tot (default: -1)
+- NEXE_LLAMA_CPP_N_BATCH: Batch size for generation (default: 512) - HIGHER = FASTER
+- NEXE_LLAMA_CPP_GPU_LAYERS: Layers on GPU, -1=all (default: -1)
 - NEXE_LLAMA_CPP_THREADS: CPU threads (default: 8)
-- NEXE_LLAMA_CPP_MAX_SESSIONS: Sessions actives màxim (default: 1)
-- NEXE_LLAMA_CPP_CHAT_FORMAT: Format del chat (default: gemma)
-- NEXE_LLAMA_CPP_USE_MLOCK: Mantenir model a RAM (default: true)
-- NEXE_LLAMA_CPP_USE_MMAP: Memory-map del model (default: true)
+- NEXE_LLAMA_CPP_MAX_SESSIONS: Maximum active sessions (default: 1)
+- NEXE_LLAMA_CPP_CHAT_FORMAT: Chat format (default: gemma)
+- NEXE_LLAMA_CPP_USE_MLOCK: Keep model in RAM (default: true)
+- NEXE_LLAMA_CPP_USE_MMAP: Memory-map the model (default: true)
 - NEXE_LLAMA_CPP_FLASH_ATTN: Flash attention (default: true)
 
 """
@@ -25,19 +25,19 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LlamaCppConfig:
     """
-    Configuració per llama-cpp-python.
+    Configuration for llama-cpp-python.
 
     Attributes:
-        model_path: Ruta absoluta al fitxer .gguf
-        n_ctx: Context window en tokens (conservador per 27B)
-        n_batch: Batch size per generació (512-2048, més alt = més ràpid)
-        n_gpu_layers: Capes a carregar a GPU (-1 = totes, Metal)
-        n_threads: Threads de CPU per inferència
-        max_sessions: Màxim de sessions actives (LRU eviction)
-        chat_format: Format del chat template (gemma, llama-2, chatml, mistral)
-        use_mlock: Mantenir model a RAM (evita swapping)
-        use_mmap: Memory-map del model (més eficient)
-        flash_attn: Flash attention (més ràpid si suportat)
+        model_path: Absolute path to the .gguf file
+        n_ctx: Context window in tokens (conservative for 27B)
+        n_batch: Batch size for generation (512-2048, higher = faster)
+        n_gpu_layers: Layers to load on GPU (-1 = all, Metal)
+        n_threads: CPU threads for inference
+        max_sessions: Maximum active sessions (LRU eviction)
+        chat_format: Chat template format (gemma, llama-2, chatml, mistral)
+        use_mlock: Keep model in RAM (avoids swapping)
+        use_mmap: Memory-map the model (more efficient)
+        flash_attn: Flash attention (faster if supported)
     """
 
     model_path: str = ""
@@ -50,7 +50,7 @@ class LlamaCppConfig:
     use_mlock: bool = True
     use_mmap: bool = True
     flash_attn: bool = True
-    mmproj_path: str = ""  # Opcional: path al CLIP projector per models VLM (llava, etc.)
+    mmproj_path: str = ""  # Optional: path to the CLIP projector for VLM models (llava, etc.)
 
     def __post_init__(self):
         """Validate configuration after creation."""
@@ -71,10 +71,10 @@ class LlamaCppConfig:
     @classmethod
     def from_env(cls) -> "LlamaCppConfig":
         """
-        Carrega configuració de variables d'entorn.
+        Load configuration from environment variables.
 
         Returns:
-            LlamaCppConfig amb valors de l'entorn o defaults.
+            LlamaCppConfig with values from the environment or defaults.
         """
         # If no explicit env var, auto-discover a GGUF dropped into
         # storage/models/ (real file or symlink). Pick the first match
@@ -132,10 +132,10 @@ class LlamaCppConfig:
 
     def validate(self) -> bool:
         """
-        Valida que la configuració és correcta.
+        Validate that the configuration is correct.
 
         Returns:
-            True si la config és vàlida, False si no.
+            True if the config is valid, False otherwise.
         """
         if not self.model_path:
             logger.error("LlamaCppConfig: model_path is required")
@@ -143,7 +143,7 @@ class LlamaCppConfig:
 
         if not os.path.exists(self.model_path):
             logger.error(
-                "LlamaCppConfig: model_path no existeix: %s",
+                "LlamaCppConfig: model_path does not exist: %s",
                 self.model_path
             )
             return False
