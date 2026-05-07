@@ -101,6 +101,125 @@ SUPPORTED_EXTENSIONS = {".txt", ".md", ".markdown", ".text"}
 from core.ingest.chunking import chunk_text  # noqa: E402  # after sys.path setup
 
 
+def _build_file_items(
+    file_path: Path,
+    ingest_cfg: Any,
+    target_collection: str,
+    log,
+    perf_chunking_ns_ref: list,
+) -> tuple[list, str, int]:
+    """Parse a single file and return (batch_items, doc_collection, num_chunks).
+
+    Reads the RAG header if present, chunks the content, and builds the
+    metadata dict for each chunk. Pure function with no I/O side-effects
+    beyond reading the file. perf_chunking_ns_ref is a 1-element list used
+    as an accumulator so the caller can sum chunking time across files.
+    """
+    content = read_file(file_path)
+    if not content:
+        return [], target_collection, 0
+
+    filename = file_path.name
+    log(_t("processing_f", i="?", n="?", f=filename))
+
+    rag_header, body_content = parse_rag_header(content)
+
+    if rag_header.is_valid:
+        log(_t("rag_header", id=rag_header.id, p=rag_header.priority))
+        doc_chunk_size = rag_header.chunk_size
+        doc_collection = rag_header.collection or target_collection
+        doc_priority = rag_header.priority
+        doc_tags = rag_header.tags
+        doc_abstract = rag_header.abstract
+        doc_id = rag_header.id
+        doc_type = rag_header.type
+        doc_lang = rag_header.lang
+    else:
+        if rag_header.validation_errors and rag_header.validation_errors != ["No RAG header found"]:
+            log(_t("invalid_header", e=', '.join(rag_header.validation_errors[:2])))
+        body_content = content
+        doc_chunk_size = CHUNK_SIZE
+        doc_collection = target_collection
+        doc_priority = DEFAULT_PRIORITY
+        doc_tags = []
+        doc_abstract = ""
+        doc_id = filename
+        doc_type = DEFAULT_TYPE
+        doc_lang = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
+
+    doc_overlap = max(DEFAULT_OVERLAP_FLOOR, doc_chunk_size // DEFAULT_OVERLAP_FACTOR)
+
+    _t0_chunk = time.perf_counter_ns()
+    chunks = chunk_text(body_content, chunk_size=doc_chunk_size, overlap=doc_overlap)
+    perf_chunking_ns_ref[0] += time.perf_counter_ns() - _t0_chunk
+
+    priority_weight = 4 - VALID_PRIORITIES.index(doc_priority) if doc_priority in VALID_PRIORITIES else 2
+    header_text = f"[Document: {filename}]\n"
+    if doc_abstract:
+        header_text += f"[Abstract: {doc_abstract}]\n"
+    header_text += "\n"
+
+    batch_items = [
+        {
+            "text": header_text + _filter_rag_injection(chunk),
+            "metadata": {
+                "source": filename,
+                "doc_id": doc_id,
+                "chunk": i + 1,
+                "total_chunks": len(chunks),
+                "type": doc_type,
+                "priority": doc_priority,
+                "priority_weight": priority_weight,
+                "tags": doc_tags,
+                "lang": doc_lang,
+                "abstract": doc_abstract[:200] if doc_abstract else "",
+            },
+        }
+        for i, chunk in enumerate(chunks)
+    ]
+    return batch_items, doc_collection, len(chunks)
+
+
+async def _flush_legacy_batch(memory, batch_items: list, doc_collection: str, num_chunks: int, batch_size: int, log) -> int:
+    """Store batch_items in legacy mode (batched with single-store fallback). Returns chunks stored."""
+    total = 0
+    for b_start in range(0, len(batch_items), batch_size):
+        batch = batch_items[b_start:b_start + batch_size]
+        try:
+            await memory.store_batch(batch, collection=doc_collection)
+            total += len(batch)
+        except Exception:
+            for item in batch:
+                await memory.store(text=item["text"], collection=doc_collection, metadata=item["metadata"])
+                total += 1
+        if num_chunks > 5 and (b_start + batch_size) <= len(batch_items):
+            log(_t("chunks_progress", i=min(b_start + batch_size, num_chunks), n=num_chunks))
+    return total
+
+
+async def _flush_mega_batch(memory, mega_items_by_collection: dict, log) -> None:
+    """Flush all accumulated mega-batch items (Bug #16). One store_batch per collection."""
+    for coll, items in mega_items_by_collection.items():
+        if not items:
+            continue
+        try:
+            await memory.store_batch(items, collection=coll)
+        except Exception as e:
+            log(f"       [WARN] mega_batch fallback for {coll}: {e}")
+            for item in items:
+                try:
+                    await memory.store(text=item["text"], collection=coll, metadata=item["metadata"])
+                except Exception as e2:
+                    log(f"       [ERROR] chunk failed: {e2}")
+
+
+def _emit_perf_log(perf_record: dict) -> None:
+    """Emit structured [PERF_INGEST] line to stdout and logger (Bug #16)."""
+    line = "[PERF_INGEST] " + json.dumps(perf_record, ensure_ascii=False)
+    print(line, flush=True)
+    logger.info(line)
+
+
 def _read_text_with_fallback(file_path: Path) -> str:
     """Llegeix text amb fallback de codificació.
 
@@ -367,145 +486,37 @@ async def ingest_knowledge(
     log(_t("processing"))
     total_chunks = 0
 
-    # Bug #16 mega-batch: when enabled we accumulate items per collection
-    # throughout the per-file loop and flush them all in a single
-    # `store_batch()` per collection at the end. This amortises the
-    # per-call setup cost of fastembed (measured ~1s/call) that dominates
-    # the baseline. When disabled (default) the legacy per-file batching
-    # is preserved bit-for-bit — parity is covered by
-    # test_ingest_knowledge_mega_batch.py.
+    # Bug #16 mega-batch: accumulate per-collection, flush once after loop.
     mega_batch_on = bool(ingest_cfg.mega_batch)
     mega_items_by_collection: dict[str, list[dict[str, Any]]] = {}
+    _perf_chunking_ref = [0]  # mutable accumulator passed to _build_file_items
 
     for idx, file_path in enumerate(files, 1):
         try:
-            content = read_file(file_path)
-            if not content:
+            log(_t("processing_f", i=idx, n=len(files), f=file_path.name))
+            batch_items, doc_collection, num_chunks = _build_file_items(
+                file_path, ingest_cfg, target_collection, log, _perf_chunking_ref,
+            )
+            if not batch_items:
                 continue
-
-            filename = file_path.name
-
-            # Show progress indicator
-            log(_t("processing_f", i=idx, n=len(files), f=filename))
-
-            # Parse RAG header if present
-            rag_header, body_content = parse_rag_header(content)
-
-            if rag_header.is_valid:
-                log(_t("rag_header", id=rag_header.id, p=rag_header.priority))
-                doc_chunk_size = rag_header.chunk_size
-                doc_collection = rag_header.collection or target_collection
-                doc_priority = rag_header.priority
-                doc_tags = rag_header.tags
-                doc_abstract = rag_header.abstract
-                doc_id = rag_header.id
-                doc_type = rag_header.type
-                doc_lang = rag_header.lang
-            else:
-                # No valid header - use defaults
-                if rag_header.validation_errors and rag_header.validation_errors != ["No RAG header found"]:
-                    log(_t("invalid_header", e=', '.join(rag_header.validation_errors[:2])))
-                body_content = content  # Use full content
-                doc_chunk_size = CHUNK_SIZE
-                doc_collection = target_collection
-                doc_priority = DEFAULT_PRIORITY
-                doc_tags = []
-                doc_abstract = ""
-                doc_id = filename
-                doc_type = DEFAULT_TYPE
-                doc_lang = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
-
-            # Calculate overlap based on chunk size
-            doc_overlap = max(DEFAULT_OVERLAP_FLOOR, doc_chunk_size // DEFAULT_OVERLAP_FACTOR)
-
-            # Add file header for context
-            header_text = f"[Document: {filename}]\n"
-            if doc_abstract:
-                header_text += f"[Abstract: {doc_abstract}]\n"
-            header_text += "\n"
-
-            # Chunk the content using document-specific settings
-            _perf_chunk_t0 = time.perf_counter_ns()
-            chunks = chunk_text(body_content, chunk_size=doc_chunk_size, overlap=doc_overlap)
-            _perf_chunking_ns += time.perf_counter_ns() - _perf_chunk_t0
-
-            # Priority weight for search (P0=4, P1=3, P2=2, P3=1)
-            priority_weight = 4 - VALID_PRIORITIES.index(doc_priority) if doc_priority in VALID_PRIORITIES else 2
-
-            # Build batch items for all chunks.
-            # Bug #16: BATCH_SIZE was hardcoded to 50 here. Now sourced from
-            # the IngestConfig SSOT (default still 50 → behaviour-preserving).
-            BATCH_SIZE = ingest_cfg.store_batch_size
-            batch_items: list[dict[str, Any]] = []
-            for i, chunk in enumerate(chunks):
-                chunk = _filter_rag_injection(chunk)
-                batch_items.append({
-                    "text": header_text + chunk,
-                    "metadata": {
-                        "source": filename,
-                        "doc_id": doc_id,
-                        "chunk": i + 1,
-                        "total_chunks": len(chunks),
-                        "type": doc_type,
-                        "priority": doc_priority,
-                        "priority_weight": priority_weight,
-                        "tags": doc_tags,
-                        "lang": doc_lang,
-                        "abstract": doc_abstract[:200] if doc_abstract else "",
-                    },
-                })
 
             if mega_batch_on:
-                # Defer storage: accumulate per destination collection and
-                # flush once, after the per-file loop has built every item.
                 mega_items_by_collection.setdefault(doc_collection, []).extend(batch_items)
-                total_chunks += len(batch_items)
-                log(_t("completed", n=len(chunks)))
-                continue
+                total_chunks += num_chunks
+            else:
+                stored = await _flush_legacy_batch(
+                    memory, batch_items, doc_collection, num_chunks, ingest_cfg.store_batch_size, log,
+                )
+                total_chunks += stored
 
-            # Legacy path: store in batches (with fallback to single-store).
-            for b_start in range(0, len(batch_items), BATCH_SIZE):
-                batch = batch_items[b_start:b_start + BATCH_SIZE]
-                try:
-                    await memory.store_batch(batch, collection=doc_collection)
-                    total_chunks += len(batch)
-                except Exception:
-                    # Fallback: store one by one
-                    for item in batch:
-                        await memory.store(
-                            text=item["text"],
-                            collection=doc_collection,
-                            metadata=item["metadata"],
-                        )
-                        total_chunks += 1
-                if len(chunks) > 5 and (b_start + BATCH_SIZE) <= len(batch_items):
-                    log(_t("chunks_progress", i=min(b_start + BATCH_SIZE, len(chunks)), n=len(chunks)))
-
-            log(_t("completed", n=len(chunks)))
-
+            log(_t("completed", n=num_chunks))
         except Exception as e:
             log(f"       [ERROR] {file_path.name}: {e}")
 
-    # Bug #16 mega-batch flush: one `store_batch` per collection holding
-    # all accumulated items. Preserves per-item metadata and RAG priority.
-    # Falls back to single-store on failure, matching the legacy safety net.
+    _perf_chunking_ns = _perf_chunking_ref[0]
+
     if mega_batch_on and mega_items_by_collection:
-        for coll, items in mega_items_by_collection.items():
-            if not items:
-                continue
-            try:
-                await memory.store_batch(items, collection=coll)
-            except Exception as e:
-                log(f"       [WARN] mega_batch fallback for {coll}: {e}")
-                for item in items:
-                    try:
-                        await memory.store(
-                            text=item["text"],
-                            collection=coll,
-                            metadata=item["metadata"],
-                        )
-                    except Exception as e2:
-                        log(f"       [ERROR] chunk failed: {e2}")
+        await _flush_mega_batch(memory, mega_items_by_collection, log)
 
     # Bug #16: capture perf snapshot BEFORE close() since close() may
     # reset internal state. Wall-clock is captured outside to include
@@ -522,12 +533,8 @@ async def ingest_knowledge(
     log(_t("ask_now"))
     log(f"{'='*60}\n")
 
-    # Bug #16: emit structured perf record as a single JSON line prefixed
-    # with [PERF_INGEST]. Benchmark harness parses this deterministically.
-    # Gated by ingest_config.perf_logging so production runs stay quiet.
     if ingest_cfg.perf_logging:
-        _perf_total_ns = time.perf_counter_ns() - _perf_t0_ns
-        _perf_record = {
+        _perf_record: dict[str, Any] = {
             "event": "ingest_complete",
             "schema_version": 1,
             "bug": 16,
@@ -535,25 +542,17 @@ async def ingest_knowledge(
             "total_chunks": total_chunks,
             "target_collection": target_collection,
             "lang": _LANG,
-            "total_ns": _perf_total_ns,
+            "total_ns": time.perf_counter_ns() - _perf_t0_ns,
             "model_init_ns": _perf_model_init_ns,
             "chunking_ns": _perf_chunking_ns,
         }
         if _perf_snap is not None:
-            _perf_record.update({
-                "embed_ns": _perf_snap.get("embed_ns", 0),
-                "embed_calls": _perf_snap.get("embed_calls", 0),
-                "chunks_embedded": _perf_snap.get("chunks_embedded", 0),
-                "store_total_ns": _perf_snap.get("store_total_ns", 0),
-                "store_calls": _perf_snap.get("store_calls", 0),
-                "chunks_stored": _perf_snap.get("chunks_stored", 0),
-                "warmup_ns": _perf_snap.get("warmup_ns", 0),
-                "upsert_ns_derived": _perf_snap.get("upsert_ns_derived", 0),
-            })
-        # Print to stdout (benchmark) AND logger (for installer log capture).
-        _perf_line = "[PERF_INGEST] " + json.dumps(_perf_record, ensure_ascii=False)
-        print(_perf_line, flush=True)
-        logger.info(_perf_line)
+            _perf_record.update({k: _perf_snap.get(k, 0) for k in (
+                "embed_ns", "embed_calls", "chunks_embedded",
+                "store_total_ns", "store_calls", "chunks_stored",
+                "warmup_ns", "upsert_ns_derived",
+            )})
+        _emit_perf_log(_perf_record)
 
     return True
 
