@@ -83,3 +83,43 @@ exclude_dirs = [
     "InstallNexe.app",
     "Nexe.app",
 ]
+
+[tool.muthur.license]
+# Llicències OSS compatibles. Inclou defaults SPDX + noms PyPI classifier.
+# Afegides en fix license-compat (27 findings BSD/Apache/MPL/PSF/LGPL/Freeware).
+allowed = [
+    # Defaults SPDX (mantenir per no perdre cobertura existent)
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Python-2.0",
+    "Unlicense",
+    "CC0-1.0",
+    # Noms PyPI classifier (boltons, click, colorama, glom, grimp, httpx,
+    # import-linter, prompt_toolkit, semantic-version, wrapt)
+    "BSD License",
+    # Noms PyPI classifier (cyclonedx-python-lib, googleapis-common-protos,
+    # lingua-language-detector, pip-api, pip_audit, py-serializable,
+    # requests, sortedcontainers, stevedore)
+    "Apache Software License",
+    # certifi, pathspec
+    "Mozilla Public License 2.0 (MPL 2.0)",
+    # defusedxml
+    "Python Software Foundation License",
+    # protobuf
+    "3-Clause BSD License",
+    # lizard (eina de mètriques, no va a producció)
+    "Freeware",
+    # semgrep (eina de dev)
+    "LGPL-2.1-or-later",
+]
+forbidden = [
+    "GPL-2.0-only",
+    "GPL-3.0-only",
+    "BUSL-1.1",
+    "SSPL-1.0",
+    "AGPL-3.0-only",
+    "Commons-Clause",
+]
