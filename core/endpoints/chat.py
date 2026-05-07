@@ -94,7 +94,7 @@ def _get_system_prompt(app_state: Any, lang: Optional[str] = None) -> str:
 
 # --- Main Endpoint ---
 
-@router.post("/chat/completions", dependencies=[Depends(require_api_key)], summary="Chat completion with RAG support and engine auto-routing")
+@router.post("/chat/completions", dependencies=[Depends(require_api_key)], summary="Chat completion with RAG support and engine auto-routing", operation_id="chat_completions")
 @limiter.limit("20/minute")
 async def chat_completions(body: ChatCompletionRequest, request: Request, background_tasks: BackgroundTasks) -> Any:
     """

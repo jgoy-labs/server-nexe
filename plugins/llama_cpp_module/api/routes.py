@@ -27,7 +27,7 @@ def create_router(module_instance) -> APIRouter:
     """
     router = APIRouter(prefix="/llama-cpp")
 
-    @router.get("/info")
+    @router.get("/info", operation_id="llama_cpp_info")
     async def get_info(_: str = Depends(require_api_key)):
         """PROTECTED: Requires API key."""
         return module_instance.get_info()

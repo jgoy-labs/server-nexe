@@ -32,7 +32,7 @@ def register_static_routes(router: APIRouter, *, module_ref):
 
     # -- GET / (serve_ui) --
 
-    @router.get("/", response_class=HTMLResponse)
+    @router.get("/", response_class=HTMLResponse, operation_id="webui_serve_ui")
     async def serve_ui(i18n=Depends(get_i18n)):
         """Serve the main page with server language injected"""
         html_path = module_ref.ui_dir / "index.html"
@@ -52,7 +52,7 @@ def register_static_routes(router: APIRouter, *, module_ref):
 
     # -- GET /static/{filename:path} --
 
-    @router.get("/static/{filename:path}")
+    @router.get("/static/{filename:path}", operation_id="webui_serve_static")
     async def serve_static(filename: str, i18n=Depends(get_i18n)):
         """Serve CSS/JS"""
         file_path = (module_ref.ui_dir / filename).resolve()

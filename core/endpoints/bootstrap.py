@@ -95,7 +95,7 @@ def check_rate_limit(client_ip: str, request: Request) -> None:
       detail="Too many attempts from your IP. Wait 5 minutes."
     )
 
-@router.post("/api/bootstrap", response_model=BootstrapResponse, summary="Initialize session with bootstrap token (development only)")
+@router.post("/api/bootstrap", response_model=BootstrapResponse, summary="Initialize session with bootstrap token (development only)", operation_id="bootstrap_session")
 async def bootstrap_session(
   bootstrap_data: BootstrapRequest,
   request: Request
@@ -208,7 +208,7 @@ async def bootstrap_session(
     ]
   )
 
-@router.post("/api/regenerate-bootstrap", summary="Regenerate expired or used bootstrap token (localhost only)")
+@router.post("/api/regenerate-bootstrap", summary="Regenerate expired or used bootstrap token (localhost only)", response_model=dict, operation_id="regenerate_bootstrap")
 async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   """
   Regenerate bootstrap token if the previous one has been used.
@@ -267,6 +267,7 @@ async def regenerate_bootstrap(request: Request) -> Dict[str, str]:
   response_model=BootstrapInfoResponse,
   summary="Bootstrap system status (requires API key in production)",
   dependencies=[Depends(require_api_key)],
+  operation_id="bootstrap_info",
 )
 async def bootstrap_info(request: Request) -> BootstrapInfoResponse:
   """

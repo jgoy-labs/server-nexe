@@ -49,18 +49,18 @@ def create_router(module_instance) -> APIRouter:
     """
     router = APIRouter(prefix="/security")
 
-    @router.get("/health")
+    @router.get("/health", operation_id="security_health")
     async def health(_: str = Depends(require_api_key)):
         """Health check per security module. PROTECTED: Requires API key."""
         result = await module_instance.health_check()
         return result.to_dict()
 
-    @router.get("/info")
+    @router.get("/info", operation_id="security_info")
     async def info(_: str = Depends(require_api_key)):
         """Informacio del modul security. PROTECTED: Requires API key."""
         return module_instance.get_info()
 
-    @router.post("/scan")
+    @router.post("/scan", operation_id="security_scan")
     @limiter.limit("2/minute")
     async def run_security_scan(
         request: Request,
@@ -124,7 +124,7 @@ def create_router(module_instance) -> APIRouter:
             logger.error("Security scan failed: %s", e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/report")
+    @router.get("/report", operation_id="security_report")
     @limiter.limit("10/minute")
     async def get_security_report(
         request: Request,
@@ -150,14 +150,14 @@ def create_router(module_instance) -> APIRouter:
             logger.error("Failed to get security report: %s", e)
             raise HTTPException(status_code=500, detail=str(e))
 
-    @router.get("/ui/assets/{path:path}")
+    @router.get("/ui/assets/{path:path}", operation_id="security_serve_assets")
     async def serve_security_assets(path: str):
         """Serveix els assets estatics (CSS, JS, fonts)"""
         assets_base = UI_PATH / "assets"
         safe_path = validate_safe_path(assets_base / path, assets_base)
         return FileResponse(safe_path)
 
-    @router.get("/ui")
+    @router.get("/ui", operation_id="security_serve_ui")
     async def serve_security_ui():
         """Serveix UI del modul security"""
         ui_file = UI_PATH / "index.html"

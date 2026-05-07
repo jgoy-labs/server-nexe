@@ -21,6 +21,7 @@ router_workflows = APIRouter(prefix="/workflows", tags=["v1", "workflows"])
     methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     include_in_schema=True,
     summary="Workflow engine (Not Implemented — planned v0.9.1+)",
+    operation_id="workflows_stub",
 )
 async def workflows_not_implemented(path: str):
     """Stub endpoint. Workflow engine planned for v0.9.1+ (~3-4 months post-launch)."""

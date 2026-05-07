@@ -31,7 +31,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
     # -- POST /session/new --
 
-    @router.post("/session/new")
+    @router.post("/session/new", operation_id="webui_create_session")
     async def create_session(request: Optional[Dict[str, Any]] = None, _auth=Depends(require_ui_auth)):
         """Crear nova sessio"""
         session = session_mgr.create_session()
@@ -42,7 +42,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
     # -- GET /session/{session_id} --
 
-    @router.get("/session/{session_id}")
+    @router.get("/session/{session_id}", operation_id="webui_get_session")
     @limiter.limit("30/minute")
     async def get_session_info(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
         """Obtenir info de sessio"""
@@ -54,7 +54,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
     # -- GET /session/{session_id}/history --
 
-    @router.get("/session/{session_id}/history")
+    @router.get("/session/{session_id}/history", operation_id="webui_session_history")
     @limiter.limit("30/minute")
     async def get_session_history(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
         """Obtenir historial de sessio"""
@@ -66,7 +66,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
     # -- DELETE /session/{session_id} --
 
-    @router.delete("/session/{session_id}")
+    @router.delete("/session/{session_id}", operation_id="webui_delete_session")
     @limiter.limit("10/minute")
     async def delete_session(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
         """Eliminar sessio"""
@@ -78,7 +78,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
     # -- PATCH /session/{session_id} (rename) --
 
-    @router.patch("/session/{session_id}")
+    @router.patch("/session/{session_id}", operation_id="webui_rename_session")
     @limiter.limit("10/minute")
     async def rename_session(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
         """Rename a session"""
@@ -96,7 +96,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
     # -- PATCH /session/{session_id}/thinking --
 
-    @router.patch("/session/{session_id}/thinking")
+    @router.patch("/session/{session_id}/thinking", operation_id="webui_toggle_thinking")
     @limiter.limit("10/minute")
     async def toggle_thinking(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
         """Toggle thinking mode for a session"""
@@ -114,7 +114,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
     # -- POST /session/{session_id}/clear-document --
 
-    @router.post("/session/{session_id}/clear-document")
+    @router.post("/session/{session_id}/clear-document", operation_id="webui_clear_document")
     async def clear_document(request: Request, session_id: str, _auth=Depends(require_ui_auth)):
         """Netejar document adjuntat d'una sessio"""
         session_id = validate_string_input(session_id, max_length=100, context="path")
@@ -127,7 +127,7 @@ def register_session_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
     # -- GET /sessions --
 
-    @router.get("/sessions")
+    @router.get("/sessions", operation_id="webui_list_sessions")
     async def list_sessions(_auth=Depends(require_ui_auth)):
         """Llistar totes les sessions"""
         return {"sessions": session_mgr.list_sessions()}

@@ -100,7 +100,7 @@ async def _module_health_status(instance) -> str:
       return "unhealthy"
   return "unknown"
 
-@router.get("/", response_model=SystemResponse, summary="General system information")
+@router.get("/", response_model=SystemResponse, summary="General system information", operation_id="root")
 @limiter.limit("30/minute")
 async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
   """Root endpoint with system information"""
@@ -114,7 +114,7 @@ async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
     type=i18n.t('server_core.api.server_type') if i18n else "basic_server"
   )
 
-@router.get("/health", response_model=HealthResponse, summary="Basic server health check")
+@router.get("/health", response_model=HealthResponse, summary="Basic server health check", operation_id="health_check")
 @limiter.limit("60/minute")
 async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthResponse:
   """System health check"""
@@ -126,7 +126,7 @@ async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthRespon
     uptime=i18n.t('server_core.api.health.uptime') if i18n else "operational"
   )
 
-@router.get("/health/ready", summary="Readiness check — verifies required modules")
+@router.get("/health/ready", summary="Readiness check — verifies required modules", response_model=dict, operation_id="readiness_check")
 @limiter.limit("120/minute")
 async def readiness_check(request: Request) -> dict:
   """
@@ -172,7 +172,7 @@ async def readiness_check(request: Request) -> dict:
     "timestamp": datetime.now(timezone.utc).isoformat(),
   }
 
-@router.get("/api/info", response_model=ApiInfoResponse, summary="API information and list of available endpoints")
+@router.get("/api/info", response_model=ApiInfoResponse, summary="API information and list of available endpoints", operation_id="api_info")
 @limiter.limit("30/minute")
 async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoResponse:
   """Basic system information"""
@@ -224,7 +224,7 @@ def _check_llama_cpp_available(modules: dict) -> bool:
   return hasattr(instance, '_node') and instance._node is not None
 
 
-@router.get("/status", summary="Real-time status: active engine, model, and loaded modules (API key required)")
+@router.get("/status", summary="Real-time status: active engine, model, and loaded modules (API key required)", response_model=dict, operation_id="server_status")
 @limiter.limit("60/minute")
 async def server_status(
   request: Request,
@@ -285,7 +285,7 @@ async def server_status(
     "timestamp": datetime.now(timezone.utc).isoformat(),
   }
 
-@router.get("/health/circuits", summary="Circuit breaker status (Ollama, Qdrant, external HTTP) (API key required)")
+@router.get("/health/circuits", summary="Circuit breaker status (Ollama, Qdrant, external HTTP) (API key required)", response_model=dict, operation_id="circuit_status")
 @limiter.limit("30/minute")
 async def circuit_status(
   request: Request,

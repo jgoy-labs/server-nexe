@@ -17,7 +17,7 @@ logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/rag", tags=["rag-v1", "future"], dependencies=[Depends(require_api_key)])
 
-@router.post("/search", summary="Semantic search in RAG vector store")
+@router.post("/search", summary="Semantic search in RAG vector store", operation_id="rag_search_v1")
 async def rag_search_v1():
   """
   Cerca semàntica RAG (API v1).
@@ -60,7 +60,7 @@ async def rag_search_v1():
     }
   )
 
-@router.post("/add", summary="Afegir documents al vector store RAG")
+@router.post("/add", summary="Afegir documents al vector store RAG", operation_id="rag_add_v1")
 async def rag_add_documents_v1():
   """
   Afegeix documents al vector store RAG (API v1).
@@ -94,7 +94,7 @@ async def rag_add_documents_v1():
     }
   )
 
-@router.delete("/documents/{document_id}", summary="Eliminar document del vector store RAG")
+@router.delete("/documents/{document_id}", summary="Eliminar document del vector store RAG", operation_id="rag_delete_v1")
 async def rag_delete_document_v1(document_id: str):
   """
   Elimina un document del vector store RAG (API v1).

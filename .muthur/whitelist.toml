@@ -52,3 +52,102 @@ reason = "plugins.web_ui_module i plugins.ollama_module formen rings via imports
 expires = "2027-05-07"
 authorized_by = "Jordi Goy"
 ticket = "imports-cycles-dev-g-2026-05-07"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# api-structure whitelist — Sessió Dev-H 2026-05-07
+#
+# Findings: 223 total
+# - InstallNexe.app/ (16): bundle pre-compilat, falsos positius
+# - api.post_returns_200 (25): API mono-usuari local, canvi trencaria frontend
+# - api.missing_response_schema (93-7=86 whitelistats, 7 fixats amb response_model=dict)
+# - api.missing_operation_id (102): fixats al codi font
+# - api.missing_docstring (3): docstrings de mòdul no requerides per FastAPI
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[exception]]
+rule = "api.*"
+path = "InstallNexe.app/**"
+reason = "Bundle pre-compilat InstallNexe.app (inclou personality/). No és codi del projecte — falsos positius."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-dev-h-2026-05-07"
+
+[[exception]]
+rule = "api.post_returns_200"
+path = "**"
+reason = "API mono-usuari local. Canviar status 200→201 trencaria el frontend existent. Canvi ajornat a sprint API versionada."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-dev-h-2026-05-07"
+
+[[exception]]
+rule = "api.missing_response_schema"
+path = "core/endpoints/chat.py"
+reason = "POST /chat/completions retorna StreamingResponse o dict dinàmic. Schema Pydantic fix no possible."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-dev-h-2026-05-07"
+
+[[exception]]
+rule = "api.missing_response_schema"
+path = "core/endpoints/v1.py"
+reason = "Endpoints retornen JSONResponse directament. response_model incompatible amb JSONResponse explícit."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-dev-h-2026-05-07"
+
+[[exception]]
+rule = "api.missing_response_schema"
+path = "core/endpoints/workflows.py"
+reason = "Endpoint catch-all stub que llença HTTPException 501. No té resposta normal. Planificat v0.9.1+."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-dev-h-2026-05-07"
+
+[[exception]]
+rule = "api.missing_response_schema"
+path = "core/server/factory_app.py"
+reason = "Rutes browser internes (/.well-known, /apple-touch-icon) amb include_in_schema=False. Retornen Response 204."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-dev-h-2026-05-07"
+
+[[exception]]
+rule = "api.missing_response_schema"
+path = "core/cli/manifest.py"
+reason = "Endpoints CLI retornen JSONResponse directament. Schema Pydantic pendent de disseny."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-dev-h-2026-05-07"
+
+[[exception]]
+rule = "api.missing_response_schema"
+path = "core/metrics/endpoint.py"
+reason = "GET /metrics retorna Response Prometheus (text/plain), no serialitzable per Pydantic."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-dev-h-2026-05-07"
+
+[[exception]]
+rule = "api.missing_response_schema"
+path = "memory/**"
+reason = "Endpoints memory retornen JSONResponse, dict dinàmic, o HTTPException 501 (stubs RAG/embeddings). Schemas Pydantic pendents de disseny."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-dev-h-2026-05-07"
+
+[[exception]]
+rule = "api.missing_response_schema"
+path = "plugins/**"
+reason = "Plugins amb respostes mixtes: HTMLResponse, FileResponse, StreamingResponse, dict dinàmic. Schemas Pydantic pendents de disseny."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-dev-h-2026-05-07"
+
+[[exception]]
+rule = "api.missing_docstring"
+path = "**"
+reason = "Docstrings de mòdul/router no requerits per la interfície FastAPI. Les funcions endpoint ja tenen docstrings."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-dev-h-2026-05-07"

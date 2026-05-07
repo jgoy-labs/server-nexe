@@ -621,7 +621,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     #    ~550 lines: intent detection, RAG, compaction,
     #    multi-engine, streaming
 
-    @router.post("/chat")
+    @router.post("/chat", operation_id="webui_chat")
     @limiter.limit("20/minute")
     async def chat(request: FastAPIRequest, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Chat endpoint with streaming and memory intent detection"""

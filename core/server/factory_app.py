@@ -66,15 +66,15 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
   # Standard browser routes that generate unnecessary 404s in logs
   from fastapi.responses import JSONResponse, Response
 
-  @app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
+  @app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False, operation_id="chrome_devtools")
   async def chrome_devtools():
       return JSONResponse({})
 
-  @app.get("/.well-known/{path:path}", include_in_schema=False)
+  @app.get("/.well-known/{path:path}", include_in_schema=False, operation_id="well_known")
   async def well_known(path: str):
       return Response(status_code=204)
 
-  @app.get("/apple-touch-icon{rest:path}", include_in_schema=False)
+  @app.get("/apple-touch-icon{rest:path}", include_in_schema=False, operation_id="apple_touch_icon")
   async def apple_touch_icon(rest: str):
       return Response(status_code=204)
 

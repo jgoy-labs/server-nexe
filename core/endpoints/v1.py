@@ -22,7 +22,7 @@ router_v1 = APIRouter(prefix="/v1", tags=["v1"])
 router_v1.include_router(chat_router)
 router_v1.include_router(router_workflows)
 
-@router_v1.get("", include_in_schema=True, summary="API v1 root — available endpoints and status")
+@router_v1.get("", include_in_schema=True, summary="API v1 root — available endpoints and status", operation_id="v1_root")
 @router_v1.get("/", include_in_schema=False)
 async def v1_root(request: Request):
   """
@@ -77,7 +77,7 @@ async def v1_root(request: Request):
     }
   })
 
-@router_v1.get("/health", include_in_schema=True, summary="API v1 specific health check")
+@router_v1.get("/health", include_in_schema=True, summary="API v1 specific health check", operation_id="v1_health")
 async def v1_health(request: Request):
   """
   Health check specific to API v1.

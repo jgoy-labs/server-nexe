@@ -45,7 +45,7 @@ def create_router(module_instance) -> APIRouter:
 
     # --- UI ---
 
-    @router.get("/ui", response_class=HTMLResponse)
+    @router.get("/ui", response_class=HTMLResponse, operation_id="ollama_serve_ui")
     async def serve_ui():
         """Serveix interficie web del chatbot Ollama."""
         index_path = ui_path / "index.html"
@@ -55,14 +55,14 @@ def create_router(module_instance) -> APIRouter:
             content = f.read()
         return HTMLResponse(content=content)
 
-    @router.get("/ui/assets/css/{path:path}")
+    @router.get("/ui/assets/css/{path:path}", operation_id="ollama_serve_css")
     async def serve_css(path: str):
         """Serveix fitxers CSS"""
         css_base = ui_path / "assets" / "css"
         safe_path = validate_safe_path(css_base / path, css_base)
         return FileResponse(safe_path, media_type="text/css")
 
-    @router.get("/ui/js/{path:path}")
+    @router.get("/ui/js/{path:path}", operation_id="ollama_serve_js")
     async def serve_js(path: str):
         """Serveix fitxers JavaScript"""
         js_base = ui_path / "js"
@@ -71,7 +71,7 @@ def create_router(module_instance) -> APIRouter:
 
     # --- Models ---
 
-    @router.get("/api/models", dependencies=[Depends(require_api_key)])
+    @router.get("/api/models", dependencies=[Depends(require_api_key)], operation_id="ollama_list_models")
     async def list_models():
         """Llista models locals d'Ollama."""
         module = _get_module()
@@ -82,7 +82,7 @@ def create_router(module_instance) -> APIRouter:
             logger.error("Failed to list Ollama models: %s", e)
             raise HTTPException(status_code=503, detail=f"Ollama connection failed: {str(e)}")
 
-    @router.post("/api/pull")
+    @router.post("/api/pull", operation_id="ollama_pull_model")
     async def pull_model(request: PullModelRequest, _: str = Depends(require_api_key)):
         """Download Ollama model with streaming progress. Requires API key."""
         module = _get_module()
@@ -102,7 +102,7 @@ def create_router(module_instance) -> APIRouter:
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
         )
 
-    @router.get("/api/models/{model_name}/info", dependencies=[Depends(require_api_key)])
+    @router.get("/api/models/{model_name}/info", dependencies=[Depends(require_api_key)], operation_id="ollama_model_info")
     async def get_model_info(model_name: str):
         """Get detailed information about a model."""
         module = _get_module()
@@ -113,7 +113,7 @@ def create_router(module_instance) -> APIRouter:
             logger.error("Failed to get model info: %s", e)
             raise HTTPException(status_code=404, detail=f"Model not found or error: {str(e)}")
 
-    @router.delete("/api/models/{model_name}")
+    @router.delete("/api/models/{model_name}", operation_id="ollama_delete_model")
     async def delete_model(model_name: str, _: str = Depends(require_api_key)):
         """Delete a local model. Requires API key."""
         module = _get_module()
@@ -126,14 +126,14 @@ def create_router(module_instance) -> APIRouter:
 
     # --- Health & Info ---
 
-    @router.get("/health", dependencies=[Depends(require_api_key)])
+    @router.get("/health", dependencies=[Depends(require_api_key)], operation_id="ollama_health")
     async def health():
         """Health check del modul Ollama."""
         module = _get_module()
         result = await module.health_check()
         return result.to_dict()
 
-    @router.get("/info", dependencies=[Depends(require_api_key)])
+    @router.get("/info", dependencies=[Depends(require_api_key)], operation_id="ollama_info")
     async def info():
         """Informacio del modul Ollama."""
         module = _get_module()

@@ -39,6 +39,7 @@ metrics_router = APIRouter(tags=["metrics"])
       "content": {"text/plain": {}},
     }
   },
+  operation_id="get_metrics",
 )
 async def get_metrics() -> Response:
   """
@@ -61,6 +62,7 @@ async def get_metrics() -> Response:
   summary="Metrics health check",
   description="Verifies that the metrics system is working",
   dependencies=[Depends(require_api_key)],
+  operation_id="metrics_health",
 )
 async def metrics_health() -> Dict[str, Any]:
   """
@@ -90,6 +92,7 @@ async def metrics_health() -> Dict[str, Any]:
   summary="Metrics summary (JSON)",
   description="Summary of key metrics in JSON format",
   dependencies=[Depends(require_api_key)],
+  operation_id="metrics_json",
 )
 async def get_metrics_json() -> Dict[str, Any]:
   """
