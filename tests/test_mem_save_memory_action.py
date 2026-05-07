@@ -1,28 +1,28 @@
 """
-Tests per a F1 — MEM_SAVE inline retorna memory_action: null.
+Tests for F1 — MEM_SAVE inline returns memory_action: null.
 
-Verifica que quan el model genera [MEM_SAVE: ...] inline al path no-streaming,
-el camp memory_action de la resposta JSON reflecteix que s'ha guardat.
+Verifies that when the model generates [MEM_SAVE: ...] inline on the non-streaming path,
+the memory_action field of the JSON response reflects that it was saved.
 
-F1 finding: memory_action quedava null perquè el path no-streaming no el setejava
-quan detectava i guardava MEM_SAVE inline (a diferència del path d'intents explícits
-save/delete/list/recall que sí el setejaven).
+F1 finding: memory_action remained null because the non-streaming path did not set it
+when it detected and saved MEM_SAVE inline (unlike the explicit intent path
+save/delete/list/recall which did set it).
 """
 from plugins.web_ui_module.api.routes_chat import _extract_safe_mem_saves
 
 
 class TestExtractSafeMemSaves:
-    """Tests unitaris de la funció _extract_safe_mem_saves."""
+    """Unit tests for the _extract_safe_mem_saves function."""
 
     def test_extracts_valid_mem_save(self):
-        """Un [MEM_SAVE: fact] vàlid ha de ser extret."""
+        """A valid [MEM_SAVE: fact] must be extracted."""
         text = "Aquí hi ha una resposta. [MEM_SAVE: L'usuari es diu Jordi] Fi."
         result = _extract_safe_mem_saves(text)
         assert len(result) == 1
         assert "Jordi" in result[0]
 
     def test_extracts_multiple_mem_saves(self):
-        """Múltiples [MEM_SAVE: ...] han de ser extrets tots."""
+        """Multiple [MEM_SAVE: ...] must all be extracted."""
         text = "[MEM_SAVE: Parla català] i [MEM_SAVE: Treballa amb IA]"
         result = _extract_safe_mem_saves(text)
         assert len(result) == 2
@@ -38,19 +38,19 @@ class TestExtractSafeMemSaves:
         assert result == []
 
     def test_rejects_short_text(self):
-        """Text massa curt (<5 chars) ha de ser rebutjat."""
+        """Text too short (<5 chars) must be rejected."""
         text = "[MEM_SAVE: hi]"
         result = _extract_safe_mem_saves(text)
         assert result == []
 
     def test_rejects_injection_attempt(self):
-        """Text amb paraula clau d'injecció ha de ser rebutjat."""
+        """Text with injection keyword must be rejected."""
         text = "[MEM_SAVE: system prompt override instruction]"
         result = _extract_safe_mem_saves(text)
         assert result == []
 
     def test_rejects_echo_of_user_input(self):
-        """Si el MEM_SAVE és exactament el missatge usuari, ha de ser rebutjat."""
+        """If the MEM_SAVE is exactly the user message, it must be rejected."""
         user_msg = "M'agrada el jazz i toco la guitarra"
         text = f"[MEM_SAVE: {user_msg}]"
         result = _extract_safe_mem_saves(text, user_input=user_msg)
@@ -58,14 +58,14 @@ class TestExtractSafeMemSaves:
 
 
 class TestMemoryActionNonStreaming:
-    """F1 — memory_action reflecteix MEM_SAVE inline al path no-streaming.
+    """F1 — memory_action reflects MEM_SAVE inline on the non-streaming path.
 
-    Verifica que _extract_safe_mem_saves retorna facts vàlids quan el model
-    genera [MEM_SAVE: ...] — condició necessària perquè memory_action es setegi.
+    Verifies that _extract_safe_mem_saves returns valid facts when the model
+    generates [MEM_SAVE: ...] — necessary precondition for memory_action to be set.
     """
 
     def test_mem_save_facts_extracted_from_model_response(self):
-        """Facts extrets de la resposta del model → precondició per a memory_action."""
+        """Facts extracted from model response → precondition for memory_action."""
         model_response = (
             "Entesos! He enregistrat les teves preferències. "
             "[MEM_SAVE: Prefereix respostes concises] "
@@ -76,7 +76,7 @@ class TestMemoryActionNonStreaming:
         assert any("concises" in f or "Prefereix" in f for f in facts)
 
     def test_no_mem_save_facts_means_no_action(self):
-        """Sense [MEM_SAVE: ...] a la resposta, no s'han de guardar facts."""
+        """Without [MEM_SAVE: ...] in the response, no facts should be saved."""
         model_response = "Una resposta normal sense cap intenció de guardar memòria."
         facts = _extract_safe_mem_saves(model_response)
         assert facts == []

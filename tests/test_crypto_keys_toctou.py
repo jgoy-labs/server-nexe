@@ -1,13 +1,13 @@
 """
-Tests per core/crypto/keys.py — Bug 8 fix release v0.9.0.
+Tests for core/crypto/keys.py — Bug 8 fix release v0.9.0.
 
-Verifica que _try_file_set crea el fitxer de master key DIRECTAMENT amb
-permisos 0600, sense la finestra TOCTOU prèvia (write_bytes → chmod 600).
+Verifies that _try_file_set creates the master key file DIRECTLY with
+0600 permissions, without the previous TOCTOU window (write_bytes → chmod 600).
 
-Estratègia:
-- Mock os.open per capturar el mode passat al obrir el fd.
-- Verificació real al filesystem: stat del fitxer creat.
-- Test de reescriptura: si ja existeix, també queda 0600.
+Strategy:
+- Mock os.open to capture the mode passed when opening the fd.
+- Real filesystem verification: stat of the created file.
+- Overwrite test: if the file already exists, it also ends up at 0600.
 """
 
 import os
@@ -21,7 +21,7 @@ from core.crypto import keys as crypto_keys
 
 
 def test_file_set_creates_with_600_permissions(tmp_path):
-    """Després de _try_file_set el fitxer ha de ser 0600."""
+    """After _try_file_set the file must be 0600."""
     key_path = tmp_path / "master.key"
     key = b"\x01" * crypto_keys.KEY_SIZE
     ok = crypto_keys._try_file_set(key, path=key_path)
@@ -33,10 +33,10 @@ def test_file_set_creates_with_600_permissions(tmp_path):
 
 
 def test_file_set_uses_unique_temp_via_mkstemp(tmp_path):
-    """El fitxer temporal es crea amb `tempfile.mkstemp` (nom únic,
-    `O_CREAT|O_EXCL|O_RDWR` internament). Això protegeix contra dues
-    crides concurrents dins el mateix procés que intentessin escriure
-    el mateix path de temp.
+    """The temporary file is created with `tempfile.mkstemp` (unique name,
+    `O_CREAT|O_EXCL|O_RDWR` internally). This protects against two
+    concurrent calls within the same process trying to write
+    the same temp path.
     """
     import tempfile as _tempfile
     key_path = tmp_path / "master.key"
@@ -62,7 +62,7 @@ def test_file_set_uses_unique_temp_via_mkstemp(tmp_path):
 
 
 def test_file_set_overwrite_existing_file_keeps_600(tmp_path):
-    """Si el fitxer ja existia, la sobreescriptura també queda a 0600."""
+    """If the file already existed, the overwrite also leaves it at 0600."""
     key_path = tmp_path / "master.key"
     key1 = b"\x03" * crypto_keys.KEY_SIZE
     key2 = b"\x04" * crypto_keys.KEY_SIZE
@@ -78,12 +78,12 @@ def test_file_set_overwrite_existing_file_keeps_600(tmp_path):
 
 
 def test_file_set_ignores_pre_existing_stale_temp(tmp_path):
-    """Un .master.key.tmp.<pid> orfe d'un crash previ no ha de bloquejar.
+    """A .master.key.tmp.<pid> orphan from a previous crash must not block.
 
-    El nou patró (tempfile.mkstemp) genera un nom únic cada cop, així que
-    un fitxer vell amb un altre suffix queda intacte i la nova escriptura
-    continua sense conflicte. La netja dels stale és opcional (no ens posa
-    en risc perquè cada crida usa un path nou).
+    The new pattern (tempfile.mkstemp) generates a unique name each time, so
+    an old file with a different suffix is left intact and the new write
+    proceeds without conflict. Cleaning up stale files is optional (poses no
+    risk because each call uses a new path).
     """
     key_path = tmp_path / "master.key"
     stale = tmp_path / f".master.key.tmp.{os.getpid()}"
@@ -94,12 +94,12 @@ def test_file_set_ignores_pre_existing_stale_temp(tmp_path):
     ok = crypto_keys._try_file_set(key, path=key_path)
     assert ok is True
     assert key_path.read_bytes() == key
-    # L'stale no bloqueja la nova escriptura, tot i que no el netegem
-    # (innòcu: no conté cap clau vàlida i no interfereix en reads futurs).
+    # The stale file does not block the new write, even though we don't clean it up
+    # (harmless: contains no valid key and does not interfere with future reads).
 
 
 def test_file_set_round_trip_with_get(tmp_path):
-    """_try_file_get retorna la clau que _try_file_set ha escrit."""
+    """_try_file_get returns the key that _try_file_set wrote."""
     key_path = tmp_path / "master.key"
     key = b"\x06" * crypto_keys.KEY_SIZE
     crypto_keys._try_file_set(key, path=key_path)

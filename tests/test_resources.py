@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_resources.py
-Description: Tests per core/resources.py.
+Description: Tests for core/resources.py.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

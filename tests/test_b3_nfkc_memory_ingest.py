@@ -3,10 +3,10 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_b3_nfkc_memory_ingest.py
-Description: TDD cec — B3 NFKC asimetria: path ingest memory-API no normalitza
-             text a NFKC. El commit 3469964 va arreglar la query però no l'ingest
-             via MemoryService.remember(). Fix: afegir NFKC a remember() (Opció b).
-             Onada 4.6b / xfail strict pre-fix.
+Description: Blind TDD — B3 NFKC asymmetry: memory-API ingest path does not normalise
+             text to NFKC. Commit 3469964 fixed the query but not the ingest
+             via MemoryService.remember(). Fix: add NFKC to remember() (Option b).
+             Wave 4.6b / xfail strict pre-fix.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -38,11 +38,11 @@ def _has_nfkc(src: str) -> bool:
 
 
 def test_memory_store_nfkc_fullwidth_to_halfwidth():
-    """MemoryService.remember() ha d'aplicar NFKC al text d'ingest.
+    """MemoryService.remember() must apply NFKC to the ingest text.
 
-    Post-fix: unicodedata.normalize("NFKC", text) ha d'aparèixer a remember()
-    abans de passar el text als embedders/extractor.
-    Garanteix simetria: fullwidth indexat ↔ halfwidth query i viceversa.
+    Post-fix: unicodedata.normalize("NFKC", text) must appear in remember()
+    before passing the text to embedders/extractor.
+    Guarantees symmetry: fullwidth indexed ↔ halfwidth query and vice versa.
     """
     remember_src = _remember_fn_src()
     assert _has_nfkc(remember_src), (
@@ -52,24 +52,24 @@ def test_memory_store_nfkc_fullwidth_to_halfwidth():
 
 
 def test_memory_store_nfkc_bidirectional():
-    """Anti-regressió B3: simetria NFKC bidireccional ingest↔query.
+    """Anti-regression B3: bidirectional NFKC symmetry ingest↔query.
 
-    Verifica que TANT el path d'ingest (MemoryService.remember) COM el path
-    de query (memory/api/v1.py) apliquen NFKC, garantint:
-      fullwidth indexat → halfwidth query → match
-      halfwidth indexat → fullwidth query → match
-    Dev#2 treu el xfail quan el fix és aplicat. Queda com a guard permanent.
+    Verifies that BOTH the ingest path (MemoryService.remember) AND the query
+    path (memory/api/v1.py) apply NFKC, guaranteeing:
+      fullwidth indexed → halfwidth query → match
+      halfwidth indexed → fullwidth query → match
+    Dev#2 removes the xfail once the fix is applied. Remains as a permanent guard.
     """
     remember_src = _remember_fn_src()
     api_src = _MEMORY_API_V1_FILE.read_text()
 
-    # Query path (commit 3469964 — ja existent, no ha de regredir)
+    # Query path (commit 3469964 — already present, must not regress)
     assert _has_nfkc(api_src), (
         "Anti-reg query path (commit 3469964): memory/api/v1.py ha perdut NFKC "
         "(regressió)"
     )
 
-    # Ingest path (post-fix B3 — ha d'existir al remember())
+    # Ingest path (post-fix B3 — must exist in remember())
     assert _has_nfkc(remember_src), (
         "Anti-reg ingest path B3: MemoryService.remember() ha de mantenir NFKC "
         "— simetria bidireccional indexat↔query"

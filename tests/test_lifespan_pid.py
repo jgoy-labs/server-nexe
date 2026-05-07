@@ -2,10 +2,10 @@
 ────────────────────────────────────
 Server Nexe — Tests
 Location: tests/test_lifespan_pid.py
-Description: Tests per a la gestió del PID file al lifespan (B06, B10),
-             reset de circuit breakers al shutdown (N03),
-             cancel·lació de cleanup tasks (N04),
-             i SIGTERM handler al runner (N05).
+Description: Tests for PID file management in the lifespan (B06, B10),
+             circuit breaker reset on shutdown (N03),
+             cleanup task cancellation (N04),
+             and SIGTERM handler in the runner (N05).
 ────────────────────────────────────
 """
 
@@ -23,20 +23,20 @@ from core.lifespan import _write_pid_file, _remove_pid_file, _PID_SUBPATH
 
 @pytest.fixture
 def project_root(tmp_path: Path) -> Path:
-    """Directori temporal com a project_root fals."""
+    """Temporary directory as a fake project_root."""
     return tmp_path
 
 
 @pytest.fixture
 def pid_path(project_root: Path) -> Path:
-    """Path canònic del PID file sota project_root temporal."""
+    """Canonical path of the PID file under the temporary project_root."""
     return project_root / _PID_SUBPATH
 
 
 # ── B06 / B10: _write_pid_file ─────────────────────────────────────────────
 
 def test_write_pid_file_creates_file(project_root: Path, pid_path: Path):
-    """_write_pid_file escriu el PID file en format JSON (B06)."""
+    """_write_pid_file writes the PID file in JSON format (B06)."""
     assert not pid_path.exists()
     ok = _write_pid_file(project_root, port=9119)
     assert ok is True
@@ -47,27 +47,27 @@ def test_write_pid_file_creates_file(project_root: Path, pid_path: Path):
     assert data["pid"] == os.getpid()
     assert data["port"] == 9119
     from datetime import datetime
-    datetime.fromisoformat(data["started"])  # ha de ser parsejable
+    datetime.fromisoformat(data["started"])  # must be parseable
 
 
 def test_write_pid_file_returns_false_if_live_pid(project_root: Path, pid_path: Path):
-    """_write_pid_file retorna False si un servidor viu ja té el lock (B10)."""
-    # Primer adquireix
+    """_write_pid_file returns False if a live server already holds the lock (B10)."""
+    # First acquire
     ok = _write_pid_file(project_root, port=9119)
     assert ok is True
 
-    # Segon intent: simula que el PID és viu (os.kill no llança)
+    # Second attempt: simulate that the PID is alive (os.kill does not raise)
     with patch("core.lifespan.os.kill", return_value=None):
         ok2 = _write_pid_file(project_root, port=9119)
     assert ok2 is False
-    # Fitxer original intacte
+    # Original file intact
     import json
     data = json.loads(pid_path.read_text())
     assert data["pid"] == os.getpid()
 
 
 def test_write_pid_file_removes_stale_and_acquires(project_root: Path, pid_path: Path):
-    """_write_pid_file elimina PID estantís i adquireix (B07 / B10)."""
+    """_write_pid_file removes a stale PID and acquires the lock (B07 / B10)."""
     import json
     pid_path.parent.mkdir(parents=True, exist_ok=True)
     pid_path.write_text(json.dumps({"pid": 99999, "port": 9119, "started": "2020-01-01T00:00:00+00:00"}))
@@ -85,7 +85,7 @@ def test_write_pid_file_removes_stale_and_acquires(project_root: Path, pid_path:
 # ── B10: _remove_pid_file ────────────────────────────────────────────────────
 
 def test_remove_pid_file_deletes_owned_file(project_root: Path, pid_path: Path):
-    """_remove_pid_file elimina el PID file que pertany a aquest procés (B10)."""
+    """_remove_pid_file removes the PID file belonging to this process (B10)."""
     import json
     pid_path.parent.mkdir(parents=True, exist_ok=True)
     pid_path.write_text(json.dumps({"pid": os.getpid(), "port": 9119, "started": "2026-01-01T00:00:00+00:00"}))
@@ -95,36 +95,36 @@ def test_remove_pid_file_deletes_owned_file(project_root: Path, pid_path: Path):
 
 
 def test_remove_pid_file_leaves_foreign_file(project_root: Path, pid_path: Path):
-    """_remove_pid_file NO elimina PID files d'un altre procés (B10)."""
+    """_remove_pid_file does NOT remove PID files belonging to another process (B10)."""
     import json
     pid_path.parent.mkdir(parents=True, exist_ok=True)
     pid_path.write_text(json.dumps({"pid": 99999, "port": 9119, "started": "2026-01-01T00:00:00+00:00"}))
 
     _remove_pid_file(project_root)
-    assert pid_path.exists()  # no l'ha eliminat
+    assert pid_path.exists()  # not removed
 
 
 def test_remove_pid_file_noop_when_missing(project_root: Path):
-    """_remove_pid_file és segur quan el fitxer no existeix (B10)."""
-    _remove_pid_file(project_root)  # no ha de llançar
+    """_remove_pid_file is safe when the file does not exist (B10)."""
+    _remove_pid_file(project_root)  # must not raise
 
 
 def test_remove_pid_file_noop_when_project_root_none():
-    """_remove_pid_file és segur amb project_root None (B10)."""
-    _remove_pid_file(None)  # no ha de llançar
+    """_remove_pid_file is safe with project_root None (B10)."""
+    _remove_pid_file(None)  # must not raise
 
 
 # ── N03: reset circuit breakers ───────────────────────────────────────────────
 
 def test_reset_all_circuit_breakers_resets_to_closed():
-    """reset_all_circuit_breakers torna tots els breakers a CLOSED (N03)."""
+    """reset_all_circuit_breakers returns all breakers to CLOSED (N03)."""
     from core.resilience import (
         reset_all_circuit_breakers,
         ollama_breaker, qdrant_breaker, http_breaker,
         CircuitState,
     )
 
-    # Forçar estat OPEN als tres breakers
+    # Force OPEN state on all three breakers
     for breaker in (ollama_breaker, qdrant_breaker, http_breaker):
         breaker._state.state = CircuitState.OPEN
         breaker._state.failure_count = 5
@@ -133,13 +133,13 @@ def test_reset_all_circuit_breakers_resets_to_closed():
 
     for breaker in (ollama_breaker, qdrant_breaker, http_breaker):
         assert breaker.state == CircuitState.CLOSED, (
-            f"Breaker '{breaker.name}' hauria d'estar CLOSED després del reset"
+            f"Breaker '{breaker.name}' should be CLOSED after reset"
         )
         assert breaker._state.failure_count == 0
 
 
 def test_circuit_breaker_reset_method():
-    """CircuitBreaker.reset() reinicia a CLOSED net (N03)."""
+    """CircuitBreaker.reset() reinitializes to clean CLOSED state (N03)."""
     from core.resilience import CircuitBreaker, CircuitBreakerConfig, CircuitState
 
     breaker = CircuitBreaker("test_reset", CircuitBreakerConfig(failure_threshold=1))
@@ -154,12 +154,12 @@ def test_circuit_breaker_reset_method():
     assert breaker._state.last_failure_time is None
 
 
-# ── N04: cleanup tasks cancel·lades ───────────────────────────────────────────
+# ── N04: cleanup tasks cancelled ─────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_cleanup_task_cancelled_on_shutdown():
-    """_cleanup_task creada al lifespan ha de ser cancel·lada al shutdown (N04)."""
-    # Simula una tasca infinita (com start_rate_limit_cleanup)
+    """_cleanup_task created in the lifespan must be cancelled on shutdown (N04)."""
+    # Simulate an infinite task (like start_rate_limit_cleanup)
     async def _infinite_loop():
         while True:
             await asyncio.sleep(3600)
@@ -167,7 +167,7 @@ async def test_cleanup_task_cancelled_on_shutdown():
     task = asyncio.create_task(_infinite_loop())
     assert not task.done()
 
-    # Simula el pattern del lifespan shutdown
+    # Simulate the lifespan shutdown pattern
     if not task.done():
         task.cancel()
         try:
@@ -181,18 +181,18 @@ async def test_cleanup_task_cancelled_on_shutdown():
 
 @pytest.mark.asyncio
 async def test_session_cleanup_task_returns_task():
-    """start_session_cleanup_task retorna un asyncio.Task (N04)."""
+    """start_session_cleanup_task returns an asyncio.Task (N04)."""
     from plugins.web_ui_module.api.routes import start_session_cleanup_task
 
     mock_mgr = MagicMock()
-    # Patch el loop intern perquè no faci I/O real
+    # Patch the internal loop so it doesn't do real I/O
     with patch("plugins.web_ui_module.api.routes._session_cleanup_loop", new=AsyncMock(return_value=None)):
         task = start_session_cleanup_task(mock_mgr)
 
     assert isinstance(task, asyncio.Task), (
-        "start_session_cleanup_task ha de retornar asyncio.Task per poder cancel·lar-lo"
+        "start_session_cleanup_task must return asyncio.Task to be cancellable"
     )
-    # Neteja
+    # Cleanup
     if not task.done():
         task.cancel()
         try:
@@ -204,9 +204,9 @@ async def test_session_cleanup_task_returns_task():
 # ── N05: SIGTERM handler al runner ────────────────────────────────────────────
 
 def test_sigterm_handler_registered_in_runner():
-    """runner.py registra _handle_sigterm com a handler de SIGTERM (N05)."""
+    """runner.py registers _handle_sigterm as the SIGTERM handler (N05)."""
     import core.server.runner as runner_module
     assert hasattr(runner_module, "_handle_sigterm"), (
-        "_handle_sigterm no definit a core.server.runner — N05 no implementat"
+        "_handle_sigterm not defined in core.server.runner — N05 not implemented"
     )
     assert callable(runner_module._handle_sigterm)

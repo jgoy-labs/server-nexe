@@ -1,12 +1,12 @@
 """
-Tests per installer/installer_reinstall.py — Bug 7 fix release v0.9.0.
+Tests for installer/installer_reinstall.py — Bug 7 fix release v0.9.0.
 
-Cobreix els 3 modes de reinstal·lació:
-- wipe       → esborra totes les dades d'usuari
-- overwrite  → preserva dades, només neteja venv
-- backup     → fa backup primer i després wipe
+Covers the 3 reinstall modes:
+- wipe       → deletes all user data
+- overwrite  → preserves data, only clears venv
+- backup     → performs backup first then wipe
 
-També verifica detect_existing_install() i validació de modes.
+Also verifies detect_existing_install() and mode validation.
 """
 
 from pathlib import Path
@@ -28,7 +28,7 @@ from installer import installer_reinstall as ir
 
 
 def _make_install(root: Path) -> None:
-    """Crea una instal·lació falsa amb .env, storage/, knowledge/, venv/."""
+    """Creates a fake installation with .env, storage/, knowledge/, venv/."""
     (root / ".env").write_text("NEXE_PRIMARY_API_KEY=secret-key\n")
     (root / "storage").mkdir()
     (root / "storage" / "vectors").mkdir()
@@ -40,7 +40,7 @@ def _make_install(root: Path) -> None:
     (root / "venv" / "bin" / "python").write_text("#!/bin/sh")
 
 
-# ── detect_existing_install ─────────────────────────────────────────────
+# ── detect_existing_install ────────────────────────────────────────────
 
 
 def test_detect_existing_install_empty_dir(tmp_path):
@@ -66,9 +66,9 @@ def test_detect_existing_install_with_venv(tmp_path):
 
 
 def test_wipe_user_data_removes_env_and_storage(tmp_path):
-    """knowledge/ és documentació del sistema (s'ingereix, no és dada d'usuari).
-    wipe_user_data esborra .env i storage/, però preserva knowledge/ perquè
-    el tar del payload la sobreescriu en reinstal·lar."""
+    """knowledge/ is system documentation (ingested, not user data).
+    wipe_user_data removes .env and storage/, but preserves knowledge/ because
+    the payload tar overwrites it during reinstall."""
     _make_install(tmp_path)
     removed = wipe_user_data(tmp_path)
     removed_names = {p.name for p in removed}
@@ -78,12 +78,12 @@ def test_wipe_user_data_removes_env_and_storage(tmp_path):
     assert not (tmp_path / ".env").exists()
     assert not (tmp_path / "storage").exists()
     assert (tmp_path / "knowledge").exists()
-    # venv NO el toca wipe_user_data — això ho fa apply_reinstall_mode
+    # venv is NOT touched by wipe_user_data — that is done by apply_reinstall_mode
     assert (tmp_path / "venv").exists()
 
 
 def test_wipe_user_data_idempotent(tmp_path):
-    # Sense res, no peta
+    # With nothing present, does not raise
     removed = wipe_user_data(tmp_path)
     assert removed == []
 
@@ -96,51 +96,51 @@ def test_backup_user_data_creates_timestamped_dir(tmp_path):
     backup_dir = backup_user_data(tmp_path)
     assert backup_dir.exists()
     assert backup_dir.is_dir()
-    # .nexe-backups/<timestamp>/  (fora de storage/ per sobreviure al wipe)
+    # .nexe-backups/<timestamp>/  (outside storage/ to survive the wipe)
     assert backup_dir.parent == tmp_path / ".nexe-backups"
 
 
 def test_backup_user_data_moves_files(tmp_path):
-    """Aviso 4 Consultor — backup usa `shutil.move`, no `copytree`.
+    """Advisory 4 Consultant — backup uses `shutil.move`, not `copytree`.
 
-    Això vol dir que després del backup els originals ja NO hi són
-    al project_root (s'han mogut, no copiat). És instantani al mateix
-    volum i no requereix 2x disc.
+    This means that after backup the originals are NO LONGER present in
+    project_root (they have been moved, not copied). It is instantaneous on
+    the same volume and does not require 2x disk space.
     """
     _make_install(tmp_path)
     backup_dir = backup_user_data(tmp_path)
     assert (backup_dir / ".env").exists()
     assert (backup_dir / ".env").read_text() == "NEXE_PRIMARY_API_KEY=secret-key\n"
-    # knowledge/ NO va al backup — és documentació del sistema, el tar la sobreescriu
+    # knowledge/ does NOT go to the backup — it is system documentation, the tar overwrites it
     assert not (backup_dir / "knowledge").exists()
-    # .env s'ha mogut (no copiat)
+    # .env has been moved (not copied)
     assert not (tmp_path / ".env").exists()
-    # knowledge/ es preserva in-place (no és dada d'usuari)
+    # knowledge/ is preserved in-place (not user data)
     assert (tmp_path / "knowledge" / "doc.md").exists()
 
 
 def test_backup_does_not_recurse_into_existing_backups(tmp_path):
-    """Dev #3 fix (Consultor passada 1, finding 4): el test original
-    mirava `backup2/storage/backups` però el codi real usa
-    `.nexe-backups/` com a carpeta de backups, així que l'assert passava
-    per construcció sense testar res. Ara verifiquem que el segon backup
-    NO conté recursivament el directori `.nexe-backups` dins seu
-    (altrament seria un backup que conté el backup anterior i creixeria
-    exponencialment)."""
+    """Dev #3 fix (Consultant pass 1, finding 4): the original test
+    checked `backup2/storage/backups` but the real code uses
+    `.nexe-backups/` as the backup folder, so the assert was passing
+    by construction without testing anything. We now verify that the second
+    backup does NOT recursively contain the `.nexe-backups` directory within it
+    (otherwise it would be a backup containing the previous backup and would grow
+    exponentially)."""
     _make_install(tmp_path)
-    # Primera passada: crea .nexe-backups/<ts1>/
+    # First pass: creates .nexe-backups/<ts1>/
     backup1 = backup_user_data(tmp_path)
     assert backup1.parent == tmp_path / ".nexe-backups"
-    # Reconstruïm dades per permetre una segona passada
-    # (venv no es toca pel backup, així que l'esborrem primer)
+    # Rebuild data to allow a second pass
+    # (venv is not touched by backup, so we remove it first)
     if (tmp_path / "venv").exists():
         shutil.rmtree(tmp_path / "venv")
     _make_install(tmp_path)
-    # Segona passada: no ha de recursar dins .nexe-backups/
+    # Second pass: must not recurse into .nexe-backups/
     backup2 = backup_user_data(tmp_path)
     assert backup2.parent == tmp_path / ".nexe-backups"
-    # El segon backup NO ha de contenir `.nexe-backups` dins seu
-    # (ni directament ni dins storage/)
+    # The second backup must NOT contain `.nexe-backups` within it
+    # (neither directly nor inside storage/)
     nested_backups_root = backup2 / ".nexe-backups"
     assert not nested_backups_root.exists(), (
         "backup recursed into itself at backup_dir root"
@@ -149,7 +149,7 @@ def test_backup_does_not_recurse_into_existing_backups(tmp_path):
     assert not nested_storage_backups.exists(), (
         "backup recursed into itself via storage/.nexe-backups"
     )
-    # El primer backup encara és accessible (no s'ha mogut dins el segon)
+    # The first backup is still accessible (has not been moved into the second)
     assert backup1.exists()
     assert (backup1 / ".env").exists()
 
@@ -158,8 +158,8 @@ def test_backup_does_not_recurse_into_existing_backups(tmp_path):
 
 
 def test_apply_wipe_removes_user_data_and_venv(tmp_path):
-    """WIPE esborra .env, storage/ i venv, però preserva knowledge/
-    (documentació del sistema — el tar la sobreescriu en reinstal·lar)."""
+    """WIPE removes .env, storage/ and venv, but preserves knowledge/
+    (system documentation — the tar overwrites it during reinstall)."""
     _make_install(tmp_path)
     summary = apply_reinstall_mode(tmp_path, REINSTALL_MODE_WIPE)
     assert summary["mode"] == REINSTALL_MODE_WIPE
@@ -178,11 +178,11 @@ def test_apply_overwrite_preserves_user_data(tmp_path):
     summary = apply_reinstall_mode(tmp_path, REINSTALL_MODE_OVERWRITE)
     assert summary["mode"] == REINSTALL_MODE_OVERWRITE
     assert summary["backup_dir"] is None
-    # Dades preservades
+    # Data preserved
     assert (tmp_path / ".env").exists()
     assert (tmp_path / "storage" / "vectors" / "qdrant.db").exists()
     assert (tmp_path / "knowledge" / "doc.md").exists()
-    # Venv eliminat (es regenerarà)
+    # Venv removed (will be regenerated)
     assert not (tmp_path / "venv").exists()
 
 
@@ -203,21 +203,21 @@ def test_apply_backup_then_wipe(tmp_path):
 
     backup_dir = Path(summary["backup_dir"])
     assert backup_dir.exists()
-    # Backup conté les dades d'usuari
+    # Backup contains user data
     assert (backup_dir / ".env").read_text() == "NEXE_PRIMARY_API_KEY=secret-key\n"
-    # knowledge/ NO va al backup — és documentació del sistema
+    # knowledge/ does NOT go to the backup — it is system documentation
     assert not (backup_dir / "knowledge").exists()
 
-    # .env i venv s'han eliminat
+    # .env and venv have been removed
     assert not (tmp_path / ".env").exists()
     assert not (tmp_path / "venv").exists()
-    # knowledge/ es preserva in-place (el tar la sobreescriurà)
+    # knowledge/ is preserved in-place (the tar will overwrite it)
     assert (tmp_path / "knowledge" / "doc.md").exists()
-    # storage/ ha estat esborrat (backup ja n'ha fet còpia abans)
-    # Però com el backup ha creat storage/backups/<timestamp>, després
-    # del wipe el directori 'storage' sencer no hi és. El backup_dir
-    # pot quedar fora si s'ha creat dins de storage/. Verifiquem que
-    # almenys el contingut del backup existeix.
+    # storage/ has been deleted (backup already made a copy)
+    # But since the backup created storage/backups/<timestamp>, after
+    # the wipe the entire 'storage' directory is gone. The backup_dir
+    # may reside outside if it was created inside storage/. We verify that
+    # at least the backup contents exist.
     assert backup_dir.exists()
 
 
@@ -228,7 +228,7 @@ def test_apply_backup_with_custom_backup_root(tmp_path):
         tmp_path, REINSTALL_MODE_BACKUP, backup_root=custom_backup
     )
     assert Path(summary["backup_dir"]).parent == custom_backup
-    # El backup extern sobreviu al wipe del project_root
+    # The external backup survives the project_root wipe
     assert Path(summary["backup_dir"]).exists()
     assert (Path(summary["backup_dir"]) / ".env").exists()
 
@@ -254,21 +254,21 @@ def test_all_modes_in_valid_set():
 
 
 # ════════════════════════════════════════════════════════════════════════
-# Tests Dev #2 — aplicació dels 7 avisos del Consultor
+# Tests Dev #2 — application of the 7 Consultant advisories
 # ════════════════════════════════════════════════════════════════════════
 
 
-# ── Aviso 1: stop server abans de qualsevol mode ─────────────────────────
+# ── Advisory 1: stop server before any mode ─────────────────────────────
 
 
 def test_stop_server_called_before_any_mode(tmp_path):
-    """El stop_server_func s'ha de cridar abans de tocar res."""
+    """stop_server_func must be called before touching anything."""
     _make_install(tmp_path)
     calls = []
 
     def fake_stop(root):
         calls.append(root)
-        # Quan ens criden, .env encara hi és (no s'ha tocat)
+        # When called, .env is still there (has not been touched)
         assert (root / ".env").exists()
         return True
 
@@ -287,7 +287,7 @@ def test_apply_aborts_if_stop_server_fails(tmp_path):
     _make_install(tmp_path)
 
     def failing_stop(root):
-        return False  # servidor viu, no es pot parar
+        return False  # server alive, cannot be stopped
 
     with pytest.raises(RuntimeError, match="Could not stop"):
         apply_reinstall_mode(
@@ -299,33 +299,32 @@ def test_apply_aborts_if_stop_server_fails(tmp_path):
 
 
 def test_default_stop_server_no_pidfile(tmp_path):
-    """Sense pidfile, _default_stop_server retorna True sense error."""
+    """Without a pidfile, _default_stop_server returns True without error."""
     assert ir._default_stop_server(tmp_path) is True
 
 
 def test_default_stop_server_stale_pidfile(tmp_path):
-    """Pidfile amb PID mort → retorna True i esborra el pidfile."""
+    """Pidfile with a dead PID → returns True and removes the pidfile."""
     pid_dir = tmp_path / "storage" / "logs"
     pid_dir.mkdir(parents=True)
     pid_file = pid_dir / "core_supervisor.pid"
-    # PID probablement mort (alt i arbitrari)
+    # PID most likely dead (high and arbitrary)
     pid_file.write_text("999999")
     assert ir._default_stop_server(tmp_path) is True
     assert not pid_file.exists()
 
 
-# ── Aviso 2: overwrite regenera .env preservant secrets ──────────────────
+# ── Advisory 2: overwrite regenerates .env preserving secrets ────────────
 
 
 def test_mode_overwrite_regenerates_env_keeping_secrets(tmp_path):
-    """Mode overwrite ha de preservar API key i CSRF via _update_env_model_config.
+    """Overwrite mode must preserve the API key and CSRF via _update_env_model_config.
 
-    La funció apply_reinstall_mode no reescriu el .env per si mateixa —
-    només valida que és llegible. La regeneració real passa quan
-    generate_env_file() es crida més tard al flow de l'installer. Aquí
-    verifiquem el contracte: (a) el .env queda intacte després d'overwrite
-    i (b) _update_env_model_config preserva els secrets quan l'installer
-    el cridi després.
+    apply_reinstall_mode does not rewrite the .env itself —
+    it only validates that it is readable. The actual regeneration happens when
+    generate_env_file() is called later in the installer flow. Here we verify
+    the contract: (a) the .env remains intact after overwrite and (b)
+    _update_env_model_config preserves secrets when the installer calls it afterwards.
     """
     _make_install(tmp_path)
     env_file = tmp_path / ".env"
@@ -337,13 +336,13 @@ def test_mode_overwrite_regenerates_env_keeping_secrets(tmp_path):
         "NEXE_OLLAMA_MODEL=gemma3:4b\n"
     )
     apply_reinstall_mode(tmp_path, REINSTALL_MODE_OVERWRITE)
-    # .env encara hi és (overwrite no l'esborra)
+    # .env is still there (overwrite does not delete it)
     assert env_file.exists()
     content = env_file.read_text()
     assert "NEXE_PRIMARY_API_KEY=supersecret-abc123" in content
     assert "NEXE_CSRF_SECRET=csrf-xyz789" in content
 
-    # Ara simulem que l'installer crida el merge amb un model nou
+    # Now simulate the installer calling the merge with a new model
     from installer.installer_setup_config import _update_env_model_config
     new_model = {
         "id": "qwen2.5:7b",
@@ -360,7 +359,7 @@ def test_mode_overwrite_regenerates_env_keeping_secrets(tmp_path):
     assert "NEXE_OLLAMA_MODEL=qwen2.5:7b" in after
 
 
-# ── Aviso 3: overwrite esborra .knowledge_ingested marker ────────────────
+# ── Advisory 3: overwrite clears the .knowledge_ingested marker ──────────
 
 
 def test_mode_overwrite_clears_knowledge_ingested_marker(tmp_path):
@@ -372,16 +371,16 @@ def test_mode_overwrite_clears_knowledge_ingested_marker(tmp_path):
     summary = apply_reinstall_mode(tmp_path, REINSTALL_MODE_OVERWRITE)
     assert not marker.exists()
     assert str(marker) in summary["removed"]
-    # Storage i knowledge preservats per la resta
+    # Storage and knowledge preserved for the rest
     assert (tmp_path / "storage" / "vectors" / "qdrant.db").exists()
     assert (tmp_path / "knowledge" / "doc.md").exists()
 
 
-# ── Aviso 4: backup usa move, no copytree ────────────────────────────────
+# ── Advisory 4: backup uses move, not copytree ───────────────────────────
 
 
 def test_mode_backup_uses_move_not_copytree(monkeypatch, tmp_path):
-    """Verifiquem que backup crida shutil.move i no shutil.copytree."""
+    """Verifies that backup calls shutil.move and not shutil.copytree."""
     _make_install(tmp_path)
 
     move_calls = []
@@ -403,12 +402,12 @@ def test_mode_backup_uses_move_not_copytree(monkeypatch, tmp_path):
 
     backup_user_data(tmp_path)
 
-    assert len(move_calls) > 0, "backup ha d'usar shutil.move"
-    assert len(copytree_calls) == 0, "backup NO ha d'usar shutil.copytree"
+    assert len(move_calls) > 0, "backup must use shutil.move"
+    assert len(copytree_calls) == 0, "backup must NOT use shutil.copytree"
 
 
 def test_mode_backup_excludes_models_by_default(tmp_path):
-    """Per defecte, storage/models/ (pot ser 30+GB) queda al seu lloc."""
+    """By default, storage/models/ (can be 30+ GB) remains in place."""
     _make_install(tmp_path)
     models_dir = tmp_path / "storage" / "models"
     models_dir.mkdir(parents=True)
@@ -417,11 +416,11 @@ def test_mode_backup_excludes_models_by_default(tmp_path):
 
     backup_dir = backup_user_data(tmp_path, exclude_models=True)
 
-    # Models NO estan al backup
+    # Models are NOT in the backup
     assert not (backup_dir / "storage" / "models").exists()
-    # Models encara hi són al seu lloc original
+    # Models are still at their original location
     assert big_file.exists()
-    # Però altres subdirs de storage sí que s'han mogut al backup
+    # But other storage subdirs have been moved to the backup
     assert (backup_dir / "storage" / "vectors" / "qdrant.db").exists()
 
 
@@ -432,11 +431,11 @@ def test_mode_backup_includes_models_when_optin(tmp_path):
     (models_dir / "m.gguf").write_text("x")
 
     backup_dir = backup_user_data(tmp_path, exclude_models=False)
-    # Amb opt-in, storage/ sencer es mou (incloent models/)
+    # With opt-in, entire storage/ is moved (including models/)
     assert (backup_dir / "storage" / "models" / "m.gguf").exists()
 
 
-# ── Aviso 5: refusa wipe si project_root és el bundle del procés ─────────
+# ── Advisory 5: refuse wipe if project_root is the running bundle ─────────
 
 
 def test_refuses_wipe_if_install_path_inside_running_bundle(tmp_path, monkeypatch):
@@ -450,22 +449,22 @@ def test_refuses_wipe_if_install_path_inside_running_bundle(tmp_path, monkeypatc
     for mode in (REINSTALL_MODE_WIPE, REINSTALL_MODE_BACKUP):
         with pytest.raises(RuntimeError, match="Refusing to wipe"):
             apply_reinstall_mode(tmp_path, mode)
-    # Dades intactes
+    # Data intact
     assert (tmp_path / ".env").exists()
 
 
 def test_overwrite_allowed_even_if_inside_bundle(tmp_path, monkeypatch):
-    """Overwrite NO fa wipe global, així que pot anar encara que project_root
-    estigui dins del bundle (només toca venv + marker)."""
+    """Overwrite does NOT perform a global wipe, so it is allowed even if project_root
+    is inside the bundle (only touches venv + marker)."""
     _make_install(tmp_path)
     monkeypatch.setattr(ir, "_is_project_root_running_bundle", lambda r: True)
 
-    # No ha de petar
+    # Must not raise
     apply_reinstall_mode(tmp_path, REINSTALL_MODE_OVERWRITE)
     assert (tmp_path / ".env").exists()
 
 
-# ── Aviso 6: master key al Keychain — no es toca per defecte ─────────────
+# ── Advisory 6: master key in Keychain — not touched by default ──────────
 
 
 def test_wipe_does_not_touch_keychain_by_default(tmp_path, monkeypatch):
@@ -498,7 +497,7 @@ def test_wipe_keychain_optin(tmp_path, monkeypatch):
     assert called["delete"] is True
 
 
-# ── Aviso 7: ~/.nexe/mail365*.json — no es toca per defecte ──────────────
+# ── Advisory 7: ~/.nexe/mail365*.json — not touched by default ───────────
 
 
 def test_wipe_does_not_touch_home_nexe_by_default(tmp_path, monkeypatch):
@@ -535,25 +534,25 @@ import shutil  # noqa: E402 — usat pels tests de move tracking
 
 
 # ════════════════════════════════════════════════════════════════════════
-# Tests Dev #3 — fixes Consultor passada 1
+# Tests Dev #3 — Consultant pass 1 fixes
 # ════════════════════════════════════════════════════════════════════════
 
 
-# ── Finding 2: BACKUP mode ha de preservar storage/models/ end-to-end ───
+# ── Finding 2: BACKUP mode must preserve storage/models/ end-to-end ─────
 
 
 def test_apply_backup_preserves_models_end_to_end(tmp_path):
-    """Finding 2 Consultor passada 1: abans del fix, mode BACKUP feia
-    backup_user_data(exclude_models=True) — que preservava models/ — i
-    després cridava wipe_user_data amb USER_DATA_PATHS incloent 'storage'
-    → shutil.rmtree(storage) esborrava els models que havíem preservat.
-    Ara el wipe post-backup és selectiu i salta storage/models/."""
+    """Finding 2 Consultant pass 1: before the fix, BACKUP mode called
+    backup_user_data(exclude_models=True) — which preserved models/ — and
+    then called wipe_user_data with USER_DATA_PATHS including 'storage'
+    → shutil.rmtree(storage) deleted the models we had preserved.
+    The post-backup wipe is now selective and skips storage/models/."""
     _make_install(tmp_path)
     models_dir = tmp_path / "storage" / "models"
     models_dir.mkdir(parents=True)
     model_file = models_dir / "gemma3-12b.gguf"
     model_file.write_text("fake-huge-model")
-    # Subdir més típic dins storage/ que SÍ s'ha de netejar
+    # More typical subdir inside storage/ that SHOULD be cleaned
     sessions_dir = tmp_path / "storage" / "sessions"
     sessions_dir.mkdir()
     (sessions_dir / "s1.json").write_text("{}")
@@ -565,30 +564,30 @@ def test_apply_backup_preserves_models_end_to_end(tmp_path):
     backup_dir = Path(summary["backup_dir"])
     assert backup_dir.exists()
 
-    # Assert 1: models preservats in-place, al seu lloc original
+    # Assert 1: models preserved in-place, at their original location
     assert model_file.exists(), (
-        "BACKUP mode destruïa els models preservats — Bug 7 Consultor"
+        "BACKUP mode was destroying preserved models — Bug 7 Consultant"
     )
     assert model_file.read_text() == "fake-huge-model"
 
-    # Assert 2: el backup conté les dades "normals" de storage/
+    # Assert 2: backup contains the "normal" storage/ data
     assert (backup_dir / "storage" / "sessions" / "s1.json").exists()
 
-    # Assert 3: storage/sessions/ original ja no hi és (s'ha mogut al backup)
+    # Assert 3: original storage/sessions/ is no longer there (moved to backup)
     assert not sessions_dir.exists()
 
-    # Assert 4: .env al backup; knowledge/ NO (és sistema, es preserva in-place)
+    # Assert 4: .env in backup; knowledge/ NOT (is system, preserved in-place)
     assert (backup_dir / ".env").exists()
     assert not (backup_dir / "knowledge").exists()
     assert (tmp_path / "knowledge").exists()
 
-    # Assert 5: venv eliminat per reinstal·lació
+    # Assert 5: venv removed for reinstall
     assert not (tmp_path / "venv").exists()
 
 
 def test_apply_backup_full_wipe_when_include_models(tmp_path):
-    """Confirma que el comportament amb exclude_models=False és el
-    complet (wipe total de storage/) — cap regressió del path antic."""
+    """Confirms that the behavior with exclude_models=False is complete
+    (full wipe of storage/) — no regression from the old path."""
     _make_install(tmp_path)
     (tmp_path / "storage" / "models").mkdir(parents=True)
     (tmp_path / "storage" / "models" / "m.gguf").write_text("x")
@@ -596,18 +595,18 @@ def test_apply_backup_full_wipe_when_include_models(tmp_path):
     apply_reinstall_mode(
         tmp_path, REINSTALL_MODE_BACKUP, exclude_models=False
     )
-    # Amb opt-in, tot storage/ és al backup (i originals fora)
+    # With opt-in, entire storage/ is in the backup (and originals are gone)
     assert not (tmp_path / "storage").exists()
 
 
-# ── Finding 5: e2e overwrite preserva secrets via generate_env_file ─────
+# ── Finding 5: e2e overwrite preserves secrets via generate_env_file ─────
 
 
 def test_apply_overwrite_preserves_secrets_e2e(tmp_path):
-    """Finding 5 Consultor passada 1: flow complet
+    """Finding 5 Consultant pass 1: full flow
     apply_reinstall_mode(OVERWRITE) → generate_env_file() real → secrets
-    preservats. Abans només verificàvem la unit _update_env_model_config
-    però no el flow sencer."""
+    preserved. Previously we only verified the _update_env_model_config unit
+    but not the full flow."""
     _make_install(tmp_path)
     env_file = tmp_path / ".env"
     env_file.write_text(
@@ -620,32 +619,32 @@ def test_apply_overwrite_preserves_secrets_e2e(tmp_path):
         "NEXE_PROMPT_TIER=full\n"
     )
 
-    # Pas 1 — apply overwrite: .env s'ha de mantenir intacte
+    # Step 1 — apply overwrite: .env must remain intact
     apply_reinstall_mode(tmp_path, REINSTALL_MODE_OVERWRITE)
     assert env_file.exists()
 
-    # Pas 2 — flow complet: l'installer crida generate_env_file amb un
-    # model config (possiblement diferent del que hi havia). Com que
-    # .env existeix, generate_env_file delega a _update_env_model_config
-    # que ha de preservar els secrets.
+    # Step 2 — full flow: installer calls generate_env_file with a
+    # model config (possibly different from before). Since .env exists,
+    # generate_env_file delegates to _update_env_model_config which must
+    # preserve the secrets.
     from installer.installer_setup_config import generate_env_file
     new_model = {
         "id": "qwen2.5:7b",
         "engine": "ollama",
         "prompt_tier": "full",
     }
-    # generate_env_file imprimeix a stdout — OK, només ens importa el
-    # contingut del fitxer final.
+    # generate_env_file prints to stdout — OK, we only care about
+    # the contents of the final file.
     generate_env_file(tmp_path, new_model)
 
     content = env_file.read_text()
-    # Assert secrets intactes
+    # Assert secrets intact
     assert "NEXE_PRIMARY_API_KEY=abc123" in content, (
-        "API key perduda després de generate_env_file (Bug crític)"
+        "API key lost after generate_env_file (critical bug)"
     )
     assert "NEXE_CSRF_SECRET=xyz789" in content, (
-        "CSRF secret perdut després de generate_env_file (Bug crític)"
+        "CSRF secret lost after generate_env_file (critical bug)"
     )
-    # Assert model refrescat
+    # Assert model refreshed
     assert "NEXE_DEFAULT_MODEL=qwen2.5:7b" in content
     assert "NEXE_OLLAMA_MODEL=qwen2.5:7b" in content

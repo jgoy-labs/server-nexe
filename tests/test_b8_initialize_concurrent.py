@@ -3,12 +3,12 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_b8_initialize_concurrent.py
-Description: TDD cec — B8 initialize() race: 4 modules plugin sense asyncio.Lock
-             a initialize() permeten que crides concurrents superin el guard
-             "if self._initialized" quan hi ha un await intermig.
-             Fix: asyncio.Lock per instància + double-check dins lock.
-             Mòduls afectats: ollama_module, web_ui_module, mlx_module, llama_cpp_module.
-             Onada 4.6d / xfail strict pre-fix.
+Description: Blind TDD — B8 initialize() race: 4 plugin modules without asyncio.Lock
+             in initialize() allow concurrent calls to bypass the guard
+             "if self._initialized" when there is an intermediate await.
+             Fix: asyncio.Lock per instance + double-check inside lock.
+             Affected modules: ollama_module, web_ui_module, mlx_module, llama_cpp_module.
+             Wave 4.6d / xfail strict pre-fix.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -29,7 +29,7 @@ _MODULE_FILES = {
 
 
 def _get_init_src(module_file: Path) -> str:
-    """Extreu el cos del __init__ fins al primer mètode seguent."""
+    """Extracts the body of __init__ up to the first subsequent method."""
     src = module_file.read_text()
     fn_start = src.find("    def __init__(")
     if fn_start < 0:
@@ -41,7 +41,7 @@ def _get_init_src(module_file: Path) -> str:
 
 
 def _get_initialize_src(module_file: Path) -> str:
-    """Extreu el cos d'initialize() fins al primer mètode següent."""
+    """Extracts the body of initialize() up to the first subsequent method."""
     src = module_file.read_text()
     fn_start = src.find("    async def initialize(")
     if fn_start < 0:
@@ -53,18 +53,18 @@ def _get_initialize_src(module_file: Path) -> str:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Test 1 — xfail strict: lock absent a ollama_module (té await real → race REAL)
+# Test 1 — xfail strict: lock absent in ollama_module (has real await → REAL race)
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_ollama_module_initialize_has_init_lock():
-    """B8: OllamaModule.__init__ ha d'instanciar asyncio.Lock() com a _init_lock.
+    """B8: OllamaModule.__init__ must instantiate asyncio.Lock() as _init_lock.
 
-    Pre-fix: cap Lock al __init__ → initialize() vulnerable a race (ensure_ollama_running
-    és async i crea window entre el guard `if self._initialized` i el `_initialized = True`).
-    Post-fix: self._init_lock = asyncio.Lock() al __init__ + double-check dins initialize().
+    Pre-fix: no Lock in __init__ → initialize() vulnerable to race (ensure_ollama_running
+    is async and creates a window between the guard `if self._initialized` and `_initialized = True`).
+    Post-fix: self._init_lock = asyncio.Lock() in __init__ + double-check inside initialize().
 
-    Revert mental: afegir Lock → _init_lock al __init__ → test PASSA.
-    Revert del fix → Lock absent → test FALLA.
+    Mental revert: add Lock → _init_lock in __init__ → test PASSES.
+    Revert of the fix → Lock absent → test FAILS.
     """
     init_src = _get_init_src(_MODULE_FILES["ollama_module"])
 
@@ -79,11 +79,11 @@ def test_ollama_module_initialize_has_init_lock():
 
 
 def test_ollama_module_initialize_uses_lock():
-    """B8 anti-reg: initialize() d'OllamaModule ha d'usar self._init_lock.
+    """B8 anti-reg: OllamaModule's initialize() must use self._init_lock.
 
-    Pin: `async with self._init_lock:` ha d'aparèixer a initialize()
-    + double-check `if self._initialized: return True` dins el bloc lock.
-    Dev#2 no ha de tocar aquest test — queda com a guard permanent.
+    Pin: `async with self._init_lock:` must appear in initialize()
+    + double-check `if self._initialized: return True` inside the lock block.
+    Dev#2 must not touch this test — remains as a permanent guard.
     """
     init_src = _get_initialize_src(_MODULE_FILES["ollama_module"])
 
@@ -93,18 +93,18 @@ def test_ollama_module_initialize_uses_lock():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Test 3 — anti-reg concurrent amb patró corregit (ha de PASSAR sempre)
+# Test 3 — anti-reg concurrent with corrected pattern (must always PASS)
 # ──────────────────────────────────────────────────────────────────────────────
 
 async def test_initialize_concurrent_lock_holds():
-    """Anti-reg B8: el patró Lock+double-check garanteix call_count==1 amb 100 crides.
+    """Anti-reg B8: the Lock+double-check pattern guarantees call_count==1 with 100 calls.
 
-    Verifica que el patró FIX (asyncio.Lock + double-check) elimina la race.
-    Queda com a guard permanent: si el Lock es trenca, call_count > 1.
+    Verifies that the FIX pattern (asyncio.Lock + double-check) eliminates the race.
+    Remains as a permanent guard: if the Lock breaks, call_count > 1.
     """
 
     class _FixedPatternModule:
-        """Patró post-fix: asyncio.Lock per instància + double-check."""
+        """Post-fix pattern: asyncio.Lock per instance + double-check."""
         def __init__(self):
             self._initialized = False
             self._init_lock = asyncio.Lock()
@@ -141,22 +141,22 @@ async def test_initialize_concurrent_lock_holds():
     m2 = _CountingModule()
     await asyncio.gather(*[m2.initialize({}) for _ in range(100)])
 
-    # El patró fix garanteix que _initialized es posa a True exactament 1 cop
+    # The fix pattern guarantees that _initialized is set to True exactly 1 time
     assert m2._initialized is True, "Anti-reg B8: _initialized ha de ser True post-gather"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Test 4 — simbòlics: els 4 mòduls han de tenir _init_lock post-fix
+# Test 4 — symbolic: all 4 modules must have _init_lock post-fix
 # ──────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("plugin_name", list(_MODULE_FILES.keys()))
 def test_initialize_module_has_init_lock(plugin_name: str):
-    """Anti-reg B8 simbòlic: tots 4 mòduls han de tenir _init_lock al __init__.
+    """Anti-reg B8 symbolic: all 4 modules must have _init_lock in __init__.
 
-    Verifica que el Lock ha estat aplicat de forma consistent als 4 mòduls:
-    ollama_module (await real), web_ui_module, mlx_module, llama_cpp_module.
-    Pre-fix: falla als 4. Post-fix: passa als 4.
-    Dev#2 no ha de tocar aquest test — guard permanent multi-mòdul.
+    Verifies that the Lock has been applied consistently across all 4 modules:
+    ollama_module (real await), web_ui_module, mlx_module, llama_cpp_module.
+    Pre-fix: fails for all 4. Post-fix: passes for all 4.
+    Dev#2 must not touch this test — permanent multi-module guard.
     """
     init_src = _get_init_src(_MODULE_FILES[plugin_name])
 

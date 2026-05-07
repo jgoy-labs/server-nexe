@@ -1,48 +1,48 @@
 """
-Onada 4.1 mypy core — REAL #38 TDD test (Dev#1, sessió 2 BUS pilot).
+Onada 4.1 mypy core — REAL #38 TDD test (Dev#1, BUS pilot session 2).
 
-Bug REAL classificat per Auditor#1 (`01-classificacio.md` §Bugs REAL detallat):
+REAL bug classified by Auditor#1 (`01-classificacio.md` §Bugs REAL detailed):
 
-  `core/metrics/endpoint.py:125` — `_update_module_health()` itera
-  `mm.list_modules()` amb `for module_name, module_info in modules.items():`.
-  La signatura real (`personality/module_manager/module_manager.py:238`)
-  retorna `List[ModuleInfo]`, no dict. La crida `.items()` falla amb
-  `AttributeError`, capturada pel `except Exception` (línies 136-137) a
+  `core/metrics/endpoint.py:125` — `_update_module_health()` iterates
+  `mm.list_modules()` with `for module_name, module_info in modules.items():`.
+  The real signature (`personality/module_manager/module_manager.py:238`)
+  returns `List[ModuleInfo]`, not a dict. The `.items()` call fails with
+  `AttributeError`, caught by `except Exception` (lines 136-137) at
   `logger.debug("module_health_update_skipped", extra={"reason": ...})`.
-  Conseqüència: `set_module_health(...)` no s'invoca mai per cap mòdul
-  i les mètriques `module_health` queden permanentment al valor inicial
-  sense alarma.
+  Consequence: `set_module_health(...)` is never called for any module
+  and `module_health` metrics remain permanently at the initial value
+  without any alarm.
 
-Aquest test (CEC al cos de la funció — Dev#1 només llegeix firma + Auditor#1):
+This test (CEC on the function body — Dev#1 only reads signature + Auditor#1):
 
-  1. Mocka `ModuleManager.list_modules()` per retornar una **llista**
-     (com producció), no un dict (com fan els 4 tests pre-existents
-     a `core/metrics/tests/test_endpoint.py:124-186` — aquests tests
-     són teatre: passen perquè el mock retorna dict, contradient la
-     signatura real).
-  2. Patxa `core.metrics.endpoint.logger` per capturar crides a `debug`.
-  3. Executa `_update_module_health()`.
-  4. Falla si s'ha registrat una crida a
-     `logger.debug("module_health_update_skipped", ...)` — que indica
-     que la funció ha empassat silenciosament una excepció (l'`AttributeError`
-     del bug #38).
+  1. Mocks `ModuleManager.list_modules()` to return a **list**
+     (as in production), not a dict (as the 4 pre-existing tests
+     at `core/metrics/tests/test_endpoint.py:124-186` do — those tests
+     are theatre: they pass because the mock returns a dict, contradicting
+     the real signature).
+  2. Patches `core.metrics.endpoint.logger` to capture `debug` calls.
+  3. Executes `_update_module_health()`.
+  4. Fails if a call to
+     `logger.debug("module_health_update_skipped", ...)` was recorded —
+     indicating that the function silently swallowed an exception (the
+     `AttributeError` from bug #38).
 
-Estats esperats:
+Expected states:
 
-  - **HEAD pre-cirurgia (aquest commit):** `xfailed` (strict). El codi crida
-    `.items()` sobre llista → `AttributeError` → `logger.debug("module_health_update_skipped")`
-    → l'assert falla → xfail compleix.
-  - **HEAD post-cirurgia (Dev#2):** quan Dev#2 arregli la iteració per recórrer
-    `List[ModuleInfo]` correctament, el `logger.debug("module_health_update_skipped")`
-    deixarà de cridar-se → el test passarà → `XPASS` farà saltar l'`xfail strict`
-    → Dev#2 ha de retirar el `@pytest.mark.xfail` per fer-lo `passing` net.
+  - **HEAD pre-surgery (this commit):** `xfailed` (strict). The code calls
+    `.items()` on a list → `AttributeError` → `logger.debug("module_health_update_skipped")`
+    → the assert fails → xfail is satisfied.
+  - **HEAD post-surgery (Dev#2):** when Dev#2 fixes the iteration to traverse
+    `List[ModuleInfo]` correctly, `logger.debug("module_health_update_skipped")`
+    will stop being called → the test passes → `XPASS` will trip the `xfail strict`
+    → Dev#2 must remove the `@pytest.mark.xfail` to make it cleanly `passing`.
 
-Evidència empírica pytest pre-fix (HEAD `79de490`, Onada 4.1 sessió 2):
+Empirical pytest evidence pre-fix (HEAD `79de490`, Onada 4.1 session 2):
 
     tests/onada4_mypy_core/test_metrics_endpoint_real.py::test_update_module_health_does_not_swallow_attributeerror_on_list_modules XFAIL
-    AssertionError: _update_module_health silenciosament va capturar una excepció
-    durant la iteració de list_modules() (que retorna List[ModuleInfo], no dict).
-    Crides a logger.debug('module_health_update_skipped'): [...]
+    AssertionError: _update_module_health silently caught an exception
+    during iteration of list_modules() (which returns List[ModuleInfo], not dict).
+    Calls to logger.debug('module_health_update_skipped'): [...]
 """
 
 import asyncio
@@ -52,8 +52,8 @@ import pytest
 
 
 def test_update_module_health_does_not_swallow_attributeerror_on_list_modules():
-    """Pin-test contracte: list_modules() retorna llista i la iteració no
-    pot empassar AttributeError silenciosament. Veure docstring del mòdul."""
+    """Pin-test contract: list_modules() returns a list and iteration must not
+    silently swallow AttributeError. See module docstring."""
     from core.metrics.endpoint import _update_module_health
 
     mock_module_info = MagicMock()
@@ -74,8 +74,8 @@ def test_update_module_health_does_not_swallow_attributeerror_on_list_modules():
         if call.args and "module_health_update_skipped" in str(call.args[0])
     ]
     assert not skip_calls, (
-        "_update_module_health silenciosament va capturar una excepció "
-        "durant la iteració de list_modules() (que retorna List[ModuleInfo], "
-        "no dict). Crides a logger.debug('module_health_update_skipped'): "
+        "_update_module_health silently caught an exception "
+        "during iteration of list_modules() (which returns List[ModuleInfo], "
+        "not dict). Calls to logger.debug('module_health_update_skipped'): "
         f"{[repr(c) for c in skip_calls]}"
     )

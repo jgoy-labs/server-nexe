@@ -6,7 +6,7 @@ Version: 0.9.0
 Author: Jordi Goy
 Location: install_nexe.py
 Description: Façade entry point — delegates to installer/install.py.
-             (Patró façade del projecte, com core/app.py → core/server/factory.py)
+             (Facade pattern of the project, like core/app.py → core/server/factory.py)
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

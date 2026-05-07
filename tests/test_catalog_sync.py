@@ -1,16 +1,16 @@
 """
-Test de sincronia entre els dos catàlegs de models de l'installer:
+Synchronisation test between the two installer model catalogues:
 
-  - installer/installer_catalog_data.py (SSOT per descarrega, schema small/medium/large)
-  - installer/swift-wizard/Resources/models.json (SSOT per UX, schema tier_8..tier_64)
+  - installer/installer_catalog_data.py (SSOT for download, schema small/medium/large)
+  - installer/swift-wizard/Resources/models.json (SSOT for UX, schema tier_8..tier_64)
 
-Els dos fitxers conviuen per disseny (2026-04-14). El Swift wizard passa
-`model_key` a install_headless.py via JSON, així que tot model mostrat a
-la UI ha d'existir al catàleg Python o l'installer fallarà amb
+Both files coexist by design (2026-04-14). The Swift wizard passes
+`model_key` to install_headless.py via JSON, so every model shown in the
+UI must exist in the Python catalogue or the installer will fail with
 "Model not found".
 
-Aquest test és un CI guard: si algú afegeix un model al JSON sense
-afegir-lo al .py (o divergeix els backends disponibles), falla.
+This test is a CI guard: if someone adds a model to the JSON without
+adding it to the .py (or diverges the available backends), it fails.
 """
 
 import json
@@ -96,7 +96,7 @@ def test_gguf_backend_presence_matches():
 
 
 def test_export_catalog_json_validates():
-    """L'script `export_catalog_json.py` (mode validator) ha de passar."""
+    """The `export_catalog_json.py` script (validator mode) must pass."""
     from installer.export_catalog_json import validate
     errors = validate(str(_json_path()))
     assert not errors, f"Validator errors: {errors}"

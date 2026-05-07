@@ -1,7 +1,7 @@
 """
-SecurityAgent — Agent de seguretat per a server-nexe.
-Detecta secrets exposats, patterns JWT i problemes d'autenticació.
-Read-only absolut: no modifica cap fitxer del target.
+SecurityAgent — Security agent for server-nexe.
+Detects exposed secrets, JWT patterns and authentication issues.
+Strictly read-only: does not modify any target file.
 """
 import re
 from pathlib import Path
@@ -18,7 +18,7 @@ _EXCLUDE_DIRS = {'.venv', 'venv', '__pycache__', '.git', 'node_modules', '.muthu
 
 
 class SecurityAgent(BaseAgent):
-    """Agent de seguretat per server-nexe — sap que usa FastAPI + JWT."""
+    """Security agent for server-nexe — aware that it uses FastAPI + JWT."""
 
     @property
     def agent_name(self) -> str:
@@ -47,18 +47,18 @@ class SecurityAgent(BaseAgent):
         try:
             total = sum(1 for _ in self._iter_python_files())
             if total != py_files_scanned:
-                skipped_note = f" ({total - py_files_scanned} fitxers saltats per errors)"
+                skipped_note = f" ({total - py_files_scanned} files skipped due to errors)"
         except OSError:
-            pass  # Iteració de seguretat pel reasoning — no crítica
+            pass  # Safety iteration for reasoning — not critical
 
         reasoning = (
-            f"He analitzat {py_files_scanned} fitxers Python via regex de patterns secrets/JWT/auth"
-            f" a {self.project_path.name}.{skipped_note}"
+            f"Analysed {py_files_scanned} Python files via regex for secrets/JWT/auth patterns"
+            f" in {self.project_path.name}.{skipped_note}"
         )
         if compare["memory_used"]:
             reasoning += (
-                f" He comparat amb el run anterior: {compare['new_issues']} nous problemes,"
-                f" {compare['resolved_issues']} resolts."
+                f" Compared against previous run: {compare['new_issues']} new issues,"
+                f" {compare['resolved_issues']} resolved."
             )
 
         run_data = {"findings": findings, "status": status}
@@ -94,7 +94,7 @@ class SecurityAgent(BaseAgent):
                     "type": "hardcoded_secret",
                     "file": rel_path,
                     "line": line_num,
-                    "message": f"Possible secret hardcoded: {match.group()[:60]}",
+                    "message": f"Possible hardcoded secret: {match.group()[:60]}",
                 })
         except (OSError, UnicodeDecodeError):
             pass
@@ -104,7 +104,7 @@ class SecurityAgent(BaseAgent):
         if not findings:
             return []
         return [
-            "Moure secrets a variables d'entorn o .env",
-            "Usar un gestor de secrets (Vault, AWS Secrets Manager)",
-            "Revisar git history per assegurar que no s'han commitejat",
+            "Move secrets to environment variables or .env",
+            "Use a secrets manager (Vault, AWS Secrets Manager)",
+            "Review git history to ensure they have not been committed",
         ]

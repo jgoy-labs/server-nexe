@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_dreaming_cycle_sql.py
-Description: Tests per Bug 9 — `MIN(10, evidence_count + 1)` era una extensio
-             SQLite (multi-arg function) no portable. Ara calculem el cap de
-             10 en Python i passem el valor com a parametre vinculat.
+Description: Tests for Bug 9 — `MIN(10, evidence_count + 1)` was a non-portable
+             SQLite extension (multi-arg function). Now we compute the cap of
+             10 in Python and pass the value as a bound parameter.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -32,11 +32,11 @@ class _FakeCursor:
 
 
 class _FakeConn:
-    """Conn que retorna evidence_count programable per al SELECT del refresh."""
+    """Conn that returns a configurable evidence_count for the refresh SELECT."""
 
     def __init__(self, current_evidence):
         self._current = current_evidence
-        self.executed = []  # llista (sql, params)
+        self.executed = []  # list of (sql, params)
         self.closed = False
 
     def execute(self, sql, params=()):
@@ -116,7 +116,7 @@ def _make_embedder():
 
 
 def _find_update_evidence(executed):
-    """Retorna (sql, params) de l'UPDATE episodic SET ... evidence_count = ?"""
+    """Returns (sql, params) for the UPDATE episodic SET ... evidence_count = ?"""
     for sql, params in executed:
         if "UPDATE episodic" in sql and "evidence_count" in sql:
             return sql, params
@@ -131,7 +131,7 @@ def _find_update_evidence(executed):
     (9, 10),
 ])
 def test_evidence_count_capped_in_python(current, expected):
-    """Bug 9: el valor s'ha de calcular en Python i passar com a parametre."""
+    """Bug 9: the value must be computed in Python and passed as a bound parameter."""
     conn = _FakeConn(current_evidence=current)
     store = _FakeStore(conn)
     vector = _make_vector_with_dup()
@@ -142,16 +142,16 @@ def test_evidence_count_capped_in_python(current, expected):
 
     sql, params = _find_update_evidence(conn.executed)
     assert sql is not None, (
-        "No s'ha trobat cap UPDATE episodic SET evidence_count. "
+        "No UPDATE episodic SET evidence_count found. "
         f"Executed: {conn.executed}"
     )
-    # SQL ha d'usar parametre vinculat, NO la funcio multi-arg MIN()
+    # SQL must use a bound parameter, NOT the multi-arg MIN() function
     assert "MIN(10," not in sql.replace(" ", ""), (
-        f"SQL encara conte MIN(10, ...): {sql}"
+        f"SQL still contains MIN(10, ...): {sql}"
     )
     assert "?" in sql
-    # El primer parametre vinculat ha de ser el nou evidence_count
+    # The first bound parameter must be the new evidence_count
     assert params[0] == expected, (
-        f"Esperat evidence_count={expected} per current={current}, "
-        f"rebut params={params}"
+        f"Expected evidence_count={expected} for current={current}, "
+        f"received params={params}"
     )

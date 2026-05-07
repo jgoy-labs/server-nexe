@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_ingest_knowledge_idempotent.py
-Description: Tests F7 — ingest_knowledge defaults a nexe_documentation,
-             és idempotent (no destructiu) i admet target_collection
-             override per casos excepcionals.
+Description: Tests F7 — ingest_knowledge defaults to nexe_documentation,
+             is idempotent (non-destructive) and accepts target_collection
+             override for exceptional cases.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 
 def _make_memory_mock(collections_existing=None):
-    """Helper: build a MemoryAPI mock with configurable existing collections."""
+    """Helper: builds a MemoryAPI mock with configurable existing collections."""
     existing = set(collections_existing or [])
     mock = MagicMock()
     mock.initialize = AsyncMock()
@@ -41,7 +41,7 @@ class TestF7DefaultsToDocumentation:
         assert DOCUMENTATION_COLLECTION != USER_KNOWLEDGE_COLLECTION
 
     def test_default_writes_to_nexe_documentation(self, tmp_path):
-        """When called without target_collection, store() must use nexe_documentation."""
+        """When called without target_collection, store() must target nexe_documentation."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"
@@ -55,7 +55,7 @@ class TestF7DefaultsToDocumentation:
             result = asyncio.run(ingest_knowledge())
 
         assert result is True
-        # All store() calls must target nexe_documentation
+        # All store() calls must target nexe_documentation.
         assert mock.store.call_count >= 1
         for call in mock.store.call_args_list:
             assert call.kwargs["collection"] == "nexe_documentation"

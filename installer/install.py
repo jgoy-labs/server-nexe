@@ -128,10 +128,10 @@ def run_installer():
         return
 
     # 3.5. Reinstall handling — Bug 7 fix.
-    # Si detectem instal·lació existent oferim 3 opcions:
-    #   1) Esborra-ho tot
-    #   2) Sobreescriu sistema preservant dades
-    #   3) Backup automàtic + instal·lació neta (default segur)
+    # If we detect an existing installation we offer 3 options:
+    #   1) Delete everything
+    #   2) Overwrite system files preserving user data
+    #   3) Automatic backup + clean install (safe default)
     if detect_existing_install(project_root):
         print(f"\n{YELLOW}[!] Instal·lació existent detectada a:{RESET} {project_root}")
         print(f"\n  {CYAN}1){RESET} Esborra-ho tot (.env, storage/, knowledge/, venv)")
@@ -156,7 +156,7 @@ def run_installer():
             print_error(f"Reinstall mode failed: {e}")
             return
     else:
-        # Sense instal·lació prèvia: assegurem que el venv està net per si de cas.
+        # No prior installation: ensure the venv is clean just in case.
         venv_path = project_root / "venv"
         if venv_path.exists():
             print(f"\n{YELLOW}[CLEAN]{RESET} {t('cleaning_venv')}")
@@ -324,9 +324,9 @@ def run_installer():
         print(f"  🧹 {t('module_cache_cleaned')}")
         print(f"     {DIM}{t('cache_explanation')}{RESET}")
 
-    # 11. (Q5.5 reobert 2026-04-08) — Qdrant binari servidor extern eliminat.
-    #     El server v0.9.0 usa QdrantClient(path="storage/vectors") embedded
-    #     via core/qdrant_pool.py. Cap binari extern necessari.
+    # 11. (Q5.5 reopened 2026-04-08) — External Qdrant server binary removed.
+    #     Server v0.9.0 uses QdrantClient(path="storage/vectors") embedded
+    #     via core/qdrant_pool.py. No external binary required.
 
     # 12. Create nexe wrapper script
     nexe_wrapper = project_root / "nexe"
@@ -411,11 +411,12 @@ def run_installer():
         print_step(f"{BOLD}{t('processing_knowledge').format(n=len(knowledge_files))}{RESET}")
         print(f"  {DIM}{t('processing_knowledge_wait')}{RESET}\n")
         try:
-            # Q5.5 reobert (2026-04-08): ingestió via embedded QdrantClient.
-            # Abans arrencàvem un binari Qdrant servidor extern a 'storage/qdrant/'
-            # que ningú connectava (ingest_knowledge va per embedded via
-            # core/qdrant_pool.py a 'storage/vectors/'), deixant residu mort.
-            # Ara la ingestió va directament per embedded.
+            # Q5.5 reopened (2026-04-08): ingestion via embedded QdrantClient.
+            # Previously we launched an external Qdrant server binary at
+            # 'storage/qdrant/' that nothing connected to (ingest_knowledge
+            # goes through the embedded path via core/qdrant_pool.py at
+            # 'storage/vectors/'), leaving dead residue. Ingestion now goes
+            # directly through the embedded path.
             ingest_env = {**os.environ, "NEXE_LANG": lang, "TRANSFORMERS_VERBOSITY": "error"}
             result = subprocess.run([  # nosec B603: python_path absolute venv Path; project_root is Path(__file__)-derived embedded as literal in -c script
                 str(python_path), "-c",

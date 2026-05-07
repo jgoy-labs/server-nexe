@@ -25,10 +25,10 @@ def test_v1_endpoint_status_consistency():
             rf'"{endpoint}":\s*\{{[^}}]*"status":\s*"([^"]+)"',
             text,
         )
-        assert block, f"No s'ha trobat el bloc de {endpoint!r} a v1.py"
+        assert block, f"Block for {endpoint!r} not found in v1.py"
         status = block.group(1)
         assert status != "implemented", (
-            f"{endpoint} status = {status!r} però l'endpoint retorna 501"
+            f"{endpoint} status = {status!r} but the endpoint returns 501"
         )
 
 
@@ -36,7 +36,7 @@ def test_v1_version_string_dynamic():
     """B7: la string de versió a v1.py NO és '0.9.0' hardcoded."""
     text = (REPO / "core/endpoints/v1.py").read_text(encoding="utf-8")
     assert "Nexe 0.9.0 Versioned API" not in text, (
-        "Hardcoded version 0.9.0 — usar __version__ dinàmic"
+        "Hardcoded version 0.9.0 — use dynamic __version__"
     )
 
 
@@ -44,7 +44,7 @@ def test_changelog_has_1_0_2_entry():
     """B7: CHANGELOG té entry per 1.0.2-beta entre 1.0.1 i 1.0.3."""
     text = (REPO / "CHANGELOG.md").read_text(encoding="utf-8")
     assert "## [1.0.2-beta]" in text, (
-        "Entry [1.0.2-beta] absent al CHANGELOG"
+        "Entry [1.0.2-beta] absent from CHANGELOG"
     )
 
 
@@ -63,14 +63,14 @@ def test_plugin_readme_marks_chat_as_removed(plugin_readme, removed_ep):
         "Removed" in text
         or "removed" in text
         or f"~~{removed_ep}~~" in text
-    ), f"{plugin_readme} no documenta que {removed_ep} està removed (returns 403)"
+    ), f"{plugin_readme} does not document that {removed_ep} is removed (returns 403)"
 
 
 def test_security_pattern_count_accurate():
     """B7: el nombre de patterns al README coincideix amb la realitat."""
     text = (REPO / "plugins/security/readme/README.md").read_text(encoding="utf-8")
     assert "69 patrons" not in text, (
-        "README diu 69 patrons; realitat 47+18=65"
+        "README says 69 patterns; reality is 47+18=65"
     )
 
     from plugins.security.sanitizer.core.patterns import (
@@ -84,7 +84,7 @@ def test_security_pattern_count_accurate():
         or f"{n_jailbreak}+{n_injection}" in text
         or f"{n_jailbreak} + {n_injection}" in text
     ), (
-        f"README no coincideix amb el real "
+        f"README does not match reality "
         f"({n_jailbreak} jailbreak + {n_injection} injection)"
     )
 
@@ -97,28 +97,28 @@ def test_no_phantom_versions_in_v1_py():
 
 
 def test_filter_rag_injection_docstring_no_overclaim_brackets():
-    """C23 resolt: NFKC no normalitza ⟦⟧ — però _NON_NFKC_BRACKET_MAP sí.
+    """C23 resolved: NFKC does not normalise ⟦⟧ — but _NON_NFKC_BRACKET_MAP does.
 
-    Verifica que el codi conté la taula de substitució explícita per a brackets
-    CJK i matemàtics (C23 v1.0.4), i que el gap ja no apareix als 'Known gaps'.
+    Verifies that the code contains the explicit substitution table for
+    CJK and mathematical brackets (C23 v1.0.4), and that the gap no longer appears in 'Known gaps'.
     """
     import unicodedata
 
-    # NFKC segueix sense normalitzar ⟦⟧ (invariant de Python, no del nostre codi)
+    # NFKC still does not normalise ⟦⟧ (Python invariant, not our code)
     assert unicodedata.normalize("NFKC", "⟦") == "⟦"
     assert unicodedata.normalize("NFKC", "⟧") == "⟧"
 
     text = (REPO / "core/endpoints/chat_sanitization.py").read_text(encoding="utf-8")
 
-    # C23: la taula de substitució explícita ha d'existir al mòdul
+    # C23: the explicit substitution table must exist in the module
     assert "_NON_NFKC_BRACKET_MAP" in text, (
-        "_NON_NFKC_BRACKET_MAP no trobat — C23 no implementat"
+        "_NON_NFKC_BRACKET_MAP not found — C23 not implemented"
     )
     assert "「" in text and "⟦" in text, (
-        "Brackets CJK/matemàtics no a la taula de substitució"
+        "CJK/mathematical brackets not in substitution table"
     )
 
-    # El gap CJK/matemàtic ja NO hauria d'aparèixer com a pendent als Known gaps
+    # The CJK/mathematical gap should NO longer appear as pending in Known gaps
     known_gaps_section = re.search(
         r"Known gaps:.*?(?=Args:|Returns:|\"\"\")",
         text,
@@ -127,5 +127,5 @@ def test_filter_rag_injection_docstring_no_overclaim_brackets():
     if known_gaps_section:
         gap_text = known_gaps_section.group(0)
         assert "CJK" not in gap_text, (
-            "C23 resolt però el docstring segueix llistant-lo com a gap"
+            "C23 resolved but docstring still lists it as a gap"
         )

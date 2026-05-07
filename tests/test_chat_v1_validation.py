@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_chat_v1_validation.py
-Description: Bug 21 — Verifica que /v1/chat/completions aplica validate_string_input
-             als camps string del payload (messages.content, model, engine).
-             SQL injection / XSS / etc. han de retornar HTTP 400.
+Description: Bug 21 — Verifies that /v1/chat/completions applies validate_string_input
+             to the string fields of the payload (messages.content, model, engine).
+             SQL injection / XSS / etc. must return HTTP 400.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -55,13 +55,13 @@ _HEADERS = {"X-API-Key": API_KEY}
 
 
 class TestChatV1Validation:
-    """Bug 21 — string input validation a /v1/chat/completions."""
+    """Bug 21 — string input validation at /v1/chat/completions."""
 
     def test_sql_injection_in_chat_passes_through_to_llm(self, client):
-        """Bug 21 r1 — SQLi a `messages.content` (context='chat') NO es bloqueja al
-        sanitizer: el payload va al LLM, no a una SQL DB. El RAG usa Qdrant
-        (vector DB). El sanitizer SÍ bloqueja SQLi en `context='param'` (model,
-        engine, etc.) — veure `test_sql_injection_in_model_field_rejected`.
+        """Bug 21 r1 — SQLi in `messages.content` (context='chat') is NOT blocked by the
+        sanitizer: the payload goes to the LLM, not to a SQL DB. RAG uses Qdrant
+        (vector DB). The sanitizer DOES block SQLi in `context='param'` (model,
+        engine, etc.) — see `test_sql_injection_in_model_field_rejected`.
         """
         payload = {
             "messages": [
@@ -71,13 +71,13 @@ class TestChatV1Validation:
             "use_rag": False,
         }
         r = client.post("/v1/chat/completions", json=payload, headers=_HEADERS)
-        # Acceptem 200 (LLM gestiona el text) o 400 (si es reactiva check_sql en chat).
+        # Accept 200 (LLM handles the text) or 400 (if check_sql is re-activated in chat).
         assert r.status_code in (200, 400), (
             f"Esperat 200 (passthrough LLM) o 400 (rejected), rebut {r.status_code}: {r.text}"
         )
 
     def test_xss_in_message_content_rejected(self, client):
-        """Payload XSS a messages.content -> 400."""
+        """XSS payload in messages.content -> 400."""
         payload = {
             "messages": [
                 {"role": "user", "content": "<script>alert('xss')</script>"}
@@ -99,7 +99,7 @@ class TestChatV1Validation:
         assert r.status_code == 400
 
     def test_oversized_message_rejected(self, client):
-        """Missatge > 8000 chars -> 400 (DoS prevention)."""
+        """Message > 8000 chars -> 400 (DoS prevention)."""
         payload = {
             "messages": [{"role": "user", "content": "A" * 9000}],
             "stream": False,
@@ -109,12 +109,12 @@ class TestChatV1Validation:
         assert r.status_code == 400
 
     def test_legitimate_message_passes_validation(self, client, monkeypatch):
-        """Missatge normal NO ha de ser rebutjat per la validació (pot fallar després per falta d'engine, no per 400 de validació)."""
+        """A normal message must NOT be rejected by validation (it may fail later due to missing engine, not due to a validation 400)."""
         payload = {
             "messages": [{"role": "user", "content": "Quina és la capital de Catalunya?"}],
             "stream": False,
             "use_rag": False,
         }
         r = client.post("/v1/chat/completions", json=payload, headers=_HEADERS)
-        # No ha de ser 400 per validació. Pot ser 200, 503, 500 etc. segons disponibilitat engine.
+        # Must not be 400 due to validation. May be 200, 503, 500 etc. depending on engine availability.
         assert r.status_code != 400, f"Validació ha rebutjat input legítim: {r.text}"

@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_qdrant_pool.py
-Description: Tests per Bug 13 — flush abans de close al qdrant_pool i error
-             handling explicit (substitueix el `except: pass` que amagava
-             corrupcions silencioses).
+Description: Tests for Bug 13 — flush before close in qdrant_pool and explicit
+             error handling (replaces the `except: pass` that was hiding
+             silent corruptions).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -26,7 +26,7 @@ def _reset_pool():
 
 
 def test_close_calls_flush_then_close():
-    """flush ha de cridar-se ABANS de close, i ambdos sense errors."""
+    """flush must be called BEFORE close, and both without errors."""
     client = MagicMock()
     call_order = []
     client.flush.side_effect = lambda: call_order.append("flush")
@@ -36,16 +36,16 @@ def test_close_calls_flush_then_close():
     pool.close_qdrant_client()
 
     assert call_order == ["flush", "close"], (
-        f"Order esperat ['flush','close'], rebut {call_order}"
+        f"Expected order ['flush','close'], got {call_order}"
     )
     assert pool._instances == {}
 
 
 def test_close_logs_warning_on_close_failure(caplog):
-    """Si close() llanca, no s'engoleix: es loguea un warning explicit.
+    """If close() raises, it is not swallowed: an explicit warning is logged.
 
-    Abans hi havia `except Exception: pass` que amagava qualsevol
-    corrupcio o error de I/O al tancament.
+    Previously there was `except Exception: pass` that was hiding any
+    corruption or I/O error on close.
     """
     client = MagicMock()
     client.flush = MagicMock()  # flush ok
@@ -59,13 +59,13 @@ def test_close_logs_warning_on_close_failure(caplog):
         "Qdrant pool close failed" in rec.message
         and "disk full" in rec.message
         for rec in caplog.records
-    ), f"No s'ha trobat el warning esperat als logs: {[r.message for r in caplog.records]}"
+    ), f"Expected warning not found in logs: {[r.message for r in caplog.records]}"
     assert pool._instances == {}
 
 
 def test_close_handles_missing_flush_gracefully(caplog):
-    """Si el client no te flush(), continua amb close() sense petar."""
-    client = MagicMock(spec=["close"])  # nomes close, sense flush
+    """If the client has no flush(), continues with close() without crashing."""
+    client = MagicMock(spec=["close"])  # only close, no flush
     pool._instances["test:no-flush"] = client
 
     with caplog.at_level(logging.DEBUG, logger="core.qdrant_pool"):
@@ -76,7 +76,7 @@ def test_close_handles_missing_flush_gracefully(caplog):
 
 
 def test_close_logs_warning_on_flush_failure(caplog):
-    """Si flush() llanca, es loguea pero close() es crida igualment."""
+    """If flush() raises, it is logged but close() is still called."""
     client = MagicMock()
     client.flush.side_effect = RuntimeError("flush boom")
     pool._instances["test:flush-fail"] = client
@@ -84,7 +84,7 @@ def test_close_logs_warning_on_flush_failure(caplog):
     with caplog.at_level(logging.WARNING, logger="core.qdrant_pool"):
         pool.close_qdrant_client()
 
-    # close() s'ha cridat tot i el flush fallat
+    # close() was called despite the flush failing
     client.close.assert_called_once()
     assert any(
         "flush" in rec.message.lower() for rec in caplog.records

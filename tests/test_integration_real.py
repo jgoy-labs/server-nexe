@@ -1,13 +1,13 @@
 """
-Tests d'integració reals contra el servidor Nexe 0.9.
+Real integration tests against Nexe 0.9 server.
 
-Requereix:
-- Servidor Nexe actiu a localhost:9119
-- Ollama actiu a localhost:11434
-- Qdrant actiu a localhost:6333
-- NEXE_PRIMARY_API_KEY configurat al .env
+Requires:
+- Nexe server running at localhost:9119
+- Ollama running at localhost:11434
+- Qdrant running at localhost:6333
+- NEXE_PRIMARY_API_KEY configured in .env
 
-Executar:
+Run:
     pytest tests/test_integration_real.py -v --tb=short -m integration
 """
 
@@ -24,11 +24,11 @@ import pytest
 # ---------------------------------------------------------------------------
 
 BASE_URL = "http://localhost:9119"
-TIMEOUT = 120.0  # models grans triguen a carregar
+TIMEOUT = 120.0  # large models take time to load
 
 
 def _read_api_key() -> str:
-    """Llegeix la API key del .env o variable d'entorn."""
+    """Read the API key from .env or environment variable."""
     key = os.environ.get("NEXE_PRIMARY_API_KEY")
     if key:
         return key
@@ -63,12 +63,12 @@ def client():
 
 @pytest.fixture(scope="session")
 def async_client():
-    # Per tests de streaming
+    # For streaming tests
     return httpx.AsyncClient(base_url=BASE_URL, timeout=TIMEOUT)
 
 
 def _server_available():
-    """Verificar que el servidor està actiu."""
+    """Verify that the server is running."""
     try:
         r = httpx.get(f"{BASE_URL}/health", timeout=5.0)
         return r.status_code == 200
@@ -78,7 +78,7 @@ def _server_available():
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.skipif(not _server_available(), reason="Servidor Nexe no disponible"),
+    pytest.mark.skipif(not _server_available(), reason="Nexe server not available"),
 ]
 
 
@@ -88,7 +88,7 @@ pytestmark = [
 
 
 class TestHealthEndpoints:
-    """Endpoints públics de salut i estat."""
+    """Public health and status endpoints."""
 
     def test_root_returns_system_info(self, client):
         r = client.get("/")
@@ -131,7 +131,7 @@ class TestHealthEndpoints:
 
 
 class TestInfoEndpoints:
-    """Endpoints d'informació de l'API."""
+    """API information endpoints."""
 
     def test_v1_root(self, client):
         r = client.get("/v1")
@@ -151,22 +151,22 @@ class TestInfoEndpoints:
 
 
 class TestSecurityEndpoints:
-    """Endpoints del mòdul de seguretat."""
+    """Security module endpoints."""
 
     def test_security_health(self, client, headers):
-        # Auditoria r4 B2: ara requereix X-API-Key
+        # Audit r4 B2: now requires X-API-Key
         r = client.get("/security/health", headers=headers)
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "healthy"
 
     def test_security_info(self, client, headers):
-        # Auditoria r4 B2: ara requereix X-API-Key
+        # Audit r4 B2: now requires X-API-Key
         r = client.get("/security/info", headers=headers)
         assert r.status_code == 200
 
     def test_security_scan_requires_csrf(self, client, headers):
-        # POST a /security/ requereix CSRF token (no exempt)
+        # POST to /security/ requires CSRF token (not exempt)
         r = client.post("/security/scan", headers=headers)
         assert r.status_code in (200, 403)  # 403 = CSRF expected
 
@@ -181,7 +181,7 @@ class TestSecurityEndpoints:
 
 
 class TestUIHealth:
-    """Health check de la UI."""
+    """UI health check."""
 
     def test_ui_health(self, client, headers):
         r = client.get("/ui/health", headers=headers)
@@ -197,7 +197,7 @@ class TestUIHealth:
 
 
 class TestMemoryStore:
-    """Guardar contingut real a la memòria (Qdrant)."""
+    """Store real content in memory (Qdrant)."""
 
     def test_store_text(self, client, headers):
         r = client.post(
@@ -243,10 +243,10 @@ class TestMemoryStore:
 
 
 class TestMemorySearch:
-    """Buscar contingut real a la memòria."""
+    """Search real content in memory."""
 
     def test_search_stored_content(self, client, headers):
-        # Primer guardem quelcom únic
+        # First store something unique
         unique = f"La Torre Eiffel fa 330 metres — {uuid.uuid4().hex[:8]}"
         client.post(
             "/v1/memory/store",
@@ -257,9 +257,9 @@ class TestMemorySearch:
                 "metadata": {"source": "integration_test"},
             },
         )
-        # Esperem un moment perquè Qdrant indexi
+        # Wait a moment for Qdrant to index
         time.sleep(1)
-        # Busquem
+        # Search
         r = client.post(
             "/v1/memory/search",
             headers=headers,
@@ -297,12 +297,12 @@ class TestMemorySearch:
 
 
 # ===========================================================================
-# 7. CHAT — MLX (model actual carregat)
+# 7. CHAT — MLX (currently loaded model)
 # ===========================================================================
 
 
 class TestChatMLX:
-    """Chat amb el motor MLX (model ja carregat al servidor)."""
+    """Chat with the MLX engine (model already loaded on the server)."""
 
     def test_chat_simple_question(self, client, headers):
         r = client.post(
@@ -365,19 +365,19 @@ class TestChatMLX:
         )
         assert r.status_code == 200
         data = r.json()
-        # Amb max_tokens=10, la resposta ha de ser curta
+        # With max_tokens=10, the response must be short
         usage = data.get("usage", {})
         if "completion_tokens" in usage:
-            assert usage["completion_tokens"] <= 50  # marge per tokens especials/thinking
+            assert usage["completion_tokens"] <= 50  # margin for special/thinking tokens
 
 
 # ===========================================================================
-# 8. CHAT — OLLAMA PETIT (phi3:mini)
+# 8. CHAT — OLLAMA SMALL (phi3:mini)
 # ===========================================================================
 
 
 class TestChatOllamaSmall:
-    """Chat amb Ollama model petit (phi3:mini 2.2GB)."""
+    """Chat with Ollama small model (phi3:mini 2.2GB)."""
 
     def test_chat_ollama_phi3(self, client, headers):
         r = client.post(
@@ -407,7 +407,7 @@ class TestChatOllamaSmall:
         )
         assert r.status_code == 200
         data = r.json()
-        # Ollama pot retornar format diferent
+        # Ollama may return a different format
         if "choices" in data:
             content = data["choices"][0]["message"]["content"]
         elif "message" in data:
@@ -431,12 +431,12 @@ class TestChatOllamaSmall:
 
 
 # ===========================================================================
-# 9. CHAT — OLLAMA MITJÀ (llama3:8b)
+# 9. CHAT — OLLAMA MEDIUM (llama3:8b)
 # ===========================================================================
 
 
 class TestChatOllamaMedium:
-    """Chat amb Ollama model mitjà (llama3:8b 4.7GB)."""
+    """Chat with Ollama medium model (llama3:8b 4.7GB)."""
 
     def test_chat_ollama_llama3(self, client, headers):
         r = client.post(
@@ -487,12 +487,12 @@ class TestChatOllamaMedium:
 
 
 # ===========================================================================
-# 10. CHAT — OLLAMA GRAN (llama2:13b)
+# 10. CHAT — OLLAMA LARGE (llama2:13b)
 # ===========================================================================
 
 
 class TestChatOllamaLarge:
-    """Chat amb Ollama model gran (llama2:13b 7.4GB)."""
+    """Chat with Ollama large model (llama2:13b 7.4GB)."""
 
     def test_chat_ollama_llama2_13b(self, client, headers):
         r = client.post(
@@ -543,7 +543,7 @@ class TestChatOllamaLarge:
 
 
 class TestChatStreaming:
-    """Chat amb streaming (Server-Sent Events)."""
+    """Chat with streaming (Server-Sent Events)."""
 
     def test_streaming_sse_format(self, client, headers):
         with client.stream(
@@ -594,22 +594,22 @@ class TestChatStreaming:
         ) as response:
             assert response.status_code == 200
             lines = list(response.iter_lines())
-            # L'últim chunk amb contingut ha de ser [DONE]
+            # The last chunk with content must be [DONE]
             data_lines = [l for l in lines if l.strip()]
             if data_lines:
                 assert any("[DONE]" in l for l in data_lines)
 
 
 # ===========================================================================
-# 12. CHAT — RAG (memòria real)
+# 12. CHAT — RAG (real memory)
 # ===========================================================================
 
 
 class TestChatRAG:
-    """Chat amb RAG activat — usa memòria real."""
+    """Chat with RAG enabled — uses real memory."""
 
     def test_chat_with_rag_uses_context(self, client, headers):
-        # 1. Guardar un fet únic
+        # 1. Store a unique fact
         unique_fact = f"La muntanya Nexetest té {uuid.uuid4().hex[:4]} metres d'alçada"
         client.post(
             "/v1/memory/store",
@@ -620,9 +620,9 @@ class TestChatRAG:
                 "metadata": {"source": "rag_test"},
             },
         )
-        time.sleep(2)  # Qdrant indexa
+        time.sleep(2)  # Qdrant indexes
 
-        # 2. Preguntar sobre el fet amb RAG
+        # 2. Ask about the fact with RAG
         r = client.post(
             "/v1/chat/completions",
             headers=headers,
@@ -650,12 +650,12 @@ class TestChatRAG:
 
 
 # ===========================================================================
-# 13. CHAT — MULTILINGÜE
+# 13. CHAT — MULTILINGUAL
 # ===========================================================================
 
 
 class TestChatMultilingual:
-    """Verificar que el servidor respon en múltiples idiomes."""
+    """Verify that the server responds in multiple languages."""
 
     def test_chat_catalan(self, client, headers):
         r = client.post(
@@ -706,7 +706,7 @@ class TestChatMultilingual:
 
 
 class TestChatErrorHandling:
-    """Verificar gestió d'errors del chat."""
+    """Verify chat error handling."""
 
     def test_chat_no_auth(self, client):
         r = client.post(
@@ -716,7 +716,7 @@ class TestChatErrorHandling:
         assert r.status_code in (401, 403)
 
     def test_chat_empty_messages_accepted(self, client, headers):
-        # El servidor accepta messages=[] amb fallback graceful
+        # The server accepts messages=[] with graceful fallback
         r = client.post(
             "/v1/chat/completions",
             headers=headers,
@@ -733,7 +733,7 @@ class TestChatErrorHandling:
         assert r.status_code in (400, 422)
 
     def test_chat_nonexistent_model_fallback(self, client, headers):
-        # El servidor fa fallback a un engine disponible si el model no existeix
+        # The server falls back to an available engine if the model does not exist
         r = client.post(
             "/v1/chat/completions",
             headers=headers,
@@ -744,7 +744,7 @@ class TestChatErrorHandling:
                 "max_tokens": 10,
             },
         )
-        # Pot retornar 200 (fallback) o error
+        # May return 200 (fallback) or error
         assert r.status_code in (200, 400, 404, 422, 500, 503)
 
 
@@ -754,7 +754,7 @@ class TestChatErrorHandling:
 
 
 class TestUISession:
-    """Gestió de sessions de la UI."""
+    """UI session management."""
 
     def test_create_session(self, client, headers):
         r = client.post("/ui/session/new", headers=headers)
@@ -769,22 +769,22 @@ class TestUISession:
         assert isinstance(data, (list, dict))
 
     def test_session_lifecycle(self, client, headers):
-        # Crear
+        # Create
         r = client.post("/ui/session/new", headers=headers)
         assert r.status_code == 200
         data = r.json()
         session_id = data.get("session_id") or data.get("id")
         assert session_id
 
-        # Obtenir info
+        # Get info
         r = client.get(f"/ui/session/{session_id}", headers=headers)
         assert r.status_code == 200
 
-        # Historial
+        # History
         r = client.get(f"/ui/session/{session_id}/history", headers=headers)
         assert r.status_code == 200
 
-        # Eliminar
+        # Delete
         r = client.delete(f"/ui/session/{session_id}", headers=headers)
         assert r.status_code == 200
 
@@ -795,7 +795,7 @@ class TestUISession:
 
 
 class TestUIChat:
-    """Chat via la interfície web UI."""
+    """Chat via the web UI interface."""
 
     def test_ui_chat_simple(self, client, headers):
         r = client.post(
@@ -808,11 +808,11 @@ class TestUIChat:
         assert "response" in data or "message" in data or "choices" in data
 
     def test_ui_chat_with_session(self, client, headers):
-        # Crear sessió
+        # Create session
         r = client.post("/ui/session/new", headers=headers)
         session_id = r.json().get("session_id") or r.json().get("id")
 
-        # Xatejar amb la sessió
+        # Chat with the session
         r = client.post(
             "/ui/chat",
             headers=headers,
@@ -838,7 +838,7 @@ class TestUIChat:
 
 
 class TestUIFileUpload:
-    """Pujada de fitxers via UI."""
+    """File upload via UI."""
 
     def test_upload_txt_file(self, client, headers):
         content = (
@@ -848,7 +848,7 @@ class TestUIFileUpload:
             "Les proves d'integració són essencials per la qualitat del programari."
         )
         files = {"file": ("test_document.txt", io.BytesIO(content.encode()), "text/plain")}
-        # Treure Content-Type perquè httpx el posi automàticament per multipart
+        # Remove Content-Type so httpx sets it automatically for multipart
         upload_headers = {"X-API-Key": headers["X-API-Key"]}
         r = client.post("/ui/upload", headers=upload_headers, files=files)
         assert r.status_code == 200
@@ -867,7 +867,7 @@ class TestUIFileUpload:
 
 
 class TestUIMemory:
-    """Operacions de memòria via UI."""
+    """Memory operations via UI."""
 
     def test_save_memory(self, client, headers):
         r = client.post(
@@ -899,7 +899,7 @@ class TestUIMemory:
 
 
 class TestBootstrapInfo:
-    """Informació del sistema de bootstrap."""
+    """Bootstrap system information."""
 
     def test_bootstrap_info(self, client):
         r = client.get("/api/bootstrap/info")
@@ -908,7 +908,7 @@ class TestBootstrapInfo:
         assert "bootstrap_enabled" in data or "mode" in data or "status" in data
 
     def test_bootstrap_info_no_auth_needed(self, client):
-        # Bootstrap info és públic
+        # Bootstrap info is public
         r = client.get("/api/bootstrap/info")
         assert r.status_code == 200
 
@@ -919,7 +919,7 @@ class TestBootstrapInfo:
 
 
 class TestAdminSystem:
-    """Endpoints d'administració del sistema (sense restart!)."""
+    """System administration endpoints (no restart!)."""
 
     def test_system_health(self, client):
         r = client.get("/admin/system/health")
@@ -938,10 +938,10 @@ class TestAdminSystem:
 
 
 class TestEndToEndFlow:
-    """Flux complet: store → chat amb RAG → recall → verify."""
+    """Complete flow: store → chat with RAG → recall → verify."""
 
     def test_full_rag_pipeline(self, client, headers):
-        # 1. Guardar un fet únic a memòria
+        # 1. Store a unique fact in memory
         unique_id = uuid.uuid4().hex[:8]
         fact = f"La ciutat de Nexegrad-{unique_id} té exactament 742.831 habitants"
 
@@ -956,10 +956,10 @@ class TestEndToEndFlow:
         )
         assert r.status_code == 200
 
-        # 2. Esperar indexació
+        # 2. Wait for indexing
         time.sleep(2)
 
-        # 3. Chat amb RAG preguntant sobre el fet
+        # 3. Chat with RAG asking about the fact
         r = client.post(
             "/v1/chat/completions",
             headers=headers,
@@ -978,10 +978,10 @@ class TestEndToEndFlow:
         assert r.status_code == 200
         data = r.json()
         chat_response = data["choices"][0]["message"]["content"]
-        # El model hauria de mencionar el número si RAG funciona
-        # (no sempre garantit, depèn del model)
+        # The model should mention the number if RAG works
+        # (not always guaranteed, depends on the model)
 
-        # 4. Recall — buscar el fet guardat
+        # 4. Recall — search for the stored fact
         r = client.post(
             "/v1/memory/search",
             headers=headers,
@@ -990,18 +990,18 @@ class TestEndToEndFlow:
         assert r.status_code == 200
         data = r.json()
         results = data.get("results", [])
-        # Ha de trobar el document que hem guardat
+        # Must find the document we stored
         assert len(results) > 0
         found = any("742.831" in str(result) or unique_id in str(result) for result in results)
-        assert found, f"No s'ha trobat el fet guardat. Results: {results}"
+        assert found, f"Stored fact not found. Results: {results}"
 
     def test_ui_chat_then_recall(self, client, headers):
-        """Xatejar via UI i verificar que es guarda a memòria."""
-        # 1. Crear sessió
+        """Chat via UI and verify it is saved to memory."""
+        # 1. Create session
         r = client.post("/ui/session/new", headers=headers)
         session_id = r.json().get("session_id") or r.json().get("id")
 
-        # 2. Xatejar
+        # 2. Chat
         unique_topic = f"test-topic-{uuid.uuid4().hex[:6]}"
         r = client.post(
             "/ui/chat",
@@ -1014,7 +1014,7 @@ class TestEndToEndFlow:
         )
         assert r.status_code == 200
 
-        # 3. Verificar historial de sessió
+        # 3. Verify session history
         r = client.get(f"/ui/session/{session_id}/history", headers=headers)
         assert r.status_code == 200
 
@@ -1025,7 +1025,7 @@ class TestEndToEndFlow:
 
 
 class TestMultiEngine:
-    """Comparar respostes entre engines diferents."""
+    """Compare responses between different engines."""
 
     def test_same_question_different_engines(self, client, headers):
         question = "What is the capital of France? Answer with just the city name."
@@ -1052,15 +1052,15 @@ class TestMultiEngine:
             elif "message" in data:
                 responses[engine_name] = data["message"]["content"]
 
-        # Tots haurien de mencionar Paris
+        # All should mention Paris
         for engine, response in responses.items():
             assert "paris" in response.lower() or "París" in response, (
-                f"Engine {engine} no ha respost Paris: {response}"
+                f"Engine {engine} did not respond with Paris: {response}"
             )
 
     def test_engines_available(self, client):
         r = client.get("/status")
         data = r.json()
         engines = data.get("engines_available", {})
-        # Almenys un engine ha d'estar actiu
-        assert any(engines.values()), f"Cap engine disponible: {engines}"
+        # At least one engine must be active
+        assert any(engines.values()), f"No engine available: {engines}"

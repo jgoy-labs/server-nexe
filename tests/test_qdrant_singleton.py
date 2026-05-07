@@ -14,7 +14,7 @@ from core.qdrant_pool import get_qdrant_client, close_qdrant_client, _lock
 
 
 def test_singleton_returns_same_instance(tmp_path):
-    """Dues crides amb el mateix path retornen el mateix objecte."""
+    """Two calls with the same path return the same object."""
     import core.qdrant_pool as pool
     pool._instances.clear()  # Reset
     try:
@@ -27,7 +27,7 @@ def test_singleton_returns_same_instance(tmp_path):
 
 
 def test_singleton_thread_safe(tmp_path):
-    """10 threads concurrents obtenen el mateix objecte."""
+    """10 concurrent threads get the same object."""
     import core.qdrant_pool as pool
     pool._instances.clear()  # Reset
     try:
@@ -39,6 +39,6 @@ def test_singleton_thread_safe(tmp_path):
         threads = [threading.Thread(target=get_client) for _ in range(10)]
         for t in threads: t.start()
         for t in threads: t.join()
-        assert len(set(results)) == 1  # Tots el mateix objecte
+        assert len(set(results)) == 1  # All the same object
     finally:
         close_qdrant_client()

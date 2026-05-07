@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_embeddings_recall_ab.py
-Description: Recall@N regression per embedding model.
-             VectorStore agnòstic: InMemoryVectorStore (numpy cosine),
-             zero dependència qdrant_client. Skip si fastembed no disponible.
+Description: Recall@N regression for embedding model.
+             VectorStore-agnostic: InMemoryVectorStore (numpy cosine),
+             zero qdrant_client dependency. Skip if fastembed not available.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -53,10 +53,10 @@ pytestmark = pytest.mark.skipif(
 # ── InMemoryVectorStore (protocol-compliant, zero Qdrant) ─────────────────────
 
 class InMemoryVectorStore:
-    """VectorStore in-memory per tests. Cosine similarity via numpy.
+    """In-memory VectorStore for tests. Cosine similarity via numpy.
 
-    Implementa el protocol VectorStore sense cap dependència externa
-    (qdrant_client, faiss, etc.). Adequat per tests unitaris i de regressió.
+    Implements the VectorStore protocol with no external dependencies
+    (qdrant_client, faiss, etc.). Suitable for unit and regression tests.
     """
 
     def __init__(self) -> None:
@@ -142,9 +142,9 @@ _GOLDEN_QUERIES: List[Dict[str, Any]] = [
     {"query": "requisits sistema operatiu per instal·lar",      "relevant": {"d10"}},
 ]
 
-# Thresholds conservadors per a un dataset de 10 docs
-_RECALL_AT_5_MIN = 0.5   # ≥5/10 queries han de retornar el doc rellevant en top-5
-_RECALL_AT_10_MIN = 0.7  # ≥7/10 en top-10
+# Conservative thresholds for a 10-doc dataset
+_RECALL_AT_5_MIN = 0.5   # ≥5/10 queries must return the relevant doc in top-5
+_RECALL_AT_10_MIN = 0.7  # ≥7/10 in top-10
 
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
@@ -181,10 +181,10 @@ def _recall_at_n(store: InMemoryVectorStore, embedder: Any, n: int) -> float:
 # ── tests ─────────────────────────────────────────────────────────────────────
 
 class TestRecallABRegression:
-    """Recall@N regression — embedding model agnòstic de VectorStore."""
+    """Recall@N regression — embedding model VectorStore-agnostic."""
 
     def test_in_memory_store_search_returns_ordered_results(self, populated_store, embedder):
-        """InMemoryVectorStore retorna resultats en ordre descendent de score."""
+        """InMemoryVectorStore returns results in descending score order."""
         q_vec = embedder.encode("assistent local sense internet")
         results = populated_store.search(
             VectorSearchRequest(query_vector=q_vec, top_k=3)
@@ -194,27 +194,27 @@ class TestRecallABRegression:
         assert results[0].score >= results[-1].score
 
     def test_recall_at_5_above_threshold(self, populated_store, embedder):
-        """Recall@5 ≥ 0.50. Detecta degradació si el model canvia.
+        """Recall@5 ≥ 0.50. Detects degradation if the model changes.
 
-        Threshold conservador: 5/10 queries han de retornar el doc rellevant
-        en top-5. Un model mpnet multilingual ben inicialitzat supera 0.70.
+        Conservative threshold: 5/10 queries must return the relevant doc
+        in top-5. A well-initialised multilingual mpnet model exceeds 0.70.
         """
         recall = _recall_at_n(populated_store, embedder, n=5)
         assert recall >= _RECALL_AT_5_MIN, (
             f"Recall@5 = {recall:.2f} < {_RECALL_AT_5_MIN}. "
-            "Possible degradació del model d'embedding."
+            "Possible embedding model degradation."
         )
 
     def test_recall_at_10_above_threshold(self, populated_store, embedder):
-        """Recall@10 ≥ 0.70. Amb 10 docs el rellevant hauria d'estar sempre present."""
+        """Recall@10 ≥ 0.70. With 10 docs the relevant one should always be present."""
         recall = _recall_at_n(populated_store, embedder, n=10)
         assert recall >= _RECALL_AT_10_MIN, (
             f"Recall@10 = {recall:.2f} < {_RECALL_AT_10_MIN}. "
-            "Possible degradació del model d'embedding."
+            "Possible embedding model degradation."
         )
 
     def test_top1_hit_rate_nonzero(self, populated_store, embedder):
-        """Almenys 3/10 queries han de tenir el doc rellevant en posició 1."""
+        """At least 3/10 queries must have the relevant doc in position 1."""
         top1_hits = sum(
             1
             for item in _GOLDEN_QUERIES
@@ -229,11 +229,11 @@ class TestRecallABRegression:
         )
         assert top1_hits >= 3, (
             f"Top-1 hits = {top1_hits}/10 < 3. "
-            "El model no retorna el doc rellevant en primera posició per gairebé cap query."
+            "The model does not return the relevant doc in first position for almost any query."
         )
 
     def test_store_delete_reduces_vectors(self, embedder):
-        """delete() elimina vectors correctament i no afecta resultats futurs."""
+        """delete() removes vectors correctly and does not affect future results."""
         store = InMemoryVectorStore()
         texts = [d["text"] for d in _GOLDEN_DOCS[:3]]
         metas = [{"id": d["id"]} for d in _GOLDEN_DOCS[:3]]

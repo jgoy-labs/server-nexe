@@ -13,17 +13,17 @@ import sys
 # ═══════════════════════════════════════════════════════════════════════════
 # UI CONSTANTS
 # ═══════════════════════════════════════════════════════════════════════════
-# Bug 4 (2026-04-06): codis ANSI crus apareixien al log GUI quan stdout no és
-# un terminal. Detecció runtime: si no és TTY (mode headless invocat per la
-# GUI o redirigit a fitxer), totes les constants de color queden buides per
-# evitar que els codis `\033[...m` arribin literals al consumidor.
+# Bug 4 (2026-04-06): raw ANSI codes appeared in the GUI log when stdout is
+# not a terminal. Runtime detection: if not a TTY (headless mode invoked by
+# the GUI or redirected to a file), all color constants are set to empty
+# strings to prevent `\033[...m` codes from reaching the consumer literally.
 #
-# ⚠️ Dev D (Consultor passada 1): aquesta detecció és un SNAPSHOT al load del
-# mòdul. Si el codi client redirigeix `sys.stdout` DESPRÉS d'importar aquest
-# mòdul (per exemple un test amb `capsys`), les constants queden bloquejades
-# al valor inicial. En producció real (CLI vs GUI headless) cada procés és
-# nou i no és problema, però si cal una solució 100% correcta caldria
-# convertir les constants a una funció `_color(name)` lazy. v0.9.1+.
+# ⚠️ Dev D (Consultant pass 1): this detection is a SNAPSHOT at module load
+# time. If client code redirects `sys.stdout` AFTER importing this module
+# (e.g. a test with `capsys`), the constants remain locked to the initial
+# value. In real production (CLI vs GUI headless) each process is new and
+# this is not an issue, but for a 100%-correct solution the constants would
+# need to be converted to a lazy `_color(name)` function. v0.9.1+.
 _USE_COLOR = sys.stdout.isatty()
 
 if _USE_COLOR:

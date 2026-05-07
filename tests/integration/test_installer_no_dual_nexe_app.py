@@ -1,12 +1,12 @@
 """
-Tests d'integració per installer/install_headless.py — Fix bug #19d.
+Integration tests for installer/install_headless.py — Fix bug #19d.
 
-Objectiu: l'installer NO ha de crear `/Applications/Nexe.app` residual.
-L'única instal·lació legítima és `<install_dir>/Nexe.app`. Dock i Login
-Items apunten allà.
+Goal: the installer must NOT create a residual `/Applications/Nexe.app`.
+The only legitimate installation is `<install_dir>/Nexe.app`. Dock and Login
+Items point there.
 
-Protecció contra regressió: si algú torna a posar la còpia a /Applications,
-aquests tests fallaran.
+Regression protection: if someone puts the copy back in /Applications,
+these tests will fail.
 """
 
 import inspect
@@ -22,10 +22,10 @@ from installer import install_headless
 class TestInstallerDoesNotCopyToApplications:
 
     def test_source_has_no_copy_to_applications_nexe_app(self):
-        """Protecció estàtica: cap línia de codi productiu d'install_headless
-        ha de copiar Nexe.app a `/Applications/Nexe.app`."""
+        """Static protection: no line of production code in install_headless
+        should copy Nexe.app to `/Applications/Nexe.app`."""
         src = inspect.getsource(install_headless)
-        # Pattern: `copytree(..., Path("/Applications/Nexe.app"))` o `/Applications/Nexe.app` com a destí
+        # Pattern: `copytree(..., Path("/Applications/Nexe.app"))` or `/Applications/Nexe.app` as destination
         problematic_patterns = [
             r'copytree\s*\([^,]+,\s*[^)]*"/Applications/Nexe\.app"',
             r'nexe_app_dest\s*=\s*Path\s*\(\s*"/Applications/Nexe\.app"\s*\)',
@@ -37,8 +37,8 @@ class TestInstallerDoesNotCopyToApplications:
             )
 
     def test_source_has_no_login_items_registering_applications_nexe_app(self):
-        """Login Items NO pot apuntar a `/Applications/Nexe.app` (app orfe
-        sense codi al costat). Ha d'apuntar a `<install_dir>/Nexe.app`."""
+        """Login Items must NOT point to `/Applications/Nexe.app` (orphan app
+        with no code alongside). Must point to `<install_dir>/Nexe.app`."""
         src = inspect.getsource(install_headless)
         assert "/Applications/Nexe.app" not in src or _only_cleanup_refs(src), (
             "install_headless no pot registrar /Applications/Nexe.app com a "
@@ -48,8 +48,8 @@ class TestInstallerDoesNotCopyToApplications:
 
 
 class TestLegacyCleanupPreserved:
-    """L'uninstaller continua netejant `/Applications/Nexe.app` residual
-    d'instal·lacions antigues (retrocompat).
+    """The uninstaller continues to clean up the residual `/Applications/Nexe.app`
+    from old installations (backwards compatibility).
     """
 
     def test_uninstaller_still_handles_legacy_applications_nexe_app(self):
@@ -57,20 +57,20 @@ class TestLegacyCleanupPreserved:
 
         src = inspect.getsource(tray_uninstaller)
         assert "/Applications/Nexe.app" in src, (
-            "Uninstaller ha de mantenir la referència a /Applications/Nexe.app "
-            "per netejar instal·lacions legacy (usuaris amb versions anteriors)."
+            "Uninstaller must keep the reference to /Applications/Nexe.app "
+            "to clean up legacy installations (users with older versions)."
         )
 
 
 def _only_cleanup_refs(src: str) -> bool:
-    """Heurística: si `/Applications/Nexe.app` apareix, només ha de ser
-    en context de neteja de residus (comentaris, branques 'if exists: remove').
-    No en branques de creació."""
-    # Simplificat: mai ha d'aparèixer dins una crida a `copytree`, `osascript`
-    # de Login Items creació, ni com a `nexe_app_dest` de destí.
+    """Heuristic: if `/Applications/Nexe.app` appears, it must only be
+    in a cleanup context (comments, 'if exists: remove' branches).
+    Not in creation branches."""
+    # Simplified: must never appear inside a `copytree` call, `osascript`
+    # Login Item creation, or as a `nexe_app_dest` destination.
     forbidden_contexts = ["copytree", "make login item at end", "nexe_app_dest"]
     for ctx in forbidden_contexts:
-        # Si la cadena problemàtica apareix a menys de 200 chars del context, trenca.
+        # If the problematic string appears within 200 chars of the context, break.
         for m in re.finditer(re.escape(ctx), src):
             window = src[max(0, m.start() - 200):m.end() + 200]
             if "/Applications/Nexe.app" in window:

@@ -2,18 +2,18 @@
 ────────────────────────────────────
 Server Nexe
 Location: tests/test_integrity_pins_visibility.py
-Description: B5 (auditoria r4) — visibilitat real del WARNING runtime
-             quan `MODEL_WEIGHT_SHA256` carrega un pin `None`, i guards
-             documentals que mantenen sincronitzats el catàleg, el comentari
-             header del mòdul i el CHANGELOG.
+Description: B5 (audit r4) — real visibility of the runtime WARNING
+             when `MODEL_WEIGHT_SHA256` loads a `None` pin, and documentary
+             guards that keep the catalog, the module header comment,
+             and the CHANGELOG in sync.
 
-             Tres invariants:
-             1. `verify_sha256(expected=None, allow_missing=True)` retorna
-                False i emet un WARNING explícit (no silent).
-             2. El fitxer `installer/installer_catalog_data.py` documenta
-                explícitament l'estat actual (tots `None`) al seu header.
-             3. Si algú comença a poblar pins, el CHANGELOG ha de reflectir
-                el progrés (failsafe contra drift doc/codi).
+             Three invariants:
+             1. `verify_sha256(expected=None, allow_missing=True)` returns
+                False and emits an explicit WARNING (not silent).
+             2. The file `installer/installer_catalog_data.py` explicitly
+                documents the current state (all `None`) in its header.
+             3. If someone starts populating pins, the CHANGELOG must reflect
+                the progress (failsafe against doc/code drift).
 ────────────────────────────────────
 """
 
@@ -31,8 +31,8 @@ CHANGELOG_PATH = REPO_ROOT / "CHANGELOG.md"
 
 
 def test_verify_sha256_emits_warning_when_pin_is_none(caplog):
-    """B5: pin=None ha d'emetre WARNING explícit (no silent)."""
-    fake_actual = "a" * 64  # SHA256 vàlid hex
+    """B5: pin=None must emit an explicit WARNING (not silent)."""
+    fake_actual = "a" * 64  # valid SHA256 hex
     with caplog.at_level(logging.WARNING, logger="core.integrity.hashing"):
         result = verify_sha256(
             actual=fake_actual,
@@ -40,34 +40,34 @@ def test_verify_sha256_emits_warning_when_pin_is_none(caplog):
             artifact="test:fake-model",
             allow_missing=True,
         )
-    assert result is False, "pin=None ha de retornar False (degraded)"
+    assert result is False, "pin=None must return False (degraded)"
     warns = [r for r in caplog.records if r.levelno == logging.WARNING]
     messages = [r.getMessage() for r in warns]
-    assert any("no SHA256 pin" in m for m in messages), f"WARNING 'no SHA256 pin' no emès. Logs: {messages}"
+    assert any("no SHA256 pin" in m for m in messages), f"WARNING 'no SHA256 pin' not emitted. Logs: {messages}"
 
 
 def test_catalog_all_pins_are_none_is_documented():
-    """B5: si TOTS els pins són None, ha d'haver un comentari STATUS al fitxer."""
+    """B5: if ALL pins are None, there must be a STATUS comment in the file."""
     text = CATALOG_PATH.read_text(encoding="utf-8")
     assert "STATUS v1.0.3-beta" in text and "ALL VALUES BELOW ARE None" in text, (
-        "Comentari header de transparència per pins=None obligatori (installer/installer_catalog_data.py)"
+        "Transparency header comment for pins=None is mandatory (installer/installer_catalog_data.py)"
     )
 
 
 def test_catalog_pin_count_consistency():
-    """B5: el CHANGELOG diu 26 entries; verificar que la realitat coincideix.
+    """B5: CHANGELOG says 26 entries; verify that reality matches.
 
-    Si en el futur algú comença a poblar pins (v1.0.4-beta C19), el CHANGELOG
-    ha d'actualitzar-se en paral·lel — failsafe contra drift doc/codi.
+    If in the future someone starts populating pins (v1.0.4-beta C19), the CHANGELOG
+    must be updated in parallel — failsafe against doc/code drift.
     """
     actual = len(MODEL_WEIGHT_SHA256)
-    assert actual >= 20, f"Catàleg estranyament petit ({actual} entries) — CHANGELOG diu ~26"
+    assert actual >= 20, f"Catalog unexpectedly small ({actual} entries) — CHANGELOG says ~26"
 
     non_none = sum(1 for v in MODEL_WEIGHT_SHA256.values() if v is not None)
     if non_none > 0:
-        # Si algú comença a poblar — assegurar que el CHANGELOG ho documenta.
+        # If someone starts populating — ensure the CHANGELOG documents it.
         ch = CHANGELOG_PATH.read_text(encoding="utf-8")
         assert "Status at" in ch and ("populated" in ch.lower() or "pinned" in ch.lower()), (
-            "Si comences a poblar pins, actualitza també el CHANGELOG "
-            "(secció 'Status at v1.0.X-beta' amb el nou nombre de pins)"
+            "If you start populating pins, also update the CHANGELOG "
+            "(section 'Status at v1.0.X-beta' with the new pin count)"
         )

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_paths_facade.py
-Description: Tests per core/paths.py (facade) i gaps de core/paths/detection.py.
+Description: Tests for core/paths.py (facade) and gaps in core/paths/detection.py.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 
 class TestPathsFacadeModule:
-    """Tests per core/paths.py (el fitxer façana, no el paquet)."""
+    """Tests for core/paths.py (the facade file, not the package)."""
 
     def test_get_repo_root_importable_from_facade(self):
         import core.paths as paths_module
@@ -47,7 +47,7 @@ class TestPathsFacadeModule:
         assert hasattr(paths_module, "NEXE_CORE_DIRS")
 
     def test_core_paths_py_file_exists(self):
-        """Verifica que el fitxer façana existeix."""
+        """Verifies that the facade file exists."""
         import core
         core_dir = Path(core.__file__).parent
         facade = core_dir / "paths.py"
@@ -55,7 +55,7 @@ class TestPathsFacadeModule:
 
 
 class TestDetectionViaMarkers:
-    """Tests per _detect_via_markers (línies 146-167)."""
+    """Tests for _detect_via_markers (lines 146-167)."""
 
     def setup_method(self):
         from core.paths.detection import reset_repo_root_cache
@@ -67,7 +67,7 @@ class TestDetectionViaMarkers:
         reset_repo_root_cache()
 
     def test_detect_via_markers_returns_path(self):
-        """_detect_via_markers troba la root del projecte."""
+        """_detect_via_markers finds the project root."""
         from core.paths.detection import _detect_via_markers
         result = _detect_via_markers()
         assert result is not None
@@ -75,7 +75,7 @@ class TestDetectionViaMarkers:
         assert result.exists()
 
     def test_detect_via_markers_returns_none_when_no_root(self, tmp_path):
-        """_detect_via_markers retorna None quan no es troba root."""
+        """_detect_via_markers returns None when no root is found."""
         from core.paths.detection import _detect_via_markers
         # Patch __file__ to point to a tmp dir where no nexe structure exists
         import core.paths.detection as det_module
@@ -87,7 +87,7 @@ class TestDetectionViaMarkers:
 
 
 class TestDetectionViaStartPath:
-    """Tests per start_path (línies 117-127 de detection.py)."""
+    """Tests for start_path (lines 117-127 of detection.py)."""
 
     def setup_method(self):
         from core.paths.detection import reset_repo_root_cache
@@ -99,17 +99,17 @@ class TestDetectionViaStartPath:
         reset_repo_root_cache()
 
     def test_invalid_start_path_logs_and_continues(self, tmp_path):
-        """start_path invàlid → _log_detection_failure s'invoca."""
+        """Invalid start_path → _log_detection_failure is invoked."""
         from core.paths.detection import get_repo_root
 
-        # tmp_path sense estructura nexe → start_path detection fails
-        # ha de continuar i trobar la root real
+        # tmp_path without nexe structure → start_path detection fails
+        # must continue and find the real root
         result = get_repo_root(start_path=tmp_path)
         assert isinstance(result, Path)
 
 
 class TestHelpersMissingLines:
-    """Tests per lines 80-82 de core/paths/helpers.py."""
+    """Tests for lines 80-82 of core/paths/helpers.py."""
 
     def test_get_plugins_path(self):
         from core.paths.helpers import get_plugins_path

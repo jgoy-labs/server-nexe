@@ -1,28 +1,28 @@
-"""Anti-regressió Cluster 5 — `api/documents.py` callable contract.
+"""Anti-regression Cluster 5 — `api/documents.py` callable contract.
 
-Cobreix els 8 findings mypy a `memory/memory/api/__init__.py:308, 347, 359, 453` i
-`memory/memory/api/documents.py:91, 180, 267`. Mecànica: les firmes de
-`store_document`, `store_documents_batch`, `search_documents` declaren
-`generate_embedding: Callable[[str], List[float]]` (sync) però el cos fa
-`await asyncio.wait_for(generate_embedding(text), ...)` i `await
-generate_embeddings_batch(texts)`. Runtime funciona perquè els callers passen
-mètodes async (`_generate_embedding`, `_generate_embeddings_batch`) que retornen
-Coroutines — `await` les espera correctament. Mypy correctament avisa: la firma
-és mentida.
+Covers the 8 mypy findings at `memory/memory/api/__init__.py:308, 347, 359, 453` and
+`memory/memory/api/documents.py:91, 180, 267`. Mechanics: the signatures of
+`store_document`, `store_documents_batch`, `search_documents` declare
+`generate_embedding: Callable[[str], List[float]]` (sync) but the body does
+`await asyncio.wait_for(generate_embedding(text), ...)` and `await
+generate_embeddings_batch(texts)`. Runtime works because callers pass
+async methods (`_generate_embedding`, `_generate_embeddings_batch`) that return
+Coroutines — `await` waits for them correctly. Mypy correctly warns: the signature
+is a lie.
 
-Decisió Director (Cluster 5): Dev#2 actualitzarà les firmes a
-`Callable[[str], Awaitable[List[float]]]` (i variant batch). El runtime NO canvia.
+Director decision (Cluster 5): Dev#2 will update the signatures to
+`Callable[[str], Awaitable[List[float]]]` (and batch variant). Runtime does NOT change.
 
-CONTRACTE PINAT (compatible pre i post-fix):
-1. `store_document`, `store_documents_batch`, `search_documents` són `async def`
-   (coroutine functions) — fix mypy NO ha de convertir-les en sync.
-2. Cridades amb un callable async legítim, completen sense crash i retornen el
-   tipus esperat. Pina la semàntica `await callable(...)` que el codi executa.
+PINNED CONTRACT (compatible pre and post-fix):
+1. `store_document`, `store_documents_batch`, `search_documents` are `async def`
+   (coroutine functions) — the mypy fix must NOT convert them to sync.
+2. Called with a legitimate async callable, they complete without crash and return the
+   expected type. Pins the `await callable(...)` semantics that the code executes.
 
-Pre-fix (HEAD `30eb2a6`): contracte compleix runtime (encara que mypy avisa).
-Post-fix: ha de seguir complint-se. Si Dev#2 inadvertidament canvia el cos a
-`embedding = generate_embedding(text)` (sync) en lloc d'await, aquest test detecta
-la regressió empíricament.
+Pre-fix (HEAD `30eb2a6`): runtime contract is fulfilled (even though mypy warns).
+Post-fix: must continue to be fulfilled. If Dev#2 inadvertently changes the body to
+`embedding = generate_embedding(text)` (sync) instead of await, this test detects
+the regression empirically.
 """
 
 from __future__ import annotations
@@ -35,11 +35,11 @@ import pytest
 
 
 def test_store_document_is_coroutine_function() -> None:
-    """`store_document` és async — fix Cluster 5 NO ha de canviar a sync."""
+    """`store_document` is async — Cluster 5 fix must NOT change it to sync."""
     from memory.memory.api.documents import store_document
 
     assert inspect.iscoroutinefunction(store_document), (
-        "store_document ha perdut el `async` — trenca tots els callers."
+        "store_document has lost the `async` — breaks all callers."
     )
 
 
@@ -56,9 +56,9 @@ def test_search_documents_is_coroutine_function() -> None:
 
 
 def test_store_document_signature_keeps_generate_embedding_param() -> None:
-    """Pina paràmetre nominat `generate_embedding`. Si Dev#2 renomena o
-    elimina el param (e.g., per simplificar la fix mypy), els callers de
-    `api/__init__.py` línies 308/453 es trenquen."""
+    """Pins the named parameter `generate_embedding`. If Dev#2 renames or
+    removes the param (e.g., to simplify the mypy fix), callers in
+    `api/__init__.py` lines 308/453 break."""
     from memory.memory.api.documents import store_document
 
     sig = inspect.signature(store_document)
@@ -73,7 +73,7 @@ def test_store_documents_batch_signature_keeps_callable_param() -> None:
 
 
 class _FakeQdrant:
-    """Mock minimal del client Qdrant per aquesta prova de contracte."""
+    """Minimal mock of the Qdrant client for this contract test."""
 
     def __init__(self) -> None:
         self.upsert_calls: List[Dict[str, Any]] = []
@@ -84,11 +84,11 @@ class _FakeQdrant:
 
 @pytest.mark.asyncio
 async def test_store_document_awaits_async_generate_embedding() -> None:
-    """Test runtime: `store_document` ha de poder rebre un `async def` callable
-    i obtenir l'embedding via `await`. Si Dev#2 canvia el cos a sync, aquest
-    test FALLA empíricament (no executa awaits).
+    """Runtime test: `store_document` must be able to receive an `async def` callable
+    and obtain the embedding via `await`. If Dev#2 changes the body to sync, this
+    test FAILS empirically (awaits are not executed).
 
-    Pina la semàntica de la línia 91 (`await asyncio.wait_for(generate_embedding(text), ...)`).
+    Pins the semantics of line 91 (`await asyncio.wait_for(generate_embedding(text), ...)`).
     """
     from memory.memory.api.documents import store_document
 
@@ -113,18 +113,18 @@ async def test_store_document_awaits_async_generate_embedding() -> None:
         executor.shutdown(wait=True)
 
     assert isinstance(doc_id, str) and len(doc_id) == 16, (
-        f"doc_id format trencat: {doc_id!r}. Premisa SHA256[:16] (documents.py:88)."
+        f"doc_id format broken: {doc_id!r}. SHA256[:16] premise (documents.py:88)."
     )
     assert embedding_calls == ["contracte cluster 5"], (
-        "L'embedder async no s'ha cridat exactament una vegada — fix Cluster 5 ha "
-        "trencat la semàntica `await generate_embedding(text)`."
+        "The async embedder was not called exactly once — Cluster 5 fix has "
+        "broken the `await generate_embedding(text)` semantics."
     )
-    assert len(qdrant.upsert_calls) == 1, "qdrant.upsert no ha estat invocat."
+    assert len(qdrant.upsert_calls) == 1, "qdrant.upsert was not invoked."
 
 
 @pytest.mark.asyncio
 async def test_store_documents_batch_awaits_async_callable() -> None:
-    """Anti-regressió L180: `await generate_embeddings_batch(texts)`."""
+    """Anti-regression L180: `await generate_embeddings_batch(texts)`."""
     from memory.memory.api.documents import store_documents_batch
 
     batch_calls: List[List[str]] = []
@@ -149,5 +149,5 @@ async def test_store_documents_batch_awaits_async_callable() -> None:
 
     assert len(doc_ids) == 2
     assert batch_calls == [["a", "b"]], (
-        "fake_async_batch no s'ha awaited correctament — semantica L180 trencada."
+        "fake_async_batch was not awaited correctly — L180 semantics broken."
     )

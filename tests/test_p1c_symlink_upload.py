@@ -1,14 +1,14 @@
 """
-Tests P1-C — Symlink upload: rebutjar fitxers desats que apuntin fora del directori d'uploads.
+Tests P1-C — Symlink upload: reject saved files that point outside the uploads directory.
 
-Attack vector demostrat: ln -s /etc/passwd evil.pdf && curl -F "file=@evil.pdf"
-→ ingeria 17 chunks de /etc/passwd a user_knowledge.
+Demonstrated attack vector: ln -s /etc/passwd evil.pdf && curl -F "file=@evil.pdf"
+→ ingested 17 chunks of /etc/passwd into user_knowledge.
 
-Fix: _is_symlink_outside_uploads() extret de upload_file, igual que
-_detect_sensitive_upload (patró P1-4/P0-2.c: helper testejable directament
-perquè @limiter.limit rebutja MagicMock).
+Fix: _is_symlink_outside_uploads() extracted from upload_file, same as
+_detect_sensitive_upload (pattern P1-4/P0-2.c: directly testable helper
+because @limiter.limit rejects MagicMock).
 
-NOTA: NO afecta models locals (MLX/llama.cpp/Ollama) — mai passen per /upload.
+NOTE: Does NOT affect local models (MLX/llama.cpp/Ollama) — they never go through /upload.
 
 www.jgoy.net · https://server-nexe.org
 """
@@ -27,7 +27,7 @@ except ImportError:
 
 class TestIsSymlinkOutsideUploads:
     def test_real_file_inside_dir_ok(self, tmp_path):
-        """Fitxer real dins del directori d'uploads → NO rebutjat (False)."""
+        """Real file inside the uploads directory → NOT rejected (False)."""
         uploads = tmp_path / "uploads"
         uploads.mkdir()
         real_file = uploads / "document.pdf"
@@ -36,7 +36,7 @@ class TestIsSymlinkOutsideUploads:
         assert _is_symlink_outside_uploads(real_file) is False
 
     def test_symlink_to_etc_passwd_rejected(self, tmp_path):
-        """Symlink que apunta a /etc/passwd → REBUTJAT (True)."""
+        """Symlink pointing to /etc/passwd → REJECTED (True)."""
         uploads = tmp_path / "uploads"
         uploads.mkdir()
         evil_link = uploads / "evil.pdf"
@@ -45,7 +45,7 @@ class TestIsSymlinkOutsideUploads:
         assert _is_symlink_outside_uploads(evil_link) is True
 
     def test_symlink_inside_uploads_dir_ok(self, tmp_path):
-        """Symlink legítim que apunta a un altre fitxer dins del directori d'uploads → OK (False)."""
+        """Legitimate symlink pointing to another file inside the uploads directory → OK (False)."""
         uploads = tmp_path / "uploads"
         uploads.mkdir()
         target = uploads / "target.txt"
@@ -56,7 +56,7 @@ class TestIsSymlinkOutsideUploads:
         assert _is_symlink_outside_uploads(link) is False
 
     def test_symlink_to_tmp_outside_uploads_rejected(self, tmp_path):
-        """Symlink que apunta a un fitxer FORA del directori d'uploads → REBUTJAT."""
+        """Symlink pointing to a file OUTSIDE the uploads directory → REJECTED."""
         uploads = tmp_path / "uploads"
         uploads.mkdir()
         external = tmp_path / "secret.txt"

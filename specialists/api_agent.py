@@ -1,7 +1,7 @@
 """
-ApiAgent — Agent d'API per a server-nexe.
-Detecta endpoints FastAPI via AST i avisa de breaking changes respecte al baseline.
-Read-only absolut.
+ApiAgent — API agent for server-nexe.
+Detects FastAPI endpoints via AST and warns of breaking changes against the baseline.
+Strictly read-only.
 """
 import ast
 from typing import Any, Dict, List, Set
@@ -13,7 +13,7 @@ _EXCLUDE_DIRS = {'.venv', 'venv', '__pycache__', '.git', 'node_modules', '.muthu
 
 
 class ApiAgent(BaseAgent):
-    """Agent d'API per server-nexe — detecta breaking changes d'endpoints."""
+    """API agent for server-nexe — detects endpoint breaking changes."""
 
     @property
     def agent_name(self) -> str:
@@ -30,12 +30,12 @@ class ApiAgent(BaseAgent):
         resolved_issues = 0
 
         if baseline is None:
-            # Primer run: guardar baseline i retornar HEALTHY
+            # First run: save baseline and return HEALTHY
             self.memory.set_baseline({"endpoints": endpoints})
             self.memory.save_run({"endpoints": endpoints, "findings": []})
             reasoning = (
-                f"He analitzat {ep_count} endpoints via AST (decoradors FastAPI) "
-                f"a {self.project_path.name}. Primer run: baseline guardat."
+                f"Analysed {ep_count} endpoints via AST (FastAPI decorators) "
+                f"in {self.project_path.name}. First run: baseline saved."
             )
             return {
                 "status": "HEALTHY",
@@ -48,7 +48,7 @@ class ApiAgent(BaseAgent):
                 "resolved_issues": 0,
             }
 
-        # Runs successius: comparar amb baseline
+        # Successive runs: compare against baseline
         memory_used = True
         baseline_eps: Set[str] = set(baseline.get("endpoints", []))
         current_eps: Set[str] = set(endpoints)
@@ -61,17 +61,17 @@ class ApiAgent(BaseAgent):
                 "id": f"api:removed:{ep}",
                 "severity": "high",
                 "type": "breaking_change",
-                "message": f"Endpoint eliminat: {ep}",
+                "message": f"Endpoint removed: {ep}",
             })
 
         new_issues = len(findings)
-        resolved_issues = 0  # Endpoints nous (added) no son problemes resolts — son features
+        resolved_issues = 0  # New endpoints (added) are not resolved issues — they are features
 
         status = "UNHEALTHY" if findings else "HEALTHY"
 
         reasoning = (
-            f"He analitzat {ep_count} endpoints via AST a {self.project_path.name}. "
-            f"He comparat amb el baseline: {len(removed)} eliminats, {len(added)} nous."
+            f"Analysed {ep_count} endpoints via AST in {self.project_path.name}. "
+            f"Compared against baseline: {len(removed)} removed, {len(added)} new."
         )
 
         self.memory.save_run({"endpoints": endpoints, "findings": findings})
@@ -81,14 +81,14 @@ class ApiAgent(BaseAgent):
             "findings": findings,
             "reasoning": reasoning,
             "top_offenders": [f["id"].replace("api:removed:", "") for f in findings[:5]],
-            "recommendations": ["Verificar backward compatibility"] if findings else [],
+            "recommendations": ["Verify backward compatibility"] if findings else [],
             "memory_used": memory_used,
             "new_issues": new_issues,
             "resolved_issues": resolved_issues,
         }
 
     def _scan_endpoints(self) -> List[str]:
-        """Detecció estàtica via AST: @router.get('/path'), @app.post('/path')."""
+        """Static detection via AST: @router.get('/path'), @app.post('/path')."""
         endpoints = []
         for py_file in self._iter_python_files():
             try:
@@ -106,7 +106,7 @@ class ApiAgent(BaseAgent):
         return sorted(set(endpoints))
 
     def _extract_endpoint(self, decorator) -> str:
-        """Extreu 'METHOD /path' d'un decorador FastAPI si és vàlid."""
+        """Extracts 'METHOD /path' from a FastAPI decorator if valid."""
         if not isinstance(decorator, ast.Call):
             return ""
         func = decorator.func

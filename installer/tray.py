@@ -46,7 +46,7 @@ NS_STATUS_WINDOW_LEVEL = 25
 
 
 def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_):
-    """NSAlert always-on-top (assumeix _ForegroundContext ja actiu)."""
+    """NSAlert always-on-top (assumes _ForegroundContext already active)."""
     try:
         from AppKit import NSAlert, NSAlertStyleWarning
     except Exception:
@@ -91,8 +91,8 @@ def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_
 
 
 class _ForegroundContext:
-    """Promociona activation policy a .regular per un bloc d'alertes, i la
-    torna al valor anterior al sortir. Evita flip-flop entre alertes."""
+    """Promote activation policy to .regular for a block of alerts, and
+    restore it to the previous value on exit. Avoids flip-flop between alerts."""
     def __init__(self):
         self.old_policy = None
 
@@ -325,7 +325,7 @@ class NexeTray(rumps.App):
                 try:
                     os.kill(existing_pid, 0)  # liveness probe
                     # PID alive — orphan server (not owned by this tray)
-                    self.status_item.title = f"Server orfe detectat (PID {existing_pid})"
+                    self.status_item.title = f"Orphan server detected (PID {existing_pid})"
                     self.toggle_item.title = self.t("start")
                     self.icon = ICON_RUNNING
                     return
@@ -550,7 +550,7 @@ class NexeTray(rumps.App):
                 details += "\n\n"
             details += self.t("uninstall_failed") + "\n• " + "\n• ".join(failed)
 
-        # Resultat final també s'ha de veure a front (NSStatusWindowLevel + .regular)
+        # Final result must also be visible at front (NSStatusWindowLevel + .regular)
         with _ForegroundContext():
             if failed:
                 _front_alert(
@@ -563,15 +563,15 @@ class NexeTray(rumps.App):
                     message=self.t("uninstall_done", details=details),
                 )
 
-        # Terminació: rumps.quit_application() a vegades no tanca el procés si
-        # el run loop esta dins un callback, i queda una icona zombie al menubar.
-        # Fem sortida explícita: quit rumps + pkill totes les trays + os._exit.
+        # Termination: rumps.quit_application() sometimes does not close the
+        # process if the run loop is inside a callback, leaving a zombie icon in
+        # the menubar. Explicit exit: quit rumps + pkill all trays + os._exit.
         try:
             rumps.quit_application()
         except Exception:  # nosec B110: best-effort rumps shutdown; if it raises we still proceed to pkill + os._exit below
             pass
-        # Matar qualsevol altre nexe-tray/installer.tray orfe (no tocar PIDs
-        # del servidor — stop_server_func ja els ha aturat).
+        # Kill any other orphan nexe-tray/installer.tray processes (do not touch
+        # server PIDs — stop_server_func has already stopped them).
         try:
             subprocess.Popen(  # nosec B603 B607: literal pkill pattern targeting our own tray processes; pkill via PATH
                 ["pkill", "-f", "nexe-tray|installer.tray"],
@@ -579,7 +579,7 @@ class NexeTray(rumps.App):
             )
         except Exception:  # nosec B110: best-effort pkill of orphan trays; if it fails we still os._exit below
             pass
-        # Sortir de veritat (bypass de qualsevol run loop pendent)
+        # Really exit (bypass any pending run loop)
         import os as _os
         _os._exit(0)
 
@@ -622,7 +622,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--autostart", action="store_true",
-                        help="Engega el servidor automaticament al obrir")
+                        help="Start the server automatically on open")
     parser.add_argument("--attach", action="store_true",
                         help="Attach to an already-running server (don't start one)")
     parser.add_argument("--server-pid", type=int, default=None,
@@ -637,7 +637,7 @@ def main():
             import urllib.error
             time.sleep(0.5)
             app._start_server()
-            for _ in range(40):  # 20s timeout (M1 8GB pot trigar)
+            for _ in range(40):  # 20s timeout (M1 8GB may take this long)
                 try:
                     req = urllib.request.urlopen(  # nosec B310: hardcoded localhost server health check, SERVER_PORT is a module constant
                         f"http://localhost:{SERVER_PORT}/health", timeout=2
