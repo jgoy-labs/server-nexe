@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/memory/tests/test_api.py
-Description: Tests per Memory API.
+Description: Tests for Memory API.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -27,57 +27,57 @@ from memory.memory.api import (
 from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
 
 class TestNamingConvention:
-  """Tests per la naming convention de collections."""
+  """Tests for collection naming convention."""
 
   def test_valid_simple_name(self):
-    """Test nom vàlid simple."""
+    """Test simple valid name."""
     validate_collection_name("nexe_knowledge")
 
   def test_valid_with_numbers(self):
-    """Test nom vàlid amb números."""
+    """Test valid name with numbers."""
     validate_collection_name("module1_data2")
 
   def test_valid_multiple_underscores(self):
-    """Test nom vàlid amb múltiples underscores."""
+    """Test valid name with multiple underscores."""
     validate_collection_name("memory_rag_sources")
 
   def test_invalid_uppercase(self):
-    """Test que rebutja majúscules."""
+    """Test that uppercase is rejected."""
     with pytest.raises(InvalidCollectionNameError):
       validate_collection_name("Nexe_Knowledge")
 
   def test_invalid_no_underscore(self):
-    """Test que rebutja noms sense underscore."""
+    """Test that names without underscore are rejected."""
     with pytest.raises(InvalidCollectionNameError):
       validate_collection_name("memory")
 
   def test_invalid_starts_with_number(self):
-    """Test que rebutja noms que comencen amb número."""
+    """Test that names starting with a number are rejected."""
     with pytest.raises(InvalidCollectionNameError):
       validate_collection_name("1module_data")
 
   def test_invalid_starts_with_underscore(self):
-    """Test que rebutja noms que comencen amb underscore."""
+    """Test that names starting with underscore are rejected."""
     with pytest.raises(InvalidCollectionNameError):
       validate_collection_name("_test_data")
 
   def test_invalid_hyphen(self):
-    """Test que rebutja noms amb guió."""
+    """Test that names with hyphens are rejected."""
     with pytest.raises(InvalidCollectionNameError):
       validate_collection_name("context-roads")
 
   def test_invalid_space(self):
-    """Test que rebutja noms amb espais."""
+    """Test that names with spaces are rejected."""
     with pytest.raises(InvalidCollectionNameError):
       validate_collection_name("context roads")
 
   def test_invalid_empty_after_underscore(self):
-    """Test que rebutja noms amb underscore final sense res."""
+    """Test that names with trailing underscore and nothing after are rejected."""
     with pytest.raises(InvalidCollectionNameError):
       validate_collection_name("context_")
 
   def test_pattern_valid_examples(self):
-    """Test exemples vàlids del pattern."""
+    """Test valid examples of the pattern."""
     valid_names = [
       "nexe_knowledge",
       "memory_sources",
@@ -91,7 +91,7 @@ class TestNamingConvention:
       assert COLLECTION_NAME_PATTERN.match(name), f"{name} should be valid"
 
   def test_pattern_invalid_examples(self):
-    """Test exemples invàlids del pattern."""
+    """Test invalid examples of the pattern."""
     invalid_names = [
       "Nexe_Knowledge",
       "memory",
@@ -107,10 +107,10 @@ class TestNamingConvention:
       assert not COLLECTION_NAME_PATTERN.match(name), f"{name} should be invalid"
 
 class TestDocumentModel:
-  """Tests per Document dataclass."""
+  """Tests for Document dataclass."""
 
   def test_document_not_expired_no_expires_at(self):
-    """Test document permanent (sense expires_at)."""
+    """Test permanent document (no expires_at)."""
     doc = Document(
       id="test123",
       text="Test content",
@@ -120,7 +120,7 @@ class TestDocumentModel:
     assert doc.ttl_remaining is None
 
   def test_document_not_expired_future_date(self):
-    """Test document amb expires_at futur."""
+    """Test document with future expires_at."""
     future = datetime.now(timezone.utc) + timedelta(hours=1)
     doc = Document(
       id="test123",
@@ -133,7 +133,7 @@ class TestDocumentModel:
     assert doc.ttl_remaining <= 3600
 
   def test_document_expired_past_date(self):
-    """Test document amb expires_at passat."""
+    """Test document with past expires_at."""
     past = datetime.now(timezone.utc) - timedelta(hours=1)
     doc = Document(
       id="test123",
@@ -145,7 +145,7 @@ class TestDocumentModel:
     assert doc.ttl_remaining == 0
 
   def test_document_metadata_default(self):
-    """Test metadata per defecte."""
+    """Test default metadata."""
     doc = Document(
       id="test123",
       text="Test content",
@@ -154,7 +154,7 @@ class TestDocumentModel:
     assert doc.metadata == {}
 
   def test_document_with_metadata(self):
-    """Test document amb metadata."""
+    """Test document with metadata."""
     doc = Document(
       id="test123",
       text="Test content",
@@ -165,10 +165,10 @@ class TestDocumentModel:
     assert doc.metadata["source"] == "api"
 
 class TestSearchResultModel:
-  """Tests per SearchResult dataclass."""
+  """Tests for SearchResult dataclass."""
 
   def test_search_result_basic(self):
-    """Test SearchResult bàsic."""
+    """Test basic SearchResult."""
     result = SearchResult(
       id="test123",
       score=0.95,
@@ -180,7 +180,7 @@ class TestSearchResultModel:
     assert result.metadata == {}
 
   def test_search_result_with_text(self):
-    """Test SearchResult amb text."""
+    """Test SearchResult with text."""
     result = SearchResult(
       id="test123",
       score=0.85,
@@ -190,7 +190,7 @@ class TestSearchResultModel:
     assert result.text == "Contingut trobat"
 
   def test_search_result_with_metadata(self):
-    """Test SearchResult amb metadata."""
+    """Test SearchResult with metadata."""
     result = SearchResult(
       id="test123",
       score=0.75,
@@ -200,10 +200,10 @@ class TestSearchResultModel:
     assert result.metadata["type"] == "document"
 
 class TestCollectionInfoModel:
-  """Tests per CollectionInfo dataclass."""
+  """Tests for CollectionInfo dataclass."""
 
   def test_collection_info_basic(self):
-    """Test CollectionInfo bàsic."""
+    """Test basic CollectionInfo."""
     info = CollectionInfo(
       name="test_data",
       vector_size=768,
@@ -215,52 +215,52 @@ class TestCollectionInfoModel:
     assert info.created_at is None
 
 class TestMemoryAPIInit:
-  """Tests d'inicialització de MemoryAPI."""
+  """Tests for MemoryAPI initialisation."""
 
   def test_init_default_values(self):
-    """Test inicialització amb valors per defecte."""
+    """Test initialisation with default values."""
     api = MemoryAPI()
     assert api.embedding_model == DEFAULT_EMBEDDING_MODEL
     assert api.vector_size == 768  # DEFAULT_VECTOR_SIZE
     assert not api._initialized
 
   def test_init_custom_model(self):
-    """Test inicialització amb model personalitzat."""
+    """Test initialisation with custom model."""
     api = MemoryAPI(embedding_model="custom-model")
     assert api.embedding_model == "custom-model"
 
   def test_ensure_initialized_raises(self):
-    """Test que _ensure_initialized llança error si no inicialitzat."""
+    """Test that _ensure_initialized raises error if not initialised."""
     api = MemoryAPI()
     with pytest.raises(RuntimeError, match="not initialized"):
       api._ensure_initialized()
 
 class TestMemoryAPIHelpers:
-  """Tests per helpers de MemoryAPI."""
+  """Tests for MemoryAPI helpers."""
 
   def test_hex_to_uuid_basic(self):
-    """Test conversió hex a UUID."""
+    """Test hex to UUID conversion."""
     result = MemoryAPI._hex_to_uuid("abc123")
     assert "-" in result
     assert len(result) == 36
 
   def test_hex_to_uuid_16_chars(self):
-    """Test conversió hex 16 chars a UUID."""
+    """Test hex 16-char to UUID conversion."""
     result = MemoryAPI._hex_to_uuid("0123456789abcdef")
     assert len(result) == 36
 
   def test_hex_to_uuid_padding(self):
-    """Test que padeja correctament."""
+    """Test that it pads correctly."""
     short = MemoryAPI._hex_to_uuid("abc")
     long = MemoryAPI._hex_to_uuid("abc" + "0" * 29)
     assert len(short) == 36
     assert len(long) == 36
 
 class TestExceptions:
-  """Tests per exceptions."""
+  """Tests for exceptions."""
 
   def test_memory_api_error_is_base(self):
-    """Test que MemoryAPIError és la base."""
+    """Test that MemoryAPIError is the base."""
     assert issubclass(CollectionNotFoundError, MemoryAPIError)
     assert issubclass(InvalidCollectionNameError, MemoryAPIError)
     assert issubclass(DocumentNotFoundError, MemoryAPIError)
@@ -277,7 +277,7 @@ class TestExceptions:
 
 @pytest.fixture
 async def memory_api(tmp_path):
-  """Fixture que crea MemoryAPI amb Qdrant temporal."""
+  """Fixture that creates MemoryAPI with a temporary Qdrant."""
   qdrant_path = tmp_path / "qdrant"
   api = MemoryAPI(qdrant_path=qdrant_path)
   await api.initialize()
@@ -287,32 +287,32 @@ async def memory_api(tmp_path):
 @pytest.mark.integration
 @pytest.mark.asyncio
 class TestMemoryAPIIntegration:
-  """Tests d'integració amb Qdrant real."""
+  """Integration tests with real Qdrant."""
 
   async def test_create_collection(self, memory_api):
-    """Test crear collection."""
+    """Test create collection."""
     result = await memory_api.create_collection("test_data")
     assert result is True
 
   async def test_create_collection_already_exists(self, memory_api):
-    """Test crear collection que ja existeix."""
+    """Test creating a collection that already exists."""
     await memory_api.create_collection("test_data")
     result = await memory_api.create_collection("test_data")
     assert result is False
 
   async def test_create_collection_invalid_name(self, memory_api):
-    """Test crear collection amb nom invàlid."""
+    """Test creating a collection with an invalid name."""
     with pytest.raises(InvalidCollectionNameError):
       await memory_api.create_collection("InvalidName")
 
   async def test_collection_exists(self, memory_api):
-    """Test comprovar si collection existeix."""
+    """Test checking whether a collection exists."""
     await memory_api.create_collection("test_data")
     assert await memory_api.collection_exists("test_data")
     assert not await memory_api.collection_exists("nonexistent_col")
 
   async def test_list_collections(self, memory_api):
-    """Test llistar collections."""
+    """Test listing collections."""
     await memory_api.create_collection("test_data")
     await memory_api.create_collection("test_other")
     collections = await memory_api.list_collections()
@@ -321,19 +321,19 @@ class TestMemoryAPIIntegration:
     assert "test_other" in names
 
   async def test_delete_collection(self, memory_api):
-    """Test eliminar collection."""
+    """Test deleting a collection."""
     await memory_api.create_collection("test_data")
     result = await memory_api.delete_collection("test_data")
     assert result is True
     assert not await memory_api.collection_exists("test_data")
 
   async def test_delete_nonexistent_collection(self, memory_api):
-    """Test eliminar collection inexistent."""
+    """Test deleting a non-existent collection."""
     result = await memory_api.delete_collection("nonexistent_col")
     assert result is False
 
   async def test_store_and_get(self, memory_api):
-    """Test guardar i recuperar document."""
+    """Test saving and retrieving a document."""
     await memory_api.create_collection("test_data")
     doc_id = await memory_api.store(
       text="Test content",
@@ -348,12 +348,12 @@ class TestMemoryAPIIntegration:
     assert doc.metadata["type"] == "test"
 
   async def test_store_nonexistent_collection(self, memory_api):
-    """Test guardar en collection inexistent."""
+    """Test saving to a non-existent collection."""
     with pytest.raises(CollectionNotFoundError):
       await memory_api.store("text", "nonexistent_col")
 
   async def test_store_with_ttl(self, memory_api):
-    """Test guardar amb TTL."""
+    """Test saving with TTL."""
     await memory_api.create_collection("test_data")
     doc_id = await memory_api.store(
       text="Temporary content",
@@ -367,7 +367,7 @@ class TestMemoryAPIIntegration:
     assert not doc.is_expired
 
   async def test_search_basic(self, memory_api):
-    """Test cerca bàsica."""
+    """Test basic search."""
     await memory_api.create_collection("test_data")
     await memory_api.store("Python is a programming language", "test_data")
     await memory_api.store("JavaScript is also a language", "test_data")
@@ -377,7 +377,7 @@ class TestMemoryAPIIntegration:
     assert results[0].score > 0
 
   async def test_search_with_filter(self, memory_api):
-    """Test cerca amb filtre."""
+    """Test search with filter."""
     await memory_api.create_collection("test_data")
     await memory_api.store("Doc type A", "test_data", metadata={"type": "A"})
     await memory_api.store("Doc type B", "test_data", metadata={"type": "B"})
@@ -392,12 +392,12 @@ class TestMemoryAPIIntegration:
         assert r.metadata["type"] == "A"
 
   async def test_search_nonexistent_collection(self, memory_api):
-    """Test cerca en collection inexistent."""
+    """Test search in a non-existent collection."""
     with pytest.raises(CollectionNotFoundError):
       await memory_api.search("query", "nonexistent_col")
 
   async def test_delete_document(self, memory_api):
-    """Test eliminar document."""
+    """Test deleting a document."""
     await memory_api.create_collection("test_data")
     doc_id = await memory_api.store("To delete", "test_data")
 
@@ -408,7 +408,7 @@ class TestMemoryAPIIntegration:
     assert doc is None
 
   async def test_count(self, memory_api):
-    """Test comptar documents."""
+    """Test counting documents."""
     await memory_api.create_collection("test_data")
     await memory_api.store("Doc 1", "test_data")
     await memory_api.store("Doc 2", "test_data")

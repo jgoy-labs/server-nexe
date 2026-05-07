@@ -14,46 +14,46 @@ import pytest
 from memory.embeddings.chunkers import TextChunker, Chunk, ChunkingResult
 
 class TestTextChunkerBasic:
-  """Tests bàsics del TextChunker."""
+  """Basic tests for TextChunker."""
 
   def setup_method(self):
     self.chunker = TextChunker()
 
   def test_empty_text(self):
-    """Text buit retorna result buit."""
+    """Empty text returns empty result."""
     result = self.chunker.chunk("")
 
     assert result.total_chunks == 0
     assert result.chunks == []
 
   def test_whitespace_only(self):
-    """Només whitespace retorna result buit."""
+    """Whitespace only returns empty result."""
     result = self.chunker.chunk("  \n\n\t ")
 
     assert result.total_chunks == 0
 
   def test_returns_chunking_result(self):
-    """chunk() retorna ChunkingResult."""
+    """chunk() returns ChunkingResult."""
     result = self.chunker.chunk("Hello world.")
 
     assert isinstance(result, ChunkingResult)
     assert result.chunker_id == "chunker.text"
 
   def test_chunks_are_chunk_instances(self):
-    """Els chunks són instàncies de Chunk."""
+    """Chunks are instances of Chunk."""
     result = self.chunker.chunk("Hello world.\n\nAnother paragraph.")
 
     for chunk in result.chunks:
       assert isinstance(chunk, Chunk)
 
 class TestParagraphChunking:
-  """Tests per chunking per paràgrafs."""
+  """Tests for paragraph-based chunking."""
 
   def setup_method(self):
     self.chunker = TextChunker()
 
   def test_split_by_double_newline(self):
-    """Separa per doble newline."""
+    """Splits by double newline."""
     text = """Primer paràgraf amb contingut.
 
 Segon paràgraf amb més contingut.
@@ -65,7 +65,7 @@ Tercer paràgraf final."""
     assert result.total_chunks >= 1
 
   def test_preserves_paragraph_content(self):
-    """Preserva el contingut dels paràgrafs."""
+    """Preserves paragraph content."""
     text = """Contingut important.
 
 Més contingut important."""
@@ -77,13 +77,13 @@ Més contingut important."""
     assert "Més contingut important" in all_text
 
 class TestSentenceChunking:
-  """Tests per chunking per sentències."""
+  """Tests for sentence-based chunking."""
 
   def setup_method(self):
     self.chunker = TextChunker()
 
   def test_fallback_to_sentences_without_paragraphs(self):
-    """Usa sentències si no hi ha paràgrafs."""
+    """Uses sentences if there are no paragraphs."""
     text = "Primera sentència. Segona sentència. Tercera sentència."
 
     result = self.chunker.chunk(text)
@@ -91,7 +91,7 @@ class TestSentenceChunking:
     assert result.total_chunks >= 1
 
   def test_long_paragraph_split_by_sentences(self):
-    """Paràgrafs llargs es divideixen per sentències."""
+    """Long paragraphs are split by sentences."""
     long_text = ". ".join([f"Sentència número {i}" for i in range(100)])
 
     result = self.chunker.chunk(long_text)
@@ -99,13 +99,13 @@ class TestSentenceChunking:
     assert result.total_chunks >= 1
 
 class TestTitleDetection:
-  """Tests per detecció de títols."""
+  """Tests for title detection."""
 
   def setup_method(self):
     self.chunker = TextChunker()
 
   def test_uppercase_title_detected(self):
-    """Detecta títols en majúscules."""
+    """Detects uppercase titles."""
     text = """INTRODUCCIÓ
 
 Contingut de la introducció amb text narratiu."""
@@ -116,7 +116,7 @@ Contingut de la introducció amb text narratiu."""
     assert result.chunks[0].section_title == "INTRODUCCIÓ"
 
   def test_markdown_heading_detected(self):
-    """Detecta headings markdown."""
+    """Detects markdown headings."""
     text = """# Secció Principal
 
 Contingut de la secció."""
@@ -128,7 +128,7 @@ Contingut de la secció."""
       assert "Contingut" in result.chunks[0].text
 
   def test_numbered_title_detected(self):
-    """Detecta títols numerats."""
+    """Detects numbered titles."""
     text = """1. Primer Punt
 
 Explicació del primer punt."""
@@ -138,7 +138,7 @@ Explicació del primer punt."""
     assert result.total_chunks >= 1
 
   def test_title_propagation(self):
-    """Títols es propaguen als chunks següents."""
+    """Titles propagate to subsequent chunks."""
     text = """SECCIÓ A
 
 Paràgraf 1 de la secció A.
@@ -156,13 +156,13 @@ Paràgraf 1 de la secció B."""
     assert len(sections) >= 1
 
 class TestChunkMerging:
-  """Tests per fusió de chunks petits."""
+  """Tests for small chunk merging."""
 
   def setup_method(self):
     self.chunker = TextChunker()
 
   def test_small_chunks_merged(self):
-    """Chunks petits es fusionen."""
+    """Small chunks are merged."""
     text = """aquest és un paràgraf curt.
 
 un altre paràgraf curt.
@@ -174,7 +174,7 @@ i un tercer paràgraf."""
     assert result.total_chunks >= 1
 
   def test_merged_chunk_preserves_content(self):
-    """Chunks fusionats preserven contingut."""
+    """Merged chunks preserve content."""
     text = """Curt.
 
 Més."""
@@ -186,75 +186,75 @@ Més."""
     assert "Més" in all_text
 
 class TestSupports:
-  """Tests pel mètode supports()."""
+  """Tests for the supports() method."""
 
   def setup_method(self):
     self.chunker = TextChunker()
 
   def test_supports_text_extension(self):
-    """Suporta extensió text."""
+    """Supports text extension."""
     assert self.chunker.supports(file_extension="txt")
     assert self.chunker.supports(file_extension=".txt")
 
   def test_supports_markdown_extension(self):
-    """Suporta extensió markdown."""
+    """Supports markdown extension."""
     assert self.chunker.supports(file_extension="md")
     assert self.chunker.supports(file_extension="markdown")
 
   def test_supports_rst_extension(self):
-    """Suporta extensió rst."""
+    """Supports rst extension."""
     assert self.chunker.supports(file_extension="rst")
 
   def test_supports_log_extension(self):
-    """Suporta extensió log."""
+    """Supports log extension."""
     assert self.chunker.supports(file_extension="log")
 
   def test_not_supports_code_extension(self):
-    """No suporta explícitament extensió codi (però és default)."""
+    """Does not explicitly support code extension (but is default)."""
     assert self.chunker.supports(file_extension="py") is False
     assert self.chunker.supports(file_extension="js") is False
 
   def test_supports_text_content_type(self):
-    """Suporta content_type 'text'."""
+    """Supports content_type 'text'."""
     assert self.chunker.supports(content_type="text")
     assert self.chunker.supports(content_type="markdown")
     assert self.chunker.supports(content_type="narrative")
 
   def test_default_supports_all(self):
-    """Com a default chunker, suporta sense arguments."""
+    """As default chunker, supports without arguments."""
     assert self.chunker.supports() is True
 
 class TestMetadata:
-  """Tests per metadata del chunker."""
+  """Tests for chunker metadata."""
 
   def setup_method(self):
     self.chunker = TextChunker()
 
   def test_metadata_id(self):
-    """Metadata té ID correcte."""
+    """Metadata has correct ID."""
     assert self.chunker.metadata["id"] == "chunker.text"
 
   def test_metadata_formats(self):
-    """Metadata té formats correctes."""
+    """Metadata has correct formats."""
     formats = self.chunker.metadata["formats"]
     assert "txt" in formats
     assert "md" in formats
     assert "rst" in formats
 
   def test_metadata_content_types(self):
-    """Metadata té content_types correctes."""
+    """Metadata has correct content_types."""
     types = self.chunker.metadata["content_types"]
     assert "text" in types
     assert "markdown" in types
 
 class TestChunkMetadata:
-  """Tests per metadata dels chunks."""
+  """Tests for chunk metadata."""
 
   def setup_method(self):
     self.chunker = TextChunker()
 
   def test_chunk_has_positions(self):
-    """Chunks tenen posicions start/end."""
+    """Chunks have start/end positions."""
     text = "Primer paràgraf.\n\nSegon paràgraf."
 
     result = self.chunker.chunk(text)
@@ -264,7 +264,7 @@ class TestChunkMetadata:
       assert chunk.end_char > chunk.start_char
 
   def test_chunk_has_index(self):
-    """Chunks tenen índex seqüencial."""
+    """Chunks have sequential index."""
     text = "A.\n\nB.\n\nC."
 
     result = self.chunker.chunk(text)
@@ -273,14 +273,14 @@ class TestChunkMetadata:
       assert chunk.chunk_index == i
 
   def test_chunk_has_document_id(self):
-    """Chunks tenen document_id."""
+    """Chunks have document_id."""
     result = self.chunker.chunk("Text.", document_id="doc123")
 
     for chunk in result.chunks:
       assert chunk.document_id == "doc123"
 
   def test_chunk_type_is_paragraph(self):
-    """Chunks tenen tipus 'paragraph'."""
+    """Chunks have type 'paragraph'."""
     text = "Paràgraf.\n\nAltre paràgraf."
 
     result = self.chunker.chunk(text)
@@ -289,31 +289,31 @@ class TestChunkMetadata:
       assert chunk.chunk_type in ("paragraph", "merged")
 
 class TestConfiguration:
-  """Tests per configuració del chunker."""
+  """Tests for chunker configuration."""
 
   def test_custom_max_chunk_size(self):
-    """Pot configurar max_chunk_size."""
+    """Can configure max_chunk_size."""
     chunker = TextChunker(max_chunk_size=500)
     assert chunker.config["max_chunk_size"] == 500
 
   def test_custom_min_chunk_size(self):
-    """Pot configurar min_chunk_size."""
+    """Can configure min_chunk_size."""
     chunker = TextChunker(min_chunk_size=50)
     assert chunker.config["min_chunk_size"] == 50
 
   def test_custom_chunk_overlap(self):
-    """Pot configurar chunk_overlap."""
+    """Can configure chunk_overlap."""
     chunker = TextChunker(chunk_overlap=100)
     assert chunker.config["chunk_overlap"] == 100
 
 class TestRealWorldText:
-  """Tests amb text real."""
+  """Tests with real-world text."""
 
   def setup_method(self):
     self.chunker = TextChunker()
 
   def test_structured_document(self):
-    """Document estructurat amb seccions."""
+    """Structured document with sections."""
     text = """INTRODUCCIÓ
 
 Aquest document presenta una visió general del projecte.
@@ -337,7 +337,7 @@ Es recomana continuar amb la següent fase."""
     assert len(sections) >= 1
 
   def test_markdown_document(self):
-    """Document markdown."""
+    """Markdown document."""
     text = """# Títol Principal
 
 Paràgraf introductori amb **text en negreta** i *cursiva*.

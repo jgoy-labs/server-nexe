@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/rag/tests/test_constants.py
-Description: Tests per RAG constants.py.
+Description: Tests for RAG constants.py.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

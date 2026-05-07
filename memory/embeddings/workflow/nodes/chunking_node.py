@@ -25,30 +25,30 @@ async def chunking_node(
   use_registry: bool = True,
 ) -> Dict[str, Any]:
   """
-  Workflow node: Chunk document amb selecció automàtica de chunker.
+  Workflow node: Chunk document with automatic chunker selection.
 
-  Selecció automàtica de chunker:
-  - Si file_path té extensió .py/.js/.ts → CodeChunker (NO overlap)
-  - Si file_path té extensió .txt/.md → TextChunker
-  - Sense file_path → SmartChunker (comportament legacy)
+  Automatic chunker selection:
+  - If file_path has extension .py/.js/.ts → CodeChunker (NO overlap)
+  - If file_path has extension .txt/.md → TextChunker
+  - Without file_path → SmartChunker (legacy behavior)
 
   Args:
-    content: Text del document
-    document_id: ID únic del document
-    max_chunk_size: Màxim chars per chunk
-    chunk_overlap: Overlap entre chunks
-    min_chunk_size: Mínim chars per chunk
-    file_path: Ruta del fitxer (per seleccionar chunker)
-    content_type: Tipus de contingut ('code', 'text', etc.)
-    use_registry: Si True, usa ChunkerRegistry (default True)
+    content: Document text
+    document_id: Unique document ID
+    max_chunk_size: Maximum chars per chunk
+    chunk_overlap: Overlap between chunks
+    min_chunk_size: Minimum chars per chunk
+    file_path: File path (to select chunker)
+    content_type: Content type ('code', 'text', etc.)
+    use_registry: If True, uses ChunkerRegistry (default True)
 
   Returns:
-    Dict amb:
+    Dict with:
     - document_id: str
     - chunk_count: int
-    - chunks: List[Dict] amb metadata
+    - chunks: List[Dict] with metadata
     - original_length: int
-    - chunker_id: str (ID del chunker usat)
+    - chunker_id: str (ID of the chunker used)
   """
   if use_registry and (file_path or content_type):
     return await _chunk_with_registry(
@@ -79,9 +79,9 @@ async def _chunk_with_registry(
   min_chunk_size: int,
 ) -> Dict[str, Any]:
   """
-  Chunk usant ChunkerRegistry per selecció automàtica.
+  Chunk using ChunkerRegistry for automatic selection.
 
-  MEMORY USA AQUEST PATRÓ per processar documents.
+  MEMORY USES THIS PATTERN to process documents.
   """
   registry = get_chunker_registry()
 
@@ -148,9 +148,9 @@ async def _chunk_with_smart_chunker(
   min_chunk_size: int,
 ) -> Dict[str, Any]:
   """
-  Chunk amb SmartChunker (comportament legacy).
+  Chunk with SmartChunker (legacy behavior).
 
-  Mantingut per retrocompatibilitat.
+  Maintained for backward compatibility.
   """
   chunker = SmartChunker(
     max_chunk_size=max_chunk_size,

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/rag/workflow/registry.py
-Description: Auto-registre de nodes RAG al NodeRegistry global del Workflow Engine.
+Description: Auto-registration of RAG nodes to the global NodeRegistry of the Workflow Engine.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -17,15 +17,15 @@ logger = structlog.get_logger(__name__)
 
 def register_rag_nodes() -> None:
   """
-  DEPRECATED: L'auto-discovery del WorkflowEngine registra automàticament
-  els nodes RAG quan el mòdul s'inicialitza.
+  DEPRECATED: WorkflowEngine auto-discovery automatically registers
+  RAG nodes when the module initializes.
 
-  Aquesta funció es manté per compatibilitat però ja no és necessària.
-  Els nodes es descobreixen automàticament des de workflow/nodes/ perquè
-  el manifest.toml té [module.integration] workflow_engine = true.
+  This function is kept for compatibility but is no longer necessary.
+  Nodes are auto-discovered from workflow/nodes/ because
+  manifest.toml has [module.integration] workflow_engine = true.
 
-  Nodes auto-descoberts:
-    - RAGSearchNode: Node de cerca al RAG amb generació de prompt
+  Auto-discovered nodes:
+    - RAGSearchNode: RAG search node with prompt generation
   """
   i18n = get_i18n()
   logger.info(

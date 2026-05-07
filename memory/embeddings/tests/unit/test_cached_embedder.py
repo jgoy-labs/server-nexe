@@ -1,9 +1,9 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: memory/embeddings/tests/unit/test_cached_embedder.py
-Description: Tests unitaris per CachedEmbedder.
+Description: Unit tests for CachedEmbedder.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -24,14 +24,14 @@ from memory.embeddings.core.interfaces import (
 
 @pytest.fixture
 async def temp_cache_dir():
-  """Directori temporal per L2 cache"""
+  """Temporary directory for L2 cache"""
   temp_dir = tempfile.mkdtemp()
   yield Path(temp_dir)
   shutil.rmtree(temp_dir, ignore_errors=True)
 
 @pytest.fixture
 async def mock_async_embedder():
-  """Mock AsyncEmbedder per tests"""
+  """Mock AsyncEmbedder for tests"""
   mock = Mock(spec=AsyncEmbedder)
   mock.model_name = "test-model"
   mock.device = "cpu"
@@ -57,7 +57,7 @@ async def mock_async_embedder():
 @pytest.fixture
 async def cached_embedder(mock_async_embedder, temp_cache_dir):
   """
-  Fixture: CachedEmbedder amb mock encoder i cache temporal.
+  Fixture: CachedEmbedder with mock encoder and temporary cache.
   """
   embedder = CachedEmbedder(
     encoder=mock_async_embedder,
@@ -77,12 +77,12 @@ async def cached_embedder(mock_async_embedder, temp_cache_dir):
 @pytest.mark.asyncio
 async def test_cache_hit(cached_embedder):
   """
-  Test 1: Cache hit en segon request.
+  Test 1: Cache hit on second request.
 
   Checks:
-  - Primer request: cache miss
-  - Segon request: cache hit
-  - Mateix embedding retornat
+  - First request: cache miss
+  - Second request: cache hit
+  - Same embedding returned
   """
   request = EmbeddingRequest(text="hello world", use_cache=True)
 
@@ -97,10 +97,10 @@ async def test_cache_hit(cached_embedder):
 @pytest.mark.asyncio
 async def test_cache_miss(cached_embedder):
   """
-  Test 2: Cache miss per texts diferents.
+  Test 2: Cache miss for different texts.
 
   Checks:
-  - Cada text diferent és cache miss
+  - Each different text is a cache miss
   """
   request1 = EmbeddingRequest(text="hello", use_cache=True)
   request2 = EmbeddingRequest(text="world", use_cache=True)
@@ -115,11 +115,11 @@ async def test_cache_miss(cached_embedder):
 @pytest.mark.asyncio
 async def test_cache_disabled(mock_async_embedder, temp_cache_dir):
   """
-  Test 3: Cache disabled → sempre genera embedding.
+  Test 3: Cache disabled → always generates embedding.
 
   Checks:
-  - Amb cache_enabled=False no usa cache
-  - Sempre cache_hit=False
+  - With cache_enabled=False does not use cache
+  - Always cache_hit=False
   """
   embedder = CachedEmbedder(
     encoder=mock_async_embedder,
@@ -139,11 +139,11 @@ async def test_cache_disabled(mock_async_embedder, temp_cache_dir):
 @pytest.mark.asyncio
 async def test_batch_cache_optimization(cached_embedder):
   """
-  Test 4: Batch amb mix cache hits/misses.
+  Test 4: Batch with mix of cache hits/misses.
 
   Checks:
-  - Només genera embeddings per cache misses
-  - Cache hits optimitzats
+  - Only generates embeddings for cache misses
+  - Cache hits optimized
   """
   request1 = BatchEmbeddingRequest(
     texts=["text1", "text2", "text3"],
@@ -166,7 +166,7 @@ async def test_batch_cache_optimization(cached_embedder):
 @pytest.mark.asyncio
 async def test_stats_tracking(cached_embedder):
   """
-  Test 5: Stats tracking correcte.
+  Test 5: Correct stats tracking.
 
   Checks:
   - total_encodings
@@ -190,10 +190,10 @@ async def test_stats_tracking(cached_embedder):
 @pytest.mark.asyncio
 async def test_clear_cache(cached_embedder):
   """
-  Test 6: Clear cache elimina tot.
+  Test 6: Clear cache removes everything.
 
   Checks:
-  - Després de clear, cache hits = 0
+  - After clear, cache hits = 0
   """
   request = EmbeddingRequest(text="test", use_cache=True)
   response1 = await cached_embedder.encode(request)
@@ -210,7 +210,7 @@ async def test_clear_cache(cached_embedder):
 @pytest.mark.asyncio
 async def test_response_metadata(cached_embedder):
   """
-  Test 7: Response conté metadata correcte.
+  Test 7: Response contains correct metadata.
 
   Checks:
   - dimensions
@@ -236,7 +236,7 @@ async def test_response_metadata(cached_embedder):
 @pytest.mark.asyncio
 async def test_batch_response_stats(cached_embedder):
   """
-  Test 8: Batch response amb stats correctes.
+  Test 8: Batch response with correct stats.
 
   Checks:
   - count
@@ -259,13 +259,13 @@ async def test_batch_response_stats(cached_embedder):
 
 """
 Test Coverage CachedEmbedder:
-✅ test_cache_hit - Cache hit funcional
-✅ test_cache_miss - Cache miss per texts diferents
+✅ test_cache_hit - Functional cache hit
+✅ test_cache_miss - Cache miss for different texts
 ✅ test_cache_disabled - Cache disabled mode
-✅ test_batch_cache_optimization - Batch amb mix hits/misses
-✅ test_stats_tracking - Stats correctes (hit rate, latencies)
-✅ test_clear_cache - Clear cache funciona
-✅ test_response_metadata - Response metadata complet
+✅ test_batch_cache_optimization - Batch with mix of hits/misses
+✅ test_stats_tracking - Correct stats (hit rate, latencies)
+✅ test_clear_cache - Clear cache works
+✅ test_response_metadata - Complete response metadata
 ✅ test_batch_response_stats - Batch response stats
 
 Total: 8 test cases

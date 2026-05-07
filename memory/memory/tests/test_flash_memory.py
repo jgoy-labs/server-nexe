@@ -18,17 +18,17 @@ from memory.memory.models.memory_types import MemoryType
 
 @pytest.mark.asyncio
 class TestFlashMemory:
-  """Tests per FlashMemory TTL cache"""
+  """Tests for FlashMemory TTL cache"""
 
   async def test_initialization(self):
-    """Inicialització amb TTL per defecte"""
+    """Initialisation with default TTL"""
     flash = FlashMemory(default_ttl_seconds=1800)
     assert flash._default_ttl == 1800
     assert len(flash._store) == 0
     assert len(flash._expiry_heap) == 0
 
   async def test_store_and_get(self):
-    """Emmagatzemar i recuperar entry"""
+    """Store and retrieve entry"""
     flash = FlashMemory()
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
@@ -44,13 +44,13 @@ class TestFlashMemory:
     assert retrieved.content == "Test content"
 
   async def test_get_nonexistent(self):
-    """Recuperar entry inexistent retorna None"""
+    """Retrieving a non-existent entry returns None"""
     flash = FlashMemory()
     result = await flash.get("nonexistent_id")
     assert result is None
 
   async def test_ttl_expiration(self):
-    """Entry expira després del TTL"""
+    """Entry expires after TTL"""
     flash = FlashMemory(default_ttl_seconds=60)
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
@@ -66,7 +66,7 @@ class TestFlashMemory:
     assert await flash.get(entry.id) is not None
 
   async def test_cleanup_expired(self):
-    """Cleanup elimina entries expirats"""
+    """Cleanup removes expired entries"""
     flash = FlashMemory(default_ttl_seconds=60)
 
     entry1 = MemoryEntry(
@@ -94,7 +94,7 @@ class TestFlashMemory:
     assert len(flash._store) == 2
 
   async def test_get_all(self):
-    """Recuperar totes les entries"""
+    """Retrieve all entries"""
     flash = FlashMemory()
 
     entry1 = MemoryEntry(entry_type=MemoryType.EPISODIC, content="One", source="test")
@@ -110,7 +110,7 @@ class TestFlashMemory:
     assert any(e.content == "Two" for e in all_entries)
 
   async def test_concurrent_access(self):
-    """Accés concurrent amb asyncio.Lock"""
+    """Concurrent access with asyncio.Lock"""
     flash = FlashMemory()
 
     async def store_entry(n):
@@ -127,7 +127,7 @@ class TestFlashMemory:
     assert len(all_entries) == 10
 
   async def test_overwrite_same_id(self):
-    """Emmagatzemar mateix ID actualitza entry"""
+    """Storing same ID updates entry"""
     flash = FlashMemory()
 
     entry1 = MemoryEntry(

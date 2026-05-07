@@ -17,17 +17,17 @@ from .base import BaseChunker, Chunk, ChunkingResult
 
 class CodeChunker(BaseChunker):
   """
-  Chunker per codi font que respecta estructures.
+  Chunker for source code that respects structures.
 
   IMPORTANT (Architectural decision):
-  - NO overlap en codi: funcions/classes són unitats atòmiques
-  - Regex primer: AST només si regex falla en casos reals
+  - NO overlap in code: functions/classes are atomic units
+  - Regex first: AST only if regex fails in real cases
 
-  Estratègia:
-  - Detecta funcions i classes completes
-  - Inclou decoradors i docstrings
-  - Metadata amb nom funció/classe i tipus
-  - Fallback a chunks per indentació per llenguatges desconeguts
+  Strategy:
+  - Detects complete functions and classes
+  - Includes decorators and docstrings
+  - Metadata with function/class name and type
+  - Fallback to indentation-based chunks for unknown languages
 
   Example:
     chunker = CodeChunker()
@@ -74,15 +74,15 @@ class CodeChunker(BaseChunker):
     metadata: Optional[Dict[str, Any]] = None,
   ) -> ChunkingResult:
     """
-    Chunk codi font preservant funcions i classes completes.
+    Chunk source code preserving complete functions and classes.
 
     Args:
-      text: Codi font a chunkejar
-      document_id: ID opcional del document
-      metadata: Metadata amb file_path per detectar llenguatge
+      text: Source code to chunk
+      document_id: Optional document ID
+      metadata: Metadata with file_path to detect language
 
     Returns:
-      ChunkingResult amb chunks atòmics (funcions/classes)
+      ChunkingResult with atomic chunks (functions/classes)
     """
     if not text or not text.strip():
       return ChunkingResult(
@@ -142,7 +142,7 @@ class CodeChunker(BaseChunker):
   def supports(
     self, file_extension: Optional[str] = None, content_type: Optional[str] = None
   ) -> bool:
-    """Indica si suporta el format/tipus."""
+    """Indicates whether the format/type is supported."""
     if file_extension:
       ext = file_extension.lower().lstrip(".")
       return ext in self.metadata["formats"]
@@ -168,12 +168,12 @@ class CodeChunker(BaseChunker):
 
   def _chunk_python(self, text: str) -> List[Tuple[str, Dict[str, Any]]]:
     """
-    Chunk codi Python per funcions i classes.
+    Chunk Python code by functions and classes.
 
-    Detecta:
-    - Funcions (def, async def) amb decoradors
-    - Classes amb decoradors
-    - Imports (opcionals al primer chunk)
+    Detects:
+    - Functions (def, async def) with decorators
+    - Classes with decorators
+    - Imports (optional in the first chunk)
     """
     lines = text.split("\n")
 
@@ -261,9 +261,9 @@ class CodeChunker(BaseChunker):
 
   def _chunk_javascript(self, text: str) -> List[Tuple[str, Dict[str, Any]]]:
     """
-    Chunk codi JavaScript/TypeScript.
+    Chunk JavaScript/TypeScript code.
 
-    Detecta:
+    Detects:
     - function (async function)
     - class
     - Arrow functions (const/let/var x = () => {})
@@ -327,9 +327,9 @@ class CodeChunker(BaseChunker):
 
   def _chunk_by_indentation(self, text: str) -> List[Tuple[str, Dict[str, Any]]]:
     """
-    Fallback: chunk per blocs d'indentació.
+    Fallback: chunk by indentation blocks.
 
-    Per llenguatges no suportats, separa per blocs a nivell 0.
+    For unsupported languages, splits by level-0 blocks.
     """
     lines = text.split("\n")
     chunks: List[Tuple[str, Dict[str, Any]]] = []

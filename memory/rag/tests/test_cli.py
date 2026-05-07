@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/rag/tests/test_cli.py
-Description: Tests per RAG CLI (cli.py).
+Description: Tests for RAG CLI (cli.py).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -18,7 +18,7 @@ from memory.rag.cli import (
 )
 
 class TestCreateParser:
-  """Tests per argument parser."""
+  """Tests for argument parser."""
 
   def test_parser_created(self):
     """Verify parser is created."""
@@ -75,7 +75,7 @@ class TestCreateParser:
     assert args.command == "sources"
 
 class TestRAGCLI:
-  """Tests per RAGCLI class."""
+  """Tests for RAGCLI class."""
 
   @pytest.fixture
   def mock_module(self):

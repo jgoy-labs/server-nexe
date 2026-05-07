@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/rag/tests/test_health.py
-Description: Tests per RAG health checks (health.py).
+Description: Tests for RAG health checks (health.py).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

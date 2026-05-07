@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/memory/models/memory_types.py
-Description: Tipus i enums per Memory Module.
+Description: Types and enums for Memory Module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -14,15 +14,15 @@ from enum import Enum
 
 class MemoryType(str, Enum):
   """
-  Tipus de memòria suportats.
+  Supported memory types.
 
   Supported types:
-  - EPISODIC: Interaccions (sense Anàlisi Contextual encara)
-  - SEMANTIC: Documents tècnics (sense alignment)
-  - PROFILE: Fets canònics d'identitat (schema tancat)
-  - FACT: Fets extrets del pipeline
+  - EPISODIC: Interactions (without Contextual Analysis yet)
+  - SEMANTIC: Technical documents (without alignment)
+  - PROFILE: Canonical identity facts (closed schema)
+  - FACT: Facts extracted from the pipeline
   - NOTEBOOK: Project notebooks
-  - SUMMARY: Resums consolidats
+  - SUMMARY: Consolidated summaries
   """
 
   EPISODIC = "episodic"

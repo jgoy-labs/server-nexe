@@ -31,14 +31,14 @@ class RAGCLI:
     self.module: Optional[RAGModule] = None
 
   def _require_module(self) -> RAGModule:
-    """Retorna self.module o llança RuntimeError si no inicialitzat.
+    """Returns self.module or raises RuntimeError if not initialized.
 
-    Helper Cluster 6 (Onada 4.2): substitueix `self.module.X()` per
-    `self._require_module().X()` als cmd_* per donar error explícit en
-    lloc d'AttributeError opaca quan algú crida un cmd sense initialize().
+    Helper Cluster 6 (Wave 4.2): replaces `self.module.X()` with
+    `self._require_module().X()` in cmd_* to give explicit error
+    instead of opaque AttributeError when someone calls a cmd without initialize().
     """
     if self.module is None:
-      raise RuntimeError("RAG not initialized — cal await RAGCLI.initialize() abans d'invocar cmd_*")
+      raise RuntimeError("RAG not initialized — must await RAGCLI.initialize() before invoking cmd_*")
     return self.module
 
   async def initialize(self) -> bool:

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/memory/api/documents.py
-Description: Operacions CRUD de documents per Memory API.
+Description: Document CRUD operations for Memory API.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -39,7 +39,7 @@ def _get_metrics():
   return _MEMORY_OPERATIONS, _MEMORY_STORE_SIZE
 
 def hex_to_uuid(hex_id: str) -> str:
-  """Converteix hex ID a UUID format per Qdrant."""
+  """Convert hex ID to UUID format for Qdrant."""
   padded = hex_id.ljust(32, "0")
   return str(uuid.UUID(padded))
 
@@ -68,20 +68,20 @@ async def store_document(
   text_store=None,
 ) -> str:
   """
-  Emmagatzema text amb embedding a una collection.
+  Store text with embedding in a collection.
 
   Args:
-    qdrant: Client Qdrant
+    qdrant: Qdrant client
     executor: ThreadPoolExecutor
-    generate_embedding: Funció per generar embeddings
-    text: Contingut textual
-    collection: Nom de la collection
-    metadata: Metadades addicionals
-    doc_id: ID personalitzat (auto-generat si None)
-    ttl_seconds: Temps de vida en segons (None = permanent)
+    generate_embedding: Function to generate embeddings
+    text: Textual content
+    collection: Collection name
+    metadata: Additional metadata
+    doc_id: Custom ID (auto-generated if None)
+    ttl_seconds: Time to live in seconds (None = permanent)
 
   Returns:
-    str: ID del document creat
+    str: ID of the created document
   """
   if doc_id is None:
     content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -248,21 +248,21 @@ async def search_documents(
   text_store=None,
 ) -> List[SearchResult]:
   """
-  Cerca per similitud semàntica.
+  Search by semantic similarity.
 
   Args:
-    qdrant: Client Qdrant
+    qdrant: Qdrant client
     executor: ThreadPoolExecutor
-    generate_embedding: Funció per generar embeddings
-    query: Text de cerca
-    collection: Nom de la collection
-    top_k: Màxim nombre de resultats
-    threshold: Puntuació mínima (0-1)
-    filter_metadata: Filtrar per metadades
-    include_expired: Incloure documents expirats
+    generate_embedding: Function to generate embeddings
+    query: Search text
+    collection: Collection name
+    top_k: Maximum number of results
+    threshold: Minimum score (0-1)
+    filter_metadata: Filter by metadata
+    include_expired: Include expired documents
 
   Returns:
-    List[SearchResult]: Resultats ordenats per similitud
+    List[SearchResult]: Results sorted by similarity
   """
   query_embedding = await generate_embedding(query)
   loop = asyncio.get_running_loop()
@@ -405,7 +405,7 @@ async def delete_document(
   collection: str,
   text_store=None,
 ) -> bool:
-  """Elimina un document."""
+  """Delete a document."""
   loop = asyncio.get_running_loop()
 
   def _delete():
@@ -435,7 +435,7 @@ async def count_documents(
   executor: ThreadPoolExecutor,
   collection: str,
 ) -> int:
-  """Compta documents en una collection."""
+  """Count documents in a collection."""
   loop = asyncio.get_running_loop()
 
   def _count():
@@ -449,7 +449,7 @@ async def cleanup_expired(
   executor: ThreadPoolExecutor,
   collection: str,
 ) -> int:
-  """Elimina documents expirats d'una collection."""
+  """Delete expired documents from a collection."""
   loop = asyncio.get_running_loop()
   now_iso = datetime.now(timezone.utc).isoformat()
 

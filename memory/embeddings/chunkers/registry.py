@@ -20,25 +20,25 @@ from .base import BaseChunker
 logger = logging.getLogger(__name__)
 
 class ChunkerNotFoundError(Exception):
-  """Chunker no trobat al registry."""
+  """Chunker not found in the registry."""
 
   pass
 
 class DuplicateChunkerError(Exception):
-  """Chunker ja registrat."""
+  """Chunker already registered."""
 
   pass
 
 class ChunkerRegistry:
   """
-  Registry central de chunkers amb auto-discovery.
+  Central chunker registry with auto-discovery.
 
-  INTEGRACIÓ AMB MEMORY:
-  - Memory cridarà get_chunker_for_format(extension) o get_chunker_for_type(content_type)
-  - El registry retorna la instància adequada
-  - Memory no necessita conèixer els chunkers específics
+  MEMORY INTEGRATION:
+  - Memory will call get_chunker_for_format(extension) or get_chunker_for_type(content_type)
+  - The registry returns the appropriate instance
+  - Memory does not need to know about specific chunkers
 
-  Ús:
+  Usage:
     registry = get_chunker_registry()
     chunker = registry.get_chunker_for_format('py')
     chunker = registry.get_chunker_for_format('txt')
@@ -46,7 +46,7 @@ class ChunkerRegistry:
   """
 
   def __init__(self) -> None:
-    """Inicialitza el registry buit."""
+    """Initializes the empty registry."""
     self._chunkers: Dict[str, Type[BaseChunker]] = {}
     self._instances: Dict[str, BaseChunker] = {}
     self._format_map: Dict[str, str] = {}
@@ -57,22 +57,22 @@ class ChunkerRegistry:
     self, chunker_class: Type[BaseChunker]
   ) -> Type[BaseChunker]:
     """
-    Registra un chunker manualment.
+    Registers a chunker manually.
 
-    També es pot usar com a decorador:
+    Can also be used as a decorator:
       @registry.register
       class MyChunker(BaseChunker):
         ...
 
     Args:
-      chunker_class: Classe que hereta de BaseChunker
+      chunker_class: Class that inherits from BaseChunker
 
     Returns:
-      La mateixa classe (per permetre ús com a decorador)
+      The same class (to allow use as a decorator)
 
     Raises:
-      ValueError: Si no hereta de BaseChunker
-      DuplicateChunkerError: Si ja existeix un chunker amb el mateix ID
+      ValueError: If it does not inherit from BaseChunker
+      DuplicateChunkerError: If a chunker with the same ID already exists
     """
     if not issubclass(chunker_class, BaseChunker):
       raise ValueError(f"Expected BaseChunker subclass, got {chunker_class}")
@@ -100,16 +100,16 @@ class ChunkerRegistry:
 
   def get_chunker(self, chunker_id: str) -> BaseChunker:
     """
-    Obté un chunker per ID.
+    Gets a chunker by ID.
 
     Args:
-      chunker_id: ID del chunker ('chunker.text', 'chunker.code', etc.)
+      chunker_id: Chunker ID ('chunker.text', 'chunker.code', etc.)
 
     Returns:
-      Instància del chunker
+      Chunker instance
 
     Raises:
-      ChunkerNotFoundError: Si no existeix
+      ChunkerNotFoundError: If it does not exist
     """
     if chunker_id not in self._instances:
       raise ChunkerNotFoundError(
@@ -120,15 +120,15 @@ class ChunkerRegistry:
 
   def get_chunker_for_format(self, file_extension: str) -> Optional[BaseChunker]:
     """
-    Obté el chunker adequat per una extensió de fitxer.
+    Gets the appropriate chunker for a file extension.
 
-    MEMORY USA AQUEST MÈTODE per seleccionar chunker.
+    MEMORY USES THIS METHOD to select a chunker.
 
     Args:
-      file_extension: Extensió sense punt ('py', 'js', 'txt')
+      file_extension: Extension without dot ('py', 'js', 'txt')
 
     Returns:
-      BaseChunker o None si no hi ha match
+      BaseChunker or None if no match
 
     Example:
       chunker = registry.get_chunker_for_format('py')
@@ -148,13 +148,13 @@ class ChunkerRegistry:
 
   def get_chunker_for_type(self, content_type: str) -> Optional[BaseChunker]:
     """
-    Obté el chunker adequat per un tipus de contingut.
+    Gets the appropriate chunker for a content type.
 
     Args:
       content_type: 'code', 'text', 'data'
 
     Returns:
-      BaseChunker o None si no hi ha match
+      BaseChunker or None if no match
     """
     ct = content_type.lower()
     chunker_id = self._type_map.get(ct)
@@ -166,15 +166,15 @@ class ChunkerRegistry:
 
   def get_default_chunker(self) -> BaseChunker:
     """
-    Retorna el chunker per defecte (text).
+    Returns the default chunker (text).
 
-    MEMORY USA AQUEST MÈTODE si no troba match específic.
+    MEMORY USES THIS METHOD if no specific match is found.
 
     Returns:
-      TextChunker si existeix, o el primer chunker disponible
+      TextChunker if it exists, or the first available chunker
 
     Raises:
-      ChunkerNotFoundError: Si no hi ha chunkers registrats
+      ChunkerNotFoundError: If no chunkers are registered
     """
     if "chunker.text" in self._instances:
       return self._instances["chunker.text"]
@@ -186,15 +186,15 @@ class ChunkerRegistry:
 
   def auto_discover(self, chunkers_dir: Optional[Path] = None) -> int:
     """
-    Auto-descobreix chunkers d'un directori.
+    Auto-discovers chunkers from a directory.
 
-    Escaneja fitxers *_chunker.py i registra classes BaseChunker.
+    Scans *_chunker.py files and registers BaseChunker classes.
 
     Args:
-      chunkers_dir: Directori a escanejar (default: directori actual)
+      chunkers_dir: Directory to scan (default: current directory)
 
     Returns:
-      Nombre de chunkers descoberts
+      Number of discovered chunkers
     """
     if chunkers_dir is None:
       chunkers_dir = Path(__file__).parent
@@ -233,10 +233,10 @@ class ChunkerRegistry:
 
   def list_chunkers(self) -> List[Dict[str, Any]]:
     """
-    Llista tots els chunkers registrats amb metadata.
+    Lists all registered chunkers with metadata.
 
     Returns:
-      Llista de diccionaris amb info de cada chunker
+      List of dictionaries with info for each chunker
     """
     return [
       {
@@ -252,10 +252,10 @@ class ChunkerRegistry:
 
   def get_stats(self) -> Dict[str, Any]:
     """
-    Estadístiques del registry.
+    Registry statistics.
 
     Returns:
-      Dict amb total_chunkers, chunker_ids, supported_formats, etc.
+      Dict with total_chunkers, chunker_ids, supported_formats, etc.
     """
     return {
       "total_chunkers": len(self._chunkers),
@@ -265,7 +265,7 @@ class ChunkerRegistry:
     }
 
   def has_chunker(self, chunker_id: str) -> bool:
-    """Comprova si existeix un chunker."""
+    """Checks whether a chunker exists."""
     return chunker_id in self._chunkers
 
   def has_format_support(self, file_extension: str) -> bool:
@@ -274,7 +274,7 @@ class ChunkerRegistry:
     return ext in self._format_map
 
   def __len__(self) -> int:
-    """Retorna el nombre de chunkers registrats."""
+    """Returns the number of registered chunkers."""
     return len(self._chunkers)
 
   def __repr__(self) -> str:
@@ -284,11 +284,11 @@ _registry: Optional[ChunkerRegistry] = None
 
 def get_chunker_registry() -> ChunkerRegistry:
   """
-  Obté el registry global de chunkers.
+  Gets the global chunker registry.
 
-  MEMORY IMPORTA AQUESTA FUNCIÓ.
+  MEMORY IMPORTS THIS FUNCTION.
 
-  Crea el singleton si no existeix i fa auto-discovery.
+  Creates the singleton if it does not exist and runs auto-discovery.
 
   Returns:
     ChunkerRegistry singleton
@@ -307,9 +307,9 @@ def get_chunker_registry() -> ChunkerRegistry:
 
 def reset_registry() -> None:
   """
-  Reset del registry (només per tests).
+  Resets the registry (for tests only).
 
-  Elimina el singleton per permetre re-inicialització.
+  Removes the singleton to allow re-initialization.
   """
   global _registry
   _registry = None

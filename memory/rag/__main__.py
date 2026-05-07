@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/rag/__main__.py
-Description: Entry point per executar RAG module com a CLI.
+Description: Entry point to run RAG module as CLI.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

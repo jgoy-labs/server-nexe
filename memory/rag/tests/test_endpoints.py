@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: memory/rag/tests/test_endpoints.py
-Description: Tests unitaris dels endpoints RAG (upload, search, add_document).
+Description: Unit tests for RAG endpoints (upload, search, add_document).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _make_upload_file(filename: str, content: bytes = b"hello world", content_type: str = "text/plain"):
-    """Crea un mock d'UploadFile per als tests."""
+    """Creates a mock UploadFile for tests."""
     mock_file = MagicMock()
     mock_file.filename = filename
     mock_file.content_type = content_type
@@ -39,11 +39,11 @@ def _make_upload_file(filename: str, content: bytes = b"hello world", content_ty
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestUploadFileEndpoint:
-    """Tests de l'endpoint d'upload de fitxers al RAG."""
+    """Tests for the RAG file upload endpoint."""
 
     @pytest.mark.asyncio
     async def test_upload_invalid_extension_raises_400(self):
-        """Verifica que .exe és rebutjat amb 400."""
+        """Verify that .exe is rejected with 400."""
         from memory.rag.routers.endpoints import upload_file_endpoint
 
         mock_file = _make_upload_file("malware.exe")
@@ -56,7 +56,7 @@ class TestUploadFileEndpoint:
 
     @pytest.mark.asyncio
     async def test_upload_no_extension_raises_400(self):
-        """Verifica que fitxer sense extensió és rebutjat."""
+        """Verify that a file with no extension is rejected."""
         from memory.rag.routers.endpoints import upload_file_endpoint
 
         mock_file = _make_upload_file("noextension")
@@ -68,10 +68,10 @@ class TestUploadFileEndpoint:
 
     @pytest.mark.asyncio
     async def test_upload_path_traversal_filename_sanitized(self):
-        """Verifica que path traversal és detectat o sanititzat."""
+        """Verify that path traversal is detected or sanitized."""
         from memory.rag.routers.endpoints import upload_file_endpoint
 
-        # ../../etc/passwd té nom base 'passwd' sense extensió → 400
+        # ../../etc/passwd has base name 'passwd' with no extension → 400
         mock_file = _make_upload_file("../../etc/passwd")
 
         with pytest.raises(HTTPException) as exc_info:
@@ -81,7 +81,7 @@ class TestUploadFileEndpoint:
 
     @pytest.mark.asyncio
     async def test_upload_valid_txt_calls_file_rag(self):
-        """Verifica que .txt vàlid arriba a file_rag.add_file."""
+        """Verify that a valid .txt reaches file_rag.add_file."""
         from memory.rag.routers.endpoints import upload_file_endpoint
 
         mock_file = _make_upload_file("document.txt", b"contingut del document")
@@ -101,7 +101,7 @@ class TestUploadFileEndpoint:
 
     @pytest.mark.asyncio
     async def test_upload_invalid_metadata_json_ignored(self):
-        """Verifica que metadata JSON invàlid no fa petar l'endpoint."""
+        """Verify that invalid metadata JSON does not crash the endpoint."""
         from memory.rag.routers.endpoints import upload_file_endpoint
 
         mock_file = _make_upload_file("doc.txt", b"text")
@@ -112,19 +112,19 @@ class TestUploadFileEndpoint:
         })
 
         with patch("memory.rag.routers.endpoints._get_file_rag", return_value=mock_file_rag):
-            # metadata invàlid → es fa servir {} com a fallback
+            # invalid metadata → {} is used as fallback
             response = await upload_file_endpoint(file=mock_file, metadata="{invalid json}")
 
         assert response.status_code == 200
 
     @pytest.mark.asyncio
     async def test_upload_file_too_large_raises_413(self):
-        """Verifica que fitxer massa gran retorna 413."""
+        """Verify that a file that is too large returns 413."""
         from memory.rag.routers.endpoints import upload_file_endpoint
 
         large_content = b"x" * 100
         mock_file = _make_upload_file("big.txt", large_content)
-        mock_file.size = 60 * 1024 * 1024  # 60 MB > 50 MB màxim
+        mock_file.size = 60 * 1024 * 1024  # 60 MB > 50 MB maximum
 
         with pytest.raises(HTTPException) as exc_info:
             await upload_file_endpoint(file=mock_file, metadata="{}")
@@ -137,11 +137,11 @@ class TestUploadFileEndpoint:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestSearchEndpoint:
-    """Tests de l'endpoint de cerca al RAG."""
+    """Tests for the RAG search endpoint."""
 
     @pytest.mark.asyncio
     async def test_search_returns_results(self):
-        """Verifica que la cerca retorna resultats."""
+        """Verify that the search returns results."""
         from memory.rag.routers.endpoints import search_endpoint
 
         mock_result = MagicMock()
@@ -167,7 +167,7 @@ class TestSearchEndpoint:
 
     @pytest.mark.asyncio
     async def test_search_empty_results(self):
-        """Verifica que cerca sense resultats retorna count 0."""
+        """Verify that a search with no results returns count 0."""
         from memory.rag.routers.endpoints import search_endpoint
 
         mock_module = AsyncMock()
@@ -184,7 +184,7 @@ class TestSearchEndpoint:
 
     @pytest.mark.asyncio
     async def test_search_error_returns_500(self):
-        """Verifica que error intern retorna 500 genèric."""
+        """Verify that an internal error returns a generic 500."""
         from memory.rag.routers.endpoints import search_endpoint
 
         mock_module = AsyncMock()
@@ -197,7 +197,7 @@ class TestSearchEndpoint:
                 await search_endpoint({"query": "test"})
 
         assert exc_info.value.status_code == 500
-        # SECURITY: no ha d'exposar detalls interns
+        # SECURITY: must not expose internal details
         assert "DB error intern" not in exc_info.value.detail
 
 
@@ -206,11 +206,11 @@ class TestSearchEndpoint:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestAddDocumentEndpoint:
-    """Tests de l'endpoint d'afegir documents al RAG."""
+    """Tests for the RAG add documents endpoint."""
 
     @pytest.mark.asyncio
     async def test_add_document_success(self):
-        """Verifica que un document vàlid s'afegeix correctament."""
+        """Verify that a valid document is added correctly."""
         from memory.rag.routers.endpoints import add_document_endpoint
 
         mock_module = AsyncMock()
@@ -233,7 +233,7 @@ class TestAddDocumentEndpoint:
 
     @pytest.mark.asyncio
     async def test_add_document_default_source(self):
-        """Verifica que el source per defecte és 'personality'."""
+        """Verify that the default source is 'personality'."""
         from memory.rag.routers.endpoints import add_document_endpoint
 
         mock_module = AsyncMock()
@@ -249,7 +249,7 @@ class TestAddDocumentEndpoint:
 
     @pytest.mark.asyncio
     async def test_add_document_error_returns_500_generic(self):
-        """Verifica que error intern retorna 500 genèric (no detalls)."""
+        """Verify that an internal error returns a generic 500 (no details)."""
         from memory.rag.routers.endpoints import add_document_endpoint
 
         mock_module = AsyncMock()
@@ -270,10 +270,10 @@ class TestAddDocumentEndpoint:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestAllowedExtensions:
-    """Tests de la whitelist d'extensions."""
+    """Tests for the extensions whitelist."""
 
     def test_whitelist_contains_expected_types(self):
-        """Verifica que la whitelist conté els tipus esperats."""
+        """Verify that the whitelist contains the expected types."""
         from memory.rag.routers.endpoints import ALLOWED_UPLOAD_EXTENSIONS
         assert ".txt" in ALLOWED_UPLOAD_EXTENSIONS
         assert ".md" in ALLOWED_UPLOAD_EXTENSIONS
@@ -281,7 +281,7 @@ class TestAllowedExtensions:
         assert ".csv" in ALLOWED_UPLOAD_EXTENSIONS
 
     def test_whitelist_excludes_dangerous_types(self):
-        """Verifica que tipus perillosos no són a la whitelist."""
+        """Verify that dangerous types are not in the whitelist."""
         from memory.rag.routers.endpoints import ALLOWED_UPLOAD_EXTENSIONS
         dangerous = {".exe", ".sh", ".bat", ".py", ".js", ".php", ".rb"}
         assert dangerous.isdisjoint(ALLOWED_UPLOAD_EXTENSIONS)

@@ -1,9 +1,9 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: memory/embeddings/tests/unit/test_async_encoder.py
-Description: Tests unitaris per AsyncEmbedder.
+Description: Unit tests for AsyncEmbedder.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -18,7 +18,7 @@ from memory.embeddings.core.async_encoder import AsyncEmbedder
 @pytest.fixture
 def mock_text_embedding():
   """
-  Mock fastembed TextEmbedding per evitar carregar model real.
+  Mock fastembed TextEmbedding to avoid loading the real model.
   """
   mock = Mock()
 
@@ -31,10 +31,10 @@ def mock_text_embedding():
 @pytest.fixture
 async def async_embedder():
   """
-  Fixture: AsyncEmbedder (sense carregar fastembed TextEmbedding real).
+  Fixture: AsyncEmbedder (without loading the real fastembed TextEmbedding).
 
-  Nota: TextEmbedding s'importa dinàmicament dins _load_model,
-  per tant NO importem fastembed aquí (per evitar deps pesades als unit tests).
+  Note: TextEmbedding is imported dynamically inside _load_model,
+  so we do NOT import fastembed here (to avoid heavy deps in unit tests).
   """
   AsyncEmbedder._instances.clear()
 
@@ -52,11 +52,11 @@ async def async_embedder():
 @pytest.mark.asyncio
 async def test_singleton_pattern():
   """
-  Test 1: Verificar Singleton pattern.
+  Test 1: Verify Singleton pattern.
 
   Checks:
-  - Mateix model → mateixa instància
-  - get_instance() retorna singleton
+  - Same model → same instance
+  - get_instance() returns singleton
   """
   AsyncEmbedder._instances.clear()
 
@@ -71,10 +71,10 @@ async def test_singleton_pattern():
 @pytest.mark.asyncio
 async def test_different_models_different_instances():
   """
-  Test 2: Models diferents → instàncies diferents.
+  Test 2: Different models → different instances.
 
   Checks:
-  - Cada model té el seu singleton
+  - Each model has its own singleton
   """
   AsyncEmbedder._instances.clear()
 
@@ -90,11 +90,11 @@ async def test_different_models_different_instances():
 @pytest.mark.asyncio
 async def test_lazy_loading(async_embedder, mock_text_embedding):
   """
-  Test 3: Lazy loading del model.
+  Test 3: Lazy loading of the model.
 
   Checks:
-  - Model no carregat fins primer encode
-  - _ensure_loaded() carrega model només una vegada
+  - Model not loaded until first encode
+  - _ensure_loaded() loads model only once
   """
   assert async_embedder._model is None, "Model no hauria d'estar carregat inicialment"
 
@@ -109,9 +109,9 @@ async def test_encode_async_single_text(async_embedder, mock_text_embedding):
   Test 4: Encode single text async.
 
   Checks:
-  - Retorna embedding correcte
+  - Returns correct embedding
   - Format: List[float]
-  - Dimensions correctes
+  - Correct dimensions
   """
   with patch.object(async_embedder, '_model', mock_text_embedding):
     result = await async_embedder.encode_async("hello world", normalize=True)
@@ -123,10 +123,10 @@ async def test_encode_async_single_text(async_embedder, mock_text_embedding):
 @pytest.mark.asyncio
 async def test_encode_async_empty_text(async_embedder):
   """
-  Test 5: Encode text buit → ValueError.
+  Test 5: Encode empty text → ValueError.
 
   Checks:
-  - Text buit raise ValueError
+  - Empty text raises ValueError
   """
   with pytest.raises(ValueError, match="Text no pot estar buit"):
     await async_embedder.encode_async("", normalize=True)
@@ -134,12 +134,12 @@ async def test_encode_async_empty_text(async_embedder):
 @pytest.mark.asyncio
 async def test_encode_batch_async(async_embedder, mock_text_embedding):
   """
-  Test 6: Encode batch de texts.
+  Test 6: Encode batch of texts.
 
   Checks:
-  - Retorna llista d'embeddings
-  - Mateix ordre que input
-  - Format correcte
+  - Returns list of embeddings
+  - Same order as input
+  - Correct format
   """
   texts = ["hello", "world", "test"]
 
@@ -153,10 +153,10 @@ async def test_encode_batch_async(async_embedder, mock_text_embedding):
 @pytest.mark.asyncio
 async def test_encode_batch_empty_list(async_embedder):
   """
-  Test 7: Encode batch buit → ValueError.
+  Test 7: Encode empty batch → ValueError.
 
   Checks:
-  - Llista buida raise ValueError
+  - Empty list raises ValueError
   """
   with pytest.raises(ValueError, match="texts no pot estar buit"):
     await async_embedder.encode_batch_async([], normalize=True)
@@ -164,10 +164,10 @@ async def test_encode_batch_empty_list(async_embedder):
 @pytest.mark.asyncio
 async def test_encode_batch_with_empty_string(async_embedder):
   """
-  Test 8: Batch amb string buit → ValueError.
+  Test 8: Batch with empty string → ValueError.
 
   Checks:
-  - Strings buides dins batch raise ValueError
+  - Empty strings in batch raise ValueError
   """
   texts = ["hello", "", "world"]
 
@@ -180,7 +180,7 @@ async def test_concurrent_encode(async_embedder, mock_text_embedding):
   Test 9: Concurrent encodes (stress test).
 
   Checks:
-  - Multiple encodes simultanis
+  - Multiple simultaneous encodes
   - Thread-safe
   - No race conditions
   """
@@ -198,7 +198,7 @@ async def test_concurrent_encode(async_embedder, mock_text_embedding):
 @pytest.mark.asyncio
 async def test_get_info(async_embedder):
   """
-  Test 10: get_info() retorna metadata correcte.
+  Test 10: get_info() returns correct metadata.
 
   Checks:
   - model_name, device, loaded status
@@ -216,9 +216,9 @@ async def test_shutdown(async_embedder):
   Test 11: Graceful shutdown.
 
   Checks:
-  - Shutdown tanca ThreadPoolExecutor
-  - Model es descarrega
-  - Instance es remove del cache
+  - Shutdown closes ThreadPoolExecutor
+  - Model is unloaded
+  - Instance is removed from cache
   """
   model_name = async_embedder.model_name
 
@@ -230,13 +230,13 @@ async def test_shutdown(async_embedder):
 """
 Test Coverage AsyncEmbedder:
 ✅ test_singleton_pattern - Singleton per model
-✅ test_different_models_different_instances - Múltiples models
-✅ test_lazy_loading - Model carrega només quan es necessita
+✅ test_different_models_different_instances - Multiple models
+✅ test_lazy_loading - Model loads only when needed
 ✅ test_encode_async_single_text - Single text encoding
-✅ test_encode_async_empty_text - Error handling text buit
+✅ test_encode_async_empty_text - Error handling empty text
 ✅ test_encode_batch_async - Batch encoding
-✅ test_encode_batch_empty_list - Error batch buit
-✅ test_encode_batch_with_empty_string - Error strings buides
+✅ test_encode_batch_empty_list - Error empty batch
+✅ test_encode_batch_with_empty_string - Error empty strings
 ✅ test_concurrent_encode - Thread-safety
 ✅ test_get_info - Metadata
 ✅ test_shutdown - Graceful cleanup

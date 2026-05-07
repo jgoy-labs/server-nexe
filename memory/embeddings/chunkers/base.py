@@ -18,19 +18,19 @@ import uuid
 @dataclass
 class Chunk:
   """
-  Chunk estàndard per Nexe - preparat per Memory.
+  Standard chunk for Nexe - prepared for Memory.
 
   Attributes:
-    chunk_id: ID únic del chunk (UUID)
-    text: Contingut del chunk
-    start_char: Posició inicial al document original
-    end_char: Posició final al document original
-    chunk_index: Índex del chunk (0, 1, 2...)
-    document_id: ID del document pare (opcional)
-    section_title: Títol de secció detectat (per TextChunker)
-    chunk_type: Tipus de chunk ('paragraph', 'function', 'class', etc.)
-    language: Llenguatge de programació (per CodeChunker)
-    metadata: Metadata addicional (file_path, etc.)
+    chunk_id: Unique chunk ID (UUID)
+    text: Chunk content
+    start_char: Start position in the original document
+    end_char: End position in the original document
+    chunk_index: Chunk index (0, 1, 2...)
+    document_id: Parent document ID (optional)
+    section_title: Detected section title (for TextChunker)
+    chunk_type: Chunk type ('paragraph', 'function', 'class', etc.)
+    language: Programming language (for CodeChunker)
+    metadata: Additional metadata (file_path, etc.)
   """
 
   chunk_id: str
@@ -54,17 +54,17 @@ class Chunk:
     **kwargs: Any,
   ) -> "Chunk":
     """
-    Factory method per crear un Chunk amb UUID automàtic.
+    Factory method to create a Chunk with automatic UUID.
 
     Args:
-      text: Contingut del chunk
-      start: Posició inicial
-      end: Posició final
-      index: Índex del chunk
-      **kwargs: Altres atributs (document_id, section_title, etc.)
+      text: Chunk content
+      start: Start position
+      end: End position
+      index: Chunk index
+      **kwargs: Other attributes (document_id, section_title, etc.)
 
     Returns:
-      Chunk amb chunk_id generat automàticament
+      Chunk with automatically generated chunk_id
     """
     return cls(
       chunk_id=str(uuid.uuid4()),
@@ -76,7 +76,7 @@ class Chunk:
     )
 
   def to_dict(self) -> Dict[str, Any]:
-    """Converteix el Chunk a diccionari."""
+    """Converts the Chunk to a dictionary."""
     return {
       "chunk_id": self.chunk_id,
       "text": self.text,
@@ -91,22 +91,22 @@ class Chunk:
     }
 
   def __len__(self) -> int:
-    """Retorna la longitud del text."""
+    """Returns the length of the text."""
     return len(self.text)
 
 @dataclass
 class ChunkingResult:
   """
-  Resultat de chunking - interfície estàndard per Memory.
+  Chunking result - standard interface for Memory.
 
   Attributes:
-    document_id: ID del document processat
-    chunks: Llista de Chunks generats
-    total_chunks: Nombre total de chunks
-    original_length: Longitud del document original
-    chunker_id: ID del chunker utilitzat
-    created_at: Timestamp de creació
-    metadata: Metadata addicional (language, etc.)
+    document_id: ID of the processed document
+    chunks: List of generated Chunks
+    total_chunks: Total number of chunks
+    original_length: Length of the original document
+    chunker_id: ID of the chunker used
+    created_at: Creation timestamp
+    metadata: Additional metadata (language, etc.)
   """
 
   document_id: Optional[str]
@@ -118,7 +118,7 @@ class ChunkingResult:
   metadata: Dict[str, Any] = field(default_factory=dict)
 
   def to_dict(self) -> Dict[str, Any]:
-    """Converteix el resultat a diccionari."""
+    """Converts the result to a dictionary."""
     return {
       "document_id": self.document_id,
       "chunks": [c.to_dict() for c in self.chunks],
@@ -135,14 +135,14 @@ class ChunkingResult:
 
 class BaseChunker(ABC):
   """
-  Classe base abstracta per tots els chunkers de Nexe.
+  Abstract base class for all Nexe chunkers.
 
-  IMPORTANT per Memory:
-  - Tots els chunkers hereten d'aquesta classe
-  - ChunkerRegistry auto-descobreix subclasses
-  - metadata.formats indica quins formats suporta
+  IMPORTANT for Memory:
+  - All chunkers inherit from this class
+  - ChunkerRegistry auto-discovers subclasses
+  - metadata.formats indicates which formats are supported
 
-  Ús:
+  Usage:
     class MyChunker(BaseChunker):
       metadata = {
         'id': 'chunker.my',
@@ -176,10 +176,10 @@ class BaseChunker(ABC):
 
   def __init__(self, **config: Any) -> None:
     """
-    Inicialitza el chunker amb configuració opcional.
+    Initializes the chunker with optional configuration.
 
     Args:
-      **config: Paràmetres de configuració que sobreescriuen els defaults
+      **config: Configuration parameters that override the defaults
     """
     self.config = {**self.default_config, **config}
 
@@ -191,17 +191,17 @@ class BaseChunker(ABC):
     metadata: Optional[Dict[str, Any]] = None,
   ) -> ChunkingResult:
     """
-    Mètode principal de chunking.
+    Main chunking method.
 
-    MEMORY CRIDA AQUEST MÈTODE.
+    MEMORY CALLS THIS METHOD.
 
     Args:
-      text: Contingut a chunkejar
-      document_id: ID opcional del document
-      metadata: Metadata addicional (file_path, language, etc.)
+      text: Content to chunk
+      document_id: Optional document ID
+      metadata: Additional metadata (file_path, language, etc.)
 
     Returns:
-      ChunkingResult amb llista de Chunks
+      ChunkingResult with list of Chunks
     """
     pass
 
@@ -210,16 +210,16 @@ class BaseChunker(ABC):
     self, file_extension: Optional[str] = None, content_type: Optional[str] = None
   ) -> bool:
     """
-    Indica si aquest chunker suporta el format/tipus.
+    Indicates whether this chunker supports the format/type.
 
-    MEMORY CRIDA AQUEST MÈTODE per seleccionar el chunker adequat.
+    MEMORY CALLS THIS METHOD to select the appropriate chunker.
 
     Args:
-      file_extension: Extensió de fitxer ('py', 'txt', etc.)
-      content_type: Tipus de contingut ('code', 'text', etc.)
+      file_extension: File extension ('py', 'txt', etc.)
+      content_type: Content type ('code', 'text', etc.)
 
     Returns:
-      True si suporta, False altrament
+      True if supported, False otherwise
     """
     pass
 
@@ -235,15 +235,15 @@ class BaseChunker(ABC):
 
   def estimate_chunks(self, text: str) -> int:
     """
-    Estima el nombre de chunks sense processar.
+    Estimates the number of chunks without processing.
 
-    Útil per predir el cost de chunking.
+    Useful for predicting the cost of chunking.
 
     Args:
-      text: Text a estimar
+      text: Text to estimate
 
     Returns:
-      Nombre estimat de chunks
+      Estimated number of chunks
     """
     if not text:
       return 0

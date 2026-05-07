@@ -13,18 +13,18 @@ from .constants import MANIFEST, MODULE_ID
 
 def get_router():
   """
-  Retorna el router públic del mòdul.
+  Returns the module's public router.
 
-  Facade que delega a router.py per evitar imports pesats.
+  Facade that delegates to router.py to avoid heavy imports.
   """
   from .router import get_router as _get_router
   return _get_router()
 
 def get_metadata():
   """
-  Retorna metadata del mòdul.
+  Returns module metadata.
 
-  Facade que delega a router.py.
+  Facade that delegates to router.py.
   """
   from .router import get_metadata as _get_metadata
   return _get_metadata()

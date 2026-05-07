@@ -20,9 +20,9 @@ from memory.rag_sources.base import (
 @pytest.fixture
 def clean_rag_module():
   """
-  Fixture per crear instància RAGModule neta.
+  Fixture to create a clean RAGModule instance.
 
-  Reset singleton per cada test.
+  Resets singleton for each test.
   """
   RAGModule._instance = None
   RAGModule._initialized = False
@@ -35,7 +35,7 @@ def clean_rag_module():
 @pytest.mark.asyncio
 async def test_module_initialize_loads_personality_rag(clean_rag_module):
   """
-  Test que initialize() carrega PersonalityRAG correctament.
+  Test that initialize() loads PersonalityRAG correctly.
   """
   module = clean_rag_module
 
@@ -55,7 +55,7 @@ async def test_module_initialize_loads_personality_rag(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_initialize_idempotent(clean_rag_module):
   """
-  Test que initialize() és idempotent (no error si ja inicialitzat).
+  Test that initialize() is idempotent (no error if already initialized).
   """
   module = clean_rag_module
 
@@ -70,7 +70,7 @@ async def test_module_initialize_idempotent(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_add_document_e2e(clean_rag_module):
   """
-  Test add_document() via RAGModule E2E.
+  Test add_document() via RAGModule end-to-end.
   """
   module = clean_rag_module
   await module.initialize()
@@ -89,7 +89,7 @@ async def test_module_add_document_e2e(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_search_e2e(clean_rag_module):
   """
-  Test search() via RAGModule E2E.
+  Test search() via RAGModule end-to-end.
   """
   module = clean_rag_module
   await module.initialize()
@@ -120,7 +120,7 @@ async def test_module_search_e2e(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_add_document_not_initialized(clean_rag_module):
   """
-  Test que add_document() error si no inicialitzat.
+  Test that add_document() errors if not initialized.
   """
   module = clean_rag_module
 
@@ -132,7 +132,7 @@ async def test_module_add_document_not_initialized(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_search_not_initialized(clean_rag_module):
   """
-  Test que search() error si no inicialitzat.
+  Test that search() errors if not initialized.
   """
   module = clean_rag_module
 
@@ -144,7 +144,7 @@ async def test_module_search_not_initialized(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_invalid_source(clean_rag_module):
   """
-  Test que error si source desconeguda.
+  Test that error occurs if source is unknown.
   """
   module = clean_rag_module
   await module.initialize()
@@ -157,7 +157,7 @@ async def test_module_invalid_source(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_get_source(clean_rag_module):
   """
-  Test get_source() retorna la source correcta.
+  Test get_source() returns the correct source.
   """
   module = clean_rag_module
   await module.initialize()
@@ -171,7 +171,7 @@ async def test_module_get_source(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_list_sources(clean_rag_module):
   """
-  Test list_sources() retorna sources disponibles.
+  Test list_sources() returns available sources.
   """
   module = clean_rag_module
 
@@ -187,7 +187,7 @@ async def test_module_list_sources(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_get_info(clean_rag_module):
   """
-  Test get_info() retorna metadata correcta.
+  Test get_info() returns correct metadata.
   """
   module = clean_rag_module
   await module.initialize()
@@ -204,7 +204,7 @@ async def test_module_get_info(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_get_health(clean_rag_module):
   """
-  Test get_health() retorna status correcte.
+  Test get_health() returns correct status.
   """
   module = clean_rag_module
   await module.initialize()
@@ -222,7 +222,7 @@ async def test_module_get_health(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_stats_tracking(clean_rag_module):
   """
-  Test que stats es rastregen correctament.
+  Test that stats are tracked correctly.
   """
   module = clean_rag_module
   await module.initialize()
@@ -248,7 +248,7 @@ async def test_module_stats_tracking(clean_rag_module):
 @pytest.mark.asyncio
 async def test_module_multiple_documents_search(clean_rag_module):
   """
-  Test cerca amb múltiples documents.
+  Test search with multiple documents.
   """
   module = clean_rag_module
   await module.initialize()

@@ -18,7 +18,7 @@ from typing import Optional, Any, Dict
 import hashlib
 import asyncio
 
-# Constants de colors per logs
+# Color constants for logs
 RED = "\033[1;31m"
 RESET = "\033[0m"
 
@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 class MultiLevelCache:
     """
-    Cache multi-nivell (L1: RAM, L2: SQLite).
-    Dissenyat per emmagatzemar embeddings i reduir latència.
+    Multi-level cache (L1: RAM, L2: SQLite).
+    Designed to store embeddings and reduce latency.
     """
 
     def __init__(
@@ -38,13 +38,13 @@ class MultiLevelCache:
         cache_dir: str = "storage/cache/embeddings"
     ):
         """
-        Inicialitza el cache.
-        
+        Initialize the cache.
+
         Args:
-            l1_max_size: Nombre màxim d'elements en RAM
-            l2_max_size_gb: Tamany màxim aproximat en disc (GB)
-            l2_ttl_hours: Temps de vida dels elements en disc
-            cache_dir: Directori per la BBDD SQLite
+            l1_max_size: Maximum number of elements in RAM
+            l2_max_size_gb: Approximate maximum size on disk (GB)
+            l2_ttl_hours: Time-to-live for elements on disk
+            cache_dir: Directory for the SQLite database
         """
         self.l1_max_size = l1_max_size
         self.l2_max_size_bytes = int(l2_max_size_gb * 1024 * 1024 * 1024)
@@ -97,7 +97,7 @@ class MultiLevelCache:
         try:
             self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
             self.conn.execute("PRAGMA busy_timeout = 5000")
-            # Crear taula si no existeix
+            # Create table if it does not exist
             cursor = self.conn.cursor()
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS cache (
@@ -139,7 +139,7 @@ class MultiLevelCache:
 
     async def get(self, text: str, model: str, version: str) -> Optional[Any]:
         """
-        Obté un valor del cache (L1 -> L2).
+        Get a value from the cache (L1 -> L2).
         """
         key = self._generate_key(text, model, version)
         
@@ -162,14 +162,14 @@ class MultiLevelCache:
                     if row:
                         data_blob, created_at = row
 
-                        # Comprovar TTL
+                        # Check TTL
                         if time.time() - created_at > self.l2_ttl_seconds:
-                            # Expirat
+                            # Expired
                             cursor.execute("DELETE FROM cache WHERE key = ?", (key,))
                             self.conn.commit()
                             return None
 
-                        # Deserialitzar
+                        # Deserialize
                         try:
                             data = self._deserialize_embedding(data_blob)
                         except Exception as e:
@@ -178,7 +178,7 @@ class MultiLevelCache:
                             logger.warning(f"L2 cache decode error: {e}")
                             return None
 
-                        # Promocionar a L1
+                        # Promote to L1
                         self._add_to_l1(key, data)
 
                         # Update last_accessed (async or fast sync)
@@ -199,14 +199,14 @@ class MultiLevelCache:
 
     async def put(self, text: str, model: str, embedding: Any, version: str):
         """
-        Guarda un valor al cache (L1 + L2).
+        Store a value in the cache (L1 + L2).
         """
         key = self._generate_key(text, model, version)
-        
-        # Guardar a L1
+
+        # Store in L1
         self._add_to_l1(key, embedding)
-        
-        # Guardar a L2
+
+        # Store in L2
         if self.conn:
             async with self._lock:
                 cursor = self.conn.cursor()
@@ -232,7 +232,7 @@ class MultiLevelCache:
                     cursor.close()
 
     def _add_to_l1(self, key: str, data: Any):
-        """Afegeix a L1 gestionant capacitat."""
+        """Add to L1 managing capacity."""
         if len(self.l1_cache) >= self.l1_max_size:
             # Remove the first entry (simple FIFO for now)
             # In Python 3.7+ dicts are ordered by insertion
@@ -245,7 +245,7 @@ class MultiLevelCache:
         self.l1_cache[key] = data
 
     async def clear(self):
-        """Neteja tots els nivells de cache."""
+        """Clear all cache levels."""
         self.l1_cache.clear()
         if self.conn:
             async with self._lock:
@@ -260,7 +260,7 @@ class MultiLevelCache:
                     cursor.close()
 
     async def shutdown(self):
-        """Tanca recursos."""
+        """Close resources."""
         if self.conn:
             try:
                 self.conn.close()

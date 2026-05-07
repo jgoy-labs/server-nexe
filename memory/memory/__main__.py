@@ -3,13 +3,13 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/memory/__main__.py
-Description: Entry point per executar Memory module com a CLI.
+Description: Entry point to run Memory module as a CLI.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from .cli import main  # type: ignore[attr-defined]  # FP: main() definida a cli.py:396, mypy no la detecta per import cycle
+from .cli import main  # type: ignore[attr-defined]  # FP: main() defined in cli.py:396, mypy does not detect it due to import cycle
 
 if __name__ == "__main__":
   main()

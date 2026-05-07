@@ -1,9 +1,9 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: memory/embeddings/tests/integration/test_module.py
-Description: Tests d'integració per EmbeddingsModule.
+Description: Integration tests for EmbeddingsModule.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -25,9 +25,9 @@ pytestmark = pytest.mark.integration
 @pytest.fixture
 def mock_text_embedding():
   """
-  Mock fastembed TextEmbedding per tests.
+  Mock fastembed TextEmbedding for tests.
 
-  IMPORTANT: embed() retorna un iterador de vectors numpy.
+  IMPORTANT: embed() returns an iterator of numpy vectors.
   """
   mock = Mock()
 
@@ -43,10 +43,10 @@ def mock_text_embedding():
 @pytest.fixture
 async def embeddings_module(mock_text_embedding):
   """
-  Fixture: EmbeddingsModule amb fastembed TextEmbedding mockat.
+  Fixture: EmbeddingsModule with mocked fastembed TextEmbedding.
 
-  NOTA: El mock ha de mantenir-se durant tot el test perquè
-  el model es carrega lazy durant encode().
+  NOTE: The mock must be kept throughout the test because
+  the model is lazily loaded during encode().
   """
   EmbeddingsModule._instance = None
   EmbeddingsModule._initialized = False
@@ -75,10 +75,10 @@ async def embeddings_module(mock_text_embedding):
 @pytest.mark.asyncio
 async def test_singleton_pattern():
   """
-  Test 1: EmbeddingsModule és Singleton.
+  Test 1: EmbeddingsModule is Singleton.
 
   Checks:
-  - get_instance() retorna mateixa instància
+  - get_instance() returns same instance
   """
   EmbeddingsModule._instance = None
 
@@ -92,11 +92,11 @@ async def test_singleton_pattern():
 @pytest.mark.asyncio
 async def test_initialize(embeddings_module):
   """
-  Test 2: Initialize configura tots els components.
+  Test 2: Initialize configures all components.
 
   Checks:
-  - _cached_embedder creat
-  - _chunker creat
+  - _cached_embedder created
+  - _chunker created
   - _initialized = True
   """
   assert embeddings_module._initialized, "Hauria d'estar inicialitzat"
@@ -106,11 +106,11 @@ async def test_initialize(embeddings_module):
 @pytest.mark.asyncio
 async def test_encode_single(embeddings_module):
   """
-  Test 3: encode() retorna embedding correcte.
+  Test 3: encode() returns correct embedding.
 
   Checks:
-  - EmbeddingResponse complet
-  - embedding amb dimensions correctes
+  - Complete EmbeddingResponse
+  - embedding with correct dimensions
   """
   request = EmbeddingRequest(text="hello world", use_cache=True)
 
@@ -124,11 +124,11 @@ async def test_encode_single(embeddings_module):
 @pytest.mark.asyncio
 async def test_encode_batch(embeddings_module):
   """
-  Test 4: encode_batch() retorna batch d'embeddings.
+  Test 4: encode_batch() returns batch of embeddings.
 
   Checks:
-  - BatchEmbeddingResponse amb count correcte
-  - embeddings en ordre correcte
+  - BatchEmbeddingResponse with correct count
+  - embeddings in correct order
   """
   import uuid
   unique_id = uuid.uuid4().hex[:8]
@@ -146,11 +146,11 @@ async def test_encode_batch(embeddings_module):
 @pytest.mark.asyncio
 async def test_chunk_document(embeddings_module):
   """
-  Test 5: chunk_document() retorna chunks correctes.
+  Test 5: chunk_document() returns correct chunks.
 
   Checks:
-  - ChunkedDocument amb metadata
-  - Chunks enumerats correctament
+  - ChunkedDocument with metadata
+  - Chunks correctly enumerated
   """
   content = """
 Títol del Document
@@ -170,10 +170,10 @@ Aquest és el segon paràgraf també amb contingut adequat.
 @pytest.mark.asyncio
 async def test_get_stats(embeddings_module):
   """
-  Test 6: get_stats() retorna estadístiques correctes.
+  Test 6: get_stats() returns correct statistics.
 
   Checks:
-  - EncoderStats amb hit rate, latencies
+  - EncoderStats with hit rate, latencies
   """
   for i in range(3):
     request = EmbeddingRequest(text=f"text_{i}", use_cache=True)
@@ -189,10 +189,10 @@ async def test_get_stats(embeddings_module):
 @pytest.mark.asyncio
 async def test_clear_cache(embeddings_module):
   """
-  Test 7: clear_cache() neteja el cache.
+  Test 7: clear_cache() clears the cache.
 
   Checks:
-  - Després de clear, cache hits canvien
+  - After clear, cache hits change
   """
   import uuid
   unique_text = f"test_clear_cache_{uuid.uuid4().hex[:8]}"
@@ -212,7 +212,7 @@ async def test_clear_cache(embeddings_module):
 @pytest.mark.asyncio
 async def test_get_health(embeddings_module):
   """
-  Test 8: get_health() retorna estat correcte.
+  Test 8: get_health() returns correct status.
 
   Checks:
   - status, checks, metadata
@@ -226,7 +226,7 @@ async def test_get_health(embeddings_module):
 @pytest.mark.asyncio
 async def test_get_info(embeddings_module):
   """
-  Test 9: get_info() retorna metadata completa.
+  Test 9: get_info() returns complete metadata.
 
   Checks:
   - module_id, name, version
@@ -244,10 +244,10 @@ async def test_get_info(embeddings_module):
 @pytest.mark.asyncio
 async def test_not_initialized_error():
   """
-  Test 10: Cridar encode() abans de initialize() → RuntimeError.
+  Test 10: Calling encode() before initialize() → RuntimeError.
 
   Checks:
-  - RuntimeError si no inicialitzat
+  - RuntimeError if not initialized
   """
   EmbeddingsModule._instance = None
   module = EmbeddingsModule.get_instance()
@@ -262,7 +262,7 @@ async def test_not_initialized_error():
 @pytest.mark.asyncio
 async def test_shutdown(embeddings_module):
   """
-  Test 11: shutdown() neteja correctament.
+  Test 11: shutdown() cleans up correctly.
 
   Checks:
   - _initialized = False
@@ -276,12 +276,12 @@ async def test_shutdown(embeddings_module):
 
 """
 Test Coverage EmbeddingsModule:
-✅ test_singleton_pattern - Singleton correcte
-✅ test_initialize - Inicialització components
+✅ test_singleton_pattern - Correct singleton
+✅ test_initialize - Component initialization
 ✅ test_encode_single - Single embedding
 ✅ test_encode_batch - Batch embeddings
-✅ test_chunk_document - Chunking funcional
-✅ test_get_stats - Estadístiques
+✅ test_chunk_document - Functional chunking
+✅ test_get_stats - Statistics
 ✅ test_clear_cache - Clear cache
 ✅ test_get_health - Health checks
 ✅ test_get_info - Module info

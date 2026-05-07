@@ -27,7 +27,7 @@ FALLBACK_PATHS = [
 ]
 
 def find_log_path() -> Path:
-  """Troba el path del log RAG."""
+  """Find the RAG log path."""
   if RAG_LOG_PATH.exists():
     return RAG_LOG_PATH
 
@@ -123,7 +123,7 @@ def show_stats():
 
 def main():
   parser = argparse.ArgumentParser(
-    description="Veure logs RAG/Memory de Nexe en temps real"
+    description="View Nexe RAG/Memory logs in real time"
   )
   parser.add_argument(
     "--lines", "-n",
@@ -160,7 +160,7 @@ def main():
 
   if args.clear:
     log_path.write_text("")
-    print(f"🗑️ RAG log netejat: {log_path}")
+    print(f"🗑️ RAG log cleared: {log_path}")
 
   GREEN = "\033[32m"
   GRAY = "\033[90m"
@@ -175,12 +175,12 @@ def main():
       check=True
     )
   except KeyboardInterrupt:
-    print("\n\n👋 Sortint del visor de logs RAG")
+    print("\n\n👋 Exiting the RAG log viewer")
   except FileNotFoundError:
     _python_tail(log_path, args.lines)
 
 def _python_tail(log_path: Path, lines: int):
-  """Fallback a Python pur si tail no existeix."""
+  """Fallback to pure Python if tail does not exist."""
   import time
 
   if log_path.exists():
@@ -199,7 +199,7 @@ def _python_tail(log_path: Path, lines: int):
         else:
           time.sleep(0.1)
   except KeyboardInterrupt:
-    print("\n\n👋 Sortint del visor de logs RAG")
+    print("\n\n👋 Exiting the RAG log viewer")
 
 if __name__ == "__main__":
   main()

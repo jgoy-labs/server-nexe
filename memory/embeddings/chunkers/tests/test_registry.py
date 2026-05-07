@@ -23,33 +23,33 @@ from memory.embeddings.chunkers import (
 )
 
 class TestChunkerRegistrySingleton:
-  """Tests per comportament singleton."""
+  """Tests for singleton behavior."""
 
   def setup_method(self):
-    """Reset registry abans de cada test."""
+    """Reset registry before each test."""
     reset_registry()
 
   def test_get_registry_returns_same_instance(self):
-    """get_chunker_registry retorna el mateix singleton."""
+    """get_chunker_registry returns the same singleton."""
     registry1 = get_chunker_registry()
     registry2 = get_chunker_registry()
     assert registry1 is registry2
 
   def test_reset_registry_creates_new_instance(self):
-    """reset_registry permet crear nou singleton."""
+    """reset_registry allows creating a new singleton."""
     registry1 = get_chunker_registry()
     reset_registry()
     registry2 = get_chunker_registry()
     assert registry1 is not registry2
 
 class TestAutoDiscovery:
-  """Tests per auto-discovery de chunkers."""
+  """Tests for chunker auto-discovery."""
 
   def setup_method(self):
     reset_registry()
 
   def test_auto_discovery_finds_builtin_chunkers(self):
-    """Auto-discovery troba TextChunker i CodeChunker."""
+    """Auto-discovery finds TextChunker and CodeChunker."""
     registry = get_chunker_registry()
 
     assert len(registry) >= 2
@@ -58,7 +58,7 @@ class TestAutoDiscovery:
     assert registry.has_chunker("chunker.code")
 
   def test_auto_discovery_registers_correct_types(self):
-    """Auto-discovery registra els tipus correctes."""
+    """Auto-discovery registers the correct types."""
     registry = get_chunker_registry()
 
     text_chunker = registry.get_chunker("chunker.text")
@@ -68,13 +68,13 @@ class TestAutoDiscovery:
     assert isinstance(code_chunker, CodeChunker)
 
 class TestChunkerSelection:
-  """Tests per selecció de chunkers."""
+  """Tests for chunker selection."""
 
   def setup_method(self):
     reset_registry()
 
   def test_get_chunker_for_python_format(self):
-    """get_chunker_for_format('py') retorna CodeChunker."""
+    """get_chunker_for_format('py') returns CodeChunker."""
     registry = get_chunker_registry()
     chunker = registry.get_chunker_for_format("py")
 
@@ -82,7 +82,7 @@ class TestChunkerSelection:
     assert isinstance(chunker, CodeChunker)
 
   def test_get_chunker_for_javascript_format(self):
-    """get_chunker_for_format('js') retorna CodeChunker."""
+    """get_chunker_for_format('js') returns CodeChunker."""
     registry = get_chunker_registry()
     chunker = registry.get_chunker_for_format("js")
 
@@ -90,7 +90,7 @@ class TestChunkerSelection:
     assert isinstance(chunker, CodeChunker)
 
   def test_get_chunker_for_text_format(self):
-    """get_chunker_for_format('txt') retorna TextChunker."""
+    """get_chunker_for_format('txt') returns TextChunker."""
     registry = get_chunker_registry()
     chunker = registry.get_chunker_for_format("txt")
 
@@ -98,7 +98,7 @@ class TestChunkerSelection:
     assert isinstance(chunker, TextChunker)
 
   def test_get_chunker_for_markdown_format(self):
-    """get_chunker_for_format('md') retorna TextChunker."""
+    """get_chunker_for_format('md') returns TextChunker."""
     registry = get_chunker_registry()
     chunker = registry.get_chunker_for_format("md")
 
@@ -106,14 +106,14 @@ class TestChunkerSelection:
     assert isinstance(chunker, TextChunker)
 
   def test_get_chunker_for_unknown_format_returns_none(self):
-    """get_chunker_for_format amb format desconegut retorna None."""
+    """get_chunker_for_format with unknown format returns None."""
     registry = get_chunker_registry()
     chunker = registry.get_chunker_for_format("xyz123")
 
     assert chunker is None
 
   def test_get_chunker_for_type_code(self):
-    """get_chunker_for_type('code') retorna CodeChunker."""
+    """get_chunker_for_type('code') returns CodeChunker."""
     registry = get_chunker_registry()
     chunker = registry.get_chunker_for_type("code")
 
@@ -121,7 +121,7 @@ class TestChunkerSelection:
     assert isinstance(chunker, CodeChunker)
 
   def test_get_chunker_for_type_text(self):
-    """get_chunker_for_type('text') retorna TextChunker."""
+    """get_chunker_for_type('text') returns TextChunker."""
     registry = get_chunker_registry()
     chunker = registry.get_chunker_for_type("text")
 
@@ -129,7 +129,7 @@ class TestChunkerSelection:
     assert isinstance(chunker, TextChunker)
 
   def test_get_default_chunker_returns_text(self):
-    """get_default_chunker retorna TextChunker."""
+    """get_default_chunker returns TextChunker."""
     registry = get_chunker_registry()
     chunker = registry.get_default_chunker()
 
@@ -137,7 +137,7 @@ class TestChunkerSelection:
     assert isinstance(chunker, TextChunker)
 
   def test_format_with_leading_dot(self):
-    """Accepta formats amb punt inicial (.py)."""
+    """Accepts formats with leading dot (.py)."""
     registry = get_chunker_registry()
     chunker = registry.get_chunker_for_format(".py")
 
@@ -145,13 +145,13 @@ class TestChunkerSelection:
     assert isinstance(chunker, CodeChunker)
 
 class TestManualRegistration:
-  """Tests per registre manual de chunkers."""
+  """Tests for manual chunker registration."""
 
   def setup_method(self):
     reset_registry()
 
   def test_register_custom_chunker(self):
-    """Pot registrar un chunker personalitzat."""
+    """Can register a custom chunker."""
     registry = ChunkerRegistry()
 
     class CustomChunker(BaseChunker):
@@ -174,7 +174,7 @@ class TestManualRegistration:
     assert registry.get_chunker_for_format("custom") is not None
 
   def test_register_duplicate_raises_error(self):
-    """Registrar duplicat llança DuplicateChunkerError."""
+    """Registering a duplicate raises DuplicateChunkerError."""
     registry = ChunkerRegistry()
     registry.register(TextChunker)
 
@@ -182,7 +182,7 @@ class TestManualRegistration:
       registry.register(TextChunker)
 
   def test_register_non_chunker_raises_error(self):
-    """Registrar no-BaseChunker llança ValueError."""
+    """Registering a non-BaseChunker raises ValueError."""
     registry = ChunkerRegistry()
 
     class NotAChunker:
@@ -192,20 +192,20 @@ class TestManualRegistration:
       registry.register(NotAChunker)
 
   def test_get_nonexistent_chunker_raises_error(self):
-    """get_chunker amb ID inexistent llança ChunkerNotFoundError."""
+    """get_chunker with non-existent ID raises ChunkerNotFoundError."""
     registry = ChunkerRegistry()
 
     with pytest.raises(ChunkerNotFoundError):
       registry.get_chunker("chunker.nonexistent")
 
 class TestRegistryStats:
-  """Tests per estadístiques del registry."""
+  """Tests for registry statistics."""
 
   def setup_method(self):
     reset_registry()
 
   def test_list_chunkers(self):
-    """list_chunkers retorna llista amb info."""
+    """list_chunkers returns list with info."""
     registry = get_chunker_registry()
     chunkers = registry.list_chunkers()
 
@@ -218,7 +218,7 @@ class TestRegistryStats:
       assert "formats" in chunker_info
 
   def test_get_stats(self):
-    """get_stats retorna estadístiques."""
+    """get_stats returns statistics."""
     registry = get_chunker_registry()
     stats = registry.get_stats()
 
@@ -232,7 +232,7 @@ class TestRegistryStats:
     assert "txt" in stats["supported_formats"]
 
   def test_has_format_support(self):
-    """has_format_support funciona correctament."""
+    """has_format_support works correctly."""
     registry = get_chunker_registry()
 
     assert registry.has_format_support("py")
@@ -241,12 +241,12 @@ class TestRegistryStats:
     assert not registry.has_format_support("xyz123")
 
   def test_len_registry(self):
-    """len(registry) retorna nombre de chunkers."""
+    """len(registry) returns number of chunkers."""
     registry = get_chunker_registry()
     assert len(registry) >= 2
 
   def test_repr_registry(self):
-    """repr mostra info útil."""
+    """repr shows useful info."""
     registry = get_chunker_registry()
     repr_str = repr(registry)
 
@@ -254,13 +254,13 @@ class TestRegistryStats:
     assert "chunkers=" in repr_str
 
 class TestMemoryIntegration:
-  """Tests que simulen com Memory usarà el registry."""
+  """Tests simulating how Memory will use the registry."""
 
   def setup_method(self):
     reset_registry()
 
   def test_memory_workflow_python_file(self):
-    """Simula processament de fitxer Python per Memory."""
+    """Simulates Python file processing by Memory."""
     registry = get_chunker_registry()
 
     file_path = "module.py"
@@ -284,7 +284,7 @@ def world():
     assert result.chunker_id == "chunker.code"
 
   def test_memory_workflow_text_file(self):
-    """Simula processament de fitxer text per Memory."""
+    """Simulates text file processing by Memory."""
     registry = get_chunker_registry()
 
     file_path = "document.txt"
@@ -313,7 +313,7 @@ Contingut de la segona secció.
     assert result.chunker_id == "chunker.text"
 
   def test_memory_workflow_unknown_format(self):
-    """Memory amb format desconegut usa default chunker."""
+    """Memory with unknown format uses default chunker."""
     registry = get_chunker_registry()
 
     file_path = "data.xyz"

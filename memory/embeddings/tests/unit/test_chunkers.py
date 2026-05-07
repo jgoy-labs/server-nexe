@@ -25,10 +25,10 @@ from memory.embeddings.chunkers import (
 )
 
 class TestChunkDataclass:
-  """Tests per la dataclass Chunk."""
+  """Tests for the Chunk dataclass."""
 
   def test_chunk_create_factory(self):
-    """Factory method crea chunk amb UUID."""
+    """Factory method creates chunk with UUID."""
     chunk = Chunk.create(
       text="Test content",
       start=0,
@@ -46,7 +46,7 @@ class TestChunkDataclass:
     assert len(chunk.chunk_id) == 36
 
   def test_chunk_to_dict(self):
-    """to_dict() serialitza correctament."""
+    """to_dict() serializes correctly."""
     chunk = Chunk.create(
       text="Test",
       start=0,
@@ -64,12 +64,12 @@ class TestChunkDataclass:
     assert d["chunk_type"] == "paragraph"
 
   def test_chunk_len(self):
-    """len(chunk) retorna longitud del text."""
+    """len(chunk) returns text length."""
     chunk = Chunk.create(text="Hello", start=0, end=5, index=0)
     assert len(chunk) == 5
 
   def test_chunk_with_metadata(self):
-    """Chunk pot tenir metadata personalitzada."""
+    """Chunk can have custom metadata."""
     chunk = Chunk.create(
       text="Code",
       start=0,
@@ -82,10 +82,10 @@ class TestChunkDataclass:
     assert chunk.metadata["language"] == "python"
 
 class TestChunkingResultDataclass:
-  """Tests per la dataclass ChunkingResult."""
+  """Tests for the ChunkingResult dataclass."""
 
   def test_chunking_result_basic(self):
-    """ChunkingResult conté informació correcta."""
+    """ChunkingResult contains correct information."""
     chunks = [
       Chunk.create(text="A", start=0, end=1, index=0),
       Chunk.create(text="B", start=2, end=3, index=1),
@@ -106,7 +106,7 @@ class TestChunkingResultDataclass:
     assert len(result.chunks) == 2
 
   def test_chunking_result_get_texts(self):
-    """get_texts() retorna només els textos."""
+    """get_texts() returns only the texts."""
     chunks = [
       Chunk.create(text="First", start=0, end=5, index=0),
       Chunk.create(text="Second", start=6, end=12, index=1),
@@ -124,7 +124,7 @@ class TestChunkingResultDataclass:
     assert texts == ["First", "Second"]
 
   def test_chunking_result_to_dict(self):
-    """to_dict() serialitza tot el resultat."""
+    """to_dict() serializes the entire result."""
     chunks = [Chunk.create(text="Test", start=0, end=4, index=0)]
 
     result = ChunkingResult(
@@ -143,26 +143,26 @@ class TestChunkingResultDataclass:
     assert d["chunks"][0]["text"] == "Test"
 
 class TestChunkerRegistryCore:
-  """Tests pel core del ChunkerRegistry."""
+  """Tests for the ChunkerRegistry core."""
 
   def setup_method(self):
     reset_registry()
 
   def test_singleton_pattern(self):
-    """get_chunker_registry() retorna singleton."""
+    """get_chunker_registry() returns singleton."""
     r1 = get_chunker_registry()
     r2 = get_chunker_registry()
     assert r1 is r2
 
   def test_reset_creates_new_instance(self):
-    """reset_registry() elimina el singleton."""
+    """reset_registry() removes the singleton."""
     r1 = get_chunker_registry()
     reset_registry()
     r2 = get_chunker_registry()
     assert r1 is not r2
 
   def test_auto_discovery_on_init(self):
-    """Auto-discovery es fa al crear el registry."""
+    """Auto-discovery runs when creating the registry."""
     registry = get_chunker_registry()
 
     assert registry.has_chunker("chunker.code")
@@ -170,7 +170,7 @@ class TestChunkerRegistryCore:
     assert len(registry) >= 2
 
   def test_get_chunker_by_id(self):
-    """get_chunker() retorna chunker per ID."""
+    """get_chunker() returns chunker by ID."""
     registry = get_chunker_registry()
 
     code = registry.get_chunker("chunker.code")
@@ -180,14 +180,14 @@ class TestChunkerRegistryCore:
     assert isinstance(text, TextChunker)
 
   def test_get_nonexistent_raises_error(self):
-    """get_chunker() amb ID inexistent llança error."""
+    """get_chunker() with non-existent ID raises error."""
     registry = get_chunker_registry()
 
     with pytest.raises(ChunkerNotFoundError):
       registry.get_chunker("chunker.nonexistent")
 
   def test_format_selection_python(self):
-    """Selecció per format Python."""
+    """Selection by Python format."""
     registry = get_chunker_registry()
 
     for ext in ["py", "pyi", "pyx", ".py"]:
@@ -195,7 +195,7 @@ class TestChunkerRegistryCore:
       assert isinstance(chunker, CodeChunker)
 
   def test_format_selection_javascript(self):
-    """Selecció per format JavaScript."""
+    """Selection by JavaScript format."""
     registry = get_chunker_registry()
 
     for ext in ["js", "jsx", "mjs", "ts", "tsx"]:
@@ -203,7 +203,7 @@ class TestChunkerRegistryCore:
       assert isinstance(chunker, CodeChunker)
 
   def test_format_selection_text(self):
-    """Selecció per format text."""
+    """Selection by text format."""
     registry = get_chunker_registry()
 
     for ext in ["txt", "md", "rst", "log"]:
@@ -211,18 +211,18 @@ class TestChunkerRegistryCore:
       assert isinstance(chunker, TextChunker)
 
   def test_unknown_format_returns_none(self):
-    """Format desconegut retorna None."""
+    """Unknown format returns None."""
     registry = get_chunker_registry()
     assert registry.get_chunker_for_format("xyz123") is None
 
   def test_default_chunker_is_text(self):
-    """Default chunker és TextChunker."""
+    """Default chunker is TextChunker."""
     registry = get_chunker_registry()
     default = registry.get_default_chunker()
     assert isinstance(default, TextChunker)
 
   def test_content_type_selection(self):
-    """Selecció per content_type."""
+    """Selection by content_type."""
     registry = get_chunker_registry()
 
     code = registry.get_chunker_for_type("code")
@@ -232,30 +232,30 @@ class TestChunkerRegistryCore:
     assert isinstance(text, TextChunker)
 
 class TestCodeChunkerCore:
-  """Tests pel core del CodeChunker."""
+  """Tests for the CodeChunker core."""
 
   def setup_method(self):
     self.chunker = CodeChunker()
 
   def test_metadata_correct(self):
-    """Metadata del chunker és correcta."""
+    """Chunker metadata is correct."""
     assert self.chunker.metadata["id"] == "chunker.code"
     assert "py" in self.chunker.metadata["formats"]
     assert "js" in self.chunker.metadata["formats"]
     assert "code" in self.chunker.metadata["content_types"]
 
   def test_no_overlap_config(self):
-    """Config té chunk_overlap = 0 (Architectural decision)."""
+    """Config has chunk_overlap = 0 (Architectural decision)."""
     assert self.chunker.config["chunk_overlap"] == 0
 
   def test_empty_input(self):
-    """Input buit retorna resultat buit."""
+    """Empty input returns empty result."""
     result = self.chunker.chunk("")
     assert result.total_chunks == 0
     assert result.chunks == []
 
   def test_python_function_detection(self):
-    """Detecta funcions Python."""
+    """Detects Python functions."""
     code = """def hello():
   print("Hello")
 
@@ -269,7 +269,7 @@ def world():
     assert result.chunks[1].metadata["name"] == "world"
 
   def test_python_class_detection(self):
-    """Detecta classes Python."""
+    """Detects Python classes."""
     code = """class MyClass:
   def __init__(self):
     pass
@@ -284,7 +284,7 @@ def world():
     assert result.chunks[0].metadata["code_type"] == "class"
 
   def test_python_decorator_included(self):
-    """Decoradors s'inclouen amb la funció."""
+    """Decorators are included with the function."""
     code = """@decorator
 @another
 def decorated():
@@ -296,7 +296,7 @@ def decorated():
     assert "@another" in result.chunks[0].text
 
   def test_javascript_function_detection(self):
-    """Detecta funcions JavaScript."""
+    """Detects JavaScript functions."""
     code = """function hello() {
   console.log("Hello");
 }
@@ -313,7 +313,7 @@ async function fetchData() {
     assert "fetchData" in names
 
   def test_javascript_arrow_function(self):
-    """Detecta arrow functions."""
+    """Detects arrow functions."""
     code = """const add = (a, b) => {
   return a + b;
 };
@@ -324,7 +324,7 @@ async function fetchData() {
     assert result.chunks[0].metadata["code_type"] == "arrow_function"
 
   def test_no_overlap_between_chunks(self):
-    """NO hi ha overlap entre chunks (Architectural decision)."""
+    """There is NO overlap between chunks (Architectural decision)."""
     code = """def func1():
   x = 1
   y = 2
@@ -346,7 +346,7 @@ def func2():
     assert "a = 10" not in func1_text
 
   def test_language_detection(self):
-    """Detecta llenguatge per extensió."""
+    """Detects language by extension."""
     py_result = self.chunker.chunk("def f(): pass", metadata={"file_path": "a.py"})
     js_result = self.chunker.chunk("function f() {}", metadata={"file_path": "a.js"})
     ts_result = self.chunker.chunk("function f() {}", metadata={"file_path": "a.ts"})
@@ -356,25 +356,25 @@ def func2():
     assert ts_result.metadata["language"] == "typescript"
 
 class TestTextChunkerCore:
-  """Tests pel core del TextChunker."""
+  """Tests for the TextChunker core."""
 
   def setup_method(self):
     self.chunker = TextChunker()
 
   def test_metadata_correct(self):
-    """Metadata del chunker és correcta."""
+    """Chunker metadata is correct."""
     assert self.chunker.metadata["id"] == "chunker.text"
     assert "txt" in self.chunker.metadata["formats"]
     assert "md" in self.chunker.metadata["formats"]
     assert "text" in self.chunker.metadata["content_types"]
 
   def test_empty_input(self):
-    """Input buit retorna resultat buit."""
+    """Empty input returns empty result."""
     result = self.chunker.chunk("")
     assert result.total_chunks == 0
 
   def test_paragraph_chunking(self):
-    """Chunk per paràgrafs (doble newline)."""
+    """Chunk by paragraphs (double newline)."""
     text = """Primer paràgraf amb contingut.
 
 Segon paràgraf amb més contingut.
@@ -388,7 +388,7 @@ Tercer paràgraf final."""
     assert "Segon paràgraf" in all_text
 
   def test_title_detection_uppercase(self):
-    """Detecta títols en majúscules."""
+    """Detects uppercase titles."""
     text = """INTRODUCCIÓ
 
 Aquest és el contingut de la introducció."""
@@ -399,7 +399,7 @@ Aquest és el contingut de la introducció."""
     assert result.chunks[0].section_title == "INTRODUCCIÓ"
 
   def test_title_detection_markdown(self):
-    """Detecta títols markdown (#)."""
+    """Detects markdown titles (#)."""
     text = """# Secció Principal
 
 Contingut de la secció."""
@@ -409,7 +409,7 @@ Contingut de la secció."""
     assert result.total_chunks >= 1
 
   def test_section_title_propagation(self):
-    """Títols es propaguen als chunks següents."""
+    """Titles propagate to subsequent chunks."""
     text = """SECCIÓ A
 
 Contingut A paràgraf 1.
@@ -426,11 +426,11 @@ Contingut B."""
     assert len(sections) >= 1
 
   def test_default_supports_all(self):
-    """TextChunker és default, suporta tot sense arguments."""
+    """TextChunker is default, supports everything without arguments."""
     assert self.chunker.supports() is True
 
   def test_chunk_positions(self):
-    """Chunks tenen posicions start/end correctes."""
+    """Chunks have correct start/end positions."""
     text = "Primer.\n\nSegon."
 
     result = self.chunker.chunk(text)
@@ -440,13 +440,13 @@ Contingut B."""
       assert chunk.end_char > chunk.start_char
 
 class TestChunkerIntegration:
-  """Tests d'integració del sistema de chunking."""
+  """Integration tests for the chunking system."""
 
   def setup_method(self):
     reset_registry()
 
   def test_memory_workflow_python(self):
-    """Simula workflow Memory amb fitxer Python."""
+    """Simulates Memory workflow with Python file."""
     registry = get_chunker_registry()
 
     file_path = "module.py"
@@ -471,7 +471,7 @@ class App:
     assert result.total_chunks >= 2
 
   def test_memory_workflow_markdown(self):
-    """Simula workflow Memory amb fitxer Markdown."""
+    """Simulates Memory workflow with Markdown file."""
     registry = get_chunker_registry()
 
     file_path = "README.md"
@@ -494,7 +494,7 @@ Sistema modular.
     assert result.total_chunks >= 1
 
   def test_fallback_to_default(self):
-    """Format desconegut usa default chunker."""
+    """Unknown format uses default chunker."""
     registry = get_chunker_registry()
 
     chunker = registry.get_chunker_for_format("xyz")
@@ -504,7 +504,7 @@ Sistema modular.
     assert isinstance(chunker, TextChunker)
 
   def test_custom_chunker_registration(self):
-    """Pot registrar chunker personalitzat."""
+    """Can register custom chunker."""
     registry = ChunkerRegistry()
 
     class CustomChunker(BaseChunker):
@@ -534,14 +534,14 @@ Sistema modular.
     assert chunker is not None
 
 class TestChunkingNodeIntegration:
-  """Tests d'integració amb chunking_node."""
+  """Integration tests with chunking_node."""
 
   def setup_method(self):
     reset_registry()
 
   @pytest.mark.asyncio
   async def test_chunking_node_with_python(self):
-    """chunking_node usa CodeChunker per .py."""
+    """chunking_node uses CodeChunker for .py."""
     from memory.embeddings.workflow.nodes.chunking_node import chunking_node
 
     code = """def hello():
@@ -558,7 +558,7 @@ class TestChunkingNodeIntegration:
 
   @pytest.mark.asyncio
   async def test_chunking_node_with_text(self):
-    """chunking_node usa TextChunker per .txt."""
+    """chunking_node uses TextChunker for .txt."""
     from memory.embeddings.workflow.nodes.chunking_node import chunking_node
 
     text = """TITOL
@@ -575,7 +575,7 @@ Contingut del document."""
 
   @pytest.mark.asyncio
   async def test_chunking_node_legacy_mode(self):
-    """chunking_node sense file_path usa SmartChunker legacy."""
+    """chunking_node without file_path uses legacy SmartChunker."""
     from memory.embeddings.workflow.nodes.chunking_node import chunking_node
 
     result = await chunking_node(
@@ -587,7 +587,7 @@ Contingut del document."""
 
   @pytest.mark.asyncio
   async def test_chunking_node_with_content_type(self):
-    """chunking_node amb content_type selecciona chunker."""
+    """chunking_node with content_type selects chunker."""
     from memory.embeddings.workflow.nodes.chunking_node import chunking_node
 
     code = """def test(): pass"""

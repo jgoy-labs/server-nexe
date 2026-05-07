@@ -112,7 +112,7 @@ def check_device_available() -> Dict[str, Any]:
     }
 
   except ImportError:
-    # fastembed porta onnxruntime com a dep — si no existeix, és un problema d'instal·lació
+    # fastembed brings onnxruntime as a dep — if it doesn't exist, it's an installation problem
     return {
       "name": "device_available",
       "status": "fail",

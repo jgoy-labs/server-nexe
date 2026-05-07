@@ -17,14 +17,14 @@ from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
 
 class EmbeddingRequest(BaseModel):
   """
-  Request per generar embedding d'un text.
+  Request to generate an embedding for a text.
 
   Attributes:
-    text: Text a convertir en embedding (1-10K chars)
-    model: Nom del model d'embeddings
-    normalize: Si normalitzar l'embedding (L2 norm)
-    use_cache: Si usar cache multi-nivell
-    cache_version: Versió del cache (per invalidació)
+    text: Text to convert to embedding (1-10K chars)
+    model: Embeddings model name
+    normalize: Whether to normalize the embedding (L2 norm)
+    use_cache: Whether to use multi-level cache
+    cache_version: Cache version (for invalidation)
   """
   text: str = Field(..., min_length=1, max_length=10000)
   model: str = Field(default=DEFAULT_EMBEDDING_MODEL)
@@ -41,15 +41,15 @@ class EmbeddingRequest(BaseModel):
 
 class EmbeddingResponse(BaseModel):
   """
-  Response amb embedding generat i metadata.
+  Response with generated embedding and metadata.
 
   Attributes:
-    embedding: Vector d'embedding (768 dimensions per defecte)
-    dimensions: Nombre de dimensions del vector
-    model: Model utilitzat
-    normalized: Si l'embedding està normalitzat
-    cache_hit: Si la resposta ve del cache
-    latency_ms: Latència de generació en ms
+    embedding: Embedding vector (768 dimensions by default)
+    dimensions: Number of vector dimensions
+    model: Model used
+    normalized: Whether the embedding is normalized
+    cache_hit: Whether the response came from cache
+    latency_ms: Generation latency in ms
   """
   embedding: List[float]
   dimensions: int
@@ -74,14 +74,14 @@ class EmbeddingResponse(BaseModel):
 
 class BatchEmbeddingRequest(BaseModel):
   """
-  Request per generar batch d'embeddings.
+  Request to generate a batch of embeddings.
 
   Attributes:
-    texts: Llista de texts (màx 100 per batch)
-    model: Model fastembed (ex: sentence-transformers/paraphrase-multilingual-mpnet-base-v2)
-    normalize: Si normalitzar embeddings
-    use_cache: Si usar cache
-    batch_size: Mida del batch intern (per fastembed TextEmbedding)
+    texts: List of texts (max 100 per batch)
+    model: fastembed model (e.g. sentence-transformers/paraphrase-multilingual-mpnet-base-v2)
+    normalize: Whether to normalize embeddings
+    use_cache: Whether to use cache
+    batch_size: Internal batch size (for fastembed TextEmbedding)
   """
   texts: List[str] = Field(..., min_length=1, max_length=100)
   model: str = Field(default=DEFAULT_EMBEDDING_MODEL)
@@ -99,14 +99,14 @@ class BatchEmbeddingRequest(BaseModel):
 
 class BatchEmbeddingResponse(BaseModel):
   """
-  Response amb batch d'embeddings i stats.
+  Response with batch of embeddings and stats.
 
   Attributes:
-    embeddings: Llista d'embeddings (mateix ordre que texts)
-    count: Nombre d'embeddings generats
-    cache_hits: Nombre de cache hits
-    total_latency_ms: Latència total del batch
-    avg_latency_ms: Latència mitjana per embedding
+    embeddings: List of embeddings (same order as texts)
+    count: Number of generated embeddings
+    cache_hits: Number of cache hits
+    total_latency_ms: Total batch latency
+    avg_latency_ms: Average latency per embedding
   """
   embeddings: List[List[float]]
   count: int
@@ -124,15 +124,15 @@ class BatchEmbeddingResponse(BaseModel):
 @runtime_checkable
 class AsyncEncoder(Protocol):
   """
-  Protocol per encoders async (no bloquegen event loop).
+  Protocol for async encoders (do not block the event loop).
 
-  Qualsevol classe que implementi aquest protocol pot ser usada
-  com encoder al sistema d'embeddings.
+  Any class that implements this protocol can be used
+  as an encoder in the embeddings system.
 
   Methods:
-    encode_async: Encode un sol text
-    encode_batch_async: Encode batch de texts
-    shutdown: Cleanup de recursos
+    encode_async: Encode a single text
+    encode_batch_async: Encode batch of texts
+    shutdown: Resource cleanup
   """
 
   async def encode_async(
@@ -141,14 +141,14 @@ class AsyncEncoder(Protocol):
     normalize: bool = True
   ) -> List[float]:
     """
-    Encode un text async.
+    Encode a text async.
 
     Args:
-      text: Text a convertir
-      normalize: Si normalitzar (L2 norm)
+      text: Text to convert
+      normalize: Whether to normalize (L2 norm)
 
     Returns:
-      Vector d'embedding
+      Embedding vector
     """
     ...
 
@@ -159,29 +159,29 @@ class AsyncEncoder(Protocol):
     batch_size: int = 32
   ) -> List[List[float]]:
     """
-    Encode batch de texts async.
+    Encode batch of texts async.
 
     Args:
-      texts: Llista de texts
-      normalize: Si normalitzar
-      batch_size: Mida del batch intern
+      texts: List of texts
+      normalize: Whether to normalize
+      batch_size: Internal batch size
 
     Returns:
-      Llista d'embeddings (mateix ordre)
+      List of embeddings (same order)
     """
     ...
 
   async def shutdown(self) -> None:
-    """Cleanup de recursos (ThreadPool, models carregats)"""
+    """Resource cleanup (ThreadPool, loaded models)"""
     ...
 
 @runtime_checkable
 class CacheProvider(Protocol):
   """
-  Protocol per providers de cache.
+  Protocol for cache providers.
 
-  Permet usar diferents backends de cache (memòria, Redis, etc.)
-  mantenint la mateixa interface.
+  Allows using different cache backends (memory, Redis, etc.)
+  while maintaining the same interface.
   """
 
   async def get(
@@ -190,7 +190,7 @@ class CacheProvider(Protocol):
     model: str,
     version: str = "v1"
   ) -> Optional[List[float]]:
-    """Get embedding del cache"""
+    """Get embedding from cache"""
     ...
 
   async def put(
@@ -200,11 +200,11 @@ class CacheProvider(Protocol):
     embedding: List[float],
     version: str = "v1"
   ) -> None:
-    """Store embedding al cache"""
+    """Store embedding in cache"""
     ...
 
   async def clear(self) -> None:
-    """Clear tot el cache"""
+    """Clear all cache"""
     ...
 
   def get_stats(self) -> Dict[str, Any]:
@@ -250,14 +250,14 @@ class ChunkMetadata(BaseModel):
 
 class ChunkedDocument(BaseModel):
   """
-  Document chunked amb tots els chunks i metadata.
+  Chunked document with all chunks and metadata.
 
   Attributes:
-    document_id: ID del document
-    original_length: Longitud del document original
-    chunks: Llista de chunks
-    chunk_count: Nombre de chunks
-    created_at: Timestamp de creació
+    document_id: Document ID
+    original_length: Length of the original document
+    chunks: List of chunks
+    chunk_count: Number of chunks
+    created_at: Creation timestamp
   """
   document_id: str
   original_length: int
@@ -274,18 +274,18 @@ class ChunkedDocument(BaseModel):
 
 class EncoderStats(BaseModel):
   """
-  Estadístiques d'un encoder.
+  Encoder statistics.
 
   Attributes:
-    model_name: Nom del model carregat
+    model_name: Name of the loaded model
     device: Device (cpu, mps, cuda)
-    total_encodings: Total encodings generats
-    total_requests: Alias per total_encodings (compatibility)
-    cache_hit_rate: Ràtio de cache hits (0.0-1.0)
-    avg_latency_ms: Latència mitjana
+    total_encodings: Total encodings generated
+    total_requests: Alias for total_encodings (compatibility)
+    cache_hit_rate: Cache hit ratio (0.0-1.0)
+    avg_latency_ms: Average latency
     p90_latency_ms: P90 latency
     p99_latency_ms: P99 latency
-    active_since: Timestamp d'inici
+    active_since: Start timestamp
   """
   model_name: str
   device: str

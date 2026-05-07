@@ -16,7 +16,7 @@ router = APIRouter(prefix="/documents", tags=["documents-v1", "future"])
 @router.get("/", summary="Llistar documents disponibles al sistema de fitxers", operation_id="rag_files_list_v1")
 async def list_documents_v1():
     """
-    Llista documents disponibles (API v1).
+    List available documents (API v1).
     STATUS: NOT IMPLEMENTED (coming soon)
     """
     raise HTTPException(

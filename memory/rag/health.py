@@ -243,18 +243,18 @@ def check_disk_space(min_gb: float = 10.0) -> Dict[str, Any]:
 
 def check_health(module) -> Dict[str, Any]:
   """
-  Executa tots els health checks i retorna estat agregat.
+  Runs all health checks and returns aggregated status.
 
   Args:
-    module: Instància RAGModule
+    module: RAGModule instance
 
   Returns:
-    Dict amb status, checks, metadata
+    Dict with status, checks, metadata
 
-  Lògica status:
-    - healthy: Tots pass
-    - degraded: Algun warn, cap fail
-    - unhealthy: Algun fail
+  Status logic:
+    - healthy: All pass
+    - degraded: Some warn, no fail
+    - unhealthy: Any fail
   """
   checks: List[Dict[str, Any]] = []
 

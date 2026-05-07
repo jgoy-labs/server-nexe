@@ -47,12 +47,12 @@ class EmbeddingsModule:
   - Async embedding generation (non-blocking event loop)
   - Multi-level cache (L1 memory + L2 disk)
   - Smart document chunking with section_title detection
-  - Batch processing optimitzat
+  - Optimized batch processing
 
   Features:
-  ✅ AsyncEmbedder amb ThreadPool (P90 <120ms)
-  ✅ CachedEmbedder amb MultiLevelCache (hit rate >80%)
-  ✅ SmartChunker amb section_title detection
+  ✅ AsyncEmbedder with ThreadPool (P90 <120ms)
+  ✅ CachedEmbedder with MultiLevelCache (hit rate >80%)
+  ✅ SmartChunker with section_title detection
   ✅ Workflow nodes integration
   ✅ Stats tracking (latencies, hit rate)
 
@@ -119,7 +119,7 @@ class EmbeddingsModule:
     1. Merge config with defaults
     2. Create AsyncEmbedder + CachedEmbedder
     3. Create SmartChunker
-    4. Validar dependencies
+    4. Validate dependencies
 
     Args:
       config: Optional configuration

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/memory/tests/test_models.py
-Description: Tests per als models de dades de Memory (MemoryEntry, MemoryType).
+Description: Tests for Memory data models (MemoryEntry, MemoryType).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -17,29 +17,29 @@ from memory.memory.models.memory_entry import MemoryEntry
 from memory.memory.models.memory_types import MemoryType
 
 class TestMemoryType:
-  """Tests per MemoryType enum"""
+  """Tests for MemoryType enum"""
 
   def test_memory_type_values(self):
-    """Verificar que els valors de l'enum són correctes"""
+    """Verify that enum values are correct"""
     assert MemoryType.EPISODIC.value == "episodic"
     assert MemoryType.SEMANTIC.value == "semantic"
 
   def test_memory_type_from_string(self):
-    """Crear MemoryType des de string"""
+    """Create MemoryType from string"""
     assert MemoryType("episodic") == MemoryType.EPISODIC
     assert MemoryType("semantic") == MemoryType.SEMANTIC
 
   def test_memory_type_invalid(self):
-    """Rebutjar valors invàlids"""
+    """Reject invalid values"""
     with pytest.raises(ValueError):
       MemoryType("invalid_type")
 
 
 class TestMemoryEntry:
-  """Tests per MemoryEntry"""
+  """Tests for MemoryEntry"""
 
   def test_memory_entry_basic(self):
-    """Crear MemoryEntry bàsica"""
+    """Create basic MemoryEntry"""
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Test content",
@@ -52,7 +52,7 @@ class TestMemoryEntry:
     assert isinstance(entry.timestamp, datetime)
 
   def test_memory_entry_deterministic_id(self):
-    """ID determinístic: SHA256(content)[:16]"""
+    """Deterministic ID: SHA256(content)[:16]"""
     entry1 = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Same content",
@@ -73,7 +73,7 @@ class TestMemoryEntry:
     assert entry1.id != entry3.id
 
   def test_memory_entry_id_format(self):
-    """ID ha de ser hex de 16 chars"""
+    """ID must be 16-char hex"""
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Test",
@@ -83,7 +83,7 @@ class TestMemoryEntry:
     assert all(c in "0123456789abcdef" for c in entry.id)
 
   def test_memory_entry_content_validation(self):
-    """Validar content: min_length=1, max_length=100_000"""
+    """Validate content: min_length=1, max_length=100_000"""
     MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="A",
@@ -105,7 +105,7 @@ class TestMemoryEntry:
       )
 
   def test_memory_entry_ttl_default(self):
-    """TTL per defecte: 1800s"""
+    """Default TTL: 1800s"""
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Test",
@@ -114,7 +114,7 @@ class TestMemoryEntry:
     assert entry.ttl_seconds == 1800
 
   def test_memory_entry_ttl_custom(self):
-    """TTL customitzat"""
+    """Custom TTL"""
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Test",
@@ -124,7 +124,7 @@ class TestMemoryEntry:
     assert entry.ttl_seconds == 3600
 
   def test_memory_entry_ttl_validation(self):
-    """TTL >= 60 (mínim 1 minut)"""
+    """TTL >= 60 (minimum 1 minute)"""
     MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Test",
@@ -156,7 +156,7 @@ class TestMemoryEntry:
       )
 
   def test_memory_entry_should_encrypt_fase13(self):
-    """should_encrypt retorna sempre False (Anàlisi Contextual no implementada)"""
+    """should_encrypt always returns False (Contextual Analysis not implemented)"""
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Test",
@@ -166,7 +166,7 @@ class TestMemoryEntry:
 
 
   def test_memory_entry_metadata_dict(self):
-    """Metadata com a dict lliure"""
+    """Metadata as a free dict"""
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Test",
@@ -177,7 +177,7 @@ class TestMemoryEntry:
     assert entry.metadata["count"] == 42
 
   def test_memory_entry_serialization(self):
-    """Serialització Pydantic (model_dump)"""
+    """Pydantic serialisation (model_dump)"""
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Test content",
@@ -194,7 +194,7 @@ class TestMemoryEntry:
     assert "timestamp" in data
 
   def test_memory_entry_json_serialization(self):
-    """Serialització JSON"""
+    """JSON serialisation"""
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Test",
@@ -206,7 +206,7 @@ class TestMemoryEntry:
     assert "Test" in json_str
 
   def test_memory_entry_from_dict(self):
-    """Crear MemoryEntry des de dict"""
+    """Create MemoryEntry from dict"""
     data = {
       "entry_type": "semantic",
       "content": "Knowledge base entry",

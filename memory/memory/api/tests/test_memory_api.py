@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: memory/memory/api/tests/test_memory_api.py
-Description: Tests per memory/memory/api/__init__.py (MemoryAPI).
+Description: Tests for memory/memory/api/__init__.py (MemoryAPI).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 
 def make_mock_api():
-    """Crea un MemoryAPI amb Qdrant i embedder mockejats."""
+    """Create a MemoryAPI with mocked Qdrant and embedder."""
     from memory.memory.api import MemoryAPI
     api = MemoryAPI.__new__(MemoryAPI)
     api._qdrant = MagicMock()
@@ -411,8 +411,8 @@ class TestInitialize:
         api = MemoryAPI(qdrant_url="http://localhost:6333")
 
         mock_client = MagicMock()
-        # QdrantClient ja no s'importa a memory.memory.api (TYPE_CHECKING guard).
-        # El client real ve de core.qdrant_pool.get_qdrant_client → patxem allà.
+        # QdrantClient is no longer imported in memory.memory.api (TYPE_CHECKING guard).
+        # The real client comes from core.qdrant_pool.get_qdrant_client → we patch there.
         with patch("core.qdrant_pool.get_qdrant_client", return_value=mock_client):
             with patch.object(api, "_init_embedder", AsyncMock()):
                 result = asyncio.run(api.initialize())

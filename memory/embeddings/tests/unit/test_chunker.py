@@ -1,9 +1,9 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: memory/embeddings/tests/unit/test_chunker.py
-Description: Tests unitaris per SmartChunker.
+Description: Unit tests for SmartChunker.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -14,7 +14,7 @@ from memory.embeddings.core.chunker import SmartChunker
 
 @pytest.fixture
 def chunker():
-  """Fixture: SmartChunker amb config default"""
+  """Fixture: SmartChunker with default config"""
   return SmartChunker(
     max_chunk_size=150,
     chunk_overlap=20,
@@ -23,10 +23,10 @@ def chunker():
 
 def test_empty_document(chunker):
   """
-  Test 1: Document buit retorna 0 chunks.
+  Test 1: Empty document returns 0 chunks.
 
   Checks:
-  - Document buit → ChunkedDocument amb 0 chunks
+  - Empty document → ChunkedDocument with 0 chunks
   """
   result = chunker.chunk_document("", document_id="doc_empty")
 
@@ -36,11 +36,11 @@ def test_empty_document(chunker):
 
 def test_chunk_by_paragraphs(chunker):
   """
-  Test 2: Chunking per paràgrafs.
+  Test 2: Chunking by paragraphs.
 
   Checks:
-  - Split per '\n\n'
-  - Cada paràgraf → chunk
+  - Split by '\n\n'
+  - Each paragraph → chunk
   - chunk_type = "paragraph"
   """
   content = """
@@ -59,11 +59,11 @@ Tercer paràgraf per validar split correcte.
 
 def test_title_detection(chunker):
   """
-  Test 3: Detecció de títols.
+  Test 3: Title detection.
 
   Checks:
-  - Títol curt uppercase → detectat
-  - Section_title propagat als chunks següents
+  - Short uppercase title → detected
+  - Section_title propagated to subsequent chunks
   """
   assert chunker._is_title("Introducció"), "Hauria de detectar títol simple"
   assert chunker._is_title("1. Capítol Primer"), "Hauria de detectar llista numerada"
@@ -76,11 +76,11 @@ def test_title_detection(chunker):
 
 def test_section_title_propagation(chunker):
   """
-  Test 4: Section title es propaga als chunks.
+  Test 4: Section title propagates to chunks.
 
   Checks:
-  - Títol detectat
-  - Paràgraf següent hereta section_title
+  - Title detected
+  - Next paragraph inherits section_title
   """
   content = """
 Introducció
@@ -102,10 +102,10 @@ Aquest altre paràgraf hauria de tenir section_title = "Desenvolupament".
 
 def test_split_long_paragraph(chunker):
   """
-  Test 5: Paràgraf llarg es split per sentències.
+  Test 5: Long paragraph is split by sentences.
 
   Checks:
-  - Paràgraf > max_chunk_size → múltiples chunks
+  - Paragraph > max_chunk_size → multiple chunks
   """
   long_para = "Aquesta és una frase. " * 20
 
@@ -115,10 +115,10 @@ def test_split_long_paragraph(chunker):
 
 def test_merge_small_chunks(chunker):
   """
-  Test 6: Chunks petits (<min_chunk_size) es fusionen.
+  Test 6: Small chunks (<min_chunk_size) are merged.
 
   Checks:
-  - Chunks molt petits es fusionen amb adjacents
+  - Very small chunks are merged with adjacent ones
   - chunk_type = "merged"
   """
   content = "A\n\nB\n\nC\n\nTexto más largo para evitar merge completo."
@@ -131,10 +131,10 @@ def test_merge_small_chunks(chunker):
 
 def test_chunk_by_sentences_fallback(chunker):
   """
-  Test 7: Chunking per sentències (fallback si no hi ha paràgrafs).
+  Test 7: Chunking by sentences (fallback if no paragraphs).
 
   Checks:
-  - Text sense '\n\n' → chunk per sentències
+  - Text without '\n\n' → chunk by sentences
   """
   content = "Primera frase. Segona frase. Tercera frase. Quarta frase amb contingut suficient."
 
@@ -144,7 +144,7 @@ def test_chunk_by_sentences_fallback(chunker):
 
 def test_chunk_metadata(chunker):
   """
-  Test 8: Metadata dels chunks és correcte.
+  Test 8: Chunk metadata is correct.
 
   Checks:
   - chunk_id (UUID)
@@ -165,7 +165,7 @@ def test_chunk_metadata(chunker):
 
 def test_chunked_document_metadata(chunker):
   """
-  Test 9: ChunkedDocument té metadata correcte.
+  Test 9: ChunkedDocument has correct metadata.
 
   Checks:
   - document_id
@@ -248,14 +248,14 @@ def test_title_ending_with_dot_not_title():
 
 """
 Test Coverage SmartChunker:
-✅ test_empty_document - Document buit
-✅ test_chunk_by_paragraphs - Chunking per paràgrafs
-✅ test_title_detection - Detecció títols (heurística)
-✅ test_section_title_propagation - Section title als chunks
-✅ test_split_long_paragraph - Split paràgrafs llargs
-✅ test_merge_small_chunks - Merge chunks petits
-✅ test_chunk_by_sentences_fallback - Fallback sentències
-✅ test_chunk_metadata - Metadata chunks correcte
+✅ test_empty_document - Empty document
+✅ test_chunk_by_paragraphs - Chunking by paragraphs
+✅ test_title_detection - Title detection (heuristic)
+✅ test_section_title_propagation - Section title in chunks
+✅ test_split_long_paragraph - Split long paragraphs
+✅ test_merge_small_chunks - Merge small chunks
+✅ test_chunk_by_sentences_fallback - Sentence fallback
+✅ test_chunk_metadata - Correct chunk metadata
 ✅ test_chunked_document_metadata - ChunkedDocument metadata
 
 Total: 9 test cases

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/memory/api/models.py
-Description: Models i exceptions per Memory API.
+Description: Models and exceptions for Memory API.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -20,33 +20,33 @@ def _coerce_aware(dt: datetime) -> datetime:
   return dt
 
 class MemoryAPIError(Exception):
-  """Base exception per Memory API."""
+  """Base exception for Memory API."""
 
 class CollectionNotFoundError(MemoryAPIError):
-  """Collection no existeix."""
+  """Collection does not exist."""
 
 class InvalidCollectionNameError(MemoryAPIError):
   """Invalid collection name (does not follow naming convention)."""
 
 class DocumentNotFoundError(MemoryAPIError):
-  """Document no trobat."""
+  """Document not found."""
 
 COLLECTION_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9]*_[a-z][a-z0-9_]*$")
 
 def validate_collection_name(name: str) -> None:
   """
-  Valida que el nom de collection segueix la naming convention.
+  Validate that the collection name follows the naming convention.
 
-  Format: {modul}_{tipus}
-  - Només minúscules, números i underscore
-  - Ha de tenir almenys un underscore separant modul i tipus
-  - Ha de començar amb lletra
+  Format: {module}_{type}
+  - Only lowercase, numbers and underscores
+  - Must have at least one underscore separating module and type
+  - Must start with a letter
 
   Args:
-    name: Nom de la collection
+    name: Collection name
 
   Raises:
-    InvalidCollectionNameError: Si el nom no és vàlid
+    InvalidCollectionNameError: If the name is not valid
 
   Examples:
     validate_collection_name("nexe_knowledge")
@@ -64,15 +64,15 @@ def validate_collection_name(name: str) -> None:
 @dataclass
 class Document:
   """
-  Document retornat per l'API.
+  Document returned by the API.
 
   Attributes:
-    id: Identificador únic del document
-    text: Contingut textual
-    collection: Nom de la collection
-    metadata: Metadades addicionals
-    created_at: Timestamp de creació
-    expires_at: Timestamp d'expiració (None = permanent)
+    id: Unique document identifier
+    text: Textual content
+    collection: Collection name
+    metadata: Additional metadata
+    created_at: Creation timestamp
+    expires_at: Expiry timestamp (None = permanent)
   """
 
   id: str
@@ -84,7 +84,7 @@ class Document:
 
   @property
   def is_expired(self) -> bool:
-    """Comprova si el document ha expirat."""
+    """Check if the document has expired."""
     if self.expires_at is None:
       return False
     now = datetime.now(timezone.utc)
@@ -104,14 +104,14 @@ class Document:
 @dataclass
 class SearchResult:
   """
-  Resultat d'una cerca semàntica.
+  Result of a semantic search.
 
   Attributes:
-    id: ID del document
-    text: Contingut textual (si disponible)
-    score: Puntuació de similitud (0-1, més alt = més similar)
-    collection: Nom de la collection
-    metadata: Metadades addicionals
+    id: Document ID
+    text: Textual content (if available)
+    score: Similarity score (0-1, higher = more similar)
+    collection: Collection name
+    metadata: Additional metadata
   """
 
   id: str
@@ -123,13 +123,13 @@ class SearchResult:
 @dataclass
 class CollectionInfo:
   """
-  Informació d'una collection.
+  Information about a collection.
 
   Attributes:
-    name: Nom de la collection
-    vector_size: Dimensió dels vectors
-    points_count: Nombre de documents
-    created_at: Timestamp de creació (si disponible)
+    name: Collection name
+    vector_size: Vector dimension
+    points_count: Number of documents
+    created_at: Creation timestamp (if available)
   """
 
   name: str

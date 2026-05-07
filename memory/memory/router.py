@@ -24,7 +24,7 @@ router_public = APIRouter(prefix="/memory", tags=["Memory"])
 @router_public.get("/health", dependencies=[Depends(require_api_key)], operation_id="memory_module_health")
 async def get_memory_health():
   """
-  Health check del mòdul Memory.
+  Health check for the Memory module.
 
   Returns:
     {
@@ -61,10 +61,10 @@ async def get_memory_health():
 @router_public.get("/info", dependencies=[Depends(require_api_key)], operation_id="memory_module_info")
 async def get_memory_info():
   """
-  Informació del mòdul Memory.
+  Information about the Memory module.
 
   Returns:
-    Metadata del mòdul (manifest)
+    Module metadata (manifest)
   """
   return {
     "module": "Memory",

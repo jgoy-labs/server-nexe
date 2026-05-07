@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: memory/embeddings/tests/test_simple_embedder.py
-Description: Tests per memory/embeddings/simple_embedder.py.
+Description: Tests for memory/embeddings/simple_embedder.py.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 @pytest.fixture(autouse=True)
 def clear_instances():
-    """Netejar singleton instances entre tests."""
+    """Clean up singleton instances between tests."""
     from memory.embeddings.simple_embedder import SimpleEmbedder
     SimpleEmbedder._instances.clear()
     yield
@@ -38,7 +38,7 @@ class TestSimpleEmbedderInit:
         assert embedder._initialized is True
 
     def test_singleton_same_model(self):
-        """Mateixa clau → mateixa instància."""
+        """Same key → same instance."""
         from memory.embeddings.simple_embedder import SimpleEmbedder
 
         mock_model = MagicMock()
@@ -50,7 +50,7 @@ class TestSimpleEmbedderInit:
         assert e1 is e2
 
     def test_different_models_different_instances(self):
-        """Models diferentes → instàncies diferents."""
+        """Different models → different instances."""
         from memory.embeddings.simple_embedder import SimpleEmbedder
 
         mock_model = MagicMock()
@@ -63,7 +63,7 @@ class TestSimpleEmbedderInit:
         assert e1 is not e2
 
     def test_fallback_when_no_local_cache(self):
-        """Si no hi ha cache local, llança RuntimeError (offline-only mode)."""
+        """If there is no local cache, raises RuntimeError (offline-only mode)."""
         from memory.embeddings.simple_embedder import SimpleEmbedder
 
         with patch("memory.embeddings.simple_embedder.TextEmbedding", side_effect=OSError("Not cached")):

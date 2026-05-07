@@ -3,10 +3,10 @@
 Server Nexe
 Author: Jordi Goy
 Location: memory/memory/engines/persistence_sqlite.py
-Description: SqliteStorageMixin — gestió SQLite per PersistenceManager.
+Description: SqliteStorageMixin — SQLite management for PersistenceManager.
 
-Conté tota la lògica de SQLite: connexió, inicialització, migració a SQLCipher,
-operacions CRUD bàsiques i consultes. S'usa com a mixin per PersistenceManager.
+Contains all SQLite logic: connection, initialization, migration to SQLCipher,
+basic CRUD operations and queries. Used as a mixin for PersistenceManager.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -36,34 +36,34 @@ except ImportError:
 
 class SqliteStorageMixin:
     """
-    Mixin amb tota la lògica SQLite per a PersistenceManager.
+    Mixin with all SQLite logic for PersistenceManager.
 
-    Atributs requerits pel mixin (definits a PersistenceManager.__init__):
-        db_path: Path — ruta al fitxer SQLite
-        _crypto: proveïdor de criptografia (opcional)
-        _encrypted: bool — si la DB és encriptada
-        executor: ThreadPoolExecutor — per operacions sync
+    Attributes required by the mixin (defined in PersistenceManager.__init__):
+        db_path: Path — path to the SQLite file
+        _crypto: cryptography provider (optional)
+        _encrypted: bool — whether the DB is encrypted
+        executor: ThreadPoolExecutor — for sync operations
     """
 
-    # Mixin contract: PersistenceManager.__init__ assigna executor; declarem
-    # només per tipar accessos del mixin (cap valor: el setteja el consumidor).
+    # Mixin contract: PersistenceManager.__init__ assigns executor; we declare
+    # it only to type mixin accesses (no value: the consumer sets it).
     executor: ThreadPoolExecutor
 
-    # ── Helpers de comprovació ────────────────────────────────────────────────
+    # ── Check helpers ────────────────────────────────────────────────────────
 
     @staticmethod
     def _is_plaintext_sqlite(path: Path) -> bool:
-        """Comprova si un fitxer és una DB SQLite sense encriptar."""
+        """Check if a file is an unencrypted SQLite DB."""
         if not path.exists() or path.stat().st_size == 0:
             return False
         with open(path, "rb") as f:
             header = f.read(16)
         return header == b"SQLite format 3\x00"
 
-    # ── Migració SQLCipher ────────────────────────────────────────────────────
+    # ── SQLCipher migration ───────────────────────────────────────────────────
 
     def _migrate_to_encrypted(self):
-        """Migra la DB plana existent a SQLCipher."""
+        """Migrate the existing plain DB to SQLCipher."""
         if not self._crypto or not SQLCIPHER_AVAILABLE:
             return
         if not self.db_path.exists():
@@ -106,10 +106,10 @@ class SqliteStorageMixin:
             if tmp_path.exists():
                 tmp_path.unlink()
 
-    # ── Inicialització ────────────────────────────────────────────────────────
+    # ── Initialization ────────────────────────────────────────────────────────
 
     def _init_sqlite(self):
-        """Inicialitza la DB SQLite amb mode WAL."""
+        """Initialize the SQLite DB with WAL mode."""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         if self._crypto and SQLCIPHER_AVAILABLE:
@@ -147,7 +147,7 @@ class SqliteStorageMixin:
         logger.info("SQLite initialized (encrypted=%s)", self._encrypted)
 
     def _connect_sqlite(self):
-        """Obre connexió SQLite/SQLCipher amb busy timeout."""
+        """Open SQLite/SQLCipher connection with busy timeout."""
         if self._encrypted and SQLCIPHER_AVAILABLE:
             conn = sqlcipher.connect(str(self.db_path))
             dek = self._crypto.derive_key("sqlite")
@@ -158,10 +158,10 @@ class SqliteStorageMixin:
         conn.execute("PRAGMA busy_timeout = 5000")
         return conn
 
-    # ── Operacions CRUD ────────────────────────────────────────────────────────
+    # ── CRUD operations ───────────────────────────────────────────────────────
 
     async def _store_sqlite(self, entry: MemoryEntry):
-        """Desa un MemoryEntry a SQLite (run_in_executor)."""
+        """Save a MemoryEntry to SQLite (run_in_executor)."""
         loop = asyncio.get_running_loop()
 
         def _sync_store():
@@ -191,7 +191,7 @@ class SqliteStorageMixin:
         logger.debug("Stored entry %s to SQLite", entry.id)
 
     async def _delete_sqlite(self, entry_id: str):
-        """Elimina un entry de SQLite (rollback helper)."""
+        """Delete an entry from SQLite (rollback helper)."""
         loop = asyncio.get_running_loop()
 
         def _sync_delete():
@@ -204,7 +204,7 @@ class SqliteStorageMixin:
         logger.debug("Deleted entry %s from SQLite (rollback)", entry_id)
 
     async def get(self, entry_id: str) -> Optional[MemoryEntry]:
-        """Recupera un entry per ID."""
+        """Retrieve an entry by ID."""
         loop = asyncio.get_running_loop()
 
         def _sync_get():
@@ -225,7 +225,7 @@ class SqliteStorageMixin:
         return await loop.run_in_executor(self.executor, _sync_get)
 
     def _row_to_entry(self, row: tuple) -> MemoryEntry:
-        """Converteix fila SQLite a MemoryEntry."""
+        """Convert SQLite row to MemoryEntry."""
         entry_id, entry_type, content, source, timestamp, ttl_seconds, metadata_json = row
         metadata = json.loads(metadata_json) if metadata_json else {}
         return MemoryEntry(
@@ -239,7 +239,7 @@ class SqliteStorageMixin:
         )
 
     async def get_stats(self) -> Dict[str, int]:
-        """Estadístiques de la DB."""
+        """DB statistics."""
         loop = asyncio.get_running_loop()
 
         def _sync_stats():
@@ -271,9 +271,9 @@ class SqliteStorageMixin:
         exclude_expired: bool = True,
     ) -> List[MemoryEntry]:
         """
-        Recupera els N entries més recents de SQLite.
+        Retrieve the N most recent entries from SQLite.
 
-        Usat per preload a RAMContext al boot.
+        Used for preload in RAMContext at boot.
         """
         loop = asyncio.get_running_loop()
         types_filter = entry_types or ["episodic"]

@@ -56,18 +56,18 @@ logger = logging.getLogger(__name__)
 
 class MemoryAPI:
   """
-  API genèrica per accés a Qdrant des de mòduls externs.
+  Generic API for accessing Qdrant from external modules.
 
-  Aquesta classe ofereix una interfície simplificada per:
-  - Crear collections per mòduls específics
-  - Emmagatzemar text amb embeddings
-  - Cercar per similitud semàntica
-  - Gestionar documents (get, delete)
+  This class provides a simplified interface for:
+  - Creating collections for specific modules
+  - Storing text with embeddings
+  - Searching by semantic similarity
+  - Managing documents (get, delete)
 
-  IMPORTANT: Aquesta API és agnòstica respecte a les collections.
-  No defineix collections específiques com "personality" o "conversations".
-  Cada mòdul consumidor (Anàlisi Contextual, Memory, Auditor) crea les seves pròpies
-  collections segons les seves necessitats.
+  IMPORTANT: This API is agnostic with respect to collections.
+  It does not define specific collections like "personality" or "conversations".
+  Each consumer module (Contextual Analysis, Memory, Auditor) creates its own
+  collections according to its needs.
 
   Example:
     async with MemoryAPI() as memory:
@@ -93,13 +93,13 @@ class MemoryAPI:
     ingest_config: Optional[IngestConfig] = None,
   ):
     """
-    Inicialitza Memory API.
+    Initialize Memory API.
 
     Args:
-      qdrant_url: URL del servidor Qdrant (default: http://localhost:6333)
-      qdrant_path: Path local per mode fitxer/test (prioritat sobre qdrant_url).
+      qdrant_url: Qdrant server URL (default: http://localhost:6333)
+      qdrant_path: Local path for file/test mode (takes priority over qdrant_url).
                    Default: storage/vectors (embedded mode)
-      embedding_model: Model d'embeddings (default: paraphrase-multilingual-mpnet-base-v2)
+      embedding_model: Embeddings model (default: paraphrase-multilingual-mpnet-base-v2)
       ingest_config: SSOT for ingest pipeline tunables (batch sizes, pre-warm,
                      mega-batch). Default IngestConfig() preserves the exact
                      historical behaviour (store_batch_size=50, no embed
@@ -149,7 +149,7 @@ class MemoryAPI:
       )
 
   async def initialize(self) -> bool:
-    """Inicialitza connexions i models."""
+    """Initialize connections and models."""
     if self._initialized:
       logger.warning("MemoryAPI already initialized")
       return True
@@ -183,7 +183,7 @@ class MemoryAPI:
       raise
 
   async def _init_embedder(self):
-    """Inicialitza el model d'embeddings."""
+    """Initialize the embeddings model."""
     loop = asyncio.get_running_loop()
     # Bug #16: forward `threads` to fastembed so ORT caps its intra-op
     # thread pool. Default (None) lets fastembed decide; ingest_config
@@ -213,7 +213,7 @@ class MemoryAPI:
       raise RuntimeError("MemoryAPI not initialized. Call initialize() first.")
 
   async def close(self):
-    """Tanca connexions i allibera recursos.
+    """Close connections and release resources.
 
     NOTE: Do NOT close the Qdrant client here — it comes from the shared pool
     (core.qdrant_pool) and other consumers depend on it. The pool handles
@@ -245,15 +245,15 @@ class MemoryAPI:
     self, name: str, vector_size: int = DEFAULT_VECTOR_SIZE, distance: str = "cosine"
   ) -> bool:
     """
-    Crea una nova collection.
+    Create a new collection.
 
     Args:
-      name: Nom seguint naming convention {modul}_{tipus}
-      vector_size: Dimensió dels vectors (default: 768)
-      distance: Mètrica ("cosine", "euclid", "dot")
+      name: Name following naming convention {module}_{type}
+      vector_size: Vector dimension (default: 768)
+      distance: Metric ("cosine", "euclid", "dot")
 
     Returns:
-      bool: True si creada, False si ja existeix
+      bool: True if created, False if it already exists
     """
     self._ensure_initialized()
     return await create_collection(
@@ -261,17 +261,17 @@ class MemoryAPI:
     )
 
   async def delete_collection(self, name: str) -> bool:
-    """Elimina una collection."""
+    """Delete a collection."""
     self._ensure_initialized()
     return await delete_collection(self._qdrant, self._executor, name)
 
   async def list_collections(self) -> List[CollectionInfo]:
-    """Llista totes les collections."""
+    """List all collections."""
     self._ensure_initialized()
     return await list_collections(self._qdrant, self._executor)
 
   async def collection_exists(self, name: str) -> bool:
-    """Comprova si una collection existeix."""
+    """Check if a collection exists."""
     self._ensure_initialized()
     return await collection_exists(self._qdrant, self._executor, name)
 
@@ -284,17 +284,17 @@ class MemoryAPI:
     ttl_seconds: Optional[int] = None,
   ) -> str:
     """
-    Emmagatzema text amb embedding.
+    Store text with embedding.
 
     Args:
-      text: Contingut textual
-      collection: Nom de la collection
-      metadata: Metadades addicionals
-      doc_id: ID personalitzat (auto-generat si None)
-      ttl_seconds: Temps de vida (None = permanent)
+      text: Textual content
+      collection: Collection name
+      metadata: Additional metadata
+      doc_id: Custom ID (auto-generated if None)
+      ttl_seconds: Time to live (None = permanent)
 
     Returns:
-      str: ID del document creat
+      str: ID of the created document
     """
     self._ensure_initialized()
 
@@ -422,18 +422,18 @@ class MemoryAPI:
     include_expired: bool = False,
   ) -> List[SearchResult]:
     """
-    Cerca per similitud semàntica.
+    Search by semantic similarity.
 
     Args:
-      query: Text de cerca
-      collection: Nom de la collection
-      top_k: Màxim nombre de resultats
-      threshold: Puntuació mínima (0-1)
-      filter_metadata: Filtrar per metadades
-      include_expired: Incloure documents expirats
+      query: Search text
+      collection: Collection name
+      top_k: Maximum number of results
+      threshold: Minimum score (0-1)
+      filter_metadata: Filter by metadata
+      include_expired: Include expired documents
 
     Returns:
-      List[SearchResult]: Resultats ordenats per similitud
+      List[SearchResult]: Results sorted by similarity
     """
     self._ensure_initialized()
 
@@ -471,7 +471,7 @@ class MemoryAPI:
     return await get_document(self._qdrant, self._executor, doc_id, collection, text_store=self._text_store)
 
   async def delete(self, doc_id: str, collection: str) -> bool:
-    """Elimina un document."""
+    """Delete a document."""
     self._ensure_initialized()
 
     if not await self.collection_exists(collection):
@@ -510,7 +510,7 @@ class MemoryAPI:
     return await loop.run_in_executor(self._executor, _scroll)
 
   async def count(self, collection: str) -> int:
-    """Compta documents en una collection."""
+    """Count documents in a collection."""
     self._ensure_initialized()
 
     if not await self.collection_exists(collection):
@@ -519,7 +519,7 @@ class MemoryAPI:
     return await count_documents(self._qdrant, self._executor, collection)
 
   async def cleanup_expired(self, collection: str) -> int:
-    """Elimina documents expirats d'una collection."""
+    """Delete expired documents from a collection."""
     self._ensure_initialized()
 
     if not await self.collection_exists(collection):
@@ -528,7 +528,7 @@ class MemoryAPI:
     return await cleanup_expired(self._qdrant, self._executor, collection)
 
   async def cleanup_all_expired(self) -> Dict[str, int]:
-    """Elimina documents expirats de totes les collections."""
+    """Delete expired documents from all collections."""
     self._ensure_initialized()
 
     collections = await self.list_collections()
@@ -549,7 +549,7 @@ class MemoryAPI:
     return results
 
   async def _generate_embedding(self, text: str) -> List[float]:
-    """Genera embedding per un text."""
+    """Generate embedding for a text."""
     loop = asyncio.get_running_loop()
 
     def _encode():
@@ -564,14 +564,14 @@ class MemoryAPI:
     return await loop.run_in_executor(self._executor, _encode)
 
   async def _generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-    """Genera embeddings per un batch de textos en una sola crida fastembed.
+    """Generate embeddings for a batch of texts in a single fastembed call.
 
-    Bug #16: respecta `ingest_config.embed_batch_size` si està configurat.
-    Default None preserva el comportament històric (no passar batch_size
-    kwarg, FastEmbed aplica el seu default intern).
+    Bug #16: respects `ingest_config.embed_batch_size` if configured.
+    Default None preserves historical behaviour (does not pass batch_size
+    kwarg, FastEmbed applies its own internal default).
 
-    Quan `ingest_config.perf_logging` és True, acumula durada i recomptes
-    a `self._perf` — zero cost quan és False.
+    When `ingest_config.perf_logging` is True, accumulates duration and counts
+    in `self._perf` — zero cost when False.
     """
     loop = asyncio.get_running_loop()
     embed_batch_size = self.ingest_config.embed_batch_size
@@ -602,19 +602,19 @@ class MemoryAPI:
     return await loop.run_in_executor(self._executor, _encode_batch)
 
   async def warmup(self) -> None:
-    """Pre-carrega pesos ONNX/tokenizer amb una crida curta (~1 token).
+    """Pre-load ONNX/tokenizer weights with a short call (~1 token).
 
-    Bug #16 pre-warm: la primera crida a `self._embedder.embed(...)` és cara
-    perquè fastembed fa lazy-init d'ONNX Runtime sessions. Fer-ho fora del
-    camí crític dona timings de workload nets.
+    Bug #16 pre-warm: the first call to `self._embedder.embed(...)` is expensive
+    because fastembed does lazy-init of ONNX Runtime sessions. Doing it outside
+    the critical path yields clean workload timings.
 
-    No-op si `ingest_config.pre_warm` és False (default). L'invocant hauria
-    de respectar la flag per deixar la decisió a la config central.
+    No-op if `ingest_config.pre_warm` is False (default). The caller should
+    respect the flag to leave the decision to the central config.
 
-    Quan perf_logging està actiu, la durada queda isolada a `warmup_ns` i
-    els comptadors `embed_ns` / `chunks_embedded` NO reflecteixen aquesta
-    crida (es decrementen al final) — així el benchmark veu la durada del
-    workload real sense contaminació del pre-warm.
+    When perf_logging is active, the duration is isolated in `warmup_ns` and
+    the `embed_ns` / `chunks_embedded` counters do NOT reflect this call
+    (they are decremented at the end) — so the benchmark sees the real
+    workload duration without pre-warm contamination.
     """
     self._ensure_initialized()
     if not self.ingest_config.pre_warm:
@@ -623,15 +623,15 @@ class MemoryAPI:
     if not perf_on:
       await self._generate_embeddings_batch(["warmup"])
       return
-    # Mesurem el warmup per separat. Prenem snapshot previ, cridem, i
-    # restem l'aportació del warmup als comptadors d'embed.
+    # We measure warmup separately. We take a prior snapshot, call, and
+    # subtract the warmup contribution from the embed counters.
     embed_ns_before = self._perf["embed_ns"]
     embed_calls_before = self._perf["embed_calls"]
     chunks_before = self._perf["chunks_embedded"]
     t0 = time.perf_counter_ns()
     await self._generate_embeddings_batch(["warmup"])
     self._perf["warmup_ns"] += time.perf_counter_ns() - t0
-    # Revertim l'efecte del warmup sobre els comptadors de workload.
+    # Revert the warmup effect on the workload counters.
     self._perf["embed_ns"] = embed_ns_before
     self._perf["embed_calls"] = embed_calls_before
     self._perf["chunks_embedded"] = chunks_before
@@ -662,7 +662,7 @@ class MemoryAPI:
 
   @staticmethod
   def _hex_to_uuid(hex_id: str) -> str:
-    """Converteix hex ID a UUID format."""
+    """Convert hex ID to UUID format."""
     return hex_to_uuid(hex_id)
 
 __all__ = [
