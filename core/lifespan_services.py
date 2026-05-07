@@ -13,6 +13,7 @@ import asyncio
 import logging
 import os
 import shutil
+import signal as _signal
 import subprocess  # nosec B404: subprocess required to start `ollama serve` at server startup; usage validated below
 from pathlib import Path
 from typing import Any, Dict
@@ -94,3 +95,26 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path, serve
             logger.warning("Ollama: Failed to start (timeout 15s)")
         except Exception as e:
           logger.warning(f"Ollama: Failed to start: {e}")
+
+
+def _stop_process(process, name: str) -> None:
+    """Send SIGINT → terminate → kill to a subprocess. Safe to call in finally blocks."""
+    if not process:
+        return
+    if process.poll() is not None:
+        return
+    try:
+        logger.info("Stopping %s process...", name)
+        process.send_signal(_signal.SIGINT)
+        process.wait(timeout=10)
+    except Exception as e:
+        logger.debug("SIGINT failed for %s: %s", name, e)
+        try:
+            process.terminate()
+            process.wait(timeout=3)
+        except Exception as e2:
+            logger.debug("Terminate failed for %s: %s", name, e2)
+            try:
+                process.kill()
+            except Exception:
+                logger.debug("Failed to force-stop %s process", name)

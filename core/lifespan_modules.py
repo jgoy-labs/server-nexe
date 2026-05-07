@@ -189,6 +189,72 @@ async def auto_ingest_knowledge(server_state):
         logger.warning("Knowledge: Auto-ingest failed: %s", str(e))
 
 
+async def _shutdown_memory_service(app, server_state) -> None:
+    """Graceful shutdown of MemoryService v1 and DreamingCycle."""
+    try:
+        if hasattr(server_state, '_dreaming_task') and server_state._dreaming_task:
+            if hasattr(server_state, '_dreaming_cycle') and server_state._dreaming_cycle:
+                server_state._dreaming_cycle.stop()
+            server_state._dreaming_task.cancel()
+            try:
+                await server_state._dreaming_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            logger.info("DreamingCycle stopped")
+        if hasattr(app.state, 'memory_service') and app.state.memory_service:
+            await app.state.memory_service.shutdown()
+            logger.info("MemoryService shut down")
+    except Exception as e:
+        logger.warning("MemoryService shutdown error (non-fatal): %s", e)
+
+
+async def _startup_module_discovery(app, server_state, _translate) -> None:
+    """Discover modules via ModuleManager and populate server_state.registry."""
+    try:
+        if not server_state.module_manager:
+            msg = _translate(server_state.i18n, "core.server.module_manager_unavailable", "ModuleManager not available")
+            logger.warning(msg)
+            return
+
+        server_state.registry = server_state.module_manager.registry
+        msg = _translate(server_state.i18n, "core.server.module_manager_ready", "ModuleManager already initialized")
+        logger.info(msg)
+
+        discovered = await server_state.module_manager.discover_modules()
+        total_modules = list(server_state.module_manager._modules.keys())
+
+        try:
+            cycle_warnings = server_state.module_manager.get_cycle_warnings()
+        except Exception:
+            cycle_warnings = []
+        for cycle_chain in cycle_warnings:
+            logger.warning("[WARN] Module dependency cycle: %s", cycle_chain)
+
+        if total_modules:
+            msg = _translate(server_state.i18n, "core.server.modules_loaded",
+                "Modules loaded: {count} ({modules})",
+                count=len(total_modules), modules=', '.join(total_modules))
+            logger.info(msg)
+        else:
+            msg = _translate(server_state.i18n, "core.server.no_modules_loaded", "No modules loaded")
+            logger.warning(msg)
+
+        if discovered:
+            msg = _translate(server_state.i18n, "core.server.new_modules_discovered",
+                "Discovered {count} new modules: {modules}",
+                count=len(discovered), modules=', '.join(discovered))
+            logger.info(msg)
+        else:
+            msg = _translate(server_state.i18n, "core.server.no_new_modules",
+                "No new modules discovered in this cycle")
+            logger.debug(msg)
+
+    except Exception as e:
+        msg = _translate(server_state.i18n, "core.server.module_manager_error",
+            "Error with ModuleManager: {error}", error=str(e))
+        logger.warning(msg)
+
+
 async def start_memory_service_v1(app, server_state):
     """Initialize MemoryService v1 + DreamingCycle background task.
 
