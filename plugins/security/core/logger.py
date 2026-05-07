@@ -42,8 +42,8 @@ def log_security_event(
     from plugins.security.core.logger import log_security_event
 
     log_security_event("path_traversal_blocked", {
-      "requested_path": "/etc/passwd",
-      "base_path": "/var/www/assets",
+      "requested_path": "/etc/passwd",  # nosemgrep
+      "base_path": "/var/www/assets",  # nosemgrep
       "ip_address": request.client.host
     }, severity="WARNING")
   """

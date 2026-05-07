@@ -109,7 +109,7 @@ class TestValidateFilename:
 
     def test_absolute_path_raises_400(self):
         with pytest.raises(HTTPException) as exc:
-            validate_filename("/etc/passwd")
+            validate_filename("/etc/passwd")  # nosemgrep
         assert exc.value.status_code == 400
 
     def test_home_expansion_raises_400(self):

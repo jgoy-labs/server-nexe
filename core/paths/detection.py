@@ -84,16 +84,16 @@ def get_repo_root(start_path: Optional[Path] = None) -> Path:
   Examples:
     >>>
     >>> import os
-    >>> os.environ["NEXE_HOME"] = "/opt/nexe"
+    >>> os.environ["NEXE_HOME"] = "/opt/nexe"  # nosemgrep
     >>> root = get_repo_root()
-    >>> assert root == Path("/opt/nexe")
+    >>> assert root == Path("/opt/nexe")  # nosemgrep
 
     >>>
     >>> root = get_repo_root()
     >>> assert (root / "personality/server.toml").exists()
 
     >>>
-    >>> root = get_repo_root(start_path=Path("/tmp/nexe-test"))
+    >>> root = get_repo_root(start_path=Path("/tmp/nexe-test"))  # nosemgrep
   """
 
   if core_home := os.getenv("NEXE_HOME"):

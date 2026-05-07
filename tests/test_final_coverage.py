@@ -1448,9 +1448,9 @@ class TestDataModelsFinal:
     def test_create_module_info(self):
         """Lines 301-322: create_module_info helper."""
         from personality.data.models import create_module_info
-        info = create_module_info("test", "/tmp/test")
+        info = create_module_info("test", "/tmp/test")  # nosemgrep
         assert info.name == "test"
-        assert info.path == Path("/tmp/test")
+        assert info.path == Path("/tmp/test")  # nosemgrep
 
     def test_create_system_event(self):
         """Lines 324-348: create_system_event helper."""

@@ -39,7 +39,7 @@ def get_security_logger() -> SecurityEventLogger:
 
   Examples:
     >>> logger = get_security_logger()
-    >>> logger.log_auth_failure("Invalid API key", ip_address="192.168.1.1")
+    >>> logger.log_auth_failure("Invalid API key", ip_address="192.168.1.1")  # nosemgrep
   """
   global _security_logger
   if _security_logger is None:

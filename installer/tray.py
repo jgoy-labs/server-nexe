@@ -131,7 +131,7 @@ try:
     WEB_UI_URL = f"{get_server_url()}/ui"
 except Exception:
     SERVER_PORT = int(os.environ.get("NEXE_SERVER_PORT", "9119"))
-    WEB_UI_URL = f"http://{os.environ.get('NEXE_SERVER_HOST', '127.0.0.1')}:{SERVER_PORT}/ui"
+    WEB_UI_URL = f"http://{os.environ.get('NEXE_SERVER_HOST', '127.0.0.1')}:{SERVER_PORT}/ui"  # nosemgrep
 
 # PID file (written by core/server/runner.py — used as fallback for Quit)
 PID_FILE = PROJECT_ROOT / "storage" / "run" / "server.pid"

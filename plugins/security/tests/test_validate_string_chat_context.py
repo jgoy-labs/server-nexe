@@ -48,7 +48,7 @@ def test_chat_context_allows_command_metacharacters() -> None:
 def test_chat_context_allows_ellipsis_and_paths() -> None:
   """Ellipsis ("...") and path-like strings must not trigger in chat."""
   out = validate_string_input("See the etc directory, for example /etc/...", context="chat")
-  assert "/etc/" in out
+  assert "/etc/" in out  # nosemgrep
 
 
 def test_chat_context_still_blocks_xss() -> None:

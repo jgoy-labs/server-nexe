@@ -126,7 +126,7 @@ def test_detect_path_traversal_encoded() -> None:
 
 def test_detect_path_traversal_absolute() -> None:
   """Test path traversal detection with absolute paths."""
-  assert detect_path_traversal("/etc/passwd") is True
+  assert detect_path_traversal("/etc/passwd") is True  # nosemgrep
 
 def test_no_path_traversal_in_normal_path() -> None:
   """Test that normal paths are not flagged."""

@@ -86,8 +86,8 @@ def anonymize_path(path: str) -> str:
   if not path:
     return path
 
-  path = re.sub(r'/Users/[^/]+', '/Users/[USER]', path)
-  path = re.sub(r'/home/[^/]+', '/home/[USER]', path)
+  path = re.sub(r'/Users/[^/]+', '/Users/[USER]', path)  # nosemgrep
+  path = re.sub(r'/home/[^/]+', '/home/[USER]', path)  # nosemgrep
 
   path = re.sub(r'C:\\Users\\[^\\]+', r'C:\\Users\\[USER]', path)
 

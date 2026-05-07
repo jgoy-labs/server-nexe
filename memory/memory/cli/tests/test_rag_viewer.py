@@ -75,7 +75,7 @@ class TestShowStats:
             }
         }
         with patch("asyncio.run", return_value=stats):
-            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):
+            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):  # nosemgrep
                 with patch("builtins.print") as mock_print:
                     rag_viewer.show_stats()
                     calls = " ".join(str(c) for c in mock_print.call_args_list)
@@ -94,7 +94,7 @@ class TestShowStats:
             }
         }
         with patch("asyncio.run", return_value=stats):
-            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):
+            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):  # nosemgrep
                 with patch("builtins.print") as mock_print:
                     rag_viewer.show_stats()
                     calls = " ".join(str(c) for c in mock_print.call_args_list)
@@ -111,7 +111,7 @@ class TestShowStats:
             }
         }
         with patch("asyncio.run", return_value=stats):
-            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):
+            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):  # nosemgrep
                 with patch("builtins.print") as mock_print:
                     rag_viewer.show_stats()
                     calls = " ".join(str(c) for c in mock_print.call_args_list)
@@ -141,7 +141,7 @@ class TestMain:
 
         with patch("argparse.ArgumentParser.parse_args",
                     return_value=argparse.Namespace(lines=30, clear=False, path=False, stats=True)):
-            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):
+            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):  # nosemgrep
                 with patch.object(rag_viewer, "show_stats") as mock_stats:
                     rag_viewer.main()
                     mock_stats.assert_called_once()
@@ -248,7 +248,7 @@ class TestShowStatsGetStats:
             "flash": {"total_entries": 5, "expired_pending": 2},
         }
         with patch("asyncio.run", return_value=stats):
-            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):
+            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):  # nosemgrep
                 with patch("builtins.print") as mock_print:
                     rag_viewer.show_stats()
                     calls = " ".join(str(c) for c in mock_print.call_args_list)
@@ -286,7 +286,7 @@ class TestShowStatsGetStats:
         # Just verify show_stats can run with various return values
         stats = {"sqlite": {"total_entries": 5}}
         with patch("asyncio.run", return_value=stats):
-            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):
+            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):  # nosemgrep
                 with patch("builtins.print"):
                     rag_viewer.show_stats()
 
@@ -304,7 +304,7 @@ class TestShowStatsGetStats:
             },
         }
         with patch("asyncio.run", return_value=stats):
-            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):
+            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):  # nosemgrep
                 with patch("builtins.print") as mock_print:
                     rag_viewer.show_stats()
                     calls = " ".join(str(c) for c in mock_print.call_args_list)

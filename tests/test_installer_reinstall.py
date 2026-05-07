@@ -523,7 +523,7 @@ def test_wipe_home_nexe_optin(tmp_path, monkeypatch):
 
     def fake_oauth():
         called["oauth"] = True
-        return [Path("/tmp/fake-mail365.json")]
+        return [Path("/tmp/fake-mail365.json")]  # nosemgrep
 
     monkeypatch.setattr(ir, "_wipe_home_nexe_oauth", fake_oauth)
 

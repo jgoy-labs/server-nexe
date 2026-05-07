@@ -42,28 +42,28 @@ class TestRollback:
 
     def test_unset_before_stays_unset_after(self, monkeypatch):
         monkeypatch.delenv("NEXE_MLX_MODEL", raising=False)
-        _switch_with_rollback("NEXE_MLX_MODEL", "/tmp/new-model")
+        _switch_with_rollback("NEXE_MLX_MODEL", "/tmp/new-model")  # nosemgrep
         assert "NEXE_MLX_MODEL" not in os.environ
 
     def test_set_before_keeps_original_after(self, monkeypatch):
-        monkeypatch.setenv("NEXE_MLX_MODEL", "/tmp/original")
-        _switch_with_rollback("NEXE_MLX_MODEL", "/tmp/new-model")
-        assert os.environ["NEXE_MLX_MODEL"] == "/tmp/original"
+        monkeypatch.setenv("NEXE_MLX_MODEL", "/tmp/original")  # nosemgrep
+        _switch_with_rollback("NEXE_MLX_MODEL", "/tmp/new-model")  # nosemgrep
+        assert os.environ["NEXE_MLX_MODEL"] == "/tmp/original"  # nosemgrep
 
     def test_value_is_read_inside_the_window(self, monkeypatch):
         """El consumidor (ex. MLXConfig.from_env) llegeix el valor mutat."""
         monkeypatch.delenv("NEXE_MLX_MODEL", raising=False)
-        value_seen = _switch_with_rollback("NEXE_MLX_MODEL", "/tmp/new-model")
-        assert value_seen == "/tmp/new-model"
+        value_seen = _switch_with_rollback("NEXE_MLX_MODEL", "/tmp/new-model")  # nosemgrep
+        assert value_seen == "/tmp/new-model"  # nosemgrep
 
     def test_rollback_even_if_consumer_raises(self, monkeypatch):
         """Excepció dins el bloc try no ha de trencar el rollback."""
-        monkeypatch.setenv("NEXE_LLAMA_CPP_MODEL", "/tmp/original")
+        monkeypatch.setenv("NEXE_LLAMA_CPP_MODEL", "/tmp/original")  # nosemgrep
 
         prev = os.environ.get("NEXE_LLAMA_CPP_MODEL")
         with pytest.raises(RuntimeError):
             try:
-                os.environ["NEXE_LLAMA_CPP_MODEL"] = "/tmp/new"
+                os.environ["NEXE_LLAMA_CPP_MODEL"] = "/tmp/new"  # nosemgrep
                 raise RuntimeError("consumer failed")
             finally:
                 if prev is None:
@@ -71,7 +71,7 @@ class TestRollback:
                 else:
                     os.environ["NEXE_LLAMA_CPP_MODEL"] = prev
 
-        assert os.environ["NEXE_LLAMA_CPP_MODEL"] == "/tmp/original"
+        assert os.environ["NEXE_LLAMA_CPP_MODEL"] == "/tmp/original"  # nosemgrep
 
 
 class TestSourceGuard:

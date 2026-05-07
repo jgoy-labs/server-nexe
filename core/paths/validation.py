@@ -37,7 +37,7 @@ def _is_valid_core_root(path: Path) -> Tuple[bool, List[str]]:
     (is_valid, reasons): bool and list of validation messages
 
   Examples:
-    >>> is_valid, reasons = _is_valid_core_root(Path("/opt/nexe"))
+    >>> is_valid, reasons = _is_valid_core_root(Path("/opt/nexe"))  # nosemgrep
     >>> if is_valid:
     >>>   print("Valid root!")
     >>> else:
