@@ -1,0 +1,54 @@
+schema_version = "1"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# imports-cycles whitelist — Sessió Dev-G 2026-05-07
+#
+# Diagnòstic: 159 cicles arquitecturals en 2 anells:
+#
+# Anell 1 (153 cicles): core.endpoints.* ↔ memory.memory.module
+#   → core.lifespan → plugins.web_ui_module.api.routes_chat → core.endpoints.chat
+#   Causa: imports LAZY (dins cos de funció) a:
+#     - core/lifespan.py:513  `from plugins.web_ui_module.api.routes import start_session_cleanup_task`
+#     - plugins/web_ui_module/api/routes_chat.py:873  `from core.endpoints.chat import _get_system_prompt`
+#     - memory/memory/module.py:16  `from core.lifespan import get_server_state` (top-level, necessari)
+#
+# Anell 2 (6 cicles): plugins.ollama_module.module ↔ plugins.ollama_module.core.*
+#   Causa: import LAZY a plugins/ollama_module/core/chat.py:53
+#     `from plugins.ollama_module import module as _m`
+#   Documentat com FIXME post-release al codi.
+#
+# Decisió (Dev-G + Director): Whitelist fins sprint de refactorització.
+# Fix real: extreure _get_system_prompt a mòdul neutre (chat_config.py).
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[exception]]
+rule = "imports.cycle"
+path = "core/endpoints/**"
+reason = "Anell arquitectural core.endpoints ↔ memory.memory.module ↔ core.lifespan ↔ web_ui_module. Imports lazy dins funcions. Runtime-safe, servidor operatiu. Fix: sprint refactoritzar _get_system_prompt."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "imports-cycles-dev-g-2026-05-07"
+
+[[exception]]
+rule = "imports.cycle"
+path = "core/lifespan*"
+reason = "core.lifespan és node del ring arquitectural amb memory.memory i web_ui_module. Import lazy a línia 513. Runtime-safe, servidor operatiu. Fix: sprint refactoritzar."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "imports-cycles-dev-g-2026-05-07"
+
+[[exception]]
+rule = "imports.cycle"
+path = "memory/memory/**"
+reason = "memory.memory.module importa core.lifespan (get_server_state) formant ring amb core.endpoints. Acoblament necessari per accés a estat servidor. Fix: sprint injecció de dependències."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "imports-cycles-dev-g-2026-05-07"
+
+[[exception]]
+rule = "imports.cycle"
+path = "plugins/**"
+reason = "plugins.web_ui_module i plugins.ollama_module formen rings via imports lazy dins funcions. FIXME documentat a ollama_module/core/chat.py. Runtime-safe, servidor operatiu. Fix: sprint."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "imports-cycles-dev-g-2026-05-07"

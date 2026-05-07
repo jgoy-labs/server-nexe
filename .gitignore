@@ -94,8 +94,9 @@ coverage.xml
 htmlcov/
 *,cover
 
-# MUTHUR (auditor intern)
-.muthur/
+# MUTHUR (auditor intern) — whitelist.toml és config de projecte, es commit
+.muthur/*
+!.muthur/whitelist.toml
 .muthur.toml
 
 # Caches temporals
@@ -128,3 +129,7 @@ Thumbs.db
 
 # DIARI INTERN (notes privades de dev, no van a GitHub)
 diari/
+
+# Node
+node_modules/
+package-lock.json
