@@ -1,5 +1,5 @@
 """
-Tests unitaris per plugins/ollama_module/module.py
+Unit tests for plugins/ollama_module/module.py
 """
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
@@ -17,7 +17,7 @@ class TestOllamaModuleInit:
     def test_custom_base_url(self):
         with patch.dict("os.environ", {"NEXE_OLLAMA_HOST": "http://custom:11434/"}):
             module = OllamaModule()
-        assert module.base_url == "http://custom:11434"  # sense trailing /
+        assert module.base_url == "http://custom:11434"  # without trailing /
 
     def test_from_env_variable(self):
         with patch.dict("os.environ", {"NEXE_OLLAMA_HOST": "http://envhost:11434"}):
@@ -46,10 +46,10 @@ class TestOllamaModuleTranslate:
 
     def test_t_with_i18n_found(self):
         mock_i18n = MagicMock()
-        mock_i18n.t.return_value = "Traduit"
+        mock_i18n.t.return_value = "Translated"
         self.module.i18n = mock_i18n
         result = self.module._t("key", "Fallback")
-        assert result == "Traduit"
+        assert result == "Translated"
 
     def test_t_with_i18n_key_not_found(self):
         mock_i18n = MagicMock()
@@ -109,10 +109,10 @@ class TestOllamaModuleCheckConnection:
 
     @pytest.mark.asyncio
     async def test_connection_httpx_not_installed(self):
-        """httpx és None → check_connection no pot funcionar"""
+        """httpx is None → check_connection cannot work"""
         module = OllamaModule()
-        # El mòdul comprova si httpx és None al health_check però no al check_connection
-        # Comprovem que el health_check retorna UNKNOWN si httpx és None
+        # The module checks if httpx is None in health_check but not in check_connection
+        # We verify that health_check returns UNKNOWN if httpx is None
         with patch("plugins.ollama_module.module.httpx", None):
             from core.loader.protocol import HealthStatus
             result = await module.health_check()

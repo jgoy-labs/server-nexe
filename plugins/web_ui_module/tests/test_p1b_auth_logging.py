@@ -1,10 +1,10 @@
 """
-Tests P1-B — Auth failures de la Web UI s'han de loggar al security log.
+Tests P1-B — Web UI auth failures must be logged to the security log.
 
-Problema: make_require_ui_auth() no cridava security_logger.log_auth_failure()
-en fallades d'autenticació. Un brute force sobre /ui/chat no apareixia als logs.
+Problem: make_require_ui_auth() was not calling security_logger.log_auth_failure()
+on authentication failures. A brute force on /ui/chat was invisible in logs.
 
-Fix: afegir import lazy + log_auth_failure() igual que auth_dependencies.py:185-193.
+Fix: add lazy import + log_auth_failure() same as auth_dependencies.py:185-193.
 
 www.jgoy.net · https://server-nexe.org
 """
@@ -17,7 +17,7 @@ from plugins.web_ui_module.api.routes_auth import make_require_ui_auth
 
 
 def _mock_request(host="1.2.3.4", path="/ui/chat"):
-    """Request mínim amb client.host i url.path."""
+    """Minimal request with client.host and url.path."""
     req = MagicMock()
     req.app.state = MagicMock(spec=[])
     req.client.host = host

@@ -1,6 +1,6 @@
 """
-Tests unitaris per MemoryHelper.
-Sense GPU ni Qdrant — cobreix tota la lògica en memòria.
+Unit tests for MemoryHelper.
+Without GPU or Qdrant — covers all in-memory logic.
 """
 import pytest
 from datetime import datetime, timezone, timedelta
@@ -157,7 +157,7 @@ class TestDetectIntentChat:
         assert intent == "chat"
 
     def test_chat_unrelated_guardar(self, mh):
-        # "guardar" al mig d'una frase no és trigger (els triggers van al FINAL)
+        # "guardar" in the middle of a sentence is not a trigger (triggers go at the END)
         intent, _ = mh.detect_intent("Per guardar fitxers usa Ctrl+S")
         assert intent == "chat"
 
@@ -235,7 +235,7 @@ class TestApplyTemporalDecay:
         assert adjusted <= 1.0
 
     def test_naive_datetime_handled(self, mh):
-        # Naive datetime (sense tzinfo) ha de funcionar
+        # Naive datetime (without tzinfo) must work
         naive = datetime.now().isoformat()
         meta = {"saved_at": naive}
         result = mh._apply_temporal_decay(0.6, meta)
@@ -294,7 +294,7 @@ class TestCalculateRetentionScore:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Constants de configuració
+# Configuration constants
 # ═══════════════════════════════════════════════════════════════
 
 class TestConstants:

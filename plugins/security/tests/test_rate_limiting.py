@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/tests/test_rate_limiting.py
-Description: Tests per RateLimitTracker, identificadors de rate limiting i helpers.
+Description: Tests for RateLimitTracker, rate limiting identifiers and helpers.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -30,7 +30,7 @@ from plugins.security.core.rate_limiting import (
 
 
 def make_mock_request(api_key: str = "", ip: str = "127.0.0.1", path: str = "/health"):
-    """Helper: crea un mock de FastAPI Request."""
+    """Helper: creates a FastAPI Request mock."""
     request = MagicMock()
     headers_mock = MagicMock()
     headers_mock.get = lambda k, default="": api_key if k == "x-api-key" else default
@@ -43,7 +43,7 @@ def make_mock_request(api_key: str = "", ip: str = "127.0.0.1", path: str = "/he
 
 
 class TestGetApiKeyIdentifier:
-    """Tests per get_api_key_identifier."""
+    """Tests for get_api_key_identifier."""
 
     def test_with_api_key_returns_hash_prefix(self):
         request = make_mock_request(api_key="my-secret-key")
@@ -67,7 +67,7 @@ class TestGetApiKeyIdentifier:
 
 
 class TestGetCompositeIdentifier:
-    """Tests per get_composite_identifier."""
+    """Tests for get_composite_identifier."""
 
     def test_with_api_key_includes_hash(self):
         with patch("plugins.security.core.rate_limiting.get_remote_address", return_value="10.0.0.1"):
@@ -84,7 +84,7 @@ class TestGetCompositeIdentifier:
 
 
 class TestGetEndpointIdentifier:
-    """Tests per get_endpoint_identifier."""
+    """Tests for get_endpoint_identifier."""
 
     def test_includes_path(self):
         with patch("plugins.security.core.rate_limiting.get_remote_address", return_value="127.0.0.1"):
@@ -100,7 +100,7 @@ class TestGetEndpointIdentifier:
 
 
 class TestRateLimitTracker:
-    """Tests per RateLimitTracker."""
+    """Tests for RateLimitTracker."""
 
     @pytest.mark.asyncio
     async def test_record_request_returns_state(self):
@@ -178,7 +178,7 @@ class TestRateLimitTracker:
 
 
 class TestRateLimitFunctions:
-    """Tests per les funcions de rate limit."""
+    """Tests for the rate limit functions."""
 
     def test_rate_limit_public_returns_decorator(self):
         decorator = rate_limit_public()
@@ -209,7 +209,7 @@ class TestRateLimitFunctions:
 
 
 class TestGetRateLimitStats:
-    """Tests per get_rate_limit_stats."""
+    """Tests for get_rate_limit_stats."""
 
     def test_returns_dict_with_active_identifiers(self):
         stats = get_rate_limit_stats()
@@ -223,7 +223,7 @@ class TestGetRateLimitStats:
 
 
 class TestAddRateLimitHeaders:
-    """Tests per add_rate_limit_headers middleware."""
+    """Tests for add_rate_limit_headers middleware."""
 
     def test_adds_rate_limit_headers(self):
         from plugins.security.core.rate_limiting import add_rate_limit_headers
@@ -266,10 +266,10 @@ class TestAddRateLimitHeaders:
 
 
 class TestStartRateLimitCleanupTask:
-    """Tests per start_rate_limit_cleanup_task."""
+    """Tests for start_rate_limit_cleanup_task."""
 
     def test_cleanup_task_can_be_cancelled(self):
-        """Verifica que el background task es pot cancel·lar."""
+        """Verifies that the background task can be cancelled."""
         from plugins.security.core.rate_limiting import start_rate_limit_cleanup_task
         import asyncio
 

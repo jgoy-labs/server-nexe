@@ -440,10 +440,10 @@ class TestWebUIManifestGaps:
 
 
 class TestSessionEncFilePermissions:
-    """C16: fitxers .enc creats amb permisos 0o600."""
+    """C16: .enc files created with permissions 0o600."""
 
     def test_enc_file_has_chmod_600(self, tmp_path):
-        """Fitxer .enc escrit per SessionManager ha de tenir permisos 0o600."""
+        """.enc file written by SessionManager must have permissions 0o600."""
         from unittest.mock import MagicMock
         from plugins.web_ui_module.core.session_manager import SessionManager
 
@@ -454,16 +454,16 @@ class TestSessionEncFilePermissions:
         sm.create_session(session_id="perm-test")
 
         enc_file = tmp_path / "perm-test.enc"
-        assert enc_file.exists(), "Fitxer .enc hauria d'existir"
+        assert enc_file.exists(), ".enc file should exist"
 
         stat = enc_file.stat()
-        # mode & 0o777 → permisos sense bits especials
+        # mode & 0o777 → permissions without special bits
         assert (stat.st_mode & 0o777) == 0o600, (
-            f"Permisos esperats 0o600, obtinguts {oct(stat.st_mode & 0o777)}"
+            f"Expected permissions 0o600, got {oct(stat.st_mode & 0o777)}"
         )
 
     def test_enc_file_chmod_oserror_no_crash(self, tmp_path):
-        """Si chmod llança OSError → no es propaga (log warning, continua)."""
+        """If chmod raises OSError → it is not propagated (log warning, continue)."""
         from unittest.mock import MagicMock, patch
         from plugins.web_ui_module.core.session_manager import SessionManager
         from pathlib import Path
@@ -479,4 +479,4 @@ class TestSessionEncFilePermissions:
             raise OSError("chmod not supported")
 
         with patch.object(Path, "chmod", chmod_fail):
-            sm.create_session(session_id="chmod-fail")  # no ha de llançar
+            sm.create_session(session_id="chmod-fail")  # must not raise

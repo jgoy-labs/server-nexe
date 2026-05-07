@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-ModelPool - Pool d'instàncies Llama vives amb LRU eviction.
+ModelPool - Pool of live Llama instances with LRU eviction.
 
-PRINCIPI CLAU: El KV cache persistent ve de mantenir la instància VIVA.
-NO fem save_state/load_state (massa car). Una sessió = una instància.
+KEY PRINCIPLE: The persistent KV cache comes from keeping the instance ALIVE.
+We do NOT use save_state/load_state (too expensive). One session = one instance.
 
-Funcionament:
-1. Cada session_id té la seva instància Llama
-2. Si system_hash canvia → reset (destruir i recrear)
-3. LRU eviction quan max_sessions superat
-4. gc.collect() per alliberar VRAM
+How it works:
+1. Each session_id has its own Llama instance
+2. If system_hash changes → reset (destroy and recreate)
+3. LRU eviction when max_sessions is exceeded
+4. gc.collect() to free VRAM
 
 """
 import gc
@@ -27,22 +27,22 @@ logger = logging.getLogger(__name__)
 
 class ModelPool:
     """
-    Pool d'instàncies Llama vives amb LRU eviction.
+    Pool of live Llama instances with LRU eviction.
 
     Attributes:
-        config: Configuració del pool
+        config: Pool configuration
         _instances: Dict session_id → Llama instance
-        _hashes: Dict session_id → system_hash (per detectar canvis)
-        _lru: Lista ordenada per ús (últim = més recent)
-        _lock: Lock per thread-safety
+        _hashes: Dict session_id → system_hash (to detect changes)
+        _lru: List ordered by usage (last = most recent)
+        _lock: Lock for thread-safety
     """
 
     def __init__(self, config: LlamaCppConfig):
         """
-        Inicialitza el pool.
+        Initialise the pool.
 
         Args:
-            config: Configuració amb model_path, n_ctx, etc.
+            config: Configuration with model_path, n_ctx, etc.
         """
         self.config = config
         self._instances: Dict[str, "Llama"] = {}
@@ -58,16 +58,16 @@ class ModelPool:
 
     def get_or_create(self, session_id: str, system_hash: str) -> Tuple["Llama", bool]:
         """
-        Retorna instància existent si system_hash coincideix.
-        Si no, destrueix i crea nova (reset).
+        Return existing instance if system_hash matches.
+        Otherwise, destroy and create a new one (reset).
 
         Args:
-            session_id: Identificador de la sessió
-            system_hash: Hash del system prompt (de prompt_builder)
+            session_id: Session identifier
+            system_hash: Hash of the system prompt (from prompt_builder)
 
         Returns:
-            Tuple (instància Llama, reused: bool)
-            reused=True si s'ha reutilitzat instància existent (cache hit)
+            Tuple (Llama instance, reused: bool)
+            reused=True if an existing instance was reused (cache hit)
         """
         with self._lock:
             # Case 1: Existing session with same hash → reuse
@@ -118,12 +118,12 @@ class ModelPool:
 
     def _create_instance(self) -> "Llama":
         """
-        Crea una nova instància Llama amb la configuració completa.
+        Create a new Llama instance with the full configuration.
 
         Returns:
-            Nova instància Llama
+            New Llama instance
         """
-        # Import lazy per evitar carregar la lib si no s'usa
+        # Lazy import to avoid loading the lib if not used
         from llama_cpp import Llama
 
         logger.info(
@@ -148,7 +148,7 @@ class ModelPool:
             use_mlock=self.config.use_mlock,      # Keep in RAM
             use_mmap=self.config.use_mmap,        # Efficient memory-map
             flash_attn=self.config.flash_attn,    # Flash attention
-            verbose=False,  # Silenciar output de llama.cpp
+            verbose=False,  # Silence llama.cpp output
         )
         if self.config.mmproj_path:
             kwargs["clip_model_path"] = self.config.mmproj_path
@@ -160,10 +160,10 @@ class ModelPool:
 
     def _touch_lru(self, session_id: str) -> None:
         """
-        Mou sessió al final de l'LRU (més recent).
+        Move session to the end of the LRU (most recent).
 
         Args:
-            session_id: Sessió a actualitzar
+            session_id: Session to update
         """
         if session_id in self._lru:
             self._lru.remove(session_id)
@@ -171,10 +171,10 @@ class ModelPool:
 
     def _destroy(self, session_id: str) -> None:
         """
-        Allibera memòria de la instància.
+        Free memory for the instance.
 
         Args:
-            session_id: Sessió a destruir
+            session_id: Session to destroy
         """
         if session_id in self._instances:
             instance = self._instances[session_id]
@@ -212,7 +212,7 @@ class ModelPool:
 
     @property
     def active_sessions(self) -> int:
-        """Retorna el nombre de sessions actives."""
+        """Return the number of active sessions."""
         return len(self._instances)
 
     def get_stats(self) -> Dict:

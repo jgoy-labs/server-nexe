@@ -139,7 +139,7 @@ def test_get_info_without_node():
 
 
 def test_info_endpoint(monkeypatch):
-    """Line 80: info endpoint. Auditoria r4 B2: ara requereix X-API-Key."""
+    """Line 80: info endpoint. Audit r4 B2: now requires X-API-Key."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 

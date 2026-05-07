@@ -3,14 +3,14 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/specialists/trasher_specialist.py
-Description: Specialist per trasher_manager — reporta storage del modul security.
+Description: Specialist for trasher_manager — reports storage of the security module.
 
-STUB — Funcional a Part 2 quan arribi trasher_manager de NAT7.
+STUB — Functional in Part 2 when trasher_manager arrives from NAT7.
 
-Contracte:
-  - trasher_manager crida get_storage_report()
-  - Retorna dict amb paths, mida, retention, cleanable
-  - El plugin no sap qui el pregunta, nomes respon
+Contract:
+  - trasher_manager calls get_storage_report()
+  - Returns dict with paths, size, retention, cleanable
+  - The plugin does not know who is asking, it only responds
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -18,8 +18,8 @@ www.jgoy.net · https://server-nexe.org
 
 
 class SecurityTrasherSpecialist:
-    """Specialist per trasher_manager. Stub fins Part 2."""
+    """Specialist for trasher_manager. Stub until Part 2."""
 
     def get_storage_report(self):
-        """Retorna informe de storage per trasher_manager."""
-        raise NotImplementedError("Stub — funcional a Part 2")
+        """Returns storage report for trasher_manager."""
+        raise NotImplementedError("Stub — functional in Part 2")

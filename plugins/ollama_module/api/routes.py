@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/ollama_module/api/routes.py
-Description: Endpoints FastAPI del modul Ollama.
-             Separat de manifest.py durant normalitzacio.
+Description: FastAPI endpoints for the Ollama module.
+             Separated from manifest.py during normalisation.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -24,13 +24,13 @@ logger = logging.getLogger(__name__)
 
 
 class PullModelRequest(BaseModel):
-    """Request per descarregar model"""
+    """Request to download a model"""
     name: str
 
 
 def create_router(module_instance) -> APIRouter:
     """
-    Crea el router FastAPI amb tots els endpoints d'Ollama.
+    Create the FastAPI router with all Ollama endpoints.
 
     Args:
         module_instance: OllamaModule instance
@@ -47,7 +47,7 @@ def create_router(module_instance) -> APIRouter:
 
     @router.get("/ui", response_class=HTMLResponse, operation_id="ollama_serve_ui")
     async def serve_ui():
-        """Serveix interficie web del chatbot Ollama."""
+        """Serves the Ollama chatbot web interface."""
         index_path = ui_path / "index.html"
         if not index_path.exists():
             return HTMLResponse(content="<h1>Ollama UI not found</h1>", status_code=404)
@@ -57,14 +57,14 @@ def create_router(module_instance) -> APIRouter:
 
     @router.get("/ui/assets/css/{path:path}", operation_id="ollama_serve_css")
     async def serve_css(path: str):
-        """Serveix fitxers CSS"""
+        """Serves CSS files"""
         css_base = ui_path / "assets" / "css"
         safe_path = validate_safe_path(css_base / path, css_base)
         return FileResponse(safe_path, media_type="text/css")
 
     @router.get("/ui/js/{path:path}", operation_id="ollama_serve_js")
     async def serve_js(path: str):
-        """Serveix fitxers JavaScript"""
+        """Serves JavaScript files"""
         js_base = ui_path / "js"
         safe_path = validate_safe_path(js_base / path, js_base)
         return FileResponse(safe_path, media_type="application/javascript")
@@ -73,7 +73,7 @@ def create_router(module_instance) -> APIRouter:
 
     @router.get("/api/models", dependencies=[Depends(require_api_key)], operation_id="ollama_list_models")
     async def list_models():
-        """Llista models locals d'Ollama."""
+        """Lists local Ollama models."""
         module = _get_module()
         try:
             models = await module.list_models()
@@ -128,14 +128,14 @@ def create_router(module_instance) -> APIRouter:
 
     @router.get("/health", dependencies=[Depends(require_api_key)], operation_id="ollama_health")
     async def health():
-        """Health check del modul Ollama."""
+        """Health check for the Ollama module."""
         module = _get_module()
         result = await module.health_check()
         return result.to_dict()
 
     @router.get("/info", dependencies=[Depends(require_api_key)], operation_id="ollama_info")
     async def info():
-        """Informacio del modul Ollama."""
+        """Information about the Ollama module."""
         module = _get_module()
         return module.get_info()
 

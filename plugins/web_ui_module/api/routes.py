@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/web_ui_module/api/routes.py
-Description: Orquestrador de rutes FastAPI del modul web_ui.
-             Delega a submoduls: routes_auth, routes_static,
+Description: FastAPI route orchestrator for the web_ui module.
+             Delegates to submodules: routes_auth, routes_static,
              routes_sessions, routes_files, routes_chat, routes_memory.
 
 www.jgoy.net · https://server-nexe.org
@@ -89,12 +89,12 @@ class _SessionManagerProxy:
 
 def create_router(module_instance) -> APIRouter:
     """
-    Crea l'APIRouter amb tots els endpoints del modul web_ui.
+    Creates the APIRouter with all web_ui module endpoints.
 
-    Rep module_instance (WebUIModule) per accedir a:
+    Receives module_instance (WebUIModule) to access:
       - module_instance.session_manager
       - module_instance.file_handler
-      - module_instance.ui_dir  (directori static/ui)
+      - module_instance.ui_dir  (static/ui directory)
     """
     # Late-binding proxy so route closures always read the live
     # session_manager, even though the loader calls create_router()

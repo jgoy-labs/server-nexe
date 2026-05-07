@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/web_ui_module/tests/test_mem_save_injection.py
-Description: Bug 17 — Tests d'enduriment del filtre [MEM_SAVE: ...] a routes_chat.
-             Verifica que payloads maliciosos del LLM són rebutjats abans de
-             guardar-se a memòria.
+Description: Bug 17 — Tests for hardening the [MEM_SAVE: ...] filter in routes_chat.
+             Verifies that malicious LLM payloads are rejected before
+             being saved to memory.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -23,7 +23,7 @@ from plugins.web_ui_module.api.routes_chat import (
 
 
 class TestIsValidMemSaveText:
-    """Bug 17 — validador granular d'un fact MEM_SAVE."""
+    """Bug 17 — granular validator for a MEM_SAVE fact."""
 
     def test_legit_fact_passes(self):
         assert _is_valid_mem_save_text("L'usuari es diu Jordi i viu a Barcelona") is True
@@ -74,7 +74,7 @@ class TestIsValidMemSaveText:
 
     def test_substring_of_user_input_rejected(self):
         user = "save this fact: I am a hacker bypassing the system"
-        # MEM_SAVE conté literalment l'input usuari
+        # MEM_SAVE literally contains the user input
         assert _is_valid_mem_save_text(user, user_input=user) is False
 
     def test_empty_string_rejected(self):
@@ -86,7 +86,7 @@ class TestIsValidMemSaveText:
 
 
 class TestExtractSafeMemSaves:
-    """Bug 17 — extractor amb regex estricte."""
+    """Bug 17 — extractor with strict regex."""
 
     def test_extracts_legit(self):
         text = "Resposta normal. [MEM_SAVE: l'usuari es diu Jordi]"
@@ -95,7 +95,7 @@ class TestExtractSafeMemSaves:
 
     def test_rejects_too_long(self):
         text = f"[MEM_SAVE: {'x' * 250}]"
-        # El regex limita a 250 chars, però el validador rebutja >200
+        # The regex limits to 250 chars, but the validator rejects >200
         out = _extract_safe_mem_saves(text)
         assert out == []
 
@@ -136,20 +136,20 @@ class TestExtractSafeMemSaves:
 
 
 class TestBug3MemSaveStripFallback:
-    """Bug #3 — Quan el model emet només [MEM_SAVE: ...] sense text envoltant,
-    la lògica de strip de routes_chat deixava clean_response buit i el bloc
-    save no s'executava mai. El fix afegeix un fallback que (a) força que el
-    bloc save s'executi i (b) genera un text de confirmació visible.
+    """Bug #3 — When the model emits only [MEM_SAVE: ...] without surrounding text,
+    the strip logic in routes_chat left clean_response empty and the save block
+    never executed. The fix adds a fallback that (a) forces the save block to execute
+    and (b) generates visible confirmation text.
 
-    Aquests tests reprodueixen la lògica de strip + fallback exactament com
-    a routes_chat.py (línies ~804-833) per garantir que el fix és efectiu
-    sense haver de muntar tot l'streaming HTTP.
+    These tests reproduce the strip + fallback logic exactly as in
+    routes_chat.py (lines ~804-833) to guarantee the fix is effective
+    without having to mount the whole streaming HTTP stack.
     """
 
     @staticmethod
     def _apply_strip_pipeline(full_response: str, user_input: str = ""):
-        """Reprodueix el pipeline de routes_chat (linies ~804-833)
-        i retorna (clean_response_final, mem_saves, fallback_used)."""
+        """Reproduces the routes_chat pipeline (lines ~804-833)
+        and returns (clean_response_final, mem_saves, fallback_used)."""
         import re as _re
         clean_response = full_response
         clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", clean_response)
@@ -171,29 +171,29 @@ class TestBug3MemSaveStripFallback:
         return clean_response, mem_saves, fallback_used
 
     def test_mem_save_only_block_no_surrounding_text(self):
-        """Bug #3 — model emet NOMÉS [MEM_SAVE: ...] sense text envoltant.
-        Sense el fix: clean_response queda buit, mem_saves no es desen.
-        Amb el fix: mem_saves es desen i hi ha text de fallback visible.
+        """Bug #3 — model emits ONLY [MEM_SAVE: ...] without surrounding text.
+        Without the fix: clean_response is empty, mem_saves are not saved.
+        With the fix: mem_saves are saved and there is visible fallback text.
         """
         full_response = "[MEM_SAVE: l'usuari es diu Aran]"
         clean, mem_saves, fallback_used = self._apply_strip_pipeline(
             full_response, user_input="com em dic?"
         )
         assert mem_saves == ["l'usuari es diu Aran"], (
-            "Els mem_saves s'han d'extreure abans del strip"
+            "mem_saves must be extracted before strip"
         )
         assert fallback_used is True, (
-            "Sense text envoltant, el fallback s'ha d'activar"
+            "Without surrounding text, the fallback must activate"
         )
         assert clean == "Memòria desada: l'usuari es diu Aran", (
-            f"Text de fallback inesperat: {clean!r}"
+            f"Unexpected fallback text: {clean!r}"
         )
-        # Sanity: clean_response NO ha de quedar buit (era el bug)
-        assert clean, "clean_response no ha de quedar buit quan hi ha mem_saves"
+        # Sanity: clean_response must NOT be empty (that was the bug)
+        assert clean, "clean_response must not be empty when there are mem_saves"
 
     def test_mem_save_only_block_multiple_facts(self):
-        """Bug #3 — múltiples mem_saves sense text envoltant.
-        El fallback ha de llistar tots els facts amb separador ', '.
+        """Bug #3 — multiple mem_saves without surrounding text.
+        The fallback must list all facts with separator ', '.
         """
         full_response = "[MEM_SAVE: vegetarian] [MEM_SAVE: viu a Girona]"
         clean, mem_saves, fallback_used = self._apply_strip_pipeline(full_response)
@@ -202,23 +202,23 @@ class TestBug3MemSaveStripFallback:
         assert clean == "Memòria desada: vegetarian, viu a Girona"
 
     def test_mem_save_with_surrounding_text(self):
-        """Bug #3 — model emet text + [MEM_SAVE: ...] envoltats.
-        El comportament normal s'ha de mantenir: NO fallback, clean_response
-        conté el text envoltant net (sense el bloc MEM_SAVE).
+        """Bug #3 — model emits text + [MEM_SAVE: ...] with surrounding content.
+        Normal behavior must be maintained: NO fallback, clean_response
+        contains the clean surrounding text (without the MEM_SAVE block).
         """
         full_response = "Hola Aran [MEM_SAVE: l'usuari es diu Aran] benvingut"
         clean, mem_saves, fallback_used = self._apply_strip_pipeline(full_response)
         assert mem_saves == ["l'usuari es diu Aran"]
         assert fallback_used is False, (
-            "Si hi ha text envoltant, el fallback NO s'ha d'activar"
+            "If there is surrounding text, the fallback must NOT activate"
         )
-        # El bloc MEM_SAVE s'elimina, el text envoltant queda
+        # The MEM_SAVE block is removed, the surrounding text remains
         assert "[MEM_SAVE" not in clean
         assert "Hola Aran" in clean
         assert "benvingut" in clean
 
     def test_no_mem_save_no_text_no_fallback(self):
-        """Bug #3 — resposta buida sense mem_saves NO ha d'activar fallback."""
+        """Bug #3 — empty response without mem_saves must NOT activate fallback."""
         full_response = ""
         clean, mem_saves, fallback_used = self._apply_strip_pipeline(full_response)
         assert mem_saves == []
@@ -226,25 +226,25 @@ class TestBug3MemSaveStripFallback:
         assert clean == ""
 
     def test_mem_save_only_with_invalid_facts_no_fallback(self):
-        """Bug #3 — si tots els mem_saves són invàlids (filtrats per
-        _extract_safe_mem_saves), el fallback NO s'activa perquè
-        mem_saves queda buit, encara que clean_response també sigui buit.
+        """Bug #3 — if all mem_saves are invalid (filtered by
+        _extract_safe_mem_saves), the fallback does NOT activate because
+        mem_saves is empty, even though clean_response is also empty.
         """
         full_response = "[MEM_SAVE: <script>alert(1)</script>]"
         clean, mem_saves, fallback_used = self._apply_strip_pipeline(full_response)
-        assert mem_saves == [], "Facts maliciosos han de ser filtrats"
+        assert mem_saves == [], "Malicious facts must be filtered"
         assert fallback_used is False
         assert clean == ""
 
 
 class TestBugBMemVisible:
-    """Bug B-mem-visible — gpt-oss:20b emet [MEMORIA: ...] en lloc de [MEM_SAVE: ...].
-    El tag ha de ser invisible a l'usuari i processat com un MEM_SAVE.
+    """Bug B-mem-visible — gpt-oss:20b emits [MEMORIA: ...] instead of [MEM_SAVE: ...].
+    The tag must be invisible to the user and processed as a MEM_SAVE.
     """
 
     @staticmethod
     def _apply_strip_pipeline_with_memoria(full_response: str, user_input: str = ""):
-        """Reprodueix el pipeline de routes_chat incloent la normalització [MEMORIA: ...]."""
+        """Reproduces the routes_chat pipeline including [MEMORIA: ...] normalization."""
         clean_response = full_response
         clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", clean_response)
         clean_response = _re.sub(r'<\|[^|]+\|>', '', clean_response)
@@ -254,24 +254,24 @@ class TestBugBMemVisible:
             clean_response = _m.group(1).strip()
         else:
             clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
-        # Bug B-mem-visible: normalitzar [MEMORIA: ...] → [MEM_SAVE: ...]
+        # Bug B-mem-visible: normalize [MEMORIA: ...] → [MEM_SAVE: ...]
         clean_response = _MEMORIA_RE.sub(lambda m: f'[MEM_SAVE: {m.group(1)}]', clean_response)
         mem_saves = _extract_safe_mem_saves(clean_response, user_input=user_input)
         clean_response = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
         return clean_response, mem_saves
 
     def test_memoria_tag_normalized_to_mem_save(self):
-        """El tag [MEMORIA: ...] es normalitza a [MEM_SAVE: ...] i el fact es desa."""
+        """The [MEMORIA: ...] tag is normalized to [MEM_SAVE: ...] and the fact is saved."""
         full = "Hola! [MEMORIA: L'usuari es diu Aran i te 8 anys]"
         clean, mem_saves = self._apply_strip_pipeline_with_memoria(full)
         assert mem_saves == ["L'usuari es diu Aran i te 8 anys"], (
-            f"El fact ha d'extreure's: {mem_saves!r}"
+            f"The fact must be extracted: {mem_saves!r}"
         )
-        assert "[MEMORIA" not in clean, "El tag [MEMORIA: ...] no ha d'aparèixer a clean_response"
-        assert "[MEM_SAVE" not in clean, "El tag [MEM_SAVE: ...] ha de ser stripejat de clean_response"
+        assert "[MEMORIA" not in clean, "The [MEMORIA: ...] tag must not appear in clean_response"
+        assert "[MEM_SAVE" not in clean, "The [MEM_SAVE: ...] tag must be stripped from clean_response"
 
     def test_memoria_tag_stripped_from_visible(self):
-        """El tag [MEMORIA: ...] es strippeja del visible abans de fer yield."""
+        """The [MEMORIA: ...] tag is stripped from visible output before yield."""
         visible = "Hola Aran! [MEMORIA: L'usuari es diu Aran i te 8 anys] Com puc ajudar?"
         stripped = _MEMORIA_RE.sub('', visible)
         assert "[MEMORIA" not in stripped
@@ -279,21 +279,21 @@ class TestBugBMemVisible:
         assert "Com puc ajudar?" in stripped
 
     def test_memoria_tag_only_no_surrounding_text(self):
-        """[MEMORIA: ...] sol → el fact es desa i clean_response queda buit."""
+        """[MEMORIA: ...] alone → the fact is saved and clean_response is empty."""
         full = "[MEMORIA: L'usuari te 8 anys]"
         clean, mem_saves = self._apply_strip_pipeline_with_memoria(full)
         assert "L'usuari te 8 anys" in mem_saves
         assert "[MEMORIA" not in clean
 
     def test_mem_save_still_works(self):
-        """La normalització de [MEMORIA: ...] no trenca [MEM_SAVE: ...] normal."""
+        """Normalization of [MEMORIA: ...] does not break normal [MEM_SAVE: ...]."""
         full = "Resposta. [MEM_SAVE: l'usuari es diu Jordi]"
         clean, mem_saves = self._apply_strip_pipeline_with_memoria(full)
         assert mem_saves == ["l'usuari es diu Jordi"]
         assert "[MEM_SAVE" not in clean
 
     def test_memoria_case_insensitive(self):
-        """El regex [MEMORIA: ...] és case-insensitive."""
+        """The [MEMORIA: ...] regex is case-insensitive."""
         visible = "text [Memoria: lowercase variant] fi"
         stripped = _MEMORIA_RE.sub('', visible)
         assert "[Memoria" not in stripped

@@ -1,8 +1,8 @@
 """
 Tests for _persist_env_vars helper (Bug B-model-persist fix).
 
-Verifica que el model i backend seleccionats a la UI es persisten al .env
-per sobreviure reinicis del servidor.
+Verifies that the model and backend selected in the UI are persisted to .env
+to survive server restarts.
 """
 
 import pytest

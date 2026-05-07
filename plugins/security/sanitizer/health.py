@@ -22,10 +22,10 @@ from .core.patterns import (
 
 def get_health() -> Dict[str, Any]:
   """
-  Retorna l'estat de salut del mòdul SANITIZER.
+  Returns the health status of the SANITIZER module.
 
   Returns:
-    Dict amb checks de salut
+    Dict with health checks
   """
   checks = {}
   overall_healthy = True
@@ -64,7 +64,7 @@ def get_health() -> Dict[str, Any]:
 
     checks["sanitizer_functional"] = {
       "status": "ok" if result.is_safe else "warning",
-      "latency_ms": round(elapsed_ms, 3),  # type: ignore[dict-item]  # float per round() — dict espera int|str però float és vàlid al context
+      "latency_ms": round(elapsed_ms, 3),  # type: ignore[dict-item]  # float from round() — dict expects int|str but float is valid in context
       "patterns_version": sanitizer.get_patterns_version(),
     }
 

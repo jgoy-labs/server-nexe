@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: plugins/security/tests/test_request_size_limits.py
-Description: Tests per límits de mida de requests. Valida que RequestSizeLimiterMiddleware rebutja requests massa grans (protecció CWE-400).
+Description: Tests for request size limits. Validates that RequestSizeLimiterMiddleware rejects oversized requests (CWE-400 protection).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

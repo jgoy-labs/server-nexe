@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/web_ui_module/health.py
-Description: Facade get_health() per al modul web_ui.
+Description: get_health() facade for the web_ui module.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -14,7 +14,7 @@ from typing import Dict, Any
 
 
 def get_health() -> Dict[str, Any]:
-    """Facade sincrona per obtenir health del modul web_ui."""
+    """Synchronous facade to get the web_ui module health."""
     from .manifest import get_module_instance  # type: ignore[attr-defined]  # FP: install_lazy_manifest() injecta get_module_instance() dinàmicament al namespace del mòdul
 
     module = get_module_instance()

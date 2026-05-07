@@ -20,21 +20,21 @@ RESISTANCE_RESPONSE = "Crec que hi ha un problema amb el teu missatge. Pots refo
 
 class InterventionNode(Node):
   """
-  Node de Intervenció per a Nexe.
+  Intervention Node for Nexe.
 
-  Quan el Sanitizer detecta amenaces, aquest node:
-  1. Genera una resposta de resistència adequada
-  2. Atura el pipeline (és terminal)
-  3. No crida el LLM (estalvia recursos i evita riscos)
+  When the Sanitizer detects threats, this node:
+  1. Generates an appropriate resistance response
+  2. Stops the pipeline (it is terminal)
+  3. Does not call the LLM (saves resources and avoids risks)
 
   Inputs:
-    threats: List[str] - Llista d'amenaces detectades pel Sanitizer
-    severity: str - Nivell de severitat ("low", "medium", "high", "critical")
+    threats: List[str] - List of threats detected by the Sanitizer
+    severity: str - Severity level ("low", "medium", "high", "critical")
 
   Outputs:
-    response: str - Resposta de resistència
-    activated: bool - True (sempre, si s'executa)
-    threat_type: str - Tipus principal d'amenaça
+    response: str - Resistance response
+    activated: bool - True (always, if executed)
+    threat_type: str - Primary threat type
   """
 
   def get_metadata(self) -> NodeMetadata:

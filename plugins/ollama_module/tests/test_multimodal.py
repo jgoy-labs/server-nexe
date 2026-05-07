@@ -1,6 +1,6 @@
 """
-Tests suport multimodal (imatges) a ollama_module.
-Usa mocks — no requereix Ollama instal·lat.
+Tests for multimodal support (images) in ollama_module.
+Uses mocks — does not require Ollama installed.
 """
 
 import base64
@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _make_image_b64(size: int = 100) -> str:
-    """Genera bytes ficticis codificats en base64."""
+    """Generates fictitious bytes encoded in base64."""
     return base64.b64encode(b"\xff\xd8\xff" + b"\x00" * size).decode()
 
 
@@ -25,34 +25,34 @@ class TestBuildPayload:
         return OllamaChat(client)
 
     def test_text_only_no_images_key(self):
-        """Sense imatges, el payload NO ha de tenir la clau 'images'."""
+        """Without images, the payload must NOT have the 'images' key."""
         chat = self._chat()
         payload = chat._build_payload("llama3.2", [{"role": "user", "content": "Hola"}], stream=True)
         assert "images" not in payload
 
     def test_with_images_adds_key(self):
-        """Amb imatges, 'images' va dins el darrer missatge user (format /api/chat)."""
+        """With images, 'images' goes inside the last user message (format /api/chat)."""
         chat = self._chat()
         img = _make_image_b64()
         payload = chat._build_payload(
             "llava", [{"role": "user", "content": "Descriu"}], stream=True, images=[img]
         )
-        # images han d'estar dins el missatge user, NO al top-level
+        # images must be inside the user message, NOT at the top-level
         assert "images" not in payload
         assert payload["messages"][-1]["images"] == [img]
 
     def test_empty_images_list_not_added(self):
-        """Llista buida no afegeix la clau 'images'."""
+        """Empty list does not add the 'images' key."""
         chat = self._chat()
         payload = chat._build_payload("llava", [], stream=True, images=[])
         assert "images" not in payload
 
 
-# ── OllamaChat.chat — integració amb mock httpx ──────────────────────────────
+# ── OllamaChat.chat — integration with mock httpx ────────────────────────────
 
 @pytest.mark.asyncio
 async def test_chat_text_only_no_regression():
-    """Text-only segueix funcionant igual (sense imatge)."""
+    """Text-only continues to work the same (without image)."""
     from plugins.ollama_module.core.chat import OllamaChat
 
     client = MagicMock()
@@ -88,7 +88,7 @@ async def test_chat_text_only_no_regression():
 
 @pytest.mark.asyncio
 async def test_chat_images_reach_payload():
-    """Amb imatge, el payload enviat a Ollama conté 'images'."""
+    """With image, the payload sent to Ollama contains 'images'."""
     from plugins.ollama_module.core.chat import OllamaChat
 
     client = MagicMock()
@@ -131,7 +131,7 @@ async def test_chat_images_reach_payload():
         ):
             results.append(chunk)
 
-    # images han d'estar dins el darrer missatge user, NO al top-level
+    # images must be inside the last user message, NOT at the top-level
     assert "images" not in captured_payload
     user_msgs = [m for m in captured_payload["messages"] if m.get("role") == "user"]
     assert user_msgs[-1]["images"] == [img_b64]
@@ -140,7 +140,7 @@ async def test_chat_images_reach_payload():
 # ── OllamaModule.chat — signatura ─────────────────────────────────────────────
 
 def test_module_chat_accepts_images_param():
-    """OllamaModule.chat() accepta el paràmetre images sense error."""
+    """OllamaModule.chat() accepts the images parameter without error."""
     import inspect
     from plugins.ollama_module.module import OllamaModule
     sig = inspect.signature(OllamaModule.chat)

@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-MLXConfig - Configuració centralitzada per mlx-lm.
+MLXConfig - Centralized configuration for mlx-lm.
 
-Totes les opcions es poden configurar via variables d'entorn:
-- NEXE_MLX_MODEL: Ruta LOCAL al model MLX (obligatori)
-- NEXE_MLX_MAX_TOKENS: Màxim tokens a generar (default: 2048)
-- NEXE_MLX_MAX_KV_SIZE: Mida màxima KV cache (default: auto segons RAM disponible)
-- NEXE_MLX_TEMPERATURE: Temperatura de sampling (default: 0.7)
+All options can be configured via environment variables:
+- NEXE_MLX_MODEL: LOCAL path to the MLX model (required)
+- NEXE_MLX_MAX_TOKENS: Maximum tokens to generate (default: 2048)
+- NEXE_MLX_MAX_KV_SIZE: Maximum KV cache size (default: auto based on available RAM)
+- NEXE_MLX_TEMPERATURE: Sampling temperature (default: 0.7)
 - NEXE_MLX_TOP_P: Top-p sampling (default: 0.9)
-- NEXE_MLX_MAX_SESSION_CACHES: Màxim caches per sessió (default: 4)
+- NEXE_MLX_MAX_SESSION_CACHES: Maximum caches per session (default: 4)
 
 """
 import os
@@ -33,16 +33,16 @@ logger = logging.getLogger(__name__)
 
 def _auto_max_kv_size() -> int:
     """
-    Calcula max_kv_size òptim segons la RAM disponible.
+    Calculates optimal max_kv_size based on available RAM.
 
-    Qwen3-32B KV cache: 64 capes × 2 (k+v) × 8 caps × 128 dims × 2 bytes = 256KB/token
-    Reservem 20GB per model + sistema, la resta per KV cache.
-    Cap a 131072 per seguretat (Qwen3 suporta fins a 131072 nativament).
+    Qwen3-32B KV cache: 64 layers × 2 (k+v) × 8 heads × 128 dims × 2 bytes = 256KB/token
+    Reserve 20GB for model + system, the rest for KV cache.
+    Cap at 131072 for safety (Qwen3 supports up to 131072 natively).
     """
     try:
         import psutil
         total_gb = psutil.virtual_memory().total / (1024 ** 3)
-        available_for_kv_gb = max(0, total_gb - 20)  # Reservar 20GB per model+sistema
+        available_for_kv_gb = max(0, total_gb - 20)  # Reserve 20GB for model+system
         kv_bytes_per_token = 256 * 1024  # 256KB/token (Qwen3-32B)
         max_tokens = int((available_for_kv_gb * 1024 ** 3) / kv_bytes_per_token)
         # Round to nearest multiple of 1024 and cap at 131072
@@ -51,7 +51,7 @@ def _auto_max_kv_size() -> int:
         logger.info(f"MLXConfig: auto max_kv_size={max_tokens} (RAM={total_gb:.0f}GB)")
         return max_tokens
     except Exception:
-        return 65536  # Fallback conservador
+        return 65536  # Conservative fallback
 
 
 def detect_hardware_tier() -> str:
@@ -73,20 +73,20 @@ def detect_hardware_tier() -> str:
 @dataclass
 class MLXConfig:
     """
-    Configuració per mlx-lm.
+    Configuration for mlx-lm.
 
     Attributes:
-        model_path: Ruta LOCAL al model MLX (safetensors format)
-        max_tokens: Màxim tokens a generar
-        max_kv_size: Mida màxima del KV cache
-        temperature: Temperatura de sampling (0.0 = determinístic)
+        model_path: LOCAL path to the MLX model (safetensors format)
+        max_tokens: Maximum tokens to generate
+        max_kv_size: Maximum KV cache size
+        temperature: Sampling temperature (0.0 = deterministic)
         top_p: Top-p nucleus sampling
-        max_session_caches: Màxim de caches per sessió (LRU eviction)
+        max_session_caches: Maximum caches per session (LRU eviction)
     """
 
     model_path: str = ""
     max_tokens: int = 2048
-    max_kv_size: int = 65536  # Override per NEXE_MLX_MAX_KV_SIZE; auto-calculat per RAM a from_env()
+    max_kv_size: int = 65536  # Override via NEXE_MLX_MAX_KV_SIZE; auto-calculated by RAM in from_env()
     temperature: float = 0.7
     top_p: float = 0.9
     max_session_caches: int = 4  # Same as ModelPool.max_sessions
@@ -110,10 +110,10 @@ class MLXConfig:
     @classmethod
     def from_env(cls) -> "MLXConfig":
         """
-        Carrega configuració de variables d'entorn o fallback a server.toml.
+        Loads configuration from environment variables or falls back to server.toml.
 
         Returns:
-            MLXConfig amb valors de l'entorn o defaults.
+            MLXConfig with values from the environment or defaults.
         """
         # 1. Start with env vars
         model_path = os.getenv("NEXE_MLX_MODEL", "")
@@ -194,25 +194,25 @@ class MLXConfig:
 
     def validate(self) -> bool:
         """
-        Valida que la configuració és correcta.
+        Validates that the configuration is correct.
 
-        NOTA: Només suporta paths locals, NO HuggingFace repo IDs.
-        Això és volgut per evitar dependència de xarxa en producció.
-        Si voleu HF repos, descarregueu prèviament amb:
+        NOTE: Only local paths are supported, NOT HuggingFace repo IDs.
+        This is intentional to avoid network dependency in production.
+        If you want HF repos, download them first with:
             huggingface-cli download <repo> --local-dir <path>
 
         Returns:
-            True si la config és vàlida, False si no.
+            True if the config is valid, False otherwise.
         """
         if not self.model_path:
             logger.error("MLXConfig: model_path is required")
             return False
 
-        # Validar que path local existeix (NO suportem HF repo IDs)
+        # Validate that the local path exists (HF repo IDs are NOT supported)
         model_path = Path(self.model_path)
         if not model_path.exists():
             logger.error(
-                "MLXConfig: model_path no existeix: %s",
+                "MLXConfig: model_path does not exist: %s",
                 self.model_path
             )
             return False
@@ -220,7 +220,7 @@ class MLXConfig:
         # Verify it is a directory (MLX models are directories)
         if not model_path.is_dir():
             logger.error(
-                "MLXConfig: model_path ha de ser un directori: %s",
+                "MLXConfig: model_path must be a directory: %s",
                 self.model_path
             )
             return False
@@ -244,12 +244,12 @@ class MLXConfig:
 
         if not 0.0 <= self.temperature <= 2.0:
             logger.warning(
-                "MLXConfig: temperature %.1f fora de rang recomanat [0, 2]",
+                "MLXConfig: temperature %.1f outside recommended range [0, 2]",
                 self.temperature
             )
 
         if not 0.0 <= self.top_p <= 1.0:
-            logger.error("MLXConfig: top_p ha d'estar entre 0 i 1")
+            logger.error("MLXConfig: top_p must be between 0 and 1")
             return False
 
         return True
@@ -257,17 +257,17 @@ class MLXConfig:
     @staticmethod
     def is_metal_available() -> bool:
         """
-        Verifica si Metal (Apple Silicon) està disponible.
+        Verifies whether Metal (Apple Silicon) is available.
 
         Returns:
-            True si Metal està disponible, False si no.
+            True if Metal is available, False otherwise.
         """
         try:
             import mlx.core as mx
             return mx.metal.is_available()
         except ImportError:
-            logger.warning("MLXConfig: mlx no instal·lat")
+            logger.warning("MLXConfig: mlx not installed")
             return False
         except Exception as e:
-            logger.warning("MLXConfig: error verificant Metal: %s", e)
+            logger.warning("MLXConfig: error verifying Metal: %s", e)
             return False

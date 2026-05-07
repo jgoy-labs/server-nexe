@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/tests/test_optional_api_key.py
-Description: Tests per optional_api_key() amb clau primaria i secundaria.
+Description: Tests for optional_api_key() with primary and secondary key.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

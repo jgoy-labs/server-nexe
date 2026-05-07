@@ -186,7 +186,7 @@ def test_get_info_not_initialized():
 
 
 def test_info_endpoint(monkeypatch):
-    """Line 81: info endpoint returns get_info(). Auditoria r4 B2: ara requereix X-API-Key."""
+    """Line 81: info endpoint returns get_info(). Audit r4 B2: now requires X-API-Key."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 

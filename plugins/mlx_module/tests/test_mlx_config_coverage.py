@@ -273,7 +273,7 @@ class TestDetectHardwareTier:
     """Tests for detect_hardware_tier() — 4 tiers mocked via psutil."""
 
     def _mock_ram(self, total_gb: float):
-        """Helper: retorna un mock de psutil.virtual_memory amb total_gb."""
+        """Helper: returns a psutil.virtual_memory mock with total_gb."""
         mock_vm = MagicMock()
         mock_vm.total = int(total_gb * (1024 ** 3))
         return mock_vm
@@ -303,7 +303,7 @@ class TestDetectHardwareTier:
             assert detect_hardware_tier() == "ultra"
 
     def test_psutil_exception_returns_low(self):
-        """Excepció a psutil → fallback 'low'."""
+        """Exception in psutil → fallback 'low'."""
         from plugins.mlx_module.core.config import detect_hardware_tier
         with patch("psutil.virtual_memory", side_effect=RuntimeError("psutil error")):
             assert detect_hardware_tier() == "low"

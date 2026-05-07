@@ -1,14 +1,14 @@
 """
-Tests P1-A — Rate limit de fallades d'autenticació a la Web UI per IP.
+Tests P1-A — Rate limit for authentication failures in the Web UI per IP.
 
-Problema: make_require_ui_auth() no tenia cap límit de freqüència.
-25 requests amb keys invàlides → 25 × 401, cap 429. Brute force invisible.
+Problem: make_require_ui_auth() had no rate limiting.
+25 requests with invalid keys → 25 × 401, no 429. Invisible brute force.
 
-Fix: dict en memòria _ui_auth_failures per IP, finestra 60s, màxim 20 intents.
-Passat el límit: 429 Too Many Requests.
+Fix: in-memory dict _ui_auth_failures per IP, 60s window, maximum 20 attempts.
+Past the limit: 429 Too Many Requests.
 
-Patró de test: funcions helpers (_check_ui_rate_limit, _record_ui_auth_failure)
-testejades directament + make_require_ui_auth() via mock, igual que P1-B.
+Test pattern: helper functions (_check_ui_rate_limit, _record_ui_auth_failure)
+tested directly + make_require_ui_auth() via mock, same as P1-B.
 
 www.jgoy.net · https://server-nexe.org
 """
@@ -48,87 +48,87 @@ def _mock_request(host="1.2.3.4", path="/ui/chat"):
     return req
 
 
-# ─── Tests dels helpers de rate limit ──────────────────────────────────────────
+# ─── Tests for rate limit helpers ──────────────────────────────────────────
 
 class TestRateLimitHelpers:
     def test_no_failures_not_limited(self):
-        """IP sense historial → no limitada."""
+        """IP without history → not limited."""
         assert _check_ui_rate_limit("10.0.0.1") is False
 
     def test_below_limit_not_limited(self):
-        """< 20 fallades → no limitada."""
+        """< 20 failures → not limited."""
         for _ in range(_UI_RATE_LIMIT - 1):
             _record_ui_auth_failure("10.0.0.1")
         assert _check_ui_rate_limit("10.0.0.1") is False
 
     def test_at_limit_is_limited(self):
-        """Exactament 20 fallades → limitada."""
+        """Exactly 20 failures → limited."""
         for _ in range(_UI_RATE_LIMIT):
             _record_ui_auth_failure("10.0.0.1")
         assert _check_ui_rate_limit("10.0.0.1") is True
 
     def test_over_limit_is_limited(self):
-        """25 fallades → limitada."""
+        """25 failures → limited."""
         for _ in range(25):
             _record_ui_auth_failure("10.0.0.1")
         assert _check_ui_rate_limit("10.0.0.1") is True
 
     def test_different_ips_independent(self):
-        """IPs independents — la limitació d'una no afecta l'altra."""
+        """Independent IPs — limiting one does not affect the other."""
         for _ in range(_UI_RATE_LIMIT):
             _record_ui_auth_failure("192.168.1.1")
-        # Una altra IP no ha d'estar limitada
+        # Another IP must not be limited
         assert _check_ui_rate_limit("10.0.0.2") is False
 
     def test_window_expiry_resets_limit(self):
-        """Timestamps fora de la finestra de 60s s'ignoren."""
+        """Timestamps outside the 60s window are ignored."""
         import time as _time
         old_time = _time.monotonic() - _UI_RATE_WINDOW - 1.0
-        # Injectem timestamps antics directament al dict
+        # Inject old timestamps directly into the dict
         _ui_auth_failures["10.0.0.3"] = [old_time] * _UI_RATE_LIMIT
-        # Tots els timestamps han expirat → no limitada
+        # All timestamps expired → not limited
         assert _check_ui_rate_limit("10.0.0.3") is False
 
 
-# ─── Tests d'integració amb make_require_ui_auth ────────────────────────────────
+# ─── Integration tests with make_require_ui_auth ────────────────────────────────
 
 @pytest.mark.asyncio
 class TestRateLimitIntegration:
     async def test_21_failures_last_returns_429(self):
-        """21 intents invàlids des de la mateixa IP → l'últim retorna 429."""
+        """21 invalid attempts from the same IP → the last returns 429."""
         require = make_require_ui_auth()
         with patch(
             "plugins.web_ui_module.api.routes_auth.get_admin_api_key",
             return_value="real_key",
         ):
-            # Primers 20 → 401
+            # First 20 → 401
             for _ in range(_UI_RATE_LIMIT):
                 with pytest.raises(HTTPException) as exc_info:
                     await require(_mock_request(host="5.5.5.5"), x_api_key="wrong")
                 assert exc_info.value.status_code == 401
 
-            # Nº 21 → 429
+            # No. 21 → 429
             with pytest.raises(HTTPException) as exc_info:
                 await require(_mock_request(host="5.5.5.5"), x_api_key="wrong")
             assert exc_info.value.status_code == 429
 
     async def test_valid_key_not_counted(self):
-        """Key vàlida no s'ha de comptar com a fallada."""
+        """Valid key must not be counted as a failure."""
         require = make_require_ui_auth()
         with patch(
             "plugins.web_ui_module.api.routes_auth.get_admin_api_key",
             return_value="real_key",
         ):
-            # 19 invàlides
+            # 19 invalid
             for _ in range(_UI_RATE_LIMIT - 1):
                 with pytest.raises(HTTPException):
                     await require(_mock_request(host="6.6.6.6"), x_api_key="wrong")
 
-            # 1 vàlida → 200 (sense excepció)
+            # 1 valid → 200 (no exception)
             result = await require(_mock_request(host="6.6.6.6"), x_api_key="real_key")
             assert result is None
 
-            # La 20a invàlida → 401 (no 429 perquè la vàlida no compta)
+            # The 20th invalid → 401 (not 429 because the valid one doesn't count)
             with pytest.raises(HTTPException) as exc_info:
                 await require(_mock_request(host="6.6.6.6"), x_api_key="wrong")
             assert exc_info.value.status_code == 401

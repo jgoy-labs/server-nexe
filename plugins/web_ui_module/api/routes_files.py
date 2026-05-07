@@ -92,17 +92,17 @@ def _detect_sensitive_upload(content: bytes) -> Optional[bytes]:
 
 
 def _is_symlink_outside_uploads(file_path: Path) -> bool:
-    """P1-C: Retorna True si file_path és un symlink que apunta fora del directori d'uploads.
+    """P1-C: Returns True if file_path is a symlink that points outside the uploads directory.
 
-    Compara el realpath del fitxer desat amb el realpath del seu directori pare.
-    Si el fitxer (o el destí del symlink) no viu dins del directori d'uploads,
-    és considerat maliciós i s'ha de rebutjar.
+    Compares the realpath of the saved file with the realpath of its parent directory.
+    If the file (or the symlink target) does not live inside the uploads directory,
+    it is considered malicious and must be rejected.
 
-    Attack vector: ln -s /etc/passwd evil.pdf → injectava /etc/passwd al RAG.
-    Patró testejable directament (igual que _detect_sensitive_upload) perquè
-    @limiter.limit rebutja MagicMock.
+    Attack vector: ln -s /etc/passwd evil.pdf → injected /etc/passwd into RAG.
+    Directly testable pattern (same as _detect_sensitive_upload) because
+    @limiter.limit rejects MagicMock.
 
-    NOTA: No afecta models locals (MLX/llama.cpp/Ollama) que mai passen per /upload.
+    NOTE: Does not affect local models (MLX/llama.cpp/Ollama) that never go through /upload.
     """
     _real = _os.path.realpath(str(file_path))
     _uploads_real = _os.path.realpath(str(file_path.parent))
@@ -110,7 +110,7 @@ def _is_symlink_outside_uploads(file_path: Path) -> bool:
 
 
 def register_file_routes(router: APIRouter, *, session_mgr, file_handler, require_ui_auth):
-    """Registra endpoints: POST /upload, GET /files, DELETE /files/cleanup"""
+    """Registers endpoints: POST /upload, GET /files, DELETE /files/cleanup"""
 
     # -- POST /upload --
 
@@ -146,8 +146,8 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
 
         file_path = await file_handler.save_file(filename, content)
 
-        # P1-C: Symlink check — el fitxer desat no ha de ser un symlink
-        # que apunti fora del directori d'uploads esperat.
+        # P1-C: Symlink check — the saved file must not be a symlink
+        # that points outside the expected uploads directory.
         if _is_symlink_outside_uploads(file_path):
             file_handler.delete_file(file_path)
             raise HTTPException(
@@ -185,7 +185,7 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
                 })
                 logger.info(f"RAG header found: id={rag_header.id}, priority={rag_header.priority}")
             else:
-                # Metadata simple (sense LLM — evita bloqueig per MLX/Ollama)
+                # Simple metadata (without LLM — avoids blocking for MLX/Ollama)
                 _lang = _os.getenv("NEXE_LANG", "ca").split("-")[0]
                 _stem = file.filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ")
                 doc_metadata.update({
@@ -197,11 +197,11 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
                 })
                 logger.info(f"No RAG header — metadata simple per '{file.filename}'")
 
-        # Chunk size adaptat a la mida del document per equilibrar precisio i cobertura:
-        #   < 20K chars  (~7 pag)   -> 800   (maxima precisio)
-        #   < 100K chars (~33 pag)  -> 1000
-        #   < 300K chars (~100 pag) -> 1200
-        #   >= 300K chars (>100 pag)-> 1500  (docs molt grans: mante coherencia per chunk)
+        # Chunk size adapted to document size to balance precision and coverage:
+        #   < 20K chars  (~7 pages)   -> 800   (maximum precision)
+        #   < 100K chars (~33 pages)  -> 1000
+        #   < 300K chars (~100 pages) -> 1200
+        #   >= 300K chars (>100 pages)-> 1500  (very large docs: maintains coherence per chunk)
         if rag_header and rag_header.is_valid:
             chunk_size = rag_header.chunk_size
         else:
@@ -233,7 +233,7 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         session = session_mgr.get_or_create_session(session_id)
         session.add_context_file(file.filename)
 
-        # Attach to session: small=full, large=first 50 chunks (~30K tokens amb context 65K)
+        # Attach to session: small=full, large=first 50 chunks (~30K tokens with 65K context)
         MAX_PREVIEW_CHUNKS = 50
         preview_chunks = chunks[:MAX_PREVIEW_CHUNKS]
         session.attach_document(file.filename, body_content, preview_chunks, total_chunks=len(chunks))

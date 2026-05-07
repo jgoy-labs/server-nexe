@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/cli/main.py
-Description: CLI del modul security amb 4 comandes standard.
+Description: CLI for the security module with 4 standard commands.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -21,7 +21,7 @@ app = typer.Typer(help="Security module CLI — Server Nexe")
 
 @app.command()
 def info():
-    """Mostra informacio del modul security."""
+    """Shows security module information."""
     from plugins.security.manifest import get_module_instance
     module = get_module_instance()
     data = module.get_info()
@@ -35,7 +35,7 @@ def info():
 
 @app.command()
 def health():
-    """Mostra l'estat de salut del modul security."""
+    """Shows the health status of the security module."""
     from plugins.security.health import get_health
     result = get_health()
     status = result.get("status", "unknown")
@@ -51,7 +51,7 @@ def health():
 
 @app.command()
 def test():
-    """Executa tests del modul security."""
+    """Runs the security module tests."""
     import subprocess  # nosec B404: subprocess required for `python -m pytest` test runner inside this plugin; usage validated below
     import sys
     from pathlib import Path
@@ -67,8 +67,8 @@ def test():
 
 @app.command()
 def workflow():
-    """Informacio de workflow nodes del modul security."""
+    """Workflow node information for the security module."""
     typer.echo("Security workflow nodes:")
     typer.echo("  - sanitizer/workflow/nodes/sanitizer_node.py")
     typer.echo("  - sanitizer/workflow/nodes/intervention_node.py")
-    typer.echo("  - workflow/ (stub — funcional a Part 2)")
+    typer.echo("  - workflow/ (stub — functional in Part 2)")

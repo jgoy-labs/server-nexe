@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-MLXChatNode - Node LLM basat en mlx-lm per Apple Silicon.
+MLXChatNode - LLM node based on mlx-lm for Apple Silicon.
 
 PREFIX MATCHING via MLXPromptCacheManager.
 
-Característiques:
-- Model singleton (carregat una vegada, reutilitzat)
-- MLXPromptCacheManager: trie-based cache amb prefix matching
-- Reutilitza KV states del prefix (system + historial)
-- Només processa tokens nous a cada torn → speedup 5-10x
+Features:
+- Model singleton (loaded once, reused)
+- MLXPromptCacheManager: trie-based cache with prefix matching
+- Reuses KV states from prefix (system + history)
+- Only processes new tokens each turn → speedup 5-10x
 
-Requereix:
+Requires:
 - Apple Silicon (M1/M2/M3/M4)
 - mlx-lm >= 0.30.0
 - Model MLX format (safetensors)
@@ -40,7 +40,7 @@ from core.utils import compute_system_hash
 logger = logging.getLogger(__name__)
 
 
-# Arquitectures VLM conegudes (config.json → architectures[])
+# Known VLM architectures (config.json → architectures[])
 _VLM_ARCHITECTURES = {
     # Qwen VL family
     "Qwen2VLForConditionalGeneration",
@@ -65,7 +65,7 @@ _VLM_ARCHITECTURES = {
 }
 
 
-# Patrons de keys vision al safetensors weight map (fallback quan architectura és desconeguda)
+# Vision key patterns in the safetensors weight map (fallback when architecture is unknown)
 _VLM_WEIGHT_PATTERNS = (
     "vision_tower",
     "vision_model",
@@ -77,25 +77,25 @@ _VLM_WEIGHT_PATTERNS = (
 
 
 def _require_torch() -> None:
-    """Verifica que torch està disponible; llança MissingDependencyError si no."""
+    """Verifies that torch is available; raises MissingDependencyError if not."""
     try:
         import torch  # noqa: F401
     except ImportError as exc:
         raise MissingDependencyError(
-            "Aquest model VL requereix PyTorch. "
-            "Reinstal·la server-nexe per obtenir el bundle complet."
+            "This VL model requires PyTorch. "
+            "Reinstall server-nexe to get the full bundle."
         ) from exc
 
 
 def _detect_vlm_capability(model_path: str) -> bool:
-    """Detecta si el model és VLM combinant 3 senyals (any-of):
+    """Detects whether the model is a VLM by combining 3 signals (any-of):
 
-    1. config.json → architectures[] conté una arquitectura VLM coneguda
-    2. config.json → conté vision_config (senyal estàndard HF)
-    3. model.safetensors.index.json → weight_map té keys vision (vision_tower,
+    1. config.json → architectures[] contains a known VLM architecture
+    2. config.json → contains vision_config (standard HF signal)
+    3. model.safetensors.index.json → weight_map has vision keys (vision_tower,
        vision_model, visual., mm_projector, ...)
 
-    El darrer pas cobreix models mal etiquetats o arquitectures noves.
+    The last step covers mislabeled models or new architectures.
     """
     if not model_path:
         return False
@@ -104,7 +104,7 @@ def _detect_vlm_capability(model_path: str) -> bool:
     if not config_path.exists():
         return False
 
-    # 1 + 2: inspecció config.json
+    # 1 + 2: config.json inspection
     try:
         config = json.loads(config_path.read_text())
     except Exception:
@@ -116,7 +116,7 @@ def _detect_vlm_capability(model_path: str) -> bool:
     if "vision_config" in config and config.get("vision_config"):
         return True
 
-    # 3: inspecció safetensors weight map (multi-shard)
+    # 3: safetensors weight map inspection (multi-shard)
     index_path = root / "model.safetensors.index.json"
     try:
         if index_path.exists():
@@ -126,7 +126,7 @@ def _detect_vlm_capability(model_path: str) -> bool:
                 if any(p in key for p in _VLM_WEIGHT_PATTERNS):
                     return True
     except Exception:  # nosec B110: optional VLM inspection — comment below documents intent (do not block decision on JSON failure)
-        # inspecció opcional; no bloquejar decisió si el JSON falla
+        # optional inspection; do not block decision if JSON fails
         pass
 
     return False
@@ -134,37 +134,37 @@ def _detect_vlm_capability(model_path: str) -> bool:
 
 class MLXChatNode:
     """
-    Motor d'inferència per a MLX adaptat per a Nexe 0.9.
+    Inference engine for MLX adapted for Nexe 0.9.
 
-    Manté:
-    - Un sol model carregat (singleton)
-    - MLXPromptCacheManager per prefix matching (trie-based)
-    - Reutilitza KV states del prefix (system + historial)
-    - Només processa tokens nous a cada torn
+    Maintains:
+    - A single loaded model (singleton)
+    - MLXPromptCacheManager for prefix matching (trie-based)
+    - Reuses KV states from prefix (system + history)
+    - Only processes new tokens each turn
 
     Class Attributes:
-        _model: Model MLX singleton
+        _model: MLX model singleton
         _tokenizer: Tokenizer singleton
-        _lock: Lock per thread-safety
-        _config: Configuració activa
+        _lock: Lock for thread-safety
+        _config: Active configuration
     """
 
     _model: Optional[Any] = None
-    _tokenizer: Optional[Any] = None  # tokenizer (text) o processor (VLM)
+    _tokenizer: Optional[Any] = None  # tokenizer (text) or processor (VLM)
     _lock: threading.RLock = threading.RLock()  # RLock: safe against accidental re-entrant calls
     _config: Optional[MLXConfig] = None
-    _is_vlm: bool = False  # True si el model carregat és VLM
+    _is_vlm: bool = False  # True if the loaded model is a VLM
 
     def __init__(self, config: Optional[MLXConfig] = None):
         """
-        Inicialitza el node MLX.
+        Initializes the MLX node.
 
         Args:
-            config: Configuració MLX (o carrega de .env si None)
+            config: MLX configuration (or loads from .env if None)
         """
         self.config = config or MLXConfig.from_env()
 
-        # Actualitzar config singleton si canvia
+        # Update singleton config if it changes
         if (MLXChatNode._config is None or
                 MLXChatNode._config.model_path != self.config.model_path):
             MLXChatNode._config = self.config
@@ -173,8 +173,8 @@ class MLXChatNode:
 
     def _get_model(self) -> tuple:
         """
-        Obtenir model i tokenizer/processor (lazy load singleton).
-        Bifurca automàticament entre mlx_lm (text) i mlx_vlm (VLM) segons config.json.
+        Get model and tokenizer/processor (lazy load singleton).
+        Automatically branches between mlx_lm (text) and mlx_vlm (VLM) based on config.json.
 
         Returns:
             tuple: (model, tokenizer_or_processor)
@@ -203,18 +203,18 @@ class MLXChatNode:
         return MLXChatNode._model, MLXChatNode._tokenizer
 
     # NOTE: Legacy cache methods (_get_or_create_cache, _touch_lru, _destroy_cache)
-    # han estat eliminats. Ara usem MLXPromptCacheManager per prefix matching real.
+    # have been removed. We now use MLXPromptCacheManager for real prefix matching.
 
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Executa generació amb MLX.
+        Executes generation with MLX.
 
         Args:
-            inputs: Dict amb system, messages, messages_for_cache, session_id, stream_callback
+            inputs: Dict with system, messages, messages_for_cache, session_id, stream_callback
 
         Returns:
-            Dict amb response, tokens, metrics, etc.
+            Dict with response, tokens, metrics, etc.
         """
         start_time = time.time()
 
@@ -228,14 +228,14 @@ class MLXChatNode:
         temperature_override = inputs.get("temperature")
         images = inputs.get("images")  # Optional[List[bytes]] — VLM support
 
-        # Log per debugging
+        # Log for debugging
         logger.info(
             "MLXChatNode: session=%s, msgs=%d",
             session_id[:8] if session_id else "none",
             len(messages)
         )
 
-        # Capturar event loop per streaming thread-safe
+        # Capture event loop for thread-safe streaming
         loop = asyncio.get_running_loop()
 
         def threadsafe_callback(text: str) -> None:
@@ -243,10 +243,10 @@ class MLXChatNode:
                 loop.call_soon_threadsafe(stream_callback, text)
 
         try:
-            # VLM path: si el model és VLM, tota la generació passa per mlx_vlm.
-            # Usem _detect_vlm_capability (llegeix config.json del model actual) com
-            # a font primària — és sempre fresca i no depèn del singleton _is_vlm
-            # que pot quedar obsolet en canviar de model VLM → text dins la mateixa sessió.
+            # VLM path: if the model is a VLM, all generation goes through mlx_vlm.
+            # We use _detect_vlm_capability (reads config.json of the current model) as
+            # the primary source — it is always fresh and does not depend on the _is_vlm
+            # singleton which can go stale when switching from VLM → text within the same session.
             is_vlm = _detect_vlm_capability(self.config.model_path)
             if is_vlm:
                 result = await asyncio.to_thread(
@@ -276,18 +276,18 @@ class MLXChatNode:
             system_tokens = len(system) // 4  # Estimate
             prompt_tps = result.get("prompt_tps", 0)
 
-            # Utilitzar prefix_reused del cache manager (basat en tokens reals)
+            # Use prefix_reused from the cache manager (based on real tokens)
             prefix_reuse = result.get("prefix_reused", False)
             cached_tokens = result.get("cached_tokens", 0)
             actual_prefill = result.get("actual_prefill_tokens", result["prompt_tokens"])
 
-            # Calcular speedup real
+            # Calculate real speedup
             if cached_tokens > 0:
                 reuse_ratio = (cached_tokens + actual_prefill) / max(actual_prefill, 1)
             else:
                 reuse_ratio = 1.0
 
-            # Calcular temps per fase (ms)
+            # Calculate time per phase (ms)
             generation_tps = result["tokens_per_second"]
             prefill_ms = int((actual_prefill / prompt_tps * 1000) if prompt_tps > 0 else 0)
             generation_ms = int((result["tokens"] / generation_tps * 1000) if generation_tps > 0 else 0)
@@ -351,10 +351,10 @@ class MLXChatNode:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Generació VLM amb mlx_vlm (text + imatge). Usa mlx_vlm.generate().
+        """VLM generation with mlx_vlm (text + image). Uses mlx_vlm.generate().
 
-        API mlx-vlm ≥ 0.4: `image` és path (str) o list de paths, i `generate()`
-        retorna `GenerationResult` amb .text + mètriques reals (no string pelat).
+        API mlx-vlm >= 0.4: `image` is a path (str) or list of paths, and `generate()`
+        returns a `GenerationResult` with .text + real metrics (not a bare string).
         """
         import os
         import tempfile
@@ -365,9 +365,9 @@ class MLXChatNode:
 
         has_image = bool(images)
 
-        # mlx-vlm apply_chat_template vol un dict amb "model_type".
-        # Gemma4Processor no té .config, i model.config és un dataclass
-        # ModelConfig (no dict). Llegim config.json directament.
+        # mlx-vlm apply_chat_template expects a dict with "model_type".
+        # Gemma4Processor does not have .config, and model.config is a dataclass
+        # ModelConfig (not a dict). We read config.json directly.
         try:
             with open(
                 os.path.join(self.config.model_path, "config.json")
@@ -376,19 +376,19 @@ class MLXChatNode:
         except Exception:
             mdl_config = {"model_type": ""}
 
-        # Construeix la llista completa de missatges: system + historial.
-        # mlx_vlm.prompt_utils.apply_chat_template accepta list[{"role","content"}]
-        # i és imprescindible passar-hi el system (perquè el model vegi el
-        # contracte MEM_SAVE, personalitat, idioma, RAG context) i tot
-        # l'historial per a converses multi-turn. Abans només enviàvem
-        # messages[-1]["content"] → el model no tenia ni system ni historial.
+        # Build the full message list: system + history.
+        # mlx_vlm.prompt_utils.apply_chat_template accepts list[{"role","content"}]
+        # and it is essential to pass the system (so the model sees the
+        # MEM_SAVE contract, personality, language, RAG context) and the full
+        # history for multi-turn conversations. Previously we only sent
+        # messages[-1]["content"] → the model had neither system nor history.
         all_messages: List[Dict[str, Any]] = []
         if system:
             all_messages.append({"role": "system", "content": system})
         if messages:
             all_messages.extend(messages)
 
-        # Prepara el prompt via chat template del processor
+        # Prepare the prompt via the processor's chat template
         formatted_prompt = apply_chat_template(
             processor=processor,
             config=mdl_config,
@@ -399,13 +399,13 @@ class MLXChatNode:
         tmp_path = None
         try:
             if has_image:
-                # Les imatges poden arribar com bytes o com str (data URI
-                # `data:image/...;base64,...` o base64 pelat). Normalitzem
-                # a bytes abans d'escriure al tempfile.
+                # Images can arrive as bytes or as str (data URI
+                # `data:image/...;base64,...` or bare base64). Normalize
+                # to bytes before writing to the tempfile.
                 raw = images[0]
                 if isinstance(raw, str):
                     import base64
-                    # treu prefix data URI si hi és
+                    # strip data URI prefix if present
                     if raw.startswith("data:"):
                         try:
                             raw = raw.split(",", 1)[1]
@@ -421,7 +421,7 @@ class MLXChatNode:
                     raise TypeError(
                         f"VLM image[0] must be bytes or base64 str, got {type(raw).__name__}"
                     )
-                # mlx-vlm 0.4 espera path de fitxer — escriu bytes a tempfile
+                # mlx-vlm 0.4 expects a file path — write bytes to tempfile
                 tmp = tempfile.NamedTemporaryFile(
                     prefix="nexe_vlm_", suffix=".img", delete=False
                 )
@@ -432,9 +432,9 @@ class MLXChatNode:
 
             start_time = time.time()
             if stream_callback:
-                # Streaming: mlx_vlm.stream_generate yielda GenerationResult
-                # amb text=last_segment (delta) per a cada token. Acumulem
-                # i llencem els deltes al callback; mètriques del darrer yield.
+                # Streaming: mlx_vlm.stream_generate yields GenerationResult
+                # with text=last_segment (delta) for each token. Accumulate
+                # and send deltas to the callback; metrics from the last yield.
                 full_text = ""
                 last = None
                 for chunk in vlm_stream(
@@ -452,7 +452,7 @@ class MLXChatNode:
                 result_text = full_text
                 result_obj = last
             else:
-                # One-shot (no streaming): text complet al final
+                # One-shot (no streaming): full text at the end
                 one = vlm_generate(
                     model=model,
                     processor=processor,
@@ -470,7 +470,7 @@ class MLXChatNode:
                 except OSError:
                     pass
 
-        # Mètriques reals (mlx-vlm ≥ 0.4 GenerationResult)
+        # Real metrics (mlx-vlm >= 0.4 GenerationResult)
         text = result_text
         prompt_tokens = getattr(result_obj, "prompt_tokens", 0)
         gen_tokens = getattr(result_obj, "generation_tokens", len(text.split()))
@@ -481,7 +481,7 @@ class MLXChatNode:
         elapsed_ms = int((time.time() - start_time) * 1000)
 
         return {
-            "text": text,           # Format consistent amb extract_metrics()
+            "text": text,           # Consistent format with extract_metrics()
             "tokens": gen_tokens,
             "tokens_per_second": round(gen_tps, 1) if gen_tps else round(
                 gen_tokens / max(elapsed_ms / 1000, 0.001), 1
@@ -493,7 +493,7 @@ class MLXChatNode:
             "prompt_tps": round(prompt_tps, 1),
             "peak_memory_mb": round(peak_memory, 1),
             "identity_hash": "",
-            "vlm": True,            # Flag extra per indicar mode VLM
+            "vlm": True,            # Extra flag to indicate VLM mode
         }
 
     def _generate_blocking(
@@ -507,9 +507,9 @@ class MLXChatNode:
         temperature: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
-        Generació blocking amb MLX i PREFIX MATCHING (executat en thread).
+        Blocking generation with MLX and PREFIX MATCHING (executed in thread).
 
-        Helpers a generate_helpers.py.
+        Helpers in generate_helpers.py.
         """
         with MLXChatNode._lock:
             return self._generate_blocking_inner(
@@ -534,7 +534,7 @@ class MLXChatNode:
         model, tokenizer = self._get_model()
         cache_manager = get_prompt_cache_manager(max_size=8)
 
-        # Model key per cache (path + identity_hash + session_id)
+        # Model key for cache (path + identity_hash + session_id)
         identity_hash = compute_system_hash(system)
         session_key = session_id[:8] if session_id else "default"
         model_key = f"{self.config.model_path}:{identity_hash}:{session_key}"
@@ -556,12 +556,12 @@ class MLXChatNode:
             total_tokens - cached_token_count, "YES" if prefix_reused else "NO"
         )
 
-        # 3. Determinar tokens a processar
+        # 3. Determine tokens to process
         tokens_to_process, new_tokens = determine_tokens_to_process(
             full_tokens, cached_token_count, prefix_reused
         )
 
-        # 4. Crear sampler
+        # 4. Create sampler
         sampler = make_sampler(temp=temperature if temperature is not None else self.config.temperature, top_p=self.config.top_p)
 
         # 5. Run generation with streaming
@@ -586,9 +586,9 @@ class MLXChatNode:
 
     @classmethod
     def reset_model(cls) -> None:
-        """Destruir model, tokenizer i tots els caches."""
+        """Destroy model, tokenizer and all caches."""
         with cls._lock:
-            # Netejar cache manager (prefix matching)
+            # Clear cache manager (prefix matching)
             try:
                 from .prompt_cache_manager import get_prompt_cache_manager
                 cache_manager = get_prompt_cache_manager()
@@ -596,7 +596,7 @@ class MLXChatNode:
             except Exception as e:
                 logger.warning("MLXChatNode: error clearing cache manager: %s", e)
 
-            # Destruir model
+            # Destroy model
             if cls._model is not None:
                 del cls._model
                 cls._model = None
@@ -610,7 +610,7 @@ class MLXChatNode:
             # Release memory
             try:
                 import mlx.core as mx
-                mx.clear_cache()  # Substitueix mx.metal.clear_cache (deprecated)
+                mx.clear_cache()  # Replaces mx.metal.clear_cache (deprecated)
             except Exception as e:
                 logger.warning("MLXChatNode: error clearing cache: %s", e)
 
@@ -620,14 +620,14 @@ class MLXChatNode:
     @classmethod
     def get_pool_stats(cls) -> Dict[str, Any]:
         """Return cache statistics."""
-        # Obtenir stats del cache manager
+        # Get cache manager stats
         cache_manager_stats = {}
         try:
             from .prompt_cache_manager import get_prompt_cache_manager
             cache_manager = get_prompt_cache_manager()
             cache_manager_stats = cache_manager.get_stats()
         except Exception as e:
-            logger.debug("MLX stats collection failed: %s", e)  # nosec B110 - Stats opcionals
+            logger.debug("MLX stats collection failed: %s", e)  # nosec B110 - Stats optional
 
         return {
             "model_loaded": cls._model is not None,

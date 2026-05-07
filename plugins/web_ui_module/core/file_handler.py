@@ -15,11 +15,11 @@ from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
-# Formats suportats (sync amb core/ingest/ingest_knowledge.py)
+# Supported formats (in sync with core/ingest/ingest_knowledge.py)
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".markdown", ".text", ".pdf"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
-# Magic bytes per validacio MIME (SEC-004)
+# Magic bytes for MIME validation (SEC-004)
 MAGIC_BYTES = {
     ".pdf": [b"%PDF"],
     ".txt": None,    # text — validated via UTF-8 decode
@@ -48,12 +48,12 @@ class FileHandler:
 
     def validate_file(self, filename: str, file_size: int, content_bytes: bytes = None) -> Tuple[bool, str]:  # type: ignore[assignment]  # no_implicit_optional
         """
-        Validar fitxer abans de processar
+        Validate file before processing
 
         Args:
-            filename: Nom del fitxer
-            file_size: Mida en bytes
-            content_bytes: Contingut en bytes (per validar magic bytes)
+            filename: File name
+            file_size: Size in bytes
+            content_bytes: Content in bytes (for validating magic bytes)
 
         Returns:
             (valid, error_message)
@@ -70,7 +70,7 @@ class FileHandler:
 
         # Validate magic bytes (SEC-004)
         if content_bytes and ext in MAGIC_BYTES and MAGIC_BYTES[ext] is not None:
-            valid_magic = any(content_bytes[:len(m)] == m for m in MAGIC_BYTES[ext])  # type: ignore[union-attr]  # FP: mypy no estreny subscript post-is-not-None check (L72 ja comprova MAGIC_BYTES[ext] is not None)
+            valid_magic = any(content_bytes[:len(m)] == m for m in MAGIC_BYTES[ext])  # type: ignore[union-attr]  # FP: mypy does not narrow subscript post-is-not-None check (L72 already checks MAGIC_BYTES[ext] is not None)
             if not valid_magic:
                 logger.warning(f"Magic bytes mismatch for {filename} (ext={ext})")
                 return False, f"File content does not match {ext} format"
@@ -87,14 +87,14 @@ class FileHandler:
 
     async def save_file(self, filename: str, content: bytes) -> Path:
         """
-        Desar fitxer al directori temporal
+        Save file to the temporary directory
 
         Args:
-            filename: Nom del fitxer
-            content: Contingut en bytes
+            filename: File name
+            content: Content in bytes
 
         Returns:
-            Path del fitxer desat
+            Path of the saved file
         """
         # Sanitize filename
         safe_filename = Path(filename).name
@@ -116,13 +116,13 @@ class FileHandler:
 
     def extract_text(self, file_path: Path) -> str:
         """
-        Extreure text del fitxer segons el format
+        Extract text from the file according to its format
 
         Args:
-            file_path: Path al fitxer
+            file_path: Path to the file
 
         Returns:
-            Contingut de text
+            Text content
         """
         ext = file_path.suffix.lower()
 
@@ -216,13 +216,13 @@ class FileHandler:
 
     def delete_file(self, file_path: Path) -> bool:
         """
-        Eliminar fitxer temporal
+        Delete temporary file
 
         Args:
-            file_path: Path al fitxer
+            file_path: Path to the file
 
         Returns:
-            True si eliminat correctament
+            True if deleted successfully
         """
         try:
             if file_path.exists():
@@ -271,10 +271,10 @@ class FileHandler:
 
     def get_uploaded_files(self) -> list:
         """
-        Llistar tots els fitxers pujats
+        List all uploaded files
 
         Returns:
-            Llista de diccionaris amb info dels fitxers
+            List of dictionaries with file info
         """
         files = []
         try:

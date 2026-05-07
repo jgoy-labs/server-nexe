@@ -1,13 +1,13 @@
 """
-Bug 15 — Ollama circuit breaker NO ha de tractar errors semantics 4xx
-(404 model not found, 400 bad request, 422 validation) com a fallades
-d'infraestructura. Nomes 5xx + ConnectError + TimeoutError obren breaker.
+Bug 15 — Ollama circuit breaker must NOT treat semantic 4xx errors
+(404 model not found, 400 bad request, 422 validation) as infrastructure failures.
+Only 5xx + ConnectError + TimeoutError open the breaker.
 
 Tests:
-- 404 -> ModelNotFoundError + breaker NO incrementa failures
-- 400/422 -> OllamaSemanticError + breaker NO incrementa failures
-- 503 -> breaker SI incrementa failures
-- httpx.ConnectError -> breaker SI incrementa failures
+- 404 -> ModelNotFoundError + breaker does NOT increment failures
+- 400/422 -> OllamaSemanticError + breaker does NOT increment failures
+- 503 -> breaker DOES increment failures
+- httpx.ConnectError -> breaker DOES increment failures
 """
 import pytest
 import httpx
@@ -55,7 +55,7 @@ class TestSemanticErrorsDoNotOpenBreaker:
 
     @pytest.mark.asyncio
     async def test_404_raises_model_not_found_and_keeps_breaker_closed(self):
-        """404 -> ModelNotFoundError, breaker no toca."""
+        """404 -> ModelNotFoundError, breaker not touched."""
         module = OllamaModule()
         client = _patch_post_with_status_error(404)
         with patch("plugins.ollama_module.module.httpx.AsyncClient", return_value=client):
@@ -63,7 +63,7 @@ class TestSemanticErrorsDoNotOpenBreaker:
                 await module.get_model_info("nonexistent-model")
         assert exc_info.value.model_name == "nonexistent-model"
         assert exc_info.value.status_code == 404
-        # El breaker NO ha registrat cap failure
+        # The breaker has NOT recorded any failure
         assert ollama_breaker._state.failure_count == 0
         assert ollama_breaker.is_closed
 
@@ -123,9 +123,9 @@ class TestInfraErrorsDoOpenBreaker:
 
 
 class TestRepeated404DoesNotOpenBreaker:
-    """Cas real del bug: caller demana model inexistent N vegades.
-    Abans -> al cap de N intents el breaker s'obria i bloquejava qualsevol
-    altre model valid. Despres del fix -> el breaker mai s'obre per 404."""
+    """Real bug case: caller requests a non-existent model N times.
+    Before -> after N attempts the breaker opened and blocked any
+    other valid model. After the fix -> the breaker never opens for 404."""
 
     @pytest.mark.asyncio
     async def test_many_404_keeps_breaker_closed(self):

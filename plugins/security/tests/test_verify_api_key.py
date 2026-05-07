@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: plugins/security/tests/test_verify_api_key.py
-Description: Tests per verify_api_key() refactoritzat. Valida que llença HTTPException(401) correctament i usa timing-safe comparison.
+Description: Tests for refactored verify_api_key(). Validates that it raises HTTPException(401) correctly and uses timing-safe comparison.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -15,7 +15,7 @@ from fastapi import HTTPException
 
 def test_verify_api_key_without_admin_key():
   """
-  Test que verify_api_key() llença 401 si no hi ha API key configurada.
+  Test that verify_api_key() raises 401 if no API key is configured.
 
   Finding
   """
@@ -38,7 +38,7 @@ def test_verify_api_key_without_admin_key():
 
 def test_verify_api_key_with_none():
   """
-  Test que verify_api_key() llença 401 si provided_key és None.
+  Test that verify_api_key() raises 401 if provided_key is None.
 
   Finding
   """
@@ -53,7 +53,7 @@ def test_verify_api_key_with_none():
 
 def test_verify_api_key_with_empty_string():
   """
-  Test que verify_api_key() llença 401 si provided_key és string buit.
+  Test that verify_api_key() raises 401 if provided_key is an empty string.
 
   Finding
   """
@@ -68,7 +68,7 @@ def test_verify_api_key_with_empty_string():
 
 def test_verify_api_key_with_invalid_key():
   """
-  Test que verify_api_key() llença 401 si provided_key és incorrecta.
+  Test that verify_api_key() raises 401 if provided_key is incorrect.
 
   Finding
   """
@@ -84,7 +84,7 @@ def test_verify_api_key_with_invalid_key():
 
 def test_verify_api_key_with_valid_key():
   """
-  Test que verify_api_key() retorna la key si és vàlida.
+  Test that verify_api_key() returns the key if it is valid.
 
   Finding
   """
@@ -99,9 +99,9 @@ def test_verify_api_key_with_valid_key():
 
 def test_verify_api_key_timing_safe():
   """
-  Test que verify_api_key() usa secrets.compare_digest() (timing-safe).
+  Test that verify_api_key() uses secrets.compare_digest() (timing-safe).
 
-  Verificar que la implementació no és vulnerable a timing attacks.
+  Verify that the implementation is not vulnerable to timing attacks.
   """
   from plugins.security.core.auth import generate_api_key, verify_api_key
   import time
@@ -143,10 +143,10 @@ def test_verify_api_key_timing_safe():
 
 def test_verify_api_key_as_fastapi_dependency():
   """
-  Test que verify_api_key() funciona correctament com a Depends() de FastAPI.
+  Test that verify_api_key() works correctly as a FastAPI Depends().
 
   Finding
-  no protegia endpoints perquè retornava False en lloc de llençar 401.
+  it was not protecting endpoints because it returned False instead of raising 401.
   """
   from fastapi import FastAPI, Depends
   from fastapi.testclient import TestClient
@@ -175,10 +175,10 @@ def test_verify_api_key_as_fastapi_dependency():
 
 def test_verify_api_key_backwards_compatibility():
   """
-  Test que verify_api_key() manté compatibilitat amb codi existent.
+  Test that verify_api_key() maintains compatibility with existing code.
 
-  Codi que cridava verify_api_key() manualment i capturava False
-  ara hauria de capturar HTTPException.
+  Code that called verify_api_key() manually and caught False
+  should now catch HTTPException.
   """
   from plugins.security.core.auth import generate_api_key, verify_api_key
 
@@ -187,7 +187,7 @@ def test_verify_api_key_backwards_compatibility():
 
   try:
     result = verify_api_key(x_api_key="invalid-key")
-    pytest.fail("verify_api_key() hauria de llençar HTTPException per key invàlida")
+    pytest.fail("verify_api_key() should raise HTTPException for invalid key")
   except HTTPException as e:
     assert e.status_code == 401
 
@@ -198,11 +198,11 @@ def test_verify_api_key_backwards_compatibility():
 @pytest.fixture(autouse=True)
 def cleanup_env():
   """
-  Aïlla variables d'API keys per fer els tests deterministes.
+  Isolates API key variables to make tests deterministic.
 
-  IMPORTANT: A CI/linuxtest s'injecta `NEXE_PRIMARY_API_KEY` globalment.
-  Aquests tests validen `verify_api_key()` en escenaris controlats, així
-  que netegem totes les vars relacionades abans de cada test i les restaurem després.
+  IMPORTANT: In CI/linuxtest, `NEXE_PRIMARY_API_KEY` is injected globally.
+  These tests validate `verify_api_key()` in controlled scenarios, so
+  we clean all related vars before each test and restore them afterwards.
   """
   key_env_vars = (
     "NEXE_ADMIN_API_KEY",

@@ -1,6 +1,6 @@
 """
-Tests unitaris per FileHandler.
-Sense GPU — tota la lògica és E/S local (tmp_path).
+Unit tests for FileHandler.
+Without GPU — all logic is local I/O (tmp_path).
 """
 import pytest
 import time

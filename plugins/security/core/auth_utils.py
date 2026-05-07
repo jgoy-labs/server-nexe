@@ -17,13 +17,13 @@ from .auth_config import get_admin_api_key
 
 def generate_api_key(length: int = 32) -> str:
   """
-  Genera una API key segura
+  Generates a secure API key
 
   Args:
-    length: Longitud de la key (default 32 bytes = 64 hex chars)
+    length: Key length (default 32 bytes = 64 hex chars)
 
   Returns:
-    API key hexadecimal
+    Hexadecimal API key
 
   Usage:
     new_key = generate_api_key()
@@ -35,21 +35,21 @@ def verify_api_key(
   x_api_key: Optional[str] = Header(None, alias="X-API-Key", description="API Key")
 ) -> str:
   """
-  Verifica una API key i llença 401 si no és vàlida
+  Verifies an API key and raises 401 if not valid
 
-  ✅ SECURITY FIX: Ara llença HTTPException(401) en lloc de retornar False
-  Això garanteix que endpoints amb Depends(verify_api_key) estan protegits.
+  ✅ SECURITY FIX: Now raises HTTPException(401) instead of returning False
+  This ensures that endpoints with Depends(verify_api_key) are protected.
 
-  Compatible amb FastAPI Depends() i crides manuals.
+  Compatible with FastAPI Depends() and manual calls.
 
   Args:
-    x_api_key: API key del header X-API-Key (automàtic amb Depends)
+    x_api_key: API key from the X-API-Key header (automatic with Depends)
 
   Returns:
-    str: La API key vàlida (si correcta)
+    str: The valid API key (if correct)
 
   Raises:
-    HTTPException: 401 si la key no és vàlida o no configurada
+    HTTPException: 401 if the key is not valid or not configured
 
   Usage:
     @router.get("/protected")

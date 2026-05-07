@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/sanitizer/workflow/nodes/tests/conftest.py
-Description: Conftest per mockejar nexe_flow abans d'importar els nodes de workflow.
+Description: Conftest to mock nexe_flow before importing the workflow nodes.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

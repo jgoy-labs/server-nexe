@@ -35,7 +35,7 @@ def get_security_logger() -> SecurityEventLogger:
   Get global security logger instance (singleton pattern).
 
   Returns:
-    SecurityEventLogger instance (sempre la mateixa)
+    SecurityEventLogger instance (always the same one)
 
   Examples:
     >>> logger = get_security_logger()

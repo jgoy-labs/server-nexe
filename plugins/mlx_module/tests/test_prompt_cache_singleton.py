@@ -1,6 +1,6 @@
 """
-Bug 19 — get_prompt_cache_manager() singleton sense lock.
-N threads que el criden simultaniament han de rebre la MATEIXA instancia.
+Bug 19 — get_prompt_cache_manager() singleton without a lock.
+N threads calling it simultaneously must receive the SAME instance.
 """
 import threading
 import pytest
@@ -14,7 +14,7 @@ from plugins.mlx_module.core.prompt_cache_manager import (
 
 @pytest.fixture(autouse=True)
 def reset_singleton():
-    """Reset el singleton abans/despres de cada test."""
+    """Reset the singleton before/after each test."""
     pcm_mod._prompt_cache_manager = None
     yield
     pcm_mod._prompt_cache_manager = None
@@ -29,8 +29,8 @@ class TestSingletonThreadSafety:
         barrier = threading.Barrier(N)
 
         def worker():
-            # Sincronitzar tots els threads perque arribin alhora a la
-            # crida — maximitza la probabilitat de race condition.
+            # Synchronize all threads so they arrive at the call at the same time
+            # — maximizes the probability of a race condition.
             barrier.wait()
             instance = get_prompt_cache_manager()
             with lock:
@@ -45,17 +45,17 @@ class TestSingletonThreadSafety:
         assert len(results) == N
         first = results[0]
         assert isinstance(first, MLXPromptCacheManager)
-        # Tots els threads han de tenir EXACTAMENT la mateixa instancia
+        # All threads must have EXACTLY the same instance
         for inst in results:
-            assert inst is first, "Race condition: dues instancies del singleton"
+            assert inst is first, "Race condition: two singleton instances"
 
     def test_repeated_calls_return_same_instance(self):
         a = get_prompt_cache_manager()
         b = get_prompt_cache_manager()
-        c = get_prompt_cache_manager(max_size=99)  # max_size ignorat el 2on cop
+        c = get_prompt_cache_manager(max_size=99)  # max_size ignored on the 2nd call
         assert a is b is c
 
     def test_singleton_lock_exists(self):
-        """Sanity: el module ha d'exposar _singleton_lock (Bug 19 fix)."""
+        """Sanity: the module must expose _singleton_lock (Bug 19 fix)."""
         assert hasattr(pcm_mod, "_singleton_lock")
         assert isinstance(pcm_mod._singleton_lock, type(threading.Lock()))

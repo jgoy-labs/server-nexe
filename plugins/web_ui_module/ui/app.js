@@ -332,7 +332,7 @@ class NexeUI {
         s('#loginBtn', 'login_btn');
         s('#loginError', 'login_error', 'html');
         s('.login-hint', 'login_hint', 'html');
-        // Welcome — regenera tot el DOM si és visible (tots 10 botons traduïts)
+        // Welcome — regenerate the full DOM if visible (all 10 buttons translated)
         if (this.chatMessages && this.chatMessages.querySelector('.welcome-screen')) {
             this.showWelcome();
         }
@@ -430,10 +430,10 @@ class NexeUI {
     }
 
     _setThinkingText(spanEl, text) {
-        // Descompon el text en un <span> per lletra perquè el CSS pugui
-        // aplicar un `animation-delay` diferent a cada una i formar una
-        // "onada" estil loading. Preserva espais amb nbsp ( ) perquè
-        // inline-block no col·lapsi el whitespace.
+        // Breaks the text into a <span> per letter so CSS can
+        // apply a different `animation-delay` to each one and form a
+        // loading-style "wave". Preserves spaces with nbsp ( ) because
+        // inline-block would collapse whitespace.
         spanEl.textContent = '';
         const chars = [...(text || '')];
         chars.forEach((ch, i) => {
@@ -506,7 +506,7 @@ class NexeUI {
         langSelect.addEventListener('change', async () => {
             this.lang = langSelect.value;
             this.applyI18n();
-            // Persistir al servidor
+            // Persist to server
             try {
                 await this.fetchWithCsrf('/ui/lang', {
                     method: 'POST',
@@ -669,7 +669,7 @@ class NexeUI {
         const btn = document.getElementById('loginBtn');
         const error = document.getElementById('loginError');
 
-        // Pre-omplir amb la key guardada (si existeix)
+        // Pre-fill with the saved key (if it exists)
         const savedKey = localStorage.getItem('nexe_api_key');
         if (savedKey && !input.value) {
             input.value = savedKey;
@@ -771,11 +771,11 @@ class NexeUI {
         this.imagePreviewName = document.getElementById('imagePreviewName');
         this.imageBadge = document.getElementById('imageBadge');
 
-        // Intercepta Cmd+C / Ctrl+C sobre missatges del xat: les bombolles
-        // (`.message.user`, `.message.assistant`) tenen fons de color i el
-        // copy HTML per defecte s'emporta el `background` estilitzat, que
-        // queda enganxat al destí. Substituïm el HTML del clipboard per
-        // text/plain + HTML nu sense estils.
+        // Intercepts Cmd+C / Ctrl+C on chat messages: the bubbles
+        // (`.message.user`, `.message.assistant`) have a colored background and the
+        // default HTML copy carries the styled `background`, which
+        // gets pasted to the destination. We replace the clipboard HTML with
+        // text/plain + bare HTML without styles.
         this.chatMessages.addEventListener('copy', (e) => {
             const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0) return;
@@ -783,7 +783,7 @@ class NexeUI {
             if (!text) return;
             e.preventDefault();
             e.clipboardData.setData('text/plain', text);
-            // HTML "pla": cada línia <br>, sense atributs ni classes → no arrossega fons.
+            // "Plain" HTML: each line as <br>, no attributes or classes → does not carry background styling.
             const html = text
                 .split('\n')
                 .map(l => l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
@@ -887,7 +887,7 @@ class NexeUI {
             const saved = localStorage.getItem('nexe_theme');
             const preferLight = saved ? saved === 'light' : window.matchMedia('(prefers-color-scheme: light)').matches;
             applyTheme(preferLight);
-            // Seguir canvis del SO si l'usuari no ha triat manualment
+            // Follow OS changes if the user has not chosen manually
             window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
                 if (!localStorage.getItem('nexe_theme')) applyTheme(e.matches);
             });
@@ -1058,7 +1058,7 @@ class NexeUI {
                 // Suport objecte {name, size_gb} o string legacy
                 const name = typeof m === 'object' ? m.name : m;
                 opt.value = name;
-                // Mostra 👁️ si té visió, 🧠 si pensa + mida aproximada en RAM
+                // Shows 👁️ if has vision, 🧠 if thinks + approximate RAM size
                 const hasVision = this._modelHasVision(name, backendId);
                 const hasThinking = this._canThink(name);
                 const sizeGb = typeof m === 'object' ? m.size_gb : 0;
@@ -1073,16 +1073,16 @@ class NexeUI {
         }
     }
 
-    /// Heurística client-side: un model té visió (VLM) si el nom conté
-    /// famílies/tags multimodals coneguts. Equivalent al hasVision del Swift wizard.
-    /// backend: 'ollama'|'mlx'|'llamacpp' — Qwen3.5 vision funciona a Ollama però no a MLX (torch).
+    /// Client-side heuristic: a model has vision (VLM) if the name contains
+    /// known multimodal families/tags. Equivalent to hasVision in the Swift wizard.
+    /// backend: 'ollama'|'mlx'|'llamacpp' — Qwen3.5 vision works on Ollama but not on MLX (torch).
     _modelHasVision(name, backend) {
         const n = (name || '').toLowerCase();
-        // Omni-models que requereixen torch/torchvision —
-        // a MLX peten. A Ollama funcionen bé.
-        // Veure knowledge/*/LIMITATIONS.md secció "Models multimodal (VLM)".
+        // Omni-models that require torch/torchvision —
+        // they crash on MLX. They work fine on Ollama.
+        // See knowledge/*/LIMITATIONS.md section "Multimodal models (VLM)".
         const omniExcludes = [
-            'qwen3.5',      // Qwen3.5 (totes les mides) — torch requerit per MLX
+            'qwen3.5',      // Qwen3.5 (all sizes) — torch required for MLX
             'qwen3-omni',
             'kimi-vl',
             'qwen3-vl-moe',
@@ -1109,11 +1109,11 @@ class NexeUI {
         const model = modelSel.value;
         const selectedOpt = backendSel.selectedOptions[0];
         const wasDisconnected = selectedOpt && selectedOpt.dataset.connected === '0';
-        // Flag: el següent chat probablement disparar à MODEL_LOADING (el
-        // model nou encara no és a VRAM). `sendMessage` consulta aquest
-        // flag per saltar-se el placeholder "Processant…" wave i deixar
-        // que el banner blau de càrrega sigui la signal primària. El flag
-        // es neteja al MODEL_READY o al final del stream.
+        // Flag: the next chat will likely trigger MODEL_LOADING (the
+        // new model is not yet in VRAM). `sendMessage` checks this
+        // flag to skip the "Processing…" wave placeholder and let
+        // the blue loading banner be the primary signal. The flag
+        // is cleared on MODEL_READY or at the end of the stream.
         this._modelJustChanged = true;
 
         const el = document.getElementById('modelInfoText');
@@ -1191,9 +1191,9 @@ class NexeUI {
     }
 
     _handleUnauthorized() {
-        // No esborrem localStorage — Safari amb ITP pot netejar-lo
-        // entre sessions. Si la key era valida, l'usuari simplement
-        // la torna a enviar sense haver de recordar-la.
+        // We don't clear localStorage — Safari with ITP may clear it
+        // between sessions. If the key was valid, the user simply
+        // resends it without having to remember it.
         this.apiKey = null;
         this.showLoginOverlay();
     }
@@ -1415,9 +1415,9 @@ class NexeUI {
         this.chatMessages.innerHTML = '';
 
         messages.forEach(msg => {
-            // Fix 2026-04-22: reconstrueix data URL de la imatge persistida
-            // a la sessió. Sense això, post-reinici la imatge desapareixia
-            // tot i tenir `image_b64` al disc.
+            // Fix 2026-04-22: reconstructs the data URL of the image persisted
+            // in the session. Without this, after a restart the image would disappear
+            // even though `image_b64` was on disk.
             let imageUrl = null;
             if (msg.image_b64) {
                 const mime = msg.image_type || 'image/jpeg';
@@ -1459,7 +1459,7 @@ class NexeUI {
         // Create AbortController for this request
         this.abortController = new AbortController();
 
-        // Capturar imatge seleccionada abans de netejar l'estat VLM
+        // Capture selected image before clearing VLM state
         const pendingImage = this._selectedImage ? { ...this._selectedImage } : null;
         this._clearSelectedImage();
 
@@ -1519,14 +1519,14 @@ class NexeUI {
                 const messages = this.chatMessages.querySelectorAll('.message.assistant');
                 const lastMsg = messages[messages.length - 1];
                 assistantMessageDiv = lastMsg.querySelector('.message-text');
-                // Placeholder "Processant…" wave només quan tots dos
-                // condicionals ho permeten (lògica Jordi 2026-04-22):
-                //   (a) el toggle de thinking mode està OFF — si està ON,
-                //       el model obrirà un `.think-block` amb el seu propi
-                //       indicador i no cal ocupar la bombolla.
-                //   (b) l'usuari NO acaba de canviar de model — si n'ha
-                //       canviat, el `MODEL_LOADING` blau és la signal
-                //       primària; el placeholder arribaria tard igualment.
+                // "Processing…" wave placeholder only when both
+                // conditions allow it (Jordi logic 2026-04-22):
+                //   (a) the thinking mode toggle is OFF — if it's ON,
+                //       the model will open a `.think-block` with its own
+                //       indicator and the bubble does not need to be occupied.
+                //   (b) the user has NOT just changed the model — if they have,
+                //       the blue `MODEL_LOADING` is the primary signal;
+                //       the placeholder would arrive too late anyway.
                 const _thinkOn = (() => {
                     const tt = document.getElementById('thinkingToggle');
                     return tt && tt.checked;
@@ -1594,7 +1594,7 @@ class NexeUI {
                     // Pattern 0: <think>...</think>... (tag complet)
                     const m0 = cleaned.match(/<think>([\s\S]*?)<\/think>\s*([\s\S]*)/);
                     if (m0) return { thinking: m0[1].trim(), content: m0[2].trim() };
-                    // Pattern 0b: ...text...</think>... (sense tag d'obertura — DeepSeek R1)
+                    // Pattern 0b: ...text...</think>... (without opening tag — DeepSeek R1)
                     const m0b = cleaned.match(/^([\s\S]+?)<\/think>\s*([\s\S]*)/);
                     if (m0b && m0b[1].trim().length > 10) return { thinking: m0b[1].trim(), content: m0b[2].trim() };
                     // Pattern 1: "analysisXXX...assistantfinalYYY" (gpt-oss)
@@ -1765,7 +1765,7 @@ class NexeUI {
 
                         let chunk = decoder.decode(value, { stream: true });
 
-                        // Detectar token MODEL (model realment usat)
+                        // Detect MODEL token (model actually used)
                         const modelMatch = chunk.match(/\x00\[MODEL:([^\]]+)\]\x00/); // eslint-disable-line no-control-regex
                         if (modelMatch) {
                             usedModel = modelMatch[1];
@@ -1779,14 +1779,14 @@ class NexeUI {
                             chunk = chunk.replace(/\x00\[RAG:\d+\]\x00/, ''); // eslint-disable-line no-control-regex
                         }
 
-                        // Detectar RAG average score
+                        // Detect RAG average score
                         const ragAvgMatch = chunk.match(/\x00\[RAG_AVG:([\d.]+)\]\x00/); // eslint-disable-line no-control-regex
                         if (ragAvgMatch) {
                             ragAvg = parseFloat(ragAvgMatch[1]);
                             chunk = chunk.replace(/\x00\[RAG_AVG:[\d.]+\]\x00/, ''); // eslint-disable-line no-control-regex
                         }
 
-                        // Detectar RAG items (per-font scores)
+                        // Detect RAG items (per-source scores)
                         let ragItemMatch;
                         const ragItemRe = /\x00\[RAG_ITEM:([^|]+)\|([\d.]+)\]\x00/g; // eslint-disable-line no-control-regex
                         while ((ragItemMatch = ragItemRe.exec(chunk)) !== null) {
@@ -1794,13 +1794,13 @@ class NexeUI {
                         }
                         chunk = chunk.replace(/\x00\[RAG_ITEM:[^\]]+\]\x00/g, ''); // eslint-disable-line no-control-regex
 
-                        // Detectar token COMPACT (context compactat)
+                        // Detect COMPACT token (compacted context)
                         compactMatch = chunk.match(/\x00\[COMPACT:(\d+)\]\x00/); // eslint-disable-line no-control-regex
                         if (compactMatch) {
                             chunk = chunk.replace(/\x00\[COMPACT:\d+\]\x00/, ''); // eslint-disable-line no-control-regex
                         }
 
-                        // Detectar DOC_TRUNCATED (document massa gran pel context)
+                        // Detect DOC_TRUNCATED (document too large for context)
                         const truncMatch = chunk.match(/\x00\[DOC_TRUNCATED:(\d+)\]\x00/); // eslint-disable-line no-control-regex
                         if (truncMatch) {
                             const truncPct = parseInt(truncMatch[1]);
@@ -1811,7 +1811,7 @@ class NexeUI {
                             lastMsg.querySelector('.message-content').insertBefore(truncNotice, assistantMessageDiv);
                         }
 
-                        // Detectar MODEL_LOADING (model carregant-se a VRAM)
+                        // Detect MODEL_LOADING (model loading into VRAM)
                         const loadingMatch = chunk.match(/\x00\[MODEL_LOADING:([^\]|]+)\|?([^\]]*)\]\x00/); // eslint-disable-line no-control-regex
                         if (loadingMatch) {
                             chunk = chunk.replace(/\x00\[MODEL_LOADING:[^\]]+\]\x00/, ''); // eslint-disable-line no-control-regex
@@ -1825,12 +1825,12 @@ class NexeUI {
                                 <span>${this.t('model_loading')}… <strong>${loadingModel}</strong>${backendLabel ? ` <em class="loading-backend">[${backendLabel}]</em>` : ''} — <em class="loading-timer">0s</em></span>
                             `;
                             lastMsg.querySelector('.message-content').insertBefore(loadingEl, assistantMessageDiv);
-                            // Durant la càrrega del model a VRAM, el loadingEl blau
-                            // és la signal primària — amaguem el placeholder
-                            // "Processant…" per no xafar-lo visualment. Tornarà
-                            // al seu lloc amb el primer token real (si el model
-                            // encara està "pensant") o simplement el text
-                            // streaming sobrescriurà.
+                            // During model loading into VRAM, the blue loadingEl
+                            // is the primary signal — we hide the "Processing…"
+                            // placeholder so it's not visually crushed. It will
+                            // return with the first real token (if the model is
+                            // still "thinking") or the streaming text will simply
+                            // overwrite it.
                             if (assistantMessageDiv.classList.contains('thinking-placeholder')) {
                                 assistantMessageDiv.classList.remove('thinking-placeholder');
                                 assistantMessageDiv.textContent = '';
@@ -1847,8 +1847,8 @@ class NexeUI {
                         // Detect MODEL_READY (model loaded, starts responding)
                         if (chunk.includes('\x00[MODEL_READY]\x00')) {
                             chunk = chunk.replace('\x00[MODEL_READY]\x00', '');
-                            // Model ja carregat — si l'usuari envia més chats,
-                            // el placeholder "Processant…" wave ja pot tornar.
+                            // Model already loaded — if the user sends more chats,
+                            // the "Processing…" wave placeholder can return.
                             this._modelJustChanged = false;
                             if (this._loadingTimer) { clearInterval(this._loadingTimer); this._loadingTimer = null; }
                             if (loadingEl) {
@@ -1856,10 +1856,10 @@ class NexeUI {
                                 loadingEl = null;
                                 const startedAt = this._loadStartTime || Date.now();
                                 const visibleMs = Date.now() - startedAt;
-                                // Garantia mínima de 700ms de banner blau visible —
-                                // si MODEL_LOADING i MODEL_READY arriben al mateix
-                                // chunk (cas càrregues molt ràpides), l'usuari veia
-                                // directament el verd "0s" sense veure mai el blau.
+                                // Minimum guarantee of 700ms of visible blue banner —
+                                // if MODEL_LOADING and MODEL_READY arrive in the same
+                                // chunk (case of very fast loads), the user would see
+                                // the green "0s" directly without ever seeing the blue.
                                 const MIN_BLUE_MS = 700;
                                 const finalize = () => {
                                     const totalSec = Math.round((Date.now() - startedAt) / 1000);
@@ -1905,7 +1905,7 @@ class NexeUI {
                             deletedFacts = delMatch[2].split('|');
                             chunk = chunk.replace(/\x00\[DEL:\d+:.+?\]\x00/g, ''); // eslint-disable-line no-control-regex
                         }
-                        // Detect pending delete — model vol esborrar, però cal confirmació
+                        // Detect pending delete — model wants to delete, but confirmation needed
                         const pendingDelMatch = chunk.match(/\x00\[PENDING_DELETE:(.+?)\]\x00/); // eslint-disable-line no-control-regex
                         if (pendingDelMatch) {
                             const fact = pendingDelMatch[1].replace(/\\\|/g, '|');
@@ -1919,8 +1919,8 @@ class NexeUI {
                     }
                     // Streaming done — if loading indicator remains, mark as loaded
                     if (this._loadingTimer) { clearInterval(this._loadingTimer); this._loadingTimer = null; }
-                    // Reset flag si no s'ha netejat via MODEL_READY (ex: model
-                    // ja estava carregat i no s'ha emès `[MODEL_READY]`).
+                    // Reset flag if not cleared via MODEL_READY (e.g. model
+                    // was already loaded and `[MODEL_READY]` was not emitted).
                     this._modelJustChanged = false;
                     if (loadingEl) {
                         const elapsed = Math.round((Date.now() - (this._loadStartTime || Date.now())) / 1000);
@@ -1972,8 +1972,8 @@ class NexeUI {
                         fullResponse = fullResponse.replace(/\n\s*\.\s*\n/g, '\n');
                         fullResponse = fullResponse.replace(/\n{3,}/g, '\n\n');
                     }
-                    // Guard: si la resposta queda buida despres de treure MEM_SAVE
-                    // (el backend fa re-prompt, però per seguretat mantenim fallback UI)
+                    // Guard: if the response is empty after removing MEM_SAVE
+                    // (backend does re-prompt, but for safety we keep UI fallback)
                     if (!fullResponse.trim() && memFacts.length > 0) {
                         console.info('[nexe] Empty response after MEM_SAVE — backend should have re-prompted. Facts:', memFacts);
                         fullResponse = '\u2705 ' + memFacts.join(', ');
@@ -1986,14 +1986,14 @@ class NexeUI {
                     // Strip [DEL:N:...] tokens from final render
                     fullResponse = fullResponse.replace(/\[DEL:\d+:.+?\]/g, '');
                     // Note: renderMarkdown sanitizes HTML via marked.js (safe render)
-                    // Guard: si per algun motiu no va entrar mai a _scheduleRender,
-                    // netejar el placeholder-classe aquí (no visible però l'eliminem).
+                    // Guard: if for some reason _scheduleRender was never entered,
+                    // clean the placeholder class here (not visible but we remove it).
                     if (assistantMessageDiv.classList.contains('thinking-placeholder')) {
                         assistantMessageDiv.classList.remove('thinking-placeholder');
                     }
                     assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse);
                     if (tMode !== 'responding' && tMode !== 'init') closeThinkBlock();
-                    // Stats per missatge
+                    // Per-message stats
                     const elapsed = (Date.now() - this._streamStart) / 1000;
                     const finalTok = this._streamTokens;
                     const finalSpd = elapsed > 0.5 ? (finalTok / elapsed).toFixed(1) : null;
@@ -2243,8 +2243,8 @@ class NexeUI {
             contentDiv.appendChild(imgEl);
         }
 
-        // textDiv: sempre present per assistant (el streaming el necessita via querySelector)
-        // per user, només si hi ha contingut (bubbles imatge-only no en necessiten)
+        // textDiv: always present for assistant (streaming needs it via querySelector)
+        // for user, only if there is content (image-only bubbles don't need one)
         const needsTextDiv = role === 'assistant' || content;
         let textDiv = null;
         if (needsTextDiv) {
@@ -2253,7 +2253,7 @@ class NexeUI {
             if (role === 'user') {
                 textDiv.textContent = content;
             } else {
-                textDiv.innerHTML = this.renderMarkdown(content); // renderMarkdown sanititza l'HTML (custom renderer)
+                textDiv.innerHTML = this.renderMarkdown(content); // renderMarkdown sanitizes HTML (custom renderer)
             }
             contentDiv.appendChild(textDiv);
         }
@@ -2266,10 +2266,10 @@ class NexeUI {
             }
             contentDiv.appendChild(statsDiv);
         } else if (role === 'user' && textDiv) {
-            // Simetria amb l'assistant: al missatge de l'usuari també hi ha
-            // d'haver el comptador aproximat de tokens i el botó de copiar.
-            // El count real ve del backend com a `prompt_tokens` quan arriba
-            // la resposta; mentre no hi és s'usa l'heurística ~1 tok / 4 chars.
+            // Symmetry with assistant: the user message also needs
+            // an approximate token counter and a copy button.
+            // The real count comes from the backend as `prompt_tokens` when the
+            // response arrives; until then the heuristic ~1 tok / 4 chars is used.
             const statsDiv = document.createElement('div');
             statsDiv.className = 'message-stats';
             this._renderUserStats(statsDiv, content, textDiv, stats);
@@ -2288,8 +2288,8 @@ class NexeUI {
     }
 
     _renderUserStats(statsDiv, content, textDiv, stats = null) {
-        // Comptador aproximat: ~1 token per cada 4 caràcters (heurística estàndard).
-        // Si el backend ens passa `prompt_tokens` al stats, prioritza aquell valor.
+        // Approximate counter: ~1 token per 4 characters (standard heuristic).
+        // If the backend provides `prompt_tokens` in stats, that value is used instead.
         const approxTokens = Math.max(1, Math.ceil((content || '').length / 4));
         const tokens = (stats && stats.prompt_tokens) || approxTokens;
         const tokenLabel = (stats && stats.prompt_tokens) ? `${tokens} tok` : `~${tokens} tok`;
@@ -2304,7 +2304,7 @@ class NexeUI {
         tokSpan.appendChild(tokText);
         statsDiv.appendChild(tokSpan);
 
-        // Botó de copiar — mateix patró que el de l'assistant.
+        // Copy button — same pattern as the assistant's.
         const copyBtn = document.createElement('button');
         copyBtn.className = 'copy-btn';
         copyBtn.title = 'Copy';
@@ -2536,7 +2536,7 @@ class NexeUI {
         const file = event.target.files?.[0] || event;
         if (!file || !file.name) return;
 
-        // Si és una imatge, redirigir al flux VLM en lloc del RAG de documents
+        // If it's an image, redirect to VLM flow instead of document RAG
         const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
         const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
         const _ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
@@ -2551,7 +2551,7 @@ class NexeUI {
     }
 
     async uploadFile(file) {
-        // Overlay bloqueig amb spinner i timer
+        // Blocking overlay with spinner and timer
         this.uploadBtn.disabled = true;
         this.setAiState('thinking');
 
@@ -2598,10 +2598,10 @@ class NexeUI {
 
                 this.addUploadedFile(data);
 
-                // Bug #17: prompt específic per imatges vs documents
+                // Bug #17: specific prompt for images vs documents
                 const isImage = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(data.filename || file.name || '');
 
-                // Mostra la imatge inline al chat (bubble usuari) si és una foto
+                // Show image inline in the chat (user bubble) if it's a photo
                 if (isImage) {
                     const previewUrl = URL.createObjectURL(file);
                     this.addMessageToChat('user', '', true, null, previewUrl);
@@ -2650,7 +2650,7 @@ class NexeUI {
         this.filePreview.replaceChildren();
         this.filePreview.classList.remove('active');
         this.uploadedFile = null;
-        // Netejar document server-side
+        // Clear document server-side
         if (this.currentSessionId) {
             this.fetchWithCsrf('/ui/session/' + this.currentSessionId + '/clear-document', {
                 method: 'POST',
@@ -2804,10 +2804,10 @@ class NexeUI {
     _scheduleRender(el, content) {
         // Render markdown max every 80ms to avoid overloading the DOM
         if (this._renderTimer) return;
-        // Primer token amb text REAL — treu el placeholder wave. No el
-        // netegem amb `content` buit, ja que els chunks [MODEL_LOADING]
-        // arriben abans dels tokens i netejarien el placeholder deixant
-        // un forat mentre el model encara carrega a VRAM.
+        // First token with REAL text — removes the placeholder wave. We do not
+        // clear it with empty `content`, since [MODEL_LOADING] chunks
+        // arrive before tokens and would clear the placeholder leaving
+        // a gap while the model is still loading into VRAM.
         if (el && el.classList.contains('thinking-placeholder') && content && content.trim()) {
             el.classList.remove('thinking-placeholder');
             el.textContent = '';

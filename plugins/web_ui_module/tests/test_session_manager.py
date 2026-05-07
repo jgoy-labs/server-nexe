@@ -1,6 +1,6 @@
 """
-Tests unitaris per SessionManager i ChatSession.
-Sense GPU — tota la lògica és en memòria + disc (tmp_path).
+Unit tests for SessionManager and ChatSession.
+Without GPU — all logic is in-memory + disk (tmp_path).
 """
 import json
 from datetime import datetime, timezone, timedelta
@@ -177,7 +177,7 @@ class TestSessionManagerCRUD:
 
 
 # ═══════════════════════════════════════════════════════════════
-# SessionManager — Persistència
+# SessionManager — Persistence
 # ═══════════════════════════════════════════════════════════════
 
 class TestSessionManagerPersistence:
@@ -186,7 +186,7 @@ class TestSessionManagerPersistence:
         sm1 = SessionManager(storage_path=str(tmp_path))
         s = sm1.create_session(session_id="persist-me")
         s.add_message("user", "hello")
-        sm1._save_session_to_disk(s)  # persistència explícita
+        sm1._save_session_to_disk(s)  # explicit persistence
 
         sm2 = SessionManager(storage_path=str(tmp_path))
         loaded = sm2.get_session("persist-me")
@@ -300,7 +300,7 @@ class TestChatSessionCompacting:
         assert s.compaction_count == 0
         s.apply_compaction("resum 1")
         assert s.compaction_count == 1
-        # Afegir més missatges i compactar de nou
+        # Add more messages and compact again
         self._fill_session(s, 10)
         s.apply_compaction("resum 2")
         assert s.compaction_count == 2
@@ -486,7 +486,7 @@ class TestCorruptedSessionsDiagnosis:
     def test_corrupted_enc_logged_as_error(self, tmp_path, crypto, caplog):
         import logging
         other_crypto_bad = tmp_path / "rogue.enc"
-        # Escriu bytes que no són un .enc vàlid (nonce correcte, ciphertext aleatori)
+        # Write bytes that are not a valid .enc (correct nonce, random ciphertext)
         import os as _os
         other_crypto_bad.write_bytes(_os.urandom(64))
 

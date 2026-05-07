@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 MAX_MEMORY_ENTRIES = 500          # Maximum entries in personal_memory
 SIMILARITY_THRESHOLD = 0.80       # No guardar si similaritat > 80% (baixat de 0.85)
 PRUNE_BATCH_SIZE = 30             # How many entries to remove when the limit is exceeded
-TEMPORAL_DECAY_DAYS = 7           # Dies per aplicar decay temporal (recent = bonus)
+TEMPORAL_DECAY_DAYS = 7           # Days to apply temporal decay (recent = bonus)
 MIN_IMPORTANCE_SCORE = 0.3        # Minimum to save (filters out chatter)
 DELETE_THRESHOLD = 0.20           # Threshold for delete search. History: 0.82 → 0.70 → 0.55 → 0.20 (bug #18 e2e 2026-04-15). Low threshold guarantees the fact is found even with paraphrase-multilingual scoring. IMPORTANT: only the top-1 result is deleted (see delete_from_memory), so a low threshold is safe — we find more candidates but only act on the best match.
 
@@ -43,12 +43,12 @@ MEMORY_TYPES = {
 # Intent patterns for memory operations (Catalan + Spanish + English)
 # Patterns that indicate user wants to SAVE something
 SAVE_TRIGGERS = [
-    # Catalan — al final del missatge
+    # Catalan — at the end of the message
     r',?\s*(ho\s+)?pots\s+guardar\??$',
     r',?\s*(ho\s+)?pots\s+recordar\??$',
     r',?\s*guarda[\-\']?ho\??$',
     r',?\s*desa[\-\']?ho\??$',
-    # Catalan — al principi del missatge ("Recorda que X")
+    # Catalan — at the beginning of the message ("Recorda que X")
     r'^recorda\s+que\s+',
     r'^guarda\s+que\s+',
     r'^apunta\s+que\s+',
@@ -57,28 +57,28 @@ SAVE_TRIGGERS = [
     r'\brecordar?\b.*mem[oò]ria',
     r'\bdesa\b.*mem[oò]ria',
     r'\bapunta\b.*mem[oò]ria',
-    # Spanish — al final del missatge
+    # Spanish — at the end of the message
     r',?\s*lo\s+puedes\s+guardar\??$',
     r',?\s*puedes\s+guardar(lo)?\??$',
     r',?\s*lo\s+puedes\s+recordar\??$',
     r',?\s*puedes\s+recordar(lo)?\??$',
     r',?\s*gu[aá]rda(lo)?\??$',
     r',?\s*recu[eé]rda(lo)?\??$',
-    # Spanish — al principi del missatge ("Recuerda que X")
+    # Spanish — at the beginning of the message ("Recuerda que X")
     r'^recuerda\s+que\s+',
     r'^guarda\s+que\s+',
     r'^apunta\s+que\s+',
-    # Spanish — amb "memoria"
+    # Spanish — with "memoria"
     r'\bguardar?\b.*memoria',
     r'\brecordar?\b.*memoria',
-    # English — al final del missatge
+    # English — at the end of the message
     r',?\s*(can\s+you\s+)?(please\s+)?save\s+(it|this|that)\??$',
     r',?\s*(can\s+you\s+)?(please\s+)?remember\s+(it|this|that)\??$',
     r',?\s*save\s+it\??$',
-    # English — al principi del missatge ("Remember that X")
+    # English — at the beginning of the message ("Remember that X")
     r'^remember\s+that\s+',
     r'^save\s+that\s+',
-    # English — amb "memory"
+    # English — with "memory"
     r'\bsave\b.*memory',
     r'\bremember\b.*memory',
 ]
@@ -155,11 +155,11 @@ CLEAR_ALL_CONFIRM_TRIGGERS = [
 
 # Patterns that indicate user wants to DELETE/FORGET something
 DELETE_TRIGGERS = [
-    # Catalan — al principi ("Oblida que X", "Esborra que X")
+    # Catalan — at the beginning ("Oblida que X", "Esborra que X")
     r'^oblida\s+(que\s+)?',
     r'^esborra\s+(que\s+)?',
     r'^elimina\s+(que\s+)?',
-    # Catalan — al final ("..., oblida-ho", "..., esborra-ho")
+    # Catalan — at the end ("..., oblida-ho", "..., esborra-ho")
     r',?\s*(ho\s+)?pots\s+oblidar\??$',
     r',?\s*(ho\s+)?pots\s+esborrar\??$',
     r',?\s*oblida[\-\']?ho\??$',
@@ -168,27 +168,27 @@ DELETE_TRIGGERS = [
     r'\boblidar?\b.*mem[oò]ria',
     r'\besborrar?\b.*mem[oò]ria',
     r'\beliminar?\b.*mem[oò]ria',
-    # Spanish — al principi
+    # Spanish — at the beginning
     r'^olvida\s+(que\s+)?',
     r'^borra\s+(que\s+)?',
     r'^elimina\s+(que\s+)?',
-    # Spanish — al final
+    # Spanish — at the end
     r',?\s*(lo\s+)?puedes\s+olvidar\??$',
     r',?\s*(lo\s+)?puedes\s+borrar\??$',
     r',?\s*olv[ií]da(lo)?\??$',
     r',?\s*b[oó]rra(lo)?\??$',
-    # Spanish — amb "memoria"
+    # Spanish — with "memoria"
     r'\bolvidar?\b.*memoria',
     r'\bborrar?\b.*memoria',
-    # English — al principi
+    # English — at the beginning
     r'^forget\s+(that\s+)?',
     r'^delete\s+(that\s+)?',
     r'^erase\s+(that\s+)?',
-    # English — al final
+    # English — at the end
     r',?\s*(can\s+you\s+)?(please\s+)?forget\s+(it|this|that)\??$',
     r',?\s*(can\s+you\s+)?(please\s+)?delete\s+(it|this|that)\??$',
     r',?\s*forget\s+it\??$',
-    # English — amb "memory"
+    # English — with "memory"
     r'\bforget\b.*memory',
     r'\bdelete\b.*memory',
     r'\berase\b.*memory',
@@ -241,7 +241,7 @@ class MemoryHelper:
         self.list_triggers = [re.compile(p, re.IGNORECASE) for p in LIST_TRIGGERS]
         self.clear_all_triggers = [re.compile(p, re.IGNORECASE) for p in CLEAR_ALL_TRIGGERS]
         self.clear_all_confirm_triggers = [re.compile(p, re.IGNORECASE) for p in CLEAR_ALL_CONFIRM_TRIGGERS]
-        # Patterns per detectar xerrameca (no guardar)
+        # Patterns to detect chatter (do not save)
         self.skip_patterns = [
             re.compile(r'^(hola|hey|ei|bon dia|bona tarda|bones|adéu|fins aviat)', re.IGNORECASE),
             re.compile(r'^(hi|hello|hey|good morning|bye|goodbye)', re.IGNORECASE),
@@ -293,7 +293,7 @@ class MemoryHelper:
                 _memory_api_init_failed = False
                 _memory_api_last_failure_ts = None
             try:
-                # Reutilitzar el singleton de v1.py si ja existeix (evita duplicar fastembed TextEmbedding)
+                # Reuse the v1.py singleton if it already exists (avoids duplicating fastembed TextEmbedding)
                 try:
                     from memory.memory.api.v1 import get_memory_api as _get_v1_api
                     api = await _get_v1_api()
@@ -426,7 +426,7 @@ class MemoryHelper:
             return False
         except Exception as e:
             logger.warning(f"Duplicate check failed: {e}")
-            return False  # En cas de dubte, guardar
+            return False  # When in doubt, save
 
     def _calculate_retention_score(self, entry) -> float:
         """
@@ -796,7 +796,7 @@ class MemoryHelper:
         if not memory:
             return {"success": False, "chunks_saved": 0, "message": "Memory API not available"}
 
-        # Documents van a user_knowledge (separat de personal_memory que es per memoria personal)
+        # Documents go to user_knowledge (separate from personal_memory which is for personal memory)
         DOC_COLLECTION = "user_knowledge"
         if not await memory.collection_exists(DOC_COLLECTION):
             await memory.create_collection(DOC_COLLECTION, vector_size=DEFAULT_VECTOR_SIZE)
@@ -820,12 +820,12 @@ class MemoryHelper:
         # 50 → behaviour-preserving). See memory/memory/config.py.
         BATCH_SIZE = resolve_ingest_config(memory).store_batch_size
 
-        # Defense-in-depth — Apliquem `_filter_rag_injection` a cada chunk
-        # abans d'indexar a `user_knowledge`. El mateix filtre ja es fa a
-        # retrieval (`_sanitize_rag_context`), però un document amb tags
-        # `[MEM_SAVE:]`, `[MEMORIA:]` o `[CONTEXT ...]` no hauria d'arribar
-        # mai al vector index sense neutralitzar. El filtre NO trunca — la
-        # truncació només s'aplica a RETRIEVAL.
+        # Defense-in-depth — We apply `_filter_rag_injection` to each chunk
+        # before indexing to `user_knowledge`. The same filter is already applied at
+        # retrieval (`_sanitize_rag_context`), but a document with tags
+        # `[MEM_SAVE:]`, `[MEMORIA:]` or `[CONTEXT ...]` should never reach
+        # the vector index unneutralized. The filter does NOT truncate —
+        # truncation only applies at RETRIEVAL.
         for batch_start in range(0, total, BATCH_SIZE):
             batch_end = min(batch_start + BATCH_SIZE, total)
             batch_chunks = chunks[batch_start:batch_end]

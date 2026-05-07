@@ -1,9 +1,9 @@
 """
-Tests per ChatSession.add_message amb image_b64 — Fix bug #19c.
+Tests for ChatSession.add_message with image_b64 — Fix bug #19c.
 
-Objectiu: les imatges adjuntades a un missatge han de persistir entre
-sessions (save → reload). Abans del fix, add_message() descartava image_b64
-i la imatge desapareixia al recarregar.
+Objective: images attached to a message must persist between
+sessions (save → reload). Before the fix, add_message() discarded image_b64
+and the image disappeared on reload.
 """
 
 import base64

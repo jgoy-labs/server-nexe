@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/checks/auth_check.py
-Description: Security check per validar la configuracio d'autenticacio.
+Description: Security check to validate the authentication configuration.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -18,16 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 class AuthCheck:
-    """Valida la configuracio d'autenticacio del sistema."""
+    """Validates the system authentication configuration."""
 
     def __init__(self, project_root: Path = None):  # type: ignore[assignment]  # no_implicit_optional
         self.project_root = project_root or Path(__file__).parent.parent.parent.parent
 
     def run(self) -> List[Dict[str, Any]]:
-        """Executa els checks d'autenticacio."""
+        """Runs the authentication checks."""
         findings = []
 
-        # Check 1: API keys configurades?
+        # Check 1: API keys configured?
         primary_key = os.getenv("NEXE_PRIMARY_API_KEY", "")
         secondary_key = os.getenv("NEXE_SECONDARY_API_KEY", "")
         admin_key = os.getenv("NEXE_ADMIN_API_KEY", "")
@@ -51,7 +51,7 @@ class AuthCheck:
                     "recommendation": "Set NEXE_PRIMARY_API_KEY environment variable"
                 })
 
-        # Check 2: Dev mode en produccio?
+        # Check 2: Dev mode in production?
         nexe_env = os.getenv("NEXE_ENV", "development").lower()
         if dev_mode and nexe_env == "production":
             findings.append({
@@ -73,7 +73,7 @@ class AuthCheck:
                 "recommendation": "Disable NEXE_DEV_MODE_ALLOW_REMOTE"
             })
 
-        # Check 4: Clau secundaria activa (hauria de migrar-se)
+        # Check 4: Secondary key still active (should be migrated)
         if secondary_key:
             findings.append({
                 "check": "auth_config",
@@ -83,7 +83,7 @@ class AuthCheck:
                 "recommendation": "Remove NEXE_SECONDARY_API_KEY after migration"
             })
 
-        # Check 5: Module allowlist en produccio
+        # Check 5: Module allowlist in production
         approved = os.getenv("NEXE_APPROVED_MODULES", "").strip()
         if nexe_env == "production" and not approved:
             findings.append({

@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/ollama_module/health.py
-Description: Facade get_health() per al modul Ollama.
-             F7 FIX: Async health check (no bloqueja event loop).
+Description: Facade get_health() for the Ollama module.
+             F7 FIX: Async health check (does not block the event loop).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -18,7 +18,7 @@ from typing import Dict, Any
 try:
     import httpx
 except ImportError:
-    httpx = None  # type: ignore[assignment]  # Module|None, httpx absent en entorns sense dependència
+    httpx = None  # type: ignore[assignment]  # Module|None, httpx absent in environments without the dependency
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,8 @@ OLLAMA_HEALTH_TIMEOUT = float(os.getenv('NEXE_OLLAMA_HEALTH_TIMEOUT', '5.0'))
 
 async def get_health_async() -> Dict[str, Any]:
     """
-    Health check ASYNC del modul Ollama (F7 fix).
-    No bloqueja l'event loop.
+    ASYNC health check for the Ollama module (F7 fix).
+    Does not block the event loop.
     """
     if httpx is None:
         return {
@@ -74,8 +74,8 @@ async def get_health_async() -> Dict[str, Any]:
 
 def get_health() -> Dict[str, Any]:
     """
-    Facade sincrona — delega a get_health_async.
-    Si ja dins event loop, retorna resultat basic.
+    Synchronous facade — delegates to get_health_async.
+    If already inside an event loop, returns a basic result.
     """
     try:
         loop = asyncio.get_running_loop()
@@ -83,7 +83,7 @@ def get_health() -> Dict[str, Any]:
         loop = None
 
     if loop and loop.is_running():
-        # Dins event loop — retornem basic sense bloquejar
+        # Inside event loop — return basic result without blocking
         return {
             "name": "ollama_module",
             "status": "unknown",

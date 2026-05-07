@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/checks/rate_limit_check.py
-Description: Security check per validar la configuracio de rate limiting.
+Description: Security check to validate the rate limiting configuration.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -18,16 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 class RateLimitCheck:
-    """Valida la configuracio de rate limiting."""
+    """Validates the rate limiting configuration."""
 
     def __init__(self, project_root: Path = None):  # type: ignore[assignment]  # no_implicit_optional
         self.project_root = project_root or Path(__file__).parent.parent.parent.parent
 
     def run(self) -> List[Dict[str, Any]]:
-        """Executa els checks de rate limiting."""
+        """Runs the rate limiting checks."""
         findings = []
 
-        # Check 1: slowapi disponible?
+        # Check 1: slowapi available?
         try:
             import slowapi
             findings.append({
@@ -46,7 +46,7 @@ class RateLimitCheck:
                 "recommendation": "Install slowapi: pip install slowapi"
             })
 
-        # Check 2: Limits configurats
+        # Check 2: Limits configured
         global_limit = os.getenv("NEXE_RATE_LIMIT_GLOBAL", "")
         if not global_limit:
             findings.append({
@@ -57,7 +57,7 @@ class RateLimitCheck:
                 "recommendation": "Set NEXE_RATE_LIMIT_GLOBAL for custom limits"
             })
 
-        # Check 3: Rate limit tracker funcional?
+        # Check 3: Rate limit tracker functional?
         try:
             from plugins.security.core.rate_limiting import RateLimitTracker
             # Side-effect: instantiation verifies the tracker can be constructed.
@@ -78,7 +78,7 @@ class RateLimitCheck:
                 "recommendation": "Check plugins/security/core/rate_limiting.py"
             })
 
-        # Check 4: Limits de produccio
+        # Check 4: Production limits
         nexe_env = os.getenv("NEXE_ENV", "development").lower()
         health_limit = os.getenv("NEXE_RATE_LIMIT_HEALTH", "1000/minute")
         if nexe_env == "production":

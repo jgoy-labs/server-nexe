@@ -2,8 +2,8 @@
 ------------------------------------
 Server Nexe
 Location: plugins/web_ui_module/api/routes_auth.py
-Description: Endpoints d'autenticacio, info, backends i health.
-             Extret de routes.py durant refactoring de tech debt.
+Description: Authentication, info, backends, and health endpoints.
+             Extracted from routes.py during tech debt refactoring.
 
 www.jgoy.net · https://server-nexe.org
 ------------------------------------
@@ -42,23 +42,23 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Idioma del servidor — mutable via UI
+# Server language — mutable via UI
 _server_lang = _os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
 
 def get_server_lang() -> str:
     return _server_lang
 
 
-# P1-A: Rate limit de fallades d'autenticació per IP.
-# Dict en memòria: {ip: [timestamps monotonic de fallades dins de la finestra]}.
-# Nexe 0.9.x és single-worker (uvicorn workers=1) — no cal lock.
+# P1-A: Rate limit for authentication failures per IP.
+# In-memory dict: {ip: [monotonic timestamps of failures within the window]}.
+# Nexe 0.9.x is single-worker (uvicorn workers=1) — no lock needed.
 _ui_auth_failures: dict[str, list[float]] = {}
-_UI_RATE_LIMIT: int = 20   # màxim d'intents fallits dins la finestra
-_UI_RATE_WINDOW: float = 60.0  # finestra en segons
+_UI_RATE_LIMIT: int = 20   # maximum failed attempts within the window
+_UI_RATE_WINDOW: float = 60.0  # window in seconds
 
 
 def _check_ui_rate_limit(ip: str) -> bool:
-    """Retorna True si la IP ha superat el límit de fallades d'auth."""
+    """Returns True if the IP has exceeded the auth failure limit."""
     now = _time.monotonic()
     cutoff = now - _UI_RATE_WINDOW
     timestamps = [t for t in _ui_auth_failures.get(ip, []) if t > cutoff]
@@ -67,7 +67,7 @@ def _check_ui_rate_limit(ip: str) -> bool:
 
 
 def _record_ui_auth_failure(ip: str) -> None:
-    """Registra una fallada d'autenticació per a la IP donada."""
+    """Records an authentication failure for the given IP."""
     now = _time.monotonic()
     cutoff = now - _UI_RATE_WINDOW
     timestamps = [t for t in _ui_auth_failures.get(ip, []) if t > cutoff]
@@ -76,12 +76,12 @@ def _record_ui_auth_failure(ip: str) -> None:
 
 
 def make_require_ui_auth():
-    """Crea la dependencia FastAPI d'autenticacio per a la Web UI.
+    """Creates the FastAPI authentication dependency for the Web UI.
 
-    FAIL CLOSED: si no hi ha API key configurada al servidor, totes les
-    peticions UI son rebutjades amb 503. Mai mode permissive (que era el
-    bug Codex P1: si NEXE_PRIMARY_API_KEY/NEXE_ADMIN_API_KEY estaven
-    buides, les rutes UI quedaven obertes a tothom).
+    FAIL CLOSED: if no API key is configured on the server, all
+    UI requests are rejected with 503. Never permissive mode (which was
+    the Codex P1 bug: if NEXE_PRIMARY_API_KEY/NEXE_ADMIN_API_KEY were
+    empty, the UI routes were open to everyone).
 
     R6-15 v1.0.4: same FAIL CLOSED behaviour applies when the security plugin
     itself is absent — protected endpoints return 503, never 200 unauthorized.
@@ -90,7 +90,7 @@ def make_require_ui_auth():
         request: Request,
         x_api_key: Optional[str] = Header(None),
     ):
-        """Valida API key per a endpoints de la Web UI (FAIL CLOSED)"""
+        """Validates API key for Web UI endpoints (FAIL CLOSED)"""
         if not _SECURITY_AVAILABLE:
             # Degraded mode: security plugin missing. Public endpoints (UI
             # static, /health) bypass this dependency; protected endpoints
@@ -107,7 +107,7 @@ def make_require_ui_auth():
                 status_code=503,
                 detail=get_message(get_i18n(request), "webui.auth.no_key_configured")
             )
-        # P1-A: Rate limit check — ABANS del compare_digest per evitar timing side-channel
+        # P1-A: Rate limit check — BEFORE compare_digest to avoid timing side-channel
         _client_ip = str(request.client.host) if request.client else "unknown"
         if _check_ui_rate_limit(_client_ip):
             raise HTTPException(
@@ -115,9 +115,9 @@ def make_require_ui_auth():
                 detail="Too many authentication failures. Try again later.",
             )
         if not secrets.compare_digest(x_api_key or "", expected):
-            # P1-A: Registra la fallada per al rate limit
+            # P1-A: Record the failure for rate limiting
             _record_ui_auth_failure(_client_ip)
-            # P1-B: Log auth failure al security log (patró de auth_dependencies.py:185-195)
+            # P1-B: Log auth failure to the security log (pattern from auth_dependencies.py:185-195)
             try:
                 from plugins.security.security_logger import get_security_logger
                 _sec_log = get_security_logger()
@@ -136,12 +136,12 @@ def make_require_ui_auth():
 
 
 def _persist_env_vars(updates: dict) -> None:
-    """Escriu/actualitza parells clau=valor al fitxer .env del projecte.
+    """Writes/updates key=value pairs in the project's .env file.
 
-    - Si la clau ja existeix, substitueix el valor a la mateixa línia.
-    - Si no existeix, afegeix la línia al final.
-    - No toca les línies de comentaris ni les altres claus.
-    - Si no existeix el fitxer .env (instal·lació sense fitxer), silencia.
+    - If the key already exists, replaces the value on the same line.
+    - If it doesn't exist, appends the line at the end.
+    - Does not touch comment lines or other keys.
+    - If the .env file doesn't exist (installation without file), silences.
     """
     env_path = Path(__file__).parents[3] / ".env"
     if not env_path.exists():
@@ -170,13 +170,13 @@ def _persist_env_vars(updates: dict) -> None:
 
 
 def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
-    """Registra endpoints: /auth, /info, /backends, /backend, /health"""
+    """Registers endpoints: /auth, /info, /backends, /backend, /health"""
 
     # -- GET /auth --
 
     @router.get("/auth", operation_id="webui_verify_auth")
     async def verify_auth(_auth=Depends(require_ui_auth)):
-        """Verificar API key"""
+        """Verify API key"""
         return {"status": "ok"}
 
     # -- POST /lang --
@@ -187,7 +187,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         _auth=Depends(require_ui_auth),
         i18n=Depends(get_i18n),
     ):
-        """Canvia l'idioma del servidor"""
+        """Change the server language"""
         global _server_lang
         lang = body.get("lang", "").strip().lower()
         if lang not in ("ca", "es", "en"):
@@ -204,7 +204,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
 
     @router.get("/info", operation_id="webui_info")
     async def get_ui_info(_auth=Depends(require_ui_auth)):
-        """Info del model i backend actiu"""
+        """Active model and backend info"""
         import os
         model_name = os.getenv("NEXE_DEFAULT_MODEL", "")
         configured_backend = os.getenv("NEXE_MODEL_ENGINE", "auto")
@@ -213,7 +213,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
             from core.lifespan import get_server_state
             state = get_server_state()
             version = state.config.get('meta', {}).get('version', '0.9')
-            # Detectar backend real (com /status)
+            # Detect actual backend (as in /status)
             modules = getattr(state, 'modules', {}) or {}
             if configured_backend in ("mlx", "auto"):
                 mlx_mod = modules.get("mlx_module")
@@ -266,14 +266,14 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
 
     @router.get("/backends", operation_id="webui_list_backends")
     async def list_backends(_auth=Depends(require_ui_auth)):
-        """Llista backends disponibles amb els seus models"""
+        """List available backends with their models"""
         import os
         from core.lifespan import get_server_state
 
         module_manager = get_server_state().module_manager
         backends = []
 
-        # Directori de models local
+        # Local models directory
         models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
         if not models_dir.is_absolute():
             from core.lifespan import get_server_state
@@ -330,7 +330,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                 mlx_list = []
                 for d in models_dir.iterdir():
                     if d.is_dir():
-                        # Sumar fitxers .safetensors per estimar mida
+                        # Sum .safetensors files to estimate size
                         size = sum(f.stat().st_size for f in d.rglob("*.safetensors") if f.is_file())
                         mlx_list.append({"name": d.name, "size_gb": round(size / (1024**3), 1) if size else 0})
                 if mlx_list:
@@ -338,7 +338,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         except Exception as e:
             logger.debug(f"MLX backend scan failed: {e}")
 
-        # Llama.cpp - nomes mostrar si hi ha fitxers .gguf disponibles
+        # Llama.cpp - only show if there are .gguf files available
         try:
             reg = module_manager.registry.get_module("llama_cpp_module")
             if reg and reg.instance:
@@ -363,7 +363,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                     b["active"] = True
                     active_set = True
                     break
-        # Fallback: activar primer backend connectat
+        # Fallback: activate first connected backend
         if not active_set:
             for b in backends:
                 if b.get("connected", True) and b["models"]:
@@ -377,10 +377,10 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
 
     # -- POST /backend --
 
-    # Bug 27 (2026-04-06) — normalització de noms de backend. El catàleg i
-    # els `.env` antics poden usar `llama_cpp`/`llama-cpp`/`llama_cpp_module`
-    # mentre que l'API esperava `llamacpp`. Acceptem tots aquests i els
-    # traduïm al nom canònic sense trencar backwards-compat.
+    # Bug 27 (2026-04-06) — backend name normalization. The catalog and
+    # old `.env` files may use `llama_cpp`/`llama-cpp`/`llama_cpp_module`
+    # while the API expected `llamacpp`. We accept all of these and
+    # translate them to the canonical name without breaking backwards-compat.
     _BACKEND_ALIASES = {
         "ollama": "ollama",
         "ollama_module": "ollama",
@@ -394,30 +394,29 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     }
 
     def _normalize_backend_name(name: str) -> str:
-        """Retorna el nom canònic del backend o '' si és invàlid."""
+        """Returns the canonical backend name or '' if invalid."""
         return _BACKEND_ALIASES.get((name or "").lower().strip(), "")
 
     async def _backend_model_exists(canonical_backend: str, model_name: str) -> bool:
-        """Verifica best-effort que el model existeix per al backend indicat.
+        """Best-effort verification that the model exists for the indicated backend.
 
-        Bug 26 (2026-04-06) — abans s'acceptava qualsevol model sense
-        verificar i l'error només apareixia al primer chat. Ara, com a
-        mínim per Ollama (que té un endpoint de listing), comprovem que
-        el model existeix abans d'acceptar el canvi.
+        Bug 26 (2026-04-06) — previously any model was accepted without
+        verification and the error only appeared on the first chat. Now, at
+        least for Ollama (which has a listing endpoint), we check that
+        the model exists before accepting the change.
 
-        Per MLX/llamacpp la verificació exhaustiva requereix tocar el
-        plugin corresponent: acceptem sempre (best-effort) i ja fallarà
-        al primer ús si el model no existeix.
+        For MLX/llamacpp exhaustive verification requires touching the
+        corresponding plugin: we always accept (best-effort) and it will fail
+        on first use if the model doesn't exist.
 
-        ⚠️ Dev D (Consultor passada 1): si Ollama no és accessible o tornem
-        abans de la verificació per timeout/error, acceptem optimisticament
-        (retornem True) per no bloquejar el canvi de backend durant downtime
-        d'Ollama. Això és un **mitigant parcial** del bug: quan Ollama cau,
-        podem acceptar un model inexistent. Loguem explícitament el cas per
-        traçabilitat.
+        ⚠️ Dev D (Consultant pass 1): if Ollama is not accessible or we return
+        before verification due to timeout/error, we accept optimistically
+        (return True) to avoid blocking backend switches during Ollama downtime.
+        This is a **partial mitigation** of the bug: when Ollama is down,
+        we may accept a non-existent model. We log explicitly for traceability.
         """
         if not model_name:
-            return True  # permetre canvi de backend sense model
+            return True  # allow backend change without model
         if canonical_backend == "ollama":
             try:
                 import httpx
@@ -433,10 +432,10 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                         return True
                     data = resp.json()
                     available = [m.get("name", "") for m in data.get("models", [])]
-                    # Acceptem match exacte o amb sufix :latest
+                    # Accept exact match or with :latest suffix
                     if model_name in available or f"{model_name}:latest" in available:
                         return True
-                    # Partial match: mateixa família (ex. "qwen3.5:4b" → "qwen3.5")
+                    # Partial match: same family (e.g. "qwen3.5:4b" → "qwen3.5")
                     base = model_name.split(":")[0]
                     return any(base == a.split(":")[0] for a in available)
             except Exception as e:
@@ -445,13 +444,13 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                     "Ollama (%s); acceptant optimisticament",
                     model_name, e,
                 )
-                return True  # no es pot verificar → acceptem
-        # MLX / llamacpp / auto: best-effort, acceptem
+                return True  # cannot verify → accept
+        # MLX / llamacpp / auto: best-effort, accept
         return True
 
     @router.post("/backend", operation_id="webui_set_backend")
     async def set_backend(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
-        """Canvia el backend i/o model actiu en runtime. Arrenca Ollama si cal."""
+        """Change the active backend and/or model at runtime. Starts Ollama if needed."""
         import os
         import subprocess  # nosec B404: subprocess required to start Ollama (literal argv) inside set_backend endpoint, gated by require_ui_auth; mono-user local
         import shutil
@@ -459,7 +458,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         model = request.get("model", "")
         ollama_started = False
 
-        # Bug 27 — normalitzem abans de validar
+        # Bug 27 — normalize before validating
         canonical = _normalize_backend_name(raw_backend)
         if raw_backend and not canonical:
             raise HTTPException(
@@ -471,7 +470,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
             )
 
         if canonical == "ollama":
-            # Comprovar si Ollama corre, si no, intentar arrencar-lo
+            # Check if Ollama is running, if not, try to start it
             try:
                 import httpx
                 async with httpx.AsyncClient(timeout=3.0) as client:
@@ -479,10 +478,10 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                     if resp.status_code != 200:
                         raise ConnectionError()
             except Exception:
-                # Ollama no corre — intentar arrencar headless (Bug Ollama GUI 2026-04-06)
-                # Prioritzem `ollama serve` directe (sense GUI). Fallback al binari del
-                # bundle Ollama.app (també en mode headless — NO fem `open -a Ollama`
-                # perquè això llançaria la GUI completa al Dock i la finestra).
+                # Ollama is not running — try to start headless (Bug Ollama GUI 2026-04-06)
+                # We prefer direct `ollama serve` (without GUI). Fallback to the binary in
+                # the Ollama.app bundle (also headless — we do NOT run `open -a Ollama`
+                # because that would launch the full GUI to the Dock and a window).
                 if shutil.which("ollama"):
                     try:
                         subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv inside set_backend endpoint gated by require_ui_auth; mono-user local — equivalent to user running it directly
@@ -506,10 +505,10 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                     except Exception as e:
                         logger.warning(f"Could not start ollama serve from bundle: {e}")
 
-        # Bug 26 — abans d'acceptar el canvi, validar que el model existeix
-        # per al backend escollit. Si el canvi només afecta el backend (sense
-        # model), ho permetem. Si hi ha model explicit i sabem comprovar-lo,
-        # llancem 400 si no existeix.
+        # Bug 26 — before accepting the change, validate that the model exists
+        # for the chosen backend. If the change only affects the backend (no
+        # model), we allow it. If there is an explicit model and we can check it,
+        # we raise 400 if it doesn't exist.
         if canonical and model:
             if not await _backend_model_exists(canonical, model):
                 raise HTTPException(
@@ -540,9 +539,9 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
             logger.info(f"Backend changed to: {canonical}")
         if model:
             os.environ["NEXE_DEFAULT_MODEL"] = model
-            logger.info(f"Model canviat a: {model}")
+            logger.info(f"Model changed to: {model}")
 
-        # Persistir canvis al .env perquè sobrevisquin al reinici
+        # Persist changes to .env so they survive a restart
         persist = {}
         if canonical:
             persist["NEXE_MODEL_ENGINE"] = canonical
@@ -562,7 +561,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
 
     @router.get("/health", operation_id="webui_auth_health")
     async def health():
-        """Health check del plugin"""
+        """Plugin health check"""
         return {
             "status": "healthy",
             "initialized": True,

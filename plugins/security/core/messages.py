@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: plugins/security/core/messages.py
-Description: Missatges fallback i18n per security core.
+Description: Fallback i18n messages for security core.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -54,15 +54,15 @@ FALLBACK_MESSAGES = {
 
 def get_message(i18n, key: str, **kwargs) -> str:
   """
-  Obté missatge traduït o fallback.
+  Gets a translated message or fallback.
 
   Args:
-    i18n: Gestor i18n (pot ser None)
-    key: Clau del missatge
-    **kwargs: Arguments per format
+    i18n: i18n manager (can be None)
+    key: Message key
+    **kwargs: Arguments for formatting
 
   Returns:
-    Missatge formatat
+    Formatted message
   """
   if i18n:
     return i18n.t(key, **kwargs)

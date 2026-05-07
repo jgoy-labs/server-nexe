@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/__main__.py
-Description: Entry point CLI per al modul security.
-             Permet executar: python -m plugins.security [command]
+Description: CLI entry point for the security module.
+             Allows running: python -m plugins.security [command]
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

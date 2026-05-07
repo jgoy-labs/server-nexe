@@ -18,18 +18,18 @@ from .messages import get_message
 
 def validate_safe_path(requested_path: Path, base_path: Path) -> Path:
   """
-  Valida que un path no contingui path traversal (../)
+  Validates that a path does not contain path traversal (../)
 
   Args:
-    requested_path: Path sol·licitat (pot contenir ../)
-    base_path: Path base permès (root del directori segur)
+    requested_path: Requested path (may contain ../)
+    base_path: Allowed base path (root of the secure directory)
 
   Returns:
-    Path resolt i validat dins de base_path
+    Path resolved and validated within base_path
 
   Raises:
-    HTTPException 400 si conté path traversal
-    HTTPException 404 si el fitxer no existeix
+    HTTPException 400 if path traversal is detected
+    HTTPException 404 if the file does not exist
 
   Usage:
     @router.get("/assets/{filename}")
@@ -77,19 +77,19 @@ def validate_safe_path(requested_path: Path, base_path: Path) -> Path:
 
 def validate_command(command: str, allowed_commands: List[str]) -> List[str]:
   """
-  Valida i sanititza un comandament per subprocess.run
-  Prevé RCE (Remote Command Execution) mitjançant whitelist
+  Validates and sanitizes a command for subprocess.run
+  Prevents RCE (Remote Command Execution) via whitelist
 
   Args:
-    command: Comandament a validar (string)
-    allowed_commands: Llista de comandaments base permesos (whitelist)
+    command: Command to validate (string)
+    allowed_commands: List of allowed base commands (whitelist)
 
   Returns:
-    Lista de strings segura per subprocess.run(...)
+    Safe list of strings for subprocess.run(...)
 
   Raises:
-    HTTPException 400 si format invàlid
-    HTTPException 403 si comandament no permès
+    HTTPException 400 if format is invalid
+    HTTPException 403 if command is not allowed
 
   Usage:
     safe_cmd = validate_command("open file.txt", allowed_commands=["open"])
@@ -127,16 +127,16 @@ def validate_command(command: str, allowed_commands: List[str]) -> List[str]:
 
 def validate_filename(filename: str) -> str:
   """
-  Valida que un filename no contingui caràcters perillosos
+  Validates that a filename does not contain dangerous characters
 
   Args:
-    filename: Nom del fitxer a validar
+    filename: Name of the file to validate
 
   Returns:
-    Filename validat
+    Validated filename
 
   Raises:
-    HTTPException 400 si conté caràcters perillosos
+    HTTPException 400 if it contains dangerous characters
 
   Usage:
     safe_name = validate_filename(user_input)
@@ -167,17 +167,17 @@ def validate_filename(filename: str) -> str:
 
 def validate_api_endpoint_path(path: str, allowed_prefixes: List[str]) -> str:
   """
-  Valida que un path d'API estigui dins dels prefixos permesos
+  Validates that an API path is within the allowed prefixes
 
   Args:
-    path: Path de l'API a validar
-    allowed_prefixes: Llista de prefixos permesos
+    path: API path to validate
+    allowed_prefixes: List of allowed prefixes
 
   Returns:
-    Path validat
+    Validated path
 
   Raises:
-    HTTPException 403 si no està permès
+    HTTPException 403 if not allowed
 
   Usage:
     safe_path = validate_api_endpoint_path(

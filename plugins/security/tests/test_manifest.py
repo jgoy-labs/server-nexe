@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/tests/test_manifest.py
-Description: Tests per security manifest (endpoints REST, SecurityModule, init_security_module).
+Description: Tests for the security manifest (REST endpoints, SecurityModule, init_security_module).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -25,7 +25,7 @@ from plugins.security.manifest import (
 
 @pytest.fixture(scope="module")
 def app_with_security():
-    """App FastAPI amb el router de security muntat."""
+    """FastAPI app with the security router mounted."""
     _app = FastAPI()
     _app.include_router(router_public)
     return _app
@@ -45,7 +45,7 @@ def auth_headers(monkeypatch):
 
 
 class TestSecurityModule:
-    """Tests per la classe SecurityModule."""
+    """Tests for the SecurityModule class."""
 
     def test_init_no_args(self):
         mod = SecurityModule()
@@ -69,7 +69,7 @@ class TestSecurityModule:
 
 
 class TestSecurityHealthEndpoint:
-    """Tests per GET /security/health. Auditoria r4 B2: requereix X-API-Key."""
+    """Tests for GET /security/health. Audit r4 B2: requires X-API-Key."""
 
     def test_health_returns_200(self, client, auth_headers):
         response = client.get("/security/health", headers=auth_headers)
@@ -83,7 +83,7 @@ class TestSecurityHealthEndpoint:
 
 
 class TestSecurityInfoEndpoint:
-    """Tests per GET /security/info. Auditoria r4 B2: requereix X-API-Key."""
+    """Tests for GET /security/info. Audit r4 B2: requires X-API-Key."""
 
     def test_info_returns_200(self, client, auth_headers):
         response = client.get("/security/info", headers=auth_headers)
@@ -103,7 +103,7 @@ class TestSecurityInfoEndpoint:
 
 
 class TestSecurityScanEndpoint:
-    """Tests per POST /security/scan."""
+    """Tests for POST /security/scan."""
 
     def test_scan_requires_auth(self, client):
         response = client.post("/security/scan")
@@ -137,7 +137,7 @@ class TestSecurityScanEndpoint:
 
 
 class TestSecurityReportEndpoint:
-    """Tests per GET /security/report."""
+    """Tests for GET /security/report."""
 
     def test_report_requires_auth(self, client):
         response = client.get("/security/report")
@@ -156,7 +156,7 @@ class TestSecurityReportEndpoint:
 
 
 class TestSecurityAssetsEndpoint:
-    """Tests per GET /security/ui/assets/{path}."""
+    """Tests for GET /security/ui/assets/{path}."""
 
     def test_missing_asset_returns_404(self, client):
         response = client.get("/security/ui/assets/nonexistent.css")
@@ -168,7 +168,7 @@ class TestSecurityAssetsEndpoint:
 
 
 class TestSecurityUIEndpoint:
-    """Tests per GET /security/ui."""
+    """Tests for GET /security/ui."""
 
     def test_ui_returns_json_if_no_html(self, client):
         response = client.get("/security/ui")
@@ -180,7 +180,7 @@ class TestSecurityUIEndpoint:
 
 
 class TestInitSecurityModule:
-    """Tests per init_security_module."""
+    """Tests for init_security_module."""
 
     def test_returns_metadata(self, tmp_path, monkeypatch):
         result = init_security_module()

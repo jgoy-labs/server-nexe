@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/ollama_module/core/client.py
-Description: Client Ollama — connexio, auto-start, base_url.
-             Extret de module.py durant normalitzacio BUS 2026-04-06.
+Description: Ollama Client — connection, auto-start, base_url.
+             Extracted from module.py during BUS normalisation 2026-04-06.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -24,26 +24,26 @@ DEFAULT_BASE_URL = "http://localhost:11434"
 
 
 def _parent():
-    """Lazy import del modul parent per accedir a httpx patchable pels tests.
+    """Lazy import of the parent module to access httpx patchable by tests.
 
-    Els tests unit fan patch('plugins.ollama_module.module.httpx', ...) i
-    patch('plugins.ollama_module.module.httpx.AsyncClient', ...). Per tant
-    el codi extret ha de llegir httpx desde el namespace del parent i no pas
-    importar-lo directament.
+    Unit tests patch('plugins.ollama_module.module.httpx', ...) and
+    patch('plugins.ollama_module.module.httpx.AsyncClient', ...). Therefore
+    the extracted code must read httpx from the parent namespace rather than
+    importing it directly.
 
     FIXME (post-release): Refactor tests to patch core/ instead of module/.
-    Aquest "parent binding pattern" és un deute tècnic introduit durant el BUS
-    de normalització pre-release (2026-04-06) per preservar la retrocompat amb
-    30+ patches existents. Quan els tests es migrin a patch
-    'plugins.ollama_module.core.client.httpx' (i equivalents per chat.py /
-    models.py), aquest helper es pot eliminar i fer un import normal d'httpx.
+    This "parent binding pattern" is a technical debt introduced during the BUS
+    normalisation pre-release (2026-04-06) to preserve backward compatibility
+    with 30+ existing patches. When tests are migrated to patch
+    'plugins.ollama_module.core.client.httpx' (and equivalents for chat.py /
+    models.py), this helper can be removed and replaced with a normal httpx import.
     """
     from plugins.ollama_module import module as _m
     return _m
 
 
 def resolve_base_url() -> str:
-    """Resol la base_url d'Ollama desde env vars."""
+    """Resolves the Ollama base_url from env vars."""
     base_url = (
         os.getenv("NEXE_OLLAMA_HOST")
         or os.getenv("OLLAMA_HOST")
@@ -53,14 +53,14 @@ def resolve_base_url() -> str:
 
 
 class OllamaClient:
-    """Client Ollama basic — connexio i auto-start."""
+    """Basic Ollama client — connection and auto-start."""
 
     def __init__(self, base_url: str):
         self.base_url = base_url
-        self._ollama_process = None  # Popen ref per reap al shutdown (evita zombis)
+        self._ollama_process = None  # Popen ref for reaping at shutdown (avoids zombies)
 
     async def check_connection(self) -> bool:
-        """Verifica si Ollama esta accessible."""
+        """Checks if Ollama is reachable."""
         httpx = _parent().httpx
         try:
             async with httpx.AsyncClient(timeout=OLLAMA_CONNECTION_TIMEOUT) as client:
@@ -71,7 +71,7 @@ class OllamaClient:
             return False
 
     async def is_model_loaded(self, model_name: str) -> bool:
-        """Comprova si un model esta carregat a VRAM via /api/ps."""
+        """Checks if a model is loaded in VRAM via /api/ps."""
         httpx = _parent().httpx
         try:
             async with httpx.AsyncClient(timeout=OLLAMA_CONNECTION_TIMEOUT) as client:
@@ -79,9 +79,9 @@ class OllamaClient:
                 if response.status_code == 200:
                     data = response.json()
                     loaded = data.get("models", [])
-                    # Match exacte: "qwen3.5:9b" != "qwen3.5:2b"
-                    # Ollama retorna noms amb tag (e.g. "qwen3.5:9b")
-                    # Si l'usuari no posa tag, Ollama usa ":latest"
+                    # Exact match: "qwen3.5:9b" != "qwen3.5:2b"
+                    # Ollama returns names with tag (e.g. "qwen3.5:9b")
+                    # If the user omits the tag, Ollama uses ":latest"
                     target = model_name if ":" in model_name else f"{model_name}:latest"
                     for m in loaded:
                         name = m.get("name", "")
@@ -101,7 +101,7 @@ class OllamaClient:
         if httpx is None:
             return
 
-        # Comprovar si ja corre
+        # Check if already running
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get(f"{self.base_url}/api/tags")
@@ -111,20 +111,20 @@ class OllamaClient:
         except Exception:  # nosec B110: best-effort connection probe; on failure fall through to start-Ollama path
             pass
 
-        # No corre — intentar arrencar
+        # Not running — attempt to start
         is_macos = platform.system() == "Darwin"
 
-        # Bug Ollama GUI (2026-04-06) — preferim sempre `ollama serve` headless.
-        # Abans feiem `open -a Ollama` que llança la GUI completa (Dock + finestra)
-        # i molesta l'usuari constantment. El binari serve viu dins el bundle de
-        # Ollama.app i el podem invocar directament sense aixecar la GUI.
+        # Bug Ollama GUI (2026-04-06) — we always prefer headless `ollama serve`.
+        # Previously we used `open -a Ollama` which launches the full GUI (Dock + window)
+        # and constantly bothers the user. The serve binary lives inside the
+        # Ollama.app bundle and can be invoked directly without raising the GUI.
         macos_ollama_bin = "/Applications/Ollama.app/Contents/Resources/ollama"
         if is_macos and os.path.exists(macos_ollama_bin):
             try:
                 self._ollama_process = subprocess.Popen(  # nosec B603: macos_ollama_bin is hardcoded absolute path "/Applications/Ollama.app/Contents/Resources/ollama"; literal `serve`
                     [macos_ollama_bin, "serve"],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    start_new_session=True,  # No morir amb el parent process
+                    start_new_session=True,  # Don't die with the parent process
                 )
                 logger.info("ollama serve started headless from Ollama.app bundle (macOS)")
             except Exception as e:
@@ -134,7 +134,7 @@ class OllamaClient:
                 self._ollama_process = subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv; ollama via PATH (mono-user local — equivalent to running it manually)
                     ["ollama", "serve"],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    start_new_session=True  # No morir amb el parent process
+                    start_new_session=True  # Don't die with the parent process
                 )
                 logger.info("ollama serve started automatically")
             except Exception as e:
@@ -143,7 +143,7 @@ class OllamaClient:
             logger.info("Ollama not installed — skipping auto-start")
             return
 
-        # Esperar que estigui llest (max 15s)
+        # Wait until ready (max 15s)
         import asyncio
         for i in range(15):
             await asyncio.sleep(1)
@@ -158,16 +158,16 @@ class OllamaClient:
         logger.warning("Ollama started but not responding after 15s")
 
     def reap_process(self) -> None:
-        """Reap no-bloquejant del procés Ollama iniciat per nosaltres.
+        """Non-blocking reap of the Ollama process started by us.
 
-        .poll() retorna None si el procés segueix en marxa (daemon, OK),
-        o el codi de sortida si ja ha acabat (el reap evita el zombie).
+        .poll() returns None if the process is still running (daemon, OK),
+        or the exit code if it has already finished (reaping avoids the zombie).
         """
         if self._ollama_process is not None:
             self._ollama_process.poll()
 
     async def unload_all_models(self):
-        """Descarrega tots els models d'Ollama de la VRAM (shutdown helper)."""
+        """Unloads all Ollama models from VRAM (shutdown helper)."""
         httpx = _parent().httpx
         if httpx is None:
             return
