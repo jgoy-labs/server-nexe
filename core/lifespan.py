@@ -51,6 +51,7 @@ from personality.integration import APIIntegrator  # noqa: E402  # after warning
 from .config import load_config  # noqa: E402  # after warnings filter
 from .lifespan_services import (  # noqa: E402  # after warnings filter
     _auto_start_services,
+    _stop_process,
     OLLAMA_HEALTH_TIMEOUT,
     OLLAMA_UNLOAD_TIMEOUT,
 )
@@ -65,7 +66,13 @@ from .lifespan_modules import (  # noqa: E402  # after warnings filter
     initialize_plugin_modules,
     auto_ingest_knowledge,
     start_memory_service_v1,
+    _startup_module_discovery,
+    _shutdown_memory_service,
 )
+from .lifespan_crypto import _startup_encryption  # noqa: E402  # after warnings filter
+from .lifespan_qdrant import _startup_qdrant, _shutdown_qdrant  # noqa: E402  # after warnings filter
+from .lifespan_auto_clean import _startup_auto_clean  # noqa: E402  # after warnings filter
+from .lifespan_sessions import _startup_session_cleanup  # noqa: E402  # after warnings filter
 
 logger = logging.getLogger(__name__)
 
@@ -225,23 +232,18 @@ async def _prewarm_fastembed() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
   """
-  Application lifespan management
-
-  Handles:
-  - Configuration loading
-  - APIIntegrator initialization
-  - Graceful shutdown
+  Application lifespan — façade that delegates each startup/shutdown phase
+  to dedicated submodule helpers.
   """
   try:
     logger.info("=" * 70)
     logger.info("LIFESPAN STARTUP TRIGGERED")
     logger.info("=" * 70)
 
-    msg = _translate(server_state.i18n, "core.server.banner",
-      "Nexe 0.9 - Modular AI System")
+    msg = _translate(server_state.i18n, "core.server.banner", "Nexe 0.9 - Modular AI System")
     logger.info(msg)
 
-    reload_trigger = server_state.project_root / ".nexe_reload_trigger.py"  # type: ignore[operator]  # project_root is initialised by factory_state before lifespan runs
+    reload_trigger = server_state.project_root / ".nexe_reload_trigger.py"  # type: ignore[operator]
     if reload_trigger.exists():
       try:
         reload_trigger.unlink()
@@ -250,16 +252,13 @@ async def lifespan(app: FastAPI):
         logger.warning("Could not delete reload trigger: %s", e)
 
     msg = _translate(server_state.i18n, "core.server.project_root",
-      "Project root: {path}",
-      path=str(server_state.project_root))
+      "Project root: {path}", path=str(server_state.project_root))
     logger.info(msg)
 
     server_state.config = load_config(server_state.project_root, server_state.i18n)
-    app.state.config = server_state.config  # Sync: eliminates the desync between server_state and app.state
+    app.state.config = server_state.config
 
-    # === PID FILE (B06, B07, B10) ===
-    # Write the PID atomically at startup. Aborts if a live server already
-    # holds it (single-instance guard). The finally always cleans it up (B10).
+    # PID file — single-instance guard (B06, B07, B10)
     from core.config import DEFAULT_HOST, DEFAULT_PORT
     _srv_startup_cfg = server_state.config.get('core', {}).get('server', {})
     _startup_port = _srv_startup_cfg.get('port', DEFAULT_PORT)
@@ -269,80 +268,16 @@ async def lifespan(app: FastAPI):
         "Use './nexe stop' to stop the existing instance."
       )
 
-    # === ENCRYPTION AT REST (opt-in) ===
-    try:
-      from core.crypto import CryptoProvider, check_encryption_status
+    # Encryption at rest
+    await _startup_encryption(server_state)
 
-      encryption_config = server_state.config.get('security', {}).get('encryption', {})
+    # Qdrant singleton pool
+    _startup_qdrant()
 
-      # P1-D: default 'auto' — enable if sqlcipher3 is available, otherwise continue with WARNING.
-      # Env var NEXE_ENCRYPTION_ENABLED: 'auto' (default) | 'true' | 'false' | '' (legacy = auto)
-      env_crypto = os.environ.get('NEXE_ENCRYPTION_ENABLED', 'auto')
-      from memory.memory.engines.persistence import SQLCIPHER_AVAILABLE
-      crypto_enabled = _resolve_encryption_enabled(env_crypto, sqlcipher_available=SQLCIPHER_AVAILABLE)
-
-      normalized_env = env_crypto.strip().lower()
-      if normalized_env == 'true' and not SQLCIPHER_AVAILABLE:
-          raise RuntimeError(
-              "Encryption at rest requested (NEXE_ENCRYPTION_ENABLED=true) "
-              "but sqlcipher3 is not installed. The server will NOT start to avoid "
-              "a false sense of security. Either:\n"
-              "  (1) Install sqlcipher3: pip install sqlcipher3-binary\n"
-              "  (2) Disable encryption: NEXE_ENCRYPTION_ENABLED=false"
-          )
-
-      # P1-D guard: in auto mode, if plain-text data already exists, do NOT enable encryption
-      # (attempting to open it as SQLCipher would crash the server). Warn and require migration.
-      if crypto_enabled and normalized_env in ('', 'auto'):
-        storage_path_check = server_state.project_root / "storage" if server_state.project_root else None
-        if storage_path_check:
-          db_path = storage_path_check / "memory" / "memories.db"
-          if db_path.exists():
-            try:
-              with open(db_path, 'rb') as _f:
-                _header = _f.read(16)
-              if _header == b'SQLite format 3\x00':
-                crypto_enabled = False
-                logger.warning(
-                    "Encryption auto=ON skipped: existing plain-text memories.db detected. "
-                    "Run 'nexe encryption encrypt-all' to migrate data, then restart. "
-                    "Set NEXE_ENCRYPTION_ENABLED=false to suppress this warning."
-                )
-            except Exception:  # nosec B110: SQLite header probe at startup; unreadable → fall through to _resolve_encryption_enabled (comment documents intent)
-              pass  # cannot read the DB — continue with the result of _resolve_encryption_enabled
-
-      if crypto_enabled:
-        server_state.crypto_provider = CryptoProvider()
-        logger.info("Encryption at rest: ENABLED (AES-256-GCM)")
-      elif normalized_env in ('', 'auto') and not SQLCIPHER_AVAILABLE:
-        from core.crypto import format_plaintext_startup_banner
-        logger.warning(format_plaintext_startup_banner())
-      else:
-        logger.info("Encryption at rest: disabled")
-
-      # Always check for unencrypted data
-      warn_unencrypted = encryption_config.get('warn_unencrypted', True)
-      if warn_unencrypted:
-        storage_path = server_state.project_root / "storage" if server_state.project_root else None
-        check_encryption_status(storage_path)
-
-    except Exception as e:
-      if isinstance(e, RuntimeError):
-          raise  # Fail-closed: SQLCIPHER_AVAILABLE check must propagate, not be swallowed
-      logger.warning("Encryption init failed (non-fatal): %s", e)
-      server_state.crypto_provider = None
-
-    # Init Qdrant singleton pool
-    from core.qdrant_pool import get_qdrant_client, close_qdrant_client
-    qdrant_url = os.environ.get("NEXE_QDRANT_URL")
-    qdrant_path = os.environ.get("NEXE_QDRANT_PATH", "storage/vectors")
-    get_qdrant_client(url=qdrant_url, path=qdrant_path if not qdrant_url else None)
-
-    # Auto-start services (Qdrant, Ollama) if not running
-    # B09: timeout to avoid indefinite hangs if Qdrant/Ollama do not start
+    # Auto-start external services (Qdrant, Ollama) — B09 timeout
     try:
       await asyncio.wait_for(
-        _auto_start_services(server_state.config, server_state.project_root, server_state),  # type: ignore[arg-type]  # project_root is initialised by factory_state before lifespan runs
+        _auto_start_services(server_state.config, server_state.project_root, server_state),  # type: ignore[arg-type]
         timeout=STARTUP_TIMEOUT,
       )
     except asyncio.TimeoutError:
@@ -356,81 +291,27 @@ async def lifespan(app: FastAPI):
     server_config = server_state.config.get('core', {}).get('server', {})
     host = server_config.get('host', DEFAULT_HOST)
     port = server_config.get('port', DEFAULT_PORT)
-
     msg = _translate(server_state.i18n, "core.server.binding_server",
-      "Server ready at {host}:{port}",
-      host=host, port=port)
+      "Server ready at {host}:{port}", host=host, port=port)
     logger.info(msg)
-
-    msg = _translate(server_state.i18n, "core.server.all_systems_go",
-      "All systems operational - Nexe 0.9 ready!")
+    msg = _translate(server_state.i18n, "core.server.all_systems_go", "All systems operational - Nexe 0.9 ready!")
     logger.info(msg)
 
     server_state.api_integrator = APIIntegrator(app, server_state.i18n)
-
-    msg = _translate(server_state.i18n, "core.server.api_integrator_ready",
-      "API Integrator ready")
+    msg = _translate(server_state.i18n, "core.server.api_integrator_ready", "API Integrator ready")
     logger.info(msg)
 
     # Cleanup Ollama models from previous sessions
     await cleanup_ollama_startup(server_state, _translate, OLLAMA_HEALTH_TIMEOUT, OLLAMA_UNLOAD_TIMEOUT)
 
-    try:
-      if server_state.module_manager:
-        server_state.registry = server_state.module_manager.registry
-        msg = _translate(server_state.i18n, "core.server.module_manager_ready", "ModuleManager already initialized")
-        logger.info(msg)
-
-        discovered = await server_state.module_manager.discover_modules()
-        total_modules = list(server_state.module_manager._modules.keys())
-
-        # Bug 20 fix — startup summary: if discover has detected dependency
-        # cycles, show them with [WARN] prefix so they are not hidden
-        # (previously modules were silently disabled).
-        try:
-          cycle_warnings = server_state.module_manager.get_cycle_warnings()
-        except Exception:
-          cycle_warnings = []
-        for cycle_chain in cycle_warnings:
-          logger.warning(
-            "[WARN] Module dependency cycle: %s", cycle_chain
-          )
-
-        if total_modules:
-          msg = _translate(server_state.i18n, "core.server.modules_loaded",
-            "Modules loaded: {count} ({modules})",
-            count=len(total_modules), modules=', '.join(total_modules))
-          logger.info(msg)
-        else:
-          msg = _translate(server_state.i18n, "core.server.no_modules_loaded", "No modules loaded")
-          logger.warning(msg)
-
-        if discovered:
-          msg = _translate(server_state.i18n, "core.server.new_modules_discovered",
-            "Discovered {count} new modules: {modules}",
-            count=len(discovered), modules=', '.join(discovered))
-          logger.info(msg)
-        else:
-          msg = _translate(server_state.i18n, "core.server.no_new_modules",
-            "No new modules discovered in this cycle")
-          logger.debug(msg)
-
-      else:
-        msg = _translate(server_state.i18n, "core.server.module_manager_unavailable", "ModuleManager not available")
-        logger.warning(msg)
-
-    except Exception as e:
-      msg = _translate(server_state.i18n, "core.server.module_manager_error",
-        "Error with ModuleManager: {error}", error=str(e))
-      logger.warning(msg)
+    # Module discovery
+    await _startup_module_discovery(app, server_state, _translate)
 
     msg = _translate(server_state.i18n, "core.server.application_ready",
       "Application started and ready to receive requests")
     logger.info(msg)
 
-    # Load memory modules, plugins, knowledge, and MemoryService v1
-    # (extracted to lifespan_modules.py for maintainability)
-    # B09: timeout to avoid indefinite hangs in each initialisation phase
+    # Startup phases: memory, plugins, knowledge, MemoryService v1 — B09 timeout each
     _startup_phases = [
       ("memory modules", load_memory_modules(app, server_state, _translate)),
       ("plugin modules", initialize_plugin_modules(app, server_state)),
@@ -450,9 +331,6 @@ async def lifespan(app: FastAPI):
 
     # Bootstrap tokens
     setup_bootstrap_tokens(server_state, _translate)
-
-    # Bug 11: auto-renewal of the bootstrap token. Without this, in long
-    # sessions the user must restart the server when the token expires.
     try:
       bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
       auto_renew = os.getenv('NEXE_BOOTSTRAP_AUTO_RENEW', 'true').lower() == 'true'
@@ -461,6 +339,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
       logger.warning("Could not start bootstrap token auto-renewal: %s", e)
 
+    # Rate limit cleanup background task
     if hasattr(app.state, 'start_rate_limit_cleanup'):
       server_state._cleanup_task = asyncio.create_task(app.state.start_rate_limit_cleanup())
       msg = _translate(server_state.i18n, "core.server.rate_limit_cleanup_started",
@@ -471,64 +350,23 @@ async def lifespan(app: FastAPI):
     server_state._prewarm_task = asyncio.create_task(_prewarm_fastembed())
     logger.info("MemoryAPI: fastembed pre-warm task scheduled")
 
-    auto_clean_enabled = os.getenv('NEXE_AUTO_CLEAN_ENABLED', os.getenv('AUTO_CLEAN_ENABLED', 'false')).lower() == 'true'
-    if auto_clean_enabled:
-      try:
-        from personality.auto_clean.core.auto_clean import run_auto_clean
+    # Auto-clean
+    await _startup_auto_clean(server_state, _translate)
 
-        msg = _translate(server_state.i18n, "core.server.auto_clean_start",
-          "Auto-Clean: Running automatic cleanup...")
-        logger.info(msg)
-
-        dry_run = os.getenv('NEXE_AUTO_CLEAN_DRY_RUN', os.getenv('AUTO_CLEAN_DRY_RUN', 'true')).lower() == 'true'
-        result = await run_auto_clean(
-          core_root=server_state.project_root,
-          dry_run=dry_run
-        )
-
-        if result.get("files_cleaned", 0) > 0 or result.get("would_clean", 0) > 0:
-          action = "would clean" if dry_run else "cleaned"
-          count = result.get("would_clean", 0) if dry_run else result.get("files_cleaned", 0)
-          msg = _translate(server_state.i18n, "core.server.auto_clean_done",
-            "Auto-Clean: {count} files {action}", count=count, action=action)
-          logger.info(msg)
-        else:
-          msg = _translate(server_state.i18n, "core.server.auto_clean_nothing",
-            "Auto-Clean: Nothing to clean")
-          logger.debug(msg)
-
-      except ImportError:
-        logger.debug("Auto-Clean not available")
-      except Exception as e:
-        msg = _translate(server_state.i18n, "core.server.auto_clean_error",
-          "Auto-Clean error: {error}", error=str(e))
-        logger.warning(msg)
-
+    # configure_modules callback
     if hasattr(server_state, 'configure_modules_callback') and server_state.configure_modules_callback is not None:
       server_state.configure_modules_callback(server_state.api_integrator, server_state.i18n)
 
     # Session cleanup background task (N-5 / N04)
-    # Keep the reference so it can be cancelled on shutdown (N04).
-    try:
-      from plugins.web_ui_module.api.routes import start_session_cleanup_task
-      web_ui = app.state.modules.get("web_ui_module")
-      if web_ui and hasattr(web_ui, 'session_manager'):
-        server_state._session_cleanup_task = start_session_cleanup_task(web_ui.session_manager)
-        logger.info("Session cleanup task started (runs every hour)")
-      else:
-        logger.warning("web_ui_module not loaded — session cleanup task skipped")
-    except Exception as e:
-      logger.warning("Could not start session cleanup task: %s", e)
+    await _startup_session_cleanup(app, server_state)
 
-    # Final message: Server ready
+    # Final banner
     _srv_cfg = server_state.config.get("core", {}).get("server", {})
     _nexe_url = os.environ.get(
         "NEXE_API_BASE_URL",
         f"http://{_srv_cfg.get('host', DEFAULT_HOST)}:{_srv_cfg.get('port', DEFAULT_PORT)}",
     )
     _api_key = os.environ.get("NEXE_PRIMARY_API_KEY", "")
-    _lang = os.environ.get("NEXE_LANG", "ca")
-
     _crypto_status = "ENABLED" if server_state.crypto_provider else "disabled"
 
     logger.info("=" * 70)
@@ -548,70 +386,22 @@ async def lifespan(app: FastAPI):
     raise
 
   finally:
-    msg = _translate(server_state.i18n, "core.server.shutdown_initiated",
-      "System shutdown initiated...")
+    msg = _translate(server_state.i18n, "core.server.shutdown_initiated", "System shutdown initiated...")
     logger.info(msg)
 
-    # === PID FILE CLEANUP (B10) — always, even if startup failed ===
-    _remove_pid_file(server_state.project_root)  # type: ignore[arg-type]  # project_root is initialised by factory_state before lifespan runs
+    # PID file cleanup — always, even if startup failed (B10)
+    _remove_pid_file(server_state.project_root)  # type: ignore[arg-type]
 
     try:
-      # Bug 11: cleanly stop bootstrap token auto-renewal task
       try:
         await stop_bootstrap_token_renewal()
       except Exception as e:
         logger.debug("Error stopping bootstrap token renewal: %s", e)
 
-      # Cleanup Ollama models on shutdown
       await cleanup_ollama_shutdown(OLLAMA_HEALTH_TIMEOUT, OLLAMA_UNLOAD_TIMEOUT)
 
-      def _stop_process(process, name: str):
-        if not process:
-          return
-        if process.poll() is not None:
-          return
-        try:
-          import signal
-          logger.info("Stopping %s process...", name)
-          process.send_signal(signal.SIGINT)
-          process.wait(timeout=10)
-        except Exception as e:
-          logger.debug("SIGINT failed for %s: %s", name, e)
-          try:
-            process.terminate()
-            process.wait(timeout=3)
-          except Exception as e:
-            logger.debug("Terminate failed for %s: %s", name, e)
-            try:
-              process.kill()
-            except Exception:
-              logger.debug("Failed to force-stop %s process", name)
-
-      # Close Qdrant singleton pool
-      try:
-        from core.qdrant_pool import close_qdrant_client
-        close_qdrant_client()
-        logger.info("Qdrant pool closed")
-      except Exception as e:
-        logger.debug("Qdrant pool close failed: %s", e)
-
-      # Graceful shutdown MemoryService v1
-      try:
-        if hasattr(server_state, '_dreaming_task') and server_state._dreaming_task:
-          if hasattr(server_state, '_dreaming_cycle') and server_state._dreaming_cycle:
-            server_state._dreaming_cycle.stop()
-          server_state._dreaming_task.cancel()
-          try:
-            await server_state._dreaming_task
-          except (asyncio.CancelledError, Exception):
-            pass
-          logger.info("DreamingCycle stopped")
-        if hasattr(app.state, 'memory_service') and app.state.memory_service:
-          await app.state.memory_service.shutdown()
-          logger.info("MemoryService shut down")
-      except Exception as e:
-        logger.warning("MemoryService shutdown error (non-fatal): %s", e)
-
+      _shutdown_qdrant()
+      await _shutdown_memory_service(app, server_state)
       _stop_process(server_state.ollama_process, "Ollama")
 
       if server_state.api_integrator:
@@ -621,11 +411,10 @@ async def lifespan(app: FastAPI):
       # NOTE: Do NOT set module_manager or registry to None here.
       # They are stateless in-memory registries and must persist between
       # TestClient contexts (multiple lifespan cycles in the same process).
-      # Setting them to None causes "ModuleManager not available" on next startup.
       if server_state.module_manager:
         logger.debug("ModuleManager kept alive (stateless registry)")
 
-      # Cancel background cleanup tasks (N04)
+      # Cancel background tasks (N04)
       for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task'):
         _task = getattr(server_state, _task_attr, None)
         if _task is not None and not _task.done():
