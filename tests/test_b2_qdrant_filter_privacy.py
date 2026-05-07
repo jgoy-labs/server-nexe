@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_b2_qdrant_filter_privacy.py
-Description: TDD cec — B2 privacy leak: search_with_filter drops user_id filter
+Description: Blind TDD — B2 privacy leak: search_with_filter drops user_id filter
              in qdrant ≥1.11 fallback path (query_points without query_filter).
-             Onada 4.6b / xfail strict pre-fix.
+             Wave 4.6b / xfail strict pre-fix.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -33,22 +33,22 @@ def _make_point(user_id: str, content: str) -> MagicMock:
 
 
 def test_search_with_filter_user_id_drop_in_fallback():
-    """Fallback query_points() ha de respectar el user_id filter.
+    """Fallback query_points() must respect the user_id filter.
 
-    Post-fix: query_points() ha de rebre query_filter i filtrar correctament.
-    Ara: retorna user-A i user-B junts per una query filtrada a user-A.
+    Post-fix: query_points() must receive query_filter and filter correctly.
+    Current: returns user-A and user-B together for a query filtered to user-A.
 
-    Smart mock: simula el comportament real del vector store — sense query_filter
-    retorna tots els punts; amb query_filter retorna only el subset filtrat.
-    Revert mental: aplicar fix → query_points rep query_filter → test XPASS.
+    Smart mock: simulates the real vector store behaviour — without query_filter
+    returns all points; with query_filter returns only the filtered subset.
+    Mental revert: apply fix → query_points receives query_filter → test XPASS.
     """
     point_a = _make_point("user-A", "secret of A")
     point_b = _make_point("user-B", "secret of B")
 
     def _smart_query_points(collection_name, query, limit, query_filter=None, **_kw):
         res = MagicMock()
-        # Sense filtre: comportament actual buggy — retorna tots els points
-        # Amb filtre: comportament esperat post-fix — retorna sols els filtrats
+        # Without filter: current buggy behaviour — returns all points
+        # With filter: expected post-fix behaviour — returns only the filtered ones
         res.points = [point_a] if query_filter is not None else [point_a, point_b]
         return res
 
@@ -72,11 +72,11 @@ def test_search_with_filter_user_id_drop_in_fallback():
 
 
 def test_qdrant_adapter_fallback_passes_filter():
-    """Anti-regressió B2: el bloc except de search_with_filter conté query_filter=.
+    """Anti-regression B2: the except block of search_with_filter contains query_filter=.
 
-    Pin estàtic via lectura de font per detectar eliminació silenciosa del fix.
-    Post-fix: 'query_filter' ha d'aparèixer al bloc except de search_with_filter.
-    Dev#2 treu el xfail quan el fix és aplicat.
+    Static pin via source reading to detect silent removal of the fix.
+    Post-fix: 'query_filter' must appear in the except block of search_with_filter.
+    Dev#2 removes the xfail once the fix is applied.
     """
     src = _ADAPTER_FILE.read_text()
 

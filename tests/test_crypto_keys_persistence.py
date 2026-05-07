@@ -1,18 +1,18 @@
 """
-Tests per core/crypto/keys.py — Fix bug #19b pre-release (MEK persistent nivell militar).
+Tests for core/crypto/keys.py — Fix bug #19b pre-release (military-grade persistent MEK).
 
-Objectiu: garantir que la Master Encryption Key (MEK) mai es regenera mentre
-existeixi com a mínim UNA font persistent, i que sempre queda replicada a
-AMBDUES fonts (file + keyring) per resistir un reset del Keychain.
+Objective: guarantee that the Master Encryption Key (MEK) is never regenerated while
+at least ONE persistent source exists, and that it is always replicated to
+BOTH sources (file + keyring) to survive a Keychain reset.
 
-Escenari crític: robot autònom es reinicia. Si el Keychain es buida (reset OS,
-upgrade), el servidor ha de llegir del fitxer `~/.nexe/master.key`, no generar
-una clau nova que invalidi totes les sessions xifrades anteriors.
+Critical scenario: autonomous robot restarts. If the Keychain is wiped (OS reset,
+upgrade), the server must read from `~/.nexe/master.key`, not generate
+a new key that would invalidate all previously encrypted sessions.
 
-Estratègia:
-- `tmp_path` per aïllar el fitxer de clau real.
-- Monkeypatch dels wrappers `_try_keyring_get`/`_try_keyring_set` per simular
-  estat del Keychain sense tocar el Keychain real.
+Strategy:
+- `tmp_path` to isolate the real key file.
+- Monkeypatch of `_try_keyring_get`/`_try_keyring_set` wrappers to simulate
+  Keychain state without touching the real Keychain.
 """
 
 import pytest
@@ -22,7 +22,7 @@ from core.crypto import keys as crypto_keys
 
 @pytest.fixture
 def fake_keyring(monkeypatch):
-    """Keychain en memòria per tests."""
+    """In-memory Keychain for tests."""
     store = {"value": None}
 
     def _get():
@@ -39,23 +39,23 @@ def fake_keyring(monkeypatch):
 
 @pytest.fixture
 def fake_keyring_broken(monkeypatch):
-    """Keyring que falla sempre (ex: Linux headless sense secretservice)."""
+    """Keyring that always fails (e.g. headless Linux without secretservice)."""
     monkeypatch.setattr(crypto_keys, "_try_keyring_get", lambda: None)
     monkeypatch.setattr(crypto_keys, "_try_keyring_set", lambda key: False)
 
 
 @pytest.fixture(autouse=True)
 def no_env_mek(monkeypatch):
-    """Assegurar que NEXE_MASTER_KEY no contamina els tests."""
+    """Ensure NEXE_MASTER_KEY does not contaminate tests."""
     monkeypatch.delenv(crypto_keys.ENV_VAR_NAME, raising=False)
 
 
 def test_file_written_even_when_keychain_succeeds(tmp_path, fake_keyring):
-    """BUG #19b: al generar una MEK nova, el file ha d'existir EN QUALSEVOL CAS.
+    """BUG #19b: when generating a new MEK, the file must exist IN ANY CASE.
 
-    Estat actual (buggy): `if not _try_keyring_set(key): _try_file_set(...)`
-    → si el keyring funciona, el file NO es crea. Això deixa el servidor
-    depenent d'una única font (Keychain) que pot invalidar-se.
+    Current state (buggy): `if not _try_keyring_set(key): _try_file_set(...)`
+    → if keyring succeeds, the file is NOT created. This leaves the server
+    dependent on a single source (Keychain) that can be invalidated.
     """
     key_path = tmp_path / "master.key"
     assert not key_path.exists()
@@ -64,15 +64,15 @@ def test_file_written_even_when_keychain_succeeds(tmp_path, fake_keyring):
     key = crypto_keys.get_or_create_master_key(key_file_path=key_path)
 
     assert len(key) == crypto_keys.KEY_SIZE
-    assert key_path.exists(), "File backup NO escrit tot i Keychain OK — risc de pèrdua total"
+    assert key_path.exists(), "File backup NOT written despite Keychain OK — total loss risk"
     assert key_path.read_bytes() == key
-    assert fake_keyring["value"] == key, "Keychain també ha de tenir la clau"
+    assert fake_keyring["value"] == key, "Keychain must also hold the key"
 
 
 def test_file_read_first_before_keychain(tmp_path, fake_keyring):
-    """El fitxer és la font primària. Si hi ha fitxer amb una clau vàlida,
-    es llegeix d'allà sense consultar el keyring (que podria tenir una altra clau
-    antiga o nova incompatible)."""
+    """The file is the primary source. If a file with a valid key exists,
+    it is read from there without consulting the keyring (which might hold a different,
+    old or incompatible key)."""
     key_path = tmp_path / "master.key"
     file_key = b"\x11" * crypto_keys.KEY_SIZE
     keyring_key = b"\x22" * crypto_keys.KEY_SIZE
@@ -82,11 +82,11 @@ def test_file_read_first_before_keychain(tmp_path, fake_keyring):
 
     loaded = crypto_keys.get_or_create_master_key(key_file_path=key_path)
 
-    assert loaded == file_key, "Llegir del file primer: és la font de veritat permanent"
+    assert loaded == file_key, "Read file first: it is the permanent source of truth"
 
 
 def test_no_regeneration_when_file_exists(tmp_path, fake_keyring):
-    """Amb fitxer present i keyring buit, NO generar clau nova."""
+    """With file present and empty keyring, do NOT generate a new key."""
     key_path = tmp_path / "master.key"
     original_key = b"\x33" * crypto_keys.KEY_SIZE
     crypto_keys._try_file_set(original_key, path=key_path)
@@ -94,15 +94,15 @@ def test_no_regeneration_when_file_exists(tmp_path, fake_keyring):
 
     loaded = crypto_keys.get_or_create_master_key(key_file_path=key_path)
 
-    assert loaded == original_key, "Mai regenerar si el file existeix"
+    assert loaded == original_key, "Never regenerate if the file exists"
 
 
 def test_keychain_synced_to_file_on_read(tmp_path, fake_keyring):
-    """Si només hi ha keychain (sense file), al llegir-la s'ha de sincronitzar al file.
+    """If only the keychain exists (no file), reading it must sync to the file.
 
-    Cas real: usuari ve d'una versió anterior que només guardava al Keychain.
-    Al primer startup amb el nou codi, cal replicar al file per resistir
-    futurs resets del Keychain.
+    Real case: user comes from a previous version that only saved to the Keychain.
+    On first startup with the new code, replicate to file to survive
+    future Keychain resets.
     """
     key_path = tmp_path / "master.key"
     keyring_key = b"\x44" * crypto_keys.KEY_SIZE
@@ -112,43 +112,43 @@ def test_keychain_synced_to_file_on_read(tmp_path, fake_keyring):
     loaded = crypto_keys.get_or_create_master_key(key_file_path=key_path)
 
     assert loaded == keyring_key
-    assert key_path.exists(), "El fitxer no s'ha sincronitzat des del keyring"
+    assert key_path.exists(), "File was not synced from the keyring"
     assert key_path.read_bytes() == keyring_key
 
 
 def test_restart_roundtrip_same_mek_despite_keychain_reset(tmp_path, fake_keyring):
-    """Escenari robot autònom: primer start (genera clau). Reset del Keychain.
-    Segon start: ha de llegir del file, NO generar nova."""
+    """Autonomous robot scenario: first start (generates key). Keychain reset.
+    Second start: must read from file, NOT generate a new one."""
     key_path = tmp_path / "master.key"
 
     first = crypto_keys.get_or_create_master_key(key_file_path=key_path)
     assert key_path.exists()
 
-    # Reset Keychain (simula upgrade OS, corruption, etc.)
+    # Reset Keychain (simulates OS upgrade, corruption, etc.)
     fake_keyring["value"] = None
 
     second = crypto_keys.get_or_create_master_key(key_file_path=key_path)
 
-    assert second == first, "Clau ha canviat entre restarts — sessions antigues perdudes"
+    assert second == first, "Key changed between restarts — old sessions lost"
 
 
 def test_keyring_broken_falls_back_to_file_only(tmp_path, fake_keyring_broken):
-    """Linux headless sense secretservice: keyring sempre falla. El servidor
-    ha de funcionar només amb file."""
+    """Headless Linux without secretservice: keyring always fails. The server
+    must work with file only."""
     key_path = tmp_path / "master.key"
 
     first = crypto_keys.get_or_create_master_key(key_file_path=key_path)
     assert key_path.exists()
     assert len(first) == crypto_keys.KEY_SIZE
 
-    # Segon start: NO regenerar
+    # Second start: do NOT regenerate
     second = crypto_keys.get_or_create_master_key(key_file_path=key_path)
     assert second == first
 
 
 def test_file_corrupt_falls_through_to_keyring(tmp_path, fake_keyring):
-    """Si el fitxer existeix però té mida incorrecta (corrupte/manipulat),
-    el sistema ha de caure al keyring, no crashejar."""
+    """If the file exists but has the wrong size (corrupt/tampered),
+    the system must fall through to the keyring, not crash."""
     key_path = tmp_path / "master.key"
     key_path.write_bytes(b"corrupted-too-short")
     keyring_key = b"\x55" * crypto_keys.KEY_SIZE
@@ -156,11 +156,11 @@ def test_file_corrupt_falls_through_to_keyring(tmp_path, fake_keyring):
 
     loaded = crypto_keys.get_or_create_master_key(key_file_path=key_path)
 
-    assert loaded == keyring_key, "Cal fallar enrere al keyring si file corrupte"
+    assert loaded == keyring_key, "Must fall back to keyring if file is corrupt"
 
 
 def test_generate_populates_both_sources(tmp_path, fake_keyring):
-    """Al generar una MEK nova des de zero, AMBDUES fonts queden actualitzades."""
+    """When generating a new MEK from scratch, BOTH sources are populated."""
     key_path = tmp_path / "master.key"
     assert fake_keyring["value"] is None
     assert not key_path.exists()
@@ -172,8 +172,8 @@ def test_generate_populates_both_sources(tmp_path, fake_keyring):
 
 
 def test_file_set_failure_is_logged(tmp_path, monkeypatch, caplog):
-    """Si el write del fitxer falla, es loggea com error i retorna False.
-    Robustesa per sistemes amb permisos inesperats."""
+    """If the file write fails, it is logged as an error and returns False.
+    Robustness for systems with unexpected permissions."""
     import logging
     key = b"\x77" * crypto_keys.KEY_SIZE
     bad_path = tmp_path / "nonwritable.key"
@@ -191,8 +191,8 @@ def test_file_set_failure_is_logged(tmp_path, monkeypatch, caplog):
 
 
 def test_file_get_read_failure_returns_none(tmp_path, monkeypatch):
-    """Si Path.read_bytes() falla per causes inesperades, _try_file_get
-    retorna None i el fallback continua."""
+    """If Path.read_bytes() fails for unexpected reasons, _try_file_get
+    returns None and the fallback continues."""
     key_path = tmp_path / "master.key"
     key_path.write_bytes(b"\x88" * crypto_keys.KEY_SIZE)
 
@@ -206,11 +206,11 @@ def test_file_get_read_failure_returns_none(tmp_path, monkeypatch):
 
 
 def test_keyring_read_failure_returns_none(monkeypatch):
-    """Si el keyring.get_password crasheja, retornem None silenciosament."""
+    """If keyring.get_password crashes, return None silently."""
     def _import_error():
         raise RuntimeError("keyring unavailable")
 
-    # Simulem excepció dins _try_keyring_get interceptant l'import
+    # Simulate exception inside _try_keyring_get by intercepting the import
     import sys
     original_keyring = sys.modules.get("keyring")
 

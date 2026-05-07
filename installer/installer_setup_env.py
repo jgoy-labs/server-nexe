@@ -20,24 +20,24 @@ from .installer_i18n import t
 
 
 def _is_dmg_python(executable_path):
-    """Detecta si l'executable Python ve d'un DMG montat (.app dins /Volumes/)."""
+    """Detect whether the Python executable comes from a mounted DMG (.app inside /Volumes/)."""
     return "/Volumes/" in executable_path and ".app/" in executable_path
 
 
 def _find_python_bundle_root(executable_path):
-    """Troba l'arrel del bundle Python (directori amb bin/ i lib/).
+    """Find the root of the Python bundle (directory with bin/ and lib/).
 
-    Puja des de l'executable fins a trobar un directori que contingui
-    tant bin/python3 com lib/libpython3.12.dylib.
-    Retorna None si no és un bundle reconegut.
+    Walk up from the executable until finding a directory that contains
+    both bin/python3 and lib/libpython3.12.dylib.
+    Returns None if it is not a recognised bundle.
     """
     path = Path(executable_path).resolve()
-    # L'executable sol ser a .../python/bin/python3
-    # L'arrel del bundle és .../python/
+    # The executable is usually at .../python/bin/python3
+    # The bundle root is .../python/
     candidate = path.parent.parent  # bin/python3 -> python/
     if (candidate / "bin" / "python3").exists() and (candidate / "lib").exists():
         return candidate
-    # Fallback: buscar cap amunt
+    # Fallback: search upward
     for parent in path.parents:
         if (parent / "bin" / "python3").exists() and (parent / "lib" / "libpython3.12.dylib").exists():
             return parent
@@ -45,21 +45,21 @@ def _find_python_bundle_root(executable_path):
 
 
 def _copy_python_bundle(bundle_root, install_dir):
-    """Copia el bundle Python complet al directori d'instal·lació.
+    """Copy the full Python bundle to the installation directory.
 
-    Crea install_dir/python_bundle/ amb bin/ i lib/ copiats.
-    Retorna el path al python3 local.
+    Creates install_dir/python_bundle/ with bin/ and lib/ copied.
+    Returns the path to the local python3.
     """
     import shutil
 
     dest = install_dir / "python_bundle"
     dest_python = dest / "bin" / "python3"
 
-    # Si ja existeix, retorna directament
+    # If already exists, return directly
     if dest_python.exists():
         return str(dest_python)
 
-    # Copiar bin/ i lib/
+    # Copy bin/ and lib/
     dest_bin = dest / "bin"
     dest_lib = dest / "lib"
 
@@ -71,7 +71,7 @@ def _copy_python_bundle(bundle_root, install_dir):
     shutil.copytree(str(bundle_root / "bin"), str(dest_bin), symlinks=False)
     shutil.copytree(str(bundle_root / "lib"), str(dest_lib), symlinks=False)
 
-    # Assegurar permisos d'execució
+    # Ensure execute permissions
     for f in dest_bin.iterdir():
         if f.is_file():
             f.chmod(f.stat().st_mode | 0o755)
@@ -80,40 +80,40 @@ def _copy_python_bundle(bundle_root, install_dir):
 
 
 def _get_python_for_venv(project_root):
-    """Retorna el path al Python que s'ha d'usar per crear el venv.
+    """Return the Python path to use for creating the venv.
 
-    Si estem dins un DMG (sys.executable a /Volumes/*.app/), copia
-    el bundle Python al directori d'instal·lació i retorna el Python local.
-    Si no, retorna sys.executable directament.
+    If running inside a DMG (sys.executable in /Volumes/*.app/), copy
+    the Python bundle to the installation directory and return the local
+    Python. Otherwise return sys.executable directly.
     """
     if _is_dmg_python(sys.executable):
         bundle_root = _find_python_bundle_root(sys.executable)
         if bundle_root is not None:
-            print(f"  📦 DMG detectat — copiant Python bundle a {project_root}/python_bundle/")
+            print(f"  📦 DMG detected — copying Python bundle to {project_root}/python_bundle/")
             local_python = _copy_python_bundle(bundle_root, project_root)
             return local_python
     return sys.executable
 
 
 def _make_venv_standalone(venv_path):
-    """Fer el venv autònom del DMG/app bundle.
+    """Make the venv independent of the DMG/app bundle.
 
-    Quan el venv es crea amb --copies des del Python bundled:
-    1. Copia libpython3.12.dylib perque @executable_path el trobi
-    2. Re-signa ad-hoc el Python del venv (treu hardened runtime)
-       perque pugui carregar .so instal·lats per pip (PyObjC, etc.)
+    When the venv is created with --copies from the bundled Python:
+    1. Copy libpython3.12.dylib so @executable_path can find it
+    2. Ad-hoc re-sign the venv Python (remove hardened runtime)
+       so it can load .so files installed by pip (PyObjC, etc.)
     """
     import shutil
 
-    # Copiar libpython al venv perque el binari copiat la trobi
+    # Copy libpython into the venv so the copied binary can find it
     bundled_lib = Path(sys.executable).parent.parent / "lib" / "libpython3.12.dylib"
     venv_lib_dir = venv_path / "lib"
     venv_lib = venv_lib_dir / "libpython3.12.dylib"
     if bundled_lib.exists() and not venv_lib.exists():
         shutil.copy2(str(bundled_lib), str(venv_lib))
 
-    # Re-signar ad-hoc (sense hardened runtime) perque pip .so funcioni
-    # + treure quarantine (AirDrop/Safari afegeixen com.apple.quarantine)
+    # Ad-hoc re-sign (without hardened runtime) so pip .so files work
+    # + strip quarantine (AirDrop/Safari add com.apple.quarantine)
     for name in ("python3.12", "python3", "python"):
         venv_bin = venv_path / "bin" / name
         if venv_bin.exists() and not venv_bin.is_symlink():
@@ -126,7 +126,7 @@ def _make_venv_standalone(venv_path):
                 capture_output=True,
             )
 
-    # Treure quarantine de libpython copiat
+    # Strip quarantine from the copied libpython
     if venv_lib.exists():
         subprocess.run(  # nosec B603 B607: venv_lib is project_root-derived Path; xattr via PATH
             ["xattr", "-rd", "com.apple.quarantine", str(venv_lib)],
@@ -135,19 +135,19 @@ def _make_venv_standalone(venv_path):
 
 
 def _find_bundle_resources(project_root):
-    """Localitza InstallNexe.app/Contents/Resources/ amb wheels/ i embeddings/.
+    """Locate InstallNexe.app/Contents/Resources/ with wheels/ and embeddings/.
 
-    Cerca en ordre:
-    1. NEXE_BUNDLE_RESOURCES env var (set explícitament pel caller).
+    Search order:
+    1. NEXE_BUNDLE_RESOURCES env var (set explicitly by the caller).
     2. project_root/InstallNexe.app/... (dev/gitoss layout, co-located).
-    3. Volums muntats (/Volumes/*/InstallNexe.app/...) — cas DMG real: el
-       wizard SwiftUI corre des del DMG muntat, extreu el payload a
-       project_root (/Applications/server-nexe/), però l'app bundle amb
-       els wheels resta al volum DMG. Sense aquest fallback el pip.conf
-       no s'escriu i pip cau a PyPI (on llama-cpp-python només té sdist
-       → compilació → prompt CLT al M1 net).
+    3. Mounted volumes (/Volumes/*/InstallNexe.app/...) — real DMG case: the
+       SwiftUI wizard runs from the mounted DMG, extracts the payload to
+       project_root (/Applications/server-nexe/), but the app bundle with
+       the wheels stays on the DMG volume. Without this fallback pip.conf
+       is not written and pip falls back to PyPI (where llama-cpp-python
+       only has an sdist → compilation → CLT prompt on a fresh M1).
 
-    Retorna None si cap candidat té wheels/ → el flow cau a online mode.
+    Returns None if no candidate has wheels/ → the flow falls back to online mode.
     """
     # 1. Explicit env var (allows SwiftUI wizard or tests to override)
     env_path = os.environ.get("NEXE_BUNDLE_RESOURCES")
@@ -176,15 +176,15 @@ def _find_bundle_resources(project_root):
 
 
 def _write_venv_pip_conf(venv_path, wheels_dir):
-    """Escriu venv/pip.conf per forçar pip a usar nomÉs wheels locals.
+    """Write venv/pip.conf to force pip to use ONLY local wheels.
 
-    Efecte: totes les crides `pip install ...` posteriors dins el venv fan
-    servir `--find-links=wheels_dir --no-index` implícit. Zero tocar PyPI,
-    zero risc de compilació (no hi ha sdist a wheels_dir).
+    Effect: all subsequent `pip install ...` calls inside the venv implicitly
+    use `--find-links=wheels_dir --no-index`. Zero PyPI contact, zero
+    compilation risk (no sdist in wheels_dir).
 
-    Retorna True si s'ha configurat, False si wheels_dir no és usable
-    (inexistent, no és dir, o està buit). En cas False, el caller cau a
-    online mode sense tocar el pip.conf.
+    Returns True if configured, False if wheels_dir is not usable
+    (non-existent, not a dir, or empty). On False the caller falls back to
+    online mode without touching pip.conf.
     """
     if wheels_dir is None or not wheels_dir.is_dir():
         return False
@@ -205,11 +205,12 @@ def _write_venv_pip_conf(venv_path, wheels_dir):
 
 
 def _seed_fastembed_cache(bundle_embeddings_dir, cache_dir):
-    """Copia el bundle de fastembed al cache natiu de l'usuari.
+    """Copy the fastembed bundle into the user's native cache.
 
-    Així, el primer `TextEmbedding(model_name)` que fa l'installer (via
-    `install.py`) troba el model ja present i no descarrega res de HuggingFace.
-    RAG funciona offline des del primer boot.
+    This way the first `TextEmbedding(model_name)` call made by the
+    installer (via `install.py`) finds the model already present and
+    downloads nothing from HuggingFace. RAG works offline from the first
+    boot.
 
     F4.1 (audit DoD-AUD-SX-0423 §2.7): before copying, validate the bundle's
     integrity manifest (``embeddings.manifest.json``). On mismatch,
@@ -218,8 +219,8 @@ def _seed_fastembed_cache(bundle_embeddings_dir, cache_dir):
     do not ship a manifest — the verifier logs a WARNING and we copy the
     bundle as-is to stay compatible with existing 1.0.2-beta installs.
 
-    Retorna True si s'ha sembrat, False si el bundle no és usable (inexistent,
-    no és dir, o està buit). Idempotent: es pot cridar múltiples vegades.
+    Returns True if seeded, False if the bundle is not usable (non-existent,
+    not a dir, or empty). Idempotent: can be called multiple times.
     """
     import shutil as _shutil
 
@@ -248,11 +249,11 @@ def _seed_fastembed_cache(bundle_embeddings_dir, cache_dir):
 
 
 def _default_fastembed_cache_dir():
-    """Ubicació del cache de fastembed per a l'usuari actual.
+    """Location of the fastembed cache for the current user.
 
-    Respecta FASTEMBED_CACHE_DIR si està exportada (usada pel wizard al
-    dev Mac per redirigir el cache). Cau a `~/.cache/fastembed/` que és
-    la convenció cross-platform de fastembed.
+    Respects FASTEMBED_CACHE_DIR if exported (used by the wizard on the
+    dev Mac to redirect the cache). Falls back to `~/.cache/fastembed/`
+    which is the cross-platform fastembed convention.
     """
     env_override = os.environ.get("FASTEMBED_CACHE_DIR")
     if env_override:
@@ -267,25 +268,25 @@ def setup_environment(project_root, hw, engine="auto"):
 
     venv_path = project_root / "venv"
 
-    # Si el venv existeix però està trencat (pip3 no hi és), esborrar i recrear
+    # If the venv exists but is broken (pip3 is missing), delete and recreate
     if venv_path.exists():
         pip3 = venv_path / "bin" / "pip3"
         if not pip3.exists():
-            print("  ⚠️  Venv trencat detectat, recreant...")
+            print("  ⚠️  Broken venv detected, recreating...")
             _shutil.rmtree(venv_path)
 
     if not venv_path.exists():
         print(f"  📦 {t('creating_venv')}")
         if platform.system() == "Darwin":
-            # macOS: --copies --without-pip per evitar SIGABRT del binari copiat
-            # (necessita libpython copiada ABANS de poder executar ensurepip)
+            # macOS: --copies --without-pip to avoid SIGABRT from the copied binary
+            # (it needs libpython copied BEFORE ensurepip can be executed)
             python_for_venv = _get_python_for_venv(project_root)
             subprocess.run(  # nosec B603: python_for_venv from _get_python_for_venv (sys.executable or bundled Python copy); literal venv module args
                 [python_for_venv, "-m", "venv", "--copies", "--without-pip", "venv"],
                 check=True, capture_output=True,
             )
             _make_venv_standalone(venv_path)
-            # Ara el Python del venv funciona — instal·lar pip
+            # Now the venv Python works — install pip
             venv_python = str(venv_path / "bin" / "python3")
             subprocess.run([venv_python, "-m", "ensurepip", "--upgrade"], check=True, capture_output=True)  # nosec B603: venv_python is venv_path-derived absolute Path; literal ensurepip args
         else:
@@ -317,7 +318,7 @@ def setup_environment(project_root, hw, engine="auto"):
             print(f"  📦 Offline install: wheels locals ({wheels_dir})")
         embeddings_dir = bundle_resources / "embeddings"
         if _seed_fastembed_cache(embeddings_dir, _default_fastembed_cache_dir()):
-            print("  📦 Embedding model disponible offline")
+            print("  📦 Embedding model available offline")
 
     # 2. Install core requirements
     req_file = project_root / "requirements.txt"

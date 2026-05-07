@@ -88,7 +88,7 @@ def test_session_swap_attack_blocked(tmp_path, crypto):
     sm._save_session_to_disk(sa)
     sm._save_session_to_disk(sb)
 
-    # Atac swap: A.enc ↔ B.enc
+    # Swap attack: A.enc ↔ B.enc
     (storage / "sess-A.enc").rename(storage / "sess-A.enc.bak")
     (storage / "sess-B.enc").rename(storage / "sess-A.enc")
     (storage / "sess-A.enc.bak").rename(storage / "sess-B.enc")

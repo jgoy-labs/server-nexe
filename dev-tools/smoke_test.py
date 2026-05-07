@@ -4,18 +4,18 @@
 dev-tools/smoke_test.py
 Smoke Test via API HTTP — Nexe Server
 
-Prova el servidor en viu (localhost:9119) després de la instal·lació.
-NO usa pytest ni TestClient — fa requests HTTP reals.
+Tests the live server (localhost:9119) after installation.
+Does NOT use pytest or TestClient — makes real HTTP requests.
 
-Ús:
+Usage:
   python3 dev-tools/smoke_test.py
   python3 dev-tools/smoke_test.py --host localhost --port 9119
-  python3 dev-tools/smoke_test.py --skip-gpu     # salta tests de chat
+  python3 dev-tools/smoke_test.py --skip-gpu     # skips chat tests
   python3 dev-tools/smoke_test.py --verbose
 
-Requereix:
-  - Servidor Nexe corrent (./nexe go)
-  - NEXE_PRIMARY_API_KEY al .env o variable d'entorn
+Requires:
+  - Nexe server running (./nexe go)
+  - NEXE_PRIMARY_API_KEY in .env or environment variable
 ────────────────────────────────────
 """
 import sys
@@ -42,7 +42,7 @@ def warn(msg):  print(f"  {YELLOW}!{NC}  {msg}")
 def info(msg):  print(f"  {CYAN}·{NC}  {msg}")
 def section(t): print(f"\n{BOLD}{CYAN}── {t} ──{NC}")
 
-# ── Resultats globals ────────────────────────────────────────
+# ── Global results ────────────────────────────────────────
 PASSED = []
 FAILED = []
 
@@ -86,21 +86,21 @@ def main():
     parser = argparse.ArgumentParser(description="Nexe API Smoke Test")
     parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", type=int, default=9119)
-    parser.add_argument("--skip-gpu", action="store_true", help="Salta tests de chat (GPU)")
-    parser.add_argument("--skip-memory", action="store_true", help="Salta tests de memòria (Qdrant)")
+    parser.add_argument("--skip-gpu", action="store_true", help="Skip chat tests (GPU)")
+    parser.add_argument("--skip-memory", action="store_true", help="Skip memory tests (Qdrant)")
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
     BASE = f"http://{args.host}:{args.port}"
 
-    # Llegir API key
+    # Read API key
     api_key = os.environ.get("NEXE_PRIMARY_API_KEY") or \
               os.environ.get("NEXE_ADMIN_API_KEY") or \
               _read_env_file()
 
     if not api_key:
-        print(f"{RED}ERROR:{NC} No s'ha trobat NEXE_PRIMARY_API_KEY")
-        print("  Defineix-la al .env o: export NEXE_PRIMARY_API_KEY=la-teva-clau")
+        print(f"{RED}ERROR:{NC} NEXE_PRIMARY_API_KEY not found")
+        print("  Define it in .env or: export NEXE_PRIMARY_API_KEY=your-key")
         sys.exit(1)
 
     H = {"X-API-Key": api_key}
@@ -114,46 +114,46 @@ def main():
     print(NC)
 
     # ────────────────────────────────────────────────────────
-    # 1. CONNECTIVITAT BÀSICA
+    # 1. BASIC CONNECTIVITY
     # ────────────────────────────────────────────────────────
-    section("1. Connectivitat")
+    section("1. Connectivity")
 
     status, body = get(f"{BASE}/health", headers=H)
     record("GET /health → 200", status == 200, f"status={status}")
 
     if status != 200:
-        fail("El servidor no respon. Comprova que ./nexe go està corrent.")
+        fail("Server not responding. Check that ./nexe go is running.")
         _print_summary()
         sys.exit(1)
 
-    # Versió
+    # Version
     version = body.get("version", "?")
-    info(f"Versió del servidor: {version}")
+    info(f"Server version: {version}")
 
-    # Sense API key → 401
+    # Without API key → 401
     status_unauth, _ = get(f"{BASE}/health")
-    # /health pot ser públic — no forcem 401 aquí
-    info(f"Sense API key → {status_unauth}")
+    # /health may be public — do not force 401 here
+    info(f"Without API key → {status_unauth}")
 
     # ────────────────────────────────────────────────────────
     # 2. SECURITY
     # ────────────────────────────────────────────────────────
-    section("2. Seguretat")
+    section("2. Security")
 
     status, _ = get(f"{BASE}/security/report", headers=H)
-    record("GET /security/report autenticat", status == 200, f"status={status}")
+    record("GET /security/report authenticated", status == 200, f"status={status}")
 
-    status, _ = get(f"{BASE}/security/report", headers={"X-API-Key": "clau-incorrecta"})
-    record("GET /security/report clau incorrecta → 401", status == 401, f"status={status}")
+    status, _ = get(f"{BASE}/security/report", headers={"X-API-Key": "wrong-key"})
+    record("GET /security/report wrong key → 401", status == 401, f"status={status}")
 
     # Path traversal
     status, _ = get(f"{BASE}/ui/static/../../../etc/passwd", headers=H)
-    record("Path traversal bloquejat", status in [400, 403, 404], f"status={status}")
+    record("Path traversal blocked", status in [400, 403, 404], f"status={status}")
 
     # ────────────────────────────────────────────────────────
     # 3. WEB UI — SESSIONS
     # ────────────────────────────────────────────────────────
-    section("3. Sessions Web UI")
+    section("3. Web UI Sessions")
 
     status, body = post(f"{BASE}/ui/session/new", headers=H)
     record("POST /ui/session/new", status == 200, f"status={status}")
@@ -170,10 +170,10 @@ def main():
         record("DELETE /ui/session/{id}", status == 200)
 
         status, _ = get(f"{BASE}/ui/session/{session_id}", headers=H)
-        record("Session eliminada → 404", status == 404)
+        record("Session deleted → 404", status == 404)
 
     status, _ = get(f"{BASE}/ui/session/inexistent-xyz", headers=H)
-    record("Session inexistent → 404", status == 404)
+    record("Non-existent session → 404", status == 404)
 
     status, body = get(f"{BASE}/ui/sessions", headers=H)
     record("GET /ui/sessions", status == 200 and "sessions" in body)
@@ -181,7 +181,7 @@ def main():
     # ────────────────────────────────────────────────────────
     # 4. RAG
     # ────────────────────────────────────────────────────────
-    section("4. RAG / Cerca semàntica")
+    section("4. RAG / Semantic search")
 
     status, body = get(f"{BASE}/rag/health", headers=H)
     record("GET /rag/health", status == 200, f"status={status}")
@@ -191,7 +191,7 @@ def main():
     if args.verbose and status == 200:
         info(f"RAG info: {json.dumps(body, indent=2)[:200]}")
 
-    # Cerca semàntica (requereix ingesta prèvia)
+    # Semantic search (requires prior ingestion)
     status, body = post(f"{BASE}/rag/search", headers=H,
                         body={"query": "quin port fa servir NEXE", "top_k": 3})
     record("POST /rag/search → 200", status == 200, f"status={status}")
@@ -199,7 +199,7 @@ def main():
     if status == 200:
         results = body.get("results", body.get("documents", []))
         has_results = len(results) > 0
-        record("RAG search troba resultats", has_results, f"{len(results)} resultats")
+        record("RAG search finds results", has_results, f"{len(results)} results")
 
         if has_results:
             combined = " ".join(
@@ -207,14 +207,14 @@ def main():
                 for r in results
             )
             has_port = "9119" in combined
-            record("RAG troba port 9119 als docs", has_port,
-                   "contingut OK" if has_port else f"contingut: {combined[:100]}")
+            record("RAG finds port 9119 in docs", has_port,
+                   "content OK" if has_port else f"content: {combined[:100]}")
 
     # ────────────────────────────────────────────────────────
-    # 5. MEMÒRIA (Qdrant)
+    # 5. MEMORY (Qdrant)
     # ────────────────────────────────────────────────────────
     if not args.skip_memory:
-        section("5. Memòria persistent (Qdrant)")
+        section("5. Persistent memory (Qdrant)")
 
         unique = f"smoke_test_{int(time.time())}"
         status, body = post(f"{BASE}/ui/memory/save", headers=H,
@@ -223,10 +223,10 @@ def main():
                                   "metadata": {"type": "fact"}})
         record("POST /ui/memory/save", status == 200, f"status={status}")
         save_ok = status == 200 and body.get("success")
-        record("Memory save exitós", bool(save_ok), body.get("message", ""))
+        record("Memory save successful", bool(save_ok), body.get("message", ""))
 
         if save_ok:
-            time.sleep(0.5)  # deixar que Qdrant indexi
+            time.sleep(0.5)  # let Qdrant index
             status, body = post(f"{BASE}/ui/memory/recall", headers=H,
                                 body={"query": unique, "limit": 3})
             record("POST /ui/memory/recall", status == 200, f"status={status}")
@@ -234,36 +234,36 @@ def main():
             if status == 200:
                 results = body.get("results", [])
                 found = any(unique in (r.get("content", "") or "") for r in results)
-                record("Memory recall troba el contingut guardat", found,
-                       f"{len(results)} resultats")
+                record("Memory recall finds saved content", found,
+                       f"{len(results)} results")
 
-        # Validació: contingut buit → 400
+        # Validation: empty content → 400
         status, _ = post(f"{BASE}/ui/memory/save", headers=H,
                          body={"content": "", "session_id": "test"})
-        record("Memory save sense contingut → 400", status == 400, f"status={status}")
+        record("Memory save without content → 400", status == 400, f"status={status}")
     else:
-        warn("Memòria: skip (--skip-memory)")
+        warn("Memory: skip (--skip-memory)")
 
     # ────────────────────────────────────────────────────────
-    # 6. CHAT (GPU requerit)
+    # 6. CHAT (GPU required)
     # ────────────────────────────────────────────────────────
     if not args.skip_gpu:
         section("6. Chat (GPU + model)")
 
-        # Crear sessió de chat
+        # Create chat session
         status, body = post(f"{BASE}/ui/session/new", headers=H)
         chat_sid = body.get("session_id", "") if status == 200 else ""
 
         if not chat_sid:
-            warn("No s'ha pogut crear sessió de chat")
+            warn("Could not create chat session")
         else:
-            # Missatge buit → 400
+            # Empty message → 400
             status, _ = post(f"{BASE}/ui/chat", headers=H,
                              body={"message": "", "session_id": chat_sid})
-            record("Chat missatge buit → 400", status == 400, f"status={status}")
+            record("Chat empty message → 400", status == 400, f"status={status}")
 
-            # Pregunta factual sobre els docs RAG
-            print(f"\n  {CYAN}·{NC}  Enviant pregunta al model (pot trigar 30-120s)...")
+            # Factual question about RAG docs
+            print(f"\n  {CYAN}·{NC}  Sending question to model (may take 30-120s)...")
             t0 = time.time()
             status, body = post(f"{BASE}/ui/chat", headers=H,
                                 body={"message": "Quin port fa servir el servidor NEXE per defecte? Respon en una sola línia.",
@@ -276,11 +276,11 @@ def main():
                 response_text = (body.get("response") or body.get("message") or
                                  body.get("text") or str(body))
                 has_port = "9119" in response_text
-                record("Resposta conté '9119' (RAG funciona)", has_port,
+                record("Response contains '9119' (RAG works)", has_port,
                        f"{response_text[:150]}" if args.verbose else "")
-                info(f"Resposta: {response_text[:200]}")
+                info(f"Response: {response_text[:200]}")
 
-                # Intent de guardar a memòria
+                # Intent to save to memory
                 status2, body2 = post(f"{BASE}/ui/chat", headers=H,
                                       body={"message": "El meu nom de prova és SmokeUser_123, ho pots guardar?",
                                             "session_id": chat_sid},
@@ -291,17 +291,17 @@ def main():
                     record("memory_action == 'save'", mem_action == "save",
                            f"memory_action={mem_action}")
 
-            # Neteja
+            # Cleanup
             delete(f"{BASE}/ui/session/{chat_sid}", headers=H)
     else:
         warn("Chat GPU: skip (--skip-gpu)")
 
     # ────────────────────────────────────────────────────────
-    # 7. UPLOAD (sense GPU)
+    # 7. UPLOAD (no GPU required)
     # ────────────────────────────────────────────────────────
-    section("7. Upload de fitxers")
+    section("7. File upload")
 
-    # Extensió invàlida
+    # Invalid extension
     boundary = "----SmokeTestBoundary"
     body_bytes = (
         f"--{boundary}\r\n"
@@ -321,21 +321,21 @@ def main():
             status = r.status
     except urllib.error.HTTPError as e:
         status = e.code
-    record("Upload .exe rebutjat → 400", status == 400, f"status={status}")
+    record("Upload .exe rejected → 400", status == 400, f"status={status}")
 
-    # Llistar fitxers
+    # List files
     status, body = get(f"{BASE}/ui/files", headers=H)
     record("GET /ui/files", status == 200 and "files" in body, f"status={status}")
 
     # ────────────────────────────────────────────────────────
-    # RESUM FINAL
+    # FINAL SUMMARY
     # ────────────────────────────────────────────────────────
     _print_summary()
     sys.exit(0 if not FAILED else 1)
 
 
 def _read_env_file():
-    """Llegir NEXE_PRIMARY_API_KEY del .env local."""
+    """Read NEXE_PRIMARY_API_KEY from the local .env file."""
     env_path = Path(__file__).parents[1] / ".env"
     if env_path.exists():
         for line in env_path.read_text().splitlines():
@@ -350,15 +350,15 @@ def _read_env_file():
 def _print_summary():
     total = len(PASSED) + len(FAILED)
     print(f"\n{BOLD}{'═'*50}{NC}")
-    print(f"{BOLD}  RESUM SMOKE TEST{NC}")
+    print(f"{BOLD}  SMOKE TEST SUMMARY{NC}")
     print(f"{'═'*50}")
-    print(f"  {GREEN}Passats:{NC}  {len(PASSED)}/{total}")
+    print(f"  {GREEN}Passed:{NC}  {len(PASSED)}/{total}")
     if FAILED:
-        print(f"  {RED}Fallats:{NC}  {len(FAILED)}/{total}")
+        print(f"  {RED}Failed:{NC}  {len(FAILED)}/{total}")
         for f in FAILED:
             print(f"    {RED}✗{NC} {f}")
     else:
-        print(f"\n  {GREEN}{BOLD}Tot correcte ✓{NC}")
+        print(f"\n  {GREEN}{BOLD}All correct ✓{NC}")
     print(f"{'═'*50}\n")
 
 

@@ -1,32 +1,32 @@
 """
 Cluster 1 — config_validator._get_message conflict keyword 'key' (4 findings).
 
-Bug: _get_message(self, key: str, **kwargs) rep TypeError quan es crida
-     self._get_message('msg_key', key='value') — 'key' és param posicional i kwarg
-     alhora → "got multiple values for argument 'key'".
+Bug: _get_message(self, key: str, **kwargs) receives TypeError when called
+     self._get_message('msg_key', key='value') — 'key' is both a positional param and kwarg
+     → "got multiple values for argument 'key'".
 
-El bug ocorre a les crides internes de:
-  - _validate_required_keys (clau faltant a meta/core/etc.)
-  - _validate_types_and_values (port com a string, host com a non-str)
-  - _validate_plugins_section (temperature fora de rang)
+The bug occurs in the internal calls of:
+  - _validate_required_keys (missing key in meta/core/etc.)
+  - _validate_types_and_values (port as string, host as non-str)
+  - _validate_plugins_section (temperature out of range)
 
-Contract pin: validate() ha de retornar ValidationResult(valid=False, errors=[...]),
-NO crashar amb TypeError.
+Contract pin: validate() must return ValidationResult(valid=False, errors=[...]),
+NOT crash with TypeError.
 """
 import pytest
 import toml
 
 
 def test_cluster1_missing_required_key_returns_validation_error(tmp_path):
-    """TDD: validate() amb meta sense 'version' retorna ValidationResult(valid=False), NO TypeError.
+    """TDD: validate() with meta without 'version' returns ValidationResult(valid=False), NOT TypeError.
 
-    FALLA pre-fix (TypeError a _validate_required_keys L141).
-    PASSA post-fix (rename key → msg_key en signatura _get_message).
+    FAILS pre-fix (TypeError at _validate_required_keys L141).
+    PASSES post-fix (rename key → msg_key in _get_message signature).
     """
     from personality.module_manager.config_validator import ConfigValidator, ValidationResult
 
     config = {
-        "meta": {"environment": "development"},  # manquen 'version' i 'environment' no és suficient
+        "meta": {"environment": "development"},  # missing 'version' and 'environment' is not sufficient
         "core": {"server": {"host": "127.0.0.1", "port": 9119}},
         "personality": {"orchestrator": {"modules_path": "plugins"}},
         "plugins": {"models": {"primary": "test"}},
@@ -44,11 +44,11 @@ def test_cluster1_missing_required_key_returns_validation_error(tmp_path):
 
 
 def test_cluster1_port_string_type_returns_validation_error(tmp_path):
-    """TDD: validate() amb port com a string retorna ValidationResult(valid=False), NO TypeError.
+    """TDD: validate() with port as string returns ValidationResult(valid=False), NOT TypeError.
 
-    FALLA pre-fix (TypeError a _validate_types_and_values L164 — crida
+    FAILS pre-fix (TypeError at _validate_types_and_values L164 — call
     _get_message('validation.type_mismatch', key='port', ...)).
-    PASSA post-fix.
+    PASSES post-fix.
     """
     from personality.module_manager.config_validator import ConfigValidator, ValidationResult
 
@@ -78,11 +78,11 @@ level = "INFO"
 
 
 def test_cluster1_temperature_out_of_range_returns_validation_error(tmp_path):
-    """TDD: validate() amb temperature=3.0 retorna ValidationResult(valid=False), NO TypeError.
+    """TDD: validate() with temperature=3.0 returns ValidationResult(valid=False), NOT TypeError.
 
-    FALLA pre-fix (TypeError a _validate_plugins_section L231 — crida
+    FAILS pre-fix (TypeError at _validate_plugins_section L231 — call
     _get_message('validation.value_out_of_range', key='temperature', ...)).
-    PASSA post-fix.
+    PASSES post-fix.
     """
     from personality.module_manager.config_validator import ConfigValidator, ValidationResult
 

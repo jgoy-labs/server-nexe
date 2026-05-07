@@ -247,7 +247,7 @@ MODEL_CATALOG = {
     ],
     # ─────────────────────────────────────────────────────────────────────────
     # XLARGE MODELS - For 32 GB+ RAM machines (6 models)
-    # Recommended MLX: Gemma 4 31B. Recommended Ollama: ALIA-40B (ibèric)
+    # Recommended MLX: Gemma 4 31B. Recommended Ollama: ALIA-40B (Iberian)
     # ─────────────────────────────────────────────────────────────────────────
     "xlarge": [
         {
@@ -399,8 +399,8 @@ MODEL_CATALOG = {
 #
 # ───────────────────────────────────────────────────────────────────────────
 # STATUS v1.0.4-beta (C19, 2026-05-06): Ollama config digests + Salamandra GGUF
-# poblats. MLX dir-hashes poblats per als models disponibles a Wintermute.
-# Valors None restants: models no descarregats localment en el moment del pin.
+# populated. MLX dir-hashes populated for models available on Wintermute.
+# Remaining None values: models not downloaded locally at the time of pinning.
 # ───────────────────────────────────────────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════
 MODEL_WEIGHT_SHA256: dict[tuple[str, str], Optional[str]] = {

@@ -111,10 +111,10 @@ def test_release_pidfile_noop_when_missing(tmp_path: Path):
 
 
 def test_acquire_pidfile_atomic_concurrent(tmp_path: Path):
-    """Dos threads concurrents: exactament un guanya el lock, l'altre rep False.
+    """Two concurrent threads: exactly one wins the lock, the other gets False.
 
-    RED gate: amb la implementació no-atòmica (exists+write) tots dos poden
-    guanyar simultàniament. Amb O_CREAT|O_EXCL exactament un guanya.
+    RED gate: with the non-atomic implementation (exists+write) both can
+    win simultaneously. With O_CREAT|O_EXCL exactly one wins.
     """
     import threading
 
@@ -123,7 +123,7 @@ def test_acquire_pidfile_atomic_concurrent(tmp_path: Path):
     barrier = threading.Barrier(2)
 
     def _try_acquire():
-        barrier.wait()  # garanteix execució simultània
+        barrier.wait()  # guarantees simultaneous execution
         ok = _acquire_pidfile(pid_path, port=9119)
         results.append(ok)
 
@@ -134,8 +134,8 @@ def test_acquire_pidfile_atomic_concurrent(tmp_path: Path):
     t1.join()
     t2.join()
 
-    # Exactament un True i un False
+    # Exactly one True and one False
     assert sorted(results) == [False, True], (
-        f"Esperàvem [False, True], obtingut {sorted(results)} — "
-        "TOCTOU race: tots dos han adquirit el lock simultàniament"
+        f"Expected [False, True], got {sorted(results)} — "
+        "TOCTOU race: both have acquired the lock simultaneously"
     )

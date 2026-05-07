@@ -1,8 +1,8 @@
 """
-Tests per a F4 — CLI stop: PID file primer, fallback pgrep.
+Tests for F4 — CLI stop: PID file first, pgrep fallback.
 
-Verifica que `nexe stop` llegeix storage/run/server.pid si existeix,
-i usa pgrep com a fallback si el PID file no existeix o el PID és mort.
+Verifies that `nexe stop` reads storage/run/server.pid if it exists,
+and uses pgrep as fallback if the PID file does not exist or the PID is dead.
 """
 import json
 import signal
@@ -13,7 +13,7 @@ from core.cli.cli import app
 
 
 def _make_pid_file(tmp_path: Path, pid: int) -> Path:
-    """Crea un PID file canònic amb el format esperat."""
+    """Creates a canonical PID file with the expected format."""
     pid_dir = tmp_path / "storage" / "run"
     pid_dir.mkdir(parents=True)
     pid_file = pid_dir / "server.pid"
@@ -22,10 +22,10 @@ def _make_pid_file(tmp_path: Path, pid: int) -> Path:
 
 
 class TestStopPidFilePrimary:
-    """F4 — PID file canònic com a font primària."""
+    """F4 — Canonical PID file as primary source."""
 
     def test_stop_reads_pid_file_and_sends_sigterm(self):
-        """Si PID file existeix i PID és viu, SIGTERM al PID del fitxer (no pgrep)."""
+        """If PID file exists and PID is alive, send SIGTERM to the file's PID (not pgrep)."""
         target_pid = 99999
         runner = CliRunner()
 
@@ -35,35 +35,35 @@ class TestStopPidFilePrimary:
              patch("pathlib.Path.read_text") as mock_read_text, \
              patch("pathlib.Path.unlink"):
 
-            # Simula: PID file existeix i PID és viu
+            # Simulate: PID file exists and PID is alive
             mock_exists.return_value = True
             mock_read_text.return_value = json.dumps({"pid": target_pid, "port": 9119})
-            # kill(pid, 0) → procés viu (no excepció); kill(pid, SIGTERM) → OK
+            # kill(pid, 0) → process alive (no exception); kill(pid, SIGTERM) → OK
             mock_kill.return_value = None
 
             runner.invoke(app, ["stop", "--force"])
 
-            # Ha d'haver cridat kill amb SIGTERM al target_pid
+            # Must have called kill with SIGTERM to target_pid
             sigterm_calls = [c for c in mock_kill.call_args_list if c == call(target_pid, signal.SIGTERM)]
             assert len(sigterm_calls) == 1, f"Expected SIGTERM to {target_pid}, got: {mock_kill.call_args_list}"
-            # NO ha d'haver cridat pgrep
+            # Must NOT have called pgrep
             assert mock_subproc.call_count == 0, "Should not use pgrep when PID file is valid"
 
 
 class TestStopFallbackPgrep:
-    """F4 — Fallback a pgrep quan PID file no existeix o PID és mort."""
+    """F4 — Fallback to pgrep when PID file does not exist or PID is dead."""
 
     def test_stop_uses_pgrep_when_no_pid_file(self):
-        """Sense PID file, ha de fer pgrep com a fallback."""
+        """Without PID file, must use pgrep as fallback."""
         runner = CliRunner()
 
         with patch("os.kill") as mock_kill, \
              patch("subprocess.run") as mock_subproc, \
              patch("pathlib.Path.exists") as mock_exists:
 
-            # Simula: PID file no existeix
+            # Simulate: PID file does not exist
             mock_exists.return_value = False
-            # pgrep retorna PID
+            # pgrep returns PID
             mock_pgrep = MagicMock()
             mock_pgrep.stdout = "12345\n"
             mock_subproc.return_value = mock_pgrep
@@ -72,14 +72,14 @@ class TestStopFallbackPgrep:
 
             runner.invoke(app, ["stop", "--force"])
 
-            # Ha d'haver cridat pgrep
+            # Must have called pgrep
             assert mock_subproc.called, "Should use pgrep when no PID file"
             pgrep_calls = [c for c in mock_subproc.call_args_list
                            if c.args and "pgrep" in c.args[0]]
             assert len(pgrep_calls) >= 1 or any("pgrep" in str(c) for c in mock_subproc.call_args_list)
 
     def test_stop_uses_pgrep_when_pid_is_dead(self):
-        """Si PID file existeix però el PID és mort (ProcessLookupError), fallback a pgrep."""
+        """If PID file exists but the PID is dead (ProcessLookupError), fall back to pgrep."""
         runner = CliRunner()
 
         with patch("os.kill") as mock_kill, \
@@ -88,7 +88,7 @@ class TestStopFallbackPgrep:
              patch("pathlib.Path.read_text") as mock_read_text, \
              patch("pathlib.Path.unlink"):
 
-            # Simula: PID file existeix però el PID és mort
+            # Simulate: PID file exists but the PID is dead
             mock_exists.return_value = True
             mock_read_text.return_value = json.dumps({"pid": 99998, "port": 9119})
 
@@ -102,18 +102,18 @@ class TestStopFallbackPgrep:
 
             mock_kill.side_effect = kill_side_effect
 
-            # pgrep no troba res → no running
+            # pgrep finds nothing → not running
             mock_pgrep = MagicMock()
             mock_pgrep.stdout = ""
             mock_subproc.return_value = mock_pgrep
 
             runner.invoke(app, ["stop", "--force"])
 
-            # pgrep ha de ser cridat (fallback)
+            # pgrep must be called (fallback)
             assert mock_subproc.called, "Should fall back to pgrep with dead PID"
 
     def test_stop_no_services_running(self):
-        """Sense PID file ni pgrep hits → missatge informatiu."""
+        """Without PID file or pgrep hits → informational message."""
         runner = CliRunner()
 
         with patch("subprocess.run") as mock_subproc, \
@@ -126,7 +126,7 @@ class TestStopFallbackPgrep:
 
             result = runner.invoke(app, ["stop", "--force"])
 
-            # NEXE_LANG-aware: accepta sortida en català o anglès (auditoria r1 P1).
+            # NEXE_LANG-aware: accepts output in Catalan or English (audit r1 P1).
             assert (
                 "No Nexe services are running" in result.output
                 or "Cap servei Nexe actiu" in result.output

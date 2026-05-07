@@ -1,23 +1,23 @@
-"""Anti-regressió cluster `session_id` chat_cli (Onada 4.1, BUS Dev#1bis).
+"""Anti-regression cluster `session_id` chat_cli (Onada 4.1, BUS Dev#1bis).
 
-Cobreix els findings mypy #21, #22, #24, #26 (`01-classificacio.md`). El
-problema mypy: `session_id` retornat per `client.create_ui_session()` és
-`Optional[str]` i s'usa com a `str` als 4 call sites de chat_cli (línies 308,
+Covers mypy findings #21, #22, #24, #26 (`01-classificacio.md`). The
+mypy problem: `session_id` returned by `client.create_ui_session()` is
+`Optional[str]` and is used as `str` at the 4 chat_cli call sites (lines 308,
 320, 334, 384).
 
-El fix Dev#2 (Cluster 8) afegirà un guard `assert session_id is not None`
-(o early-return) al chat_cli **abans** del while loop. La firma del client
-NO canvia. Aquest test pina dos contractes:
+The Dev#2 fix (Cluster 8) will add a guard `assert session_id is not None`
+(or early-return) to chat_cli **before** the while loop. The client signature
+does NOT change. This test pins two contracts:
 
-1. `NexeAPIClient.create_ui_session` retorna `Optional[str]` (la NULLABILITAT
-   és font del finding mypy — pre i post-fix la firma manté None possible).
-2. `NexeAPIClient.chat_ui_stream` i `NexeAPIClient.upload_file` declaren un
-   paràmetre nominat `session_id` (no canvia de nom amb el fix).
+1. `NexeAPIClient.create_ui_session` returns `Optional[str]` (the NULLABILITY
+   is the source of the mypy finding — pre and post-fix the signature keeps None possible).
+2. `NexeAPIClient.chat_ui_stream` and `NexeAPIClient.upload_file` declare a
+   named parameter `session_id` (does not change name with the fix).
 
-Si Dev#2 inadvertidament toca la firma del client (out-of-scope cluster 8),
-aquest test salta — *teeth* contra refactor col·lateral.
+If Dev#2 inadvertently touches the client signature (out-of-scope cluster 8),
+this test fails — *teeth* against collateral refactor.
 
-CEC: només `inspect.signature`. Cap invocació real del client.
+CEC: `inspect.signature` only. No real client invocation.
 """
 
 from __future__ import annotations
@@ -27,10 +27,10 @@ import typing
 
 
 def test_create_ui_session_returns_optional_str() -> None:
-    """Pina que `create_ui_session` continua retornant `Optional[str]`.
+    """Pins that `create_ui_session` continues to return `Optional[str]`.
 
-    Si Dev#2 fa narrowing prematur a `str` aquí (en lloc de fer-lo al chat_cli),
-    el contracte amb tot el codi crida-er trenca.
+    If Dev#2 does premature narrowing to `str` here (instead of doing it in chat_cli),
+    the contract with all calling code breaks.
     """
     from core.cli.utils.api_client import NexeAPIClient
 
@@ -45,29 +45,29 @@ def test_create_ui_session_returns_optional_str() -> None:
     )
     assert is_optional_str, (
         f"NexeAPIClient.create_ui_session return annotation = {return_ann!r}, "
-        f"esperat Optional[str] / Union[str, None]. El finding mypy #21/#22/#24/#26 "
-        f"depèn d'aquesta nullabilitat — narrowing prematur trencaria el guard "
-        f"futur del chat_cli."
+        f"expected Optional[str] / Union[str, None]. The mypy finding #21/#22/#24/#26 "
+        f"depends on this nullability — premature narrowing would break the future "
+        f"guard in chat_cli."
     )
 
 
 def test_upload_file_has_session_id_parameter() -> None:
-    """Pina paràmetre nominat `session_id` a `upload_file` (cf. chat_cli.py:308 #21)."""
+    """Pins named parameter `session_id` in `upload_file` (cf. chat_cli.py:308 #21)."""
     from core.cli.utils.api_client import NexeAPIClient
 
     sig = inspect.signature(NexeAPIClient.upload_file)
     assert "session_id" in sig.parameters, (
-        "NexeAPIClient.upload_file ha perdut `session_id` — trenca cluster #21."
+        "NexeAPIClient.upload_file has lost `session_id` — breaks cluster #21."
     )
 
 
 def test_chat_ui_stream_has_session_id_parameter() -> None:
-    """Pina paràmetre nominat `session_id` a `chat_ui_stream` (cf.
+    """Pins named parameter `session_id` in `chat_ui_stream` (cf.
     chat_cli.py:320,334,384 #22,#24,#26)."""
     from core.cli.utils.api_client import NexeAPIClient
 
     sig = inspect.signature(NexeAPIClient.chat_ui_stream)
     assert "session_id" in sig.parameters, (
-        "NexeAPIClient.chat_ui_stream ha perdut `session_id` — "
-        "trenca cluster #22/#24/#26."
+        "NexeAPIClient.chat_ui_stream has lost `session_id` — "
+        "breaks cluster #22/#24/#26."
     )

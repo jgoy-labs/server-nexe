@@ -140,7 +140,7 @@ def _install_ollama_macos() -> bool:
     try:
         bundle_zip = _find_bundle_ollama_zip()
         if bundle_zip:
-            print("  📦 Ollama offline: instal·lant des del bundle...")
+            print("  📦 Ollama offline: installing from bundle...")
             zip_path = str(bundle_zip)
         else:
             print("  📥 Downloading Ollama for macOS...")

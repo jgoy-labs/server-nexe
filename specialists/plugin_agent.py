@@ -1,7 +1,7 @@
 """
-PluginAgent — Agent de plugins per a server-nexe.
-Valida el contracte de cada plugin (estructura mínima) i detecta regressions.
-Read-only absolut.
+PluginAgent — Plugin agent for server-nexe.
+Validates the contract of each plugin (minimum structure) and detects regressions.
+Strictly read-only.
 """
 from pathlib import Path
 from typing import Any, Dict, List
@@ -12,7 +12,7 @@ _REQUIRED_FILES = ("__init__.py",)
 
 
 class PluginAgent(BaseAgent):
-    """Agent de plugins per server-nexe — valida contractes i detecta regressions."""
+    """Plugin agent for server-nexe — validates contracts and detects regressions."""
 
     @property
     def agent_name(self) -> str:
@@ -24,7 +24,7 @@ class PluginAgent(BaseAgent):
             return {
                 "status": "HEALTHY",
                 "findings": [],
-                "reasoning": f"No s'ha trobat carpeta plugins/ a {self.project_path.name}. No hi ha plugins a validar.",
+                "reasoning": f"plugins/ folder not found in {self.project_path.name}. No plugins to validate.",
                 "top_offenders": [],
                 "recommendations": [],
                 "memory_used": False,
@@ -38,7 +38,7 @@ class PluginAgent(BaseAgent):
             return {
                 "status": "DEGRADED",
                 "findings": [],
-                "reasoning": f"No he pogut llegir {plugins_dir}: error de permisos.",
+                "reasoning": f"Could not read {plugins_dir}: permission error.",
                 "top_offenders": [],
                 "recommendations": [],
                 "memory_used": False,
@@ -61,13 +61,13 @@ class PluginAgent(BaseAgent):
             status = "DEGRADED"
 
         reasoning = (
-            f"He analitzat {len(plugins)} plugins a {self.project_path.name}/plugins/ "
-            f"verificant contracte mínim ({', '.join(_REQUIRED_FILES)})."
+            f"Analysed {len(plugins)} plugins in {self.project_path.name}/plugins/ "
+            f"verifying minimum contract ({', '.join(_REQUIRED_FILES)})."
         )
         if compare["memory_used"]:
             reasoning += (
-                f" He comparat amb el run anterior: {compare['new_issues']} nous problemes,"
-                f" {compare['resolved_issues']} resolts."
+                f" Compared against previous run: {compare['new_issues']} new issues,"
+                f" {compare['resolved_issues']} resolved."
             )
 
         self.memory.save_run({"plugins": [p.name for p in plugins], "findings": findings})
@@ -92,7 +92,7 @@ class PluginAgent(BaseAgent):
                     "severity": "high",
                     "type": "plugin_contract_violation",
                     "plugin": plugin_dir.name,
-                    "message": f"Plugin '{plugin_dir.name}' sense {required}",
+                    "message": f"Plugin '{plugin_dir.name}' missing {required}",
                 })
         return findings
 
@@ -100,6 +100,6 @@ class PluginAgent(BaseAgent):
         if not findings:
             return []
         return [
-            "Afegir __init__.py a cada plugin per garantir el contracte de paquet Python",
-            "Considerar afegir manifest.toml per metadades del plugin",
+            "Add __init__.py to each plugin to ensure Python package contract",
+            "Consider adding manifest.toml for plugin metadata",
         ]

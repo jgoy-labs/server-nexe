@@ -3,10 +3,10 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_install_skip_model.py
-Description: Tests per Bug 28 — flag --skip-model-download al installer
-             headless. Permet a l'usuari saltar la descarrega proactivament;
-             el model escollit queda registrat al .env i `storage/models/`
-             queda buit (l'usuari el descarrega despres via `nexe model pull`).
+Description: Tests for Bug 28 — --skip-model-download flag in the headless
+             installer. Allows the user to proactively skip the download;
+             the chosen model is registered in .env and `storage/models/`
+             remains empty (the user downloads it later via `nexe model pull`).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -25,7 +25,7 @@ def test_parse_cli_skip_model_download_flag():
 
 
 def test_parse_cli_skip_model_download_combined_with_reinstall():
-    """Combinacio amb --reinstall-mode segueix funcionant."""
+    """Combination with --reinstall-mode still works."""
     overrides = _parse_cli_overrides([
         "--skip-model-download",
         "--reinstall-mode", "wipe",
@@ -35,24 +35,24 @@ def test_parse_cli_skip_model_download_combined_with_reinstall():
 
 
 def test_parse_cli_no_flag_default_off():
-    """Sense flag, no apareix la clau (default off via .get())."""
+    """Without the flag, the key does not appear (default off via .get())."""
     overrides = _parse_cli_overrides([])
     assert "skip_model_download" not in overrides
 
 
 def test_run_headless_skip_model_does_not_download(monkeypatch, tmp_path):
-    """`run_headless` amb skip_model_download no crida cap _download_*.
+    """`run_headless` with skip_model_download does not call any _download_*.
 
-    Verifica el comportament Bug 28: el model NO es descarrega, pero el
-    .env s'escriu igualment (registrant el model_key + engine).
-    Storage/models queda buit.
+    Verifies Bug 28 behavior: the model is NOT downloaded, but the
+    .env is still written (registering the model_key + engine).
+    Storage/models remains empty.
     """
     import installer.install_headless as ih
 
     project_root = tmp_path / "nexe-install"
     project_root.mkdir()
 
-    # Stubs de tot el que toca disc/xarxa
+    # Stubs for everything that touches disk/network
     monkeypatch.setattr(ih, "detect_existing_install", lambda _: False)
     monkeypatch.setattr(
         ih, "detect_hardware",
@@ -65,7 +65,7 @@ def test_run_headless_skip_model_does_not_download(monkeypatch, tmp_path):
     (project_root / "venv" / "bin").mkdir(parents=True)
     (project_root / "venv" / "bin" / "python").write_text("#!/bin/bash\n")
 
-    # Si algu crida una descarrega -> test failure
+    # If anything calls a download -> test failure
     def _no_download(*a, **k):
         raise AssertionError("Model download must NOT be called when skip_model_download=True")
 
@@ -74,7 +74,7 @@ def test_run_headless_skip_model_does_not_download(monkeypatch, tmp_path):
     monkeypatch.setattr(ih, "_download_mlx_model", _no_download)
     monkeypatch.setattr(ih, "ensure_ollama_installed", lambda: True)
 
-    # Stub generate_env_file: simula escriptura del .env amb el model
+    # Stub generate_env_file: simulates writing the .env with the model
     captured_env = {}
 
     def _fake_generate(root, model_cfg):
@@ -88,18 +88,18 @@ def test_run_headless_skip_model_does_not_download(monkeypatch, tmp_path):
         )
 
     monkeypatch.setattr(ih, "generate_env_file", _fake_generate)
-    # Q5.5 reobert (2026-04-08): download_qdrant eliminat — Qdrant és embedded.
-    # El mock que abans existia aquí ja no cal perquè la funció no existeix.
+    # Q5.5 reopened (2026-04-08): download_qdrant removed — Qdrant is now embedded.
+    # The mock that previously existed here is no longer needed because the function does not exist.
     monkeypatch.setattr(ih, "_write_commands_file", lambda *a, **k: None)
 
-    # Curtcircuit per al subprocess d'embeddings i ingestio
+    # Short-circuit the subprocess for embeddings and ingestion
     import subprocess
     monkeypatch.setattr(
         subprocess, "run",
         lambda *a, **k: type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
     )
 
-    # Catalog reduit per al test (busca model_key real existent)
+    # Reduced catalog for the test (looks up a real existing model_key)
     from installer.installer_catalog_data import MODEL_CATALOG
     sample_key = None
     for cat in MODEL_CATALOG.values():
@@ -109,7 +109,7 @@ def test_run_headless_skip_model_does_not_download(monkeypatch, tmp_path):
                 break
         if sample_key:
             break
-    assert sample_key, "Catalog buit, no es pot fer test"
+    assert sample_key, "Catalog is empty, cannot run test"
 
     config = {
         "lang": "ca",
@@ -119,20 +119,20 @@ def test_run_headless_skip_model_does_not_download(monkeypatch, tmp_path):
         "skip_model_download": True,
     }
 
-    # Aïllem el SystemExit final per platforms no-Darwin / Login Items
+    # Isolate the final SystemExit for non-Darwin platforms / Login Items
     try:
         ih._run_headless_inner(config)
     except SystemExit:
         pass
 
-    # .env escrit amb el model
+    # .env written with the model
     env_file = project_root / ".env"
-    assert env_file.exists(), ".env no s'ha generat"
+    assert env_file.exists(), ".env was not generated"
     content = env_file.read_text()
     assert "NEXE_MODEL_ID=" in content
-    # storage/models buit (cap descarrega)
+    # storage/models empty (no download)
     models_dir = project_root / "storage" / "models"
     if models_dir.exists():
         assert list(models_dir.iterdir()) == [], (
-            f"storage/models hauria d'estar buit: {list(models_dir.iterdir())}"
+            f"storage/models should be empty: {list(models_dir.iterdir())}"
         )

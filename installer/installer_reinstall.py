@@ -2,45 +2,46 @@
 ────────────────────────────────────
 Server Nexe
 Location: installer/installer_reinstall.py
-Description: Helpers per gestionar instal·lacions existents amb 3 modes:
-             - wipe      → esborra dades d'usuari (.env, storage/, venv); preserva knowledge/ (sistema)
-             - overwrite → sobreescriu codi/binaris/catàleg, preservant dades d'usuari
-             - backup    → fa backup de dades a <root>/.nexe-backups/<timestamp>/ i després wipe
+Description: Helpers for managing existing installations with 3 modes:
+             - wipe      → deletes user data (.env, storage/, venv); preserves knowledge/ (system)
+             - overwrite → overwrites code/binaries/catalog, preserving user data
+             - backup    → backs up data to <root>/.nexe-backups/<timestamp>/ then wipes
 
-Bug 7 fix — abans la reinstal·lació no netejava res, així que la mateixa
-NEXE_PRIMARY_API_KEY persistia, la memòria Qdrant no es netejava i la
-knowledge base es duplicava per re-ingestió.
+Bug 7 fix — previously reinstallation cleaned nothing, so the same
+NEXE_PRIMARY_API_KEY persisted, Qdrant memory was not cleared, and the
+knowledge base was duplicated by re-ingestion.
 
-Notes importants (avisos Consultor):
+Important notes (Consultant advisories):
 
-1. Abans d'aplicar qualsevol mode es para el servidor (supervisor) si
-   està corrent. Si no el parem, Qdrant i altres processos poden estar
-   escrivint durant el backup/wipe → corrupció.
+1. Before applying any mode, the server (supervisor) is stopped if
+   running. If not stopped, Qdrant and other processes may be writing
+   during the backup/wipe → corruption.
 
-2. Mode `overwrite` regenera `.env` via `_update_env_model_config()`
-   mantenint NEXE_PRIMARY_API_KEY i NEXE_CSRF_SECRET però refrescant
-   la configuració de model (perquè el wizard permet canviar de model
-   al reinstal·lar). Si no es regenerés quedaria incoherència.
+2. `overwrite` mode regenerates `.env` via `_update_env_model_config()`
+   keeping NEXE_PRIMARY_API_KEY and NEXE_CSRF_SECRET but refreshing
+   the model configuration (because the wizard allows changing the model
+   on reinstall). Without regenerating this would leave inconsistencies.
 
-3. Mode `overwrite` esborra `storage/.knowledge_ingested` perquè el
-   proper startup torni a indexar i la KB no quedi amb chunks vells.
+3. `overwrite` mode deletes `storage/.knowledge_ingested` so the next
+   startup re-indexes and the KB is not left with stale chunks.
 
-4. Backup usa `shutil.move` (instantani al mateix volum) en comptes de
-   `copytree` (lent i 2x disc). Per defecte exclou `storage/models/`
-   (que pot ser 30+ GB). Opt-in via `exclude_models=False`.
+4. Backup uses `shutil.move` (instant on the same volume) instead of
+   `copytree` (slow and 2x disk). By default excludes `storage/models/`
+   (which can be 30+ GB). Opt-in via `exclude_models=False`.
 
-5. Wipe refusa executar-se si el project_root coincideix amb el bundle
-   del procés actual (`Install Nexe.app/Contents/Resources/...`). Sinó
-   ens disparem al peu esborrant l'executable que ens està corrent.
+5. Wipe refuses to run if project_root matches the bundle of the current
+   process (`Install Nexe.app/Contents/Resources/...`). Otherwise we
+   shoot ourselves in the foot by deleting the executable that is
+   running us.
 
-6. La master encryption key viu al macOS Keychain (servei `server-nexe`,
-   user `master-encryption-key`) amb fallback a `~/.nexe/master.key`.
-   Per defecte `wipe` NO toca la Keychain entry. Opt-in via
-   `wipe_keychain=True`.
+6. The master encryption key lives in the macOS Keychain (service
+   `server-nexe`, user `master-encryption-key`) with fallback to
+   `~/.nexe/master.key`. By default `wipe` does NOT touch the Keychain
+   entry. Opt-in via `wipe_keychain=True`.
 
-7. Fitxers OAuth `~/.nexe/mail365_tokens.json` i `~/.nexe/mail365.json`
-   són fora del project_root i cap mode els toca per defecte. Opt-in
-   via `wipe_home_nexe=True` per esborrar-los explícitament.
+7. OAuth files `~/.nexe/mail365_tokens.json` and `~/.nexe/mail365.json`
+   are outside project_root and no mode touches them by default. Opt-in
+   via `wipe_home_nexe=True` to delete them explicitly.
 ────────────────────────────────────
 """
 
@@ -58,7 +59,7 @@ from typing import Callable, Iterable, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Modes vàlids — exposats com a string per ús al CLI/GUI
+# Valid modes — exposed as strings for use in CLI/GUI
 REINSTALL_MODE_WIPE = "wipe"
 REINSTALL_MODE_OVERWRITE = "overwrite"
 REINSTALL_MODE_BACKUP = "backup"
@@ -69,22 +70,22 @@ VALID_REINSTALL_MODES = (
 )
 DEFAULT_REINSTALL_MODE = REINSTALL_MODE_BACKUP
 
-# Marcadors d'instal·lació existent (qualsevol indica instal·lació prèvia)
+# Existing installation markers (any one indicates a prior installation)
 INSTALL_MARKERS = (".env", "storage", "venv")
 
-# Paths considerats "dades d'usuari" — backup/wipe els toca
-# knowledge/ NO és dada d'usuari — és documentació del sistema que ve del payload.
-# Wipe + reinstal·lació sobreescriu knowledge/ automàticament via tar.
+# Paths considered "user data" — backup/wipe touches them
+# knowledge/ is NOT user data — it is system documentation that comes from the payload.
+# Wipe + reinstall overwrites knowledge/ automatically via tar.
 USER_DATA_PATHS = (".env", "storage")
 
-# Paths considerats "sistema" — overwrite també els pot tocar
+# Paths considered "system" — overwrite may also touch them
 SYSTEM_PATHS = ("venv", "qdrant", "nexe", "core", "memory", "personality", "plugins", "knowledge")
 
-# Keychain identifiers — han de coincidir amb core/crypto/keys.py
+# Keychain identifiers — must match core/crypto/keys.py
 KEYRING_SERVICE = "server-nexe"
 KEYRING_USERNAME = "master-encryption-key"
 
-# Fitxers OAuth persistents a ~/.nexe/ (no dins project_root)
+# Persistent OAuth files at ~/.nexe/ (not inside project_root)
 HOME_NEXE_FILES = ("mail365_tokens.json", "mail365.json")
 
 
@@ -92,10 +93,10 @@ HOME_NEXE_FILES = ("mail365_tokens.json", "mail365.json")
 
 
 def _default_stop_server(project_root: Path, timeout: float = 10.0) -> bool:
-    """Para el supervisor si està corrent via PID file a storage/logs/.
+    """Stop the supervisor if it is running via PID file at storage/logs/.
 
-    Retorna True si s'ha parat un procés o si no n'hi havia. Retorna
-    False si hi havia un procés però no s'ha pogut parar.
+    Returns True if a process was stopped or if there was none. Returns
+    False if there was a process but it could not be stopped.
     """
     pid_file = project_root / "storage" / "logs" / "core_supervisor.pid"
     if not pid_file.exists():
@@ -106,18 +107,18 @@ def _default_stop_server(project_root: Path, timeout: float = 10.0) -> bool:
         pid = int(pid_str)
     except (OSError, ValueError) as e:
         logger.warning("Could not read supervisor PID file: %s", e)
-        # PID file corrupte → esborrem-lo, considerem que no hi ha servidor
+        # Corrupt PID file → delete it, consider that no server is running
         try:
             pid_file.unlink()
         except OSError:
             pass
         return True
 
-    # Comprova si el procés existeix
+    # Check if the process exists
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
-        # Procés mort, només neteja el pidfile
+        # Process dead, just clean up the pidfile
         try:
             pid_file.unlink()
         except OSError:
@@ -127,7 +128,7 @@ def _default_stop_server(project_root: Path, timeout: float = 10.0) -> bool:
         logger.warning("No permission to signal supervisor PID %d", pid)
         return False
 
-    # Envia SIGTERM i espera
+    # Send SIGTERM and wait
     logger.info("Stopping running supervisor PID=%d before reinstall", pid)
     try:
         os.kill(pid, signal.SIGTERM)
@@ -148,7 +149,7 @@ def _default_stop_server(project_root: Path, timeout: float = 10.0) -> bool:
             return True
         time.sleep(0.2)
 
-    # No ha mort → SIGKILL
+    # Did not die → SIGKILL
     logger.warning("Supervisor PID=%d did not exit on SIGTERM, sending SIGKILL", pid)
     try:
         os.kill(pid, signal.SIGKILL)
@@ -157,11 +158,11 @@ def _default_stop_server(project_root: Path, timeout: float = 10.0) -> bool:
     except PermissionError:
         return False
 
-    # Darrera comprovació
+    # Last check
     time.sleep(0.5)
     try:
         os.kill(pid, 0)
-        return False  # encara viu
+        return False  # still alive
     except ProcessLookupError:
         try:
             pid_file.unlink()
@@ -171,27 +172,27 @@ def _default_stop_server(project_root: Path, timeout: float = 10.0) -> bool:
 
 
 def detect_existing_install(project_root: Path) -> bool:
-    """Retorna True si project_root conté una instal·lació prèvia."""
+    """Return True if project_root contains a prior installation."""
     return any((project_root / m).exists() for m in INSTALL_MARKERS)
 
 
 def _is_project_root_running_bundle(project_root: Path) -> bool:
-    """True si el procés actual viu dins project_root (auto-destrucció).
+    """True if the current process lives inside project_root (self-destruction).
 
-    Si l'instal·lador corre des de `Install Nexe.app/Contents/...` i
-    project_root apunta al mateix bundle, fer wipe ens dispararia al peu
-    esborrant el nostre propi executable/libs.
+    If the installer runs from `Install Nexe.app/Contents/...` and
+    project_root points at the same bundle, doing a wipe would shoot us
+    in the foot by deleting our own executable/libs.
     """
     try:
         project_resolved = project_root.resolve()
     except (OSError, RuntimeError):
         return False
 
-    # Nota: NO usar Path(__file__) — en mode headless, els scripts de
-    # l'installer es carreguen via PYTHONPATH des de project_root, de manera
-    # que __file__ resol dins project_root. Això és correcte i no indica
-    # que el binary vivi allà. Només comprovem sys.executable (el binary
-    # real del procés, que al DMG wizard és dins el bundle del DMG).
+    # Note: do NOT use Path(__file__) — in headless mode, installer scripts
+    # are loaded via PYTHONPATH from project_root, so __file__ resolves
+    # inside project_root. That is correct and does not mean the binary
+    # lives there. We only check sys.executable (the actual process binary,
+    # which in the DMG wizard lives inside the DMG bundle).
     candidates: list[Path] = []
     try:
         exe = Path(sys.executable).resolve()
@@ -209,7 +210,7 @@ def _is_project_root_running_bundle(project_root: Path) -> bool:
 
 
 def _safe_remove(path: Path) -> None:
-    """Esborra fitxer o directori si existeix. No falla si no hi és."""
+    """Delete file or directory if it exists. Does not fail if absent."""
     if not path.exists() and not path.is_symlink():
         return
     if path.is_symlink() or path.is_file():
@@ -222,7 +223,7 @@ def _safe_remove(path: Path) -> None:
 
 
 def _wipe_keychain_master_key() -> bool:
-    """Esborra l'entrada de la master key del keyring. Best-effort."""
+    """Delete the master key entry from the keyring. Best-effort."""
     try:
         import keyring
         keyring.delete_password(KEYRING_SERVICE, KEYRING_USERNAME)
@@ -234,7 +235,7 @@ def _wipe_keychain_master_key() -> bool:
 
 
 def _wipe_home_nexe_oauth() -> List[Path]:
-    """Esborra tokens OAuth a ~/.nexe/mail365*.json. Opt-in."""
+    """Delete OAuth tokens at ~/.nexe/mail365*.json. Opt-in."""
     removed: List[Path] = []
     home_nexe = Path.home() / ".nexe"
     for name in HOME_NEXE_FILES:
@@ -254,19 +255,19 @@ def wipe_user_data(
     wipe_keychain: bool = False,
     wipe_home_nexe: bool = False,
 ) -> List[Path]:
-    """Mode 'wipe': esborra dades d'usuari (.env, storage/, knowledge/).
+    """Mode 'wipe': delete user data (.env, storage/, knowledge/).
 
-    Per defecte NO toca:
-    - macOS Keychain (servei `server-nexe`, user `master-encryption-key`)
+    By default does NOT touch:
+    - macOS Keychain (service `server-nexe`, user `master-encryption-key`)
     - ~/.nexe/mail365_tokens.json, ~/.nexe/mail365.json (OAuth tokens)
 
     Args:
-        project_root: arrel del projecte server-nexe.
-        paths: paths relatius a project_root a esborrar.
-        wipe_keychain: si True, esborra l'entrada de la master key del keyring.
-        wipe_home_nexe: si True, esborra ~/.nexe/mail365*.json.
+        project_root: root of the server-nexe project.
+        paths: paths relative to project_root to delete.
+        wipe_keychain: if True, delete the master key entry from the keyring.
+        wipe_home_nexe: if True, delete ~/.nexe/mail365*.json.
 
-    Retorna la llista de paths que s'han esborrat efectivament.
+    Returns the list of paths that were actually deleted.
     """
     removed: List[Path] = []
     for rel in paths:
@@ -291,19 +292,19 @@ def backup_user_data(
     paths: Iterable[str] = USER_DATA_PATHS,
     exclude_models: bool = True,
 ) -> Path:
-    """Mode 'backup': mou dades d'usuari a backup_root/<timestamp>/.
+    """Mode 'backup': move user data to backup_root/<timestamp>/.
 
-    Usa `shutil.move` (instantani al mateix volum) en comptes de
-    `copytree` (lent i requereix 2x disc). Això és crític perquè
-    `storage/models/` pot ser 30+ GB.
+    Uses `shutil.move` (instant on the same volume) instead of
+    `copytree` (slow and requires 2x disk). This is critical because
+    `storage/models/` can be 30+ GB.
 
-    Per defecte exclou `storage/models/` del backup (paràmetre
-    `exclude_models=True`). Els models són pesats i en una reinstal·lació
-    típica l'usuari els re-descarrega (o els conserva opt-in).
+    By default excludes `storage/models/` from the backup
+    (`exclude_models=True`). Models are large and in a typical reinstall
+    the user re-downloads them (or keeps them opt-in).
 
-    Per defecte backup_root és `project_root/.nexe-backups`, fora de
-    `storage/` — això permet que el wipe posterior NO esborri el backup
-    que acabem de fer. Retorna el path del backup creat.
+    By default backup_root is `project_root/.nexe-backups`, outside
+    `storage/` — this ensures the subsequent wipe does NOT delete the
+    backup we just made. Returns the path of the created backup.
     """
     if backup_root is None:
         backup_root = project_root / ".nexe-backups"
@@ -326,8 +327,8 @@ def backup_user_data(
         dest = backup_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-        # Cas especial: si és 'storage' i volem excloure models o
-        # evitar recursió dins del propi backup_root, ho tractem apart.
+        # Special case: if it is 'storage' and we want to exclude models
+        # or avoid recursion inside the backup_root itself, handle it separately.
         needs_special_storage = False
         if src.is_dir():
             try:
@@ -340,8 +341,8 @@ def backup_user_data(
                 needs_special_storage = True
 
         if needs_special_storage:
-            # Mou entrades fill una per una, saltant 'models/' i '.nexe-backups'
-            # si viuen dins. Les subcarpetes restants es mouen intactes.
+            # Move child entries one by one, skipping 'models/' and '.nexe-backups'
+            # if they live inside. Remaining subdirectories are moved intact.
             dest.mkdir(parents=True, exist_ok=True)
             for child in src.iterdir():
                 if exclude_models and child.name == "models":
@@ -353,10 +354,9 @@ def backup_user_data(
                 except (OSError, ValueError):
                     pass
                 shutil.move(str(child), str(dest / child.name))
-            # Després de moure els fills vàlids, si 'src' encara té
-            # coses dins (models o el propi backup_root), el deixem
-            # al seu lloc. Altrament l'esborrem perquè el wipe posterior
-            # no tingui feina.
+            # After moving valid children, if 'src' still has things
+            # inside (models or the backup_root itself), leave it in place.
+            # Otherwise delete it so the subsequent wipe has nothing to do.
             try:
                 remaining = list(src.iterdir())
                 if not remaining:
@@ -365,26 +365,27 @@ def backup_user_data(
                 pass
             continue
 
-        # Cas general: move directe (instantani al mateix volum)
+        # General case: direct move (instant on the same volume)
         shutil.move(str(src), str(dest))
 
     return backup_dir
 
 
 def _regenerate_env_for_overwrite(project_root: Path) -> bool:
-    """Marca el `.env` per regenerar model config preservant secrets.
+    """Mark `.env` for model-config regeneration while preserving secrets.
 
-    En mode `overwrite`, el codi nou del wizard cridarà `generate_env_file`
-    que al seu torn crida `_update_env_model_config` si el `.env` ja
-    existeix. Aquesta funció preserva NEXE_PRIMARY_API_KEY i
-    NEXE_CSRF_SECRET (linies sense match van pel `else` del merge) però
-    refresca la config de model.
+    In `overwrite` mode, the new wizard code will call `generate_env_file`
+    which in turn calls `_update_env_model_config` if `.env` already exists.
+    That function preserves NEXE_PRIMARY_API_KEY and NEXE_CSRF_SECRET
+    (unmatched lines go through the merge `else`) but refreshes the model
+    configuration.
 
-    Aquí no fem res: només validem que el fitxer existeix i és llegible.
-    La regeneració real passa quan `install.py` / `install_headless.py`
-    criden `generate_env_file(project_root, model_config)` més tard.
+    Nothing is done here: we only validate that the file exists and is
+    readable. The actual regeneration happens when `install.py` /
+    `install_headless.py` calls `generate_env_file(project_root, model_config)`
+    later.
 
-    Retorna True si el `.env` existeix i és vàlid per al merge posterior.
+    Returns True if `.env` exists and is valid for the subsequent merge.
     """
     env_file = project_root / ".env"
     if not env_file.exists():
@@ -398,7 +399,7 @@ def _regenerate_env_for_overwrite(project_root: Path) -> bool:
 
 
 def _kill_existing_tray() -> None:
-    """Matar el procés nexe-tray existent abans de substituir el venv (B10)."""
+    """Kill the existing nexe-tray process before replacing the venv (B10)."""
     result = subprocess.run(["pgrep", "-f", "nexe-tray"], capture_output=True, text=True)  # nosec B603 B607: literal pgrep pattern; system tool via PATH (mono-user local)
     for pid_str in result.stdout.strip().splitlines():
         try:
@@ -416,22 +417,22 @@ def apply_reinstall_mode(
     wipe_keychain: bool = False,
     wipe_home_nexe: bool = False,
 ) -> dict:
-    """Aplica el mode escollit i retorna un resum del que s'ha fet.
+    """Apply the chosen mode and return a summary of what was done.
 
     Args:
-        project_root: arrel del projecte server-nexe.
-        mode: un de VALID_REINSTALL_MODES.
-        backup_root: opcional — destí dels backups (només mode 'backup').
-        stop_server_func: opcional — callable(project_root) -> bool per
-            parar el servidor abans de tocar res. Per defecte s'usa
-            `_default_stop_server` que mira el pidfile a
+        project_root: root of the server-nexe project.
+        mode: one of VALID_REINSTALL_MODES.
+        backup_root: optional — backup destination (backup mode only).
+        stop_server_func: optional — callable(project_root) -> bool to
+            stop the server before touching anything. Defaults to
+            `_default_stop_server` which checks the pidfile at
             storage/logs/core_supervisor.pid.
-        exclude_models: mode backup — excloure storage/models/.
-        wipe_keychain: mode wipe — esborrar master key del keyring.
-        wipe_home_nexe: mode wipe — esborrar ~/.nexe/mail365*.json.
+        exclude_models: backup mode — exclude storage/models/.
+        wipe_keychain: wipe mode — delete master key from keyring.
+        wipe_home_nexe: wipe mode — delete ~/.nexe/mail365*.json.
 
     Returns:
-        dict amb claus: mode, removed (List[str]), backup_dir (str|None),
+        dict with keys: mode, removed (List[str]), backup_dir (str|None),
         server_stopped (bool).
     """
     if mode not in VALID_REINSTALL_MODES:
@@ -440,8 +441,8 @@ def apply_reinstall_mode(
             f"Valid modes: {', '.join(VALID_REINSTALL_MODES)}"
         )
 
-    # Aviso 5 — refusa si project_root és el bundle on viu el procés.
-    # Només aplica si el mode tocarà coses dins del project_root.
+    # Advisory 5 — refuse if project_root is the bundle where the process lives.
+    # Only applies if the mode will touch things inside project_root.
     if mode in (REINSTALL_MODE_WIPE, REINSTALL_MODE_BACKUP):
         if _is_project_root_running_bundle(project_root):
             raise RuntimeError(
@@ -451,7 +452,7 @@ def apply_reinstall_mode(
                 "the installer from outside the bundle."
             )
 
-    # Aviso 1 — parar el servidor abans de qualsevol mode
+    # Advisory 1 — stop the server before any mode
     if stop_server_func is None:
         stop_server_func = _default_stop_server
     server_stopped = False
@@ -474,13 +475,13 @@ def apply_reinstall_mode(
     }
 
     if mode == REINSTALL_MODE_OVERWRITE:
-        # Aviso 2 — validar que .env serà regenerable via merge.
-        # La regeneració real la fa generate_env_file() més tard al
-        # flow de l'installer; aquí només comprovem integritat.
+        # Advisory 2 — validate that .env will be regenerable via merge.
+        # Actual regeneration is done by generate_env_file() later in the
+        # installer flow; here we only check integrity.
         _regenerate_env_for_overwrite(project_root)
 
-        # Aviso 3 — esborrar marker de KB ingerida perquè el codi nou
-        # torni a indexar i no quedin chunks vells.
+        # Advisory 3 — delete KB ingestion marker so the new code
+        # re-indexes and no stale chunks remain.
         marker = project_root / "storage" / ".knowledge_ingested"
         if marker.exists():
             try:
@@ -489,9 +490,9 @@ def apply_reinstall_mode(
             except OSError as e:
                 logger.warning("Could not remove knowledge marker: %s", e)
 
-        # Matar tray existent abans de substituir el venv
+        # Kill existing tray before replacing the venv
         _kill_existing_tray()
-        # Treiem el venv (es regenerarà). Mantenim .env, storage/, knowledge/.
+        # Remove the venv (will be regenerated). Keep .env, storage/, knowledge/.
         venv = project_root / "venv"
         if venv.exists():
             _safe_remove(venv)
@@ -506,17 +507,17 @@ def apply_reinstall_mode(
         )
         result["backup_dir"] = str(backup_dir)
 
-        # Dev #3 fix — Bug 7 Consultor passada 1:
-        # Abans aquí cridàvem wipe_user_data amb els paths per defecte
-        # (.env, storage, knowledge). Com que `storage/` es feia via
-        # shutil.rmtree, els models que havíem preservat amb
-        # exclude_models=True s'esborraven igualment. Solució (b):
-        # quan exclude_models=True, fem un wipe selectiu de storage/
-        # eliminant tot el contingut EXCEPTE models/. La resta de
-        # paths (.env, knowledge/) ja els ha mogut el backup_user_data,
-        # els passem igualment al wipe per si alguna cosa residual.
+        # Dev #3 fix — Bug 7 Consultant pass 1:
+        # Previously we called wipe_user_data with the default paths
+        # (.env, storage, knowledge). Since `storage/` was handled via
+        # shutil.rmtree, models preserved with exclude_models=True were
+        # deleted anyway. Solution (b): when exclude_models=True, do a
+        # selective wipe of storage/ removing everything EXCEPT models/.
+        # The other paths (.env, knowledge/) have already been moved by
+        # backup_user_data; we still pass them to wipe in case anything
+        # residual remains.
         if exclude_models:
-            wipe_paths = [".env"]  # knowledge/ NO: és codi sistema, el tar la reomple
+            wipe_paths = [".env"]  # knowledge/ NO: it's system code, tar will refill it
             removed = wipe_user_data(
                 project_root,
                 paths=wipe_paths,
@@ -532,7 +533,7 @@ def apply_reinstall_mode(
                     _safe_remove(child)
                     removed.append(child)
         else:
-            # Sense preservació de models, wipe complet normal.
+            # Without model preservation, normal full wipe.
             removed = wipe_user_data(
                 project_root,
                 wipe_keychain=wipe_keychain,
@@ -540,7 +541,7 @@ def apply_reinstall_mode(
             )
 
         result["removed"] = [str(p) for p in removed]
-        # Matar tray existent abans de substituir el venv
+        # Kill existing tray before replacing the venv
         _kill_existing_tray()
         venv = project_root / "venv"
         if venv.exists():
@@ -555,7 +556,7 @@ def apply_reinstall_mode(
         wipe_home_nexe=wipe_home_nexe,
     )
     result["removed"] = [str(p) for p in removed]
-    # Matar tray existent abans de substituir el venv
+    # Kill existing tray before replacing the venv
     _kill_existing_tray()
     venv = project_root / "venv"
     if venv.exists():

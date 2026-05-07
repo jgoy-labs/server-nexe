@@ -2,19 +2,19 @@
 ────────────────────────────────────
 Server Nexe
 Location: tests/onada4_mypy_plugins/test_cluster06_from_dict_missing_timestamps.py
-Description: Tests cecs Onada 4.4 — Cluster 6 (session_manager.py from_dict arg-type).
+Description: Blind tests Onada 4.4 — Cluster 6 (session_manager.py from_dict arg-type).
 
-Cluster 6: ChatSession.from_dict() rep dicts de sessió deserialitzats del disc.
-Si el dict no té 'created_at' o 'last_activity' (sessió antiga, corrupció parcial,
-o migració), datetime.fromisoformat(None) → TypeError → sessió descartada
-silenciosament per _load_sessions() try/except.
+Cluster 6: ChatSession.from_dict() receives session dicts deserialized from disk.
+If the dict lacks 'created_at' or 'last_activity' (old session, partial corruption,
+or migration), datetime.fromisoformat(None) → TypeError → session silently discarded
+by _load_sessions() try/except.
 
-Contracte post-fix (Dev#2): from_dict() NO peta amb claus absents i retorna
-timestamps fallback raonables (e.g. datetime.now(timezone.utc)).
+Post-fix contract (Dev#2): from_dict() does NOT crash with absent keys and returns
+reasonable fallback timestamps (e.g. datetime.now(timezone.utc)).
 
-Contract pin: ChatSession.from_dict({'id': 'x'}) → cap TypeError, sessió vàlida.
+Contract pin: ChatSession.from_dict({'id': 'x'}) → no TypeError, valid session.
 
-Veure: nat/dev/server-nexe/diari/2026-05/20260504/onada4-mypy-plugins/02-tests.md
+See: nat/dev/server-nexe/diari/2026-05/20260504/onada4-mypy-plugins/02-tests.md
 ────────────────────────────────────
 """
 
@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 
 
 def test_from_dict_missing_created_at_does_not_raise():
-    """TDD Cluster 6: from_dict() amb 'created_at' absent NO ha de petar.
+    """TDD Cluster 6: from_dict() with 'created_at' absent must NOT crash.
 
     Pre-fix: TypeError ('NoneType'). Post-fix: fallback datetime.now(utc).
     """
@@ -38,15 +38,15 @@ def test_from_dict_missing_created_at_does_not_raise():
     session = ChatSession.from_dict(data)
 
     assert isinstance(session.created_at, datetime), (
-        f"created_at ha de ser datetime post-fix, obtingut: {type(session.created_at)}"
+        f"created_at must be datetime post-fix, obtained: {type(session.created_at)}"
     )
     assert session.created_at.tzinfo is not None, (
-        "created_at ha de tenir timezone (aware datetime)"
+        "created_at must have timezone (aware datetime)"
     )
 
 
 def test_from_dict_missing_last_activity_does_not_raise():
-    """TDD Cluster 6: from_dict() amb 'last_activity' absent NO ha de petar.
+    """TDD Cluster 6: from_dict() with 'last_activity' absent must NOT crash.
 
     Pre-fix: TypeError. Post-fix: fallback datetime.now(utc).
     """
@@ -61,18 +61,18 @@ def test_from_dict_missing_last_activity_does_not_raise():
     session = ChatSession.from_dict(data)
 
     assert isinstance(session.last_activity, datetime), (
-        f"last_activity ha de ser datetime post-fix, obtingut: {type(session.last_activity)}"
+        f"last_activity must be datetime post-fix, obtained: {type(session.last_activity)}"
     )
     assert session.last_activity.tzinfo is not None, (
-        "last_activity ha de tenir timezone (aware datetime)"
+        "last_activity must have timezone (aware datetime)"
     )
 
 
 def test_from_dict_complete_dict_preserved():
-    """Anti-regressió Cluster 6: from_dict() amb totes les claus presents NO ha de canviar.
+    """Anti-regression Cluster 6: from_dict() with all keys present must NOT change.
 
-    Pina que el fix de Dev#2 no altera el comportament del cas normal (sessió
-    correctament serialitzada). Passa pre-fix i post-fix.
+    Pins that the Dev#2 fix does not alter the behaviour of the normal case (correctly
+    serialized session). Passes pre-fix and post-fix.
     """
     from plugins.web_ui_module.core.session_manager import ChatSession
 

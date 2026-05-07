@@ -1,13 +1,13 @@
 """
-Tests P1-D — Encryption default 'auto' en lloc de False.
+Tests P1-D — Encryption default 'auto' instead of False.
 
-Problema: el default era false — totes les sessions en plain text,
-contradient el missatge "privacy-first" del README.
+Problem: the default was false — all sessions in plain text,
+contradicting the "privacy-first" message in the README.
 
-Fix: default 'auto' — si sqlcipher3 disponible: activa encryption;
-si no: continua en plain text amb WARNING explícit.
+Fix: default 'auto' — if sqlcipher3 is available: enable encryption;
+if not: continue in plain text with an explicit WARNING.
 
-Helper testejable: _resolve_encryption_enabled(env_value, sqlcipher_available) → bool
+Testable helper: _resolve_encryption_enabled(env_value, sqlcipher_available) → bool
 
 www.jgoy.net · https://server-nexe.org
 """
@@ -22,39 +22,39 @@ except ImportError:
 
 class TestResolveEncryptionEnabled:
     def test_auto_with_sqlcipher_enables(self):
-        """auto + sqlcipher3 disponible → encryption activa."""
+        """auto + sqlcipher3 available → encryption enabled."""
         assert _resolve_encryption_enabled("auto", sqlcipher_available=True) is True
 
     def test_auto_without_sqlcipher_disabled(self):
-        """auto + sqlcipher3 absent → encryption inactiva."""
+        """auto + sqlcipher3 absent → encryption disabled."""
         assert _resolve_encryption_enabled("auto", sqlcipher_available=False) is False
 
     def test_empty_string_behaves_as_auto_with_sqlcipher(self):
-        """Cadena buida ('' = cas legacy) → comportament auto: ON si disponible."""
+        """Empty string ('' = legacy case) → auto behaviour: ON if available."""
         assert _resolve_encryption_enabled("", sqlcipher_available=True) is True
 
     def test_empty_string_behaves_as_auto_without_sqlcipher(self):
-        """Cadena buida → comportament auto: OFF si no disponible."""
+        """Empty string → auto behaviour: OFF if not available."""
         assert _resolve_encryption_enabled("", sqlcipher_available=False) is False
 
     def test_true_enables_regardless_sqlcipher(self):
-        """true → encryption activa (SQLCIPHER_AVAILABLE no importa aquí, el gestiona el caller)."""
+        """true → encryption enabled (SQLCIPHER_AVAILABLE doesn't matter here, handled by caller)."""
         assert _resolve_encryption_enabled("true", sqlcipher_available=True) is True
         assert _resolve_encryption_enabled("true", sqlcipher_available=False) is True
 
     def test_false_disables(self):
-        """false → encryption inactiva independentment de sqlcipher3."""
+        """false → encryption disabled regardless of sqlcipher3."""
         assert _resolve_encryption_enabled("false", sqlcipher_available=True) is False
         assert _resolve_encryption_enabled("false", sqlcipher_available=False) is False
 
     def test_uppercase_true(self):
-        """TRUE (majúscules) → tractament equivalent a 'true'."""
+        """TRUE (uppercase) → equivalent treatment to 'true'."""
         assert _resolve_encryption_enabled("TRUE", sqlcipher_available=True) is True
 
     def test_uppercase_false(self):
-        """FALSE (majúscules) → tractament equivalent a 'false'."""
+        """FALSE (uppercase) → equivalent treatment to 'false'."""
         assert _resolve_encryption_enabled("FALSE", sqlcipher_available=True) is False
 
     def test_unknown_value_defaults_off(self):
-        """Valor desconegut → OFF (comportament segur per defecte)."""
+        """Unknown value → OFF (safe default behaviour)."""
         assert _resolve_encryption_enabled("maybe", sqlcipher_available=True) is False

@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
-"""Propaga la versió del projecte (pyproject.toml) cap als Info.plist que
-no poden importar Python en runtime (.app bundles macOS).
+"""Propagate the project version (pyproject.toml) to Info.plist files that
+cannot import Python at runtime (.app bundles on macOS).
 
-Complementari a ``core/version.py``:
-- ``core/version.py`` llegeix pyproject.toml en runtime (codi Python).
-- Aquest script escriu als Info.plist en build-time (bundles macOS).
+Complementary to ``core/version.py``:
+- ``core/version.py`` reads pyproject.toml at runtime (Python code).
+- This script writes to Info.plist files at build time (macOS bundles).
 
-Bundles sincronitzats (comparteixen versió de server-nexe):
+Synced bundles (share the server-nexe version):
 - ``Nexe.app/Contents/Info.plist``
 - ``installer/NexeTray.app/Contents/Info.plist``
 
-Bundles NO sincronitzats (tenen la seva pròpia versió d'installer):
+NOT synced bundles (have their own installer version):
 - ``Install Nexe.app`` / ``InstallNexe.app`` / ``swift-wizard/Resources``
 
-Ús:
-    python -m installer.sync_plist_versions            # aplica canvis
-    python -m installer.sync_plist_versions --check    # només verifica (CI)
+Usage:
+    python -m installer.sync_plist_versions            # apply changes
+    python -m installer.sync_plist_versions --check    # verify only (CI)
 """
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ except ModuleNotFoundError:  # Python < 3.11
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = PROJECT_ROOT / "pyproject.toml"
 
-# Bundles que han de compartir la versió de server-nexe.
-# Afegir-ne de nous aquí quan calgui.
+# Bundles that must share the server-nexe version.
+# Add new ones here when needed.
 SYNCED_PLISTS: tuple[Path, ...] = (
     PROJECT_ROOT / "Nexe.app" / "Contents" / "Info.plist",
     PROJECT_ROOT / "installer" / "NexeTray.app" / "Contents" / "Info.plist",
@@ -56,13 +56,13 @@ def _write_plist(path: Path, data: dict) -> None:
 
 
 def sync(check_only: bool = False) -> int:
-    """Sincronitza (o verifica) versions. Retorna nombre de fitxers fora de sync."""
+    """Sync (or verify) versions. Return number of files out of sync."""
     version = _project_version()
     out_of_sync = 0
 
     for plist_path in SYNCED_PLISTS:
         if not plist_path.exists():
-            print(f"[SKIP] {plist_path} no existeix", file=sys.stderr)
+            print(f"[SKIP] {plist_path} does not exist", file=sys.stderr)
             continue
 
         data = _read_plist(plist_path)
@@ -76,7 +76,7 @@ def sync(check_only: bool = False) -> int:
         if check_only:
             print(
                 f"[OUT OF SYNC] {plist_path.relative_to(PROJECT_ROOT)}: "
-                f"short={current_short!r}, build={current_build!r} → esperat {version!r}"
+                f"short={current_short!r}, build={current_build!r} → expected {version!r}"
             )
         else:
             data["CFBundleShortVersionString"] = version
@@ -91,6 +91,6 @@ if __name__ == "__main__":
     check = "--check" in sys.argv[1:]
     diff = sync(check_only=check)
     if check and diff:
-        print(f"\n{diff} plist(s) fora de sync. Executa: python -m installer.sync_plist_versions")
+        print(f"\n{diff} plist(s) out of sync. Run: python -m installer.sync_plist_versions")
         sys.exit(1)
     sys.exit(0)

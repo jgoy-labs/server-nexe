@@ -3,11 +3,11 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_module_discovery_cycles.py
-Description: Tests per Bug 20 — quan ModuleDiscovery detecta un cicle de
-             dependencies, ha de:
-               1. Loguejar un error visible amb la cadena del cicle
-               2. Inhabilitar els modules afectats (com abans)
-               3. Guardar el cicle a `_cycle_warnings` per consulta posterior
+Description: Tests for Bug 20 — when ModuleDiscovery detects a dependency cycle,
+             it must:
+               1. Log a visible error with the cycle chain
+               2. Disable the affected modules (as before)
+               3. Store the cycle in `_cycle_warnings` for later query
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -24,7 +24,7 @@ from personality.module_manager.discovery import ModuleDiscovery
 
 
 def _make_discovery(modules_dict):
-    """Construeix ModuleDiscovery amb mocks dels components."""
+    """Build ModuleDiscovery with mocked components."""
     path_disc = MagicMock()
     path_disc.load_cache.return_value = True
     path_disc._module_locations = {n: f"/fake/{n}" for n in modules_dict}
@@ -48,7 +48,7 @@ def _make_discovery(modules_dict):
 
 
 def test_cycle_detected_disables_modules_and_logs(caplog):
-    """A -> B -> A: ambdos quedern enabled=False i hi ha log.error."""
+    """A -> B -> A: both end up with enabled=False and there is a log.error."""
     modules = {
         "A": ModuleInfo(
             name="A", path="/fake/A", manifest_path="A.toml",
@@ -68,25 +68,25 @@ def test_cycle_detected_disables_modules_and_logs(caplog):
     with caplog.at_level(logging.ERROR, logger="personality.module_manager.discovery"):
         asyncio.run(disc.discover(modules, lock, force=True))
 
-    # Modules inhabilitats
+    # Modules disabled
     assert modules["A"].enabled is False
     assert modules["B"].enabled is False
     assert modules["A"].state == ModuleState.ERROR
     assert modules["B"].state == ModuleState.ERROR
 
-    # Log error visible amb "cycle" i els noms dels modules
+    # Visible error log with "cycle" and the module names
     error_records = [r for r in caplog.records if r.levelno >= logging.ERROR]
     error_text = " ".join(r.message for r in error_records).lower()
     assert "cycle" in error_text
     assert "a" in error_text and "b" in error_text
 
-    # _cycle_warnings populat
+    # _cycle_warnings populated
     assert len(disc._cycle_warnings) >= 1
     assert any("A" in w and "B" in w for w in disc._cycle_warnings)
 
 
 def test_no_cycle_no_warnings():
-    """Sense cicle, _cycle_warnings queda buit i ningu es desactiva."""
+    """Without a cycle, _cycle_warnings remains empty and no one is disabled."""
     modules = {
         "X": ModuleInfo(
             name="X", path="/fake/X", manifest_path="X.toml",
@@ -110,7 +110,7 @@ def test_no_cycle_no_warnings():
 
 
 def test_get_cycle_warnings_returns_copy():
-    """get_cycle_warnings() ha de retornar una copia, no la llista interna."""
+    """get_cycle_warnings() must return a copy, not the internal list."""
     modules = {
         "A": ModuleInfo(
             name="A", path="/fake/A", manifest_path="A.toml",
@@ -128,7 +128,7 @@ def test_get_cycle_warnings_returns_copy():
 
     warnings = disc.get_cycle_warnings()
     assert len(warnings) >= 1
-    # Mutar la copia no ha d'afectar l'interna
+    # Mutating the copy must not affect the internal list
     warnings.clear()
     assert len(disc.get_cycle_warnings()) >= 1
 
@@ -138,8 +138,8 @@ def test_get_cycle_warnings_returns_copy():
 
 def test_lifespan_startup_summary_emits_warn_for_cycles(caplog):
     """
-    Bug 20 — simulem el tros del lifespan que llegeix cycle_warnings i
-    emet [WARN] log.warning per cada cadena.
+    Bug 20 — simulate the lifespan section that reads cycle_warnings and
+    emits [WARN] log.warning for each chain.
     """
     import logging as _logging
     lifespan_logger = _logging.getLogger("core.lifespan")
@@ -151,7 +151,7 @@ def test_lifespan_startup_summary_emits_warn_for_cycles(caplog):
     mm = _FakeMM()
 
     with caplog.at_level(_logging.WARNING, logger="core.lifespan"):
-        # Replica del bloc nou afegit a core/lifespan.py
+        # Replica of the new block added to core/lifespan.py
         try:
             cycle_warnings = mm.get_cycle_warnings()
         except Exception:

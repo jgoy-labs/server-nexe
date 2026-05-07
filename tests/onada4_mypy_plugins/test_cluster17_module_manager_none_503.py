@@ -2,22 +2,22 @@
 ────────────────────────────────────
 Server Nexe
 Location: tests/onada4_mypy_plugins/test_cluster17_module_manager_none_503.py
-Description: Tests cecs Onada 4.4 — Cluster 17 (module_manager.registry None cross-file).
+Description: Blind tests Onada 4.4 — Cluster 17 (module_manager.registry None cross-file).
 
-Cluster 17: routes_chat.py L575/592 i rag_handler.py L57 accedeixen a
-`module_manager.registry` sense guard. Si get_server_state().module_manager
-és None (startup race o inicialització fallida), AttributeError → absorbida
-per except Exception → response_text "Error: ..." → HTTP 200 (NO 503).
+Cluster 17: routes_chat.py L575/592 and rag_handler.py L57 access
+`module_manager.registry` without a guard. If get_server_state().module_manager
+is None (startup race or failed initialization), AttributeError → absorbed
+by except Exception → response_text "Error: ..." → HTTP 200 (NOT 503).
 
-Contracte post-fix (Dev#2): si module_manager=None → HTTPException(503).
-Ruta calenta del chat (L575 és la primera crida del bloc "intent chat").
+Post-fix contract (Dev#2): if module_manager=None → HTTPException(503).
+Hot path of chat (L575 is the first call of the "intent chat" block).
 
-Contract pin (anti-regressió, PASSA pre i post): ServerState.module_manager
-és Optional (None per defecte), no s'ha endurit com a obligatori post-fix.
+Contract pin (anti-regression, PASSES pre and post): ServerState.module_manager
+is Optional (None by default), has not been hardened as required post-fix.
 
-Contract TDD (xfail): POST /chat amb module_manager=None → 503 (no 200).
+Contract TDD (xfail): POST /chat with module_manager=None → 503 (not 200).
 
-Veure: nat/dev/server-nexe/diari/2026-05/20260504/onada4-mypy-plugins/02-tests.md
+See: nat/dev/server-nexe/diari/2026-05/20260504/onada4-mypy-plugins/02-tests.md
 ────────────────────────────────────
 """
 
@@ -26,39 +26,39 @@ from unittest.mock import MagicMock, patch
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Test 1 — anti-regressió (PASSA pre i post-fix)
+# Test 1 — anti-regression (PASSES pre and post-fix)
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_server_state_module_manager_is_optional_none_by_default():
-    """Anti-regressió Cluster 17: ServerState.module_manager és Optional, None per defecte.
+    """Anti-regression Cluster 17: ServerState.module_manager is Optional, None by default.
 
-    Pina que post-fix Dev#2 no endurixi module_manager com a Required (no-None).
-    L'atribut ha de continuar essent inicialitzat a None al __init__ (set a
-    initialize()/lifespan). Si Dev#2 canvia el default a un valor no-None,
-    trencaria el contracte de startup (lifespan.py depèn del default None).
+    Pins that post-fix Dev#2 does not harden module_manager as Required (non-None).
+    The attribute must continue to be initialised to None in __init__ (set at
+    initialize()/lifespan). If Dev#2 changes the default to a non-None value,
+    it would break the startup contract (lifespan.py depends on the default None).
 
-    PASSA pre-fix i post-fix.
+    PASSES pre-fix and post-fix.
     """
     from core.lifespan import ServerState
 
     state = ServerState()
     assert hasattr(state, "module_manager"), (
-        "ServerState ha de tenir atribut 'module_manager' — "
-        "refactor col·lateral Cluster 17 no hauria d'eliminar-lo."
+        "ServerState must have attribute 'module_manager' — "
+        "collateral refactor Cluster 17 should not remove it."
     )
     assert state.module_manager is None, (
-        f"ServerState().module_manager ha de ser None per defecte (Optional), "
-        f"obtingut: {state.module_manager!r}. "
-        "Si post-fix Dev#2 el canvia a no-None, trenca el contracte de startup."
+        f"ServerState().module_manager must be None by default (Optional), "
+        f"obtained: {state.module_manager!r}. "
+        "If post-fix Dev#2 changes it to non-None, it breaks the startup contract."
     )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Fixtures per al test HTTP (Cluster 17 xfail)
+# Fixtures for the HTTP test (Cluster 17 xfail)
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _build_minimal_chat_app():
-    """App FastAPI mínima amb l'endpoint POST /chat registrat."""
+    """Minimal FastAPI app with the POST /chat endpoint registered."""
     from fastapi import FastAPI, APIRouter
     from slowapi.middleware import SlowAPIMiddleware
     from slowapi.errors import RateLimitExceeded
@@ -93,11 +93,11 @@ def _build_minimal_chat_app():
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_chat_endpoint_module_manager_none_returns_503():
-    """TDD Cluster 17: POST /chat amb module_manager=None ha de retornar HTTP 503.
+    """TDD Cluster 17: POST /chat with module_manager=None must return HTTP 503.
 
-    Pre-fix: retorna 200 amb {'response': "Error: 'NoneType' object has no attribute
-    'registry'", ...} (AttributeError absorbida per except Exception a routes_chat.py).
-    Post-fix (Dev#2): guard explícit → HTTPException(503, 'Service unavailable').
+    Pre-fix: returns 200 with {'response': "Error: 'NoneType' object has no attribute
+    'registry'", ...} (AttributeError absorbed by except Exception in routes_chat.py).
+    Post-fix (Dev#2): explicit guard → HTTPException(503, 'Service unavailable').
     """
     from fastapi.testclient import TestClient
 
@@ -124,6 +124,6 @@ def test_chat_endpoint_module_manager_none_returns_503():
             r = client.post("/chat", json={"message": "hola"})
 
     assert r.status_code == 503, (
-        f"Esperat HTTP 503 (module_manager=None, guard dev#2), "
-        f"obtingut {r.status_code}. Body: {r.text[:200]!r}"
+        f"Expected HTTP 503 (module_manager=None, dev#2 guard), "
+        f"received {r.status_code}. Body: {r.text[:200]!r}"
     )

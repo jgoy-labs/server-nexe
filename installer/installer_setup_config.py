@@ -64,8 +64,8 @@ def generate_env_file(project_root, model_config=None):
                     elif model_config['engine'] == 'ollama':
                         f.write(f"NEXE_OLLAMA_MODEL={model_config['id']}\n")
                 else:
-                    # No model selected — instal·la sense model, l'usuari afegirà un model manualment
-                    f.write("# NEXE_DEFAULT_MODEL=  (configura via 'nexe model pull <name>')\n")
+                    # No model selected — install without a model, user will add one manually
+                    f.write("# NEXE_DEFAULT_MODEL=  (configure via 'nexe model pull <name>')\n")
                     f.write("NEXE_MODEL_ENGINE=ollama\n")
                     f.write("NEXE_PROMPT_TIER=small\n")
                 f.write("NEXE_QDRANT_PATH=storage/vectors\n")

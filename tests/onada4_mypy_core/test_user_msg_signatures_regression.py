@@ -1,19 +1,19 @@
-"""Anti-regressió cluster `user_msg` (Onada 4.1, BUS Dev#1bis).
+"""Anti-regression cluster `user_msg` (Onada 4.1, BUS Dev#1bis).
 
-Cobreix els findings mypy #49, #50, #51, #58 i propagats #52-#57, #60, #61
-(`01-classificacio.md`). Pina el **contracte de signatura** de les 4 funcions
-del cluster: el paràmetre `user_msg` ha d'acceptar `None` com a default.
+Covers mypy findings #49, #50, #51, #58 and propagated #52-#57, #60, #61
+(`01-classificacio.md`). Pins the **signature contract** of the 4 functions
+in the cluster: the `user_msg` parameter must accept `None` as the default.
 
-El fix Dev#2 canviarà l'anotació `user_msg: str = None` per
-`user_msg: Optional[str] = None` (PEP 484). El default value (`None`)
-*no canvia*, només l'anotació estàtica. Aquest test pina aquest contracte
-runtime: pre-fix passa (default ja és None) i post-fix continua passant.
+The Dev#2 fix will change the annotation `user_msg: str = None` to
+`user_msg: Optional[str] = None` (PEP 484). The default value (`None`)
+*does not change*, only the static annotation. This test pins this runtime
+contract: pre-fix passes (default is already None) and post-fix continues to pass.
 
-Si Dev#2 inadvertidament canvia el default value (e.g. `user_msg: Optional[str] = ""`)
-o reanomena el paràmetre, aquest test salta — *teeth* contra refactor inadvertit.
+If Dev#2 inadvertently changes the default value (e.g. `user_msg: Optional[str] = ""`)
+or renames the parameter, this test fails — *teeth* against inadvertent refactor.
 
-CEC: només firma + invocació-binding via `inspect.Signature.bind`. NO s'executa
-el cos de les funcions (les coroutines es creen i tanquen sense awaitar).
+CEC: signature + invocation-binding via `inspect.Signature.bind` only. The
+function bodies are NOT executed (the coroutines are created and closed without awaiting).
 """
 
 from __future__ import annotations
@@ -38,22 +38,22 @@ def test_user_msg_default_is_none(module_path: str, func_name: str) -> None:
     func = getattr(module, func_name)
     sig = inspect.signature(func)
     assert "user_msg" in sig.parameters, (
-        f"{module_path}.{func_name} ha perdut el paràmetre `user_msg` — "
-        f"trenca contracte cluster #49/#50/#51/#58."
+        f"{module_path}.{func_name} has lost the `user_msg` parameter — "
+        f"breaks cluster contract #49/#50/#51/#58."
     )
     param = sig.parameters["user_msg"]
     assert param.default is None, (
         f"{module_path}.{func_name}.user_msg.default = {param.default!r}, "
-        f"esperat None. El fix Onada 4.1 ha de mantenir el default a None "
-        f"i només canviar l'anotació a Optional[str]."
+        f"expected None. The Onada 4.1 fix must keep the default at None "
+        f"and only change the annotation to Optional[str]."
     )
 
 
 def test_forward_to_ollama_binds_user_msg_none() -> None:
-    """Pina que la firma `_forward_to_ollama(messages, request, app_state, user_msg=None)`
-    accepta `user_msg=None` sense TypeError de binding.
+    """Pins that the signature `_forward_to_ollama(messages, request, app_state, user_msg=None)`
+    accepts `user_msg=None` without a binding TypeError.
 
-    Crea la coroutine però la tanca abans d'executar el cos (CEC).
+    Creates the coroutine but closes it before executing the body (CEC).
     """
     from core.endpoints.chat_engines.ollama import _forward_to_ollama
 

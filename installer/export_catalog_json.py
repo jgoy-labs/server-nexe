@@ -2,24 +2,25 @@
 ------------------------------------
 Server Nexe
 Location: installer/export_catalog_json.py
-Description: Validador de sincronia entre installer_catalog_data.py
-             (SSOT per a descarrega de models) i swift-wizard/Resources/models.json
-             (SSOT per a UX del wizard, tiers basats en RAM).
+Description: Sync validator between installer_catalog_data.py
+             (SSOT for model downloads) and swift-wizard/Resources/models.json
+             (SSOT for wizard UX, RAM-based tiers).
 
-             Els dos fitxers conviuen per disseny (2026-04-14):
-               - .py té schema small/medium/large i camps de descarrega rics
-                 (mlx URL real, chat_format, prompt_tier, lang) — consumit
-                 per install_headless.py i la CLI interactiva.
-               - .json té schema tier_8..tier_64 per UX i flags booleans
-                 consumit pel Swift wizard (ModelCatalog.swift).
+             Both files coexist by design (2026-04-14):
+               - .py has a small/medium/large schema with rich download fields
+                 (real mlx URL, chat_format, prompt_tier, lang) — consumed by
+                 install_headless.py and the interactive CLI.
+               - .json has a tier_8..tier_64 schema for UX with boolean flags
+                 consumed by the Swift wizard (ModelCatalog.swift).
 
-             Aquest script NO regenera el JSON (perdria la distribucio RAM-tier
-             editada a ma). Valida que tot `key` al JSON existeixi al .py
-             i que els backends siguin coherents (mlx/ollama/gguf presents
-             als dos llocs). S'executa al CI (test_installer_catalog.py).
+             This script does NOT regenerate the JSON (it would lose the
+             RAM-tier distribution edited by hand). It validates that every
+             `key` in the JSON exists in the .py and that the backends are
+             consistent (mlx/ollama/gguf present in both places). Runs in CI
+             (test_installer_catalog.py).
 
-             Per regenerar estructural el JSON des del .py cal un `--force`
-             explicit (no recomanat; trencarà la UX del wizard).
+             To structurally regenerate the JSON from the .py an explicit
+             `--force` is required (not recommended; will break the wizard UX).
 ------------------------------------
 """
 
@@ -34,7 +35,7 @@ from installer.installer_catalog_data import MODEL_CATALOG
 
 
 def _flatten_py():
-    """Retorna dict {key: model_dict} del catàleg Python."""
+    """Return dict {key: model_dict} from the Python catalog."""
     out = {}
     for _, models in MODEL_CATALOG.items():
         for m in models:
@@ -43,7 +44,7 @@ def _flatten_py():
 
 
 def _flatten_json(path):
-    """Retorna dict {key: model_dict} del catàleg JSON."""
+    """Return dict {key: model_dict} from the JSON catalog."""
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     out = {}
     for _, models in data.items():
@@ -53,7 +54,7 @@ def _flatten_json(path):
 
 
 def validate(json_path: str) -> list[str]:
-    """Valida sincronia. Retorna llista d'errors (buida si tot OK)."""
+    """Validate sync. Return list of errors (empty if all OK)."""
     py = _flatten_py()
     js = _flatten_json(json_path)
     errors: list[str] = []
@@ -66,7 +67,7 @@ def validate(json_path: str) -> list[str]:
             )
             continue
         pm = py[key]
-        # Bool JSON vs URL .py: tots dos han de coincidir en presència
+        # Bool JSON vs URL .py: both must match in presence
         if bool(jm.get("mlx")) != bool(pm.get("mlx")):
             errors.append(
                 f"[SYNC] '{key}': mlx mismatch — JSON={jm.get('mlx')!r} "
@@ -92,7 +93,7 @@ def _default_json_path():
 
 
 def export_catalog(output_path: str):
-    """Backward-compat: valida. Per generar estructural cal --force."""
+    """Backward-compat: validates. Structural generation requires --force."""
     errors = validate(output_path)
     if errors:
         print("Errors de sincronia detectats:", file=sys.stderr)
@@ -107,18 +108,18 @@ def export_catalog(output_path: str):
 def _cli():
     import argparse
     parser = argparse.ArgumentParser(
-        description="Validador de sincronia entre installer_catalog_data.py i models.json"
+        description="Sync validator between installer_catalog_data.py and models.json"
     )
     parser.add_argument(
         "json_path",
         nargs="?",
         default=_default_json_path(),
-        help="Path al models.json (default: installer/swift-wizard/Resources/models.json)",
+        help="Path to models.json (default: installer/swift-wizard/Resources/models.json)",
     )
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Mode validator pur (CI): exit 0 si OK, exit 1 amb errors a stderr",
+        help="Pure validator mode (CI): exit 0 if OK, exit 1 with errors to stderr",
     )
     args = parser.parse_args()
 

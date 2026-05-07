@@ -1,13 +1,13 @@
 """
-Bug 11 — Bootstrap token expira sense recuperacio.
-Implementacio: background task asyncio que cada (ttl-5)*60 segons
-regenera el token via regenerate_bootstrap_token().
+Bug 11 — Bootstrap token expires without recovery.
+Implementation: asyncio background task that every (ttl-5)*60 seconds
+regenerates the token via regenerate_bootstrap_token().
 
 Tests:
-- regenerate_bootstrap_token genera token diferent del previ
-- start_bootstrap_token_renewal arrenca una asyncio.Task viva
-- stop_bootstrap_token_renewal cancel·la net (sense exception)
-- la task es cancellable quan està dormint
+- regenerate_bootstrap_token generates a token different from the previous one
+- start_bootstrap_token_renewal starts a live asyncio.Task
+- stop_bootstrap_token_renewal cancels cleanly (without exception)
+- the task is cancellable while sleeping
 """
 import asyncio
 import pytest
@@ -37,7 +37,7 @@ def init_db(tmp_path):
 @pytest.fixture(autouse=True)
 async def cleanup_renewal_task():
     yield
-    # Sempre netejar la task entre tests
+    # Always clean up the task between tests
     await stop_bootstrap_token_renewal()
 
 
@@ -49,7 +49,7 @@ class TestRegenerateBootstrapToken:
         new = regenerate_bootstrap_token(ttl_minutes=30)
         assert new != old
         assert new.startswith("Nexe-")
-        # I esta persistit
+        # And it is persisted
         info = get_bootstrap_token()
         assert info["token"] == new
 
@@ -80,7 +80,7 @@ class TestRenewalTaskLifecycle:
     async def test_start_twice_replaces_task(self, init_db):
         first = start_bootstrap_token_renewal(ttl_minutes=30, interval_seconds=3600)
         second = start_bootstrap_token_renewal(ttl_minutes=30, interval_seconds=3600)
-        # La primera s'ha de cancellar
+        # The first one must be cancelled
         await asyncio.sleep(0)  # let cancellation propagate
         assert first.cancelled() or first.done()
         assert lt._renewal_task is second
@@ -88,12 +88,12 @@ class TestRenewalTaskLifecycle:
 
     @pytest.mark.asyncio
     async def test_stop_when_no_task_is_safe(self, init_db):
-        # Sense haver arrencat res
+        # Without having started anything
         await stop_bootstrap_token_renewal()  # no exception
 
 
 class TestRenewalLoopRegenerates:
-    """Verifica que el loop crida regenerate quan passa el sleep."""
+    """Verifies that the loop calls regenerate after the sleep elapses."""
 
     @pytest.mark.asyncio
     async def test_loop_regenerates_after_interval(self, init_db, monkeypatch):
@@ -103,7 +103,7 @@ class TestRenewalLoopRegenerates:
 
         regen_calls = []
 
-        # Patch sleep perque sigui instantani
+        # Patch sleep to make it instantaneous
         real_sleep = asyncio.sleep
 
         async def fast_sleep(_seconds):
@@ -111,7 +111,7 @@ class TestRenewalLoopRegenerates:
 
         monkeypatch.setattr("core.lifespan_tokens.asyncio.sleep", fast_sleep)
 
-        # Patch regenerate per comptar
+        # Patch regenerate to count calls
         original_regen = lt.regenerate_bootstrap_token
 
         def counting_regen(ttl_minutes=30):
@@ -121,7 +121,7 @@ class TestRenewalLoopRegenerates:
         monkeypatch.setattr(lt, "regenerate_bootstrap_token", counting_regen)
 
         task = asyncio.create_task(_bootstrap_token_renewal_loop(1, 30))
-        # Donem temps a unes quantes iteracions
+        # Give time for a few iterations
         await real_sleep(0.05)
         task.cancel()
         try:
@@ -130,7 +130,7 @@ class TestRenewalLoopRegenerates:
             pass
 
         assert len(regen_calls) >= 1
-        # I el token ha canviat
+        # And the token has changed
         info = get_bootstrap_token()
         assert info["token"] != initial
 
@@ -142,10 +142,10 @@ class TestRenewalRetryBackoff:
     async def test_retry_recovers_after_transient_failures(
         self, init_db, monkeypatch, caplog
     ):
-        """Si regenerate falla 2 cops i recupera al 3r, hi ha missatge 'recovered'."""
+        """If regenerate fails 2 times and recovers on the 3rd, there is a 'recovered' message."""
         import logging
 
-        # Sleep instantani
+        # Instantaneous sleep
         real_sleep = asyncio.sleep
 
         async def fast_sleep(_seconds):
@@ -153,7 +153,7 @@ class TestRenewalRetryBackoff:
 
         monkeypatch.setattr("core.lifespan_tokens.asyncio.sleep", fast_sleep)
 
-        # Regenerate falla 2 cops, tercera OK
+        # Regenerate fails 2 times, third call OK
         calls = {"n": 0}
 
         def flaky_regen(ttl_minutes=30):
@@ -173,9 +173,9 @@ class TestRenewalRetryBackoff:
             except asyncio.CancelledError:
                 pass
 
-        # Hi ha hagut com a minim 3 crides (1 inicial + 2 retries)
+        # There have been at least 3 calls (1 initial + 2 retries)
         assert calls["n"] >= 3
-        # Hi ha d'haver missatge 'recovered'
+        # There must be a 'recovered' message
         text = " ".join(r.getMessage() for r in caplog.records)
         assert "recovered" in text.lower(), (
             f"no s'ha trobat missatge 'recovered' als logs: {text}"
@@ -185,7 +185,7 @@ class TestRenewalRetryBackoff:
     async def test_retry_all_fail_loop_continues(
         self, init_db, monkeypatch, caplog
     ):
-        """Si tots els retries fallen, el loop continua (no aturada)."""
+        """If all retries fail, the loop continues (no stop)."""
         import logging
 
         real_sleep = asyncio.sleep
@@ -212,7 +212,7 @@ class TestRenewalRetryBackoff:
             except asyncio.CancelledError:
                 pass
 
-        # Com a minim la crida inicial + 3 retries = 4 (i pot passar al segon cicle)
+        # At least the initial call + 3 retries = 4 (and may spill into the second cycle)
         assert call_count["n"] >= 4
         text = " ".join(r.getMessage() for r in caplog.records).lower()
         assert "exhausted" in text or "retries" in text

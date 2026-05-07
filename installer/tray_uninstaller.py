@@ -71,14 +71,14 @@ def remove_login_items() -> bool:
         return False
 
 
-NS_STATUS_WINDOW_LEVEL = 25  # sobre qualsevol finestra d'app normal
+NS_STATUS_WINDOW_LEVEL = 25  # above any normal app window
 
 
 class _ForegroundContext:
-    """Context manager que promociona la tray a .regular durant tot un flux
-    d'alertes i la torna a .accessory (menubar only) al sortir. Es fa UNA
-    sola vegada per evitar interferir amb el modal event loop entre alertes
-    (causa de que les alertes es 'saltaven' — flip-flop d'activation policy).
+    """Context manager that promotes the tray to .regular for an entire alert
+    flow and returns it to .accessory (menubar only) on exit. Done ONCE to
+    avoid interfering with the modal event loop between alerts (the cause of
+    alerts being 'skipped' — activation policy flip-flop).
     """
     def __init__(self):
         self.old_policy = None
@@ -105,9 +105,9 @@ class _ForegroundContext:
 def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_):
     """Show an always-on-top NSAlert.
 
-    Assumeix que activation policy JA està promocionada a .regular (via
-    _ForegroundContext al caller). Nomes puja window level i crida runModal.
-    Retorn compat rumps: 1 (OK) / 0 (Cancel) / -1 (Other).
+    Assumes activation policy is ALREADY promoted to .regular (via
+    _ForegroundContext in the caller). Only raises window level and calls
+    runModal. Return compat with rumps: 1 (OK) / 0 (Cancel) / -1 (Other).
     """
     try:
         from AppKit import NSAlert, NSAlertStyleWarning
@@ -248,7 +248,7 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
             nexe_symlink.unlink()
             removed.append("/usr/local/bin/nexe")
         except PermissionError:
-            failed.append("/usr/local/bin/nexe (permis denegat)")
+            failed.append("/usr/local/bin/nexe (permission denied)")
         except Exception:
             failed.append("/usr/local/bin/nexe")
 

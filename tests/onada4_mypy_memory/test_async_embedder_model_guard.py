@@ -1,27 +1,27 @@
-"""Anti-regressió Cluster 8 — `AsyncEmbedder._model` lazy-load guard.
+"""Anti-regression Cluster 8 — `AsyncEmbedder._model` lazy-load guard.
 
-Cobreix els 2 findings mypy `union-attr` a
-`memory/embeddings/core/async_encoder.py:207` (`_encode_sync` cridant
-`self._model.embed([text])`) i L283 (`_encode_batch_sync` cridant
-`self._model.embed(texts, ...)`). Causa: `_model: Optional[object] = None`
-(L94) i només es carrega via `await self._ensure_loaded()` (L105-122).
-Mypy no infereix l'invariant cross-await que `_encode_sync` només s'invoca
-post-`_ensure_loaded`.
+Covers the 2 mypy `union-attr` findings at
+`memory/embeddings/core/async_encoder.py:207` (`_encode_sync` calling
+`self._model.embed([text])`) and L283 (`_encode_batch_sync` calling
+`self._model.embed(texts, ...)`). Cause: `_model: Optional[object] = None`
+(L94) and it is only loaded via `await self._ensure_loaded()` (L105-122).
+Mypy does not infer the cross-await invariant that `_encode_sync` is only
+invoked post-`_ensure_loaded`.
 
-Decisió Director (Cluster 8): Dev#2 introdueix un guard `assert self._model
-is not None` o `if self._model is None: raise RuntimeError(...)` als helpers
-síncrons.
+Director decision (Cluster 8): Dev#2 introduces a guard `assert self._model
+is not None` or `if self._model is None: raise RuntimeError(...)` in the
+sync helpers.
 
-CONTRACTE PINAT:
-1. `_encode_sync` i `_encode_batch_sync` segueixen sent mètodes d'instància
-   amb signatures (text, normalize) i (texts, normalize, batch_size). Fix
-   mypy NO ha de canviar les signatures externes.
-2. **TDD post-fix:** quan `_model is None` i s'invoca `_encode_sync`, ha de
-   llançar `RuntimeError` (no `AttributeError` opaca). Aquest test pina el
-   contracte explícit del fix Cluster 8 — pre-fix és AttributeError.
+PINNED CONTRACT:
+1. `_encode_sync` and `_encode_batch_sync` remain instance methods
+   with signatures (text, normalize) and (texts, normalize, batch_size). The
+   mypy fix must NOT change the external signatures.
+2. **TDD post-fix:** when `_model is None` and `_encode_sync` is invoked, it must
+   raise `RuntimeError` (not an opaque `AttributeError`). This test pins the
+   explicit contract of the Cluster 8 fix — pre-fix is AttributeError.
 
 Pre-fix (HEAD `30eb2a6`): `AttributeError: 'NoneType' object has no attribute
-'embed'`. Per això el TDD es marca `xfail(strict=True)`.
+'embed'`. That is why the TDD is marked `xfail(strict=True)`.
 """
 
 from __future__ import annotations
@@ -33,11 +33,11 @@ import pytest
 
 
 def _fresh_embedder():
-    """Crea instància `AsyncEmbedder` amb model_name únic per evitar singleton hits.
+    """Creates an `AsyncEmbedder` instance with a unique model_name to avoid singleton hits.
 
-    El singleton de `AsyncEmbedder.__new__` reusa instàncies per `model_name`. Usant
-    un `uuid` garantim que `_initialized=False` al `__new__` i el `__init__` corre
-    íntegrament (i deixa `self._model = None` segons L94).
+    The `AsyncEmbedder.__new__` singleton reuses instances per `model_name`. Using
+    a `uuid` ensures `_initialized=False` in `__new__` and `__init__` runs
+    fully (leaving `self._model = None` as per L94).
     """
     from memory.embeddings.core.async_encoder import AsyncEmbedder
 
@@ -46,13 +46,13 @@ def _fresh_embedder():
 
 
 def test_encode_sync_signature_pinned() -> None:
-    """Anti-regressió: `_encode_sync(self, text: str, normalize: bool)` pin."""
+    """Anti-regression: `_encode_sync(self, text: str, normalize: bool)` pin."""
     from memory.embeddings.core.async_encoder import AsyncEmbedder
 
     sig = inspect.signature(AsyncEmbedder._encode_sync)
     assert list(sig.parameters.keys()) == ["self", "text", "normalize"], (
-        f"Signatura _encode_sync canviada: {list(sig.parameters.keys())}. "
-        "Fix Cluster 8 ha de mantenir la signatura externa."
+        f"Signature _encode_sync changed: {list(sig.parameters.keys())}. "
+        "Cluster 8 fix must maintain the external signature."
     )
 
 
@@ -61,36 +61,36 @@ def test_encode_batch_sync_signature_pinned() -> None:
 
     sig = inspect.signature(AsyncEmbedder._encode_batch_sync)
     assert list(sig.parameters.keys()) == ["self", "texts", "normalize", "batch_size"], (
-        f"Signatura _encode_batch_sync canviada: {list(sig.parameters.keys())}."
+        f"Signature _encode_batch_sync changed: {list(sig.parameters.keys())}."
     )
 
 
 def test_async_embedder_model_starts_none() -> None:
-    """Pina la premisa del bug: `__init__` deixa `_model = None` (línia 94)."""
+    """Pins the bug premise: `__init__` leaves `_model = None` (line 94)."""
     embedder = _fresh_embedder()
     try:
         assert embedder._model is None, (
-            "AsyncEmbedder.__init__ ja no inicialitza _model a None — invariant "
-            "lazy-load trencat (cluster 8 perd sentit)."
+            "AsyncEmbedder.__init__ no longer initialises _model to None — "
+            "lazy-load invariant broken (cluster 8 loses its rationale)."
         )
     finally:
-        # Singleton cleanup per no contaminar altres tests
+        # Singleton cleanup to avoid contaminating other tests
         from memory.embeddings.core.async_encoder import AsyncEmbedder
         AsyncEmbedder._instances.pop(embedder.model_name, None)
 
 
 def test_encode_sync_raises_runtime_error_when_model_none() -> None:
-    """TDD post-fix: `_encode_sync` amb `_model=None` llança `RuntimeError`."""
+    """TDD post-fix: `_encode_sync` with `_model=None` raises `RuntimeError`."""
     embedder = _fresh_embedder()
     try:
-        assert embedder._model is None  # premisa explícita
+        assert embedder._model is None  # explicit premise
 
         with pytest.raises(RuntimeError) as exc_info:
             embedder._encode_sync("text", True)
 
         msg = str(exc_info.value).lower()
         assert "model" in msg or "loaded" in msg or "ensure" in msg, (
-            f"Missatge esperat menciona model/loaded/ensure, rebut: {exc_info.value!r}"
+            f"Expected message to mention model/loaded/ensure, received: {exc_info.value!r}"
         )
     finally:
         from memory.embeddings.core.async_encoder import AsyncEmbedder

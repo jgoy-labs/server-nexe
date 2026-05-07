@@ -3,40 +3,40 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_installer_skip_model_no_model.py
-Description: Tests per "Continuar sense model" (model_key buida).
-             Cobreix el path en que l'usuari vol instal·lar sense
-             descarregar cap model (model_key="" al JSON de config).
-             Verifica que:
-             - _update_env_model_config no peta amb model_config=None
-             - generate_env_file accepta model_config=None (nou .env)
-             - run_headless_inner amb model_key="" no peta i arriba al Step 4
+Description: Tests for "Continue without model" (empty model_key).
+             Covers the path where the user wants to install without
+             downloading any model (model_key="" in the config JSON).
+             Verifies that:
+             - _update_env_model_config does not crash with model_config=None
+             - generate_env_file accepts model_config=None (new .env)
+             - run_headless_inner with model_key="" does not crash and reaches Step 4
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
 
-# ── Tests _update_env_model_config amb model_config=None ─────────────────────
+# ── Tests for _update_env_model_config with model_config=None ────────────────
 
 class TestUpdateEnvModelConfigNone:
-    """_update_env_model_config ha de ser no-op quan model_config=None."""
+    """_update_env_model_config must be a no-op when model_config=None."""
 
     def test_none_model_config_does_not_crash(self, tmp_path):
-        """.env existent + model_config=None -> no crash, .env intacte."""
+        """Existing .env + model_config=None -> no crash, .env intact."""
         from installer.installer_setup_config import _update_env_model_config
 
         env_file = tmp_path / ".env"
         original = "NEXE_PRIMARY_API_KEY=abc123\nNEXE_MODEL_ENGINE=ollama\n"
         env_file.write_text(original)
 
-        # Red gate: crashava amb TypeError: 'NoneType' object is not subscriptable
+        # Red gate: used to crash with TypeError: 'NoneType' object is not subscriptable
         _update_env_model_config(env_file, None)
 
-        # .env no modificat
+        # .env not modified
         assert env_file.read_text() == original
 
     def test_none_model_config_preserves_api_key(self, tmp_path):
-        """API key no es perd quan cridem _update_env_model_config(None)."""
+        """API key is not lost when calling _update_env_model_config(None)."""
         from installer.installer_setup_config import _update_env_model_config
 
         env_file = tmp_path / ".env"
@@ -53,30 +53,30 @@ class TestUpdateEnvModelConfigNone:
         assert "NEXE_CSRF_SECRET=csrf-abc" in content
 
 
-# ── Tests generate_env_file amb model_config=None ────────────────────────────
+# ── Tests for generate_env_file with model_config=None ───────────────────────
 
 class TestGenerateEnvFileNone:
-    """generate_env_file accepta model_config=None (nou install sense model)."""
+    """generate_env_file accepts model_config=None (new install without model)."""
 
     def test_new_env_file_created_without_model(self, tmp_path, capsys):
-        """Nou .env generat quan model_config=None (cap model seleccionat)."""
+        """New .env generated when model_config=None (no model selected)."""
         from installer.installer_setup_config import generate_env_file
 
         generate_env_file(tmp_path, model_config=None)
 
         env_file = tmp_path / ".env"
-        assert env_file.exists(), ".env no s'ha creat"
+        assert env_file.exists(), ".env was not created"
         content = env_file.read_text()
-        # Clau API generada
+        # API key generated
         assert "NEXE_PRIMARY_API_KEY=" in content
-        # Comentari per afegir model manualment
+        # Comment instructing to add model manually
         assert "nexe model pull" in content
-        # Cap línia activa (no comentada) amb NEXE_DEFAULT_MODEL=
+        # No active (uncommented) line with NEXE_DEFAULT_MODEL=
         active_model_lines = [line for line in content.splitlines() if line.startswith("NEXE_DEFAULT_MODEL=")]
-        assert active_model_lines == [], f"No hauria d'haver NEXE_DEFAULT_MODEL actiu: {active_model_lines}"
+        assert active_model_lines == [], f"There should be no active NEXE_DEFAULT_MODEL: {active_model_lines}"
 
     def test_existing_env_not_overwritten_with_none(self, tmp_path, capsys):
-        """Si .env ja existeix i model_config=None, no es sobreescriu."""
+        """If .env already exists and model_config=None, it is not overwritten."""
         from installer.installer_setup_config import generate_env_file
 
         env_file = tmp_path / ".env"
@@ -84,17 +84,17 @@ class TestGenerateEnvFileNone:
 
         generate_env_file(tmp_path, model_config=None)
 
-        # Clau original preservada
+        # Original key preserved
         assert "keep-this-key" in env_file.read_text()
 
 
-# ── Tests run_headless_inner amb model_key="" ─────────────────────────────────
+# ── Tests for run_headless_inner with model_key="" ────────────────────────────
 
 class TestRunHeadlessNoModel:
-    """run_headless_inner amb model_key="" (Continuar sense model)."""
+    """run_headless_inner with model_key="" (Continue without model)."""
 
     def test_empty_model_key_reaches_step4(self, monkeypatch, tmp_path):
-        """Amb model_key='', l'installer arriba al Step 4 (config) sense crash."""
+        """With model_key='', the installer reaches Step 4 (config) without crashing."""
         import installer.install_headless as ih
         import subprocess
 
@@ -114,16 +114,16 @@ class TestRunHeadlessNoModel:
         (project_root / "venv" / "bin").mkdir(parents=True)
         (project_root / "venv" / "bin" / "python").write_text("#!/bin/bash\n")
 
-        # Si algu crida una descarrega -> error (no hi ha model_key)
+        # If anything calls a download -> error (no model_key)
         def _no_download(*a, **k):
-            raise AssertionError("Cap descarrega esperada sense model seleccionat")
+            raise AssertionError("No download expected without a selected model")
 
         monkeypatch.setattr(ih, "_download_ollama_model", _no_download)
         monkeypatch.setattr(ih, "_download_gguf_model", _no_download)
         monkeypatch.setattr(ih, "_download_mlx_model", _no_download)
         monkeypatch.setattr(ih, "ensure_ollama_installed", lambda: True)
 
-        # Capturar la crida a generate_env_file
+        # Capture the call to generate_env_file
         generate_called = []
 
         def _fake_generate(root, model_cfg):
@@ -141,23 +141,23 @@ class TestRunHeadlessNoModel:
         config = {
             "lang": "ca",
             "path": str(project_root),
-            "model_key": "",   # ← "Continuar sense model"
+            "model_key": "",   # ← "Continue without model"
             "engine": "ollama",
         }
 
         try:
             ih._run_headless_inner(config)
         except SystemExit:
-            pass  # Darwin login items pot fer sys.exit en test
+            pass  # Darwin login items may call sys.exit in test
 
-        # generate_env_file ha de ser cridat amb model_config=None
-        assert generate_called, "generate_env_file no s'ha cridat"
+        # generate_env_file must be called with model_config=None
+        assert generate_called, "generate_env_file was not called"
         assert generate_called[0] is None, (
-            f"model_config hauria de ser None, got: {generate_called[0]}"
+            f"model_config should be None, got: {generate_called[0]}"
         )
 
     def test_empty_model_key_sets_skip_model(self, monkeypatch, tmp_path):
-        """model_key='' activa skip_model_download internament."""
+        """model_key='' activates skip_model_download internally."""
         import installer.install_headless as ih
         import subprocess
 
@@ -201,5 +201,5 @@ class TestRunHeadlessNoModel:
             pass
 
         assert download_calls == [], (
-            f"Cap descarrega esperada amb model_key='', però s'han cridat: {download_calls}"
+            f"No download expected with model_key='', but these were called: {download_calls}"
         )

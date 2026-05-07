@@ -1,12 +1,12 @@
 """
-Tests per memory/memory/workers/dreaming_cycle.py — Bug 10 fix release v0.9.0.
+Tests for memory/memory/workers/dreaming_cycle.py — Bug 10 fix release v0.9.0.
 
-Verifica que _count_pending() i _sync_vector_index() tanquen sempre la
-connexió SQLite (no n'hi havia close() abans → connection leak acumulatiu
-ja que el cycle corre cada 15 min).
+Verifies that _count_pending() and _sync_vector_index() always close the
+SQLite connection (there was no close() before → cumulative connection leak
+since the cycle runs every 15 min).
 
-Estratègia: store fals que retorna una MagicMock com a connexió i compta
-quantes vegades es cridava close().
+Strategy: fake store that returns a MagicMock as connection and counts
+how many times close() was called.
 """
 
 import asyncio
@@ -30,7 +30,7 @@ class _FakeCursor:
 
 
 class _FakeConn:
-    """Connexió SQLite fals que registra close() i execute()."""
+    """Fake SQLite connection that records close() and execute() calls."""
 
     def __init__(self, count=0, rows=None):
         self.closed = False
@@ -67,7 +67,7 @@ class _FakeStore:
 
 
 def _make_cycle(store, vector=None, embedder=None):
-    # Bypassem __init__ complet per evitar dependència de MemoryConfig real
+    # Bypass full __init__ to avoid dependency on real MemoryConfig
     cycle = DreamingCycle.__new__(DreamingCycle)
     cycle._store = store
     cycle._vector = vector
@@ -93,7 +93,7 @@ def test_count_pending_closes_connection():
 
 
 def test_count_pending_closes_connection_on_exception():
-    """Si execute() peta, la connexió també s'ha de tancar."""
+    """If execute() raises, the connection must also be closed."""
     class _BadConn(_FakeConn):
         def execute(self, sql, params=()):
             raise RuntimeError("boom")
@@ -103,7 +103,7 @@ def test_count_pending_closes_connection_on_exception():
     cycle = _make_cycle(store)
 
     result = cycle._count_pending()
-    # _count_pending captura excepcions i retorna 0
+    # _count_pending catches exceptions and returns 0
     assert result == 0
     assert conn.closed, "connection not closed after exception"
 
@@ -142,7 +142,7 @@ def test_sync_vector_index_closes_connection_on_exception():
 
 
 def test_sync_vector_index_skips_when_no_dependencies():
-    """Sense store/vector/embedder, _sync_vector_index ha de retornar net."""
+    """Without store/vector/embedder, _sync_vector_index must return cleanly."""
     cycle = _make_cycle(store=None)
     asyncio.run(cycle._sync_vector_index())  # no exception
 
@@ -156,7 +156,7 @@ def test_sync_vector_index_skips_when_vector_unavailable():
 
     cycle = _make_cycle(store, vector=vector, embedder=embedder)
     asyncio.run(cycle._sync_vector_index())
-    # No s'ha obert connexió perquè s'ha sortit abans
+    # No connection was opened because we exited early
     assert not conn.closed
     assert conn.executed == []
 
@@ -165,7 +165,7 @@ def test_sync_vector_index_skips_when_vector_unavailable():
 
 
 def test_recover_stuck_leases_closes_connection():
-    """_recover_stuck_leases ha de tancar la connexió SQLite (Bug 10)."""
+    """_recover_stuck_leases must close the SQLite connection (Bug 10)."""
     conn = _FakeConn()
     store = _FakeStore(conn)
     cycle = _make_cycle(store)
@@ -191,7 +191,7 @@ def test_recover_stuck_leases_no_store():
 
 
 def test_process_staging_closes_connection_empty():
-    """_process_staging ha de tancar la connexió quan no hi ha entries."""
+    """_process_staging must close the connection when there are no entries."""
     conn = _FakeConn(rows=[])
     store = _FakeStore(conn)
     cycle = _make_cycle(store)
@@ -217,10 +217,10 @@ def test_process_staging_no_store():
 
 
 def test_process_one_closes_connection_profile_path():
-    """_process_one ha de tancar la connexió pel camí profile (Bug 10, leak quadràtic)."""
+    """_process_one must close the connection on the profile path (Bug 10, quadratic leak)."""
     conn = _FakeConn()
     store = _FakeStore(conn)
-    # Afegim els mètodes que _process_one crida
+    # Add the methods that _process_one calls
     store.upsert_profile = MagicMock()
     cycle = _make_cycle(store)
     entry = {
@@ -239,7 +239,7 @@ def test_process_one_closes_connection_profile_path():
 
 
 def test_process_one_closes_connection_on_exception():
-    """Si el processat peta a mig camí, la connexió igualment s'ha de tancar."""
+    """If processing fails midway, the connection must still be closed."""
     class _BadConn(_FakeConn):
         def __init__(self):
             super().__init__()

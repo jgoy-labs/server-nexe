@@ -3,10 +3,10 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_b7_ollama_url_resolve.py
-Description: TDD cec — B7 Ollama URL hardcoded: routes_auth.py ignora NEXE_OLLAMA_HOST.
-             4 literals "http://localhost:11434" (L298, L418, L471, L524) han d'usar
-             resolve_base_url() de plugins/ollama_module/core/client.py.
-             Onada 4.6d / xfail strict pre-fix.
+Description: Blind TDD — B7 Ollama URL hardcoded: routes_auth.py ignores NEXE_OLLAMA_HOST.
+             4 literals "http://localhost:11434" (L298, L418, L471, L524) must use
+             resolve_base_url() from plugins/ollama_module/core/client.py.
+             Wave 4.6d / xfail strict pre-fix.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -23,15 +23,15 @@ _ROUTES_AUTH_FILE = (
 
 
 def test_routes_auth_uses_resolve_base_url():
-    """B7: routes_auth.py ha d'importar i usar resolve_base_url() en lloc de localhost literal.
+    """B7: routes_auth.py must import and use resolve_base_url() instead of a localhost literal.
 
-    Pre-fix: resolve_base_url no s'importa i els 4 punts (L298, L418, L471, L524)
-    hardcodegen "http://localhost:11434" ignorant NEXE_OLLAMA_HOST.
-    Post-fix: from plugins.ollama_module.core.client import resolve_base_url (o equivalent)
-    + usat als 4 URL constructions.
+    Pre-fix: resolve_base_url is not imported and the 4 points (L298, L418, L471, L524)
+    hardcode "http://localhost:11434" ignoring NEXE_OLLAMA_HOST.
+    Post-fix: from plugins.ollama_module.core.client import resolve_base_url (or equivalent)
+    + used in the 4 URL constructions.
 
-    Revert mental: aplicar fix → resolve_base_url a la font → test PASSA.
-    Revert del fix → localhost torna → test FALLA.
+    Mental revert: apply fix → resolve_base_url in the source → test PASSES.
+    Revert of the fix → localhost returns → test FAILS.
     """
     src = _ROUTES_AUTH_FILE.read_text()
 
@@ -47,12 +47,12 @@ def test_routes_auth_uses_resolve_base_url():
 
 
 def test_routes_auth_no_localhost_hardcoded():
-    """Anti-reg B7: 'localhost:11434' no ha d'aparèixer literalment a routes_auth.py.
+    """Anti-reg B7: 'localhost:11434' must not appear literally in routes_auth.py.
 
-    Pin estàtic permanent: detecta si post-fix algú torna a hardcodejar localhost.
-    Cobreix els 4 punts: L298 (urllib/api/ps), L418 (httpx/api/tags a _backend_model_exists),
-    L471 (httpx/api/tags a set_backend), L524 (httpx/api/chat a set_backend).
-    Dev#2 no ha de tocar aquest test — queda com a guard permanent.
+    Permanent static pin: detects if someone re-hardcodes localhost after the fix.
+    Covers the 4 points: L298 (urllib/api/ps), L418 (httpx/api/tags in _backend_model_exists),
+    L471 (httpx/api/tags in set_backend), L524 (httpx/api/chat in set_backend).
+    Dev#2 must not touch this test — remains as a permanent guard.
     """
     src = _ROUTES_AUTH_FILE.read_text()
 

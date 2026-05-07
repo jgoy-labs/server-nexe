@@ -1,26 +1,26 @@
-"""Anti-regressió Cluster 6 — `RAGCLI.module` post-init guard.
+"""Anti-regression Cluster 6 — `RAGCLI.module` post-init guard.
 
-Cobreix els 5 findings mypy `union-attr` a `memory/rag/cli.py:59, 108, 185, 217, 229`.
-Tots són `Item "None" of "RAGModule | None" has no attribute X` perquè
-`self.module: Optional[RAGModule] = None` (cli.py:31) i `cmd_*` cridats abans
-d'`initialize()` accedeixen `self.module.X()` directament.
+Covers the 5 mypy `union-attr` findings at `memory/rag/cli.py:59, 108, 185, 217, 229`.
+All are `Item "None" of "RAGModule | None" has no attribute X` because
+`self.module: Optional[RAGModule] = None` (cli.py:31) and `cmd_*` called before
+`initialize()` access `self.module.X()` directly.
 
-Decisió Director (Cluster 6): Dev#2 introdueix helper `_require_module(self) -> RAGModule`
-que llança `RuntimeError("RAG not initialized")` i substitueix `self.module.X()` per
-`self._require_module().X()` als 5 callsites.
+Director decision (Cluster 6): Dev#2 introduces helper `_require_module(self) -> RAGModule`
+that raises `RuntimeError("RAG not initialized")` and replaces `self.module.X()` with
+`self._require_module().X()` at the 5 callsites.
 
-CONTRACTE PINAT:
-1. `RAGCLI()` post-construcció té `self.module is None` (premisa del bug).
-2. `cmd_info`, `cmd_health`, `cmd_search`, `cmd_sources` són `async def`
-   (ja que tots usen `await` o esperen mòdul async). Fix Cluster 6 NO ha de canviar
-   les seves signatures externes.
-3. Cridats sense initialize, retornen `1` (graceful failure via try/except global)
-   en lloc de propagar excepció. Aquest contracte es compleix pre i post-fix:
+PINNED CONTRACT:
+1. `RAGCLI()` post-construction has `self.module is None` (bug premise).
+2. `cmd_info`, `cmd_health`, `cmd_search`, `cmd_sources` are `async def`
+   (since all use `await` or expect an async module). Cluster 6 fix must NOT change
+   their external signatures.
+3. Called without initialize, they return `1` (graceful failure via global try/except)
+   instead of propagating an exception. This contract holds pre and post-fix:
    pre-fix `AttributeError` → except → return 1; post-fix `RuntimeError` → except → return 1.
 
-Pre-fix (HEAD `30eb2a6`): contracte runtime es compleix gràcies al try/except.
-Post-fix: ha de seguir complint-se. Si Dev#2 elimina el try/except (out-of-scope),
-la suite detecta la regressió.
+Pre-fix (HEAD `30eb2a6`): runtime contract is fulfilled thanks to try/except.
+Post-fix: must continue to be fulfilled. If Dev#2 removes the try/except (out-of-scope),
+the suite detects the regression.
 """
 
 from __future__ import annotations
@@ -32,62 +32,62 @@ import pytest
 
 
 def test_ragcli_module_optional_at_init() -> None:
-    """`RAGCLI()` ha de tenir `self.module is None` post-construcció.
+    """`RAGCLI()` must have `self.module is None` post-construction.
 
-    Aquest test pina la premisa del cluster: el camp existeix com a `Optional` i
-    comença a None. Si Dev#2 canvia el tipus o el valor inicial (e.g., a una
-    instància dummy), trenca la condició del bug i invalida el helper proposat."""
+    This test pins the cluster premise: the field exists as `Optional` and
+    starts at None. If Dev#2 changes the type or initial value (e.g., to a
+    dummy instance), it breaks the bug condition and invalidates the proposed helper."""
     from memory.rag.cli import RAGCLI
 
     cli = RAGCLI()
     assert cli.module is None, (
-        "RAGCLI.__init__ ja no inicialitza module a None — premisa cluster 6 trencada."
+        "RAGCLI.__init__ no longer initialises module to None — cluster 6 premise broken."
     )
 
 
 def test_ragcli_async_methods_signatures_pinned() -> None:
-    """Pina que els 4 mètodes `cmd_*` afectats segueixen sent async i prenen `args`.
+    """Pins that the 4 affected `cmd_*` methods remain async and take `args`.
 
-    Els findings mypy són a cli.py:59 (cmd_info), 108 (cmd_health), 185 (cmd_search),
-    217 + 229 (cmd_sources). Si Dev#2 canvia signatures (e.g. afegint `module: RAGModule`
-    com a paràmetre per evitar el guard), trenca tots els callers via `argparse`."""
+    The mypy findings are at cli.py:59 (cmd_info), 108 (cmd_health), 185 (cmd_search),
+    217 + 229 (cmd_sources). If Dev#2 changes signatures (e.g. adding `module: RAGModule`
+    as a parameter to avoid the guard), it breaks all callers via `argparse`."""
     from memory.rag.cli import RAGCLI
 
     for method_name in ("cmd_info", "cmd_health", "cmd_search", "cmd_sources"):
         method = getattr(RAGCLI, method_name, None)
-        assert method is not None, f"RAGCLI.{method_name} ha desaparegut."
+        assert method is not None, f"RAGCLI.{method_name} has disappeared."
         assert inspect.iscoroutinefunction(method), (
-            f"RAGCLI.{method_name} ha perdut `async def` — out-of-scope cluster 6."
+            f"RAGCLI.{method_name} has lost `async def` — out-of-scope cluster 6."
         )
         sig = inspect.signature(method)
         # `self` + `args`
         assert len(sig.parameters) == 2, (
-            f"Signatura RAGCLI.{method_name}{sig} ha canviat — esperat (self, args)."
+            f"Signature RAGCLI.{method_name}{sig} has changed — expected (self, args)."
         )
 
 
 def test_ragcli_cmd_info_returns_one_without_initialize() -> None:
-    """Anti-regressió comportament: `cmd_info` cridat sense `initialize()`
-    completa amb return 1 (no propaga excepció a fora).
+    """Behavioural anti-regression: `cmd_info` called without `initialize()`
+    completes with return 1 (does not propagate exception outward).
 
-    Pre-fix: AttributeError caçat per try/except → return 1.
-    Post-fix: RuntimeError caçat per try/except → return 1.
-    Si Dev#2 elimina el try/except global de cmd_info, el test FALLA."""
+    Pre-fix: AttributeError caught by try/except → return 1.
+    Post-fix: RuntimeError caught by try/except → return 1.
+    If Dev#2 removes the global try/except from cmd_info, the test FAILS."""
     from memory.rag.cli import RAGCLI
 
     cli = RAGCLI()
-    assert cli.module is None  # precondició
+    assert cli.module is None  # precondition
 
-    # cmd_info pren `args` però no l'usa, podem passar None
+    # cmd_info takes `args` but does not use it, we can pass None
     rc = asyncio.run(cli.cmd_info(args=None))
     assert rc == 1, (
-        f"cmd_info sense initialize ha retornat {rc} (esperat 1). "
-        "El try/except global ha estat eliminat o el helper post-fix propaga."
+        f"cmd_info without initialize returned {rc} (expected 1). "
+        "The global try/except has been removed or the post-fix helper propagates."
     )
 
 
 def test_ragcli_cmd_health_returns_one_without_initialize() -> None:
-    """Idèntic anti-regressió per cmd_health."""
+    """Identical anti-regression for cmd_health."""
     from memory.rag.cli import RAGCLI
 
     cli = RAGCLI()

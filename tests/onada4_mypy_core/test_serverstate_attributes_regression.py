@@ -1,30 +1,30 @@
-"""Anti-regressió cluster `ServerState` atributs dinàmics (Onada 4.1, BUS Dev#1bis).
+"""Anti-regression cluster `ServerState` dynamic attributes (Onada 4.1, BUS Dev#1bis).
 
-Cobreix els findings mypy #45, #46, #47, #65 (`01-classificacio.md`). Avui
-els 4 atributs (`_cleanup_task`, `_prewarm_task`, `_session_cleanup_task`,
-`configure_modules_callback`) NO estan declarats al `ServerState.__init__` —
-s'assignen via `setattr` dinàmic a `core/lifespan.py:461,467,512` i
-`core/server/factory_state.py:42`. Mypy flagueja `attr-defined`.
+Covers mypy findings #45, #46, #47, #65 (`01-classificacio.md`). Currently
+the 4 attributes (`_cleanup_task`, `_prewarm_task`, `_session_cleanup_task`,
+`configure_modules_callback`) are NOT declared in `ServerState.__init__` —
+they are assigned via dynamic `setattr` at `core/lifespan.py:461,467,512` and
+`core/server/factory_state.py:42`. Mypy flags `attr-defined`.
 
-El fix Dev#2 (Cluster 1) afegirà aquests 4 atributs al `__init__` amb default
-None i anotació Optional. El comportament observable runtime ha de ser
-estable: l'assignació dinàmica posterior continua funcionant, i el default
-post-fix és None.
+The Dev#2 fix (Cluster 1) will add these 4 attributes to `__init__` with default
+None and Optional annotation. The observable runtime behaviour must be
+stable: the subsequent dynamic assignment continues to work, and the
+post-fix default is None.
 
-Aquest test pina dos contractes runtime estables a través del fix:
+This test pins two stable runtime contracts across the fix:
 
-1. **Default observable:** `getattr(state, attr, None) is None` — pre-fix és
-   None per fallback de getattr (atribut absent), post-fix és None pel default
-   declarat. Si Dev#2 inadvertidament inicialitza un atribut a un valor
-   no-None (e.g. `self._cleanup_task: Task = asyncio.create_task(...)`), el
-   test salta.
+1. **Observable default:** `getattr(state, attr, None) is None` — pre-fix is
+   None via getattr fallback (attribute absent), post-fix is None via the
+   declared default. If Dev#2 inadvertently initialises an attribute to a
+   non-None value (e.g. `self._cleanup_task: Task = asyncio.create_task(...)`),
+   the test fails.
 
-2. **Settability runtime:** els 4 atributs són settable via setattr i
-   recuperables via getattr (patró exacte de lifespan.py:461 etc). Detecta
-   si Dev#2 introduís un descriptor read-only o un `__slots__` restrictiu.
+2. **Runtime settability:** the 4 attributes are settable via setattr and
+   retrievable via getattr (exact pattern of lifespan.py:461 etc). Detects
+   if Dev#2 introduced a read-only descriptor or a restrictive `__slots__`.
 
-CEC: només instanciació pública de `ServerState` + getattr/setattr. Cap
-lectura del cos de `lifespan.py` ni de `factory_state.py`.
+CEC: public instantiation of `ServerState` + getattr/setattr only. No
+reading of `lifespan.py` or `factory_state.py` bodies.
 """
 
 from __future__ import annotations
@@ -38,11 +38,11 @@ DYNAMIC_ATTRS = (
 
 
 def test_serverstate_dynamic_attrs_default_to_none_via_getattr() -> None:
-    """Pina contracte: pre i post-fix, `getattr(state, attr, None) is None`.
+    """Pins contract: pre and post-fix, `getattr(state, attr, None) is None`.
 
-    Pre-fix: l'atribut no existeix, getattr retorna el fallback None.
-    Post-fix: l'atribut existeix a __init__ inicialitzat a None.
-    Observable runtime idèntic.
+    Pre-fix: attribute does not exist, getattr returns the fallback None.
+    Post-fix: attribute exists in __init__ initialised to None.
+    Identical observable runtime.
     """
     from core.lifespan import ServerState
 
@@ -50,17 +50,17 @@ def test_serverstate_dynamic_attrs_default_to_none_via_getattr() -> None:
     for attr in DYNAMIC_ATTRS:
         assert getattr(state, attr, None) is None, (
             f"ServerState().{attr} (via getattr default=None) = "
-            f"{getattr(state, attr, None)!r}, esperat None. "
-            f"Si el fix Onada 4.1 inicialitza l'atribut a un valor no-None, "
-            f"trenca el contracte runtime amb lifespan.py:461,467,512 + "
-            f"factory_state.py:42 (que confien que el default és None abans "
-            f"d'assignar via setattr)."
+            f"{getattr(state, attr, None)!r}, expected None. "
+            f"If the Onada 4.1 fix initialises the attribute to a non-None value, "
+            f"it breaks the runtime contract with lifespan.py:461,467,512 + "
+            f"factory_state.py:42 (which rely on the default being None before "
+            f"assigning via setattr)."
         )
 
 
 def test_serverstate_dynamic_attrs_are_settable_runtime() -> None:
-    """Pina contracte: els 4 atributs es poden assignar via setattr i
-    recuperar via getattr (patró exacte de lifespan.py:461 i factory_state.py:42).
+    """Pins contract: the 4 attributes can be assigned via setattr and
+    retrieved via getattr (exact pattern of lifespan.py:461 and factory_state.py:42).
     """
     from core.lifespan import ServerState
 
@@ -74,18 +74,17 @@ def test_serverstate_dynamic_attrs_are_settable_runtime() -> None:
     for attr, value in sentinel_values.items():
         setattr(state, attr, value)
         assert getattr(state, attr) is value, (
-            f"ServerState().{attr} no és settable runtime — el fix Onada 4.1 "
-            f"hauria de mantenir-lo settable (lifespan.py:461 etc l'assigna "
-            f"dinàmicament)."
+            f"ServerState().{attr} is not settable at runtime — the Onada 4.1 fix "
+            f"should keep it settable (lifespan.py:461 etc assigns it "
+            f"dynamically)."
         )
 
 
 def test_serverstate_known_init_attrs_are_present() -> None:
-    """Pina contracte sobre els 9 atributs ja existents al __init__ (firma
-    declarada a `core/lifespan.py:185-196` — read-only, no implementació).
+    """Pins contract on the 9 attributes already existing in __init__ (signature
+    declared at `core/lifespan.py:185-196` — read-only, not implementation).
 
-    Si Dev#2 elimina algun d'aquests durant el fix de Cluster 1/2, el test
-    salta.
+    If Dev#2 removes any of these during the Cluster 1/2 fix, the test fails.
     """
     from core.lifespan import ServerState
 
@@ -103,6 +102,6 @@ def test_serverstate_known_init_attrs_are_present() -> None:
     )
     for attr in expected_existing:
         assert hasattr(state, attr), (
-            f"ServerState ha perdut l'atribut existent `{attr}` — "
-            f"refactor col·lateral fora d'abast Onada 4.1."
+            f"ServerState has lost the existing attribute `{attr}` — "
+            f"collateral refactor out of Onada 4.1 scope."
         )

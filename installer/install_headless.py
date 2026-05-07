@@ -22,10 +22,10 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 
-# Bug 3 (2026-04-06) — silenciar warnings de HuggingFace al log GUI.
-# Abans `Please set a HF_TOKEN...` arribava a la GUI durant la instal·lació
-# headless i confonia l'usuari. Ara desactivem telemetria, progress bars i
-# els warnings específics abans que cap import HF els pugui emetre.
+# Bug 3 (2026-04-06) — silence HuggingFace warnings in the GUI log.
+# Previously `Please set a HF_TOKEN...` reached the GUI during headless
+# installation and confused users. We now disable telemetry, progress bars
+# and specific warnings before any HF import can emit them.
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
@@ -62,12 +62,12 @@ from installer.installer_reinstall import (  # noqa: E402  # after sys.path setu
 # ═══════════════════════════════════════════════════════════════════════════
 # INSTALLATION LOG — persistent file for debugging failures
 # ═══════════════════════════════════════════════════════════════════════════
-# Dev #3 fix (Consultor passada 1, finding 3): abans LOG_DIR era
-# PROJECT_ROOT/storage/logs, però `apply_reinstall_mode(BACKUP)` mou
-# `storage/` a `.nexe-backups/` i el FileHandler queda escrivint a un
-# fd mort. Ara els logs d'instal·lació viuen a ~/.nexe/install_logs/,
-# fora del project_root, persistents entre instal·lacions i immunes
-# al backup/wipe de l'installer.
+# Dev #3 fix (Consultant pass 1, finding 3): previously LOG_DIR was
+# PROJECT_ROOT/storage/logs, but `apply_reinstall_mode(BACKUP)` moves
+# `storage/` to `.nexe-backups/` and the FileHandler keeps writing to a
+# dead fd. Installation logs now live at ~/.nexe/install_logs/, outside
+# the project_root, persisting across installs and immune to the
+# installer's backup/wipe.
 LOG_DIR = Path.home() / ".nexe" / "install_logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOG_DIR / f"log_installer_error_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
@@ -121,7 +121,7 @@ def _write_project_marker(app_bundle, project_root):
 
     Writing inside Contents/Resources/ breaks the bundle's sealed signature
     (Gatekeeper refuses with 'a sealed resource is missing or invalid' and
-    'Nexe.app està malmès'). Marker lives at user level, outside any signed
+    'Nexe.app is damaged'). Marker lives at user level, outside any signed
     bundle, readable by the Swift launcher via resolveProjectRoot().
 
     Note: `app_bundle` kept as argument for backward compat — not used now.
@@ -184,10 +184,10 @@ def _run_headless_inner(config):
     project_root = Path(config.get("path", str(PROJECT_ROOT)))
     model_key = config.get("model_key")
     engine = config.get("engine", "ollama")
-    # Bug 28 fix — permet a l'usuari saltar proactivament la descarrega
-    # del model. El model escollit queda registrat a `.env` (per a quan
-    # l'usuari el descarregui manualment despres via `nexe model pull`),
-    # pero NO toquem `storage/models/` i no consumim ample de banda.
+    # Bug 28 fix — allows the user to proactively skip the model download.
+    # The chosen model is recorded in `.env` (for when the user downloads
+    # it manually later via `nexe model pull`), but we do NOT touch
+    # `storage/models/` and consume no bandwidth.
     skip_model_download = bool(config.get("skip_model_download", False))
     reinstall_mode = config.get("reinstall_mode", DEFAULT_REINSTALL_MODE)
     if reinstall_mode not in VALID_REINSTALL_MODES:
@@ -197,10 +197,11 @@ def _run_headless_inner(config):
         )
         reinstall_mode = DEFAULT_REINSTALL_MODE
 
-    # Bug 7 fix — gestió de reinstal·lació amb 3 modes (wipe/overwrite/backup).
-    # Si detectem una instal·lació prèvia, apliquem el mode escollit per
-    # l'usuari abans de fer res més. Sense això, la mateixa API key, vectors
-    # i knowledge base es reciclarien (i la KB es duplicaria per re-ingestió).
+    # Bug 7 fix — reinstall handling with 3 modes (wipe/overwrite/backup).
+    # If we detect an existing installation, we apply the user-chosen mode
+    # before doing anything else. Without this, the same API key, vectors
+    # and knowledge base would be recycled (and the KB would be duplicated
+    # by re-ingestion).
     if project_root.exists() and detect_existing_install(project_root):
         try:
             summary = apply_reinstall_mode(project_root, reinstall_mode)
@@ -265,7 +266,7 @@ def _run_headless_inner(config):
             "chat_format": selected_model.get("chat_format", "chatml"),
         }
     else:
-        # "Continuar sense model" — instal·la sense descarregar cap model
+        # "Continue without model" — install without downloading any model
         model_config = None
         skip_model_download = True
         _log.info("No model selected — installing without model download")
@@ -321,9 +322,9 @@ def _run_headless_inner(config):
         sys.exit(1)
 
     # ── Step 3: Download model ──────────────────────────────────────────
-    # Bug 28 fix — si l'usuari ha demanat saltar la descarrega, el
-    # model queda registrat al .env (Step 4) pero no descarreguem res.
-    # L'usuari pot fer `nexe model pull <name>` despres.
+    # Bug 28 fix — if the user requested skipping the download, the
+    # model is recorded in .env (Step 4) but we download nothing.
+    # The user can run `nexe model pull <name>` later.
     if skip_model_download or model_config is None:
         emit(3, "running", "Skipping model download (user requested)")
         _log.info(
@@ -405,9 +406,9 @@ def _run_headless_inner(config):
         cache_file.unlink()
 
     # ── Step 5: Qdrant (embedded, no external download) ─────────────────
-    # Q5.5 reobert (2026-04-08): Qdrant ara és embedded via QdrantClient(path=)
-    # a core/qdrant_pool.py. Cap binari extern necessari. L'step es manté per
-    # compatibilitat amb la GUI Swift wizard (7 steps esperats) però és no-op.
+    # Q5.5 reopened (2026-04-08): Qdrant is now embedded via QdrantClient(path=)
+    # in core/qdrant_pool.py. No external binary required. The step is kept for
+    # compatibility with the GUI Swift wizard (7 steps expected) but is a no-op.
     emit(5, "running", "Qdrant embedded (no external download needed)...")
     _log.info("Qdrant is embedded (storage/vectors via QdrantClient path=), skipping external binary")
     emit(5, "done")
@@ -478,15 +479,16 @@ def _run_headless_inner(config):
 
     if knowledge_files:
         try:
-            # Q5.5 reobert (2026-04-08): ingestió via embedded QdrantClient.
-            # Abans arrencàvem un binari Qdrant servidor extern a 'storage/qdrant/'
-            # que ningú connectava. Ara la ingestió va directament per embedded
-            # a 'storage/vectors/' via core/qdrant_pool.py.
+            # Q5.5 reopened (2026-04-08): ingestion via embedded QdrantClient.
+            # Previously we launched an external Qdrant server binary at
+            # 'storage/qdrant/' that nothing connected to. Ingestion now goes
+            # directly through the embedded path at 'storage/vectors/' via
+            # core/qdrant_pool.py.
             ingest_env = {**os.environ, "NEXE_LANG": lang, "TRANSFORMERS_VERBOSITY": "error"}
-            # NO check=True — si subprocess falla volem veure el stderr, no un
-            # CalledProcessError genèric. Capturem stdout/stderr i els escrivim
-            # al log de l'installer per visibilitat (bug 2026-04-14: ingest
-            # només processava IDENTITY.md i sortia 0 sense cap traça).
+            # NO check=True — if the subprocess fails we want to see stderr,
+            # not a generic CalledProcessError. We capture stdout/stderr and
+            # write them to the installer log for visibility (bug 2026-04-14:
+            # ingest only processed IDENTITY.md and exited 0 with no trace).
             result = subprocess.run([  # nosec B603: python_path absolute venv Path; project_root is Path(__file__)-derived embedded as literal in -c script
                 str(python_path), "-c",
                 f"import sys; sys.path.insert(0, '{project_root}'); "
@@ -581,7 +583,7 @@ def _run_headless_inner(config):
     else:
         _log.info("Non-macOS platform: skipping .app registration and Login Items")
 
-    # F6: avís headless — no s'instal·la NexeTray.app (tray de sistema)
+    # F6: headless notice — NexeTray.app (system tray) is not installed
     if platform.system() == "Darwin":
         print(
             "[INFO] Headless mode: NexeTray.app (menu-bar icon) has not been installed. "
@@ -615,8 +617,8 @@ def _get_model_size(model_key):
 def _parse_cli_overrides(argv):
     """Parse minimal CLI overrides — currently only --reinstall-mode.
 
-    Bug 7 — permet a un usuari headless triar el mode de reinstal·lació
-    sense haver de fer-ho via JSON. El JSON segueix manant si també l'aporta.
+    Bug 7 — allows a headless user to choose the reinstall mode without
+    having to pass it via JSON. The JSON still takes precedence if provided.
     """
     overrides = {}
     it = iter(argv)
@@ -630,14 +632,14 @@ def _parse_cli_overrides(argv):
         elif arg.startswith("--reinstall-mode="):
             overrides["reinstall_mode"] = arg.split("=", 1)[1]
         elif arg == "--skip-model-download":
-            # Bug 28 fix — flag CLI per saltar la descarrega del model
-            # de forma proactiva (no nomes en cas d'error). El model
-            # escollit queda registrat al .env per a descarrega manual
-            # posterior via `nexe model pull <name>`.
+            # Bug 28 fix — CLI flag to proactively skip the model download
+            # (not only on error). The chosen model is recorded in .env
+            # for manual download later via `nexe model pull <name>`.
             overrides["skip_model_download"] = True
         elif arg == "--no-login-item":
-            # El Swift wizard gestiona Login Items segons checkbox de l'usuari;
-            # amb aquesta flag, install_headless evita afegir-lo per no duplicar.
+            # The Swift wizard manages Login Items according to the user's
+            # checkbox; with this flag, install_headless skips adding it
+            # to avoid duplicates.
             overrides["skip_login_item"] = True
     if "reinstall_mode" in overrides:
         if overrides["reinstall_mode"] not in VALID_REINSTALL_MODES:
@@ -655,7 +657,7 @@ if __name__ == "__main__":
         cli_overrides = _parse_cli_overrides(sys.argv[1:])
         raw = sys.stdin.read()
         config = json.loads(raw)
-        # CLI overrides aplicats si el JSON no els porta
+        # CLI overrides applied if the JSON does not include them
         for k, v in cli_overrides.items():
             config.setdefault(k, v)
         _log.info(f"Starting installation with config: {json.dumps(config, ensure_ascii=False)}")

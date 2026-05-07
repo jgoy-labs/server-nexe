@@ -1,20 +1,20 @@
 """
-Cluster 3 (L331) — path_discovery.find_module_path signatura Optional[Path].
+Cluster 3 (L331) — path_discovery.find_module_path signature Optional[Path].
 
-La signatura actual declara -> Path, però el cos retorna modules.get(module_name)
-que és Path | None. El docstring ja confirma "Module path or None".
+The current signature declares -> Path, but the body returns modules.get(module_name)
+which is Path | None. The docstring already confirms "Module path or None".
 
-Contract pin: find_module_path('mòdul_inexistent') retorna None sense crash.
-El fix mypy (canviar -> Path a -> Optional[Path]) NO ha de trencar aquest contracte.
+Contract pin: find_module_path('non_existent_module') returns None without crash.
+The mypy fix (changing -> Path to -> Optional[Path]) must NOT break this contract.
 """
 from pathlib import Path
 
 
 def test_cluster3_find_module_path_inexistent_returns_none():
-    """Anti-regressió: find_module_path amb mòdul inexistent retorna None, no crash.
+    """Anti-regression: find_module_path with non-existent module returns None, not crash.
 
-    PASSA pre-fix (comportament runtime ja correcte).
-    FALLA si Dev#2 canvia l'impl. a raise o retorn no-None per a mòduls desconeguts.
+    PASSES pre-fix (runtime behaviour already correct).
+    FAILS if Dev#2 changes the implementation to raise or return non-None for unknown modules.
     """
     from personality.module_manager.path_discovery import PathDiscovery
 
@@ -22,15 +22,15 @@ def test_cluster3_find_module_path_inexistent_returns_none():
     result = pd.find_module_path("__module_that_does_not_exist_onada4__")
 
     assert result is None, (
-        f"find_module_path retorna {result!r} en lloc de None — "
-        "contracte Optional[Path] trencat (Cluster 3 Onada 4.3)"
+        f"find_module_path returns {result!r} instead of None — "
+        "Optional[Path] contract broken (Cluster 3 Onada 4.3)"
     )
 
 
 def test_cluster3_find_module_path_signature_accepts_str():
-    """Anti-regressió: find_module_path accepta un str com a únic argument posicional.
+    """Anti-regression: find_module_path accepts a str as the only positional argument.
 
-    Pina que la signatura pública no afegeixi paràmetres obligatoris nous (Dev#2 scope mypy).
+    Pins that the public signature does not add new mandatory parameters (Dev#2 mypy scope).
     """
     import inspect
     from personality.module_manager.path_discovery import PathDiscovery
@@ -39,9 +39,9 @@ def test_cluster3_find_module_path_signature_accepts_str():
     params = list(sig.parameters.keys())
 
     assert "module_name" in params, (
-        f"Paràmetre 'module_name' ha desaparegut de find_module_path — signatura trencada. "
-        f"Paràmetres actuals: {params}"
+        f"Parameter 'module_name' has disappeared from find_module_path — signature broken. "
+        f"Current parameters: {params}"
     )
     assert params[1] == "module_name", (
-        f"'module_name' ha canviat de posició: {params}"
+        f"'module_name' has changed position: {params}"
     )

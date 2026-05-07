@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_request_size_limiter.py
-Description: Tests per core/request_size_limiter.py (middleware mida requests).
+Description: Tests for core/request_size_limiter.py (request size middleware).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -32,20 +32,20 @@ def make_app(max_size=100):
 class TestRequestSizeLimiterMiddleware:
 
     def test_small_request_passes(self):
-        """Request petita passa sense problemes."""
+        """Small request passes without issues."""
         client = TestClient(make_app(max_size=1000))
         resp = client.post("/echo", content=b"hello", headers={"Content-Length": "5"})
         assert resp.status_code == 200
 
     def test_large_content_length_rejected_413(self):
-        """Request gran amb Content-Length → 413."""
+        """Large request with Content-Length → 413."""
         client = TestClient(make_app(max_size=10))
         resp = client.post("/echo", content=b"x" * 20,
                            headers={"Content-Length": "20"})
         assert resp.status_code == 413
 
     def test_413_response_has_error_key(self):
-        """Resposta 413 té clau 'error'."""
+        """413 response has 'error' key."""
         client = TestClient(make_app(max_size=10))
         resp = client.post("/echo", content=b"x" * 20,
                            headers={"Content-Length": "20"})
@@ -53,7 +53,7 @@ class TestRequestSizeLimiterMiddleware:
         assert "error" in data
 
     def test_413_response_has_max_size_mb(self):
-        """Resposta 413 té clau 'max_size_mb'."""
+        """413 response has 'max_size_mb' key."""
         client = TestClient(make_app(max_size=10))
         resp = client.post("/echo", content=b"x" * 20,
                            headers={"Content-Length": "20"})
@@ -61,7 +61,7 @@ class TestRequestSizeLimiterMiddleware:
         assert "max_size_mb" in data
 
     def test_negative_content_length_treated_as_no_header(self):
-        """Content-Length negatiu → tractament com si no hi hagués header."""
+        """Negative Content-Length → treated as if the header is absent."""
         # Negative content length -> ValueError caught, treated as no header
         # Small body should pass through
         client = TestClient(make_app(max_size=1000))
@@ -71,7 +71,7 @@ class TestRequestSizeLimiterMiddleware:
         assert resp.status_code in (200, 400)
 
     def test_invalid_content_length_ignored(self):
-        """Content-Length invalid → s'ignora i es processa normalment."""
+        """Invalid Content-Length → ignored and processed normally."""
         client = TestClient(make_app(max_size=1000))
         resp = client.post("/echo", content=b"hello",
                            headers={"Content-Length": "abc"})
@@ -79,7 +79,7 @@ class TestRequestSizeLimiterMiddleware:
         assert resp.status_code in (200, 400)
 
     def test_get_request_passes_without_size_check(self):
-        """GET requests passen sense verificació de mida."""
+        """GET requests pass without size check."""
         from core.request_size_limiter import RequestSizeLimiterMiddleware
         app = FastAPI()
         app.add_middleware(RequestSizeLimiterMiddleware, max_size=1)
@@ -93,7 +93,7 @@ class TestRequestSizeLimiterMiddleware:
         assert resp.status_code == 200
 
     def test_security_logger_called_on_rejection(self):
-        """Si hi ha security_logger, log_request_too_large s'invoca."""
+        """If there is a security_logger, log_request_too_large is invoked."""
         from core.request_size_limiter import RequestSizeLimiterMiddleware
         app = FastAPI()
         app.add_middleware(RequestSizeLimiterMiddleware, max_size=10)
@@ -113,7 +113,7 @@ class TestRequestSizeLimiterMiddleware:
         mock_logger.log_request_too_large.assert_called_once()
 
     def test_streaming_body_too_large_rejected(self):
-        """Body massa gran sense Content-Length → 413 durant lectura."""
+        """Body too large without Content-Length → 413 during reading."""
         client = TestClient(make_app(max_size=5))
         # POST without explicit Content-Length triggers streaming check
         resp = client.post(
@@ -123,14 +123,14 @@ class TestRequestSizeLimiterMiddleware:
         assert resp.status_code in (200, 413)  # depends on client behavior
 
     def test_default_max_size_is_100mb(self):
-        """Mida màxima per defecte és 100MB."""
+        """Default maximum size is 100MB."""
         from core.request_size_limiter import RequestSizeLimiterMiddleware
         app = FastAPI()
         middleware = RequestSizeLimiterMiddleware(app)
         assert middleware.max_size == 104857600  # 100MB
 
     def test_custom_max_size_set_correctly(self):
-        """Mida màxima personalitzada es configura bé."""
+        """Custom maximum size is configured correctly."""
         from core.request_size_limiter import RequestSizeLimiterMiddleware
         app = FastAPI()
         middleware = RequestSizeLimiterMiddleware(app, max_size=512)

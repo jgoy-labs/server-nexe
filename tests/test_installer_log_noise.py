@@ -2,8 +2,8 @@
 ────────────────────────────────────
 Server Nexe
 Location: tests/test_installer_log_noise.py
-Description: Tests pels Bugs 3, 4, 5, 6, 14 del Bloc 3 — soroll de log a la GUI
-             durant l'instal·lador headless i a runtime del servidor.
+Description: Tests for Bugs 3, 4, 5, 6, 14 in Block 3 — log noise in the GUI
+             during the headless installer and at server runtime.
 ────────────────────────────────────
 """
 
@@ -17,12 +17,12 @@ _ROOT = Path(__file__).parent.parent
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Bug 3 — HF_TOKEN warning silenciat al headless installer
+# Bug 3 — HF_TOKEN warning silenced in the headless installer
 # ═══════════════════════════════════════════════════════════════════════════
 
 def test_bug3_hf_token_env_vars_set_after_install_headless_import():
-    """Importar install_headless ha de fixar les env vars que silencien HF."""
-    # Forcem un re-import en subprocess net per evitar contaminació de l'estat
+    """Importing install_headless must set the env vars that silence HF."""
+    # Force a re-import in a clean subprocess to avoid state contamination
     code = (
         "import os, sys; "
         f"sys.path.insert(0, {str(_ROOT)!r}); "
@@ -38,15 +38,15 @@ def test_bug3_hf_token_env_vars_set_after_install_headless_import():
         timeout=30,
     )
     lines = result.stdout.strip().splitlines()
-    assert lines == ["1", "1", "1"], f"HF env vars no fixades: {result.stdout!r} stderr={result.stderr!r}"
+    assert lines == ["1", "1", "1"], f"HF env vars not set: {result.stdout!r} stderr={result.stderr!r}"
 
 
 def test_bug3_huggingface_logger_level_error():
-    """El logger huggingface_hub ha de quedar a ERROR perquè no escampi WARN.
+    """The huggingface_hub logger must be set to ERROR to suppress WARN output.
 
-    Usa subprocess per evitar contaminació del caché d'imports de Python:
-    si install_headless ja ha estat importat per un test anterior, el codi
-    de nivell de mòdul (setLevel) no es re-executa en el procés actual.
+    Uses subprocess to avoid contamination of the Python import cache:
+    if install_headless has already been imported by a previous test, the
+    module-level code (setLevel) is not re-executed in the current process.
     """
     code = (
         "import sys; "
@@ -62,22 +62,22 @@ def test_bug3_huggingface_logger_level_error():
         timeout=30,
     )
     import logging
-    assert result.returncode == 0, f"Error subprocess: {result.stderr!r}"
+    assert result.returncode == 0, f"Subprocess error: {result.stderr!r}"
     assert int(result.stdout.strip()) == logging.ERROR, (
-        f"Logger level incorrecte: {result.stdout.strip()!r} (esperat {logging.ERROR})"
+        f"Incorrect logger level: {result.stdout.strip()!r} (expected {logging.ERROR})"
     )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Bug 4 — Codis ANSI no apareixen quan stdout no és TTY
+# Bug 4 — ANSI codes do not appear when stdout is not a TTY
 # ═══════════════════════════════════════════════════════════════════════════
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def test_bug4_installer_display_constants_empty_when_not_tty():
-    """Quan stdout no és TTY (cas headless real), les constants de color
-    han de ser cadenes buides."""
+    """When stdout is not a TTY (real headless case), color constants
+    must be empty strings."""
     code = (
         "import sys; "
         f"sys.path.insert(0, {str(_ROOT)!r}); "
@@ -87,18 +87,18 @@ def test_bug4_installer_display_constants_empty_when_not_tty():
         "vals = (d.BLUE, d.GREEN, d.YELLOW, d.RED, d.CYAN, d.MAGENTA, d.BOLD, d.DIM, d.RESET); "
         "print(all(v == '' for v in vals))"
     )
-    # Sense pty: stdout NO és TTY
+    # Without pty: stdout is NOT a TTY
     result = subprocess.run(
         [sys.executable, "-c", code],
         capture_output=True,
         text=True,
         timeout=30,
     )
-    assert result.stdout.strip() == "True", f"Constants no buides: {result.stdout!r}"
+    assert result.stdout.strip() == "True", f"Constants not empty: {result.stdout!r}"
 
 
 def test_bug4_app_logo_no_ansi_when_not_tty():
-    """El logo APP_LOGO no ha de contenir cap escapament ANSI en headless."""
+    """The APP_LOGO must not contain any ANSI escape codes in headless mode."""
     code = (
         "import sys; "
         f"sys.path.insert(0, {str(_ROOT)!r}); "
@@ -113,25 +113,25 @@ def test_bug4_app_logo_no_ansi_when_not_tty():
         text=True,
         timeout=30,
     )
-    assert result.stdout.strip() == "CLEAN", f"APP_LOGO conté ANSI: {result.stdout!r}"
+    assert result.stdout.strip() == "CLEAN", f"APP_LOGO contains ANSI: {result.stdout!r}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Bug 5 — Bloc didàctic Qdrant només en mode interactiu
+# Bug 5 — Qdrant didactic block only in interactive mode
 # ═══════════════════════════════════════════════════════════════════════════
-# Q5.5 reobert (2026-04-08): el test `test_bug5_qdrant_didactic_block_guarded_by_isatty`
-# verificava que installer/installer_setup_qdrant.py tenia blocs didàctics protegits
-# per `sys.stdout.isatty()`. Aquell fitxer ha estat ELIMINAT perquè Qdrant ara és
-# embedded (core/qdrant_pool.py) i no cal descarregar cap binari extern. El test
-# queda obsolet per disseny — el bug que validava ja no pot existir.
+# Q5.5 reopened (2026-04-08): the test `test_bug5_qdrant_didactic_block_guarded_by_isatty`
+# verified that installer/installer_setup_qdrant.py had didactic blocks guarded by
+# `sys.stdout.isatty()`. That file has been REMOVED because Qdrant is now
+# embedded (core/qdrant_pool.py) and no external binary needs to be downloaded.
+# The test is obsolete by design — the bug it validated can no longer exist.
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Bug 6 + Bug 14 — Warnings i tqdm silenciats al runtime del servidor
+# Bug 6 + Bug 14 — Warnings and tqdm silenced at server runtime
 # ═══════════════════════════════════════════════════════════════════════════
 
 def test_bug14_lifespan_sets_tqdm_disable():
-    """Importar core.lifespan ha de fixar TQDM_DISABLE=1."""
+    """Importing core.lifespan must set TQDM_DISABLE=1."""
     code = (
         "import sys; "
         f"sys.path.insert(0, {str(_ROOT)!r}); "
@@ -145,11 +145,11 @@ def test_bug14_lifespan_sets_tqdm_disable():
         text=True,
         timeout=60,
     )
-    assert result.stdout.strip() == "1", f"TQDM_DISABLE no fixat: {result.stdout!r} stderr={result.stderr[:500]!r}"
+    assert result.stdout.strip() == "1", f"TQDM_DISABLE not set: {result.stdout!r} stderr={result.stderr[:500]!r}"
 
 
 def test_bug6_lifespan_filters_position_ids_warning():
-    """Els filtres de warnings han d'ignorar `.*position_ids.*` i
+    """Warning filters must ignore `.*position_ids.*` and
     `.*Some weights of.*`."""
     code = (
         "import sys, warnings; "
@@ -168,5 +168,5 @@ def test_bug6_lifespan_filters_position_ids_warning():
         timeout=60,
     )
     assert result.stdout.strip() == "1", (
-        f"Filters position_ids o Some weights no presents: {result.stdout!r} stderr={result.stderr[:500]!r}"
+        f"Filters position_ids or Some weights not present: {result.stdout!r} stderr={result.stderr[:500]!r}"
     )

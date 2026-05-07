@@ -1,12 +1,12 @@
 """
-Tests per installer/installer_setup_env.py — fix del venv trencat quan s'expulsa el DMG.
+Tests for installer/installer_setup_env.py — fix for broken venv when the DMG is ejected.
 
-Cobertura:
-- _is_dmg_python: detecta si sys.executable ve d'un DMG montat
-- _copy_python_bundle: copia el bundle Python al directori d'instal·lació
-- _get_python_for_venv: tria el Python correcte (bundle copiat vs sys.executable)
-- _make_venv_standalone: safety net per assegurar que el venv és autònom
-- setup_environment: integració (path macOS amb DMG simulat)
+Coverage:
+- _is_dmg_python: detects whether sys.executable comes from a mounted DMG
+- _copy_python_bundle: copies the Python bundle to the installation directory
+- _get_python_for_venv: selects the correct Python (copied bundle vs sys.executable)
+- _make_venv_standalone: safety net to ensure the venv is self-contained
+- setup_environment: integration (macOS path with simulated DMG)
 """
 
 import os
@@ -22,12 +22,12 @@ from unittest.mock import MagicMock, patch, call
 import pytest
 
 
-# ── Helpers per simular un bundle Python dins /Volumes/ ──────────────
+# ── Helpers to simulate a Python bundle inside /Volumes/ ─────────────
 
 
 def _make_fake_python_bundle(tmp_path, base="/Volumes/Install Nexe/InstallNexe.app"):
-    """Crea un bundle Python fals dins tmp_path que simula /Volumes/."""
-    # Estructura: base/Contents/Resources/python/bin/python3
+    """Creates a fake Python bundle inside tmp_path that simulates /Volumes/."""
+    # Structure: base/Contents/Resources/python/bin/python3
     #                                             /lib/python3.12/encodings/__init__.py
     #                                             /lib/libpython3.12.dylib
     bundle_root = tmp_path / base.lstrip("/")
@@ -39,28 +39,28 @@ def _make_fake_python_bundle(tmp_path, base="/Volumes/Install Nexe/InstallNexe.a
     lib_dir.mkdir(parents=True)
     py_lib_dir.mkdir(parents=True)
 
-    # Crear binari fals (fitxer executable)
+    # Create fake binary (executable file)
     python_bin = bin_dir / "python3"
     python_bin.write_text("#!/bin/sh\necho fake python")
     python_bin.chmod(0o755)
 
-    # Crear python3.12 symlink
+    # Create python3.12 symlink
     (bin_dir / "python3.12").symlink_to(python_bin)
 
-    # Crear libpython fals
+    # Create fake libpython
     (lib_dir / "libpython3.12.dylib").write_bytes(b"\x00" * 100)
 
-    # Crear encodings fals
+    # Create fake encodings
     (py_lib_dir / "__init__.py").write_text("# encodings stub")
 
     return str(python_bin)
 
 
-# ── Tests per _is_dmg_python ─────────────────────────────────────────
+# ── Tests for _is_dmg_python ─────────────────────────────────────────
 
 
 class TestIsDmgPython:
-    """Detecta si Python ve d'un DMG montat."""
+    """Detects whether Python comes from a mounted DMG."""
 
     def test_volumes_path_detected(self):
         from installer.installer_setup_env import _is_dmg_python
@@ -87,11 +87,11 @@ class TestIsDmgPython:
         assert not _is_dmg_python("/usr/bin/python3")
 
 
-# ── Tests per _find_python_bundle_root ───────────────────────────────
+# ── Tests for _find_python_bundle_root ───────────────────────────────
 
 
 class TestFindPythonBundleRoot:
-    """Troba l'arrel del bundle Python a partir del path de l'executable."""
+    """Finds the Python bundle root from the executable path."""
 
     def test_standard_bundle_layout(self, tmp_path):
         fake_py = _make_fake_python_bundle(tmp_path)
@@ -107,11 +107,11 @@ class TestFindPythonBundleRoot:
         assert result is None
 
 
-# ── Tests per _copy_python_bundle ────────────────────────────────────
+# ── Tests for _copy_python_bundle ────────────────────────────────────
 
 
 class TestCopyPythonBundle:
-    """Copia el bundle Python del DMG al directori d'instal·lació."""
+    """Copies the Python bundle from the DMG to the installation directory."""
 
     def test_copies_bin_and_lib(self, tmp_path):
         fake_py = _make_fake_python_bundle(tmp_path)
@@ -150,11 +150,11 @@ class TestCopyPythonBundle:
         local_python = _copy_python_bundle(bundle_root, install_dir)
         bundle_dir = install_dir / "python_bundle"
 
-        # Cap symlink dins del bundle copiat ha d'apuntar a /Volumes/
+        # No symlink inside the copied bundle must point to /Volumes/
         for p in bundle_dir.rglob("*"):
             if p.is_symlink():
                 target = str(os.readlink(p))
-                assert "/Volumes/" not in target, f"Symlink {p} apunta a {target}"
+                assert "/Volumes/" not in target, f"Symlink {p} points to {target}"
 
     def test_skips_if_already_copied(self, tmp_path):
         fake_py = _make_fake_python_bundle(tmp_path)
@@ -164,18 +164,18 @@ class TestCopyPythonBundle:
         install_dir = tmp_path / "install"
         install_dir.mkdir()
 
-        # Primera còpia
+        # First copy
         local_python1 = _copy_python_bundle(bundle_root, install_dir)
-        # Segona còpia — no ha de petar
+        # Second copy — must not raise
         local_python2 = _copy_python_bundle(bundle_root, install_dir)
         assert local_python1 == local_python2
 
 
-# ── Tests per _get_python_for_venv ───────────────────────────────────
+# ── Tests for _get_python_for_venv ───────────────────────────────────
 
 
 class TestGetPythonForVenv:
-    """Tria el Python correcte per crear el venv."""
+    """Selects the correct Python for creating the venv."""
 
     @patch("installer.installer_setup_env._is_dmg_python", return_value=False)
     def test_returns_sys_executable_when_not_dmg(self, mock_is_dmg):
@@ -197,20 +197,20 @@ class TestGetPythonForVenv:
         mock_copy.assert_called_once()
 
 
-# ── Tests per _make_venv_standalone (ja existent, ha de seguir funcionant) ──
+# ── Tests for _make_venv_standalone (already existing, must keep working) ──
 
 
 class TestMakeVenvStandalone:
-    """Safety net: _make_venv_standalone segueix funcionant."""
+    """Safety net: _make_venv_standalone keeps working."""
 
     @patch("subprocess.run")
     def test_copies_libpython_if_exists(self, mock_run, tmp_path):
-        # Simular bundle amb libpython
+        # Simulate bundle with libpython
         lib_dir = tmp_path / "bundle" / "lib"
         lib_dir.mkdir(parents=True)
         (lib_dir / "libpython3.12.dylib").write_bytes(b"\x00" * 50)
 
-        # Simular venv
+        # Simulate venv
         venv_path = tmp_path / "venv"
         venv_lib = venv_path / "lib"
         venv_lib.mkdir(parents=True)
@@ -225,11 +225,11 @@ class TestMakeVenvStandalone:
         assert (venv_lib / "libpython3.12.dylib").exists()
 
 
-# ── Tests d'integració per setup_environment ─────────────────────────
+# ── Integration tests for setup_environment ───────────────────────────
 
 
 class TestSetupEnvironmentDmgPath:
-    """Verifica que setup_environment usa el Python local quan ve de DMG."""
+    """Verifies that setup_environment uses the local Python when coming from a DMG."""
 
     @patch("installer.installer_setup_env.platform")
     @patch("installer.installer_setup_env.subprocess")
@@ -253,7 +253,7 @@ class TestSetupEnvironmentDmgPath:
         from installer.installer_setup_env import setup_environment
         setup_environment(project_root, hw, engine="auto")
 
-        # Verificar que la crida a venv usa el python local, NO sys.executable
+        # Verify that the venv call uses the local python, NOT sys.executable
         venv_call = mock_subprocess.run.call_args_list[0]
         python_used = venv_call[0][0][0]
         assert python_used == "/local/python_bundle/bin/python3"
@@ -290,14 +290,14 @@ class TestSetupEnvironmentNonDmg:
         assert python_used == sys.executable
 
 
-# ── Tests per _find_bundle_resources ─────────────────────────────────
+# ── Tests for _find_bundle_resources ─────────────────────────────────
 
 
 class TestFindBundleResources:
-    """Localitza InstallNexe.app/Contents/Resources/ per trobar wheels + embeddings bundled."""
+    """Locates InstallNexe.app/Contents/Resources/ to find bundled wheels + embeddings."""
 
     def _make_resources(self, base, with_wheels=True):
-        """Helper: crea estructura InstallNexe.app amb wheels/ opcional."""
+        """Helper: creates InstallNexe.app structure with optional wheels/."""
         resources = base / "InstallNexe.app" / "Contents" / "Resources"
         resources.mkdir(parents=True)
         if with_wheels:
@@ -365,7 +365,7 @@ class TestFindBundleResources:
         original_find = mod._find_bundle_resources
 
         def patched_find(proj_root):
-            """Replace /Volumes scan with tmp_path/Volumes scan."""
+            """Replaces /Volumes scan with tmp_path/Volumes scan."""
             import os
             env_path = os.environ.get("NEXE_BUNDLE_RESOURCES")
             if env_path:
@@ -387,11 +387,11 @@ class TestFindBundleResources:
         assert found == resources
 
 
-# ── Tests per _write_venv_pip_conf ───────────────────────────────────
+# ── Tests for _write_venv_pip_conf ───────────────────────────────────
 
 
 class TestWriteVenvPipConf:
-    """Configura pip del venv perquè usi wheels locals sense PyPI (no-index)."""
+    """Configures the venv's pip to use local wheels without PyPI (no-index)."""
 
     def _make_venv(self, tmp_path):
         venv = tmp_path / "venv"
@@ -459,14 +459,14 @@ class TestWriteVenvPipConf:
         assert ok is False
 
 
-# ── Tests per _seed_fastembed_cache ──────────────────────────────────
+# ── Tests for _seed_fastembed_cache ──────────────────────────────────
 
 
 class TestSeedFastembedCache:
-    """Copia el bundle d'embeddings al cache natiu de fastembed."""
+    """Copies the embeddings bundle to the native fastembed cache."""
 
     def _make_bundle(self, tmp_path):
-        """Crea un directori que simula el bundle de fastembed amb model.onnx."""
+        """Creates a directory that simulates the fastembed bundle with model.onnx."""
         bundle = tmp_path / "embeddings_bundle"
         model_dir = bundle / "models--sentence-transformers--paraphrase-multilingual-mpnet-base-v2"
         model_dir.mkdir(parents=True)
@@ -512,11 +512,11 @@ class TestSeedFastembedCache:
         assert ok is False
 
 
-# ── Tests per _default_fastembed_cache_dir ───────────────────────────
+# ── Tests for _default_fastembed_cache_dir ───────────────────────────
 
 
 class TestDefaultFastembedCacheDir:
-    """Respecta FASTEMBED_CACHE_DIR si està definit, cau a ~/.cache/fastembed si no."""
+    """Respects FASTEMBED_CACHE_DIR if set, falls back to ~/.cache/fastembed otherwise."""
 
     def test_respects_env_var_override(self, tmp_path, monkeypatch):
         target = tmp_path / "custom_cache"

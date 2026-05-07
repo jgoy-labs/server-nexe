@@ -1,9 +1,9 @@
 """
-Tests per installer/installer_catalog_data.py — Bug 29 fix release v0.9.0.
+Tests for installer/installer_catalog_data.py — Bug 29 fix release v0.9.0.
 
-Phi-3.5 ha estat retirat del catàleg perquè la URL GGUF de Microsoft
-requereix login HF i només descarregava 29 bytes (HTML d'error),
-provocant falles silencioses durant la instal·lació.
+Phi-3.5 has been removed from the catalog because the Microsoft GGUF URL
+requires HF login and only downloaded 29 bytes (error HTML),
+causing silent failures during installation.
 """
 
 import json
@@ -39,13 +39,13 @@ def test_no_phi35_gguf_url():
 
 
 def test_phi35_not_in_swift_wizard_models_json():
-    """El catàleg JSON paral·lel del Swift wizard també ha d'estar net."""
+    """The parallel Swift wizard JSON catalog must also be clean."""
     json_path = (
         Path(__file__).resolve().parent.parent
         / "installer" / "swift-wizard" / "Resources" / "models.json"
     )
     if not json_path.exists():
-        # Si no hi és en aquest checkout, no fallem el test.
+        # If not present in this checkout, do not fail the test.
         return
     data = json.loads(json_path.read_text())
     keys = []
@@ -56,5 +56,5 @@ def test_phi35_not_in_swift_wizard_models_json():
 
 
 def test_catalog_still_has_small_models():
-    """Sanity: encara hi ha models petits després de treure phi35."""
+    """Sanity: small models are still present after removing phi35."""
     assert len(MODEL_CATALOG.get("small", [])) >= 2

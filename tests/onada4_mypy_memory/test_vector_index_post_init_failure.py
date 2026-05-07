@@ -1,24 +1,24 @@
-"""Anti-regressió Cluster 2 — `VectorIndex` post-init failure defaults.
+"""Anti-regression Cluster 2 — `VectorIndex` post-init failure defaults.
 
-Cobreix els 4 findings mypy `attr-defined` a `memory/memory/storage/vector_index.py`
-(L110, 148, 171, 180). Tots són `"None" has no attribute X` perquè `self._client`
-declara None com estat inicial fins a `_init_client()`.
+Covers the 4 mypy `attr-defined` findings at `memory/memory/storage/vector_index.py`
+(L110, 148, 171, 180). All are `"None" has no attribute X` because `self._client`
+declares None as its initial state until `_init_client()`.
 
-Mecànica del bug latent: si `_init_client()` falla, `self._client` queda None i
-`self._available = False`. Cada operació pública (`index`, `search`, `delete`,
-`count`) té un guard `if not self._available: return <default>` ABANS de tocar
-`self._client`. Mypy no narrows i marca els callsites.
+Latent bug mechanics: if `_init_client()` fails, `self._client` remains None and
+`self._available = False`. Each public operation (`index`, `search`, `delete`,
+`count`) has a guard `if not self._available: return <default>` BEFORE touching
+`self._client`. Mypy does not narrow and flags the callsites.
 
-Decisió Director: Dev#2 farà un fix del tipus `assert self._client is not None`
-post-guard `_available` o convertirà el guard a `if self._client is None: return
-<default>`. **Aquest test pina el contracte runtime sense suposar quina opció
-escull Dev#2:** post-init failure → operacions públiques retornen defaults sense
-crash, MAI raise.
+Director decision: Dev#2 will do a fix of the type `assert self._client is not None`
+post-`_available` guard or will convert the guard to `if self._client is None: return
+<default>`. **This test pins the runtime contract without assuming which option
+Dev#2 chooses:** post-init failure → public operations return defaults without
+crash, NEVER raise.
 
-Pre-fix (HEAD `30eb2a6`): contracte ja es compleix gràcies al guard `_available`.
-Post-fix: ha de seguir complint-se. Si Dev#2 trenca el guard (e.g., elimina
-`if not self._available: return 0` confiant en assert), aquest test detecta la
-regressió.
+Pre-fix (HEAD `30eb2a6`): contract is already fulfilled thanks to the `_available` guard.
+Post-fix: must continue to be fulfilled. If Dev#2 breaks the guard (e.g., removes
+`if not self._available: return 0` relying on assert), this test detects the
+regression.
 """
 
 from __future__ import annotations
@@ -30,11 +30,11 @@ import pytest
 
 @pytest.fixture
 def broken_vector_index(monkeypatch: pytest.MonkeyPatch, tmp_path: Any):
-    """Crea un VectorIndex amb _init_client forçat a fallar.
+    """Creates a VectorIndex with _init_client forced to fail.
 
-    L'estat resultant és `_available=False` i `_client=None` — la condició exacta
-    que dispara els 4 findings mypy. Forcing-`from_pool` a llançar simula qualsevol
-    error d'init (Qdrant lock contention, permisos, disc ple…)."""
+    The resulting state is `_available=False` and `_client=None` — the exact condition
+    that triggers the 4 mypy findings. Forcing `from_pool` to raise simulates any
+    init error (Qdrant lock contention, permissions, disk full…)."""
     from memory.embeddings.adapters import QdrantAdapter
     from memory.memory.storage.vector_index import VectorIndex
 
@@ -45,14 +45,14 @@ def broken_vector_index(monkeypatch: pytest.MonkeyPatch, tmp_path: Any):
 
     vi = VectorIndex(qdrant_path=str(tmp_path / "vectors"))
     assert vi._available is False, (
-        "Setup invalid: _init_client no ha caigut a la branca except (revisa monkeypatch)."
+        "Invalid setup: _init_client did not fall into the except branch (check monkeypatch)."
     )
     assert vi._client is None
     return vi
 
 
 def test_vector_index_index_returns_zero_when_unavailable(broken_vector_index: Any) -> None:
-    """`index()` amb `_available=False` retorna 0 sense crash (cobreix L110)."""
+    """`index()` with `_available=False` returns 0 without crash (covers L110)."""
     result = broken_vector_index.index(
         entries=[{"id": "x", "user_id": "u", "namespace": "default"}],
         embeddings=[[0.0, 0.1]],
@@ -61,7 +61,7 @@ def test_vector_index_index_returns_zero_when_unavailable(broken_vector_index: A
 
 
 def test_vector_index_search_returns_empty_when_unavailable(broken_vector_index: Any) -> None:
-    """`search()` amb `_available=False` retorna llista buida sense crash (cobreix L148)."""
+    """`search()` with `_available=False` returns empty list without crash (covers L148)."""
     result = broken_vector_index.search(
         embedding=[0.0, 0.1],
         user_id="u",
@@ -70,23 +70,23 @@ def test_vector_index_search_returns_empty_when_unavailable(broken_vector_index:
 
 
 def test_vector_index_delete_returns_zero_when_unavailable(broken_vector_index: Any) -> None:
-    """`delete()` amb `_available=False` retorna 0 sense crash (cobreix L171)."""
+    """`delete()` with `_available=False` returns 0 without crash (covers L171)."""
     result = broken_vector_index.delete(ids=["a", "b"])
     assert result == 0
 
 
 def test_vector_index_count_returns_zero_when_unavailable(broken_vector_index: Any) -> None:
-    """`count()` amb `_available=False` retorna 0 sense crash (cobreix L180)."""
+    """`count()` with `_available=False` returns 0 without crash (covers L180)."""
     result = broken_vector_index.count()
     assert result == 0
 
 
 def test_vector_index_index_empty_entries_returns_zero(tmp_path: Any) -> None:
-    """Anti-regressió segon guard: entries buides retornen 0 sense tocar `_client`.
+    """Anti-regression second guard: empty entries return 0 without touching `_client`.
 
-    Aquest path és independent de `_available`; pina la branca short-circuit dels
-    23 callsites. Si Dev#2 simplifica el guard `if not self._available or not entries`
-    incorrectament, el test detecta la regressió."""
+    This path is independent of `_available`; pins the short-circuit branch of the
+    23 callsites. If Dev#2 simplifies the guard `if not self._available or not entries`
+    incorrectly, the test detects the regression."""
     from memory.memory.storage.vector_index import VectorIndex
 
     vi = VectorIndex(qdrant_path=str(tmp_path / "vectors_ok"))

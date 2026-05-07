@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_session_manager_robustness.py
-Description: Tests defensius per SessionManager._load_sessions (defensa B4 sessions).
-             Cobreix: path inexistent, buit, .enc corrupte, session.id mismatch,
-             .json plain, mix de casos happy + roïns.
+Description: Defensive tests for SessionManager._load_sessions (B4 session defence).
+             Covers: non-existent path, empty, corrupt .enc, session.id mismatch,
+             plain .json, mix of happy + bad cases.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -20,7 +20,7 @@ from plugins.web_ui_module.core.session_manager import SessionManager, ChatSessi
 
 
 def _make_failing_crypto():
-    """Crypto provider que sempre llança a decrypt."""
+    """Crypto provider that always raises on decrypt."""
     mock = MagicMock()
     mock.decrypt.side_effect = ValueError("AAD mismatch (mock)")
     mock.encrypt.return_value = b""
@@ -28,7 +28,7 @@ def _make_failing_crypto():
 
 
 def _make_bad_id_crypto(good_payload: bytes):
-    """Crypto provider que retorna payload amb session.id diferent del nom del fitxer."""
+    """Crypto provider that returns a payload with a session.id different from the filename."""
     mock = MagicMock()
     mock.decrypt.return_value = good_payload
     mock.encrypt.return_value = good_payload
@@ -36,7 +36,7 @@ def _make_bad_id_crypto(good_payload: bytes):
 
 
 def _make_smart_crypto(good_stem: str, good_payload: bytes):
-    """Crypto provider que retorna good_payload per al fitxer good_stem i llança per a la resta."""
+    """Crypto provider that returns good_payload for the good_stem file and raises for the rest."""
     mock = MagicMock()
 
     def decrypt(data, aad=None):
@@ -52,20 +52,20 @@ def _make_smart_crypto(good_stem: str, good_payload: bytes):
 class TestSessionManagerRobustness:
 
     def test_storage_path_inexistent_no_throw(self, tmp_path):
-        """Path inexistent → no llança; mkdir crea el directori."""
+        """Non-existent path → does not raise; mkdir creates the directory."""
         storage = tmp_path / "nested" / "sessions"
         sm = SessionManager(storage_path=str(storage))
         assert storage.exists()
         assert sm.corrupted_sessions_count == 0
 
     def test_empty_storage_no_throw(self, tmp_path):
-        """Directori buit → no llança; 0 sessions carregades, 0 corrupted."""
+        """Empty directory → does not raise; 0 sessions loaded, 0 corrupted."""
         sm = SessionManager(storage_path=str(tmp_path))
         assert len(sm.list_sessions()) == 0
         assert sm.corrupted_sessions_count == 0
 
     def test_corrupted_enc_raises_counted(self, tmp_path):
-        """.enc corrupte (decrypt llança) → no llança; corrupted_count += 1."""
+        """Corrupt .enc (decrypt raises) → does not raise; corrupted_count += 1."""
         crypto = _make_failing_crypto()
         (tmp_path / "abc123.enc").write_bytes(b"garbage-data")
         sm = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
@@ -73,21 +73,21 @@ class TestSessionManagerRobustness:
         assert len(sm.list_sessions()) == 0
 
     def test_session_id_mismatch_counted(self, tmp_path):
-        """.enc amb session.id mismatch (swap attack simulat) → counted, no carregat."""
+        """.enc with session.id mismatch (simulated swap attack) → counted, not loaded."""
         bad_payload = json.dumps({
             "id": "WRONG-ID",
             "messages": [],
             "context_files": [],
         }).encode()
         crypto = _make_bad_id_crypto(bad_payload)
-        # El fitxer es diu "real-file-id.enc" però el contingut diu WRONG-ID
+        # The file is named "real-file-id.enc" but the content says WRONG-ID
         (tmp_path / "real-file-id.enc").write_bytes(bad_payload)
         sm = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
         assert sm.corrupted_sessions_count == 1
         assert len(sm.list_sessions()) == 0
 
     def test_plain_json_loaded_without_crypto(self, tmp_path):
-        """.json plain sense crypto provider → es carrega correctament."""
+        """Plain .json without crypto provider → loaded correctly."""
         session = ChatSession(session_id="plain-session")
         session.add_message("user", "test message")
         (tmp_path / "plain-session.json").write_text(
@@ -100,7 +100,7 @@ class TestSessionManagerRobustness:
         assert sm.corrupted_sessions_count == 0
 
     def test_mix_happy_and_corrupted(self, tmp_path):
-        """Mix: 1 .enc vàlid + 1 .enc corrupte → 1 carregat, 1 comptat com a corrupte."""
+        """Mix: 1 valid .enc + 1 corrupt .enc → 1 loaded, 1 counted as corrupt."""
         good_id = "good-enc-session"
         good_data = {"id": good_id, "messages": [], "context_files": []}
         good_payload = json.dumps(good_data).encode()
