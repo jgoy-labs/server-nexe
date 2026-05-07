@@ -1,5 +1,5 @@
 """
-Tests del pipeline de memòria v1 — dev2 fase 1.
+Tests for the memory pipeline v1 — dev2 phase 1.
 Gate, Extractor, Validator, Deduplicator.
 Session: 20260330
 """
@@ -19,11 +19,11 @@ from memory.memory.models.memory_types import (
 
 
 # ──────────────────────────────────────────
-# 2.1 Gate filtra brossa
+# 2.1 Gate filters junk
 # ──────────────────────────────────────────
 
 class TestGateFiltraBrossa:
-    """10 missatges trivials → ZERO passen el gate."""
+    """10 trivial messages → ZERO pass the gate."""
 
     JUNK_MESSAGES = [
         "Hola!",
@@ -43,21 +43,21 @@ class TestGateFiltraBrossa:
 
     @pytest.mark.parametrize("msg", JUNK_MESSAGES)
     def test_junk_message_rejected(self, msg):
-        """Cada missatge trivial ha de ser rebutjat pel gate."""
+        """Each trivial message must be rejected by the gate."""
         result = self.gate.evaluate(msg, is_user_message=True)
         assert not result.passed, (
-            f"Gate hauria de rebutjar '{msg}' però ha passat "
+            f"Gate should reject '{msg}' but it passed "
             f"(reason={result.reason}, score={result.score})"
         )
 
     def test_all_junk_rejected_batch(self):
-        """Cap dels 10 missatges trivials ha de passar."""
+        """None of the 10 trivial messages should pass."""
         passed = [
             msg
             for msg in self.JUNK_MESSAGES
             if self.gate.evaluate(msg, is_user_message=True).passed
         ]
-        assert len(passed) == 0, f"Missatges que han passat indegudament: {passed}"
+        assert len(passed) == 0, f"Messages that passed incorrectly: {passed}"
 
     def test_empty_rejected(self):
         result = self.gate.evaluate("", is_user_message=True)
@@ -77,11 +77,11 @@ class TestGateFiltraBrossa:
 
 
 # ──────────────────────────────────────────
-# 2.2 Pipeline accepta fets
+# 2.2 Pipeline accepts facts
 # ──────────────────────────────────────────
 
 class TestGateAcceptaFets:
-    """Missatges amb fets reals → passen el gate."""
+    """Messages with real facts → pass the gate."""
 
     FACT_MESSAGES = [
         "Em dic Anna i tinc 30 anys",
@@ -96,16 +96,16 @@ class TestGateAcceptaFets:
 
     @pytest.mark.parametrize("msg", FACT_MESSAGES)
     def test_fact_message_accepted(self, msg):
-        """Missatge amb fets ha de passar el gate."""
+        """Message with facts must pass the gate."""
         result = self.gate.evaluate(msg, is_user_message=True)
         assert result.passed, (
-            f"Gate hauria d'acceptar '{msg}' però l'ha rebutjat "
+            f"Gate should accept '{msg}' but rejected it "
             f"(reason={result.reason}, score={result.score})"
         )
 
 
 class TestExtractorFets:
-    """L'extractor extreu fets dels missatges."""
+    """The extractor extracts facts from messages."""
 
     def setup_method(self):
         self.extractor = Extractor()
@@ -113,37 +113,37 @@ class TestExtractorFets:
     def test_extract_name_and_age(self):
         facts = self.extractor.extract("Em dic Anna i tinc 30 anys")
         attrs = {f.attribute for f in facts if f.attribute}
-        assert "name" in attrs, f"No ha extret 'name'. Facts: {facts}"
+        assert "name" in attrs, f"Did not extract 'name'. Facts: {facts}"
         name_fact = next(f for f in facts if f.attribute == "name")
         assert "Anna" in name_fact.value
 
     def test_extract_location_and_company(self):
         facts = self.extractor.extract("Visc a Madrid, treballo a Google")
         attrs = {f.attribute for f in facts if f.attribute}
-        assert "location" in attrs, f"No ha extret 'location'. Facts: {facts}"
-        assert "company" in attrs, f"No ha extret 'company'. Facts: {facts}"
+        assert "location" in attrs, f"Did not extract 'location'. Facts: {facts}"
+        assert "company" in attrs, f"Did not extract 'company'. Facts: {facts}"
 
     def test_extract_preferences(self):
         facts = self.extractor.extract("M'agrada rock, odio reggaeton")
         tags_flat = [tag for f in facts for tag in f.tags]
-        assert "preference" in tags_flat, f"No ha extret preferències. Facts: {facts}"
+        assert "preference" in tags_flat, f"Did not extract preferences. Facts: {facts}"
 
     def test_extract_identity(self):
         facts = self.extractor.extract("Soc vegetariana des de fa 5 anys")
-        assert len(facts) > 0, "No ha extret cap fet"
+        assert len(facts) > 0, "Did not extract any fact"
 
     def test_extract_languages(self):
         facts = self.extractor.extract("Parlo català, castellà, anglès")
         attrs = {f.attribute for f in facts if f.attribute}
-        assert "spoken_languages" in attrs, f"No ha extret idiomes. Facts: {facts}"
+        assert "spoken_languages" in attrs, f"Did not extract languages. Facts: {facts}"
 
 
 # ──────────────────────────────────────────
-# 2.3 Dedup — 4 formulacions de Barcelona → màx 2 entries
+# 2.3 Dedup — 4 formulations of Barcelona → max 2 entries
 # ──────────────────────────────────────────
 
 class TestDedup:
-    """4 formulacions del mateix fet → SHA256 no les detecta (bug conegut)."""
+    """4 formulations of the same fact → SHA256 does not detect them (known bug)."""
 
     BARCELONA_VARIANTS = [
         "Visc a Barcelona",
@@ -156,21 +156,21 @@ class TestDedup:
         self.dedup = Deduplicator()
 
     def test_exact_duplicate_detected(self):
-        """Duplicat exacte sí que es detecta."""
+        """Exact duplicate is detected."""
         entry = MemoryEntry(entry_type=MemoryType.EPISODIC, content="Visc a Barcelona")
         assert not self.dedup.is_duplicate(entry)
-        assert self.dedup.is_duplicate(entry)  # segon cop → duplicat
+        assert self.dedup.is_duplicate(entry)  # second time → duplicate
 
     def test_semantic_variants_dedup(self):
-        """4 variants semàntiques del mateix fet → màx 2 entries."""
+        """4 semantic variants of the same fact → max 2 entries."""
         entries = [
             MemoryEntry(entry_type=MemoryType.EPISODIC, content=text)
             for text in self.BARCELONA_VARIANTS
         ]
         accepted = [e for e in entries if not self.dedup.is_duplicate(e)]
         assert len(accepted) <= 2, (
-            f"Dedup ha acceptat {len(accepted)} de 4 variants "
-            f"(màx 2 esperat). Accepted: {[e.content for e in accepted]}"
+            f"Dedup accepted {len(accepted)} of 4 variants "
+            f"(max 2 expected). Accepted: {[e.content for e in accepted]}"
         )
 
     def test_content_hash_deterministic(self):
@@ -185,26 +185,26 @@ class TestDedup:
 
 
 # ──────────────────────────────────────────
-# 2.4 Correcció
+# 2.4 Correction
 # ──────────────────────────────────────────
 
 class TestCorrection:
-    """'Em dic Anna' → 'No, em dic Maria' → Maria sobreescriu Anna."""
+    """'Em dic Anna' → 'No, em dic Maria' → Maria overwrites Anna."""
 
     def setup_method(self):
         self.extractor = Extractor()
         self.validator = Validator()
 
     def test_correction_detected(self):
-        """L'extractor detecta 'No, em dic Maria' com a correcció."""
+        """The extractor detects 'No, em dic Maria' as a correction."""
         facts = self.extractor.extract("No, em dic Maria")
         corrections = [f for f in facts if f.is_correction]
-        assert len(corrections) > 0, f"No ha detectat correcció. Facts: {facts}"
+        assert len(corrections) > 0, f"Did not detect correction. Facts: {facts}"
         assert corrections[0].attribute == "name"
         assert "Maria" in corrections[0].value
 
     def test_correction_upserts_profile(self):
-        """El validator decideix UPSERT_PROFILE per una correcció de nom."""
+        """The validator decides UPSERT_PROFILE for a name correction."""
         fact = ExtractedFact(
             content="No, em dic Maria",
             entity="user",
@@ -219,18 +219,18 @@ class TestCorrection:
             fact, trust_level=TrustLevel.TRUSTED, existing_value="Anna"
         )
         assert result.decision == ValidatorDecision.UPSERT_PROFILE, (
-            f"Esperava UPSERT_PROFILE, obtingut {result.decision}"
+            f"Expected UPSERT_PROFILE, got {result.decision}"
         )
 
     def test_correction_overwrites_previous(self):
-        """Pipeline complet: Anna → Maria."""
-        # Primer: Anna
+        """Full pipeline: Anna → Maria."""
+        # First: Anna
         facts_anna = self.extractor.extract("Em dic Anna")
         anna_fact = next((f for f in facts_anna if f.attribute == "name"), None)
         assert anna_fact is not None
         assert "Anna" in anna_fact.value
 
-        # Després: correcció a Maria
+        # Then: correction to Maria
         facts_maria = self.extractor.extract("No, em dic Maria")
         maria_fact = next(
             (f for f in facts_maria if f.attribute == "name" or f.is_correction),
@@ -239,7 +239,7 @@ class TestCorrection:
         assert maria_fact is not None
         assert "Maria" in maria_fact.value
 
-        # Validator amb existing_value="Anna"
+        # Validator with existing_value="Anna"
         result = self.validator.validate(
             maria_fact,
             trust_level=TrustLevel.TRUSTED,
@@ -253,7 +253,7 @@ class TestCorrection:
 # ──────────────────────────────────────────
 
 class TestValidator:
-    """Decisions del validator segons tipus de fet."""
+    """Validator decisions according to fact type."""
 
     def setup_method(self):
         self.validator = Validator()
@@ -272,7 +272,7 @@ class TestValidator:
         assert result.decision == ValidatorDecision.UPSERT_PROFILE
 
     def test_duplicate_value_rejected(self):
-        """Mateix valor ja existent → rebutjat (novelty baixa)."""
+        """Same value already exists → rejected (low novelty)."""
         fact = ExtractedFact(
             content="Em dic Anna",
             entity="user",
@@ -369,7 +369,7 @@ class TestSchemaEnforcer:
 
 
 # ──────────────────────────────────────────
-# Coverage extra: Extractor health, preferences, _looks_factual
+# Extra coverage: Extractor health, preferences, _looks_factual
 # ──────────────────────────────────────────
 
 class TestExtractorHealth:
@@ -424,7 +424,7 @@ class TestExtractorLooksFactual:
         self.extractor = Extractor()
 
     def test_factual_no_pattern_match(self):
-        """Text factual que no fa match amb cap pattern específic → generic fact."""
+        """Factual text that does not match any specific pattern → generic fact."""
         facts = self.extractor.extract("Faig servir Linux cada dia per treballar")
         assert len(facts) > 0
         assert any("general" in f.tags for f in facts)
@@ -434,12 +434,12 @@ class TestExtractorLooksFactual:
         assert len(facts) == 0
 
     def test_non_factual_long_text(self):
-        """Text llarg però no factual → pot no generar facts."""
+        """Long but non-factual text → may not generate facts."""
         facts = self.extractor.extract("El cel és blau i les flors són boniques")
-        # No hauria de generar facts (no identity, no preference, no factual markers)
+        # Should not generate facts (no identity, no preference, no factual markers)
         factual_markers = any("general" in f.tags for f in facts)
         identity_facts = any("identity" in f.tags for f in facts)
-        assert not identity_facts  # No és un fet d'identitat
+        assert not identity_facts  # Not an identity fact
 
 
 class TestExtractorEdgeCases:
@@ -447,7 +447,7 @@ class TestExtractorEdgeCases:
         self.extractor = Extractor()
 
     def test_short_value_ignored(self):
-        """Values massa curts s'ignoren."""
+        """Values that are too short are ignored."""
         facts = self.extractor.extract("I work at X")
         companies = [f for f in facts if f.attribute == "company"]
         # "X" is len 1, should be ignored
@@ -478,14 +478,14 @@ class TestGateEdgeCases:
         assert result.passed
 
     def test_pure_question_with_assertion(self):
-        """Question amb assertion ha de passar."""
+        """Question with assertion must pass."""
         result = self.gate.evaluate(
             "Recordes que soc programador?", is_user_message=True
         )
         assert result.passed
 
     def test_high_importance_short(self):
-        """Missatge curt però amb pattern important."""
+        """Short message but with an important pattern."""
         result = self.gate.evaluate("Soc enginyer", is_user_message=True)
         assert result.passed
 
@@ -495,7 +495,7 @@ class TestGateEdgeCases:
 # ──────────────────────────────────────────
 
 class TestPipelineFlow:
-    """Test integrat Gate → Extractor → Validator."""
+    """Integrated test Gate → Extractor → Validator."""
 
     def setup_method(self):
         self.gate = Gate()
@@ -503,14 +503,14 @@ class TestPipelineFlow:
         self.validator = Validator()
 
     def test_junk_never_reaches_extractor(self):
-        """Brossa filtrada pel gate no arriba a l'extractor."""
+        """Junk filtered by the gate never reaches the extractor."""
         junk = ["Hola!", "ok", "si", "???"]
         for msg in junk:
             gate_result = self.gate.evaluate(msg, is_user_message=True)
             assert not gate_result.passed
 
     def test_fact_flows_through_pipeline(self):
-        """Fet real passa gate → extractor → validator."""
+        """Real fact passes gate → extractor → validator."""
         msg = "Em dic Anna i tinc 30 anys"
 
         gate_result = self.gate.evaluate(msg, is_user_message=True)
@@ -527,11 +527,11 @@ class TestPipelineFlow:
                 assert result.decision != ValidatorDecision.REJECT
 
     def test_correction_flows_through_pipeline(self):
-        """Correcció passa gate → extractor (correction) → validator (upsert)."""
+        """Correction passes gate → extractor (correction) → validator (upsert)."""
         msg = "No, em dic Maria"
 
         gate_result = self.gate.evaluate(msg, is_user_message=True)
-        assert gate_result.passed, f"Gate ha rebutjat correcció: {gate_result.reason}"
+        assert gate_result.passed, f"Gate rejected correction: {gate_result.reason}"
 
         facts = self.extractor.extract(msg)
         corrections = [f for f in facts if f.is_correction]

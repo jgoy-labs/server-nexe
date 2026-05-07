@@ -22,17 +22,17 @@ async def embedding_node(
   cache_version: str = "v1"
 ) -> Dict[str, Any]:
   """
-  Workflow node: Genera embedding per un text.
+  Workflow node: Generates embedding for a text.
 
   Args:
-    text: Text a convertir
-    model: Model fastembed (ex: sentence-transformers/paraphrase-multilingual-mpnet-base-v2)
-    use_cache: Si usar cache multi-nivell
-    normalize: Si normalitzar embedding
-    cache_version: Versió del cache
+    text: Text to convert
+    model: fastembed model (e.g. sentence-transformers/paraphrase-multilingual-mpnet-base-v2)
+    use_cache: Whether to use multi-level cache
+    normalize: Whether to normalize embedding
+    cache_version: Cache version
 
   Returns:
-    Dict amb:
+    Dict with:
     - embedding: Vector
     - dimensions: int
     - cache_hit: bool

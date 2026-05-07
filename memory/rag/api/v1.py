@@ -20,7 +20,7 @@ router = APIRouter(prefix="/rag", tags=["rag-v1", "future"], dependencies=[Depen
 @router.post("/search", summary="Semantic search in RAG vector store", operation_id="rag_search_v1")
 async def rag_search_v1():
   """
-  Cerca semàntica RAG (API v1).
+  RAG semantic search (API v1).
 
   STATUS: NOT IMPLEMENTED (coming soon)
 
@@ -63,7 +63,7 @@ async def rag_search_v1():
 @router.post("/add", summary="Afegir documents al vector store RAG", operation_id="rag_add_v1")
 async def rag_add_documents_v1():
   """
-  Afegeix documents al vector store RAG (API v1).
+  Add documents to the RAG vector store (API v1).
 
   STATUS: NOT IMPLEMENTED (coming soon)
 
@@ -97,12 +97,12 @@ async def rag_add_documents_v1():
 @router.delete("/documents/{document_id}", summary="Eliminar document del vector store RAG", operation_id="rag_delete_v1")
 async def rag_delete_document_v1(document_id: str):
   """
-  Elimina un document del vector store RAG (API v1).
+  Delete a document from the RAG vector store (API v1).
 
   STATUS: NOT IMPLEMENTED (coming soon)
 
   Path params:
-    - document_id: ID del document a eliminar
+    - document_id: ID of the document to delete
 
   Expected returns:
     {

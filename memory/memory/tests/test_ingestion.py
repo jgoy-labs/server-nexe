@@ -23,7 +23,7 @@ from memory.memory.models.memory_types import MemoryType
 
 @pytest.fixture
 async def temp_pipeline():
-  """Fixture: IngestionPipeline amb components temporals"""
+  """Fixture: IngestionPipeline with temporary components"""
   flash = FlashMemory(default_ttl_seconds=1800)
 
   temp_dir = Path(tempfile.mkdtemp())
@@ -51,10 +51,10 @@ async def temp_pipeline():
 
 @pytest.mark.asyncio
 class TestIngestionPipeline:
-  """Tests per IngestionPipeline"""
+  """Tests for IngestionPipeline"""
 
   async def test_initialization(self, temp_pipeline):
-    """Inicialització amb flash + persistence"""
+    """Initialisation with flash + persistence"""
     pipeline = temp_pipeline
 
     assert pipeline.flash is not None
@@ -64,7 +64,7 @@ class TestIngestionPipeline:
     assert pipeline.stats["total_ingested"] == 0
 
   async def test_ingest_single_entry(self, temp_pipeline):
-    """Ingestar una sola entry"""
+    """Ingest a single entry"""
     pipeline = temp_pipeline
 
     entry = MemoryEntry(
@@ -86,7 +86,7 @@ class TestIngestionPipeline:
     assert persist_entry is not None
 
   async def test_deduplication(self, temp_pipeline):
-    """Deduplicació: mateix content no s'ingesta dos cops"""
+    """Deduplication: same content is not ingested twice"""
     pipeline = temp_pipeline
 
     entry1 = MemoryEntry(
@@ -110,7 +110,7 @@ class TestIngestionPipeline:
     assert pipeline.stats["duplicates_skipped"] == 1
 
   async def test_embedding_generation(self, temp_pipeline):
-    """Generació d'embedding retorna dummy vector"""
+    """Embedding generation returns dummy vector"""
     pipeline = temp_pipeline
 
     text = "Test text for embedding"
@@ -121,7 +121,7 @@ class TestIngestionPipeline:
     assert all(isinstance(x, float) for x in embedding)
 
   async def test_embedding_deterministic(self, temp_pipeline):
-    """Embeddings són determinístics (mateix text = mateix vector)"""
+    """Embeddings are deterministic (same text = same vector)"""
     pipeline = temp_pipeline
 
     text = "Same text"
@@ -131,7 +131,7 @@ class TestIngestionPipeline:
     assert embedding1 == embedding2
 
   async def test_ingest_batch(self, temp_pipeline):
-    """Ingest batch de múltiples entries"""
+    """Ingest batch of multiple entries"""
     pipeline = temp_pipeline
 
     entries = [
@@ -152,7 +152,7 @@ class TestIngestionPipeline:
     assert pipeline.stats["total_ingested"] == 5
 
   async def test_ingest_batch_with_duplicates(self, temp_pipeline):
-    """Batch amb duplicats (mateix content)"""
+    """Batch with duplicates (same content)"""
     pipeline = temp_pipeline
 
     entries = [
@@ -167,7 +167,7 @@ class TestIngestionPipeline:
     assert batch_stats["duplicates"] == 1
 
   async def test_cleanup_expired(self, temp_pipeline):
-    """Neteja d'entries expirades"""
+    """Cleanup of expired entries"""
     pipeline = temp_pipeline
 
     deleted = await pipeline.cleanup_expired()
@@ -175,7 +175,7 @@ class TestIngestionPipeline:
     assert deleted == 0
 
   async def test_get_stats(self, temp_pipeline):
-    """Obtenir estadístiques del pipeline"""
+    """Get pipeline statistics"""
     pipeline = temp_pipeline
 
     for i in range(3):
@@ -194,7 +194,7 @@ class TestIngestionPipeline:
     assert "deduplicator" in stats
 
   async def test_concurrent_ingestion(self, temp_pipeline):
-    """Ingesta concurrent amb asyncio.gather"""
+    """Concurrent ingestion with asyncio.gather"""
     pipeline = temp_pipeline
 
     async def ingest_one(n):
@@ -212,7 +212,7 @@ class TestIngestionPipeline:
     assert pipeline.stats["total_ingested"] >= 8
 
   async def test_pipeline_close(self, temp_pipeline):
-    """Tancar pipeline (shutdown executor)"""
+    """Close pipeline (shutdown executor)"""
     pipeline = temp_pipeline
 
     pipeline.close()

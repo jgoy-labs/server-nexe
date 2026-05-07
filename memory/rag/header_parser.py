@@ -26,12 +26,12 @@ HEADER_END = "---"
 VALID_PRIORITIES = ["P0", "P1", "P2", "P3"]
 VALID_TYPES = ["docs", "tutorial", "api", "faq", "notes", "config", "other"]
 VALID_LANGS = ["ca", "es", "en", "multi"]
-# Les 3 col·leccions canòniques del RAG ("passadissos de la biblioteca"):
-# - nexe_documentation: knowhow del propi nexe (auto-ingest de knowledge/)
-# - user_knowledge: documents ad-hoc pujats per l'usuari al chat
-# - personal_memory: fets que el chat recorda (MEM_SAVE/RECALL)
-# Nota: "personal_memory" es deia "nexe_web_ui" fins al refactor 2026-04-08.
-# La constant "system" existia pre-v0.9.0 però cap codi la feia servir — eliminada.
+# The 3 canonical RAG collections ("library corridors"):
+# - nexe_documentation: nexe's own knowhow (auto-ingest from knowledge/)
+# - user_knowledge: ad-hoc documents uploaded by the user in chat
+# - personal_memory: facts the chat remembers (MEM_SAVE/RECALL)
+# Note: "personal_memory" was called "nexe_web_ui" until the 2026-04-08 refactor.
+# The "system" constant existed pre-v0.9.0 but no code used it — removed.
 DEFAULT_COLLECTIONS = ["nexe_documentation", "user_knowledge", "personal_memory"]
 
 # Chunk size limits
@@ -48,7 +48,7 @@ MAX_TAGS = 20
 class RAGHeader:
     """Standardized RAG header structure"""
 
-    # Obligatoris
+    # Required fields
     versio: str = HEADER_VERSION
     data: str = ""
     id: str = ""
@@ -57,16 +57,16 @@ class RAGHeader:
     chunk_size: int = DEFAULT_CHUNK_SIZE
     priority: str = "P2"
 
-    # Opcionals
+    # Optional fields
     lang: str = field(default_factory=lambda: os.getenv("NEXE_LANG", "ca").split("-")[0].lower())
     type: str = "docs"
-    # collection=None → el caller aplica el seu target_collection (bug 2026-04-14)
+    # collection=None → caller applies their target_collection (bug 2026-04-14)
     collection: Optional[str] = None
     author: str = ""
     expires: Optional[str] = None
     related: List[str] = field(default_factory=list)
 
-    # Metadades internes
+    # Internal metadata
     is_valid: bool = False
     validation_errors: List[str] = field(default_factory=list)
     raw_header: str = ""
@@ -139,10 +139,10 @@ class RAGHeaderParser:
 
         header.raw_header = header_text
 
-        # Parsear camps
+        # Parse fields
         parsed = self._parse_yaml_like(header_text)
 
-        # Assignar camps obligatoris
+        # Assign required fields
         header.versio = str(parsed.get("versio", HEADER_VERSION)).strip('"\'')
         header.data = str(parsed.get("data", "")).strip('"\'')
         header.id = str(parsed.get("id", "")).strip('"\'')
@@ -151,15 +151,15 @@ class RAGHeaderParser:
         header.chunk_size = self._parse_int(parsed.get("chunk_size"), DEFAULT_CHUNK_SIZE)
         header.priority = str(parsed.get("priority", "P2")).strip('"\'').upper()
 
-        # Assignar camps opcionals
+        # Assign optional fields
         _default_lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
         header.lang = str(parsed.get("lang", _default_lang)).strip('"\'').lower()
         header.type = str(parsed.get("type", "docs")).strip('"\'').lower()
-        # IMPORTANT: default ha de ser None perquè el caller (ingest_knowledge)
-        # pugui aplicar el seu target_collection. Si posem "user_knowledge" aquí
-        # obliguem a que tots els docs sense `collection:` explícit acabin a la
-        # col·lecció d'usuari — bug 2026-04-14 que feia que corporate docs
-        # (nexe_documentation) només continguessin fitxers amb header explícit.
+        # IMPORTANT: default must be None so the caller (ingest_knowledge)
+        # can apply their target_collection. Setting "user_knowledge" here
+        # would force all docs without explicit `collection:` into the
+        # user collection — bug 2026-04-14 which caused corporate docs
+        # (nexe_documentation) to only contain files with explicit header.
         _collection_raw = parsed.get("collection")
         header.collection = str(_collection_raw).strip('"\'') if _collection_raw else None
         header.author = str(parsed.get("author", "")).strip('"\'')
@@ -170,7 +170,7 @@ class RAGHeaderParser:
                 header.expires = None
         header.related = self._parse_list(parsed.get("related", []))
 
-        # Validar
+        # Validate
         header.validation_errors = self._validate(header)
         header.is_valid = len(header.validation_errors) == 0
 
@@ -233,15 +233,15 @@ class RAGHeaderParser:
             if not line or line.startswith('#'):
                 continue
 
-            # Buscar key: value
+            # Search for key: value
             match = re.match(r'^(\w+):\s*(.*)$', line)
             if match:
                 key = match.group(1).lower()
                 value = match.group(2).strip()
 
-                # Detectar llistes [item1, item2]
+                # Detect lists [item1, item2]
                 if value.startswith('[') and value.endswith(']'):
-                    # Parsejar llista
+                    # Parse list
                     list_content = value[1:-1]
                     items = [item.strip().strip('"\'') for item in list_content.split(',')]
                     result[key] = [item for item in items if item]
@@ -274,9 +274,9 @@ class RAGHeaderParser:
         """Validate header fields"""
         errors = []
 
-        # Camps obligatoris
+        # Required fields
         if not header.id:
-            errors.append("Camp 'id' obligatori")
+            errors.append("Field 'id' is required")
 
         if not header.abstract:
             errors.append("Field 'abstract' is required")
@@ -298,27 +298,27 @@ class RAGHeaderParser:
         if header.priority not in VALID_PRIORITIES:
             errors.append(f"priority must be: {', '.join(VALID_PRIORITIES)}")
 
-        # Validar lang
+        # Validate lang
         if header.lang not in VALID_LANGS:
-            errors.append(f"lang ha de ser: {', '.join(VALID_LANGS)}")
+            errors.append(f"lang must be: {', '.join(VALID_LANGS)}")
 
-        # Validar type
+        # Validate type
         if header.type not in VALID_TYPES:
-            errors.append(f"type ha de ser: {', '.join(VALID_TYPES)}")
+            errors.append(f"type must be: {', '.join(VALID_TYPES)}")
 
-        # Validar data (format YYYY-MM-DD)
+        # Validate data (format YYYY-MM-DD)
         if header.data:
             try:
                 datetime.strptime(header.data, "%Y-%m-%d")
             except ValueError:
-                errors.append("'data' ha de tenir format YYYY-MM-DD")
+                errors.append("'data' must have format YYYY-MM-DD")
 
-        # Validar expires si existeix
+        # Validate expires if present
         if header.expires:
             try:
                 datetime.strptime(header.expires, "%Y-%m-%d")
             except ValueError:
-                errors.append("'expires' ha de tenir format YYYY-MM-DD o null")
+                errors.append("'expires' must have format YYYY-MM-DD or null")
 
         return errors
 
@@ -359,7 +359,7 @@ chunk_size: {chunk_size}
 priority: {priority.upper()}
 """
 
-        # Afegir camps opcionals
+        # Add optional fields
         optional_fields = []
 
         lang = kwargs.get('lang', 'ca')

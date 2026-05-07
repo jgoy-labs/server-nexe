@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/memory/rag_logger.py
-Description: RAGLogger - Logging detallat per operacions RAG/Memory.
+Description: RAGLogger - Detailed logging for RAG/Memory operations.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -73,12 +73,12 @@ class RAGEmojis:
 
 class RAGLogger:
   """
-  Logger verbose per operacions RAG/Memory.
+  Verbose logger for RAG/Memory operations.
 
-  Escriu a rag.log amb format visual detallat.
-  Usar amb: tail -f ~/Nexe-Logs/rag.log
+  Writes to rag.log with detailed visual format.
+  Use with: tail -f ~/Nexe-Logs/rag.log
 
-  O crear alias:
+  Or create alias:
   alias nexe-rag='tail -f ~/Nexe-Logs/rag.log'
   """
 
@@ -88,7 +88,7 @@ class RAGLogger:
     self._setup_logger()
 
   def _get_writable_log_path(self) -> Path:
-    """Troba una ruta writable pel log."""
+    """Find a writable path for the log."""
     import os as _os
     primary_path = Path(_os.environ.get("NEXE_LOGS_DIR", str(Path.home() / "Nexe-Logs"))) / "rag.log"
     try:
@@ -118,7 +118,7 @@ class RAGLogger:
     return primary_path
 
   def _setup_logger(self):
-    """Configura el logger per escriure al fitxer.
+    """Configure the logger to write to the file.
 
     R6-11 v1.0.4: rotate at midnight, keep 14 days. Each chat exchange writes
     several DEBUG lines through this logger; without rotation the file grew
@@ -145,16 +145,16 @@ class RAGLogger:
       self.logger.addHandler(fh)
 
   def _write(self, message: str):
-    """Escriu al log si enabled"""
+    """Write to the log if enabled"""
     if self.enabled:
       self.logger.info(message)
 
   def _timestamp(self) -> str:
-    """Retorna timestamp formatat"""
+    """Return formatted timestamp"""
     return datetime.now(timezone.utc).strftime("%H:%M:%S.%f")[:-3]
 
   def _timing(self, ms: float) -> str:
-    """Formata timing amb color segons rendiment"""
+    """Format timing with colour according to performance"""
     if ms < 50:
       color = Colors.BRIGHT_GREEN
     elif ms < 200:
@@ -168,7 +168,7 @@ class RAGLogger:
     return f"{color}{ms:.1f}ms{Colors.RESET}"
 
   def _score_color(self, score: float) -> str:
-    """Color segons score de similaritat"""
+    """Colour according to similarity score"""
     if score > 0.8:
       return Colors.BRIGHT_GREEN
     elif score > 0.6:
@@ -181,7 +181,7 @@ class RAGLogger:
       return Colors.DIM
 
   def _truncate(self, text: str, max_len: int = 80) -> str:
-    """Trunca text afegint ... si cal"""
+    """Truncate text adding ... if needed"""
     if len(text) > max_len:
       return text[:max_len] + "..."
     return text
@@ -202,24 +202,24 @@ class RAGLogger:
     self._write("")
 
   def recall_step_flash(self, found: int, timing_ms: float):
-    """Log cerca a FlashMemory"""
+    """Log search in FlashMemory"""
     self._write(f" {RAGEmojis.FLASH} {Colors.YELLOW}STEP 1: FlashMemory (RAM){Colors.RESET}")
     if found > 0:
-      self._write(f"   {RAGEmojis.FOUND} {Colors.GREEN}TROBAT:{Colors.RESET} {found} entrades")
+      self._write(f"   {RAGEmojis.FOUND} {Colors.GREEN}FOUND:{Colors.RESET} {found} entries")
     else:
-      self._write(f"   {RAGEmojis.NOT_FOUND} {Colors.DIM}Buit - continuant a SQLite{Colors.RESET}")
+      self._write(f"   {RAGEmojis.NOT_FOUND} {Colors.DIM}Empty - continuing to SQLite{Colors.RESET}")
     self._write(f"   {RAGEmojis.CLOCK} {self._timing(timing_ms)}")
     self._write("")
 
   def recall_step_sqlite(self, found: int, timing_ms: float, cached_to_flash: int = 0):
-    """Log cerca a SQLite"""
+    """Log search in SQLite"""
     self._write(f" {RAGEmojis.SQLITE} {Colors.BLUE}STEP 2: SQLite (persistence){Colors.RESET}")
     if found > 0:
-      self._write(f"   {RAGEmojis.FOUND} {Colors.GREEN}TROBAT:{Colors.RESET} {found} entrades")
+      self._write(f"   {RAGEmojis.FOUND} {Colors.GREEN}FOUND:{Colors.RESET} {found} entries")
       if cached_to_flash > 0:
-        self._write(f"   {RAGEmojis.FLASH} Cached {cached_to_flash} entrades a FlashMemory")
+        self._write(f"   {RAGEmojis.FLASH} Cached {cached_to_flash} entries to FlashMemory")
     else:
-      self._write(f"   {RAGEmojis.NOT_FOUND} {Colors.DIM}Buit - continuant a Qdrant{Colors.RESET}")
+      self._write(f"   {RAGEmojis.NOT_FOUND} {Colors.DIM}Empty - continuing to Qdrant{Colors.RESET}")
     self._write(f"   {RAGEmojis.CLOCK} {self._timing(timing_ms)}")
     self._write("")
 
@@ -227,30 +227,30 @@ class RAGLogger:
     """Log a semantic search step in Qdrant."""
     self._write(f" {RAGEmojis.QDRANT} {Colors.MAGENTA}STEP 3: Qdrant (semantic search){Colors.RESET}")
     if found > 0:
-      self._write(f"   {RAGEmojis.FOUND} {Colors.GREEN}TROBAT:{Colors.RESET} {found} resultats")
+      self._write(f"   {RAGEmojis.FOUND} {Colors.GREEN}FOUND:{Colors.RESET} {found} results")
       if results:
         for i, r in enumerate(results[:3]):
           score = r.get("score", 0)
           content = self._truncate(r.get("content", ""), 50)
           self._write(f"    [{self._score_color(score)}{score:.3f}{Colors.RESET}] \"{content}\"")
     else:
-      self._write(f"   {RAGEmojis.NOT_FOUND} {Colors.DIM}Cap resultat{Colors.RESET}")
+      self._write(f"   {RAGEmojis.NOT_FOUND} {Colors.DIM}No results{Colors.RESET}")
     self._write(f"   {RAGEmojis.CLOCK} {self._timing(timing_ms)}")
     self._write("")
 
   def recall_complete(self, source: str, total_entries: int, context_chars: int, total_ms: float):
-    """Log final del recall"""
+    """Log end of recall"""
     self._write(f"{Colors.DIM}{'─' * 70}{Colors.RESET}")
     self._write(f" {RAGEmojis.CHECK} {Colors.BOLD}{Colors.GREEN}RECALL COMPLETE{Colors.RESET}")
-    self._write(f"   Font: {Colors.CYAN}{source}{Colors.RESET}")
-    self._write(f"   Entrades: {total_entries}")
+    self._write(f"   Source: {Colors.CYAN}{source}{Colors.RESET}")
+    self._write(f"   Entries: {total_entries}")
     self._write(f"   Context: {context_chars} chars (~{context_chars // 4} tokens)")
     self._write(f"   {RAGEmojis.CLOCK} Total: {self._timing(total_ms)}")
     self._write(f"{Colors.BRIGHT_CYAN}{'═' * 70}{Colors.RESET}")
     self._write("")
 
   def recall_error(self, error: str):
-    """Log error en recall"""
+    """Log error in recall"""
     self._write(f" {RAGEmojis.ERROR} {Colors.RED}ERROR:{Colors.RESET} {error}")
     self._write(f"{Colors.BRIGHT_RED}{'═' * 70}{Colors.RESET}")
     self._write("")
@@ -262,7 +262,7 @@ class RAGLogger:
     self._write(f"{RAGEmojis.STORE} {Colors.BOLD}{Colors.BRIGHT_BLUE}MEMORY STORE{Colors.RESET} [{self._timestamp()}]")
     self._write(f"{Colors.BRIGHT_BLUE}{'═' * 70}{Colors.RESET}")
     self._write("")
-    self._write(f" {Colors.DIM}Tipus:{Colors.RESET} {content_type}")
+    self._write(f" {Colors.DIM}Type:{Colors.RESET} {content_type}")
     self._write(f" {Colors.DIM}Person:{Colors.RESET} {person_id}")
     self._write(f" {Colors.DIM}Preview:{Colors.RESET} \"{self._truncate(content_preview, 60)}\"")
     self._write("")
@@ -278,14 +278,14 @@ class RAGLogger:
     self._write("")
 
   def store_sqlite(self, entry_id: str, timing_ms: float):
-    """Log guardat a SQLite"""
+    """Log saved to SQLite"""
     self._write(f" {RAGEmojis.SQLITE} {Colors.BLUE}SQLite{Colors.RESET}")
-    self._write(f"   {RAGEmojis.CHECK} Guardat: {entry_id[:16]}...")
+    self._write(f"   {RAGEmojis.CHECK} Saved: {entry_id[:16]}...")
     self._write(f"   {RAGEmojis.CLOCK} {self._timing(timing_ms)}")
     self._write("")
 
   def store_qdrant(self, entry_id: str, timing_ms: float, collection: str = "nexe_memory"):
-    """Log guardat a Qdrant"""
+    """Log saved to Qdrant"""
     self._write(f" {RAGEmojis.QDRANT} {Colors.MAGENTA}Qdrant{Colors.RESET}")
     self._write(f"   Collection: {collection}")
     self._write(f"   {RAGEmojis.CHECK} Vector upserted: {entry_id[:16]}...")
@@ -310,12 +310,12 @@ class RAGLogger:
     self._write("")
 
   def store_error(self, error: str, destination: str = ""):
-    """Log error en store"""
+    """Log error in store"""
     dest_info = f" ({destination})" if destination else ""
     self._write(f" {RAGEmojis.ERROR} {Colors.RED}ERROR{dest_info}:{Colors.RESET} {error}")
 
   def memory_search_start(self, query: str, max_tokens: int):
-    """Log inici cerca MEMORY"""
+    """Log start of MEMORY search"""
     self._write("")
     self._write(f"{Colors.BRIGHT_MAGENTA}{'═' * 70}{Colors.RESET}")
     self._write(f"{RAGEmojis.MEMORY} {Colors.BOLD}{Colors.BRIGHT_MAGENTA}MEMORY CONTEXT{Colors.RESET} [{self._timestamp()}]")
@@ -326,19 +326,19 @@ class RAGLogger:
     self._write("")
 
   def memory_route(self, collections: List[str], timing_ms: float):
-    """Log routing MEMORY"""
+    """Log MEMORY routing"""
     self._write(f" {RAGEmojis.SEARCH} {Colors.YELLOW}ROUTING{Colors.RESET}")
     if collections:
       self._write(f"   {RAGEmojis.FOUND} Selected: {', '.join(collections)}")
     else:
-      self._write(f"   {RAGEmojis.NOT_FOUND} Cap col·lecció seleccionada")
+      self._write(f"   {RAGEmojis.NOT_FOUND} No collection selected")
     self._write(f"   {RAGEmojis.CLOCK} {self._timing(timing_ms)}")
     self._write("")
 
   def memory_collection_search(self, collection: str, results: int, timing_ms: float, top_results: Optional[List[Dict]] = None):
     """Log a search in a specific collection."""
     self._write(f" {RAGEmojis.QDRANT} {Colors.CYAN}{collection}{Colors.RESET}")
-    self._write(f"   {RAGEmojis.FOUND} Resultats: {results}")
+    self._write(f"   {RAGEmojis.FOUND} Results: {results}")
     if top_results:
       for r in top_results[:2]:
         score = r.get("score", 0)
@@ -347,9 +347,9 @@ class RAGLogger:
     self._write(f"   {RAGEmojis.CLOCK} {self._timing(timing_ms)}")
 
   def memory_memory_search(self, results: int, timing_ms: float, top_results: Optional[List[Dict]] = None):
-    """Log cerca a nexe_memory"""
+    """Log search in nexe_memory"""
     self._write(f" {RAGEmojis.BRAIN} {Colors.BLUE}nexe_memory{Colors.RESET}")
-    self._write(f"   {RAGEmojis.FOUND} Converses similars: {results}")
+    self._write(f"   {RAGEmojis.FOUND} Similar conversations: {results}")
     if top_results:
       for r in top_results[:2]:
         score = r.get("score", 0)
@@ -359,10 +359,10 @@ class RAGLogger:
     self._write("")
 
   def memory_complete(self, total_sources: int, context_chars: int, total_ms: float):
-    """Log final cerca MEMORY"""
+    """Log end of MEMORY search"""
     self._write(f"{Colors.DIM}{'─' * 70}{Colors.RESET}")
     self._write(f" {RAGEmojis.CHECK} {Colors.BOLD}{Colors.GREEN}MEMORY COMPLETE{Colors.RESET}")
-    self._write(f"   Fonts: {total_sources}")
+    self._write(f"   Sources: {total_sources}")
     self._write(f"   Context: {context_chars} chars (~{context_chars // 4} tokens)")
     self._write(f"   {RAGEmojis.CLOCK} Total: {self._timing(total_ms)}")
     self._write(f"{Colors.BRIGHT_MAGENTA}{'═' * 70}{Colors.RESET}")
@@ -390,8 +390,8 @@ class RAGLogger:
     self._write(f"   Limit: {limit}, threshold: {score_threshold}")
 
   def qdrant_results(self, results: List[Dict], timing_ms: float):
-    """Log resultats Qdrant"""
-    self._write(f"   {RAGEmojis.FOUND} Resultats: {len(results)}")
+    """Log Qdrant results"""
+    self._write(f"   {RAGEmojis.FOUND} Results: {len(results)}")
     for i, r in enumerate(results[:3]):
       score = r.get("score", 0)
       entry_id = r.get("id", "")[:12]
@@ -399,7 +399,7 @@ class RAGLogger:
     self._write(f"   {RAGEmojis.CLOCK} {self._timing(timing_ms)}")
 
   def qdrant_upsert(self, collection: str, point_id: str, timing_ms: float):
-    """Log upsert a Qdrant"""
+    """Log upsert to Qdrant"""
     self._write(f" {RAGEmojis.QDRANT} {Colors.MAGENTA}QDRANT UPSERT{Colors.RESET}")
     self._write(f"   Collection: {collection}")
     self._write(f"   Point ID: {point_id[:16]}...")

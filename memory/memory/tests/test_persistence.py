@@ -21,7 +21,7 @@ from memory.memory.models.memory_types import MemoryType
 
 @pytest.fixture
 async def temp_persistence():
-  """Fixture: PersistenceManager amb paths temporals"""
+  """Fixture: PersistenceManager with temporary paths"""
   temp_dir = Path(tempfile.mkdtemp())
   db_path = temp_dir / "test_memory.db"
   qdrant_path = temp_dir / "test_qdrant"
@@ -40,10 +40,10 @@ async def temp_persistence():
 
 @pytest.mark.asyncio
 class TestPersistenceManager:
-  """Tests per PersistenceManager"""
+  """Tests for PersistenceManager"""
 
   async def test_initialization(self, temp_persistence):
-    """Inicialització SQLite + Qdrant"""
+    """Initialisation SQLite + Qdrant"""
     pm = temp_persistence
 
     assert pm.db_path.exists()
@@ -55,7 +55,7 @@ class TestPersistenceManager:
     assert "test_collection" in collection_names
 
   async def test_store_and_get(self, temp_persistence):
-    """Emmagatzemar i recuperar entry"""
+    """Store and retrieve entry"""
     pm = temp_persistence
 
     entry = MemoryEntry(
@@ -76,7 +76,7 @@ class TestPersistenceManager:
     assert retrieved.source == "test"
 
   async def test_store_with_embedding(self, temp_persistence):
-    """Emmagatzemar amb embedding vector"""
+    """Store with embedding vector"""
     pm = temp_persistence
 
     entry = MemoryEntry(
@@ -95,7 +95,7 @@ class TestPersistenceManager:
     assert retrieved is not None
 
   async def test_get_nonexistent(self, temp_persistence):
-    """Recuperar entry inexistent retorna None"""
+    """Retrieving a non-existent entry returns None"""
     pm = temp_persistence
 
     result = await pm.get("nonexistent_id")
@@ -103,7 +103,7 @@ class TestPersistenceManager:
     assert result is None
 
   async def test_hex_to_uuid_conversion(self):
-    """Conversió hex ID a UUID format"""
+    """Conversion of hex ID to UUID format"""
     hex_id = "019c2cdb30d195ae"
 
     uuid_str = PersistenceManager._hex_to_uuid(hex_id)
@@ -113,7 +113,7 @@ class TestPersistenceManager:
     assert uuid_str.startswith("019c2cdb-30d1-95ae-0000")
 
   async def test_insert_or_replace(self, temp_persistence):
-    """INSERT OR REPLACE actualitza entry existent"""
+    """INSERT OR REPLACE updates existing entry"""
     pm = temp_persistence
 
     entry1 = MemoryEntry(
@@ -135,7 +135,7 @@ class TestPersistenceManager:
     assert retrieved.source == "updated"
 
   async def test_get_stats(self, temp_persistence):
-    """Obtenir estadístiques de persistència"""
+    """Get persistence statistics"""
     pm = temp_persistence
 
     await pm.store(MemoryEntry(
@@ -161,7 +161,7 @@ class TestPersistenceManager:
     assert stats["semantic_count"] == 1
 
   async def test_concurrent_writes(self, temp_persistence):
-    """Escriptures concurrents (WAL mode)"""
+    """Concurrent writes (WAL mode)"""
     pm = temp_persistence
 
     async def store_entry(n):
@@ -178,7 +178,7 @@ class TestPersistenceManager:
     assert stats["total_entries"] == 10
 
   async def test_metadata_serialization(self, temp_persistence):
-    """Serialització de metadata a JSON"""
+    """Serialisation of metadata to JSON"""
     pm = temp_persistence
 
     entry = MemoryEntry(
@@ -195,7 +195,7 @@ class TestPersistenceManager:
     assert retrieved.metadata["count"] == 42
 
   async def test_search_vectors(self, temp_persistence):
-    """Cerca semàntica amb Qdrant"""
+    """Semantic search with Qdrant"""
     pm = temp_persistence
 
     for i in range(3):
@@ -216,7 +216,7 @@ class TestPersistenceManager:
       assert isinstance(score, float)
 
   async def test_empty_stats(self, temp_persistence):
-    """Stats amb BD buida"""
+    """Stats with empty DB"""
     pm = temp_persistence
 
     stats = await pm.get_stats()

@@ -18,7 +18,7 @@ class TestColors:
 
     def test_all_color_attributes(self):
         from memory.memory.rag_logger import Colors
-        # Verificar que tots els atributs de color existeixen
+        # Verify that all colour attributes exist
         for attr in ["RESET", "BOLD", "DIM", "BLACK", "RED", "GREEN", "YELLOW",
                      "BLUE", "MAGENTA", "CYAN", "WHITE", "BRIGHT_RED",
                      "BRIGHT_GREEN", "BRIGHT_YELLOW", "BRIGHT_BLUE",
@@ -40,7 +40,7 @@ class TestRAGEmojis:
 
 class TestRAGLogger:
     def setup_method(self, method):
-        """Setup per cada test"""
+        """Setup for each test"""
         import tempfile
         self.tmp = Path(tempfile.mkdtemp())
 

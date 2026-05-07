@@ -19,10 +19,10 @@ from memory.memory.models.memory_types import MemoryType
 
 @pytest.mark.asyncio
 class TestMemoryModule:
-  """Tests per MemoryModule singleton"""
+  """Tests for MemoryModule singleton"""
 
   async def test_singleton_pattern(self):
-    """MemoryModule és Singleton"""
+    """MemoryModule is a Singleton"""
     module1 = MemoryModule.get_instance()
 
     module2 = MemoryModule.get_instance()
@@ -30,14 +30,14 @@ class TestMemoryModule:
     assert module1 is module2
 
   async def test_direct_instantiation_fails(self):
-    """No es pot instanciar directament"""
+    """Cannot be instantiated directly"""
     MemoryModule.get_instance()
 
     with pytest.raises(RuntimeError):
       MemoryModule()
 
   async def test_get_instance_before_init(self):
-    """get_instance() funciona sense init previ"""
+    """get_instance() works without prior init"""
     MemoryModule._instance = None
 
     module = MemoryModule.get_instance()
@@ -49,7 +49,7 @@ class TestMemoryModule:
     MemoryModule._instance = None
 
   async def test_initialization(self, tmp_path):
-    """Inicialitzar MemoryModule"""
+    """Initialise MemoryModule"""
     from unittest.mock import patch, MagicMock
     MemoryModule._instance = None
 
@@ -71,7 +71,7 @@ class TestMemoryModule:
     MemoryModule._instance = None
 
   async def test_double_initialization(self, tmp_path):
-    """Segona inicialització no falla (idempotent)"""
+    """Second initialisation does not fail (idempotent)"""
     from unittest.mock import patch, MagicMock
     MemoryModule._instance = None
 
@@ -90,7 +90,7 @@ class TestMemoryModule:
     MemoryModule._instance = None
 
   async def test_get_info(self):
-    """Obtenir informació del mòdul"""
+    """Get module information"""
     MemoryModule._instance = None
 
     module = MemoryModule.get_instance()
@@ -106,7 +106,7 @@ class TestMemoryModule:
     MemoryModule._instance = None
 
   async def test_get_health_before_init(self):
-    """get_health() funciona abans d'inicialitzar"""
+    """get_health() works before initialising"""
     MemoryModule._instance = None
 
     module = MemoryModule.get_instance()
@@ -119,7 +119,7 @@ class TestMemoryModule:
     MemoryModule._instance = None
 
   async def test_shutdown_before_init(self):
-    """Shutdown sense init no falla"""
+    """Shutdown without init does not fail"""
     MemoryModule._instance = None
 
     module = MemoryModule.get_instance()
@@ -132,7 +132,7 @@ class TestMemoryModule:
 
   @pytest.mark.integration
   async def test_full_lifecycle(self):
-    """Test cicle complet: init -> store -> recall -> shutdown"""
+    """Test full lifecycle: init -> store -> recall -> shutdown"""
     MemoryModule._instance = None
 
     module = MemoryModule.get_instance()
@@ -163,11 +163,11 @@ class TestMemoryModule:
     MemoryModule._instance = None
 
   @pytest.mark.xfail(
-    reason="MemoryModule utilitza rutes relatives a l'usuari i pot ignorar l'arrel real del repo en certs entorns",
+    reason="MemoryModule uses user-relative paths and may ignore the real repo root in certain environments",
     strict=False,
   )
   async def test_storage_paths_follow_repo_root(self, monkeypatch, tmp_path):
-    """La persistència hauria de viure a storage/memory però s'escriu a Path.home"""
+    """Persistence should live in storage/memory but is written to Path.home"""
     MemoryModule._instance = None
     fake_home = tmp_path / "fake_home"
     fake_home.mkdir(parents=True, exist_ok=True)
@@ -185,14 +185,14 @@ class TestMemoryModule:
 
       assert module._persistence.db_path.is_relative_to(
         expected_storage
-      ), "La base de dades hauria d'estar dins storage/memory"
+      ), "The database should be inside storage/memory"
     finally:
       await module.shutdown()
       MemoryModule._instance = None
 
   @pytest.mark.integration
   async def test_integration_smoke(self):
-    """Smoke test complert"""
+    """Complete smoke test"""
     MemoryModule._instance = None
 
     module = MemoryModule.get_instance()

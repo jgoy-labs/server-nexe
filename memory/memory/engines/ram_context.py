@@ -20,13 +20,13 @@ logger = logging.getLogger(__name__)
 
 class RAMContext:
   """
-  Vista immutable sobre FlashMemory per context window LLM.
+  Immutable view over FlashMemory for LLM context window.
 
   Features:
-  - FIFO: max 100 entries més recents
-  - Read-only (no modifica Flash)
-  - to_context_string() amb safeguards
-  - Refresh automàtic des de Flash
+  - FIFO: max 100 most recent entries
+  - Read-only (does not modify Flash)
+  - to_context_string() with safeguards
+  - Automatic refresh from Flash
   """
 
   def __init__(
@@ -45,14 +45,14 @@ class RAMContext:
     safe_mode: bool = True
   ) -> List[MemoryEntry]:
     """
-    Recuperar últimes N entries per context window.
+    Retrieve last N entries for context window.
 
     Args:
-      limit: Màxim entries (default: self._max_entries)
-      safe_mode: Truncar content per seguretat
+      limit: Maximum entries (default: self._max_entries)
+      safe_mode: Truncate content for safety
 
     Returns:
-      List[MemoryEntry] ordenades per timestamp DESC
+      List[MemoryEntry] sorted by timestamp DESC
     """
     effective_limit = min(limit or self._max_entries, self._max_entries)
 
@@ -70,15 +70,15 @@ class RAMContext:
     safe_mode: bool = True
   ) -> str:
     """
-    Generar string de context per LLM amb safeguards.
+    Generate context string for LLM with safeguards.
 
     Args:
-      limit: Màxim entries a incloure
-      max_length_per_entry: Màxim chars per entrada
-      safe_mode: Activar truncació anti-info-leak
+      limit: Maximum entries to include
+      max_length_per_entry: Maximum chars per entry
+      safe_mode: Enable anti-info-leak truncation
 
     Returns:
-      str: Context formatat per LLM
+      str: Context formatted for LLM
     """
     entries = await self.get_context_window(limit=limit, safe_mode=safe_mode)
 
@@ -102,14 +102,14 @@ class RAMContext:
     limit: int = 20
   ) -> List[MemoryEntry]:
     """
-    Recuperar últimes N entries d'un tipus específic.
+    Retrieve last N entries of a specific type.
 
     Args:
-      entry_type: Tipus de memòria (MemoryType.EPISODIC/SEMANTIC)
-      limit: Màxim entries
+      entry_type: Memory type (MemoryType.EPISODIC/SEMANTIC)
+      limit: Maximum entries
 
     Returns:
-      List[MemoryEntry] filtrades per tipus
+      List[MemoryEntry] filtered by type
     """
     all_entries = await self.get_context_window(limit=self._max_entries)
 
@@ -121,10 +121,10 @@ class RAMContext:
 
   async def get_stats(self) -> dict:
     """
-    Obtenir estadístiques de RAMContext.
+    Get RAMContext statistics.
 
     Returns:
-      Dict amb stats (total_available, episodic_count, semantic_count)
+      Dict with stats (total_available, episodic_count, semantic_count)
     """
     entries = await self.get_context_window(limit=self._max_entries)
 

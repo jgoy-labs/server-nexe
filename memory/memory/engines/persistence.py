@@ -3,17 +3,17 @@
 Server Nexe
 Author: Jordi Goy
 Location: memory/memory/engines/persistence.py
-Description: PersistenceManager — SQLite (metadades) + QdrantAdapter (vectors).
+Description: PersistenceManager — SQLite (metadata) + QdrantAdapter (vectors).
 
-Arquitectura dual-store:
-  - SQLite (WAL): font de veritat per a metadades i contingut textual
-  - QdrantAdapter: índex vectorial per a cerca semàntica (substituïble)
+Dual-store architecture:
+  - SQLite (WAL): source of truth for metadata and textual content
+  - QdrantAdapter: vector index for semantic search (replaceable)
 
-Substituibilitat:
-  El vector store s'accedeix via QdrantAdapter que implementa el Protocol
-  VectorStore. Per canviar de Qdrant a un altre backend, substitueix
-  QdrantAdapter per una altra implementació del Protocol.
-  Veure: knowledge/*/ARCHITECTURE.md — secció "Com canviar el vector store"
+Replaceability:
+  The vector store is accessed via QdrantAdapter which implements the Protocol
+  VectorStore. To switch from Qdrant to another backend, replace
+  QdrantAdapter with another implementation of the Protocol.
+  See: knowledge/*/ARCHITECTURE.md — section "How to change the vector store"
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -35,14 +35,14 @@ logger = logging.getLogger(__name__)
 
 
 class StorageError(Exception):
-    """Error en operacions de persistència."""
+    """Error in persistence operations."""
 
 
-# Configurable timeouts via variables d'entorn
+# Configurable timeouts via environment variables
 MAX_TIMEOUT = 60.0
 
 def _safe_timeout(env_var: str, default: float) -> float:
-    """Timeout des d'env var amb cap de seguretat."""
+    """Timeout from env var with safety cap."""
     try:
         value = float(os.getenv(env_var, str(default)))
         if value <= 0:
@@ -58,16 +58,16 @@ SQLITE_PRELOAD_TIMEOUT = _safe_timeout("NEXE_SQLITE_PRELOAD_TIMEOUT", 10.0)
 
 class PersistenceManager(SqliteStorageMixin):
     """
-    Gestor de persistència dual: SQLite + QdrantAdapter.
+    Dual persistence manager: SQLite + QdrantAdapter.
 
-    Hereda tota la lògica SQLite de SqliteStorageMixin.
-    Gestiona el vector store via QdrantAdapter (substituïble).
+    Inherits all SQLite logic from SqliteStorageMixin.
+    Manages the vector store via QdrantAdapter (replaceable).
 
     Features:
-      - SQLite WAL: metadades + text
-      - QdrantAdapter: vectors d'embedding (intercanviable)
-      - Rollback: elimina SQLite si Qdrant falla (mode strict)
-      - run_in_executor per operacions blocking
+      - SQLite WAL: metadata + text
+      - QdrantAdapter: embedding vectors (interchangeable)
+      - Rollback: deletes SQLite if Qdrant fails (strict mode)
+      - run_in_executor for blocking operations
     """
 
     DEFAULT_QDRANT_PATH = Path("storage/vectors")
@@ -104,17 +104,17 @@ class PersistenceManager(SqliteStorageMixin):
 
     @staticmethod
     def _hex_to_uuid(hex_id: str) -> str:
-        """Converteix hex ID a UUID per Qdrant."""
+        """Convert hex ID to UUID for Qdrant."""
         padded = hex_id.ljust(32, "0")
         return str(uuid.UUID(padded))
 
     def _init_qdrant(self) -> None:
         """
-        Inicialitza el QdrantAdapter.
+        Initialize the QdrantAdapter.
 
-        Prioritat:
-          1. Path local (mode embedded)
-          2. URL (mode servidor)
+        Priority:
+          1. Local path (embedded mode)
+          2. URL (server mode)
         """
         from memory.embeddings.adapters import QdrantAdapter
         from memory.memory.engines.qdrant_types import Distance, VectorParams
@@ -171,18 +171,18 @@ class PersistenceManager(SqliteStorageMixin):
         strict: bool = True,
     ) -> str:
         """
-        Desa entry amb consistència dual (SQLite + Qdrant).
+        Save entry with dual consistency (SQLite + Qdrant).
 
         Args:
-            entry: MemoryEntry a desar
-            embedding: Vector d'embedding (opcional)
-            strict: Si True, rollback SQLite si Qdrant falla
+            entry: MemoryEntry to save
+            embedding: Embedding vector (optional)
+            strict: If True, rollback SQLite if Qdrant fails
 
         Returns:
-            ID de l'entry
+            Entry ID
 
         Raises:
-            StorageError: Si la persistència falla en mode strict
+            StorageError: If persistence fails in strict mode
         """
         await self._store_sqlite(entry)
 
@@ -217,7 +217,7 @@ class PersistenceManager(SqliteStorageMixin):
         embedding: List[float],
         metadata: Dict[str, Any],
     ):
-        """Desa vector a Qdrant via QdrantAdapter."""
+        """Save vector to Qdrant via QdrantAdapter."""
         from memory.memory.engines.qdrant_types import PointStruct
 
         uuid_id = PersistenceManager._hex_to_uuid(entry_id)
@@ -247,10 +247,10 @@ class PersistenceManager(SqliteStorageMixin):
         limit: int = 10,
     ) -> List[tuple]:
         """
-        Cerca semàntica via QdrantAdapter.
+        Semantic search via QdrantAdapter.
 
         Returns:
-            Llista de (entry_id, score)
+            List of (entry_id, score)
         """
         loop = asyncio.get_running_loop()
 
@@ -270,7 +270,7 @@ class PersistenceManager(SqliteStorageMixin):
         return [(r.id, r.score) for r in results]
 
     def close(self):
-        """Tanca recursos. No tanca QdrantClient — és compartit via pool."""
+        """Close resources. Does not close QdrantClient — it is shared via pool."""
         self.executor.shutdown(wait=True)
         self.qdrant = None
         logger.info("PersistenceManager closed")

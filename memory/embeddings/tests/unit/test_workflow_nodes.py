@@ -1,9 +1,9 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: memory/embeddings/tests/unit/test_workflow_nodes.py
-Description: Tests unitaris per workflow nodes (embedding_node, chunking_node).
+Description: Unit tests for workflow nodes (embedding_node, chunking_node).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -19,7 +19,7 @@ from memory.embeddings.core.async_encoder import AsyncEmbedder
 
 @pytest.fixture
 def mock_text_embedding():
-  """Mock fastembed TextEmbedding"""
+  """Mock fastembed TextEmbedding for tests"""
   mock = Mock()
 
   def mock_embed(texts, **kwargs):
@@ -31,9 +31,9 @@ def mock_text_embedding():
 @pytest.fixture
 async def setup_module(mock_text_embedding):
   """
-  Setup EmbeddingsModule per tests.
+  Setup EmbeddingsModule for tests.
 
-  NOTA: El mock es manté durant tot el test per lazy loading.
+  NOTE: The mock is kept throughout the test due to lazy loading.
   """
   EmbeddingsModule._instance = None
   EmbeddingsModule._initialized = False
@@ -55,10 +55,10 @@ async def setup_module(mock_text_embedding):
 @pytest.mark.asyncio
 async def test_embedding_node(setup_module):
   """
-  Test 1: embedding_node retorna format correcte.
+  Test 1: embedding_node returns correct format.
 
   Checks:
-  - Dict amb embedding, dimensions, cache_hit, etc.
+  - Dict with embedding, dimensions, cache_hit, etc.
   """
   result = await embedding_node(text="hello world", model="test-model")
 
@@ -77,10 +77,10 @@ async def test_embedding_node(setup_module):
 @pytest.mark.asyncio
 async def test_embedding_node_with_params(setup_module):
   """
-  Test 2: embedding_node amb paràmetres custom.
+  Test 2: embedding_node with custom parameters.
 
   Checks:
-  - Paràmetres passats correctament
+  - Parameters passed correctly
   """
   result = await embedding_node(
     text="test",
@@ -96,10 +96,10 @@ async def test_embedding_node_with_params(setup_module):
 @pytest.mark.asyncio
 async def test_chunking_node():
   """
-  Test 3: chunking_node retorna format correcte.
+  Test 3: chunking_node returns correct format.
 
   Checks:
-  - Dict amb document_id, chunk_count, chunks, etc.
+  - Dict with document_id, chunk_count, chunks, etc.
   """
   content = """
 Títol
@@ -126,10 +126,10 @@ Paràgraf 2 també amb contingut adequat.
 @pytest.mark.asyncio
 async def test_chunking_node_with_params():
   """
-  Test 4: chunking_node amb paràmetres custom.
+  Test 4: chunking_node with custom parameters.
 
   Checks:
-  - max_chunk_size, overlap, min_size passats correctament
+  - max_chunk_size, overlap, min_size passed correctly
   """
   content = "Test content amb múltiples frases. Cada frase pot ser un chunk. Això permet validar paràmetres."
 
@@ -147,7 +147,7 @@ async def test_chunking_node_with_params():
 @pytest.mark.asyncio
 async def test_chunking_node_chunk_metadata():
   """
-  Test 5: Chunks tenen metadata correcte.
+  Test 5: Chunks have correct metadata.
 
   Checks:
   - chunk_id, chunk_index, char_start, char_end, etc.
@@ -173,10 +173,10 @@ async def test_chunking_node_chunk_metadata():
 
 """
 Test Coverage Workflow Nodes:
-✅ test_embedding_node - Output format correcte
-✅ test_embedding_node_with_params - Paràmetres custom
-✅ test_chunking_node - Output format correcte
-✅ test_chunking_node_with_params - Paràmetres custom
+✅ test_embedding_node - Correct output format
+✅ test_embedding_node_with_params - Custom parameters
+✅ test_chunking_node - Correct output format
+✅ test_chunking_node_with_params - Custom parameters
 ✅ test_chunking_node_chunk_metadata - Chunks metadata
 
 Total: 5 test cases

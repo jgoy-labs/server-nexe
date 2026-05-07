@@ -295,8 +295,8 @@ class TestMemoryCLI:
         cli.module = MagicMock()
         cli.module._ram_context = None
 
-        # get_memory_service() pot retornar un svc vàlid si un test anterior
-        # ha inicialitzat el MemoryService (singleton). Forcem el fallback legacy.
+        # get_memory_service() may return a valid svc if a previous test
+        # has initialised the MemoryService (singleton). Force the legacy fallback.
         with patch("memory.memory.module.get_memory_service", return_value=None):
             args = argparse.Namespace()
             result = await cli.cmd_stats(args)
@@ -310,7 +310,7 @@ class TestMemoryCLI:
         cli.module._ram_context = MagicMock()
         cli.module._ram_context.get_stats = AsyncMock(side_effect=RuntimeError("fail"))
 
-        # Forcem el fallback legacy per assegurar que l'excepció de get_stats s'exercita.
+        # Force the legacy fallback to ensure the get_stats exception is exercised.
         with patch("memory.memory.module.get_memory_service", return_value=None):
             args = argparse.Namespace()
             result = await cli.cmd_stats(args)

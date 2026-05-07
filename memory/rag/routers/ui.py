@@ -17,7 +17,7 @@ MODULE_PATH = Path(__file__).parent.parent
 UI_PATH = MODULE_PATH / "ui"
 
 async def serve_ui():
-  """Serveix la UI del RAG module."""
+  """Serve the RAG module UI."""
   index_path = UI_PATH / "index.html"
 
   if not index_path.exists():
@@ -58,7 +58,7 @@ async def serve_assets(path: str):
   return FileResponse(safe_path)
 
 async def serve_js(path: str):
-  """Serveix els fitxers JavaScript."""
+  """Serve JavaScript files."""
   from plugins.security.core.validators import validate_safe_path
 
   js_base = UI_PATH / "js"

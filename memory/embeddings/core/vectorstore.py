@@ -15,15 +15,15 @@ from typing_extensions import Literal
 
 class VectorSearchRequest(BaseModel):
   """
-  Petició de cerca semàntica en un vector store.
+  Semantic search request in a vector store.
 
   Attributes:
-    query_vector: Vector d'embedding per cercar (e.g. 768 dimensions)
-    top_k: Nombre màxim de resultats a retornar (default: 10)
-    filters: Filtres opcionals sobre metadades (e.g. {"source": "pdf"})
-    metric: Mètrica de distància a utilitzar (default: "cosine")
+    query_vector: Embedding vector to search for (e.g. 768 dimensions)
+    top_k: Maximum number of results to return (default: 10)
+    filters: Optional metadata filters (e.g. {"source": "pdf"})
+    metric: Distance metric to use (default: "cosine")
 
-  Exemples:
+  Examples:
     >>> request = VectorSearchRequest(
     ...   query_vector=[0.1, 0.2, 0.3, ...],
     ...   top_k=5,
@@ -100,17 +100,17 @@ class VectorSearchHit(BaseModel):
 
 class VectorStore(Protocol):
   """
-  Protocol per implementacions de vector stores intercanviables.
+  Protocol for interchangeable vector store implementations.
 
-  Aquest protocol defineix la interfície que han de complir totes les
-  implementacions de vector databases (Qdrant, FAISS, etc.)
-  per garantir que es poden utilitzar de forma intercanviable.
+  This protocol defines the interface that all implementations of
+  vector databases (Qdrant, FAISS, etc.) must comply with
+  to guarantee they can be used interchangeably.
 
-  Implementacions conegudes:
+  Known implementations:
     - memory.memory.tools.qdrant.QdrantAdapter
-    - memory.tools.faiss.adapter.FAISSAdapter (futur)
+    - memory.tools.faiss.adapter.FAISSAdapter (future)
 
-  Exemples:
+  Examples:
     >>>
     >>> def create_vector_store(type: str) -> VectorStore:
     ...   if type == "qdrant":
@@ -130,21 +130,21 @@ class VectorStore(Protocol):
     metadatas: List[Dict[str, Any]]
   ) -> List[str]:
     """
-    Afegir múltiples vectors al store.
+    Add multiple vectors to the store.
 
     Args:
-      vectors: Llista de vectors d'embeddings (e.g. [[0.1, 0.2, ...], ...])
-      texts: Llista de textos originals corresponents
-      metadatas: Llista de diccionaris amb metadades per cada vector
+      vectors: List of embedding vectors (e.g. [[0.1, 0.2, ...], ...])
+      texts: List of corresponding original texts
+      metadatas: List of dictionaries with metadata for each vector
 
     Returns:
-      Llista d'IDs generats per cada vector afegit
+      List of generated IDs for each added vector
 
     Raises:
-      ValueError: Si les llistes no tenen la mateixa longitud
-      RuntimeError: Si hi ha un error en guardar al vector store
+      ValueError: If the lists do not have the same length
+      RuntimeError: If there is an error saving to the vector store
 
-    Exemples:
+    Examples:
       >>> ids = store.add_vectors(
       ...   vectors=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
       ...   texts=["primer document", "segon document"],
@@ -160,19 +160,19 @@ class VectorStore(Protocol):
     request: VectorSearchRequest
   ) -> List[VectorSearchHit]:
     """
-    Cercar vectors similars al query vector.
+    Search for vectors similar to the query vector.
 
     Args:
-      request: Petició de cerca amb query_vector, top_k, filters, etc.
+      request: Search request with query_vector, top_k, filters, etc.
 
     Returns:
-      Llista de resultats ordenats per similitud (més alt primer)
+      List of results sorted by similarity (highest first)
 
     Raises:
-      ValueError: Si el query_vector té dimensions incorrectes
-      RuntimeError: Si hi ha un error en la cerca
+      ValueError: If the query_vector has incorrect dimensions
+      RuntimeError: If there is an error in the search
 
-    Exemples:
+    Examples:
       >>> request = VectorSearchRequest(
       ...   query_vector=[0.15, 0.25, 0.35],
       ...   top_k=5,
@@ -188,18 +188,18 @@ class VectorStore(Protocol):
 
   def delete(self, ids: List[str]) -> int:
     """
-    Eliminar vectors per IDs.
+    Delete vectors by IDs.
 
     Args:
-      ids: Llista d'IDs de vectors a eliminar
+      ids: List of vector IDs to delete
 
     Returns:
-      Nombre de vectors eliminats correctament
+      Number of successfully deleted vectors
 
     Raises:
-      RuntimeError: Si hi ha un error en eliminar
+      RuntimeError: If there is an error deleting
 
-    Exemples:
+    Examples:
       >>> num_deleted = store.delete(["doc-1", "doc-2", "doc-3"])
       >>> print(f"Eliminats {num_deleted} documents")
       Eliminats 3 documents
@@ -208,16 +208,16 @@ class VectorStore(Protocol):
 
   def health(self) -> Dict[str, Any]:
     """
-    Obtenir estat de salut del vector store.
+    Get health status of the vector store.
 
     Returns:
-      Diccionari amb informació d'estat:
+      Dictionary with status information:
         - status: "healthy" | "degraded" | "unhealthy"
-        - num_vectors: Nombre total de vectors
-        - storage_size: Mida en bytes (opcional)
-        - last_updated: Timestamp última actualització (opcional)
+        - num_vectors: Total number of vectors
+        - storage_size: Size in bytes (optional)
+        - last_updated: Last update timestamp (optional)
 
-    Exemples:
+    Examples:
       >>> health = store.health()
       >>> print(health)
       {

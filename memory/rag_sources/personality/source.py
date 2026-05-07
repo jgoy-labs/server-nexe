@@ -15,7 +15,7 @@ from typing import List, Dict, Any
 logger = logging.getLogger(__name__)
 
 class PersonalityRAG:
-    """Font de coneixement basada en la identitat del sistema."""
+    """Knowledge source based on the system identity."""
     
     def __init__(self) -> None:
         self.name = "personality_core"
@@ -23,7 +23,7 @@ class PersonalityRAG:
         logger.info("PersonalityRAG source initialized")
 
     async def add_document(self, request) -> str:
-        """Afegeix un document a la font."""
+        """Adds a document to the source."""
         doc_id = f"personality-{uuid.uuid4().hex}"
         self._documents.append({
             "doc_id": doc_id,

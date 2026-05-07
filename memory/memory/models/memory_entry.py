@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/memory/models/memory_entry.py
-Description: Model principal MemoryEntry.
+Description: Main model MemoryEntry.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -50,13 +50,13 @@ class MemoryEntry(BaseModel):
     default=1800,
     ge=60,
     le=86400 * 30,
-    description="Time-to-live en segons (default: 30 min)"
+    description="Time-to-live in seconds (default: 30 min)"
   )
 
 
   metadata: Dict[str, Any] = Field(
     default_factory=dict,
-    description="Metadata lliure (tags, context, etc.)"
+    description="Free metadata (tags, context, etc.)"
   )
 
   @field_validator('content')
@@ -70,11 +70,11 @@ class MemoryEntry(BaseModel):
   @model_validator(mode='after')
   def generate_deterministic_id(self):
     """
-    Generar ID determinista si no existeix.
+    Generate deterministic ID if it does not exist.
 
-    Estratègia: SHA256(content)[:16]
-    - Permet deduplicació per contingut
-    - 16 chars = 64 bits = col·lisió improbable
+    Strategy: SHA256(content)[:16]
+    - Allows deduplication by content
+    - 16 chars = 64 bits = collision unlikely
     """
     if not self.id:
       content_hash = hashlib.sha256(self.content.encode('utf-8')).hexdigest()
@@ -92,17 +92,17 @@ class MemoryEntry(BaseModel):
     safe_mode: bool = True
   ) -> str:
     """
-    Converteix a string per LLM context amb safeguard info-leak.
+    Convert to string for LLM context with info-leak safeguard.
 
     Args:
-      max_length: Màxim chars
-      safe_mode: IMPORTANT - trunca per defecte per evitar:
-           - Credencials en PDFs
-           - Dades personals
-           - Claus PGP
+      max_length: Maximum chars
+      safe_mode: IMPORTANT - truncates by default to avoid:
+           - Credentials in PDFs
+           - Personal data
+           - PGP keys
 
     Returns:
-      str: Context formatat
+      str: Formatted context
     """
     timestamp_str = self.timestamp.strftime("%Y-%m-%d %H:%M:%S")
 

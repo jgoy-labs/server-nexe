@@ -61,13 +61,13 @@ _SEMANTIC_PATTERNS = [
 
 class Deduplicator:
   """
-  Deduplicador de contingut per pipeline d'ingesta.
+  Content deduplicator for the ingestion pipeline.
 
   Features:
-  - SHA256 hash per ID determinista (dedup exacte)
-  - Semantic dedup per atribut+valor normalitzat (dedup semàntic)
-  - Cache in-memory de IDs processats
-  - Check contra Persistence per duplicats existents
+  - SHA256 hash for deterministic ID (exact dedup)
+  - Semantic dedup by normalised attribute+value (semantic dedup)
+  - In-memory cache of processed IDs
+  - Check against Persistence for existing duplicates
   """
 
   def __init__(self) -> None:
@@ -77,13 +77,13 @@ class Deduplicator:
 
   def is_duplicate(self, entry: MemoryEntry) -> bool:
     """
-    Verificar si una entrada és duplicada (exacte o semàntic).
+    Check whether an entry is a duplicate (exact or semantic).
 
     Args:
-      entry: MemoryEntry a verificar
+      entry: MemoryEntry to check
 
     Returns:
-      bool: True si és duplicada
+      bool: True if it is a duplicate
     """
     entry_id = entry.id
 
@@ -135,15 +135,15 @@ class Deduplicator:
 
   def mark_as_seen(self, entry_id: str):
     """
-    Marcar un ID com processat (per duplicats de Persistence).
+    Mark an ID as processed (for duplicates from Persistence).
 
     Args:
-      entry_id: ID de l'entrada
+      entry_id: Entry ID
     """
     self._seen_ids.add(entry_id)
 
   def clear_cache(self):
-    """Netejar cache in-memory (per testing o reset)"""
+    """Clear in-memory cache (for testing or reset)"""
     self._seen_ids.clear()
     logger.info("Deduplicator cache cleared")
 
@@ -156,13 +156,13 @@ class Deduplicator:
   @staticmethod
   def compute_content_hash(content: str) -> str:
     """
-    Calcular hash determinista del contingut.
+    Calculate deterministic hash of the content.
 
     Args:
-      content: Text a hashejar
+      content: Text to hash
 
     Returns:
-      str: SHA256 hash (16 primers chars)
+      str: SHA256 hash (first 16 chars)
     """
     return hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
 

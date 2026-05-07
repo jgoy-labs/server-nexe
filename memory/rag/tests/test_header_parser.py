@@ -1,5 +1,5 @@
 """
-Tests per memory/rag/header_parser.py
+Tests for memory/rag/header_parser.py
 """
 import os
 import pytest
@@ -29,7 +29,7 @@ class TestRAGHeader:
         assert header.chunk_size == DEFAULT_CHUNK_SIZE
         assert header.priority == "P2"
         assert header.type == "docs"
-        # collection=None → caller (ingest) aplica target_collection al seu critèri
+        # collection=None → caller (ingest) applies target_collection at their discretion
         assert header.collection is None
 
     def test_to_dict(self):
@@ -269,7 +269,7 @@ Contingut
         assert len(result["tags"]) == 3
 
     def test_extract_header_with_versio_marker(self):
-        """Capçalera que comença directament amb 'versio:'"""
+        """Header that starts directly with 'versio:'"""
         content = """versio: "1.0"
 id: test-id
 abstract: "Test"
@@ -344,7 +344,7 @@ priority: P1
 Contingut
 """
             header, body = self.parser.parse(doc)
-            # Lang per defecte ve de NEXE_LANG → "es"
+            # Default lang comes from NEXE_LANG → "es"
             assert header.lang == "es"
 
     def test_abstract_too_long_validation(self):

@@ -3,21 +3,21 @@
 Server Nexe
 Author: Jordi Goy
 Location: memory/embeddings/adapters/qdrant_adapter.py
-Description: QdrantAdapter — implementació del Protocol VectorStore sobre QdrantClient.
+Description: QdrantAdapter — implementation of the VectorStore Protocol on top of QdrantClient.
 
-Propòsit:
-  Capa d'indireció entre els consumidors del vector store i Qdrant.
-  Permet substituir Qdrant per qualsevol altre vector store implementant
-  el Protocol VectorStore sense tocar els consumidors.
+Purpose:
+  Indirection layer between vector store consumers and Qdrant.
+  Allows replacing Qdrant with any other vector store by implementing
+  the VectorStore Protocol without touching consumers.
 
-Protocol implementat:
+Implemented protocol:
   memory.embeddings.core.vectorstore.VectorStore
 
-Mètodes addicionals de gestió (passthrough):
-  Exposa els mètodes de col·lecció necessaris per consumidors existents.
-  Això permet la migració gradual sense trencar l'API existent.
+Additional management methods (passthrough):
+  Exposes the collection methods needed by existing consumers.
+  This allows gradual migration without breaking the existing API.
 
-Ús:
+Usage:
   >>> adapter = QdrantAdapter(collection_name="nexe_docs", path="storage/vectors")
   >>> ids = adapter.add_vectors([[0.1, 0.2]], ["text"], [{"source": "pdf"}])
   >>> hits = adapter.search(VectorSearchRequest(query_vector=[0.1, 0.2], top_k=5))
@@ -35,23 +35,23 @@ logger = logging.getLogger(__name__)
 
 class QdrantAdapter:
     """
-    Adaptor entre el Protocol VectorStore i QdrantClient.
+    Adapter between the VectorStore Protocol and QdrantClient.
 
-    Una instància = una col·lecció per defecte (per al Protocol).
-    Mètodes passthrough permeten gestió multi-col·lecció (compatible legacy).
+    One instance = one default collection (for the Protocol).
+    Passthrough methods allow multi-collection management (legacy compatible).
 
     Args:
-        collection_name: Col·lecció per defecte per als mètodes del Protocol
-        path: Path local (mode embedded)
-        url: URL del servidor Qdrant (mode servidor)
-        client: QdrantClient ja creat (prioritat sobre path/url)
+        collection_name: Default collection for Protocol methods
+        path: Local path (embedded mode)
+        url: Qdrant server URL (server mode)
+        client: Already created QdrantClient (takes priority over path/url)
 
-    Exemple canvi de backend futur (per documentació):
+    Example future backend swap (for documentation):
         class WeaviateAdapter:
-            def add_vectors(self, ...): # usa weaviate-client
-            def search(self, ...): # usa weaviate-client
-            def delete(self, ...): # usa weaviate-client
-            def health(self, ...): # usa weaviate-client
+            def add_vectors(self, ...): # uses weaviate-client
+            def search(self, ...): # uses weaviate-client
+            def delete(self, ...): # uses weaviate-client
+            def health(self, ...): # uses weaviate-client
     """
 
     def __init__(
@@ -70,19 +70,19 @@ class QdrantAdapter:
             self._client = self._create_client()
 
     def _require_client(self) -> Any:
-        """Retorna self._client o llança RuntimeError si l'adapter està tancat.
+        """Returns self._client or raises RuntimeError if the adapter is closed.
 
-        Helper Cluster 1 (Onada 4.2 — DUBTE 1 opció A): substitueix
-        `self._require_client().X()` per `self._require_client().X()` als 23 callsites
-        per donar error semànticament correcte (RuntimeError "closed") quan
-        algú reusa l'adapter post-`close()` enlloc de propagar AttributeError.
+        Helper Cluster 1 (Onada 4.2 — DUBTE 1 opció A): replaces
+        `self._require_client().X()` with `self._require_client().X()` at the 23 callsites
+        to give a semantically correct error (RuntimeError "closed") when
+        someone reuses the adapter after `close()` instead of propagating AttributeError.
         """
         if self._client is None:
             raise RuntimeError("QdrantAdapter is closed")
         return self._client
 
     def _create_client(self) -> Any:
-        """Crea el QdrantClient intern via el pool compartit."""
+        """Creates the internal QdrantClient via the shared pool."""
         from core.qdrant_pool import get_qdrant_client
         if self._path:
             return get_qdrant_client(path=self._path)
@@ -92,7 +92,7 @@ class QdrantAdapter:
 
     @classmethod
     def from_pool(cls, collection_name: str, path: Optional[str] = None, url: Optional[str] = None) -> "QdrantAdapter":
-        """Crea adapter usant el pool compartit (core.qdrant_pool)."""
+        """Creates adapter using the shared pool (core.qdrant_pool)."""
         from core.qdrant_pool import get_qdrant_client
         if path:
             client = get_qdrant_client(path=path)
@@ -100,7 +100,7 @@ class QdrantAdapter:
             client = get_qdrant_client(url=url)
         return cls(collection_name=collection_name, client=client)
 
-    # ── Protocol VectorStore ──────────────────────────────────────────────────
+    # ── VectorStore Protocol ──────────────────────────────────────────────────
 
     def add_vectors(
         self,
@@ -109,13 +109,13 @@ class QdrantAdapter:
         metadatas: List[Dict[str, Any]],
     ) -> List[str]:
         """
-        Afegir vectors al store.
+        Add vectors to the store.
 
-        Implementa VectorStore.add_vectors().
-        Genera IDs UUID v4 per cada vector.
+        Implements VectorStore.add_vectors().
+        Generates UUID v4 IDs for each vector.
 
         Returns:
-            Llista d'IDs generats
+            List of generated IDs
         """
         from qdrant_client.models import PointStruct
 
@@ -141,12 +141,12 @@ class QdrantAdapter:
 
     def search(self, request: Any) -> List[Any]:
         """
-        Cerca semàntica en la col·lecció per defecte.
+        Semantic search in the default collection.
 
-        Implementa VectorStore.search() — accepta VectorSearchRequest.
+        Implements VectorStore.search() — accepts VectorSearchRequest.
 
         Returns:
-            Llista de VectorSearchHit
+            List of VectorSearchHit
         """
         from memory.embeddings.core.vectorstore import VectorSearchHit
 
@@ -158,7 +158,7 @@ class QdrantAdapter:
                 score_threshold=None,
             )
         except Exception:
-            # Fallback per qdrant-client moderns (1.11+)
+            # Fallback for modern qdrant-client (1.11+)
             res = self._require_client().query_points(
                 collection_name=self._collection_name,
                 query=request.query_vector,
@@ -178,12 +178,12 @@ class QdrantAdapter:
 
     def delete(self, ids: List[str]) -> int:
         """
-        Eliminar vectors per IDs de la col·lecció per defecte.
+        Delete vectors by IDs from the default collection.
 
-        Implementa VectorStore.delete().
+        Implements VectorStore.delete().
 
         Returns:
-            Nombre de vectors eliminats
+            Number of deleted vectors
         """
         from qdrant_client.models import PointIdsList
 
@@ -199,12 +199,12 @@ class QdrantAdapter:
 
     def health(self) -> Dict[str, Any]:
         """
-        Estat de salut del vector store.
+        Health status of the vector store.
 
-        Implementa VectorStore.health().
+        Implements VectorStore.health().
 
         Returns:
-            Dict amb status, num_vectors, collection
+            Dict with status, num_vectors, collection
         """
         try:
             info = self._require_client().get_collection(self._collection_name)
@@ -222,32 +222,32 @@ class QdrantAdapter:
                 "backend": "qdrant_embedded",
             }
 
-    # ── Passthrough de gestió de col·leccions (compat legacy) ─────────────────
-    # Permeten que documents.py, collections.py i persistence.py segueixin
-    # cridant els mateixos mètodes sense canvis de lògica.
-    # Quan es migri a un altre backend, cal implementar aquests mètodes.
+    # ── Collection management passthrough (legacy compat) ─────────────────────
+    # Allow documents.py, collections.py and persistence.py to keep
+    # calling the same methods without logic changes.
+    # When migrating to another backend, these methods must be implemented.
 
     def get_collections(self) -> Any:
-        """Llista de totes les col·leccions."""
+        """List of all collections."""
         return self._require_client().get_collections()
 
     def create_collection(self, collection_name: str, vectors_config: Any) -> None:
-        """Crea una nova col·lecció."""
+        """Creates a new collection."""
         self._require_client().create_collection(
             collection_name=collection_name,
             vectors_config=vectors_config,
         )
 
     def delete_collection(self, collection_name: str) -> None:
-        """Elimina una col·lecció."""
+        """Deletes a collection."""
         self._require_client().delete_collection(collection_name=collection_name)
 
     def get_collection(self, collection_name: str) -> Any:
-        """Informació d'una col·lecció."""
+        """Information about a collection."""
         return self._require_client().get_collection(collection_name)
 
     def upsert(self, collection_name: str, points: List[Any]) -> None:
-        """Afegir o actualitzar punts en una col·lecció."""
+        """Add or update points in a collection."""
         self._require_client().upsert(collection_name=collection_name, points=points)
 
     def client_search(
@@ -258,7 +258,7 @@ class QdrantAdapter:
         limit: int = 10,
         score_threshold: Optional[float] = None,
     ) -> List[Any]:
-        """Cerca en una col·lecció específica (API legacy)."""
+        """Search in a specific collection (legacy API)."""
         try:
             return self._require_client().search(
                 collection_name=collection_name,
@@ -276,7 +276,7 @@ class QdrantAdapter:
             return res.points
 
     def client_delete(self, collection_name: str, points_selector: Any) -> None:
-        """Elimina punts d'una col·lecció específica."""
+        """Deletes points from a specific collection."""
         try:
             self._require_client().delete(
                 collection_name=collection_name,
@@ -289,7 +289,7 @@ class QdrantAdapter:
             )
 
     def retrieve(self, collection_name: str, ids: List[str], with_payload: bool = True) -> List[Any]:
-        """Recupera punts per ID d'una col·lecció."""
+        """Retrieves points by ID from a collection."""
         return self._require_client().retrieve(
             collection_name=collection_name,
             ids=ids,
@@ -305,7 +305,7 @@ class QdrantAdapter:
         with_vectors: bool = False,
         scroll_filter: Any = None,
     ) -> Any:
-        """Navega iterativament pels punts d'una col·lecció."""
+        """Iteratively navigates through the points of a collection."""
         kwargs: Dict[str, Any] = {
             "collection_name": collection_name,
             "limit": limit,
@@ -319,7 +319,7 @@ class QdrantAdapter:
         return self._require_client().scroll(**kwargs)
 
     def query_points(self, collection_name: str, query: List[float], limit: int = 10) -> Any:
-        """API moderna de cerca (qdrant-client 1.11+)."""
+        """Modern search API (qdrant-client 1.11+)."""
         return self._require_client().query_points(
             collection_name=collection_name,
             query=query,
@@ -327,7 +327,7 @@ class QdrantAdapter:
         )
 
     def close(self) -> None:
-        """Tanca el client intern. No usar si el client ve del pool compartit."""
+        """Closes the internal client. Do not use if the client comes from the shared pool."""
         if self._client is not None:
             try:
                 self._client.close()
@@ -335,9 +335,9 @@ class QdrantAdapter:
                 pass
             self._client = None
 
-    # ── Helpers d'alt nivell (oculten models Qdrant als callers) ─────────────
-    # Permeten que els consumidors (ex: vector_index.py) no necessitin importar
-    # qdrant_client.models directament.
+    # ── High-level helpers (hide Qdrant models from callers) ──────────────────
+    # Allow consumers (e.g. vector_index.py) to avoid importing
+    # qdrant_client.models directly.
 
     def ensure_collection(
         self,
@@ -346,17 +346,17 @@ class QdrantAdapter:
         distance: str = "cosine",
     ) -> bool:
         """
-        Crea la col·lecció si no existeix.
+        Creates the collection if it does not exist.
 
-        Oculta VectorParams, Distance i la lògica de check als callers.
+        Hides VectorParams, Distance and the check logic from callers.
 
         Args:
-            collection_name: Nom de la col·lecció
-            vector_size: Dimensió dels vectors
-            distance: "cosine", "euclid" o "dot"
+            collection_name: Collection name
+            vector_size: Vector dimension
+            distance: "cosine", "euclid" or "dot"
 
         Returns:
-            True si creada, False si ja existia
+            True if created, False if it already existed
         """
         from qdrant_client.models import Distance, VectorParams
 
@@ -384,11 +384,11 @@ class QdrantAdapter:
         points_data: List[Dict[str, Any]],
     ) -> None:
         """
-        Upsert de punts sense exposar PointStruct als callers.
+        Upsert of points without exposing PointStruct to callers.
 
         Args:
-            collection_name: Col·lecció destí
-            points_data: Llista de dicts amb claus: `id`, `vector`, `payload`
+            collection_name: Target collection
+            points_data: List of dicts with keys: `id`, `vector`, `payload`
         """
         from qdrant_client.models import PointStruct
 
@@ -407,17 +407,17 @@ class QdrantAdapter:
         score_threshold: Optional[float] = None,
     ) -> List[Any]:
         """
-        Cerca semàntica amb filtre de metadades, sense exposar Filter/FieldCondition.
+        Semantic search with metadata filter, without exposing Filter/FieldCondition.
 
         Args:
-            collection_name: Col·lecció a cercar
-            query_vector: Vector de consulta
-            filter_conditions: Llista de dicts `{key, value}` com a condicions must
-            limit: Màxim de resultats
-            score_threshold: Puntuació mínima (None = sense límit)
+            collection_name: Collection to search
+            query_vector: Query vector
+            filter_conditions: List of dicts `{key, value}` as must conditions
+            limit: Maximum number of results
+            score_threshold: Minimum score (None = no limit)
 
         Returns:
-            Llista de ScoredPoint (resultats Qdrant)
+            List of ScoredPoint (Qdrant results)
         """
         from qdrant_client.models import FieldCondition, Filter, MatchValue
 
@@ -448,14 +448,14 @@ class QdrantAdapter:
 
     def delete_by_ids(self, collection_name: str, ids: List[str]) -> int:
         """
-        Elimina punts per IDs sense exposar PointIdsList als callers.
+        Deletes points by IDs without exposing PointIdsList to callers.
 
         Args:
-            collection_name: Col·lecció destí
-            ids: Llista d'IDs a eliminar
+            collection_name: Target collection
+            ids: List of IDs to delete
 
         Returns:
-            Nombre de punts eliminats
+            Number of deleted points
         """
         from qdrant_client.models import PointIdsList
 

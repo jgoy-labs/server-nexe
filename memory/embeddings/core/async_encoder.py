@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: memory/embeddings/core/async_encoder.py
-Description: AsyncEmbedder: Wrapper async per fastembed TextEmbedding que NO bloqueja l'event loop.
+Description: AsyncEmbedder: Async wrapper for fastembed TextEmbedding that does NOT block the event loop.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -30,24 +30,24 @@ def _normalize(v: np.ndarray) -> List[float]:
 
 class AsyncEmbedder:
   """
-  Wrapper async per fastembed TextEmbedding (no bloqueja event loop).
+  Async wrapper for fastembed TextEmbedding (does not block event loop).
 
-  CRÍTIC: fastembed és síncron i bloquejant. Aquest wrapper
-  executa embed() en ThreadPoolExecutor per evitar bloquejar FastAPI.
+  CRITICAL: fastembed is synchronous and blocking. This wrapper
+  runs embed() in a ThreadPoolExecutor to avoid blocking FastAPI.
 
   Features:
-  - Lazy loading del model (només carrega quan es necessita)
-  - Thread-safe amb asyncio.Lock
-  - Singleton per model (evita múltiples instàncies)
-  - Graceful shutdown del ThreadPool
+  - Lazy loading of the model (only loads when needed)
+  - Thread-safe with asyncio.Lock
+  - Singleton per model (avoids multiple instances)
+  - Graceful shutdown of the ThreadPool
 
   Attributes:
-    model_name: Nom del model
+    model_name: Model name
     device: Device (ignored — fastembed uses ONNX runtime)
-    max_workers: Màxim threads al pool (2 per Mac per thermal limits)
-    _model: Instància de TextEmbedding (lazy loaded)
-    _load_lock: Lock per lazy loading thread-safe
-    executor: ThreadPoolExecutor per encoding async
+    max_workers: Maximum threads in the pool (2 for Mac due to thermal limits)
+    _model: TextEmbedding instance (lazy loaded)
+    _load_lock: Lock for thread-safe lazy loading
+    executor: ThreadPoolExecutor for async encoding
   """
 
   _instances: Dict[str, "AsyncEmbedder"] = {}
@@ -56,10 +56,10 @@ class AsyncEmbedder:
 
   def __new__(cls, model_name: str, **kwargs):
     """
-    Singleton pattern: Retorna instància existent si ja està carregada.
+    Singleton pattern: Returns existing instance if already loaded.
 
-    Evita carregar el mateix model múltiples vegades (memòria limitada).
-    Thread-safe amb lock per evitar race conditions en multi-worker.
+    Avoids loading the same model multiple times (limited memory).
+    Thread-safe with lock to avoid race conditions in multi-worker.
     """
     with cls._instances_lock:
       if model_name not in cls._instances:
@@ -79,7 +79,7 @@ class AsyncEmbedder:
 
     Args:
       model_name: Model name (fastembed compatible)
-      max_workers: Threads al pool (2 per Mac, 4 per servers)
+      max_workers: Threads in the pool (2 for Mac, 4 for servers)
       device: Ignored (fastembed uses ONNX runtime)
     """
     if self._initialized:
@@ -105,10 +105,10 @@ class AsyncEmbedder:
 
   async def _ensure_loaded(self):
     """
-    Lazy loading del model (carrega només quan es necessita).
+    Lazy loading of the model (loads only when needed).
 
-    Thread-safe amb double-check locking pattern.
-    Executa la càrrega en ThreadPoolExecutor per no bloquejar event loop.
+    Thread-safe with double-check locking pattern.
+    Runs the load in ThreadPoolExecutor to avoid blocking the event loop.
     """
     if self._model is None:
       async with self._load_lock:
@@ -132,9 +132,9 @@ class AsyncEmbedder:
 
   def _load_model(self):
     """
-    Carrega model en thread separat (bloquejant).
+    Loads model in a separate thread (blocking).
 
-    IMPORTANT: Aquest mètode s'executa al ThreadPool, NO al main thread.
+    IMPORTANT: This method runs in the ThreadPool, NOT in the main thread.
 
     Returns:
       TextEmbedding instance
@@ -155,17 +155,17 @@ class AsyncEmbedder:
     normalize: bool = True
   ) -> List[float]:
     """
-    Encode un text async (no bloqueja event loop).
+    Encode a text async (does not block event loop).
 
     Args:
-      text: Text a convertir en embedding
-      normalize: Si normalitzar embedding (L2 norm)
+      text: Text to convert to embedding
+      normalize: Whether to normalize embedding (L2 norm)
 
     Returns:
-      Vector d'embedding (768 dimensions per defecte)
+      Embedding vector (768 dimensions by default)
 
     Raises:
-      ValueError: Si text buit
+      ValueError: If text is empty
     """
     if not text.strip():
       raise ValueError("Text no pot estar buit")
@@ -196,14 +196,14 @@ class AsyncEmbedder:
 
   def _encode_sync(self, text: str, normalize: bool) -> List[float]:
     """
-    Encode síncron (executa al ThreadPool).
+    Synchronous encode (runs in the ThreadPool).
 
     Args:
-      text: Text a convertir
-      normalize: Si normalitzar
+      text: Text to convert
+      normalize: Whether to normalize
 
     Returns:
-      Embedding com a llista de floats
+      Embedding as a list of floats
     """
     if self._model is None:
       raise RuntimeError("AsyncEmbedder._model not loaded — cal await _ensure_loaded() abans d'invocar _encode_sync")
@@ -221,18 +221,18 @@ class AsyncEmbedder:
     batch_size: int = 32
   ) -> List[List[float]]:
     """
-    Encode batch de texts async (optimitzat).
+    Encode batch of texts async (optimized).
 
     Args:
-      texts: Llista de texts
-      normalize: Si normalitzar embeddings
-      batch_size: Mida del batch intern
+      texts: List of texts
+      normalize: Whether to normalize embeddings
+      batch_size: Internal batch size
 
     Returns:
-      Llista d'embeddings (mateix ordre que texts)
+      List of embeddings (same order as texts)
 
     Raises:
-      ValueError: Si texts buit o conté strings buides
+      ValueError: If texts is empty or contains empty strings
     """
     if not texts:
       raise ValueError("texts no pot estar buit")
@@ -273,15 +273,15 @@ class AsyncEmbedder:
     batch_size: int
   ) -> List[List[float]]:
     """
-    Encode batch síncron (executa al ThreadPool).
+    Synchronous batch encode (runs in the ThreadPool).
 
     Args:
-      texts: Llista de texts
-      normalize: Si normalitzar
-      batch_size: Mida del batch
+      texts: List of texts
+      normalize: Whether to normalize
+      batch_size: Batch size
 
     Returns:
-      Llista d'embeddings
+      List of embeddings
     """
     if self._model is None:
       raise RuntimeError("AsyncEmbedder._model not loaded — cal await _ensure_loaded() abans d'invocar _encode_batch_sync")
@@ -294,10 +294,10 @@ class AsyncEmbedder:
 
   async def shutdown(self):
     """
-    Graceful shutdown del ThreadPoolExecutor.
+    Graceful shutdown of the ThreadPoolExecutor.
 
-    IMPORTANT: Cridar aquest mètode abans de tancar l'aplicació
-    per evitar tasks pendents.
+    IMPORTANT: Call this method before closing the application
+    to avoid pending tasks.
     """
     logger.info("shutting_down_embedder", model=self.model_name)
     self.executor.shutdown(wait=True)
@@ -310,10 +310,10 @@ class AsyncEmbedder:
 
   def get_info(self) -> dict:
     """
-    Get informació del encoder.
+    Get encoder information.
 
     Returns:
-      Dict amb model_name, device, loaded status
+      Dict with model_name, device, loaded status
     """
     return {
       "model_name": self.model_name,

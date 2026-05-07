@@ -48,7 +48,7 @@ def _get_file_rag():
     return None
 
 async def add_document_endpoint(request: Dict[str, Any]):
-  """Afegir document al RAG."""
+  """Add document to the RAG."""
   from ..module import RAGModule
   from memory.rag_sources.base import AddDocumentRequest
 
@@ -79,7 +79,7 @@ async def add_document_endpoint(request: Dict[str, Any]):
     raise HTTPException(status_code=500, detail="Internal server error.")
 
 async def search_endpoint(request: Dict[str, Any]):
-  """Cercar documents rellevants."""
+  """Search for relevant documents."""
   from ..module import RAGModule
   from memory.rag_sources.base import SearchRequest
 

@@ -29,17 +29,17 @@ async def create_collection(
   distance: str = "cosine",
 ) -> bool:
   """
-  Crea una nova collection.
+  Create a new collection.
 
   Args:
-    qdrant: Client Qdrant
-    executor: ThreadPoolExecutor per operacions sync
-    name: Nom de la collection seguint naming convention {modul}_{tipus}
-    vector_size: Dimensió dels vectors (default: 768)
-    distance: Mètrica de distància ("cosine", "euclid", "dot")
+    qdrant: Qdrant client
+    executor: ThreadPoolExecutor for sync operations
+    name: Collection name following naming convention {module}_{type}
+    vector_size: Vector dimension (default: 768)
+    distance: Distance metric ("cosine", "euclid", "dot")
 
   Returns:
-    bool: True si creada, False si ja existeix
+    bool: True if created, False if it already exists
   """
   validate_collection_name(name)
   loop = asyncio.get_running_loop()
@@ -74,7 +74,7 @@ async def delete_collection(
   executor: ThreadPoolExecutor,
   name: str,
 ) -> bool:
-  """Elimina una collection."""
+  """Delete a collection."""
   loop = asyncio.get_running_loop()
 
   def _delete():
@@ -93,7 +93,7 @@ async def list_collections(
   qdrant: Any,
   executor: ThreadPoolExecutor,
 ) -> List[CollectionInfo]:
-  """Llista totes les collections."""
+  """List all collections."""
   loop = asyncio.get_running_loop()
 
   def _list():
@@ -119,7 +119,7 @@ async def collection_exists(
   executor: ThreadPoolExecutor,
   name: str,
 ) -> bool:
-  """Comprova si una collection existeix."""
+  """Check if a collection exists."""
   loop = asyncio.get_running_loop()
 
   def _exists():

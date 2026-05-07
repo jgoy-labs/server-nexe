@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/rag/workflow/nodes/rag_search_node.py
-Description: Node de Workflow Engine per cercar documents al RAG.
+Description: Workflow Engine node to search documents in RAG.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -19,7 +19,7 @@ from personality.i18n import get_i18n
 logger = structlog.get_logger(__name__)
 
 try:
-  from memory.rag_sources.file import FileRAGSource  # type: ignore[attr-defined]  # FP: import defensive sota try/except (FileRAGSource és símbol latent, RAG_AVAILABLE en gestiona absència)
+  from memory.rag_sources.file import FileRAGSource  # type: ignore[attr-defined]  # FP: defensive import under try/except (FileRAGSource is a latent symbol, RAG_AVAILABLE manages its absence)
   RAG_AVAILABLE = True
 except ImportError as e:
   RAG_AVAILABLE = False
@@ -31,21 +31,21 @@ except ImportError as e:
 
 class RAGSearchNode(Node):
   """
-  Node de Workflow que cerca documents al RAG i genera prompt amb context.
+  Workflow node that searches documents in RAG and generates a prompt with context.
 
-  Workflow típic:
-    User Query → RAGSearchNode → Prompt amb context → OllamaNode → Response
+  Typical workflow:
+    User Query → RAGSearchNode → Prompt with context → OllamaNode → Response
 
-  Inputs esperats:
-    - query (str): Query de l'usuari
+  Expected inputs:
+    - query (str): User query
 
-  Outputs generats:
-    - prompt (str): Prompt generat amb context
-    - context (str): Text concatenat dels documents trobats
-    - results (List[Dict]): Llista de resultats amb metadata
-    - num_results (int): Número de resultats trobats
+  Generated outputs:
+    - prompt (str): Prompt generated with context
+    - context (str): Concatenated text of found documents
+    - results (List[Dict]): List of results with metadata
+    - num_results (int): Number of results found
 
-  Exemple configuració:
+  Example configuration:
     {
       "source": "my-docs",
       "top_k": 5,
@@ -55,7 +55,7 @@ class RAGSearchNode(Node):
   """
 
   def __init__(self) -> None:
-    """Inicialitza el node RAGSearch."""
+    """Initialize the RAGSearch node."""
     super().__init__()
 
     self._rag_source: Optional[FileRAGSource] = None
@@ -148,13 +148,13 @@ class RAGSearchNode(Node):
 
   def _init_rag_source(self):
     """
-    Inicialitza la RAG source (lazy initialization).
+    Initialize the RAG source (lazy initialization).
 
     Returns:
-      FileRAGSource inicialitzada
+      Initialized FileRAGSource
 
     Raises:
-      RuntimeError: Si no es pot inicialitzar la source o RAG no disponible
+      RuntimeError: If the source cannot be initialized or RAG is not available
     """
     if not RAG_AVAILABLE:
       i18n = get_i18n()
@@ -189,22 +189,22 @@ class RAGSearchNode(Node):
 
   async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Executa la cerca al RAG i genera el prompt amb context.
+    Execute the RAG search and generate the prompt with context.
 
     Args:
-      inputs: Diccionari amb:
-        - query (str): Query de l'usuari
+      inputs: Dictionary with:
+        - query (str): User query
 
     Returns:
-      Diccionari amb:
-        - prompt (str): Prompt generat amb context
-        - context (str): Text concatenat dels documents
-        - results (List[Dict]): Resultats amb metadata
-        - num_results (int): Número de resultats
+      Dictionary with:
+        - prompt (str): Prompt generated with context
+        - context (str): Concatenated text of documents
+        - results (List[Dict]): Results with metadata
+        - num_results (int): Number of results
 
     Raises:
-      ValueError: Si falta el paràmetre 'query'
-      RuntimeError: Si la cerca falla
+      ValueError: If the 'query' parameter is missing
+      RuntimeError: If the search fails
     """
     self.validate_inputs(inputs)
 
@@ -284,13 +284,13 @@ class RAGSearchNode(Node):
 
   def validate_config(self) -> bool:
     """
-    Valida la configuració del node.
+    Validate the node configuration.
 
     Returns:
-      True si la configuració és vàlida
+      True if configuration is valid
 
     Raises:
-      ValueError: Si la configuració és invàlida
+      ValueError: If configuration is invalid
     """
     top_k = self.config.get('top_k', 5)
     score_threshold = self.config.get('score_threshold', 0.7)

@@ -51,24 +51,24 @@ def _get_metrics():
 
 class CachedEmbedder:
   """
-  Embedder amb cache multi-nivell integrat.
+  Embedder with integrated multi-level cache.
 
-  Combina AsyncEmbedder (async encoding) amb MultiLevelCache (L1+L2)
-  per optimitzar latència i reduir càrrega del model.
+  Combines AsyncEmbedder (async encoding) with MultiLevelCache (L1+L2)
+  to optimize latency and reduce model load.
 
   Features:
-  - Cache L1 (memòria): Hit rate >80% en producció
-  - Cache L2 (disc): Quota 5GB, TTL 72h
-  - Batch optimization: Agrupa requests per eficiència
+  - Cache L1 (memory): Hit rate >80% in production
+  - Cache L2 (disk): Quota 5GB, TTL 72h
+  - Batch optimization: Groups requests for efficiency
   - Stats tracking: Hit rate, latencies, throughput
-  - Versioning: Suport per invalidar cache al canviar model
+  - Versioning: Support for invalidating cache when changing model
 
   Attributes:
     encoder: AsyncEmbedder instance
     cache: MultiLevelCache instance
-    model_name: Nom del model
-    cache_enabled: Si cache activa globalment
-    _stats: Estadístiques acumulades
+    model_name: Model name
+    cache_enabled: Whether cache is globally enabled
+    _stats: Accumulated statistics
   """
 
   def __init__(
@@ -84,10 +84,10 @@ class CachedEmbedder:
 
     Args:
       encoder: AsyncEmbedder instance
-      cache_enabled: Si activar cache (False per debug)
-      l1_max_size: Màxim items L1 cache
-      l2_max_size_gb: Quota màxima L2 (GB)
-      l2_ttl_hours: TTL per items L2
+      cache_enabled: Whether to enable cache (False for debug)
+      l1_max_size: Maximum L1 cache items
+      l2_max_size_gb: Maximum L2 quota (GB)
+      l2_ttl_hours: TTL for L2 items
     """
     self.encoder = encoder
     self.model_name = encoder.model_name
@@ -310,10 +310,10 @@ class CachedEmbedder:
 
   def get_stats(self) -> EncoderStats:
     """
-    Get estadístiques acumulades del encoder.
+    Get accumulated encoder statistics.
 
     Returns:
-      EncoderStats amb hit rate, latencies, etc.
+      EncoderStats with hit rate, latencies, etc.
     """
     hit_rate = self._cache_hits / self._total_requests if self._total_requests > 0 else 0.0
 

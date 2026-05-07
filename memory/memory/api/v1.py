@@ -72,14 +72,14 @@ async def get_memory_api():
         # memory_helper and permanently disabled RAG recalls.
         _new_api = MemoryAPI()
         await _new_api.initialize()
-        # Les 3 col·leccions canòniques ("passadissos de la biblioteca RAG"):
-        # - nexe_documentation: knowhow del propi nexe (knowledge/ folder auto-ingest)
-        # - user_knowledge: documents ad-hoc que l'usuari puja al chat
-        # - personal_memory: fets que el chat recorda de l'usuari (MEM_SAVE/RECALL)
+        # The 3 canonical collections ("RAG library corridors"):
+        # - nexe_documentation: nexe's own knowhow (knowledge/ folder auto-ingest)
+        # - user_knowledge: ad-hoc documents uploaded by the user via chat
+        # - personal_memory: facts the chat remembers about the user (MEM_SAVE/RECALL)
         #
-        # Nota: la col·lecció de memòria personal es deia "nexe_web_ui" fins
-        # al refactor del 2026-04-08 (origen tècnic del plugin web_ui_module).
-        # Renombrada a "personal_memory" per alinear el nom amb la funció.
+        # Note: the personal memory collection was called "nexe_web_ui" until
+        # the 2026-04-08 refactor (technical origin of the web_ui_module plugin).
+        # Renamed to "personal_memory" to align the name with the function.
         #
         # Ensure canonical collections exist (F5 fix). Previously only
         # the personal memory collection was created and nexe_documentation
@@ -199,7 +199,7 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         # also keeps the truncated debug log (line below) in sync.
         body.query = unicodedata.normalize("NFKC", body.query)
 
-        # Determinar col·leccions a cercar
+        # Determine collections to search
         if body.collections:
             cols = body.collections
         elif body.collection:
@@ -237,7 +237,7 @@ async def memory_search(request: Request, body: MemorySearchRequest):
                 logger.warning("Search failed for collection %s: %s", col, e)
                 continue
 
-        # Si totes les cerques van fallar, propagar l'error
+        # If all searches failed, propagate the error
         if cols_searched > 0 and search_errors == cols_searched and last_error:
             raise last_error
 

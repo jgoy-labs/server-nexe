@@ -1,10 +1,10 @@
 """
-Adapters de vector stores per al Protocol VectorStore.
+Vector store adapters for the VectorStore Protocol.
 
-Importa QdrantAdapter per crear instàncies de vector store
-que implementen el Protocol VectorStore definit a core/vectorstore.py.
+Imports QdrantAdapter to create vector store instances
+that implement the VectorStore Protocol defined in core/vectorstore.py.
 
-Exemples:
+Examples:
     >>> from memory.embeddings.adapters import QdrantAdapter
     >>> store = QdrantAdapter(collection_name="nexe_docs", path="storage/vectors")
     >>> ids = store.add_vectors([[0.1, 0.2], [0.3, 0.4]], ["text1", "text2"], [{}, {}])

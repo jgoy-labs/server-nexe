@@ -22,14 +22,14 @@ logger = logging.getLogger(__name__)
 
 class MemoryRecallNode(Node):
   """
-  Node per recuperar memòries de Memory.
+  Node for retrieving memories from Memory.
 
   Fallback chain:
-  1. FlashMemory (RAM) - més ràpid
-  2. SQLite (persistence) - si RAM buida
-  3. Qdrant (semantic search) - si query provided
+  1. FlashMemory (RAM) - fastest
+  2. SQLite (persistence) - if RAM is empty
+  3. Qdrant (semantic search) - if query provided
 
-  Exemple d'ús en workflow:
+  Usage example in workflow:
     ```yaml
     nodes:
      - id: recall_context
@@ -88,7 +88,7 @@ class MemoryRecallNode(Node):
 
   async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Executa el recall amb fallback chain.
+    Execute recall with fallback chain.
     """
     start_time = time.time()
     limit = inputs.get("limit", 10)
@@ -250,7 +250,7 @@ class MemoryRecallNode(Node):
       }
 
   async def _get_embedding(self, text: str) -> Optional[List[float]]:
-    """Genera embedding via Ollama API."""
+    """Generate embedding via Ollama API."""
     try:
       import httpx
 
@@ -293,7 +293,7 @@ class MemoryRecallNode(Node):
     return "\n".join(parts)
 
   def _entry_to_dict(self, entry: MemoryEntry) -> Dict[str, Any]:
-    """Converteix MemoryEntry a dict."""
+    """Convert MemoryEntry to dict."""
     return {
       "id": entry.id,
       "content": entry.content[:200],

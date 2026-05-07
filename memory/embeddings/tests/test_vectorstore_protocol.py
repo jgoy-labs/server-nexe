@@ -20,10 +20,10 @@ from memory.embeddings.core.vectorstore import (
 )
 
 class TestVectorSearchRequest:
-  """Tests per el model VectorSearchRequest."""
+  """Tests for the VectorSearchRequest model."""
 
   def test_valid_request(self):
-    """Test creació request vàlid."""
+    """Test valid request creation."""
     request = VectorSearchRequest(
       query_vector=[0.1, 0.2, 0.3],
       top_k=10
@@ -34,7 +34,7 @@ class TestVectorSearchRequest:
     assert request.filters is None
 
   def test_request_with_filters(self):
-    """Test request amb filtres."""
+    """Test request with filters."""
     request = VectorSearchRequest(
       query_vector=[0.1, 0.2],
       top_k=5,
@@ -43,7 +43,7 @@ class TestVectorSearchRequest:
     assert request.filters == {"source": "pdf", "language": "ca"}
 
   def test_request_with_different_metrics(self):
-    """Test request amb diferents mètriques."""
+    """Test request with different metrics."""
     for metric in ["cosine", "euclidean", "dot"]:
       request = VectorSearchRequest(
         query_vector=[0.1, 0.2],
@@ -52,7 +52,7 @@ class TestVectorSearchRequest:
       assert request.metric == metric
 
   def test_invalid_metric(self):
-    """Test mètrica invàlida."""
+    """Test invalid metric."""
     with pytest.raises(ValidationError) as exc_info:
       VectorSearchRequest(
         query_vector=[0.1, 0.2],
@@ -61,13 +61,13 @@ class TestVectorSearchRequest:
     assert "metric" in str(exc_info.value)
 
   def test_empty_query_vector(self):
-    """Test vector buit rebutjat."""
+    """Test empty vector rejected."""
     with pytest.raises(ValidationError) as exc_info:
       VectorSearchRequest(query_vector=[])
     assert "query_vector" in str(exc_info.value)
 
   def test_invalid_top_k_zero(self):
-    """Test top_k=0 rebutjat."""
+    """Test top_k=0 rejected."""
     with pytest.raises(ValidationError) as exc_info:
       VectorSearchRequest(
         query_vector=[0.1, 0.2],
@@ -76,7 +76,7 @@ class TestVectorSearchRequest:
     assert "top_k" in str(exc_info.value)
 
   def test_invalid_top_k_negative(self):
-    """Test top_k negatiu rebutjat."""
+    """Test negative top_k rejected."""
     with pytest.raises(ValidationError) as exc_info:
       VectorSearchRequest(
         query_vector=[0.1, 0.2],
@@ -85,7 +85,7 @@ class TestVectorSearchRequest:
     assert "top_k" in str(exc_info.value)
 
   def test_invalid_top_k_too_large(self):
-    """Test top_k massa gran rebutjat."""
+    """Test top_k too large rejected."""
     with pytest.raises(ValidationError) as exc_info:
       VectorSearchRequest(
         query_vector=[0.1, 0.2],
@@ -94,17 +94,17 @@ class TestVectorSearchRequest:
     assert "top_k" in str(exc_info.value)
 
   def test_query_vector_with_non_numbers(self):
-    """Test query_vector amb no-números rebutjat."""
+    """Test query_vector with non-numbers rejected."""
     with pytest.raises(ValidationError) as exc_info:
       VectorSearchRequest(
         query_vector=[0.1, "invalid", 0.3]
       )
 
 class TestVectorSearchHit:
-  """Tests per el model VectorSearchHit."""
+  """Tests for the VectorSearchHit model."""
 
   def test_valid_hit(self):
-    """Test creació hit vàlid."""
+    """Test valid hit creation."""
     hit = VectorSearchHit(
       id="doc-123",
       score=0.95,
@@ -117,7 +117,7 @@ class TestVectorSearchHit:
     assert hit.metadata == {"source": "pdf", "page": 1}
 
   def test_hit_with_empty_metadata(self):
-    """Test hit amb metadata buida."""
+    """Test hit with empty metadata."""
     hit = VectorSearchHit(
       id="doc-1",
       score=0.8,
@@ -126,7 +126,7 @@ class TestVectorSearchHit:
     assert hit.metadata == {}
 
   def test_hit_score_boundaries(self):
-    """Test score als límits (0.0 i 1.0)."""
+    """Test score at boundaries (0.0 and 1.0)."""
     hit_min = VectorSearchHit(id="1", score=0.0, text="Min")
     assert hit_min.score == 0.0
 
@@ -134,7 +134,7 @@ class TestVectorSearchHit:
     assert hit_max.score == 1.0
 
   def test_invalid_score_negative(self):
-    """Test score negatiu rebutjat."""
+    """Test negative score rejected."""
     with pytest.raises(ValidationError) as exc_info:
       VectorSearchHit(
         id="doc-1",
@@ -144,7 +144,7 @@ class TestVectorSearchHit:
     assert "score" in str(exc_info.value)
 
   def test_invalid_score_too_large(self):
-    """Test score >1.0 rebutjat."""
+    """Test score >1.0 rejected."""
     with pytest.raises(ValidationError) as exc_info:
       VectorSearchHit(
         id="doc-1",
@@ -154,7 +154,7 @@ class TestVectorSearchHit:
     assert "score" in str(exc_info.value)
 
   def test_empty_id(self):
-    """Test id buit rebutjat."""
+    """Test empty id rejected."""
     with pytest.raises(ValidationError) as exc_info:
       VectorSearchHit(
         id="",
@@ -164,17 +164,17 @@ class TestVectorSearchHit:
     assert "id" in str(exc_info.value)
 
 class TestVectorStoreProtocol:
-  """Tests per el Protocol VectorStore."""
+  """Tests for the VectorStore Protocol."""
 
   def test_protocol_cannot_be_instantiated(self):
-    """Test que el Protocol no es pot instanciar directament."""
+    """Test that the Protocol cannot be instantiated directly."""
 
     expected_methods = ['add_vectors', 'search', 'delete', 'health']
     for method in expected_methods:
       assert hasattr(VectorStore, method), f"Protocol manca mètode: {method}"
 
   def test_mock_implementation_complies(self):
-    """Test que una implementació mock compleix el protocol."""
+    """Test that a mock implementation complies with the protocol."""
 
     class MockVectorStore:
       """Mock implementation per testing."""
@@ -230,10 +230,10 @@ class TestVectorStoreProtocol:
     assert "num_vectors" in health
 
   def test_protocol_type_checking(self):
-    """Test que el protocol funciona amb type checking."""
+    """Test that the protocol works with type checking."""
 
     def use_vector_store(store: VectorStore) -> int:
-      """Funció que usa el protocol."""
+      """Function that uses the protocol."""
       health = store.health()
       return health.get("num_vectors", 0)
 
@@ -252,10 +252,10 @@ class TestVectorStoreProtocol:
     assert result == 42
 
 class TestVectorStoreIntegration:
-  """Tests d'integració entre components."""
+  """Integration tests between components."""
 
   def test_request_and_hit_compatibility(self):
-    """Test que Request i Hit són compatibles."""
+    """Test that Request and Hit are compatible."""
 
     request = VectorSearchRequest(
       query_vector=[0.1, 0.2, 0.3],
@@ -281,7 +281,7 @@ class TestVectorStoreIntegration:
       assert hit.metadata.get("language") == "ca"
 
   def test_serialization_deserialization(self):
-    """Test serialització/deserialització Pydantic."""
+    """Test Pydantic serialization/deserialization."""
 
     request = VectorSearchRequest(
       query_vector=[0.1, 0.2, 0.3],

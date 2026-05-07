@@ -1,5 +1,5 @@
 """
-Tests per memory/rag/router.py
+Tests for memory/rag/router.py
 """
 import pytest
 from fastapi import FastAPI
@@ -41,12 +41,12 @@ class TestRAGRouterEndpoints:
     def test_health_endpoint(self):
         app = make_app()
         client = TestClient(app, raise_server_exceptions=False)
-        # Patchem la funció delegada al router (not endpoints, sino el handler)
+        # Patch the delegated function on the router (not endpoints, but the handler)
         from memory.rag import router as rag_router_module
         with patch.object(rag_router_module, "health_endpoint",
                           new=AsyncMock(return_value={"status": "healthy"})):
             resp = client.get("/rag/health")
-        assert resp.status_code in (200, 503)  # 503 si el RAG no és disponible
+        assert resp.status_code in (200, 503)  # 503 if RAG is not available
 
     def test_info_endpoint(self):
         app = make_app()

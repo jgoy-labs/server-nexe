@@ -18,10 +18,10 @@ from memory.memory.models.memory_types import MemoryType
 
 @pytest.mark.asyncio
 class TestRAMContext:
-  """Tests per RAMContext"""
+  """Tests for RAMContext"""
 
   async def test_initialization(self):
-    """Inicialització amb FlashMemory"""
+    """Initialisation with FlashMemory"""
     flash = FlashMemory()
     ram = RAMContext(flash_memory=flash, max_entries=100)
 
@@ -29,7 +29,7 @@ class TestRAMContext:
     assert ram._max_entries == 100
 
   async def test_get_context_window(self):
-    """Recuperar finestra de context"""
+    """Retrieve context window"""
     flash = FlashMemory()
     ram = RAMContext(flash_memory=flash, max_entries=10)
 
@@ -46,7 +46,7 @@ class TestRAMContext:
     assert len(context) == 5
 
   async def test_fifo_limit(self):
-    """Finestra limitada a max_entries"""
+    """Window limited to max_entries"""
     flash = FlashMemory()
     ram = RAMContext(flash_memory=flash, max_entries=3)
 
@@ -63,7 +63,7 @@ class TestRAMContext:
     assert len(context) == 3
 
   async def test_to_context_string(self):
-    """Generar context string per LLM"""
+    """Generate context string for LLM"""
     flash = FlashMemory()
     ram = RAMContext(flash_memory=flash)
 
@@ -87,7 +87,7 @@ class TestRAMContext:
     assert "Python is a programming language" in context_str
 
   async def test_safe_mode_truncation(self):
-    """Safe mode trunca content llarg"""
+    """Safe mode truncates long content"""
     flash = FlashMemory()
     ram = RAMContext(flash_memory=flash)
 
@@ -107,7 +107,7 @@ class TestRAMContext:
     assert long_content in context_unsafe
 
   async def test_get_recent_by_type(self):
-    """Filtrar per entry_type"""
+    """Filter by entry_type"""
     flash = FlashMemory()
     ram = RAMContext(flash_memory=flash)
 
@@ -132,7 +132,7 @@ class TestRAMContext:
     assert len(semantic) == 2
 
   async def test_get_stats(self):
-    """Obtenir estadístiques"""
+    """Get statistics"""
     flash = FlashMemory()
     ram = RAMContext(flash_memory=flash, max_entries=100)
 
@@ -160,7 +160,7 @@ class TestRAMContext:
     assert stats["max_entries"] == 100
 
   async def test_empty_context(self):
-    """Context buit quan no hi ha entries"""
+    """Empty context when there are no entries"""
     flash = FlashMemory()
     ram = RAMContext(flash_memory=flash)
 

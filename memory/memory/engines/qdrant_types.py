@@ -2,10 +2,10 @@
 ────────────────────────────────────
 Server Nexe
 Location: memory/memory/engines/qdrant_types.py
-Description: Punt únic d'importació dels tipus de qdrant_client.models.
+Description: Single import point for qdrant_client.models types.
 
-Centralitza la dependència a qdrant_client en un sol fitxer dins memory/memory/.
-Si en el futur es canvia el vector store, només cal modificar aquest fitxer.
+Centralizes the dependency on qdrant_client in a single file within memory/memory/.
+If the vector store is changed in the future, only this file needs to be modified.
 ────────────────────────────────────
 """
 

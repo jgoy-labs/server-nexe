@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: memory/memory/api/tests/test_v1_endpoints.py
-Description: Tests HTTP per memory/memory/api/v1.py (endpoints /memory).
+Description: HTTP tests for memory/memory/api/v1.py (endpoints /memory).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -152,7 +152,7 @@ class TestMemoryStoreEndpoint:
         assert resp.status_code == 401
 
     def test_store_default_collection(self):
-        """Si no s'especifica collection, usa personal_memory."""
+        """If no collection is specified, uses personal_memory."""
         client = TestClient(make_app())
         mock_mem = make_mock_memory()
 
@@ -169,7 +169,7 @@ class TestMemoryStoreEndpoint:
         assert call_kwargs["collection"] == "personal_memory"
 
     def test_store_sets_default_source_metadata(self):
-        """Metadata source = 'chat-cli' per defecte."""
+        """Metadata source = 'chat-cli' by default."""
         client = TestClient(make_app())
         mock_mem = make_mock_memory()
 
@@ -265,7 +265,7 @@ class TestMemorySearchEndpoint:
         assert call_kwargs["top_k"] == 10
 
     def test_search_result_without_metadata(self):
-        """Resultats sense metadata retornen dict buit."""
+        """Results without metadata return empty dict."""
         client = TestClient(make_app())
         mock_mem = make_mock_memory()
 

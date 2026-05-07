@@ -141,9 +141,9 @@ class DreamingCycle:
     def _count_pending(self) -> int:
         """Count pending staging entries.
 
-        Bug 10 fix — abans la connexió SQLite no es tancava i causava un
-        connection leak acumulatiu (DreamingCycle corre cada 15 min).
-        Ara usem try/finally amb close() explícit.
+        Bug 10 fix — previously the SQLite connection was never closed and
+        caused an accumulative connection leak (DreamingCycle runs every 15 min).
+        Now we use try/finally with explicit close().
         """
         if not self._store:
             return 0
@@ -169,9 +169,9 @@ class DreamingCycle:
     async def _recover_stuck_leases(self):
         """Reset leased entries older than 5 minutes.
 
-        Bug 10 fix — abans la connexió SQLite no es tancava i causava un
-        connection leak a cada cicle (15 min). Ara usem try/finally amb
-        close() explícit.
+        Bug 10 fix — previously the SQLite connection was never closed and
+        caused a connection leak on every cycle (15 min). Now we use
+        try/finally with explicit close().
         """
         if not self._store:
             return
@@ -197,9 +197,9 @@ class DreamingCycle:
     async def _process_staging(self):
         """Process pending staging entries in batches.
 
-        Bug 10 fix — la connexió SQLite no es tancava mai i amb un leak
-        de ~1 conn/cicle s'acumulava ràpid (cycle cada 15 min). Ara
-        try/finally amb close() explícit.
+        Bug 10 fix — the SQLite connection was never closed and with a
+        leak of ~1 conn/cycle it accumulated quickly (cycle every 15 min).
+        Now try/finally with explicit close().
         """
         if not self._store:
             return
@@ -246,12 +246,11 @@ class DreamingCycle:
     async def _process_one(self, entry: Dict[str, Any]):
         """Process a single staging entry to Profile or Episodic.
 
-        Bug 10 fix — _process_one es crida un cop per cada entrada de
-        staging (batch de 10) a cada cicle de DreamingCycle. Abans cada
-        invocació obria una connexió SQLite i no la tancava mai — leak
-        quadràtic respecte del nombre d'entrades. Ara try/finally amb
-        close() explícit i tots els `return` anticipats surten via
-        finally.
+        Bug 10 fix — _process_one is called once per staging entry
+        (batch of 10) on each DreamingCycle cycle. Previously each
+        invocation opened a SQLite connection and never closed it — a
+        quadratic leak relative to the number of entries. Now try/finally
+        with explicit close() and all early returns exit via finally.
         """
         if not self._store:
             return
@@ -322,12 +321,12 @@ class DreamingCycle:
                         if similar and similar[0]["score"] > self._config.dedup_refresh_threshold:
                             # Quasi-duplicate: refresh
                             existing_id = similar[0]["id"]
-                            # Bug 9 fix — abans usavem `MIN(10, evidence_count + 1)`
-                            # com a multi-arg function, que es una extensio SQLite
-                            # i no es portable a altres dialects (Postgres, MySQL,
-                            # ...). Calculem el cap de 10 en Python i passem el
-                            # valor com a parametre vinculat. Llegim primer el
-                            # valor actual i fem el min en codi.
+                            # Bug 9 fix — previously we used `MIN(10, evidence_count + 1)`
+                            # as a multi-arg function, which is a SQLite extension
+                            # and not portable to other dialects (Postgres, MySQL,
+                            # ...). We calculate the cap of 10 in Python and pass
+                            # the value as a bound parameter. We first read the
+                            # current value and do the min in code.
                             cur = conn.execute(
                                 "SELECT evidence_count FROM episodic WHERE id = ?",
                                 (existing_id,),
@@ -380,9 +379,9 @@ class DreamingCycle:
     async def _sync_vector_index(self):
         """Sync unsynced RDBMS entries to vector index.
 
-        Bug 10 fix — connection leak: la connexió SQLite no es tancava.
-        Ara usem try/finally amb close() explícit per evitar un leak
-        acumulatiu (cycle cada 15 min).
+        Bug 10 fix — connection leak: the SQLite connection was not closed.
+        Now we use try/finally with explicit close() to avoid an
+        accumulative leak (cycle every 15 min).
         """
         if not self._store or not self._vector or not self._embedder:
             return
@@ -456,8 +455,8 @@ class DreamingCycle:
     async def _gc_lightweight(self):
         """Lightweight GC: expire TTL staging + old tombstones.
 
-        Bug 10 fix — connection leak: la connexió SQLite no es tancava.
-        Ara try/finally amb close() explícit.
+        Bug 10 fix — connection leak: the SQLite connection was not closed.
+        Now try/finally with explicit close().
         """
         if not self._store:
             return

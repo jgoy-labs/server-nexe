@@ -47,7 +47,7 @@ class VectorIndex:
                 path=str(self._qdrant_path),
             )
 
-            # Ensure collection exists via helper (oculta VectorParams/Distance)
+            # Ensure collection exists via helper (hides VectorParams/Distance)
             created = self._client.ensure_collection(
                 collection_name=COLLECTION_NAME,
                 vector_size=VECTOR_SIZE,
@@ -106,7 +106,7 @@ class VectorIndex:
             }
             for entry, embedding in zip(entries, embeddings)
         ]
-        # upsert_points oculta PointStruct al caller
+        # upsert_points hides PointStruct from the caller
         self._client.upsert_points(
             collection_name=COLLECTION_NAME,
             points_data=points_data,
@@ -137,7 +137,7 @@ class VectorIndex:
         if not self._available or self._client is None:
             return []
 
-        # search_with_filter oculta Filter/FieldCondition/MatchValue al caller
+        # search_with_filter hides Filter/FieldCondition/MatchValue from the caller
         filter_conditions = [
             {"key": "user_id", "value": user_id},
             {"key": "state", "value": "active"},
@@ -167,7 +167,7 @@ class VectorIndex:
         if not self._available or self._client is None or not ids:
             return 0
 
-        # delete_by_ids oculta PointIdsList al caller
+        # delete_by_ids hides PointIdsList from the caller
         return self._client.delete_by_ids(
             collection_name=COLLECTION_NAME,
             ids=ids,

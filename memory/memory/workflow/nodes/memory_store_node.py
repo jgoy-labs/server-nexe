@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/memory/workflow/nodes/memory_store_node.py
-Description: Node per emmagatzemar contingut a Memory (FlashMemory + Persistence).
+Description: Node for storing content in Memory (FlashMemory + Persistence).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -19,14 +19,14 @@ logger = logging.getLogger(__name__)
 
 class MemoryStoreNode(Node):
   """
-  Node per emmagatzemar contingut a Memory.
+  Node for storing content in Memory.
 
-  Funcionalitats:
-  - Crea MemoryEntry des del content
-  - Ingereix via IngestionPipeline
-  - Retorna entry_id per referència futura
+  Features:
+  - Creates MemoryEntry from content
+  - Ingests via IngestionPipeline
+  - Returns entry_id for future reference
 
-  Exemple d'ús en workflow:
+  Usage example in workflow:
     ```yaml
     nodes:
      - id: store_conversation
@@ -41,10 +41,10 @@ class MemoryStoreNode(Node):
 
   def get_metadata(self) -> NodeMetadata:
     """
-    Metadata del node per al registre del Workflow Engine.
+    Node metadata for registration in the Workflow Engine.
 
     Returns:
-      NodeMetadata: Informació del node
+      NodeMetadata: Node information
     """
     return NodeMetadata(
       id="memory.store",
@@ -97,13 +97,13 @@ class MemoryStoreNode(Node):
 
   async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Executa el node: emmagatzema contingut a Memory.
+    Execute the node: store content in Memory.
 
     Args:
-      inputs: Dict amb content, entry_type, source, ttl_seconds
+      inputs: Dict with content, entry_type, source, ttl_seconds
 
     Returns:
-      Dict amb entry_id i success
+      Dict with entry_id and success
     """
     try:
       content = inputs.get("content")
