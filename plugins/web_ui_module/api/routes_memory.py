@@ -35,7 +35,7 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
 
     # -- POST /memory/save --
 
-    @router.post("/memory/save")
+    @router.post("/memory/save", operation_id="webui_memory_save")
     @limiter.limit("10/minute")
     async def memory_save(request: Request, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Guardar contingut explicitament a la memoria (via MemoryService if available)"""
@@ -61,7 +61,7 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
 
     # -- POST /memory/recall --
 
-    @router.post("/memory/recall")
+    @router.post("/memory/recall", operation_id="webui_memory_recall")
     @limiter.limit("30/minute")
     async def memory_recall(request: Request, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Cercar a la memoria"""
@@ -83,7 +83,7 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
 
     # -- POST /memory/confirm-delete --
 
-    @router.post("/memory/confirm-delete")
+    @router.post("/memory/confirm-delete", operation_id="webui_memory_confirm_delete")
     @limiter.limit("10/minute")
     async def memory_confirm_delete(request: Request, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Esborra un fet de memòria un cop l'usuari l'ha confirmat al frontend."""

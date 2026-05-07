@@ -114,7 +114,7 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
 
     # -- POST /upload --
 
-    @router.post("/upload")
+    @router.post("/upload", operation_id="webui_upload_file")
     @limiter.limit("5/minute")
     async def upload_file(
         request: Request,
@@ -255,7 +255,7 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
 
     # -- GET /files --
 
-    @router.get("/files")
+    @router.get("/files", operation_id="webui_list_files")
     async def list_uploaded_files(_auth=Depends(require_ui_auth)):
         """List all uploaded files"""
         files = file_handler.get_uploaded_files()
@@ -263,7 +263,7 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
 
     # -- POST /files/cleanup --
 
-    @router.post("/files/cleanup")
+    @router.post("/files/cleanup", operation_id="webui_cleanup_files")
     @limiter.limit("5/minute")
     async def cleanup_files(request: Request, max_age_hours: int = 24, _auth=Depends(require_ui_auth)):
         """Clean up old files (default > 24h)"""

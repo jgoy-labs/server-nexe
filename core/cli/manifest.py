@@ -20,7 +20,7 @@ router_public = APIRouter(prefix="/cli", tags=["cli-central"])
 
 MODULE_PATH = Path(__file__).parent
 
-@router_public.get("/health")
+@router_public.get("/health", operation_id="cli_health")
 async def cli_health():
   """
   Return the health status of the Nexe Central CLI.
@@ -50,7 +50,7 @@ async def cli_health():
       status_code=500
     )
 
-@router_public.get("/info")
+@router_public.get("/info", operation_id="cli_info")
 async def cli_info():
   """
   Return information about the Nexe Central CLI.
@@ -84,7 +84,7 @@ async def cli_info():
       status_code=500
     )
 
-@router_public.get("/list")
+@router_public.get("/list", operation_id="cli_list")
 async def cli_list():
   """
   Return the list of available CLIs (redirects to /ui-control/api/clis).

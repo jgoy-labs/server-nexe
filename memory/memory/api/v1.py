@@ -100,7 +100,7 @@ async def get_memory_api():
         _memory_api = _new_api  # only assigned after successful initialization
     return _memory_api
 
-@router.post("/store", response_model=MemoryStoreResponse, dependencies=[Depends(require_api_key)], summary="Store content in semantic memory (API key required)")
+@router.post("/store", response_model=MemoryStoreResponse, dependencies=[Depends(require_api_key)], summary="Store content in semantic memory (API key required)", operation_id="memory_store")
 async def memory_store(request: Request, body: MemoryStoreRequest):
     """
     Store content in semantic memory (RAG).
@@ -168,7 +168,7 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
             detail="Internal error. Check server logs."
         )
 
-@router.post("/search", response_model=MemorySearchResponse, dependencies=[Depends(require_api_key)], summary="Search semantic memory by vector similarity (API key required)")
+@router.post("/search", response_model=MemorySearchResponse, dependencies=[Depends(require_api_key)], summary="Search semantic memory by vector similarity (API key required)", operation_id="memory_search")
 @limiter.limit("60/minute")
 async def memory_search(request: Request, body: MemorySearchRequest):
     """
@@ -260,7 +260,7 @@ async def memory_search(request: Request, body: MemorySearchRequest):
             detail="Internal error. Check server logs."
         )
 
-@router.get("/health", summary="Health check for memory subsystem and Qdrant collections")
+@router.get("/health", summary="Health check for memory subsystem and Qdrant collections", operation_id="memory_health")
 async def memory_health():
     """Health check for memory subsystem."""
     try:

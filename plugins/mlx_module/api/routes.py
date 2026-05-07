@@ -32,7 +32,7 @@ def create_router(module_instance) -> APIRouter:
             raise HTTPException(status_code=503, detail="MLXModule not initialized")
         return module_instance
 
-    @router.get("/info")
+    @router.get("/info", operation_id="mlx_info")
     async def get_info(_: str = Depends(require_api_key)):
         """Informacio del modul MLX. PROTECTED: Requires API key."""
         module = _get_module()

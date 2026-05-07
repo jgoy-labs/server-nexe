@@ -35,6 +35,7 @@ def configure_dependencies(_api_integrator_instance, _i18n_manager):
   response_model=ModulesListResponse,
   summary="List integrated modules and their APIs",
   dependencies=[Depends(require_api_key)],
+  operation_id="list_modules",
 )
 @limiter.limit("10/minute")
 async def list_integrated_modules(
@@ -64,6 +65,7 @@ async def list_integrated_modules(
   response_model=ModuleRoutesResponse,
   summary="Registered routes for a specific module",
   dependencies=[Depends(require_api_key)],
+  operation_id="get_module_routes",
 )
 @limiter.limit("10/minute")
 async def get_module_routes(

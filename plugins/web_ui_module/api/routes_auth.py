@@ -174,14 +174,14 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
 
     # -- GET /auth --
 
-    @router.get("/auth")
+    @router.get("/auth", operation_id="webui_verify_auth")
     async def verify_auth(_auth=Depends(require_ui_auth)):
         """Verificar API key"""
         return {"status": "ok"}
 
     # -- POST /lang --
 
-    @router.post("/lang")
+    @router.post("/lang", operation_id="webui_set_language")
     async def set_language(
         body: dict,
         _auth=Depends(require_ui_auth),
@@ -202,7 +202,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
 
     # -- GET /info --
 
-    @router.get("/info")
+    @router.get("/info", operation_id="webui_info")
     async def get_ui_info(_auth=Depends(require_ui_auth)):
         """Info del model i backend actiu"""
         import os
@@ -264,7 +264,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
 
     # -- GET /backends --
 
-    @router.get("/backends")
+    @router.get("/backends", operation_id="webui_list_backends")
     async def list_backends(_auth=Depends(require_ui_auth)):
         """Llista backends disponibles amb els seus models"""
         import os
@@ -449,7 +449,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         # MLX / llamacpp / auto: best-effort, acceptem
         return True
 
-    @router.post("/backend")
+    @router.post("/backend", operation_id="webui_set_backend")
     async def set_backend(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Canvia el backend i/o model actiu en runtime. Arrenca Ollama si cal."""
         import os
@@ -560,7 +560,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
 
     # -- GET /health --
 
-    @router.get("/health")
+    @router.get("/health", operation_id="webui_auth_health")
     async def health():
         """Health check del plugin"""
         return {
