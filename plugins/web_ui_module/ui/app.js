@@ -3,6 +3,7 @@
  * Nexe UI - Client JavaScript
  * ============================================
  */
+/* global confirm, alert, AbortController, TextDecoder, FileReader */
 
 const UI_STRINGS = {
     ca: {
@@ -431,7 +432,7 @@ class NexeUI {
     _setThinkingText(spanEl, text) {
         // Descompon el text en un <span> per lletra perquè el CSS pugui
         // aplicar un `animation-delay` diferent a cada una i formar una
-        // "onada" estil loading. Preserva espais amb nbsp ( ) perquè
+        // "onada" estil loading. Preserva espais amb nbsp ( ) perquè
         // inline-block no col·lapsi el whitespace.
         spanEl.textContent = '';
         const chars = [...(text || '')];
@@ -439,7 +440,7 @@ class NexeUI {
             const letter = document.createElement('span');
             letter.className = 'think-char';
             letter.style.setProperty('--i', String(i));
-            letter.textContent = ch === ' ' ? ' ' : ch;
+            letter.textContent = ch === ' ' ? ' ' : ch;
             spanEl.appendChild(letter);
         });
     }
@@ -461,7 +462,6 @@ class NexeUI {
 
     async fetchWithCsrf(url, options = {}) {
         const opts = { ...options };
-        const method = (opts.method || 'GET').toUpperCase();
         opts.credentials = opts.credentials || 'same-origin';
         if (this.apiKey) {
             opts.headers = { ...(opts.headers || {}), 'X-API-Key': this.apiKey };
@@ -533,7 +533,7 @@ class NexeUI {
                     const cb = document.getElementById(id);
                     if (cb) cb.checked = !disabled.includes(coll);
                 }
-            } catch (e) { /* ignore corrupt localStorage */ }
+            } catch { /* ignore corrupt localStorage */ }
         }
         for (const id of Object.keys(COLL_MAP)) {
             const cb = document.getElementById(id);
@@ -588,7 +588,7 @@ class NexeUI {
         try {
             const disabled = JSON.parse(saved);
             return ALL.filter(c => !disabled.includes(c));
-        } catch (e) { return ALL; }
+        } catch { return ALL; }
     }
 
     // ── Thinking toggle ────────────────────────────────────────────
@@ -699,7 +699,7 @@ class NexeUI {
                     input.value = '';
                     input.focus();
                 }
-            } catch (e) {
+            } catch {
                 error.style.display = 'block';
             } finally {
                 btn.disabled = false;
@@ -983,7 +983,7 @@ class NexeUI {
                     el.title = `model: ${data.model}\nbackend: ${data.backend}\nversion: ${data.version}`;
                 }
             }
-        } catch (e) {
+        } catch {
             const el = document.getElementById('modelInfoText');
             if (el) el.textContent = 'nexe';
         } finally {
@@ -1151,7 +1151,7 @@ class NexeUI {
                                     if (opt) opt.textContent = 'Ollama';
                                 }
                             }
-                        } catch (_) {}
+                        } catch { /* intentional: ignore JSON parse error */ }
                     }
                     if (!ready && el) el.textContent = this.t('ollama_not_responding');
                 } else {
@@ -1447,7 +1447,7 @@ class NexeUI {
                     this.currentSessionId = sd.session_id;
                     this.loadSessions();
                 }
-            } catch (e) { /* continue without session */ }
+            } catch { /* continue without session */ }
         }
 
         // Show stop button
@@ -1766,45 +1766,45 @@ class NexeUI {
                         let chunk = decoder.decode(value, { stream: true });
 
                         // Detectar token MODEL (model realment usat)
-                        const modelMatch = chunk.match(/\x00\[MODEL:([^\]]+)\]\x00/);
+                        const modelMatch = chunk.match(/\x00\[MODEL:([^\]]+)\]\x00/); // eslint-disable-line no-control-regex
                         if (modelMatch) {
                             usedModel = modelMatch[1];
-                            chunk = chunk.replace(/\x00\[MODEL:[^\]]+\]\x00/, '');
+                            chunk = chunk.replace(/\x00\[MODEL:[^\]]+\]\x00/, ''); // eslint-disable-line no-control-regex
                         }
 
                         // Detect RAG token (retrieved memories)
-                        const ragMatch = chunk.match(/\x00\[RAG:(\d+)\]\x00/);
+                        const ragMatch = chunk.match(/\x00\[RAG:(\d+)\]\x00/); // eslint-disable-line no-control-regex
                         if (ragMatch) {
                             ragCount = parseInt(ragMatch[1], 10);
-                            chunk = chunk.replace(/\x00\[RAG:\d+\]\x00/, '');
+                            chunk = chunk.replace(/\x00\[RAG:\d+\]\x00/, ''); // eslint-disable-line no-control-regex
                         }
 
                         // Detectar RAG average score
-                        const ragAvgMatch = chunk.match(/\x00\[RAG_AVG:([\d.]+)\]\x00/);
+                        const ragAvgMatch = chunk.match(/\x00\[RAG_AVG:([\d.]+)\]\x00/); // eslint-disable-line no-control-regex
                         if (ragAvgMatch) {
                             ragAvg = parseFloat(ragAvgMatch[1]);
-                            chunk = chunk.replace(/\x00\[RAG_AVG:[\d.]+\]\x00/, '');
+                            chunk = chunk.replace(/\x00\[RAG_AVG:[\d.]+\]\x00/, ''); // eslint-disable-line no-control-regex
                         }
 
                         // Detectar RAG items (per-font scores)
                         let ragItemMatch;
-                        const ragItemRe = /\x00\[RAG_ITEM:([^|]+)\|([\d.]+)\]\x00/g;
+                        const ragItemRe = /\x00\[RAG_ITEM:([^|]+)\|([\d.]+)\]\x00/g; // eslint-disable-line no-control-regex
                         while ((ragItemMatch = ragItemRe.exec(chunk)) !== null) {
                             ragItems.push({ col: ragItemMatch[1], score: parseFloat(ragItemMatch[2]) });
                         }
-                        chunk = chunk.replace(/\x00\[RAG_ITEM:[^\]]+\]\x00/g, '');
+                        chunk = chunk.replace(/\x00\[RAG_ITEM:[^\]]+\]\x00/g, ''); // eslint-disable-line no-control-regex
 
                         // Detectar token COMPACT (context compactat)
-                        compactMatch = chunk.match(/\x00\[COMPACT:(\d+)\]\x00/);
+                        compactMatch = chunk.match(/\x00\[COMPACT:(\d+)\]\x00/); // eslint-disable-line no-control-regex
                         if (compactMatch) {
-                            chunk = chunk.replace(/\x00\[COMPACT:\d+\]\x00/, '');
+                            chunk = chunk.replace(/\x00\[COMPACT:\d+\]\x00/, ''); // eslint-disable-line no-control-regex
                         }
 
                         // Detectar DOC_TRUNCATED (document massa gran pel context)
-                        const truncMatch = chunk.match(/\x00\[DOC_TRUNCATED:(\d+)\]\x00/);
+                        const truncMatch = chunk.match(/\x00\[DOC_TRUNCATED:(\d+)\]\x00/); // eslint-disable-line no-control-regex
                         if (truncMatch) {
                             const truncPct = parseInt(truncMatch[1]);
-                            chunk = chunk.replace(/\x00\[DOC_TRUNCATED:\d+\]\x00/, '');
+                            chunk = chunk.replace(/\x00\[DOC_TRUNCATED:\d+\]\x00/, ''); // eslint-disable-line no-control-regex
                             const truncNotice = document.createElement('div');
                             truncNotice.className = 'trunc-notice';
                             truncNotice.textContent = this.t('doc_truncated').replace('{pct}', truncPct);
@@ -1812,9 +1812,9 @@ class NexeUI {
                         }
 
                         // Detectar MODEL_LOADING (model carregant-se a VRAM)
-                        const loadingMatch = chunk.match(/\x00\[MODEL_LOADING:([^\]|]+)\|?([^\]]*)\]\x00/);
+                        const loadingMatch = chunk.match(/\x00\[MODEL_LOADING:([^\]|]+)\|?([^\]]*)\]\x00/); // eslint-disable-line no-control-regex
                         if (loadingMatch) {
-                            chunk = chunk.replace(/\x00\[MODEL_LOADING:[^\]]+\]\x00/, '');
+                            chunk = chunk.replace(/\x00\[MODEL_LOADING:[^\]]+\]\x00/, ''); // eslint-disable-line no-control-regex
                             const loadingModel = loadingMatch[1];
                             const loadingBackend = loadingMatch[2] || '';
                             const backendLabel = loadingBackend.replace('_module', '').toUpperCase();
@@ -1877,8 +1877,8 @@ class NexeUI {
                         }
 
                         // Detect saving spinner [SAVING]
-                        if (chunk.match(/\x00\[SAVING\]\x00/)) {
-                            chunk = chunk.replace(/\x00\[SAVING\]\x00/g, '');
+                        if (chunk.match(/\x00\[SAVING\]\x00/)) { // eslint-disable-line no-control-regex
+                            chunk = chunk.replace(/\x00\[SAVING\]\x00/g, ''); // eslint-disable-line no-control-regex
                             const savingEl = document.getElementById('nexe-mem-saving');
                             if (!savingEl) {
                                 const el = document.createElement('span');
@@ -1890,26 +1890,26 @@ class NexeUI {
                             }
                         }
                         // Detect saved memory count token [MEM:N] or [MEM]
-                        if (chunk.match(/\x00\[MEM:?\d*\]\x00/)) {
+                        if (chunk.match(/\x00\[MEM:?\d*\]\x00/)) { // eslint-disable-line no-control-regex
                             memorySaved = true;
-                            chunk = chunk.replace(/\x00\[MEM:?\d*\]\x00/g, '');
+                            chunk = chunk.replace(/\x00\[MEM:?\d*\]\x00/g, ''); // eslint-disable-line no-control-regex
                             const savingEl = document.getElementById('nexe-mem-saving');
                             if (savingEl) savingEl.remove();
                         }
 
                         // Detect deleted memory token [DEL:N:fact1|fact2|...]
-                        const delMatch = chunk.match(/\x00\[DEL:(\d+):(.+?)\]\x00/);
+                        const delMatch = chunk.match(/\x00\[DEL:(\d+):(.+?)\]\x00/); // eslint-disable-line no-control-regex
                         if (delMatch) {
                             memoryDeleted = true;
                             deletedCount = parseInt(delMatch[1]);
                             deletedFacts = delMatch[2].split('|');
-                            chunk = chunk.replace(/\x00\[DEL:\d+:.+?\]\x00/g, '');
+                            chunk = chunk.replace(/\x00\[DEL:\d+:.+?\]\x00/g, ''); // eslint-disable-line no-control-regex
                         }
                         // Detect pending delete — model vol esborrar, però cal confirmació
-                        const pendingDelMatch = chunk.match(/\x00\[PENDING_DELETE:(.+?)\]\x00/);
+                        const pendingDelMatch = chunk.match(/\x00\[PENDING_DELETE:(.+?)\]\x00/); // eslint-disable-line no-control-regex
                         if (pendingDelMatch) {
                             const fact = pendingDelMatch[1].replace(/\\\|/g, '|');
-                            chunk = chunk.replace(/\x00\[PENDING_DELETE:.+?\]\x00/g, '');
+                            chunk = chunk.replace(/\x00\[PENDING_DELETE:.+?\]\x00/g, ''); // eslint-disable-line no-control-regex
                             // Show confirmation dialog after streaming ends
                             setTimeout(() => this._showDeleteConfirmDialog(fact), 100);
                         }
@@ -2464,7 +2464,7 @@ class NexeUI {
         // (persisted messages re-rendered from disk). Central strip here
         // = single source of truth for every render path.
         const cleaned = text
-            .replace(/\x00/g, '')                       // stray delimiters
+            .replace(/\x00/g, '') // eslint-disable-line no-control-regex
             .replace(/\[MODEL:[^\]]+\]/g, '')          // [MODEL:nexe-system]
             .replace(/\[MEM(?::\d+)?\]/g, '')          // [MEM] and [MEM:N]
             .replace(/\[DEL:\d+(?::[^\]]*)?\]/g, '')   // [DEL:N:facts]
