@@ -20,27 +20,27 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Environment setup — ha d'anar ABANS de qualsevol import que pogui carregar
-# HuggingFace/sentence-transformers transitivament. Mouríem encara mes amunt
-# pero os/warnings estan dalt de tot.
+# Environment setup — must go BEFORE any import that could transitively load
+# HuggingFace/sentence-transformers. We would move it even higher but
+# os/warnings are already at the top.
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Force offline mode for HuggingFace — server must work without internet
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
-# Bug 14 (2026-04-06) — silenciar tqdm de sentence-transformers en runtime del
-# servidor. Les barres `Batches: 0%|...` es barrejaven amb els logs del servidor
-# i creaven línies corruptes. Aplicat NOMÉS en runtime servidor (no afecta la
-# descàrrega inicial de models, que es fa via installer/setup_models.py).
+# Bug 14 (2026-04-06) — silence tqdm from sentence-transformers at server runtime.
+# The `Batches: 0%|...` bars mixed with server logs and created corrupt lines.
+# Applied ONLY at server runtime (does not affect the initial model download,
+# which is done via installer/setup_models.py).
 os.environ.setdefault("TQDM_DISABLE", "1")
 
-# Bug 6 (2026-04-06) — silenciar warnings sorollosos en carregar embedders.
-# `paraphrase-multilingual-mpnet-base-v2` emet warnings UserWarning per
-# `position_ids UNEXPECTED` i `Some weights of...` que no aporten res.
-# Dev D (Consultor passada 1): moguts ABANS dels imports `from .lifespan_modules
-# import ...` per assegurar que s'apliquen encara que algun import transitiu
-# carregui sentence_transformers en temps d'import.
+# Bug 6 (2026-04-06) — silence noisy warnings when loading embedders.
+# `paraphrase-multilingual-mpnet-base-v2` emits UserWarning for
+# `position_ids UNEXPECTED` and `Some weights of...` which add no value.
+# Dev D (Consultant pass 1): moved BEFORE `from .lifespan_modules import ...`
+# to ensure they apply even if a transitive import loads sentence_transformers
+# at import time.
 _warnings.filterwarnings("ignore", message=".*position_ids.*", category=UserWarning)
 _warnings.filterwarnings("ignore", message=".*Some weights of.*", category=UserWarning)
 _warnings.filterwarnings("ignore", category=UserWarning, module="fastembed")
@@ -72,23 +72,23 @@ logger = logging.getLogger(__name__)
 
 from core.server.helpers import translate as _translate  # noqa: E402  # after warnings filter
 
-# Timeout per fase d'arrencada (B09). Configurable via NEXE_STARTUP_TIMEOUT.
+# Startup phase timeout (B09). Configurable via NEXE_STARTUP_TIMEOUT.
 STARTUP_TIMEOUT = float(os.getenv("NEXE_STARTUP_TIMEOUT", "30"))
 
-# Path canònic del PID file (B06, B10, B15).
+# Canonical path for the PID file (B06, B10, B15).
 _PID_SUBPATH = Path("storage") / "run" / "server.pid"
 
 
 def _resolve_encryption_enabled(env_value: str, *, sqlcipher_available: bool) -> bool:
-  """P1-D: Determina si l'encriptació s'ha d'activar donada la config env i disponibilitat.
+  """P1-D: Determine whether encryption should be enabled given the env config and availability.
 
-  - 'auto' o '' (buit/legacy): activar si sqlcipher3 disponible, sinó OFF
-  - 'true': sempre ON (el caller verifica SQLCIPHER_AVAILABLE i fa RuntimeError si cal)
-  - 'false': sempre OFF
-  - qualsevol altre valor: OFF (comportament segur per defecte)
+  - 'auto' or '' (empty/legacy): enable if sqlcipher3 is available, otherwise OFF
+  - 'true': always ON (caller checks SQLCIPHER_AVAILABLE and raises RuntimeError if needed)
+  - 'false': always OFF
+  - any other value: OFF (safe default behaviour)
 
-  Funció pura (sense efectes secundaris) per poder-la testejar directament.
-  El logging el fa el caller (lifespan startup).
+  Pure function (no side effects) so it can be tested directly.
+  Logging is done by the caller (lifespan startup).
   """
   normalized = env_value.strip().lower()
   if normalized in ('', 'auto'):
@@ -101,10 +101,10 @@ def _resolve_encryption_enabled(env_value: str, *, sqlcipher_available: bool) ->
 
 
 def _write_pid_file(project_root: Path, port: int) -> bool:
-  """Escriu el PID file de forma atòmica (O_CREAT|O_EXCL). B06, B07, B10.
+  """Write the PID file atomically (O_CREAT|O_EXCL). B06, B07, B10.
 
-  Retorna True si l'ha adquirit, False si un servidor viu ja el té.
-  Fitxers estantis (PID mort o corrupte) s'eliminen automàticament.
+  Returns True if acquired, False if a live server already holds it.
+  Stale files (dead or corrupt PID) are removed automatically.
   """
   pid_path = project_root / _PID_SUBPATH
   pid_path.parent.mkdir(parents=True, exist_ok=True)
@@ -127,8 +127,8 @@ def _write_pid_file(project_root: Path, port: int) -> bool:
       try:
         raw = pid_path.read_text()
         if not raw.strip():
-          # Buit: un altre procés acaba de crear-lo amb O_EXCL i encara escriu.
-          # Tractem com a locked — NO eliminem.
+          # Empty: another process just created it with O_EXCL and is still writing.
+          # Treat as locked — do NOT delete.
           logger.debug("PID file exists but empty — another process is acquiring it.")
           return False
         data = _json.loads(raw)
@@ -160,9 +160,9 @@ def _write_pid_file(project_root: Path, port: int) -> bool:
 
 
 def _remove_pid_file(project_root: Path) -> None:
-  """Elimina el PID file si existeix i pertany a aquest procés. B10.
+  """Remove the PID file if it exists and belongs to this process. B10.
 
-  Segur de cridar sempre al finally — mai llança excepcions.
+  Safe to call in a finally block — never raises exceptions.
   """
   if project_root is None:
     return
@@ -203,11 +203,11 @@ server_state = ServerState()
 
 
 async def _prewarm_fastembed() -> None:
-    """B.1: Pre-warm fastembed ONNX runtime al startup (background, non-blocking).
+    """B.1: Pre-warm fastembed ONNX runtime at startup (background, non-blocking).
 
-    Obté el singleton MemoryAPI (creat o reutilitzat per get_memory_api),
-    activa pre_warm a la instància i crida warmup(). No modifica els
-    defaults globals d'IngestConfig.
+    Obtains the MemoryAPI singleton (created or reused by get_memory_api),
+    enables pre_warm on the instance and calls warmup(). Does not modify the
+    global IngestConfig defaults.
     """
     import time as _time
     try:
@@ -255,11 +255,11 @@ async def lifespan(app: FastAPI):
     logger.info(msg)
 
     server_state.config = load_config(server_state.project_root, server_state.i18n)
-    app.state.config = server_state.config  # Sync: elimina el desync entre server_state i app.state
+    app.state.config = server_state.config  # Sync: eliminates the desync between server_state and app.state
 
     # === PID FILE (B06, B07, B10) ===
-    # Escriu el PID de forma atòmica al startup. Avorta si un servidor viu
-    # ja el té (single-instance guard). El finally sempre el neteja (B10).
+    # Write the PID atomically at startup. Aborts if a live server already
+    # holds it (single-instance guard). The finally always cleans it up (B10).
     from core.config import DEFAULT_HOST, DEFAULT_PORT
     _srv_startup_cfg = server_state.config.get('core', {}).get('server', {})
     _startup_port = _srv_startup_cfg.get('port', DEFAULT_PORT)
@@ -275,7 +275,7 @@ async def lifespan(app: FastAPI):
 
       encryption_config = server_state.config.get('security', {}).get('encryption', {})
 
-      # P1-D: default 'auto' — activar si sqlcipher3 disponible, sinó continuar amb WARNING.
+      # P1-D: default 'auto' — enable if sqlcipher3 is available, otherwise continue with WARNING.
       # Env var NEXE_ENCRYPTION_ENABLED: 'auto' (default) | 'true' | 'false' | '' (legacy = auto)
       env_crypto = os.environ.get('NEXE_ENCRYPTION_ENABLED', 'auto')
       from memory.memory.engines.persistence import SQLCIPHER_AVAILABLE
@@ -291,8 +291,8 @@ async def lifespan(app: FastAPI):
               "  (2) Disable encryption: NEXE_ENCRYPTION_ENABLED=false"
           )
 
-      # P1-D guard: en mode auto, si hi ha dades plain text existents, NO activar encryption
-      # (intentar obrir-les com SQLCipher faria fallar el servidor). Avisar i requerir migració.
+      # P1-D guard: in auto mode, if plain-text data already exists, do NOT enable encryption
+      # (attempting to open it as SQLCipher would crash the server). Warn and require migration.
       if crypto_enabled and normalized_env in ('', 'auto'):
         storage_path_check = server_state.project_root / "storage" if server_state.project_root else None
         if storage_path_check:
@@ -309,7 +309,7 @@ async def lifespan(app: FastAPI):
                     "Set NEXE_ENCRYPTION_ENABLED=false to suppress this warning."
                 )
             except Exception:  # nosec B110: SQLite header probe at startup; unreadable → fall through to _resolve_encryption_enabled (comment documents intent)
-              pass  # no podem llegir la DB — continuem amb el resultat de _resolve_encryption_enabled
+              pass  # cannot read the DB — continue with the result of _resolve_encryption_enabled
 
       if crypto_enabled:
         server_state.crypto_provider = CryptoProvider()
@@ -339,7 +339,7 @@ async def lifespan(app: FastAPI):
     get_qdrant_client(url=qdrant_url, path=qdrant_path if not qdrant_url else None)
 
     # Auto-start services (Qdrant, Ollama) if not running
-    # B09: timeout per evitar penjades indefinides si Qdrant/Ollama no arranquen
+    # B09: timeout to avoid indefinite hangs if Qdrant/Ollama do not start
     try:
       await asyncio.wait_for(
         _auto_start_services(server_state.config, server_state.project_root, server_state),  # type: ignore[arg-type]  # project_root is initialised by factory_state before lifespan runs
@@ -384,9 +384,9 @@ async def lifespan(app: FastAPI):
         discovered = await server_state.module_manager.discover_modules()
         total_modules = list(server_state.module_manager._modules.keys())
 
-        # Bug 20 fix — startup summary: si el discover ha detectat cicles
-        # de dependencies, els mostrem amb prefix [WARN] perque no quedin
-        # amagats (abans els modules s'inhabilitaven en silenci).
+        # Bug 20 fix — startup summary: if discover has detected dependency
+        # cycles, show them with [WARN] prefix so they are not hidden
+        # (previously modules were silently disabled).
         try:
           cycle_warnings = server_state.module_manager.get_cycle_warnings()
         except Exception:
@@ -430,7 +430,7 @@ async def lifespan(app: FastAPI):
 
     # Load memory modules, plugins, knowledge, and MemoryService v1
     # (extracted to lifespan_modules.py for maintainability)
-    # B09: timeout per evitar penjades indefinides en cada fase d'inicialització
+    # B09: timeout to avoid indefinite hangs in each initialisation phase
     _startup_phases = [
       ("memory modules", load_memory_modules(app, server_state, _translate)),
       ("plugin modules", initialize_plugin_modules(app, server_state)),
@@ -451,8 +451,8 @@ async def lifespan(app: FastAPI):
     # Bootstrap tokens
     setup_bootstrap_tokens(server_state, _translate)
 
-    # Bug 11: auto-renovacio del bootstrap token. Sense aixo, en sessions
-    # llargues l'usuari ha de reiniciar el servidor quan el token expira.
+    # Bug 11: auto-renewal of the bootstrap token. Without this, in long
+    # sessions the user must restart the server when the token expires.
     try:
       bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
       auto_renew = os.getenv('NEXE_BOOTSTRAP_AUTO_RENEW', 'true').lower() == 'true'
@@ -508,7 +508,7 @@ async def lifespan(app: FastAPI):
       server_state.configure_modules_callback(server_state.api_integrator, server_state.i18n)
 
     # Session cleanup background task (N-5 / N04)
-    # Guarda la referència per poder cancel·lar-la al shutdown (N04).
+    # Keep the reference so it can be cancelled on shutdown (N04).
     try:
       from plugins.web_ui_module.api.routes import start_session_cleanup_task
       web_ui = app.state.modules.get("web_ui_module")
@@ -552,11 +552,11 @@ async def lifespan(app: FastAPI):
       "System shutdown initiated...")
     logger.info(msg)
 
-    # === PID FILE CLEANUP (B10) — sempre, fins i tot si startup ha fallat ===
+    # === PID FILE CLEANUP (B10) — always, even if startup failed ===
     _remove_pid_file(server_state.project_root)  # type: ignore[arg-type]  # project_root is initialised by factory_state before lifespan runs
 
     try:
-      # Bug 11: stop bootstrap token auto-renewal task net
+      # Bug 11: cleanly stop bootstrap token auto-renewal task
       try:
         await stop_bootstrap_token_renewal()
       except Exception as e:
@@ -625,7 +625,7 @@ async def lifespan(app: FastAPI):
       if server_state.module_manager:
         logger.debug("ModuleManager kept alive (stateless registry)")
 
-      # Cancel·la cleanup tasks en background (N04)
+      # Cancel background cleanup tasks (N04)
       for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task'):
         _task = getattr(server_state, _task_attr, None)
         if _task is not None and not _task.done():
@@ -636,7 +636,7 @@ async def lifespan(app: FastAPI):
             pass
           logger.debug("Background task '%s' cancelled", _task_attr)
 
-      # Reinicia circuit breakers a CLOSED per al proper reinici (N03)
+      # Reset circuit breakers to CLOSED for the next restart (N03)
       try:
         from core.resilience import reset_all_circuit_breakers
         reset_all_circuit_breakers()

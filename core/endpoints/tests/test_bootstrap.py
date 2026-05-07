@@ -1,5 +1,5 @@
 """
-Tests per core/endpoints/bootstrap.py
+Tests for core/endpoints/bootstrap.py
 """
 import pytest
 from datetime import datetime, timezone
@@ -16,8 +16,8 @@ def client():
     app = FastAPI()
     app.state.i18n = None
     app.include_router(router)
-    # Bug 22: /api/bootstrap/info ara requereix X-API-Key. En tests unitaris
-    # de la lògica de bootstrap n'overridem l'auth.
+    # Bug 22: /api/bootstrap/info now requires X-API-Key. In unit tests
+    # of the bootstrap logic we override the auth.
     from plugins.security.core.auth_dependencies import require_api_key
     app.dependency_overrides[require_api_key] = lambda: "test-bypass"
     return TestClient(app, raise_server_exceptions=False)
@@ -56,7 +56,7 @@ class TestTranslateHelper:
     def test_t_with_exception_returns_fallback(self):
         from core.endpoints.bootstrap import _t
         req = MagicMock()
-        req.app.state = MagicMock(spec=[])  # sense i18n → AttributeError
+        req.app.state = MagicMock(spec=[])  # without i18n → AttributeError
         result = _t(req, "key", "Fallback text")
         assert result == "Fallback text"
 
@@ -78,7 +78,7 @@ class TestCheckRateLimit:
         req = MagicMock()
         req.app.state.i18n = None
         with patch("core.bootstrap_tokens.check_bootstrap_rate_limit", return_value="ok"):
-            check_rate_limit("127.0.0.1", req)  # no ha de llençar
+            check_rate_limit("127.0.0.1", req)  # must not raise
 
     def test_global_limit_raises_429(self):
         from core.endpoints.bootstrap import check_rate_limit
@@ -164,21 +164,21 @@ class TestBootstrapSession:
         assert resp.status_code == 503
 
     def test_bootstrap_invalid_ip_format(self, client, monkeypatch):
-        """IP invàlida → 400"""
+        """Invalid IP → 400"""
         monkeypatch.setenv("NEXE_ENV", "development")
-        # TestClient usa "testclient" com IP → ValueError a ip_address()
+        # TestClient uses "testclient" as IP → ValueError in ip_address()
         resp = client.post("/api/bootstrap", json={"token": "TOKEN"})
         assert resp.status_code == 400
 
     def _patch_client_ip(self, ip="127.0.0.1"):
-        """Context manager per simular una IP específica al client"""
+        """Context manager to simulate a specific client IP"""
         import ipaddress as ipmod
         mock_client = MagicMock()
         mock_client.host = ip
         return patch("fastapi.Request.client", new_callable=lambda: property(lambda self: mock_client))
 
     def test_bootstrap_success_from_localhost(self, monkeypatch, tmp_path):
-        """Bootstrap exit des de localhost"""
+        """Bootstrap success from localhost"""
         monkeypatch.setenv("NEXE_ENV", "development")
         from core.bootstrap_tokens import BootstrapTokenManager
         manager = BootstrapTokenManager()
@@ -196,17 +196,17 @@ class TestBootstrapSession:
              patch("starlette.testclient.TestClient"):
             pass
 
-        # Patch a nivell de la funció del endpoint
+        # Patch at the endpoint function level
         with patch("core.endpoints.bootstrap.check_rate_limit"), \
              patch("core.bootstrap_tokens.validate_master_bootstrap", return_value=True), \
              patch("core.bootstrap_tokens.create_session_token", return_value="sess-token-xyz"):
             resp = client.post("/api/bootstrap", json={"token": "nexe-test-token"})
 
-        # Amb IP "testclient" → error 400. Provem la lògica a través del mock
-        assert resp.status_code in (200, 400)  # 400 per IP invàlida de TestClient
+        # With IP "testclient" → error 400. Test the logic via mock
+        assert resp.status_code in (200, 400)  # 400 for invalid TestClient IP
 
     def test_bootstrap_invalid_token_no_info(self, monkeypatch, tmp_path):
-        """Token incorrecte sense info → 503"""
+        """Incorrect token with no info → 503"""
         monkeypatch.setenv("NEXE_ENV", "development")
 
         app = FastAPI()
@@ -219,10 +219,10 @@ class TestBootstrapSession:
              patch("core.bootstrap_tokens.get_bootstrap_token", return_value=None):
             resp = client.post("/api/bootstrap", json={"token": "WRONG-TOKEN"})
 
-        assert resp.status_code in (400, 503)  # 400 per IP invàlida
+        assert resp.status_code in (400, 503)  # 400 for invalid IP
 
     def test_bootstrap_token_already_used(self, monkeypatch):
-        """Token ja usat → 403"""
+        """Token already used → 403"""
         monkeypatch.setenv("NEXE_ENV", "development")
         now_ts = datetime.now(timezone.utc).timestamp()
 
@@ -237,10 +237,10 @@ class TestBootstrapSession:
                    return_value={"token": "T", "expires": now_ts + 600, "used": True}):
             resp = client.post("/api/bootstrap", json={"token": "T"})
 
-        assert resp.status_code in (400, 403)  # 400 per IP invàlida de TestClient
+        assert resp.status_code in (400, 403)  # 400 for invalid TestClient IP
 
     def test_bootstrap_token_expired(self, monkeypatch):
-        """Token expirat → 410"""
+        """Expired token → 410"""
         monkeypatch.setenv("NEXE_ENV", "development")
         expired_ts = datetime.now(timezone.utc).timestamp() - 3600
 
@@ -255,10 +255,10 @@ class TestBootstrapSession:
                    return_value={"token": "T", "expires": expired_ts, "used": False}):
             resp = client.post("/api/bootstrap", json={"token": "T"})
 
-        assert resp.status_code in (400, 410)
+        assert resp.status_code in (400, 410)  # 400 for invalid TestClient IP
 
     def test_bootstrap_invalid_status_401(self, monkeypatch):
-        """Token invàlid però token actiu → 401"""
+        """Invalid token but active token → 401"""
         monkeypatch.setenv("NEXE_ENV", "development")
         now_ts = datetime.now(timezone.utc).timestamp()
 
@@ -273,7 +273,7 @@ class TestBootstrapSession:
                    return_value={"token": "correct-token", "expires": now_ts + 600, "used": False}):
             resp = client.post("/api/bootstrap", json={"token": "wrong-token"})
 
-        assert resp.status_code in (400, 401)
+        assert resp.status_code in (400, 401)  # 400 for invalid TestClient IP
 
 
 # ═══════════════════════════════════════════════════════════════════════════

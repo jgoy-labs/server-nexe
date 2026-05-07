@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: core/cli/tests/test_i18n.py
-Description: Tests del helper `core.cli.i18n.t` — lookup amb fallback,
-             interpolació kwargs, cache i comportament davant d'idiomes
-             inexistents.
+Description: Tests for the `core.cli.i18n.t` helper — lookup with fallback,
+             kwargs interpolation, cache and behaviour with non-existent
+             languages.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -18,7 +18,7 @@ from core.cli import i18n
 
 @pytest.fixture(autouse=True)
 def _fresh_cache(monkeypatch):
-    """Assegura cache i entorn NEXE_LANG nets per cada test."""
+    """Ensure clean cache and NEXE_LANG environment for each test."""
     monkeypatch.delenv("NEXE_LANG", raising=False)
     i18n.clear_cache()
     yield
@@ -37,7 +37,7 @@ class TestBasicLookup:
         assert i18n.t("cli.greetings.hello", lang="en-US") == "Hello"
 
     def test_nested_key(self):
-        # Claus amb 3 nivells de profunditat resolen correctament.
+        # Keys with 3 levels of depth resolve correctly.
         out = i18n.t("cli.go.starting_server", lang="ca-ES")
         assert "Iniciant" in out
 
@@ -45,7 +45,7 @@ class TestBasicLookup:
 class TestFallback:
 
     def test_unknown_lang_falls_back_to_ca(self):
-        """Un idioma no existent cau a ca-ES."""
+        """A non-existent language falls back to ca-ES."""
         assert i18n.t("cli.greetings.hello", lang="xx-XX") == "Hola"
 
     def test_unknown_key_returns_default(self):
@@ -64,7 +64,7 @@ class TestInterpolation:
         assert out == "Nexe CLI v1.0.3-beta"
 
     def test_kwargs_missing_does_not_crash(self):
-        # Missing kwargs → retorna el text cru sense petar.
+        # Missing kwargs → return raw text without crashing.
         out = i18n.t("cli.version_banner", lang="en-US")
         assert "{version}" in out
 
@@ -85,9 +85,9 @@ class TestEnvLang:
 class TestCache:
 
     def test_clear_cache_allows_reload(self, monkeypatch):
-        # Primera càrrega
+        # First load
         assert i18n.t("cli.greetings.hello", lang="ca-ES") == "Hola"
-        # Cache clear + canvi d'entorn funciona
+        # Cache clear + environment change works
         i18n.clear_cache()
         monkeypatch.setenv("NEXE_LANG", "en-US")
         assert i18n.t("cli.greetings.hello") == "Hello"

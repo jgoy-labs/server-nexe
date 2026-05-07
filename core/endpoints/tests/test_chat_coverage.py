@@ -473,16 +473,15 @@ class TestChatCompletionsRagBranches:
             assert isinstance(result, StreamingResponse)
 
     def test_ollama_model_partial_match_uses_matching(self):
-        """Bug 23 (2026-04-06): si hi ha match parcial (mateixa família),
-        el codi ha de promocionar-lo al model canònic i seguir. Aquest test
-        verifica el camí de partial match. Abans, la versió "fallback al
-        primer chat model" també passava; ara només passa si hi ha matching
-        real."""
+        """Bug 23 (2026-04-06): if there is a partial match (same family),
+        the code must promote it to the canonical model and proceed. This test
+        verifies the partial match path. Previously, the "fallback to the first
+        chat model" version also passed; now it only passes if there is a real match."""
         from core.endpoints.chat import _forward_to_ollama, ChatCompletionRequest, Message
 
-        # El default de _forward_to_ollama sense env vars és "llama3.2".
-        # Posem un model disponible amb el mateix prefix perquè el partial
-        # match (`model_name.split(":")[0] in m`) l'agafi.
+        # The default of _forward_to_ollama without env vars is "llama3.2".
+        # We add an available model with the same prefix so the partial
+        # match (`model_name.split(":")[0] in m`) picks it up.
         tags_data = {"models": [{"name": "llama3.2:latest"}]}
         mock_tags = MagicMock(status_code=200)
         mock_tags.json.return_value = tags_data

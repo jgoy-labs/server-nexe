@@ -389,12 +389,12 @@ def get_server_url(scheme: str = "http") -> str:
 
 
 # ─────────────────────────────────────────────────────────────
-# NexeSettings — Registry d'env vars per al futur panell admin
+# NexeSettings — Registry of env vars for the future admin panel
 #
-# Font única de veritat de totes les NEXE_* env vars.
-# No substitueix els consumidors existents (os.getenv directe);
-# actua com a registry per descobriment dinàmic.
-# Tota nova env var s'afegeix aquí i queda disponible al panell.
+# Single source of truth for all NEXE_* env vars.
+# Does not replace existing consumers (direct os.getenv);
+# acts as a registry for dynamic discovery.
+# Every new env var is added here and becomes available in the panel.
 # ─────────────────────────────────────────────────────────────
 
 if _PYDANTIC_SETTINGS_AVAILABLE:
@@ -477,10 +477,10 @@ if _PYDANTIC_SETTINGS_AVAILABLE:
 
         @classmethod
         def list_settings(cls) -> list[dict]:
-            """Per al futur panell admin: llista totes les settings amb metadata.
+            """For the future admin panel: list all settings with metadata.
 
             Returns:
-                Llista de dicts amb: name (env var), field, default, description, type.
+                List of dicts with: name (env var), field, default, description, type.
             """
             return [
                 {

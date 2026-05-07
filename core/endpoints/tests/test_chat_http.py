@@ -82,7 +82,7 @@ class TestChatCompletionsEndpoint:
         assert resp.status_code == 401
 
     def test_ollama_success_non_streaming(self):
-        """Ollama disponible i retorna resposta correcta."""
+        """Ollama available and returns correct response."""
         ollama_resp = {"message": {"content": "Hola, sóc Nexe"}, "done": True}
         tags_resp_data = {"models": [{"name": "llama3.2"}]}
 
@@ -112,7 +112,7 @@ class TestChatCompletionsEndpoint:
         assert "nexe_engine" in data
 
     def test_ollama_connect_error_503(self):
-        """ConnectError quan Ollama no disponible."""
+        """ConnectError when Ollama is unavailable."""
         import httpx
 
         mock_client = AsyncMock()
@@ -130,7 +130,7 @@ class TestChatCompletionsEndpoint:
         assert resp.status_code == 503
 
     def test_mlx_engine_no_module_falls_back_to_ollama(self):
-        """Sense mlx_module, ha de fer fallback a Ollama."""
+        """Without mlx_module, must fall back to Ollama."""
         import httpx
 
         mock_client = AsyncMock()
@@ -138,7 +138,7 @@ class TestChatCompletionsEndpoint:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
 
-        # No mlx_module en modules
+        # No mlx_module in modules
         with patch("httpx.AsyncClient", return_value=mock_client), \
              patch("memory.memory.api.v1.get_memory_api", side_effect=Exception("no memory")):
             client = self._client(modules={})
@@ -149,7 +149,7 @@ class TestChatCompletionsEndpoint:
         assert resp.status_code == 503  # Ollama fallback fails too
 
     def test_llama_cpp_no_module_falls_back_to_ollama(self):
-        """Sense llama_cpp_module, ha de fer fallback a Ollama."""
+        """Without llama_cpp_module, must fall back to Ollama."""
         import httpx
 
         mock_client = AsyncMock()
@@ -167,7 +167,7 @@ class TestChatCompletionsEndpoint:
         assert resp.status_code == 503
 
     def test_rag_context_injected_with_memory_api(self):
-        """RAG: MemoryAPI retorna resultats que s'injecten al prompt."""
+        """RAG: MemoryAPI returns results that are injected into the prompt."""
         mock_result = MagicMock()
         mock_result.text = "Nexe és un assistent"
         mock_result.metadata = {"source": "docs/test.md"}
@@ -189,11 +189,11 @@ class TestChatCompletionsEndpoint:
                                json=self._payload(use_rag=True, engine="ollama"),
                                headers=self._headers())
 
-        # RAG cerca però Ollama falla → 503
+        # RAG searches but Ollama fails → 503
         assert resp.status_code == 503
 
     def test_rag_memory_api_fails_uses_rag_module_fallback(self):
-        """Si MemoryAPI falla, prova rag_module com fallback."""
+        """If MemoryAPI fails, try rag_module as fallback."""
         mock_rag = MagicMock()
         mock_rag.search = AsyncMock(return_value=["Some RAG result"])
 
@@ -214,7 +214,7 @@ class TestChatCompletionsEndpoint:
         assert resp.status_code == 503
 
     def test_system_prompt_injected_when_missing(self):
-        """Si no hi ha system message, s'afegeix system prompt de Nexe."""
+        """If there is no system message, Nexe system prompt is added."""
         config = {"personality": {"prompt": {"ca_full": "Ets Nexe en català"}}}
 
         import httpx
@@ -234,7 +234,7 @@ class TestChatCompletionsEndpoint:
         assert resp.status_code == 503
 
     def test_system_prompt_not_duplicated_when_present(self):
-        """Si el client envia system message, no s'afegeix extra."""
+        """If the client sends a system message, no extra one is added."""
         payload = {
             "messages": [
                 {"role": "system", "content": "Custom system"},
@@ -259,7 +259,7 @@ class TestChatCompletionsEndpoint:
         assert resp.status_code == 503  # Ollama fails, but we got here
 
     def test_mlx_engine_non_streaming_success(self):
-        """MLX engine disponible retorna resposta correcta."""
+        """MLX engine available returns correct response."""
         mlx_module = AsyncMock()
         mlx_module.chat = AsyncMock(return_value={
             "response": "Hola des de MLX",
@@ -281,7 +281,7 @@ class TestChatCompletionsEndpoint:
         assert data["choices"][0]["message"]["content"] == "Hola des de MLX"
 
     def test_llama_cpp_engine_non_streaming_success(self):
-        """Llama.cpp engine disponible retorna resposta correcta."""
+        """Llama.cpp engine available returns correct response."""
         llama_module = AsyncMock()
         llama_module.chat = AsyncMock(return_value={
             "response": "Hola des de Llama.cpp",
@@ -318,7 +318,7 @@ class TestChatCompletionsEndpoint:
         assert resp.status_code == 503  # Ollama fallback fails
 
     def test_ollama_response_sets_nexe_engine(self):
-        """Resposta Ollama ha de tenir nexe_engine al dict."""
+        """Ollama response must have nexe_engine in the dict."""
         tags_resp_data = {"models": [{"name": "llama3.2"}]}
         mock_tags = MagicMock()
         mock_tags.status_code = 200
@@ -347,7 +347,7 @@ class TestChatCompletionsEndpoint:
         assert data.get("nexe_engine") == "ollama"
 
     def test_preferred_fallback_adds_headers(self):
-        """Quan preferred engine no disponible, X-Nexe-Fallback-From s'afegeix."""
+        """When preferred engine is unavailable, X-Nexe-Fallback-From is added."""
         tags_resp_data = {"models": [{"name": "llama3.2"}]}
         mock_tags = MagicMock()
         mock_tags.status_code = 200
@@ -364,7 +364,7 @@ class TestChatCompletionsEndpoint:
         mock_client.get = AsyncMock(return_value=mock_tags)
         mock_client.post = AsyncMock(return_value=mock_chat_resp)
 
-        # mlx preferred but only ollama available
+        # mlx preferred but only Ollama available
         with patch("httpx.AsyncClient", return_value=mock_client), \
              patch("memory.memory.api.v1.get_memory_api", side_effect=Exception("no")), \
              patch.dict(os.environ, {"NEXE_MODEL_ENGINE": "mlx"}):
@@ -457,7 +457,7 @@ class TestForwardToOllama:
         )
 
     def test_model_from_env(self):
-        """Model es llegeix de NEXE_OLLAMA_MODEL si no especificat."""
+        """Model is read from NEXE_OLLAMA_MODEL if not specified."""
         from core.endpoints.chat import _forward_to_ollama
 
         tags_data = {"models": [{"name": "mistral"}]}
@@ -486,7 +486,7 @@ class TestForwardToOllama:
         assert isinstance(result, dict)
 
     def test_ollama_error_status_raises(self):
-        """Ollama retorna error HTTP → HTTPException."""
+        """Ollama returns HTTP error → HTTPException."""
         from core.endpoints.chat import _forward_to_ollama
         from fastapi import HTTPException
 
@@ -515,7 +515,7 @@ class TestForwardToOllama:
         assert exc_info.value.status_code == 500
 
     def test_no_chat_models_raises_503(self):
-        """Si no hi ha chat models (només embeddings), HTTPException 503."""
+        """If there are no chat models (only embeddings), HTTPException 503."""
         from core.endpoints.chat import _forward_to_ollama
         from fastapi import HTTPException
 
@@ -540,7 +540,7 @@ class TestForwardToOllama:
         assert exc_info.value.status_code == 503
 
     def test_model_partial_match_used(self):
-        """Si el model demanat no existeix però hi ha match parcial, usa'l."""
+        """If the requested model does not exist but there is a partial match, use it."""
         from core.endpoints.chat import _forward_to_ollama
 
         tags_data = {"models": [{"name": "llama3.2:latest"}]}
@@ -567,10 +567,10 @@ class TestForwardToOllama:
         assert isinstance(result, dict)
 
     def test_model_not_found_raises_404(self):
-        """Bug 23 (2026-04-06): si el model demanat no existeix i no hi ha
-        match parcial, abans feiem fallback silenciós al primer chat model
-        (HTTP 200 amb un model diferent del demanat — enganyós). Ara retornem
-        HTTPException 404 perquè el client sàpiga que el model no existeix."""
+        """Bug 23 (2026-04-06): if the requested model does not exist and there is no
+        partial match, we previously did a silent fallback to the first chat model
+        (HTTP 200 with a different model than requested — misleading). Now we return
+        HTTPException 404 so the client knows the model does not exist."""
         from core.endpoints.chat import _forward_to_ollama
         from fastapi import HTTPException
 
@@ -595,7 +595,7 @@ class TestForwardToOllama:
         assert "not found" in str(exc_info.value.detail).lower()
 
     def test_ollama_post_connect_error(self):
-        """ConnectError durant POST → HTTPException 503."""
+        """ConnectError during POST → HTTPException 503."""
         import httpx
         from core.endpoints.chat import _forward_to_ollama
         from fastapi import HTTPException
@@ -629,7 +629,7 @@ class TestForwardToOllama:
         assert exc.value.status_code == 503
 
     def test_streaming_returns_streaming_response(self):
-        """Mode stream=True retorna StreamingResponse."""
+        """stream=True mode returns StreamingResponse."""
         from core.endpoints.chat import _forward_to_ollama
 
         tags_data = {"models": [{"name": "llama3.2"}]}
@@ -656,7 +656,7 @@ class TestForwardToOllama:
         assert isinstance(result, StreamingResponse)
 
     def test_tags_error_status_raises_502(self):
-        """Ollama /api/tags retorna status != 200 → HTTPException 502."""
+        """Ollama /api/tags returns status != 200 → HTTPException 502."""
         from core.endpoints.chat import _forward_to_ollama
         from fastapi import HTTPException
 
@@ -678,7 +678,7 @@ class TestForwardToOllama:
         assert exc.value.status_code == 502
 
     def test_model_from_config(self):
-        """Model es llegeix de config quan no hi ha env var."""
+        """Model is read from config when there is no env var."""
         from core.endpoints.chat import _forward_to_ollama
 
         tags_data = {"models": [{"name": "gemma3"}]}
@@ -713,7 +713,7 @@ class TestForwardToOllama:
         assert isinstance(result, dict)
 
     def test_streaming_with_fallback_adds_headers(self):
-        """Mode stream=True amb fallback_from afegeix headers."""
+        """stream=True mode with fallback_from adds headers."""
         from core.endpoints.chat import _forward_to_ollama
 
         tags_data = {"models": [{"name": "llama3.2"}]}
@@ -753,7 +753,7 @@ class TestOllamaStreamGenerator:
         return asyncio.run(_run())
 
     def test_yields_sse_chunks(self):
-        """Genera chunks SSE per cada token."""
+        """Generates SSE chunks for each token."""
         from core.endpoints.chat import _ollama_stream_generator
 
         lines = [
@@ -792,7 +792,7 @@ class TestOllamaStreamGenerator:
         assert any("[DONE]" in c for c in chunks)
 
     def test_error_status_yields_error_and_done(self):
-        """Status != 200 → yields error i [DONE]."""
+        """Status != 200 → yields error and [DONE]."""
         from core.endpoints.chat import _ollama_stream_generator
 
         mock_resp = AsyncMock()
@@ -835,7 +835,7 @@ class TestOllamaStreamGenerator:
         assert any("error" in c.lower() for c in chunks)
 
     def test_json_decode_error_skipped(self):
-        """Línies amb JSON invalid s'ignoren sense crash."""
+        """Lines with invalid JSON are ignored without crash."""
         from core.endpoints.chat import _ollama_stream_generator
 
         lines = [
@@ -873,7 +873,7 @@ class TestOllamaStreamGenerator:
         assert any("[DONE]" in c for c in chunks)
 
     def test_empty_line_skipped(self):
-        """Línies buides s'ignoren."""
+        """Empty lines are ignored."""
         from core.endpoints.chat import _ollama_stream_generator
 
         lines = [
@@ -934,7 +934,7 @@ class TestForwardToMLX:
         return req
 
     def test_no_mlx_module_falls_back_to_ollama(self):
-        """Sense mlx_module, fa fallback a Ollama."""
+        """Without mlx_module, falls back to Ollama."""
         import httpx
         from core.endpoints.chat import _forward_to_mlx
         from fastapi import HTTPException
@@ -957,7 +957,7 @@ class TestForwardToMLX:
         assert exc.value.status_code == 503
 
     def test_mlx_module_without_chat_attr_falls_back(self):
-        """MLX module sense attr 'chat', fa fallback."""
+        """MLX module without 'chat' attr, falls back."""
         import httpx
         from core.endpoints.chat import _forward_to_mlx
         from fastapi import HTTPException
@@ -980,7 +980,7 @@ class TestForwardToMLX:
         assert exc.value.status_code == 503
 
     def test_mlx_non_streaming_returns_openai_format(self):
-        """MLX non-streaming retorna format compatible amb OpenAI."""
+        """MLX non-streaming returns OpenAI-compatible format."""
         from core.endpoints.chat import _forward_to_mlx
 
         mlx_module = AsyncMock()
@@ -1003,7 +1003,7 @@ class TestForwardToMLX:
         assert result["choices"][0]["message"]["content"] == "Hola MLX"
 
     def test_mlx_streaming_returns_streaming_response(self):
-        """MLX streaming retorna StreamingResponse."""
+        """MLX streaming returns StreamingResponse."""
         from core.endpoints.chat import _forward_to_mlx
 
         mlx_module = AsyncMock()
@@ -1020,7 +1020,7 @@ class TestForwardToMLX:
         assert isinstance(result, StreamingResponse)
 
     def test_mlx_exception_falls_back_to_ollama(self):
-        """Excepció durant MLX → fallback a Ollama."""
+        """Exception during MLX → fallback to Ollama."""
         import httpx
         from core.endpoints.chat import _forward_to_mlx
         from fastapi import HTTPException
@@ -1046,7 +1046,7 @@ class TestForwardToMLX:
         assert exc.value.status_code == 503
 
     def test_mlx_separates_system_and_user_messages(self):
-        """Separa system message de user messages per MLX."""
+        """Separates system message from user messages for MLX."""
         from core.endpoints.chat import _forward_to_mlx
 
         mlx_module = AsyncMock()
@@ -1088,7 +1088,7 @@ class TestForwardToLlamaCpp:
         return req
 
     def test_no_llama_module_falls_back(self):
-        """Sense llama_cpp_module, fa fallback a Ollama."""
+        """Without llama_cpp_module, falls back to Ollama."""
         import httpx
         from core.endpoints.chat import _forward_to_llama_cpp
         from fastapi import HTTPException
@@ -1111,7 +1111,7 @@ class TestForwardToLlamaCpp:
         assert exc.value.status_code == 503
 
     def test_llama_cpp_non_streaming_success(self):
-        """Llama.cpp non-streaming retorna format OpenAI."""
+        """Llama.cpp non-streaming returns OpenAI format."""
         from core.endpoints.chat import _forward_to_llama_cpp
 
         llama_module = AsyncMock()
@@ -1134,7 +1134,7 @@ class TestForwardToLlamaCpp:
         assert result["choices"][0]["message"]["content"] == "Hola Llama.cpp"
 
     def test_llama_cpp_streaming_returns_streaming_response(self):
-        """Llama.cpp streaming retorna StreamingResponse."""
+        """Llama.cpp streaming returns StreamingResponse."""
         from core.endpoints.chat import _forward_to_llama_cpp
 
         llama_module = AsyncMock()
@@ -1151,7 +1151,7 @@ class TestForwardToLlamaCpp:
         assert isinstance(result, StreamingResponse)
 
     def test_llama_cpp_exception_falls_back(self):
-        """Excepció durant llama.cpp → fallback a Ollama."""
+        """Exception during llama.cpp → fallback to Ollama."""
         import httpx
         from core.endpoints.chat import _forward_to_llama_cpp
         from fastapi import HTTPException
@@ -1177,7 +1177,7 @@ class TestForwardToLlamaCpp:
         assert exc.value.status_code == 503
 
     def test_llama_cpp_separates_system_messages(self):
-        """Separa system message de user messages per llama.cpp."""
+        """Separates system message from user messages for llama.cpp."""
         from core.endpoints.chat import _forward_to_llama_cpp
 
         llama_module = AsyncMock()
@@ -1246,7 +1246,7 @@ class TestMLXStreamGenerator:
         assert "[DONE]" in text
 
     def test_yields_done_at_end(self):
-        """El generator sempre acaba amb [DONE]."""
+        """The generator always ends with [DONE]."""
         from core.endpoints.chat import _mlx_stream_generator
 
         async def fake_chat(messages, system, session_id, stream_callback=None):
@@ -1268,7 +1268,7 @@ class TestMLXStreamGenerator:
         assert any("[DONE]" in c for c in chunks)
 
     def test_exception_in_task_yields_done_anyway(self):
-        """Excepció durant run_mlx → generator acaba amb [DONE] igualment."""
+        """Exception during run_mlx → generator ends with [DONE] anyway."""
         from core.endpoints.chat import _mlx_stream_generator
 
         async def fake_chat(messages, system, session_id, stream_callback=None):
@@ -1338,7 +1338,7 @@ class TestLlamaCppStreamGenerator:
         assert "[DONE]" in text
 
     def test_yields_done_at_end(self):
-        """Sempre acaba amb [DONE]."""
+        """Always ends with [DONE]."""
         from core.endpoints.chat import _llama_cpp_stream_generator
 
         async def fake_chat(messages, system, session_id, stream_callback=None):
@@ -1360,7 +1360,7 @@ class TestLlamaCppStreamGenerator:
         assert any("[DONE]" in c for c in chunks)
 
     def test_exception_in_task_yields_done_anyway(self):
-        """Excepció durant run_llama → generator acaba amb [DONE] igualment."""
+        """Exception during run_llama → generator ends with [DONE] anyway."""
         from core.endpoints.chat import _llama_cpp_stream_generator
 
         async def fake_chat(messages, system, session_id, stream_callback=None):

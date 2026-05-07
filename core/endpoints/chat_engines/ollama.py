@@ -72,7 +72,7 @@ async def _forward_to_ollama(
     if not model_name:
         model_name = os.environ.get("NEXE_OLLAMA_MODEL")
     if not model_name:
-        # Legacy: NEXE_DEFAULT_MODEL pot ser una URL HF o path — ignorar-la per Ollama
+        # Legacy: NEXE_DEFAULT_MODEL may be an HF URL or path — ignore it for Ollama
         _default = os.environ.get("NEXE_DEFAULT_MODEL", "")
         if _default and not _default.startswith(("http", "/", "~", "storage/")):
             model_name = _default
@@ -110,12 +110,12 @@ async def _forward_to_ollama(
                 model_name = matching[0]
                 logger.info("Using available model: %s", model_name)
             else:
-                # Bug 23 (2026-04-06) — abans, si el model demanat no existia,
-                # agafavem silenciosament el primer chat_model com a fallback i
-                # retornavem una resposta amb un model que l'usuari no havia
-                # demanat (HTTP 200). Això enganyava als clients. Ara, si no
-                # tenim match exacte ni parcial, llancem 404 amb missatge clar.
-                # Si ni tan sols hi ha chat models disponibles, 503 com abans.
+                # Bug 23 (2026-04-06) — previously, if the requested model did not exist,
+                # we silently used the first chat_model as a fallback and
+                # returned a response with a model the user had not
+                # requested (HTTP 200). This was misleading to clients. Now, if there is
+                # no exact or partial match, we raise 404 with a clear message.
+                # If there are no chat models available at all, 503 as before.
                 _lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
                 if chat_models:
                     raise HTTPException(
@@ -216,7 +216,7 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
                     if not line:
                         continue
                     try:
-                        # Ollama retorna JSON lines
+                        # Ollama returns JSON lines
                         data = json.loads(line)
                         content = _sanitize_sse_token(data.get("message", {}).get("content", ""))
                         done = data.get("done", False)

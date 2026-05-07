@@ -1,5 +1,5 @@
 """
-Tests unitaris per core/endpoints/chat.py (funcions pures, sense HTTP)
+Unit tests for core/endpoints/chat.py (pure functions, no HTTP)
 """
 import os
 import pytest
@@ -23,14 +23,14 @@ class TestSanitizeRagContext:
             MAX_CONTEXT_RATIO,
             CHARS_PER_TOKEN_ESTIMATE,
         )
-        # El límit real és dinàmic: max(literal, window * ratio * chars_per_token)
+        # The effective limit is dynamic: max(literal, window * ratio * chars_per_token)
         effective_max = max(
             MAX_RAG_CONTEXT_LENGTH,
             int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO * CHARS_PER_TOKEN_ESTIMATE),
         )
         long_text = "a" * (effective_max + 500)
         result = _sanitize_rag_context(long_text)
-        # El resultat ha de ser truncat + tag
+        # The result must be truncated + tag
         assert len(result) < len(long_text)
         assert "[...truncat]" in result
 
@@ -353,7 +353,7 @@ class TestRagResultToText:
         from core.endpoints.chat import _rag_result_to_text
         obj = MagicMock()
         obj.text = "Atribut text"
-        # L'objecte no és dict però té .text
+        # The object is not a dict but has .text
         result = _rag_result_to_text(obj)
         assert result == "Atribut text"
 
