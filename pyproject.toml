@@ -82,6 +82,7 @@ exclude = [
 exclude_dirs = [
     "InstallNexe.app",
     "Nexe.app",
+    "personality",
 ]
 
 [tool.muthur.license]

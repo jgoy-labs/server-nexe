@@ -36,7 +36,7 @@ def _find_ollama() -> str:
         return found
     for path in [
         "/usr/local/bin/ollama",
-        "/opt/homebrew/bin/ollama",
+        "/opt/homebrew/bin/ollama",  # nosemgrep
         os.path.expanduser("~/bin/ollama"),
         "/Applications/Ollama.app/Contents/Resources/ollama",
     ]:

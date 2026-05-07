@@ -72,7 +72,7 @@ class TestIsDmgPython:
 
     def test_homebrew_not_detected(self):
         from installer.installer_setup_env import _is_dmg_python
-        assert not _is_dmg_python("/opt/homebrew/bin/python3.12")
+        assert not _is_dmg_python("/opt/homebrew/bin/python3.12")  # nosemgrep
 
     def test_usr_local_not_detected(self):
         from installer.installer_setup_env import _is_dmg_python
@@ -80,7 +80,7 @@ class TestIsDmgPython:
 
     def test_venv_not_detected(self):
         from installer.installer_setup_env import _is_dmg_python
-        assert not _is_dmg_python("/Users/user/project/venv/bin/python3")
+        assert not _is_dmg_python("/Users/user/project/venv/bin/python3")  # nosemgrep
 
     def test_linux_not_detected(self):
         from installer.installer_setup_env import _is_dmg_python
@@ -103,7 +103,7 @@ class TestFindPythonBundleRoot:
 
     def test_returns_none_for_system_python(self):
         from installer.installer_setup_env import _find_python_bundle_root
-        result = _find_python_bundle_root("/opt/homebrew/bin/python3.12")
+        result = _find_python_bundle_root("/opt/homebrew/bin/python3.12")  # nosemgrep
         assert result is None
 
 

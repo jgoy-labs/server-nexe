@@ -207,7 +207,7 @@ def detect_path_traversal(text: str) -> bool:
     r'\.\./',
     r'\.\.\\\\',
     r'%252e%252e',
-    r'/etc/',
+    r'/etc/',  # nosemgrep
     r'c:',
     r'\\\\',
   ]

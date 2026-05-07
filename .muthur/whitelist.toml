@@ -151,3 +151,95 @@ reason = "Docstrings de mòdul/router no requerits per la interfície FastAPI. L
 expires = "2027-05-07"
 authorized_by = "Jordi Goy"
 ticket = "api-structure-dev-h-2026-05-07"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# hardcode whitelist — Sessió Dev-I 2026-05-07
+#
+# Findings: 103 total
+# - InstallNexe.app/ (39): exclòs per [tool.muthur] exclude_dirs
+# - personality/ (6): afegit a [tool.muthur] exclude_dirs
+# - tests/ top-level (7): # nosemgrep als fitxers
+# - core/ (10): IPs bind addr configurables (NEXE_SERVER_HOST) + docstrings → # nosemgrep
+# - installer/ (2): paths sistema ollama + IP fallback → # nosemgrep
+# - memory/ (9): /tmp/ fallbacks (nosec+nosemgrep) + test patches → # nosemgrep
+# - plugins/ (30): regex sanititzadors, tests seguretat, docstrings → # nosemgrep
+#
+# NOTA TÈCNICA: els checks hardcode usen semgrep amb tmpdir efímer.
+# El check_id resultant conté el path del tmpdir (volatile cada run).
+# La whitelist.toml no pot suprimir findings amb rule IDs volàtils
+# (entry.rule != finding.rule → exact match requerit).
+# Mecanisme real de supressió: # nosemgrep als fitxers font.
+# Les entrades TOML documenten la decisió però NO suprimeixen activament.
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[exception]]
+rule = "hardcode.absolute_path"
+path = "core/paths/**"
+reason = "Docstrings d'exemples amb /opt/nexe i /tmp/nexe-test. Paths il·lustratius a docstrings de get_repo_root i _is_valid_core_root. Suprimit via # nosemgrep al codi."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "hardcode-dev-i-2026-05-07"
+
+[[exception]]
+rule = "hardcode.ip_address"
+path = "core/config.py"
+reason = "127.0.0.1 és el bind address per defecte del servidor local. Configurable via NEXE_SERVER_HOST env var. DEFAULT_HOST, DEFAULT_LOCALHOST_ALIASES, NexeSettings.server_host. Suprimit via # nosemgrep."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "hardcode-dev-i-2026-05-07"
+
+[[exception]]
+rule = "hardcode.absolute_path"
+path = "installer/installer_ollama_install.py"
+reason = "/opt/homebrew/bin/ollama és una cerca de fallback d'instal·lació binari sistema. shutil.which() és el mètode primari; la llista és un fallback per app bundles amb PATH mínim. Suprimit via # nosemgrep."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "hardcode-dev-i-2026-05-07"
+
+[[exception]]
+rule = "hardcode.ip_address"
+path = "installer/tray.py"
+reason = "127.0.0.1 en bloc except com a fallback quan core.config no és importable. Configurable via NEXE_SERVER_HOST. Suprimit via # nosemgrep."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "hardcode-dev-i-2026-05-07"
+
+[[exception]]
+rule = "hardcode.absolute_path"
+path = "memory/**"
+reason = "/tmp/nexe-logs/rag.log és el darrer recurs de fallback (nosec B108) quan ~/Nexe-Logs i storage/logs no son escrivibles. Patches de tests usen /tmp/rag.log. Suprimit via # nosemgrep."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "hardcode-dev-i-2026-05-07"
+
+[[exception]]
+rule = "hardcode.absolute_path"
+path = "plugins/ollama_module/**"
+reason = "Regex sanititzador r'/Users/...' i r'/home/...' per redactar paths en respostes LLM. El pattern detecta el literal dins la regex, no un path real. Suprimit via # nosemgrep."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "hardcode-dev-i-2026-05-07"
+
+[[exception]]
+rule = "hardcode.absolute_path"
+path = "plugins/security/**"
+reason = "Patterns de seguretat (/etc/ en detectors traversal), docstrings (/etc/passwd, /var/www/assets), regex sanititzadors (/Users/, /home/), i dades de test de sanitització. Suprimit via # nosemgrep."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "hardcode-dev-i-2026-05-07"
+
+[[exception]]
+rule = "hardcode.ip_address"
+path = "plugins/security/**"
+reason = "192.168.1.1 en exemple de docstring del getter singleton. Suprimit via # nosemgrep."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "hardcode-dev-i-2026-05-07"
+
+[[exception]]
+rule = "hardcode.absolute_path"
+path = "tests/**"
+reason = "Tests arrel amb /tmp/, /opt/homebrew/, /Users/user/ (genèrics), /etc/passwd. Paths de fixtures de test acceptables. Suprimit via # nosemgrep."
+expires = "2027-05-07"
+authorized_by = "Jordi Goy"
+ticket = "hardcode-dev-i-2026-05-07"

@@ -116,16 +116,16 @@ class TestAnonymizePath:
 
   def test_macos_home_path(self):
     """macOS home paths should anonymize username."""
-    path = "/Users/john/project/file.py"
+    path = "/Users/john/project/file.py"  # nosemgrep
     result = anonymize_path(path)
-    assert result == "/Users/[USER]/project/file.py"
+    assert result == "/Users/[USER]/project/file.py"  # nosemgrep
     assert "john" not in result
 
   def test_linux_home_path(self):
     """Linux home paths should anonymize username."""
-    path = "/home/jane/app/config.toml"
+    path = "/home/jane/app/config.toml"  # nosemgrep
     result = anonymize_path(path)
-    assert result == "/home/[USER]/app/config.toml"
+    assert result == "/home/[USER]/app/config.toml"  # nosemgrep
     assert "jane" not in result
 
   def test_windows_path(self):
@@ -137,7 +137,7 @@ class TestAnonymizePath:
 
   def test_system_path_unchanged(self):
     """System paths without usernames should pass through."""
-    path = "/var/log/app.log"
+    path = "/var/log/app.log"  # nosemgrep
     assert anonymize_path(path) == path
 
   def test_empty_path(self):
@@ -171,7 +171,7 @@ class TestSanitizeLogEntry:
 
   def test_sanitize_path_in_details(self):
     """Paths in details should be anonymized."""
-    entry = {"details": {"path": "/Users/admin/secret/file.txt"}}
+    entry = {"details": {"path": "/Users/admin/secret/file.txt"}}  # nosemgrep
     result = sanitize_log_entry(entry)
     assert "[USER]" in result["details"]["path"]
     assert "admin" not in result["details"]["path"]
@@ -195,7 +195,7 @@ class TestSanitizeLogEntry:
       "message": f"Auth with key {'c' * 64}",
       "endpoint": "/api/data?key=xyz",
       "details": {
-        "path": "/home/user/data.json",
+        "path": "/home/user/data.json",  # nosemgrep
         "prompt": "d" * 300,
       },
     }

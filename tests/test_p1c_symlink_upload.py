@@ -40,7 +40,7 @@ class TestIsSymlinkOutsideUploads:
         uploads = tmp_path / "uploads"
         uploads.mkdir()
         evil_link = uploads / "evil.pdf"
-        os.symlink("/etc/passwd", evil_link)
+        os.symlink("/etc/passwd", evil_link)  # nosemgrep
 
         assert _is_symlink_outside_uploads(evil_link) is True
 

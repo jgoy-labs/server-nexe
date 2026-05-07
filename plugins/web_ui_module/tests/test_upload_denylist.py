@@ -18,7 +18,7 @@ except ImportError:
 # ─── Positive: should be rejected ──────────────────────────────────────────
 
 def test_reject_passwd_header():
-  """/etc/passwd first line must be detected."""
+  """/etc/passwd first line must be detected."""  # nosemgrep
   content = b"root:x:0:0:root:/root:/bin/bash\nuser:x:1000:1000::/home/user:/bin/zsh"
   matched = _detect_sensitive_upload(content)
   assert matched == b"root:x:0:0:"

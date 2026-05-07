@@ -131,8 +131,8 @@ def sanitize_ollama_response(response: str) -> str:
   """
   response = re.sub(r'\b[a-f0-9]{32,128}\b', '[REDACTED_API_KEY]', response, flags=re.IGNORECASE)
 
-  response = re.sub(r'/Users/[^/\s]+(/[^\s]*)?', '[REDACTED_PATH]', response)
-  response = re.sub(r'/home/[^/\s]+(/[^\s]*)?', '[REDACTED_PATH]', response)
+  response = re.sub(r'/Users/[^/\s]+(/[^\s]*)?', '[REDACTED_PATH]', response)  # nosemgrep
+  response = re.sub(r'/home/[^/\s]+(/[^\s]*)?', '[REDACTED_PATH]', response)  # nosemgrep
   response = re.sub(r'C:\\Users\\[^\\\s]+(\\.]*)?', '[REDACTED_PATH]', response)
 
   response = re.sub(r'(API_KEY|SECRET|PASSWORD|TOKEN)=[^\s]+', r'\1=[REDACTED]', response, flags=re.IGNORECASE)
