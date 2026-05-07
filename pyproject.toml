@@ -44,7 +44,7 @@ exclude_dirs = [
 # 60% confidence floods the report with false positives from indirect dispatch
 # (plugin loader, FastAPI router decoration, slowapi limit tags). 80%+ catches
 # the real dead code: 90%-confidence unused imports are essentially always real.
-exclude = ["tests/", ".venv/", "InstallNexe.app/", "__pycache__/"]
+exclude = ["tests/", ".venv/", ".test_venv/", "InstallNexe.app/", "__pycache__/"]
 min_confidence = 80
 
 [tool.mypy]
@@ -65,3 +65,11 @@ exclude = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.muthur]
+# Directoris a excloure de tots els checks MUTHUR (per nom de directori).
+# InstallNexe.app i Nexe.app són bundles pre-compilats, no codi font.
+exclude_dirs = [
+    "InstallNexe.app",
+    "Nexe.app",
+]
