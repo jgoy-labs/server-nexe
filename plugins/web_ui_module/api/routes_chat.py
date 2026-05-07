@@ -601,6 +601,133 @@ async def _handle_nonstreaming_response(
     return response_text, memory_action, mem_deleted_delta
 
 
+def _resolve_engines(preferred_engine: str) -> list:
+    """Return engine priority list for the requested backend."""
+    _all = ["ollama_module", "mlx_module", "llama_cpp_module"]
+    _map = {
+        "auto": _all,
+        "ollama": _all,
+        "mlx": ["mlx_module", "ollama_module", "llama_cpp_module"],
+        "llamacpp": ["llama_cpp_module", "ollama_module", "mlx_module"],
+    }
+    return _map.get(preferred_engine, _all)
+
+
+async def _switch_engine_model(engine, engine_name: str, body: dict, model_name: str) -> None:
+    """Hot-swap the model on the engine when the UI selector sends body['model'].
+
+    Mutates env vars for the minimum time needed to read the new config,
+    then restores them (P0-3 env leak fix). Uses _MODEL_SWITCH_LOCK to
+    serialize concurrent mutations on class-level singletons.
+    """
+    import os
+    from core.lifespan import get_server_state as _gss
+    models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
+    if not models_dir.is_absolute():
+        models_dir = Path(_gss().project_root) / models_dir  # type: ignore[arg-type]
+    local_path = models_dir / model_name  # type: ignore[operator]
+
+    if engine_name == "mlx_module" and local_path.exists():
+        _prev = os.environ.get("NEXE_MLX_MODEL")
+        try:
+            os.environ["NEXE_MLX_MODEL"] = str(local_path)
+            from plugins.mlx_module.core.config import MLXConfig
+            new_config = MLXConfig.from_env()
+        finally:
+            if _prev is None:
+                os.environ.pop("NEXE_MLX_MODEL", None)
+            else:
+                os.environ["NEXE_MLX_MODEL"] = _prev
+        if hasattr(engine, '_node') and engine._node:
+            if engine._node.config.model_path != new_config.model_path:
+                engine._node.config = new_config  # type: ignore[assignment]
+                engine._node.__class__._config = new_config
+                engine._node.__class__._model = None
+                import logging as _lg; _lg.getLogger(__name__).info("MLX model switched to: %s", local_path)
+
+    elif engine_name == "llama_cpp_module" and local_path.exists():
+        _prev = os.environ.get("NEXE_LLAMA_CPP_MODEL")
+        try:
+            os.environ["NEXE_LLAMA_CPP_MODEL"] = str(local_path)
+            from plugins.llama_cpp_module.core.config import LlamaCppConfig
+            from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
+            from plugins.llama_cpp_module.core.model_pool import ModelPool
+            new_config = LlamaCppConfig.from_env()  # type: ignore[assignment]
+        finally:
+            if _prev is None:
+                os.environ.pop("NEXE_LLAMA_CPP_MODEL", None)
+            else:
+                os.environ["NEXE_LLAMA_CPP_MODULE"] = _prev
+        if hasattr(engine, '_node') and engine._node:
+            if engine._node.config.model_path != new_config.model_path:
+                if LlamaCppChatNode._pool is not None:
+                    LlamaCppChatNode._pool.destroy_all()
+                engine._node.config = new_config  # type: ignore[assignment]
+                LlamaCppChatNode._config = new_config  # type: ignore[assignment]
+                LlamaCppChatNode._pool = ModelPool(new_config)  # type: ignore[arg-type]
+                import logging as _lg; _lg.getLogger(__name__).info("Llama.cpp model switched to: %s", new_config.model_path)
+
+
+async def _build_rag_context(memory_helper, message: str, body: dict, attached_doc) -> tuple:
+    """Recall from memory and build the RAG context string.
+
+    Returns (rag_context, rag_count, rag_items) where rag_items is a list of
+    (collection, score) tuples. Returns empty values when an attached doc is
+    present (document context takes priority over RAG).
+    """
+    if attached_doc:
+        return "", 0, []
+
+    rag_context = ""
+    rag_count = 0
+    rag_items: list = []
+    _log = logging.getLogger(__name__)
+
+    try:
+        _active_colls = body.get("rag_collections")
+        _log.info("RAG: attempting recall (collections=%s)", _active_colls or "all")
+        recall_result = await memory_helper.recall_from_memory(
+            message, limit=5, collections=_active_colls, session_id=None,
+        )
+        if recall_result["success"] and recall_result["results"]:
+            rag_threshold = float(body.get("rag_threshold", 0.25))
+            relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
+            _log.info("RAG pre-filter: %s results, threshold=%s", len(recall_result["results"]), rag_threshold)
+            if relevant:
+                rag_count = len(relevant)
+                doc_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") == "nexe_documentation"]
+                knowledge_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") == "user_knowledge"]
+                memory_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") not in ("user_knowledge", "nexe_documentation")]
+                _rag_labels = {
+                    "ca": ("DOCUMENTACIO DEL SISTEMA", "DOCUMENTACIO TECNICA", "MEMORIA DE L'USUARI"),
+                    "es": ("DOCUMENTACION DEL SISTEMA", "DOCUMENTACION TECNICA", "MEMORIA DEL USUARIO"),
+                    "en": ("SYSTEM DOCUMENTATION", "TECHNICAL DOCUMENTATION", "USER MEMORY"),
+                }
+                _lang_key = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
+                _labels = _rag_labels.get(_lang_key, _rag_labels["en"])
+                if doc_items:
+                    rag_context += f"\n\n[{_labels[0]}]\n" + "".join(f"- {r['content']}\n" for r in doc_items)
+                if knowledge_items:
+                    rag_context += f"\n\n[{_labels[1]}]\n" + "".join(f"- {r['content']}\n" for r in knowledge_items)
+                if memory_items:
+                    rag_context += f"\n\n[{_labels[2]}]\n" + "".join(f"- {r['content']}\n" for r in memory_items)
+                rag_context = _sanitize_rag_context(rag_context)
+                _log.info("RAG: %s relevant memories (score >= %s)", rag_count, rag_threshold)
+                for item in relevant:
+                    score = item.get("score", 0)
+                    col = item.get("metadata", {}).get("source_collection", "?")
+                    rag_items.append((col, score))
+                    _log.info("  RAG [%s] score=%.2f -> %r", col, score, item["content"][:80].replace("\n", " "))
+        elif not recall_result["success"]:
+            _log.warning("RAG: recall failed — %s", recall_result.get("message", "unknown"))
+        else:
+            _log.info("RAG: no results for query (success=True, results=[])")
+    except Exception as e:
+        _log.warning("RAG lookup failed: %s", e)
+
+    return rag_context, rag_count, rag_items
+
+
 def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     """Registers endpoint: POST /chat"""
 
@@ -665,15 +792,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             logger.info(f"Available modules: {available_modules}")
 
             # Engine priority based on config
-            engines_to_try = []
-            if preferred_engine == "auto":
-                engines_to_try = ["ollama_module", "mlx_module", "llama_cpp_module"]
-            elif preferred_engine == "ollama":
-                engines_to_try = ["ollama_module", "mlx_module", "llama_cpp_module"]
-            elif preferred_engine == "mlx":
-                engines_to_try = ["mlx_module", "ollama_module", "llama_cpp_module"]
-            elif preferred_engine == "llamacpp":
-                engines_to_try = ["llama_cpp_module", "ollama_module", "mlx_module"]
+            engines_to_try = _resolve_engines(preferred_engine)
 
             response_text = None  # type: ignore[assignment]  # Optional[str] per disseny, s'inicialitza None i s'assigna post-engine
             for engine_name in engines_to_try:
@@ -711,53 +830,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     # from inheriting the value from the previous switch (P0-3 env leak).
                     if body.get("model"):
                         async with _MODEL_SWITCH_LOCK:
-                            from core.lifespan import get_server_state as _gss
-                            models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
-                            if not models_dir.is_absolute():
-                                models_dir = Path(_gss().project_root) / models_dir  # type: ignore[arg-type]  # project_root: Path|None; invariant: set en startup (lifespan)
-                            local_path = models_dir / model_name  # type: ignore[operator]  # model_name: Any per body.get; truthy check a L625 impedeix empty
-
-                            if engine_name == "mlx_module" and local_path.exists():
-                                _prev_mlx = os.environ.get("NEXE_MLX_MODEL")
-                                try:
-                                    os.environ["NEXE_MLX_MODEL"] = str(local_path)
-                                    from plugins.mlx_module.core.config import MLXConfig
-                                    new_config = MLXConfig.from_env()
-                                finally:
-                                    if _prev_mlx is None:
-                                        os.environ.pop("NEXE_MLX_MODEL", None)
-                                    else:
-                                        os.environ["NEXE_MLX_MODEL"] = _prev_mlx
-                                if hasattr(engine, '_node') and engine._node:
-                                    if engine._node.config.model_path != new_config.model_path:
-                                        engine._node.config = new_config  # type: ignore[assignment]  # cross-branch: mypy unifica new_config MLXConfig|LlamaCppConfig; en context mlx_module és MLXConfig
-                                        engine._node.__class__._config = new_config
-                                        engine._node.__class__._model = None
-                                        logger.info(f"MLX model switched to: {local_path}")
-
-                            elif engine_name == "llama_cpp_module" and local_path.exists():
-                                _prev_llama = os.environ.get("NEXE_LLAMA_CPP_MODEL")
-                                try:
-                                    os.environ["NEXE_LLAMA_CPP_MODEL"] = str(local_path)
-                                    from plugins.llama_cpp_module.core.config import LlamaCppConfig
-                                    from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
-                                    from plugins.llama_cpp_module.core.model_pool import ModelPool
-                                    new_config = LlamaCppConfig.from_env()  # type: ignore[assignment]  # cross-branch: new_config previously MLXConfig in mlx branch, reclassified LlamaCppConfig in llama_cpp branch
-                                finally:
-                                    if _prev_llama is None:
-                                        os.environ.pop("NEXE_LLAMA_CPP_MODEL", None)
-                                    else:
-                                        os.environ["NEXE_LLAMA_CPP_MODEL"] = _prev_llama
-                                if hasattr(engine, '_node') and engine._node:
-                                    old_path = engine._node.config.model_path
-                                    if old_path != new_config.model_path:
-                                        # Destroy old pool and recreate with new config
-                                        if LlamaCppChatNode._pool is not None:
-                                            LlamaCppChatNode._pool.destroy_all()
-                                        engine._node.config = new_config  # type: ignore[assignment]  # cross-branch: mypy unifies new_config MLXConfig|LlamaCppConfig; in llama_cpp_module context it is LlamaCppConfig
-                                        LlamaCppChatNode._config = new_config  # type: ignore[assignment]  # cross-branch: MLXConfig|LlamaCppConfig unified; in llama_cpp_module context it is LlamaCppConfig
-                                        LlamaCppChatNode._pool = ModelPool(new_config)  # type: ignore[arg-type]  # new_config: MLXConfig|LlamaCppConfig cross-branch; in llama_cpp branch context it is LlamaCppConfig
-                                        logger.info(f"Llama.cpp model switched to: {new_config.model_path}")
+                            await _switch_engine_model(engine, engine_name, body, model_name)
 
                     # Per-session thinking toggle
                     thinking_enabled = getattr(session, "thinking_enabled", False)
@@ -810,61 +883,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         logger.info(f"Using attached document: {attached_doc['filename']} (parts {shown}/{total_chunks}, {len(doc_content)} chars)")
 
                     # 3. Get Memory Context (RAG) - ALWAYS search, not just with patterns
-                    rag_context = ""
-                    rag_count = 0
-                    _rag_items = []  # (collection, score) tuples for weight display
-                    if not attached_doc:
-                        try:
-                            _active_colls = body.get("rag_collections")
-                            logger.info("RAG: attempting recall (collections=%s)", _active_colls or "all")
-                            recall_result = await memory_helper.recall_from_memory(message, limit=5, collections=_active_colls, session_id=session.id)
-                            if recall_result["success"] and recall_result["results"]:
-                                # Filter by minimum score (configurable, default 0.30)
-                                rag_threshold = float(body.get("rag_threshold", 0.25))
-                                all_scores = [(r.get('metadata', {}).get('source_collection', '?'), r.get('score', 0)) for r in recall_result["results"]]
-                                logger.info("RAG pre-filter: %s results, threshold=%s, scores=%s", len(recall_result['results']), rag_threshold, all_scores)
-                                relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
-                                if relevant:
-                                    rag_count = len(relevant)
-                                    # Separate by collection: system docs, technical docs, memory
-                                    doc_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'nexe_documentation']
-                                    knowledge_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') == 'user_knowledge']
-                                    memory_items = [r for r in relevant if r.get('metadata', {}).get('source_collection') not in ('user_knowledge', 'nexe_documentation')]
-                                    # RAG context labels per language (match with system prompt)
-                                    _rag_labels = {
-                                        "ca": ("DOCUMENTACIO DEL SISTEMA", "DOCUMENTACIO TECNICA", "MEMORIA DE L'USUARI"),
-                                        "es": ("DOCUMENTACION DEL SISTEMA", "DOCUMENTACION TECNICA", "MEMORIA DEL USUARIO"),
-                                        "en": ("SYSTEM DOCUMENTATION", "TECHNICAL DOCUMENTATION", "USER MEMORY"),
-                                    }
-                                    _lang_key = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
-                                    _labels = _rag_labels.get(_lang_key, _rag_labels["en"])
-                                    if doc_items:
-                                        rag_context += f"\n\n[{_labels[0]}]\n"
-                                        for item in doc_items:
-                                            rag_context += f"- {item['content']}\n"
-                                    if knowledge_items:
-                                        rag_context += f"\n\n[{_labels[1]}]\n"
-                                        for item in knowledge_items:
-                                            rag_context += f"- {item['content']}\n"
-                                    if memory_items:
-                                        rag_context += f"\n\n[{_labels[2]}]\n"
-                                        for item in memory_items:
-                                            rag_context += f"- {item['content']}\n"
-                                    # Sanitize RAG context (prompt injection + control chars + truncate)
-                                    rag_context = _sanitize_rag_context(rag_context)
-                                    logger.info("RAG: %s relevant memories (score >= %s)", len(relevant), rag_threshold)
-                                    for item in relevant:
-                                        score = item.get('score', 0)
-                                        col = item.get('metadata', {}).get('source_collection', '?')
-                                        _rag_items.append((col, score))
-                                        preview = item['content'][:80].replace('\n', ' ')
-                                        logger.info(f"  RAG [{col}] score={score:.2f} -> {repr(preview)}")
-                            elif not recall_result["success"]:
-                                logger.warning("RAG: recall failed — %s", recall_result.get("message", "unknown"))
-                            else:
-                                logger.info("RAG: no results for query (success=True, results=[])")
-                        except Exception as e:
-                            logger.warning(f"RAG lookup failed: {e}")
+                    rag_context, rag_count, _rag_items = await _build_rag_context(
+                        memory_helper, message, body, attached_doc,
+                    )
 
                     # 4. Construct Final System Prompt
                     # Read the prompt from server.toml via app_state (language + tier)
