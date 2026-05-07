@@ -145,10 +145,10 @@ async def _llama_cpp_stream_generator(
     temperature: Optional[float] = None,
 ):
     """
-    Generator SSE per Llama.cpp streaming.
+    SSE generator for Llama.cpp streaming.
 
-    Usa asyncio.Queue per fer pont entre el callback de llama.cpp
-    i l'async generator que necessita FastAPI.
+    Uses asyncio.Queue to bridge between the llama.cpp callback
+    and the async generator that FastAPI requires.
     """
     tokens_queue: asyncio.Queue = asyncio.Queue(maxsize=2048)
     loop = asyncio.get_running_loop()
@@ -157,7 +157,7 @@ async def _llama_cpp_stream_generator(
     response_parts_llama = []
 
     def on_token(token: str):
-        """Callback cridat per cada token generat (des de thread)."""
+        """Callback called for each generated token (from thread)."""
         response_parts_llama.append(token)
         try:
             loop.call_soon_threadsafe(
@@ -168,7 +168,7 @@ async def _llama_cpp_stream_generator(
             logger.warning("Llama.cpp stream token enqueue failed (queue full/closed): %s", e)
 
     async def run_llama():
-        """Executa Llama.cpp en background amb stream_callback."""
+        """Run Llama.cpp in the background with stream_callback."""
         try:
             result = await llama_module.chat(
                 messages=user_messages,

@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: core/cli/module.py
-Description: Classe principal del mòdul CLI Central Nexe. Gestiona la
-             descoberta i execució de CLIs de mòduls.
+Description: Main class of the Nexe Central CLI module. Manages the
+             discovery and execution of module CLIs.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -102,34 +102,34 @@ class CLIModule:
 
   def get_ascii_art(self) -> str:
     """
-    Retorna el banner ASCII del CLI Central Nexe.
+    Return the ASCII banner for the Nexe Central CLI.
 
-    Reutilitza el logo canònic `NEXE_LOGO` definit a `core.cli.output`
-    (el que `print_banner()` ja mostra a tots els altres punts d'entrada
-    del CLI), evitant tenir dos banners divergents. El banner anterior
-    d'aquesta funció era un residu d'"NAT 7" heretat del projecte
-    original i no coincidia amb el logo canònic `server-nexe`.
+    Reuses the canonical `NEXE_LOGO` defined in `core.cli.output`
+    (the one that `print_banner()` already shows at all other CLI entry
+    points), avoiding two diverging banners. The previous banner in this
+    function was a residue of "NAT 7" inherited from the original project
+    and did not match the canonical `server-nexe` logo.
 
     Returns:
-      str: Banner ASCII oficial + subtítol.
+      str: Official ASCII banner + subtitle.
     """
     return f"{NEXE_LOGO}\nCLI Central - Module Orchestrator\n"
 
   def greet(self, name: str = "Nexe", lang: Optional[str] = None) -> str:
     """
-    Genera un missatge de benvinguda localitzat amb el banner ASCII.
+    Generate a localised welcome message with the ASCII banner.
 
-    Les claus `cli.greetings.hello` i `cli.greetings.welcome` es
-    resolen via `core.cli.i18n.t`, que llegeix
-    `core/cli/languages/{lang}/common.json` amb fallback a ca-ES.
+    The keys `cli.greetings.hello` and `cli.greetings.welcome` are
+    resolved via `core.cli.i18n.t`, which reads
+    `core/cli/languages/{lang}/common.json` with fallback to ca-ES.
 
     Args:
-      name: Nom a saludar.
-      lang: Codi d'idioma (`ca-ES`, `es-ES`, `en-US`). Si és None s'obté
-        de la variable d'entorn `NEXE_LANG`; per defecte `ca-ES`.
+      name: Name to greet.
+      lang: Language code (`ca-ES`, `es-ES`, `en-US`). If None, obtained
+        from the `NEXE_LANG` environment variable; defaults to `ca-ES`.
 
     Returns:
-      str: Missatge de benvinguda amb el banner ASCII.
+      str: Welcome message with the ASCII banner.
     """
     hello = t("cli.greetings.hello", lang=lang, default="Hola")
     welcome = t("cli.greetings.welcome", lang=lang, default="Benvingut al CLI Central Nexe")

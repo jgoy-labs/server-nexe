@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: core/cli/tests/test_module_greet.py
-Description: Tests per al banner ASCII i la salutació localitzada de
-             `CLIModule`. Guarden el fix pel residu "NAT 7" que
-             apareixia al banner anterior.
+Description: Tests for the ASCII banner and localised greeting of
+             `CLIModule`. Guards the fix for the "NAT 7" residue that
+             appeared in the previous banner.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -24,19 +24,19 @@ def cli():
 class TestAsciiArt:
 
     def test_uses_canonical_nexe_logo(self, cli):
-        """`get_ascii_art()` ha de reutilitzar `NEXE_LOGO` de `output.py`,
-        no un banner duplicat/divergent."""
+        """`get_ascii_art()` must reuse `NEXE_LOGO` from `output.py`,
+        not a duplicate/diverging banner."""
         from core.cli.output import NEXE_LOGO
         art = cli.get_ascii_art()
         assert NEXE_LOGO in art
 
     def test_no_nat_residue(self, cli):
-        """Regression guard: el banner anterior formava 'NAT 7'.
-        El logo canònic `server-nexe` no conté les sigles NAT."""
+        """Regression guard: the previous banner formed 'NAT 7'.
+        The canonical `server-nexe` logo does not contain the NAT initials."""
         art = cli.get_ascii_art()
-        # Aplanem per detectar la forma visual `NAT` (tres blocs consecutius
-        # que al banner obsolet formaven les lletres N-A-T).
-        # Simplement buscar la subcadena en majúscules:
+        # Flatten to detect the visual form `NAT` (three consecutive blocks
+        # that in the obsolete banner formed the letters N-A-T).
+        # Simply search for the substring in uppercase:
         assert "NAT" not in art
 
     def test_contains_module_orchestrator_header(self, cli):
@@ -45,7 +45,7 @@ class TestAsciiArt:
 
     def test_returns_multiline_str(self, cli):
         art = cli.get_ascii_art()
-        # El logo canònic té 5 línies + títol — mínim 5 salts de línia.
+        # The canonical logo has 5 lines + title — minimum 5 newlines.
         assert art.count("\n") >= 5
 
 
@@ -67,13 +67,13 @@ class TestGreet:
         assert "Welcome" in out
 
     def test_unknown_lang_falls_back_to_ca(self, cli):
-        """Un idioma inexistent cau a ca-ES sense crash."""
+        """A non-existent language falls back to ca-ES without crash."""
         out = cli.greet("Jordi", lang="xx-XX")
         assert "Hola Jordi!" in out
         assert "Benvingut" in out
 
     def test_env_var_default(self, cli, monkeypatch):
-        """Si no es passa lang, s'usa NEXE_LANG."""
+        """If lang is not passed, NEXE_LANG is used."""
         monkeypatch.setenv("NEXE_LANG", "es-ES")
         out = cli.greet("Jordi")
         assert "Bienvenido" in out

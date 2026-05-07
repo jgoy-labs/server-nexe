@@ -39,10 +39,10 @@ async def _mlx_stream_generator(
     temperature: Optional[float] = None,
 ):
     """
-    Generator SSE per MLX streaming.
+    SSE generator for MLX streaming.
 
-    Usa asyncio.Queue per fer pont entre el callback síncron de MLX
-    i l'async generator que necessita FastAPI.
+    Uses asyncio.Queue to bridge between the synchronous MLX callback
+    and the async generator that FastAPI requires.
     """
     tokens_queue: asyncio.Queue = asyncio.Queue(maxsize=2048)
     loop = asyncio.get_running_loop()
@@ -51,10 +51,10 @@ async def _mlx_stream_generator(
     response_parts_mlx = []
 
     def on_token(token: str):
-        """Callback cridat per cada token generat (des de thread MLX)."""
+        """Callback called for each generated token (from MLX thread)."""
         response_parts_mlx.append(token)
         try:
-            # Thread-safe: posar token a la queue
+            # Thread-safe: put token in the queue
             loop.call_soon_threadsafe(
                 tokens_queue.put_nowait,
                 token
@@ -63,7 +63,7 @@ async def _mlx_stream_generator(
             logger.warning("Stream token enqueue failed (queue full/closed): %s", e)
 
     async def run_mlx():
-        """Executa MLX en background amb stream_callback."""
+        """Run MLX in the background with stream_callback."""
         try:
             result = await mlx_module.chat(
                 messages=user_messages,
@@ -80,18 +80,18 @@ async def _mlx_stream_generator(
         finally:
             generation_done.set()
 
-    # Iniciar MLX en background
+    # Start MLX in background
     mlx_task = asyncio.create_task(run_mlx())
 
     try:
-        # Enviar tokens mentre es generen
+        # Send tokens as they are generated
         while not generation_done.is_set() or not tokens_queue.empty():
             try:
                 token = await asyncio.wait_for(
                     tokens_queue.get(),
                     timeout=0.1
                 )
-                # Format OpenAI SSE
+                # OpenAI SSE format
                 chunk = {
                     "id": f"mlx-stream-{int(time.time())}",
                     "object": "chat.completion.chunk",
@@ -108,10 +108,10 @@ async def _mlx_stream_generator(
                 if generation_done.is_set() and tokens_queue.empty():
                     break
 
-        # Esperar que acabi
+        # Wait for completion
         await mlx_task
 
-        # Chunk final amb finish_reason
+        # Final chunk with finish_reason
         final_chunk = {
             "id": f"mlx-stream-{int(time.time())}",
             "object": "chat.completion.chunk",

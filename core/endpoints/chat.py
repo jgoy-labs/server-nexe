@@ -66,13 +66,13 @@ router = APIRouter(tags=["chat"])
 
 def _get_system_prompt(app_state: Any, lang: Optional[str] = None) -> str:
     """
-    Selecciona el system prompt per idioma i tier de model.
+    Select the system prompt by language and model tier.
 
-    Prioritat:
+    Priority:
     1. server.toml [personality.prompt].<lang>_<tier>
-    2. server.toml [personality.prompt].<lang>_full  (fallback de tier)
-    3. server.toml [personality.prompt].en_full       (fallback neutre)
-    4. Prompt mínim hardcoded
+    2. server.toml [personality.prompt].<lang>_full  (tier fallback)
+    3. server.toml [personality.prompt].en_full       (neutral fallback)
+    4. Hardcoded minimum prompt
     """
     if lang is None:
         lang = os.getenv("NEXE_LANG", "en")
@@ -137,7 +137,7 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
     # 3. Augment System Prompt (Nexe persona + sanitized RAG context)
     messages = [m.model_dump() for m in body.messages]
 
-    # Injectar system prompt de Nexe si el client no n'envia cap
+    # Inject Nexe system prompt if the client does not send one
     has_system = messages and messages[0]['role'] == 'system'
     if not has_system:
         nexe_prompt = _get_system_prompt(request.app.state, _server_lang)

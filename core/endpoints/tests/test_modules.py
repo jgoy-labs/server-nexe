@@ -1,5 +1,5 @@
 """
-Tests per core/endpoints/modules.py
+Tests for core/endpoints/modules.py
 """
 import pytest
 from fastapi import FastAPI
@@ -22,15 +22,15 @@ def make_app(api_integrator=None, i18n=None):
     app.add_middleware(SlowAPIMiddleware)
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-    # Importar router i sobreescriure la dependència get_api_integrator
+    # Import router and override the get_api_integrator dependency
     from core.endpoints.modules import router, get_api_integrator, get_i18n
     from plugins.security.core.auth_dependencies import require_api_key
     app.include_router(router)
 
-    # Override de la dependència
+    # Override the dependency
     app.dependency_overrides[get_api_integrator] = lambda: api_integrator
-    # Bug 22: /modules ara requereix X-API-Key. En aquests tests unitaris
-    # de lògica de modules.py n'overridem l'auth.
+    # Bug 22: /modules now requires X-API-Key. In these unit tests
+    # of modules.py logic we override the auth.
     app.dependency_overrides[require_api_key] = lambda: "test-bypass"
 
     return app

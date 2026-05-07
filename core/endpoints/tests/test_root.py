@@ -1,5 +1,5 @@
 """
-Tests per core/endpoints/root.py
+Tests for core/endpoints/root.py
 """
 import pytest
 from fastapi import FastAPI
@@ -39,7 +39,7 @@ class TestGetI18n:
     def test_get_i18n_without_state(self):
         from core.endpoints.root import get_i18n
         req = MagicMock()
-        req.app.state = MagicMock(spec=[])  # sense atribut i18n
+        req.app.state = MagicMock(spec=[])  # without i18n attribute
         result = get_i18n(req)
         assert result is None
 
@@ -93,8 +93,8 @@ class TestRequiredModulesFromConfig:
         assert result == set()
 
     def test_enabled_modules(self, monkeypatch):
-        # Aïllar de pollution d'entorn: NEXE_APPROVED_MODULES pot estar set
-        # per altres tests/fixtures i provoca intersecció buida.
+        # Isolate from environment pollution: NEXE_APPROVED_MODULES may be set
+        # by other tests/fixtures and causes an empty intersection.
         monkeypatch.delenv("NEXE_APPROVED_MODULES", raising=False)
         from core.endpoints.root import _required_modules_from_config
         config = {"plugins": {"modules": {"enabled": ["security_module", "rag_module"]}}}
@@ -165,7 +165,7 @@ class TestModuleHealthStatus:
     @pytest.mark.asyncio
     async def test_with_neither_method(self):
         from core.endpoints.root import _module_health_status
-        instance = MagicMock(spec=[])  # sense get_health ni health_check
+        instance = MagicMock(spec=[])  # without get_health or health_check
         result = await _module_health_status(instance)
         assert result == "unknown"
 
@@ -223,7 +223,7 @@ class TestHealthEndpoint:
 
 class TestReadinessEndpoint:
     def test_readiness_no_required_modules(self):
-        """Sense mòduls requerits → healthy"""
+        """No required modules → healthy"""
         app = make_app(config={})
         client = TestClient(app)
         resp = client.get("/health/ready")
@@ -233,7 +233,7 @@ class TestReadinessEndpoint:
         assert "timestamp" in data
 
     def test_readiness_required_modules_present_healthy(self):
-        """Mòdul requerit present i healthy → healthy"""
+        """Required module present and healthy → healthy"""
         mock_module = MagicMock()
         mock_module.get_health.return_value = {"status": "healthy"}
         config = {"plugins": {"models": {"preferred_engine": "ollama"}}}
@@ -246,7 +246,7 @@ class TestReadinessEndpoint:
         assert data["status"] == "healthy"
 
     def test_readiness_missing_module(self):
-        """Mòdul requerit absent → unhealthy"""
+        """Required module absent → unhealthy"""
         config = {"plugins": {"models": {"preferred_engine": "ollama"}}}
         app = make_app(config=config, modules={})
         client = TestClient(app)
@@ -256,7 +256,7 @@ class TestReadinessEndpoint:
         assert data["status"] == "unhealthy"
 
     def test_readiness_unhealthy_module(self):
-        """Mòdul present però unhealthy → unhealthy"""
+        """Module present but unhealthy → unhealthy"""
         mock_module = MagicMock()
         mock_module.get_health.return_value = {"status": "unhealthy"}
         config = {"plugins": {"models": {"preferred_engine": "ollama"}}}
@@ -269,7 +269,7 @@ class TestReadinessEndpoint:
         assert data["status"] == "unhealthy"
 
     def test_readiness_degraded_module(self):
-        """Mòdul degraded → degraded"""
+        """Degraded module → degraded"""
         mock_module = MagicMock()
         mock_module.get_health.return_value = {"status": "degraded"}
         config = {"plugins": {"models": {"preferred_engine": "ollama"}}}
@@ -282,8 +282,8 @@ class TestReadinessEndpoint:
         assert data["status"] == "degraded"
 
     def test_readiness_unknown_module(self):
-        """Mòdul amb status unknown → degraded"""
-        mock_module = MagicMock(spec=[])  # sense get_health ni health_check
+        """Module with unknown status → degraded"""
+        mock_module = MagicMock(spec=[])  # without get_health or health_check
         config = {"plugins": {"models": {"preferred_engine": "ollama"}}}
         modules = {"ollama_module": mock_module}
         app = make_app(config=config, modules=modules)
@@ -294,8 +294,8 @@ class TestReadinessEndpoint:
         assert data["status"] == "degraded"
 
     def test_readiness_engine_degraded_via_health_check_async(self):
-        """Mòdul requerit que retorna DEGRADED via health_check() async → readiness 'degraded' (no 'unhealthy').
-        Guard de regressió per BUG #5: ollama_module retornava UNHEALTHY quan Ollama no arrancava."""
+        """Required module returning DEGRADED via async health_check() → readiness 'degraded' (not 'unhealthy').
+        Regression guard for BUG #5: ollama_module returned UNHEALTHY when Ollama did not start."""
         from unittest.mock import AsyncMock as _AsyncMock
 
         mock_module = MagicMock(spec=["health_check"])
@@ -315,8 +315,8 @@ class TestReadinessEndpoint:
         )
 
     def test_readiness_mixed_degraded_and_healthy_gives_degraded(self, monkeypatch):
-        """Un mòdul DEGRADED + un HEALTHY → readiness 'degraded'.
-        Aïlla NEXE_APPROVED_MODULES per garantir que 'security' no quedi filtrat en CI."""
+        """One DEGRADED module + one HEALTHY → readiness 'degraded'.
+        Isolates NEXE_APPROVED_MODULES to ensure 'security' is not filtered out in CI."""
         from unittest.mock import AsyncMock as _AsyncMock
         monkeypatch.delenv("NEXE_APPROVED_MODULES", raising=False)
 
@@ -387,7 +387,7 @@ class TestStatusEndpoint:
         assert "engines_available" in data
 
     def test_status_with_mlx_node(self):
-        """MLX amb _node → mlx_available=True"""
+        """MLX with _node → mlx_available=True"""
         mock_mlx = MagicMock()
         mock_mlx._node = MagicMock()  # node actiu
         modules = {"mlx_module": mock_mlx}
@@ -400,7 +400,7 @@ class TestStatusEndpoint:
         assert data["engines_available"]["mlx"] is True
 
     def test_status_with_mlx_no_node(self):
-        """MLX sense _node → mlx_available=False, fallback ollama"""
+        """MLX without _node → mlx_available=False, fallback ollama"""
         mock_mlx = MagicMock()
         mock_mlx._node = None
         modules = {"mlx_module": mock_mlx}
@@ -411,7 +411,7 @@ class TestStatusEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert data["engines_available"]["mlx"] is False
-        assert data["engine"] == "ollama"  # fallback
+        assert data["engine"] == "ollama"  # fallback to ollama
 
     def test_status_with_llama_cpp(self):
         """llama_cpp present → llama_cpp_available=True"""
@@ -436,7 +436,7 @@ class TestStatusEndpoint:
         assert data["engines_available"]["ollama"] is True
 
     def test_status_llama_cpp_configured_but_missing(self):
-        """llama_cpp configurat però no disponible → fallback ollama"""
+        """llama_cpp configured but unavailable → fallback ollama"""
         app = make_app()
         client = TestClient(app)
         with patch.dict("os.environ", {"NEXE_MODEL_ENGINE": "llama_cpp"}):

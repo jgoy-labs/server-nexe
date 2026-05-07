@@ -214,23 +214,23 @@ def stop(ctx: click.Context, force: bool):
 
   found: list[tuple[str, Optional[str], list[int]]] = []
 
-  # F4 fix: llegir PID file canònic primer (storage/run/server.pid)
+  # F4 fix: read canonical PID file first (storage/run/server.pid)
   pid_from_file = None
   if pid_file.exists():
     try:
       data = json.loads(pid_file.read_text())
       candidate = data.get("pid")
       if candidate:
-        os.kill(candidate, 0)  # Comprova si el procés existeix (signal 0 = no kill)
+        os.kill(candidate, 0)  # Check if the process exists (signal 0 = no kill)
         pid_from_file = candidate
         found.append(("Nexe Server", None, [pid_from_file]))
     except (ProcessLookupError, OSError):
-      # PID file obsolet: el procés ja no existeix
+      # Stale PID file: the process no longer exists
       pid_file.unlink(missing_ok=True)
     except Exception:  # nosec B110: PID file unreadable/corrupt → fallback to pgrep (comment below documents intent)
       pass  # JSON malformat o altre error: fallback a pgrep
 
-  # Fallback: pgrep si no hi havia PID file vàlid
+  # Fallback: pgrep if there was no valid PID file
   if not found:
     try:
       result = subprocess.run(  # nosec B603 B607: pgrep on hardcoded literal pattern; system tool resolved via PATH (mono-user local)
