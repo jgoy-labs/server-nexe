@@ -9,7 +9,7 @@ starlette>=0.49.1,<1.0.0  # explicit pin for CVE-2025-54121 / CVE-2025-62727
 uvicorn[standard]==0.34.3
 pydantic==2.10.6
 pydantic-settings>=2.4,<3.0
-python-multipart>=0.0.27  # CVE-2026-40347; GHSA-pp6c-gr5w-3c5g fixed in 0.0.27
+python-multipart==0.0.20  # CVE GHSA-pp6c-gr5w-3c5g (DoS) — màx versió compatible Python 3.9; patch requereix >=3.10
 starlette-csrf==3.0.0
 httpx==0.27.2
 qdrant-client==1.16.1
@@ -18,7 +18,7 @@ structlog==25.5.0
 click==8.1.7
 rich==13.7.0
 typer==0.9.0
-python-dotenv>=1.2.2  # GHSA-mf9w-mj56-hr94 symlink attack fixed in 1.2.2
+python-dotenv==1.2.1  # CVE GHSA-mf9w-mj56-hr94 (symlink attack) — sense patch disponible a PyPI 2026-05-07
 pyyaml>=6.0.2
 numpy==1.26.4
 slowapi==0.1.9
@@ -26,7 +26,7 @@ prometheus-client==0.19.0
 tenacity==9.1.2
 psutil==5.9.8
 huggingface_hub==0.36.2
-filelock>=3.20.3  # GHSA-qmgc-5h2g-mvrw GHSA-w853-jp5j-5j7f TOCTOU fixed in 3.20.3 (dep transitiva explicitada)
+filelock>=3.19.1  # GHSA-qmgc-5h2g-mvrw GHSA-w853-jp5j-5j7f TOCTOU — 3.20.3 no existeix a PyPI (màx 3.19.1); CVEs pendents
 # macOS-only deps (tray app) → requirements-macos.txt
 
 # --- Memory & RAG ---
