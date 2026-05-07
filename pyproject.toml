@@ -66,6 +66,16 @@ exclude = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.lizard]
+# InstallNexe.app i Nexe.app són bundles pre-compilats (stdlib Python bundlada
+# + binaris), no codi font del projecte. Els seus fitxers generen fals positius
+# de complexitat (ex: re/_parser.py CCN=121) que no hem de corregir nosaltres.
+exclude = [
+    ".test_venv/*",
+    "InstallNexe.app/*",
+    "Nexe.app/*",
+]
+
 [tool.muthur]
 # Directoris a excloure de tots els checks MUTHUR (per nom de directori).
 # InstallNexe.app i Nexe.app són bundles pre-compilats, no codi font.
