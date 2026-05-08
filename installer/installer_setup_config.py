@@ -97,82 +97,81 @@ def generate_env_file(project_root, model_config=None):
         print_success(t('env_exists'))
 
 
-def _update_env_model_config(env_file, model_config):
-    """Update model configuration in existing .env file."""
-    if model_config is None:
-        # No model selected — keep existing .env as-is
-        return
+# ═══════════════════════════════════════════════════════════════════════════
+# FAÇADE HELPERS — each absorbs one logical block of _update_env_model_config
+# ═══════════════════════════════════════════════════════════════════════════
 
-    import os
-    import secrets
+def _compute_approved_modules(engine):
+    """Return the NEXE_APPROVED_MODULES value for a given engine."""
+    base = "security,web_ui_module"
+    if engine == 'ollama':
+        return f"{base},ollama_module"
+    if engine == 'mlx':
+        return f"{base},mlx_module,ollama_module"
+    if engine == 'llama_cpp':
+        return f"{base},llama_cpp_module,ollama_module"
+    return f"{base},ollama_module,mlx_module,llama_cpp_module"
 
-    # Read existing content
-    with open(env_file, 'r') as f:
-        lines = f.readlines()
 
-    # Track which keys we need to update/add
+def _rewrite_env_lines(lines, model_config):
+    """Iterate existing .env lines and update model-related keys in place.
+
+    Returns (new_lines, found_keys) where found_keys tracks which keys existed.
+    """
     model_id = model_config['id']
     model_engine = model_config['engine']
-    found_model = False
-    found_engine = False
-    found_csrf = False
-    found_mlx_model = False
-    found_llama_cpp_model = False
-    found_llama_cpp_chat_format = False
-    found_prompt_tier = False
-    found_ollama_model = False
-    found_approved_modules = False
+    found_keys = {
+        'model': False,
+        'engine': False,
+        'csrf': False,
+        'mlx_model': False,
+        'llama_cpp_model': False,
+        'llama_cpp_chat_format': False,
+        'prompt_tier': False,
+        'ollama_model': False,
+        'approved_modules': False,
+    }
     new_lines = []
 
     for line in lines:
         if line.startswith('NEXE_DEFAULT_MODEL='):
             new_lines.append(f"NEXE_DEFAULT_MODEL={model_id}\n")
-            found_model = True
+            found_keys['model'] = True
         elif line.startswith('NEXE_MODEL_ENGINE='):
             new_lines.append(f"NEXE_MODEL_ENGINE={model_engine}\n")
-            found_engine = True
+            found_keys['engine'] = True
         elif line.startswith('NEXE_CSRF_SECRET='):
-            found_csrf = True
+            found_keys['csrf'] = True
             new_lines.append(line)
         elif line.startswith('NEXE_MLX_MODEL='):
-            found_mlx_model = True
+            found_keys['mlx_model'] = True
             if model_engine == 'mlx':
                 model_name = model_id.split('/')[-1]
                 new_lines.append(f"NEXE_MLX_MODEL=storage/models/{model_name}\n")
             else:
                 new_lines.append(line)
         elif line.startswith('NEXE_LLAMA_CPP_MODEL='):
-            found_llama_cpp_model = True
+            found_keys['llama_cpp_model'] = True
             if model_engine == 'llama_cpp':
                 filename = model_id.split('/')[-1]
                 new_lines.append(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
             else:
                 new_lines.append(line)
         elif line.startswith('NEXE_LLAMA_CPP_CHAT_FORMAT='):
-            found_llama_cpp_chat_format = True
+            found_keys['llama_cpp_chat_format'] = True
             if model_engine == 'llama_cpp':
                 chat_fmt = model_config.get('chat_format', 'chatml')
                 new_lines.append(f"NEXE_LLAMA_CPP_CHAT_FORMAT={chat_fmt}\n")
             else:
                 new_lines.append(line)
         elif line.startswith('NEXE_PROMPT_TIER='):
-            found_prompt_tier = True
+            found_keys['prompt_tier'] = True
             new_lines.append(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
         elif line.startswith('NEXE_APPROVED_MODULES='):
-            engine = model_config.get('engine', 'ollama')
-            base_modules = "security,web_ui_module"
-            if engine == 'ollama':
-                approved_modules = f"{base_modules},ollama_module"
-            elif engine == 'mlx':
-                approved_modules = f"{base_modules},mlx_module,ollama_module"
-            elif engine == 'llama_cpp':
-                approved_modules = f"{base_modules},llama_cpp_module,ollama_module"
-            else:
-                approved_modules = f"{base_modules},ollama_module,mlx_module,llama_cpp_module"
-            new_lines.append(f"NEXE_APPROVED_MODULES={approved_modules}\n")
-            found_approved_modules = True
+            new_lines.append(f"NEXE_APPROVED_MODULES={_compute_approved_modules(model_engine)}\n")
+            found_keys['approved_modules'] = True
         elif line.startswith('NEXE_OLLAMA_MODEL='):
-            found_ollama_model = True
+            found_keys['ollama_model'] = True
             if model_engine == 'ollama':
                 new_lines.append(f"NEXE_OLLAMA_MODEL={model_id}\n")
             else:
@@ -180,47 +179,49 @@ def _update_env_model_config(env_file, model_config):
         else:
             new_lines.append(line)
 
-    # Add missing keys at the end
+    return new_lines, found_keys
+
+
+def _append_missing_env_keys(new_lines, found_keys, model_config):
+    """Append keys absent from the existing .env to the end of new_lines."""
+    import secrets as _secrets
+
+    model_id = model_config['id']
+    model_engine = model_config['engine']
+
     if new_lines and not new_lines[-1].endswith('\n'):
         new_lines.append('\n')
 
-    if not found_csrf:
-        new_lines.append(f"NEXE_CSRF_SECRET={secrets.token_hex(32)}\n")
+    if not found_keys['csrf']:
+        new_lines.append(f"NEXE_CSRF_SECRET={_secrets.token_hex(32)}\n")
 
     if not any('# Model configuration' in line for line in new_lines):
         new_lines.append("# Model configuration\n")
-    if not found_model:
+    if not found_keys['model']:
         new_lines.append(f"NEXE_DEFAULT_MODEL={model_id}\n")
-    if not found_engine:
+    if not found_keys['engine']:
         new_lines.append(f"NEXE_MODEL_ENGINE={model_engine}\n")
-    if not found_mlx_model and model_engine == 'mlx':
+    if not found_keys['mlx_model'] and model_engine == 'mlx':
         model_name = model_id.split('/')[-1]
         new_lines.append(f"NEXE_MLX_MODEL=storage/models/{model_name}\n")
-    if not found_llama_cpp_model and model_engine == 'llama_cpp':
+    if not found_keys['llama_cpp_model'] and model_engine == 'llama_cpp':
         filename = model_id.split('/')[-1]
         new_lines.append(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
-    if not found_llama_cpp_chat_format and model_engine == 'llama_cpp':
+    if not found_keys['llama_cpp_chat_format'] and model_engine == 'llama_cpp':
         chat_fmt = model_config.get('chat_format', 'chatml')
         new_lines.append(f"NEXE_LLAMA_CPP_CHAT_FORMAT={chat_fmt}\n")
-    if not found_prompt_tier:
+    if not found_keys['prompt_tier']:
         new_lines.append(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
-    if not found_approved_modules:
-        engine = model_config.get('engine', 'ollama')
-        base_modules = "security,web_ui_module"
-        if engine == 'ollama':
-            approved_modules = f"{base_modules},ollama_module"
-        elif engine == 'mlx':
-            approved_modules = f"{base_modules},mlx_module,ollama_module"
-        elif engine == 'llama_cpp':
-            approved_modules = f"{base_modules},llama_cpp_module,ollama_module"
-        else:
-            approved_modules = f"{base_modules},ollama_module,mlx_module,llama_cpp_module"
-        new_lines.append(f"NEXE_APPROVED_MODULES={approved_modules}\n")
-    if not found_ollama_model and model_engine == 'ollama':
+    if not found_keys['approved_modules']:
+        new_lines.append(f"NEXE_APPROVED_MODULES={_compute_approved_modules(model_engine)}\n")
+    if not found_keys['ollama_model'] and model_engine == 'ollama':
         new_lines.append(f"NEXE_OLLAMA_MODEL={model_id}\n")
 
-    # Write back — atomic write with cleanup on failure
-    env_tmp = env_file.parent / f".env.tmp.{os.getpid()}"
+
+def _atomic_write_env(env_file, new_lines):
+    """Write new_lines to env_file atomically using a tmp file + rename."""
+    import os as _os
+    env_tmp = env_file.parent / f".env.tmp.{_os.getpid()}"
     try:
         with open(env_tmp, 'w') as f:
             f.writelines(new_lines)
@@ -229,4 +230,18 @@ def _update_env_model_config(env_file, model_config):
         env_tmp.unlink(missing_ok=True)
         raise
 
-    print(f"  📝 {t('model_selected')}: {model_id} ({model_engine})")
+
+def _update_env_model_config(env_file, model_config):
+    """Update model configuration in existing .env file."""
+    if model_config is None:
+        # No model selected — keep existing .env as-is
+        return
+
+    with open(env_file, 'r') as f:
+        lines = f.readlines()
+
+    new_lines, found_keys = _rewrite_env_lines(lines, model_config)
+    _append_missing_env_keys(new_lines, found_keys, model_config)
+    _atomic_write_env(env_file, new_lines)
+
+    print(f"  📝 {t('model_selected')}: {model_config['id']} ({model_config['engine']})")
