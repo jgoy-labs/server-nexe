@@ -71,8 +71,6 @@ async def build_rag_context(
     Returns:
         Context text string (empty if no results)
     """
-    from memory.rag_sources.base import SearchRequest
-
     # R1 v1.0.4: NFKC-normalize the query to mirror the ingest path.
     # Documents are NFKC-normalized at ingest via MemoryService.remember() (fix B3
     # Onada 4.6b). Single normalization here covers the three downstream
@@ -82,100 +80,106 @@ async def build_rag_context(
     context_text = ""
 
     try:
-        # Try MemoryAPI first (same as /v1/memory/store uses)
         try:
             from memory.memory.api.v1 import get_memory_api
             memory = await get_memory_api()
 
-            all_results = []
+            collections = [
+                ("nexe_documentation", RAG_DOCS_THRESHOLD, 3, None),
+                ("user_knowledge", RAG_KNOWLEDGE_THRESHOLD, 3, {"lang": server_lang}),
+                ("personal_memory", RAG_MEMORY_THRESHOLD, 2, None),
+            ]
 
-            # 1. Search documentation first (nexe_documentation)
-            try:
-                if await memory.collection_exists("nexe_documentation"):
-                    doc_results = await memory.search(
-                        query=last_user_msg,
-                        collection="nexe_documentation",
-                        top_k=3,
-                        threshold=RAG_DOCS_THRESHOLD
-                    )
-                    if doc_results:
-                        all_results.extend(doc_results)
-                        logger.info("RAG: Found %d docs from documentation", len(doc_results))
-            except Exception as e:
-                logger.debug("RAG docs search failed: %s", e)
-
-            # 2. Search user knowledge (custom documents in knowledge/ folder)
-            try:
-                if await memory.collection_exists("user_knowledge"):
-                    knowledge_results = await memory.search(
-                        query=last_user_msg,
-                        collection="user_knowledge",
-                        top_k=3,
-                        threshold=RAG_KNOWLEDGE_THRESHOLD,
-                        filter_metadata={"lang": server_lang}
-                    )
-                    if knowledge_results:
-                        all_results.extend(knowledge_results)
-                        logger.info("RAG: Found %d docs from user knowledge", len(knowledge_results))
-            except Exception as e:
-                logger.debug("RAG knowledge search failed: %s", e)
-
-            # 3. Search user memory (personal_memory - conversations)
-            try:
-                if await memory.collection_exists("personal_memory"):
-                    mem_results = await memory.search(
-                        query=last_user_msg,
-                        collection="personal_memory",
-                        top_k=2,
-                        threshold=RAG_MEMORY_THRESHOLD
-                    )
-                    if mem_results:
-                        all_results.extend(mem_results)
-                        logger.info("RAG: Found %d docs from chat memory", len(mem_results))
-            except Exception as e:
-                logger.debug("RAG chat memory search failed: %s", e)
+            all_results: list = []
+            for name, threshold, top_k, filter_md in collections:
+                all_results.extend(
+                    await _search_collection(memory, name, last_user_msg, threshold, top_k, filter_md)
+                )
 
             if all_results:
-                # Deduplicate results by content hash
-                seen_hashes = set()
-                unique_results = []
-                for r in all_results:
-                    content_hash = hashlib.sha256(r.text[:500].encode()).hexdigest()
-                    if content_hash not in seen_hashes:
-                        seen_hashes.add(content_hash)
-                        unique_results.append(r)
-                # Build context with clear source headers
-                context_parts = []
-                for r in unique_results[:5]:
-                    source = getattr(r, 'metadata', {}).get('source', 'unknown') if hasattr(r, 'metadata') else 'unknown'
-                    context_parts.append(f"[Font: {source}]\n{r.text}")
-                context_text = "\n\n".join(context_parts)
-                logger.info("RAG Context found (MemoryAPI): %d chars, %d results", len(context_text), len(all_results))
+                context_text = _build_context_from_results(all_results)
+                logger.info(
+                    "RAG Context found (MemoryAPI): %d chars, %d results",
+                    len(context_text), len(all_results),
+                )
         except Exception as mem_err:
             logger.debug("MemoryAPI not available: %s", mem_err)
-
-            # Fallback to RAG module if MemoryAPI fails
-            rag_module = None
-            if hasattr(app_state, 'modules'):
-                rag_module = app_state.modules.get('rag')
-
-            if rag_module and hasattr(rag_module, 'search'):
-                search_request = SearchRequest(query=last_user_msg, top_k=3)
-                results = await rag_module.search(search_request, source="personality")
-
-                if results:
-                    if isinstance(results, list):
-                        context_text = "\n".join([_rag_result_to_text(r) for r in results])
-                    else:
-                        context_text = str(results)
-                    logger.info("RAG Context found (RAG module): %d chars", len(context_text))
-                else:
-                    logger.info("RAG Search returned no results")
-            else:
-                logger.debug("No RAG source available")
+            context_text = await _rag_module_fallback(app_state, last_user_msg)
 
     except Exception as e:
         logger.error("RAG Error: %s", e)
         # Continue without context rather than failing
 
+    return context_text
+
+
+# ─── Private helpers ─────────────────────────────────────────────────────────
+
+
+async def _search_collection(
+    memory: Any,
+    name: str,
+    query: str,
+    threshold: float,
+    top_k: int,
+    filter_metadata: dict | None = None,
+) -> list:
+    """Search a single MemoryAPI collection, returning [] on error or no results."""
+    try:
+        if await memory.collection_exists(name):
+            kwargs: dict = dict(query=query, collection=name, top_k=top_k, threshold=threshold)
+            if filter_metadata:
+                kwargs["filter_metadata"] = filter_metadata
+            results = await memory.search(**kwargs)
+            if results:
+                logger.info("RAG: Found %d docs from %s", len(results), name)
+                return results
+    except Exception as e:
+        logger.debug("RAG %s search failed: %s", name, e)
+    return []
+
+
+def _deduplicate_results(results: list) -> list:
+    """Remove results with duplicate content (sha256 of first 500 chars)."""
+    seen: set = set()
+    unique = []
+    for r in results:
+        h = hashlib.sha256(r.text[:500].encode()).hexdigest()
+        if h not in seen:
+            seen.add(h)
+            unique.append(r)
+    return unique
+
+
+def _build_context_from_results(all_results: list) -> str:
+    """Deduplicate and format up to 5 results into the context string."""
+    unique = _deduplicate_results(all_results)
+    parts = []
+    for r in unique[:5]:
+        source = getattr(r, 'metadata', {}).get('source', 'unknown') if hasattr(r, 'metadata') else 'unknown'
+        parts.append(f"[Font: {source}]\n{r.text}")
+    return "\n\n".join(parts)
+
+
+async def _rag_module_fallback(app_state: Any, query: str) -> str:
+    """Fallback to legacy RAG module if MemoryAPI is unavailable."""
+    from memory.rag_sources.base import SearchRequest
+
+    rag_module = app_state.modules.get('rag') if hasattr(app_state, 'modules') else None
+    if not (rag_module and hasattr(rag_module, 'search')):
+        logger.debug("No RAG source available")
+        return ""
+
+    search_request = SearchRequest(query=query, top_k=3)
+    results = await rag_module.search(search_request, source="personality")
+
+    if not results:
+        logger.info("RAG Search returned no results")
+        return ""
+
+    if isinstance(results, list):
+        context_text = "\n".join([_rag_result_to_text(r) for r in results])
+    else:
+        context_text = str(results)
+    logger.info("RAG Context found (RAG module): %d chars", len(context_text))
     return context_text

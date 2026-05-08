@@ -262,3 +262,120 @@ class TestOllamaNodeTokenCounting:
       result = await ollama_node.execute({"prompt": "Test"})
 
       assert result["tokens"] == 13
+
+
+class TestBuildPayload:
+  """Test OllamaNode._build_payload."""
+
+  def test_build_payload_minimal(self, ollama_node):
+    """Minimal payload without system or max_tokens."""
+    payload = ollama_node._build_payload("hello", "llama3.2", 0.7, None, None, False)
+    assert payload["model"] == "llama3.2"
+    assert payload["prompt"] == "hello"
+    assert payload["stream"] is False
+    assert payload["options"]["temperature"] == 0.7
+    assert "system" not in payload
+    assert "num_predict" not in payload["options"]
+
+  def test_build_payload_with_system(self, ollama_node):
+    """Payload includes system when provided."""
+    payload = ollama_node._build_payload("hello", "llama3.2", 0.7, None, "You are helpful", False)
+    assert payload["system"] == "You are helpful"
+
+  def test_build_payload_without_system(self, ollama_node):
+    """Payload excludes system key when not provided."""
+    payload = ollama_node._build_payload("hello", "llama3.2", 0.7, None, None, False)
+    assert "system" not in payload
+
+  def test_build_payload_with_max_tokens(self, ollama_node):
+    """Payload includes num_predict when max_tokens provided."""
+    payload = ollama_node._build_payload("hello", "llama3.2", 0.7, 100, None, False)
+    assert payload["options"]["num_predict"] == 100
+
+  def test_build_payload_without_max_tokens(self, ollama_node):
+    """Payload excludes num_predict when max_tokens not provided."""
+    payload = ollama_node._build_payload("hello", "llama3.2", 0.7, None, None, False)
+    assert "num_predict" not in payload["options"]
+
+  def test_build_payload_streaming_true(self, ollama_node):
+    """Payload stream=True when streaming enabled."""
+    payload = ollama_node._build_payload("hello", "llama3.2", 0.7, None, None, True)
+    assert payload["stream"] is True
+
+  def test_build_payload_streaming_false(self, ollama_node):
+    """Payload stream=False when streaming disabled."""
+    payload = ollama_node._build_payload("hello", "llama3.2", 0.7, None, None, False)
+    assert payload["stream"] is False
+
+
+class TestExecuteBlocking:
+  """Test OllamaNode._execute_blocking."""
+
+  @pytest.mark.asyncio
+  async def test_execute_blocking_success(self, ollama_node):
+    """Blocking execution returns (text, token_count) on success."""
+    with patch("httpx.AsyncClient.post") as mock_post:
+      mock_resp = MagicMock()
+      mock_resp.json.return_value = {"response": "Hello world", "eval_count": 5}
+      mock_resp.raise_for_status = MagicMock()
+      mock_post.return_value = mock_resp
+
+      payload = {
+        "model": "llama3.2", "prompt": "Hi", "stream": False,
+        "keep_alive": "30m", "options": {"temperature": 0.7}
+      }
+      text, count = await ollama_node._execute_blocking(payload, "http://localhost:11434")
+
+      assert text == "Hello world"
+      assert count == 5
+
+  @pytest.mark.asyncio
+  async def test_execute_blocking_connect_error(self, ollama_node):
+    """Blocking execution raises ConnectionError on ConnectError."""
+    with patch("httpx.AsyncClient.post") as mock_post:
+      import httpx
+      mock_post.side_effect = httpx.ConnectError("Connection refused")
+
+      payload = {"model": "llama3.2", "prompt": "Hi", "stream": False, "keep_alive": "30m", "options": {}}
+      with pytest.raises(ConnectionError, match="Cannot connect to Ollama"):
+        await ollama_node._execute_blocking(payload, "http://localhost:11434")
+
+  @pytest.mark.asyncio
+  async def test_execute_blocking_timeout(self, ollama_node):
+    """Blocking execution raises TimeoutError on TimeoutException."""
+    with patch("httpx.AsyncClient.post") as mock_post:
+      import httpx
+      mock_post.side_effect = httpx.TimeoutException("Timeout")
+
+      payload = {"model": "llama3.2", "prompt": "Hi", "stream": False, "keep_alive": "30m", "options": {}}
+      with pytest.raises(TimeoutError, match="timed out"):
+        await ollama_node._execute_blocking(payload, "http://localhost:11434")
+
+  @pytest.mark.asyncio
+  async def test_execute_blocking_404(self, ollama_node):
+    """Blocking execution raises ValueError on model not found (404)."""
+    with patch("httpx.AsyncClient.post") as mock_post:
+      import httpx
+      mock_resp = MagicMock()
+      mock_resp.status_code = 404
+      mock_post.side_effect = httpx.HTTPStatusError(
+        "Not found", request=MagicMock(), response=mock_resp
+      )
+
+      payload = {"model": "llama3.2", "prompt": "Hi", "stream": False, "keep_alive": "30m", "options": {}}
+      with pytest.raises(ValueError, match="not found"):
+        await ollama_node._execute_blocking(payload, "http://localhost:11434")
+
+  @pytest.mark.asyncio
+  async def test_execute_blocking_other_http_error(self, ollama_node):
+    """Blocking execution reraises non-404 HTTPStatusError."""
+    with patch("httpx.AsyncClient.post") as mock_post:
+      import httpx
+      mock_resp = MagicMock()
+      mock_resp.status_code = 500
+      err = httpx.HTTPStatusError("Server error", request=MagicMock(), response=mock_resp)
+      mock_post.side_effect = err
+
+      payload = {"model": "llama3.2", "prompt": "Hi", "stream": False, "keep_alive": "30m", "options": {}}
+      with pytest.raises(httpx.HTTPStatusError):
+        await ollama_node._execute_blocking(payload, "http://localhost:11434")

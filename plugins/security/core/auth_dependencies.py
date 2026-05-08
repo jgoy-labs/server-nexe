@@ -44,6 +44,122 @@ def _is_loopback_ip(ip: str) -> bool:
     return False
   return addr.is_loopback
 
+def _update_key_metrics(keys_config) -> None:
+  if keys_config.primary:
+    if keys_config.primary.expires_at:
+      days_remaining = (keys_config.primary.expires_at - datetime.now(timezone.utc)).days
+      update_key_expiry_days('primary', days_remaining)
+    else:
+      update_key_expiry_days('primary', -1)
+    update_key_status('primary', keys_config.primary.status.value)
+  else:
+    update_key_status('primary', 'not_configured')
+
+  if keys_config.secondary:
+    if keys_config.secondary.expires_at:
+      days_remaining = (keys_config.secondary.expires_at - datetime.now(timezone.utc)).days
+      update_key_expiry_days('secondary', days_remaining)
+    else:
+      update_key_expiry_days('secondary', -1)
+    update_key_status('secondary', keys_config.secondary.status.value)
+  else:
+    update_key_status('secondary', 'not_configured')
+
+  set_grace_period_active(keys_config.secondary and keys_config.secondary.is_valid)
+
+
+def _check_dev_mode(request: Request, dev_mode: bool) -> str:
+  if dev_mode:
+    client_ip = request.client.host if request.client else "unknown"
+    allow_remote = os.getenv("NEXE_DEV_MODE_ALLOW_REMOTE", "false").lower() == "true"
+    if not allow_remote and not _is_loopback_ip(client_ip):
+      raise HTTPException(
+        status_code=403,
+        detail="DEV mode bypass only allowed from localhost"
+      )
+    try:
+      from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
+      security_logger = get_security_logger()
+      security_logger.log_event(
+        event_type=SecurityEventType.AUTH_SUCCESS,
+        severity=SecuritySeverity.WARNING,
+        message="DEV MODE: API key bypassed",
+        details={"warning": "NOT for production!"}
+      )
+    except ImportError:
+      pass
+    return "dev-mode-bypass"
+  raise HTTPException(
+    status_code=500,
+    detail="Server misconfiguration: No valid API key configured"
+  )
+
+
+def _authenticate_primary(x_api_key: str, keys_config, request: Request) -> Optional[str]:
+  if keys_config.primary and keys_config.primary.is_valid:
+    if secrets.compare_digest(x_api_key, keys_config.primary.key):
+      record_auth_attempt('success', 'primary', request.url.path)
+      try:
+        from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
+        security_logger = get_security_logger()
+        security_logger.log_event(
+          event_type=SecurityEventType.AUTH_SUCCESS,
+          severity=SecuritySeverity.INFO,
+          message="Authentication with primary API key",
+          details={
+            "key_type": "primary",
+            "expires_at": keys_config.primary.expires_at.isoformat() if keys_config.primary.expires_at else None
+          }
+        )
+      except ImportError:
+        pass
+      return x_api_key
+  return None
+
+
+def _authenticate_secondary(x_api_key: str, keys_config, request: Request) -> Optional[str]:
+  if keys_config.secondary and keys_config.secondary.is_valid:
+    if secrets.compare_digest(x_api_key, keys_config.secondary.key):
+      record_auth_attempt('success', 'secondary', request.url.path)
+      try:
+        from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
+        security_logger = get_security_logger()
+        security_logger.log_event(
+          event_type=SecurityEventType.AUTH_SUCCESS,
+          severity=SecuritySeverity.WARNING,
+          message="Authentication with secondary API key (deprecated)",
+          details={
+            "key_type": "secondary",
+            "action_required": "MIGRATE TO PRIMARY KEY",
+            "expires_at": keys_config.secondary.expires_at.isoformat() if keys_config.secondary.expires_at else None
+          }
+        )
+      except ImportError:
+        pass
+      return x_api_key
+  return None
+
+
+def _log_failure(request: Request, keys_config) -> None:
+  failure_reason = "invalid_api_key"
+  if keys_config.primary and keys_config.primary.status == KeyStatus.EXPIRED:
+    failure_reason = "primary_key_expired"
+  if keys_config.secondary and keys_config.secondary.status == KeyStatus.EXPIRED:
+    failure_reason = "secondary_key_expired"
+
+  record_auth_failure(failure_reason)
+
+  try:
+    from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
+    security_logger = get_security_logger()
+    security_logger.log_auth_failure(
+      reason=failure_reason,
+      ip_address=request.client.host if request.client else "unknown"
+    )
+  except ImportError:
+    pass
+
+
 async def require_api_key(
   request: Request,
   x_api_key: Optional[str] = Header(None, description="Admin API Key")
@@ -74,58 +190,12 @@ async def require_api_key(
   keys_config = load_api_keys()
   dev_mode = is_dev_mode()
 
-  if keys_config.primary:
-    if keys_config.primary.expires_at:
-      days_remaining = (keys_config.primary.expires_at - datetime.now(timezone.utc)).days
-      update_key_expiry_days('primary', days_remaining)
-    else:
-      update_key_expiry_days('primary', -1)
-    update_key_status('primary', keys_config.primary.status.value)
-  else:
-    update_key_status('primary', 'not_configured')
-
-  if keys_config.secondary:
-    if keys_config.secondary.expires_at:
-      days_remaining = (keys_config.secondary.expires_at - datetime.now(timezone.utc)).days
-      update_key_expiry_days('secondary', days_remaining)
-    else:
-      update_key_expiry_days('secondary', -1)
-    update_key_status('secondary', keys_config.secondary.status.value)
-  else:
-    update_key_status('secondary', 'not_configured')
-
-  set_grace_period_active(keys_config.secondary and keys_config.secondary.is_valid)
+  _update_key_metrics(keys_config)
 
   if not keys_config.has_any_valid_key:
-    if dev_mode:
-      client_ip = request.client.host if request.client else "unknown"
-      allow_remote = os.getenv("NEXE_DEV_MODE_ALLOW_REMOTE", "false").lower() == "true"
-      if not allow_remote and not _is_loopback_ip(client_ip):
-        raise HTTPException(
-          status_code=403,
-          detail="DEV mode bypass only allowed from localhost"
-        )
-      try:
-        from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
-        security_logger = get_security_logger()
-        security_logger.log_event(
-          event_type=SecurityEventType.AUTH_SUCCESS,
-          severity=SecuritySeverity.WARNING,
-          message="DEV MODE: API key bypassed",
-          details={"warning": "NOT for production!"}
-        )
-      except ImportError:
-        pass
-      return "dev-mode-bypass"
-    else:
-      raise HTTPException(
-        status_code=500,
-        detail="Server misconfiguration: No valid API key configured"
-      )
+    return _check_dev_mode(request, dev_mode)
 
   if not x_api_key:
-
-
     record_auth_failure('missing_key')
     # Q3.1 fix: read i18n from app.state instead of None (Codex P1 i18n bypass)
     _i18n = getattr(request.app.state, 'i18n', None)
@@ -135,65 +205,15 @@ async def require_api_key(
       headers={"WWW-Authenticate": "ApiKey"}
     )
 
-  if keys_config.primary and keys_config.primary.is_valid:
-    if secrets.compare_digest(x_api_key, keys_config.primary.key):
-      record_auth_attempt('success', 'primary', request.url.path)
+  result = _authenticate_primary(x_api_key, keys_config, request)
+  if result:
+    return result
 
-      try:
-        from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
-        security_logger = get_security_logger()
-        security_logger.log_event(
-          event_type=SecurityEventType.AUTH_SUCCESS,
-          severity=SecuritySeverity.INFO,
-          message="Authentication with primary API key",
-          details={
-            "key_type": "primary",
-            "expires_at": keys_config.primary.expires_at.isoformat() if keys_config.primary.expires_at else None
-          }
-        )
-      except ImportError:
-        pass
-      return x_api_key
+  result = _authenticate_secondary(x_api_key, keys_config, request)
+  if result:
+    return result
 
-  if keys_config.secondary and keys_config.secondary.is_valid:
-    if secrets.compare_digest(x_api_key, keys_config.secondary.key):
-      record_auth_attempt('success', 'secondary', request.url.path)
-
-      try:
-        from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
-        security_logger = get_security_logger()
-        security_logger.log_event(
-          event_type=SecurityEventType.AUTH_SUCCESS,
-          severity=SecuritySeverity.WARNING,
-          message="Authentication with secondary API key (deprecated)",
-          details={
-            "key_type": "secondary",
-            "action_required": "MIGRATE TO PRIMARY KEY",
-            "expires_at": keys_config.secondary.expires_at.isoformat() if keys_config.secondary.expires_at else None
-          }
-        )
-      except ImportError:
-        pass
-      return x_api_key
-
-  failure_reason = "invalid_api_key"
-  if keys_config.primary and keys_config.primary.status == KeyStatus.EXPIRED:
-    failure_reason = "primary_key_expired"
-  if keys_config.secondary and keys_config.secondary.status == KeyStatus.EXPIRED:
-    failure_reason = "secondary_key_expired"
-
-  record_auth_failure(failure_reason)
-
-  try:
-    from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
-    security_logger = get_security_logger()
-    security_logger.log_auth_failure(
-      reason=failure_reason,
-      ip_address=request.client.host if request.client else "unknown"
-    )
-  except ImportError:
-    pass
-
+  _log_failure(request, keys_config)
   raise HTTPException(
     status_code=401,
     detail="Invalid or expired API key",

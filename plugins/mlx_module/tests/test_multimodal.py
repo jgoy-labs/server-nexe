@@ -376,3 +376,124 @@ class TestMLXExecuteBifurcation:
         assert call_args[0][0] == node._generate_vlm
         # The response is valid
         assert result.get("response") == "Veig un gat."
+
+
+# ── _normalize_image_input ───────────────────────────────────────────────────
+
+class TestNormalizeImageInput:
+
+    def _make_node(self):
+        from plugins.mlx_module.core.config import MLXConfig
+        from plugins.mlx_module.core.chat import MLXChatNode
+        MLXChatNode._model = None
+        MLXChatNode._tokenizer = None
+        return MLXChatNode(config=MLXConfig(model_path="/fake/model"))
+
+    def test_bytes_passthrough(self):
+        node = self._make_node()
+        data = b"\xff\xd8\xff\xe0" + b"\x00" * 10
+        assert node._normalize_image_input(data) is data
+
+    def test_bytearray_passthrough(self):
+        node = self._make_node()
+        data = bytearray(b"\xff\xd8\xff\xe0")
+        result = node._normalize_image_input(data)
+        assert isinstance(result, (bytes, bytearray))
+
+    def test_bare_base64_str_decoded(self):
+        import base64
+        node = self._make_node()
+        raw = b"\xff\xd8\xff\xe0" + b"\x00" * 10
+        encoded = base64.b64encode(raw).decode()
+        result = node._normalize_image_input(encoded)
+        assert result == raw
+
+    def test_data_uri_prefix_stripped_and_decoded(self):
+        import base64
+        node = self._make_node()
+        raw = b"\x89PNG\r\n" + b"\x00" * 20
+        encoded = base64.b64encode(raw).decode()
+        data_uri = f"data:image/png;base64,{encoded}"
+        result = node._normalize_image_input(data_uri)
+        assert result == raw
+
+    def test_invalid_base64_str_raises_value_error(self):
+        node = self._make_node()
+        with pytest.raises(ValueError, match="not valid base64"):
+            node._normalize_image_input("!!!not_base64!!!")
+
+    def test_wrong_type_raises_type_error(self):
+        node = self._make_node()
+        with pytest.raises(TypeError, match="must be bytes or base64 str"):
+            node._normalize_image_input(12345)
+
+    def test_data_uri_without_comma_raises_value_error(self):
+        """data: prefix sense coma → no es pot separar el payload, decodificació falla."""
+        import base64
+        node = self._make_node()
+        raw = b"\x00" * 4
+        encoded = base64.b64encode(raw).decode()
+        data_uri_no_comma = f"data:image/png;base64{encoded}"
+        with pytest.raises(ValueError, match="not valid base64"):
+            node._normalize_image_input(data_uri_no_comma)
+
+
+# ── _extract_vlm_metrics ─────────────────────────────────────────────────────
+
+class TestExtractVlmMetrics:
+
+    def _make_node(self):
+        from plugins.mlx_module.core.config import MLXConfig
+        from plugins.mlx_module.core.chat import MLXChatNode
+        MLXChatNode._model = None
+        MLXChatNode._tokenizer = None
+        return MLXChatNode(config=MLXConfig(model_path="/fake/model"))
+
+    def _full_result_obj(self):
+        obj = MagicMock()
+        obj.prompt_tokens = 50
+        obj.generation_tokens = 12
+        obj.prompt_tps = 200.0
+        obj.generation_tps = 55.3
+        obj.peak_memory = 4096.0
+        return obj
+
+    def test_all_fields_present(self):
+        node = self._make_node()
+        obj = self._full_result_obj()
+        out = node._extract_vlm_metrics(obj, "Hola món", 500)
+        assert out["text"] == "Hola món"
+        assert out["tokens"] == 12
+        assert out["prompt_tokens"] == 50
+        assert out["prompt_tps"] == 200.0
+        assert out["peak_memory_mb"] == 4096.0
+        assert out["tokens_per_second"] == 55.3
+        assert out["vlm"] is True
+        assert out["prefix_reused"] is False
+        assert out["cached_tokens"] == 0
+        assert out["actual_prefill_tokens"] == 50
+        assert out["identity_hash"] == ""
+
+    def test_missing_generation_tokens_fallback_to_word_count(self):
+        node = self._make_node()
+        obj = MagicMock(spec=[])
+        out = node._extract_vlm_metrics(obj, "un dos tres quatre", 1000)
+        assert out["tokens"] == 4
+
+    def test_zero_gen_tps_uses_elapsed_fallback(self):
+        node = self._make_node()
+        obj = MagicMock()
+        obj.prompt_tokens = 10
+        obj.generation_tokens = 10
+        obj.prompt_tps = 0.0
+        obj.generation_tps = 0.0
+        obj.peak_memory = 0.0
+        out = node._extract_vlm_metrics(obj, "hola món test", 2000)
+        assert out["tokens_per_second"] == round(10 / 2.0, 1)
+
+    def test_missing_all_attrs_does_not_crash(self):
+        node = self._make_node()
+        obj = MagicMock(spec=[])
+        out = node._extract_vlm_metrics(obj, "text", 100)
+        assert "text" in out
+        assert out["vlm"] is True

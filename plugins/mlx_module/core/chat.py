@@ -342,6 +342,132 @@ class MLXChatNode:
             )
             raise
 
+    def _normalize_image_input(self, raw) -> bytes:
+        if isinstance(raw, str):
+            import base64
+            if raw.startswith("data:"):
+                try:
+                    raw = raw.split(",", 1)[1]
+                except IndexError:
+                    pass
+            try:
+                raw = base64.b64decode(raw, validate=False)
+            except Exception as exc:
+                raise ValueError(
+                    f"VLM image[0] is str but not valid base64: {exc}"
+                ) from exc
+        if not isinstance(raw, (bytes, bytearray)):
+            raise TypeError(
+                f"VLM image[0] must be bytes or base64 str, got {type(raw).__name__}"
+            )
+        return raw
+
+    def _prepare_vlm_prompt(
+        self,
+        messages: List[Dict],
+        system: str,
+        processor,
+        has_image: bool,
+    ) -> str:
+        import os
+        from mlx_vlm.prompt_utils import apply_chat_template
+
+        try:
+            with open(
+                os.path.join(self.config.model_path, "config.json")
+            ) as _cf:
+                mdl_config = json.load(_cf)
+        except Exception:
+            mdl_config = {"model_type": ""}
+
+        all_messages: List[Dict[str, Any]] = []
+        if system:
+            all_messages.append({"role": "system", "content": system})
+        if messages:
+            all_messages.extend(messages)
+
+        return apply_chat_template(
+            processor=processor,
+            config=mdl_config,
+            prompt=all_messages if all_messages else "",
+            num_images=1 if has_image else 0,
+        )
+
+    def _run_vlm_streaming(
+        self,
+        model,
+        processor,
+        formatted_prompt: str,
+        tmp_path: Optional[str],
+        max_tokens: Optional[int],
+        stream_callback: Callable[[str], None],
+    ):
+        from mlx_vlm import stream_generate as vlm_stream
+
+        full_text = ""
+        last = None
+        for chunk in vlm_stream(
+            model=model,
+            processor=processor,
+            image=tmp_path,
+            prompt=formatted_prompt,
+            max_tokens=max_tokens or self.config.max_tokens,
+        ):
+            delta = getattr(chunk, "text", "") or ""
+            if delta:
+                stream_callback(delta)
+                full_text += delta
+            last = chunk
+        return full_text, last
+
+    def _run_vlm_oneshot(
+        self,
+        model,
+        processor,
+        formatted_prompt: str,
+        tmp_path: Optional[str],
+        max_tokens: Optional[int],
+    ):
+        from mlx_vlm import generate as vlm_generate
+
+        one = vlm_generate(
+            model=model,
+            processor=processor,
+            image=tmp_path,
+            prompt=formatted_prompt,
+            max_tokens=max_tokens or self.config.max_tokens,
+            verbose=False,
+        )
+        return (one.text if hasattr(one, "text") else str(one)), one
+
+    def _extract_vlm_metrics(
+        self,
+        result_obj,
+        result_text: str,
+        elapsed_ms: int,
+    ) -> Dict[str, Any]:
+        prompt_tokens = getattr(result_obj, "prompt_tokens", 0)
+        gen_tokens = getattr(result_obj, "generation_tokens", len(result_text.split()))
+        prompt_tps = getattr(result_obj, "prompt_tps", 0) or 0
+        gen_tps = getattr(result_obj, "generation_tps", 0) or 0
+        peak_memory = getattr(result_obj, "peak_memory", 0) or 0
+
+        return {
+            "text": result_text,
+            "tokens": gen_tokens,
+            "tokens_per_second": round(gen_tps, 1) if gen_tps else round(
+                gen_tokens / max(elapsed_ms / 1000, 0.001), 1
+            ),
+            "prompt_tokens": prompt_tokens,
+            "prefix_reused": False,
+            "cached_tokens": 0,
+            "actual_prefill_tokens": prompt_tokens,
+            "prompt_tps": round(prompt_tps, 1),
+            "peak_memory_mb": round(peak_memory, 1),
+            "identity_hash": "",
+            "vlm": True,
+        }
+
     def _generate_vlm(
         self,
         system: str,
@@ -358,70 +484,15 @@ class MLXChatNode:
         """
         import os
         import tempfile
-        from mlx_vlm import generate as vlm_generate, stream_generate as vlm_stream
-        from mlx_vlm.prompt_utils import apply_chat_template
 
         model, processor = self._get_model()
-
         has_image = bool(images)
-
-        # mlx-vlm apply_chat_template expects a dict with "model_type".
-        # Gemma4Processor does not have .config, and model.config is a dataclass
-        # ModelConfig (not a dict). We read config.json directly.
-        try:
-            with open(
-                os.path.join(self.config.model_path, "config.json")
-            ) as _cf:
-                mdl_config = json.load(_cf)
-        except Exception:
-            mdl_config = {"model_type": ""}
-
-        # Build the full message list: system + history.
-        # mlx_vlm.prompt_utils.apply_chat_template accepts list[{"role","content"}]
-        # and it is essential to pass the system (so the model sees the
-        # MEM_SAVE contract, personality, language, RAG context) and the full
-        # history for multi-turn conversations. Previously we only sent
-        # messages[-1]["content"] → the model had neither system nor history.
-        all_messages: List[Dict[str, Any]] = []
-        if system:
-            all_messages.append({"role": "system", "content": system})
-        if messages:
-            all_messages.extend(messages)
-
-        # Prepare the prompt via the processor's chat template
-        formatted_prompt = apply_chat_template(
-            processor=processor,
-            config=mdl_config,
-            prompt=all_messages if all_messages else "",
-            num_images=1 if has_image else 0,
-        )
+        formatted_prompt = self._prepare_vlm_prompt(messages, system, processor, has_image)
 
         tmp_path = None
         try:
             if has_image:
-                # Images can arrive as bytes or as str (data URI
-                # `data:image/...;base64,...` or bare base64). Normalize
-                # to bytes before writing to the tempfile.
-                raw = images[0]
-                if isinstance(raw, str):
-                    import base64
-                    # strip data URI prefix if present
-                    if raw.startswith("data:"):
-                        try:
-                            raw = raw.split(",", 1)[1]
-                        except IndexError:
-                            pass
-                    try:
-                        raw = base64.b64decode(raw, validate=False)
-                    except Exception as exc:
-                        raise ValueError(
-                            f"VLM image[0] is str but not valid base64: {exc}"
-                        ) from exc
-                if not isinstance(raw, (bytes, bytearray)):
-                    raise TypeError(
-                        f"VLM image[0] must be bytes or base64 str, got {type(raw).__name__}"
-                    )
-                # mlx-vlm 0.4 expects a file path — write bytes to tempfile
+                raw = self._normalize_image_input(images[0])
                 tmp = tempfile.NamedTemporaryFile(
                     prefix="nexe_vlm_", suffix=".img", delete=False
                 )
@@ -432,37 +503,14 @@ class MLXChatNode:
 
             start_time = time.time()
             if stream_callback:
-                # Streaming: mlx_vlm.stream_generate yields GenerationResult
-                # with text=last_segment (delta) for each token. Accumulate
-                # and send deltas to the callback; metrics from the last yield.
-                full_text = ""
-                last = None
-                for chunk in vlm_stream(
-                    model=model,
-                    processor=processor,
-                    image=tmp_path,
-                    prompt=formatted_prompt,
-                    max_tokens=max_tokens or self.config.max_tokens,
-                ):
-                    delta = getattr(chunk, "text", "") or ""
-                    if delta:
-                        stream_callback(delta)
-                        full_text += delta
-                    last = chunk
-                result_text = full_text
-                result_obj = last
-            else:
-                # One-shot (no streaming): full text at the end
-                one = vlm_generate(
-                    model=model,
-                    processor=processor,
-                    image=tmp_path,
-                    prompt=formatted_prompt,
-                    max_tokens=max_tokens or self.config.max_tokens,
-                    verbose=False,
+                result_text, result_obj = self._run_vlm_streaming(
+                    model, processor, formatted_prompt, tmp_path,
+                    max_tokens, stream_callback,
                 )
-                result_text = one.text if hasattr(one, "text") else str(one)
-                result_obj = one
+            else:
+                result_text, result_obj = self._run_vlm_oneshot(
+                    model, processor, formatted_prompt, tmp_path, max_tokens,
+                )
         finally:
             if tmp_path:
                 try:
@@ -470,31 +518,8 @@ class MLXChatNode:
                 except OSError:
                     pass
 
-        # Real metrics (mlx-vlm >= 0.4 GenerationResult)
-        text = result_text
-        prompt_tokens = getattr(result_obj, "prompt_tokens", 0)
-        gen_tokens = getattr(result_obj, "generation_tokens", len(text.split()))
-        prompt_tps = getattr(result_obj, "prompt_tps", 0) or 0
-        gen_tps = getattr(result_obj, "generation_tps", 0) or 0
-        peak_memory = getattr(result_obj, "peak_memory", 0) or 0
-
         elapsed_ms = int((time.time() - start_time) * 1000)
-
-        return {
-            "text": text,           # Consistent format with extract_metrics()
-            "tokens": gen_tokens,
-            "tokens_per_second": round(gen_tps, 1) if gen_tps else round(
-                gen_tokens / max(elapsed_ms / 1000, 0.001), 1
-            ),
-            "prompt_tokens": prompt_tokens,
-            "prefix_reused": False,
-            "cached_tokens": 0,
-            "actual_prefill_tokens": prompt_tokens,
-            "prompt_tps": round(prompt_tps, 1),
-            "peak_memory_mb": round(peak_memory, 1),
-            "identity_hash": "",
-            "vlm": True,            # Extra flag to indicate VLM mode
-        }
+        return self._extract_vlm_metrics(result_obj, result_text, elapsed_ms)
 
     def _generate_blocking(
         self,
