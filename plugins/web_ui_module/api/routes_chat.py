@@ -948,6 +948,39 @@ async def _switch_engine_model(engine, engine_name: str, body: dict, model_name:
                 import logging as _lg; _lg.getLogger(__name__).info("Llama.cpp model switched to: %s", new_config.model_path)
 
 
+def _build_rag_items_tuple(relevant_results) -> list[tuple[str, float]]:
+    return [
+        (r.get("metadata", {}).get("source_collection", "?"), r.get("score", 0))
+        for r in relevant_results
+    ]
+
+
+def _filter_relevant_results(recall_results, rag_threshold, log) -> tuple[list, list, list]:
+    """Retorna (doc_items, knowledge_items, memory_items)."""
+    relevant = [r for r in recall_results if r.get("score", 0) >= rag_threshold]
+    doc_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") == "nexe_documentation"]
+    knowledge_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") == "user_knowledge"]
+    memory_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") not in ("user_knowledge", "nexe_documentation")]
+    return doc_items, knowledge_items, memory_items
+
+
+def _format_rag_sections_by_language(doc_items, knowledge_items, memory_items, lang_key) -> str:
+    _rag_labels = {
+        "ca": ("DOCUMENTACIO DEL SISTEMA", "DOCUMENTACIO TECNICA", "MEMORIA DE L'USUARI"),
+        "es": ("DOCUMENTACION DEL SISTEMA", "DOCUMENTACION TECNICA", "MEMORIA DEL USUARIO"),
+        "en": ("SYSTEM DOCUMENTATION", "TECHNICAL DOCUMENTATION", "USER MEMORY"),
+    }
+    _labels = _rag_labels.get(lang_key, _rag_labels["en"])
+    rag_context = ""
+    if doc_items:
+        rag_context += f"\n\n[{_labels[0]}]\n" + "".join(f"- {r['content']}\n" for r in doc_items)
+    if knowledge_items:
+        rag_context += f"\n\n[{_labels[1]}]\n" + "".join(f"- {r['content']}\n" for r in knowledge_items)
+    if memory_items:
+        rag_context += f"\n\n[{_labels[2]}]\n" + "".join(f"- {r['content']}\n" for r in memory_items)
+    return rag_context
+
+
 async def _build_rag_context(memory_helper, message: str, body: dict, attached_doc) -> tuple:
     """Recall from memory and build the RAG context string.
 
@@ -971,32 +1004,23 @@ async def _build_rag_context(memory_helper, message: str, body: dict, attached_d
         )
         if recall_result["success"] and recall_result["results"]:
             rag_threshold = float(body.get("rag_threshold", 0.25))
-            relevant = [r for r in recall_result["results"] if r.get("score", 0) >= rag_threshold]
             _log.info("RAG pre-filter: %s results, threshold=%s", len(recall_result["results"]), rag_threshold)
+            doc_items, knowledge_items, memory_items = _filter_relevant_results(
+                recall_result["results"], rag_threshold, _log
+            )
+            relevant = doc_items + knowledge_items + memory_items
             if relevant:
                 rag_count = len(relevant)
-                doc_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") == "nexe_documentation"]
-                knowledge_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") == "user_knowledge"]
-                memory_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") not in ("user_knowledge", "nexe_documentation")]
-                _rag_labels = {
-                    "ca": ("DOCUMENTACIO DEL SISTEMA", "DOCUMENTACIO TECNICA", "MEMORIA DE L'USUARI"),
-                    "es": ("DOCUMENTACION DEL SISTEMA", "DOCUMENTACION TECNICA", "MEMORIA DEL USUARIO"),
-                    "en": ("SYSTEM DOCUMENTATION", "TECHNICAL DOCUMENTATION", "USER MEMORY"),
-                }
                 _lang_key = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
-                _labels = _rag_labels.get(_lang_key, _rag_labels["en"])
-                if doc_items:
-                    rag_context += f"\n\n[{_labels[0]}]\n" + "".join(f"- {r['content']}\n" for r in doc_items)
-                if knowledge_items:
-                    rag_context += f"\n\n[{_labels[1]}]\n" + "".join(f"- {r['content']}\n" for r in knowledge_items)
-                if memory_items:
-                    rag_context += f"\n\n[{_labels[2]}]\n" + "".join(f"- {r['content']}\n" for r in memory_items)
+                rag_context = _format_rag_sections_by_language(
+                    doc_items, knowledge_items, memory_items, _lang_key
+                )
                 rag_context = _sanitize_rag_context(rag_context)
+                rag_items = _build_rag_items_tuple(relevant)
                 _log.info("RAG: %s relevant memories (score >= %s)", rag_count, rag_threshold)
                 for item in relevant:
                     score = item.get("score", 0)
                     col = item.get("metadata", {}).get("source_collection", "?")
-                    rag_items.append((col, score))
                     _log.info("  RAG [%s] score=%.2f -> %r", col, score, item["content"][:80].replace("\n", " "))
         elif not recall_result["success"]:
             _log.warning("RAG: recall failed — %s", recall_result.get("message", "unknown"))
