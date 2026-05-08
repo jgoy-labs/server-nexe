@@ -300,3 +300,15 @@ reason = "self_path és el paràmetre posicional de chmod_fail usada com a reemp
 expires = "2027-05-08"
 authorized_by = "Jordi Goy"
 ticket = "vulture-whitelist-2026-05-08"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# api-structure whitelist — 2026-05-09
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[exception]]
+rule = "api.missing_operation_id"
+path = "core/endpoints/v1.py"
+reason = "GET / té include_in_schema=False — no apareix a l'OpenAPI i no necessita operation_id. FP de muthur."
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "api-structure-2026-05-09"
