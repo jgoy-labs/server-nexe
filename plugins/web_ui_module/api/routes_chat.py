@@ -778,6 +778,79 @@ async def _handle_memory_intent(
     return response_text, memory_action, resolved_intent, mem_deleted
 
 
+_MEMSAVE_JUNK_RE = _re.compile(
+    r'(?i)(no\s+(coneix|s.han|tinc|té|hi ha)|'
+    r'no\s+s.han\s+detectat|busco\s+ajuda|necessit[oa]|'
+    r'primera\s+interacci|no\s+personal|sense\s+dades|'
+    # Anti-hallucination: detect fabricated personal data
+    r'se\s+llama\s+\w+\s+y\s+(vive|tiene|trabaja)|'
+    r'el\s+usuario\s+se\s+llama|the\s+user.s\s+name\s+is|'
+    r'l.usuari\s+es\s+diu)',
+)
+
+
+def _clean_nonstreaming_text(response_text: str) -> str:
+    """Strip think/GPT-OSS tags and extract the final answer section."""
+    response_text = _re.sub(r"<think>[\s\S]*?</think>\s*", "", response_text)
+    response_text = _re.sub(r'<\|[^|]+\|>', '', response_text)
+    _m = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', response_text, _re.IGNORECASE)
+    if _m:
+        return _m.group(1).strip()
+    return _re.sub(r'^analysis\s*', '', response_text, flags=_re.IGNORECASE).strip()
+
+
+async def _save_mem_saves_nonstreaming(
+    mem_saves: list,
+    session,
+    memory_helper,
+) -> None:
+    """Persist MEM_SAVE facts extracted from a non-streaming response."""
+    _prior_msgs = [msg for msg in session.messages if msg.get("role") == "user"]
+    _is_first_turn = len(_prior_msgs) <= 1
+    for _fact in mem_saves:
+        _fact = _fact.strip()
+        if not _fact or len(_fact) < 5:
+            continue
+        if _MEMSAVE_JUNK_RE.search(_fact):
+            logger.debug("MEM_SAVE skip (junk/no-stream): '%s'", _fact[:80])
+            continue
+        if _is_first_turn:
+            logger.debug("MEM_SAVE skip (first turn, likely hallucination): '%s'", _fact[:80])
+            continue
+        try:
+            _save_r = await memory_helper.save_to_memory(
+                content=_fact,
+                session_id=session.id,
+                metadata={"type": "user_fact", "source": "llm_extract", "is_mem_save": True},
+            )
+            if _save_r.get("document_id"):
+                logger.info("MEM_SAVE (no-stream): '%s'", _fact[:80])
+        except Exception as e:
+            logger.debug("MEM_SAVE failed (no-stream): %s", e)
+
+
+async def _delete_mem_deletes_nonstreaming(
+    mem_deletes: list,
+    memory_helper,
+) -> int:
+    """Delete facts for each MEM_DELETE tag. Returns total deleted count."""
+    _del_total = 0
+    for _del_fact in mem_deletes:
+        _del_fact = _del_fact.strip()
+        if not _del_fact or len(_del_fact) < 3:
+            continue
+        try:
+            _del_result = await memory_helper.delete_from_memory(_del_fact)
+            if _del_result["success"] and _del_result.get("deleted", 0) > 0:
+                _del_total += _del_result["deleted"]
+                logger.info("MEM_DELETE (model tag, no-stream): deleted %d for '%s'", _del_result["deleted"], _del_fact[:80])
+            else:
+                logger.info("MEM_DELETE (model tag, no-stream): no match for '%s'", _del_fact[:80])
+        except Exception as e:
+            logger.warning("MEM_DELETE failed (no-stream): %s", e)
+    return _del_total
+
+
 async def _handle_nonstreaming_response(
     response_text: str,
     session,
@@ -790,81 +863,21 @@ async def _handle_nonstreaming_response(
     Strips think/GPT-OSS tags, extracts and saves MEM_SAVE facts, processes
     MEM_DELETE tags. Runs on the non-streaming chat path only.
     """
-    # Clean thinking tags
-    response_text = _re.sub(r"<think>[\s\S]*?</think>\s*", "", response_text)
-    response_text = _re.sub(r'<\|[^|]+\|>', '', response_text)
-    # GPT-OSS: extract only the "final" part
-    _m_ns = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', response_text, _re.IGNORECASE)
-    if _m_ns:
-        response_text = _m_ns.group(1).strip()
-    else:
-        response_text = _re.sub(r'^analysis\s*', '', response_text, flags=_re.IGNORECASE).strip()
+    response_text = _clean_nonstreaming_text(response_text)
     # Bug 17: Extract [MEM_SAVE: ...] facts with strict validation before strip
     _mem_saves_ns = _extract_safe_mem_saves(response_text, user_input=message)
     response_text = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', response_text).strip()
     # F1 fix: if the model generated inline MEM_SAVE, reflect it in memory_action
     if _mem_saves_ns:
         memory_action = "mem_save_inline"
-    # Save extracted facts to memory
-    if _mem_saves_ns:
-        _junk_re = _re.compile(
-            r'(?i)(no\s+(coneix|s.han|tinc|té|hi ha)|'
-            r'no\s+s.han\s+detectat|busco\s+ajuda|necessit[oa]|'
-            r'primera\s+interacci|no\s+personal|sense\s+dades|'
-            # Anti-hallucination: detect fabricated personal data
-            r'se\s+llama\s+\w+\s+y\s+(vive|tiene|trabaja)|'
-            r'el\s+usuario\s+se\s+llama|the\s+user.s\s+name\s+is|'
-            r'l.usuari\s+es\s+diu)',
-        )
-        # Anti-hallucination: skip MEM_SAVEs on first interaction
-        _prior_msgs = [msg for msg in session.messages if msg.get("role") == "user"]
-        _is_first_turn = len(_prior_msgs) <= 1
-        for _fact in _mem_saves_ns:
-            _fact = _fact.strip()
-            if not _fact or len(_fact) < 5:
-                continue
-            if _junk_re.search(_fact):
-                logger.debug("MEM_SAVE skip (junk/no-stream): '%s'", _fact[:80])
-                continue
-            if _is_first_turn:
-                logger.debug("MEM_SAVE skip (first turn, likely hallucination): '%s'", _fact[:80])
-                continue
-            try:
-                _save_r = await memory_helper.save_to_memory(
-                    content=_fact,
-                    session_id=session.id,
-                    metadata={"type": "user_fact", "source": "llm_extract", "is_mem_save": True}
-                )
-                if _save_r.get("document_id"):
-                    logger.info("MEM_SAVE (no-stream): '%s'", _fact[:80])
-            except Exception as e:
-                logger.debug("MEM_SAVE failed (no-stream): %s", e)
-
+        await _save_mem_saves_nonstreaming(_mem_saves_ns, session, memory_helper)
     # Bug 18: Extract [MEM_DELETE: ...] and [OLVIDA/OBLIT/FORGET: ...] (non-streaming)
-    response_text = _OBLIT_RE.sub(
-        lambda m: f'[MEM_DELETE: {m.group(2)}]', response_text
-    )
+    response_text = _OBLIT_RE.sub(lambda m: f'[MEM_DELETE: {m.group(2)}]', response_text)
     _mem_deletes_ns = _MEM_DELETE_RE.findall(response_text)
     mem_deleted_delta = 0
     if _mem_deletes_ns:
         response_text = _re.sub(r'\[MEM_DELETE:[^\[\]\n\r\t]{1,250}\]\s*', '', response_text).strip()
-        _del_total_ns = 0
-        for _del_fact in _mem_deletes_ns:
-            _del_fact = _del_fact.strip()
-            if not _del_fact or len(_del_fact) < 3:
-                continue
-            try:
-                _del_result = await memory_helper.delete_from_memory(_del_fact)
-                if _del_result["success"] and _del_result.get("deleted", 0) > 0:
-                    _del_total_ns += _del_result["deleted"]
-                    logger.info("MEM_DELETE (model tag, no-stream): deleted %d for '%s'", _del_result["deleted"], _del_fact[:80])
-                else:
-                    logger.info("MEM_DELETE (model tag, no-stream): no match for '%s'", _del_fact[:80])
-            except Exception as e:
-                logger.warning("MEM_DELETE failed (no-stream): %s", e)
-        if _del_total_ns > 0:
-            mem_deleted_delta = _del_total_ns
-
+        mem_deleted_delta = await _delete_mem_deletes_nonstreaming(_mem_deletes_ns, memory_helper)
     return response_text, memory_action, mem_deleted_delta
 
 

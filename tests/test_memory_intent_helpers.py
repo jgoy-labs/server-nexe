@@ -1,8 +1,8 @@
-"""Tests for _handle_save_intent, _handle_delete_intent,
-_handle_list_intent, _handle_clear_all_confirm_intent.
+"""Tests for helpers extracted from _handle_memory_intent and
+_handle_nonstreaming_response (facade pattern refactor).
 
-TDD: these tests are written BEFORE the refactor and drive the API of
-the helper functions extracted from _handle_memory_intent.
+TDD: tests are written BEFORE the refactor and drive the API of
+the helper functions.
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -16,6 +16,9 @@ from plugins.web_ui_module.api.routes_chat import (
     _handle_delete_intent,
     _handle_list_intent,
     _handle_clear_all_confirm_intent,
+    _clean_nonstreaming_text,
+    _save_mem_saves_nonstreaming,
+    _delete_mem_deletes_nonstreaming,
 )
 
 
@@ -316,3 +319,125 @@ class TestHandleClearAllConfirmIntent:
             mem_deleted=0,
         )
         assert session._pending_clear_all is False
+
+
+# ===========================================================================
+# _clean_nonstreaming_text
+# ===========================================================================
+
+class TestCleanNonstreamingText:
+    def test_removes_think_tags(self):
+        text = "<think>internal reasoning</think>  The conclusion is here."
+        result = _clean_nonstreaming_text(text)
+        assert "<think>" not in result
+        assert "internal reasoning" not in result
+        assert "The conclusion is here." in result
+
+    def test_removes_gpt_oss_pipe_tags(self):
+        text = "<|im_start|>assistant\nHello there"
+        result = _clean_nonstreaming_text(text)
+        assert "<|" not in result
+        assert "Hello there" in result
+
+    def test_extracts_final_part(self):
+        text = "analysis some stuff\nfinal The real answer is 42."
+        result = _clean_nonstreaming_text(text)
+        assert result == "The real answer is 42."
+
+    def test_strips_analysis_prefix_when_no_final(self):
+        text = "analysis  this is the actual answer"
+        result = _clean_nonstreaming_text(text)
+        assert not result.lower().startswith("analysis")
+        assert "this is the actual answer" in result
+
+    def test_passthrough_plain_text(self):
+        text = "Hello, this is a normal response."
+        result = _clean_nonstreaming_text(text)
+        assert result == text
+
+
+# ===========================================================================
+# _save_mem_saves_nonstreaming
+# ===========================================================================
+
+class TestSaveMemSavesNonstreaming:
+    @pytest.mark.asyncio
+    async def test_saves_valid_fact(self):
+        mh = _make_memory_helper()
+        mh.save_to_memory.return_value = {"document_id": "doc-99", "success": True}
+        session = _make_session(messages=[{"role": "user", "content": "msg1"}, {"role": "user", "content": "msg2"}])
+        await _save_mem_saves_nonstreaming(["I like jazz music"], session, mh)
+        mh.save_to_memory.assert_called_once()
+        call_kwargs = mh.save_to_memory.call_args[1]
+        assert call_kwargs["content"] == "I like jazz music"
+
+    @pytest.mark.asyncio
+    async def test_skips_short_facts(self):
+        mh = _make_memory_helper()
+        session = _make_session(messages=[{"role": "user", "content": "a"}, {"role": "user", "content": "b"}])
+        await _save_mem_saves_nonstreaming(["hi", "ok", "yes"], session, mh)
+        mh.save_to_memory.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_skips_junk_facts(self):
+        mh = _make_memory_helper()
+        session = _make_session(messages=[{"role": "user", "content": "a"}, {"role": "user", "content": "b"}])
+        junk_facts = [
+            "no coneix res sobre l'usuari",
+            "no s'han detectat dades personals",
+        ]
+        await _save_mem_saves_nonstreaming(junk_facts, session, mh)
+        mh.save_to_memory.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_skips_first_turn(self):
+        mh = _make_memory_helper()
+        session = _make_session(messages=[{"role": "user", "content": "first message"}])
+        await _save_mem_saves_nonstreaming(["I like cats"], session, mh)
+        mh.save_to_memory.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_handles_save_exception(self):
+        mh = _make_memory_helper()
+        mh.save_to_memory.side_effect = RuntimeError("db crash")
+        session = _make_session(messages=[{"role": "user", "content": "a"}, {"role": "user", "content": "b"}])
+        # Must not raise
+        await _save_mem_saves_nonstreaming(["I like jazz"], session, mh)
+
+
+# ===========================================================================
+# _delete_mem_deletes_nonstreaming
+# ===========================================================================
+
+class TestDeleteMemDeletesNonstreaming:
+    @pytest.mark.asyncio
+    async def test_returns_total_deleted(self):
+        mh = _make_memory_helper()
+        mh.delete_from_memory.side_effect = [
+            {"success": True, "deleted": 2},
+            {"success": True, "deleted": 1},
+        ]
+        total = await _delete_mem_deletes_nonstreaming(["fact one", "fact two"], mh)
+        assert total == 3
+
+    @pytest.mark.asyncio
+    async def test_returns_zero_when_no_match(self):
+        mh = _make_memory_helper()
+        mh.delete_from_memory.return_value = {"success": True, "deleted": 0}
+        total = await _delete_mem_deletes_nonstreaming(["unknown topic"], mh)
+        assert total == 0
+
+    @pytest.mark.asyncio
+    async def test_skips_short_facts(self):
+        mh = _make_memory_helper()
+        total = await _delete_mem_deletes_nonstreaming(["ab", "x"], mh)
+        mh.delete_from_memory.assert_not_called()
+        assert total == 0
+
+    @pytest.mark.asyncio
+    async def test_handles_exception_gracefully(self):
+        mh = _make_memory_helper()
+        mh.delete_from_memory.side_effect = RuntimeError("crash")
+        # Must not raise
+        total = await _delete_mem_deletes_nonstreaming(["some fact"], mh)
+        assert total == 0
