@@ -185,40 +185,32 @@ def _start_parent_watchdog():
   logger.debug("Parent watchdog started — monitoring tray PID %d", tray_pid)
 
 
-def _maybe_launch_tray(_project_root: "Path | None" = None):
-    """Launch the macOS tray icon if on macOS and no tray is already running.
-
-    Args:
-        _project_root: Override project root (tests only). If None, derived from __file__.
-    """
-    from pathlib import Path
-
-    # Guard 1: Already launched from tray
+def _is_tray_already_running() -> bool:
+    """Return True if NEXE_TRAY_PID is set (server was launched from the tray)."""
     if os.environ.get("NEXE_TRAY_PID"):
         logger.debug("Tray already running (NEXE_TRAY_PID set) — skipping tray launch")
-        return
+        return True
+    return False
 
-    # Guard 2: macOS only
+
+def _is_tray_supported() -> bool:
+    """Return True if all conditions for tray launch are met."""
     if sys.platform != "darwin":
-        return
-
-    # Guard 3: Docker/headless — no GUI
+        return False
     if os.environ.get("NEXE_DOCKER") or os.environ.get("CONTAINER"):
-        return
-
-    # Guard 4: User opted out
+        return False
     if os.environ.get("NEXE_NO_TRAY"):
-        return
-
-    # Guard 5: Check rumps availability
+        return False
     try:
         import rumps  # noqa: F401
     except ImportError:
         logger.debug("rumps not installed — tray not available")
-        return
+        return False
+    return True
 
-    # Guard 6: Kill stale tray before launching fresh one.
-    # Cerca tant el mòdul Python (dev) com el binari NexeTray.app (bundle).
+
+def _kill_stale_tray() -> None:
+    """Kill any stale tray processes before launching a fresh one."""
     try:
         stale_pids: list[int] = []
         for pattern in ("installer.tray", "nexe-tray", "NexeTray"):
@@ -236,7 +228,6 @@ def _maybe_launch_tray(_project_root: "Path | None" = None):
                 except (ProcessLookupError, PermissionError):
                     pass
             time.sleep(1)
-            # Force kill if still alive (rumps may ignore SIGTERM)
             for pid in stale_pids:
                 try:
                     os.kill(pid, signal.SIGKILL)
@@ -244,31 +235,22 @@ def _maybe_launch_tray(_project_root: "Path | None" = None):
                     pass
             time.sleep(0.3)
             logger.debug("Killed stale tray process(es) — launching fresh one")
-    except Exception:  # nosec B110: best-effort cleanup of stale tray processes; if it fails the fresh tray launch below still proceeds
+    except Exception:  # nosec B110: best-effort cleanup; if it fails the fresh tray launch still proceeds
         pass
 
-    # Launch tray in --attach mode.
-    #
-    # Priority: NexeTray.app bundle (Gatekeeper-safe, macOS Sequoia provenance OK,
-    # appears as "server-nexe" in Activity Monitor via CFBundleName).
-    # Fallback: python -m installer.tray (dev mode, no bundle present).
-    #
-    # The bundle's entry point (NexeTray.app/Contents/MacOS/NexeTray) is a bash
-    # script that exec's the venv Python with the same args via "$@", so
-    # --attach and --server-pid are forwarded transparently.
-    project_root = _project_root if _project_root is not None else Path(__file__).resolve().parent.parent
+
+def _launch_tray_process(project_root: Path) -> None:
+    """Launch the tray process, preferring the NexeTray.app bundle over python -m."""
     venv_python = project_root / "venv" / "bin" / "python"
     python_exe = str(venv_python) if venv_python.exists() else sys.executable
 
     server_pid = os.getpid()
     tray_args = ["--attach", "--server-pid", str(server_pid)]
-
     tray_binary = project_root / "installer" / "NexeTray.app" / "Contents" / "MacOS" / "NexeTray"
 
     try:
         if tray_binary.exists():
-            # App bundle path: Gatekeeper-safe, correct CFBundleName in Force Quit
-            subprocess.Popen(  # nosec B603: tray_binary is project_root-derived absolute Path (NexeTray.app/Contents/MacOS/NexeTray); tray_args is local literal list
+            subprocess.Popen(  # nosec B603: tray_binary is project_root-derived absolute Path; tray_args is local literal list
                 [str(tray_binary)] + tray_args,
                 cwd=str(project_root),
                 stdout=subprocess.DEVNULL,
@@ -277,7 +259,6 @@ def _maybe_launch_tray(_project_root: "Path | None" = None):
             )
             logger.info("Tray launched via bundle (server PID %d)", server_pid)
         else:
-            # Fallback for dev environments without the app bundle
             subprocess.Popen(  # nosec B603: python_exe is venv_python absolute Path or sys.executable fallback; tray_args is local literal list
                 [python_exe, "-m", "installer.tray"] + tray_args,
                 cwd=str(project_root),
@@ -288,6 +269,21 @@ def _maybe_launch_tray(_project_root: "Path | None" = None):
             logger.info("Tray launched via python -m (dev fallback, server PID %d)", server_pid)
     except Exception as e:
         logger.debug("Could not launch tray: %s", e)
+
+
+def _maybe_launch_tray(_project_root: "Path | None" = None):
+    """Launch the macOS tray icon if on macOS and no tray is already running.
+
+    Args:
+        _project_root: Override project root (tests only). If None, derived from __file__.
+    """
+    if _is_tray_already_running():
+        return
+    if not _is_tray_supported():
+        return
+    _kill_stale_tray()
+    project_root = _project_root if _project_root is not None else Path(__file__).resolve().parent.parent
+    _launch_tray_process(project_root)
 
 
 def _handle_sigterm(signum, frame):  # noqa: ARG001

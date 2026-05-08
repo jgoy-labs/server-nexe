@@ -19,6 +19,8 @@ except ImportError as e:
 
 import os
 import re
+import json
+import time
 import logging
 from typing import Dict, Any, Optional
 from nexe_flow.core.node import Node, NodeMetadata, NodeInput, NodeOutput
@@ -248,6 +250,117 @@ class OllamaNode(Node):
       color="#10a37f"
     )
 
+  def _build_payload(
+    self,
+    prompt: str,
+    model: str,
+    temperature: float,
+    max_tokens,
+    system,
+    use_streaming: bool,
+  ) -> dict:
+    payload = {
+      "model": model,
+      "prompt": prompt,
+      "stream": use_streaming,
+      "keep_alive": "30m",
+      "options": {"temperature": temperature},
+    }
+    if system:
+      payload["system"] = system
+    if max_tokens:
+      payload["options"]["num_predict"] = int(max_tokens)
+    return payload
+
+  async def _execute_streaming(
+    self,
+    payload: dict,
+    stream_callback,
+    base_url: str,
+    start_time: float,
+    _verbose_logger=None,
+  ) -> tuple:
+    generated_text = ""
+    token_count = 0
+    try:
+      async with httpx.AsyncClient(timeout=120.0) as client:
+        async with client.stream(
+          "POST",
+          f"{base_url}/api/generate",
+          json=payload,
+        ) as response:
+          response.raise_for_status()
+          async for line in response.aiter_lines():
+            if line:
+              chunk = json.loads(line)
+              token = chunk.get("response", "")
+              if token:
+                generated_text += token
+                token_count += 1
+                if stream_callback:
+                  stream_callback(token)
+                if _verbose_logger:
+                  elapsed = time.perf_counter() - start_time
+                  _verbose_logger.llm_streaming_progress(token_count, elapsed)
+              if chunk.get("done", False):
+                break
+    except httpx.ConnectError:
+      raise ConnectionError(
+        f"Cannot connect to Ollama at {self.base_url}. "
+        "Make sure Ollama is running (ollama serve)"
+      )
+    except httpx.TimeoutException:
+      model_name = payload.get("model", "unknown")
+      raise TimeoutError(
+        f"Ollama request timed out after 120s. "
+        f"Model '{model_name}' might be too large or prompt too complex."
+      )
+    except httpx.HTTPStatusError as e:
+      if e.response.status_code == 404:
+        model_name = payload.get("model", "unknown")
+        raise ValueError(
+          f"Model '{model_name}' not found. "
+          f"Pull it first: ollama pull {model_name}"
+        )
+      raise
+    return generated_text, token_count
+
+  async def _execute_blocking(
+    self,
+    payload: dict,
+    base_url: str,
+  ) -> tuple:
+    try:
+      async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+          f"{base_url}/api/generate",
+          json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
+        generated_text = data.get("response", "")
+        token_count = data.get("eval_count", int(len(generated_text.split()) * 1.3))
+    except httpx.ConnectError:
+      raise ConnectionError(
+        f"Cannot connect to Ollama at {self.base_url}. "
+        "Make sure Ollama is running (ollama serve)"
+      )
+    except httpx.TimeoutException:
+      model_name = payload.get("model", "unknown")
+      raise TimeoutError(
+        f"Ollama request timed out after 120s. "
+        f"Model '{model_name}' might be too large or prompt too complex."
+      )
+    except httpx.HTTPStatusError as e:
+      if e.response.status_code == 404:
+        model_name = payload.get("model", "unknown")
+        raise ValueError(
+          f"Model '{model_name}' not found. "
+          f"Pull it first: ollama pull {model_name}"
+        )
+      raise
+    return generated_text, token_count
+
   async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
     Execute Ollama API call.
@@ -282,84 +395,21 @@ class OllamaNode(Node):
     stream_callback = inputs.get('stream_callback', None)
     use_streaming = stream_callback is not None
 
-    payload = {
-      "model": model,
-      "prompt": prompt,
-      "stream": use_streaming,
-      "keep_alive": "30m",
-      "options": {
-        "temperature": temperature
-      }
-    }
+    payload = self._build_payload(prompt, model, temperature, max_tokens, system, use_streaming)
 
-    if system:
-      payload["system"] = system
-
-    if max_tokens:
-      payload["options"]["num_predict"] = int(max_tokens)
-
-    import time
     start_time = time.perf_counter()
-    token_count = 0
 
     try:
       from plugins.workflow_engine.core.execution.sequential_executor import _verbose_logger
     except ImportError:
       _verbose_logger = None
 
-    try:
-      if use_streaming:
-        generated_text = ""
-        async with httpx.AsyncClient(timeout=120.0) as client:
-          async with client.stream(
-            "POST",
-            f"{self.base_url}/api/generate",
-            json=payload
-          ) as response:
-            response.raise_for_status()
-            async for line in response.aiter_lines():
-              if line:
-                import json
-                chunk = json.loads(line)
-                token = chunk.get("response", "")
-                if token:
-                  generated_text += token
-                  token_count += 1
-                  if stream_callback:
-                    stream_callback(token)
-                  if _verbose_logger:
-                    elapsed = time.perf_counter() - start_time
-                    _verbose_logger.llm_streaming_progress(token_count, elapsed)
-                if chunk.get("done", False):
-                  break
-      else:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-          response = await client.post(
-            f"{self.base_url}/api/generate",
-            json=payload
-          )
-          response.raise_for_status()
-          data = response.json()
-          generated_text = data.get("response", "")
-          token_count = data.get("eval_count", int(len(generated_text.split()) * 1.3))
-
-    except httpx.ConnectError:
-      raise ConnectionError(
-        f"Cannot connect to Ollama at {self.base_url}. "
-        "Make sure Ollama is running (ollama serve)"
+    if use_streaming:
+      generated_text, token_count = await self._execute_streaming(
+        payload, stream_callback, self.base_url, start_time, _verbose_logger
       )
-    except httpx.TimeoutException:
-      raise TimeoutError(
-        f"Ollama request timed out after 120s. "
-        f"Model '{model}' might be too large or prompt too complex."
-      )
-    except httpx.HTTPStatusError as e:
-      if e.response.status_code == 404:
-        raise ValueError(
-          f"Model '{model}' not found. "
-          f"Pull it first: ollama pull {model}"
-        )
-      raise
+    else:
+      generated_text, token_count = await self._execute_blocking(payload, self.base_url)
 
     elapsed_s = time.perf_counter() - start_time
     tokens_per_second = token_count / elapsed_s if elapsed_s > 0 else 0

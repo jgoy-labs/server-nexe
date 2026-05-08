@@ -299,3 +299,201 @@ class TestOptionalApiKey:
             from plugins.security.core.auth_dependencies import optional_api_key
             result = await optional_api_key(x_api_key="wrong-key")
             assert result is None
+
+
+# ── Helpers directes ─────────────────────────────────────────────────────────
+
+class TestUpdateKeyMetrics:
+    """Tests directes per a _update_key_metrics."""
+
+    def test_no_keys_configured(self):
+        from plugins.security.core.auth_models import ApiKeyConfig
+        from plugins.security.core.auth_dependencies import _update_key_metrics
+
+        config = ApiKeyConfig()
+        with patch("plugins.security.core.auth_dependencies.update_key_status") as mock_status, \
+             patch("plugins.security.core.auth_dependencies.set_grace_period_active") as mock_grace:
+            _update_key_metrics(config)
+            mock_status.assert_any_call('primary', 'not_configured')
+            mock_status.assert_any_call('secondary', 'not_configured')
+            # None and ... = None (Python short-circuit), falsy is correct here
+            assert not mock_grace.call_args[0][0]
+
+    def test_primary_with_expiry(self):
+        from plugins.security.core.auth_models import ApiKeyData, ApiKeyConfig
+
+        future = datetime.now(timezone.utc) + timedelta(days=15)
+        primary = ApiKeyData(key="pk", expires_at=future)
+        config = ApiKeyConfig(primary=primary)
+
+        with patch("plugins.security.core.auth_dependencies.update_key_expiry_days") as mock_expiry, \
+             patch("plugins.security.core.auth_dependencies.update_key_status"), \
+             patch("plugins.security.core.auth_dependencies.set_grace_period_active"):
+            from plugins.security.core.auth_dependencies import _update_key_metrics
+            _update_key_metrics(config)
+            mock_expiry.assert_any_call('primary', pytest.approx(15, abs=1))
+
+
+class TestCheckDevMode:
+    """Tests directes per a _check_dev_mode."""
+
+    def test_dev_mode_true_localhost_returns_bypass(self):
+        from plugins.security.core.auth_dependencies import _check_dev_mode
+
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+
+        result = _check_dev_mode(mock_request, dev_mode=True)
+        assert result == "dev-mode-bypass"
+
+    def test_dev_mode_true_remote_allowed_via_env(self, monkeypatch):
+        from plugins.security.core.auth_dependencies import _check_dev_mode
+
+        monkeypatch.setenv("NEXE_DEV_MODE_ALLOW_REMOTE", "true")
+        mock_request = MagicMock()
+        mock_request.client.host = "10.0.0.5"
+
+        result = _check_dev_mode(mock_request, dev_mode=True)
+        assert result == "dev-mode-bypass"
+
+    def test_dev_mode_false_raises_500(self):
+        from plugins.security.core.auth_dependencies import _check_dev_mode
+
+        mock_request = MagicMock()
+        with pytest.raises(HTTPException) as exc_info:
+            _check_dev_mode(mock_request, dev_mode=False)
+        assert exc_info.value.status_code == 500
+
+    def test_dev_mode_true_remote_blocked(self, monkeypatch):
+        from plugins.security.core.auth_dependencies import _check_dev_mode
+
+        monkeypatch.delenv("NEXE_DEV_MODE_ALLOW_REMOTE", raising=False)
+        mock_request = MagicMock()
+        mock_request.client.host = "192.168.1.50"
+
+        with pytest.raises(HTTPException) as exc_info:
+            _check_dev_mode(mock_request, dev_mode=True)
+        assert exc_info.value.status_code == 403
+
+
+class TestAuthenticatePrimary:
+    """Tests directes per a _authenticate_primary."""
+
+    def test_valid_primary_match_returns_key(self):
+        from plugins.security.core.auth_models import ApiKeyData, ApiKeyConfig
+        from plugins.security.core.auth_dependencies import _authenticate_primary
+
+        primary = ApiKeyData(key="primary-key-ok")
+        config = ApiKeyConfig(primary=primary)
+
+        mock_request = MagicMock()
+        mock_request.url.path = "/test"
+
+        with patch("plugins.security.core.auth_dependencies.record_auth_attempt"):
+            result = _authenticate_primary("primary-key-ok", config, mock_request)
+        assert result == "primary-key-ok"
+
+    def test_valid_primary_no_match_returns_none(self):
+        from plugins.security.core.auth_models import ApiKeyData, ApiKeyConfig
+        from plugins.security.core.auth_dependencies import _authenticate_primary
+
+        primary = ApiKeyData(key="primary-key-ok")
+        config = ApiKeyConfig(primary=primary)
+
+        mock_request = MagicMock()
+        result = _authenticate_primary("wrong-key", config, mock_request)
+        assert result is None
+
+    def test_no_primary_returns_none(self):
+        from plugins.security.core.auth_models import ApiKeyConfig
+        from plugins.security.core.auth_dependencies import _authenticate_primary
+
+        config = ApiKeyConfig()
+        mock_request = MagicMock()
+        result = _authenticate_primary("any-key", config, mock_request)
+        assert result is None
+
+
+class TestAuthenticateSecondary:
+    """Tests directes per a _authenticate_secondary."""
+
+    def test_valid_secondary_match_returns_key(self):
+        from plugins.security.core.auth_models import ApiKeyData, ApiKeyConfig
+        from plugins.security.core.auth_dependencies import _authenticate_secondary
+
+        secondary = ApiKeyData(key="secondary-key-ok")
+        config = ApiKeyConfig(secondary=secondary)
+
+        mock_request = MagicMock()
+        mock_request.url.path = "/test"
+
+        with patch("plugins.security.core.auth_dependencies.record_auth_attempt"):
+            result = _authenticate_secondary("secondary-key-ok", config, mock_request)
+        assert result == "secondary-key-ok"
+
+    def test_valid_secondary_no_match_returns_none(self):
+        from plugins.security.core.auth_models import ApiKeyData, ApiKeyConfig
+        from plugins.security.core.auth_dependencies import _authenticate_secondary
+
+        secondary = ApiKeyData(key="secondary-key-ok")
+        config = ApiKeyConfig(secondary=secondary)
+
+        mock_request = MagicMock()
+        result = _authenticate_secondary("wrong-key", config, mock_request)
+        assert result is None
+
+    def test_no_secondary_returns_none(self):
+        from plugins.security.core.auth_models import ApiKeyConfig
+        from plugins.security.core.auth_dependencies import _authenticate_secondary
+
+        config = ApiKeyConfig()
+        mock_request = MagicMock()
+        result = _authenticate_secondary("any-key", config, mock_request)
+        assert result is None
+
+
+class TestLogFailure:
+    """Tests directes per a _log_failure."""
+
+    def test_invalid_key_reason(self):
+        from plugins.security.core.auth_models import ApiKeyConfig
+        from plugins.security.core.auth_dependencies import _log_failure
+
+        config = ApiKeyConfig()
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+
+        with patch("plugins.security.core.auth_dependencies.record_auth_failure") as mock_fail:
+            _log_failure(mock_request, config)
+            mock_fail.assert_called_once_with("invalid_api_key")
+
+    def test_primary_expired_reason(self):
+        from plugins.security.core.auth_models import ApiKeyData, ApiKeyConfig
+        from plugins.security.core.auth_dependencies import _log_failure
+
+        past = datetime.now(timezone.utc) - timedelta(days=5)
+        primary = ApiKeyData(key="old-pk", expires_at=past)
+        config = ApiKeyConfig(primary=primary)
+
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+
+        with patch("plugins.security.core.auth_dependencies.record_auth_failure") as mock_fail:
+            _log_failure(mock_request, config)
+            mock_fail.assert_called_once_with("primary_key_expired")
+
+    def test_secondary_expired_reason(self):
+        from plugins.security.core.auth_models import ApiKeyData, ApiKeyConfig
+        from plugins.security.core.auth_dependencies import _log_failure
+
+        past = datetime.now(timezone.utc) - timedelta(days=3)
+        secondary = ApiKeyData(key="old-sk", expires_at=past)
+        primary = ApiKeyData(key="valid-pk")
+        config = ApiKeyConfig(primary=primary, secondary=secondary)
+
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+
+        with patch("plugins.security.core.auth_dependencies.record_auth_failure") as mock_fail:
+            _log_failure(mock_request, config)
+            mock_fail.assert_called_once_with("secondary_key_expired")
