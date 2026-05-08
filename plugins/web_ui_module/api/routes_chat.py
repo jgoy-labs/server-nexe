@@ -923,7 +923,8 @@ async def _switch_engine_model(engine, engine_name: str, body: dict, model_name:
                 engine._node.config = new_config  # type: ignore[assignment]
                 engine._node.__class__._config = new_config
                 engine._node.__class__._model = None
-                import logging as _lg; _lg.getLogger(__name__).info("MLX model switched to: %s", local_path)
+                import logging as _lg
+                _lg.getLogger(__name__).info("MLX model switched to: %s", local_path)
 
     elif engine_name == "llama_cpp_module" and local_path.exists():
         _prev = os.environ.get("NEXE_LLAMA_CPP_MODEL")
@@ -945,7 +946,8 @@ async def _switch_engine_model(engine, engine_name: str, body: dict, model_name:
                 engine._node.config = new_config  # type: ignore[assignment]
                 LlamaCppChatNode._config = new_config  # type: ignore[assignment]
                 LlamaCppChatNode._pool = ModelPool(new_config)  # type: ignore[arg-type]
-                import logging as _lg; _lg.getLogger(__name__).info("Llama.cpp model switched to: %s", new_config.model_path)
+                import logging as _lg
+                _lg.getLogger(__name__).info("Llama.cpp model switched to: %s", new_config.model_path)
 
 
 def _build_rag_items_tuple(relevant_results) -> list[tuple[str, float]]:
