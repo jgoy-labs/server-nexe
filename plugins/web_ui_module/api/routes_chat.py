@@ -592,6 +592,138 @@ def _validate_chat_input(body: dict, request: FastAPIRequest) -> tuple[Optional[
     return image_bytes, message
 
 
+async def _handle_save_intent(
+    extracted_content: str,
+    message: str,
+    session_id: str,
+    rag_collections,
+    memory_helper,
+) -> tuple[str, str]:
+    """Save a fact to memory. Returns (response_text, memory_action)."""
+    content_to_save = extracted_content.strip() if extracted_content else message
+    content_to_save = content_to_save.rstrip('?!').strip()
+    if content_to_save:
+        result = await memory_helper.save_to_memory(
+            content=content_to_save,
+            session_id=session_id,
+            metadata={"original_message": message, "type": "user_fact"},
+            collections=rag_collections,
+        )
+        if result["success"] and result.get("document_id"):
+            _safe = str(content_to_save).replace("\x00", "").replace("]", "")[:200]
+            response_text = (
+                f"\x00[MODEL:nexe-system]\x00Saved to memory: \"{_safe}\"\n\n"
+                "I'll remember this for future conversations.\x00[MEM]\x00"
+            )
+        elif result.get("duplicate"):
+            _safe = str(content_to_save).replace("\x00", "").replace("]", "")[:200]
+            response_text = f"\x00[MODEL:nexe-system]\x00Already in memory: \"{_safe}\" (similar entry exists)."
+        else:
+            response_text = f"\x00[MODEL:nexe-system]\x00Could not save: {result.get('message', 'Unknown error')}"
+    else:
+        response_text = "\x00[MODEL:nexe-system]\x00What do you want me to remember? Write what you want to save."
+    return response_text, "save"
+
+
+async def _handle_delete_intent(
+    extracted_content: str,
+    session,
+    rag_collections,
+    memory_helper,
+) -> tuple[str, str, int]:
+    """Delete facts from memory. Returns (response_text, memory_action, mem_deleted)."""
+    content_to_delete = extracted_content.strip() if extracted_content else ""
+    mem_deleted = 0
+    if content_to_delete:
+        # B-mem-delete fix: sanitize history BEFORE the result check so the
+        # original "Oblida que..." message is never seen by the LLM in
+        # subsequent turns, regardless of whether entries were actually deleted.
+        if session.messages and session.messages[-1]["role"] == "user":
+            session.messages[-1]["content"] = f"[Memory command: delete '{content_to_delete[:50]}']"
+        result = await memory_helper.delete_from_memory(
+            content_to_delete,
+            collections=rag_collections,
+        )
+        if result["success"] and result.get("deleted", 0) > 0:
+            mem_deleted = result["deleted"]
+            deleted_facts = result.get("deleted_facts", [])
+            facts_detail = ""
+            if deleted_facts:
+                facts_list = ", ".join(f'"{f["text"][:60]}"' for f in deleted_facts[:5])
+                facts_detail = f" [{facts_list}]"
+            response_text = (
+                f"\x00[MODEL:nexe-system]\x00"
+                f"Deleted {result['deleted']} memory(ies){facts_detail}. "
+                "I won't remember this anymore."
+            )
+            if deleted_facts:
+                session._recently_deleted_facts = [f["text"] for f in deleted_facts]
+                facts_pipe = "|".join(f["text"][:80] for f in deleted_facts[:5])
+                response_text += f"\x00[DEL:{result['deleted']}:{facts_pipe}]\x00"
+        elif result["success"]:
+            response_text = f"\x00[MODEL:nexe-system]\x00Nothing found about \"{content_to_delete[:100]}\" in memory."
+        else:
+            response_text = f"\x00[MODEL:nexe-system]\x00Error: {result.get('message', 'Unknown error')}"
+    else:
+        # content_to_delete empty: still sanitize history so the LLM
+        # does not see the raw "Oblida que..." in subsequent turns.
+        if session.messages and session.messages[-1]["role"] == "user":
+            session.messages[-1]["content"] = "[Memory command: delete (no content specified)]"
+        response_text = "\x00[MODEL:nexe-system]\x00What do you want me to forget?"
+    return response_text, "delete", mem_deleted
+
+
+async def _handle_list_intent(
+    rag_collections,
+    memory_helper,
+) -> tuple[str, str]:
+    """List stored memories. Returns (response_text, memory_action)."""
+    list_result = await memory_helper.list_memories(
+        limit=20,
+        collections=rag_collections,
+    )
+    if list_result["success"] and list_result["facts"]:
+        facts_lines = []
+        for i, f in enumerate(list_result["facts"], 1):
+            date_str = f.get("created_at", "")[:10] if f.get("created_at") else ""
+            facts_lines.append(f"  {i}. {f['text']}" + (f" ({date_str})" if date_str else ""))
+        facts_text = "\n".join(facts_lines)
+        total = list_result["total"]
+        shown = len(list_result["facts"])
+        header = f"Active memory — {shown} of {total} entries:\n"
+        response_text = f"\x00[MODEL:nexe-system]\x00{header}{facts_text}"
+    else:
+        response_text = "\x00[MODEL:nexe-system]\x00No memories stored."
+    return response_text, "list"
+
+
+async def _handle_clear_all_confirm_intent(
+    session,
+    memory_helper,
+    mem_deleted: int,
+) -> tuple[str, str, int]:
+    """Execute full memory wipe (2-turn confirm). Returns (response_text, memory_action, mem_deleted)."""
+    session._pending_clear_all = False
+    try:
+        clear_result = await memory_helper.clear_memory(confirm=True)
+        if clear_result.get("success"):
+            response_text = (
+                "\x00[MODEL:nexe-system]\x00"
+                "✓ Memòria personal esborrada completament. "
+                "Ja no recordo res sobre tu."
+            )
+            mem_deleted = max(mem_deleted, 1)
+            logger.info("clear_all executed via 2-turn confirmation (session=%s)", session.id)
+        else:
+            _err = str(clear_result.get("message", "unknown"))
+            response_text = f"\x00[MODEL:nexe-system]\x00Error esborrant la memòria: {_err}"
+            logger.warning("clear_all failed: %s", _err)
+    except Exception as _clear_err:
+        response_text = f"\x00[MODEL:nexe-system]\x00Error esborrant la memòria: {_clear_err}"
+        logger.error("clear_all exception: %s", _clear_err)
+    return response_text, "clear_all", mem_deleted
+
+
 async def _handle_memory_intent(
     intent: str,
     extracted_content: str,
@@ -610,99 +742,22 @@ async def _handle_memory_intent(
     memory_action = None
     mem_deleted = 0
     resolved_intent = intent
+    rag_collections = body.get("rag_collections")
 
     if intent == "save":
-        # Save to memory
-        content_to_save = extracted_content.strip() if extracted_content else message
-        # Clean up content (remove trailing punctuation from save request)
-        content_to_save = content_to_save.rstrip('?!').strip()
-
-        if content_to_save:
-            result = await memory_helper.save_to_memory(
-                content=content_to_save,
-                session_id=session.id,
-                metadata={"original_message": message, "type": "user_fact"},
-                collections=body.get("rag_collections"),
-            )
-            if result["success"] and result.get("document_id"):
-                _safe_content = str(content_to_save).replace("\x00", "").replace("]", "")[:200]
-                response_text = f"\x00[MODEL:nexe-system]\x00Saved to memory: \"{_safe_content}\"\n\nI'll remember this for future conversations.\x00[MEM]\x00"
-            elif result.get("duplicate"):
-                _safe_content = str(content_to_save).replace("\x00", "").replace("]", "")[:200]
-                response_text = f"\x00[MODEL:nexe-system]\x00Already in memory: \"{_safe_content}\" (similar entry exists)."
-            else:
-                response_text = f"\x00[MODEL:nexe-system]\x00Could not save: {result.get('message', 'Unknown error')}"
-        else:
-            response_text = "\x00[MODEL:nexe-system]\x00What do you want me to remember? Write what you want to save."
-        memory_action = "save"
-
-    elif intent == "delete":
-        # Delete from memory
-        content_to_delete = extracted_content.strip() if extracted_content else ""
-        if content_to_delete:
-            # B-mem-delete fix: sanitize history BEFORE the result check so that
-            # the original "Oblida que..." message is never seen by the LLM in
-            # subsequent turns, regardless of whether entries were actually deleted.
-            if session.messages and session.messages[-1]["role"] == "user":
-                session.messages[-1]["content"] = f"[Memory command: delete '{content_to_delete[:50]}']"
-            result = await memory_helper.delete_from_memory(
-                content_to_delete,
-                collections=body.get("rag_collections"),
-            )
-            if result["success"] and result.get("deleted", 0) > 0:
-                mem_deleted = result["deleted"]
-                deleted_facts = result.get("deleted_facts", [])
-                facts_detail = ""
-                if deleted_facts:
-                    facts_list = ", ".join(f'"{f["text"][:60]}"' for f in deleted_facts[:5])
-                    facts_detail = f" [{facts_list}]"
-                response_text = (
-                    f"\x00[MODEL:nexe-system]\x00"
-                    f"Deleted {result['deleted']} memory(ies){facts_detail}. "
-                    f"I won't remember this anymore."
-                )
-                # Save deleted facts to avoid re-saving on the next turn
-                if deleted_facts:
-                    session._recently_deleted_facts = [f["text"] for f in deleted_facts]
-                # Emit delete token for frontend badge
-                if deleted_facts:
-                    facts_pipe = "|".join(f["text"][:80] for f in deleted_facts[:5])
-                    response_text += f"\x00[DEL:{result['deleted']}:{facts_pipe}]\x00"
-            elif result["success"]:
-                response_text = f"\x00[MODEL:nexe-system]\x00Nothing found about \"{content_to_delete[:100]}\" in memory."
-            else:
-                response_text = f"\x00[MODEL:nexe-system]\x00Error: {result.get('message', 'Unknown error')}"
-        else:
-            # content_to_delete empty: still sanitize history so the LLM
-            # does not see the raw "Oblida que..." in subsequent turns.
-            if session.messages and session.messages[-1]["role"] == "user":
-                session.messages[-1]["content"] = "[Memory command: delete (no content specified)]"
-            response_text = "\x00[MODEL:nexe-system]\x00What do you want me to forget?"
-        memory_action = "delete"
-
-    elif intent == "list":
-        list_result = await memory_helper.list_memories(
-            limit=20,
-            collections=body.get("rag_collections"),
+        response_text, memory_action = await _handle_save_intent(
+            extracted_content, message, session.id, rag_collections, memory_helper
         )
-        if list_result["success"] and list_result["facts"]:
-            facts_lines = []
-            for i, f in enumerate(list_result["facts"], 1):
-                date_str = f.get("created_at", "")[:10] if f.get("created_at") else ""
-                facts_lines.append(f"  {i}. {f['text']}" + (f" ({date_str})" if date_str else ""))
-            facts_text = "\n".join(facts_lines)
-            total = list_result["total"]
-            shown = len(list_result["facts"])
-            header = f"Active memory — {shown} of {total} entries:\n"
-            response_text = f"\x00[MODEL:nexe-system]\x00{header}{facts_text}"
-        else:
-            response_text = "\x00[MODEL:nexe-system]\x00No memories stored."
-        memory_action = "list"
-
+    elif intent == "delete":
+        response_text, memory_action, mem_deleted = await _handle_delete_intent(
+            extracted_content, session, rag_collections, memory_helper
+        )
+    elif intent == "list":
+        response_text, memory_action = await _handle_list_intent(
+            rag_collections, memory_helper
+        )
     elif intent == "clear_all":
-        # Bug #18 P0: "Oblida tot" / "Forget everything" — arm the 2-turn
-        # confirmation. The actual wipe only happens on the next user message
-        # if it matches CLEAR_ALL_CONFIRM_TRIGGERS (see the intent hijack above).
+        # Bug #18 P0: arm the 2-turn confirmation; wipe only happens on confirm.
         session._pending_clear_all = True
         response_text = (
             "\x00[MODEL:nexe-system]\x00"
@@ -712,35 +767,13 @@ async def _handle_memory_intent(
             "o qualsevol altra cosa per cancel·lar."
         )
         memory_action = "clear_all_pending"
-
     elif intent == "clear_all_confirm":
-        # Hijacked from a pending clear_all. Execute the full wipe.
-        session._pending_clear_all = False
-        try:
-            clear_result = await memory_helper.clear_memory(confirm=True)
-            if clear_result.get("success"):
-                response_text = (
-                    "\x00[MODEL:nexe-system]\x00"
-                    "✓ Memòria personal esborrada completament. "
-                    "Ja no recordo res sobre tu."
-                )
-                # Mark a synthetic deleted count so the UI badge shows
-                mem_deleted = max(mem_deleted, 1)
-                logger.info("clear_all executed via 2-turn confirmation (session=%s)", session.id)
-            else:
-                _err = str(clear_result.get("message", "unknown"))
-                response_text = f"\x00[MODEL:nexe-system]\x00Error esborrant la memòria: {_err}"
-                logger.warning("clear_all failed: %s", _err)
-        except Exception as _clear_err:
-            response_text = f"\x00[MODEL:nexe-system]\x00Error esborrant la memòria: {_clear_err}"
-            logger.error("clear_all exception: %s", _clear_err)
-        memory_action = "clear_all"
-
+        response_text, memory_action, mem_deleted = await _handle_clear_all_confirm_intent(
+            session, memory_helper, mem_deleted
+        )
     elif intent == "recall":
-        # Recall intent: DON'T show raw results, use LLM with memory context
-        # Falls through to normal chat processing with memory search
         memory_action = "recall"
-        resolved_intent = "chat"  # Treat as chat so LLM responds naturally
+        resolved_intent = "chat"
 
     return response_text, memory_action, resolved_intent, mem_deleted
 
