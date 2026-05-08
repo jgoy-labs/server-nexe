@@ -97,6 +97,29 @@ _REPROMPT_OVERRIDE = {
     "en": "\n\nIMPORTANT: Memory has been saved successfully. Now respond naturally to the user's message. Do NOT emit [MEM_SAVE:] tags — already done. Just have a normal conversation.",
 }
 
+# ─── Context header patterns (compiled once) ─────────────────────────────────
+_CTX_HEADERS_RE = _re.compile(
+    r'\[(?:CONTEXT|FI CONTEXT|MEMORIA DE L\'USUARI|MEMORIA DEL USUARIO|'
+    r'USER MEMORY|DOCUMENTACI[ÓO] DEL SISTEMA|SYSTEM DOCUMENTATION|'
+    r'DOCUMENTACI[ÓO] T[EÈ]CNICA|TECHNICAL DOCUMENTATION|'
+    r'DOCUMENT ADJUNTAT|FI DOCUMENT)\]',
+    _re.IGNORECASE
+)
+
+# ─── Junk MEM_SAVE patterns (compiled once) ───────────────────────────────────
+_JUNK_PATTERNS_RE = _re.compile(
+    r'(?i)(no\s+(coneix|s\.han|tinc|té|hi ha)|'
+    r'no\s+s\.han\s+detectat|'
+    r'busco\s+ajuda|necessit[oa]|'
+    r'primera\s+interacci|'
+    r'no\s+personal|sense\s+dades|'
+    r"I\s+don.t\s+(know|have)|no\s+information|"
+    r"first\s+interaction|not\s+personal|no\s+data|"
+    r"no\s+previous|cannot\s+recall|"
+    r'\[MEM_SAVE|ignore\s+(all\s+)?previous|'
+    r'system\s+prompt|override\s+instruction)',
+)
+
 
 _ATOMIZER_SYSTEM = {
     "ca": "Ets un separador de fets. Separa el fet en fets atòmics, UN per línia. Si ja és atòmic, retorna'l tal com és. Mai afegeixis explicacions — sols els fets.",
@@ -310,6 +333,38 @@ def _extract_safe_mem_saves(text: str, user_input: str = "") -> list:
             if _is_valid_mem_save_text(atomic, user_input):
                 result.append(atomic)
     return result
+
+
+def _parse_chunk(chunk: Any) -> tuple[str, str]:
+    """Extreu (content, thinking) d'un chunk de l'engine."""
+    content = ""
+    thinking = ""
+    if isinstance(chunk, dict):
+        if "message" in chunk:
+            thinking = chunk["message"].get("thinking", "")
+            content = chunk["message"].get("content", "")
+        elif "content" in chunk:
+            content = chunk["content"]
+        elif "response" in chunk:
+            content = chunk["response"]
+    elif isinstance(chunk, str):
+        content = chunk
+    return content, thinking
+
+
+def _normalize_content(content: str, model_name: str) -> str:
+    """Normalitza GPT-OSS i pipe tags per al model específic."""
+    if "gpt-oss" in model_name.lower():
+        content = content.replace('<|analysis|>', '<think>')
+        content = content.replace('<|assistant|>', '</think>')
+        content = _re.sub(r'<\|[^|]+\|>', '', content)
+        content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
+    else:
+        content = content.replace('<|thinking|>', '<think>')
+        content = content.replace('<|/thinking|>', '</think>')
+        content = _re.sub(r'<\|[^|]+\|>', '', content)
+        content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
+    return content
 
 
 def _validate_chat_input(body: dict, request: FastAPIRequest) -> tuple[Optional[bytes], str]:
@@ -1151,19 +1206,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     _has_any_thinking = False
                                     _latex_buf = LatexStreamBuffer()
                                     async for chunk in chat_result:
-                                        content = ""
-                                        thinking = ""
-                                        if isinstance(chunk, dict):
-                                            # Ollama: thinking in separate field (qwen3.5, etc.)
-                                            if "message" in chunk:
-                                                thinking = chunk["message"].get("thinking", "")
-                                                content = chunk["message"].get("content", "")
-                                            elif "content" in chunk:
-                                                content = chunk["content"]
-                                            elif "response" in chunk:
-                                                content = chunk["response"]
-                                        elif isinstance(chunk, str):
-                                            content = chunk
+                                        content, thinking = _parse_chunk(chunk)
 
                                         # Model loaded — any chunk = model is responding
                                         if _first_chunk:
@@ -1186,20 +1229,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             full_response += "</think>"
 
                                         if content:
-                                            _is_gpt_oss = "gpt-oss" in model_name.lower()
-                                            if _is_gpt_oss:
-                                                # GPT-OSS: normalize analysis/assistant → think tags
-                                                # so the client detects thinking in real time
-                                                content = content.replace('<|analysis|>', '<think>')
-                                                content = content.replace('<|assistant|>', '</think>')
-                                                content = _re.sub(r'<\|[^|]+\|>', '', content)
-                                                content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
-                                            else:
-                                                # Normal models: normalize thinking tags
-                                                content = content.replace('<|thinking|>', '<think>')
-                                                content = content.replace('<|/thinking|>', '</think>')
-                                                content = _re.sub(r'<\|[^|]+\|>', '', content)
-                                                content = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', content)
+                                            content = _normalize_content(content, model_name)
                                             full_response += content
                                             # Separate embedded <think> blocks in content (qwq:32b, etc.)
                                             if '<think>' in content or '</think>' in content or _in_content_think:
@@ -1304,14 +1334,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     _encoded = _del_fact.replace('|', '\\|')
                                     yield f"\x00[PENDING_DELETE:{_encoded}]\x00"
                             # Strip context block headers that models occasionally echo verbatim
-                            _CTX_HEADERS = _re.compile(
-                                r'\[(?:CONTEXT|FI CONTEXT|MEMORIA DE L\'USUARI|MEMORIA DEL USUARIO|'
-                                r'USER MEMORY|DOCUMENTACI[ÓO] DEL SISTEMA|SYSTEM DOCUMENTATION|'
-                                r'DOCUMENTACI[ÓO] T[EÈ]CNICA|TECHNICAL DOCUMENTATION|'
-                                r'DOCUMENT ADJUNTAT|FI DOCUMENT)\]',
-                                _re.IGNORECASE
-                            )
-                            clean_response = _CTX_HEADERS.sub('', clean_response).strip()
+                            clean_response = _CTX_HEADERS_RE.sub('', clean_response).strip()
                             # Fallback extractor: models (e.g. Gemma-3 VLM) that say
                             # "He recordat que [fact]" without emitting [MEM_SAVE:].
                             # Only fires when _mem_saves is empty (i.e. model didn't tag).
@@ -1404,21 +1427,6 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
                                 # Save LLM-extracted facts to memory
                                 _mem_saved_count = 0
-                                # Junk patterns: false facts the model may generate
-                                _junk_patterns = _re.compile(
-                                    r'(?i)(no\s+(coneix|s\.han|tinc|té|hi ha)|'
-                                    r'no\s+s\.han\s+detectat|'
-                                    r'busco\s+ajuda|necessit[oa]|'
-                                    r'primera\s+interacci|'
-                                    r'no\s+personal|sense\s+dades|'
-                                    # English junk patterns
-                                    r"I\s+don.t\s+(know|have)|no\s+information|"
-                                    r"first\s+interaction|not\s+personal|no\s+data|"
-                                    r"no\s+previous|cannot\s+recall|"
-                                    # Prompt injection markers in facts
-                                    r'\[MEM_SAVE|ignore\s+(all\s+)?previous|'
-                                    r'system\s+prompt|override\s+instruction)',
-                                )
                                 for fact in _mem_saves:
                                     fact = fact.strip()
                                     if not fact or len(fact) < 5:
@@ -1435,7 +1443,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         if _skip:
                                             continue
                                     # Filter negative/junk facts
-                                    if _junk_patterns.search(fact):
+                                    if _JUNK_PATTERNS_RE.search(fact):
                                         logger.debug("MEM_SAVE skip (junk): '%s'", fact[:80])
                                         continue
                                     try:
