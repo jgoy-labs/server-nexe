@@ -5,6 +5,8 @@ from plugins.web_ui_module.api.routes_chat import (
     _normalize_content,
     _JUNK_PATTERNS_RE,
     _CTX_HEADERS_RE,
+    _process_content_think_tags,
+    _build_mem_stats,
 )
 
 
@@ -156,8 +158,11 @@ class TestCtxHeadersRe:
     def test_matches_documentacio_sistema_catala(self):
         assert _CTX_HEADERS_RE.search("[DOCUMENTACIÓ DEL SISTEMA]")
 
-    def test_matches_documentacio_sistema_catala(self):
+    def test_matches_documentacio_sistema_catala_plain(self):
         assert _CTX_HEADERS_RE.search("[DOCUMENTACIO DEL SISTEMA]")
+
+    def test_matches_documentacio_sistema_catala_accented(self):
+        assert _CTX_HEADERS_RE.search("[DOCUMENTACIÓ DEL SISTEMA]")
 
     def test_matches_technical_documentation(self):
         assert _CTX_HEADERS_RE.search("[TECHNICAL DOCUMENTATION]")
@@ -173,3 +178,101 @@ class TestCtxHeadersRe:
 
     def test_case_insensitive(self):
         assert _CTX_HEADERS_RE.search("[context]")
+
+
+# ─── _process_content_think_tags ─────────────────────────────────────────────
+
+class TestProcessContentThinkTags:
+    def test_no_think_tags(self):
+        visible, in_think, found = _process_content_think_tags("text normal", False)
+        assert visible == "text normal"
+        assert in_think is False
+        assert found is False
+
+    def test_think_open_unclosed(self):
+        visible, in_think, found = _process_content_think_tags("pre<think>pensant", False)
+        assert visible == "pre"
+        assert in_think is True
+        assert found is True
+
+    def test_think_closed_full_block(self):
+        visible, in_think, found = _process_content_think_tags("<think>hidden</think>visible", False)
+        assert visible == "visible"
+        assert in_think is False
+        assert found is True
+
+    def test_already_in_think_no_close(self):
+        visible, in_think, found = _process_content_think_tags("dins think", True)
+        assert visible == ""
+        assert in_think is True
+        assert found is False
+
+    def test_already_in_think_closes(self):
+        visible, in_think, found = _process_content_think_tags("fi</think>visible", True)
+        assert visible == "visible"
+        assert in_think is False
+        assert found is False
+
+    def test_think_in_middle(self):
+        visible, in_think, found = _process_content_think_tags("pre<think>mid</think>post", False)
+        assert visible == "prepost"
+        assert in_think is False
+        assert found is True
+
+    def test_empty_content(self):
+        visible, in_think, found = _process_content_think_tags("", False)
+        assert visible == ""
+        assert in_think is False
+        assert found is False
+
+
+# ─── _build_mem_stats ─────────────────────────────────────────────────────────
+
+class TestBuildMemStats:
+    def test_no_rag_no_mem(self):
+        stats = _build_mem_stats(
+            session=None, rag_count=0, rag_items=[], model_name="llama3",
+            elapsed=1.5, full_response_len=400, mem_saved_count=0, mem_saves=[]
+        )
+        assert stats["tokens"] == 100  # 400 // 4
+        assert stats["elapsed"] == 1.5
+        assert stats["model"] == "llama3"
+        assert stats["rag_count"] is None
+        assert stats["rag_avg"] is None
+        assert stats["mem_saved"] is None
+        assert stats["mem_facts"] is None
+
+    def test_with_rag(self):
+        rag_items = [("col1", 0.8), ("col2", 0.6)]
+        stats = _build_mem_stats(
+            session=None, rag_count=2, rag_items=rag_items, model_name="mistral",
+            elapsed=2.0, full_response_len=200, mem_saved_count=0, mem_saves=[]
+        )
+        assert stats["rag_count"] == 2
+        assert stats["rag_avg"] == 0.7
+        assert stats["rag_items"] == [["col1", 0.8], ["col2", 0.6]]
+
+    def test_with_mem_saves(self):
+        stats = _build_mem_stats(
+            session=None, rag_count=0, rag_items=[], model_name="qwen3",
+            elapsed=3.0, full_response_len=100, mem_saved_count=2,
+            mem_saves=["l'usuari es diu Joan", "l'usuari té 30 anys"]
+        )
+        assert stats["mem_saved"] == 2
+        assert stats["mem_facts"] == ["l'usuari es diu Joan", "l'usuari té 30 anys"]
+
+    def test_min_tokens_one(self):
+        stats = _build_mem_stats(
+            session=None, rag_count=0, rag_items=[], model_name=None,
+            elapsed=0.1, full_response_len=0, mem_saved_count=0, mem_saves=[]
+        )
+        assert stats["tokens"] == 1
+        assert stats["model"] is None
+
+    def test_model_truncated_at_100(self):
+        long_model = "x" * 150
+        stats = _build_mem_stats(
+            session=None, rag_count=0, rag_items=[], model_name=long_model,
+            elapsed=1.0, full_response_len=100, mem_saved_count=0, mem_saves=[]
+        )
+        assert len(stats["model"]) == 100
