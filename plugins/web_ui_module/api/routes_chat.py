@@ -367,6 +367,67 @@ def _normalize_content(content: str, model_name: str) -> str:
     return content
 
 
+def _process_content_think_tags(content: str, in_think: bool) -> tuple[str, bool, bool]:
+    """Separa el visible d'un chunk amb <think> tags incrustats (qwq:32b, etc.).
+
+    Retorna (visible, in_think_new, found_thinking).
+    """
+    if '<think>' not in content and '</think>' not in content and not in_think:
+        return content, False, False
+    vis_parts: list[str] = []
+    sc = 0
+    found_thinking = False
+    while sc < len(content):
+        if in_think:
+            te = content.find('</think>', sc)
+            if te >= 0:
+                in_think = False
+                sc = te + 8
+            else:
+                break
+        else:
+            ts = content.find('<think>', sc)
+            if ts >= 0:
+                if ts > sc:
+                    vis_parts.append(content[sc:ts])
+                in_think = True
+                found_thinking = True
+                sc = ts + 7
+            else:
+                vis_parts.append(content[sc:])
+                break
+    return ''.join(vis_parts), in_think, found_thinking
+
+
+def _build_mem_stats(
+    session: Any,
+    rag_count: int,
+    rag_items: list,
+    model_name: "str | None",
+    elapsed: float,
+    full_response_len: int,
+    mem_saved_count: int,
+    mem_saves: list,
+) -> dict:
+    """Construeix el dict stats per a session.add_message."""
+    est_tokens = max(1, full_response_len // 4)
+    rag_avg_val = None
+    if rag_count > 0 and rag_items:
+        rag_avg_val = round(sum(s for _, s in rag_items) / len(rag_items), 2)
+    saved_facts = [f.strip() for f in mem_saves if f.strip() and len(f.strip()) >= 5] if mem_saved_count > 0 else None
+    saved_rag_items = [[str(c)[:30], round(s, 2)] for c, s in rag_items] if rag_items else None
+    return {
+        "tokens": est_tokens,
+        "elapsed": elapsed,
+        "model": str(model_name)[:100] if model_name else None,
+        "rag_count": rag_count if rag_count > 0 else None,
+        "rag_avg": rag_avg_val,
+        "rag_items": saved_rag_items,
+        "mem_saved": mem_saved_count if mem_saved_count > 0 else None,
+        "mem_facts": saved_facts,
+    }
+
+
 def _validate_chat_input(body: dict, request: FastAPIRequest) -> tuple[Optional[bytes], str]:
     """Returns (image_bytes, message). Raises HTTPException on validation error."""
     message = body.get("message", "")
@@ -1232,31 +1293,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                             content = _normalize_content(content, model_name)
                                             full_response += content
                                             # Separate embedded <think> blocks in content (qwq:32b, etc.)
-                                            if '<think>' in content or '</think>' in content or _in_content_think:
-                                                _vis_parts = []
-                                                _sc = 0
-                                                while _sc < len(content):
-                                                    if _in_content_think:
-                                                        _te = content.find('</think>', _sc)
-                                                        if _te >= 0:
-                                                            _in_content_think = False
-                                                            _sc = _te + 8
-                                                        else:
-                                                            break
-                                                    else:
-                                                        _ts = content.find('<think>', _sc)
-                                                        if _ts >= 0:
-                                                            if _ts > _sc:
-                                                                _vis_parts.append(content[_sc:_ts])
-                                                            _in_content_think = True
-                                                            _has_any_thinking = True
-                                                            _sc = _ts + 7
-                                                        else:
-                                                            _vis_parts.append(content[_sc:])
-                                                            break
-                                                visible = ''.join(_vis_parts)
-                                            else:
-                                                visible = content
+                                            visible, _in_content_think, _found_thinking = _process_content_think_tags(content, _in_content_think)
+                                            _has_any_thinking |= _found_thinking
                                             # [MEM_SAVE: ...] tags pass through to client
                                             # Client handles them like <think> blocks (blue collapsible)
                                             # Bug B-mem-visible: strip [MEMORIA: ...] from visible output —
@@ -1465,22 +1503,11 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
                                 # Save message with stats for persistence
                                 _elapsed = round(_time_mod.time() - _stream_start_t, 1)
-                                _est_tokens = max(1, len(full_response) // 4)
-                                _rag_avg_val = None
-                                if rag_count > 0 and _rag_items:
-                                    _rag_avg_val = round(sum(s for _, s in _rag_items) / len(_rag_items), 2)
-                                _saved_facts = [f.strip() for f in _mem_saves if f.strip() and len(f.strip()) >= 5] if _mem_saved_count > 0 else None
-                                _saved_rag_items = [[str(c)[:30], round(s, 2)] for c, s in _rag_items] if _rag_items else None
-                                session.add_message("assistant", clean_response, stats={
-                                    "tokens": _est_tokens,
-                                    "elapsed": _elapsed,
-                                    "model": str(model_name)[:100] if model_name else None,
-                                    "rag_count": rag_count if rag_count > 0 else None,
-                                    "rag_avg": _rag_avg_val,
-                                    "rag_items": _saved_rag_items,
-                                    "mem_saved": _mem_saved_count if _mem_saved_count > 0 else None,
-                                    "mem_facts": _saved_facts,
-                                })
+                                _stats = _build_mem_stats(
+                                    session, rag_count, _rag_items, model_name,
+                                    _elapsed, len(full_response), _mem_saved_count, _mem_saves,
+                                )
+                                session.add_message("assistant", clean_response, stats=_stats)
                                 session_mgr._save_session_to_disk(session)
 
                         return "", model_name, StreamingResponse(
