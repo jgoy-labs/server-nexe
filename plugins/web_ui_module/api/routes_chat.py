@@ -499,6 +499,66 @@ def _clean_full_response(full_response: str, user_input: str = "") -> tuple[str,
     return clean_response, mem_saves, mem_deletes
 
 
+async def _yield_reprompt(
+    engine: Any,
+    model_name: str,
+    sig: Any,
+    lang: str,
+    system_prompt: str,
+    messages: list,
+    mem_saves: list,
+    thinking_enabled: bool,
+    rp_out: list,
+):
+    """Re-prompt quan la resposta és buida però hi ha MEM_SAVEs.
+
+    Yields els chunks filtrats (sense think, sense MEM_SAVE).
+    Si la resposta és OK, rp_out[0] = clean_response acumulat.
+    El fallback (yield 'Memòria desada: ...') resta al caller.
+    """
+    _fallback_facts = [f.strip() for f in mem_saves if f and f.strip()]
+    if not _fallback_facts:
+        return
+    _lang_short = lang[:2] if lang else "ca"
+    _rp_override = _REPROMPT_OVERRIDE.get(_lang_short, _REPROMPT_OVERRIDE["en"])
+    _rp_system = system_prompt + _rp_override
+    try:
+        if 'model' in sig.parameters:
+            logger.info("Re-prompt: empty after MEM_SAVE, re-calling %s", model_name)
+            _rp_msgs = [{"role": "system", "content": _rp_system}] + messages
+            _rp_result = engine.chat(model=model_name, messages=_rp_msgs, stream=True,
+                                     thinking_enabled=thinking_enabled)
+            _rp_response = ""
+            _rp_in_think = False
+            async for _rp_chunk in _rp_result:
+                _rp_content = ""
+                if isinstance(_rp_chunk, dict) and "message" in _rp_chunk:
+                    if _rp_chunk["message"].get("thinking", ""):
+                        continue
+                    _rp_content = _rp_chunk["message"].get("content", "")
+                elif isinstance(_rp_chunk, dict):
+                    _rp_content = _rp_chunk.get("content", _rp_chunk.get("response", ""))
+                elif isinstance(_rp_chunk, str):
+                    _rp_content = _rp_chunk
+                if '<think>' in _rp_content:
+                    _rp_in_think = True
+                    _rp_content = _rp_content.split('<think>')[0]
+                if '</think>' in _rp_content:
+                    _rp_in_think = False
+                    _rp_content = _rp_content.split('</think>')[-1]
+                if _rp_in_think:
+                    continue
+                _rp_content = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]', '', _rp_content)
+                if _rp_content:
+                    _rp_response += _rp_content
+                    yield _rp_content
+            if _rp_response.strip():
+                rp_out.append(_rp_response.strip())
+                logger.info("Re-prompt OK: %d chars", len(_rp_response.strip()))
+    except Exception as e:
+        logger.warning("Re-prompt failed: %s", e)
+
+
 def _validate_chat_input(body: dict, request: FastAPIRequest) -> tuple[Optional[bytes], str]:
     """Returns (image_bytes, message). Raises HTTPException on validation error."""
     message = body.get("message", "")
@@ -1409,49 +1469,18 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             # a conversational response, resend with system prompt without
                             # MEM_SAVE instructions so it generates a natural response.
                             if not clean_response and _mem_saves:
-                                _fallback_facts = [f.strip() for f in _mem_saves if f and f.strip()]
-                                if _fallback_facts:
-                                    _lang_short = _lang[:2] if _lang else "ca"
-                                    _rp_override = _REPROMPT_OVERRIDE.get(_lang_short, _REPROMPT_OVERRIDE["en"])
-                                    _rp_system = system_prompt + _rp_override
-                                    _rp_ok = False
-                                    try:
-                                        if 'model' in sig.parameters:
-                                            logger.info("Re-prompt: empty after MEM_SAVE, re-calling %s", model_name)
-                                            _rp_msgs = [{"role": "system", "content": _rp_system}] + messages
-                                            _rp_result = engine.chat(model=model_name, messages=_rp_msgs, stream=True,
-                                                                      thinking_enabled=thinking_enabled)
-                                            _rp_response = ""
-                                            _rp_in_think = False
-                                            async for _rp_chunk in _rp_result:
-                                                _rp_content = ""
-                                                if isinstance(_rp_chunk, dict) and "message" in _rp_chunk:
-                                                    if _rp_chunk["message"].get("thinking", ""):
-                                                        continue
-                                                    _rp_content = _rp_chunk["message"].get("content", "")
-                                                elif isinstance(_rp_chunk, dict):
-                                                    _rp_content = _rp_chunk.get("content", _rp_chunk.get("response", ""))
-                                                elif isinstance(_rp_chunk, str):
-                                                    _rp_content = _rp_chunk
-                                                if '<think>' in _rp_content:
-                                                    _rp_in_think = True
-                                                    _rp_content = _rp_content.split('<think>')[0]
-                                                if '</think>' in _rp_content:
-                                                    _rp_in_think = False
-                                                    _rp_content = _rp_content.split('</think>')[-1]
-                                                if _rp_in_think:
-                                                    continue
-                                                _rp_content = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]', '', _rp_content)
-                                                if _rp_content:
-                                                    _rp_response += _rp_content
-                                                    yield _rp_content
-                                            if _rp_response.strip():
-                                                clean_response = _rp_response.strip()
-                                                _rp_ok = True
-                                                logger.info("Re-prompt OK: %d chars", len(clean_response))
-                                    except Exception as e:
-                                        logger.warning("Re-prompt failed: %s", e)
-                                    if not _rp_ok:
+                                _rp_out: list = []
+                                async for _chunk in _yield_reprompt(
+                                    engine, model_name, sig, _lang,
+                                    system_prompt, messages, _mem_saves,
+                                    thinking_enabled, _rp_out,
+                                ):
+                                    yield _chunk
+                                if _rp_out:
+                                    clean_response = _rp_out[0]
+                                elif _mem_saves:
+                                    _fallback_facts = [f.strip() for f in _mem_saves if f and f.strip()]
+                                    if _fallback_facts:
                                         clean_response = "Memòria desada: " + ", ".join(_fallback_facts)
                                         yield clean_response
                                         logger.info("Re-prompt fallback: confirmation message")

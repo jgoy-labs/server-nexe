@@ -10,6 +10,7 @@ from plugins.web_ui_module.api.routes_chat import (
     _build_mem_stats,
     _yield_response_headers,
     _clean_full_response,
+    _yield_reprompt,
 )
 
 
@@ -369,3 +370,78 @@ class TestCleanFullResponse:
             "[OBLIT: L'usuari vol esborrar un record]"
         )
         assert len(deletes) == 1
+
+
+# ─── _yield_reprompt ──────────────────────────────────────────────────────────
+
+class _FakeSig:
+    parameters = {"model": None, "messages": None, "stream": None}
+
+class _FakeSigNoModel:
+    parameters = {"messages": None, "stream": None}
+
+def _make_engine(*chunks):
+    """Retorna un FakeEngine que yielda els chunks donats."""
+    async def _gen(**kwargs):
+        for c in chunks:
+            yield c
+
+    class _Engine:
+        def chat(self, model, messages, stream, thinking_enabled):
+            return _gen()
+
+    return _Engine()
+
+
+class TestYieldReprompt:
+    def test_reprompt_ok_yields_and_sets_rp_out(self):
+        engine = _make_engine("hola", " món")
+        rp_out: list = []
+        chunks = _collect(_yield_reprompt(
+            engine, "llama3", _FakeSig(), "ca",
+            "sys", [], ["l'usuari es diu Joan"], False, rp_out,
+        ))
+        assert "".join(chunks) == "hola món"
+        assert rp_out == ["hola món"]
+
+    def test_reprompt_no_model_param_skips(self):
+        rp_out: list = []
+        chunks = _collect(_yield_reprompt(
+            None, "llama3", _FakeSigNoModel(), "ca",
+            "sys", [], ["fact"], False, rp_out,
+        ))
+        assert chunks == []
+        assert rp_out == []
+
+    def test_reprompt_engine_exception_leaves_rp_out_empty(self):
+        class _BadEngine:
+            def chat(self, model, messages, stream, thinking_enabled):
+                raise RuntimeError("engine down")
+
+        rp_out: list = []
+        chunks = _collect(_yield_reprompt(
+            _BadEngine(), "llama3", _FakeSig(), "ca",
+            "sys", [], ["fact"], False, rp_out,
+        ))
+        assert chunks == []
+        assert rp_out == []
+
+    def test_reprompt_empty_mem_saves_skips(self):
+        rp_out: list = []
+        chunks = _collect(_yield_reprompt(
+            None, "llama3", _FakeSig(), "ca",
+            "sys", [], [], False, rp_out,
+        ))
+        assert chunks == []
+        assert rp_out == []
+
+    def test_reprompt_strips_mem_save_tags(self):
+        engine = _make_engine("text [MEM_SAVE: fake] fi")
+        rp_out: list = []
+        chunks = _collect(_yield_reprompt(
+            engine, "llama3", _FakeSig(), "ca",
+            "sys", [], ["fact"], False, rp_out,
+        ))
+        joined = "".join(chunks)
+        assert "[MEM_SAVE:" not in joined
+        assert "text" in joined
