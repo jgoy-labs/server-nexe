@@ -453,13 +453,6 @@ async def _yield_response_headers(
         yield f"\x00[DOC_TRUNCATED:{doc_truncated_pct}]\x00"
 
 
-_REMEMBERED_RE = _re.compile(
-    r'(?:He recordat que|He recordado que|I\'ve remembered that|I have remembered that)\s+'
-    r'((?:L\'usuari|El usuario|The user|l\'usuari|el usuario|the user)\s+[^.!?\n]{8,150})',
-    _re.IGNORECASE
-)
-
-
 def _clean_full_response(full_response: str, user_input: str = "") -> tuple[str, list, list]:
     """Neteja la resposta completa i extreu MEM_SAVE i MEM_DELETE.
 
@@ -488,12 +481,6 @@ def _clean_full_response(full_response: str, user_input: str = "") -> tuple[str,
             logger.info("MEM_DELETE (model tag): pending confirmation for '%s'", _del_fact[:80])
             mem_deletes.append(_del_fact)
     clean_response = _CTX_HEADERS_RE.sub('', clean_response).strip()
-    mem_saves: list = []
-    if not mem_saves:
-        for _rm in _REMEMBERED_RE.finditer(clean_response):
-            _extracted = _rm.group(1).strip().rstrip('.,!?')
-            if _extracted and _is_valid_mem_save_text(_extracted):
-                mem_saves.append(_extracted)
     mem_saves = _extract_safe_mem_saves(clean_response, user_input=user_input)
     clean_response = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
     return clean_response, mem_saves, mem_deletes
