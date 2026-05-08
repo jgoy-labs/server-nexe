@@ -227,73 +227,78 @@ def _parse_collections(collections_str: Optional[str]) -> Optional[list[str]]:
     return [_COLL_ALIASES.get(c.strip(), c.strip()) for c in collections_str.split(',')]
 
 
-async def _handle_slash_command(
-    cmd: str, cmd_arg: str, client: Any,
-    session_id: str, stream_kwargs: dict
-) -> bool:
-    """Retorna True si s'ha processat (cal fer continue al bucle)."""
-    if cmd == "upload" and cmd_arg:
-        path_parts = re.split(r'(?<!\\) ', cmd_arg.strip(), maxsplit=1)
-        raw_path = path_parts[0].replace("\\ ", " ")
-        follow_up = path_parts[1].strip() if len(path_parts) > 1 else ""
-        file_path = os.path.expanduser(raw_path)
-        if not os.path.isfile(file_path):
-            click.echo(click.style(f"❌ File not found: {file_path}", fg="red"))
-            return True
-        filename = Path(file_path).name
-        click.echo(click.style(f"📎 Uploading {filename}...", fg="yellow"))
-        upload_ok = False
-        try:
-            upload_result = await client.upload_file(file_path, session_id)
-            if not upload_result:
-                click.echo(click.style("❌ Error uploading file. Check that the format is compatible.", fg="red"))
-            else:
-                chunks = upload_result.get("chunks", "?")
-                click.echo(click.style(f"✅ {filename} indexed ({chunks} chunks).", fg="green"))
-                upload_ok = True
-        except Exception as e:
-            click.echo(click.style(f"❌ Error: {e}", fg="red"))
-        if upload_ok and follow_up:
+async def _cmd_upload(cmd_arg: str, client: Any, session_id: str, stream_kwargs: dict) -> None:
+    path_parts = re.split(r'(?<!\\) ', cmd_arg.strip(), maxsplit=1)
+    raw_path = path_parts[0].replace("\\ ", " ")
+    follow_up = path_parts[1].strip() if len(path_parts) > 1 else ""
+    file_path = os.path.expanduser(raw_path)
+    if not os.path.isfile(file_path):
+        click.echo(click.style(f"❌ File not found: {file_path}", fg="red"))
+        return
+    filename = Path(file_path).name
+    click.echo(click.style(f"📎 Uploading {filename}...", fg="yellow"))
+    upload_ok = False
+    try:
+        upload_result = await client.upload_file(file_path, session_id)
+        if not upload_result:
+            click.echo(click.style("❌ Error uploading file. Check that the format is compatible.", fg="red"))
+        else:
+            chunks = upload_result.get("chunks", "?")
+            click.echo(click.style(f"✅ {filename} indexed ({chunks} chunks).", fg="green"))
+            upload_ok = True
+    except Exception as e:
+        click.echo(click.style(f"❌ Error: {e}", fg="red"))
+    if upload_ok and follow_up:
+        first = True
+        async for chunk in _stream_with_spinner(client.chat_ui_stream(message=follow_up, session_id=session_id, **stream_kwargs)):
+            if first:
+                first = False
+                click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
+            print(chunk, end="", flush=True)
+        print()
+
+
+async def _cmd_save(cmd_arg: str, client: Any, session_id: str, stream_kwargs: dict) -> None:
+    try:
+        success = await client.memory_store(cmd_arg)
+        if success:
+            ack_prompt = f"The user just asked you to remember this: \"{cmd_arg}\". Reply briefly confirming you will remember it, without repeating all the information."
             first = True
-            async for chunk in _stream_with_spinner(client.chat_ui_stream(message=follow_up, session_id=session_id, **stream_kwargs)):
+            async for chunk in _stream_with_spinner(client.chat_ui_stream(message=ack_prompt, session_id=session_id, **stream_kwargs)):
                 if first:
                     first = False
                     click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
                 print(chunk, end="", flush=True)
             print()
-        return True
+        else:
+            click.echo(click.style("❌ Error saving.", fg="red"))
+    except Exception as e:
+        click.echo(click.style(f"❌ Error: {e}", fg="red"))
 
-    elif cmd == "save" and cmd_arg:
-        try:
-            success = await client.memory_store(cmd_arg)
-            if success:
-                ack_prompt = f"The user just asked you to remember this: \"{cmd_arg}\". Reply briefly confirming you will remember it, without repeating all the information."
-                first = True
-                async for chunk in _stream_with_spinner(client.chat_ui_stream(message=ack_prompt, session_id=session_id, **stream_kwargs)):
-                    if first:
-                        first = False
-                        click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
-                    print(chunk, end="", flush=True)
-                print()
-            else:
-                click.echo(click.style("❌ Error saving.", fg="red"))
-        except Exception as e:
-            click.echo(click.style(f"❌ Error: {e}", fg="red"))
-        return True
 
+async def _cmd_recall(cmd_arg: str, client: Any) -> None:
+    try:
+        results = await client.memory_search(cmd_arg)
+        if results:
+            click.echo(click.style("📚 Found in memory:", fg="cyan"))
+            for r in results[:3]:
+                click.echo(f"  • {r.get('content', r)[:100]}...")
+        else:
+            click.echo(click.style("🔍 Nothing found.", dim=True))
+    except Exception as e:
+        click.echo(click.style(f"❌ Error: {e}", fg="red"))
+
+
+async def _handle_slash_command(
+    cmd: str, cmd_arg: str, client: Any,
+    session_id: str, stream_kwargs: dict
+) -> bool:
+    """Retorna True si s'ha processat (cal fer continue al bucle)."""
+    _session_cmds = {"upload": _cmd_upload, "save": _cmd_save}
+    if cmd in _session_cmds and cmd_arg:
+        await _session_cmds[cmd](cmd_arg, client, session_id, stream_kwargs)
     elif cmd == "recall" and cmd_arg:
-        try:
-            results = await client.memory_search(cmd_arg)
-            if results:
-                click.echo(click.style("📚 Found in memory:", fg="cyan"))
-                for r in results[:3]:
-                    click.echo(f"  • {r.get('content', r)[:100]}...")
-            else:
-                click.echo(click.style("🔍 Nothing found.", dim=True))
-        except Exception as e:
-            click.echo(click.style(f"❌ Error: {e}", fg="red"))
-        return True
-
+        await _cmd_recall(cmd_arg, client)
     elif cmd == "help":
         click.echo(click.style("\n📖 Available commands:", fg="cyan", bold=True))
         click.echo("  /upload <path>  Upload file (PDF, MD, TXT...) for analysis")
@@ -302,12 +307,10 @@ async def _handle_slash_command(
         click.echo("  /help           Show this help")
         click.echo("  clear           Clear history")
         click.echo("  exit            Quit the chat\n")
-        return True
-
     else:
         click.echo(click.style(f"❓ Unknown command: /{cmd}", fg="yellow"))
         click.echo("Type /help to see available commands.")
-        return True
+    return True
 
 
 def _process_metadata_chunk(chunk: dict, state: dict) -> None:

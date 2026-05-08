@@ -4,6 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.cli.chat_cli import (
     _check_server_status,
+    _cmd_recall,
+    _cmd_save,
+    _cmd_upload,
     _create_chat_session,
     _handle_slash_command,
     _handle_user_message,
@@ -167,6 +170,97 @@ class TestHandleSlashCommand:
         client = MagicMock()
         result = await _handle_slash_command("upload", "/no/such/file.txt", client, "sess", {})
         assert result is True
+
+
+# ─── _cmd_upload ─────────────────────────────────────────────────────────────
+
+class TestCmdUpload:
+    async def test_file_not_found_echoes_error(self, tmp_path):
+        client = MagicMock()
+        await _cmd_upload("/no/such/file.pdf", client, "sess", {})
+        client.upload_file.assert_not_called()
+
+    async def test_upload_success_no_followup(self, tmp_path):
+        f = tmp_path / "doc.txt"
+        f.write_text("hello")
+        client = MagicMock()
+        client.upload_file = AsyncMock(return_value={"chunks": 3})
+        await _cmd_upload(str(f), client, "sess", {})
+        client.upload_file.assert_called_once_with(str(f), "sess")
+
+    async def test_upload_failure_echoes_error(self, tmp_path):
+        f = tmp_path / "bad.txt"
+        f.write_text("x")
+        client = MagicMock()
+        client.upload_file = AsyncMock(return_value=None)
+        await _cmd_upload(str(f), client, "sess", {})
+        client.upload_file.assert_called_once()
+
+    async def test_upload_success_with_followup(self, tmp_path):
+        f = tmp_path / "doc.txt"
+        f.write_text("content")
+        call_count = 0
+
+        async def _fake_stream(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            yield "ok"
+
+        client = MagicMock()
+        client.upload_file = AsyncMock(return_value={"chunks": 2})
+        client.chat_ui_stream = _fake_stream
+        with patch("core.cli.chat_cli._stream_with_spinner", side_effect=lambda g: g):
+            await _cmd_upload(f"{f} what is this?", client, "sess", {})
+        assert call_count == 1
+
+
+# ─── _cmd_save ───────────────────────────────────────────────────────────────
+
+class TestCmdSave:
+    async def test_save_success_streams_ack(self):
+        async def _fake_stream(*args, **kwargs):
+            yield "confirmat"
+
+        client = MagicMock()
+        client.memory_store = AsyncMock(return_value=True)
+        client.chat_ui_stream = _fake_stream
+        with patch("core.cli.chat_cli._stream_with_spinner", side_effect=lambda g: g):
+            await _cmd_save("recordar algo", client, "sess", {})
+        client.memory_store.assert_called_once_with("recordar algo")
+
+    async def test_save_failure_echoes_error(self):
+        client = MagicMock()
+        client.memory_store = AsyncMock(return_value=False)
+        await _cmd_save("text", client, "sess", {})
+        client.memory_store.assert_called_once_with("text")
+
+    async def test_save_exception_echoes_error(self):
+        client = MagicMock()
+        client.memory_store = AsyncMock(side_effect=RuntimeError("conn failed"))
+        await _cmd_save("text", client, "sess", {})
+        client.memory_store.assert_called_once()
+
+
+# ─── _cmd_recall ─────────────────────────────────────────────────────────────
+
+class TestCmdRecall:
+    async def test_recall_with_results(self):
+        client = MagicMock()
+        client.memory_search = AsyncMock(return_value=[{"content": "algo important"}])
+        await _cmd_recall("query", client)
+        client.memory_search.assert_called_once_with("query")
+
+    async def test_recall_no_results(self):
+        client = MagicMock()
+        client.memory_search = AsyncMock(return_value=[])
+        await _cmd_recall("res", client)
+        client.memory_search.assert_called_once_with("res")
+
+    async def test_recall_exception_echoes_error(self):
+        client = MagicMock()
+        client.memory_search = AsyncMock(side_effect=RuntimeError("db error"))
+        await _cmd_recall("query", client)
+        client.memory_search.assert_called_once()
 
 
 # ─── _handle_user_message ────────────────────────────────────────────────────
