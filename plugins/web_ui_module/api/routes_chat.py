@@ -428,6 +428,77 @@ def _build_mem_stats(
     }
 
 
+async def _yield_response_headers(
+    model_name: str,
+    rag_count: int,
+    rag_items: list,
+    compacted: bool,
+    compaction_count: int,
+    doc_truncated_pct: int,
+):
+    """Yield dels tokens de capçalera: MODEL, RAG*, COMPACT, DOC_TRUNCATED."""
+    _safe_model = str(model_name).replace("\x00", "").replace("]", "")[:100]
+    yield f"\x00[MODEL:{_safe_model}]\x00"
+    if rag_count > 0:
+        yield f"\x00[RAG:{int(rag_count)}]\x00"
+        if rag_items:
+            avg_score = sum(s for _, s in rag_items) / len(rag_items)
+            yield f"\x00[RAG_AVG:{avg_score:.2f}]\x00"
+            for _col, _score in rag_items:
+                _safe_col = str(_col).replace("\x00", "").replace("|", "_")[:30]
+                yield f"\x00[RAG_ITEM:{_safe_col}|{_score:.2f}]\x00"
+    if compacted:
+        yield f"\x00[COMPACT:{int(compaction_count)}]\x00"
+    if doc_truncated_pct > 0:
+        yield f"\x00[DOC_TRUNCATED:{doc_truncated_pct}]\x00"
+
+
+_REMEMBERED_RE = _re.compile(
+    r'(?:He recordat que|He recordado que|I\'ve remembered that|I have remembered that)\s+'
+    r'((?:L\'usuari|El usuario|The user|l\'usuari|el usuario|the user)\s+[^.!?\n]{8,150})',
+    _re.IGNORECASE
+)
+
+
+def _clean_full_response(full_response: str, user_input: str = "") -> tuple[str, list, list]:
+    """Neteja la resposta completa i extreu MEM_SAVE i MEM_DELETE.
+
+    Retorna (clean_response, mem_saves, mem_deletes).
+    El yield de PENDING_DELETE ha de fer-lo el caller.
+    """
+    clean_response = full_response
+    clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", clean_response)
+    clean_response = _re.sub(r'<\|[^|]+\|>', '', clean_response)
+    clean_response = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', clean_response)
+    _m = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', clean_response, _re.IGNORECASE)
+    if _m:
+        clean_response = _m.group(1).strip()
+    else:
+        clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
+    clean_response = _MEMORIA_RE.sub(lambda m: f'[MEM_SAVE: {m.group(1)}]', clean_response)
+    clean_response = _OBLIT_RE.sub(lambda m: f'[MEM_DELETE: {m.group(2)}]', clean_response)
+    raw_deletes = _MEM_DELETE_RE.findall(clean_response)
+    mem_deletes: list = []
+    if raw_deletes:
+        clean_response = _re.sub(r'\[MEM_DELETE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
+        for _del_fact in raw_deletes:
+            _del_fact = _del_fact.strip()
+            if not _del_fact or len(_del_fact) < 3:
+                continue
+            logger.info("MEM_DELETE (model tag): pending confirmation for '%s'", _del_fact[:80])
+            mem_deletes.append(_del_fact)
+    clean_response = _CTX_HEADERS_RE.sub('', clean_response).strip()
+    mem_saves: list = []
+    if not mem_saves:
+        for _rm in _REMEMBERED_RE.finditer(clean_response):
+            _extracted = _rm.group(1).strip().rstrip('.,!?')
+            if _extracted and _is_valid_mem_save_text(_extracted):
+                mem_saves.append(_extracted)
+    mem_saves = _extract_safe_mem_saves(clean_response, user_input=user_input)
+    clean_response = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
+    return clean_response, mem_saves, mem_deletes
+
+
 def _validate_chat_input(body: dict, request: FastAPIRequest) -> tuple[Optional[bytes], str]:
     """Returns (image_bytes, message). Raises HTTPException on validation error."""
     message = body.get("message", "")
@@ -1229,21 +1300,12 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         async def response_generator():
                             full_response = ""
                             _mem_saves = []  # init here so fallback extractor never hits UnboundLocalError
+                            async for _h in _yield_response_headers(
+                                model_name, rag_count, _rag_items, _compacted,
+                                session.compaction_count, _doc_truncated_pct,
+                            ):
+                                yield _h
                             _safe_model = str(model_name).replace("\x00", "").replace("]", "")[:100]
-                            yield f"\x00[MODEL:{_safe_model}]\x00"
-                            if rag_count > 0:
-                                yield f"\x00[RAG:{int(rag_count)}]\x00"
-                                # RAG weight details for UI/CLI display
-                                if _rag_items:
-                                    avg_score = sum(s for _, s in _rag_items) / len(_rag_items)
-                                    yield f"\x00[RAG_AVG:{avg_score:.2f}]\x00"
-                                    for _col, _score in _rag_items:
-                                        _safe_col = str(_col).replace("\x00", "").replace("|", "_")[:30]
-                                        yield f"\x00[RAG_ITEM:{_safe_col}|{_score:.2f}]\x00"
-                            if _compacted:
-                                yield f"\x00[COMPACT:{int(session.compaction_count)}]\x00"
-                            if _doc_truncated_pct > 0:
-                                yield f"\x00[DOC_TRUNCATED:{_doc_truncated_pct}]\x00"
 
                             # Check if model is loaded (Ollama, MLX, llama.cpp)
                             if hasattr(engine, 'is_model_loaded'):
@@ -1338,62 +1400,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 logger.info("Model did not produce thinking tokens (model decides when to think)")
 
                             # Save clean response (no think/GPT-OSS tags) to session/disk
-                            clean_response = full_response
-                            clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", clean_response)
-                            clean_response = _re.sub(r'<\|[^|]+\|>', '', clean_response)
-                            clean_response = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', clean_response)
-                            # GPT-OSS: extract only the "final" part (real response)
-                            _m = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', clean_response, _re.IGNORECASE)
-                            if _m:
-                                clean_response = _m.group(1).strip()
-                            else:
-                                # Fallback: remove "analysis..." prefix if present
-                                clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
-                            # Bug B-mem-visible: normalize [MEMORIA: ...] → [MEM_SAVE: ...] before
-                            # extracting and stripping, because gpt-oss:20b emits [MEMORIA: ...].
-                            clean_response = _MEMORIA_RE.sub(
-                                lambda m: f'[MEM_SAVE: {m.group(1)}]', clean_response
-                            )
-                            # Bug 18: Normalize [OLVIDA/OBLIT/FORGET: ...] → [MEM_DELETE: ...]
-                            clean_response = _OBLIT_RE.sub(
-                                lambda m: f'[MEM_DELETE: {m.group(2)}]', clean_response
-                            )
-                            # Bug 18: Extract [MEM_DELETE: ...] — we don't delete immediately.
-                            # We emit PENDING_DELETE so the frontend shows a confirmation.
-                            # The actual deletion happens at POST /ui/memory/confirm-delete.
-                            _mem_deletes = _MEM_DELETE_RE.findall(clean_response)
-                            if _mem_deletes:
-                                clean_response = _re.sub(r'\[MEM_DELETE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
-                                for _del_fact in _mem_deletes:
-                                    _del_fact = _del_fact.strip()
-                                    if not _del_fact or len(_del_fact) < 3:
-                                        continue
-                                    logger.info("MEM_DELETE (model tag): pending confirmation for '%s'", _del_fact[:80])
-                                    _encoded = _del_fact.replace('|', '\\|')
-                                    yield f"\x00[PENDING_DELETE:{_encoded}]\x00"
-                            # Strip context block headers that models occasionally echo verbatim
-                            clean_response = _CTX_HEADERS_RE.sub('', clean_response).strip()
-                            # Fallback extractor: models (e.g. Gemma-3 VLM) that say
-                            # "He recordat que [fact]" without emitting [MEM_SAVE:].
-                            # Only fires when _mem_saves is empty (i.e. model didn't tag).
-                            # Only extracts facts that start with known subject prefixes.
-                            _REMEMBERED_RE = _re.compile(
-                                r'(?:He recordat que|He recordado que|I\'ve remembered that|I have remembered that)\s+'
-                                r'((?:L\'usuari|El usuario|The user|l\'usuari|el usuario|the user)\s+[^.!?\n]{8,150})',
-                                _re.IGNORECASE
-                            )
-                            if not _mem_saves:
-                                for _rm in _REMEMBERED_RE.finditer(clean_response):
-                                    _extracted = _rm.group(1).strip().rstrip('.,!?')
-                                    if _extracted and _is_valid_mem_save_text(_extracted):
-                                        _mem_saves.append(_extracted)
-                            # Bug 17: Extract [MEM_SAVE: ...] facts with strict validation.
-                            # _extract_safe_mem_saves filters by format/length/whitelist
-                            # and rejects MEM_SAVEs that copy the user message.
-                            _mem_saves = _extract_safe_mem_saves(clean_response, user_input=message)
-                            # Even so, the visible body strip applies to the broad pattern to
-                            # eliminate ANY [MEM_SAVE: ...] (valid or not) from the response.
-                            clean_response = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
+                            clean_response, _mem_saves, _mem_deletes = _clean_full_response(full_response, message)
+                            for _del_fact in _mem_deletes:
+                                _encoded = _del_fact.replace('|', '\\|')
+                                yield f"\x00[PENDING_DELETE:{_encoded}]\x00"
 
                             # Re-prompt: if the model emitted ONLY [MEM_SAVE: ...] without
                             # a conversational response, resend with system prompt without

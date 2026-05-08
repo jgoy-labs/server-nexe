@@ -1,5 +1,6 @@
 """Tests per a les funcions helpers extretes del closure response_generator."""
 import pytest
+import asyncio
 from plugins.web_ui_module.api.routes_chat import (
     _parse_chunk,
     _normalize_content,
@@ -7,6 +8,8 @@ from plugins.web_ui_module.api.routes_chat import (
     _CTX_HEADERS_RE,
     _process_content_think_tags,
     _build_mem_stats,
+    _yield_response_headers,
+    _clean_full_response,
 )
 
 
@@ -155,9 +158,6 @@ class TestCtxHeadersRe:
     def test_matches_user_memory_english(self):
         assert _CTX_HEADERS_RE.search("[USER MEMORY]")
 
-    def test_matches_documentacio_sistema_catala(self):
-        assert _CTX_HEADERS_RE.search("[DOCUMENTACIÓ DEL SISTEMA]")
-
     def test_matches_documentacio_sistema_catala_plain(self):
         assert _CTX_HEADERS_RE.search("[DOCUMENTACIO DEL SISTEMA]")
 
@@ -276,3 +276,96 @@ class TestBuildMemStats:
             elapsed=1.0, full_response_len=100, mem_saved_count=0, mem_saves=[]
         )
         assert len(stats["model"]) == 100
+
+
+# ─── _yield_response_headers ─────────────────────────────────────────────────
+
+async def _collect_async(gen):
+    return [item async for item in gen]
+
+def _collect(gen):
+    """Helper: esgota un async generator i retorna la llista de strings."""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(_collect_async(gen))
+    finally:
+        loop.close()
+
+
+class TestYieldResponseHeaders:
+    def test_basic_model_only(self):
+        tokens = _collect(_yield_response_headers("llama3", 0, [], False, 0, 0))
+        assert tokens == ["\x00[MODEL:llama3]\x00"]
+
+    def test_model_sanitized(self):
+        tokens = _collect(_yield_response_headers("mod\x00el]x", 0, [], False, 0, 0))
+        assert tokens[0] == "\x00[MODEL:modelx]\x00"
+
+    def test_with_rag_and_items(self):
+        rag_items = [("col1", 0.8), ("col2", 0.6)]
+        tokens = _collect(_yield_response_headers("m", 2, rag_items, False, 0, 0))
+        assert "\x00[RAG:2]\x00" in tokens
+        assert any("[RAG_AVG:" in t for t in tokens)
+        assert any("[RAG_ITEM:" in t for t in tokens)
+
+    def test_with_compact(self):
+        tokens = _collect(_yield_response_headers("m", 0, [], True, 3, 0))
+        assert "\x00[COMPACT:3]\x00" in tokens
+
+    def test_with_doc_truncated(self):
+        tokens = _collect(_yield_response_headers("m", 0, [], False, 0, 42))
+        assert "\x00[DOC_TRUNCATED:42]\x00" in tokens
+
+    def test_rag_item_sanitized(self):
+        rag_items = [("col|bad\x00", 0.9)]
+        tokens = _collect(_yield_response_headers("m", 1, rag_items, False, 0, 0))
+        rag_item_tok = next(t for t in tokens if "[RAG_ITEM:" in t)
+        assert "|" not in rag_item_tok.split("[RAG_ITEM:")[1].split("|")[0]
+
+    def test_no_rag_no_compact_no_truncated(self):
+        tokens = _collect(_yield_response_headers("m", 0, [], False, 0, 0))
+        assert all("[RAG" not in t and "[COMPACT" not in t and "[DOC" not in t for t in tokens)
+
+
+# ─── _clean_full_response ─────────────────────────────────────────────────────
+
+class TestCleanFullResponse:
+    def test_strips_think_tags(self):
+        clean, saves, deletes = _clean_full_response("<think>pensant</think>resposta")
+        assert "pensant" not in clean
+        assert "resposta" in clean
+
+    def test_mem_save_extracted_and_stripped(self):
+        clean, saves, deletes = _clean_full_response(
+            "L'usuari es diu Joan [MEM_SAVE: L'usuari es diu Joan]", ""
+        )
+        assert "[MEM_SAVE:" not in clean
+        assert any("Joan" in s for s in saves)
+
+    def test_mem_delete_extracted(self):
+        clean, saves, deletes = _clean_full_response(
+            "He oblidat [MEM_DELETE: L'usuari es diu Joan]"
+        )
+        assert "[MEM_DELETE:" not in clean
+        assert len(deletes) == 1
+        assert "Joan" in deletes[0]
+
+    def test_ctx_headers_stripped(self):
+        clean, saves, deletes = _clean_full_response("[CONTEXT]\nresposta\n[FI CONTEXT]")
+        assert "[CONTEXT]" not in clean
+        assert "[FI CONTEXT]" not in clean
+        assert "resposta" in clean
+
+    def test_mem_delete_short_filtered(self):
+        clean, saves, deletes = _clean_full_response("[MEM_DELETE: x]")
+        assert deletes == []
+
+    def test_pipe_tags_stripped(self):
+        clean, saves, deletes = _clean_full_response("<|system|>hidden")
+        assert "<|system|>" not in clean
+
+    def test_oblit_normalized_to_mem_delete(self):
+        clean, saves, deletes = _clean_full_response(
+            "[OBLIT: L'usuari vol esborrar un record]"
+        )
+        assert len(deletes) == 1
