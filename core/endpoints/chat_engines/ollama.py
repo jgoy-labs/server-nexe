@@ -55,19 +55,8 @@ _OLLAMA_ERRORS = {
 }
 
 
-async def _forward_to_ollama(
-    messages: List[Dict],
-    request: ChatCompletionRequest,
-    app_state=None,
-    user_msg: Optional[str] = None,
-    fallback_from: Optional[str] = None,
-    fallback_reason: Optional[str] = None,
-):
-    """Forward request to local Ollama instance."""
-    _ollama_host = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-    url = f"{_ollama_host}/api/chat"
-
-    # Get model from: request > NEXE_OLLAMA_MODEL > NEXE_DEFAULT_MODEL (if not a URL) > config > fallback
+def _resolve_ollama_model(request, app_state) -> str:
+    """Cascada: request.model → NEXE_OLLAMA_MODEL → NEXE_DEFAULT_MODEL (no URL) → config → 'llama3.2'."""
     model_name = request.model
     if not model_name:
         model_name = os.environ.get("NEXE_OLLAMA_MODEL")
@@ -79,20 +68,22 @@ async def _forward_to_ollama(
     if not model_name and app_state:
         config = getattr(app_state, "config", {}) or {}
         model_name = config.get("plugins", {}).get("models", {}).get("primary")
-    if not model_name:
-        model_name = "llama3.2"  # Last resort fallback
+    return model_name or "llama3.2"
 
-    # Check if Ollama is available before trying to connect
+
+async def _validate_ollama_model(host: str, model_name: str) -> tuple[str, list]:
+    """Verifica que el model existeix a Ollama. Retorna (model_name_final, chat_models).
+    Llança HTTPException si Ollama no disponible o model no trobat."""
     try:
         _now = time.time()
         if _ollama_tags_cache["models"] is not None and (_now - _ollama_tags_cache["ts"]) < TAGS_CACHE_TTL:
             available_models = _ollama_tags_cache["models"]
         else:
             async with httpx.AsyncClient(timeout=3.0) as client:
-                tags_resp = await client.get(f"{_ollama_host}/api/tags")
+                tags_resp = await client.get(f"{host}/api/tags")
                 if tags_resp.status_code != 200:
-                     from core.messages import get_message as _core_msg
-                     raise HTTPException(status_code=502, detail=_core_msg(None, "core.ollama.http_error", status=tags_resp.status_code))
+                    from core.messages import get_message as _core_msg
+                    raise HTTPException(status_code=502, detail=_core_msg(None, "core.ollama.http_error", status=tags_resp.status_code))
                 available_models = [m.get("name", "") for m in tags_resp.json().get("models", [])]
                 _ollama_tags_cache["models"] = available_models
                 _ollama_tags_cache["ts"] = _now
@@ -100,7 +91,7 @@ async def _forward_to_ollama(
         # Filter out embedding models (they can't chat!) — runs on BOTH cache hit and miss
         EMBEDDING_MODELS = {"nomic-embed", "mxbai-embed", "all-minilm", "bge-", "embed"}
         chat_models = [m for m in available_models
-                      if not any(emb in m.lower() for emb in EMBEDDING_MODELS)]
+                       if not any(emb in m.lower() for emb in EMBEDDING_MODELS)]
 
         # Verify the model exists
         if model_name not in available_models and f"{model_name}:latest" not in available_models:
@@ -135,8 +126,12 @@ async def _forward_to_ollama(
             status_code=503,
             detail=_OLLAMA_ERRORS.get(_lang, _OLLAMA_ERRORS["en"])["unavailable"]
         )
+    return model_name, chat_models
 
-    payload = {
+
+def _build_ollama_payload(request, messages: List[Dict], model_name: str) -> dict:
+    """Construeix el payload per a l'API d'Ollama."""
+    return {
         "model": model_name,
         "messages": messages,
         "stream": request.stream,
@@ -148,56 +143,85 @@ async def _forward_to_ollama(
         }
     }
 
-    if request.stream:
-        headers = {"X-Nexe-Engine": "ollama"}
-        if fallback_from:
-            headers["X-Nexe-Fallback-From"] = fallback_from
-            headers["X-Nexe-Fallback-Reason"] = fallback_reason or "fallback"
-        return StreamingResponse(
-            _ollama_stream_generator(url, payload, app_state, user_msg),
-            media_type="text/event-stream",
-            headers=headers,
-        )
-    else:
-        # Blocking call
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(url, json=payload, timeout=_OLLAMA_STREAM_TIMEOUT)
-                if resp.status_code != 200:
-                    try:
-                        error_detail = resp.json().get("error", "Unknown Ollama error")
-                    except (ValueError, json.JSONDecodeError, AttributeError):
-                        error_detail = f"Ollama returned HTTP {resp.status_code}"
-                    raise HTTPException(status_code=resp.status_code, detail=error_detail)
-                raw = resp.json()
-                # Convert Ollama native format to OpenAI-compatible format
-                response = {
-                    "id": f"chatcmpl-{raw.get('created_at', '')}",
-                    "object": "chat.completion",
-                    "model": raw.get("model", ""),
-                    "choices": [{
-                        "index": 0,
-                        "message": raw.get("message", {"role": "assistant", "content": ""}),
-                        "finish_reason": "stop" if raw.get("done") else "length",
-                    }],
-                    "usage": {
-                        "prompt_tokens": raw.get("prompt_eval_count", 0),
-                        "completion_tokens": raw.get("eval_count", 0),
-                        "total_tokens": (raw.get("prompt_eval_count", 0) or 0) + (raw.get("eval_count", 0) or 0),
-                    },
-                    "nexe_engine": "ollama",
+
+def _ollama_streaming_response(
+    url: str, payload: dict, app_state, user_msg,
+    fallback_from: Optional[str], fallback_reason: Optional[str]
+) -> StreamingResponse:
+    """Construeix i retorna el StreamingResponse amb headers de fallback si escau."""
+    headers = {"X-Nexe-Engine": "ollama"}
+    if fallback_from:
+        headers["X-Nexe-Fallback-From"] = fallback_from
+        headers["X-Nexe-Fallback-Reason"] = fallback_reason or "fallback"
+    return StreamingResponse(
+        _ollama_stream_generator(url, payload, app_state, user_msg),
+        media_type="text/event-stream",
+        headers=headers,
+    )
+
+
+async def _ollama_blocking_response(
+    url: str, payload: dict,
+    fallback_from: Optional[str], fallback_reason: Optional[str]
+) -> dict:
+    """POST bloquejant a Ollama + conversió a format OpenAI + gestió d'errors."""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, json=payload, timeout=_OLLAMA_STREAM_TIMEOUT)
+            if resp.status_code != 200:
+                try:
+                    error_detail = resp.json().get("error", "Unknown Ollama error")
+                except (ValueError, json.JSONDecodeError, AttributeError):
+                    error_detail = f"Ollama returned HTTP {resp.status_code}"
+                raise HTTPException(status_code=resp.status_code, detail=error_detail)
+            raw = resp.json()
+            # Convert Ollama native format to OpenAI-compatible format
+            response = {
+                "id": f"chatcmpl-{raw.get('created_at', '')}",
+                "object": "chat.completion",
+                "model": raw.get("model", ""),
+                "choices": [{
+                    "index": 0,
+                    "message": raw.get("message", {"role": "assistant", "content": ""}),
+                    "finish_reason": "stop" if raw.get("done") else "length",
+                }],
+                "usage": {
+                    "prompt_tokens": raw.get("prompt_eval_count", 0),
+                    "completion_tokens": raw.get("eval_count", 0),
+                    "total_tokens": (raw.get("prompt_eval_count", 0) or 0) + (raw.get("eval_count", 0) or 0),
+                },
+                "nexe_engine": "ollama",
+            }
+            if fallback_from:
+                response["nexe_fallback"] = {
+                    "from": fallback_from, "to": "ollama", "reason": fallback_reason or "fallback",
                 }
-                if fallback_from:
-                    response["nexe_fallback"] = {
-                        "from": fallback_from, "to": "ollama", "reason": fallback_reason or "fallback",
-                    }
-                return response
-        except httpx.ConnectError:
-            from core.messages import get_message as _core_msg
-            raise HTTPException(
-                status_code=503,
-                detail=_core_msg(None, "core.ollama.not_responding")
-            )
+            return response
+    except httpx.ConnectError:
+        from core.messages import get_message as _core_msg
+        raise HTTPException(
+            status_code=503,
+            detail=_core_msg(None, "core.ollama.not_responding")
+        )
+
+
+async def _forward_to_ollama(
+    messages: List[Dict],
+    request: ChatCompletionRequest,
+    app_state=None,
+    user_msg: Optional[str] = None,
+    fallback_from: Optional[str] = None,
+    fallback_reason: Optional[str] = None,
+):
+    """Forward request to local Ollama instance."""
+    _ollama_host = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    url = f"{_ollama_host}/api/chat"
+    model_name = _resolve_ollama_model(request, app_state)
+    model_name, _ = await _validate_ollama_model(_ollama_host, model_name)  # raises status_code=404 if not found, 503 if unavailable
+    payload = _build_ollama_payload(request, messages, model_name)
+    if request.stream:
+        return _ollama_streaming_response(url, payload, app_state, user_msg, fallback_from, fallback_reason)
+    return await _ollama_blocking_response(url, payload, fallback_from, fallback_reason)
 
 async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user_msg: Optional[str] = None):
     """OpenAI-compatible streaming generator from Ollama with Auto-Save support."""
