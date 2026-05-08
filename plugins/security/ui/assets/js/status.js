@@ -35,7 +35,7 @@
       list.innerHTML = (data.endpoints || [])
         .map(e => `<li><code>${e}</code></li>`)
         .join('');
-    } catch (e) {
+    } catch(e) {
       setError('Failed to load info: ' + e.message);
     }
   }
@@ -57,7 +57,7 @@
           </div>`
         ).join('');
       }
-    } catch (e) {
+    } catch {
       document.getElementById('health-status').innerHTML =
         '<span class="status unknown">unreachable</span>';
     }
