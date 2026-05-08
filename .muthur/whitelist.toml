@@ -243,3 +243,15 @@ reason = "Tests arrel amb /tmp/, /opt/homebrew/, /Users/user/ (genèrics), /etc/
 expires = "2027-05-07"
 authorized_by = "Jordi Goy"
 ticket = "hardcode-dev-i-2026-05-07"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# mypy whitelist — 2026-05-08
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[exception]]
+rule = "annotation-unchecked"
+path = "plugins/web_ui_module/api/routes_chat.py"
+reason = "_yield_reprompt és un closure async dins una funció no tipada (response_generator). Anotar la funció pare requeriria refactoritzar tot el closure. Nota informativa, no error real."
+expires = "2027-05-08"
+authorized_by = "Jordi Goy"
+ticket = "mypy-whitelist-2026-05-08"
