@@ -381,7 +381,7 @@ async def _try_precomputed_kb(memory, default_root, lang, log) -> bool:
     return False
 
 
-async def _process_file_batch(memory, files, target_collection, ingest_cfg, mega_batch_on, log) -> tuple[int, dict]:
+async def _process_file_batch(memory, files, target_collection, ingest_cfg, mega_batch_on, log) -> tuple[int, dict[str, list[dict[str, Any]]], int]:
     total_chunks = 0
     mega_items_by_collection: dict[str, list[dict[str, Any]]] = {}
     _perf_chunking_ref = [0]
@@ -527,7 +527,7 @@ async def ingest_knowledge(
     _emit_final_summary(files, total_chunks, target_collection, log)
 
     if ingest_cfg.perf_logging:
-        _perf_record: dict[str, Any] = {
+        _perf_record: dict[str, Any] = {  # type: ignore[no-redef]
             "event": "ingest_complete",
             "schema_version": 1,
             "bug": 16,
