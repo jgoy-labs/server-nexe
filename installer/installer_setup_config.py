@@ -113,6 +113,37 @@ def _compute_approved_modules(engine):
     return f"{base},ollama_module,mlx_module,llama_cpp_module"
 
 
+def _rewrite_mlx_line(line, model_id, model_engine):
+    """Return the rewritten NEXE_MLX_MODEL line (update only when engine is mlx)."""
+    if model_engine == 'mlx':
+        model_name = model_id.split('/')[-1]
+        return f"NEXE_MLX_MODEL=storage/models/{model_name}\n"
+    return line
+
+
+def _rewrite_llama_cpp_lines(line, model_id, model_engine, model_config, found_keys):
+    """Rewrite NEXE_LLAMA_CPP_MODEL or NEXE_LLAMA_CPP_CHAT_FORMAT. Updates found_keys in place."""
+    if line.startswith('NEXE_LLAMA_CPP_MODEL='):
+        found_keys['llama_cpp_model'] = True
+        if model_engine == 'llama_cpp':
+            filename = model_id.split('/')[-1]
+            return f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n"
+        return line
+    if line.startswith('NEXE_LLAMA_CPP_CHAT_FORMAT='):
+        found_keys['llama_cpp_chat_format'] = True
+        if model_engine == 'llama_cpp':
+            return f"NEXE_LLAMA_CPP_CHAT_FORMAT={model_config.get('chat_format', 'chatml')}\n"
+        return line
+    return line  # unknown NEXE_LLAMA_CPP_ key — preserve as-is
+
+
+def _rewrite_ollama_line(line, model_id, model_engine):
+    """Return the rewritten NEXE_OLLAMA_MODEL line (update only when engine is ollama)."""
+    if model_engine == 'ollama':
+        return f"NEXE_OLLAMA_MODEL={model_id}\n"
+    return line
+
+
 def _rewrite_env_lines(lines, model_config):
     """Iterate existing .env lines and update model-related keys in place.
 
@@ -145,25 +176,9 @@ def _rewrite_env_lines(lines, model_config):
             new_lines.append(line)
         elif line.startswith('NEXE_MLX_MODEL='):
             found_keys['mlx_model'] = True
-            if model_engine == 'mlx':
-                model_name = model_id.split('/')[-1]
-                new_lines.append(f"NEXE_MLX_MODEL=storage/models/{model_name}\n")
-            else:
-                new_lines.append(line)
-        elif line.startswith('NEXE_LLAMA_CPP_MODEL='):
-            found_keys['llama_cpp_model'] = True
-            if model_engine == 'llama_cpp':
-                filename = model_id.split('/')[-1]
-                new_lines.append(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
-            else:
-                new_lines.append(line)
-        elif line.startswith('NEXE_LLAMA_CPP_CHAT_FORMAT='):
-            found_keys['llama_cpp_chat_format'] = True
-            if model_engine == 'llama_cpp':
-                chat_fmt = model_config.get('chat_format', 'chatml')
-                new_lines.append(f"NEXE_LLAMA_CPP_CHAT_FORMAT={chat_fmt}\n")
-            else:
-                new_lines.append(line)
+            new_lines.append(_rewrite_mlx_line(line, model_id, model_engine))
+        elif line.startswith('NEXE_LLAMA_CPP_'):
+            new_lines.append(_rewrite_llama_cpp_lines(line, model_id, model_engine, model_config, found_keys))
         elif line.startswith('NEXE_PROMPT_TIER='):
             found_keys['prompt_tier'] = True
             new_lines.append(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
@@ -172,14 +187,26 @@ def _rewrite_env_lines(lines, model_config):
             found_keys['approved_modules'] = True
         elif line.startswith('NEXE_OLLAMA_MODEL='):
             found_keys['ollama_model'] = True
-            if model_engine == 'ollama':
-                new_lines.append(f"NEXE_OLLAMA_MODEL={model_id}\n")
-            else:
-                new_lines.append(line)
+            new_lines.append(_rewrite_ollama_line(line, model_id, model_engine))
         else:
             new_lines.append(line)
 
     return new_lines, found_keys
+
+
+def _append_engine_specific_keys(new_lines, found_keys, model_config, model_id, model_engine):
+    """Append engine-specific model path keys absent from the existing .env."""
+    if not found_keys['mlx_model'] and model_engine == 'mlx':
+        model_name = model_id.split('/')[-1]
+        new_lines.append(f"NEXE_MLX_MODEL=storage/models/{model_name}\n")
+    if not found_keys['llama_cpp_model'] and model_engine == 'llama_cpp':
+        filename = model_id.split('/')[-1]
+        new_lines.append(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
+    if not found_keys['llama_cpp_chat_format'] and model_engine == 'llama_cpp':
+        chat_fmt = model_config.get('chat_format', 'chatml')
+        new_lines.append(f"NEXE_LLAMA_CPP_CHAT_FORMAT={chat_fmt}\n")
+    if not found_keys['ollama_model'] and model_engine == 'ollama':
+        new_lines.append(f"NEXE_OLLAMA_MODEL={model_id}\n")
 
 
 def _append_missing_env_keys(new_lines, found_keys, model_config):
@@ -201,21 +228,11 @@ def _append_missing_env_keys(new_lines, found_keys, model_config):
         new_lines.append(f"NEXE_DEFAULT_MODEL={model_id}\n")
     if not found_keys['engine']:
         new_lines.append(f"NEXE_MODEL_ENGINE={model_engine}\n")
-    if not found_keys['mlx_model'] and model_engine == 'mlx':
-        model_name = model_id.split('/')[-1]
-        new_lines.append(f"NEXE_MLX_MODEL=storage/models/{model_name}\n")
-    if not found_keys['llama_cpp_model'] and model_engine == 'llama_cpp':
-        filename = model_id.split('/')[-1]
-        new_lines.append(f"NEXE_LLAMA_CPP_MODEL=storage/models/{filename}\n")
-    if not found_keys['llama_cpp_chat_format'] and model_engine == 'llama_cpp':
-        chat_fmt = model_config.get('chat_format', 'chatml')
-        new_lines.append(f"NEXE_LLAMA_CPP_CHAT_FORMAT={chat_fmt}\n")
+    _append_engine_specific_keys(new_lines, found_keys, model_config, model_id, model_engine)
     if not found_keys['prompt_tier']:
         new_lines.append(f"NEXE_PROMPT_TIER={model_config.get('prompt_tier', 'full')}\n")
     if not found_keys['approved_modules']:
         new_lines.append(f"NEXE_APPROVED_MODULES={_compute_approved_modules(model_engine)}\n")
-    if not found_keys['ollama_model'] and model_engine == 'ollama':
-        new_lines.append(f"NEXE_OLLAMA_MODEL={model_id}\n")
 
 
 def _atomic_write_env(env_file, new_lines):
