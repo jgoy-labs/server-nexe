@@ -6,7 +6,7 @@ import pytest
 import signal
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 from slowapi import Limiter
 from slowapi.util import get_remote_address

@@ -255,3 +255,48 @@ reason = "_yield_reprompt és un closure async dins una funció no tipada (respo
 expires = "2027-05-08"
 authorized_by = "Jordi Goy"
 ticket = "mypy-whitelist-2026-05-08"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# vulture whitelist — 2026-05-08
+# FP inherents de pytest fixtures i protocols Python
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[exception]]
+rule = "unused_variable"
+path = "memory/embeddings/tests/unit/test_workflow_nodes.py"
+reason = "setup_module és una fixture pytest injectada per nom. Vulture no segueix la resolució de fixtures per nom de paràmetre."
+expires = "2027-05-08"
+authorized_by = "Jordi Goy"
+ticket = "vulture-whitelist-2026-05-08"
+
+[[exception]]
+rule = "unused_variable"
+path = "plugins/llama_cpp_module/tests/test_initialize_import_check.py"
+reason = "no_llama_cpp és una fixture pytest injectada per nom als 3 tests de la classe. Vulture no segueix la resolució de fixtures."
+expires = "2027-05-08"
+authorized_by = "Jordi Goy"
+ticket = "vulture-whitelist-2026-05-08"
+
+[[exception]]
+rule = "unused_variable"
+path = "plugins/web_ui_module/tests/test_graceful_degradation.py"
+reason = "security_absent és una fixture pytest injectada per nom a 4 tests. Vulture no segueix la resolució de fixtures."
+expires = "2027-05-08"
+authorized_by = "Jordi Goy"
+ticket = "vulture-whitelist-2026-05-08"
+
+[[exception]]
+rule = "unused_variable"
+path = "plugins/security/sanitizer/tests/test_health_coverage.py"
+reason = "objtype és el segon paràmetre del protocol descriptor Python __get__(self, obj, objtype=None). Vulture no reconeix protocols especials de Python."
+expires = "2027-05-08"
+authorized_by = "Jordi Goy"
+ticket = "vulture-whitelist-2026-05-08"
+
+[[exception]]
+rule = "unused_variable"
+path = "plugins/web_ui_module/tests/test_coverage_gaps.py"
+reason = "self_path és el paràmetre posicional de chmod_fail usada com a reemplaçament de Path.chmod via patch.object. Vulture no veu l'activació indirecta."
+expires = "2027-05-08"
+authorized_by = "Jordi Goy"
+ticket = "vulture-whitelist-2026-05-08"

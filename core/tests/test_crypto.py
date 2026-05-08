@@ -171,8 +171,6 @@ class TestKeyManagement:
     def test_keyring_get_failure_returns_none(self):
         with patch.dict("sys.modules", {"keyring": None}):
             # Force reimport to hit ImportError
-            import importlib
-            import core.crypto.keys as keys_mod
             # Simulate keyring raising on import inside function
             mock_keyring = MagicMock()
             mock_keyring.get_password.side_effect = Exception("keyring broken")

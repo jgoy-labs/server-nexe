@@ -40,7 +40,6 @@ from core.paths.helpers import (
     get_data_dir,
     get_cache_dir,
 )
-import core.paths as paths_module
 
 
 # ─── Tests validation.py ──────────────────────────────────────────────────────

@@ -9,7 +9,6 @@ from memory.rag.header_parser import (
     RAGHeader,
     RAGHeaderParser,
     HEADER_VERSION,
-    HEADER_START,
     VALID_PRIORITIES,
     VALID_TYPES,
     VALID_LANGS,

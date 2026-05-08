@@ -13,7 +13,7 @@ import asyncio
 import json
 import os
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, ANY
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from fastapi.responses import StreamingResponse

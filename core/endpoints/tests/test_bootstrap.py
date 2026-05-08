@@ -172,7 +172,6 @@ class TestBootstrapSession:
 
     def _patch_client_ip(self, ip="127.0.0.1"):
         """Context manager to simulate a specific client IP"""
-        import ipaddress as ipmod
         mock_client = MagicMock()
         mock_client.host = ip
         return patch("fastapi.Request.client", new_callable=lambda: property(lambda self: mock_client))

@@ -5,7 +5,7 @@ Tests for memory/memory/cli/rag_viewer.py.
 import pytest
 import argparse
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock, mock_open
+from unittest.mock import patch, MagicMock, AsyncMock
 
 
 class TestFindLogPath:
