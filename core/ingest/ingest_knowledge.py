@@ -320,176 +320,71 @@ async def _ingest_from_precomputed(
     return True
 
 
-async def ingest_knowledge(
-    folder: Optional[Path] = None,
-    quiet: bool = False,
-    target_collection: str = DOCUMENTATION_COLLECTION,
-):
-    """Ingest user documents from knowledge/ folder into Qdrant.
-
-    Args:
-        folder: Path to knowledge folder (default: PROJECT_ROOT/knowledge)
-        quiet: If True, suppress output (for auto-ingest at startup)
-        target_collection: Destination collection (default: nexe_documentation,
-            i.e. corporate know-how). Use "user_knowledge" only for ad-hoc docs
-            uploaded by end users from the chat UI.
-    """
-    from memory.memory.api import MemoryAPI
-
-    def log(msg):
-        if not quiet:
-            logger.info("%s", msg)
-
+def _resolve_knowledge_path(folder, lang) -> Path:
     knowledge_path = folder or PROJECT_ROOT / "knowledge"
-
-    # Use language-specific subfolder if it exists (e.g. knowledge/ca/)
-    lang_path = knowledge_path / _LANG
+    lang_path = knowledge_path / lang
     if lang_path.is_dir():
-        knowledge_path = lang_path
+        return lang_path
+    return knowledge_path
 
-    log(f"\n{'='*60}")
-    log(_t("title"))
-    log(_t("add_docs"))
-    log(f"{'='*60}\n")
 
-    if not knowledge_path.exists():
-        knowledge_path.mkdir(parents=True)
-        log(f"[INFO] {_t('folder_created', p=knowledge_path)}")
-        log(f"       {_t('add_and_rerun')}")
-        return True
-
-    # Find all supported files
+def _discover_documents(knowledge_path) -> list[Path]:
     files: list[Path] = []
     for ext in SUPPORTED_EXTENSIONS:
         files.extend(knowledge_path.glob(f"**/*{ext}"))
+    files.extend(knowledge_path.glob("**/*.pdf"))
+    return [f for f in files if not f.name.startswith('.')]
 
-    # Add PDF files
-    pdf_files = list(knowledge_path.glob("**/*.pdf"))
-    files.extend(pdf_files)
 
-    # Filter out hidden files
-    files = [f for f in files if not f.name.startswith('.')]
-
-    if not files:
-        log(f"[INFO] {_t('no_docs', p=knowledge_path)}")
-        log(f"       {_t('formats')}")
-        log(f"\n       {_t('example')}")
-        log("         cp ~/Documents/manual.pdf knowledge/")
-        log("         python -m core.ingest.ingest_knowledge")
-        return True
-
-    log(_t("found_docs", n=len(files)))
+def _print_ingestion_header(files) -> None:
+    logger.info(_t("found_docs", n=len(files)))
     for f in files:
-        log(f"       - {f.name}")
+        logger.info("       - %s", f.name)
 
-    # Bug #16 instrumentation: wall-clock of the whole ingest phase starts
-    # here, after file listing and before MemoryAPI creation. This matches
-    # what end users experience during a cold install (see benchmark
-    # harness in scripts/bench_ingest_bug16.py). When perf_logging is
-    # disabled the local variables have negligible cost.
-    _perf_t0_ns = time.perf_counter_ns()
-    _perf_chunking_ns = 0
 
-    # Initialize MemoryAPI
-    log(f"\n{_t('connecting')}")
-    _perf_t_init_ns = time.perf_counter_ns()
+async def _initialize_memory() -> "Any":
+    from memory.memory.api import MemoryAPI
     memory = MemoryAPI()
-    try:
-        await memory.initialize()
-    except Exception as e:
-        log(_t("conn_error", e=e))
-        log(_t("ensure_running"))
-        return False
-    _perf_model_init_ns = time.perf_counter_ns() - _perf_t_init_ns
+    await memory.initialize()
+    return memory
 
-    # Bug #16: read SSOT ingest config defensively so mocks without
-    # ingest_config wired up keep working. Production MemoryAPI always
-    # has a real IngestConfig attached (see memory/memory/config.py).
-    ingest_cfg = resolve_ingest_config(memory)
 
-    # Reset perf counters so this ingest run starts from a clean slate
-    # (safe no-op if counters are already zero). Only matters when
-    # perf_logging is True, but callable unconditionally.
-    if hasattr(memory, "reset_perf_counters"):
-        memory.reset_perf_counters()
-
-    # Pre-warm embedder if enabled. Default pre_warm=False → skip entirely,
-    # preserving historical call order to MemoryAPI.
-    if ingest_cfg.pre_warm:
-        await memory.warmup()
-
-    # Bug #16: try the pre-computed KB fast path BEFORE running the
-    # embedding pipeline. Only applies when the caller is ingesting the
-    # default corporate KB (folder is None or inside PROJECT_ROOT/knowledge).
-    # On any validation miss we fall through to the legacy embed path
-    # below without altering its behaviour.
-    _precomputed_used = False
-    try:
-        _default_root = PROJECT_ROOT / "knowledge"
-        _custom_folder = folder is not None and not str(knowledge_path).startswith(str(_default_root))
-        if not _custom_folder:
-            _kb = PrecomputedKB(_default_root)
-            if _kb.exists():
-                _outcome = _kb.validate(
-                    model_name=memory.embedding_model,
-                    chunker_source_path=PROJECT_ROOT / "core" / "ingest" / "chunking.py",
-                    ingest_source_path=PROJECT_ROOT / "core" / "ingest" / "ingest_knowledge.py",
-                )
-                if _outcome.ok and _LANG in _kb.list_languages():
-                    _precomputed_used = await _ingest_from_precomputed(
-                        memory=memory,
-                        kb=_kb,
-                        lang=_LANG,
-                        log=log,
-                    )
-                elif not _outcome.ok:
-                    log(f"[INFO] precomputed KB skipped: {_outcome.reason}")
-    except Exception as e:
-        # Precomputed path is strictly an optimisation; any failure is
-        # logged and we fall through to the embed pipeline.
-        log(f"[INFO] precomputed KB error, falling back: {e}")
-
-    if _precomputed_used:
-        # Fast path already upserted everything and emitted its own
-        # summary. Skip the legacy embed loop entirely.
-        if ingest_cfg.perf_logging:
-            _perf_total_ns = time.perf_counter_ns() - _perf_t0_ns
-            _perf_record = {
-                "event": "ingest_complete",
-                "schema_version": 1,
-                "bug": 16,
-                "path": "precomputed",
-                "lang": _LANG,
-                "total_ns": _perf_total_ns,
-                "model_init_ns": _perf_model_init_ns,
-            }
-            _perf_line = "[PERF_INGEST] " + json.dumps(_perf_record, ensure_ascii=False)
-            print(_perf_line, flush=True)
-            logger.info(_perf_line)
-        await memory.close()
-        return True
-
-    # Ensure target collection exists (idempotent — F7 fix).
-    # Previously this code did `delete_collection + create_collection` which
-    # was destructive: re-running ingest wiped any user docs already stored
-    # in the collection. Now we only create when missing.
+async def _ensure_collection(memory, target_collection, log) -> bool:
     log(_t("preparing_col", c=target_collection))
     try:
         if not await memory.collection_exists(target_collection):
             await memory.create_collection(target_collection, vector_size=DEFAULT_VECTOR_SIZE)
         log(_t("col_ready", c=target_collection))
+        return True
     except Exception as e:
         log(_t("col_error", e=e))
         return False
 
-    # Ingest each file
-    log(_t("processing"))
-    total_chunks = 0
 
-    # Bug #16 mega-batch: accumulate per-collection, flush once after loop.
-    mega_batch_on = bool(ingest_cfg.mega_batch)
+async def _try_precomputed_kb(memory, default_root, lang, log) -> bool:
+    try:
+        _kb = PrecomputedKB(default_root)
+        if _kb.exists():
+            _outcome = _kb.validate(
+                model_name=memory.embedding_model,
+                chunker_source_path=PROJECT_ROOT / "core" / "ingest" / "chunking.py",
+                ingest_source_path=PROJECT_ROOT / "core" / "ingest" / "ingest_knowledge.py",
+            )
+            if _outcome.ok and lang in _kb.list_languages():
+                return await _ingest_from_precomputed(
+                    memory=memory, kb=_kb, lang=lang, log=log,
+                )
+            elif not _outcome.ok:
+                log(f"[INFO] precomputed KB skipped: {_outcome.reason}")
+    except Exception as e:
+        log(f"[INFO] precomputed KB error, falling back: {e}")
+    return False
+
+
+async def _process_file_batch(memory, files, target_collection, ingest_cfg, mega_batch_on, log) -> tuple[int, dict]:
+    total_chunks = 0
     mega_items_by_collection: dict[str, list[dict[str, Any]]] = {}
-    _perf_chunking_ref = [0]  # mutable accumulator passed to _build_file_items
+    _perf_chunking_ref = [0]
 
     for idx, file_path in enumerate(files, 1):
         try:
@@ -513,18 +408,10 @@ async def ingest_knowledge(
         except Exception as e:
             log(f"       [ERROR] {file_path.name}: {e}")
 
-    _perf_chunking_ns = _perf_chunking_ref[0]
+    return total_chunks, mega_items_by_collection, _perf_chunking_ref[0]
 
-    if mega_batch_on and mega_items_by_collection:
-        await _flush_mega_batch(memory, mega_items_by_collection, log)
 
-    # Bug #16: capture perf snapshot BEFORE close() since close() may
-    # reset internal state. Wall-clock is captured outside to include
-    # close() in the total (user-observed duration).
-    _perf_snap = memory.get_perf_snapshot() if hasattr(memory, "get_perf_snapshot") else None
-
-    await memory.close()
-
+def _emit_final_summary(files, total_chunks, target_collection, log) -> None:
     log(f"\n{'='*60}")
     log(_t("ingestion_done"))
     log(_t("docs_processed", n=len(files)))
@@ -532,6 +419,112 @@ async def ingest_knowledge(
     log(_t("collection", c=target_collection))
     log(_t("ask_now"))
     log(f"{'='*60}\n")
+
+
+async def ingest_knowledge(
+    folder: Optional[Path] = None,
+    quiet: bool = False,
+    target_collection: str = DOCUMENTATION_COLLECTION,
+):
+    """Ingest user documents from knowledge/ folder into Qdrant.
+
+    Args:
+        folder: Path to knowledge folder (default: PROJECT_ROOT/knowledge)
+        quiet: If True, suppress output (for auto-ingest at startup)
+        target_collection: Destination collection (default: nexe_documentation,
+            i.e. corporate know-how). Use "user_knowledge" only for ad-hoc docs
+            uploaded by end users from the chat UI.
+    """
+    def log(msg):
+        if not quiet:
+            logger.info("%s", msg)
+
+    knowledge_path = _resolve_knowledge_path(folder, _LANG)
+
+    log(f"\n{'='*60}")
+    log(_t("title"))
+    log(_t("add_docs"))
+    log(f"{'='*60}\n")
+
+    if not knowledge_path.exists():
+        knowledge_path.mkdir(parents=True)
+        log(f"[INFO] {_t('folder_created', p=knowledge_path)}")
+        log(f"       {_t('add_and_rerun')}")
+        return True
+
+    files = _discover_documents(knowledge_path)
+
+    if not files:
+        log(f"[INFO] {_t('no_docs', p=knowledge_path)}")
+        log(f"       {_t('formats')}")
+        log(f"\n       {_t('example')}")
+        log("         cp ~/Documents/manual.pdf knowledge/")
+        log("         python -m core.ingest.ingest_knowledge")
+        return True
+
+    _print_ingestion_header(files)
+
+    # Bug #16 instrumentation: wall-clock starts after file listing and
+    # before MemoryAPI creation.
+    _perf_t0_ns = time.perf_counter_ns()
+
+    log(f"\n{_t('connecting')}")
+    _perf_t_init_ns = time.perf_counter_ns()
+    try:
+        memory = await _initialize_memory()
+    except Exception as e:
+        log(_t("conn_error", e=e))
+        log(_t("ensure_running"))
+        return False
+    _perf_model_init_ns = time.perf_counter_ns() - _perf_t_init_ns
+
+    ingest_cfg = resolve_ingest_config(memory)
+    getattr(memory, "reset_perf_counters", lambda: None)()
+    if ingest_cfg.pre_warm:
+        await memory.warmup()
+
+    _default_root = PROJECT_ROOT / "knowledge"
+    _custom_folder = folder is not None and not str(knowledge_path).startswith(str(_default_root))
+    _precomputed_used = False
+    if not _custom_folder:
+        _precomputed_used = await _try_precomputed_kb(memory, _default_root, _LANG, log)
+
+    if _precomputed_used:
+        if ingest_cfg.perf_logging:
+            _perf_total_ns = time.perf_counter_ns() - _perf_t0_ns
+            _perf_record = {
+                "event": "ingest_complete",
+                "schema_version": 1,
+                "bug": 16,
+                "path": "precomputed",
+                "lang": _LANG,
+                "total_ns": _perf_total_ns,
+                "model_init_ns": _perf_model_init_ns,
+            }
+            _perf_line = "[PERF_INGEST] " + json.dumps(_perf_record, ensure_ascii=False)
+            print(_perf_line, flush=True)
+            logger.info(_perf_line)
+        await memory.close()
+        return True
+
+    if not await _ensure_collection(memory, target_collection, log):
+        return False
+
+    log(_t("processing"))
+    mega_batch_on = bool(ingest_cfg.mega_batch)
+    total_chunks, mega_items_by_collection, _perf_chunking_ns = await _process_file_batch(
+        memory, files, target_collection, ingest_cfg, mega_batch_on, log,
+    )
+
+    if mega_batch_on:
+        await _flush_mega_batch(memory, mega_items_by_collection, log)
+
+    # Bug #16: capture perf snapshot BEFORE close().
+    _perf_snap = memory.get_perf_snapshot() if hasattr(memory, "get_perf_snapshot") else None
+
+    await memory.close()
+
+    _emit_final_summary(files, total_chunks, target_collection, log)
 
     if ingest_cfg.perf_logging:
         _perf_record: dict[str, Any] = {
