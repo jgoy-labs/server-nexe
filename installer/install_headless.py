@@ -178,16 +178,16 @@ def run_headless(config):
         builtins.input = _original_input
 
 
-def _run_headless_inner(config):
-    """Inner implementation (with input() already patched)."""
+# ═══════════════════════════════════════════════════════════════════════════
+# FAÇADE HELPERS — each absorbs one logical block of _run_headless_inner
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _parse_headless_config(config):
+    """Extract and validate all config fields from the JSON payload."""
     lang = config.get("lang", "ca")
     project_root = Path(config.get("path", str(PROJECT_ROOT)))
     model_key = config.get("model_key")
     engine = config.get("engine", "ollama")
-    # Bug 28 fix — allows the user to proactively skip the model download.
-    # The chosen model is recorded in `.env` (for when the user downloads
-    # it manually later via `nexe model pull`), but we do NOT touch
-    # `storage/models/` and consume no bandwidth.
     skip_model_download = bool(config.get("skip_model_download", False))
     reinstall_mode = config.get("reinstall_mode", DEFAULT_REINSTALL_MODE)
     if reinstall_mode not in VALID_REINSTALL_MODES:
@@ -196,91 +196,99 @@ def _run_headless_inner(config):
             reinstall_mode, DEFAULT_REINSTALL_MODE,
         )
         reinstall_mode = DEFAULT_REINSTALL_MODE
+    return lang, project_root, model_key, engine, skip_model_download, reinstall_mode
 
+
+def _apply_reinstall_if_needed(project_root, reinstall_mode):
+    """Apply reinstall mode if an existing installation is detected."""
+    if not (project_root.exists() and detect_existing_install(project_root)):
+        return
     # Bug 7 fix — reinstall handling with 3 modes (wipe/overwrite/backup).
     # If we detect an existing installation, we apply the user-chosen mode
     # before doing anything else. Without this, the same API key, vectors
     # and knowledge base would be recycled (and the KB would be duplicated
     # by re-ingestion).
-    if project_root.exists() and detect_existing_install(project_root):
-        try:
-            summary = apply_reinstall_mode(project_root, reinstall_mode)
-            _log.info(
-                "Reinstall mode=%s applied: removed=%d backup_dir=%s",
-                summary["mode"], len(summary["removed"]), summary["backup_dir"],
-            )
-            if summary.get("backup_dir"):
-                print(f"[BACKUP] {summary['backup_dir']}", flush=True)
-            print(f"[REINSTALL] mode={reinstall_mode}", flush=True)
-        except Exception as e:
-            _log.error(f"Reinstall mode application failed: {e}\n{traceback.format_exc()}")
-            print(f"[ERROR] Reinstall mode failed: {e}", flush=True)
-            sys.exit(1)
+    try:
+        summary = apply_reinstall_mode(project_root, reinstall_mode)
+        _log.info(
+            "Reinstall mode=%s applied: removed=%d backup_dir=%s",
+            summary["mode"], len(summary["removed"]), summary["backup_dir"],
+        )
+        if summary.get("backup_dir"):
+            print(f"[BACKUP] {summary['backup_dir']}", flush=True)
+        print(f"[REINSTALL] mode={reinstall_mode}", flush=True)
+    except Exception as e:
+        _log.error(f"Reinstall mode application failed: {e}\n{traceback.format_exc()}")
+        print(f"[ERROR] Reinstall mode failed: {e}", flush=True)
+        sys.exit(1)
 
-    # Set language for i18n
+
+def _configure_i18n(lang):
+    """Set language environment variable and update i18n module."""
     os.environ["NEXE_LANG"] = lang
     import installer.installer_i18n as i18n
     i18n.LANG = lang
 
-    # Find the model in the catalog
-    selected_model = None
-    if model_key:
-        for category in MODEL_CATALOG.values():
-            for model in category:
-                if model["key"] == model_key:
-                    selected_model = model
-                    break
-            if selected_model:
-                break
 
-        if not selected_model:
-            print(f"[ERROR] Model not found: {model_key}", flush=True)
-            sys.exit(1)
+def _resolve_model_config(model_key, engine, skip_model_download):
+    """Find model in catalog, build model_config dict, apply engine fallback.
+
+    Returns (model_config, engine, skip_model_download, selected_model).
+    Calls sys.exit(1) if model_key is provided but not found or has no artifact.
+    """
+    if not model_key:
+        # "Continue without model" — install without downloading any model
+        _log.info("No model selected — installing without model download")
+        return None, engine, True, None
+
+    selected_model = None
+    for category in MODEL_CATALOG.values():
+        for model in category:
+            if model["key"] == model_key:
+                selected_model = model
+                break
+        if selected_model:
+            break
+
+    if not selected_model:
+        print(f"[ERROR] Model not found: {model_key}", flush=True)
+        sys.exit(1)
 
     # Build model_config (same structure as select_model() returns)
-    if selected_model:
-        model_id = _model_id_for_engine(selected_model, engine)
-        if not model_id:
-            for fallback_engine in ("mlx", "ollama", "llama_cpp"):
-                model_id = _model_id_for_engine(selected_model, fallback_engine)
-                if model_id:
-                    _log.warning(
-                        "Engine '%s' not available for model '%s', falling back to '%s'",
-                        engine, selected_model["key"], fallback_engine,
-                    )
-                    engine = fallback_engine
-                    break
+    model_id = _model_id_for_engine(selected_model, engine)
+    if not model_id:
+        for fallback_engine in ("mlx", "ollama", "llama_cpp"):
+            model_id = _model_id_for_engine(selected_model, fallback_engine)
+            if model_id:
+                _log.warning(
+                    "Engine '%s' not available for model '%s', falling back to '%s'",
+                    engine, selected_model["key"], fallback_engine,
+                )
+                engine = fallback_engine
+                break
 
-        if not model_id:
-            print(f"[ERROR] No downloadable artifact found for model: {model_key}", flush=True)
-            sys.exit(1)
+    if not model_id:
+        print(f"[ERROR] No downloadable artifact found for model: {model_key}", flush=True)
+        sys.exit(1)
 
-        model_config = {
-            "size": _get_model_size(model_key),
-            "engine": engine,
-            "id": model_id,
-            "name": selected_model["name"],
-            "disk_size": f"~{selected_model['disk_gb']} GB",
-            "ram": selected_model["ram_gb"],
-            "prompt_tier": selected_model.get("prompt_tier", "full"),
-            "chat_format": selected_model.get("chat_format", "chatml"),
-        }
-    else:
-        # "Continue without model" — install without downloading any model
-        model_config = None
-        skip_model_download = True
-        _log.info("No model selected — installing without model download")
+    model_config = {
+        "size": _get_model_size(model_key),
+        "engine": engine,
+        "id": model_id,
+        "name": selected_model["name"],
+        "disk_size": f"~{selected_model['disk_gb']} GB",
+        "ram": selected_model["ram_gb"],
+        "prompt_tier": selected_model.get("prompt_tier", "full"),
+        "chat_format": selected_model.get("chat_format", "chatml"),
+    }
+    return model_config, engine, skip_model_download, selected_model
 
-    # Detect hardware (quiet — prints are captured by GUI log)
-    hw = detect_hardware()
 
-    # Create storage folders
-    for folder in ("storage/cache", "storage/logs", "storage/models", "storage/vectors"):
-        (project_root / folder).mkdir(parents=True, exist_ok=True)
+def _run_env_setup(project_root, hw, engine):
+    """Steps 1+2: create virtual environment and install dependencies.
 
-    # ── Step 1+2: Virtual environment + dependencies ─────────────────────
-    # setup_environment() handles both: creates venv if needed, then installs deps.
-    # We monitor the venv dir to transition from step 1 → step 2.
+    Returns python_path. Calls sys.exit(1) on failure.
+    """
     emit(1, "running", "Creating virtual environment...")
     _log.info("Starting setup_environment (venv + deps)")
     venv_path = project_root / "venv"
@@ -321,10 +329,16 @@ def _run_headless_inner(config):
         print(f"[ERROR] {e}", flush=True)
         sys.exit(1)
 
-    # ── Step 3: Download model ──────────────────────────────────────────
-    # Bug 28 fix — if the user requested skipping the download, the
-    # model is recorded in .env (Step 4) but we download nothing.
-    # The user can run `nexe model pull <name>` later.
+    return python_path
+
+
+def _run_model_download(model_config, engine, skip_model_download, model_key, selected_model, hw, project_root, python_path):
+    """Step 3: download the selected model.
+
+    Returns (model_ok, model_config). model_config may be updated when MLX
+    falls back to Ollama so the correct engine is recorded in .env.
+    Bug 28 fix — if skip_model_download, records model in .env but downloads nothing.
+    """
     if skip_model_download or model_config is None:
         emit(3, "running", "Skipping model download (user requested)")
         _log.info(
@@ -333,47 +347,47 @@ def _run_headless_inner(config):
         )
         emit(3, "done", "Skipped (no model selected or download deferred)")
         print("[MODEL_SKIPPED] download deferred", flush=True)
-        _model_ok = True  # treated as success — user opted out explicitly
-    else:
-        emit(3, "running", f"Downloading {model_config['name']} ({engine})...")
-        _log.info(f"Starting model download: {model_config['name']} engine={engine} id={model_config['id']}")
-        try:
-            if engine == "ollama":
-                if not ensure_ollama_installed(headless=True):
-                    _log.warning("Ollama installation failed or skipped")
-                    emit(3, "error", "Ollama not available")
-                    raise RuntimeError("Ollama installation failed — cannot download model")
-                _download_ollama_model(model_config, headless=True)
-            elif engine == "llama_cpp":
-                _download_gguf_model(model_config, project_root, headless=True)
-            elif engine == "mlx":
-                if not hw.get("has_metal", False):
-                    _log.warning("MLX requested but Metal not available — falling back to ollama")
-                    emit(3, "running", "MLX not available (no Metal), falling back to Ollama...")
-                    # Rebuild model_config for ollama fallback
-                    ollama_id = selected_model.get("ollama")
-                    if ollama_id:
-                        model_config = {**model_config, "engine": "ollama", "id": ollama_id}
-                        engine = "ollama"
-                        if not ensure_ollama_installed(headless=True):
-                            raise RuntimeError("Ollama installation failed — cannot download model")
-                        _download_ollama_model(model_config, headless=True)
-                    else:
-                        raise RuntimeError(f"No Ollama fallback for model {model_config['name']}")
-                else:
-                    _download_mlx_model(model_config, project_root, python_path, headless=True)
-            _log.info("Model download complete")
-            emit(3, "done")
-        except Exception as e:
-            _log.error(f"Model download failed: {e}\n{traceback.format_exc()}")
-            emit(3, "error", str(e)[:200])
-            print(f"[ERROR] Model download failed: {e}", flush=True)
-            _model_ok = False
-            # Continue — model can be downloaded later
-        else:
-            _model_ok = True
+        return True, model_config
 
-    # ── Step 4: Configure .env ──────────────────────────────────────────
+    emit(3, "running", f"Downloading {model_config['name']} ({engine})...")
+    _log.info(f"Starting model download: {model_config['name']} engine={engine} id={model_config['id']}")
+    try:
+        if engine == "ollama":
+            if not ensure_ollama_installed(headless=True):
+                _log.warning("Ollama installation failed or skipped")
+                emit(3, "error", "Ollama not available")
+                raise RuntimeError("Ollama installation failed — cannot download model")
+            _download_ollama_model(model_config, headless=True)
+        elif engine == "llama_cpp":
+            _download_gguf_model(model_config, project_root, headless=True)
+        elif engine == "mlx":
+            if not hw.get("has_metal", False):
+                _log.warning("MLX requested but Metal not available — falling back to ollama")
+                emit(3, "running", "MLX not available (no Metal), falling back to Ollama...")
+                # Rebuild model_config for ollama fallback
+                ollama_id = selected_model.get("ollama")
+                if ollama_id:
+                    model_config = {**model_config, "engine": "ollama", "id": ollama_id}
+                    engine = "ollama"
+                    if not ensure_ollama_installed(headless=True):
+                        raise RuntimeError("Ollama installation failed — cannot download model")
+                    _download_ollama_model(model_config, headless=True)
+                else:
+                    raise RuntimeError(f"No Ollama fallback for model {model_config['name']}")
+            else:
+                _download_mlx_model(model_config, project_root, python_path, headless=True)
+        _log.info("Model download complete")
+        emit(3, "done")
+        return True, model_config
+    except Exception as e:
+        _log.error(f"Model download failed: {e}\n{traceback.format_exc()}")
+        emit(3, "error", str(e)[:200])
+        print(f"[ERROR] Model download failed: {e}", flush=True)
+        return False, model_config
+
+
+def _run_config_step(project_root, model_config):
+    """Step 4: generate .env and report API key to GUI. Exits on failure."""
     emit(4, "running", "Generating configuration...")
     _log.info("Starting .env generation")
     try:
@@ -400,20 +414,9 @@ def _run_headless_inner(config):
         print(f"[ERROR] Config generation failed: {e}", flush=True)
         sys.exit(1)
 
-    # Clean module cache
-    cache_file = project_root / "personality" / ".module_cache.json"
-    if cache_file.exists():
-        cache_file.unlink()
 
-    # ── Step 5: Qdrant (embedded, no external download) ─────────────────
-    # Q5.5 reopened (2026-04-08): Qdrant is now embedded via QdrantClient(path=)
-    # in core/qdrant_pool.py. No external binary required. The step is kept for
-    # compatibility with the GUI Swift wizard (7 steps expected) but is a no-op.
-    emit(5, "running", "Qdrant embedded (no external download needed)...")
-    _log.info("Qdrant is embedded (storage/vectors via QdrantClient path=), skipping external binary")
-    emit(5, "done")
-
-    # Create nexe wrapper script
+def _setup_nexe_wrapper(project_root, python_path):
+    """Create the nexe wrapper script and attempt a global symlink. Returns nexe_cmd."""
     nexe_wrapper = project_root / "nexe"
     with open(nexe_wrapper, "w") as f:
         f.write("#!/bin/bash\n")
@@ -421,7 +424,6 @@ def _run_headless_inner(config):
         f.write(f'{python_path} -m core.cli "$@"\n')
     nexe_wrapper.chmod(0o755)
 
-    # Try global symlink
     global_symlink_created = False
     try:
         symlink_path = Path("/usr/local/bin/nexe")
@@ -432,13 +434,11 @@ def _run_headless_inner(config):
     except Exception:  # nosec B110: /usr/local/bin symlink failure (typically PermissionError) is non-fatal — the local ./nexe wrapper still works
         pass
 
-    nexe_cmd = "nexe" if global_symlink_created else "./nexe"
+    return "nexe" if global_symlink_created else "./nexe"
 
-    # Create knowledge folder
-    knowledge_dir = project_root / "knowledge"
-    knowledge_dir.mkdir(exist_ok=True)
 
-    # ── Step 6: Download embeddings ─────────────────────────────────────
+def _run_embeddings_step(project_root, python_path):
+    """Step 6: download the embedding model into the project venv."""
     emit(6, "running", "Downloading embedding model...")
     _log.info("Starting embeddings download")
     try:
@@ -466,9 +466,12 @@ def _run_headless_inner(config):
         emit(6, "error", str(e)[:200])
         # Non-fatal — will auto-download on first use
 
-    # ── Step 7: Process knowledge base ──────────────────────────────────
+
+def _run_knowledge_step(project_root, python_path, lang):
+    """Step 7: ingest knowledge base files into the embedded Qdrant collection."""
     emit(7, "running", "Processing knowledge base...")
     _log.info(f"Starting knowledge ingestion, lang={lang}")
+    knowledge_dir = project_root / "knowledge"
     _ingest_dir = knowledge_dir / lang if (knowledge_dir / lang).is_dir() else knowledge_dir
     knowledge_files = (
         list(_ingest_dir.glob("*.md"))
@@ -517,9 +520,9 @@ def _run_headless_inner(config):
     _log.info("Knowledge ingestion complete")
     emit(7, "done")
 
-    # Write COMMANDS.md
-    _write_commands_file(project_root, nexe_cmd, model_config)
 
+def _register_macos_app(project_root, config):
+    """Register Nexe.app at install path for Dock + Login Items. Remove legacy orphan."""
     # Register Nexe.app at <install_path>/Nexe.app for Dock + Login Items (macOS only).
     #
     # Bug #19d (v1.0 release): Nexe.app lives ONLY inside the install directory.
@@ -531,67 +534,123 @@ def _run_headless_inner(config):
     #
     # Retrocompat: the uninstaller still cleans `/Applications/Nexe.app` if a
     # pre-fix installation left one behind.
-    if platform.system() == "Darwin":
-        install_nexe_app = project_root / "Nexe.app"
-        nexe_app_ready = install_nexe_app.exists()
-        # Always persist the project-root marker so the Swift launcher can
-        # resolve the install dir from any launch path.
-        if nexe_app_ready:
-            try:
-                _write_project_marker(install_nexe_app, project_root)
-            except Exception as e:
-                _log.warning(f"Could not write project_root marker: {e}")
-
-        # Clean up legacy `/Applications/Nexe.app` from previous installs —
-        # it is always an orphan (no venv next to it) after the #19d fix.
-        # Guard: if the user chose `/Applications` as the install root
-        # (bare — headless CLI only, the GUI wizard forces `server-nexe`
-        # suffix via DestinationView), `install_nexe_app` resolves to the
-        # SAME path as `legacy_app` and a naive rmtree would wipe the
-        # bundle we just installed.
-        legacy_app = Path("/Applications/Nexe.app")
+    install_nexe_app = project_root / "Nexe.app"
+    nexe_app_ready = install_nexe_app.exists()
+    # Always persist the project-root marker so the Swift launcher can
+    # resolve the install dir from any launch path.
+    if nexe_app_ready:
         try:
-            same_target = legacy_app.resolve() == install_nexe_app.resolve()
-        except Exception:
-            same_target = False
-        if legacy_app.exists() and not same_target:
-            try:
-                import shutil
-                shutil.rmtree(legacy_app)
-                _log.info("Removed legacy /Applications/Nexe.app orphan")
-            except Exception as e:
-                _log.warning(f"Could not remove legacy /Applications/Nexe.app: {e}")
+            _write_project_marker(install_nexe_app, project_root)
+        except Exception as e:
+            _log.warning(f"Could not write project_root marker: {e}")
 
-        # Login Items — point at the canonical install-dir Nexe.app.
-        # The Swift wizard owns the user's checkbox choice; with
-        # --no-login-item it skips this call to avoid duplicates.
-        skip_login_item = bool(config.get("skip_login_item", False))
-        if skip_login_item:
-            _log.info("Login Items: skipped (managed by GUI wizard)")
-        elif nexe_app_ready:
-            try:
-                subprocess.run([  # nosec B603 B607: install_nexe_app is project_root-derived Path (controlled); osascript via PATH (macOS-only headless installer)
-                    "osascript", "-e",
-                    f'tell application "System Events" to make login item at end '
-                    f'with properties {{path:"{install_nexe_app}", hidden:true}}'
-                ], capture_output=True, timeout=10)
-                _log.info("Nexe added to Login Items at %s", install_nexe_app)
-            except Exception as e:
-                _log.warning(f"Could not add to Login Items: {e}")
-        else:
-            _log.warning("Skipping Login Items setup: %s missing", install_nexe_app)
+    # Clean up legacy `/Applications/Nexe.app` from previous installs —
+    # it is always an orphan (no venv next to it) after the #19d fix.
+    # Guard: if the user chose `/Applications` as the install root
+    # (bare — headless CLI only, the GUI wizard forces `server-nexe`
+    # suffix via DestinationView), `install_nexe_app` resolves to the
+    # SAME path as `legacy_app` and a naive rmtree would wipe the
+    # bundle we just installed.
+    legacy_app = Path("/Applications/Nexe.app")
+    try:
+        same_target = legacy_app.resolve() == install_nexe_app.resolve()
+    except Exception:
+        same_target = False
+    if legacy_app.exists() and not same_target:
+        try:
+            import shutil
+            shutil.rmtree(legacy_app)
+            _log.info("Removed legacy /Applications/Nexe.app orphan")
+        except Exception as e:
+            _log.warning(f"Could not remove legacy /Applications/Nexe.app: {e}")
+
+    # Login Items — point at the canonical install-dir Nexe.app.
+    # The Swift wizard owns the user's checkbox choice; with
+    # --no-login-item it skips this call to avoid duplicates.
+    skip_login_item = bool(config.get("skip_login_item", False))
+    if skip_login_item:
+        _log.info("Login Items: skipped (managed by GUI wizard)")
+    elif nexe_app_ready:
+        try:
+            subprocess.run([  # nosec B603 B607: install_nexe_app is project_root-derived Path (controlled); osascript via PATH (macOS-only headless installer)
+                "osascript", "-e",
+                f'tell application "System Events" to make login item at end '
+                f'with properties {{path:"{install_nexe_app}", hidden:true}}'
+            ], capture_output=True, timeout=10)
+            _log.info("Nexe added to Login Items at %s", install_nexe_app)
+        except Exception as e:
+            _log.warning(f"Could not add to Login Items: {e}")
     else:
-        _log.info("Non-macOS platform: skipping .app registration and Login Items")
+        _log.warning("Skipping Login Items setup: %s missing", install_nexe_app)
 
     # F6: headless notice — NexeTray.app (system tray) is not installed
+    print(
+        "[INFO] Headless mode: NexeTray.app (menu-bar icon) has not been installed. "
+        "The server will auto-start on login (Login Item). "
+        "To add the tray icon, use the GUI installer.",
+        flush=True,
+    )
+    _log.info("Headless mode: NexeTray.app not installed (no tray icon)")
+
+
+def _run_headless_inner(config):
+    """Inner implementation (with input() already patched)."""
+    lang, project_root, model_key, engine, skip_model_download, reinstall_mode = _parse_headless_config(config)
+    _apply_reinstall_if_needed(project_root, reinstall_mode)
+    _configure_i18n(lang)
+    model_config, engine, skip_model_download, selected_model = _resolve_model_config(
+        model_key, engine, skip_model_download
+    )
+
+    # Detect hardware (quiet — prints are captured by GUI log)
+    hw = detect_hardware()
+
+    # Create storage folders
+    for folder in ("storage/cache", "storage/logs", "storage/models", "storage/vectors"):
+        (project_root / folder).mkdir(parents=True, exist_ok=True)
+
+    # ── Step 1+2: Virtual environment + dependencies ─────────────────────
+    python_path = _run_env_setup(project_root, hw, engine)
+
+    # ── Step 3: Download model ──────────────────────────────────────────
+    _model_ok, model_config = _run_model_download(
+        model_config, engine, skip_model_download, model_key, selected_model, hw, project_root, python_path
+    )
+
+    # ── Step 4: Configure .env ──────────────────────────────────────────
+    _run_config_step(project_root, model_config)
+
+    # Clean module cache
+    cache_file = project_root / "personality" / ".module_cache.json"
+    if cache_file.exists():
+        cache_file.unlink()
+
+    # ── Step 5: Qdrant (embedded, no external download) ─────────────────
+    # Q5.5 reopened (2026-04-08): Qdrant is now embedded via QdrantClient(path=)
+    # in core/qdrant_pool.py. No external binary required. The step is kept for
+    # compatibility with the GUI Swift wizard (7 steps expected) but is a no-op.
+    emit(5, "running", "Qdrant embedded (no external download needed)...")
+    _log.info("Qdrant is embedded (storage/vectors via QdrantClient path=), skipping external binary")
+    emit(5, "done")
+
+    nexe_cmd = _setup_nexe_wrapper(project_root, python_path)
+
+    # Create knowledge folder
+    (project_root / "knowledge").mkdir(exist_ok=True)
+
+    # ── Step 6: Download embeddings ─────────────────────────────────────
+    _run_embeddings_step(project_root, python_path)
+
+    # ── Step 7: Process knowledge base ──────────────────────────────────
+    _run_knowledge_step(project_root, python_path, lang)
+
+    # Write COMMANDS.md
+    _write_commands_file(project_root, nexe_cmd, model_config)
+
     if platform.system() == "Darwin":
-        print(
-            "[INFO] Headless mode: NexeTray.app (menu-bar icon) has not been installed. "
-            "The server will auto-start on login (Login Item). "
-            "To add the tray icon, use the GUI installer.",
-            flush=True,
-        )
-        _log.info("Headless mode: NexeTray.app not installed (no tray icon)")
+        _register_macos_app(project_root, config)
+    else:
+        _log.info("Non-macOS platform: skipping .app registration and Login Items")
 
     print(f"[LOG] {LOG_FILE}", flush=True)
     if _model_ok:
