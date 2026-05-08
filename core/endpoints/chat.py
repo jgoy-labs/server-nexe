@@ -92,20 +92,9 @@ def _get_system_prompt(app_state: Any, lang: Optional[str] = None) -> str:
     return "You are Nexe, an AI assistant. Respond clearly and helpfully."
 
 
-# --- Main Endpoint ---
+# --- Helper Functions ---
 
-@router.post("/chat/completions", dependencies=[Depends(require_api_key)], summary="Chat completion with RAG support and engine auto-routing", operation_id="chat_completions")
-@limiter.limit("20/minute")
-async def chat_completions(body: ChatCompletionRequest, request: Request, background_tasks: BackgroundTasks) -> Any:
-    """
-    Unified Chat Completion endpoint.
-    Supports:
-    - RAG (Retrieval Augmented Generation)
-    - Auto-routing to engines (Ollama, MLX, Llama.cpp)
-    """
-    # SECURITY (Bug 21): Validate all string fields against XSS, SQL injection, etc.
-    # Same pattern as Web UI (plugins/web_ui_module/api/routes_chat.py:78).
-    # context="chat" relaxes detectors that produce false positives in conversational text.
+def _validate_chat_request(body: ChatCompletionRequest) -> None:
     if body.model is not None:
         body.model = validate_string_input(body.model, max_length=200, context="param")
     if body.engine is not None:
@@ -114,40 +103,31 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
         if _msg.role is not None:
             _msg.role = validate_string_input(_msg.role, max_length=50, context="param")
         if _msg.content is not None:
-            # SECURITY: Strip memory injection tags BEFORE validate to match routes_chat.py pattern
             if _msg.role == "user":
                 _msg.content = strip_memory_tags(_msg.content)
             _msg.content = validate_string_input(_msg.content, max_length=8000, context="chat")
 
-    engine, preferred_fallback = _resolve_engine(body.engine, request.app.state)
-    start_time = time.time()
-    engine_status = "success"
 
-    # Server language: NEXE_LANG env var (not i18n module, which tracks UI translation language)
-    _server_lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()  # "ca-ES" → "ca"
-
-    # 2. RAG Context Injection
+async def _build_rag_and_system_prompt(
+    body: ChatCompletionRequest, app_state: Any, server_lang: str
+) -> tuple[list[dict], str]:
     context_text = ""
     if body.use_rag:
         last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
         if last_user_msg:
             logger.info("RAG Search for: '%s'", last_user_msg[:80] + "..." if len(last_user_msg) > 80 else last_user_msg)
-            context_text = await build_rag_context(last_user_msg, request.app.state, _server_lang)
+            context_text = await build_rag_context(last_user_msg, app_state, server_lang)
 
-    # 3. Augment System Prompt (Nexe persona + sanitized RAG context)
     messages = [m.model_dump() for m in body.messages]
 
-    # Inject Nexe system prompt if the client does not send one
     has_system = messages and messages[0]['role'] == 'system'
     if not has_system:
-        nexe_prompt = _get_system_prompt(request.app.state, _server_lang)
+        nexe_prompt = _get_system_prompt(app_state, server_lang)
         messages.insert(0, {"role": "system", "content": nexe_prompt})
 
     if context_text and messages:
-        # SECURITY: Sanitize RAG context before injection
         safe_context = _sanitize_rag_context(context_text)
 
-        # CONTEXT WINDOW CONTROL: Ensure RAG doesn't overflow model context
         total_messages_text = "".join(m.get('content', '') for m in messages)
         used_tokens = _estimate_tokens(total_messages_text)
         max_rag_tokens = int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO)
@@ -160,13 +140,10 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
 
         remaining_budget = DEFAULT_CONTEXT_WINDOW - used_tokens - _estimate_tokens(safe_context)
         if remaining_budget < 256:
-            # Not enough room for model response — reduce RAG further
             safe_context = safe_context[:1000]
             logger.warning("RAG context aggressively trimmed — only %s tokens remaining for response", remaining_budget)
 
-        # Inject RAG context into the last user message (NOT system prompt)
-        # This preserves prefix caching for the system prompt
-        _labels = _RAG_CONTEXT_LABELS.get(_server_lang, _RAG_CONTEXT_LABELS["en"])
+        _labels = _RAG_CONTEXT_LABELS.get(server_lang, _RAG_CONTEXT_LABELS["en"])
         _instruction = _labels["intro"]
         for i in range(len(messages) - 1, -1, -1):
             if messages[i]['role'] == 'user':
@@ -179,58 +156,59 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
                 )
                 break
 
-    # 4. Dispatch to Engine
-    # Extract last user message for auto-save logic
-    last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
+    return messages, context_text
 
-    response = None
+
+async def _dispatch_to_engine(
+    engine: str, messages: list[dict], body: ChatCompletionRequest,
+    request: Request, app_state: Any, last_user_msg: Optional[str]
+) -> Any:
+    if engine.lower() == "ollama":
+        return await _forward_to_ollama(messages, body, app_state, last_user_msg)
+    elif engine.lower() == "mlx":
+        return await _forward_to_mlx(messages, body, request)
+    elif engine.lower() in ["llama_cpp", "llama.cpp", "llamacpp"]:
+        return await _forward_to_llama_cpp(messages, body, request)
+    else:
+        return await _forward_to_ollama(messages, body, app_state, last_user_msg)
+
+
+def _record_engine_metrics(engine: str, engine_status: str, start_time: float) -> None:
     try:
-        if engine.lower() == "ollama":
-            # Pass auto-save args
-            response = await _forward_to_ollama(messages, body, request.app.state, last_user_msg)
-        elif engine.lower() == "mlx":
-            response = await _forward_to_mlx(messages, body, request)
-        elif engine.lower() in ["llama_cpp", "llama.cpp", "llamacpp"]:
-            response = await _forward_to_llama_cpp(messages, body, request)
-        else:
-            # Default/Fallback
-            response = await _forward_to_ollama(messages, body, request.app.state, last_user_msg)
-    except Exception:
-        engine_status = "error"
-        raise
-    finally:
-        try:
-            from core.metrics.registry import CHAT_ENGINE_REQUESTS, CHAT_ENGINE_DURATION
-            CHAT_ENGINE_REQUESTS.labels(engine=engine, status=engine_status).inc()
-            CHAT_ENGINE_DURATION.labels(engine=engine).observe(time.time() - start_time)
-        except Exception as e:
-            logger.debug("Chat engine metrics update failed: %s", e)
+        from core.metrics.registry import CHAT_ENGINE_REQUESTS, CHAT_ENGINE_DURATION
+        CHAT_ENGINE_REQUESTS.labels(engine=engine, status=engine_status).inc()
+        CHAT_ENGINE_DURATION.labels(engine=engine).observe(time.time() - start_time)
+    except Exception as e:
+        logger.debug("Chat engine metrics update failed: %s", e)
 
-    # 5. Episodic Memory Storage (Auto-Save for NON-streaming)
-    # Streaming responses handle their own saving inside the generator now
+
+def _schedule_episodic_memory(
+    response: Any, background_tasks: BackgroundTasks,
+    app_state: Any, last_user_msg: Optional[str]
+) -> None:
     if not isinstance(response, StreamingResponse):
         try:
-            # Extract content from response
             content = ""
             if isinstance(response, dict):
                 choices = response.get("choices", [])
                 if choices:
                     content = choices[0].get("message", {}).get("content", "")
-
-            # Try Ollama native format: {"message": {"content": "..."}}
             if not content and isinstance(response, dict):
                 content = response.get("message", {}).get("content", "")
-
             if content and last_user_msg:
-                # Add storage task
                 background_tasks.add_task(
                     _save_conversation_to_memory,
-                    request.app.state,
+                    app_state,
                     last_user_msg,
                     content
                 )
         except Exception as e:
             logger.error("Failed to schedule memory save: %s", e)
+
+
+def _inject_response_headers(
+    response: Any, engine: str, context_text: str, preferred_fallback: Optional[str]
+) -> Any:
     if isinstance(response, StreamingResponse):
         if "X-Nexe-Engine" not in response.headers:
             response.headers["X-Nexe-Engine"] = engine
@@ -246,8 +224,44 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
                 "nexe_fallback",
                 {"from": preferred_fallback, "to": engine, "reason": "preferred_unavailable"},
             )
-
     return response
+
+
+# --- Main Endpoint ---
+
+@router.post("/chat/completions", dependencies=[Depends(require_api_key)], summary="Chat completion with RAG support and engine auto-routing", operation_id="chat_completions")
+@limiter.limit("20/minute")
+async def chat_completions(body: ChatCompletionRequest, request: Request, background_tasks: BackgroundTasks) -> Any:
+    """
+    Unified Chat Completion endpoint.
+    Supports:
+    - RAG (Retrieval Augmented Generation)
+    - Auto-routing to engines (Ollama, MLX, Llama.cpp)
+    """
+    _validate_chat_request(body)
+
+    engine, preferred_fallback = _resolve_engine(body.engine, request.app.state)
+    start_time = time.time()
+    engine_status = "success"
+
+    _server_lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+
+    messages, context_text = await _build_rag_and_system_prompt(body, request.app.state, _server_lang)
+
+    last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
+
+    response = None
+    try:
+        response = await _dispatch_to_engine(engine, messages, body, request, request.app.state, last_user_msg)
+    except Exception:
+        engine_status = "error"
+        raise
+    finally:
+        _record_engine_metrics(engine, engine_status, start_time)
+
+    _schedule_episodic_memory(response, background_tasks, request.app.state, last_user_msg)
+
+    return _inject_response_headers(response, engine, context_text, preferred_fallback)
 
 
 # Re-exports for backwards compatibility (used by tests and other modules
