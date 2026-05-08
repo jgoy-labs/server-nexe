@@ -269,7 +269,7 @@ class OllamaNode(Node):
     if system:
       payload["system"] = system
     if max_tokens:
-      payload["options"]["num_predict"] = int(max_tokens)
+      payload["options"]["num_predict"] = int(max_tokens)  # type: ignore[index]
     return payload
 
   async def _execute_streaming(

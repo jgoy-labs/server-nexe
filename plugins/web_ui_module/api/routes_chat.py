@@ -524,7 +524,7 @@ async def _yield_reprompt(
                         continue
                     _rp_content = _rp_chunk["message"].get("content", "")
                 elif isinstance(_rp_chunk, dict):
-                    _rp_content = _rp_chunk.get("content", _rp_chunk.get("response", ""))
+                    _rp_content = _rp_chunk.get("content", _rp_chunk.get("response", "")) or ""  # type: ignore[assignment]
                 elif isinstance(_rp_chunk, str):
                     _rp_content = _rp_chunk
                 if '<think>' in _rp_content:
@@ -1136,7 +1136,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     # from inheriting the value from the previous switch (P0-3 env leak).
                     if body.get("model"):
                         async with _MODEL_SWITCH_LOCK:
-                            await _switch_engine_model(engine, engine_name, body, model_name)
+                            await _switch_engine_model(engine, engine_name, body, model_name)  # type: ignore[arg-type]
 
                     # Per-session thinking toggle
                     thinking_enabled = getattr(session, "thinking_enabled", False)
