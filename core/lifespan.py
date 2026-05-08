@@ -229,13 +229,8 @@ async def _prewarm_fastembed() -> None:
         logger.warning("MemoryAPI: fastembed pre-warm failed (non-fatal): %s", exc)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-  """
-  Application lifespan — façade that delegates each startup/shutdown phase
-  to dedicated submodule helpers.
-  """
-  try:
+async def _startup_init(app: FastAPI) -> None:
+    """Bloc 1: log inicial, reload trigger, config, PID, encryption, qdrant."""
     logger.info("=" * 70)
     logger.info("LIFESPAN STARTUP TRIGGERED")
     logger.info("=" * 70)
@@ -245,14 +240,14 @@ async def lifespan(app: FastAPI):
 
     reload_trigger = server_state.project_root / ".nexe_reload_trigger.py"  # type: ignore[operator]
     if reload_trigger.exists():
-      try:
-        reload_trigger.unlink()
-        logger.debug("Cleaned up reload trigger: %s", reload_trigger)
-      except Exception as e:
-        logger.warning("Could not delete reload trigger: %s", e)
+        try:
+            reload_trigger.unlink()
+            logger.debug("Cleaned up reload trigger: %s", reload_trigger)
+        except Exception as e:
+            logger.warning("Could not delete reload trigger: %s", e)
 
     msg = _translate(server_state.i18n, "core.server.project_root",
-      "Project root: {path}", path=str(server_state.project_root))
+        "Project root: {path}", path=str(server_state.project_root))
     logger.info(msg)
 
     server_state.config = load_config(server_state.project_root, server_state.i18n)
@@ -263,36 +258,36 @@ async def lifespan(app: FastAPI):
     _srv_startup_cfg = server_state.config.get('core', {}).get('server', {})
     _startup_port = _srv_startup_cfg.get('port', DEFAULT_PORT)
     if server_state.project_root and not _write_pid_file(server_state.project_root, _startup_port):
-      raise RuntimeError(
-        f"Server already running on port {_startup_port}. "
-        "Use './nexe stop' to stop the existing instance."
-      )
+        raise RuntimeError(
+            f"Server already running on port {_startup_port}. "
+            "Use './nexe stop' to stop the existing instance."
+        )
 
-    # Encryption at rest
     await _startup_encryption(server_state)
-
-    # Qdrant singleton pool
     _startup_qdrant()
 
-    # Auto-start external services (Qdrant, Ollama) — B09 timeout
-    try:
-      await asyncio.wait_for(
-        _auto_start_services(server_state.config, server_state.project_root, server_state),  # type: ignore[arg-type]
-        timeout=STARTUP_TIMEOUT,
-      )
-    except asyncio.TimeoutError:
-      logger.error(
-        "Services startup timed out after %ss (NEXE_STARTUP_TIMEOUT). "
-        "Check Qdrant and Ollama availability.",
-        STARTUP_TIMEOUT,
-      )
-      raise RuntimeError(f"Services startup timed out after {STARTUP_TIMEOUT}s")
 
+async def _startup_services(app: FastAPI) -> None:
+    """Bloc 2: serveis externs (timeout), APIIntegrator, Ollama cleanup, module discovery."""
+    try:
+        await asyncio.wait_for(
+            _auto_start_services(server_state.config, server_state.project_root, server_state),  # type: ignore[arg-type]
+            timeout=STARTUP_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        logger.error(
+            "Services startup timed out after %ss (NEXE_STARTUP_TIMEOUT). "
+            "Check Qdrant and Ollama availability.",
+            STARTUP_TIMEOUT,
+        )
+        raise RuntimeError(f"Services startup timed out after {STARTUP_TIMEOUT}s")
+
+    from core.config import DEFAULT_HOST, DEFAULT_PORT
     server_config = server_state.config.get('core', {}).get('server', {})
     host = server_config.get('host', DEFAULT_HOST)
     port = server_config.get('port', DEFAULT_PORT)
     msg = _translate(server_state.i18n, "core.server.binding_server",
-      "Server ready at {host}:{port}", host=host, port=port)
+        "Server ready at {host}:{port}", host=host, port=port)
     logger.info(msg)
     msg = _translate(server_state.i18n, "core.server.all_systems_go", "All systems operational - Nexe 0.9 ready!")
     logger.info(msg)
@@ -301,66 +296,63 @@ async def lifespan(app: FastAPI):
     msg = _translate(server_state.i18n, "core.server.api_integrator_ready", "API Integrator ready")
     logger.info(msg)
 
-    # Cleanup Ollama models from previous sessions
     await cleanup_ollama_startup(server_state, _translate, OLLAMA_HEALTH_TIMEOUT, OLLAMA_UNLOAD_TIMEOUT)
-
-    # Module discovery
     await _startup_module_discovery(app, server_state, _translate)
 
     msg = _translate(server_state.i18n, "core.server.application_ready",
-      "Application started and ready to receive requests")
+        "Application started and ready to receive requests")
     logger.info(msg)
 
-    # Startup phases: memory, plugins, knowledge, MemoryService v1 — B09 timeout each
+
+async def _startup_phases_and_tokens(app: FastAPI) -> None:
+    """Bloc 3: phases startup (timeout each), tokens bootstrap, tasques segon pla, callbacks."""
     _startup_phases = [
-      ("memory modules", load_memory_modules(app, server_state, _translate)),
-      ("plugin modules", initialize_plugin_modules(app, server_state)),
-      ("knowledge ingest", auto_ingest_knowledge(server_state)),
-      ("MemoryService v1", start_memory_service_v1(app, server_state)),
+        ("memory modules", load_memory_modules(app, server_state, _translate)),
+        ("plugin modules", initialize_plugin_modules(app, server_state)),
+        ("knowledge ingest", auto_ingest_knowledge(server_state)),
+        ("MemoryService v1", start_memory_service_v1(app, server_state)),
     ]
     for _phase_name, _phase_coro in _startup_phases:
-      try:
-        await asyncio.wait_for(_phase_coro, timeout=STARTUP_TIMEOUT)
-      except asyncio.TimeoutError:
-        logger.error(
-          "Startup phase '%s' timed out after %ss (NEXE_STARTUP_TIMEOUT). "
-          "Server may be degraded.",
-          _phase_name, STARTUP_TIMEOUT,
-        )
-        raise RuntimeError(f"Startup phase '{_phase_name}' timed out after {STARTUP_TIMEOUT}s")
+        try:
+            await asyncio.wait_for(_phase_coro, timeout=STARTUP_TIMEOUT)
+        except asyncio.TimeoutError:
+            logger.error(
+                "Startup phase '%s' timed out after %ss (NEXE_STARTUP_TIMEOUT). "
+                "Server may be degraded.",
+                _phase_name, STARTUP_TIMEOUT,
+            )
+            raise RuntimeError(f"Startup phase '{_phase_name}' timed out after {STARTUP_TIMEOUT}s")
 
-    # Bootstrap tokens
     setup_bootstrap_tokens(server_state, _translate)
     try:
-      bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
-      auto_renew = os.getenv('NEXE_BOOTSTRAP_AUTO_RENEW', 'true').lower() == 'true'
-      if auto_renew:
-        start_bootstrap_token_renewal(ttl_minutes=bootstrap_ttl)
+        bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
+        auto_renew = os.getenv('NEXE_BOOTSTRAP_AUTO_RENEW', 'true').lower() == 'true'
+        if auto_renew:
+            start_bootstrap_token_renewal(ttl_minutes=bootstrap_ttl)
     except Exception as e:
-      logger.warning("Could not start bootstrap token auto-renewal: %s", e)
+        logger.warning("Could not start bootstrap token auto-renewal: %s", e)
 
-    # Rate limit cleanup background task
     if hasattr(app.state, 'start_rate_limit_cleanup'):
-      server_state._cleanup_task = asyncio.create_task(app.state.start_rate_limit_cleanup())
-      msg = _translate(server_state.i18n, "core.server.rate_limit_cleanup_started",
-        "Rate limit cleanup task started")
-      logger.info(msg)
+        server_state._cleanup_task = asyncio.create_task(app.state.start_rate_limit_cleanup())
+        msg = _translate(server_state.i18n, "core.server.rate_limit_cleanup_started",
+            "Rate limit cleanup task started")
+        logger.info(msg)
 
     # B.1 — pre-warm fastembed ONNX runtime (background, non-blocking)
     server_state._prewarm_task = asyncio.create_task(_prewarm_fastembed())
     logger.info("MemoryAPI: fastembed pre-warm task scheduled")
 
-    # Auto-clean
     await _startup_auto_clean(server_state, _translate)
 
-    # configure_modules callback
     if hasattr(server_state, 'configure_modules_callback') and server_state.configure_modules_callback is not None:
-      server_state.configure_modules_callback(server_state.api_integrator, server_state.i18n)
+        server_state.configure_modules_callback(server_state.api_integrator, server_state.i18n)
 
-    # Session cleanup background task (N-5 / N04)
     await _startup_session_cleanup(app, server_state)
 
-    # Final banner
+
+def _startup_final_banner() -> None:
+    """Bloc 4: banner final amb URL, API key i estat encryption."""
+    from core.config import DEFAULT_HOST, DEFAULT_PORT
     _srv_cfg = server_state.config.get("core", {}).get("server", {})
     _nexe_url = os.environ.get(
         "NEXE_API_BASE_URL",
@@ -376,16 +368,40 @@ async def lifespan(app: FastAPI):
     logger.info("  Encryption: %s", _crypto_status)
     logger.info("=" * 70)
 
-    yield
 
-  except Exception as e:
-    msg = _translate(server_state.i18n, "core.server.critical_error",
-      "Critical system error: {error}", error=str(e))
-    logger.error(msg)
-    logger.exception("Critical startup error", exc_info=True)
-    raise
+async def _startup(app: FastAPI) -> None:
+    """Orquestrador de startup: delega cada fase al seu helper."""
+    await _startup_init(app)
+    await _startup_services(app)
+    await _startup_phases_and_tokens(app)
+    _startup_final_banner()
 
-  finally:
+
+async def _cancel_background_tasks() -> None:
+    """Cancel·la les tasques en segon pla actives (N04)."""
+    for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task'):
+        _task = getattr(server_state, _task_attr, None)
+        if _task is not None and not _task.done():
+            _task.cancel()
+            try:
+                await _task
+            except (asyncio.CancelledError, Exception):
+                pass
+            logger.debug("Background task '%s' cancelled", _task_attr)
+
+
+def _reset_circuit_breakers() -> None:
+    """Reseteja els circuit breakers a CLOSED per al proper restart (N03)."""
+    try:
+        from core.resilience import reset_all_circuit_breakers
+        reset_all_circuit_breakers()
+        logger.debug("Circuit breakers reset to CLOSED")
+    except Exception as exc:
+        logger.debug("Circuit breaker reset failed (non-fatal): %s", exc)
+
+
+async def _shutdown(app: FastAPI) -> None:
+    """Orquestrador de shutdown: neteja ordenada de tots els serveis."""
     msg = _translate(server_state.i18n, "core.server.shutdown_initiated", "System shutdown initiated...")
     logger.info(msg)
 
@@ -393,54 +409,56 @@ async def lifespan(app: FastAPI):
     _remove_pid_file(server_state.project_root)  # type: ignore[arg-type]
 
     try:
-      try:
-        await stop_bootstrap_token_renewal()
-      except Exception as e:
-        logger.debug("Error stopping bootstrap token renewal: %s", e)
+        try:
+            await stop_bootstrap_token_renewal()
+        except Exception as e:
+            logger.debug("Error stopping bootstrap token renewal: %s", e)
 
-      await cleanup_ollama_shutdown(OLLAMA_HEALTH_TIMEOUT, OLLAMA_UNLOAD_TIMEOUT)
+        await cleanup_ollama_shutdown(OLLAMA_HEALTH_TIMEOUT, OLLAMA_UNLOAD_TIMEOUT)
+        _shutdown_qdrant()
+        await _shutdown_memory_service(app, server_state)
+        _stop_process(server_state.ollama_process, "Ollama")
 
-      _shutdown_qdrant()
-      await _shutdown_memory_service(app, server_state)
-      _stop_process(server_state.ollama_process, "Ollama")
+        if server_state.api_integrator:
+            logger.debug("Closing APIIntegrator...")
+            server_state.api_integrator = None
 
-      if server_state.api_integrator:
-        logger.debug("Closing APIIntegrator...")
-        server_state.api_integrator = None
+        # NOTE: Do NOT set module_manager or registry to None here.
+        # They are stateless in-memory registries and must persist between
+        # TestClient contexts (multiple lifespan cycles in the same process).
+        if server_state.module_manager:
+            logger.debug("ModuleManager kept alive (stateless registry)")
 
-      # NOTE: Do NOT set module_manager or registry to None here.
-      # They are stateless in-memory registries and must persist between
-      # TestClient contexts (multiple lifespan cycles in the same process).
-      if server_state.module_manager:
-        logger.debug("ModuleManager kept alive (stateless registry)")
-
-      # Cancel background tasks (N04)
-      for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task'):
-        _task = getattr(server_state, _task_attr, None)
-        if _task is not None and not _task.done():
-          _task.cancel()
-          try:
-            await _task
-          except (asyncio.CancelledError, Exception):
-            pass
-          logger.debug("Background task '%s' cancelled", _task_attr)
-
-      # Reset circuit breakers to CLOSED for the next restart (N03)
-      try:
-        from core.resilience import reset_all_circuit_breakers
-        reset_all_circuit_breakers()
-        logger.debug("Circuit breakers reset to CLOSED")
-      except Exception as exc:
-        logger.debug("Circuit breaker reset failed (non-fatal): %s", exc)
+        await _cancel_background_tasks()
+        _reset_circuit_breakers()
 
     except Exception as e:
-      msg = _translate(server_state.i18n, "core.server.cleanup_error",
-        "Error during cleanup: {error}", error=str(e))
-      logger.error(msg)
+        msg = _translate(server_state.i18n, "core.server.cleanup_error",
+            "Error during cleanup: {error}", error=str(e))
+        logger.error(msg)
 
     msg = _translate(server_state.i18n, "core.server.shutdown_goodbye",
-      "Nexe 0.9 stopped successfully. See you soon!")
+        "Nexe 0.9 stopped successfully. See you soon!")
     logger.info(msg)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+  """
+  Application lifespan — façade that delegates each startup/shutdown phase
+  to dedicated submodule helpers.
+  """
+  try:
+    await _startup(app)
+    yield
+  except Exception as e:
+    msg = _translate(server_state.i18n, "core.server.critical_error",
+      "Critical system error: {error}", error=str(e))
+    logger.error(msg)
+    logger.exception("Critical startup error", exc_info=True)
+    raise
+  finally:
+    await _shutdown(app)
 
 def get_server_state() -> ServerState:
   """Get the global server state"""
