@@ -202,15 +202,183 @@ def detect_model():
     return "auto"
 
 
+async def _resolve_chat_engine_and_model(
+    engine: Optional[str], model: Optional[str]
+) -> tuple[str, str]:
+    if not engine:
+        engine = detect_engine()
+    if not model:
+        model = detect_model()
+    return engine, model
+
+
+async def _check_server_status(client: Any) -> bool:
+    return await client.is_server_running()
+
+
+async def _create_chat_session(client: Any) -> Optional[str]:
+    return await client.create_ui_session()
+
+
+def _parse_collections(collections_str: Optional[str]) -> Optional[list[str]]:
+    _COLL_ALIASES = {'memory': 'personal_memory', 'knowledge': 'nexe_documentation', 'docs': 'nexe_documentation'}
+    if not collections_str:
+        return None
+    return [_COLL_ALIASES.get(c.strip(), c.strip()) for c in collections_str.split(',')]
+
+
+async def _handle_slash_command(
+    cmd: str, cmd_arg: str, client: Any,
+    session_id: str, stream_kwargs: dict
+) -> bool:
+    """Retorna True si s'ha processat (cal fer continue al bucle)."""
+    if cmd == "upload" and cmd_arg:
+        path_parts = re.split(r'(?<!\\) ', cmd_arg.strip(), maxsplit=1)
+        raw_path = path_parts[0].replace("\\ ", " ")
+        follow_up = path_parts[1].strip() if len(path_parts) > 1 else ""
+        file_path = os.path.expanduser(raw_path)
+        if not os.path.isfile(file_path):
+            click.echo(click.style(f"❌ File not found: {file_path}", fg="red"))
+            return True
+        filename = Path(file_path).name
+        click.echo(click.style(f"📎 Uploading {filename}...", fg="yellow"))
+        upload_ok = False
+        try:
+            upload_result = await client.upload_file(file_path, session_id)
+            if not upload_result:
+                click.echo(click.style("❌ Error uploading file. Check that the format is compatible.", fg="red"))
+            else:
+                chunks = upload_result.get("chunks", "?")
+                click.echo(click.style(f"✅ {filename} indexed ({chunks} chunks).", fg="green"))
+                upload_ok = True
+        except Exception as e:
+            click.echo(click.style(f"❌ Error: {e}", fg="red"))
+        if upload_ok and follow_up:
+            first = True
+            async for chunk in _stream_with_spinner(client.chat_ui_stream(message=follow_up, session_id=session_id, **stream_kwargs)):
+                if first:
+                    first = False
+                    click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
+                print(chunk, end="", flush=True)
+            print()
+        return True
+
+    elif cmd == "save" and cmd_arg:
+        try:
+            success = await client.memory_store(cmd_arg)
+            if success:
+                ack_prompt = f"The user just asked you to remember this: \"{cmd_arg}\". Reply briefly confirming you will remember it, without repeating all the information."
+                first = True
+                async for chunk in _stream_with_spinner(client.chat_ui_stream(message=ack_prompt, session_id=session_id, **stream_kwargs)):
+                    if first:
+                        first = False
+                        click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
+                    print(chunk, end="", flush=True)
+                print()
+            else:
+                click.echo(click.style("❌ Error saving.", fg="red"))
+        except Exception as e:
+            click.echo(click.style(f"❌ Error: {e}", fg="red"))
+        return True
+
+    elif cmd == "recall" and cmd_arg:
+        try:
+            results = await client.memory_search(cmd_arg)
+            if results:
+                click.echo(click.style("📚 Found in memory:", fg="cyan"))
+                for r in results[:3]:
+                    click.echo(f"  • {r.get('content', r)[:100]}...")
+            else:
+                click.echo(click.style("🔍 Nothing found.", dim=True))
+        except Exception as e:
+            click.echo(click.style(f"❌ Error: {e}", fg="red"))
+        return True
+
+    elif cmd == "help":
+        click.echo(click.style("\n📖 Available commands:", fg="cyan", bold=True))
+        click.echo("  /upload <path>  Upload file (PDF, MD, TXT...) for analysis")
+        click.echo("  /save <text>    Save text to memory")
+        click.echo("  /recall <query> Search memory")
+        click.echo("  /help           Show this help")
+        click.echo("  clear           Clear history")
+        click.echo("  exit            Quit the chat\n")
+        return True
+
+    else:
+        click.echo(click.style(f"❓ Unknown command: /{cmd}", fg="yellow"))
+        click.echo("Type /help to see available commands.")
+        return True
+
+
+def _process_metadata_chunk(chunk: dict, state: dict) -> None:
+    """Actualitza l'estat mutable amb MODEL, RAG, RAG_AVG, etc."""
+    if "MODEL" in chunk:
+        state["model_name"] = chunk["MODEL"]
+    if "RAG" in chunk:
+        try:
+            state["rag_count"] = int(chunk["RAG"])
+        except (ValueError, TypeError):
+            pass
+    if "RAG_AVG" in chunk:
+        try:
+            state["rag_avg"] = float(chunk["RAG_AVG"])
+        except (ValueError, TypeError):
+            pass
+    if "RAG_ITEM" in chunk:
+        parts = chunk["RAG_ITEM"].split("|", 1)
+        if len(parts) == 2:
+            try:
+                state["rag_items"].append((parts[0], float(parts[1])))
+            except (ValueError, TypeError):
+                pass
+    if "MEM" in chunk:
+        state["mem_saved"] = True
+    if "COMPACT" in chunk:
+        try:
+            state["compact_count"] = int(chunk["COMPACT"])
+        except (ValueError, TypeError):
+            pass
+
+
+async def _handle_user_message(
+    user_input: str, client: Any,
+    session_id: str, stream_kwargs: dict, verbose: bool
+) -> None:
+    """Streaming complet + stats + verbose RAG."""
+    first = True
+    t_start = time.monotonic()
+    char_count = 0
+    state: dict = {
+        "model_name": None, "rag_count": 0, "rag_avg": 0.0,
+        "rag_items": [], "mem_saved": False, "compact_count": 0,
+    }
+
+    async for chunk in _stream_with_spinner(client.chat_ui_stream(message=user_input, session_id=session_id, **stream_kwargs)):
+        if isinstance(chunk, dict):
+            _process_metadata_chunk(chunk, state)
+            continue
+        if first:
+            first = False
+            click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
+        char_count += len(chunk)
+        print(chunk, end="", flush=True)
+
+    elapsed = time.monotonic() - t_start
+    stats = _format_stats_line(elapsed, char_count, state["model_name"], state["rag_count"], state["rag_avg"], state["mem_saved"], state["compact_count"])
+    print(click.style(f"  [{stats}]", dim=True))
+
+    if verbose and state["rag_items"]:
+        for col, score in state["rag_items"]:
+            bar = _format_rag_bar(score, 10)
+            color = "green" if score >= 0.8 else "yellow" if score >= 0.6 else "red"
+            click.echo(click.style(f"    {col:<15} {bar} {score:.0%}", fg=color))
+
+
 async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool = False,
                       rag_threshold: Optional[float] = None, collections: Optional[str] = None):
     from .utils.api_client import NexeAPIClient
 
-    if not engine:
-        engine = detect_engine()
-
-    if not model:
-        model = detect_model()
+    engine, model = await _resolve_chat_engine_and_model(engine, model)
 
     if no_rag:
         click.echo(click.style("ℹ️  --no-rag ignored: the UI pipeline always manages memory context.", fg="yellow"))
@@ -219,16 +387,14 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
 
     client = NexeAPIClient()
 
-    # Check server status
     import os as _os
     from core.config import get_server_url
     _nexe_url = _os.environ.get("NEXE_API_BASE_URL", get_server_url()).rstrip("/")
-    if not await client.is_server_running():
+    if not await _check_server_status(client):
         click.echo(click.style(f"\n❌ Error: Nexe server not responding at {_nexe_url}", fg="red", bold=True))
         click.echo("Make sure you have run './nexe go' in another terminal before starting the chat.\n")
         return
 
-    # Get actual engine from server status (not just from .env)
     try:
         import httpx
         async with httpx.AsyncClient() as http_client:
@@ -241,26 +407,19 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
     except Exception:  # nosec B110: best-effort engine status fetch; on failure keep the engine value from CLI/.env
         pass
 
-    # Create UI session (same pipeline as web UI)
-    session_id = await client.create_ui_session()
+    session_id = await _create_chat_session(client)
     if not session_id:
         click.echo(click.style("⚠️  Could not create UI session. Check that the web_ui module is active.", fg="yellow"))
         return
 
-    # Parse collection names to internal IDs
-    _COLL_ALIASES = {'memory': 'personal_memory', 'knowledge': 'nexe_documentation', 'docs': 'nexe_documentation'}
-    _rag_collections = None
-    if collections:
-        _rag_collections = [_COLL_ALIASES.get(c.strip(), c.strip()) for c in collections.split(',')]
+    _rag_collections = _parse_collections(collections)
+    _stream_kwargs: dict[str, Any] = {}
+    if _rag_collections:
         click.echo(click.style(f"  Collections: {', '.join(_rag_collections)}", fg="cyan"))
+        _stream_kwargs['rag_collections'] = _rag_collections
     if rag_threshold is not None:
         click.echo(click.style(f"  RAG threshold: {rag_threshold}", fg="cyan"))
-
-    _stream_kwargs: dict[str, Any] = {}
-    if rag_threshold is not None:
         _stream_kwargs['rag_threshold'] = rag_threshold
-    if _rag_collections is not None:
-        _stream_kwargs['rag_collections'] = _rag_collections
 
     click.echo(f"\n  {click.style('🚀 Nexe Chat', fg='cyan', bold=True)}")
     click.echo(f"  {click.style('Engine:', fg='yellow')} {engine}  |  {click.style('Model:', fg='yellow')} {model}  |  {click.style('Memory:', fg='yellow')} ✅ Active")
@@ -284,152 +443,16 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
                     click.echo(click.style("❌ Error reiniciant sessió.", fg="red"))
                 continue
 
-            # Slash commands (only if first token is a known command, not a file path)
             KNOWN_COMMANDS = {"save", "recall", "help", "upload"}
             _first_token = user_input[1:].split()[0].lower() if len(user_input) > 1 else ""
             if user_input.startswith("/") and _first_token in KNOWN_COMMANDS:
                 cmd_parts = user_input[1:].split(" ", 1)
                 cmd = cmd_parts[0].lower()
                 cmd_arg = cmd_parts[1] if len(cmd_parts) > 1 else ""
+                await _handle_slash_command(cmd, cmd_arg, client, session_id, _stream_kwargs)
+                continue
 
-                if cmd == "upload" and cmd_arg:
-                    # Separate path (spaces escaped with \) from optional message
-                    # Ex: /upload /path/Comments\ AI.md what does this doc say?
-                    path_parts = re.split(r'(?<!\\) ', cmd_arg.strip(), maxsplit=1)
-                    raw_path = path_parts[0].replace("\\ ", " ")
-                    follow_up = path_parts[1].strip() if len(path_parts) > 1 else ""
-                    file_path = os.path.expanduser(raw_path)
-                    if not os.path.isfile(file_path):
-                        click.echo(click.style(f"❌ File not found: {file_path}", fg="red"))
-                        continue
-                    filename = Path(file_path).name
-                    click.echo(click.style(f"📎 Uploading {filename}...", fg="yellow"))
-                    upload_ok = False
-                    try:
-                        upload_result = await client.upload_file(file_path, session_id)
-                        if not upload_result:
-                            click.echo(click.style("❌ Error uploading file. Check that the format is compatible.", fg="red"))
-                        else:
-                            chunks = upload_result.get("chunks", "?")
-                            click.echo(click.style(f"✅ {filename} indexed ({chunks} chunks).", fg="green"))
-                            upload_ok = True
-                    except Exception as e:
-                        click.echo(click.style(f"❌ Error: {e}", fg="red"))
-                    # If there is a follow-up message, send it now
-                    if upload_ok and follow_up:
-                        first = True
-                        async for chunk in _stream_with_spinner(client.chat_ui_stream(message=follow_up, session_id=session_id, **_stream_kwargs)):
-                            if first:
-                                first = False
-                                click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
-                            print(chunk, end="", flush=True)
-                        print()
-                    continue
-
-                elif cmd == "save" and cmd_arg:
-                    try:
-                        success = await client.memory_store(cmd_arg)
-                        if success:
-                            ack_prompt = f"The user just asked you to remember this: \"{cmd_arg}\". Reply briefly confirming you will remember it, without repeating all the information."
-                            first = True
-                            async for chunk in _stream_with_spinner(client.chat_ui_stream(message=ack_prompt, session_id=session_id, **_stream_kwargs)):
-                                if first:
-                                    first = False
-                                    click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
-                                print(chunk, end="", flush=True)
-                            print()
-                        else:
-                            click.echo(click.style("❌ Error saving.", fg="red"))
-                    except Exception as e:
-                        click.echo(click.style(f"❌ Error: {e}", fg="red"))
-                    continue
-
-                elif cmd == "recall" and cmd_arg:
-                    try:
-                        results = await client.memory_search(cmd_arg)
-                        if results:
-                            click.echo(click.style("📚 Found in memory:", fg="cyan"))
-                            for r in results[:3]:
-                                click.echo(f"  • {r.get('content', r)[:100]}...")
-                        else:
-                            click.echo(click.style("🔍 Nothing found.", dim=True))
-                    except Exception as e:
-                        click.echo(click.style(f"❌ Error: {e}", fg="red"))
-                    continue
-
-                elif cmd == "help":
-                    click.echo(click.style("\n📖 Available commands:", fg="cyan", bold=True))
-                    click.echo("  /upload <path>  Upload file (PDF, MD, TXT...) for analysis")
-                    click.echo("  /save <text>    Save text to memory")
-                    click.echo("  /recall <query> Search memory")
-                    click.echo("  /help           Show this help")
-                    click.echo("  clear           Clear history")
-                    click.echo("  exit            Quit the chat\n")
-                    continue
-
-                else:
-                    click.echo(click.style(f"❓ Unknown command: /{cmd}", fg="yellow"))
-                    click.echo("Type /help to see available commands.")
-                    continue
-
-            first = True
-            t_start = time.monotonic()
-            char_count = 0
-            _model_name = None
-            _rag_count = 0
-            _rag_avg = 0.0
-            _rag_items = []
-            _mem_saved = False
-            _compact_count = 0
-
-            async for chunk in _stream_with_spinner(client.chat_ui_stream(message=user_input, session_id=session_id, **_stream_kwargs)):
-                if isinstance(chunk, dict):
-                    # Metadata from server
-                    if "MODEL" in chunk:
-                        _model_name = chunk["MODEL"]
-                    if "RAG" in chunk:
-                        try:
-                            _rag_count = int(chunk["RAG"])
-                        except (ValueError, TypeError):
-                            pass
-                    if "RAG_AVG" in chunk:
-                        try:
-                            _rag_avg = float(chunk["RAG_AVG"])
-                        except (ValueError, TypeError):
-                            pass
-                    if "RAG_ITEM" in chunk:
-                        # Format: "collection|score"
-                        parts = chunk["RAG_ITEM"].split("|", 1)
-                        if len(parts) == 2:
-                            try:
-                                _rag_items.append((parts[0], float(parts[1])))
-                            except (ValueError, TypeError):
-                                pass
-                    if "MEM" in chunk:
-                        _mem_saved = True
-                    if "COMPACT" in chunk:
-                        try:
-                            _compact_count = int(chunk["COMPACT"])
-                        except (ValueError, TypeError):
-                            pass
-                    continue
-
-                if first:
-                    first = False
-                    click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
-                char_count += len(chunk)
-                print(chunk, end="", flush=True)
-
-            elapsed = time.monotonic() - t_start
-            stats = _format_stats_line(elapsed, char_count, _model_name, _rag_count, _rag_avg, _mem_saved, _compact_count)
-            print(click.style(f"  [{stats}]", dim=True))
-
-            # Verbose RAG detail
-            if verbose and _rag_items:
-                for col, score in _rag_items:
-                    bar = _format_rag_bar(score, 10)
-                    color = "green" if score >= 0.8 else "yellow" if score >= 0.6 else "red"
-                    click.echo(click.style(f"    {col:<15} {bar} {score:.0%}", fg=color))
+            await _handle_user_message(user_input, client, session_id, _stream_kwargs, verbose)
 
         except KeyboardInterrupt:
             click.echo("\n👋 Goodbye!")
