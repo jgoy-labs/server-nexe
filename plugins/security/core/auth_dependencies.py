@@ -150,7 +150,7 @@ def _log_failure(request: Request, keys_config) -> None:
   record_auth_failure(failure_reason)
 
   try:
-    from plugins.security.security_logger import get_security_logger, SecurityEventType, SecuritySeverity
+    from plugins.security.security_logger import get_security_logger
     security_logger = get_security_logger()
     security_logger.log_auth_failure(
       reason=failure_reason,
