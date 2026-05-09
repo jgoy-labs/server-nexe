@@ -93,6 +93,84 @@ class GCDaemon:
 
         return importance * decay * access_boost
 
+    def _gc_score_entries(self, entries) -> list:
+        """Return list of entry IDs with score < 0.15."""
+        to_delete = []
+        for entry in entries:
+            score = self.calculate_entry_score(
+                importance=entry.get("importance", 0.5),
+                created_at=entry.get("created_at", ""),
+                access_count=entry.get("access_count", 0),
+                last_accessed=entry.get("last_accessed"),
+            )
+            if score < 0.15:
+                to_delete.append(entry["id"])
+        return to_delete
+
+    def _gc_enforce_budget(self, entries, to_delete: list) -> list:
+        """If over 90% budget, add worst 15% to deletion list. Returns merged list."""
+        budget_max = self._config.budgets.episodic_max
+        if len(entries) <= int(budget_max * 0.9):
+            return to_delete
+        scored = []
+        for entry in entries:
+            s = self.calculate_entry_score(
+                importance=entry.get("importance", 0.5),
+                created_at=entry.get("created_at", ""),
+                access_count=entry.get("access_count", 0),
+                last_accessed=entry.get("last_accessed"),
+            )
+            scored.append((entry["id"], s))
+        scored.sort(key=lambda x: x[1])
+        purge_count = max(1, int(len(entries) * 0.15))
+        budget_ids = [s[0] for s in scored[:purge_count]]
+        return list(set(to_delete) | set(budget_ids))
+
+    def _gc_delete_entries(self, conn, user_id: str, to_delete: list) -> None:
+        """Archive entries in RDBMS, remove from vector index, create tombstones."""
+        placeholders = ",".join("?" for _ in to_delete)
+        sql = f"UPDATE episodic SET state = 'archived' WHERE id IN ({placeholders})"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
+        conn.execute(sql, to_delete)
+        conn.commit()
+        if self._vector:
+            try:
+                self._vector.delete(to_delete)
+            except Exception as e:
+                logger.warning("GC vector delete failed: %s", e)
+        for eid in to_delete:
+            try:
+                self._store.add_tombstone(user_id=user_id, content_hash=eid, reason="gc_decay")
+            except Exception:  # nosec B110: best-effort tombstone insertion during GC; failure logged elsewhere via outer error path (BACKLOG-v1.0.5 M5-02 review for log.debug upgrade)
+                pass
+
+    def _gc_expire_tombstones(self, conn, user_id: str, dry_run: bool) -> int:
+        """Count (and optionally delete) expired tombstones. Returns count."""
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = conn.execute(
+            "SELECT COUNT(*) FROM tombstones WHERE user_id = ? AND expires_at < ?",
+            (user_id, now),
+        )
+        count = cursor.fetchone()[0]
+        if not dry_run:
+            conn.execute(
+                "DELETE FROM tombstones WHERE user_id = ? AND expires_at < ?",
+                (user_id, now),
+            )
+            conn.commit()
+        return count
+
+    def _gc_write_log(self, conn, result: dict) -> None:
+        """Insert a gc_log row summarising this GC run."""
+        conn.execute(
+            "INSERT INTO gc_log "
+            "(profile_scanned, profile_deleted, episodic_scanned, "
+            "episodic_deleted, staging_purged, tombstones_expired) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (0, 0, result["episodic_scanned"], result["episodic_deleted"],
+             0, result["tombstones_expired"]),
+        )
+        conn.commit()
+
     def run_gc(self, user_id: str, dry_run: bool = False) -> Dict[str, Any]:
         """
         Run full GC for a user.
@@ -132,97 +210,25 @@ class GCDaemon:
             entries = [dict(r) for r in cursor.fetchall()]
             result["episodic_scanned"] = len(entries)
 
-            to_delete = []
-            for entry in entries:
-                score = self.calculate_entry_score(
-                    importance=entry.get("importance", 0.5),
-                    created_at=entry.get("created_at", ""),
-                    access_count=entry.get("access_count", 0),
-                    last_accessed=entry.get("last_accessed"),
-                )
-                if score < 0.15:
-                    to_delete.append(entry["id"])
+            to_delete = self._gc_score_entries(entries)
 
-            # 2. Budget enforcement: if over 90%, delete worst 15%
+            # 2. Budget enforcement
             budget_max = self._config.budgets.episodic_max
             if len(entries) > int(budget_max * 0.9):
                 result["budget_enforced"] = True
-                # Sort by score ascending — worst first
-                scored = []
-                for entry in entries:
-                    s = self.calculate_entry_score(
-                        importance=entry.get("importance", 0.5),
-                        created_at=entry.get("created_at", ""),
-                        access_count=entry.get("access_count", 0),
-                        last_accessed=entry.get("last_accessed"),
-                    )
-                    scored.append((entry["id"], s))
-                scored.sort(key=lambda x: x[1])
-                purge_count = max(1, int(len(entries) * 0.15))
-                budget_ids = [s[0] for s in scored[:purge_count]]
-                to_delete = list(set(to_delete) | set(budget_ids))
+                to_delete = self._gc_enforce_budget(entries, to_delete)
 
             result["episodic_deleted"] = len(to_delete)
 
             if not dry_run and to_delete:
-                # Delete from RDBMS
-                placeholders = ",".join("?" for _ in to_delete)
-                sql = f"UPDATE episodic SET state = 'archived' WHERE id IN ({placeholders})"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
-                conn.execute(sql, to_delete)
-                conn.commit()
-
-                # Delete from vector index
-                if self._vector:
-                    try:
-                        self._vector.delete(to_delete)
-                    except Exception as e:
-                        logger.warning("GC vector delete failed: %s", e)
-
-                # Create tombstones
-                for eid in to_delete:
-                    try:
-                        self._store.add_tombstone(
-                            user_id=user_id,
-                            content_hash=eid,
-                            reason="gc_decay",
-                        )
-                    except Exception:  # nosec B110: best-effort tombstone insertion during GC; failure logged elsewhere via outer error path (BACKLOG-v1.0.5 M5-02 review for log.debug upgrade)
-                        pass
+                self._gc_delete_entries(conn, user_id, to_delete)
 
             # 3. Expire old tombstones
-            now = datetime.now(timezone.utc).isoformat()
-            if not dry_run:
-                cursor = conn.execute(
-                    "SELECT COUNT(*) FROM tombstones "
-                    "WHERE user_id = ? AND expires_at < ?",
-                    (user_id, now),
-                )
-                result["tombstones_expired"] = cursor.fetchone()[0]
-                conn.execute(
-                    "DELETE FROM tombstones WHERE user_id = ? AND expires_at < ?",
-                    (user_id, now),
-                )
-                conn.commit()
-            else:
-                cursor = conn.execute(
-                    "SELECT COUNT(*) FROM tombstones "
-                    "WHERE user_id = ? AND expires_at < ?",
-                    (user_id, now),
-                )
-                result["tombstones_expired"] = cursor.fetchone()[0]
+            result["tombstones_expired"] = self._gc_expire_tombstones(conn, user_id, dry_run)
 
-            # Log
+            # 4. Log
             if not dry_run:
-                conn.execute(
-                    "INSERT INTO gc_log "
-                    "(profile_scanned, profile_deleted, episodic_scanned, "
-                    "episodic_deleted, staging_purged, tombstones_expired) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (0, 0, result["episodic_scanned"],
-                     result["episodic_deleted"], 0,
-                     result["tombstones_expired"]),
-                )
-                conn.commit()
+                self._gc_write_log(conn, result)
 
         except Exception as e:
             logger.error("GC failed for user %s: %s", user_id, e)
