@@ -109,6 +109,82 @@ def _retry_instructions(engine: str, model_id: str) -> str:
 # ═══════════════════════════════════════════════════════════════════════
 
 
+def _resolve_ollama_bin(ollama_bin: str, model_id: str) -> Optional[str]:
+    """Return the resolved ollama binary path or None if not found."""
+    if shutil.which(ollama_bin):
+        return ollama_bin
+    if Path(ollama_bin).is_file():
+        return ollama_bin
+    logger.warning(
+        "Integrity: ollama binary not found at %r — cannot verify digest for %r",
+        ollama_bin, model_id,
+    )
+    return None
+
+
+def _run_ollama_show(resolved: str, model_id: str) -> Optional[str]:
+    """Run ``ollama show --json`` and return stdout or None on failure."""
+    try:
+        result = subprocess.run(  # nosec B603: resolved is validated via shutil.which/Path.is_file; model_id is from internal MODEL_CATALOG (supply chain trust)
+            [resolved, "show", "--json", model_id],
+            capture_output=True,
+            text=True,
+            timeout=_OLLAMA_SHOW_TIMEOUT,
+        )
+    except (subprocess.TimeoutExpired, OSError) as e:
+        logger.warning(
+            "Integrity: `ollama show --json %s` failed (%s) — cannot verify digest",
+            model_id, e,
+        )
+        return None
+    if result.returncode != 0 or not result.stdout.strip():
+        logger.warning(
+            "Integrity: `ollama show --json %s` returned %d; stderr=%s — cannot verify digest",
+            model_id,
+            result.returncode,
+            (result.stderr or "").strip()[:200],
+        )
+        return None
+    return result.stdout
+
+
+def _parse_ollama_digest(stdout: str, model_id: str) -> Optional[str]:
+    """Parse the digest field from ollama show JSON output."""
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError as e:
+        logger.warning(
+            "Integrity: `ollama show --json %s` emitted invalid JSON (%s) — cannot verify digest",
+            model_id, e,
+        )
+        return None
+    digest = (
+        (payload.get("details") or {}).get("digest")
+        or payload.get("digest")
+        or None
+    )
+    if digest is None:
+        logger.warning(
+            "Integrity: `ollama show --json %s` has no details.digest — older Ollama? "
+            "Falling back to legacy mode.",
+            model_id,
+        )
+        return None
+    # Schema drift: some Ollama versions emit ``digest`` as a structured
+    # object (dict/list) instead of a string.
+    if not isinstance(digest, str):
+        logger.warning(
+            "Integrity: `ollama show --json %s` returned non-string digest %r — "
+            "falling back to legacy mode.",
+            model_id, type(digest).__name__,
+        )
+        return None
+    # Normalise away the optional ``sha256:`` prefix some versions emit.
+    if digest.lower().startswith("sha256:"):
+        digest = digest[len("sha256:"):]
+    return digest
+
+
 def get_ollama_digest(
     model_id: str,
     *,
@@ -127,84 +203,13 @@ def get_ollama_digest(
     legacy condition ("verify not available for this environment") rather
     than as a mismatch.
     """
-    # ``shutil.which`` handles the PATH lookup for bare names; when the
-    # caller passes an explicit path we also accept it directly if it
-    # points at a real file. Anything else → None (missing binary).
-    resolved: Optional[str]
-    if shutil.which(ollama_bin):
-        resolved = ollama_bin
-    elif Path(ollama_bin).is_file():
-        resolved = ollama_bin
-    else:
-        resolved = None
+    resolved = _resolve_ollama_bin(ollama_bin, model_id)
     if resolved is None:
-        logger.warning(
-            "Integrity: ollama binary not found at %r — cannot verify digest for %r",
-            ollama_bin, model_id,
-        )
         return None
-
-    try:
-        result = subprocess.run(  # nosec B603: resolved is validated via shutil.which/Path.is_file; model_id is from internal MODEL_CATALOG (supply chain trust)
-            [resolved, "show", "--json", model_id],
-            capture_output=True,
-            text=True,
-            timeout=_OLLAMA_SHOW_TIMEOUT,
-        )
-    except (subprocess.TimeoutExpired, OSError) as e:
-        logger.warning(
-            "Integrity: `ollama show --json %s` failed (%s) — cannot verify digest",
-            model_id, e,
-        )
+    stdout = _run_ollama_show(resolved, model_id)
+    if stdout is None:
         return None
-
-    if result.returncode != 0 or not result.stdout.strip():
-        logger.warning(
-            "Integrity: `ollama show --json %s` returned %d; stderr=%s — cannot verify digest",
-            model_id,
-            result.returncode,
-            (result.stderr or "").strip()[:200],
-        )
-        return None
-
-    try:
-        payload = json.loads(result.stdout)
-    except json.JSONDecodeError as e:
-        logger.warning(
-            "Integrity: `ollama show --json %s` emitted invalid JSON (%s) — cannot verify digest",
-            model_id, e,
-        )
-        return None
-
-    digest = (
-        (payload.get("details") or {}).get("digest")
-        or payload.get("digest")
-        or None
-    )
-    if digest is None:
-        logger.warning(
-            "Integrity: `ollama show --json %s` has no details.digest — older Ollama? "
-            "Falling back to legacy mode.",
-            model_id,
-        )
-        return None
-    # Schema drift: some Ollama versions emit ``digest`` as a structured
-    # object (dict/list) instead of a string. The rest of this function
-    # (lower(), prefix slice, hex regex) would crash with AttributeError;
-    # treat any non-string payload as legacy so the install proceeds
-    # under the existing WARNING path instead of killing it with an
-    # unhandled exception.
-    if not isinstance(digest, str):
-        logger.warning(
-            "Integrity: `ollama show --json %s` returned non-string digest %r — "
-            "falling back to legacy mode.",
-            model_id, type(digest).__name__,
-        )
-        return None
-    # Normalise away the optional ``sha256:`` prefix some versions emit.
-    if digest.lower().startswith("sha256:"):
-        digest = digest[len("sha256:"):]
-    return digest
+    return _parse_ollama_digest(stdout, model_id)
 
 
 # ═══════════════════════════════════════════════════════════════════════
