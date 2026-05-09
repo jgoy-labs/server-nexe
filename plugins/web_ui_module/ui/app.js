@@ -762,7 +762,7 @@ class NexeUI {
         this.sessionsList = document.getElementById('sessionsList');
         this.statsBar = document.getElementById('statsBar');
 
-        // VLM: imatge seleccionada {b64, type, name} o null
+        // VLM: selected image {b64, type, name} or null
         this._selectedImage = null;
         this.imageBtn = document.getElementById('imageBtn');
         this.imageInput = document.getElementById('imageInput');
@@ -950,7 +950,7 @@ class NexeUI {
             });
         }
 
-        // Load sessions i info model
+        // Load sessions and model info
         this.loadSessions();
         this.loadServerInfo();
         this.showWelcome();
@@ -958,7 +958,7 @@ class NexeUI {
         // Setup drag and drop
         this.setupDragAndDrop();
 
-        // Inicialitzar icones Lucide
+        // Initialize Lucide icons
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
@@ -971,7 +971,7 @@ class NexeUI {
             }
             if (resp.ok) {
                 const data = await resp.json();
-                // Aplicar idioma del servidor
+                // Apply server language
                 if (data.lang && UI_STRINGS[data.lang]) {
                     this.lang = data.lang;
                     this.applyI18n();
@@ -1055,7 +1055,7 @@ class NexeUI {
         if (backend) {
             for (const m of backend.models) {
                 const opt = document.createElement('option');
-                // Suport objecte {name, size_gb} o string legacy
+                // Supports object {name, size_gb} or legacy string
                 const name = typeof m === 'object' ? m.name : m;
                 opt.value = name;
                 // Shows 👁️ if has vision, 🧠 if thinks + approximate RAM size
@@ -1131,7 +1131,7 @@ class NexeUI {
                 const data = await resp.json();
                 if (data.ollama_started) {
                     if (el) el.textContent = `Ollama — ${this.t('starting')}`;
-                    // Retry fins que Ollama estigui connectat (max 30s)
+                    // Retry until Ollama is connected (max 30s)
                     let ready = false;
                     for (let i = 0; i < 10 && !ready; i++) {
                         await new Promise(r => setTimeout(r, 3000));
@@ -1146,7 +1146,7 @@ class NexeUI {
                                     this._backends = d2.backends;
                                     this._updateModelSelect('ollama');
                                     if (el) el.textContent = `Ollama ${this.t('connected').toLowerCase()}`;
-                                    // Actualitzar el dropdown (treure "desconnectat")
+                                    // Update the dropdown (remove "disconnected")
                                     const opt = backendSel.querySelector('[value="ollama"]');
                                     if (opt) opt.textContent = 'Ollama';
                                 }
@@ -1184,7 +1184,7 @@ class NexeUI {
     _stopStreamStats() {
         clearInterval(this._statsInterval);
         this._statsInterval = null;
-        // Deixa les stats visibles 3s i desapareix
+        // Keep stats visible for 3s then hide
         setTimeout(() => {
             if (this.statsBar) this.statsBar.classList.remove('active');
         }, 3000);
@@ -1463,7 +1463,7 @@ class NexeUI {
         const pendingImage = this._selectedImage ? { ...this._selectedImage } : null;
         this._clearSelectedImage();
 
-        // Add user message to chat — si hi ha imatge adjunta, mostra-la inline
+        // Add user message to chat — if there is an attached image, show it inline
         const userImageUrl = pendingImage ? `data:${pendingImage.type};base64,${pendingImage.b64}` : null;
         this.addMessageToChat('user', message, true, null, userImageUrl);
         this.messageInput.value = '';
@@ -1630,13 +1630,13 @@ class NexeUI {
                                     tTok = Math.ceil(tContent.length / 4);
                                     break;
                                 } else {
-                                    // Not GPT-OSS — resposta directa
+                                    // Not GPT-OSS — direct response
                                     tMode = 'responding';
                                     this.setAiState('streaming');
                                     this._startStreamStats();
                                 }
                             } else if (tGptOssChecked && tBuf.trimStart().length > 0 && !tBuf.trimStart().startsWith('<')) {
-                                // Primer char no es tag — resposta directa
+                                // First char is not a tag — direct response
                                 tMode = 'responding';
                                 this.setAiState('streaming');
                                 this._startStreamStats();

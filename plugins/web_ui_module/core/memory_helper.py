@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # MEMORY MANAGEMENT CONFIG
 # ============================================
 MAX_MEMORY_ENTRIES = 500          # Maximum entries in personal_memory
-SIMILARITY_THRESHOLD = 0.80       # No guardar si similaritat > 80% (baixat de 0.85)
+SIMILARITY_THRESHOLD = 0.80       # Do not save if similarity > 80% (lowered from 0.85)
 PRUNE_BATCH_SIZE = 30             # How many entries to remove when the limit is exceeded
 TEMPORAL_DECAY_DAYS = 7           # Days to apply temporal decay (recent = bonus)
 MIN_IMPORTANCE_SCORE = 0.3        # Minimum to save (filters out chatter)
@@ -821,7 +821,7 @@ class MemoryHelper:
         Save document chunks individually to user_knowledge.
         Each chunk gets its own embedding — enables semantic search within the document.
 
-        Pattern: NAT UBIK process_chunks — un embed+upsert per chunk, progress cada 25.
+        Pattern: NAT UBIK process_chunks — one embed+upsert per chunk, progress every 25.
         """
         import time
         memory = await self.get_memory_api()

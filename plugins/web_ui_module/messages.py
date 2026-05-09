@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import logging
 
-from core.dependencies import get_i18n  # noqa: F401 — re-export per compatibilitat backward
+from core.dependencies import get_i18n  # noqa: F401 — re-export for backward compatibility
 
 logger = logging.getLogger(__name__)
 

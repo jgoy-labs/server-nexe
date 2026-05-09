@@ -353,7 +353,7 @@ def _parse_chunk(chunk: Any) -> tuple[str, str]:
 
 
 def _normalize_content(content: str, model_name: str) -> str:
-    """Normalitza GPT-OSS i pipe tags per al model específic."""
+    """Normalize GPT-OSS and pipe tags for the specific model."""
     if "gpt-oss" in model_name.lower():
         content = content.replace('<|analysis|>', '<think>')
         content = content.replace('<|assistant|>', '</think>')
@@ -368,9 +368,9 @@ def _normalize_content(content: str, model_name: str) -> str:
 
 
 def _process_content_think_tags(content: str, in_think: bool) -> tuple[str, bool, bool]:
-    """Separa el visible d'un chunk amb <think> tags incrustats (qwq:32b, etc.).
+    """Split the visible part of a chunk with embedded <think> tags (qwq:32b, etc.).
 
-    Retorna (visible, in_think_new, found_thinking).
+    Returns (visible, in_think_new, found_thinking).
     """
     if '<think>' not in content and '</think>' not in content and not in_think:
         return content, False, False
@@ -409,7 +409,7 @@ def _build_mem_stats(
     mem_saved_count: int,
     mem_saves: list,
 ) -> dict:
-    """Construeix el dict stats per a session.add_message."""
+    """Build the stats dict for session.add_message."""
     est_tokens = max(1, full_response_len // 4)
     rag_avg_val = None
     if rag_count > 0 and rag_items:
@@ -436,7 +436,7 @@ async def _yield_response_headers(
     compaction_count: int,
     doc_truncated_pct: int,
 ):
-    """Yield dels tokens de capçalera: MODEL, RAG*, COMPACT, DOC_TRUNCATED."""
+    """Yield the header tokens: MODEL, RAG*, COMPACT, DOC_TRUNCATED."""
     _safe_model = str(model_name).replace("\x00", "").replace("]", "")[:100]
     yield f"\x00[MODEL:{_safe_model}]\x00"
     if rag_count > 0:
@@ -454,10 +454,10 @@ async def _yield_response_headers(
 
 
 def _clean_full_response(full_response: str, user_input: str = "") -> tuple[str, list, list]:
-    """Neteja la resposta completa i extreu MEM_SAVE i MEM_DELETE.
+    """Clean the full response and extract MEM_SAVE and MEM_DELETE tags.
 
-    Retorna (clean_response, mem_saves, mem_deletes).
-    El yield de PENDING_DELETE ha de fer-lo el caller.
+    Returns (clean_response, mem_saves, mem_deletes).
+    The PENDING_DELETE yield must be done by the caller.
     """
     clean_response = full_response
     clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", clean_response)
@@ -524,11 +524,11 @@ async def _yield_reprompt(
     thinking_enabled: bool,
     rp_out: list,
 ):
-    """Re-prompt quan la resposta és buida però hi ha MEM_SAVEs.
+    """Re-prompt when the response is empty but there are MEM_SAVEs.
 
-    Yields els chunks filtrats (sense think, sense MEM_SAVE).
-    Si la resposta és OK, rp_out[0] = clean_response acumulat.
-    El fallback (yield 'Memòria desada: ...') resta al caller.
+    Yields filtered chunks (no think, no MEM_SAVE).
+    If the response is OK, rp_out[0] = accumulated clean_response.
+    The fallback (yield 'Memory saved: ...') remains with the caller.
     """
     _fallback_facts = [f.strip() for f in mem_saves if f and f.strip()]
     if not _fallback_facts:
@@ -1411,9 +1411,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 raise HTTPException(status_code=503, detail="Service unavailable: module manager not initialized")
             # Prioritize model/backend from request (UI selector) over env vars
             model_name = body.get("model") or os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
-            if len(model_name) > 100:  # type: ignore[arg-type]  # model_name: Any|str|None; os.getenv default impedeix None en pràctica
+            if len(model_name) > 100:  # type: ignore[arg-type]  # model_name: Any|str|None; os.getenv default prevents None in practice
                 raise HTTPException(status_code=400, detail="Model name too long (max 100 chars)")
-            preferred_engine = (body.get("backend") or os.getenv("NEXE_MODEL_ENGINE", "auto")).lower()  # type: ignore[union-attr]  # Any|str|None .lower(); os.getenv default "auto" impedeix None
+            preferred_engine = (body.get("backend") or os.getenv("NEXE_MODEL_ENGINE", "auto")).lower()  # type: ignore[union-attr]  # Any|str|None .lower(); os.getenv default "auto" prevents None
 
             # Log available modules
             available_modules = [m.name for m in module_manager.registry.list_modules()]
@@ -1422,7 +1422,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             # Engine priority based on config
             engines_to_try = _resolve_engines(preferred_engine)
 
-            response_text = None  # type: ignore[assignment]  # Optional[str] per disseny, s'inicialitza None i s'assigna post-engine
+            response_text = None  # type: ignore[assignment]  # Optional[str] by design, initialized None and assigned post-engine
             for engine_name in engines_to_try:
                 logger.info(f"Trying engine: {engine_name}")
                 registration = module_manager.registry.get_module(engine_name)
