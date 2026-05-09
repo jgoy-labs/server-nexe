@@ -625,6 +625,36 @@ async def _handle_save_intent(
     return response_text, "save"
 
 
+def _sanitize_delete_history(session, content_to_delete: str) -> None:
+    """Sanitize session history before delete so the LLM never sees raw 'Oblida que...' turns."""
+    if not (session.messages and session.messages[-1]["role"] == "user"):
+        return
+    if content_to_delete:
+        session.messages[-1]["content"] = f"[Memory command: delete '{content_to_delete[:50]}']"
+    else:
+        session.messages[-1]["content"] = "[Memory command: delete (no content specified)]"
+
+
+def _build_delete_success_response(result: dict, content_to_delete: str, session) -> tuple[str, int]:
+    """Build response text and mem_deleted count when delete_from_memory returns success."""
+    mem_deleted = result["deleted"]
+    deleted_facts = result.get("deleted_facts", [])
+    facts_detail = ""
+    if deleted_facts:
+        facts_list = ", ".join(f'"{f["text"][:60]}"' for f in deleted_facts[:5])
+        facts_detail = f" [{facts_list}]"
+    response_text = (
+        f"\x00[MODEL:nexe-system]\x00"
+        f"Deleted {result['deleted']} memory(ies){facts_detail}. "
+        "I won't remember this anymore."
+    )
+    if deleted_facts:
+        session._recently_deleted_facts = [f["text"] for f in deleted_facts]
+        facts_pipe = "|".join(f["text"][:80] for f in deleted_facts[:5])
+        response_text += f"\x00[DEL:{result['deleted']}:{facts_pipe}]\x00"
+    return response_text, mem_deleted
+
+
 async def _handle_delete_intent(
     extracted_content: str,
     session,
@@ -638,28 +668,13 @@ async def _handle_delete_intent(
         # B-mem-delete fix: sanitize history BEFORE the result check so the
         # original "Oblida que..." message is never seen by the LLM in
         # subsequent turns, regardless of whether entries were actually deleted.
-        if session.messages and session.messages[-1]["role"] == "user":
-            session.messages[-1]["content"] = f"[Memory command: delete '{content_to_delete[:50]}']"
+        _sanitize_delete_history(session, content_to_delete)
         result = await memory_helper.delete_from_memory(
             content_to_delete,
             collections=rag_collections,
         )
         if result["success"] and result.get("deleted", 0) > 0:
-            mem_deleted = result["deleted"]
-            deleted_facts = result.get("deleted_facts", [])
-            facts_detail = ""
-            if deleted_facts:
-                facts_list = ", ".join(f'"{f["text"][:60]}"' for f in deleted_facts[:5])
-                facts_detail = f" [{facts_list}]"
-            response_text = (
-                f"\x00[MODEL:nexe-system]\x00"
-                f"Deleted {result['deleted']} memory(ies){facts_detail}. "
-                "I won't remember this anymore."
-            )
-            if deleted_facts:
-                session._recently_deleted_facts = [f["text"] for f in deleted_facts]
-                facts_pipe = "|".join(f["text"][:80] for f in deleted_facts[:5])
-                response_text += f"\x00[DEL:{result['deleted']}:{facts_pipe}]\x00"
+            response_text, mem_deleted = _build_delete_success_response(result, content_to_delete, session)
         elif result["success"]:
             response_text = f"\x00[MODEL:nexe-system]\x00Nothing found about \"{content_to_delete[:100]}\" in memory."
         else:
@@ -667,8 +682,7 @@ async def _handle_delete_intent(
     else:
         # content_to_delete empty: still sanitize history so the LLM
         # does not see the raw "Oblida que..." in subsequent turns.
-        if session.messages and session.messages[-1]["role"] == "user":
-            session.messages[-1]["content"] = "[Memory command: delete (no content specified)]"
+        _sanitize_delete_history(session, content_to_delete)
         response_text = "\x00[MODEL:nexe-system]\x00What do you want me to forget?"
     return response_text, "delete", mem_deleted
 
