@@ -312,3 +312,84 @@ reason = "GET / té include_in_schema=False — no apareix a l'OpenAPI i no nece
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "api-structure-2026-05-09"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# warn-comments whitelist — 2026-05-09
+#
+# El checker detecta qualsevol línia amb ⚠ — no distingeix comentari tècnic
+# de string de missatge visual per l'usuari. Els paths whitelistats contenen
+# ⚠️ exclusivament com a icona visual en missatges d'instal·lació/UI.
+# Els warnings tècnics reals (crypto, sqlite, integrity) NO estan whitelistats.
+# ═══════════════════════════════════════════════════════════════════════════
+
+[[exception]]
+rule = "warn_comments.explicit_warning"
+path = "installer/**"
+reason = "Missatges visuals ⚠️ per l'usuari durant la instal·lació (translations ca/en/es, setup_env, install, finalize, hardware, models). No són advertències tècniques pendents."
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "warn-comments-fp-2026-05-09"
+
+[[exception]]
+rule = "warn_comments.explicit_warning"
+path = "plugins/web_ui_module/ui/app.js"
+reason = "Strings UI: 'col_warning_prefix: ⚠ Desactivat' i similars. Icones visuals de la interfície, no advertències tècniques."
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "warn-comments-fp-2026-05-09"
+
+[[exception]]
+rule = "warn_comments.explicit_warning"
+path = "core/cli/cli.py"
+reason = "click.echo(click.style('⚠️ ...')) — missatges visuals de la CLI per l'usuari, no advertències tècniques de codi."
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "warn-comments-fp-2026-05-09"
+
+[[exception]]
+rule = "warn_comments.explicit_warning"
+path = "core/cli/chat_cli.py"
+reason = "click.echo(click.style('⚠️ ...')) — missatge visual de la CLI per l'usuari."
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "warn-comments-fp-2026-05-09"
+
+[[exception]]
+rule = "warn_comments.explicit_warning"
+path = "core/ingest/ingest_knowledge.py"
+reason = "Dict i18n amb ⚠️ com a prefix visual de missatge d'error per l'usuari (ca/es/en)."
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "warn-comments-fp-2026-05-09"
+
+[[exception]]
+rule = "warn_comments.explicit_warning"
+path = "plugins/web_ui_module/api/routes_auth.py"
+reason = "Missatge visual ⚠️ per l'usuari en resposta d'autenticació."
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "warn-comments-fp-2026-05-09"
+
+[[exception]]
+rule = "warn_comments.explicit_warning"
+path = "scripts/translate_comments.py"
+reason = "Script de traducció que conté ⚠ com a exemple de text a processar."
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "warn-comments-fp-2026-05-09"
+
+[[exception]]
+rule = "warn_comments.explicit_warning"
+path = "dev-tools/conftest.py"
+reason = "Conftest de tests que conté ⚠ en missatge de diagnòstic de test."
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "warn-comments-fp-2026-05-09"
+
+[[exception]]
+rule = "warn_comments.explicit_warning"
+path = "memory/memory/rag_logger.py"
+reason = "WARNING = '⚠️' és una constant de string per formatar missatges de log. No és un comentari tècnic pendent."
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "warn-comments-fp-2026-05-09"
