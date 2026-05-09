@@ -95,6 +95,39 @@ class OllamaChat:
                     break
         return payload
 
+    async def _stream_request(self, httpx, ollama_breaker, url: str, payload: Dict[str, Any]):
+        """Execute a streaming POST and yield parsed JSON lines."""
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            async with client.stream("POST", url, json=payload) as response:
+                response.raise_for_status()
+                await ollama_breaker.record_success()
+                async for line in response.aiter_lines():
+                    if line.strip():
+                        try:
+                            yield json.loads(line)
+                        except json.JSONDecodeError:
+                            logger.warning("Invalid JSON in chat: %s", line)
+
+    async def _direct_request(self, httpx, ollama_breaker, url: str, payload: Dict[str, Any]):
+        """Execute a non-streaming POST and yield the single JSON response."""
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+            await ollama_breaker.record_success()
+            yield response.json()
+
+    async def _retry_without_thinking(self, httpx, ollama_breaker, url: str,
+                                      payload: Dict[str, Any], stream: bool, model: str):
+        """Retry the request with think:false after a 400 rejection."""
+        logger.warning("Model %s rejects think:true (400) — retrying without thinking", model)
+        payload["think"] = False
+        if stream:
+            async for chunk in self._stream_request(httpx, ollama_breaker, url, payload):
+                yield chunk
+        else:
+            async for chunk in self._direct_request(httpx, ollama_breaker, url, payload):
+                yield chunk
+
     async def chat(
         self, model: str, messages: List[Dict[str, str]], stream: bool = True,
         images: Optional[List[str]] = None, thinking_enabled: bool = False,
@@ -109,57 +142,23 @@ class OllamaChat:
                 f"Circuit [ollama] is OPEN. Will retry in {ollama_breaker.config.timeout_seconds}s"
             )
 
+        url = f"{self.base_url}/api/chat"
         try:
             payload = self._build_payload(model, messages, stream, images=images,
                                           thinking_enabled=thinking_enabled)
-
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                if stream:
-                    async with client.stream(
-                        "POST", f"{self.base_url}/api/chat", json=payload
-                    ) as response:
-                        response.raise_for_status()
-                        await ollama_breaker.record_success()
-                        async for line in response.aiter_lines():
-                            if line.strip():
-                                try:
-                                    data = json.loads(line)
-                                    yield data
-                                except json.JSONDecodeError:
-                                    logger.warning("Invalid JSON in chat: %s", line)
-                else:
-                    response = await client.post(
-                        f"{self.base_url}/api/chat", json=payload
-                    )
-                    response.raise_for_status()
-                    await ollama_breaker.record_success()
-                    yield response.json()
+            if stream:
+                async for chunk in self._stream_request(httpx, ollama_breaker, url, payload):
+                    yield chunk
+            else:
+                async for chunk in self._direct_request(httpx, ollama_breaker, url, payload):
+                    yield chunk
 
         except httpx.HTTPStatusError as e:
-            # Fallback: if think:true caused 400, retry without thinking
             if e.response.status_code == 400 and payload.get("think"):
-                logger.warning("Model %s rejects think:true (400) — retrying without thinking", model)
-                payload["think"] = False
-                async with httpx.AsyncClient(timeout=self._timeout) as retry_client:
-                    if stream:
-                        async with retry_client.stream(
-                            "POST", f"{self.base_url}/api/chat", json=payload
-                        ) as retry_resp:
-                            retry_resp.raise_for_status()
-                            await ollama_breaker.record_success()
-                            async for line in retry_resp.aiter_lines():
-                                if line.strip():
-                                    try:
-                                        yield json.loads(line)
-                                    except json.JSONDecodeError:
-                                        pass
-                    else:
-                        retry_resp = await retry_client.post(
-                            f"{self.base_url}/api/chat", json=payload
-                        )
-                        retry_resp.raise_for_status()
-                        await ollama_breaker.record_success()
-                        yield retry_resp.json()
+                async for chunk in self._retry_without_thinking(
+                    httpx, ollama_breaker, url, payload, stream, model
+                ):
+                    yield chunk
                 return
             if e.response.status_code == 404:
                 logger.warning("Ollama chat: model %s not found (404)", model)
