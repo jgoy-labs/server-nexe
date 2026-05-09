@@ -11,6 +11,45 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
+def _merge_same_role(filtered: List[Dict]) -> List[Dict]:
+    """Merge consecutive messages that share the same role."""
+    merged: list = []
+    for msg in filtered:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if merged and merged[-1]["role"] == role:
+            merged[-1]["content"] += "\n\n" + content
+        else:
+            merged.append({"role": role, "content": content})
+    return merged
+
+
+def _ensure_starts_with_user(merged: List[Dict]) -> List[Dict]:
+    """Prepend a user placeholder if the list starts with an assistant turn."""
+    if merged and merged[0]["role"] != "user":
+        merged.insert(0, {"role": "user", "content": "(continua)"})
+    return merged
+
+
+def _enforce_alternation(merged: List[Dict]) -> List[Dict]:
+    """Ensure strict user/assistant alternation, inserting placeholders where needed."""
+    sanitized = []
+    expected_role = "user"
+    for msg in merged:
+        if msg["role"] == expected_role:
+            sanitized.append(msg)
+            expected_role = "assistant" if expected_role == "user" else "user"
+        elif msg["role"] == "assistant" and expected_role == "user":
+            sanitized.append({"role": "user", "content": "(continua)"})
+            sanitized.append(msg)
+            expected_role = "user"
+        elif msg["role"] == "user" and expected_role == "assistant":
+            sanitized.append({"role": "assistant", "content": "(understood)"})
+            sanitized.append(msg)
+            expected_role = "assistant"
+    return sanitized
+
+
 def sanitize_messages_for_alternation(messages: List[Dict]) -> List[Dict]:
     """
     Sanitizes messages to ensure strict user/assistant alternation.
@@ -30,49 +69,13 @@ def sanitize_messages_for_alternation(messages: List[Dict]) -> List[Dict]:
     if not messages:
         return []
 
-    # Filter system messages (added separately)
     filtered = [m for m in messages if m.get("role") != "system"]
-
     if not filtered:
         return []
 
-    # Merge consecutive messages from the same role
-    merged: list = []
-    for msg in filtered:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-
-        if merged and merged[-1]["role"] == role:
-            # Merge with the previous
-            merged[-1]["content"] += "\n\n" + content
-        else:
-            merged.append({"role": role, "content": content})
-
-    # Ensure it starts with "user"
-    if merged and merged[0]["role"] != "user":
-        # If it starts with assistant, insert a user placeholder
-        merged.insert(0, {"role": "user", "content": "(continua)"})
-
-    # Verify alternation and correct if needed
-    sanitized = []
-    expected_role = "user"
-
-    for msg in merged:
-        if msg["role"] == expected_role:
-            sanitized.append(msg)
-            expected_role = "assistant" if expected_role == "user" else "user"
-        elif msg["role"] == "assistant" and expected_role == "user":
-            # Missing a user turn, insert placeholder
-            sanitized.append({"role": "user", "content": "(continua)"})
-            sanitized.append(msg)
-            expected_role = "user"
-        elif msg["role"] == "user" and expected_role == "assistant":
-            # Missing assistant turn, insert placeholder
-            sanitized.append({"role": "assistant", "content": "(understood)"})
-            sanitized.append(msg)
-            expected_role = "assistant"
-
-    return sanitized
+    merged = _merge_same_role(filtered)
+    merged = _ensure_starts_with_user(merged)
+    return _enforce_alternation(merged)
 
 
 def prepare_tokens(
