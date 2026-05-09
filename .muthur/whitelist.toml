@@ -4070,3 +4070,12 @@ reason = "Detector classifies as English (detected: en) below confidence thresho
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/metrics/tests/test_middleware.py"
+message_contains = "detected: ca,"
+reason = "FP: short EN docstring ('Test error request metrics.') misdetected as Catalan — technical EN comment"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
