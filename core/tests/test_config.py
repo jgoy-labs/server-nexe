@@ -111,7 +111,7 @@ class TestSaveConfig:
         assert loaded["core"]["server"]["host"] == "127.0.0.1"
 
     def test_returns_false_on_error(self, tmp_path):
-        # Directori no existent
+        # Non-existent directory
         invalid_path = tmp_path / "no_dir" / "output.toml"
         config = {"core": {}}
         result = save_config(config, invalid_path)

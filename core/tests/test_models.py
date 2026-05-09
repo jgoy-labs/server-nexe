@@ -42,7 +42,7 @@ class TestSystemResponse:
     def test_missing_required_field_raises(self):
         import pydantic
         with pytest.raises(pydantic.ValidationError):
-            SystemResponse(system="Nexe")  # falten camps requerits
+            SystemResponse(system="Nexe")  # missing required fields
 
 
 class TestHealthResponse:
