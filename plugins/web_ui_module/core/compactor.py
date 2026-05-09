@@ -33,41 +33,49 @@ def _is_ollama_engine(engine) -> bool:
     return "ollama" in cls_name.lower() or "ollama" in module_name.lower()
 
 
+async def _call_engine_ollama(engine, messages, system_msg) -> str:
+    """Calls Ollama engine and consumes the async-generator response."""
+    model_name = _os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
+    full_messages = [{"role": "system", "content": system_msg}] + messages
+    result = engine.chat(model=model_name, messages=full_messages, stream=False)
+    summary = ""
+    async for chunk in result:
+        if isinstance(chunk, dict):
+            msg = chunk.get("message", {})
+            if isinstance(msg, dict):
+                summary += msg.get("content", "")
+            elif chunk.get("response"):
+                summary += chunk["response"]
+        elif isinstance(chunk, str):
+            summary += chunk
+    return summary
+
+
+def _extract_mlx_content(summary_result) -> str:
+    """Extracts content string from MLX/LlamaCpp chat() return value."""
+    if isinstance(summary_result, dict):
+        if "message" in summary_result and isinstance(summary_result["message"], dict):
+            return summary_result["message"].get("content", "")
+        if "response" in summary_result:
+            return summary_result["response"]
+        if "content" in summary_result:
+            return summary_result["content"]
+        if "choices" in summary_result:
+            choices = summary_result["choices"]
+            if choices:
+                return choices[0].get("message", {}).get("content", "")
+    if isinstance(summary_result, str):
+        return summary_result
+    return ""
+
+
 async def _call_engine(engine, messages, system_msg):
     """Calls engine.chat() adapting to the engine type (Ollama vs MLX/LlamaCpp)."""
     if _is_ollama_engine(engine):
-        model_name = _os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
-        full_messages = [{"role": "system", "content": system_msg}] + messages
-        result = engine.chat(model=model_name, messages=full_messages, stream=False)
-        # OllamaModule.chat() is an async generator — consume it
-        summary = ""
-        async for chunk in result:
-            if isinstance(chunk, dict):
-                msg = chunk.get("message", {})
-                if isinstance(msg, dict):
-                    summary += msg.get("content", "")
-                elif chunk.get("response"):
-                    summary += chunk["response"]
-            elif isinstance(chunk, str):
-                summary += chunk
-        return summary
-    else:
-        # MLX/LlamaCpp accept system= kwarg
-        summary_result = await engine.chat(messages=messages, system=system_msg)
-        if isinstance(summary_result, dict):
-            if "message" in summary_result and isinstance(summary_result["message"], dict):
-                return summary_result["message"].get("content", "")
-            elif "response" in summary_result:
-                return summary_result["response"]
-            elif "content" in summary_result:
-                return summary_result["content"]
-            elif "choices" in summary_result:
-                choices = summary_result["choices"]
-                if choices:
-                    return choices[0].get("message", {}).get("content", "")
-        elif isinstance(summary_result, str):
-            return summary_result
-        return ""
+        return await _call_engine_ollama(engine, messages, system_msg)
+    # MLX/LlamaCpp accept system= kwarg
+    summary_result = await engine.chat(messages=messages, system=system_msg)
+    return _extract_mlx_content(summary_result)
 
 
 async def compact_session(session, engine, session_manager):
