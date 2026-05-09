@@ -1170,6 +1170,192 @@ async def _yield_atomize_and_save_mem_saves(
     count_out.append(_mem_saved_count)
 
 
+def _build_document_context(attached_doc: dict) -> tuple[str, int, int]:
+    """Build document_context string from an attached_doc dict.
+
+    Returns (document_context, shown, total_chunks).
+    """
+    chunks = attached_doc.get('chunks', [attached_doc.get('content', '')])
+    total_chunks = attached_doc.get('total_chunks', len(chunks))
+    total_chars = attached_doc.get('total_chars', 0)
+    shown = len(chunks)
+    doc_content = "\n\n---\n\n".join(chunks)
+    if total_chunks == 1:
+        document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n\n{doc_content}\n"
+    else:
+        est_pages_total = round(total_chars / 3000)
+        est_pages_shown = round(len(doc_content) / 3000)
+        pct = round(shown * 100 / total_chunks)
+        document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n"
+        if shown < total_chunks:
+            document_context += (
+                f"[Mostrant les primeres ~{est_pages_shown} pagines de ~{est_pages_total} "
+                f"({shown}/{total_chunks} parts, {pct}% del document). "
+                f"La resta del document esta indexada — l'usuari pot fer preguntes "
+                f"sobre qualsevol part i el sistema les recuperara.]\n\n"
+            )
+        else:
+            document_context += f"[Document complet: ~{est_pages_total} pagines]\n\n"
+        document_context += f"{doc_content}\n"
+    document_context = _sanitize_rag_context(document_context)
+    logger.info(
+        "Using attached document: %s (parts %d/%d, %d chars)",
+        attached_doc['filename'], shown, total_chunks, len(doc_content),
+    )
+    return document_context, shown, total_chunks
+
+
+def _build_system_prompt_with_time() -> tuple[str, str]:
+    """Read system prompt from server.toml and inject current datetime.
+
+    Returns (system_prompt, lang).
+    """
+    try:
+        from core.lifespan import get_server_state
+        from core.endpoints.chat import _get_system_prompt
+        import os as _os_inner
+        _state = get_server_state()
+        _lang = _os_inner.getenv("NEXE_LANG", "ca")
+        base_system_prompt = _get_system_prompt(_state, _lang)
+    except Exception:
+        _lang = "ca"
+        base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
+    from datetime import datetime as _dt
+    _now = _dt.now().astimezone()
+    system_prompt = base_system_prompt + f"\n\nNow: {_now.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+    return system_prompt, _lang
+
+
+def _inject_context_into_messages(
+    engine_messages: list,
+    message: str,
+    document_context: str,
+    rag_context: str,
+    budget: dict,
+    available_chars: int,
+    history_chars: int,
+) -> tuple[list, int]:
+    """Append the user message (plus document/RAG context) to engine_messages.
+
+    Returns (engine_messages, doc_truncated_pct).
+    """
+    _doc_truncated_pct = budget["doc_truncated_pct"]
+    if document_context and budget["doc_kept_chars"] > 0:
+        _original_doc_len = len(document_context)
+        document_context = document_context[: budget["doc_kept_chars"]]
+        if _doc_truncated_pct > 0:
+            logger.info(
+                "Bug 32: document truncated %s%% to preserve history reserve "
+                "(history=%s, reserve=%s, doc_orig=%s, doc_kept=%s)",
+                _doc_truncated_pct, history_chars, budget["history_reserve"],
+                _original_doc_len, budget["doc_kept_chars"],
+            )
+        doc_block = (
+            "[DOCUMENT ADJUNTAT]\n"
+            f"{document_context}\n"
+            "[FI DOCUMENT]\n\n"
+            "Respon EXCLUSIVAMENT basant-te en el document anterior. "
+            "Si la informacio no hi es, indica-ho clarament.\n\n"
+            f"{message}"
+        )
+        engine_messages.append({"role": "user", "content": doc_block})
+    elif document_context and budget["doc_kept_chars"] == 0:
+        logger.warning(
+            "Bug 32: dropping document (history reserved fully) — history=%s, reserve=%s",
+            history_chars, budget["history_reserve"],
+        )
+        engine_messages.append({"role": "user", "content": message})
+    elif rag_context and available_chars > 0:
+        rag_context = rag_context[:available_chars]
+        _rag_instruction = {
+            "ca": (
+                "INFORMACIO RECUPERADA. UTILITZA-LA per respondre. "
+                "Si la resposta es aqui, cita-la directament. "
+                "Fonts: [DOCUMENTACIO DEL SISTEMA] = knowledge base del sistema, "
+                "[DOCUMENTACIO TECNICA] = documents pujats per l'usuari, "
+                "[MEMORIA DE L'USUARI] = coses que l'usuari t'ha dit abans. "
+                "Quan et preguntin d'on saps algo, indica la font correcta. "
+                "MAI diguis que ho saps pel teu entrenament si la info ve d'aqui:"
+            ),
+            "es": (
+                "INFORMACION RECUPERADA. UTILIZALA para responder. "
+                "Si la respuesta esta aqui, citala directamente. "
+                "Fuentes: [DOCUMENTACION DEL SISTEMA] = knowledge base del sistema, "
+                "[DOCUMENTACION TECNICA] = documentos subidos por el usuario, "
+                "[MEMORIA DEL USUARIO] = cosas que el usuario te dijo antes. "
+                "Cuando te pregunten de donde sabes algo, indica la fuente correcta. "
+                "NUNCA digas que lo sabes por tu entrenamiento si la info viene de aqui:"
+            ),
+            "en": (
+                "RETRIEVED INFORMATION. USE IT to answer. "
+                "If the answer is here, cite it directly. "
+                "Sources: [SYSTEM DOCUMENTATION] = system knowledge base, "
+                "[TECHNICAL DOCUMENTATION] = documents uploaded by the user, "
+                "[USER MEMORY] = things the user told you before. "
+                "When asked where you know something from, indicate the correct source. "
+                "NEVER say you know it from training if the info comes from here:"
+            ),
+        }
+        _lang_key = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
+        _instr = _rag_instruction.get(_lang_key, _rag_instruction["en"])
+        rag_block = f"[CONTEXT]\n{_instr}\n{rag_context}\n[FI CONTEXT]\n\n{message}"
+        engine_messages.append({"role": "user", "content": rag_block})
+    else:
+        engine_messages.append({"role": "user", "content": message})
+    return engine_messages, _doc_truncated_pct
+
+
+def _inject_image_block(messages: list) -> list:
+    """Prepend a localised image-context block to the last user message if present."""
+    _img_blocks = {
+        "ca": (
+            "[IMATGE ADJUNTA]\n"
+            "L'usuari ha adjuntat una imatge a aquest missatge. "
+            "Analitza la imatge i incorpora-la a la teva resposta. "
+            "Prioritza el que veus a la imatge per sobre de memòries anteriors.\n"
+            "[FI IMATGE]"
+        ),
+        "es": (
+            "[IMAGEN ADJUNTA]\n"
+            "El usuario ha adjuntado una imagen a este mensaje. "
+            "Analiza la imagen e incorpórala a tu respuesta. "
+            "Prioriza lo que ves en la imagen por encima de memorias anteriores.\n"
+            "[FIN IMAGEN]"
+        ),
+        "en": (
+            "[ATTACHED IMAGE]\n"
+            "The user has attached an image to this message. "
+            "Analyze the image and incorporate it into your response. "
+            "Prioritize what you see in the image over previous memories.\n"
+            "[END IMAGE]"
+        ),
+    }
+    _lang_key2 = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
+    _img_block = _img_blocks.get(_lang_key2, _img_blocks["en"])
+    if messages and messages[-1]["role"] == "user":
+        messages[-1] = dict(messages[-1])
+        messages[-1]["content"] = f"{_img_block}\n\n{messages[-1]['content']}"
+    return messages
+
+
+async def _accumulate_nonstreaming_response(chat_result, response_chunks: list) -> None:
+    """Accumulate chunks from a non-streaming chat_result into response_chunks."""
+    import inspect
+    if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
+        async for chunk in chat_result:
+            if isinstance(chunk, dict) and "message" in chunk and "content" in chunk["message"]:
+                response_chunks.append(chunk["message"]["content"])
+            elif isinstance(chunk, dict) and "content" in chunk:
+                response_chunks.append(chunk["content"])
+            elif isinstance(chunk, str):
+                response_chunks.append(chunk)
+    else:
+        result = await chat_result if inspect.iscoroutine(chat_result) else chat_result
+        content = _extract_nonstreaming_content(result)
+        if content:
+            response_chunks.append(content)
+
+
 def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     """Registers endpoint: POST /chat"""
 
@@ -1295,34 +1481,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
                     document_context = ""
                     if attached_doc:
-                        chunks = attached_doc.get('chunks', [attached_doc.get('content', '')])
-                        total_chunks = attached_doc.get('total_chunks', len(chunks))
-                        total_chars = attached_doc.get('total_chars', 0)
-
-                        shown = len(chunks)
-                        doc_content = "\n\n---\n\n".join(chunks)
-
-                        if total_chunks == 1:
-                            document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n\n{doc_content}\n"
-                        else:
-                            est_pages_total = round(total_chars / 3000)
-                            est_pages_shown = round(len(doc_content) / 3000)
-                            pct = round(shown * 100 / total_chunks)
-                            document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n"
-                            if shown < total_chunks:
-                                document_context += (
-                                    f"[Mostrant les primeres ~{est_pages_shown} pagines de ~{est_pages_total} "
-                                    f"({shown}/{total_chunks} parts, {pct}% del document). "
-                                    f"La resta del document esta indexada — l'usuari pot fer preguntes "
-                                    f"sobre qualsevol part i el sistema les recuperara.]\n\n"
-                                )
-                            else:
-                                document_context += f"[Document complet: ~{est_pages_total} pagines]\n\n"
-                            document_context += f"{doc_content}\n"
-
-                        # Sanitize document context (prompt injection + control chars)
-                        document_context = _sanitize_rag_context(document_context)
-                        logger.info(f"Using attached document: {attached_doc['filename']} (parts {shown}/{total_chunks}, {len(doc_content)} chars)")
+                        document_context, _shown, _total_chunks = _build_document_context(attached_doc)
 
                     # 3. Get Memory Context (RAG) - ALWAYS search, not just with patterns
                     rag_context, rag_count, _rag_items = await _build_rag_context(
@@ -1330,25 +1489,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     )
 
                     # 4. Construct Final System Prompt
-                    # Read the prompt from server.toml via app_state (language + tier)
-                    try:
-                        from core.lifespan import get_server_state
-                        from core.endpoints.chat import _get_system_prompt
-                        import os as _os_inner
-                        _state = get_server_state()
-                        _lang = _os_inner.getenv("NEXE_LANG", "ca")
-                        base_system_prompt = _get_system_prompt(_state, _lang)
-                    except Exception:
-                        base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
-                    # Inject date + time (with seconds + local timezone) into
-                    # the system prompt so the model can resolve time-sensitive
-                    # queries ("what time is it?", "how long ago was…").
-                    from datetime import datetime as _dt
-                    _now = _dt.now().astimezone()
-                    system_prompt = (
-                        base_system_prompt
-                        + f"\n\nNow: {_now.strftime('%Y-%m-%d %H:%M:%S %Z')}"
-                    )
+                    system_prompt, _lang = _build_system_prompt_with_time()
 
                     # 4. Prepare messages payload for engine
                     engine_messages = [
@@ -1382,107 +1523,17 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     available_chars = _budget["available_chars"]
 
                     # Inject context into messages (not system prompt -> MLX can cache the prefix)
-                    _doc_truncated_pct = _budget["doc_truncated_pct"]
-                    if document_context and _budget["doc_kept_chars"] > 0:
-                        _original_doc_len = len(document_context)
-                        document_context = document_context[: _budget["doc_kept_chars"]]
-                        if _doc_truncated_pct > 0:
-                            logger.info(
-                                "Bug 32: document truncated %s%% to preserve history reserve "
-                                "(history=%s, reserve=%s, doc_orig=%s, doc_kept=%s)",
-                                _doc_truncated_pct, history_chars, _budget["history_reserve"],
-                                _original_doc_len, _budget["doc_kept_chars"],
-                            )
-                        # Attached document: goes before the user message
-                        doc_block = (
-                            "[DOCUMENT ADJUNTAT]\n"
-                            f"{document_context}\n"
-                            "[FI DOCUMENT]\n\n"
-                            "Respon EXCLUSIVAMENT basant-te en el document anterior. "
-                            "Si la informacio no hi es, indica-ho clarament.\n\n"
-                            f"{message}"
-                        )
-                        engine_messages.append({"role": "user", "content": doc_block})
-                    elif document_context and _budget["doc_kept_chars"] == 0:
-                        # Bug 32: no space left for document; we discard because history has priority.
-                        logger.warning(
-                            "Bug 32: dropping document (history reserved fully) — history=%s, reserve=%s",
-                            history_chars, _budget["history_reserve"],
-                        )
-                        document_context = ""
-                        engine_messages.append({"role": "user", "content": message})
-                    elif rag_context and available_chars > 0:
-                        rag_context = rag_context[:available_chars]
-                        # RAG context: system docs, technical docs, memory
-                        _rag_instruction = {
-                            "ca": (
-                                "INFORMACIO RECUPERADA. UTILITZA-LA per respondre. "
-                                "Si la resposta es aqui, cita-la directament. "
-                                "Fonts: [DOCUMENTACIO DEL SISTEMA] = knowledge base del sistema, "
-                                "[DOCUMENTACIO TECNICA] = documents pujats per l'usuari, "
-                                "[MEMORIA DE L'USUARI] = coses que l'usuari t'ha dit abans. "
-                                "Quan et preguntin d'on saps algo, indica la font correcta. "
-                                "MAI diguis que ho saps pel teu entrenament si la info ve d'aqui:"
-                            ),
-                            "es": (
-                                "INFORMACION RECUPERADA. UTILIZALA para responder. "
-                                "Si la respuesta esta aqui, citala directamente. "
-                                "Fuentes: [DOCUMENTACION DEL SISTEMA] = knowledge base del sistema, "
-                                "[DOCUMENTACION TECNICA] = documentos subidos por el usuario, "
-                                "[MEMORIA DEL USUARIO] = cosas que el usuario te dijo antes. "
-                                "Cuando te pregunten de donde sabes algo, indica la fuente correcta. "
-                                "NUNCA digas que lo sabes por tu entrenamiento si la info viene de aqui:"
-                            ),
-                            "en": (
-                                "RETRIEVED INFORMATION. USE IT to answer. "
-                                "If the answer is here, cite it directly. "
-                                "Sources: [SYSTEM DOCUMENTATION] = system knowledge base, "
-                                "[TECHNICAL DOCUMENTATION] = documents uploaded by the user, "
-                                "[USER MEMORY] = things the user told you before. "
-                                "When asked where you know something from, indicate the correct source. "
-                                "NEVER say you know it from training if the info comes from here:"
-                            ),
-                        }
-                        _lang_key = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
-                        _instr = _rag_instruction.get(_lang_key, _rag_instruction["en"])
-                        rag_block = f"[CONTEXT]\n{_instr}\n{rag_context}\n[FI CONTEXT]\n\n{message}"
-                        engine_messages.append({"role": "user", "content": rag_block})
-                    else:
-                        engine_messages.append({"role": "user", "content": message})
+                    engine_messages, _doc_truncated_pct = _inject_context_into_messages(
+                        engine_messages, message, document_context, rag_context,
+                        _budget, available_chars, history_chars,
+                    )
 
                     messages = engine_messages
                     response_chunks = []
 
                     # When an image is attached, wrap with context block (same pattern as documents)
                     if image_b64:
-                        _img_blocks = {
-                            "ca": (
-                                "[IMATGE ADJUNTA]\n"
-                                "L'usuari ha adjuntat una imatge a aquest missatge. "
-                                "Analitza la imatge i incorpora-la a la teva resposta. "
-                                "Prioritza el que veus a la imatge per sobre de memòries anteriors.\n"
-                                "[FI IMATGE]"
-                            ),
-                            "es": (
-                                "[IMAGEN ADJUNTA]\n"
-                                "El usuario ha adjuntado una imagen a este mensaje. "
-                                "Analiza la imagen e incorpórala a tu respuesta. "
-                                "Prioriza lo que ves en la imagen por encima de memorias anteriores.\n"
-                                "[FIN IMAGEN]"
-                            ),
-                            "en": (
-                                "[ATTACHED IMAGE]\n"
-                                "The user has attached an image to this message. "
-                                "Analyze the image and incorporate it into your response. "
-                                "Prioritize what you see in the image over previous memories.\n"
-                                "[END IMAGE]"
-                            ),
-                        }
-                        _lang_key2 = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
-                        _img_block = _img_blocks.get(_lang_key2, _img_blocks["en"])
-                        if messages and messages[-1]["role"] == "user":
-                            messages[-1] = dict(messages[-1])
-                            messages[-1]["content"] = f"{_img_block}\n\n{messages[-1]['content']}"
+                        messages = _inject_image_block(messages)
 
                     # Adapt to different chat signatures
                     import inspect
@@ -1695,26 +1746,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         )
 
                     # Handle non-streaming response accumulation
-                    if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
-                        async for chunk in chat_result:
-                            if isinstance(chunk, dict) and "message" in chunk and "content" in chunk["message"]:
-                                response_chunks.append(chunk["message"]["content"])
-                            elif isinstance(chunk, dict) and "content" in chunk:
-                                response_chunks.append(chunk["content"])
-                            elif isinstance(chunk, str):
-                                response_chunks.append(chunk)
-                    else:
-                        # Await if it's a coroutine (direct result)
-                        result = await chat_result if inspect.iscoroutine(chat_result) else chat_result
-                        if isinstance(result, dict):
-                            if "message" in result and "content" in result["message"]:
-                                response_chunks.append(result["message"]["content"])
-                            elif "content" in result:
-                                response_chunks.append(result["content"])
-                            elif "response" in result:
-                                response_chunks.append(result["response"])
-                        elif isinstance(result, str):
-                            response_chunks.append(result)
+                    await _accumulate_nonstreaming_response(chat_result, response_chunks)
 
                     response_text = "".join(response_chunks)
                     if response_text:
