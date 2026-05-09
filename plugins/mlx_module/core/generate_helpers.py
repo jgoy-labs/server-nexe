@@ -204,6 +204,47 @@ def determine_tokens_to_process(
     return tokens_to_process, new_tokens
 
 
+def _get_stop_sequences(model_path: str) -> List[str]:
+    """Return appropriate stop sequences for the given model path."""
+    if "gpt-oss" in model_path.lower():
+        return ["<|endoftext|>"]
+    return [
+        "<|end|>", "<|endoftext|>",  # Phi-3.5, GPT
+        "</s>",                       # Llama 2
+        "<|eot_id|>",                 # Llama 3.x
+        "<end_of_turn>",              # Gemma
+        "<|im_end|>",                 # ChatML format
+    ]
+
+
+def _apply_stop_sequences(text: str, stop_sequences: List[str]) -> Tuple[str, bool]:
+    """Truncate text at the first stop sequence found. Returns (text, stop_detected)."""
+    for stop_seq in stop_sequences:
+        if stop_seq in text:
+            return text.split(stop_seq)[0], True
+    return text, False
+
+
+def _emit_token(
+    response: Any,
+    stop_sequences: List[str],
+    full_response: List[str],
+    generated_tokens: List[int],
+    stream_callback: Optional[Callable[[str], None]],
+) -> bool:
+    """Process one generator response; return True if a stop sequence was detected."""
+    stop_detected = False
+    if response.text:
+        current_text, stop_detected = _apply_stop_sequences(response.text, stop_sequences)
+        if current_text:
+            full_response.append(current_text)
+            if stream_callback:
+                stream_callback(current_text)
+    if hasattr(response, 'token'):
+        generated_tokens.append(response.token)
+    return stop_detected
+
+
 def run_streaming_generation(
     model: Any,
     tokenizer: Any,
@@ -237,57 +278,23 @@ def run_streaming_generation(
     """
     from mlx_lm import stream_generate
 
-    full_response = []
+    stop_sequences = _get_stop_sequences(model_path)
+    full_response: List[str] = []
     last_response = None
-    generated_tokens = []
-
-    # Common stop tokens for different models
-    # Post-process the response to truncate when they appear
-    _is_gpt_oss = "gpt-oss" in model_path.lower()
-    if _is_gpt_oss:
-        # GPT-OSS: only real EOS — <|...|> tags are internal channels
-        STOP_SEQUENCES = ["<|endoftext|>"]
-    else:
-        STOP_SEQUENCES = [
-            "<|end|>", "<|endoftext|>",  # Phi-3.5, GPT
-            "</s>",  # Llama 2
-            "<|eot_id|>",  # Llama 3.x
-            "<end_of_turn>",  # Gemma
-            "<|im_end|>",  # ChatML format
-        ]
+    generated_tokens: List[int] = []
 
     # MLX relies on tokenizer.eos_token_ids for stopping
-    # No need for explicit stop_words parameter
     generator = stream_generate(
-        model,
-        tokenizer,
-        tokens_to_process,
-        max_tokens=max_tokens,
-        sampler=sampler,
-        prompt_cache=cached_kv
+        model, tokenizer, tokens_to_process,
+        max_tokens=max_tokens, sampler=sampler, prompt_cache=cached_kv
     )
 
     # First iteration: prefill + first token
     stop_detected = False
     try:
         first_response = next(generator)
-        if first_response.text:
-            # Check for stop sequences
-            current_text = first_response.text
-            for stop_seq in STOP_SEQUENCES:
-                if stop_seq in current_text:
-                    # Truncate at stop sequence
-                    current_text = current_text.split(stop_seq)[0]
-                    stop_detected = True
-                    break
-
-            if current_text:
-                full_response.append(current_text)
-                if stream_callback:
-                    stream_callback(current_text)
-
-        if hasattr(first_response, 'token'):
-            generated_tokens.append(first_response.token)
+        stop_detected = _emit_token(first_response, stop_sequences, full_response,
+                                    generated_tokens, stream_callback)
         last_response = first_response
 
         # SAVE CACHE POST-PREFILL (before the rest times out!)
@@ -302,31 +309,13 @@ def run_streaming_generation(
     # Continue with the rest of generation
     if not stop_detected:
         for response in generator:
-            if response.text:
-                # Check for stop sequences
-                current_text = response.text
-                for stop_seq in STOP_SEQUENCES:
-                    if stop_seq in current_text:
-                        # Truncate at stop sequence
-                        current_text = current_text.split(stop_seq)[0]
-                        stop_detected = True
-                        break
-
-                if current_text:
-                    full_response.append(current_text)
-                    if stream_callback:
-                        stream_callback(current_text)
-
-            if hasattr(response, 'token'):
-                generated_tokens.append(response.token)
+            stop_detected = _emit_token(response, stop_sequences, full_response,
+                                        generated_tokens, stream_callback)
             last_response = response
-
-            # Exit loop if stop detected
             if stop_detected:
                 break
 
-    text = "".join(full_response)
-    return text, last_response, generated_tokens
+    return "".join(full_response), last_response, generated_tokens
 
 
 def save_cache_post_generation(
