@@ -102,6 +102,51 @@ class _ForegroundContext:
                 pass
 
 
+def _front_alert_rumps_fallback(title, message, ok, cancel, other):
+    """Fallback path when AppKit is unavailable: delegate to rumps.alert."""
+    import rumps
+    kwargs = {}
+    if title is not None:
+        kwargs["title"] = title
+    if message is not None:
+        kwargs["message"] = message
+    if ok is not None:
+        kwargs["ok"] = ok
+    if cancel is not None:
+        kwargs["cancel"] = cancel
+    if other is not None:
+        kwargs["other"] = other
+    return rumps.alert(**kwargs)
+
+
+def _build_nsalert(title, message, ok, cancel, other):
+    """Construct and configure an NSAlert with buttons."""
+    from AppKit import NSAlert, NSAlertStyleWarning
+    alert = NSAlert.alloc().init()
+    if title is not None:
+        alert.setMessageText_(str(title))
+    if message is not None:
+        alert.setInformativeText_(str(message))
+    alert.setAlertStyle_(NSAlertStyleWarning)
+    alert.addButtonWithTitle_(str(ok) if ok is not None else "OK")
+    if cancel is not None:
+        alert.addButtonWithTitle_(str(cancel))
+    if other is not None:
+        alert.addButtonWithTitle_(str(other))
+    return alert
+
+
+def _nsalert_response_to_int(response):
+    """Convert NSAlertFirstButtonReturn=1000, Second=1001, Third=1002 to ints."""
+    if response == 1000:
+        return 1
+    elif response == 1001:
+        return 0
+    elif response == 1002:
+        return -1
+    return response
+
+
 def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_):
     """Show an always-on-top NSAlert.
 
@@ -110,48 +155,15 @@ def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_
     runModal. Return compat with rumps: 1 (OK) / 0 (Cancel) / -1 (Other).
     """
     try:
-        from AppKit import NSAlert, NSAlertStyleWarning
+        alert = _build_nsalert(title, message, ok, cancel, other)
     except Exception:
-        import rumps
-        kwargs = {}
-        if title is not None:
-            kwargs["title"] = title
-        if message is not None:
-            kwargs["message"] = message
-        if ok is not None:
-            kwargs["ok"] = ok
-        if cancel is not None:
-            kwargs["cancel"] = cancel
-        if other is not None:
-            kwargs["other"] = other
-        return rumps.alert(**kwargs)
-
-    alert = NSAlert.alloc().init()
-    if title is not None:
-        alert.setMessageText_(str(title))
-    if message is not None:
-        alert.setInformativeText_(str(message))
-    alert.setAlertStyle_(NSAlertStyleWarning)
-
-    alert.addButtonWithTitle_(str(ok) if ok is not None else "OK")
-    if cancel is not None:
-        alert.addButtonWithTitle_(str(cancel))
-    if other is not None:
-        alert.addButtonWithTitle_(str(other))
+        return _front_alert_rumps_fallback(title, message, ok, cancel, other)
 
     window = alert.window()
     window.setLevel_(NS_STATUS_WINDOW_LEVEL)
     window.makeKeyAndOrderFront_(None)
 
-    response = alert.runModal()
-    # NSAlertFirstButtonReturn=1000, Second=1001, Third=1002
-    if response == 1000:
-        return 1
-    elif response == 1001:
-        return 0
-    elif response == 1002:
-        return -1
-    return response
+    return _nsalert_response_to_int(alert.runModal())
 
 
 def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
