@@ -461,100 +461,64 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         # MLX / llamacpp / auto: best-effort, accept
         return True
 
-    @router.post("/backend", operation_id="webui_set_backend")
-    async def set_backend(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
-        """Change the active backend and/or model at runtime. Starts Ollama if needed."""
-        import os
-        import subprocess  # nosec B404: subprocess required to start Ollama (literal argv) inside set_backend endpoint, gated by require_ui_auth; mono-user local
+    async def _ensure_ollama_running() -> bool:
+        """Check if Ollama is reachable; if not, start it headlessly. Returns True if started."""
+        import subprocess  # nosec B404: subprocess required to start Ollama (literal argv); gated by require_ui_auth; mono-user local
         import shutil
-        raw_backend = request.get("backend", "")
-        model = request.get("model", "")
-        ollama_started = False
-
-        # Bug 27 — normalize before validating
-        canonical = _normalize_backend_name(raw_backend)
-        if raw_backend and not canonical:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Invalid backend '{raw_backend}'. Valid backends: "
-                    f"ollama, mlx, llamacpp, llama_cpp, auto"
-                ),
-            )
-
-        if canonical == "ollama":
-            # Check if Ollama is running, if not, try to start it
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(f"{resolve_base_url()}/api/tags")
+                if resp.status_code == 200:
+                    return False  # already running
+        except Exception:
+            pass
+        # Ollama is not running — start headless (Bug Ollama GUI 2026-04-06)
+        # Prefer direct `ollama serve`; fallback to Ollama.app bundle binary.
+        # We do NOT run `open -a Ollama` (would launch GUI/Dock window).
+        if shutil.which("ollama"):
             try:
-                import httpx
-                async with httpx.AsyncClient(timeout=3.0) as client:
-                    resp = await client.get(f"{resolve_base_url()}/api/tags")
-                    if resp.status_code != 200:
-                        raise ConnectionError()
-            except Exception:
-                # Ollama is not running — try to start headless (Bug Ollama GUI 2026-04-06)
-                # We prefer direct `ollama serve` (without GUI). Fallback to the binary in
-                # the Ollama.app bundle (also headless — we do NOT run `open -a Ollama`
-                # because that would launch the full GUI to the Dock and a window).
-                if shutil.which("ollama"):
-                    try:
-                        subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv inside set_backend endpoint gated by require_ui_auth; mono-user local — equivalent to user running it directly
-                            ["ollama", "serve"],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            start_new_session=True,
-                        )
-                        logger.info("Ollama service started automatically")
-                        ollama_started = True
-                    except Exception as e:
-                        logger.warning(f"Could not start Ollama: {e}")
-                elif _os.path.exists("/Applications/Ollama.app/Contents/Resources/ollama"):
-                    try:
-                        subprocess.Popen(  # nosec B603: absolute path to Ollama.app bundled binary + literal `serve` argv; gated by require_ui_auth (mono-user local)
-                            ["/Applications/Ollama.app/Contents/Resources/ollama", "serve"],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            start_new_session=True,
-                        )
-                        logger.info("ollama serve started headless from Ollama.app bundle")
-                        ollama_started = True
-                    except Exception as e:
-                        logger.warning(f"Could not start ollama serve from bundle: {e}")
-
-        # Bug 26 — before accepting the change, validate that the model exists
-        # for the chosen backend. If the change only affects the backend (no
-        # model), we allow it. If there is an explicit model and we can check it,
-        # we raise 400 if it doesn't exist.
-        if canonical and model:
-            if not await _backend_model_exists(canonical, model):
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Model '{model}' not found for backend '{canonical}'. "
-                        f"Verify the model is installed before switching."
-                    ),
+                subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv; gated by require_ui_auth; mono-user local
+                    ["ollama", "serve"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
                 )
-
-        # Unload previous Ollama model to free VRAM when switching
-        old_model = os.getenv("NEXE_DEFAULT_MODEL", "")
-        old_backend = os.getenv("NEXE_MODEL_ENGINE", "auto")
-        if old_model and model and old_model != model and old_backend in ("ollama", "auto"):
+                logger.info("Ollama service started automatically")
+                return True
+            except Exception as e:
+                logger.warning(f"Could not start Ollama: {e}")
+        elif _os.path.exists("/Applications/Ollama.app/Contents/Resources/ollama"):
             try:
-                import httpx as _httpx
-                async with _httpx.AsyncClient(timeout=5.0) as _uc:
-                    await _uc.post(
-                        f"{resolve_base_url()}/api/chat",
-                        json={"model": old_model, "keep_alive": 0}
-                    )
-                    logger.info(f"Unloaded previous model from Ollama VRAM: {old_model}")
-            except Exception as _ue:
-                logger.debug(f"Could not unload previous model {old_model}: {_ue}")
+                subprocess.Popen(  # nosec B603: absolute path to Ollama.app bundled binary + literal `serve` argv; gated by require_ui_auth (mono-user local)
+                    ["/Applications/Ollama.app/Contents/Resources/ollama", "serve"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
+                )
+                logger.info("ollama serve started headless from Ollama.app bundle")
+                return True
+            except Exception as e:
+                logger.warning(f"Could not start ollama serve from bundle: {e}")
+        return False
 
+    async def _unload_previous_ollama_model(old_model: str, new_model: str, old_backend: str) -> None:
+        """Unload previous Ollama model from VRAM when switching models."""
+        if not (old_model and new_model and old_model != new_model and old_backend in ("ollama", "auto")):
+            return
+        try:
+            import httpx as _httpx
+            async with _httpx.AsyncClient(timeout=5.0) as _uc:
+                await _uc.post(f"{resolve_base_url()}/api/chat", json={"model": old_model, "keep_alive": 0})
+                logger.info(f"Unloaded previous model from Ollama VRAM: {old_model}")
+        except Exception as _ue:
+            logger.debug(f"Could not unload previous model {old_model}: {_ue}")
+
+    def _apply_and_persist_backend(canonical: str, model: str) -> None:
+        """Set env vars for backend/model and persist them to .env."""
+        import os
         if canonical:
             os.environ["NEXE_MODEL_ENGINE"] = canonical
             logger.info(f"Backend changed to: {canonical}")
         if model:
             os.environ["NEXE_DEFAULT_MODEL"] = model
             logger.info(f"Model changed to: {model}")
-
-        # Persist changes to .env so they survive a restart
         persist = {}
         if canonical:
             persist["NEXE_MODEL_ENGINE"] = canonical
@@ -563,11 +527,43 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         if persist:
             _persist_env_vars(persist)
 
+    @router.post("/backend", operation_id="webui_set_backend")
+    async def set_backend(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
+        """Change the active backend and/or model at runtime. Starts Ollama if needed."""
+        import os
+        raw_backend = request.get("backend", "")
+        model = request.get("model", "")
+
+        # Bug 27 — normalize before validating
+        canonical = _normalize_backend_name(raw_backend)
+        if raw_backend and not canonical:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid backend '{raw_backend}'. Valid backends: ollama, mlx, llamacpp, llama_cpp, auto",
+            )
+
+        ollama_started = False
+        if canonical == "ollama":
+            ollama_started = await _ensure_ollama_running()
+
+        # Bug 26 — validate model exists before accepting the change
+        if canonical and model:
+            if not await _backend_model_exists(canonical, model):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Model '{model}' not found for backend '{canonical}'. Verify the model is installed before switching.",
+                )
+
+        old_model = os.getenv("NEXE_DEFAULT_MODEL", "")
+        old_backend = os.getenv("NEXE_MODEL_ENGINE", "auto")
+        await _unload_previous_ollama_model(old_model, model, old_backend)
+        _apply_and_persist_backend(canonical, model)
+
         return {
             "status": "ok",
             "backend": os.getenv("NEXE_MODEL_ENGINE", "auto"),
             "model": os.getenv("NEXE_DEFAULT_MODEL", ""),
-            "ollama_started": ollama_started
+            "ollama_started": ollama_started,
         }
 
     # -- GET /health --
