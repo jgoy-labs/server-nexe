@@ -15,7 +15,7 @@ from .installer_catalog_data import MODEL_CATALOG  # noqa: F401 (re-exported)
 
 
 def _determine_recommended_category(usable_ram: int) -> tuple:
-    """Retorna (rec_choice, rec_label) basat en la RAM disponible."""
+    """Return (rec_choice, rec_label) based on available RAM."""
     if usable_ram < 5:
         return "1", t('size_small')
     elif usable_ram < 20:
@@ -25,7 +25,7 @@ def _determine_recommended_category(usable_ram: int) -> tuple:
 
 
 def _resolve_category(size_choice: str, recommended: str) -> tuple:
-    """Converteix l'elecció de mida a (categoria, nom_categoria)."""
+    """Convert the size choice to (category, category_name)."""
     category_map = {
         "1": ("small", t('category_small')),
         "2": ("medium", t('category_medium')),
@@ -35,7 +35,7 @@ def _resolve_category(size_choice: str, recommended: str) -> tuple:
 
 
 def _get_model_engines(model: dict) -> list:
-    """Retorna la llista de noms d'engines disponibles per a un model."""
+    """Return the list of available engine names for a model."""
     engines = []
     if model.get("mlx"):
         engines.append("MLX")
@@ -47,7 +47,7 @@ def _get_model_engines(model: dict) -> list:
 
 
 def _get_model_status(fits: bool, fits_disk: bool, disk_free_gb: float) -> str:
-    """Retorna la cadena d'estat RAM/disc per a un model."""
+    """Return the RAM/disk status string for a model."""
     if fits:
         return f"{GREEN}✓ {t('compatible')}{RESET}"
     elif not fits_disk and disk_free_gb > 0:
@@ -57,7 +57,7 @@ def _get_model_status(fits: bool, fits_disk: bool, disk_free_gb: float) -> str:
 
 
 def _localize(field: "str | dict[str, str]", lang: str) -> str:
-    """Retorna el camp localitzat si és dict; si no, el valor directe."""
+    """Return the localised field if it is a dict; otherwise return the value directly."""
     if isinstance(field, dict):
         return field.get(lang, field['ca'])
     return field
@@ -66,7 +66,7 @@ def _localize(field: "str | dict[str, str]", lang: str) -> str:
 def _print_model_entry(
     i: int, model: dict, usable_ram: int, disk_free_gb: float, lang: str
 ) -> None:
-    """Imprimeix l'entrada d'un model a la llista de selecció."""
+    """Print a model entry in the selection list."""
     fits_ram = usable_ram >= model["ram_gb"]
     fits_disk = disk_free_gb >= model.get("disk_gb", 0) * 1.2
     fits = fits_ram and fits_disk
@@ -92,13 +92,13 @@ def _print_model_entry(
 def _print_model_list(
     models: list, usable_ram: int, disk_free_gb: float, lang: str
 ) -> None:
-    """Imprimeix la llista completa de models d'una categoria."""
+    """Print the full list of models for a category."""
     for i, model in enumerate(models, 1):
         _print_model_entry(i, model, usable_ram, disk_free_gb, lang)
 
 
 def _select_category(recommended: str, rec_label: str) -> str:
-    """Mostra el menú de mida i retorna l'elecció de l'usuari."""
+    """Show the size menu and return the user's choice."""
     print(f"\n{YELLOW}{'─'*60}{RESET}")
     print(f"\n{BOLD}{t('model_sizes_title')}{RESET}\n")
     print(f"  {CYAN}1.{RESET} {t('model_small_desc')}")
@@ -111,7 +111,7 @@ def _select_category(recommended: str, rec_label: str) -> str:
 
 
 def _select_model_from_list(models: list) -> dict:
-    """Demana a l'usuari que triï un model. Retorna el model seleccionat."""
+    """Ask the user to choose a model. Return the selected model."""
     default = "1"
     choice = input(f"{BOLD}{t('select_model_prompt').format(n=len(models), default=default)}{RESET} ").strip()
     if not choice:
@@ -123,7 +123,7 @@ def _select_model_from_list(models: list) -> dict:
 
 
 def _build_available_engines(selected_model: dict, has_metal: bool) -> list:
-    """Construeix la llista d'engines disponibles per al model seleccionat."""
+    """Build the list of available engines for the selected model."""
     available = []
     if has_metal and selected_model.get("mlx"):
         available.append(("mlx", "MLX", t('engine_mlx_desc'), True))
@@ -135,7 +135,7 @@ def _build_available_engines(selected_model: dict, has_metal: bool) -> list:
 
 
 def _select_engine_interactive(selected_model: dict, available_engines: list) -> str:
-    """Mostra el menú d'engines i retorna l'engine triat per l'usuari."""
+    """Show the engine menu and return the engine chosen by the user."""
     if len(available_engines) > 1:
         clear()
         print(APP_LOGO)
@@ -160,7 +160,7 @@ def _select_engine_interactive(selected_model: dict, available_engines: list) ->
 
 
 def _warn_qwen35_mlx(engine: str, selected_model: dict) -> None:
-    """Avisa sobre conflicte de dependències pip per a Qwen3.5 + MLX."""
+    """Warn about pip dependency conflict for Qwen3.5 + MLX."""
     if engine == "mlx" and selected_model.get("mlx") and "Qwen3.5" in selected_model.get("mlx", ""):
         print(f"\n{YELLOW}{'─'*60}{RESET}")
         print(f"{YELLOW}{BOLD}{t('mlx_dep_warning_title')}{RESET}")
@@ -170,7 +170,7 @@ def _warn_qwen35_mlx(engine: str, selected_model: dict) -> None:
 
 
 def _get_model_id(engine: str, selected_model: dict) -> str:
-    """Retorna l'ID del model per a l'engine seleccionat."""
+    """Return the model ID for the selected engine."""
     if engine == "mlx":
         return selected_model["mlx"]
     elif engine == "llama_cpp":

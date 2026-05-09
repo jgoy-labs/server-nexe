@@ -105,7 +105,7 @@ def _perform_linux_relocation(source_root: Path, project_root: Path) -> None:
 
 
 def _setup_install_log(project_root: Path):
-    """Crea storage/logs/, inicia TeeWriter i redirigeix stdout. Retorna (tee, log_path)."""
+    """Create storage/logs/, start TeeWriter and redirect stdout. Return (tee, log_path)."""
     log_dir = project_root / "storage" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"install_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
@@ -115,7 +115,7 @@ def _setup_install_log(project_root: Path):
 
 
 def _confirm_proceed(tee) -> bool:
-    """Demana confirmació a l'usuari. Tanca el tee i retorna False si cancel·la."""
+    """Ask for user confirmation. Close the tee and return False if cancelled."""
     confirm = input(f"\n{BOLD}{t('proceed_install')}{RESET} {t('yes_no')}: ").strip().lower()
     if confirm not in ('y', 'yes', 's', 'si', 'sí'):
         print("Cancelled.")
@@ -125,7 +125,7 @@ def _confirm_proceed(tee) -> bool:
 
 
 def _handle_reinstall_or_clean(project_root: Path) -> bool:
-    """Gestiona reinstal·lació interactiva o neteja del venv. Retorna False si cal abortar."""
+    """Handle interactive reinstall or venv cleanup. Return False if the install should abort."""
     if detect_existing_install(project_root):
         print(f"\n{YELLOW}[!] Instal·lació existent detectada a:{RESET} {project_root}")
         print(f"\n  {CYAN}1){RESET} Esborra-ho tot (.env, storage/, knowledge/, venv)")
@@ -159,7 +159,7 @@ def _handle_reinstall_or_clean(project_root: Path) -> bool:
 
 
 def _resolve_skip_model_config() -> dict:
-    """Detecta el primer model Ollama local; si no n'hi ha, usa Qwen3.5 2B com a fallback."""
+    """Detect the first local Ollama model; if none found, fall back to Qwen3.5 2B."""
     detected = None
     try:
         import json as _json
@@ -203,7 +203,7 @@ def _resolve_skip_model_config() -> dict:
 
 
 def _show_download_confirmation() -> None:
-    """Mostra la pantalla de confirmació de descàrrega amb avís de bateria."""
+    """Show the download confirmation screen with battery warning."""
     clear()
     print(APP_LOGO)
     print(f"\n{BOLD}📦 {t('download_confirmation_title')}{RESET}\n")
@@ -219,7 +219,7 @@ def _show_download_confirmation() -> None:
 
 
 def _create_storage_folders(project_root: Path) -> None:
-    """Crea els quatre subdirectoris de storage/."""
+    """Create the four subdirectories under storage/."""
     print_step(f"{BOLD}{t('preparing_data')}{RESET}")
     for folder in ("storage/cache", "storage/logs", "storage/models", "storage/vectors"):
         (project_root / folder).mkdir(parents=True, exist_ok=True)
@@ -227,7 +227,7 @@ def _create_storage_folders(project_root: Path) -> None:
 
 
 def _handle_mlx_engine(model_config: dict, project_root: Path, python_path: Path) -> None:
-    """Verifica Metal i descarrega MLX, o ofereix fallback a Ollama si Metal no disponible."""
+    """Verify Metal and download MLX, or offer Ollama fallback if Metal is unavailable."""
     metal_available = False
     try:
         result = subprocess.run(  # nosec B603: python_path is venv-derived absolute Path; -c argument is hardcoded literal Metal probe
@@ -276,7 +276,7 @@ def _handle_mlx_engine(model_config: dict, project_root: Path, python_path: Path
 
 
 def _cleanup_module_cache(project_root: Path) -> None:
-    """Esborra .module_cache.json si existeix."""
+    """Delete .module_cache.json if it exists."""
     cache_file = project_root / "personality" / ".module_cache.json"
     if cache_file.exists():
         cache_file.unlink()
@@ -285,7 +285,7 @@ def _cleanup_module_cache(project_root: Path) -> None:
 
 
 def _create_nexe_wrapper(project_root: Path, python_path: Path) -> tuple:
-    """Crea el script nexe i intenta el symlink global. Retorna (wrapper_path, symlink_ok)."""
+    """Create the nexe script and attempt a global symlink. Return (wrapper_path, symlink_ok)."""
     nexe_wrapper = project_root / "nexe"
     with open(nexe_wrapper, "w") as f:
         f.write("#!/bin/bash\n")
@@ -314,7 +314,7 @@ def _create_nexe_wrapper(project_root: Path, python_path: Path) -> tuple:
 
 
 def _setup_knowledge_dir(project_root: Path) -> Path:
-    """Crea i retorna el directori knowledge/."""
+    """Create and return the knowledge/ directory."""
     print_step(f"{BOLD}{t('knowledge_folder_created')}{RESET}")
     knowledge_dir = project_root / "knowledge"
     knowledge_dir.mkdir(exist_ok=True)
@@ -324,7 +324,7 @@ def _setup_knowledge_dir(project_root: Path) -> Path:
 
 
 def _download_embeddings(project_root: Path, python_path: Path) -> None:
-    """Demana permís i descarrega el model d'embeddings via fastembed."""
+    """Ask for permission and download the embeddings model via fastembed."""
     print(f"\n{YELLOW}{'─'*60}{RESET}")
     info_text = t('embeddings_info').format(bold=BOLD, reset=RESET)
     print(info_text)
@@ -367,7 +367,7 @@ def _download_embeddings(project_root: Path, python_path: Path) -> None:
 def _ingest_knowledge_if_present(
     project_root: Path, python_path: Path, knowledge_dir: Path, lang: str
 ) -> None:
-    """Ingesta documents de knowledge/ si n'hi ha."""
+    """Ingest documents from knowledge/ if any are present."""
     _ingest_dir = knowledge_dir / lang if (knowledge_dir / lang).is_dir() else knowledge_dir
     knowledge_files = (
         list(_ingest_dir.glob("*.md"))
