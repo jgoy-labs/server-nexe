@@ -4079,3 +4079,795 @@ reason = "FP: short EN docstring ('Test error request metrics.') misdetected as 
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-fp-20260509"
+
+
+# ═══════════════════════════════════════════════════════════════
+# lang-comments FP — detected:ca i detected:es (Grup K, DONE)
+# Informe: 2026-05-09-192924-55b81a42
+# 87 noves entrades: 60 detected:ca + 27 detected:es
+# Tots FP: el detector Lingua confon termes tècnics EN curts
+# amb Català/Espanyol (locale codes ca-ES, short docstrings, etc.)
+# ═══════════════════════════════════════════════════════════════
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/cli/cli.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/endpoints/chat.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/endpoints/chat_engines/llama_cpp.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/endpoints/chat_engines/ollama.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/endpoints/chat_rag.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/endpoints/tests/test_bootstrap.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/endpoints/tests/test_root.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/endpoints/tests/test_root.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/ingest/ingest_knowledge.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/ingest/tests/test_ingest_knowledge.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/metrics/tests/test_endpoint.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/metrics/tests/test_registry.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/paths/tests/test_paths.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/tests/test_small_coverage.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/download_verify.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/install.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/install_headless.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/installer_catalog_data.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/installer_hardware.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/installer_ollama_install.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/installer_setup_models.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/tray.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/embeddings/tests/test_top_k_cap.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/embeddings/tests/test_vectorstore_protocol.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/api/__init__.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/api/text_store.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/cli/tests/test_rag_viewer.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/pipeline/extractor.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/pipeline/extractor.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/rag_logger.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/storage/sqlite_migrations.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/tests/test_api.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/tests/test_api.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/tests/test_ingestion.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/tests/test_models.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/workflow/nodes/memory_recall_node.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/rag/header_parser.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/rag/tests/test_cli.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/rag/tests/test_constants.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/llama_cpp_module/__init__.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/llama_cpp_module/core/config.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/mlx_module/core/config.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/mlx_module/tests/test_mlx_config_coverage.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/api/routes.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/core/errors.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/module.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/tests/integration/test_ollama_integration.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/tests/integration/test_ollama_integration.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/tests/unit/test_module_coverage.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/tests/unit/test_ollama_node.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/tests/unit/test_ollama_node.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/workflow/nodes/tests/test_nodes_init.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/workflow/nodes/tests/test_ollama_node_full.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/workflow/nodes/tests/test_ollama_node_full.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/workflow/tests/test_workflow_init.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/security/core/input_sanitizers.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/security/module.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/security/security_logger/helpers.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/security/tests/test_coverage_gaps.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/security/tests/test_manifest_coverage.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/api/routes_chat.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/core/memory_helper.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/core/session_manager.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/module.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/tests/integration/test_web_ui_endpoints.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/tests/test_coverage_gaps.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/tests/test_mem_save_injection.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/tests/test_memory_delete.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/ui/app.js"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/ui/app.js"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/integration/test_mem_delete_e2e.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/onada4_mypy_core/test_stream_kwargs_regression.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/onada4_mypy_memory/test_async_embedder_model_guard.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/onada4_mypy_memory/test_memory_entry_id_invariant.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/onada4_mypy_plugins/test_cluster17_module_manager_none_503.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_embeddings_recall_ab.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_final_coverage.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_final_coverage.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_install_headless.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_installer_reinstall.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_installer_setup_env.py"
+message_contains = "detected: ca,"
+reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_integration_real.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_integrity_pins_visibility.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_lifespan_helpers.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_memory_contract.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_pid_file.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_removed_direct_routes_guard.py"
+message_contains = "detected: es,"
+reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
