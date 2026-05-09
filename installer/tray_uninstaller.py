@@ -166,26 +166,10 @@ def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_
     return _nsalert_response_to_int(alert.runModal())
 
 
-def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
-    """
-    Perform the full uninstall process.
-
-    Args:
-        install_dir: Path to the Nexe installation directory
-        t_func: Translation function (key, **kwargs) -> str
-        stop_server_func: Callable to stop the running server
-
-    Returns:
-        (removed: list[str], failed: list[str])
-    """
-    # Calculate storage before showing warning
+def _uninstall_confirm_dialogs(install_dir: Path, t_func) -> tuple:
+    """Show the 3 confirmation dialogs. Return (cancelled, keep_data, storage_dir)."""
     storage_text = t_func("uninstall_storage", size=calculate_storage(install_dir))
-
-    # Promocionem activation policy UNA vegada per tot el flux de 3 alertes.
-    # (Abans es promocionava/desmotava per alerta → race condition amb event
-    # loop → alertes es "saltaven" sense esperar input de l'usuari.)
     with _ForegroundContext():
-        # First window: warning with what will be deleted
         response = _front_alert(
             title=t_func("uninstall_title"),
             message=t_func("uninstall_warning", storage=storage_text, path=str(install_dir)),
@@ -193,9 +177,8 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
             cancel=t_func("uninstall_title"),
         )
         if response != 0:
-            return None, None  # User cancelled
+            return True, False, None
 
-        # Second window: final confirmation
         response2 = _front_alert(
             title=t_func("uninstall_title"),
             message=t_func("uninstall_confirm"),
@@ -203,9 +186,8 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
             cancel=t_func("uninstall_title"),
         )
         if response2 != 0:
-            return None, None  # User cancelled
+            return True, False, None
 
-        # Third window: ask about data backup
         keep_data = False
         storage_dir = install_dir / "storage"
         if storage_dir.exists():
@@ -216,10 +198,13 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
                 cancel=t_func("uninstall_delete_all"),
             )
             keep_data = (data_response == 1)
+    return False, keep_data, storage_dir
 
-    # Backup storage/ if requested
+
+def _uninstall_backup_storage(storage_dir: Path, keep_data: bool, t_func, removed, failed):
+    """Optionally backup storage/ and report outcome into removed/failed."""
     backup_path = None
-    if keep_data and storage_dir.exists():
+    if keep_data and storage_dir is not None and storage_dir.exists():
         from datetime import datetime
         backup_name = f"nexe-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         backup_path = Path.home() / backup_name
@@ -227,33 +212,25 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
             shutil.copytree(storage_dir, backup_path)
         except Exception:
             backup_path = None
-
-    # Stop server
-    stop_server_func()
-
-    removed = []
-    failed = []
-
-    # Report backup result
     if keep_data:
         if backup_path:
             removed.append(t_func("uninstall_backup_ok", path=str(backup_path)))
         else:
             failed.append(t_func("uninstall_backup_failed"))
 
-    # Remove from Login Items
+
+def _uninstall_remove_system_entries(removed, failed):
+    """Remove Login Items, Dock entry, /usr/local/bin/nexe and /Applications/Nexe.app."""
     if remove_login_items():
         removed.append("Login Items")
     else:
         failed.append("Login Items")
 
-    # Remove from Dock
     if remove_from_dock():
         removed.append("Dock")
     else:
         failed.append("Dock")
 
-    # Remove /usr/local/bin/nexe symlink
     nexe_symlink = Path("/usr/local/bin/nexe")
     if nexe_symlink.is_symlink() or nexe_symlink.exists():
         try:
@@ -264,7 +241,6 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
         except Exception:
             failed.append("/usr/local/bin/nexe")
 
-    # Remove /Applications/Nexe.app
     nexe_app = Path("/Applications/Nexe.app")
     if nexe_app.exists():
         try:
@@ -273,7 +249,6 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
         except Exception:
             failed.append("/Applications/Nexe.app")
 
-    # Remove marker file + app support dir (outside bundle per codesign seal)
     support_dir = Path.home() / "Library" / "Application Support" / "Nexe"
     if support_dir.exists():
         try:
@@ -282,7 +257,9 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
         except Exception:
             failed.append(str(support_dir))
 
-    # Remove installation directory using a detached shell script
+
+def _uninstall_remove_install_dir(install_dir: Path, removed, failed):
+    """Schedule removal of install_dir via a detached shell script."""
     cleanup_script = f"""#!/bin/bash
 sleep 2
 rm -rf "{install_dir}" && touch /tmp/nexe_uninstall_ok || touch /tmp/nexe_uninstall_failed
@@ -297,5 +274,30 @@ rm -rf "{install_dir}" && touch /tmp/nexe_uninstall_ok || touch /tmp/nexe_uninst
         removed.append(str(install_dir))
     except Exception:
         failed.append(str(install_dir))
+
+
+def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
+    """
+    Perform the full uninstall process.
+
+    Args:
+        install_dir: Path to the Nexe installation directory
+        t_func: Translation function (key, **kwargs) -> str
+        stop_server_func: Callable to stop the running server
+
+    Returns:
+        (removed: list[str], failed: list[str])
+    """
+    cancelled, keep_data, storage_dir = _uninstall_confirm_dialogs(install_dir, t_func)
+    if cancelled:
+        return None, None
+
+    removed = []
+    failed = []
+
+    _uninstall_backup_storage(storage_dir, keep_data, t_func, removed, failed)
+    stop_server_func()
+    _uninstall_remove_system_entries(removed, failed)
+    _uninstall_remove_install_dir(install_dir, removed, failed)
 
     return removed, failed
