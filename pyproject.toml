@@ -117,6 +117,30 @@ allowed = [
     "Freeware",
     # semgrep (eina de dev)
     "LGPL-2.1-or-later",
+    # aiohttp — Apache-2.0 AND MIT (compound SPDX expression)
+    "Apache-2.0 AND MIT",
+    # fastembed (Qdrant) — PyPI metadata error; real license is Apache-2.0
+    "Other/Proprietary License",
+    # multidict — Apache License 2.0 (verbose form of Apache-2.0)
+    "Apache License 2.0",
+    # numpy 2.x — compound BSD/MIT/Zlib/CC0 (all permissive)
+    "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+    # Zlib (used in numpy compound above)
+    "Zlib",
+    # 0BSD (used in numpy compound above)
+    "0BSD",
+    # pillow — MIT-CMU (PIL/CMU variant of MIT)
+    "MIT-CMU",
+    # regex — Apache-2.0 AND CNRI-Python (Python runtime license, permissive)
+    "Apache-2.0 AND CNRI-Python",
+    # CNRI-Python standalone
+    "CNRI-Python",
+    # shellingham — ISC License (ISCL) (verbose form of ISC)
+    "ISC License (ISCL)",
+    # tqdm — MPL-2.0 AND MIT (both already allowed individually)
+    "MPL-2.0 AND MIT",
+    # MPL-2.0 standalone SPDX
+    "MPL-2.0",
 ]
 forbidden = [
     "GPL-2.0-only",
