@@ -97,7 +97,7 @@ class TestApplyReinstallIfNeeded:
     def test_existing_install_backup_dir_printed(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setattr(ih, "detect_existing_install", lambda _: True)
         monkeypatch.setattr(ih, "apply_reinstall_mode", lambda root, mode: {
-            "mode": mode, "removed": [], "backup_dir": "/tmp/nexe-backup",
+            "mode": mode, "removed": [], "backup_dir": "/tmp/nexe-backup",  # nosemgrep
         })
         ih._apply_reinstall_if_needed(tmp_path, "backup")
         out = capsys.readouterr().out
@@ -211,8 +211,8 @@ class TestResolveModelConfig:
 
 
 class TestRunModelDownload:
-    _FAKE_ROOT = Path("/tmp/nexe-test")
-    _FAKE_PYTHON = Path("/tmp/nexe-test/venv/bin/python")
+    _FAKE_ROOT = Path("/tmp/nexe-test")  # nosemgrep
+    _FAKE_PYTHON = Path("/tmp/nexe-test/venv/bin/python")  # nosemgrep
 
     def _model_config(self, engine="ollama"):
         return {
