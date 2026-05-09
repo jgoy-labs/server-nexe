@@ -56,7 +56,7 @@ def _get_model_status(fits: bool, fits_disk: bool, disk_free_gb: float) -> str:
         return f"{RED}{t('fits_tight')}{RESET}"
 
 
-def _localize(field, lang: str) -> str:
+def _localize(field: "str | dict[str, str]", lang: str) -> str:
     """Retorna el camp localitzat si és dict; si no, el valor directe."""
     if isinstance(field, dict):
         return field.get(lang, field['ca'])
