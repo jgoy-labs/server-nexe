@@ -198,50 +198,69 @@ def go_bang(ctx: click.Context):
   """Start the full Nexe system (Server with embedded Qdrant). Alias for 'go'."""
   _start_nexe(ctx)
 
+def _stop_find_pid_from_file(pid_file) -> list:
+  """F4 fix: read canonical PID file. Returns list of found (name, pattern, pids) or empty."""
+  import json
+  import os
+  if not pid_file.exists():
+    return []
+  try:
+    data = json.loads(pid_file.read_text())
+    candidate = data.get("pid")
+    if candidate:
+      os.kill(candidate, 0)  # Check if the process exists (signal 0 = no kill)
+      return [("Nexe Server", None, [candidate])]
+  except (ProcessLookupError, OSError):
+    # Stale PID file: the process no longer exists
+    pid_file.unlink(missing_ok=True)
+  except Exception:  # nosec B110: PID file unreadable/corrupt → fallback to pgrep
+    pass
+  return []
+
+
+def _stop_find_via_pgrep() -> list:
+  """Fallback: find Nexe processes via pgrep. Returns list of found (name, pattern, pids) or empty."""
+  import subprocess  # nosec B404: subprocess required for pgrep fallback to find Nexe processes
+  try:
+    result = subprocess.run(  # nosec B603 B607: pgrep on hardcoded literal pattern; system tool resolved via PATH (mono-user local)
+      ["pgrep", "-f", "uvicorn.*nexe"],
+      capture_output=True, text=True
+    )
+    pids = [int(p) for p in result.stdout.strip().split('\n') if p.strip()]
+    if pids:
+      return [("Nexe Server", "uvicorn.*nexe", pids)]
+  except Exception:  # nosec B110: best-effort pgrep fallback; empty list reported to user on failure
+    pass
+  return []
+
+
+def _stop_send_sigterm(found: list) -> None:
+  """Send SIGTERM to all found PIDs, echoing status for each."""
+  import os
+  import signal
+  for name, _, pids in found:
+    for pid in pids:
+      try:
+        os.kill(pid, signal.SIGTERM)
+        click.echo(t("cli.stop.stopped_ok", name=name, pid=pid))
+      except ProcessLookupError:
+        click.echo(t("cli.stop.no_longer_exists", name=name, pid=pid))
+      except PermissionError:
+        click.echo(t("cli.stop.permission_denied", name=name, pid=pid))
+
+
 @app.command()
 @click.option('--force', '-f', is_flag=True, help='Skip confirmation')
 @click.pass_context
 def stop(ctx: click.Context, force: bool):
   """Stop all Nexe services (server)."""
-  import json
-  import os
-  import signal
-  import subprocess  # nosec B404: subprocess required for pgrep fallback to find Nexe processes; usage validated below
   from pathlib import Path
 
   project_root = Path(__file__).parent.parent.parent
   pid_file = project_root / "storage" / "run" / "server.pid"
 
-  found: list[tuple[str, Optional[str], list[int]]] = []
-
-  # F4 fix: read canonical PID file first (storage/run/server.pid)
-  pid_from_file = None
-  if pid_file.exists():
-    try:
-      data = json.loads(pid_file.read_text())
-      candidate = data.get("pid")
-      if candidate:
-        os.kill(candidate, 0)  # Check if the process exists (signal 0 = no kill)
-        pid_from_file = candidate
-        found.append(("Nexe Server", None, [pid_from_file]))
-    except (ProcessLookupError, OSError):
-      # Stale PID file: the process no longer exists
-      pid_file.unlink(missing_ok=True)
-    except Exception:  # nosec B110: PID file unreadable/corrupt → fallback to pgrep (comment below documents intent)
-      pass  # JSON malformat o altre error: fallback a pgrep
-
-  # Fallback: pgrep if there was no valid PID file
-  if not found:
-    try:
-      result = subprocess.run(  # nosec B603 B607: pgrep on hardcoded literal pattern; system tool resolved via PATH (mono-user local)
-        ["pgrep", "-f", "uvicorn.*nexe"],
-        capture_output=True, text=True
-      )
-      pids = [int(p) for p in result.stdout.strip().split('\n') if p.strip()]
-      if pids:
-        found.append(("Nexe Server", "uvicorn.*nexe", pids))
-    except Exception:  # nosec B110: best-effort pgrep fallback for stop command; if it fails the empty `found` list is reported to the user
-      pass
+  # F4 fix: read canonical PID file first, fall back to pgrep
+  found = _stop_find_pid_from_file(pid_file) or _stop_find_via_pgrep()
 
   if not found:
     click.echo(t("cli.stop.no_services"))
@@ -256,16 +275,7 @@ def stop(ctx: click.Context, force: bool):
       click.echo(t("cli.stop.cancelled"))
       return
 
-  for name, _, pids in found:
-    for pid in pids:
-      try:
-        os.kill(pid, signal.SIGTERM)
-        click.echo(t("cli.stop.stopped_ok", name=name, pid=pid))
-      except ProcessLookupError:
-        click.echo(t("cli.stop.no_longer_exists", name=name, pid=pid))
-      except PermissionError:
-        click.echo(t("cli.stop.permission_denied", name=name, pid=pid))
-
+  _stop_send_sigterm(found)
   click.echo(t("cli.stop.services_stopped"))
 
 @app.command()
