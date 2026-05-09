@@ -623,6 +623,42 @@ class MemoryHelper:
                 "message": f"Error saving to memory: {str(e)}"
             }
 
+    @staticmethod
+    def _extract_fact_text(r) -> str:
+        """Extract human-readable text from a search result entry."""
+        if hasattr(r, 'payload') and r.payload:
+            text = r.payload.get("text", "")
+            if text:
+                return text
+        if hasattr(r, 'metadata') and r.metadata:
+            text = r.metadata.get("text", "")
+            if text:
+                return text
+        return r.text if hasattr(r, 'text') and r.text else ""
+
+    async def _delete_top_match_from_collection(
+        self, memory, content: str, collection: str, deleted_facts: list
+    ) -> int:
+        """Search collection and delete the top-1 matching entry. Returns count deleted (0 or 1)."""
+        try:
+            if not await memory.collection_exists(collection):
+                return 0
+            results = await memory.search(
+                query=content, collection=collection, top_k=5, threshold=DELETE_THRESHOLD
+            )
+            for r in results[:1]:  # only delete the top match — prevents collateral deletion
+                try:
+                    fact_text = self._extract_fact_text(r)
+                    deleted_facts.append({"id": str(r.id), "text": fact_text, "score": round(r.score, 2)})
+                    await memory.delete(r.id, collection)
+                    logger.info("Deleted memory entry %s from %s (score=%.2f): %s", r.id, collection, r.score, fact_text[:80])
+                    return 1
+                except Exception as e:
+                    logger.warning("Failed to delete %s from %s: %s", r.id, collection, e)
+        except Exception as e:
+            logger.debug("Delete search in %s failed: %s", collection, e)
+        return 0
+
     async def delete_from_memory(
         self,
         content: str,
@@ -645,32 +681,10 @@ class MemoryHelper:
                 return {"success": False, "deleted": 0, "deleted_facts": [], "message": "Memory API not available"}
 
             deleted = 0
-            deleted_facts = []
+            deleted_facts: list = []
             target_collections = collections if collections is not None else ["personal_memory", "user_knowledge"]
             for collection in target_collections:
-                try:
-                    if not await memory.collection_exists(collection):
-                        continue
-                    results = await memory.search(
-                        query=content, collection=collection, top_k=5, threshold=DELETE_THRESHOLD
-                    )
-                    for r in results[:1]:  # only delete the top match — prevents collateral deletion of unrelated facts
-                        try:
-                            fact_text = ""
-                            if hasattr(r, 'payload') and r.payload:
-                                fact_text = r.payload.get("text", "")
-                            elif hasattr(r, 'metadata') and r.metadata:
-                                fact_text = r.metadata.get("text", "")
-                            if not fact_text and hasattr(r, 'text'):
-                                fact_text = r.text or ""
-                            deleted_facts.append({"id": str(r.id), "text": fact_text, "score": round(r.score, 2)})
-                            await memory.delete(r.id, collection)
-                            deleted += 1
-                            logger.info("Deleted memory entry %s from %s (score=%.2f): %s", r.id, collection, r.score, fact_text[:80])
-                        except Exception as e:
-                            logger.warning("Failed to delete %s from %s: %s", r.id, collection, e)
-                except Exception as e:
-                    logger.debug("Delete search in %s failed: %s", collection, e)
+                deleted += await self._delete_top_match_from_collection(memory, content, collection, deleted_facts)
 
             if deleted > 0:
                 return {"success": True, "deleted": deleted, "deleted_facts": deleted_facts, "message": f"Esborrat {deleted} entrada(es) de la memoria"}
