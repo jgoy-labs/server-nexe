@@ -128,44 +128,55 @@ class Validator:
             "contradiction_risk": contradiction_risk,
         }
 
-    def _decide(
+    def _decide_early_exit(
         self,
-        fact: ExtractedFact,
         scores: dict,
         trust_level: TrustLevel,
-    ) -> ValidatorDecision:
-        """Decision tree based on scores."""
+    ) -> "Optional[ValidatorDecision]":
+        """Return early decision based on novelty and contradiction, or None."""
+        if scores["novelty"] < 0.2:
+            return ValidatorDecision.REJECT
+        if scores["contradiction_risk"] > 0.7 and trust_level == TrustLevel.UNTRUSTED:
+            return ValidatorDecision.STAGE_ONLY
+        return None
+
+    def _decide_correction(
+        self,
+        fact: ExtractedFact,
+        explicitness: float,
+    ) -> "Optional[ValidatorDecision]":
+        """Return decision for correction facts, or None if not applicable."""
+        if not (fact.is_correction and explicitness > 0.7):
+            return None
+        if fact.attribute:
+            canonical, _ = self._schema.resolve(fact.attribute)
+            if canonical:
+                return ValidatorDecision.UPSERT_PROFILE
+        return ValidatorDecision.PROMOTE_EPISODIC
+
+    def _decide_profile(
+        self,
+        fact: ExtractedFact,
+        trust: float,
+        explicitness: float,
+    ) -> "Optional[ValidatorDecision]":
+        """Return profile-based decision if fact has schema attribute, else None."""
+        if not fact.attribute:
+            return None
+        canonical, method = self._schema.resolve(fact.attribute)
+        if canonical and method != "none":
+            if trust >= 0.8 or explicitness >= 0.7:
+                return ValidatorDecision.UPSERT_PROFILE
+            return ValidatorDecision.STAGE_ONLY
+        return None
+
+    def _decide_composite(self, scores: dict) -> ValidatorDecision:
+        """Return episodic/stage/reject decision based on composite score."""
         trust = scores["trust"]
         explicitness = scores["explicitness"]
         novelty = scores["novelty"]
         contradiction = scores["contradiction_risk"]
         future_utility = scores["future_utility"]
-
-        # Very low novelty = already known, skip
-        if novelty < 0.2:
-            return ValidatorDecision.REJECT
-
-        # High contradiction + untrusted = reject
-        if contradiction > 0.7 and trust_level == TrustLevel.UNTRUSTED:
-            return ValidatorDecision.STAGE_ONLY
-
-        # Corrections always promoted (user explicitly correcting)
-        if fact.is_correction and explicitness > 0.7:
-            if fact.attribute:
-                canonical, _ = self._schema.resolve(fact.attribute)
-                if canonical:
-                    return ValidatorDecision.UPSERT_PROFILE
-            return ValidatorDecision.PROMOTE_EPISODIC
-
-        # Profile-worthy: has schema attribute + explicit + trusted/important
-        if fact.attribute:
-            canonical, method = self._schema.resolve(fact.attribute)
-            if canonical and method != "none":
-                if trust >= 0.8 or explicitness >= 0.7:
-                    return ValidatorDecision.UPSERT_PROFILE
-                return ValidatorDecision.STAGE_ONLY
-
-        # Episodic-worthy: decent scores
         composite = (
             trust * 0.25
             + explicitness * 0.20
@@ -173,12 +184,29 @@ class Validator:
             + novelty * 0.15
             + (1.0 - contradiction) * 0.15
         )
-
         if composite >= 0.55:
             return ValidatorDecision.PROMOTE_EPISODIC
         if composite >= 0.35:
             return ValidatorDecision.STAGE_ONLY
         return ValidatorDecision.REJECT
+
+    def _decide(
+        self,
+        fact: ExtractedFact,
+        scores: dict,
+        trust_level: TrustLevel,
+    ) -> ValidatorDecision:
+        """Decision tree based on scores."""
+        early = self._decide_early_exit(scores, trust_level)
+        if early is not None:
+            return early
+        correction = self._decide_correction(fact, scores["explicitness"])
+        if correction is not None:
+            return correction
+        profile = self._decide_profile(fact, scores["trust"], scores["explicitness"])
+        if profile is not None:
+            return profile
+        return self._decide_composite(scores)
 
     @staticmethod
     def _explain(decision: ValidatorDecision, scores: dict) -> str:
