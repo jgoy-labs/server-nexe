@@ -104,13 +104,62 @@ async def initialize_plugin_modules(app, server_state):
         logger.error(f"Error during plugin initialization: {e}", exc_info=True)
 
 
+def _auto_ingest_is_disabled(nexe_env: str, auto_ingest_enabled: bool) -> bool:
+    """Return True if auto-ingest should be skipped (test env or disabled via env var)."""
+    return nexe_env in ("test", "testing") or not auto_ingest_enabled
+
+
+def _resolve_knowledge_path_for_auto_ingest(project_root) -> "Path":
+    """Resolve the effective knowledge path, applying lang subdirectory if present."""
+    from pathlib import Path
+    knowledge_path = project_root / "knowledge"
+    _nexe_lang = os.getenv("NEXE_LANG", "ca")
+    lang_path = knowledge_path / _nexe_lang
+    if lang_path.is_dir():
+        knowledge_path = lang_path
+    return knowledge_path
+
+
+def _collect_files_to_ingest(knowledge_path) -> list:
+    """Collect all supported document files under knowledge_path."""
+    from core.ingest.ingest_knowledge import SUPPORTED_EXTENSIONS
+    files_to_ingest: list = []
+    for ext in SUPPORTED_EXTENSIONS:
+        files_to_ingest.extend(knowledge_path.glob(f"**/*{ext}"))
+    files_to_ingest.extend(knowledge_path.glob("**/*.pdf"))
+    return [f for f in files_to_ingest if not f.name.startswith('.')]
+
+
+async def _check_needs_reingest(ingested_marker) -> bool:
+    """Return True if re-ingest is needed despite marker existing (BUG #20).
+
+    Verifies Qdrant has sufficient content; clears the marker if re-ingest is needed.
+    """
+    try:
+        from memory.memory.api.v1 import get_memory_api as _get_v1_api
+        _api = await _get_v1_api()
+        if await _api.collection_exists("nexe_documentation"):
+            doc_count = await _api.count("nexe_documentation")
+            if doc_count >= 10:
+                logger.debug("Knowledge: Already ingested (%d docs). Skipping.", doc_count)
+                return False
+            logger.warning("Knowledge: Marker exists but only %d docs in Qdrant — re-ingesting", doc_count)
+        else:
+            logger.warning("Knowledge: Marker exists but collection missing — re-ingesting")
+    except Exception as e:
+        logger.warning("Knowledge: Could not verify Qdrant state (%s) — re-ingesting", e)
+
+    ingested_marker.unlink(missing_ok=True)
+    return True
+
+
 async def auto_ingest_knowledge(server_state):
     """Auto-ingest knowledge/ folder on first run only."""
     try:
         nexe_env = os.getenv("NEXE_ENV", "production").lower()
         auto_ingest_enabled = os.getenv("NEXE_AUTO_INGEST_KNOWLEDGE", "true").lower() == "true"
 
-        if nexe_env in ("test", "testing") or not auto_ingest_enabled:
+        if _auto_ingest_is_disabled(nexe_env, auto_ingest_enabled):
             logger.debug(
                 "Knowledge: Auto-ingest disabled (NEXE_ENV=%s, NEXE_AUTO_INGEST_KNOWLEDGE=%s)",
                 nexe_env,
@@ -118,73 +167,40 @@ async def auto_ingest_knowledge(server_state):
             )
             return
 
-        knowledge_path = server_state.project_root / "knowledge"
-        _nexe_lang = os.getenv("NEXE_LANG", "ca")
-        lang_path = knowledge_path / _nexe_lang
-        if lang_path.is_dir():
-            knowledge_path = lang_path
+        knowledge_path = _resolve_knowledge_path_for_auto_ingest(server_state.project_root)
         ingested_marker = server_state.project_root / "storage" / ".knowledge_ingested"
 
-        if knowledge_path.exists():
-            from core.ingest.ingest_knowledge import ingest_knowledge, SUPPORTED_EXTENSIONS
+        if not knowledge_path.exists():
+            return
 
-            files_to_ingest = []
-            for ext in SUPPORTED_EXTENSIONS:
-                files_to_ingest.extend(knowledge_path.glob(f"**/*{ext}"))
-            files_to_ingest.extend(knowledge_path.glob("**/*.pdf"))
+        from core.ingest.ingest_knowledge import ingest_knowledge
+        files_to_ingest = _collect_files_to_ingest(knowledge_path)
 
-            files_to_ingest = [f for f in files_to_ingest if not f.name.startswith('.')]
+        if not files_to_ingest:
+            logger.debug("Knowledge: No documents to ingest (folder empty or only README)")
+            return
 
-            if files_to_ingest:
-                # BUG #20: Check marker AND verify Qdrant has content.
-                # If marker exists but Qdrant is empty (model change, wipe),
-                # we must re-ingest.
-                if ingested_marker.exists():
-                    _needs_reingest = False
-                    try:
-                        from memory.memory.api.v1 import get_memory_api as _get_v1_api
-                        _api = await _get_v1_api()
-                        if await _api.collection_exists("nexe_documentation"):
-                            doc_count = await _api.count("nexe_documentation")
-                            if doc_count >= 10:
-                                logger.debug(
-                                    "Knowledge: Already ingested (%d docs). Skipping.",
-                                    doc_count,
-                                )
-                                return
-                            else:
-                                logger.warning(
-                                    "Knowledge: Marker exists but only %d docs in Qdrant — re-ingesting",
-                                    doc_count,
-                                )
-                                _needs_reingest = True
-                        else:
-                            logger.warning("Knowledge: Marker exists but collection missing — re-ingesting")
-                            _needs_reingest = True
-                    except Exception as e:
-                        logger.warning("Knowledge: Could not verify Qdrant state (%s) — re-ingesting", e)
-                        _needs_reingest = True
+        # BUG #20: Check marker AND verify Qdrant has content.
+        if ingested_marker.exists():
+            needs_reingest = await _check_needs_reingest(ingested_marker)
+            if not needs_reingest:
+                return
 
-                    if _needs_reingest:
-                        ingested_marker.unlink(missing_ok=True)
-
-                # First run or re-ingest needed — ingest knowledge
-                logger.info("Knowledge: Auto-ingesting %d document(s)...", len(files_to_ingest))
-                # F7: explicit target_collection — auto-ingest at startup
-                # writes corporate know-how to nexe_documentation, never
-                # to the user_knowledge collection.
-                success = await ingest_knowledge(
-                    knowledge_path,
-                    quiet=True,
-                    target_collection="nexe_documentation",
-                )
-                if success:
-                    logger.info("Knowledge: Ingestion completed successfully")
-                    ingested_marker.touch()
-                else:
-                    logger.warning("Knowledge: Ingestion had some errors")
-            else:
-                logger.debug("Knowledge: No documents to ingest (folder empty or only README)")
+        # First run or re-ingest needed — ingest knowledge
+        logger.info("Knowledge: Auto-ingesting %d document(s)...", len(files_to_ingest))
+        # F7: explicit target_collection — auto-ingest at startup
+        # writes corporate know-how to nexe_documentation, never
+        # to the user_knowledge collection.
+        success = await ingest_knowledge(
+            knowledge_path,
+            quiet=True,
+            target_collection="nexe_documentation",
+        )
+        if success:
+            logger.info("Knowledge: Ingestion completed successfully")
+            ingested_marker.touch()
+        else:
+            logger.warning("Knowledge: Ingestion had some errors")
     except Exception as e:
         logger.warning("Knowledge: Auto-ingest failed: %s", str(e))
 
