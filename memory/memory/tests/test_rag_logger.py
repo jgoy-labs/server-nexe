@@ -1,5 +1,5 @@
 """
-Tests per memory/memory/rag_logger.py
+Tests for memory/memory/rag_logger.py
 """
 import pytest
 import os
