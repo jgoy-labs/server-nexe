@@ -73,7 +73,7 @@ class TestComputeContextBudget:
         out = compute_context_budget(
             max_context_chars=10000,
             system_chars=500,
-            history_chars=5000,  # excedeix reserva
+            history_chars=5000,  # exceeds reserve
             message_chars=200,
             document_chars=8000,
             history_ratio=0.30,

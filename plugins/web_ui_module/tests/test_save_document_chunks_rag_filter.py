@@ -60,7 +60,7 @@ class TestSaveDocumentChunksFilter:
 
         assert result["success"] is True
         assert mem.store_batch.await_count == 1
-        # La crida a store_batch ha de rebre el text NETEJAT, no el cru.
+        # The store_batch call must receive the CLEANED text, not the raw one.
         batch_arg = mem.store_batch.await_args.args[0]
         assert len(batch_arg) == 2
         texts = [item["text"] for item in batch_arg]
@@ -101,7 +101,7 @@ class TestSaveDocumentChunksFilter:
         assert "[CONTEXT without" not in opened
 
     def test_filter_also_applied_on_single_store_fallback(self):
-        """Si el batch store falla, el fallback per-chunk també aplica el filter."""
+        """If the batch store fails, the per-chunk fallback also applies the filter."""
         mem = _make_memory_mock()
         mem.store_batch = AsyncMock(side_effect=RuntimeError("batch failed"))
         mh_module._memory_api_instance = mem

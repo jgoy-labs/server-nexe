@@ -371,7 +371,7 @@ def _qdrant_available():
 
 
 def _memory_api_available():
-    """Verifica que la Memory API es pot inicialitzar (Qdrant + dependències OK)."""
+    """Verify that the Memory API can be initialised (Qdrant + dependencies OK)."""
     if not _qdrant_available():
         return False
     try:
@@ -409,7 +409,7 @@ class TestMemoryRoundTrip:
         assert body.get("success") is True
 
     def test_recall_finds_saved_content(self, client, headers):
-        # Primer guardar
+        # Save first
         client.post(
             "/ui/memory/save",
             headers=headers,
@@ -443,7 +443,7 @@ class TestMemoryRoundTrip:
 
     def test_duplicate_not_saved_twice(self, client, headers):
         content = "Contingut únic per test de deduplicació abc123xyz"
-        # Guardar dos cops
+        # Save twice
         r1 = client.post("/ui/memory/save", headers=headers,
                          json={"content": content, "session_id": "dedup-test"})
         r2 = client.post("/ui/memory/save", headers=headers,

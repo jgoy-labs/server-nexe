@@ -34,7 +34,7 @@ except ImportError as e:
 
 @pytest.fixture(autouse=True)
 def clear_rate_limit_state():
-    """Neteja el dict de fallades entre tests per evitar interferències."""
+    """Clear the failure dict between tests to avoid interference."""
     _ui_auth_failures.clear()
     yield
     _ui_auth_failures.clear()

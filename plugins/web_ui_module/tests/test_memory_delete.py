@@ -79,7 +79,7 @@ class TestDetectDeleteIntent:
         assert "em dic Joan" in content
 
     def test_delete_catalan_oblida_macarrons(self, mh):
-        """B-mem-delete: 'Oblida que m'agraden els macarrons' ha de ser intent delete."""
+        """B-mem-delete: 'Oblida que m'agraden els macarrons' must be intent delete."""
         intent, content = mh.detect_intent("Oblida que m'agraden els macarrons")
         assert intent == "delete"
         assert "m'agraden els macarrons" in content
@@ -287,7 +287,7 @@ class TestClearAllConfirm:
         assert not mh.matches_clear_all_confirm("què recordes de mi?")
         assert not mh.matches_clear_all_confirm("hola, com estàs?")
         assert not mh.matches_clear_all_confirm("no, cancel")
-        assert not mh.matches_clear_all_confirm("sí que m'agrada el cafè")  # "sí que" ≠ confirm
+        assert not mh.matches_clear_all_confirm("sí que m'agrada el cafè")  # "sí que" ≠ confirm (not a confirmation)
 
 
 # ═══════════════════════════════════════════════════════════════

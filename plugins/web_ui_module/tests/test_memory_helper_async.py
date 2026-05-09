@@ -433,7 +433,7 @@ class TestSaveDocumentChunks:
         mem.create_collection.assert_called_once()
 
     def test_chunk_exception_continues(self):
-        """Si un chunk falla, continua amb els altres."""
+        """If a chunk fails, processing continues with the others."""
         mem = make_memory_mock(collection_exists=True)
         call_count = 0
 

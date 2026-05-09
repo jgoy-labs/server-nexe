@@ -28,7 +28,7 @@ def _mock_request(host="1.2.3.4", path="/ui/chat"):
 @pytest.mark.asyncio
 class TestP1BAuthLogging:
     async def test_invalid_key_logs_auth_failure(self):
-        """Key invàlida → log_auth_failure() es crida al security logger."""
+        """Invalid key → log_auth_failure() is called on the security logger."""
         require = make_require_ui_auth()
         mock_sec_logger = MagicMock()
         with patch("plugins.web_ui_module.api.routes_auth.get_admin_api_key", return_value="real_key"):
@@ -41,7 +41,7 @@ class TestP1BAuthLogging:
                 assert exc_info.value.status_code == 401
                 mock_sec_logger.log_auth_failure.assert_called_once()
                 kwargs = mock_sec_logger.log_auth_failure.call_args
-                # Verificar que s'ha passat la IP correcta
+                # Verify the correct IP was passed
                 all_args = str(kwargs)
                 assert "1.2.3.4" in all_args
 
@@ -60,7 +60,7 @@ class TestP1BAuthLogging:
                 mock_sec_logger.log_auth_failure.assert_called_once()
 
     async def test_valid_key_no_auth_failure_log(self):
-        """Key vàlida → NO s'ha de cridar log_auth_failure()."""
+        """Valid key → log_auth_failure() must NOT be called."""
         require = make_require_ui_auth()
         mock_sec_logger = MagicMock()
         with patch("plugins.web_ui_module.api.routes_auth.get_admin_api_key", return_value="real_key"):

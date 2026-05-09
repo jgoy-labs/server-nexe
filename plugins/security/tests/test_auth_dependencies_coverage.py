@@ -304,7 +304,7 @@ class TestOptionalApiKey:
 # ── Helpers directes ─────────────────────────────────────────────────────────
 
 class TestUpdateKeyMetrics:
-    """Tests directes per a _update_key_metrics."""
+    """Direct tests for _update_key_metrics."""
 
     def test_no_keys_configured(self):
         from plugins.security.core.auth_models import ApiKeyConfig
@@ -335,7 +335,7 @@ class TestUpdateKeyMetrics:
 
 
 class TestCheckDevMode:
-    """Tests directes per a _check_dev_mode."""
+    """Direct tests for _check_dev_mode."""
 
     def test_dev_mode_true_localhost_returns_bypass(self):
         from plugins.security.core.auth_dependencies import _check_dev_mode
@@ -377,7 +377,7 @@ class TestCheckDevMode:
 
 
 class TestAuthenticatePrimary:
-    """Tests directes per a _authenticate_primary."""
+    """Direct tests for _authenticate_primary."""
 
     def test_valid_primary_match_returns_key(self):
         from plugins.security.core.auth_models import ApiKeyData, ApiKeyConfig
@@ -415,7 +415,7 @@ class TestAuthenticatePrimary:
 
 
 class TestAuthenticateSecondary:
-    """Tests directes per a _authenticate_secondary."""
+    """Direct tests for _authenticate_secondary."""
 
     def test_valid_secondary_match_returns_key(self):
         from plugins.security.core.auth_models import ApiKeyData, ApiKeyConfig
@@ -453,7 +453,7 @@ class TestAuthenticateSecondary:
 
 
 class TestLogFailure:
-    """Tests directes per a _log_failure."""
+    """Direct tests for _log_failure."""
 
     def test_invalid_key_reason(self):
         from plugins.security.core.auth_models import ApiKeyConfig

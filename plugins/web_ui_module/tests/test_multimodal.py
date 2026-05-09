@@ -18,7 +18,7 @@ VALID_PNG_B64  = _b64(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
 # ── Inline extraction helpers (avoids importing the whole module) ─────────────────
 
 def _extract_image(body: dict):
-    """Reimplementa la lògica d'extracció de routes_chat per testar-la aïllada."""
+    """Re-implements the image extraction logic from routes_chat to test it in isolation."""
     ALLOWED = {"image/jpeg", "image/png", "image/webp"}
     MAX = 10 * 1024 * 1024
 
@@ -83,7 +83,7 @@ class TestImageExtraction:
         assert result is not None
 
     def test_missing_image_type_raises(self):
-        """image_b64 present però sense image_type → rebutjat."""
+        """image_b64 present but no image_type → rejected."""
         with pytest.raises(ValueError, match="image_type not supported"):
             _extract_image({"image_b64": VALID_JPEG_B64})  # image_type = ""
 
@@ -93,12 +93,12 @@ class TestImageExtraction:
 class TestChatBodyStructure:
 
     def test_body_without_image_no_image_keys(self):
-        """Body normal sense imatge no té image_b64."""
+        """Normal body without image has no image_b64."""
         body = {"message": "Hola", "session_id": "abc", "stream": True}
         assert "image_b64" not in body
 
     def test_body_with_image_has_both_keys(self):
-        """Quan el frontend afegeix imatge, body té image_b64 i image_type."""
+        """When the frontend adds an image, body has image_b64 and image_type."""
         body = {
             "message": "Descriu la foto",
             "session_id": "abc",

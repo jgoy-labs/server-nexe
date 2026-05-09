@@ -42,7 +42,7 @@ class TestConcurrentCreateThreads:
 
 
 class TestConcurrentGetOrCreate:
-    """get_or_create amb el mateix id no ha de duplicar la sessio."""
+    """get_or_create with the same id must not duplicate the session."""
 
     def test_get_or_create_same_id_threads(self, sm):
         N = 30
@@ -61,15 +61,15 @@ class TestConcurrentGetOrCreate:
         for t in threads:
             t.join()
 
-        # Una unica instancia compartida
+        # A single shared instance
         assert len(set(results)) == 1
-        # Una unica entrada al manager
+        # A single entry in the manager
         listed = [s for s in sm.list_sessions() if s["id"] == sid]
         assert len(listed) == 1
 
 
 class TestConcurrentMixedOps:
-    """Crear + esborrar + carregar concurrent: estat coherent, sense exception."""
+    """Concurrent create + delete + load: coherent state, no exception."""
 
     def test_mixed_create_delete_get(self, sm):
         errors = []
@@ -107,7 +107,7 @@ class TestConcurrentMixedOps:
 
 
 class TestAsyncioGather:
-    """Mateix workload via asyncio.gather usant run_in_executor."""
+    """Same workload via asyncio.gather using run_in_executor."""
 
     @pytest.mark.asyncio
     async def test_create_many_via_gather(self, sm):

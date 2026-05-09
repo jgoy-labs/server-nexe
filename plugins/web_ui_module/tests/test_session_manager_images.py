@@ -28,8 +28,8 @@ class TestAddMessageWithImage:
         assert history[0]["image_b64"] == SMALL_B64
 
     def test_add_message_image_b64_optional_default_none(self):
-        """No regressió: add_message sense image_b64 continua funcionant
-        i no afegeix la clau al missatge."""
+        """No regression: add_message without image_b64 still works
+        and does not add the key to the message."""
         s = ChatSession()
         s.add_message("user", "text only")
         history = s.get_history()
@@ -106,7 +106,7 @@ class TestImageSurvivesDiskRoundtrip:
         assert history[0]["image_b64"] == SMALL_B64
 
     def test_image_b64_2mb_survives_roundtrip(self, tmp_path, crypto):
-        """Imatge gran (~2MB base64) — no s'ha de truncar ni perdre."""
+        """Large image (~2MB base64) — must not be truncated or lost."""
         big_bytes = os.urandom(1_500_000)  # ~2MB base64
         big_b64 = base64.b64encode(big_bytes).decode("ascii")
 
@@ -120,8 +120,8 @@ class TestImageSurvivesDiskRoundtrip:
         assert loaded.get_history()[0]["image_b64"] == big_b64
 
     def test_text_only_message_has_no_image_key_on_disk(self, tmp_path):
-        """Verificació backward compat: un missatge sense imatge NO afegeix
-        el camp al JSON serialitzat — evita alterar fitxers existents."""
+        """Backward-compat check: a message without an image must NOT add
+        the field to the serialised JSON — avoids altering existing files."""
         sm = SessionManager(storage_path=str(tmp_path))
         s = sm.create_session(session_id="plain-no-img")
         s.add_message("user", "just text")
