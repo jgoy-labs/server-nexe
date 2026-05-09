@@ -45,42 +45,41 @@ except ImportError:
 NS_STATUS_WINDOW_LEVEL = 25
 
 
-def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_):
-    """NSAlert always-on-top (assumes _ForegroundContext already active)."""
-    try:
-        from AppKit import NSAlert, NSAlertStyleWarning
-    except Exception:
-        kwargs = {}
-        if title is not None:
-            kwargs["title"] = title
-        if message is not None:
-            kwargs["message"] = message
-        if ok is not None:
-            kwargs["ok"] = ok
-        if cancel is not None:
-            kwargs["cancel"] = cancel
-        if other is not None:
-            kwargs["other"] = other
-        return rumps.alert(**kwargs)
+def _front_alert_rumps_fallback(title, message, ok, cancel, other):
+    """Fallback path when AppKit is unavailable: delegate to rumps.alert."""
+    kwargs = {}
+    if title is not None:
+        kwargs["title"] = title
+    if message is not None:
+        kwargs["message"] = message
+    if ok is not None:
+        kwargs["ok"] = ok
+    if cancel is not None:
+        kwargs["cancel"] = cancel
+    if other is not None:
+        kwargs["other"] = other
+    return rumps.alert(**kwargs)
 
+
+def _build_nsalert(title, message, ok, cancel, other):
+    """Construct and configure an NSAlert with buttons."""
+    from AppKit import NSAlert, NSAlertStyleWarning
     alert = NSAlert.alloc().init()
     if title is not None:
         alert.setMessageText_(str(title))
     if message is not None:
         alert.setInformativeText_(str(message))
     alert.setAlertStyle_(NSAlertStyleWarning)
-
     alert.addButtonWithTitle_(str(ok) if ok is not None else "OK")
     if cancel is not None:
         alert.addButtonWithTitle_(str(cancel))
     if other is not None:
         alert.addButtonWithTitle_(str(other))
+    return alert
 
-    window = alert.window()
-    window.setLevel_(NS_STATUS_WINDOW_LEVEL)
-    window.makeKeyAndOrderFront_(None)
 
-    response = alert.runModal()
+def _nsalert_response_to_int(response):
+    """Convert NSAlertFirstButtonReturn codes to rumps-compat integers."""
     if response == 1000:
         return 1
     elif response == 1001:
@@ -88,6 +87,20 @@ def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_
     elif response == 1002:
         return -1
     return response
+
+
+def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_):
+    """NSAlert always-on-top (assumes _ForegroundContext already active)."""
+    try:
+        alert = _build_nsalert(title, message, ok, cancel, other)
+    except Exception:
+        return _front_alert_rumps_fallback(title, message, ok, cancel, other)
+
+    window = alert.window()
+    window.setLevel_(NS_STATUS_WINDOW_LEVEL)
+    window.makeKeyAndOrderFront_(None)
+
+    return _nsalert_response_to_int(alert.runModal())
 
 
 class _ForegroundContext:
