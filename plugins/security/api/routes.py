@@ -37,6 +37,59 @@ MODULE_PATH = Path(__file__).parent.parent
 UI_PATH = MODULE_PATH / "ui"
 
 
+def _build_security_checks(project_root: Path) -> list:
+    """Instantiate all security check objects."""
+    from plugins.security.checks.auth_check import AuthCheck
+    from plugins.security.checks.web_security_check import WebSecurityCheck
+    from plugins.security.checks.rate_limit_check import RateLimitCheck
+    return [
+        AuthCheck(project_root=project_root),
+        WebSecurityCheck(project_root=project_root),
+        RateLimitCheck(project_root=project_root),
+    ]
+
+
+async def _run_checks(checks: list) -> list:
+    """Run each check (sync or async) and collect results."""
+    results = []
+    for check in checks:
+        try:
+            if asyncio.iscoroutinefunction(check.run):  # type: ignore[attr-defined]
+                check_results = await check.run()  # type: ignore[attr-defined]
+            else:
+                check_results = check.run()  # type: ignore[attr-defined]
+            if isinstance(check_results, list):
+                results.extend(check_results)
+            elif check_results:
+                results.append(check_results)
+        except Exception as check_error:
+            logger.warning("Check %s failed: %s", check.__class__.__name__, check_error)
+    return results
+
+
+def _categorise_findings(results: list) -> dict:
+    """Split result list into severity buckets and return summary+findings."""
+    critical = [r for r in results if r.get("severity") == "CRITICAL"]
+    high = [r for r in results if r.get("severity") == "HIGH"]
+    medium = [r for r in results if r.get("severity") == "MEDIUM"]
+    low = [r for r in results if r.get("severity") == "LOW"]
+    return {
+        "summary": {
+            "total_findings": len(results),
+            "critical": len(critical),
+            "high": len(high),
+            "medium": len(medium),
+            "low": len(low),
+        },
+        "findings": {
+            "critical": critical,
+            "high": high,
+            "medium": medium,
+            "low": low,
+        },
+    }
+
+
 def create_router(module_instance) -> APIRouter:
     """
     Creates the FastAPI router with all security endpoints.
@@ -74,52 +127,11 @@ def create_router(module_instance) -> APIRouter:
         Rate limited: 2 requests/minute
         """
         try:
-            from plugins.security.checks.auth_check import AuthCheck
-            from plugins.security.checks.web_security_check import WebSecurityCheck
-            from plugins.security.checks.rate_limit_check import RateLimitCheck
-
-            results = []
             project_root = MODULE_PATH.parent.parent  # server-nexe root
-
-            checks = [
-                AuthCheck(project_root=project_root),
-                WebSecurityCheck(project_root=project_root),
-                RateLimitCheck(project_root=project_root),
-            ]
-            for check in checks:
-                try:
-                    if asyncio.iscoroutinefunction(check.run):  # type: ignore[attr-defined]  # checks: all classes have .run() — list[object] by inference
-                        check_results = await check.run()  # type: ignore[attr-defined]
-                    else:
-                        check_results = check.run()  # type: ignore[attr-defined]
-                    if isinstance(check_results, list):
-                        results.extend(check_results)
-                    elif check_results:
-                        results.append(check_results)
-                except Exception as check_error:
-                    logger.warning("Check %s failed: %s", check.__class__.__name__, check_error)
-
-            critical = [r for r in results if r.get("severity") == "CRITICAL"]
-            high = [r for r in results if r.get("severity") == "HIGH"]
-            medium = [r for r in results if r.get("severity") == "MEDIUM"]
-            low = [r for r in results if r.get("severity") == "LOW"]
-
-            return {
-                "status": "completed",
-                "summary": {
-                    "total_findings": len(results),
-                    "critical": len(critical),
-                    "high": len(high),
-                    "medium": len(medium),
-                    "low": len(low)
-                },
-                "findings": {
-                    "critical": critical,
-                    "high": high,
-                    "medium": medium,
-                    "low": low
-                }
-            }
+            checks = _build_security_checks(project_root)
+            results = await _run_checks(checks)
+            categorised = _categorise_findings(results)
+            return {"status": "completed", **categorised}
         except Exception as e:
             logger.error("Security scan failed: %s", e)
             raise HTTPException(status_code=500, detail=str(e))
