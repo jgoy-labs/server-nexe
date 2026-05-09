@@ -243,6 +243,86 @@ class DreamingCycle:
                 except Exception:  # nosec B110: best-effort SQLite conn.close() inside finally (Bug 10 fix); no-op if already closed
                     pass
 
+    def _process_upsert_profile(self, conn, entry: Dict[str, Any], extractor_output: dict) -> None:
+        """Write profile entry from extractor_output if attribute is present."""
+        user_id = entry["user_id"]
+        attribute = extractor_output.get("attribute")
+        value = extractor_output.get("value", entry.get("raw_text"))
+        if attribute:
+            self._store.upsert_profile(
+                user_id=user_id,
+                attribute=attribute,
+                value=value,
+                entity=extractor_output.get("entity", "user"),
+                source=entry.get("source", "dreaming"),
+                trust_level=entry.get("trust_level", "untrusted"),
+                is_critical=extractor_output.get("is_critical", False),
+            )
+
+    def _process_dedup_refresh(self, conn, entry: Dict[str, Any], content: str) -> bool:
+        """Check vector dedup; if quasi-duplicate found, refresh and return True (caller should return)."""
+        if not (self._vector and self._vector.available and self._embedder):
+            return False
+        try:
+            embedding = self._embedder.encode(content)
+            emb_list = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
+            similar = self._vector.search(
+                embedding=emb_list,
+                user_id=entry["user_id"],
+                threshold=self._config.dedup_refresh_threshold,
+                limit=1,
+            )
+            if similar and similar[0]["score"] > self._config.dedup_refresh_threshold:
+                existing_id = similar[0]["id"]
+                # Bug 9 fix — calculate the cap of 10 in Python (not via MIN() multi-arg SQLite extension)
+                cur = conn.execute("SELECT evidence_count FROM episodic WHERE id = ?", (existing_id,))
+                row = cur.fetchone()
+                current_evidence = row[0] if row and row[0] is not None else 0
+                new_evidence = min(10, current_evidence + 1)
+                conn.execute(
+                    "UPDATE episodic SET updated_at = datetime('now'), evidence_count = ? WHERE id = ?",
+                    (new_evidence, existing_id),
+                )
+                conn.execute("UPDATE staging SET status = 'processed' WHERE id = ?", (entry["id"],))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.debug("Dedup check failed, inserting as new: %s", e)
+        return False
+
+    def _process_episodic(self, conn, entry: Dict[str, Any], extractor_output: dict) -> bool:
+        """Handle episodic path: tombstone check, dedup, insert. Returns False if entry was short-circuited."""
+        user_id = entry["user_id"]
+        entry_id = entry["id"]
+        content = entry.get("raw_text", "")
+        content_hash = hashlib.sha256(content.lower().strip().encode()).hexdigest()
+
+        # Tombstone check
+        if self._store.is_tombstoned(user_id, content_hash):
+            if entry.get("trust_level", "untrusted") != "trusted":
+                logger.debug("Tombstoned content skipped: %s", entry_id)
+                conn.execute("UPDATE staging SET status = 'processed' WHERE id = ?", (entry_id,))
+                conn.commit()
+                return False
+
+        # Dedup check
+        if self._process_dedup_refresh(conn, entry, content):
+            return False
+
+        # Insert new episodic
+        self._store.insert_episodic(
+            user_id=user_id,
+            content=content,
+            memory_type=extractor_output.get("type", "fact"),
+            importance=extractor_output.get("importance", 0.5),
+            source=entry.get("source", "dreaming"),
+            trust_level=entry.get("trust_level", "untrusted"),
+            namespace=entry.get("namespace", "default"),
+            metadata=extractor_output.get("metadata"),
+            related_ids=extractor_output.get("related_ids"),
+        )
+        return True
+
     async def _process_one(self, entry: Dict[str, Any]):
         """Process a single staging entry to Profile or Episodic.
 
@@ -259,7 +339,6 @@ class DreamingCycle:
         try:
             conn = self._store._connect()
             entry_id = entry["id"]
-            user_id = entry["user_id"]
             decision = entry.get("validator_decision", "stage_only")
             target = entry.get("target_store")
 
@@ -276,98 +355,13 @@ class DreamingCycle:
             extractor_output = json.loads(extractor_json) if extractor_json else {}
 
             if decision == "upsert_profile" or target == "profile":
-                attribute = extractor_output.get("attribute")
-                value = extractor_output.get("value", entry.get("raw_text"))
-                if attribute:
-                    self._store.upsert_profile(
-                        user_id=user_id,
-                        attribute=attribute,
-                        value=value,
-                        entity=extractor_output.get("entity", "user"),
-                        source=entry.get("source", "dreaming"),
-                        trust_level=entry.get("trust_level", "untrusted"),
-                        is_critical=extractor_output.get("is_critical", False),
-                    )
-
+                self._process_upsert_profile(conn, entry, extractor_output)
             elif decision in ("promote_episodic", "stage_only") or target == "episodic":
-                content = entry.get("raw_text", "")
-                content_hash = hashlib.sha256(
-                    content.lower().strip().encode()
-                ).hexdigest()
-
-                # Tombstone check
-                if self._store.is_tombstoned(user_id, content_hash):
-                    trust = entry.get("trust_level", "untrusted")
-                    if trust != "trusted":
-                        logger.debug("Tombstoned content skipped: %s", entry_id)
-                        conn.execute(
-                            "UPDATE staging SET status = 'processed' WHERE id = ?",
-                            (entry_id,),
-                        )
-                        conn.commit()
-                        return
-
-                # Dedup check (v1: >0.92 refresh, <0.92 new)
-                if self._vector and self._vector.available and self._embedder:
-                    try:
-                        embedding = self._embedder.encode(content)
-                        emb_list = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
-                        similar = self._vector.search(
-                            embedding=emb_list,
-                            user_id=user_id,
-                            threshold=self._config.dedup_refresh_threshold,
-                            limit=1,
-                        )
-                        if similar and similar[0]["score"] > self._config.dedup_refresh_threshold:
-                            # Quasi-duplicate: refresh
-                            existing_id = similar[0]["id"]
-                            # Bug 9 fix — previously we used `MIN(10, evidence_count + 1)`
-                            # as a multi-arg function, which is a SQLite extension
-                            # and not portable to other dialects (Postgres, MySQL,
-                            # ...). We calculate the cap of 10 in Python and pass
-                            # the value as a bound parameter. We first read the
-                            # current value and do the min in code.
-                            cur = conn.execute(
-                                "SELECT evidence_count FROM episodic WHERE id = ?",
-                                (existing_id,),
-                            )
-                            row = cur.fetchone()
-                            current_evidence = row[0] if row and row[0] is not None else 0
-                            new_evidence = min(10, current_evidence + 1)
-                            conn.execute(
-                                "UPDATE episodic SET updated_at = datetime('now'), "
-                                "evidence_count = ? "
-                                "WHERE id = ?",
-                                (new_evidence, existing_id),
-                            )
-                            conn.execute(
-                                "UPDATE staging SET status = 'processed' WHERE id = ?",
-                                (entry_id,),
-                            )
-                            conn.commit()
-                            return
-                    except Exception as e:
-                        logger.debug("Dedup check failed, inserting as new: %s", e)
-
-                # Insert new episodic
-                importance = extractor_output.get("importance", 0.5)
-                self._store.insert_episodic(
-                    user_id=user_id,
-                    content=content,
-                    memory_type=extractor_output.get("type", "fact"),
-                    importance=importance,
-                    source=entry.get("source", "dreaming"),
-                    trust_level=entry.get("trust_level", "untrusted"),
-                    namespace=entry.get("namespace", "default"),
-                    metadata=extractor_output.get("metadata"),
-                    related_ids=extractor_output.get("related_ids"),
-                )
+                if not self._process_episodic(conn, entry, extractor_output):
+                    return
 
             # Mark processed
-            conn.execute(
-                "UPDATE staging SET status = 'processed' WHERE id = ?",
-                (entry_id,),
-            )
+            conn.execute("UPDATE staging SET status = 'processed' WHERE id = ?", (entry_id,))
             conn.commit()
         finally:
             if conn is not None:
