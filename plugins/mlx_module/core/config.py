@@ -107,6 +107,47 @@ class MLXConfig:
             project_root = Path(__file__).parents[3]  # From plugins/mlx_module/core/ to project root
             self.model_path = str(project_root / self.model_path)
 
+    @staticmethod
+    def _model_path_from_toml() -> str:
+        """Try to read model path from personality/server.toml (step 2 fallback)."""
+        try:
+            import tomllib
+            config_path = Path("personality/server.toml")
+            if not config_path.exists():
+                config_path = Path(__file__).parents[3] / "personality/server.toml"
+            if not config_path.exists():
+                return ""
+            with open(config_path, "rb") as f:
+                server_cfg = tomllib.load(f)
+            plugins_cfg = server_cfg.get("plugins", {}).get("models", {})
+            if plugins_cfg.get("preferred_engine") == "mlx":
+                candidate = plugins_cfg.get("primary", "")
+                if "/" in candidate or "\\" in candidate:
+                    return candidate
+        except Exception as e:
+            logger.warning(f"MLXConfig: Failed to read server.toml: {e}")
+        return ""
+
+    @staticmethod
+    def _model_path_autodiscover() -> str:
+        """Auto-discover first valid MLX model in storage/models/ (step 3 fallback)."""
+        try:
+            models_dir = Path("storage/models")
+            if not models_dir.exists():
+                models_dir = Path(__file__).parents[3] / "storage/models"
+            if models_dir.exists():
+                candidates = sorted(
+                    p for p in models_dir.iterdir()
+                    if p.is_dir() and (p / "config.json").exists()
+                )
+                if candidates:
+                    path = str(candidates[0].resolve())
+                    logger.info(f"MLXConfig: auto-discovered MLX model at {path}")
+                    return path
+        except Exception as e:
+            logger.debug(f"MLXConfig: auto-discover scan failed: {e}")
+        return ""
+
     @classmethod
     def from_env(cls) -> "MLXConfig":
         """
@@ -115,60 +156,11 @@ class MLXConfig:
         Returns:
             MLXConfig with values from the environment or defaults.
         """
-        # 1. Start with env vars
-        model_path = os.getenv("NEXE_MLX_MODEL", "")
-        
-        # 2. Fallback to server.toml if model_path is empty
-        if not model_path:
-            try:
-                # Use tomllib (stdlib, Python 3.11+, TOML 1.0 compliant).
-                # Previously used `toml==0.10.2` which trips on triple-quoted
-                # strings containing escaped quotes + accents (see server.toml
-                # personality prompts): "Found tokens after a closed string".
-                # The server core config already uses tomllib — aligning here.
-                import tomllib
-                config_path = Path("personality/server.toml")
-                if not config_path.exists():
-                     # Try absolute path based on project root if relative fails
-                     config_path = Path(__file__).parents[3] / "personality/server.toml"
-
-                if config_path.exists():
-                    with open(config_path, "rb") as f:
-                        server_cfg = tomllib.load(f)
-                    plugins_cfg = server_cfg.get("plugins", {}).get("models", {})
-
-                    # Only use if engine is MLX
-                    if plugins_cfg.get("preferred_engine") == "mlx":
-                        candidate_path = plugins_cfg.get("primary", "")
-                        # Validate it looks like a path (contains slashes or exists)
-                        if "/" in candidate_path or "\\" in candidate_path:
-                             model_path = candidate_path
-            except Exception as e:
-                logger.warning(f"MLXConfig: Failed to read server.toml: {e}")
-
-        # 3. Final fallback: auto-discover an MLX model dropped into
-        # storage/models/ (real dir or symlink). A valid MLX model has a
-        # config.json at its root (mlx-lm requirement). Pick the first one
-        # found, sorted alphabetically for determinism. Enables the UX
-        # "drop a model, restart, it just works" — no env var needed.
-        if not model_path:
-            try:
-                models_dir = Path("storage/models")
-                if not models_dir.exists():
-                    models_dir = Path(__file__).parents[3] / "storage/models"
-                if models_dir.exists():
-                    candidates = sorted(
-                        p for p in models_dir.iterdir()
-                        if p.is_dir() and (p / "config.json").exists()
-                    )
-                    if candidates:
-                        # Use absolute path so __post_init__ doesn't re-resolve
-                        # relative to a different project root than the one we
-                        # scanned.
-                        model_path = str(candidates[0].resolve())
-                        logger.info(f"MLXConfig: auto-discovered MLX model at {model_path}")
-            except Exception as e:
-                logger.debug(f"MLXConfig: auto-discover scan failed: {e}")
+        model_path = (
+            os.getenv("NEXE_MLX_MODEL", "")
+            or cls._model_path_from_toml()
+            or cls._model_path_autodiscover()
+        )
 
         config = cls(
             model_path=model_path,
