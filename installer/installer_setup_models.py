@@ -61,6 +61,95 @@ def _show_manual_instructions(model, engine):
     print(f"{DIM}💡 {t('manual_install_note')}{RESET}")
 
 
+def _ollama_prompt_choice(headless):
+    """Ask user to download now or later. Return '1' or '2'."""
+    if headless:
+        return "1"
+    print(f"{BOLD}{t('download_options')}{RESET}\n")
+    print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
+    print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
+    print()
+    try:
+        return input(f"{BOLD}[1/2]:{RESET} ").strip()
+    except (EOFError, OSError):
+        return "1"
+
+
+def _ollama_ensure_running(ollama_bin):
+    """Start ollama serve if not already running and wait up to 15s."""
+    import time
+    import socket
+    result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)  # nosec B603: ollama_bin from _find_ollama (whitelisted absolute paths or PATH-resolved); literal subcommand
+    if result.returncode != 0:
+        print(f"{YELLOW}[...]{RESET} {t('starting_ollama')}")
+        subprocess.Popen([ollama_bin, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal `serve` subcommand
+        for _ in range(30):
+            try:
+                with socket.create_connection(("localhost", 11434), timeout=0.5):
+                    break
+            except (ConnectionRefusedError, OSError):
+                time.sleep(0.5)
+        else:
+            print(f"{YELLOW}[WARN]{RESET} Ollama may not be ready yet")
+
+
+def _ollama_pull_model(ollama_bin, model_id):
+    """Run ollama pull for model_id; raise CalledProcessError on failure."""
+    print(f"\n{CYAN}[2/3]{RESET} {t('downloading_model_progress')}")
+    print(f"      {DIM}{ollama_bin} pull {model_id}{RESET}\n")
+    process = subprocess.Popen(  # nosec B603: ollama_bin from _find_ollama (whitelisted); model_id from internal MODEL_CATALOG (supply chain trust)
+        [ollama_bin, "pull", model_id],
+        stdout=sys.stdout,
+        stderr=sys.stderr
+    )
+    return_code = process.wait()
+    if return_code != 0:
+        raise subprocess.CalledProcessError(return_code, "ollama pull")
+
+
+def _ollama_verify_and_report(ollama_bin, model_id):
+    """Check model appears in ollama list and run SHA256 integrity check."""
+    print(f"\n{CYAN}[3/4]{RESET} {t('verifying_download')}")
+    result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal subcommand (post-download verification)
+    model_base = model_id.split(":")[0]
+    if model_base in result.stdout or model_id in result.stdout:
+        # F4.1 (audit DoD-AUD-SX-0423 §2.7): compare the manifest
+        # digest reported by Ollama against the catalog pin.
+        try:
+            matched = verify_download_integrity(
+                "ollama", model_id, Path("."),
+                ollama_bin=ollama_bin,
+            )
+        except DownloadIntegrityError as exc:
+            print_warn(f"✗ Integrity check failed for {model_id}")
+            print(str(exc))
+            raise
+        if not matched:
+            print(f"{YELLOW}⚠️  {model_id}: SHA256 not pinned in catalog "
+                  f"— install proceeded without integrity check{RESET}")
+        print_success(t('model_downloaded_ok').format(id=model_id))
+    else:
+        print_warn(t('model_not_in_list'))
+        print(f"  {DIM}{t('run_ollama_list')}{RESET}")
+
+
+def _ollama_pull_embeddings(ollama_bin):
+    """Pull nomic-embed-text embeddings model."""
+    print(f"\n{CYAN}[4/4]{RESET} {t('downloading_embeddings_step')}")
+    print(f"      {DIM}{ollama_bin} pull nomic-embed-text{RESET}\n")
+    embed_process = subprocess.Popen(  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal model name "nomic-embed-text"
+        [ollama_bin, "pull", "nomic-embed-text"],
+        stdout=sys.stdout,
+        stderr=sys.stderr
+    )
+    embed_return = embed_process.wait()
+    if embed_return == 0:
+        print_success(t('embeddings_downloaded'))
+    else:
+        print_warn(t('embeddings_failed'))
+        print(f"  {DIM}{t('embeddings_manual')}{RESET}")
+
+
 def _download_ollama_model(model_config, headless=False):
     """Download Ollama model immediately after selection."""
     clear()
@@ -73,97 +162,16 @@ def _download_ollama_model(model_config, headless=False):
     print(f"   {t('engine_ollama_label')}")
     print()
 
-    if headless:
-        choice = "1"  # Always download in headless mode
-    else:
-        print(f"{BOLD}{t('download_options')}{RESET}\n")
-        print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
-        print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
-        print()
-
-        try:
-            choice = input(f"{BOLD}[1/2]:{RESET} ").strip()
-        except (EOFError, OSError):
-            choice = "1"  # Default to download if no stdin
+    choice = _ollama_prompt_choice(headless)
 
     if choice == "1":
         try:
             ollama_bin = _find_ollama()
             print(f"\n{CYAN}[1/3]{RESET} {t('ollama_checking')}")
-            result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)  # nosec B603: ollama_bin from _find_ollama (whitelisted absolute paths or PATH-resolved); literal subcommand
-            if result.returncode != 0:
-                print(f"{YELLOW}[...]{RESET} {t('starting_ollama')}")
-                subprocess.Popen([ollama_bin, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal `serve` subcommand
-                # Wait for Ollama to be ready (max 15s)
-                import time
-                import socket
-                for _ in range(30):
-                    try:
-                        with socket.create_connection(("localhost", 11434), timeout=0.5):
-                            break
-                    except (ConnectionRefusedError, OSError):
-                        time.sleep(0.5)
-                else:
-                    print(f"{YELLOW}[WARN]{RESET} Ollama may not be ready yet")
-
-            print(f"\n{CYAN}[2/3]{RESET} {t('downloading_model_progress')}")
-            print(f"      {DIM}{ollama_bin} pull {model_id}{RESET}\n")
-
-            process = subprocess.Popen(  # nosec B603: ollama_bin from _find_ollama (whitelisted); model_id from internal MODEL_CATALOG (supply chain trust)
-                [ollama_bin, "pull", model_id],
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            )
-            return_code = process.wait()
-
-            if return_code != 0:
-                raise subprocess.CalledProcessError(return_code, "ollama pull")
-
-            print(f"\n{CYAN}[3/4]{RESET} {t('verifying_download')}")
-            result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal subcommand (post-download verification)
-            model_base = model_id.split(":")[0]
-            if model_base in result.stdout or model_id in result.stdout:
-                # F4.1 (audit DoD-AUD-SX-0423 §2.7): compare the manifest
-                # digest reported by Ollama against the catalog pin. On
-                # mismatch the call raises DownloadIntegrityError, which
-                # bubbles up to the caller (CLI exits non-zero, GUI marks
-                # step 3 as error). Legacy entries (expected=None) return
-                # False here and we surface a not-pinned notice.
-                try:
-                    matched = verify_download_integrity(
-                        "ollama", model_id, Path("."),
-                        ollama_bin=ollama_bin,
-                    )
-                except DownloadIntegrityError as exc:
-                    print_warn(f"✗ Integrity check failed for {model_id}")
-                    print(str(exc))
-                    raise
-                if matched:
-                    print_success(t('model_downloaded_ok').format(id=model_id))
-                else:
-                    print(f"{YELLOW}⚠️  {model_id}: SHA256 not pinned in catalog "
-                          f"— install proceeded without integrity check{RESET}")
-                    print_success(t('model_downloaded_ok').format(id=model_id))
-            else:
-                print_warn(t('model_not_in_list'))
-                print(f"  {DIM}{t('run_ollama_list')}{RESET}")
-
-            print(f"\n{CYAN}[4/4]{RESET} {t('downloading_embeddings_step')}")
-            print(f"      {DIM}{ollama_bin} pull nomic-embed-text{RESET}\n")
-
-            embed_process = subprocess.Popen(  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal model name "nomic-embed-text"
-                [ollama_bin, "pull", "nomic-embed-text"],
-                stdout=sys.stdout,
-                stderr=sys.stderr
-            )
-            embed_return = embed_process.wait()
-
-            if embed_return == 0:
-                print_success(t('embeddings_downloaded'))
-            else:
-                print_warn(t('embeddings_failed'))
-                print(f"  {DIM}{t('embeddings_manual')}{RESET}")
-
+            _ollama_ensure_running(ollama_bin)
+            _ollama_pull_model(ollama_bin, model_id)
+            _ollama_verify_and_report(ollama_bin, model_id)
+            _ollama_pull_embeddings(ollama_bin)
         except subprocess.CalledProcessError as e:
             print_warn(f"{t('download_failed')} (code: {e.returncode})")
             if headless:
