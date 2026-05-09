@@ -311,6 +311,56 @@ def wipe_user_data(
     return removed
 
 
+def _make_backup_dir(backup_root: Path) -> Path:
+    """Create a unique timestamped backup directory inside backup_root."""
+    backup_root.mkdir(parents=True, exist_ok=True)
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    backup_dir = backup_root / timestamp
+    suffix = 0
+    while backup_dir.exists():
+        suffix += 1
+        backup_dir = backup_root / f"{timestamp}_{suffix}"
+    backup_dir.mkdir(parents=True)
+    return backup_dir
+
+
+def _needs_selective_move(src: Path, rel: str, backup_root_resolved: Path, exclude_models: bool) -> bool:
+    """Return True if src requires child-by-child move instead of a direct shutil.move."""
+    if not src.is_dir():
+        return False
+    try:
+        src_resolved = src.resolve()
+        if backup_root_resolved == src_resolved or backup_root_resolved.is_relative_to(src_resolved):
+            return True
+    except (OSError, ValueError):
+        pass
+    if exclude_models and rel == "storage" and (src / "models").exists():
+        return True
+    return False
+
+
+def _selective_move_dir(src: Path, dest: Path, backup_root_resolved: Path, exclude_models: bool) -> None:
+    """Move child entries of src to dest, skipping models/ and backup_root itself."""
+    dest.mkdir(parents=True, exist_ok=True)
+    for child in src.iterdir():
+        if exclude_models and child.name == "models":
+            continue
+        try:
+            child_resolved = child.resolve()
+            if backup_root_resolved == child_resolved or backup_root_resolved.is_relative_to(child_resolved):
+                continue
+        except (OSError, ValueError):
+            pass
+        shutil.move(str(child), str(dest / child.name))
+    # Remove src if now empty (models or backup_root left inside it → leave it)
+    try:
+        remaining = list(src.iterdir())
+        if not remaining:
+            src.rmdir()
+    except OSError:
+        pass
+
+
 def backup_user_data(
     project_root: Path,
     backup_root: Path | None = None,
@@ -333,16 +383,8 @@ def backup_user_data(
     """
     if backup_root is None:
         backup_root = project_root / ".nexe-backups"
-    backup_root.mkdir(parents=True, exist_ok=True)
 
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    backup_dir = backup_root / timestamp
-    suffix = 0
-    while backup_dir.exists():
-        suffix += 1
-        backup_dir = backup_root / f"{timestamp}_{suffix}"
-    backup_dir.mkdir(parents=True)
-
+    backup_dir = _make_backup_dir(backup_root)
     backup_root_resolved = backup_root.resolve()
 
     for rel in paths:
@@ -352,42 +394,10 @@ def backup_user_data(
         dest = backup_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-        # Special case: if it is 'storage' and we want to exclude models
-        # or avoid recursion inside the backup_root itself, handle it separately.
-        needs_special_storage = False
-        if src.is_dir():
-            try:
-                src_resolved = src.resolve()
-                if backup_root_resolved == src_resolved or backup_root_resolved.is_relative_to(src_resolved):
-                    needs_special_storage = True
-            except (OSError, ValueError):
-                pass
-            if exclude_models and rel == "storage" and (src / "models").exists():
-                needs_special_storage = True
-
-        if needs_special_storage:
-            # Move child entries one by one, skipping 'models/' and '.nexe-backups'
-            # if they live inside. Remaining subdirectories are moved intact.
-            dest.mkdir(parents=True, exist_ok=True)
-            for child in src.iterdir():
-                if exclude_models and child.name == "models":
-                    continue
-                try:
-                    child_resolved = child.resolve()
-                    if backup_root_resolved == child_resolved or backup_root_resolved.is_relative_to(child_resolved):
-                        continue
-                except (OSError, ValueError):
-                    pass
-                shutil.move(str(child), str(dest / child.name))
-            # After moving valid children, if 'src' still has things
-            # inside (models or the backup_root itself), leave it in place.
-            # Otherwise delete it so the subsequent wipe has nothing to do.
-            try:
-                remaining = list(src.iterdir())
-                if not remaining:
-                    src.rmdir()
-            except OSError:
-                pass
+        if _needs_selective_move(src, rel, backup_root_resolved, exclude_models):
+            # Special case: if it is 'storage' and we want to exclude models
+            # or avoid recursion inside the backup_root itself, handle it separately.
+            _selective_move_dir(src, dest, backup_root_resolved, exclude_models)
             continue
 
         # General case: direct move (instant on the same volume)
