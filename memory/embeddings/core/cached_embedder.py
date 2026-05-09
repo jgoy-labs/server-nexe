@@ -204,10 +204,64 @@ class CachedEmbedder:
       latency_ms=latency_ms
     )
 
+  async def _batch_with_cache(self, request: "BatchEmbeddingRequest") -> tuple:
+    """Resolve embeddings using cache, generating only for misses. Returns (embeddings, cache_hits)."""
+    cache = self.cache
+    to_generate = []
+    cached_embeddings = {}
+    cache_hits = 0
+
+    for i, text in enumerate(request.texts):
+      cached = await cache.get(text=text, model=request.model, version="v1")
+      if cached is not None:
+        cached_embeddings[i] = cached
+        cache_hits += 1
+      else:
+        to_generate.append((i, text))
+
+    if to_generate:
+      texts_to_gen = [text for _, text in to_generate]
+      new_embeddings = await self.encoder.encode_batch_async(
+        texts=texts_to_gen, normalize=request.normalize, batch_size=request.batch_size
+      )
+      for (idx, text), embedding in zip(to_generate, new_embeddings):
+        await cache.put(text=text, model=request.model, embedding=embedding, version="v1")
+        cached_embeddings[idx] = embedding
+
+    embeddings = [cached_embeddings[i] for i in range(len(request.texts))]
+    return embeddings, cache_hits
+
+  async def _batch_without_cache(self, request: "BatchEmbeddingRequest") -> tuple:
+    """Generate all embeddings directly without cache. Returns (embeddings, cache_hits=0)."""
+    embeddings = await self.encoder.encode_batch_async(
+      texts=request.texts, normalize=request.normalize, batch_size=request.batch_size
+    )
+    return embeddings, 0
+
+  def _batch_update_stats(self, count: int, cache_hits: int, total_latency_ms: float, avg_latency_ms: float) -> None:
+    """Update internal counters and trim latency window."""
+    self._total_requests += count
+    self._cache_hits += cache_hits
+    self._latencies.extend([avg_latency_ms] * count)
+    if len(self._latencies) > 1000:
+      self._latencies = self._latencies[-1000:]
+
+  def _batch_emit_metrics(self, count: int, cache_hits: int) -> None:
+    """Emit Prometheus metrics for a batch encode."""
+    ops, hits, misses = _get_metrics()
+    if ops:
+      ops.labels(operation="batch_encode").inc()
+    if hits and cache_hits > 0:
+      for _ in range(cache_hits):
+        hits.inc()
+    if misses and cache_hits < count:
+      for _ in range(count - cache_hits):
+        misses.inc()
+
   async def encode_batch(
     self,
-    request: BatchEmbeddingRequest
-  ) -> BatchEmbeddingResponse:
+    request: "BatchEmbeddingRequest"
+  ) -> "BatchEmbeddingResponse":
     """
     Encode batch amb cache optimization.
 
@@ -224,62 +278,16 @@ class CachedEmbedder:
       BatchEmbeddingResponse amb embeddings i stats
     """
     start = time.time()
-    embeddings = []
-    cache_hits = 0
 
     if self.cache_enabled and self.cache is not None and request.use_cache:
-      cache = self.cache
-      to_generate = []
-      cached_embeddings = {}
-
-      for i, text in enumerate(request.texts):
-        cached = await cache.get(
-          text=text,
-          model=request.model,
-          version="v1"
-        )
-
-        if cached is not None:
-          cached_embeddings[i] = cached
-          cache_hits += 1
-        else:
-          to_generate.append((i, text))
-
-      if to_generate:
-        texts_to_gen = [text for _, text in to_generate]
-        new_embeddings = await self.encoder.encode_batch_async(
-          texts=texts_to_gen,
-          normalize=request.normalize,
-          batch_size=request.batch_size
-        )
-
-        for (idx, text), embedding in zip(to_generate, new_embeddings):
-          await cache.put(
-            text=text,
-            model=request.model,
-            embedding=embedding,
-            version="v1"
-          )
-          cached_embeddings[idx] = embedding
-
-      embeddings = [cached_embeddings[i] for i in range(len(request.texts))]
-
+      embeddings, cache_hits = await self._batch_with_cache(request)
     else:
-      embeddings = await self.encoder.encode_batch_async(
-        texts=request.texts,
-        normalize=request.normalize,
-        batch_size=request.batch_size
-      )
+      embeddings, cache_hits = await self._batch_without_cache(request)
 
     total_latency_ms = (time.time() - start) * 1000
     avg_latency_ms = total_latency_ms / len(request.texts)
 
-    self._total_requests += len(request.texts)
-    self._cache_hits += cache_hits
-    self._latencies.extend([avg_latency_ms] * len(request.texts))
-
-    if len(self._latencies) > 1000:
-      self._latencies = self._latencies[-1000:]
+    self._batch_update_stats(len(request.texts), cache_hits, total_latency_ms, avg_latency_ms)
 
     logger.info(
       "batch_encode_completed",
@@ -290,15 +298,7 @@ class CachedEmbedder:
       avg_latency_ms=avg_latency_ms
     )
 
-    ops, hits, misses = _get_metrics()
-    if ops:
-      ops.labels(operation="batch_encode").inc()
-    if hits and cache_hits > 0:
-      for _ in range(cache_hits):
-        hits.inc()
-    if misses and cache_hits < len(request.texts):
-      for _ in range(len(request.texts) - cache_hits):
-        misses.inc()
+    self._batch_emit_metrics(len(request.texts), cache_hits)
 
     return BatchEmbeddingResponse(
       embeddings=embeddings,
