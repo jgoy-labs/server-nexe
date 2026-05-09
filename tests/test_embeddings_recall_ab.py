@@ -114,7 +114,7 @@ class InMemoryVectorStore:
         return {"status": "healthy", "num_vectors": len(self._ids)}
 
 
-# ── Golden dataset (català / temàtica Nexe-IA) ────────────────────────────────
+# ── Golden dataset (Catalan / Nexe-AI topic) ────────────────────────────────
 
 _GOLDEN_DOCS = [
     {"id": "d01", "text": "El servidor Nexe és un assistent local d'IA que funciona sense connexió a internet."},

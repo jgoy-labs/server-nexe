@@ -161,7 +161,7 @@ def test_sync_vector_index_skips_when_vector_unavailable():
     assert conn.executed == []
 
 
-# ── Dev #3: Bug 10 fix passada 2 — les 4 funcions restants ──────────────
+# ── Dev #3: Bug 10 fix pass 2 — the 4 remaining functions ──────────────
 
 
 def test_recover_stuck_leases_closes_connection():

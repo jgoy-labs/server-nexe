@@ -1,5 +1,5 @@
 """
-Tests per _prewarm_fastembed (B.1) — core/lifespan.py
+Tests for _prewarm_fastembed (B.1) — core/lifespan.py
 """
 
 import pytest

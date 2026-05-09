@@ -293,7 +293,7 @@ def test_apply_aborts_if_stop_server_fails(tmp_path):
         apply_reinstall_mode(
             tmp_path, REINSTALL_MODE_WIPE, stop_server_func=failing_stop
         )
-    # Dades intactes
+    # Data intact
     assert (tmp_path / ".env").exists()
     assert (tmp_path / "storage").exists()
 
@@ -351,10 +351,10 @@ def test_mode_overwrite_regenerates_env_keeping_secrets(tmp_path):
     }
     _update_env_model_config(env_file, new_model)
     after = env_file.read_text()
-    # Secrets preservats
+    # Secrets preserved
     assert "NEXE_PRIMARY_API_KEY=supersecret-abc123" in after
     assert "NEXE_CSRF_SECRET=csrf-xyz789" in after
-    # Model refrescat
+    # Model refreshed
     assert "NEXE_DEFAULT_MODEL=qwen2.5:7b" in after
     assert "NEXE_OLLAMA_MODEL=qwen2.5:7b" in after
 

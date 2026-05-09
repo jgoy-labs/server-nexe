@@ -1,4 +1,4 @@
-"""Tests per a les funcions helper extretes de _chat_async."""
+"""Tests for the helper functions extracted from _chat_async."""
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 

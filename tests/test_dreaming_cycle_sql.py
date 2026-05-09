@@ -45,7 +45,7 @@ class _FakeConn:
         if sql_norm.startswith("SELECT evidence_count FROM episodic"):
             return _FakeCursor(one=(self._current,))
         if "FROM staging" in sql and "ORDER BY" in sql:
-            # _process_staging select — no entrar pel batch loop
+            # _process_staging select — do not enter the batch loop
             return _FakeCursor(rows=[])
         if sql_norm.startswith("SELECT") and "FROM staging" in sql_norm:
             return _FakeCursor(rows=[])

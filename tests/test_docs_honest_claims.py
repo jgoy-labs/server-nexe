@@ -1,9 +1,9 @@
-"""B7 r4: docs públics coincideixen amb la realitat del codi.
+"""B7 r4: public docs match the reality of the code.
 
-Cada test verifica empíricament que un dels claims falsos detectats per
-auditoria F16c (i el claim 8 afegit per auditor B6) ha estat corregit.
+Each test verifies empirically that one of the false claims detected by
+audit F16c (and claim 8 added by auditor B6) has been corrected.
 
-Origen: nat/dev/server-nexe/diari/prompts/onada-2-blockers-r4/B7-docs-claims-falsos.md
+Origin: nat/dev/server-nexe/diari/prompts/onada-2-blockers-r4/B7-docs-claims-falsos.md
 """
 import re
 from pathlib import Path
@@ -14,10 +14,10 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 def test_v1_endpoint_status_consistency():
-    """B7: status declarats a v1.py coincideixen amb realitat empírica.
+    """B7: statuses declared in v1.py match empirical reality.
 
-    Endpoints que retornen 501 (`embeddings/encode`, `rag/search`,
-    `documents/`) NO poden declarar `status: "implemented"` al registre v1.
+    Endpoints that return 501 (`embeddings/encode`, `rag/search`,
+    `documents/`) CANNOT declare `status: "implemented"` in the v1 registry.
     """
     text = (REPO / "core/endpoints/v1.py").read_text(encoding="utf-8")
     for endpoint in ("embeddings", "rag", "documents"):
@@ -33,7 +33,7 @@ def test_v1_endpoint_status_consistency():
 
 
 def test_v1_version_string_dynamic():
-    """B7: la string de versió a v1.py NO és '0.9.0' hardcoded."""
+    """B7: the version string in v1.py is NOT '0.9.0' hardcoded."""
     text = (REPO / "core/endpoints/v1.py").read_text(encoding="utf-8")
     assert "Nexe 0.9.0 Versioned API" not in text, (
         "Hardcoded version 0.9.0 — use dynamic __version__"
@@ -41,7 +41,7 @@ def test_v1_version_string_dynamic():
 
 
 def test_changelog_has_1_0_2_entry():
-    """B7: CHANGELOG té entry per 1.0.2-beta entre 1.0.1 i 1.0.3."""
+    """B7: CHANGELOG has an entry for 1.0.2-beta between 1.0.1 and 1.0.3."""
     text = (REPO / "CHANGELOG.md").read_text(encoding="utf-8")
     assert "## [1.0.2-beta]" in text, (
         "Entry [1.0.2-beta] absent from CHANGELOG"
@@ -57,7 +57,7 @@ def test_changelog_has_1_0_2_entry():
     ],
 )
 def test_plugin_readme_marks_chat_as_removed(plugin_readme, removed_ep):
-    """B7: READMEs documenten que /chat directe està removed v1.0.3-beta."""
+    """B7: READMEs document that direct /chat is removed in v1.0.3-beta."""
     text = (REPO / plugin_readme).read_text(encoding="utf-8")
     assert (
         "Removed" in text
@@ -67,7 +67,7 @@ def test_plugin_readme_marks_chat_as_removed(plugin_readme, removed_ep):
 
 
 def test_security_pattern_count_accurate():
-    """B7: el nombre de patterns al README coincideix amb la realitat."""
+    """B7: the number of patterns in the README matches reality."""
     text = (REPO / "plugins/security/readme/README.md").read_text(encoding="utf-8")
     assert "69 patrons" not in text, (
         "README says 69 patterns; reality is 47+18=65"
@@ -90,7 +90,7 @@ def test_security_pattern_count_accurate():
 
 
 def test_no_phantom_versions_in_v1_py():
-    """B7 (regressió): cap version string ≠ __version__ a v1.py."""
+    """B7 (regression): no version string ≠ __version__ in v1.py."""
     text = (REPO / "core/endpoints/v1.py").read_text(encoding="utf-8")
     phantom = re.findall(r"\bNexe\s+\d+\.\d+\.\d+", text)
     assert not phantom, f"Phantom version strings: {phantom}"

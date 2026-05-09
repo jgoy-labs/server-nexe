@@ -136,7 +136,7 @@ class TestRenewalLoopRegenerates:
 
 
 class TestRenewalRetryBackoff:
-    """Fix Consultor passada 1 — Finding 4: retry exponencial quan regenerate falla."""
+    """Fix Consultor pass 1 — Finding 4: exponential retry when regenerate fails."""
 
     @pytest.mark.asyncio
     async def test_retry_recovers_after_transient_failures(

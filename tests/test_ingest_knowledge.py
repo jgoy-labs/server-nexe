@@ -1,4 +1,4 @@
-"""Tests per a les funcions helper extretes d'ingest_knowledge."""
+"""Tests for the helper functions extracted from ingest_knowledge."""
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 

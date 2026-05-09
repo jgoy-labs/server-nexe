@@ -137,7 +137,7 @@ def test_docs_endpoints_disabled_in_production():
     saved = os.environ.get("NEXE_ENV")
     try:
         os.environ["NEXE_ENV"] = "production"
-        # Reproduïm la lògica que aplica factory_app.create_fastapi_instance
+        # Reproduce the logic applied by factory_app.create_fastapi_instance
         _docs_enabled = os.environ["NEXE_ENV"].lower() in ("development", "test")
         app = FastAPI(
             docs_url="/docs" if _docs_enabled else None,

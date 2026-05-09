@@ -61,7 +61,7 @@ class TestBlockedRoutes:
     """The 3 routes declared in removed_direct_routes must return 403."""
 
     def test_mlx_chat_direct_returns_403(self):
-        """POST /mlx/chat → 403 amb error code direct_plugin_endpoint_disabled."""
+        """POST /mlx/chat → 403 with error code direct_plugin_endpoint_disabled."""
         app = _build_guarded_app(("mlx_module", "/chat", "/mlx"))
         with TestClient(app, raise_server_exceptions=False) as client:
             r = client.post("/mlx/chat", json={"messages": []})
@@ -251,7 +251,7 @@ class TestPathParamMatching:
     """The guard must support routes with path params ({id}, etc.)."""
 
     def test_path_param_matching_in_removed_route(self):
-        """removed=["/things/{id}"] → GET /things/42 retorna 403."""
+        """removed=["/things/{id}"] → GET /things/42 returns 403."""
         from core.middleware import register_removed_route, RemovedDirectRoutesGuard
 
         app = FastAPI()

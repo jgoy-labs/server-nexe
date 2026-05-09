@@ -1,4 +1,4 @@
-"""Tests per a les funcions helpers extretes del closure response_generator."""
+"""Tests for the helper functions extracted from the response_generator closure."""
 import pytest
 import asyncio
 from plugins.web_ui_module.api.routes_chat import (
@@ -285,7 +285,7 @@ async def _collect_async(gen):
     return [item async for item in gen]
 
 def _collect(gen):
-    """Helper: esgota un async generator i retorna la llista de strings."""
+    """Helper: exhausts an async generator and returns the list of strings."""
     loop = asyncio.new_event_loop()
     try:
         return loop.run_until_complete(_collect_async(gen))
@@ -381,7 +381,7 @@ class _FakeSigNoModel:
     parameters = {"messages": None, "stream": None}
 
 def _make_engine(*chunks):
-    """Retorna un FakeEngine que yielda els chunks donats."""
+    """Returns a FakeEngine that yields the given chunks."""
     async def _gen(**kwargs):
         for c in chunks:
             yield c

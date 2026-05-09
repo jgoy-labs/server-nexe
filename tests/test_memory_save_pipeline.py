@@ -99,7 +99,7 @@ _HEADERS = {"X-API-Key": API_KEY}
 
 @pytest.fixture
 def api_client(monkeypatch):
-    """TestClient per al router /memory amb API key via env var."""
+    """TestClient for the /memory router with API key via env var."""
     monkeypatch.setenv("NEXE_PRIMARY_API_KEY", API_KEY)
 
     from fastapi import FastAPI

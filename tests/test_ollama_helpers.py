@@ -1,4 +1,4 @@
-"""Tests per a les funcions helper extretes de _forward_to_ollama."""
+"""Tests for the helper functions extracted from _forward_to_ollama."""
 import httpx
 import pytest
 from fastapi import HTTPException

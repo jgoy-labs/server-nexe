@@ -1,8 +1,8 @@
-"""Tests per a les funcions helper extretes de _build_rag_context.
+"""Tests for the helper functions extracted from _build_rag_context.
 
-Cobreix: _build_rag_items_tuple, _filter_relevant_results,
-         _format_rag_sections_by_language, _search_collection,
-         _deduplicate_results.
+Covers: _build_rag_items_tuple, _filter_relevant_results,
+        _format_rag_sections_by_language, _search_collection,
+        _deduplicate_results.
 """
 
 import hashlib
@@ -254,7 +254,7 @@ class TestDeduplicateResults:
         obj1 = _make_rag_obj(long_text)
         obj2 = _make_rag_obj(long_text[:-1] + "B")
         result = _deduplicate_results([obj1, obj2])
-        # Els primers 500 chars son iguals → duplicat
+        # The first 500 chars are identical → duplicate
         assert len(result) == 1
 
     def test_preserves_order(self):
