@@ -162,7 +162,8 @@ def _log_failure(request: Request, keys_config) -> None:
 
 async def require_api_key(
   request: Request,
-  x_api_key: Optional[str] = Header(None, description="Admin API Key")
+  x_api_key: Optional[str] = Header(None, description="Admin API Key"),
+  authorization: Optional[str] = Header(None, description="Bearer token (sidecar fallback)")
 ) -> str:
   """
   FastAPI Dependency to validate mandatory API key.
@@ -194,6 +195,12 @@ async def require_api_key(
 
   if not keys_config.has_any_valid_key:
     return _check_dev_mode(request, dev_mode)
+
+  # Sidecar fallback: accept Authorization: Bearer <key> when X-API-Key is absent
+  if not x_api_key and authorization:
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() == "bearer" and token:
+      x_api_key = token
 
   if not x_api_key:
     record_auth_failure('missing_key')

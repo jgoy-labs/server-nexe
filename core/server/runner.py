@@ -286,6 +286,46 @@ def _maybe_launch_tray(_project_root: "Path | None" = None):
     _launch_tray_process(project_root)
 
 
+def _handle_port_conflict(host: str, port: int, headless: bool, sidecar: bool, i18n: object) -> None:
+  """Handle port-in-use conflict. Exits or kills depending on mode.
+
+  Extracted for testability. Called only when is_port_in_use() is True.
+  """
+  if sidecar:
+    logger.error(
+      "Sidecar mode: port %s at %s already occupied. "
+      "Tauri must pre-reserve the port. Exiting.", port, host
+    )
+    sys.exit(1)
+  elif headless:
+    if kill_process_on_port(port):
+      logger.info(translate(i18n, "core.server.process_killed",
+        "Previous process on port {port} terminated.", port=port))
+    else:
+      logger.error(translate(i18n, "core.server.kill_failed",
+        "Could not terminate process on port {port}.", port=port))
+      sys.exit(1)
+  else:
+    try:
+      print(f"\n{YELLOW}Port {port} is in use. Kill existing process? [y/N]: {RESET}", end="")
+      response = input().strip().lower()
+      if response in ('y', 'yes'):
+        if kill_process_on_port(port):
+          logger.info(translate(i18n, "core.server.process_killed",
+            "Previous process on port {port} terminated.", port=port))
+        else:
+          logger.error(translate(i18n, "core.server.kill_failed",
+            "Could not terminate process on port {port}. Try manually: lsof -ti:{port} | xargs kill", port=port))
+          sys.exit(1)
+      else:
+        logger.info(translate(i18n, "core.server.find_port_usage",
+          "To find what's using the port: lsof -ti:{port}", port=port))
+        sys.exit(1)
+    except (EOFError, KeyboardInterrupt):
+      print()
+      sys.exit(1)
+
+
 def _handle_sigterm(signum, frame):  # noqa: ARG001
   """SIGTERM handler (N05). Garanteix sortida neta pre-uvicorn.
 
@@ -356,35 +396,9 @@ def main():
       )
     )
     # When launched from tray (no terminal), auto-kill the old process
-    headless = os.environ.get("NEXE_TRAY_PID") or not sys.stdin.isatty()
-    if headless:
-      if kill_process_on_port(port):
-        logger.info(translate(i18n, "core.server.process_killed",
-          "Previous process on port {port} terminated.", port=port))
-      else:
-        logger.error(translate(i18n, "core.server.kill_failed",
-          "Could not terminate process on port {port}.", port=port))
-        sys.exit(1)
-    else:
-      # Interactive: ask user
-      try:
-        print(f"\n{YELLOW}Port {port} is in use. Kill existing process? [y/N]: {RESET}", end="")
-        response = input().strip().lower()
-        if response in ('y', 'yes'):
-          if kill_process_on_port(port):
-            logger.info(translate(i18n, "core.server.process_killed",
-              "Previous process on port {port} terminated.", port=port))
-          else:
-            logger.error(translate(i18n, "core.server.kill_failed",
-              "Could not terminate process on port {port}. Try manually: lsof -ti:{port} | xargs kill", port=port))
-            sys.exit(1)
-        else:
-          logger.info(translate(i18n, "core.server.find_port_usage",
-            "To find what's using the port: lsof -ti:{port}", port=port))
-          sys.exit(1)
-      except (EOFError, KeyboardInterrupt):
-        print()
-        sys.exit(1)
+    headless = bool(os.environ.get("NEXE_TRAY_PID") or not sys.stdin.isatty())
+    sidecar = bool(os.environ.get("NEXE_SIDECAR"))
+    _handle_port_conflict(host, port, headless, sidecar, i18n)
 
   logger.info(
     translate(i18n, "server_core.startup.starting_server_on", "Starting server on {host}:{port}", host=host, port=port)
