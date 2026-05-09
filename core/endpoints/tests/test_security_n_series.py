@@ -35,37 +35,37 @@ class TestServerTomlProductionConfig:
         """environment = 'production' (no 'development')."""
         content = self._read_toml()
         assert 'environment = "production"' in content, (
-            "server.toml ha de tenir environment = \"production\""
+            "server.toml must have environment = \"production\""
         )
         assert 'environment = "development"' not in content
 
     def test_debug_is_disabled(self):
         """debug = false prevents exposing Python stack traces in HTTP responses."""
         content = self._read_toml()
-        assert "debug = false" in content, "server.toml ha de tenir debug = false"
+        assert "debug = false" in content, "server.toml must have debug = false"
         assert "debug = true" not in content
 
     def test_reload_is_disabled(self):
         """reload = false prevents live-reload in production."""
         content = self._read_toml()
-        assert "reload = false" in content, "server.toml ha de tenir reload = false"
+        assert "reload = false" in content, "server.toml must have reload = false"
         assert "reload = true" not in content
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# system.py — PID i comandos kill no exposats a respostes HTTP
+# system.py — PID and kill commands not exposed in HTTP responses
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestSystemEndpointInfoDisclosure:
     """
-    Verifica que els endpoints /admin/system/restart i /admin/system/status
-    no retornen supervisor_pid, restart_command ni shutdown_command.
-    Exposar el PID + el comandament exacte per aturar-lo facilita lateral
-    movement si la clau API és robada.
+    Verifies that the /admin/system/restart and /admin/system/status endpoints
+    do not return supervisor_pid, restart_command or shutdown_command.
+    Exposing the PID + the exact command to stop it enables lateral movement
+    if the API key is stolen.
     """
 
     def test_restart_response_no_supervisor_pid(self):
-        """/restart no ha de retornar supervisor_pid al client."""
+        """/restart must not return supervisor_pid to the client."""
         from core.endpoints.system import restart_server
         source = inspect.getsource(restart_server)
         # Get the return section (after background_tasks.add_task)
@@ -73,20 +73,20 @@ class TestSystemEndpointInfoDisclosure:
         assert '"supervisor_pid"' not in return_section
 
     def test_status_response_no_supervisor_pid(self):
-        """/status no ha de retornar supervisor_pid."""
+        """/status must not return supervisor_pid."""
         from core.endpoints.system import supervisor_status
         source = inspect.getsource(supervisor_status)
         assert '"supervisor_pid"' not in source
 
     def test_status_response_no_restart_command(self):
-        """/status no ha de retornar la comanda kill -HUP <pid>."""
+        """/status must not return the kill -HUP <pid> command."""
         from core.endpoints.system import supervisor_status
         source = inspect.getsource(supervisor_status)
         assert '"restart_command"' not in source
         assert "kill -HUP" not in source
 
     def test_status_response_no_shutdown_command(self):
-        """/status no ha de retornar la comanda kill -TERM <pid>."""
+        """/status must not return the kill -TERM <pid> command."""
         from core.endpoints.system import supervisor_status
         source = inspect.getsource(supervisor_status)
         assert '"shutdown_command"' not in source
@@ -106,32 +106,32 @@ class TestSystemEndpointInfoDisclosure:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# memory/api/v1.py — str(e) no retornat al client HTTP
+# memory/api/v1.py — str(e) not returned to the HTTP client
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestMemoryAPIErrorDisclosure:
     """
-    Verifica que les excepcions internes de memory/api/v1.py no exposen
-    l'error intern (str(e)) a la resposta HTTP. str(e) pot contenir URL Qdrant
-    interna, topologia de xarxa o missatges de connexió.
+    Verifies that internal exceptions in memory/api/v1.py do not expose
+    the internal error (str(e)) in the HTTP response. str(e) may contain the
+    internal Qdrant URL, network topology or connection messages.
     """
 
     def test_store_exception_no_str_e_in_http_detail(self):
-        """memory_store no inclou str(e) al detail de l'HTTPException."""
+        """memory_store does not include str(e) in the HTTPException detail."""
         from memory.memory.api.v1 import memory_store
         source = inspect.getsource(memory_store)
         except_section = source.split("except Exception")[1] if "except Exception" in source else ""
         assert "str(e)" not in except_section
 
     def test_search_exception_no_str_e_in_http_detail(self):
-        """memory_search no inclou str(e) al detail de l'HTTPException."""
+        """memory_search does not include str(e) in the HTTPException detail."""
         from memory.memory.api.v1 import memory_search
         source = inspect.getsource(memory_search)
         except_section = source.split("except Exception")[1] if "except Exception" in source else ""
         assert "str(e)" not in except_section
 
     def test_health_exception_no_str_e_in_response(self):
-        """memory_health (sense auth!) no inclou str(e) a la resposta JSON."""
+        """memory_health (no auth!) does not include str(e) in the JSON response."""
         from memory.memory.api.v1 import memory_health
         source = inspect.getsource(memory_health)
         except_section = source.split("except Exception")[1] if "except Exception" in source else ""
@@ -156,7 +156,7 @@ class TestMemoryAPIErrorDisclosure:
         assert "exc_info=True" in source
 
     def test_search_logs_with_exc_info(self):
-        """memory_search fa logger.error amb exc_info=True."""
+        """memory_search calls logger.error with exc_info=True."""
         from memory.memory.api.v1 import memory_search
         source = inspect.getsource(memory_search)
         assert "exc_info=True" in source
@@ -168,27 +168,27 @@ class TestMemoryAPIErrorDisclosure:
 
 class TestStaticFilePathTraversal:
     """
-    Verifica que /ui/static/ és immune a path traversal.
-    Sense protecció, GET /ui/static/../../etc/passwd llegiria fitxers
-    del sistema fora del directori static/.
+    Verifies that /ui/static/ is immune to path traversal.
+    Without protection, GET /ui/static/../../etc/passwd would read system files
+    outside the static/ directory.
     """
 
     def test_route_uses_path_type_parameter(self):
-        """La ruta usa {filename:path} per capturar subpaths amb '/'."""
+        """The route uses {filename:path} to capture subpaths containing '/'."""
         from plugins.web_ui_module.api import routes_static
         source = inspect.getsource(routes_static)
         assert '"/static/{filename:path}"' in source, (
-            "La ruta ha de ser /static/{filename:path}, no /static/{filename}"
+            "The route must be /static/{filename:path}, not /static/{filename}"
         )
 
     def test_serve_static_uses_resolve(self):
-        """serve_static crida .resolve() per normalitzar el path (elimina ..)."""
+        """serve_static calls .resolve() to normalise the path (removes ..)."""
         from plugins.web_ui_module.api import routes_static
         source = inspect.getsource(routes_static)
         assert ".resolve()" in source
 
     def test_serve_static_checks_startswith(self):
-        """serve_static comprova que el path resultant estigui dins de static_dir."""
+        """serve_static checks that the resulting path is inside static_dir."""
         from plugins.web_ui_module.api import routes_static
         source = inspect.getsource(routes_static)
         assert "startswith" in source
@@ -205,7 +205,7 @@ class TestStaticFilePathTraversal:
         static_dir = Path("/app/static").resolve()
         traversal = (Path("/app/static") / "../../etc/passwd").resolve()
         assert not str(traversal).startswith(str(static_dir)), (
-            "Path traversal ha de ser detectat per startswith()"
+            "Path traversal must be detected by startswith()"
         )
 
     def test_traversal_logic_accepts_valid_path(self):
@@ -217,7 +217,7 @@ class TestStaticFilePathTraversal:
     def test_traversal_nested_path_rejected(self):
         """Path traversal with an intermediate subdir is equally rejected."""
         static_dir = Path("/app/static").resolve()
-        # /app/static/css/../../etc/passwd → /app/etc/passwd → fora de static/
+        # /app/static/css/../../etc/passwd → /app/etc/passwd → outside static/
         traversal = (Path("/app/static") / "css/../../etc/passwd").resolve()
         assert not str(traversal).startswith(str(static_dir))
 
@@ -228,16 +228,16 @@ class TestStaticFilePathTraversal:
 
 class TestSessionCleanupTask:
     """
-    Verifica que el cleanup de sessions inactives té una tasca asyncio
-    que s'executa automàticament cada hora. Sense això, les sessions
-    s'acumulen en RAM i disc indefinidament.
+    Verifies that the inactive session cleanup has an asyncio task
+    that runs automatically every hour. Without this, sessions
+    accumulate in RAM and on disk indefinitely.
     """
 
     def test_cleanup_loop_function_exists(self):
-        """_session_cleanup_loop existeix a api/routes.py."""
+        """_session_cleanup_loop exists in api/routes.py."""
         from plugins.web_ui_module.api import routes
         assert hasattr(routes, '_session_cleanup_loop'), (
-            "_session_cleanup_loop no trobat a api/routes.py"
+            "_session_cleanup_loop not found in api/routes.py"
         )
 
     def test_cleanup_loop_is_coroutine(self):
@@ -252,25 +252,25 @@ class TestSessionCleanupTask:
         assert callable(start_session_cleanup_task)
 
     def test_cleanup_loop_uses_hourly_interval(self):
-        """El loop duerme 3600 segons (1 hora) entre execucions."""
+        """The loop sleeps 3600 seconds (1 hour) between runs."""
         from plugins.web_ui_module.api.routes import _session_cleanup_loop
         source = inspect.getsource(_session_cleanup_loop)
-        assert "3600" in source, "El loop ha de dormir 3600s (1 hora)"
+        assert "3600" in source, "The loop must sleep 3600s (1 hour)"
 
     def test_cleanup_loop_calls_cleanup_inactive(self):
-        """El loop crida cleanup_inactive() del session_manager."""
+        """The loop calls cleanup_inactive() on the session_manager."""
         from plugins.web_ui_module.api.routes import _session_cleanup_loop
         source = inspect.getsource(_session_cleanup_loop)
         assert "cleanup_inactive" in source
 
     def test_cleanup_loop_has_max_age_hours(self):
-        """cleanup_inactive es crida amb max_age_hours (TTL sessions)."""
+        """cleanup_inactive is called with max_age_hours (session TTL)."""
         from plugins.web_ui_module.api.routes import _session_cleanup_loop
         source = inspect.getsource(_session_cleanup_loop)
         assert "max_age_hours" in source
 
     def test_lifespan_imports_and_calls_cleanup_task(self):
-        """lifespan.py crida start_session_cleanup_task() durant el startup."""
+        """lifespan.py calls start_session_cleanup_task() during startup."""
         from core import lifespan
         source = inspect.getsource(lifespan)
         assert "start_session_cleanup_task" in source
@@ -282,8 +282,8 @@ class TestSessionCleanupTask:
 
 class TestSystemHealthVersion:
     """
-    Verifica que /admin/system/health retorna la versió real del
-    fitxer de config, no la cadena hardcoded "0.7.1" incorrecta.
+    Verifies that /admin/system/health returns the real version from the
+    config file, not the incorrect hardcoded string "0.7.1".
     """
 
     def test_health_no_hardcoded_old_version(self):
@@ -291,7 +291,7 @@ class TestSystemHealthVersion:
         from core.endpoints.system import system_health
         source = inspect.getsource(system_health)
         assert '"0.7.1"' not in source, (
-            "/health no ha de tenir la versió '0.7.1' hardcoded"
+            "/health must not have version '0.7.1' hardcoded"
         )
 
     def test_health_reads_from_server_state(self):
@@ -305,18 +305,18 @@ class TestSystemHealthVersion:
         """/health has a fallback version if config is not available."""
         from core.endpoints.system import system_health
         source = inspect.getsource(system_health)
-        # Ha de tenir un fallback (0.9.x)
+        # Must have a fallback (0.9.x)
         assert "0.9" in source
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Dead code eliminat de manifest.py (import duplicat i variable no llegida)
+# Dead code removed from manifest.py (duplicate import and unread variable)
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestManifestDeadCodeRemoved:
     """
-    Verifica que 'import logging' no apareix duplicat.
-    Verifica que la variable _initialized ha estat eliminada.
+    Verifies that 'import logging' does not appear duplicated.
+    Verifies that the _initialized variable has been removed.
     """
 
     def _read_routes(self) -> str:
@@ -324,18 +324,18 @@ class TestManifestDeadCodeRemoved:
         return path.read_text(encoding="utf-8")
 
     def test_no_duplicate_import_logging(self):
-        """'import logging' apareix exactament una vegada a routes.py."""
+        """'import logging' appears exactly once in routes.py."""
         content = self._read_routes()
         count = content.count("import logging")
         assert count == 1, (
-            f"'import logging' apareix {count} vegades a routes.py (s'espera 1)"
+            f"'import logging' appears {count} times in routes.py (expected 1)"
         )
 
     def test_no_initialized_variable(self):
-        """La variable _initialized ha estat eliminada (mai s'usava)."""
+        """The _initialized variable has been removed (it was never used)."""
         # Check both manifest.py and routes.py
         manifest_path = PROJECT_ROOT / "plugins" / "web_ui_module" / "manifest.py"
         content = manifest_path.read_text(encoding="utf-8")
         assert "_initialized" not in content, (
-            "_initialized encara existeix a manifest.py però mai s'usa"
+            "_initialized still exists in manifest.py but is never used"
         )

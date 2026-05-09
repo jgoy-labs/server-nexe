@@ -85,7 +85,7 @@ PREFERENCE_PATTERNS = [
         ),
         "positive",
     ),
-    # "Odio X" / "No m'agrada X" / "I hate X"
+    # "I hate X" / "I don't like X" (also: "odio X", "no m'agrada X")
     (
         re.compile(
             r"(?:odio|no\s+m'agrada|no\s+me\s+gusta|i\s+(?:hate|dislike|don'?t\s+like))\s+(.+?)(?:\.|,|$)",

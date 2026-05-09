@@ -124,7 +124,7 @@ class TestGetSupervisorPid:
     def test_dead_process_pid(self, tmp_path):
         from core.endpoints.system import get_supervisor_pid
         pid_file = tmp_path / "test.pid"
-        pid_file.write_text("999999")  # PID molt alt, probablement no existeix
+        pid_file.write_text("999999")  # Very high PID, likely does not exist
         with patch("core.endpoints.system.SUPERVISOR_PID_FILE", pid_file), \
              patch("core.endpoints.system._get_i18n", return_value=None), \
              patch("os.kill", side_effect=ProcessLookupError("no process")):
@@ -163,7 +163,7 @@ class TestGetSupervisorPid:
         pid_file.write_text("12345")
         with patch("core.endpoints.system.SUPERVISOR_PID_FILE", pid_file), \
              patch("core.endpoints.system._get_i18n", return_value=None), \
-             patch("os.kill", return_value=None):  # PID existeix
+             patch("os.kill", return_value=None):  # PID exists
             result = get_supervisor_pid()
             assert result == 12345
 
@@ -193,7 +193,7 @@ class TestSendRestartSignal:
 
     @pytest.mark.asyncio
     async def test_send_restart_signal_generic_exception(self, tmp_path):
-        """Exception dins del try → capturada i loggada"""
+        """Exception inside the try → caught and logged"""
         from core.endpoints.system import send_restart_signal
         pid_file = tmp_path / "test.pid"
         pid_file.write_text("12345")
