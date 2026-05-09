@@ -148,6 +148,45 @@ class Extractor:
     - Health/allergy mentions
     """
 
+    def _extract_identity_facts(self, clean: str, facts: "List[ExtractedFact]") -> None:
+        """Append identity-pattern facts (deduped by attribute) to facts in place."""
+        for pattern, attribute, value_fn in IDENTITY_PATTERNS:
+            match = pattern.search(clean)
+            if not match:
+                continue
+            value = value_fn(match)
+            if value and len(value) > 1 and not any(f.attribute == attribute for f in facts):
+                facts.append(ExtractedFact(
+                    content=clean, entity="user", attribute=attribute,
+                    value=value, tags=["identity"], importance=0.8, source="heuristic",
+                ))
+
+    def _extract_health_facts(self, clean: str, facts: "List[ExtractedFact]") -> None:
+        """Append health-pattern facts (deduped) to facts in place."""
+        for pattern, attribute in HEALTH_PATTERNS:
+            match = pattern.search(clean)
+            if not match:
+                continue
+            value = match.group(1).strip().rstrip(".")
+            if value and not any(f.attribute == attribute and f.value == value for f in facts):
+                facts.append(ExtractedFact(
+                    content=clean, entity="user", attribute=attribute,
+                    value=value, tags=["health", "critical"], importance=0.9, source="heuristic",
+                ))
+
+    def _extract_preference_facts(self, clean: str, facts: "List[ExtractedFact]") -> None:
+        """Append preference-pattern facts to facts in place."""
+        for pattern, sentiment in PREFERENCE_PATTERNS:
+            match = pattern.search(clean)
+            if not match:
+                continue
+            value = match.group(1).strip().rstrip(".")
+            if value and len(value) > 1:
+                facts.append(ExtractedFact(
+                    content=clean, entity="user", attribute=None,
+                    value=value, tags=["preference", sentiment], importance=0.6, source="heuristic",
+                ))
+
     def extract(self, text: str) -> List[ExtractedFact]:
         """
         Extract facts from text using heuristics.
@@ -163,78 +202,20 @@ class Extractor:
         if not clean:
             return facts
 
-        # Check corrections first (higher priority)
         correction = self._check_corrections(clean)
         if correction:
             facts.append(correction)
 
-        # Identity patterns
-        for pattern, attribute, value_fn in IDENTITY_PATTERNS:
-            match = pattern.search(clean)
-            if match:
-                value = value_fn(match)
-                if value and len(value) > 1:
-                    fact = ExtractedFact(
-                        content=clean,
-                        entity="user",
-                        attribute=attribute,
-                        value=value,
-                        tags=["identity"],
-                        importance=0.8,
-                        source="heuristic",
-                    )
-                    # Avoid duplicate attributes in same extraction
-                    if not any(f.attribute == attribute for f in facts):
-                        facts.append(fact)
-
-        # Health patterns (high importance)
-        for pattern, attribute in HEALTH_PATTERNS:
-            match = pattern.search(clean)
-            if match:
-                value = match.group(1).strip().rstrip(".")
-                if value:
-                    fact = ExtractedFact(
-                        content=clean,
-                        entity="user",
-                        attribute=attribute,
-                        value=value,
-                        tags=["health", "critical"],
-                        importance=0.9,
-                        source="heuristic",
-                    )
-                    if not any(f.attribute == attribute and f.value == value for f in facts):
-                        facts.append(fact)
-
-        # Preference patterns
-        for pattern, sentiment in PREFERENCE_PATTERNS:
-            match = pattern.search(clean)
-            if match:
-                value = match.group(1).strip().rstrip(".")
-                if value and len(value) > 1:
-                    fact = ExtractedFact(
-                        content=clean,
-                        entity="user",
-                        attribute=None,
-                        value=value,
-                        tags=["preference", sentiment],
-                        importance=0.6,
-                        source="heuristic",
-                    )
-                    facts.append(fact)
+        self._extract_identity_facts(clean, facts)
+        self._extract_health_facts(clean, facts)
+        self._extract_preference_facts(clean, facts)
 
         # If no structured facts but text looks factual, create generic
         if not facts and self._looks_factual(clean):
-            facts.append(
-                ExtractedFact(
-                    content=clean,
-                    entity="user",
-                    attribute=None,
-                    value=None,
-                    tags=["general"],
-                    importance=0.5,
-                    source="heuristic",
-                )
-            )
+            facts.append(ExtractedFact(
+                content=clean, entity="user", attribute=None,
+                value=None, tags=["general"], importance=0.5, source="heuristic",
+            ))
 
         return facts
 
