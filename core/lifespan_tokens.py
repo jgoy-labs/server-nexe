@@ -143,7 +143,7 @@ async def _bootstrap_token_renewal_loop(interval_seconds: int, ttl_minutes: int)
         regenerate_bootstrap_token(ttl_minutes=ttl_minutes)
       except asyncio.CancelledError:
         raise
-      except Exception as e:  # noqa: BLE001 — defensive: no aturar el loop
+      except Exception as e:  # noqa: BLE001 — defensive: do not stop the loop
         logger.error("Bootstrap token regeneration failed: %s", e)
         recovered = False
         for delay in _BOOTSTRAP_RETRY_BACKOFFS:

@@ -15,7 +15,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
-# ─── Tests _t i constants ─────────────────────────────────────────────────────
+# ─── Tests _t and constants ───────────────────────────────────────────────────
 
 class TestTranslationHelper:
 

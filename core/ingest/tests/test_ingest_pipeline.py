@@ -47,7 +47,7 @@ def _mlx_available():
 
 
 # ═══════════════════════════════════════════════════════════════
-# Unitaris — chunk_text (de ingest_knowledge.py)
+# Unit tests — chunk_text (from ingest_knowledge.py)
 # ═══════════════════════════════════════════════════════════════
 
 from core.ingest.ingest_knowledge import chunk_text, read_file, CHUNK_SIZE, CHUNK_OVERLAP  # noqa: E402  # grouped with the test class below
@@ -127,7 +127,7 @@ class TestReadFile:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Unitaris — header_parser (RAG metadata)
+# Unit tests — header_parser (RAG metadata)
 # ═══════════════════════════════════════════════════════════════
 
 class TestHeaderParser:
