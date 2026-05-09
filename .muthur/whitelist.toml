@@ -4871,3 +4871,12 @@ reason = "FP: Lingua detector misclassifies short EN comment as Spanish — tech
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-fp-20260509"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/ingest/tests/test_ingest_pipeline.py"
+message_contains = "detected: en,"
+reason = "FP: Lingua detector misclassifies short EN comment as non-English — section header below confidence threshold"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-fp-20260509"
