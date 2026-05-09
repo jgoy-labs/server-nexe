@@ -86,6 +86,101 @@ class MemoryRecallNode(Node):
       ]
     )
 
+  async def _try_memory_service(self, person_id: str, query: str, limit: int, start_time: float, rag_log) -> Optional[Dict[str, Any]]:
+    """Attempt recall via MemoryService (v1). Returns result dict or None if unavailable."""
+    try:
+      from memory.memory.module import get_memory_service
+      svc = get_memory_service()
+    except Exception:
+      svc = None
+    if not (svc and svc.initialized and query):
+      return None
+    user_id = person_id if person_id != "default" else "default"
+    cards = await svc.recall(user_id, query, limit=limit)
+    total_ms = (time.time() - start_time) * 1000
+    context = self._format_cards(cards)
+    rag_log.recall_complete("memory_service", len(cards), len(context), total_ms)
+    return {
+      "context": context,
+      "entries": [{"id": c.entry_id, "content": c.content[:200], "source": c.source_store, "score": c.score} for c in cards],
+      "entry_count": len(cards),
+      "source": "memory_service"
+    }
+
+  async def _recall_flash(self, module, limit: int, rag_log) -> tuple:
+    """Try FlashMemory. Returns (entries, source) — source='flash' if found, 'none' otherwise."""
+    logger.info("  STEP 1: FlashMemory (RAM)")
+    step_start = time.time()
+    if not module._flash_memory:
+      rag_log.recall_step_flash(0, 0)
+      logger.warning("   FlashMemory not available")
+      return [], "none"
+    flash_entries = await module._flash_memory.get_all(limit=limit)
+    step_ms = (time.time() - step_start) * 1000
+    logger.info(f"   FlashMemory entries: {len(flash_entries)}")
+    rag_log.recall_step_flash(len(flash_entries), step_ms)
+    if flash_entries:
+      logger.info(f"  Found {len(flash_entries)} in FlashMemory")
+      return flash_entries, "flash"
+    return [], "none"
+
+  async def _recall_sqlite(self, module, limit: int, entry_type_str: str, rag_log) -> tuple:
+    """Try SQLite. Returns (entries, source) — source='sqlite' if found, 'none' otherwise."""
+    logger.info("  STEP 2: SQLite (fallback)")
+    step_start = time.time()
+    try:
+      sqlite_entries = await module._persistence.get_recent(
+        limit=limit, entry_types=[entry_type_str] if entry_type_str else None
+      )
+      step_ms = (time.time() - step_start) * 1000
+      logger.info(f"   SQLite entries: {len(sqlite_entries)}")
+      cached_count = 0
+      if sqlite_entries:
+        source = "sqlite"
+        logger.info(f"  Found {len(sqlite_entries)} in SQLite")
+        if module._flash_memory:
+          for entry in sqlite_entries:
+            await module._flash_memory.store(entry)
+          cached_count = len(sqlite_entries)
+          logger.info(f"   Cached {len(sqlite_entries)} to FlashMemory")
+        rag_log.recall_step_sqlite(len(sqlite_entries), step_ms, cached_count)
+        return sqlite_entries, source
+      rag_log.recall_step_sqlite(0, step_ms, 0)
+    except Exception as e:
+      logger.warning(f"   SQLite error: {e}")
+      rag_log.recall_step_sqlite(0, 0)
+    return [], "none"
+
+  async def _recall_qdrant(self, module, query: str, limit: int, rag_log) -> tuple:
+    """Try Qdrant semantic search. Returns (entries, source)."""
+    logger.info("  STEP 3: Qdrant (semantic search)")
+    step_start = time.time()
+    entries: List[MemoryEntry] = []
+    try:
+      embedding = await self._get_embedding(query)
+      if not embedding:
+        logger.warning("   Could not generate embedding")
+        rag_log.recall_step_qdrant(0, 0)
+        return [], "none"
+      logger.info(f"   Embedding generated: {len(embedding)} dims")
+      qdrant_results = await module._persistence.search(query_vector=embedding, limit=limit)
+      step_ms = (time.time() - step_start) * 1000
+      logger.info(f"   Qdrant results: {len(qdrant_results)}")
+      qdrant_dicts = []
+      if qdrant_results:
+        for entry_id, score in qdrant_results:
+          entry = await module._persistence.get(str(entry_id))
+          if entry:
+            entries.append(entry)
+            qdrant_dicts.append({"id": entry_id, "score": score, "content": entry.content[:50]})
+        logger.info(f"  Found {len(entries)} via Qdrant")
+      rag_log.recall_step_qdrant(len(entries), step_ms, qdrant_dicts)
+      return entries, "qdrant" if entries else "none"
+    except Exception as e:
+      logger.warning(f"   Qdrant error: {e}")
+      rag_log.recall_step_qdrant(0, 0)
+      return [], "none"
+
   async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     """
     Execute recall with fallback chain.
@@ -105,120 +200,23 @@ class MemoryRecallNode(Node):
 
     try:
       # Try MemoryService first (v1)
-      try:
-        from memory.memory.module import get_memory_service
-        svc = get_memory_service()
-      except Exception:
-        svc = None
-      if svc and svc.initialized and query:
-        user_id = person_id if person_id != "default" else "default"
-        cards = await svc.recall(user_id, query, limit=limit)
-        total_ms = (time.time() - start_time) * 1000
-        context = self._format_cards(cards)
-        rag_log.recall_complete("memory_service", len(cards), len(context), total_ms)
-        return {
-          "context": context,
-          "entries": [{"id": c.entry_id, "content": c.content[:200], "source": c.source_store, "score": c.score} for c in cards],
-          "entry_count": len(cards),
-          "source": "memory_service"
-        }
+      svc_result = await self._try_memory_service(person_id, query, limit, start_time, rag_log)
+      if svc_result is not None:
+        return svc_result
 
       module = MemoryModule.get_instance()
-
       if not module._initialized:
         logger.info("  Auto-initializing MemoryModule...")
         await module.initialize()
         logger.info("  MemoryModule initialized")
 
-      entries: List[MemoryEntry] = []
-      source = "none"
-
-      step_start = time.time()
-      logger.info("  STEP 1: FlashMemory (RAM)")
-
-      if module._flash_memory:
-        flash_entries = await module._flash_memory.get_all(limit=limit)
-        step_ms = (time.time() - step_start) * 1000
-        logger.info(f"   FlashMemory entries: {len(flash_entries)}")
-
-        rag_log.recall_step_flash(len(flash_entries), step_ms)
-
-        if flash_entries:
-          entries = flash_entries
-          source = "flash"
-          logger.info(f"  Found {len(entries)} in FlashMemory")
-      else:
-        rag_log.recall_step_flash(0, 0)
-        logger.warning("   FlashMemory not available")
+      entries, source = await self._recall_flash(module, limit, rag_log)
 
       if not entries and module._persistence:
-        step_start = time.time()
-        logger.info("  STEP 2: SQLite (fallback)")
-
-        try:
-          sqlite_entries = await module._persistence.get_recent(
-            limit=limit,
-            entry_types=[entry_type_str] if entry_type_str else None
-          )
-          step_ms = (time.time() - step_start) * 1000
-          logger.info(f"   SQLite entries: {len(sqlite_entries)}")
-
-          cached_count = 0
-          if sqlite_entries:
-            entries = sqlite_entries
-            source = "sqlite"
-            logger.info(f"  Found {len(entries)} in SQLite")
-
-            if module._flash_memory:
-              for entry in sqlite_entries:
-                await module._flash_memory.store(entry)
-              cached_count = len(sqlite_entries)
-              logger.info(f"   Cached {len(sqlite_entries)} to FlashMemory")
-
-          rag_log.recall_step_sqlite(len(sqlite_entries), step_ms, cached_count)
-        except Exception as e:
-          logger.warning(f"   SQLite error: {e}")
-          rag_log.recall_step_sqlite(0, 0)
+        entries, source = await self._recall_sqlite(module, limit, entry_type_str, rag_log)
 
       if not entries and query and module._persistence:
-        step_start = time.time()
-        logger.info("  STEP 3: Qdrant (semantic search)")
-
-        try:
-          embedding = await self._get_embedding(query)
-
-          if embedding:
-            logger.info(f"   Embedding generated: {len(embedding)} dims")
-
-            qdrant_results = await module._persistence.search(
-              query_vector=embedding,
-              limit=limit
-            )
-            step_ms = (time.time() - step_start) * 1000
-            logger.info(f"   Qdrant results: {len(qdrant_results)}")
-
-            qdrant_dicts = []
-            if qdrant_results:
-              for entry_id, score in qdrant_results:
-                entry = await module._persistence.get(str(entry_id))
-                if entry:
-                  entries.append(entry)
-                  qdrant_dicts.append({
-                    "id": entry_id,
-                    "score": score,
-                    "content": entry.content[:50] if entry else ""
-                  })
-
-              source = "qdrant"
-              logger.info(f"  Found {len(entries)} via Qdrant")
-
-            rag_log.recall_step_qdrant(len(entries), step_ms, qdrant_dicts)
-          else:
-            logger.warning("   Could not generate embedding")
-            rag_log.recall_step_qdrant(0, 0)
-        except Exception as e:
-          logger.warning(f"   Qdrant error: {e}")
-          rag_log.recall_step_qdrant(0, 0)
+        entries, source = await self._recall_qdrant(module, query, limit, rag_log)
 
       context = self._format_context(entries)
       total_ms = (time.time() - start_time) * 1000
