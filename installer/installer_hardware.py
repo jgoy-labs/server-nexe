@@ -29,59 +29,59 @@ def get_sysctl(key):
         return None
 
 
-def detect_hardware():
-    global HW_INFO
-    print_step(f"{BOLD}{t('analyzing_hardware')}{RESET}")
-    sys_type = platform.system()
+def _detect_darwin_hw():
+    """Detect RAM, hw_type, is_apple_silicon and has_metal on macOS."""
+    mem_bytes = int(get_sysctl("hw.memsize") or 0)
+    ram_gb = round(mem_bytes / (1024**3))
+    cpu_brand = get_sysctl("machdep.cpu.brand_string") or "Apple Processor"
+    if "Apple" in cpu_brand or os.uname().machine == "arm64":
+        hw_type = f"Apple Silicon ({os.uname().machine})"
+        is_apple_silicon = True
+        has_metal = True  # All Apple Silicon has Metal
+    else:
+        hw_type = "Apple Intel"
+        is_apple_silicon = False
+        has_metal = False
+    return ram_gb, hw_type, is_apple_silicon, has_metal
+
+
+def _detect_linux_hw():
+    """Detect RAM, hw_type and is_rpi on Linux."""
     ram_gb = 0
-    hw_type = "Generic Computer"
+    hw_type = f"Linux ({platform.machine()})"
     is_rpi = False
-    is_apple_silicon = False
-    has_metal = False
-    disk_total_gb = 0
-    disk_free_gb = 0
+    try:
+        with open('/proc/meminfo', 'r') as f:
+            for line in f:
+                if "MemTotal" in line:
+                    ram_kb = int(re.search(r'\d+', line).group())
+                    ram_gb = round(ram_kb / (1024*1024))
+                    break
+        model_path = Path('/proc/device-tree/model')
+        if model_path.exists():
+            with open(model_path, 'r') as f:
+                hw_type = f.read().strip().replace('\x00', '')
+            if "Raspberry Pi" in hw_type:
+                is_rpi = True
+    except Exception:
+        ram_gb = 4
+    return ram_gb, hw_type, is_rpi
 
-    if sys_type == "Darwin":
-        mem_bytes = int(get_sysctl("hw.memsize") or 0)
-        ram_gb = round(mem_bytes / (1024**3))
-        cpu_brand = get_sysctl("machdep.cpu.brand_string") or "Apple Processor"
-        if "Apple" in cpu_brand or os.uname().machine == "arm64":
-            hw_type = f"Apple Silicon ({os.uname().machine})"
-            is_apple_silicon = True
-            has_metal = True  # All Apple Silicon has Metal
-        else:
-            hw_type = "Apple Intel"
-    elif sys_type == "Linux":
-        try:
-            with open('/proc/meminfo', 'r') as f:
-                for line in f:
-                    if "MemTotal" in line:
-                        ram_kb = int(re.search(r'\d+', line).group())
-                        ram_gb = round(ram_kb / (1024*1024))
-                        break
-            model_path = Path('/proc/device-tree/model')
-            if model_path.exists():
-                with open(model_path, 'r') as f:
-                    hw_type = f.read().strip().replace('\x00', '')
-                if "Raspberry Pi" in hw_type:
-                    is_rpi = True
-            else:
-                hw_type = f"Linux ({platform.machine()})"
-        except Exception:
-            ram_gb = 4
 
-    # Detect disk space
+def _detect_disk_space():
+    """Return (disk_total_gb, disk_free_gb) or (0, 0) on error."""
     try:
         import shutil
         total, used, free = shutil.disk_usage(Path.home())
-        disk_total_gb = round(total / (1024**3))
-        disk_free_gb = round(free / (1024**3))
+        return round(total / (1024**3)), round(free / (1024**3))
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning("Could not detect disk space: %s", e)
-        disk_total_gb = 0
-        disk_free_gb = 0
+        return 0, 0
 
+
+def _print_hw_summary(hw_type, ram_gb, disk_total_gb, disk_free_gb, is_apple_silicon):
+    """Print a human-readable hardware summary."""
     print(f"  {CYAN}🖥️  {t('platform')}:{RESET} {hw_type}")
     print(f"  {CYAN}🧠 {t('ram_available')}:{RESET}  {ram_gb} GB")
     if disk_total_gb > 0:
@@ -91,9 +91,27 @@ def detect_hardware():
         print(f"  {YELLOW}[WARN]{RESET} Could not detect available disk space. Verify manually.")
     if is_apple_silicon:
         print(f"  {CYAN}⚡ {t('metal_support')}:{RESET} {GREEN}{t('yes')}{RESET}")
-
-    # Compatibility warning
     print(f"\n  {YELLOW}⚠️  {t('tested_warning')}{RESET}")
+
+
+def detect_hardware():
+    global HW_INFO
+    print_step(f"{BOLD}{t('analyzing_hardware')}{RESET}")
+    sys_type = platform.system()
+
+    ram_gb = 0
+    hw_type = "Generic Computer"
+    is_rpi = False
+    is_apple_silicon = False
+    has_metal = False
+
+    if sys_type == "Darwin":
+        ram_gb, hw_type, is_apple_silicon, has_metal = _detect_darwin_hw()
+    elif sys_type == "Linux":
+        ram_gb, hw_type, is_rpi = _detect_linux_hw()
+
+    disk_total_gb, disk_free_gb = _detect_disk_space()
+    _print_hw_summary(hw_type, ram_gb, disk_total_gb, disk_free_gb, is_apple_silicon)
 
     HW_INFO = {
         "ram": ram_gb,
