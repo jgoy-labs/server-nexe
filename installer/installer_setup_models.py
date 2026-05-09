@@ -188,6 +188,54 @@ def _download_ollama_model(model_config, headless=False):
             pass
 
 
+def _gguf_prompt_choice(headless):
+    """Ask user to download now or later. Return '1' or '2'."""
+    if headless:
+        return "1"
+    print(f"{BOLD}{t('download_options')}{RESET}\n")
+    print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
+    print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
+    print()
+    try:
+        return input(f"{BOLD}[1/2]:{RESET} ").strip()
+    except (EOFError, OSError):
+        return "1"
+
+
+def _gguf_fetch_and_verify(model_config, project_root):
+    """Download GGUF file via curl and run SHA256 integrity check."""
+    models_dir = project_root / "storage" / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    filename = model_config['id'].split('/')[-1]
+    output_path = models_dir / filename
+
+    print(f"\n{CYAN}[...]{RESET} {t('downloading_file').format(filename=filename)}")
+    print(f"   {DIM}{model_config['id']}{RESET}")
+
+    subprocess.run([  # nosec B603 B607: output_path is project_root-derived Path; model_config['id'] is GGUF URL from internal MODEL_CATALOG (supply chain); curl via PATH
+        "curl", "-L", "--progress-bar",
+        "-o", str(output_path),
+        model_config['id']
+    ], check=True)
+
+    if not output_path.exists() or output_path.stat().st_size == 0:
+        raise RuntimeError(f"Downloaded file is empty or missing: {output_path}")
+
+    # F4.1 (audit DoD-AUD-SX-0423 §2.7): SHA256 integrity check.
+    try:
+        matched = verify_download_integrity("gguf", model_config['id'], output_path)
+    except DownloadIntegrityError as exc:
+        print_warn(f"✗ Integrity check failed for {filename}")
+        print(str(exc))
+        raise
+    if not matched:
+        print(f"{YELLOW}⚠️  {filename}: SHA256 not pinned in catalog "
+              f"— install proceeded without integrity check{RESET}")
+
+    print_success(t('download_success'))
+    print(f"  📁 {output_path}")
+
+
 def _download_gguf_model(model_config, project_root, headless=False):
     """Download GGUF model immediately after selection."""
     clear()
@@ -198,54 +246,11 @@ def _download_gguf_model(model_config, project_root, headless=False):
     print(f"   {t('engine_gguf_label')}")
     print()
 
-    if headless:
-        choice = "1"  # Always download in headless mode
-    else:
-        print(f"{BOLD}{t('download_options')}{RESET}\n")
-        print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
-        print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
-        print()
-
-        try:
-            choice = input(f"{BOLD}[1/2]:{RESET} ").strip()
-        except (EOFError, OSError):
-            choice = "1"  # Default to download if no stdin
+    choice = _gguf_prompt_choice(headless)
 
     if choice == "1":
         try:
-            models_dir = project_root / "storage" / "models"
-            models_dir.mkdir(parents=True, exist_ok=True)
-            filename = model_config['id'].split('/')[-1]
-            output_path = models_dir / filename
-
-            print(f"\n{CYAN}[...]{RESET} {t('downloading_file').format(filename=filename)}")
-            print(f"   {DIM}{model_config['id']}{RESET}")
-
-            subprocess.run([  # nosec B603 B607: output_path is project_root-derived Path; model_config['id'] is GGUF URL from internal MODEL_CATALOG (supply chain); curl via PATH
-                "curl", "-L", "--progress-bar",
-                "-o", str(output_path),
-                model_config['id']
-            ], check=True)
-
-            # Verify file was actually downloaded and has content
-            if not output_path.exists() or output_path.stat().st_size == 0:
-                raise RuntimeError(f"Downloaded file is empty or missing: {output_path}")
-
-            # F4.1 (audit DoD-AUD-SX-0423 §2.7): SHA256 integrity check.
-            try:
-                matched = verify_download_integrity(
-                    "gguf", model_config['id'], output_path,
-                )
-            except DownloadIntegrityError as exc:
-                print_warn(f"✗ Integrity check failed for {filename}")
-                print(str(exc))
-                raise
-            if not matched:
-                print(f"{YELLOW}⚠️  {filename}: SHA256 not pinned in catalog "
-                      f"— install proceeded without integrity check{RESET}")
-
-            print_success(t('download_success'))
-            print(f"  📁 {output_path}")
+            _gguf_fetch_and_verify(model_config, project_root)
         except DownloadIntegrityError:
             # Already printed as "✗ Integrity check failed …" above.
             # Propagate unconditionally (interactive and headless alike).
