@@ -1,8 +1,8 @@
-"""TDD per al refactor de generate_rag_metadata (CCN 28 → ≤8).
+"""TDD for the generate_rag_metadata refactor (CCN 28 → ≤8).
 
-Cobreix: _fallback_metadata, _parse_llm_metadata_response,
-         _get_engine_instance, _collect_stream_response,
-         _call_llm_for_metadata, _try_engines, generate_rag_metadata.
+Covers: _fallback_metadata, _parse_llm_metadata_response,
+        _get_engine_instance, _collect_stream_response,
+        _call_llm_for_metadata, _try_engines, generate_rag_metadata.
 """
 
 import inspect

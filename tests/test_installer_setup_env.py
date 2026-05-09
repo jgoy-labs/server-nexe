@@ -261,7 +261,7 @@ class TestSetupEnvironmentDmgPath:
 
 
 class TestSetupEnvironmentNonDmg:
-    """Verifica que setup_environment funciona normal quan NO ve de DMG."""
+    """Verifies that setup_environment works normally when NOT coming from a DMG."""
 
     @patch("installer.installer_setup_env.platform")
     @patch("installer.installer_setup_env.subprocess")

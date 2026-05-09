@@ -78,7 +78,7 @@ def test_bug18_read_file_undecodable_returns_empty(tmp_path: Path):
     # This test verifies that no exception is raised.
     f.write_bytes(b"\x00\x01\x02\x03")
     result = read_file(f)
-    assert isinstance(result, str)  # NO excepció
+    assert isinstance(result, str)  # no exception raised
 
 
 # ═══════════════════════════════════════════════════════════════════════════

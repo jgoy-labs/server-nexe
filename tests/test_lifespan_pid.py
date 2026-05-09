@@ -201,7 +201,7 @@ async def test_session_cleanup_task_returns_task():
             pass
 
 
-# ── N05: SIGTERM handler al runner ────────────────────────────────────────────
+# ── N05: SIGTERM handler in the runner ────────────────────────────────────────────
 
 def test_sigterm_handler_registered_in_runner():
     """runner.py registers _handle_sigterm as the SIGTERM handler (N05)."""
