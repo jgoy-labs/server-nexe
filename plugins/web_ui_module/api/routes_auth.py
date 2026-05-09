@@ -205,6 +205,120 @@ def _resolve_model_name(model_name: str, backend: str, configured_backend: str) 
     return model_name or "nexe"
 
 
+def _resolve_models_dir() -> "Path":
+    """Return absolute Path to the models directory using server state project root."""
+    import os
+    models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
+    if not models_dir.is_absolute():
+        from core.lifespan import get_server_state
+        root = Path(get_server_state().project_root)
+        models_dir = root / models_dir
+    return models_dir
+
+
+def _overlay_ollama_ps_sizes(model_list: list) -> None:
+    """Bug #14: overlay real RAM sizes from `ollama ps` for loaded models (in-place)."""
+    try:
+        import urllib.request
+        import json as _json
+        req = urllib.request.urlopen(f"{resolve_base_url()}/api/ps", timeout=2)  # nosec B310
+        ps_data = _json.loads(req.read())
+        for loaded in ps_data.get("models", []):
+            loaded_name = loaded.get("name", "")
+            loaded_size = loaded.get("size", 0)
+            if loaded_name and loaded_size:
+                loaded_gb = round(loaded_size / (1024 ** 3), 1)
+                for entry in model_list:
+                    if entry["name"] == loaded_name:
+                        entry["size_gb"] = loaded_gb
+                        break
+    except Exception:  # nosec B110: ollama ps probe failure → keep disk-based sizes
+        pass
+
+
+async def _scan_ollama_backend(module_manager) -> "Optional[dict]":
+    """Return Ollama backend dict or None if the module is absent."""
+    try:
+        reg = module_manager.registry.get_module("ollama_module")
+        if not (reg and reg.instance):
+            return None
+        engine = reg.instance
+        if hasattr(engine, "get_module_instance"):
+            engine = engine.get_module_instance()
+        ollama_connected = False
+        model_list: list = []
+        if hasattr(engine, "list_models"):
+            try:
+                models = await engine.list_models()
+                ollama_connected = True
+                for m in models:
+                    name = m.get("name", m.get("model", "?"))
+                    size_bytes = m.get("size", 0)
+                    size_gb = round(size_bytes / (1024 ** 3), 1) if size_bytes else 0
+                    model_list.append({"name": name, "size_gb": size_gb})
+                _overlay_ollama_ps_sizes(model_list)
+            except Exception:
+                ollama_connected = False
+        return {"id": "ollama", "name": "Ollama", "models": model_list, "active": False, "connected": ollama_connected}
+    except Exception as e:
+        logger.debug(f"Ollama backend scan failed: {e}")
+        return None
+
+
+def _scan_mlx_backend(models_dir: "Path") -> "Optional[dict]":
+    """Return MLX backend dict or None if no MLX models found."""
+    try:
+        if not models_dir.exists():
+            return None
+        mlx_list = []
+        for d in models_dir.iterdir():
+            if d.is_dir():
+                size = sum(f.stat().st_size for f in d.rglob("*.safetensors") if f.is_file())
+                mlx_list.append({"name": d.name, "size_gb": round(size / (1024 ** 3), 1) if size else 0})
+        if mlx_list:
+            return {"id": "mlx", "name": "MLX", "models": mlx_list, "active": False}
+    except Exception as e:
+        logger.debug(f"MLX backend scan failed: {e}")
+    return None
+
+
+def _scan_llamacpp_backend(module_manager, models_dir: "Path") -> "Optional[dict]":
+    """Return Llama.cpp backend dict or None if module absent or no .gguf files."""
+    try:
+        reg = module_manager.registry.get_module("llama_cpp_module")
+        if not (reg and reg.instance):
+            return None
+        gguf_list = []
+        if models_dir.exists():
+            for f in models_dir.iterdir():
+                if f.suffix == ".gguf":
+                    size = f.stat().st_size
+                    gguf_list.append({"name": f.name, "size_gb": round(size / (1024 ** 3), 1) if size else 0})
+        if gguf_list:
+            return {"id": "llamacpp", "name": "Llama.cpp", "models": gguf_list, "active": False}
+    except Exception as e:
+        logger.debug(f"Llama.cpp backend scan failed: {e}")
+    return None
+
+
+def _mark_active_backend(backends: list, current_backend: str) -> str:
+    """Mark the active backend in-place; falls back to first connected backend. Returns effective current_backend."""
+    import os
+    for b in backends:
+        if current_backend == b["id"] or (current_backend in ("auto", "ollama_module") and b["id"] == "ollama"):
+            if b.get("connected", True):
+                b["active"] = True
+                return current_backend
+    # Fallback: activate first connected backend with models
+    for b in backends:
+        if b.get("connected", True) and b["models"]:
+            b["active"] = True
+            os.environ["NEXE_MODEL_ENGINE"] = b["id"]
+            logger.info(f"Backend fallback: {b['id']} (configured backend unavailable)")
+            return b["id"]
+    return current_backend
+
+
 async def _fetch_rag_collections() -> list:
     """Return list of RAG collection dicts {name, count}. Returns [] on error."""
     try:
@@ -284,107 +398,22 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         from core.lifespan import get_server_state
 
         module_manager = get_server_state().module_manager
+        models_dir = _resolve_models_dir()
         backends = []
 
-        # Local models directory
-        models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
-        if not models_dir.is_absolute():
-            from core.lifespan import get_server_state
-            root = Path(get_server_state().project_root)
-            models_dir = root / models_dir
+        ollama = await _scan_ollama_backend(module_manager)
+        if ollama:
+            backends.append(ollama)
+        mlx = _scan_mlx_backend(models_dir)
+        if mlx:
+            backends.append(mlx)
+        llamacpp = _scan_llamacpp_backend(module_manager, models_dir)
+        if llamacpp:
+            backends.append(llamacpp)
 
-        # Ollama (always show if the module exists, mark as disconnected if unreachable)
-        try:
-            reg = module_manager.registry.get_module("ollama_module")
-            if reg and reg.instance:
-                engine = reg.instance
-                if hasattr(engine, "get_module_instance"):
-                    engine = engine.get_module_instance()
-                ollama_connected = False
-                model_list = []
-                if hasattr(engine, "list_models"):
-                    try:
-                        models = await engine.list_models()
-                        ollama_connected = True
-                        for m in models:
-                            name = m.get("name", m.get("model", "?"))
-                            size_bytes = m.get("size", 0)
-                            size_gb = round(size_bytes / (1024**3), 1) if size_bytes else 0
-                            model_list.append({"name": name, "size_gb": size_gb})
-                        # Bug #14: overlay RAM real from ollama ps for loaded models
-                        try:
-                            import urllib.request
-                            import json as _json
-                            req = urllib.request.urlopen(f"{resolve_base_url()}/api/ps", timeout=2)  # nosec B310
-                            ps_data = _json.loads(req.read())
-                            for loaded in ps_data.get("models", []):
-                                loaded_name = loaded.get("name", "")
-                                loaded_size = loaded.get("size", 0)
-                                if loaded_name and loaded_size:
-                                    loaded_gb = round(loaded_size / (1024**3), 1)
-                                    for entry in model_list:
-                                        if entry["name"] == loaded_name:
-                                            entry["size_gb"] = loaded_gb
-                                            break
-                        except Exception:  # nosec B110: ollama ps probe failure → keep disk-based sizes (comment below documents intent)
-                            pass  # ollama ps unavailable — keep disk sizes
-                    except Exception:
-                        ollama_connected = False
-                backends.append({
-                    "id": "ollama", "name": "Ollama", "models": model_list,
-                    "active": False, "connected": ollama_connected
-                })
-        except Exception as e:
-            logger.debug(f"Ollama backend scan failed: {e}")
-
-        # MLX
-        try:
-            if models_dir.exists():
-                mlx_list = []
-                for d in models_dir.iterdir():
-                    if d.is_dir():
-                        # Sum .safetensors files to estimate size
-                        size = sum(f.stat().st_size for f in d.rglob("*.safetensors") if f.is_file())
-                        mlx_list.append({"name": d.name, "size_gb": round(size / (1024**3), 1) if size else 0})
-                if mlx_list:
-                    backends.append({"id": "mlx", "name": "MLX", "models": mlx_list, "active": False})
-        except Exception as e:
-            logger.debug(f"MLX backend scan failed: {e}")
-
-        # Llama.cpp - only show if there are .gguf files available
-        try:
-            reg = module_manager.registry.get_module("llama_cpp_module")
-            if reg and reg.instance:
-                gguf_list = []
-                if models_dir.exists():
-                    for f in models_dir.iterdir():
-                        if f.suffix == ".gguf":
-                            size = f.stat().st_size
-                            gguf_list.append({"name": f.name, "size_gb": round(size / (1024**3), 1) if size else 0})
-                if gguf_list:
-                    backends.append({"id": "llamacpp", "name": "Llama.cpp", "models": gguf_list, "active": False})
-        except Exception as e:
-            logger.debug(f"Llama.cpp backend scan failed: {e}")
-
-        # Mark active — if the configured backend is disconnected, fall back to the first connected one
         current_backend = os.getenv("NEXE_MODEL_ENGINE", "auto").lower()
         current_model = os.getenv("NEXE_DEFAULT_MODEL", "")
-        active_set = False
-        for b in backends:
-            if current_backend == b["id"] or (current_backend in ("auto", "ollama_module") and b["id"] == "ollama"):
-                if b.get("connected", True):
-                    b["active"] = True
-                    active_set = True
-                    break
-        # Fallback: activate first connected backend
-        if not active_set:
-            for b in backends:
-                if b.get("connected", True) and b["models"]:
-                    b["active"] = True
-                    current_backend = b["id"]
-                    os.environ["NEXE_MODEL_ENGINE"] = b["id"]
-                    logger.info(f"Backend fallback: {b['id']} (configured backend unavailable)")
-                    break
+        current_backend = _mark_active_backend(backends, current_backend)
 
         return {"backends": backends, "current_backend": current_backend, "current_model": current_model}
 
