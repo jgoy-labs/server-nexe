@@ -132,7 +132,7 @@ class TestDetectVlmCapability:
         assert _detect_vlm_capability(path) is True
 
 
-# ── _generate_vlm compatibilitat mlx-vlm 0.4.x ──────────────────────────────
+# ── _generate_vlm compatibility with mlx-vlm 0.4.x ──────────────────────────
 
 class TestGenerateVlm04Api:
     """Verifies that the VLM flow is compatible with mlx-vlm >= 0.4:
@@ -428,7 +428,7 @@ class TestNormalizeImageInput:
             node._normalize_image_input(12345)
 
     def test_data_uri_without_comma_raises_value_error(self):
-        """data: prefix sense coma → no es pot separar el payload, decodificació falla."""
+        """data: prefix without comma → payload cannot be split, decoding fails."""
         import base64
         node = self._make_node()
         raw = b"\x00" * 4

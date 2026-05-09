@@ -59,7 +59,7 @@ class TestChatSession:
         s.add_message("user", "test")
         h = s.get_history()
         h.append({"role": "injected", "content": "bad"})
-        assert len(s.get_history()) == 1  # Original no ha canviat
+        assert len(s.get_history()) == 1  # Original has not changed
 
     def test_last_activity_updated_on_add_message(self):
         s = ChatSession()
@@ -247,7 +247,7 @@ class TestSessionManagerCleanup:
 class TestChatSessionCompacting:
 
     def _fill_session(self, s, n):
-        """Omple sessió amb n missatges user/assistant alternats."""
+        """Fill session with n alternating user/assistant messages."""
         for i in range(n):
             role = "user" if i % 2 == 0 else "assistant"
             s.add_message(role, f"msg-{i}")
@@ -276,7 +276,7 @@ class TestChatSessionCompacting:
         s = ChatSession()
         self._fill_session(s, 12)
         to_compact = s.get_messages_to_compact()
-        # 12 - COMPACT_KEEP(6) = 6 missatges a compactar
+        # 12 - COMPACT_KEEP(6) = 6 messages to compact
         assert len(to_compact) == 12 - ChatSession.COMPACT_KEEP
         assert to_compact[0]["content"] == "msg-0"
 
@@ -285,7 +285,7 @@ class TestChatSessionCompacting:
         self._fill_session(s, 12)
         s.apply_compaction("Resum de la conversa sobre tests.")
         assert len(s.messages) == ChatSession.COMPACT_KEEP
-        # Últim missatge hauria de ser msg-11
+        # Last message should be msg-11
         assert s.messages[-1]["content"] == "msg-11"
 
     def test_apply_compaction_stores_summary(self):
@@ -317,7 +317,7 @@ class TestChatSessionCompacting:
         self._fill_session(s, 12)
         s.apply_compaction("Conversa sobre IA i models locals.")
         ctx = s.get_context_messages()
-        # 2 missatges de resum + COMPACT_KEEP missatges recents
+        # 2 summary messages + COMPACT_KEEP recent messages
         assert len(ctx) == 2 + ChatSession.COMPACT_KEEP
         assert "[Summary of previous conversation]" in ctx[0]["content"]
         assert "Conversa sobre IA i models locals." in ctx[0]["content"]
@@ -352,11 +352,11 @@ class TestChatSessionCompacting:
 
     def test_multiple_compactions_accumulate(self):
         s = ChatSession()
-        # Primera ronda
+        # First round
         self._fill_session(s, 12)
         s.apply_compaction("Resum 1: IA local")
         assert len(s.messages) == ChatSession.COMPACT_KEEP
-        # Segona ronda
+        # Second round
         self._fill_session(s, 10)
         s.apply_compaction("Resum 2: IA local + streaming")
         assert s.compaction_count == 2
@@ -470,11 +470,11 @@ class TestSessionManagerEncrypted:
 # ═══════════════════════════════════════════════════════════════
 
 class TestCorruptedSessionsDiagnosis:
-    """Tests per la diagnòstica de sessions .enc que fallen al desxifrar.
+    """Tests for diagnosis of .enc sessions that fail to decrypt.
 
-    Abans del fix, el SessionManager loggejava com WARNING i s'ignorava el
-    fitxer. Ara ha de ser ERROR (dades d'usuari invisibles) i exposar un
-    comptador perquè l'observabilitat pugui detectar-ho (p.ex. /memory/health).
+    Before the fix, SessionManager logged as WARNING and the file was ignored.
+    Now it must be ERROR (invisible user data) and expose a counter so that
+    observability can detect it (e.g. /memory/health).
     """
 
     @pytest.fixture

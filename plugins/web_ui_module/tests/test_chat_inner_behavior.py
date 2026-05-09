@@ -1,14 +1,14 @@
 """
-Tests de comportament de _chat_inner (safety net per al refactor F2).
+Behaviour tests for _chat_inner (safety net for the F2 refactor).
 
-Cobreix les 5 seccions lògiques de la funció:
-  1. Validació input (imatges, missatge buit, jailbreak)
-  2. Gestió de sessions (crear, recuperar, afegir missatge)
-  3. Intents de memòria (save, delete, list, clear_all, clear_all_confirm)
+Covers the 5 logical sections of the function:
+  1. Input validation (images, empty message, jailbreak)
+  2. Session management (create, recover, add message)
+  3. Memory intents (save, delete, list, clear_all, clear_all_confirm)
   4. Chat/LLM (mock engine, streaming, errors)
-  5. Retorn final (JSON vs StreamingResponse)
+  5. Final return (JSON vs StreamingResponse)
 
-Restriccions: cap LLM real, cap Ollama, tests < 5 s cadascun.
+Constraints: no real LLM, no Ollama, tests < 5 s each.
 """
 
 import asyncio
@@ -37,8 +37,8 @@ BIG_IMAGE_B64  = _b64(b"\xff\xd8\xff" + b"\x00" * (10 * 1024 * 1024 + 10))
 
 @pytest.fixture(autouse=True)
 def _disable_rate_limiter():
-    """Desactiva slowapi per a tots els tests — el limiter valida el tipus Request
-    quan `enabled=True`, però per a tests unitaris no volem cap rate limit."""
+    """Disable slowapi for all tests — the limiter validates the Request type
+    when `enabled=True`, but for unit tests no rate limiting is needed."""
     from core.dependencies import limiter
     original = limiter.enabled
     limiter.enabled = False
@@ -47,7 +47,7 @@ def _disable_rate_limiter():
 
 
 def _mock_request():
-    """Crea un starlette Request mínim per satisfer isinstance checks."""
+    """Create a minimal starlette Request to satisfy isinstance checks."""
     app_mock = MagicMock()
     app_mock.state = State()
     app_mock.state.i18n = None
@@ -70,7 +70,7 @@ def _make_session(sid="test-sess"):
 
 
 class _MockOllamaEngine:
-    """Mock engine amb signatura Ollama (té 'model' als paràmetres)."""
+    """Mock engine with Ollama signature (has 'model' in parameters)."""
 
     def __init__(self, response="Mock LLM response"):
         self._response = response
@@ -89,7 +89,7 @@ class _MockOllamaEngine:
 
 
 def _make_server_state(engine=None):
-    """Retorna un mock de server_state amb module_manager i engine configurat."""
+    """Return a mock server_state with module_manager and engine configured."""
     if engine is None:
         engine = _MockOllamaEngine()
 
@@ -183,28 +183,28 @@ class _Harness:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Secció 1 — Validació input
+# Section 1 — Input validation
 # ═══════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
 class TestValidacioInput:
 
     async def test_missatge_buit_retorna_400(self):
-        """Missatge buit → HTTPException 400."""
+        """Empty message → HTTPException 400."""
         h = _Harness()
         with pytest.raises(HTTPException) as exc:
             await h.call({"message": ""})
         assert exc.value.status_code == 400
 
     async def test_missatge_absent_retorna_400(self):
-        """Sense clau 'message' → HTTPException 400."""
+        """No 'message' key → HTTPException 400."""
         h = _Harness()
         with pytest.raises(HTTPException) as exc:
             await h.call({})
         assert exc.value.status_code == 400
 
     async def test_imatge_jpeg_valida_acceptada(self):
-        """JPEG base64 vàlida + missatge → no llança HTTPException."""
+        """Valid JPEG base64 + message → does not raise HTTPException."""
         h = _Harness(intent="save", mem_content="test")
         result = await h.call({
             "message": "Recorda que tinc un gat",
@@ -247,7 +247,7 @@ class TestValidacioInput:
         assert exc.value.status_code == 400
 
     async def test_jailbreak_prefixa_missatge(self):
-        """Jailbreak detectat → missatge prefixat amb SECURITY NOTICE."""
+        """Detected jailbreak → message prefixed with SECURITY NOTICE."""
         h = _Harness(intent="save", mem_content="test")
         with patch("plugins.web_ui_module.api.routes_chat.detect_jailbreak_attempt",
                    return_value="jailbreak_pattern"):
@@ -258,20 +258,20 @@ class TestValidacioInput:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Secció 2 — Gestió de sessions
+# Section 2 — Session management
 # ═══════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
 class TestGestioSessions:
 
     async def test_sessio_nova_creada_sense_id(self):
-        """Quan session_id és None, get_or_create_session rep None."""
+        """When session_id is None, get_or_create_session receives None."""
         h = _Harness(intent="save", mem_content="test")
         await h.call({"message": "Recorda que treballo a Barcelona"})
         h.session_mgr.get_or_create_session.assert_called_once_with(None)
 
     async def test_sessio_existent_recuperada_per_id(self):
-        """Quan session_id és 'sess-abc', get_or_create_session rep 'sess-abc'."""
+        """When session_id is 'sess-abc', get_or_create_session receives 'sess-abc'."""
         h = _Harness(intent="save", mem_content="test")
         await h.call({
             "message": "Recorda que treballo a Barcelona",
@@ -280,28 +280,28 @@ class TestGestioSessions:
         h.session_mgr.get_or_create_session.assert_called_once_with("sess-abc")
 
     async def test_missatge_usuari_afegit_a_sessio(self):
-        """El missatge de l'usuari s'afegeix a session.messages."""
+        """The user message is added to session.messages."""
         h = _Harness(intent="save", mem_content="test")
         await h.call({"message": "Recorda que em dic Joan"})
         user_msgs = [m for m in h.session.messages if m["role"] == "user"]
         assert len(user_msgs) >= 1
 
     async def test_sessio_guardada_a_disc(self):
-        """_save_session_to_disk es crida al menys una vegada."""
+        """_save_session_to_disk is called at least once."""
         h = _Harness(intent="save", mem_content="test")
         await h.call({"message": "Recorda que m'agrada el cafè"})
         assert h.session_mgr._save_session_to_disk.call_count >= 1
 
 
 # ═══════════════════════════════════════════════════════════════
-# Secció 3 — Intents de memòria
+# Section 3 — Memory intents
 # ═══════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
 class TestIntentsMemoria:
 
     async def test_save_crida_save_to_memory(self):
-        """intent='save' → crida save_to_memory i retorna confirmació."""
+        """intent='save' → calls save_to_memory and returns confirmation."""
         h = _Harness(intent="save", mem_content="Em dic Joan")
         result = await h.call({"message": "Recorda que em dic Joan"})
         h.mh.save_to_memory.assert_called_once()
@@ -309,7 +309,7 @@ class TestIntentsMemoria:
         assert result["memory_action"] == "save"
 
     async def test_save_duplicat_retorna_already_in_memory(self):
-        """intent='save' duplicate → resposta indica que ja existeix."""
+        """intent='save' duplicate → response indicates it already exists."""
         h = _Harness(intent="save", mem_content="Em dic Joan")
         h.mh.save_to_memory = AsyncMock(return_value={
             "success": False, "duplicate": True, "document_id": None,
@@ -318,21 +318,21 @@ class TestIntentsMemoria:
         assert "Already in memory" in result["response"]
 
     async def test_delete_amb_contingut_crida_delete(self):
-        """intent='delete' amb contingut → crida delete_from_memory."""
+        """intent='delete' with content → calls delete_from_memory."""
         h = _Harness(intent="delete", mem_content="el meu nom")
         result = await h.call({"message": "Oblida que em dic Joan"})
         h.mh.delete_from_memory.assert_called_once()
         assert result["memory_action"] == "delete"
 
     async def test_delete_sense_contingut_retorna_pregunta(self):
-        """intent='delete' sense contingut → pregunta què vol oblidar."""
+        """intent='delete' without content → asks what to forget."""
         h = _Harness(intent="delete", mem_content=None)
         result = await h.call({"message": "Oblida"})
         assert "What do you want me to forget" in result["response"]
         h.mh.delete_from_memory.assert_not_called()
 
     async def test_list_amb_resultats_retorna_llista(self):
-        """intent='list' amb fets → retorna llista formatejada."""
+        """intent='list' with facts → returns formatted list."""
         h = _Harness(intent="list")
         h.mh.list_memories = AsyncMock(return_value={
             "success": True,
@@ -348,7 +348,7 @@ class TestIntentsMemoria:
         assert result["memory_action"] == "list"
 
     async def test_list_buit_retorna_no_memories(self):
-        """intent='list' sense fets → missatge 'No memories stored.'"""
+        """intent='list' without facts → message 'No memories stored.'"""
         h = _Harness(intent="list")
         h.mh.list_memories = AsyncMock(return_value={
             "success": True, "facts": [], "total": 0, "message": "No memories stored.",
@@ -357,7 +357,7 @@ class TestIntentsMemoria:
         assert "No memories stored" in result["response"]
 
     async def test_clear_all_arma_confirmacio_pendent(self):
-        """intent='clear_all' → arma _pending_clear_all i retorna missatge de confirmació."""
+        """intent='clear_all' → sets _pending_clear_all and returns confirmation message."""
         h = _Harness(intent="clear_all")
         result = await h.call({"message": "Oblida tot"})
         assert h.session._pending_clear_all is True
@@ -365,14 +365,14 @@ class TestIntentsMemoria:
         assert "irreversible" in result["response"].lower() or "segur" in result["response"].lower()
 
     async def test_clear_all_confirm_executa_esborrat(self):
-        """intent='clear_all_confirm' → crida clear_memory i retorna confirmació."""
+        """intent='clear_all_confirm' → calls clear_memory and returns confirmation."""
         h = _Harness(intent="clear_all_confirm")
         result = await h.call({"message": "sí, esborra-ho tot"})
         h.mh.clear_memory.assert_called_once()
         assert result["memory_action"] == "clear_all"
 
     async def test_pending_clear_all_amb_confirm_executa(self):
-        """Sessió amb _pending_clear_all + missatge de confirmació → executa clear."""
+        """Session with _pending_clear_all + confirmation message → executes clear."""
         h = _Harness(intent="chat")
         h.session._pending_clear_all = True
         h.mh.matches_clear_all_confirm = MagicMock(return_value=True)
@@ -381,7 +381,7 @@ class TestIntentsMemoria:
         assert result["memory_action"] == "clear_all"
 
     async def test_pending_clear_all_sense_confirm_cancel_la(self):
-        """Sessió amb _pending_clear_all + missatge no-confirm → cancel·la."""
+        """Session with _pending_clear_all + non-confirm message → cancels."""
         h = _Harness(intent="chat")
         h.session._pending_clear_all = True
         h.mh.matches_clear_all_confirm = MagicMock(return_value=False)
@@ -392,7 +392,7 @@ class TestIntentsMemoria:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Secció 4 — Chat / LLM
+# Section 4 — Chat / LLM
 # ═══════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
@@ -408,7 +408,7 @@ class TestChatLLM:
         assert exc.value.status_code == 503
 
     async def test_model_name_massa_llarg_retorna_400(self):
-        """Nom de model > 100 caràcters → HTTPException 400."""
+        """Model name > 100 characters → HTTPException 400."""
         h = _Harness(intent="chat")
         state = _make_server_state()
         state.module_manager.registry.get_module.return_value = None
@@ -418,7 +418,7 @@ class TestChatLLM:
         assert exc.value.status_code == 400
 
     async def test_chat_no_streaming_retorna_json(self):
-        """intent='chat', stream=False → retorna dict amb 'response'."""
+        """intent='chat', stream=False → returns dict with 'response'."""
         engine = _MockOllamaEngine("Hola, soc Nexe!")
         h = _Harness(intent="chat")
         state = _make_server_state(engine=engine)
@@ -437,10 +437,10 @@ class TestChatLLM:
         assert isinstance(result, StreamingResponse)
 
     async def test_cap_engine_disponible_retorna_error_text(self):
-        """Cap engine disponible → response conté missatge d'error."""
+        """No engine available → response contains error message."""
         h = _Harness(intent="chat")
         state = _make_server_state()
-        # side_effect té prioritat sobre return_value: cal esborrar-lo
+        # side_effect takes priority over return_value: must be cleared
         state.module_manager.registry.get_module.side_effect = None
         state.module_manager.registry.get_module.return_value = None
         result = await h.call({"message": "Hola"}, server_state=state)
@@ -448,7 +448,7 @@ class TestChatLLM:
         assert "Error" in result["response"]
 
     async def test_chat_missatge_afegit_a_sessio(self):
-        """Resposta LLM es desa a session.messages com a 'assistant'."""
+        """LLM response is saved to session.messages as 'assistant'."""
         engine = _MockOllamaEngine("Resposta de prova")
         h = _Harness(intent="chat")
         state = _make_server_state(engine=engine)
@@ -459,28 +459,28 @@ class TestChatLLM:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Secció 5 — Retorn final
+# Section 5 — Final return
 # ═══════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
 class TestRetornFinal:
 
     async def test_retorn_json_conte_session_id(self):
-        """Retorn JSON inclou session_id de la sessió activa."""
+        """JSON return includes session_id of the active session."""
         h = _Harness(intent="save", mem_content="test")
         result = await h.call({"message": "Recorda test"})
         assert "session_id" in result
         assert result["session_id"] == h.session.id
 
     async def test_retorn_json_conte_intent(self):
-        """Retorn JSON inclou el camp 'intent'."""
+        """JSON return includes the 'intent' field."""
         h = _Harness(intent="save", mem_content="test")
         result = await h.call({"message": "Recorda test"})
         assert "intent" in result
         assert result["intent"] == "save"
 
     async def test_retorn_json_conte_memory_action(self):
-        """Retorn JSON inclou 'memory_action' per als intents de memòria."""
+        """JSON return includes 'memory_action' for memory intents."""
         h = _Harness(intent="list")
         h.mh.list_memories = AsyncMock(return_value={
             "success": True, "facts": [], "total": 0, "message": "No memories stored.",

@@ -55,7 +55,7 @@ class TestSetLanguageI18nPropagation:
         assert i18n_mock.current_language == "ca-ES"
 
     async def test_post_lang_calls_i18n_set_language_es(self):
-        """SC08: POST /lang es → assigna i18n.current_language = 'es-ES'."""
+        """SC08: POST /lang es → sets i18n.current_language = 'es-ES'."""
         i18n_mock = _make_i18n_mock()
 
         fn = _make_set_language_fn(i18n_mock)
@@ -65,7 +65,7 @@ class TestSetLanguageI18nPropagation:
         assert i18n_mock.current_language == "es-ES"
 
     async def test_post_lang_calls_i18n_set_language_en(self):
-        """SC08: POST /lang en → assigna i18n.current_language = 'en-US'."""
+        """SC08: POST /lang en → sets i18n.current_language = 'en-US'."""
         i18n_mock = _make_i18n_mock()
 
         fn = _make_set_language_fn(i18n_mock)
@@ -75,14 +75,14 @@ class TestSetLanguageI18nPropagation:
         assert i18n_mock.current_language == "en-US"
 
     async def test_post_lang_no_i18n_no_crash(self):
-        """SC08: si i18n és None (app.state sense i18n), no peta."""
+        """SC08: if i18n is None (app.state without i18n), does not crash."""
         fn = _make_set_language_fn(i18n_mock=None)
         result = await fn(body={"lang": "ca"}, _auth=None, i18n=None)
 
         assert result == {"status": "ok", "lang": "ca"}
 
     async def test_post_lang_updates_env(self):
-        """SC08: os.environ['NEXE_LANG'] s'actualitza correctament."""
+        """SC08: os.environ['NEXE_LANG'] is updated correctly."""
         i18n_mock = _make_i18n_mock()
         fn = _make_set_language_fn(i18n_mock)
 
@@ -91,7 +91,7 @@ class TestSetLanguageI18nPropagation:
             assert os.environ.get("NEXE_LANG") == "en"
 
     async def test_post_lang_invalid_returns_400(self):
-        """SC08: idioma no suportat → HTTPException 400."""
+        """SC08: unsupported language → HTTPException 400."""
         i18n_mock = _make_i18n_mock()
         fn = _make_set_language_fn(i18n_mock)
 
@@ -102,7 +102,7 @@ class TestSetLanguageI18nPropagation:
         i18n_mock.set_language.assert_not_called()
 
     async def test_post_lang_empty_body_returns_400(self):
-        """SC08: body sense 'lang' → HTTPException 400 (string buit no és idioma vàlid)."""
+        """SC08: body without 'lang' → HTTPException 400 (empty string is not a valid language)."""
         i18n_mock = _make_i18n_mock()
         fn = _make_set_language_fn(i18n_mock)
 
@@ -113,7 +113,7 @@ class TestSetLanguageI18nPropagation:
         i18n_mock.set_language.assert_not_called()
 
     async def test_post_lang_whitespace_normalized(self):
-        """SC08: idioma amb espais es normalitza (strip + lower)."""
+        """SC08: language with spaces is normalised (strip + lower)."""
         i18n_mock = _make_i18n_mock()
         fn = _make_set_language_fn(i18n_mock)
 
@@ -122,11 +122,11 @@ class TestSetLanguageI18nPropagation:
         assert i18n_mock.current_language == "ca-ES"
 
     async def test_post_lang_current_language_always_set(self):
-        """SC08: i18n.current_language s'assigna sempre que i18n no és None,
-        independentment de l'estat previ del mock.
+        """SC08: i18n.current_language is always set when i18n is not None,
+        regardless of the mock's previous state.
         """
         i18n_mock = _make_i18n_mock()
-        i18n_mock.current_language = "en-US"  # estat previ diferent
+        i18n_mock.current_language = "en-US"  # different previous state
         fn = _make_set_language_fn(i18n_mock)
 
         result = await fn(body={"lang": "ca"}, _auth=None, i18n=i18n_mock)

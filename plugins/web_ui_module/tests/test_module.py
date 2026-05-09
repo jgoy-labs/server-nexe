@@ -109,7 +109,7 @@ class TestWebUIModuleInit:
 
 
 class TestResolveApiBaseUrl:
-    """Tests per _resolve_api_base_url."""
+    """Tests for _resolve_api_base_url."""
 
     def test_env_var_takes_priority(self, monkeypatch):
         monkeypatch.setenv("NEXE_API_BASE_URL", "http://custom:8080")
@@ -147,7 +147,7 @@ class TestResolveApiBaseUrl:
 
 
 class TestWebUIModuleEndpoints:
-    """Tests per els endpoints HTTP del mòdul."""
+    """Tests for the module's HTTP endpoints."""
 
     def test_health_endpoint(self, client):
         response = client.get("/ui/health")
@@ -230,7 +230,7 @@ class TestWebUIModuleEndpoints:
         assert response.status_code == 400
 
     def test_chat_calls_engine(self, client, auth_headers, monkeypatch):
-        """Chat hauria d'intentar cridar un engine LLM."""
+        """Chat should attempt to call an LLM engine."""
         r1 = client.post("/ui/session/new", headers=auth_headers)
         sid = r1.json()["session_id"]
 
@@ -263,7 +263,7 @@ class TestWebUIModuleEndpoints:
 
 
 class TestWebUIModuleHelpers:
-    """Tests per els mètodes helpers del mòdul."""
+    """Tests for the module's helper methods."""
 
     def test_resolve_api_base_url_from_env(self, initialized_module, monkeypatch):
         monkeypatch.setenv("NEXE_API_BASE_URL", "http://myhost:8080/")
@@ -310,10 +310,10 @@ class TestWebUIModuleHelpers:
 
 
 class TestWebUIModuleChatErrors:
-    """Tests per gestió d'errors en les respostes de chat."""
+    """Tests for error handling in chat responses."""
 
     def test_chat_engine_error_propagates(self, client, auth_headers):
-        """Chat hauria de gestionar errors de l'engine."""
+        """Chat should handle engine errors."""
         r1 = client.post("/ui/session/new", headers=auth_headers)
         sid = r1.json()["session_id"]
 
@@ -344,7 +344,7 @@ class TestWebUIModuleChatErrors:
         assert response.status_code in (200, 500, 503)
 
     def test_chat_no_engines_available(self, client, auth_headers):
-        """Chat hauria de gestionar el cas sense engines disponibles."""
+        """Chat should handle the case where no engines are available."""
         r1 = client.post("/ui/session/new", headers=auth_headers)
         sid = r1.json()["session_id"]
 
@@ -365,7 +365,7 @@ class TestWebUIModuleChatErrors:
         assert response.status_code in (200, 500, 503)
 
     def test_initialize_handles_exception(self, monkeypatch):
-        """initialize() retorna False si hi ha una excepció."""
+        """initialize() returns False if an exception occurs."""
         monkeypatch.delenv("NEXE_API_BASE_URL", raising=False)
         mod = WebUIModule()
 
@@ -374,7 +374,7 @@ class TestWebUIModuleChatErrors:
         assert result is False
 
     def test_chat_stream_response(self, client, auth_headers):
-        """Chat en mode streaming hauria de funcionar amb engine mock."""
+        """Chat in streaming mode should work with a mock engine."""
         r1 = client.post("/ui/session/new", headers=auth_headers)
         sid = r1.json()["session_id"]
 
