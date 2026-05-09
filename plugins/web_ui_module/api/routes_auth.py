@@ -169,6 +169,60 @@ def _persist_env_vars(updates: dict) -> None:
         logger.warning("_persist_env_vars: could not write .env (%s)", exc)
 
 
+def _resolve_backend_version(configured_backend: str) -> tuple:
+    """Return (backend, version) by inspecting server state modules.
+
+    Falls back to (configured_backend, '0.0.0-unknown') on error.
+    """
+    try:
+        from core.lifespan import get_server_state
+        state = get_server_state()
+        version = state.config.get('meta', {}).get('version', '0.9')
+        modules = getattr(state, 'modules', {}) or {}
+        backend = configured_backend
+        if configured_backend in ("mlx", "auto"):
+            mlx_mod = modules.get("mlx_module")
+            mlx_ok = mlx_mod and hasattr(mlx_mod, '_node') and mlx_mod._node is not None
+            if configured_backend == "mlx" and not mlx_ok:
+                backend = "ollama"
+        return backend, version
+    except Exception:
+        return configured_backend, "0.0.0-unknown"
+
+
+def _resolve_model_name(model_name: str, backend: str, configured_backend: str) -> str:
+    """Return effective model name, falling back through backend-specific env vars."""
+    import os
+    if model_name:
+        return model_name
+    effective_backend = backend or configured_backend
+    if effective_backend in ("ollama", "auto"):
+        model_name = os.getenv("NEXE_OLLAMA_MODEL", "")
+    elif effective_backend == "mlx":
+        model_name = os.getenv("NEXE_MLX_MODEL", "")
+    elif effective_backend == "llama_cpp":
+        model_name = os.getenv("NEXE_LLAMA_CPP_MODEL", "")
+    return model_name or "nexe"
+
+
+async def _fetch_rag_collections() -> list:
+    """Return list of RAG collection dicts {name, count}. Returns [] on error."""
+    try:
+        from memory.memory.api.v1 import get_memory_api
+        mem = await get_memory_api()
+        result = []
+        for coll_name in ("nexe_documentation", "personal_memory", "user_knowledge"):
+            try:
+                count = await mem.count(coll_name) if await mem.collection_exists(coll_name) else -1
+                result.append({"name": coll_name, "count": count})
+            except Exception:
+                result.append({"name": coll_name, "count": -1})
+        return result
+    except Exception as e:
+        logger.warning("Could not fetch RAG collections: %s", e)
+        return []
+
+
 def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     """Registers endpoints: /auth, /info, /backends, /backend, /health"""
 
@@ -208,58 +262,17 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         import os
         model_name = os.getenv("NEXE_DEFAULT_MODEL", "")
         configured_backend = os.getenv("NEXE_MODEL_ENGINE", "auto")
-        backend = configured_backend
-        try:
-            from core.lifespan import get_server_state
-            state = get_server_state()
-            version = state.config.get('meta', {}).get('version', '0.9')
-            # Detect actual backend (as in /status)
-            modules = getattr(state, 'modules', {}) or {}
-            if configured_backend in ("mlx", "auto"):
-                mlx_mod = modules.get("mlx_module")
-                mlx_ok = mlx_mod and hasattr(mlx_mod, '_node') and mlx_mod._node is not None
-                if configured_backend == "mlx" and not mlx_ok:
-                    backend = "ollama"
-            # B-unknown: resolve model name from backend-specific env if not set
-            if not model_name:
-                effective_backend = backend or configured_backend
-                if effective_backend in ("ollama", "auto"):
-                    model_name = os.getenv("NEXE_OLLAMA_MODEL", "")
-                elif effective_backend == "mlx":
-                    model_name = os.getenv("NEXE_MLX_MODEL", "")
-                elif effective_backend == "llama_cpp":
-                    model_name = os.getenv("NEXE_LLAMA_CPP_MODEL", "")
-            if not model_name:
-                model_name = "nexe"
-        except Exception:
-            version = "0.0.0-unknown"
-            if not model_name:
-                model_name = os.getenv("NEXE_OLLAMA_MODEL", "") or "nexe"
+        backend, version = _resolve_backend_version(configured_backend)
+        model_name = _resolve_model_name(model_name, backend, configured_backend)
         lang = get_server_lang()
-        # RAG collections info
-        rag_collections = []
-        try:
-            from memory.memory.api.v1 import get_memory_api
-            mem = await get_memory_api()
-            for coll_name in ("nexe_documentation", "personal_memory", "user_knowledge"):
-                try:
-                    if await mem.collection_exists(coll_name):
-                        count = await mem.count(coll_name)
-                        rag_collections.append({"name": coll_name, "count": count})
-                    else:
-                        rag_collections.append({"name": coll_name, "count": -1})
-                except Exception:
-                    rag_collections.append({"name": coll_name, "count": -1})
-        except Exception as e:
-            logger.warning("Could not fetch RAG collections: %s", e)
-
+        rag_collections = await _fetch_rag_collections()
         return {
             "model": model_name,
             "backend": backend,
             "configured_backend": configured_backend,
             "version": version,
             "lang": lang,
-            "rag_collections": rag_collections
+            "rag_collections": rag_collections,
         }
 
     # -- GET /backends --
