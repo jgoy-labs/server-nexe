@@ -421,6 +421,82 @@ def _emit_final_summary(files, total_chunks, target_collection, log) -> None:
     log(f"{'='*60}\n")
 
 
+def _emit_precomputed_perf_log(ingest_cfg, _perf_t0_ns: int, _perf_model_init_ns: int) -> None:
+    """Emit perf log for the precomputed path (Bug #16)."""
+    if not ingest_cfg.perf_logging:
+        return
+    _perf_total_ns = time.perf_counter_ns() - _perf_t0_ns
+    _perf_record = {
+        "event": "ingest_complete",
+        "schema_version": 1,
+        "bug": 16,
+        "path": "precomputed",
+        "lang": _LANG,
+        "total_ns": _perf_total_ns,
+        "model_init_ns": _perf_model_init_ns,
+    }
+    _perf_line = "[PERF_INGEST] " + json.dumps(_perf_record, ensure_ascii=False)
+    print(_perf_line, flush=True)
+    logger.info(_perf_line)
+
+
+def _emit_full_ingest_perf_log(
+    ingest_cfg,
+    files,
+    total_chunks: int,
+    target_collection: str,
+    _perf_t0_ns: int,
+    _perf_model_init_ns: int,
+    _perf_chunking_ns: int,
+    _perf_snap,
+) -> None:
+    """Emit detailed perf log after full ingest run (Bug #16)."""
+    if not ingest_cfg.perf_logging:
+        return
+    _perf_record: dict[str, Any] = {
+        "event": "ingest_complete",
+        "schema_version": 1,
+        "bug": 16,
+        "docs_processed": len(files),
+        "total_chunks": total_chunks,
+        "target_collection": target_collection,
+        "lang": _LANG,
+        "total_ns": time.perf_counter_ns() - _perf_t0_ns,
+        "model_init_ns": _perf_model_init_ns,
+        "chunking_ns": _perf_chunking_ns,
+    }
+    if _perf_snap is not None:
+        _perf_record.update({k: _perf_snap.get(k, 0) for k in (
+            "embed_ns", "embed_calls", "chunks_embedded",
+            "store_total_ns", "store_calls", "chunks_stored",
+            "warmup_ns", "upsert_ns_derived",
+        )})
+    _emit_perf_log(_perf_record)
+
+
+async def _ingest_initialize_memory_and_config(log):
+    """Initialize memory API, resolve ingest config, and pre-warm if needed.
+
+    Returns (memory, ingest_cfg, _perf_model_init_ns) or raises on connection failure.
+    """
+    log(f"\n{_t('connecting')}")
+    _perf_t_init_ns = time.perf_counter_ns()
+    try:
+        memory = await _initialize_memory()
+    except Exception as e:
+        log(_t("conn_error", e=e))
+        log(_t("ensure_running"))
+        raise
+    _perf_model_init_ns = time.perf_counter_ns() - _perf_t_init_ns
+
+    ingest_cfg = resolve_ingest_config(memory)
+    getattr(memory, "reset_perf_counters", lambda: None)()
+    if ingest_cfg.pre_warm:
+        await memory.warmup()
+
+    return memory, ingest_cfg, _perf_model_init_ns
+
+
 async def ingest_knowledge(
     folder: Optional[Path] = None,
     quiet: bool = False,
@@ -468,20 +544,10 @@ async def ingest_knowledge(
     # before MemoryAPI creation.
     _perf_t0_ns = time.perf_counter_ns()
 
-    log(f"\n{_t('connecting')}")
-    _perf_t_init_ns = time.perf_counter_ns()
     try:
-        memory = await _initialize_memory()
-    except Exception as e:
-        log(_t("conn_error", e=e))
-        log(_t("ensure_running"))
+        memory, ingest_cfg, _perf_model_init_ns = await _ingest_initialize_memory_and_config(log)
+    except Exception:
         return False
-    _perf_model_init_ns = time.perf_counter_ns() - _perf_t_init_ns
-
-    ingest_cfg = resolve_ingest_config(memory)
-    getattr(memory, "reset_perf_counters", lambda: None)()
-    if ingest_cfg.pre_warm:
-        await memory.warmup()
 
     _default_root = PROJECT_ROOT / "knowledge"
     _custom_folder = folder is not None and not str(knowledge_path).startswith(str(_default_root))
@@ -490,20 +556,7 @@ async def ingest_knowledge(
         _precomputed_used = await _try_precomputed_kb(memory, _default_root, _LANG, log)
 
     if _precomputed_used:
-        if ingest_cfg.perf_logging:
-            _perf_total_ns = time.perf_counter_ns() - _perf_t0_ns
-            _perf_record = {
-                "event": "ingest_complete",
-                "schema_version": 1,
-                "bug": 16,
-                "path": "precomputed",
-                "lang": _LANG,
-                "total_ns": _perf_total_ns,
-                "model_init_ns": _perf_model_init_ns,
-            }
-            _perf_line = "[PERF_INGEST] " + json.dumps(_perf_record, ensure_ascii=False)
-            print(_perf_line, flush=True)
-            logger.info(_perf_line)
+        _emit_precomputed_perf_log(ingest_cfg, _perf_t0_ns, _perf_model_init_ns)
         await memory.close()
         return True
 
@@ -526,26 +579,10 @@ async def ingest_knowledge(
 
     _emit_final_summary(files, total_chunks, target_collection, log)
 
-    if ingest_cfg.perf_logging:
-        _perf_record: dict[str, Any] = {  # type: ignore[no-redef]
-            "event": "ingest_complete",
-            "schema_version": 1,
-            "bug": 16,
-            "docs_processed": len(files),
-            "total_chunks": total_chunks,
-            "target_collection": target_collection,
-            "lang": _LANG,
-            "total_ns": time.perf_counter_ns() - _perf_t0_ns,
-            "model_init_ns": _perf_model_init_ns,
-            "chunking_ns": _perf_chunking_ns,
-        }
-        if _perf_snap is not None:
-            _perf_record.update({k: _perf_snap.get(k, 0) for k in (
-                "embed_ns", "embed_calls", "chunks_embedded",
-                "store_total_ns", "store_calls", "chunks_stored",
-                "warmup_ns", "upsert_ns_derived",
-            )})
-        _emit_perf_log(_perf_record)
+    _emit_full_ingest_perf_log(
+        ingest_cfg, files, total_chunks, target_collection,
+        _perf_t0_ns, _perf_model_init_ns, _perf_chunking_ns, _perf_snap,
+    )
 
     return True
 
