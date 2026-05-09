@@ -177,7 +177,7 @@ class TestVectorStoreProtocol:
     """Test that a mock implementation complies with the protocol."""
 
     class MockVectorStore:
-      """Mock implementation per testing."""
+      """Mock implementation for testing."""
 
       def add_vectors(
         self,

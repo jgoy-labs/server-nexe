@@ -120,19 +120,19 @@ class CachedEmbedder:
     request: EmbeddingRequest
   ) -> EmbeddingResponse:
     """
-    Encode text amb cache.
+    Encode text with cache.
 
     Pipeline:
-    1. Check cache (si enabled)
-    2. Generate embedding (si cache miss)
+    1. Check cache (if enabled)
+    2. Generate embedding (if cache miss)
     3. Store to cache
-    4. Return response amb metadata
+    4. Return response with metadata
 
     Args:
       request: EmbeddingRequest
 
     Returns:
-      EmbeddingResponse amb embedding i stats
+      EmbeddingResponse with embedding and stats
     """
     start = time.time()
     cache_hit = False
@@ -264,19 +264,19 @@ class CachedEmbedder:
     request: "BatchEmbeddingRequest"
   ) -> "BatchEmbeddingResponse":
     """
-    Encode batch amb cache optimization.
+    Encode batch with cache optimization.
 
     Pipeline:
-    1. Check cache per cada text
-    2. Generate embeddings només per cache misses (batch)
-    3. Store nous embeddings al cache
+    1. Check cache for each text
+    2. Generate embeddings only for cache misses (batch)
+    3. Store new embeddings to cache
     4. Return batch response
 
     Args:
       request: BatchEmbeddingRequest
 
     Returns:
-      BatchEmbeddingResponse amb embeddings i stats
+      BatchEmbeddingResponse with embeddings and stats
     """
     start = time.time()
 
@@ -343,7 +343,7 @@ class CachedEmbedder:
     )
 
   async def clear_cache(self):
-    """Clear tot el cache (L1 + L2)"""
+    """Clear the entire cache (L1 + L2)"""
     if self.cache:
       await self.cache.clear()
       logger.info("cache_cleared", model=self.model_name)
