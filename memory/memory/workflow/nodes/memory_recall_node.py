@@ -200,7 +200,7 @@ class MemoryRecallNode(Node):
 
     try:
       # Try MemoryService first (v1)
-      svc_result = await self._try_memory_service(person_id, query, limit, start_time, rag_log)
+      svc_result = await self._try_memory_service(person_id, query or "", limit, start_time, rag_log)
       if svc_result is not None:
         return svc_result
 

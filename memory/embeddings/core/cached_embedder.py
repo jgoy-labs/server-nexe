@@ -207,6 +207,7 @@ class CachedEmbedder:
   async def _batch_with_cache(self, request: "BatchEmbeddingRequest") -> tuple:
     """Resolve embeddings using cache, generating only for misses. Returns (embeddings, cache_hits)."""
     cache = self.cache
+    assert cache is not None  # caller guards with self.cache_enabled and self.cache is not None
     to_generate = []
     cached_embeddings = {}
     cache_hits = 0

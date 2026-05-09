@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 
 import base64 as _base64
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import AsyncGenerator, Dict, Any, Optional
 import asyncio
 import logging
 import os as _os
@@ -1529,7 +1529,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     )
 
                     messages = engine_messages
-                    response_chunks = []
+                    response_chunks: list[str] = []
 
                     # When an image is attached, wrap with context block (same pattern as documents)
                     if image_b64:

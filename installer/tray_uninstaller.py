@@ -292,8 +292,8 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
     if cancelled:
         return None, None
 
-    removed = []
-    failed = []
+    removed: list[str] = []
+    failed: list[str] = []
 
     _uninstall_backup_storage(storage_dir, keep_data, t_func, removed, failed)
     stop_server_func()

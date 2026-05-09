@@ -305,7 +305,6 @@ def _mlx_prompt_choice(headless):
 
 def _mlx_show_size_warning(model_config):
     """Show the large-download warning screen and wait for Enter."""
-    from .installer_display import RED
     clear()
     print(APP_LOGO)
     print(f"\n{RED}{BOLD}{t('download_warning_title').format(size=model_config['disk_size'])}{RESET}\n")

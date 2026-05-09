@@ -211,7 +211,8 @@ def _resolve_models_dir() -> "Path":
     models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
     if not models_dir.is_absolute():
         from core.lifespan import get_server_state
-        root = Path(get_server_state().project_root)
+        _root = get_server_state().project_root
+        root = _root if _root is not None else Path(".")
         models_dir = root / models_dir
     return models_dir
 
@@ -500,7 +501,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                 resp = await client.get(f"{resolve_base_url()}/api/tags")
                 if resp.status_code == 200:
                     return False  # already running
-        except Exception:
+        except Exception:  # nosec B110: best-effort Ollama port check — silent pass intencional
             pass
         # Ollama is not running — start headless (Bug Ollama GUI 2026-04-06)
         # Prefer direct `ollama serve`; fallback to Ollama.app bundle binary.

@@ -43,7 +43,7 @@ class Retriever:
 
     def _retrieve_working_memory(self, user_id: str, session_id: str, query: str) -> "List[MemoryCard]":
         """Retrieve cards from working memory (RAM)."""
-        cards = []
+        cards: List[MemoryCard] = []
         if not self._working:
             return cards
         for r in self._working.search(user_id, session_id, query, limit=5):
@@ -59,7 +59,7 @@ class Retriever:
 
     def _retrieve_profile(self, user_id: str, query: str) -> "List[MemoryCard]":
         """Retrieve relevant profile cards (RDBMS, deterministic)."""
-        cards = []
+        cards: List[MemoryCard] = []
         if not self._store:
             return cards
         query_lower = query.lower()
@@ -86,7 +86,7 @@ class Retriever:
 
     def _retrieve_vector(self, user_id: str, query: str, namespace: Optional[str], mode: str) -> "List[MemoryCard]":
         """Retrieve cards via semantic vector search with dynamic threshold."""
-        cards = []
+        cards: List[MemoryCard] = []
         if not (self._vector and self._vector.available and self._embedder):
             return cards
         try:
