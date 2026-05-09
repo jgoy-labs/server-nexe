@@ -137,6 +137,41 @@ async def validate_request_headers(request: Request) -> bool:
 
   return True
 
+def _get_security_logger(request: Request):
+  """Return the security_logger from app state if available, else None."""
+  if hasattr(request, 'app') and hasattr(request.app, 'state'):
+    return getattr(request.app.state, 'security_logger', None)
+  return None
+
+
+def _check_param_injection(key: str, value: str, client_ip: str, endpoint: str,
+                            request: Request, i18n) -> None:
+  """Run all injection detectors on one query param value; raise on hit."""
+  sec_log = _get_security_logger(request)
+
+  if detect_xss_attempt(value):
+    logger.warning("🚫 XSS attempt in query param '%s' from %s", key, client_ip)
+    if sec_log:
+      sec_log.log_xss_attempt(ip_address=client_ip, endpoint=endpoint, payload=value[:200])
+    raise HTTPException(400, get_message(i18n, 'security.request.invalid_query_param', param=key))
+
+  if detect_sql_injection(value):
+    logger.warning("🚫 SQL injection attempt in query param '%s' from %s", key, client_ip)
+    if sec_log:
+      sec_log.log_sql_injection_attempt(ip_address=client_ip, endpoint=endpoint, payload=value[:200])
+    raise HTTPException(400, get_message(i18n, 'security.request.invalid_query_param', param=key))
+
+  if detect_command_injection(value):
+    logger.warning("🚫 Command injection attempt in query param '%s' from %s", key, client_ip)
+    if sec_log:
+      sec_log.log_command_injection_attempt(ip_address=client_ip, endpoint=endpoint, payload=value[:200])
+    raise HTTPException(400, get_message(i18n, 'security.request.invalid_query_param', param=key))
+
+  if detect_path_traversal(value):
+    logger.warning("🚫 Path traversal attempt in query param '%s' from %s", key, client_ip)
+    raise HTTPException(400, get_message(i18n, 'security.request.invalid_query_param', param=key))
+
+
 async def validate_request_params(request: Request) -> bool:
   """
   Validate query parameters for injection attacks with i18n support.
@@ -154,71 +189,11 @@ async def validate_request_params(request: Request) -> bool:
   if hasattr(request, 'app') and hasattr(request.app, 'state'):
     i18n = getattr(request.app.state, 'i18n', None)
 
+  client_ip = request.client.host if request.client else "unknown"
+  endpoint = str(request.url.path)
+
   for key, value in request.query_params.items():
-    client_ip = request.client.host if request.client else "unknown"
-
-    if detect_xss_attempt(value):
-      logger.warning(
-        "🚫 XSS attempt in query param '%s' from %s", key, client_ip
-      )
-
-      if hasattr(request, 'app') and hasattr(request.app, 'state'):
-        if hasattr(request.app.state, 'security_logger'):
-          request.app.state.security_logger.log_xss_attempt(
-            ip_address=client_ip,
-            endpoint=str(request.url.path),
-            payload=value[:200]
-          )
-
-      raise HTTPException(
-        400,
-        get_message(i18n, 'security.request.invalid_query_param', param=key)
-      )
-
-    if detect_sql_injection(value):
-      logger.warning(
-        "🚫 SQL injection attempt in query param '%s' from %s", key, client_ip
-      )
-
-      if hasattr(request, 'app') and hasattr(request.app, 'state'):
-        if hasattr(request.app.state, 'security_logger'):
-          request.app.state.security_logger.log_sql_injection_attempt(
-            ip_address=client_ip,
-            endpoint=str(request.url.path),
-            payload=value[:200]
-          )
-
-      raise HTTPException(
-        400,
-        get_message(i18n, 'security.request.invalid_query_param', param=key)
-      )
-
-    if detect_command_injection(value):
-      logger.warning(
-        "🚫 Command injection attempt in query param '%s' from %s", key, client_ip
-      )
-
-      if hasattr(request, 'app') and hasattr(request.app, 'state'):
-        if hasattr(request.app.state, 'security_logger'):
-          request.app.state.security_logger.log_command_injection_attempt(
-            ip_address=client_ip,
-            endpoint=str(request.url.path),
-            payload=value[:200]
-          )
-
-      raise HTTPException(
-        400,
-        get_message(i18n, 'security.request.invalid_query_param', param=key)
-      )
-
-    if detect_path_traversal(value):
-      logger.warning(
-        "🚫 Path traversal attempt in query param '%s' from %s", key, client_ip
-      )
-      raise HTTPException(
-        400,
-        get_message(i18n, 'security.request.invalid_query_param', param=key)
-      )
+    _check_param_injection(key, value, client_ip, endpoint, request, i18n)
 
   return True
 
