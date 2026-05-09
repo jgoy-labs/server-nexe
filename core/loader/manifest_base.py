@@ -30,18 +30,18 @@ def create_lazy_manifest(
     on_get_instance: Optional[Callable] = None,
 ):
     """
-    Crea les funcions estàndard d'un manifest lazy-singleton.
+    Creates the standard functions for a lazy-singleton manifest.
 
     Args:
-        module_path:     Import path del mòdul (ex: "plugins.ollama_module.module")
-        module_class:    Nom de la classe (ex: "OllamaModule")
-        tags:            Tags pel router FastAPI
-        compat_aliases:  Dict {nom_atribut: "router"|"instance"} per __getattr__
-        on_create:       Callback(instance) cridat just després de crear la instància
-        on_get_instance: Callback(instance) cridat cada cop que es demana la instància
+        module_path:     Import path of the module (e.g. "plugins.ollama_module.module")
+        module_class:    Class name (e.g. "OllamaModule")
+        tags:            Tags for the FastAPI router
+        compat_aliases:  Dict {attr_name: "router"|"instance"} for __getattr__
+        on_create:       Callback(instance) called right after creating the instance
+        on_get_instance: Callback(instance) called every time the instance is requested
 
     Returns:
-        Dict amb _get_module, get_router, get_metadata,
+        Dict with _get_module, get_router, get_metadata,
         get_module_instance, __getattr__, removed_direct_routes
     """
     _removed: List[str] = list(removed_direct_routes or [])
@@ -107,20 +107,20 @@ def create_lazy_manifest(
 
 def install_lazy_manifest(caller_name: str, manifest_dict: dict, extra_attrs: Optional[dict] = None):
     """
-    Reemplaça el mòdul ``caller_name`` a ``sys.modules`` amb un wrapper
-    que suporta ``__getattr__`` i ``__setattr__`` per al patró singleton.
+    Replaces the ``caller_name`` module in ``sys.modules`` with a wrapper
+    that supports ``__getattr__`` and ``__setattr__`` for the singleton pattern.
 
-    Això permet als tests fer ``mod._module = None`` per resetejar l'estat.
+    This allows tests to do ``mod._module = None`` to reset state.
 
-    Ús típic al final d'un manifest.py::
+    Typical usage at the end of a manifest.py::
 
         _m = create_lazy_manifest(...)
         install_lazy_manifest(__name__, _m, extra_attrs={...})
 
     Args:
-        caller_name:   ``__name__`` del mòdul manifest
-        manifest_dict: El dict retornat per ``create_lazy_manifest``
-        extra_attrs:   Atributs addicionals a exposar (retrocompatibilitat)
+        caller_name:   ``__name__`` of the manifest module
+        manifest_dict: The dict returned by ``create_lazy_manifest``
+        extra_attrs:   Additional attributes to expose (backward compatibility)
     """
     _state = manifest_dict["_state"]
     original = sys.modules[caller_name]
@@ -134,7 +134,7 @@ def install_lazy_manifest(caller_name: str, manifest_dict: dict, extra_attrs: Op
                 return original.__dict__[name]
             except KeyError:
                 pass
-            # Deleguem al __getattr__ de la factoria
+            # Delegate to the factory's __getattr__
             return manifest_dict["__getattr__"](name)
 
         def __setattr__(self, name, value):
@@ -147,15 +147,15 @@ def install_lazy_manifest(caller_name: str, manifest_dict: dict, extra_attrs: Op
             super().__setattr__(name, value)
 
     wrapper = _LazyModule(caller_name, original.__doc__)
-    # Copiem tot el __dict__ de l'original
+    # Copy the entire __dict__ from the original
     wrapper.__dict__.update(original.__dict__)
-    # Exposem les funcions del manifest
+    # Expose the manifest functions
     wrapper.__dict__["_get_module"] = manifest_dict["_get_module"]
     wrapper.__dict__["get_router"] = manifest_dict["get_router"]
     wrapper.__dict__["get_metadata"] = manifest_dict["get_metadata"]
     wrapper.__dict__["get_module_instance"] = manifest_dict["get_module_instance"]
     wrapper.__dict__["removed_direct_routes"] = manifest_dict.get("removed_direct_routes", [])
-    # Atributs extra (retrocompat, constants, etc.)
+    # Extra attributes (backward compat, constants, etc.)
     if extra_attrs:
         wrapper.__dict__.update(extra_attrs)
     sys.modules[caller_name] = wrapper

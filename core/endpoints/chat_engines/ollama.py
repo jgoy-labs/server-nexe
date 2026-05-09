@@ -56,7 +56,7 @@ _OLLAMA_ERRORS = {
 
 
 def _resolve_ollama_model(request, app_state) -> str:
-    """Cascada: request.model → NEXE_OLLAMA_MODEL → NEXE_DEFAULT_MODEL (no URL) → config → 'llama3.2'."""
+    """Cascade: request.model → NEXE_OLLAMA_MODEL → NEXE_DEFAULT_MODEL (no URL) → config → 'llama3.2'."""
     model_name = request.model
     if not model_name:
         model_name = os.environ.get("NEXE_OLLAMA_MODEL")
@@ -124,8 +124,8 @@ def _resolve_model_name(model_name: str, available_models: list, chat_models: li
 
 
 async def _validate_ollama_model(host: str, model_name: str) -> tuple[str, list]:
-    """Verifica que el model existeix a Ollama. Retorna (model_name_final, chat_models).
-    Llança HTTPException si Ollama no disponible o model no trobat."""
+    """Verifies the model exists in Ollama. Returns (model_name_final, chat_models).
+    Raises HTTPException if Ollama is unavailable or model not found."""
     try:
         available_models = await _fetch_ollama_available_models(host)
         # Filter out embedding models (they can't chat!) — runs on BOTH cache hit and miss
@@ -141,7 +141,7 @@ async def _validate_ollama_model(host: str, model_name: str) -> tuple[str, list]
 
 
 def _build_ollama_payload(request, messages: List[Dict], model_name: str) -> dict:
-    """Construeix el payload per a l'API d'Ollama."""
+    """Builds the payload for the Ollama API."""
     return {
         "model": model_name,
         "messages": messages,
@@ -159,7 +159,7 @@ def _ollama_streaming_response(
     url: str, payload: dict, app_state, user_msg,
     fallback_from: Optional[str], fallback_reason: Optional[str]
 ) -> StreamingResponse:
-    """Construeix i retorna el StreamingResponse amb headers de fallback si escau."""
+    """Builds and returns the StreamingResponse with fallback headers if applicable."""
     headers = {"X-Nexe-Engine": "ollama"}
     if fallback_from:
         headers["X-Nexe-Fallback-From"] = fallback_from
@@ -175,7 +175,7 @@ async def _ollama_blocking_response(
     url: str, payload: dict,
     fallback_from: Optional[str], fallback_reason: Optional[str]
 ) -> dict:
-    """POST bloquejant a Ollama + conversió a format OpenAI + gestió d'errors."""
+    """Blocking POST to Ollama + conversion to OpenAI format + error handling."""
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(url, json=payload, timeout=_OLLAMA_STREAM_TIMEOUT)

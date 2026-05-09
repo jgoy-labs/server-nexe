@@ -221,18 +221,18 @@ def _emit_perf_log(perf_record: dict) -> None:
 
 
 def _read_text_with_fallback(file_path: Path) -> str:
-    """Llegeix text amb fallback de codificació.
+    """Reads text with encoding fallback.
 
-    Bug 18 (2026-04-06) — abans el `read_text(encoding="utf-8")` llançava
-    UnicodeDecodeError per fitxers latin-1/cp1252 i s'ignoraven silenciosament
-    (els ingests quedaven amb chunks perduts sense cap avís). Ara intentem una
-    cadena d'encodings comuns i avisem via logger.info quan no és UTF-8.
+    Bug 18 (2026-04-06) — previously `read_text(encoding="utf-8")` raised
+    UnicodeDecodeError for latin-1/cp1252 files and they were silently ignored
+    (ingests ended up with lost chunks without any warning). Now we try a
+    chain of common encodings and warn via logger.info when not UTF-8.
     """
-    # Dev D (Consultor passada 1): cp1252 ABANS de latin-1. latin-1 accepta
-    # tots els bytes 0-255 per construcció, pel que mai cauria a cp1252 si
-    # estigués abans. Els smart quotes/em-dashes de Windows-1252 quedarien
-    # com a caràcters de control invisibles. Provant cp1252 primer guanyem
-    # aquesta fidelitat pels fitxers Windows reals.
+    # Dev D (Consultant pass 1): cp1252 BEFORE latin-1. latin-1 accepts
+    # all bytes 0-255 by construction, so it would never fall through to cp1252
+    # if it came first. Windows-1252 smart quotes/em-dashes would appear
+    # as invisible control characters. By trying cp1252 first we preserve
+    # that fidelity for real Windows files.
     encodings = ("utf-8", "utf-8-sig", "cp1252", "latin-1")
     last_err: UnicodeDecodeError | None = None
     for enc in encodings:

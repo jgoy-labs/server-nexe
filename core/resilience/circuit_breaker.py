@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: core/resilience/circuit_breaker.py
-Description: Circuit Breaker amb retry exponencial per protegir serveis externs (Ollama, Qdrant, HTTP).
+Description: Circuit Breaker with exponential retry to protect external services (Ollama, Qdrant, HTTP).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -253,10 +253,10 @@ class CircuitBreaker:
     await self._record_failure(error)
 
   def reset(self) -> None:
-    """Reinicia el circuit breaker a l'estat CLOSED net. N03.
+    """Resets the circuit breaker to clean CLOSED state. N03.
 
-    Crida des del lifespan shutdown per evitar que estat corrupte
-    d'una sessió contamini el proper reinici del servidor.
+    Called from lifespan shutdown to prevent corrupt state
+    from one session contaminating the next server restart.
     """
     self._state = CircuitBreakerState()
     logger.debug("CircuitBreaker [%s]: reset to CLOSED", self.name)
@@ -297,10 +297,10 @@ http_breaker = CircuitBreaker(
 
 
 def reset_all_circuit_breakers() -> None:
-  """Reinicia tots els circuit breakers globals a l'estat CLOSED net. N03.
+  """Resets all global circuit breakers to clean CLOSED state. N03.
 
-  Crida des del lifespan shutdown. Evita que un breaker OPEN d'una sessió
-  anterior contamini el proper reinici del servidor (estat corrupte en reinici).
+  Called from lifespan shutdown. Prevents an OPEN breaker from a previous
+  session from contaminating the next server restart (corrupt state on restart).
   """
   for _breaker in (ollama_breaker, qdrant_breaker, http_breaker):
     _breaker.reset()
