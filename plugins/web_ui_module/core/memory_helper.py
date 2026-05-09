@@ -336,6 +336,44 @@ class MemoryHelper:
         self._memory_api = _memory_api_instance
         return _memory_api_instance
 
+    def _detect_save_intent(self, message: str) -> Optional[str]:
+        """Return extracted content if message matches a save trigger, else None.
+
+        Triggers at END: "Em dic Claude, guarda-ho" → content = before trigger
+        Triggers at START: "Recorda que em dic Claude" → content = after trigger
+        """
+        for pattern in self.save_triggers:
+            match = pattern.search(message)
+            if match:
+                if match.start() == 0:
+                    content = message[match.end():].strip()
+                else:
+                    content = message[:match.start()].strip().rstrip(',').strip()
+                if content:
+                    return content
+        return None
+
+    def _detect_delete_intent(self, message: str) -> Optional[str]:
+        """Return extracted content if message matches a delete trigger, else None.
+
+        "Oblida que em dic Claude" → "em dic Claude"
+        "Pots esborrar que tinc 8 anys?" → "tinc 8 anys"
+        """
+        for pattern in self.delete_triggers:
+            match = pattern.search(message)
+            if match:
+                content_after = message[match.end():].strip().rstrip('?!').strip()
+                content_before = message[:match.start()].strip().rstrip(',').strip()
+                if match.start() == 0:
+                    content = content_after
+                elif not content_after:
+                    content = content_before
+                else:
+                    content = content_after
+                if content:
+                    return content
+        return None
+
     def detect_intent(self, message: str) -> Tuple[str, Optional[str]]:
         """
         Detect user intent in message.
@@ -345,60 +383,32 @@ class MemoryHelper:
 
         Returns:
             Tuple of (intent, extracted_content)
-            intent can be: 'save', 'recall', 'chat'
+            intent can be: 'save', 'recall', 'delete', 'list', 'clear_all', 'chat'
         """
-        # Check for save intent
-        # Triggers at END: "Em dic Claude, guarda-ho" → content = before trigger
-        # Triggers at START: "Recorda que em dic Claude" → content = after trigger
-        for pattern in self.save_triggers:
-            match = pattern.search(message)
-            if match:
-                if match.start() == 0:
-                    content = message[match.end():].strip()
-                else:
-                    content = message[:match.start()].strip()
-                    content = content.rstrip(',').strip()
-                if content:
-                    return ('save', content)
+        save_content = self._detect_save_intent(message)
+        if save_content:
+            return ('save', save_content)
 
         # Bug #18 P0: check for "clear all memory" BEFORE delete.
         # "Oblida tot" would otherwise match ^oblida\s+(que\s+)? with content="tot",
-        # which semantic-searches "tot" and deletes arbitrary facts. Keep this
-        # check strictly above delete_triggers.
+        # which semantic-searches "tot" and deletes arbitrary facts.
         for pattern in self.clear_all_triggers:
             if pattern.search(message):
                 return ('clear_all', None)
 
-        # Check for delete intent
-        # "Oblida que em dic Claude" → delete, content = "em dic Claude"
-        # "Pots esborrar que tinc 8 anys?" → delete, content = "tinc 8 anys"
-        for pattern in self.delete_triggers:
-            match = pattern.search(message)
-            if match:
-                content_after = message[match.end():].strip().rstrip('?!').strip()
-                content_before = message[:match.start()].strip().rstrip(',').strip()
-                if match.start() == 0:
-                    content = content_after
-                elif not content_after:
-                    # Match at end of string → content is before
-                    content = content_before
-                else:
-                    # Mid-sentence match → content is after the verb
-                    content = content_after
-                if content:
-                    return ('delete', content)
+        delete_content = self._detect_delete_intent(message)
+        if delete_content:
+            return ('delete', delete_content)
 
         # Check for LIST intent (before recall — "que recordes de mi?" matches both)
         for pattern in self.list_triggers:
             if pattern.search(message):
                 return ('list', None)
 
-        # Check for recall intent
         for pattern in self.recall_regex:
             if pattern.search(message):
                 return ('recall', message)
 
-        # Default: normal chat
         return ('chat', None)
 
     def matches_clear_all_confirm(self, message: str) -> bool:
