@@ -289,67 +289,40 @@ def _download_gguf_model(model_config, project_root, headless=False):
             pass
 
 
-def _download_mlx_model(model_config, project_root, python_path, headless=False):
-    """Download MLX model immediately after selection."""
+def _mlx_prompt_choice(headless):
+    """Ask user to download now or later. Return '1' or '2'."""
+    if headless:
+        return "1"
+    print(f"{BOLD}{t('download_options')}{RESET}\n")
+    print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
+    print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
+    print()
+    try:
+        return input(f"{BOLD}[1/2]:{RESET} ").strip()
+    except (EOFError, OSError):
+        return "1"
+
+
+def _mlx_show_size_warning(model_config):
+    """Show the large-download warning screen and wait for Enter."""
+    from .installer_display import RED
     clear()
     print(APP_LOGO)
+    print(f"\n{RED}{BOLD}{t('download_warning_title').format(size=model_config['disk_size'])}{RESET}\n")
+    print(f"  {YELLOW}1.{RESET} {t('download_warning_power')}")
+    print(f"  {YELLOW}2.{RESET} {t('download_warning_sleep')}")
+    print(f"  {YELLOW}3.{RESET} {t('download_warning_wifi')}")
+    print(f"\n  {DIM}• {t('download_warning_time')}{RESET}")
+    print(f"  {DIM}• {t('download_warning_resume')}{RESET}\n")
+    try:
+        input(f"{GREEN}▶ {t('download_ready')} [Enter]:{RESET} ")
+    except (EOFError, OSError):
+        pass
 
-    model_id = model_config['id']
-    model_name = model_id.split('/')[-1]
 
-    print(f"\n{BOLD}📦 {t('downloading_model')}{RESET}")
-    print(f"   Model: {CYAN}{model_config['name']}{RESET}")
-    print(f"   HuggingFace ID: {CYAN}{model_id}{RESET}")
-    print(f"   {t('engine_mlx_label')}")
-    print()
-
-    if headless:
-        choice = "1"  # Always download in headless mode
-    else:
-        print(f"{BOLD}{t('download_options')}{RESET}\n")
-        print(f"  {CYAN}1.{RESET} {t('option_download_now')}")
-        print(f"  {CYAN}2.{RESET} {t('option_manual_later')}")
-        print()
-
-        try:
-            choice = input(f"{BOLD}[1/2]:{RESET} ").strip()
-        except (EOFError, OSError):
-            choice = "1"  # Default to download if no stdin
-
-    if choice == "1":
-        try:
-            models_dir = project_root / "storage" / "models"
-            models_dir.mkdir(parents=True, exist_ok=True)
-            local_model_path = models_dir / model_name
-
-            if local_model_path.exists() and any(local_model_path.iterdir()):
-                print(f"{GREEN}[OK]{RESET} {t('model_already_downloaded').format(path=local_model_path)}")
-                if not headless:
-                    try:
-                        input(f"\n{DIM}[{t('press_enter')}]{RESET}")
-                    except (EOFError, OSError):
-                        pass
-                return
-
-            if not headless:
-                clear()
-                print(APP_LOGO)
-                print(f"\n{RED}{BOLD}{t('download_warning_title').format(size=model_config['disk_size'])}{RESET}\n")
-                print(f"  {YELLOW}1.{RESET} {t('download_warning_power')}")
-                print(f"  {YELLOW}2.{RESET} {t('download_warning_sleep')}")
-                print(f"  {YELLOW}3.{RESET} {t('download_warning_wifi')}")
-                print(f"\n  {DIM}• {t('download_warning_time')}{RESET}")
-                print(f"  {DIM}• {t('download_warning_resume')}{RESET}\n")
-
-                try:
-                    input(f"{GREEN}▶ {t('download_ready')} [Enter]:{RESET} ")
-                except (EOFError, OSError):
-                    pass
-
-            print(f"\n{CYAN}[1/2]{RESET} {t('downloading_mlx_step')}")
-            print(f"      {DIM}{t('mlx_destination').format(path=local_model_path)}{RESET}\n")
-
-            download_script = f'''
+def _mlx_run_snapshot_download(python_path, model_id, local_model_path, project_root):
+    """Run snapshot_download in a subprocess. Raise CalledProcessError on failure."""
+    download_script = f'''
 from huggingface_hub import snapshot_download
 import time
 
@@ -372,44 +345,85 @@ for attempt in range(max_retries):
         else:
             raise e
 '''
-            process = subprocess.Popen(  # nosec B603: python_path absolute venv Path; download_script is f-string with model_id from MODEL_CATALOG + project_root-derived local_model_path
-                [str(python_path), "-c", download_script],
-                stdout=sys.stdout,
-                stderr=sys.stderr,
-                env={**os.environ, "PYTHONPATH": str(project_root)}
-            )
-            return_code = process.wait()
+    process = subprocess.Popen(  # nosec B603: python_path absolute venv Path; download_script is f-string with model_id from MODEL_CATALOG + project_root-derived local_model_path
+        [str(python_path), "-c", download_script],
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        env={**os.environ, "PYTHONPATH": str(project_root)}
+    )
+    return_code = process.wait()
+    if return_code != 0:
+        raise subprocess.CalledProcessError(return_code, "mlx_download")
 
-            if return_code == 0:
-                print_success(t('mlx_downloaded_ok').format(path=local_model_path))
 
-                print(f"\n{CYAN}[2/3]{RESET} {t('mlx_validating')}")
-                config_file = local_model_path / "config.json"
-                if not config_file.exists():
-                    print_warn(t('mlx_config_missing').format(path=local_model_path))
-                    print(f"{DIM}{t('mlx_may_have_issues')}{RESET}")
-                else:
-                    print(f"{GREEN}✓{RESET} {t('mlx_validated_ok')}")
+def _mlx_validate_and_verify(model_id, local_model_path):
+    """Validate config.json presence and run SHA256 integrity check."""
+    print_success(t('mlx_downloaded_ok').format(path=local_model_path))
 
-                # F4.1 (audit DoD-AUD-SX-0423 §2.7): SHA256 check of the
-                # whole snapshot dir against the catalog pin. Legacy
-                # entries (expected=None) surface a not-pinned notice.
-                print(f"\n{CYAN}[3/3]{RESET} Integrity verification (SHA256)")
-                try:
-                    matched = verify_download_integrity(
-                        "mlx", model_id, local_model_path,
-                    )
-                except DownloadIntegrityError as exc:
-                    print_warn(f"✗ Integrity check failed for {model_id}")
-                    print(str(exc))
-                    raise
-                if matched:
-                    print(f"{GREEN}✓{RESET} SHA256 pin verified")
-                else:
-                    print(f"{YELLOW}⚠️  {model_id}: SHA256 not pinned in catalog "
-                          f"— install proceeded without integrity check{RESET}")
-            else:
-                raise subprocess.CalledProcessError(return_code, "mlx_download")
+    print(f"\n{CYAN}[2/3]{RESET} {t('mlx_validating')}")
+    config_file = local_model_path / "config.json"
+    if not config_file.exists():
+        print_warn(t('mlx_config_missing').format(path=local_model_path))
+        print(f"{DIM}{t('mlx_may_have_issues')}{RESET}")
+    else:
+        print(f"{GREEN}✓{RESET} {t('mlx_validated_ok')}")
+
+    # F4.1 (audit DoD-AUD-SX-0423 §2.7): SHA256 check of the
+    # whole snapshot dir against the catalog pin. Legacy
+    # entries (expected=None) surface a not-pinned notice.
+    print(f"\n{CYAN}[3/3]{RESET} Integrity verification (SHA256)")
+    try:
+        matched = verify_download_integrity("mlx", model_id, local_model_path)
+    except DownloadIntegrityError as exc:
+        print_warn(f"✗ Integrity check failed for {model_id}")
+        print(str(exc))
+        raise
+    if matched:
+        print(f"{GREEN}✓{RESET} SHA256 pin verified")
+    else:
+        print(f"{YELLOW}⚠️  {model_id}: SHA256 not pinned in catalog "
+              f"— install proceeded without integrity check{RESET}")
+
+
+def _download_mlx_model(model_config, project_root, python_path, headless=False):
+    """Download MLX model immediately after selection."""
+    clear()
+    print(APP_LOGO)
+
+    model_id = model_config['id']
+    model_name = model_id.split('/')[-1]
+
+    print(f"\n{BOLD}📦 {t('downloading_model')}{RESET}")
+    print(f"   Model: {CYAN}{model_config['name']}{RESET}")
+    print(f"   HuggingFace ID: {CYAN}{model_id}{RESET}")
+    print(f"   {t('engine_mlx_label')}")
+    print()
+
+    choice = _mlx_prompt_choice(headless)
+
+    if choice == "1":
+        try:
+            models_dir = project_root / "storage" / "models"
+            models_dir.mkdir(parents=True, exist_ok=True)
+            local_model_path = models_dir / model_name
+
+            if local_model_path.exists() and any(local_model_path.iterdir()):
+                print(f"{GREEN}[OK]{RESET} {t('model_already_downloaded').format(path=local_model_path)}")
+                if not headless:
+                    try:
+                        input(f"\n{DIM}[{t('press_enter')}]{RESET}")
+                    except (EOFError, OSError):
+                        pass
+                return
+
+            if not headless:
+                _mlx_show_size_warning(model_config)
+
+            print(f"\n{CYAN}[1/2]{RESET} {t('downloading_mlx_step')}")
+            print(f"      {DIM}{t('mlx_destination').format(path=local_model_path)}{RESET}\n")
+
+            _mlx_run_snapshot_download(python_path, model_id, local_model_path, project_root)
+            _mlx_validate_and_verify(model_id, local_model_path)
 
         except DownloadIntegrityError:
             # Already printed as "✗ Integrity check failed …" above.
