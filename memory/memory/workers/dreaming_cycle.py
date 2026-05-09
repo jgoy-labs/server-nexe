@@ -376,6 +376,41 @@ class DreamingCycle:
                 except Exception:  # nosec B110: best-effort SQLite conn.close() inside finally (Bug 10 fix); no-op if already closed
                     pass
 
+    def _sync_fetch_unsynced_rows(self, conn):
+        """Fetch up to 20 unsynced active episodic rows."""
+        cursor = conn.execute(
+            "SELECT id, user_id, content, namespace, memory_type, "
+            "importance, trust_level, created_at, state "
+            "FROM episodic WHERE vector_synced = 0 AND state = 'active' "
+            "LIMIT 20"
+        )
+        return [dict(r) for r in cursor.fetchall()]
+
+    def _sync_build_entries(self, rows):
+        """Build index entry dicts from DB rows."""
+        return [
+            {
+                "id": row["id"],
+                "user_id": row["user_id"],
+                "namespace": row.get("namespace", "default"),
+                "memory_type": row.get("memory_type", "fact"),
+                "state": row.get("state", "active"),
+                "importance": row.get("importance", 0.5),
+                "trust_level": row.get("trust_level", "untrusted"),
+                "created_at": row.get("created_at"),
+            }
+            for row in rows
+        ]
+
+    def _sync_mark_synced(self, conn, rows):
+        """Mark rows as vector_synced in the DB."""
+        ids = [r["id"] for r in rows]
+        placeholders = ",".join("?" for _ in ids)
+        sql = f"UPDATE episodic SET vector_synced = 1 WHERE id IN ({placeholders})"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
+        conn.execute(sql, ids)
+        conn.commit()
+        logger.debug("Synced %d entries to vector index", len(ids))
+
     async def _sync_vector_index(self):
         """Sync unsynced RDBMS entries to vector index.
 
@@ -391,13 +426,7 @@ class DreamingCycle:
         conn = None
         try:
             conn = self._store._connect()
-            cursor = conn.execute(
-                "SELECT id, user_id, content, namespace, memory_type, "
-                "importance, trust_level, created_at, state "
-                "FROM episodic WHERE vector_synced = 0 AND state = 'active' "
-                "LIMIT 20"
-            )
-            rows = [dict(r) for r in cursor.fetchall()]
+            rows = self._sync_fetch_unsynced_rows(conn)
             if not rows:
                 return
 
@@ -406,27 +435,10 @@ class DreamingCycle:
             if hasattr(embeddings, 'tolist'):
                 embeddings = embeddings.tolist()
 
-            entries = []
-            for row in rows:
-                entries.append({
-                    "id": row["id"],
-                    "user_id": row["user_id"],
-                    "namespace": row.get("namespace", "default"),
-                    "memory_type": row.get("memory_type", "fact"),
-                    "state": row.get("state", "active"),
-                    "importance": row.get("importance", 0.5),
-                    "trust_level": row.get("trust_level", "untrusted"),
-                    "created_at": row.get("created_at"),
-                })
-
+            entries = self._sync_build_entries(rows)
             indexed = self._vector.index(entries, embeddings)
             if indexed > 0:
-                ids = [r["id"] for r in rows]
-                placeholders = ",".join("?" for _ in ids)
-                sql = f"UPDATE episodic SET vector_synced = 1 WHERE id IN ({placeholders})"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
-                conn.execute(sql, ids)
-                conn.commit()
-                logger.debug("Synced %d entries to vector index", indexed)
+                self._sync_mark_synced(conn, rows)
 
         except Exception as e:
             logger.error("_sync_vector_index failed: %s", e)
