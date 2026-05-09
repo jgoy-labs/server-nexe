@@ -372,22 +372,6 @@ ticket = "warn-comments-fp-2026-05-09"
 
 [[exception]]
 rule = "warn_comments.explicit_warning"
-path = "scripts/translate_comments.py"
-reason = "Script de traducció que conté ⚠ com a exemple de text a processar."
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "warn-comments-fp-2026-05-09"
-
-[[exception]]
-rule = "warn_comments.explicit_warning"
-path = "dev-tools/conftest.py"
-reason = "Conftest de tests que conté ⚠ en missatge de diagnòstic de test."
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "warn-comments-fp-2026-05-09"
-
-[[exception]]
-rule = "warn_comments.explicit_warning"
 path = "memory/memory/rag_logger.py"
 reason = "WARNING = '⚠️' és una constant de string per formatar missatges de log. No és un comentari tècnic pendent."
 expires = "2027-05-09"
@@ -550,14 +534,6 @@ ticket = "complexity-sprint-20260509"
 rule = "complexity.too_many_parameters"
 path = "core/server/runner.py"
 reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "dev-tools/smoke_test.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
@@ -1070,14 +1046,6 @@ ticket = "complexity-sprint-20260509"
 rule = "complexity.too_many_parameters"
 path = "plugins/web_ui_module/ui/lucide.min.js"
 reason = "external library (lucide icons v0.577.0) — minified vendor JS, not project code"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "scripts/precompute_kb.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
@@ -1709,22 +1677,6 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.too_many_branches"
-path = "scripts/bench_ingest_bug16.py"
-reason = "pytest test file — branch coverage inherent to test scenario permutations"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_branches"
-path = "scripts/export_whitepaper_pdf.py"
-reason = "pytest test file — branch coverage inherent to test scenario permutations"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_branches"
 path = "specialists/plugin_agent.py"
 reason = "branching inherent to design — parser, FSM, router, or CLI handler with unavoidable conditional logic"
 expires = "2027-05-09"
@@ -1950,14 +1902,6 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.file_too_long"
-path = "scripts/export_whitepaper_pdf.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
 path = "tests/test_final_coverage.py"
 reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
 expires = "2027-05-09"
@@ -2008,14 +1952,6 @@ ticket = "complexity-sprint-20260509"
 [[exception]]
 rule = "complexity.too_many_statements"
 path = "core/ingest/tests/test_precomputed_loader.py"
-reason = "test file — statement count inherent to test setup and assertion patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_statements"
-path = "dev-tools/smoke_test.py"
 reason = "test file — statement count inherent to test setup and assertion patterns"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
@@ -2086,31 +2022,6 @@ authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
 
 [[exception]]
-rule = "complexity.too_many_statements"
-path = "scripts/export_source_pdf.py"
-reason = "test file — statement count inherent to test setup and assertion patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_statements"
-path = "scripts/export_whitepaper_pdf.py"
-reason = "test file — statement count inherent to test setup and assertion patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-# --- complexity.function_too_complex ---
-[[exception]]
-rule = "complexity.function_too_complex"
-path = "dev-tools/smoke_test.py"
-reason = "test function — CCN inherent to covering multiple subsystem states"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
 rule = "complexity.function_too_complex"
 path = "installer/swift-wizard/Sources/InstallNexe/InstallerEngine.swift"
 reason = "Swift installer wizard — CCN inherent to macOS UI state machine"
@@ -2134,10 +2045,3 @@ expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
 
-[[exception]]
-rule = "complexity.function_too_complex"
-path = "scripts/translate_comments.py"
-reason = "dev tool script for comment translation — CCN acceptable for one-off tool not in production path"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
