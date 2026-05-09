@@ -270,56 +270,55 @@ class RAGHeaderParser:
         except ValueError:
             return default
 
-    def _validate(self, header: RAGHeader) -> List[str]:
-        """Validate header fields"""
-        errors = []
-
-        # Required fields
+    def _validate_required_fields(self, header: RAGHeader, errors: List[str]) -> None:
+        """Validate required header fields: id, abstract, tags."""
         if not header.id:
             errors.append("Field 'id' is required")
-
         if not header.abstract:
             errors.append("Field 'abstract' is required")
         elif len(header.abstract) > 600:
             errors.append(f"'abstract' too long ({len(header.abstract)}/600 chars)")
-
         if len(header.tags) < MIN_TAGS:
             errors.append(f"Minimum {MIN_TAGS} tags required")
         elif len(header.tags) > MAX_TAGS:
             errors.append(f"Maximum {MAX_TAGS} tags allowed")
 
-        # Validate chunk_size
+    def _validate_numeric_fields(self, header: RAGHeader, errors: List[str]) -> None:
+        """Validate chunk_size bounds."""
         if header.chunk_size < MIN_CHUNK_SIZE:
             errors.append(f"chunk_size minimum: {MIN_CHUNK_SIZE}")
         elif header.chunk_size > MAX_CHUNK_SIZE:
             errors.append(f"chunk_size maximum: {MAX_CHUNK_SIZE}")
 
-        # Validate priority
+    def _validate_enum_fields(self, header: RAGHeader, errors: List[str]) -> None:
+        """Validate priority, lang, and type enum fields."""
         if header.priority not in VALID_PRIORITIES:
             errors.append(f"priority must be: {', '.join(VALID_PRIORITIES)}")
-
-        # Validate lang
         if header.lang not in VALID_LANGS:
             errors.append(f"lang must be: {', '.join(VALID_LANGS)}")
-
-        # Validate type
         if header.type not in VALID_TYPES:
             errors.append(f"type must be: {', '.join(VALID_TYPES)}")
 
-        # Validate data (format YYYY-MM-DD)
+    def _validate_date_fields(self, header: RAGHeader, errors: List[str]) -> None:
+        """Validate date and expires fields (format YYYY-MM-DD)."""
         if header.data:
             try:
                 datetime.strptime(header.data, "%Y-%m-%d")
             except ValueError:
                 errors.append("'data' must have format YYYY-MM-DD")
-
-        # Validate expires if present
         if header.expires:
             try:
                 datetime.strptime(header.expires, "%Y-%m-%d")
             except ValueError:
                 errors.append("'expires' must have format YYYY-MM-DD or null")
 
+    def _validate(self, header: RAGHeader) -> List[str]:
+        """Validate header fields"""
+        errors: List[str] = []
+        self._validate_required_fields(header, errors)
+        self._validate_numeric_fields(header, errors)
+        self._validate_enum_fields(header, errors)
+        self._validate_date_fields(header, errors)
         return errors
 
     def create_header(
