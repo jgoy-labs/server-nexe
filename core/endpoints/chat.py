@@ -108,53 +108,74 @@ def _validate_chat_request(body: ChatCompletionRequest) -> None:
             _msg.content = validate_string_input(_msg.content, max_length=8000, context="chat")
 
 
-async def _build_rag_and_system_prompt(
-    body: ChatCompletionRequest, app_state: Any, server_lang: str
-) -> tuple[list[dict], str]:
-    context_text = ""
-    if body.use_rag:
-        last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
-        if last_user_msg:
-            logger.info("RAG Search for: '%s'", last_user_msg[:80] + "..." if len(last_user_msg) > 80 else last_user_msg)
-            context_text = await build_rag_context(last_user_msg, app_state, server_lang)
+async def _fetch_rag_context(body: ChatCompletionRequest, app_state: Any, server_lang: str) -> str:
+    """Retrieve RAG context text for the last user message, if RAG is enabled."""
+    if not body.use_rag:
+        return ""
+    last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
+    if not last_user_msg:
+        return ""
+    logger.info("RAG Search for: '%s'", last_user_msg[:80] + "..." if len(last_user_msg) > 80 else last_user_msg)
+    return await build_rag_context(last_user_msg, app_state, server_lang)
 
-    messages = [m.model_dump() for m in body.messages]
 
-    has_system = messages and messages[0]['role'] == 'system'
-    if not has_system:
+def _ensure_system_message(messages: list, app_state: Any, server_lang: str) -> None:
+    """Prepend a system message to messages list if none is present (in-place)."""
+    if not (messages and messages[0]['role'] == 'system'):
         nexe_prompt = _get_system_prompt(app_state, server_lang)
         messages.insert(0, {"role": "system", "content": nexe_prompt})
 
-    if context_text and messages:
-        safe_context = _sanitize_rag_context(context_text)
 
-        total_messages_text = "".join(m.get('content', '') for m in messages)
-        used_tokens = _estimate_tokens(total_messages_text)
-        max_rag_tokens = int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO)
-        rag_tokens = _estimate_tokens(safe_context)
+def _trim_rag_context(safe_context: str, messages: list) -> str:
+    """Trim RAG context to fit within the available token budget."""
+    total_messages_text = "".join(m.get('content', '') for m in messages)
+    used_tokens = _estimate_tokens(total_messages_text)
+    max_rag_tokens = int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO)
+    rag_tokens = _estimate_tokens(safe_context)
 
-        if rag_tokens > max_rag_tokens:
-            max_chars = max_rag_tokens * CHARS_PER_TOKEN_ESTIMATE
-            safe_context = safe_context[:max_chars]
-            logger.info("RAG context trimmed to fit context window: %s -> %s est. tokens", rag_tokens, max_rag_tokens)
+    if rag_tokens > max_rag_tokens:
+        max_chars = max_rag_tokens * CHARS_PER_TOKEN_ESTIMATE
+        safe_context = safe_context[:max_chars]
+        logger.info("RAG context trimmed to fit context window: %s -> %s est. tokens", rag_tokens, max_rag_tokens)
 
-        remaining_budget = DEFAULT_CONTEXT_WINDOW - used_tokens - _estimate_tokens(safe_context)
-        if remaining_budget < 256:
-            safe_context = safe_context[:1000]
-            logger.warning("RAG context aggressively trimmed — only %s tokens remaining for response", remaining_budget)
+    remaining_budget = DEFAULT_CONTEXT_WINDOW - used_tokens - _estimate_tokens(safe_context)
+    if remaining_budget < 256:
+        safe_context = safe_context[:1000]
+        logger.warning("RAG context aggressively trimmed — only %s tokens remaining for response", remaining_budget)
 
-        _labels = _RAG_CONTEXT_LABELS.get(server_lang, _RAG_CONTEXT_LABELS["en"])
-        _instruction = _labels["intro"]
-        for i in range(len(messages) - 1, -1, -1):
-            if messages[i]['role'] == 'user':
-                messages[i]['content'] = (
-                    f"[{_labels['docs']}]\n"
-                    f"{_instruction}\n"
-                    f"{safe_context}\n"
-                    f"[/CONTEXT]\n\n"
-                    f"{messages[i]['content']}"
-                )
-                break
+    return safe_context
+
+
+def _inject_rag_context_into_messages(messages: list, context_text: str, server_lang: str) -> None:
+    """Inject RAG context into the last user message (in-place)."""
+    if not (context_text and messages):
+        return
+    safe_context = _sanitize_rag_context(context_text)
+    safe_context = _trim_rag_context(safe_context, messages)
+    _labels = _RAG_CONTEXT_LABELS.get(server_lang, _RAG_CONTEXT_LABELS["en"])
+    _instruction = _labels["intro"]
+    for i in range(len(messages) - 1, -1, -1):
+        if messages[i]['role'] == 'user':
+            messages[i]['content'] = (
+                f"[{_labels['docs']}]\n"
+                f"{_instruction}\n"
+                f"{safe_context}\n"
+                f"[/CONTEXT]\n\n"
+                f"{messages[i]['content']}"
+            )
+            break
+
+
+async def _build_rag_and_system_prompt(
+    body: ChatCompletionRequest, app_state: Any, server_lang: str
+) -> tuple[list[dict], str]:
+    context_text = await _fetch_rag_context(body, app_state, server_lang)
+
+    messages = [m.model_dump() for m in body.messages]
+
+    _ensure_system_message(messages, app_state, server_lang)
+
+    _inject_rag_context_into_messages(messages, context_text, server_lang)
 
     return messages, context_text
 
