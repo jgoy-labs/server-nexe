@@ -91,7 +91,7 @@ def _resolve_install_root(project_root: Path) -> Path:
 
 
 def _perform_linux_relocation(source_root: Path, project_root: Path) -> None:
-    """Linux: copia source_root a project_root (fora de Downloads/tmp) i fa chdir."""
+    """Linux: copy source_root to project_root (outside Downloads/tmp) and chdir."""
     print(f"\n{YELLOW}[Linux]{RESET} Directori de descàrregues detectat.")
     print(f"  Instal·lant a: {CYAN}{project_root}{RESET}\n")
     if project_root.exists():

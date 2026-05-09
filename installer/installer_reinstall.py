@@ -524,7 +524,7 @@ def _apply_backup_mode(
             wipe_keychain=wipe_keychain,
             wipe_home_nexe=wipe_home_nexe,
         )
-        # Wipe selectiu de storage/: tot excepte models/
+        # Selective wipe of storage/: everything except models/
         storage_dir = project_root / "storage"
         if storage_dir.exists() and storage_dir.is_dir():
             for child in storage_dir.iterdir():
