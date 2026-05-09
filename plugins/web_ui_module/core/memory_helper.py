@@ -920,7 +920,7 @@ class MemoryHelper:
         self, memory, query: str, collection: str, limit: int, session_id
     ) -> list:
         """Search one collection and return scored result dicts with temporal decay applied."""
-        out = []
+        out: list[Dict[str, Any]] = []
         try:
             if not await memory.collection_exists(collection):
                 return out

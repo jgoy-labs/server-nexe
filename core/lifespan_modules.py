@@ -14,6 +14,7 @@ www.jgoy.net · https://server-nexe.org
 import asyncio
 import logging
 import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -109,9 +110,8 @@ def _auto_ingest_is_disabled(nexe_env: str, auto_ingest_enabled: bool) -> bool:
     return nexe_env in ("test", "testing") or not auto_ingest_enabled
 
 
-def _resolve_knowledge_path_for_auto_ingest(project_root) -> "Path":
+def _resolve_knowledge_path_for_auto_ingest(project_root) -> Path:
     """Resolve the effective knowledge path, applying lang subdirectory if present."""
-    from pathlib import Path
     knowledge_path = project_root / "knowledge"
     _nexe_lang = os.getenv("NEXE_LANG", "ca")
     lang_path = knowledge_path / _nexe_lang
