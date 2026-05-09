@@ -69,6 +69,33 @@ class MLXPromptCacheManager:
         self._lru: deque = deque()
         self._lock = threading.Lock()
 
+    def _trie_traverse(self, model: str, tokens: List[int]):
+        """Walk the trie following tokens; return (node, last_cache_index, index)."""
+        current = self._cache[model]
+        last_cache_index = -1
+        index = 0
+        while index < len(tokens) and tokens[index] in current:
+            current = current[tokens[index]]
+            if "cache" in current:
+                last_cache_index = index
+            index += 1
+        return current, last_cache_index, index
+
+    def _find_longer_tokens(self, node, tokens: List[int], index: int) -> Optional[List[int]]:
+        """BFS to find the shortest cached continuation beyond index."""
+        best = None
+        stack: list = [(node, [])]
+        while stack:
+            curr, extra = stack.pop()
+            if "cache" in curr:
+                if best is None or len(extra) < len(best):
+                    best = extra
+            else:
+                for tok in curr:
+                    if tok != "cache":
+                        stack.append((curr[tok], extra + [tok]))
+        return tokens[:index] + best if best else None
+
     def _search(self, model: str, tokens: List[int]) -> SearchResult:
         """
         Searches the cache for the longest matching prefix.
@@ -83,43 +110,17 @@ class MLXPromptCacheManager:
         if model not in self._cache:
             return SearchResult(model, None, None, None, 0)
 
-        current = self._cache[model]
-        last_cache_index = -1
-        index = 0
+        node, last_cache_index, index = self._trie_traverse(model, tokens)
 
-        # Traverse the trie following the tokens
-        while index < len(tokens) and tokens[index] in current:
-            current = current[tokens[index]]
-            if "cache" in current:
-                last_cache_index = index
-            index += 1
-
-        # Exact match
         if last_cache_index == len(tokens) - 1:
             return SearchResult(model, tokens, None, None, 0)
 
-        # Search for shorter cache (valid prefix)
-        shorter = None
-        if last_cache_index >= 0:
-            shorter = tokens[:last_cache_index + 1]
+        shorter = tokens[:last_cache_index + 1] if last_cache_index >= 0 else None
 
-        # Search for longer cache (if there is a continuation)
         longer = None
         common_prefix = index
         if index > 0 and last_cache_index < 0:
-            best = None
-            stack: list = [(current, [])]
-            while stack:
-                curr, extra = stack.pop()
-                if "cache" in curr:
-                    if best is None or len(extra) < len(best):
-                        best = extra
-                else:
-                    for tok in curr:
-                        if tok != "cache":
-                            stack.append((curr[tok], extra + [tok]))
-            if best:
-                longer = tokens[:index] + best
+            longer = self._find_longer_tokens(node, tokens, index)
 
         return SearchResult(model, None, shorter, longer, common_prefix)
 
