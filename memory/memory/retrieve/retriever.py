@@ -41,6 +41,80 @@ class Retriever:
         self._working = working_memory
         self._embedder = embedder
 
+    def _retrieve_working_memory(self, user_id: str, session_id: str, query: str) -> "List[MemoryCard]":
+        """Retrieve cards from working memory (RAM)."""
+        cards = []
+        if not self._working:
+            return cards
+        for r in self._working.search(user_id, session_id, query, limit=5):
+            cards.append(MemoryCard(
+                content=r["content"],
+                confidence="high",
+                source_store="working",
+                score=r.get("score", 0.8),
+                entry_id=r.get("id"),
+                metadata=r.get("metadata", {}),
+            ))
+        return cards
+
+    def _retrieve_profile(self, user_id: str, query: str) -> "List[MemoryCard]":
+        """Retrieve relevant profile cards (RDBMS, deterministic)."""
+        cards = []
+        if not self._store:
+            return cards
+        query_lower = query.lower()
+        query_words = query_lower.split()
+        for p in self._store.get_profile(user_id):
+            value_str = str(p.get("value_json", "")).lower()
+            attr_str = str(p.get("attribute", "")).lower()
+            is_relevant = (
+                any(w in value_str for w in query_words)
+                or any(w in attr_str for w in query_words)
+            )
+            is_critical = p.get("is_critical", False)
+            if is_relevant or is_critical:
+                confidence = "high" if p.get("trust_level") == "trusted" else "moderate"
+                cards.append(MemoryCard(
+                    content=f"{p['attribute']}: {p['value_json']}",
+                    confidence=confidence,
+                    source_store="profile",
+                    score=0.9 if is_critical else 0.7,
+                    entry_id=p.get("id"),
+                    metadata={"is_critical": is_critical},
+                ))
+        return cards
+
+    def _retrieve_vector(self, user_id: str, query: str, namespace: Optional[str], mode: str) -> "List[MemoryCard]":
+        """Retrieve cards via semantic vector search with dynamic threshold."""
+        cards = []
+        if not (self._vector and self._vector.available and self._embedder):
+            return cards
+        try:
+            embedding = self._embedder.encode(query)
+            embedding_list = embedding if isinstance(embedding, list) else embedding.tolist()
+            rc = self._config.retrieve
+            threshold = rc.base_threshold
+            candidates = self._vector.search(
+                embedding=embedding_list, user_id=user_id,
+                threshold=threshold, limit=20, namespace=namespace,
+            )
+            dyn_threshold = self._dynamic_threshold(candidates)
+            if mode == "exploratory":
+                dyn_threshold = rc.base_threshold
+            for c in candidates:
+                if c["score"] >= dyn_threshold:
+                    cards.append(MemoryCard(
+                        content=c["payload"].get("content", f"[episodic:{c['id']}]"),
+                        confidence=self._score_to_confidence(c["score"]),
+                        source_store="episodic",
+                        score=c["score"],
+                        entry_id=c["id"],
+                        metadata=c.get("payload", {}),
+                    ))
+        except Exception as e:
+            logger.warning("Vector search failed: %s", e)
+        return cards
+
     def retrieve(
         self,
         user_id: str,
@@ -63,91 +137,11 @@ class Retriever:
             List of MemoryCard, ordered by relevance, within token budget.
         """
         cards: List[MemoryCard] = []
-        rc = self._config.retrieve
-
-        # 1. Working Memory (RAM, current session)
-        if self._working:
-            wm_results = self._working.search(user_id, session_id, query, limit=5)
-            for r in wm_results:
-                cards.append(MemoryCard(
-                    content=r["content"],
-                    confidence="high",
-                    source_store="working",
-                    score=r.get("score", 0.8),
-                    entry_id=r.get("id"),
-                    metadata=r.get("metadata", {}),
-                ))
-
-        # 2. Profile lookup (RDBMS, deterministic)
-        if self._store:
-            profile_entries = self._store.get_profile(user_id)
-            for p in profile_entries:
-                # Simple relevance: check if query keywords overlap
-                value_str = str(p.get("value_json", "")).lower()
-                attr_str = str(p.get("attribute", "")).lower()
-                query_lower = query.lower()
-
-                is_relevant = (
-                    any(w in value_str for w in query_lower.split())
-                    or any(w in attr_str for w in query_lower.split())
-                )
-                is_critical = p.get("is_critical", False)
-
-                if is_relevant or is_critical:
-                    confidence = "high" if p.get("trust_level") == "trusted" else "moderate"
-                    cards.append(MemoryCard(
-                        content=f"{p['attribute']}: {p['value_json']}",
-                        confidence=confidence,
-                        source_store="profile",
-                        score=0.9 if is_critical else 0.7,
-                        entry_id=p.get("id"),
-                        metadata={"is_critical": is_critical},
-                    ))
-
-        # 3. Vector search (semantic)
-        if self._vector and self._vector.available and self._embedder:
-            try:
-                embedding = self._embedder.encode(query)
-                if isinstance(embedding, list):
-                    embedding_list = embedding
-                else:
-                    embedding_list = embedding.tolist()
-
-                threshold = rc.base_threshold
-                if mode == "exploratory":
-                    threshold = rc.base_threshold  # 0.40
-                candidates = self._vector.search(
-                    embedding=embedding_list,
-                    user_id=user_id,
-                    threshold=threshold,
-                    limit=20,
-                    namespace=namespace,
-                )
-
-                # Dynamic threshold (phase B)
-                dyn_threshold = self._dynamic_threshold(candidates)
-                if mode == "exploratory":
-                    dyn_threshold = rc.base_threshold
-
-                for c in candidates:
-                    if c["score"] >= dyn_threshold:
-                        cards.append(MemoryCard(
-                            content=c["payload"].get("content", f"[episodic:{c['id']}]"),
-                            confidence=self._score_to_confidence(c["score"]),
-                            source_store="episodic",
-                            score=c["score"],
-                            entry_id=c["id"],
-                            metadata=c.get("payload", {}),
-                        ))
-            except Exception as e:
-                logger.warning("Vector search failed: %s", e)
-
-        # 4. Re-rank
+        cards.extend(self._retrieve_working_memory(user_id, session_id, query))
+        cards.extend(self._retrieve_profile(user_id, query))
+        cards.extend(self._retrieve_vector(user_id, query, namespace, mode))
         cards = self._rerank(cards)
-
-        # 5. Token budget
         cards = self._apply_budget(cards)
-
         return cards
 
     def _dynamic_threshold(self, candidates: List[Dict]) -> float:
