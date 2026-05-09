@@ -71,55 +71,66 @@ def _resolve_ollama_model(request, app_state) -> str:
     return model_name or "llama3.2"
 
 
+async def _fetch_ollama_available_models(host: str) -> list:
+    """Fetch model list from Ollama /api/tags, using cache if fresh. Raises HTTPException on failure."""
+    _now = time.time()
+    if _ollama_tags_cache["models"] is not None and (_now - _ollama_tags_cache["ts"]) < TAGS_CACHE_TTL:
+        return _ollama_tags_cache["models"]
+
+    async with httpx.AsyncClient(timeout=3.0) as client:
+        tags_resp = await client.get(f"{host}/api/tags")
+        if tags_resp.status_code != 200:
+            from core.messages import get_message as _core_msg
+            raise HTTPException(status_code=502, detail=_core_msg(None, "core.ollama.http_error", status=tags_resp.status_code))
+        available_models = [m.get("name", "") for m in tags_resp.json().get("models", [])]
+        _ollama_tags_cache["models"] = available_models
+        _ollama_tags_cache["ts"] = _now
+        return available_models
+
+
+def _filter_chat_models(available_models: list) -> list:
+    """Return only chat-capable models (exclude embedding models)."""
+    EMBEDDING_MODELS = {"nomic-embed", "mxbai-embed", "all-minilm", "bge-", "embed"}
+    return [m for m in available_models if not any(emb in m.lower() for emb in EMBEDDING_MODELS)]
+
+
+def _resolve_model_name(model_name: str, available_models: list, chat_models: list) -> str:
+    """Resolve the final model name, applying partial-match fallback. Raises HTTPException if not found.
+
+    Bug 23 (2026-04-06): raise 404/503 instead of silent fallback.
+    """
+    if model_name in available_models or f"{model_name}:latest" in available_models:
+        return model_name
+
+    matching = [m for m in chat_models if model_name.split(":")[0] in m]
+    if matching:
+        model_name = matching[0]
+        logger.info("Using available model: %s", model_name)
+        return model_name
+
+    _lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+    if chat_models:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Model '{model_name}' not found. "
+                f"Available chat models: {', '.join(chat_models[:5])}"
+            ),
+        )
+    raise HTTPException(
+        status_code=503,
+        detail=_OLLAMA_ERRORS.get(_lang, _OLLAMA_ERRORS["en"])["no_model"]
+    )
+
+
 async def _validate_ollama_model(host: str, model_name: str) -> tuple[str, list]:
     """Verifica que el model existeix a Ollama. Retorna (model_name_final, chat_models).
     Llança HTTPException si Ollama no disponible o model no trobat."""
     try:
-        _now = time.time()
-        if _ollama_tags_cache["models"] is not None and (_now - _ollama_tags_cache["ts"]) < TAGS_CACHE_TTL:
-            available_models = _ollama_tags_cache["models"]
-        else:
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                tags_resp = await client.get(f"{host}/api/tags")
-                if tags_resp.status_code != 200:
-                    from core.messages import get_message as _core_msg
-                    raise HTTPException(status_code=502, detail=_core_msg(None, "core.ollama.http_error", status=tags_resp.status_code))
-                available_models = [m.get("name", "") for m in tags_resp.json().get("models", [])]
-                _ollama_tags_cache["models"] = available_models
-                _ollama_tags_cache["ts"] = _now
-
+        available_models = await _fetch_ollama_available_models(host)
         # Filter out embedding models (they can't chat!) — runs on BOTH cache hit and miss
-        EMBEDDING_MODELS = {"nomic-embed", "mxbai-embed", "all-minilm", "bge-", "embed"}
-        chat_models = [m for m in available_models
-                       if not any(emb in m.lower() for emb in EMBEDDING_MODELS)]
-
-        # Verify the model exists
-        if model_name not in available_models and f"{model_name}:latest" not in available_models:
-            # Try to find a partial match in chat models only
-            matching = [m for m in chat_models if model_name.split(":")[0] in m]
-            if matching:
-                model_name = matching[0]
-                logger.info("Using available model: %s", model_name)
-            else:
-                # Bug 23 (2026-04-06) — previously, if the requested model did not exist,
-                # we silently used the first chat_model as a fallback and
-                # returned a response with a model the user had not
-                # requested (HTTP 200). This was misleading to clients. Now, if there is
-                # no exact or partial match, we raise 404 with a clear message.
-                # If there are no chat models available at all, 503 as before.
-                _lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
-                if chat_models:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=(
-                            f"Model '{model_name}' not found. "
-                            f"Available chat models: {', '.join(chat_models[:5])}"
-                        ),
-                    )
-                raise HTTPException(
-                    status_code=503,
-                    detail=_OLLAMA_ERRORS.get(_lang, _OLLAMA_ERRORS["en"])["no_model"]
-                )
+        chat_models = _filter_chat_models(available_models)
+        model_name = _resolve_model_name(model_name, available_models, chat_models)
     except httpx.ConnectError:
         _lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
         raise HTTPException(
