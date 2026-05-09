@@ -144,6 +144,43 @@ def sanitize_html(text: str) -> str:
 
   return html.escape(text)
 
+def _apply_chat_context_flags(
+  check_sql: bool, check_command: bool, check_path_traversal: bool, check_ldap: bool,
+  context: str,
+) -> tuple:
+  """Disable detectors prone to false positives in chat context."""
+  if context == "chat":
+    return False, False, False, False
+  return check_sql, check_command, check_path_traversal, check_ldap
+
+
+def _validate_length(text: str, max_length: Optional[int], min_length: Optional[int], i18n) -> None:
+  """Raise HTTPException if text length is outside the allowed bounds."""
+  if max_length is not None and len(text) > max_length:
+    raise HTTPException(400, get_message(i18n, 'security.sanitizers.input_too_long', max_length=max_length))
+  if min_length is not None and len(text) < min_length:
+    raise HTTPException(400, get_message(i18n, 'security.sanitizers.input_too_short', min_length=min_length))
+
+
+def _run_injection_checks(
+  text: str,
+  check_xss: bool, check_sql: bool, check_command: bool,
+  check_path_traversal: bool, check_ldap: bool,
+  i18n,
+) -> None:
+  """Run all enabled injection detectors and raise HTTPException on first hit."""
+  if check_xss and detect_xss_attempt(text):
+    raise HTTPException(400, get_message(i18n, 'security.sanitizers.xss_detected'))
+  if check_sql and detect_sql_injection(text):
+    raise HTTPException(400, get_message(i18n, 'security.sanitizers.sql_injection_detected'))
+  if check_command and detect_command_injection(text):
+    raise HTTPException(400, get_message(i18n, 'security.sanitizers.command_injection_detected'))
+  if check_path_traversal and detect_path_traversal(text):
+    raise HTTPException(400, get_message(i18n, 'security.sanitizers.path_traversal_detected'))
+  if check_ldap and detect_ldap_injection(text):
+    raise HTTPException(400, get_message(i18n, 'security.sanitizers.ldap_injection_detected'))
+
+
 def validate_string_input(
   text: str,
   max_length: Optional[int] = None,
@@ -185,64 +222,15 @@ def validate_string_input(
   """
   # In chat context, skip detectors prone to false positives on free-form
   # text. XSS stays active because rendered chat output can reach the browser.
-  #   - path traversal: "..." ellipsis trips `\.\.` ("vei..." = HTTP 400)
-  #   - command: `;`, `|`, `` ` ``, `<`, `>` are normal in writing
-  #   - LDAP: `(` and `)` unavoidable in prose
-  #   - SQL: discussing "UNION SELECT * FROM logs" is legitimate tech talk
-  if context == "chat":
-    check_command = False
-    check_ldap = False
-    check_path_traversal = False
-    check_sql = False
+  check_sql, check_command, check_path_traversal, check_ldap = _apply_chat_context_flags(
+    check_sql, check_command, check_path_traversal, check_ldap, context
+  )
+
   if not isinstance(text, str):
-    raise HTTPException(
-      400,
-      get_message(i18n, 'security.sanitizers.input_not_string')
-    )
+    raise HTTPException(400, get_message(i18n, 'security.sanitizers.input_not_string'))
 
-  if max_length is not None and len(text) > max_length:
-    raise HTTPException(
-      400,
-      get_message(i18n, 'security.sanitizers.input_too_long',
-            max_length=max_length)
-    )
-
-  if min_length is not None and len(text) < min_length:
-    raise HTTPException(
-      400,
-      get_message(i18n, 'security.sanitizers.input_too_short',
-            min_length=min_length)
-    )
-
-  if check_xss and detect_xss_attempt(text):
-    raise HTTPException(
-      400,
-      get_message(i18n, 'security.sanitizers.xss_detected')
-    )
-
-  if check_sql and detect_sql_injection(text):
-    raise HTTPException(
-      400,
-      get_message(i18n, 'security.sanitizers.sql_injection_detected')
-    )
-
-  if check_command and detect_command_injection(text):
-    raise HTTPException(
-      400,
-      get_message(i18n, 'security.sanitizers.command_injection_detected')
-    )
-
-  if check_path_traversal and detect_path_traversal(text):
-    raise HTTPException(
-      400,
-      get_message(i18n, 'security.sanitizers.path_traversal_detected')
-    )
-
-  if check_ldap and detect_ldap_injection(text):
-    raise HTTPException(
-      400,
-      get_message(i18n, 'security.sanitizers.ldap_injection_detected')
-    )
+  _validate_length(text, max_length, min_length, i18n)
+  _run_injection_checks(text, check_xss, check_sql, check_command, check_path_traversal, check_ldap, i18n)
 
   if not allow_html:
     text = sanitize_html(text)
