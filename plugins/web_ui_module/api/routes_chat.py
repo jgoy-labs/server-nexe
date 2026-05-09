@@ -486,6 +486,33 @@ def _clean_full_response(full_response: str, user_input: str = "") -> tuple[str,
     return clean_response, mem_saves, mem_deletes
 
 
+def _extract_reprompt_chunk_content(chunk) -> tuple[str, bool]:
+    """Extract text content from a reprompt chunk. Returns (content, skip).
+
+    skip=True means the chunk is a pure thinking token and should be discarded.
+    """
+    if isinstance(chunk, dict) and "message" in chunk:
+        if chunk["message"].get("thinking", ""):
+            return "", True
+        return chunk["message"].get("content", ""), False
+    if isinstance(chunk, dict):
+        return chunk.get("content", chunk.get("response", "")) or "", False  # type: ignore[return-value]
+    if isinstance(chunk, str):
+        return chunk, False
+    return "", False
+
+
+def _filter_reprompt_think_tags(content: str, in_think: bool) -> tuple[str, bool]:
+    """Strip <think>…</think> tags inline, updating in_think state. Returns (filtered_content, in_think)."""
+    if '<think>' in content:
+        in_think = True
+        content = content.split('<think>')[0]
+    if '</think>' in content:
+        in_think = False
+        content = content.split('</think>')[-1]
+    return content, in_think
+
+
 async def _yield_reprompt(
     engine: Any,
     model_name: str,
@@ -518,21 +545,10 @@ async def _yield_reprompt(
             _rp_response = ""
             _rp_in_think = False
             async for _rp_chunk in _rp_result:
-                _rp_content = ""
-                if isinstance(_rp_chunk, dict) and "message" in _rp_chunk:
-                    if _rp_chunk["message"].get("thinking", ""):
-                        continue
-                    _rp_content = _rp_chunk["message"].get("content", "")
-                elif isinstance(_rp_chunk, dict):
-                    _rp_content = _rp_chunk.get("content", _rp_chunk.get("response", "")) or ""  # type: ignore[assignment]
-                elif isinstance(_rp_chunk, str):
-                    _rp_content = _rp_chunk
-                if '<think>' in _rp_content:
-                    _rp_in_think = True
-                    _rp_content = _rp_content.split('<think>')[0]
-                if '</think>' in _rp_content:
-                    _rp_in_think = False
-                    _rp_content = _rp_content.split('</think>')[-1]
+                _rp_content, _skip = _extract_reprompt_chunk_content(_rp_chunk)
+                if _skip:
+                    continue
+                _rp_content, _rp_in_think = _filter_reprompt_think_tags(_rp_content, _rp_in_think)
                 if _rp_in_think:
                     continue
                 _rp_content = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]', '', _rp_content)
