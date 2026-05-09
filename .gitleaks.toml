@@ -1,0 +1,20 @@
+# gitleaks allowlist — server-nexe
+# Tots els findings auditats per Turing/DeepSeek V3 (2026-05-09) i confirmats FP.
+# Cap secret real al repositori.
+
+[allowlist]
+description = "False positives confirmats per auditoria Turing 2026-05-09"
+paths = [
+  # tests/ — cobreix tests/ arrel i plugins/**/tests/ (substring match)
+  "tests/",
+
+  # Documentació pública — placeholders: YOUR_API_KEY, el-teu-token, etc.
+  "knowledge/",
+
+  # Codi denylist d'uploads — capçaleres PEM com a patrons de detecció, no claus reals
+  "plugins/web_ui_module/api/routes_files.py",
+
+  # Catàleg instal·lador — model IDs Qwen (qwen35_122b_moe, qwen35_397b_moe)
+  "installer/installer_catalog_data.py",
+  "installer/swift-wizard/Resources/models.json",
+]
