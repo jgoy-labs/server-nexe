@@ -14,7 +14,7 @@ class TestTranslateHelper:
         assert result == "Fallback text"
 
     def test_translate_i18n_returns_key_not_found(self):
-        """i18n retorna la clau (no trobat) → fallback"""
+        """i18n returns the key (not found) → fallback"""
         from core.middleware import _translate
         mock_i18n = MagicMock()
         mock_i18n.t.side_effect = lambda key, **kw: key
@@ -61,7 +61,7 @@ class TestSetupCors:
         app = FastAPI()
         config = {"core": {"server": {"cors_origins": ["http://localhost:3000"]}}}
         setup_cors(app, config)
-        # Verificar que s'ha afegit middleware (la llista de middleware ha augmentat)
+        # Verify that middleware was added (the middleware list has grown)
         assert len(app.user_middleware) > 0
 
     def test_wildcard_with_i18n(self):
@@ -80,23 +80,23 @@ class TestSetupTrustedHosts:
         app = FastAPI()
         config = {"core": {"server": {"host": "192.168.1.100"}}}
         setup_trusted_hosts(app, config)
-        # Verificar middleware afegit
+        # Verify middleware added
         assert len(app.user_middleware) > 0
 
     def test_default_localhost_config(self):
         from core.middleware import setup_trusted_hosts
         app = FastAPI()
-        config = {}  # sense configuració → 127.0.0.1 per defecte
+        config = {}  # no configuration → 127.0.0.1 by default
         setup_trusted_hosts(app, config)
         assert len(app.user_middleware) > 0
 
     def test_zero_host_not_added(self):
-        """0.0.0.0 no s'ha d'afegir als allowed_hosts"""
+        """0.0.0.0 must not be added to allowed_hosts"""
         from core.middleware import setup_trusted_hosts
         app = FastAPI()
         config = {"core": {"server": {"host": "0.0.0.0"}}}
         setup_trusted_hosts(app, config)
-        # El middleware s'afegeix, però 0.0.0.0 no hauria d'estar a allowed
+        # The middleware is added, but 0.0.0.0 should not be in allowed
 
 
 class TestSetupRequestSizeLimit:
@@ -110,7 +110,7 @@ class TestSetupRequestSizeLimit:
     def test_default_max_size(self):
         from core.middleware import setup_request_size_limit
         app = FastAPI()
-        config = {}  # sense configuració → valor per defecte
+        config = {}  # no configuration → default value
         setup_request_size_limit(app, config)
         assert len(app.user_middleware) > 0
 
@@ -119,7 +119,7 @@ class TestSetupRateLimiting:
     def test_basic_rate_limiting(self):
         from core.middleware import setup_rate_limiting
         app = FastAPI()
-        # ADVANCED_RATE_LIMITING=False per defecte en la majoria d'entorns de test
+        # ADVANCED_RATE_LIMITING=False by default in most test environments
         with patch("core.middleware.ADVANCED_RATE_LIMITING", False):
             setup_rate_limiting(app)
         assert hasattr(app.state, "limiter")

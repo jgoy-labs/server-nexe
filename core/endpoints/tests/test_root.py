@@ -32,7 +32,7 @@ def make_app(config=None, modules=None, i18n=None):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Tests de funcions pures
+# Tests for pure functions
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestGetI18n:
@@ -171,7 +171,7 @@ class TestModuleHealthStatus:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Tests d'endpoints HTTP
+# Tests for HTTP endpoints
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestRootEndpoint:
@@ -389,7 +389,7 @@ class TestStatusEndpoint:
     def test_status_with_mlx_node(self):
         """MLX with _node → mlx_available=True"""
         mock_mlx = MagicMock()
-        mock_mlx._node = MagicMock()  # node actiu
+        mock_mlx._node = MagicMock()  # active node
         modules = {"mlx_module": mock_mlx}
         app = make_app(modules=modules)
         client = TestClient(app)

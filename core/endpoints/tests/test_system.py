@@ -34,7 +34,7 @@ def make_app():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Tests de funcions pures
+# Tests for pure functions
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestGetI18n:
@@ -76,10 +76,10 @@ class TestTranslateHelper:
             assert result == "Traduit"
 
     def test_t_with_i18n_key_not_found(self):
-        """Quan i18n retorna la clau (no trobat) → fallback"""
+        """When i18n returns the key (not found) → fallback"""
         from core.endpoints.system import _t
         mock_i18n = MagicMock()
-        mock_i18n.t.side_effect = lambda key, **kwargs: key  # retorna la clau
+        mock_i18n.t.side_effect = lambda key, **kwargs: key  # returns the key
         with patch("core.endpoints.system._get_i18n", return_value=mock_i18n):
             result = _t("some.key", "Fallback text")
             assert result == "Fallback text"
@@ -178,7 +178,7 @@ class TestSendRestartSignal:
              patch("core.endpoints.system._get_i18n", return_value=None), \
              patch("os.kill", return_value=None), \
              patch("asyncio.sleep", return_value=None):
-            # No ha de llençar excepcions
+            # Must not raise exceptions
             await send_restart_signal()
 
     @pytest.mark.asyncio
@@ -188,8 +188,8 @@ class TestSendRestartSignal:
         with patch("core.endpoints.system.SUPERVISOR_PID_FILE", non_existent), \
              patch("core.endpoints.system._get_i18n", return_value=None), \
              patch("asyncio.sleep", return_value=None):
-            # Ha de capturar HTTPException sense relançar
-            await send_restart_signal()  # no ha de llençar
+            # Must capture HTTPException without re-raising
+            await send_restart_signal()  # must not raise
 
     @pytest.mark.asyncio
     async def test_send_restart_signal_generic_exception(self, tmp_path):
@@ -197,13 +197,13 @@ class TestSendRestartSignal:
         from core.endpoints.system import send_restart_signal
         pid_file = tmp_path / "test.pid"
         pid_file.write_text("12345")
-        # Simulem que os.kill (dins del try) llança una excepció genèrica
+        # Simulate os.kill (inside the try) raising a generic exception
         with patch("core.endpoints.system.SUPERVISOR_PID_FILE", pid_file), \
              patch("core.endpoints.system._get_i18n", return_value=None), \
              patch("os.kill", side_effect=RuntimeError("unexpected error")), \
              patch("asyncio.sleep", return_value=None):
-            # Ha de capturar l'excepció sense relançar
-            await send_restart_signal()  # no ha de llençar
+            # Must capture the exception without re-raising
+            await send_restart_signal()  # must not raise
 
 
 # ═══════════════════════════════════════════════════════════════════════════

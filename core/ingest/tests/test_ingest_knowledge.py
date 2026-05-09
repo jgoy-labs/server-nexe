@@ -167,7 +167,7 @@ class TestIngestKnowledge:
         assert result is False
 
     def test_returns_false_on_collection_creation_failure(self, tmp_path):
-        """Si la col·lecció falla, retorna False."""
+        """If the collection fails, returns False."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"
@@ -230,11 +230,11 @@ class TestIngestKnowledge:
         assert mock_memory.store.call_count >= 1
 
     def test_idempotent_does_not_delete_collection(self, tmp_path):
-        """F7 fix: si la col·lecció ja existeix, NO es delete (era destructiu).
+        """F7 fix: if the collection already exists, it is NOT deleted (was destructive).
 
-        Abans del fix, ingest_knowledge feia delete_collection + create_collection
-        i això esborrava qualsevol document que ja estigués a la col·lecció. Ara
-        només crea quan no existeix (idempotent).
+        Before the fix, ingest_knowledge did delete_collection + create_collection
+        which erased any document already in the collection. Now it only creates
+        when the collection does not exist (idempotent).
         """
         from core.ingest.ingest_knowledge import ingest_knowledge
 
@@ -296,13 +296,13 @@ class TestIngestKnowledge:
         assert result is True
 
     def test_file_with_rag_header_uses_header_settings(self, tmp_path):
-        """Fitxer amb capçalera RAG usa la configuració de la capçalera."""
+        """A file with a RAG header uses the header's configuration."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"
         knowledge_path.mkdir()
 
-        # Crea fitxer amb capçalera RAG vàlida
+        # Create a file with a valid RAG header
         rag_content = """---
 id: test-doc
 priority: P1
@@ -329,7 +329,7 @@ This is the actual content of the document.
         assert result is True
 
     def test_file_read_error_continues(self, tmp_path):
-        """Error en un fitxer no atura el procés."""
+        """An error in a file does not stop the process."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"
@@ -378,7 +378,7 @@ This is the actual content of the document.
         assert result is True
 
     def test_large_file_shows_chunk_progress(self, tmp_path):
-        """Fitxers grans mostren progrés per chunks."""
+        """Large files show progress per chunk."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"

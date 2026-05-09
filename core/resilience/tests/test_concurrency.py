@@ -23,11 +23,11 @@ except ImportError:
   HAS_NUMPY = False
 
 class TestAsyncBasics:
-  """Tests basics de async/await"""
+  """Basic tests for async/await"""
 
   @pytest.mark.asyncio
   async def test_event_loop_not_blocked(self):
-    """El event loop no es bloqueja amb operacions async"""
+    """The event loop is not blocked by async operations"""
     start = time.time()
 
     async def quick_task():
@@ -43,7 +43,7 @@ class TestAsyncBasics:
 
   @pytest.mark.asyncio
   async def test_async_sleep_yields_control(self):
-    """asyncio.sleep() cedeix control a altres tasques"""
+    """asyncio.sleep() yields control to other tasks"""
     order = []
 
     async def task(name: str, delay: float):
@@ -59,18 +59,18 @@ class TestAsyncBasics:
     assert order.index("B_end") < order.index("A_end")
 
 class TestThreadPoolExecutor:
-  """Tests del ThreadPoolExecutor"""
+  """Tests for the ThreadPoolExecutor"""
 
   @pytest.fixture
   def executor(self):
-    """Executor amb 2 workers per tests"""
+    """Executor with 2 workers for tests"""
     executor = ThreadPoolExecutor(max_workers=2)
     yield executor
     executor.shutdown(wait=True)
 
   @pytest.mark.asyncio
   async def test_run_in_executor_works(self, executor):
-    """run_in_executor funciona correctament"""
+    """run_in_executor works correctly"""
     def blocking_work():
       time.sleep(0.05)
       return "done"
@@ -82,7 +82,7 @@ class TestThreadPoolExecutor:
 
   @pytest.mark.asyncio
   async def test_executor_parallel_execution(self, executor):
-    """Executor executa en paral.lel"""
+    """Executor executes in parallel"""
     results = []
 
     def work(n):
@@ -104,7 +104,7 @@ class TestThreadPoolExecutor:
 
   @pytest.mark.asyncio
   async def test_executor_handles_exceptions(self, executor):
-    """Executor propaga excepcions correctament"""
+    """Executor propagates exceptions correctly"""
     def failing_work():
       raise ValueError("test error")
 
@@ -117,10 +117,10 @@ class TestThreadPoolExecutor:
 
 @pytest.mark.skipif(not HAS_NUMPY, reason="NumPy not available")
 class TestGILRelease:
-  """Tests de release del GIL"""
+  """Tests for GIL release"""
 
   def test_numpy_releases_gil(self):
-    """NumPy allibera el GIL durant operacions"""
+    """NumPy releases the GIL during operations"""
 
     results = {"thread1": None, "thread2": None}
     start_times = {}
@@ -157,11 +157,11 @@ class TestGILRelease:
     assert ratio < 1.8, f"GIL might not be released: ratio={ratio}"
 
 class TestMemoryManagement:
-  """Tests de gestio de memoria"""
+  """Tests for memory management"""
 
   @pytest.mark.asyncio
   async def test_no_task_accumulation(self):
-    """Les tasques completades no s'acumulen"""
+    """Completed tasks do not accumulate"""
     import gc
 
     gc.collect()
@@ -176,7 +176,7 @@ class TestMemoryManagement:
 
   @pytest.mark.asyncio
   async def test_batch_processing_yields(self):
-    """El processament per batch cedeix control"""
+    """Batch processing yields control"""
     processed = []
     other_task_ran = False
 
@@ -198,11 +198,11 @@ class TestMemoryManagement:
     assert other_task_ran
 
 class TestTimeoutHandling:
-  """Tests de timeouts"""
+  """Tests for timeout handling"""
 
   @pytest.mark.asyncio
   async def test_timeout_cancels_task(self):
-    """Timeout cancel.la la tasca correctament"""
+    """Timeout cancels the task correctly"""
     async def slow_task():
       await asyncio.sleep(10)
       return "should not reach"
@@ -212,7 +212,7 @@ class TestTimeoutHandling:
 
   @pytest.mark.asyncio
   async def test_timeout_does_not_affect_fast_tasks(self):
-    """Timeout no afecta tasques rapides"""
+    """Timeout does not affect fast tasks"""
     async def fast_task():
       await asyncio.sleep(0.01)
       return "done"
@@ -221,11 +221,11 @@ class TestTimeoutHandling:
     assert result == "done"
 
 class TestSemaphoreRateLimiting:
-  """Tests de limitacio amb semafors"""
+  """Tests for rate limiting with semaphores"""
 
   @pytest.mark.asyncio
   async def test_semaphore_limits_concurrency(self):
-    """Semafor limita concurrencia"""
+    """Semaphore limits concurrency"""
     concurrent_count = 0
     max_concurrent = 0
     semaphore = asyncio.Semaphore(2)
@@ -243,11 +243,11 @@ class TestSemaphoreRateLimiting:
     assert max_concurrent == 2, f"Max concurrent was {max_concurrent}"
 
 class TestCircuitBreakerIntegration:
-  """Tests d'integracio amb Circuit Breaker"""
+  """Integration tests with Circuit Breaker"""
 
   @pytest.mark.asyncio
   async def test_circuit_breaker_async_compatible(self):
-    """Circuit Breaker funciona amb async"""
+    """Circuit Breaker works with async"""
     from core.resilience import CircuitBreaker, CircuitBreakerConfig
 
     breaker = CircuitBreaker(
@@ -270,7 +270,7 @@ class TestCircuitBreakerIntegration:
 
   @pytest.mark.asyncio
   async def test_concurrent_protected_calls(self):
-    """Cridades concurrents protegides funcionen"""
+    """Concurrent protected calls work correctly"""
     from core.resilience import CircuitBreaker, CircuitBreakerConfig
 
     breaker = CircuitBreaker(

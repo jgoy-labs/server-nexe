@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Tests per core.version — single source of truth des de pyproject.toml."""
+"""Tests for core.version — single source of truth from pyproject.toml."""
 
 import re
 from pathlib import Path
@@ -11,7 +11,7 @@ except ModuleNotFoundError:
 
 
 def test_version_matches_pyproject():
-    """__version__ ha de coincidir amb pyproject.toml."""
+    """__version__ must match pyproject.toml."""
     from core.version import __version__
 
     pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
@@ -22,7 +22,7 @@ def test_version_matches_pyproject():
 
 
 def test_version_is_valid_semver():
-    """__version__ ha de tenir format semver vàlid (X.Y.Z o X.Y.Z-tag)."""
+    """__version__ must have valid semver format (X.Y.Z or X.Y.Z-tag)."""
     from core.version import __version__
 
     assert re.match(r"^\d+\.\d+\.\d+(-[\w.]+)?$", __version__), (

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: core/endpoints/tests/test_security_n_series.py
-Description: Tests de seguretat: configuració producció, endpoints, path traversal, sessions.
+Description: Security tests: production configuration, endpoints, path traversal, sessions.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -22,9 +22,9 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent  # server-nexe/
 
 class TestServerTomlProductionConfig:
     """
-    Verifica que server.toml inclòs al repositori té valors segurs per
-    a producció. Si s'usa sense sobreescriure, no ha d'exposar stack traces
-    ni activar live-reload.
+    Verifies that the server.toml included in the repository has safe values for
+    production. If used without overriding, it must not expose stack traces
+    nor enable live-reload.
     """
 
     def _read_toml(self) -> str:
@@ -40,13 +40,13 @@ class TestServerTomlProductionConfig:
         assert 'environment = "development"' not in content
 
     def test_debug_is_disabled(self):
-        """debug = false evita exposar stack traces Python a respostes HTTP."""
+        """debug = false prevents exposing Python stack traces in HTTP responses."""
         content = self._read_toml()
         assert "debug = false" in content, "server.toml ha de tenir debug = false"
         assert "debug = true" not in content
 
     def test_reload_is_disabled(self):
-        """reload = false evita live-reload en producció."""
+        """reload = false prevents live-reload in production."""
         content = self._read_toml()
         assert "reload = false" in content, "server.toml ha de tenir reload = false"
         assert "reload = true" not in content
@@ -68,7 +68,7 @@ class TestSystemEndpointInfoDisclosure:
         """/restart no ha de retornar supervisor_pid al client."""
         from core.endpoints.system import restart_server
         source = inspect.getsource(restart_server)
-        # Obtenir la secció return (after background_tasks.add_task)
+        # Get the return section (after background_tasks.add_task)
         return_section = source.split('"status": "restart_initiated"')[1] if '"status": "restart_initiated"' in source else source
         assert '"supervisor_pid"' not in return_section
 
@@ -93,13 +93,13 @@ class TestSystemEndpointInfoDisclosure:
         assert "kill -TERM" not in source
 
     def test_status_response_keeps_supervisor_running(self):
-        """/status manté supervisor_running (boolean, sense PID)."""
+        """/status keeps supervisor_running (boolean, no PID)."""
         from core.endpoints.system import supervisor_status
         source = inspect.getsource(supervisor_status)
         assert '"supervisor_running"' in source
 
     def test_status_response_keeps_restart_available(self):
-        """/status manté restart_available (boolean)."""
+        """/status keeps restart_available (boolean)."""
         from core.endpoints.system import supervisor_status
         source = inspect.getsource(supervisor_status)
         assert '"restart_available"' in source
@@ -138,19 +138,19 @@ class TestMemoryAPIErrorDisclosure:
         assert "str(e)" not in except_section
 
     def test_store_uses_generic_error_message(self):
-        """memory_store usa un missatge genèric, no el detall de l'excepció."""
+        """memory_store uses a generic message, not the exception detail."""
         from memory.memory.api.v1 import memory_store
         source = inspect.getsource(memory_store)
         assert "Internal error" in source
 
     def test_search_uses_generic_error_message(self):
-        """memory_search usa un missatge genèric, no el detall de l'excepció."""
+        """memory_search uses a generic message, not the exception detail."""
         from memory.memory.api.v1 import memory_search
         source = inspect.getsource(memory_search)
         assert "Internal error" in source
 
     def test_store_logs_with_exc_info(self):
-        """memory_store fa logger.error amb exc_info=True per mantenir traçabilitat."""
+        """memory_store calls logger.error with exc_info=True to maintain traceability."""
         from memory.memory.api.v1 import memory_store
         source = inspect.getsource(memory_store)
         assert "exc_info=True" in source
@@ -194,14 +194,14 @@ class TestStaticFilePathTraversal:
         assert "startswith" in source
 
     def test_serve_static_returns_403_on_traversal(self):
-        """El codi retorna HTTP 403 (no 404) si el path és fora del directori."""
+        """The code returns HTTP 403 (not 404) if the path is outside the directory."""
         from plugins.web_ui_module.api import routes_static
         source = inspect.getsource(routes_static)
         assert "403" in source
         assert "forbidden" in source.lower()
 
     def test_traversal_logic_rejects_dotdot(self):
-        """Validació directa: path amb .. queda fora de static_dir."""
+        """Direct validation: path with .. ends up outside static_dir."""
         static_dir = Path("/app/static").resolve()
         traversal = (Path("/app/static") / "../../etc/passwd").resolve()
         assert not str(traversal).startswith(str(static_dir)), (
@@ -209,13 +209,13 @@ class TestStaticFilePathTraversal:
         )
 
     def test_traversal_logic_accepts_valid_path(self):
-        """Validació directa: path legítim dins de static_dir és acceptat."""
+        """Direct validation: legitimate path inside static_dir is accepted."""
         static_dir = Path("/app/static").resolve()
         valid = (Path("/app/static") / "styles.css").resolve()
         assert str(valid).startswith(str(static_dir))
 
     def test_traversal_nested_path_rejected(self):
-        """Path traversal amb subdir intermediari és igualment rebutjat."""
+        """Path traversal with an intermediate subdir is equally rejected."""
         static_dir = Path("/app/static").resolve()
         # /app/static/css/../../etc/passwd → /app/etc/passwd → fora de static/
         traversal = (Path("/app/static") / "css/../../etc/passwd").resolve()
@@ -223,7 +223,7 @@ class TestStaticFilePathTraversal:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Session cleanup automàtic (tasca asyncio periòdica)
+# Automatic session cleanup (periodic asyncio task)
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestSessionCleanupTask:
@@ -241,13 +241,13 @@ class TestSessionCleanupTask:
         )
 
     def test_cleanup_loop_is_coroutine(self):
-        """_session_cleanup_loop és una coroutine (async def)."""
+        """_session_cleanup_loop is a coroutine (async def)."""
         import asyncio
         from plugins.web_ui_module.api.routes import _session_cleanup_loop
         assert asyncio.iscoroutinefunction(_session_cleanup_loop)
 
     def test_start_cleanup_task_function_exists(self):
-        """start_session_cleanup_task() existeix i és callable."""
+        """start_session_cleanup_task() exists and is callable."""
         from plugins.web_ui_module.api.routes import start_session_cleanup_task
         assert callable(start_session_cleanup_task)
 
@@ -277,7 +277,7 @@ class TestSessionCleanupTask:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Versió llegida de config (no hardcoded)
+# Version read from config (not hardcoded)
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestSystemHealthVersion:
@@ -287,7 +287,7 @@ class TestSystemHealthVersion:
     """
 
     def test_health_no_hardcoded_old_version(self):
-        """/health no té '0.7.1' hardcoded."""
+        """/health does not have '0.7.1' hardcoded."""
         from core.endpoints.system import system_health
         source = inspect.getsource(system_health)
         assert '"0.7.1"' not in source, (
@@ -295,14 +295,14 @@ class TestSystemHealthVersion:
         )
 
     def test_health_reads_from_server_state(self):
-        """/health llegeix la versió de get_server_state().config."""
+        """/health reads the version from get_server_state().config."""
         from core.endpoints.system import system_health
         source = inspect.getsource(system_health)
         assert "get_server_state" in source
         assert ".config" in source
 
     def test_health_has_fallback_version(self):
-        """/health té una versió de fallback si config no disponible."""
+        """/health has a fallback version if config is not available."""
         from core.endpoints.system import system_health
         source = inspect.getsource(system_health)
         # Ha de tenir un fallback (0.9.x)

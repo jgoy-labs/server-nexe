@@ -97,7 +97,7 @@ class TestIngestDocumentation:
         assert result is False
 
     def test_returns_true_on_success_no_files(self, tmp_path):
-        """Quan no hi ha fitxers .md, torna True igualment."""
+        """When there are no .md files, returns True anyway."""
         from core.ingest.ingest_docs import ingest_documentation
 
         mock_memory = MagicMock()
@@ -108,16 +108,16 @@ class TestIngestDocumentation:
 
         with patch("memory.memory.api.MemoryAPI", return_value=mock_memory), \
              patch("core.ingest.ingest_docs.PROJECT_ROOT", tmp_path):
-            # tmp_path no té docs/ ni README.md
+            # tmp_path has no docs/ or README.md
             result = asyncio.run(ingest_documentation())
 
         assert result is True
 
     def test_ingests_markdown_files(self, tmp_path):
-        """Comprova que s'ingereixen fitxers .md trobats."""
+        """Checks that found .md files are ingested."""
         from core.ingest.ingest_docs import ingest_documentation
 
-        # Crear docs dir amb un fitxer
+        # Create docs dir with one file
         docs_dir = tmp_path / "docs"
         docs_dir.mkdir()
         (docs_dir / "test.md").write_text("# Test\n\nThis is test documentation.")
@@ -138,12 +138,12 @@ class TestIngestDocumentation:
         assert mock_memory.store.call_count >= 1
 
     def test_recreates_collection_if_exists(self, tmp_path):
-        """Si la col·lecció existeix, la borra i torna a crear."""
+        """If the collection exists, it deletes and recreates it."""
         from core.ingest.ingest_docs import ingest_documentation
 
         mock_memory = MagicMock()
         mock_memory.initialize = AsyncMock()
-        mock_memory.collection_exists = AsyncMock(return_value=True)  # existeix
+        mock_memory.collection_exists = AsyncMock(return_value=True)  # exists
         mock_memory.delete_collection = AsyncMock()
         mock_memory.create_collection = AsyncMock()
         mock_memory.close = AsyncMock()
@@ -156,7 +156,7 @@ class TestIngestDocumentation:
         mock_memory.create_collection.assert_called_once()
 
     def test_readme_included_if_exists(self, tmp_path):
-        """README.md a l'arrel del projecte ha d'incloure's."""
+        """README.md at the project root must be included."""
         from core.ingest.ingest_docs import ingest_documentation
 
         readme = tmp_path / "README.md"
@@ -177,7 +177,7 @@ class TestIngestDocumentation:
         assert mock_memory.store.call_count >= 1
 
     def test_file_read_error_continues(self, tmp_path):
-        """Errors en un fitxer concret no haurien d'aturar el procés."""
+        """Errors in a specific file should not stop the process."""
         from core.ingest.ingest_docs import ingest_documentation
 
         docs_dir = tmp_path / "docs"

@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 
 from core.metrics.endpoint import metrics_router
 
-# Bug 22: /metrics ara requereix X-API-Key. Aquests tests fan servir una API key fixa.
+# Bug 22: /metrics now requires X-API-Key. These tests use a fixed API key.
 _TEST_KEY = "test-metrics-bug22-key"
 _HEADERS = {"X-API-Key": _TEST_KEY}
 

@@ -16,7 +16,7 @@ import pytest
 from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────
-# Helpers de detecció de backends
+# Backend detection helpers
 # ─────────────────────────────────────────────────────────────
 
 def _qdrant_available():
@@ -110,18 +110,18 @@ class TestReadFile:
         assert "Títol" in result
 
     def test_read_nonexistent_raises(self, tmp_path):
-        """read_file no gestiona fitxers inexistents — llança excepció."""
+        """read_file does not handle non-existent files — raises an exception."""
         p = tmp_path / "inexistent.txt"
         with pytest.raises(Exception):
             read_file(p)
 
     def test_read_strips_rag_header(self, tmp_path):
-        """Els docs de knowledge/ porten capçalera RAG delimitada per ---"""
+        """Docs in knowledge/ carry a RAG header delimited by ---"""
         content = "# === METADATA RAG ===\nid: test\n---\n\n# Títol\nCos del document"
         p = tmp_path / "doc.md"
         p.write_text(content)
         result = read_file(p)
-        # El contingut ha d'existir (capçalera o sense)
+        # The content must exist (with or without header)
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -154,7 +154,7 @@ class TestHeaderParser:
             assert isinstance(header.tags, list)
 
     def test_knowledge_readme_has_valid_header(self):
-        """El README.md de la carpeta knowledge/ ha de tenir capçalera vàlida."""
+        """The README.md in the knowledge/ folder must have a valid header."""
         from memory.rag.header_parser import parse_rag_header
         readme = Path(__file__).parents[3] / "knowledge" / "ca" / "README.md"
         if not readme.exists():
@@ -166,7 +166,7 @@ class TestHeaderParser:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Unitaris — descoberta de fitxers a knowledge/
+# Unit tests — file discovery in knowledge/
 # ═══════════════════════════════════════════════════════════════
 
 class TestKnowledgeFolderDiscovery:
@@ -258,7 +258,7 @@ class TestIngestAndSearch:
         assert "9119" in combined
 
     def test_search_finds_installation_steps(self, ingested):
-        """Cerca 'instal·lació' → ha de trobar setup.sh."""
+        """Search for 'installation' → must find setup.sh."""
         import asyncio
         from memory.memory.api import MemoryAPI
         async def _search():
@@ -275,7 +275,7 @@ class TestIngestAndSearch:
         assert "setup.sh" in combined or "instal" in combined.lower()
 
     def test_search_finds_version(self, ingested):
-        """Cerca 'versió' → ha de trobar '0.8'."""
+        """Search for 'version' → must find '0.8'."""
         import asyncio
         from memory.memory.api import MemoryAPI
         async def _search():
@@ -376,7 +376,7 @@ class TestRAGChatOllama:
 
     @pytest.fixture(scope="class")
     def rag_client(self, tmp_path_factory):
-        """Client amb ingesta prèvia dels docs de knowledge/.
+        """Client with prior ingestion of knowledge/ docs.
 
         Isolated Qdrant path via NEXE_QDRANT_PATH so ingest_knowledge()
         does not contaminate the dev `storage/vectors/`. Previous env var
@@ -482,7 +482,7 @@ class TestRAGChatMLX:
 
     @pytest.fixture(scope="class")
     def rag_client_mlx(self, tmp_path_factory):
-        """Client MLX amb ingesta prèvia dels docs de knowledge/.
+        """MLX client with prior ingestion of knowledge/ docs.
 
         Isolated Qdrant path via NEXE_QDRANT_PATH so the reset +
         delete_collection cycle does not touch the dev storage/vectors/.
