@@ -264,4 +264,4 @@ else
   warn "Alguns tests han fallat (exit code: $EXIT_CODE)"
 fi
 
-exit $EXIT_CODE
+exit "$EXIT_CODE"
