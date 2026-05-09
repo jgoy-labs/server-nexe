@@ -96,53 +96,32 @@ def find_config_path(project_root: Optional[Path] = None) -> Optional[Path]:
     return None
 
 
-def load_config(
-    project_root: Optional[Path] = None,
-    i18n=None,
-    config_path: Optional[Path] = None
-) -> Dict[str, Any]:
-    """
-    Load configuration with multi-file deep-merge.
+def _load_single_config_file(found_path: Path, i18n) -> Dict[str, Any]:
+    """Load and merge a single TOML config file into DEFAULT_CONFIG. Returns merged dict."""
+    try:
+        if i18n:
+            logger.info(i18n.t("server_core.startup.loading_config", path=str(found_path)))
+        else:
+            logger.info("Loading config from: %s", found_path)
+        with open(found_path, 'rb') as f:
+            raw = tomllib.load(f)
+        merged = _deep_merge(copy.deepcopy(DEFAULT_CONFIG), raw)
+        if i18n:
+            logger.info(i18n.t("server_core.startup.config_loaded"))
+        else:
+            logger.info("Config loaded successfully")
+        return _apply_env_overrides(merged)
+    except Exception as e:
+        if i18n:
+            logger.error(i18n.t("server_core.startup.config_error",
+                                path=str(found_path), error=str(e)))
+        else:
+            logger.error("Error loading config from %s: %s", found_path, e)
+        return _apply_env_overrides(copy.deepcopy(DEFAULT_CONFIG))
 
-    Priority (low → high): DEFAULT < personality/server.toml < root server.toml < ENV vars
 
-    When config_path is given, uses that single file (backward compat for direct overrides).
-    When searching by project_root, applies the full BASE + OVERRIDE merge pattern.
-
-    Args:
-        project_root: Path to project root directory
-        i18n: I18n manager for translated messages (optional)
-        config_path: Direct path to config file (skips multi-file search)
-
-    Returns:
-        Dict with configuration data
-    """
-    # Direct path: single file, no multi-file logic (backward compat)
-    if config_path and Path(config_path).exists():
-        found_path = Path(config_path)
-        try:
-            if i18n:
-                logger.info(i18n.t("server_core.startup.loading_config", path=str(found_path)))
-            else:
-                logger.info("Loading config from: %s", found_path)
-            with open(found_path, 'rb') as f:
-                raw = tomllib.load(f)
-            merged = _deep_merge(copy.deepcopy(DEFAULT_CONFIG), raw)
-            if i18n:
-                logger.info(i18n.t("server_core.startup.config_loaded"))
-            else:
-                logger.info("Config loaded successfully")
-            return _apply_env_overrides(merged)
-        except Exception as e:
-            if i18n:
-                logger.error(i18n.t("server_core.startup.config_error",
-                                    path=str(found_path), error=str(e)))
-            else:
-                logger.error("Error loading config from %s: %s", found_path, e)
-            return _apply_env_overrides(copy.deepcopy(DEFAULT_CONFIG))
-
-    # Multi-file merge: DEFAULT < personality/server.toml < root server.toml < ENV vars
-    base = Path(project_root) if project_root else Path.cwd()
+def _load_multi_file_config(base: Path, i18n) -> Dict[str, Any]:
+    """Merge base + override TOML files into DEFAULT_CONFIG. Returns merged dict."""
     merged = copy.deepcopy(DEFAULT_CONFIG)
     loaded_any = False
 
@@ -176,6 +155,36 @@ def load_config(
             logger.warning("No config file found, using defaults")
 
     return _apply_env_overrides(merged)
+
+
+def load_config(
+    project_root: Optional[Path] = None,
+    i18n=None,
+    config_path: Optional[Path] = None
+) -> Dict[str, Any]:
+    """
+    Load configuration with multi-file deep-merge.
+
+    Priority (low → high): DEFAULT < personality/server.toml < root server.toml < ENV vars
+
+    When config_path is given, uses that single file (backward compat for direct overrides).
+    When searching by project_root, applies the full BASE + OVERRIDE merge pattern.
+
+    Args:
+        project_root: Path to project root directory
+        i18n: I18n manager for translated messages (optional)
+        config_path: Direct path to config file (skips multi-file search)
+
+    Returns:
+        Dict with configuration data
+    """
+    # Direct path: single file, no multi-file logic (backward compat)
+    if config_path and Path(config_path).exists():
+        return _load_single_config_file(Path(config_path), i18n)
+
+    # Multi-file merge: DEFAULT < personality/server.toml < root server.toml < ENV vars
+    base = Path(project_root) if project_root else Path.cwd()
+    return _load_multi_file_config(base, i18n)
 
 
 def save_config(config: Dict[str, Any], config_path: Path) -> bool:
