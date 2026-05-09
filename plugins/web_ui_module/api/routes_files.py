@@ -109,6 +109,67 @@ def _is_symlink_outside_uploads(file_path: Path) -> bool:
     return not _real.startswith(_uploads_real + _os.sep) and _real != _uploads_real
 
 
+def _build_base_doc_metadata(filename: str, content_size: int) -> dict:
+    """Build the base document metadata dict for an upload."""
+    return {
+        "filename": filename,
+        "upload_type": "file",
+        "size": content_size,
+        "source": "web_ui",
+    }
+
+
+def _apply_rag_header_metadata(doc_metadata: dict, rag_header, body_content: str, filename: str) -> None:
+    """Update doc_metadata in-place from a RAG header (valid or fallback simple)."""
+    if rag_header.is_valid:
+        doc_metadata.update({
+            "doc_id": rag_header.id,
+            "abstract": rag_header.abstract,
+            "tags": rag_header.tags,
+            "priority": rag_header.priority,
+            "type": rag_header.type,
+            "lang": rag_header.lang,
+            "collection": rag_header.collection,
+        })
+        logger.info(f"RAG header found: id={rag_header.id}, priority={rag_header.priority}")
+    else:
+        # Simple metadata (without LLM — avoids blocking for MLX/Ollama)
+        _lang = _os.getenv("NEXE_LANG", "ca").split("-")[0]
+        _stem = filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ")
+        doc_metadata.update({
+            "abstract": " ".join(body_content.split())[:300],
+            "tags": [_stem],
+            "priority": "P2",
+            "type": "docs",
+            "lang": _lang,
+        })
+        logger.info(f"No RAG header — metadata simple per '{filename}'")
+
+
+def _compute_chunk_size(rag_header, body_content: str, filename: str) -> int:
+    """Return chunk size: from RAG header if valid, else auto from doc length.
+
+    Auto thresholds:
+      < 20K chars  (~7 pages)    -> 800   (maximum precision)
+      < 100K chars (~33 pages)   -> 1000
+      < 300K chars (~100 pages)  -> 1200
+      >= 300K chars (>100 pages) -> 1500  (very large docs)
+    """
+    if rag_header and rag_header.is_valid:
+        return rag_header.chunk_size
+    _doc_len = len(body_content)
+    if _doc_len < 20_000:
+        chunk_size = 800
+    elif _doc_len < 100_000:
+        chunk_size = 1000
+    elif _doc_len < 300_000:
+        chunk_size = 1200
+    else:
+        chunk_size = 1500
+    logger.info(f"chunk_size auto={chunk_size} per {_doc_len} chars ({filename})")
+    return chunk_size
+
+
 def register_file_routes(router: APIRouter, *, session_mgr, file_handler, require_ui_auth):
     """Registers endpoints: POST /upload, GET /files, DELETE /files/cleanup"""
 
@@ -163,58 +224,14 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         # Parse RAG header if available
         rag_header = None
         body_content = text
-        doc_metadata = {
-            "filename": file.filename,
-            "upload_type": "file",
-            "size": len(content),
-            "source": "web_ui"
-        }
+        doc_metadata = _build_base_doc_metadata(file.filename, len(content))
 
         parse_rag_header = _get_parse_rag_header()
         if parse_rag_header:
             rag_header, body_content = parse_rag_header(text)
-            if rag_header.is_valid:
-                doc_metadata.update({
-                    "doc_id": rag_header.id,
-                    "abstract": rag_header.abstract,
-                    "tags": rag_header.tags,
-                    "priority": rag_header.priority,
-                    "type": rag_header.type,
-                    "lang": rag_header.lang,
-                    "collection": rag_header.collection
-                })
-                logger.info(f"RAG header found: id={rag_header.id}, priority={rag_header.priority}")
-            else:
-                # Simple metadata (without LLM — avoids blocking for MLX/Ollama)
-                _lang = _os.getenv("NEXE_LANG", "ca").split("-")[0]
-                _stem = file.filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ")
-                doc_metadata.update({
-                    "abstract": " ".join(body_content.split())[:300],
-                    "tags": [_stem],
-                    "priority": "P2",
-                    "type": "docs",
-                    "lang": _lang,
-                })
-                logger.info(f"No RAG header — metadata simple per '{file.filename}'")
+            _apply_rag_header_metadata(doc_metadata, rag_header, body_content, file.filename)
 
-        # Chunk size adapted to document size to balance precision and coverage:
-        #   < 20K chars  (~7 pages)   -> 800   (maximum precision)
-        #   < 100K chars (~33 pages)  -> 1000
-        #   < 300K chars (~100 pages) -> 1200
-        #   >= 300K chars (>100 pages)-> 1500  (very large docs: maintains coherence per chunk)
-        if rag_header and rag_header.is_valid:
-            chunk_size = rag_header.chunk_size
-        else:
-            _doc_len = len(body_content)
-            if _doc_len < 20_000:
-                chunk_size = 800
-            elif _doc_len < 100_000:
-                chunk_size = 1000
-            elif _doc_len < 300_000:
-                chunk_size = 1200
-            else:
-                chunk_size = 1500
-            logger.info(f"chunk_size auto={chunk_size} per {_doc_len} chars ({file.filename})")
+        chunk_size = _compute_chunk_size(rag_header, body_content, file.filename)
         # Security: filter injection patterns but do NOT truncate (chunking handles size)
         body_content = _filter_rag_injection(body_content)
         chunks = file_handler.chunk_text(body_content, chunk_size=chunk_size)
