@@ -1075,6 +1075,101 @@ async def _build_rag_context(memory_helper, message: str, body: dict, attached_d
     return rag_context, rag_count, rag_items
 
 
+async def _yield_model_loading_check(engine, model_name: str, engine_name: str):
+    """Yield a MODEL_LOADING token if the engine reports the model is not yet loaded."""
+    if not hasattr(engine, 'is_model_loaded'):
+        return
+    _safe_model = str(model_name).replace("\x00", "").replace("]", "")[:100]
+    try:
+        loaded = await engine.is_model_loaded(model_name)
+        if not loaded:
+            logger.info("Model %s not loaded — loading... [%s]", model_name, engine_name)
+            yield f"\x00[MODEL_LOADING:{_safe_model}|{engine_name}]\x00"
+    except Exception as e:
+        logger.debug("Model loaded check failed for %s: %s", model_name, e)
+
+
+def _extract_nonstreaming_content(result) -> str:
+    """Extract text content from a non-streaming engine result (dict or str)."""
+    if isinstance(result, dict):
+        if "message" in result and "content" in result["message"]:
+            return result["message"]["content"]
+        if "content" in result:
+            return result["content"]
+        if "response" in result:
+            return result["response"]
+        return ""
+    if isinstance(result, str):
+        return result
+    return ""
+
+
+async def _yield_atomize_and_save_mem_saves(
+    mem_saves: list,
+    engine,
+    model_name: str,
+    sig,
+    lang: str,
+    memory_helper,
+    session,
+    count_out: list,
+) -> "AsyncGenerator[str, None]":
+    """Atomize mem_saves with LLM, save them to memory, yield SAVING/MEM tokens.
+
+    count_out[0] is set to the number of facts actually saved.
+    """
+    yield "\x00[SAVING]\x00"
+    _lang_short = lang[:2] if lang else "ca"
+    _atomized = []
+    for _raw_fact in mem_saves:
+        _raw_fact = _raw_fact.strip()
+        if not _raw_fact:
+            continue
+        try:
+            _parts = await _atomize_fact_llm(_raw_fact, engine, model_name, sig, lang=_lang_short)
+            _atomized.extend(_parts)
+        except Exception:
+            _atomized.append(_raw_fact)
+    mem_saves[:] = _atomized
+
+    _mem_saved_count = 0
+    _deleted = getattr(session, '_recently_deleted_facts', [])
+    for fact in mem_saves:
+        fact = fact.strip()
+        if not fact or len(fact) < 5:
+            continue
+        # Do not re-save recently deleted facts
+        if _deleted:
+            _skip = False
+            for _del_fact in _deleted:
+                if fact.lower() in _del_fact.lower() or _del_fact.lower() in fact.lower():
+                    logger.debug("MEM_SAVE skip (recently deleted): '%s'", fact[:80])
+                    _skip = True
+                    break
+            if _skip:
+                continue
+        # Filter negative/junk facts
+        if _JUNK_PATTERNS_RE.search(fact):
+            logger.debug("MEM_SAVE skip (junk): '%s'", fact[:80])
+            continue
+        try:
+            result = await memory_helper.save_to_memory(
+                content=fact,
+                session_id=session.id,
+                metadata={"type": "user_fact", "source": "llm_extract", "is_mem_save": True}
+            )
+            if result.get("document_id"):
+                _mem_saved_count += 1
+                logger.info("MEM_SAVE: '%s'", fact[:80])
+            else:
+                logger.debug("MEM_SAVE skip (dedup): '%s'", fact[:80])
+        except Exception as e:
+            logger.debug("MEM_SAVE failed: %s", e)
+    if _mem_saved_count > 0:
+        yield f"\x00[MEM:{_mem_saved_count}]\x00"
+    count_out.append(_mem_saved_count)
+
+
 def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     """Registers endpoint: POST /chat"""
 
@@ -1465,20 +1560,14 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 session.compaction_count, _doc_truncated_pct,
                             ):
                                 yield _h
-                            _safe_model = str(model_name).replace("\x00", "").replace("]", "")[:100]
 
                             # Check if model is loaded (Ollama, MLX, llama.cpp)
-                            if hasattr(engine, 'is_model_loaded'):
-                                try:
-                                    loaded = await engine.is_model_loaded(model_name)
-                                    if not loaded:
-                                        logger.info("Model %s not loaded — loading... [%s]", model_name, engine_name)
-                                        yield f"\x00[MODEL_LOADING:{_safe_model}|{engine_name}]\x00"
-                                except Exception as e:
-                                    logger.debug("Model loaded check failed for %s: %s", model_name, e)
+                            async for _tok in _yield_model_loading_check(engine, model_name, engine_name):
+                                yield _tok
 
                             import time as _time_mod
                             _stream_start_t = _time_mod.time()
+                            _has_any_thinking = False
                             try:
                                 # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)
                                 if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
@@ -1486,7 +1575,6 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     _in_content_think = False
                                     _first_chunk = True
                                     _first_content_after_think = None
-                                    _has_any_thinking = False
                                     _latex_buf = LatexStreamBuffer()
                                     async for chunk in chat_result:
                                         content, thinking = _parse_chunk(chunk)
@@ -1536,17 +1624,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     # Fallback for non-streaming engines
                                     yield "\x00[MODEL_READY]\x00"
                                     result = await chat_result if inspect.iscoroutine(chat_result) else chat_result
-                                    content = ""
-                                    if isinstance(result, dict):
-                                        if "message" in result and "content" in result["message"]:
-                                            content = result["message"]["content"]
-                                        elif "content" in result:
-                                            content = result["content"]
-                                        elif "response" in result:
-                                            content = result["response"]
-                                    elif isinstance(result, str):
-                                        content = result
-
+                                    content = _extract_nonstreaming_content(result)
                                     if content:
                                         full_response += content
                                         yield latex_to_unicode(content)
@@ -1586,59 +1664,16 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         logger.info("Re-prompt fallback: confirmation message")
 
                             if clean_response:
-                                # Atomize facts with LLM before saving
-                                if _mem_saves:
-                                    yield "\x00[SAVING]\x00"
-                                    _lang_short = _lang[:2] if _lang else "ca"
-                                    _atomized = []
-                                    for _raw_fact in _mem_saves:
-                                        _raw_fact = _raw_fact.strip()
-                                        if not _raw_fact:
-                                            continue
-                                        try:
-                                            _parts = await _atomize_fact_llm(_raw_fact, engine, model_name, sig, lang=_lang_short)
-                                            _atomized.extend(_parts)
-                                        except Exception:
-                                            _atomized.append(_raw_fact)
-                                    _mem_saves = _atomized
-
-                                # Save LLM-extracted facts to memory
+                                # Atomize + save LLM-extracted facts to memory
                                 _mem_saved_count = 0
-                                for fact in _mem_saves:
-                                    fact = fact.strip()
-                                    if not fact or len(fact) < 5:
-                                        continue
-                                    # Do not re-save recently deleted facts
-                                    _deleted = getattr(session, '_recently_deleted_facts', [])
-                                    if _deleted:
-                                        _skip = False
-                                        for _del_fact in _deleted:
-                                            if fact.lower() in _del_fact.lower() or _del_fact.lower() in fact.lower():
-                                                logger.debug("MEM_SAVE skip (recently deleted): '%s'", fact[:80])
-                                                _skip = True
-                                                break
-                                        if _skip:
-                                            continue
-                                    # Filter negative/junk facts
-                                    if _JUNK_PATTERNS_RE.search(fact):
-                                        logger.debug("MEM_SAVE skip (junk): '%s'", fact[:80])
-                                        continue
-                                    try:
-                                        result = await memory_helper.save_to_memory(
-                                            content=fact,
-                                            session_id=session.id,
-                                            metadata={"type": "user_fact", "source": "llm_extract", "is_mem_save": True}
-                                        )
-                                        # Count only if actually saved (not duplicate)
-                                        if result.get("document_id"):
-                                            _mem_saved_count += 1
-                                            logger.info("MEM_SAVE: '%s'", fact[:80])
-                                        else:
-                                            logger.debug("MEM_SAVE skip (dedup): '%s'", fact[:80])
-                                    except Exception as e:
-                                        logger.debug("MEM_SAVE failed: %s", e)
-                                if _mem_saved_count > 0:
-                                    yield f"\x00[MEM:{_mem_saved_count}]\x00"
+                                if _mem_saves:
+                                    _count_out: list = []
+                                    async for _tok in _yield_atomize_and_save_mem_saves(
+                                        _mem_saves, engine, model_name, sig, _lang,
+                                        memory_helper, session, _count_out,
+                                    ):
+                                        yield _tok
+                                    _mem_saved_count = _count_out[0] if _count_out else 0
 
                                 # Save message with stats for persistence
                                 _elapsed = round(_time_mod.time() - _stream_start_t, 1)
