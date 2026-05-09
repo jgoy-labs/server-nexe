@@ -916,6 +916,47 @@ class MemoryHelper:
 
         return score
 
+    async def _search_collection_results(
+        self, memory, query: str, collection: str, limit: int, session_id
+    ) -> list:
+        """Search one collection and return scored result dicts with temporal decay applied."""
+        out = []
+        try:
+            if not await memory.collection_exists(collection):
+                return out
+            results = await memory.search(query=query, collection=collection, top_k=limit * 2)
+            for r in results:
+                meta = r.metadata or {}
+                meta["source_collection"] = collection
+                if meta.get("type") == "document_chunk" and session_id:
+                    if meta.get("session_id") != session_id:
+                        continue
+                adjusted_score = self._apply_temporal_decay(r.score, meta)
+                out.append({
+                    "content": r.text or "",
+                    "score": adjusted_score,
+                    "original_score": r.score,
+                    "metadata": meta,
+                    "_id": r.id if hasattr(r, 'id') else None,
+                })
+        except Exception as e:
+            logger.warning(f"Error searching collection {collection}: {e}")
+        return out
+
+    @staticmethod
+    def _deduplicate_results(all_results: list, limit: int) -> list:
+        """Sort by score descending and deduplicate by first 200 chars of content."""
+        all_results.sort(key=lambda x: x["score"], reverse=True)
+        _seen_content: set = set()
+        deduped = []
+        for r in all_results:
+            # Use first 200 chars as dedup key (chunks from same doc are similar)
+            _key = r["content"][:200].strip()
+            if _key not in _seen_content:
+                _seen_content.add(_key)
+                deduped.append(r)
+        return deduped[:limit]
+
     async def recall_from_memory(
         self,
         query: str,
@@ -934,57 +975,15 @@ class MemoryHelper:
             memory = await self.get_memory_api()
             if not memory:
                 logger.warning("RAG recall: MemoryAPI not available (init failed or not ready)")
-                return {
-                    "success": False,
-                    "results": [],
-                    "message": "Memory API not available"
-                }
+                return {"success": False, "results": [], "message": "Memory API not available"}
 
             _all_collections = ["nexe_documentation", "personal_memory", "user_knowledge"]
             collections_to_search = [c for c in _all_collections if c in collections] if collections else _all_collections
             all_results = []
-
             for collection in collections_to_search:
-                try:
-                    if await memory.collection_exists(collection):
-                        results = await memory.search(
-                            query=query,
-                            collection=collection,
-                            top_k=limit * 2
-                        )
-                        for r in results:
-                            meta = r.metadata or {}
-                            meta["source_collection"] = collection
+                all_results.extend(await self._search_collection_results(memory, query, collection, limit, session_id))
 
-                            if meta.get("type") == "document_chunk" and session_id:
-                                if meta.get("session_id") != session_id:
-                                    continue
-
-                            adjusted_score = self._apply_temporal_decay(r.score, meta)
-
-                            all_results.append({
-                                "content": r.text or "",
-                                "score": adjusted_score,
-                                "original_score": r.score,
-                                "metadata": meta,
-                                "_id": r.id if hasattr(r, 'id') else None
-                            })
-
-                except Exception as e:
-                    logger.warning(f"Error searching collection {collection}: {e}")
-
-            all_results.sort(key=lambda x: x["score"], reverse=True)
-            # Deduplicate: keep highest-scoring result per unique content
-            _seen_content = set()
-            deduped = []
-            for r in all_results:
-                # Use first 200 chars as dedup key (chunks from same doc are similar)
-                _key = r["content"][:200].strip()
-                if _key not in _seen_content:
-                    _seen_content.add(_key)
-                    deduped.append(r)
-            final_results = deduped[:limit]
-
+            final_results = self._deduplicate_results(all_results, limit)
             return {
                 "success": True,
                 "results": final_results,
@@ -993,11 +992,7 @@ class MemoryHelper:
             }
         except Exception as e:
             logger.error(f"Memory recall error: {e}")
-            return {
-                "success": False,
-                "results": [],
-                "message": f"Error searching memory: {str(e)}"
-            }
+            return {"success": False, "results": [], "message": f"Error searching memory: {str(e)}"}
 
     async def get_memory_stats(self) -> Dict[str, Any]:
         """
