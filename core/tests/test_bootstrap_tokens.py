@@ -16,9 +16,9 @@ class TestBootstrapTokenManagerSingleton:
 
     def test_initialization(self, tmp_path):
         from core.bootstrap_tokens import BootstrapTokenManager
-        # Crear instància nova per test
+        # Create a new instance for the test
         manager = BootstrapTokenManager()
-        # Forçar reinicialització per al tmp_path del test
+        # Force re-initialization for the test's tmp_path
         manager._initialized = False
         manager.initialize_on_startup(tmp_path)
         assert manager._initialized is True
@@ -30,14 +30,14 @@ class TestBootstrapTokenManagerSingleton:
         manager = BootstrapTokenManager()
         manager._initialized = False
         manager.initialize_on_startup(tmp_path)
-        # Cridar de nou no ha de fallar
+        # Calling again must not fail
         manager.initialize_on_startup(tmp_path)
         assert manager._initialized is True
 
 
 class TestSessionTokens:
     def setup_method(self):
-        """Reinicialitzar manager per cada test"""
+        """Reinitialize manager for each test"""
         from core.bootstrap_tokens import BootstrapTokenManager
         import tempfile
         self.tmp = Path(tempfile.mkdtemp())
@@ -58,9 +58,9 @@ class TestSessionTokens:
         assert self.manager.validate_session_token("token_inexistent") is False
 
     def test_validate_expired_token(self):
-        """Token amb TTL de 0 o negatiu → expirat"""
+        """Token with TTL of 0 or negative → expired"""
         token = self.manager.create_session_token(ttl_seconds=-1)
-        # El token ha expirat immediatament
+        # The token has expired immediately
         assert self.manager.validate_session_token(token) is False
 
     def test_invalidate_token(self):
@@ -69,7 +69,7 @@ class TestSessionTokens:
         assert self.manager.validate_session_token(token) is False
 
     def test_invalidate_nonexistent_token_noop(self):
-        # No ha de llençar excepcions
+        # Must not raise exceptions
         self.manager.invalidate_token("token_que_no_existeix")
 
     def test_create_multiple_tokens(self):
@@ -109,11 +109,11 @@ class TestBootstrapMasterToken:
         assert result is False
 
     def test_validate_master_bootstrap_already_used(self):
-        """Token de bootstrap ja usat → refusar"""
+        """Bootstrap token already used → reject"""
         self.manager.set_bootstrap_token("secret-token", ttl_minutes=30)
         result1 = self.manager.validate_master_bootstrap("secret-token")
         assert result1 is True
-        # Segon intent → refusar
+        # Second attempt → reject
         result2 = self.manager.validate_master_bootstrap("secret-token")
         assert result2 is False
 
@@ -124,7 +124,7 @@ class TestBootstrapMasterToken:
     def test_set_bootstrap_token_resets_used_status(self):
         self.manager.set_bootstrap_token("token-v1", ttl_minutes=30)
         self.manager.validate_master_bootstrap("token-v1")  # usar
-        # Establir token nou → reset de l'estat "used"
+        # Set new token → reset "used" state
         self.manager.set_bootstrap_token("token-v2", ttl_minutes=30)
         info = self.manager.get_bootstrap_token()
         assert info["used"] is False
@@ -145,7 +145,7 @@ class TestBootstrapRateLimit:
 
     def test_ip_limit_exceeded(self):
         ip = "192.168.1.2"
-        # ip_limit=3 per defecte
+        # ip_limit=3 by default
         self.manager.check_bootstrap_rate_limit(ip)
         self.manager.check_bootstrap_rate_limit(ip)
         self.manager.check_bootstrap_rate_limit(ip)
@@ -153,7 +153,7 @@ class TestBootstrapRateLimit:
         assert result == "ip"
 
     def test_global_limit_exceeded(self):
-        # global_limit=10 per defecte
+        # global_limit=10 by default
         for i in range(10):
             self.manager.check_bootstrap_rate_limit(f"10.0.0.{i + 1}")
         result = self.manager.check_bootstrap_rate_limit("10.0.1.1")
@@ -161,7 +161,7 @@ class TestBootstrapRateLimit:
 
     def test_window_resets_after_expiry(self):
         ip = "192.168.1.3"
-        # Usar window_seconds molt petit per simular expiració
+        # Use a very small window_seconds to simulate expiry
         for _ in range(3):
             self.manager.check_bootstrap_rate_limit(ip, window_seconds=0)
         # Amb window=0, tots els intents expiren immediatament
@@ -173,7 +173,7 @@ class TestModuleLevelFunctions:
     def test_initialize_tokens_function(self, tmp_path):
         from core.bootstrap_tokens import initialize_tokens
         initialize_tokens(tmp_path)
-        # No ha de llençar excepcions
+        # Must not raise exceptions
 
     def test_set_get_bootstrap_token_functions(self, tmp_path):
         from core.bootstrap_tokens import (

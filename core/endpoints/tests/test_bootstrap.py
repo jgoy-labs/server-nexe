@@ -24,7 +24,7 @@ def client():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Tests de _t helper
+# Tests for the _t helper
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestTranslateHelper:
@@ -69,7 +69,7 @@ class TestTranslateHelper:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Tests de check_rate_limit
+# Tests for check_rate_limit
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestCheckRateLimit:
@@ -100,7 +100,7 @@ class TestCheckRateLimit:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Tests d'endpoints HTTP
+# Tests for HTTP endpoints
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestBootstrapInfo:

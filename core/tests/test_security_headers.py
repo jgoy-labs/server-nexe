@@ -66,11 +66,11 @@ class TestSecurityHeadersMiddleware:
         assert "microphone=()" in perm
 
     def test_http_request_no_hsts(self):
-        """HTTP normal no ha de tenir HSTS"""
+        """Normal HTTP must not have HSTS"""
         app = make_app()
         client = TestClient(app)
         resp = client.get("/test")
-        # TestClient usa HTTP per defecte → sense HSTS
+        # TestClient uses HTTP by default → no HSTS
         assert "Strict-Transport-Security" not in resp.headers
 
     def test_non_static_path_has_cache_control_no_store(self):
@@ -81,12 +81,12 @@ class TestSecurityHeadersMiddleware:
         assert "no-store" in cc
 
     def test_static_path_no_cache_control_no_store(self):
-        """Rutes /static/ no han de tenir Cache-Control: no-store"""
+        """/static/ routes must not have Cache-Control: no-store"""
         app = make_app()
         client = TestClient(app)
         resp = client.get("/static/style.css")
         cc = resp.headers.get("Cache-Control", "")
-        # Les rutes estàtiques no han de tenir no-store
+        # Static routes must not have no-store
         assert "no-store" not in cc
 
     def test_x_permitted_cross_domain_policies(self):

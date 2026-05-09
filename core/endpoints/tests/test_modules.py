@@ -39,7 +39,7 @@ def make_app(api_integrator=None, i18n=None):
 class TestConfigureDependencies:
     def test_configure_dependencies_noop(self):
         from core.endpoints.modules import configure_dependencies
-        # No ha de llençar excepcions
+        # Must not raise exceptions
         configure_dependencies(MagicMock(), MagicMock())
 
 

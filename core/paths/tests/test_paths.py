@@ -60,7 +60,7 @@ class TestIsValidCoreRoot:
         assert any("not a directory" in r for r in reasons)
 
     def test_missing_server_toml_returns_false(self, tmp_path):
-        # Crear estructura sense server.toml
+        # Create structure without server.toml
         (tmp_path / "plugins").mkdir()
         (tmp_path / "core").mkdir()
         valid, reasons = _is_valid_core_root(tmp_path)
@@ -68,15 +68,15 @@ class TestIsValidCoreRoot:
         assert any("server.toml" in r or "Required config" in r for r in reasons)
 
     def test_incomplete_structure_returns_false(self, tmp_path):
-        # server.toml present però menys de 2 dirs
+        # server.toml present but fewer than 2 dirs
         (tmp_path / "personality").mkdir()
         (tmp_path / "personality" / "server.toml").write_text("title = 'Nexe'")
-        (tmp_path / "plugins").mkdir()  # só 1 dir de 4
+        (tmp_path / "plugins").mkdir()  # only 1 dir out of 4
         valid, reasons = _is_valid_core_root(tmp_path)
         assert valid is False
 
     def test_valid_root(self, tmp_path):
-        # Crear estructura vàlida
+        # Create valid structure
         (tmp_path / "personality").mkdir()
         (tmp_path / "personality" / "server.toml").write_text("title = 'Nexe'")
         (tmp_path / "plugins").mkdir()
@@ -147,7 +147,7 @@ class TestGetRepoRoot:
         reset_repo_root_cache()
 
     def teardown_method(self):
-        # Neteja env vars temporals
+        # Clean up temporary env vars
         os.environ.pop("NEXE_HOME", None)
         reset_repo_root_cache()
 
@@ -162,8 +162,8 @@ class TestGetRepoRoot:
         assert (root / "personality" / "server.toml").exists()
 
     def test_nexe_home_env_var_used(self, tmp_path):
-        """NEXE_HOME hauria de tenir prioritat màxima."""
-        # Crear estructura vàlida al tmp_path
+        """NEXE_HOME should have maximum priority."""
+        # Create valid structure at tmp_path
         (tmp_path / "personality").mkdir()
         (tmp_path / "personality" / "server.toml").write_text("title = 'Test'")
         (tmp_path / "plugins").mkdir()
@@ -176,15 +176,15 @@ class TestGetRepoRoot:
         assert root == tmp_path.resolve()
 
     def test_nexe_home_invalid_raises(self, tmp_path):
-        """NEXE_HOME invàlid ha de llançar RuntimeError."""
+        """Invalid NEXE_HOME must raise RuntimeError."""
         os.environ["NEXE_HOME"] = str(tmp_path / "nonexistent")
         reset_repo_root_cache()
         with pytest.raises(RuntimeError, match="NEXE_HOME"):
             get_repo_root()
 
     def test_start_path_used(self, tmp_path):
-        """start_path hauria d'usar-se si és vàlid."""
-        # Crear estructura vàlida
+        """start_path should be used if valid."""
+        # Create valid structure
         (tmp_path / "personality").mkdir()
         (tmp_path / "personality" / "server.toml").write_text("title = 'Test'")
         (tmp_path / "plugins").mkdir()
@@ -195,7 +195,7 @@ class TestGetRepoRoot:
         assert root == tmp_path.resolve()
 
     def test_reset_cache_works(self):
-        """reset_repo_root_cache() ha de permetre re-detecció."""
+        """reset_repo_root_cache() must allow re-detection."""
         root1 = get_repo_root()
         reset_repo_root_cache()
         root2 = get_repo_root()

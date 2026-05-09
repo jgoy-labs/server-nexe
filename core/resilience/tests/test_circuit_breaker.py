@@ -23,11 +23,11 @@ from core.resilience.circuit_breaker import (
 )
 
 class TestCircuitBreakerBasic:
-  """Tests bàsics del Circuit Breaker"""
+  """Basic tests for the Circuit Breaker"""
 
   @pytest.fixture
   def breaker(self):
-    """Circuit breaker amb configuració de test (ràpid)"""
+    """Circuit breaker with test configuration (fast)"""
     return CircuitBreaker(
       "test",
       CircuitBreakerConfig(
@@ -41,13 +41,13 @@ class TestCircuitBreakerBasic:
     )
 
   def test_starts_closed(self, breaker):
-    """El circuit comença tancat"""
+    """The circuit starts closed"""
     assert breaker.state == CircuitState.CLOSED
     assert breaker.is_closed
     assert not breaker.is_open
 
   def test_initial_status(self, breaker):
-    """Estat inicial retorna valors correctes"""
+    """Initial state returns correct values"""
     status = breaker.get_status()
 
     assert status["name"] == "test"
@@ -59,16 +59,16 @@ class TestCircuitBreakerBasic:
 
   @pytest.mark.asyncio
   async def test_can_execute_when_closed(self, breaker):
-    """Permet execució quan està tancat"""
+    """Allows execution when closed"""
     can_execute = await breaker._can_execute()
     assert can_execute is True
 
 class TestCircuitBreakerTransitions:
-  """Tests de transicions d'estat"""
+  """Tests for state transitions"""
 
   @pytest.fixture
   def breaker(self):
-    """Circuit breaker amb configuració de test"""
+    """Circuit breaker with test configuration"""
     return CircuitBreaker(
       "test_transitions",
       CircuitBreakerConfig(
@@ -81,7 +81,7 @@ class TestCircuitBreakerTransitions:
 
   @pytest.mark.asyncio
   async def test_opens_after_failures(self, breaker):
-    """El circuit s'obre després de N fallades"""
+    """The circuit opens after N failures"""
     for i in range(3):
       await breaker._record_failure(Exception(f"failure {i}"))
 
@@ -90,7 +90,7 @@ class TestCircuitBreakerTransitions:
 
   @pytest.mark.asyncio
   async def test_stays_closed_under_threshold(self, breaker):
-    """El circuit es manté tancat si no arriba al threshold"""
+    """The circuit stays closed if the threshold is not reached"""
     await breaker._record_failure(Exception("failure 1"))
     await breaker._record_failure(Exception("failure 2"))
 
@@ -99,7 +99,7 @@ class TestCircuitBreakerTransitions:
 
   @pytest.mark.asyncio
   async def test_rejects_when_open(self, breaker):
-    """Rebutja peticions quan està obert"""
+    """Rejects requests when open"""
     for _ in range(3):
       await breaker._record_failure(Exception("test"))
 
@@ -110,7 +110,7 @@ class TestCircuitBreakerTransitions:
 
   @pytest.mark.asyncio
   async def test_half_open_after_timeout(self, breaker):
-    """Passa a half-open després del timeout"""
+    """Transitions to half-open after the timeout"""
     for _ in range(3):
       await breaker._record_failure(Exception("test"))
 
@@ -124,7 +124,7 @@ class TestCircuitBreakerTransitions:
 
   @pytest.mark.asyncio
   async def test_closes_after_successes_in_half_open(self, breaker):
-    """Es tanca després de N èxits en half-open"""
+    """Closes after N successes in half-open"""
     breaker._transition_to(CircuitState.HALF_OPEN)
     assert breaker.state == CircuitState.HALF_OPEN
 
@@ -136,7 +136,7 @@ class TestCircuitBreakerTransitions:
 
   @pytest.mark.asyncio
   async def test_reopens_on_failure_in_half_open(self, breaker):
-    """Es torna a obrir si falla en half-open"""
+    """Reopens if it fails in half-open"""
     breaker._transition_to(CircuitState.HALF_OPEN)
     assert breaker.state == CircuitState.HALF_OPEN
 
@@ -146,7 +146,7 @@ class TestCircuitBreakerTransitions:
     assert breaker.is_open
 
 class TestCircuitBreakerProtectDecorator:
-  """Tests del decorador protect"""
+  """Tests for the protect decorator"""
 
   @pytest.fixture
   def breaker(self):
@@ -165,7 +165,7 @@ class TestCircuitBreakerProtectDecorator:
 
   @pytest.mark.asyncio
   async def test_protect_success(self, breaker):
-    """Decorador permet èxits"""
+    """Decorator allows successes"""
     @breaker.protect
     async def successful_func():
       return "success"
@@ -179,7 +179,7 @@ class TestCircuitBreakerProtectDecorator:
 
   @pytest.mark.asyncio
   async def test_protect_raises_circuit_open_error(self, breaker):
-    """Decorador llença CircuitOpenError quan obert"""
+    """Decorator raises CircuitOpenError when open"""
     for _ in range(2):
       await breaker._record_failure(Exception("force open"))
 
@@ -195,7 +195,7 @@ class TestCircuitBreakerProtectDecorator:
 
   @pytest.mark.asyncio
   async def test_protect_propagates_exceptions(self, breaker):
-    """Decorador propaga excepcions originals"""
+    """Decorator propagates original exceptions"""
     @breaker.protect
     async def failing_func():
       raise ValueError("custom error")
@@ -206,41 +206,41 @@ class TestCircuitBreakerProtectDecorator:
     assert "custom error" in str(exc_info.value)
 
 class TestPreConfiguredBreakers:
-  """Tests dels circuit breakers pre-configurats"""
+  """Tests for pre-configured circuit breakers"""
 
   def test_ollama_breaker_exists(self):
-    """Ollama breaker està configurat"""
+    """Ollama breaker is configured"""
     assert ollama_breaker is not None
     assert ollama_breaker.name == "ollama"
     assert ollama_breaker.config.failure_threshold == 3
     assert ollama_breaker.config.timeout_seconds == 60
 
   def test_qdrant_breaker_exists(self):
-    """Qdrant breaker està configurat"""
+    """Qdrant breaker is configured"""
     assert qdrant_breaker is not None
     assert qdrant_breaker.name == "qdrant"
     assert qdrant_breaker.config.failure_threshold == 3
     assert qdrant_breaker.config.timeout_seconds == 30
 
   def test_http_breaker_exists(self):
-    """HTTP breaker està configurat"""
+    """HTTP breaker is configured"""
     assert http_breaker is not None
     assert http_breaker.name == "http_external"
     assert http_breaker.config.failure_threshold == 10
     assert http_breaker.config.timeout_seconds == 120
 
   def test_all_breakers_start_closed(self):
-    """Tots els breakers comencen tancats"""
+    """All breakers start closed"""
     assert ollama_breaker.is_closed
     assert qdrant_breaker.is_closed
     assert http_breaker.is_closed
 
 class TestCircuitBreakerConcurrency:
-  """Tests de concurrència del Circuit Breaker"""
+  """Concurrency tests for the Circuit Breaker"""
 
   @pytest.fixture
   def breaker(self):
-    """Circuit breaker per tests de concurrència"""
+    """Circuit breaker for concurrency tests"""
     return CircuitBreaker(
       "test_concurrency",
       CircuitBreakerConfig(
@@ -252,7 +252,7 @@ class TestCircuitBreakerConcurrency:
 
   @pytest.mark.asyncio
   async def test_concurrent_failures(self, breaker):
-    """Gestiona fallades concurrents correctament"""
+    """Handles concurrent failures correctly"""
     async def record_failure():
       await breaker._record_failure(Exception("concurrent"))
 
@@ -262,7 +262,7 @@ class TestCircuitBreakerConcurrency:
 
   @pytest.mark.asyncio
   async def test_concurrent_successes(self, breaker):
-    """Gestiona èxits concurrents correctament"""
+    """Handles concurrent successes correctly"""
     breaker._transition_to(CircuitState.HALF_OPEN)
 
     async def record_success():

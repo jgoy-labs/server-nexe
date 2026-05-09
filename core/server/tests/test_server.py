@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: core/server/tests/test_server.py
-Description: Tests bàsics per servidor Nexe. Valida endpoints root/health/info, CORS config, rate limiting i injeccions d'i18n/limiter/config.
+Description: Basic tests for the Nexe server. Validates root/health/info endpoints, CORS config, rate limiting and i18n/limiter/config injections.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -55,7 +55,7 @@ def test_api_info_endpoint(client):
 
 def test_modules_endpoint(client, auth_headers, monkeypatch):
   """Test modules listing endpoint (Bug 22: requires X-API-Key)."""
-  # Sincronitza la primary key amb la del fixture (load_api_keys es llegeix dinamicament)
+  # Sync the primary key with the fixture's key (load_api_keys is read dynamically)
   monkeypatch.setenv("NEXE_PRIMARY_API_KEY", auth_headers["X-API-Key"])
   monkeypatch.delenv("NEXE_PRIMARY_KEY_EXPIRES", raising=False)
   response = client.get("/modules", headers=auth_headers)
@@ -101,14 +101,14 @@ def test_config_injection(client):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Tests de _maybe_launch_tray — llançament del bundle NexeTray.app
+# Tests for _maybe_launch_tray — NexeTray.app bundle launch
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestMaybeLaunchTray:
-    """Cobreix guards i branques de llançament de _maybe_launch_tray."""
+    """Covers guards and launch branches of _maybe_launch_tray."""
 
     def test_guard_tray_already_running(self):
-        """Si NEXE_TRAY_PID és present → no llança res."""
+        """If NEXE_TRAY_PID is present → launches nothing."""
         from core.server.runner import _maybe_launch_tray
         with patch.dict("os.environ", {"NEXE_TRAY_PID": "12345"}):
             with patch("core.server.runner.subprocess") as mock_sub:
@@ -116,7 +116,7 @@ class TestMaybeLaunchTray:
                 mock_sub.Popen.assert_not_called()
 
     def test_guard_non_macos(self):
-        """Si no és macOS → no llança res."""
+        """If not macOS → launches nothing."""
         from core.server.runner import _maybe_launch_tray
         import os
         env = {k: v for k, v in os.environ.items()
@@ -129,7 +129,7 @@ class TestMaybeLaunchTray:
                     mock_sub.Popen.assert_not_called()
 
     def test_guard_no_tray_env(self):
-        """Si NEXE_NO_TRAY és present → no llança res."""
+        """If NEXE_NO_TRAY is present → launches nothing."""
         from core.server.runner import _maybe_launch_tray
         with patch.dict("os.environ", {"NEXE_NO_TRAY": "1"}):
             with patch("core.server.runner.subprocess") as mock_sub:
@@ -137,7 +137,7 @@ class TestMaybeLaunchTray:
                 mock_sub.Popen.assert_not_called()
 
     def test_guard_docker(self):
-        """Si NEXE_DOCKER és present → no llança res."""
+        """If NEXE_DOCKER is present → launches nothing."""
         from core.server.runner import _maybe_launch_tray
         with patch.dict("os.environ", {"NEXE_DOCKER": "1"}):
             with patch("core.server.runner.subprocess") as mock_sub:
@@ -145,7 +145,7 @@ class TestMaybeLaunchTray:
                 mock_sub.Popen.assert_not_called()
 
     def test_launch_fallback_when_no_bundle(self, tmp_path):
-        """Si NexeTray.app no existeix → fallback python -m installer.tray."""
+        """If NexeTray.app does not exist → fallback to python -m installer.tray."""
         from core.server.runner import _maybe_launch_tray
         import os
         env = {k: v for k, v in os.environ.items()
@@ -160,17 +160,17 @@ class TestMaybeLaunchTray:
             mock_sub.run.return_value = MagicMock(returncode=1, stdout="")
             mock_sub.Popen = mock_popen
             mock_sub.DEVNULL = -1
-            # tmp_path no té NexeTray.app → activa el fallback
+            # tmp_path has no NexeTray.app → activates the fallback
             _maybe_launch_tray(_project_root=tmp_path)
             assert mock_popen.called
             cmd = mock_popen.call_args[0][0]
             assert "installer.tray" in " ".join(str(c) for c in cmd)
 
     def test_launch_via_bundle_when_exists(self, tmp_path):
-        """Si NexeTray.app existeix → llança el bundle (Gatekeeper-safe)."""
+        """If NexeTray.app exists → launches the bundle (Gatekeeper-safe)."""
         from core.server.runner import _maybe_launch_tray
         import os
-        # Crea binari fals del bundle
+        # Create a fake bundle binary
         binary = tmp_path / "installer" / "NexeTray.app" / "Contents" / "MacOS" / "NexeTray"
         binary.parent.mkdir(parents=True)
         binary.touch()
@@ -186,7 +186,7 @@ class TestMaybeLaunchTray:
             mock_sub.run.return_value = MagicMock(returncode=1, stdout="")
             mock_sub.Popen = mock_popen
             mock_sub.DEVNULL = -1
-            # tmp_path té NexeTray.app → activa el bundle path
+            # tmp_path has NexeTray.app → activates the bundle path
             _maybe_launch_tray(_project_root=tmp_path)
             assert mock_popen.called
             cmd = mock_popen.call_args[0][0]

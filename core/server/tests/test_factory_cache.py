@@ -249,7 +249,7 @@ def test_create_app_benchmark_cold_vs_warm(monkeypatch):
   assert speedup > 10, f"Cache should be >10x faster, got {speedup:.1f}x"
 
 def test_create_app_multiple_sequential_calls(monkeypatch):
-  """Test que múltiples crides sequencials retornen cache"""
+  """Test that multiple sequential calls return the cache"""
   apps = [create_app() for _ in range(5)]
 
   for i, app in enumerate(apps[1:], start=1):

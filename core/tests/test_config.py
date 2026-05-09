@@ -216,7 +216,7 @@ class TestConfigSingleton:
     def test_get_config_reload(self):
         config1 = get_config()
         config2 = get_config(reload=True)
-        # Pot ser el mateix contingut però és una nova càrrega
+        # May have the same content but it is a new load
         assert isinstance(config2, dict)
 
     def test_get_config_path(self):
@@ -227,7 +227,7 @@ class TestConfigSingleton:
     def test_reset_config(self):
         get_config()
         reset_config()
-        # Ara l'singleton és None de nou
-        # La propera crida el reinicialitzarà
+        # Now the singleton is None again
+        # The next call will reinitialize it
         config = get_config()
         assert isinstance(config, dict)
