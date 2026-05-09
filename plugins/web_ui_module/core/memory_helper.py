@@ -258,6 +258,46 @@ class MemoryHelper:
                 return True
         return False
 
+    @staticmethod
+    def _retry_still_cooling() -> bool:
+        """F3: Returns True if the failure cooldown has NOT elapsed yet (caller should return None)."""
+        elapsed = time.monotonic() - _memory_api_last_failure_ts if _memory_api_last_failure_ts else None
+        return elapsed is not None and elapsed < _MEMORY_API_RETRY_INTERVAL_S
+
+    @staticmethod
+    def _reset_failure_and_log() -> None:
+        """Reset failure flags before a retry attempt and log the retry."""
+        global _memory_api_init_failed, _memory_api_last_failure_ts
+        elapsed = time.monotonic() - _memory_api_last_failure_ts if _memory_api_last_failure_ts else None
+        logger.warning(
+            "MemoryAPI: retrying initialization after %.0fs (previous failure %.0fs ago)",
+            _MEMORY_API_RETRY_INTERVAL_S,
+            elapsed if elapsed is not None else 0,
+        )
+        _memory_api_init_failed = False
+        _memory_api_last_failure_ts = None
+
+    @staticmethod
+    async def _create_memory_api():
+        """Create (or reuse) MemoryAPI and ensure required collections exist.
+
+        Bug #19a — creates missing collections only; never deletes/recreates existing ones.
+        """
+        try:
+            from memory.memory.api.v1 import get_memory_api as _get_v1_api
+            api = await _get_v1_api()
+            logger.info("MemoryAPI singleton reused from v1.py")
+        except Exception as _v1_err:
+            logger.warning("Could not reuse v1 singleton (%s), creating new MemoryAPI", _v1_err)
+            from memory.memory.api import MemoryAPI
+            api = MemoryAPI()
+            await api.initialize()
+        for coll_name in ("personal_memory", "user_knowledge"):
+            if not await api.collection_exists(coll_name):
+                await api.create_collection(coll_name, vector_size=DEFAULT_VECTOR_SIZE)
+                logger.info("Created memory collection %s", coll_name)
+        return api
+
     async def get_memory_api(self):
         """Get or initialize Memory API instance (module-level singleton, thread-safe)."""
         global _memory_api_instance, _memory_api_init_failed, _memory_api_last_failure_ts
@@ -269,8 +309,7 @@ class MemoryHelper:
             # elapsed=None means no timestamp recorded (should not happen in production
             # since L317 always sets it, but treat as "eligible for retry" to avoid
             # permanent silence when the flag is set without a timestamp).
-            elapsed = time.monotonic() - _memory_api_last_failure_ts if _memory_api_last_failure_ts else None
-            if elapsed is not None and elapsed < _MEMORY_API_RETRY_INTERVAL_S:
+            if self._retry_still_cooling():
                 return None
         async with _memory_init_lock:
             # Double-check after acquiring lock (handles concurrent callers and the
@@ -282,42 +321,11 @@ class MemoryHelper:
                 return _memory_api_instance
             if _memory_api_init_failed:
                 # Still failed after acquiring lock — we are the retry caller.
-                elapsed = time.monotonic() - _memory_api_last_failure_ts if _memory_api_last_failure_ts else None
-                if elapsed is not None and elapsed < _MEMORY_API_RETRY_INTERVAL_S:
+                if self._retry_still_cooling():
                     return None
-                logger.warning(
-                    "MemoryAPI: retrying initialization after %.0fs (previous failure %.0fs ago)",
-                    _MEMORY_API_RETRY_INTERVAL_S,
-                    elapsed if elapsed is not None else 0,
-                )
-                _memory_api_init_failed = False
-                _memory_api_last_failure_ts = None
+                self._reset_failure_and_log()
             try:
-                # Reuse the v1.py singleton if it already exists (avoids duplicating fastembed TextEmbedding)
-                try:
-                    from memory.memory.api.v1 import get_memory_api as _get_v1_api
-                    api = await _get_v1_api()
-                    logger.info("MemoryAPI singleton reused from v1.py")
-                except Exception as _v1_err:
-                    logger.warning("Could not reuse v1 singleton (%s), creating new MemoryAPI", _v1_err)
-                    from memory.memory.api import MemoryAPI
-                    api = MemoryAPI()
-                    await api.initialize()
-
-                # Bug #19a — create missing collections only. Never delete or
-                # recreate an existing collection at startup: DEFAULT_VECTOR_SIZE
-                # is the single source of truth (768) and nothing in the normal
-                # runtime path should produce a different size. A transient
-                # qdrant_client anomaly or disk corruption returning a wrong
-                # dim used to silently wipe user memory here — that is worse
-                # than the rare mismatch. If a real mismatch ever appears,
-                # Qdrant will raise at the next upsert with a clear error
-                # surface, which is recoverable without data loss.
-                for coll_name in ("personal_memory", "user_knowledge"):
-                    if not await api.collection_exists(coll_name):
-                        await api.create_collection(coll_name, vector_size=DEFAULT_VECTOR_SIZE)
-                        logger.info("Created memory collection %s", coll_name)
-
+                api = await self._create_memory_api()
                 _memory_api_instance = api
                 logger.info("MemoryAPI singleton initialized and cached")
             except Exception as e:
