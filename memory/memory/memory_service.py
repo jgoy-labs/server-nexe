@@ -84,6 +84,71 @@ class MemoryService:
 
     # ── Write path ──
 
+    def _remember_gate(self, text: str, source: str, is_mem_save: bool, force: bool):
+        """Run the gate check. Returns GateResult (always passed if force=True)."""
+        if force:
+            from .pipeline.gate import GateResult
+            return GateResult(passed=True, reason="forced", score=1.0)
+        is_user = source in ("user_message", "cli", "web_ui")
+        return self._gate.evaluate(text, is_user_message=is_user, is_mem_save=is_mem_save)
+
+    def _remember_extract_facts(self, text: str, entity: str, importance_hint: Optional[float]) -> list:
+        """Extract facts from text, falling back to a generic fact if none found."""
+        facts = self._extractor.extract(text)
+        if not facts:
+            facts = [ExtractedFact(
+                content=text,
+                entity=entity,
+                importance=importance_hint or 0.5,
+                source="heuristic",
+            )]
+        return facts
+
+    def _remember_get_existing_value(self, user_id: str, fact: "ExtractedFact") -> Optional[str]:
+        """Return the current profile value for fact.attribute, or None."""
+        if not fact.attribute:
+            return None
+        canonical, _ = self._schema_enforcer.resolve(fact.attribute)
+        if not canonical:
+            return None
+        profiles = self._store.get_profile(user_id, canonical)
+        if not profiles:
+            return None
+        existing = json.loads(profiles[0]["value_json"])
+        if isinstance(existing, list):
+            existing = ", ".join(str(v) for v in existing)
+        return existing
+
+    def _remember_store_fact(self, user_id: str, fact: "ExtractedFact", result, entity: str, source: str, trust_level: str, namespace: str) -> Optional[str]:
+        """Write fact to profile or episodic based on validator decision. Returns target_store name."""
+        if result.decision == ValidatorDecision.UPSERT_PROFILE:
+            if fact.attribute:
+                canonical, _ = self._schema_enforcer.resolve(fact.attribute)
+                if canonical and fact.value:
+                    is_critical = self._schema_enforcer.is_critical(canonical)
+                    self._store.upsert_profile(
+                        user_id=user_id,
+                        attribute=canonical,
+                        value=fact.value,
+                        entity=entity,
+                        source=source,
+                        trust_level=trust_level,
+                        is_critical=is_critical,
+                    )
+            return "profile"
+        if result.decision == ValidatorDecision.PROMOTE_EPISODIC:
+            self._store.insert_episodic(
+                user_id=user_id,
+                content=fact.content,
+                memory_type="fact",
+                importance=fact.importance,
+                source=source,
+                trust_level=trust_level,
+                namespace=namespace,
+            )
+            return "episodic"
+        return None
+
     async def remember(
         self,
         user_id: str,
@@ -104,37 +169,12 @@ class MemoryService:
         """
         text = unicodedata.normalize("NFKC", text)
 
-        # Gate (skip if force=True)
-        if not force:
-            is_user = source in ("user_message", "cli", "web_ui")
-            gate_result = self._gate.evaluate(
-                text,
-                is_user_message=is_user,
-                is_mem_save=is_mem_save,
-            )
-        else:
-            from .pipeline.gate import GateResult
-            gate_result = GateResult(passed=True, reason="forced", score=1.0)
+        gate_result = self._remember_gate(text, source, is_mem_save, force)
         if not gate_result.passed:
-            logger.debug(
-                "Gate rejected: %s (reason=%s)", text[:50], gate_result.reason
-            )
+            logger.debug("Gate rejected: %s (reason=%s)", text[:50], gate_result.reason)
             return None
 
-        # Extract facts
-        facts = self._extractor.extract(text)
-        if not facts:
-            # No structured facts, but gate passed — store as generic
-            facts = [
-                ExtractedFact(
-                    content=text,
-                    entity=entity,
-                    importance=importance_hint or 0.5,
-                    source="heuristic",
-                )
-            ]
-
-        # Validate and store each fact
+        facts = self._remember_extract_facts(text, entity, importance_hint)
         tl = TrustLevel(trust_level)
         entry_id = None
 
@@ -142,52 +182,14 @@ class MemoryService:
             if importance_hint is not None:
                 fact.importance = importance_hint
 
-            # Check existing value for novelty/contradiction
-            existing_value = None
-            if fact.attribute:
-                canonical, _ = self._schema_enforcer.resolve(fact.attribute)
-                if canonical:
-                    profiles = self._store.get_profile(user_id, canonical)
-                    if profiles:
-                        existing_value = json.loads(profiles[0]["value_json"])
-                        if isinstance(existing_value, list):
-                            existing_value = ", ".join(str(v) for v in existing_value)
-
+            existing_value = self._remember_get_existing_value(user_id, fact)
             result = self._validator.validate(fact, tl, existing_value)
 
             if result.decision == ValidatorDecision.REJECT:
                 logger.debug("Validator rejected: %s", fact.content[:50])
                 continue
 
-            # Determine target store
-            target_store = None
-            if result.decision == ValidatorDecision.UPSERT_PROFILE:
-                target_store = "profile"
-                # Direct profile upsert for trusted + correction
-                if fact.attribute:
-                    canonical, _ = self._schema_enforcer.resolve(fact.attribute)
-                    if canonical and fact.value:
-                        is_critical = self._schema_enforcer.is_critical(canonical)
-                        self._store.upsert_profile(
-                            user_id=user_id,
-                            attribute=canonical,
-                            value=fact.value,
-                            entity=entity,
-                            source=source,
-                            trust_level=trust_level,
-                            is_critical=is_critical,
-                        )
-            elif result.decision == ValidatorDecision.PROMOTE_EPISODIC:
-                target_store = "episodic"
-                self._store.insert_episodic(
-                    user_id=user_id,
-                    content=fact.content,
-                    memory_type="fact",
-                    importance=fact.importance,
-                    source=source,
-                    trust_level=trust_level,
-                    namespace=namespace,
-                )
+            target_store = self._remember_store_fact(user_id, fact, result, entity, source, trust_level, namespace)
 
             # Always create staging entry for traceability
             entry_id = self._store.insert_staging(
