@@ -356,7 +356,7 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
     # (--deep no recorre Resources/python/ correctament i deixen signatura adhoc)
     if [ -d "$RESOURCES/python" ]; then
         info "Signing embedded Python binaries..."
-        find "$RESOURCES/python" \( -name '*.dylib' -o -name '*.so' -o -perm +111 \) -type f | while read f; do
+        find "$RESOURCES/python" \( -name '*.dylib' -o -name '*.so' -o -perm +111 \) -type f | while read -r f; do
             if file "$f" | grep -q "Mach-O"; then
                 codesign --force --sign "$IDENTITY" --options runtime --timestamp "$f" 2>/dev/null || true
                 info "  Signed: $(basename "$f")"
@@ -391,7 +391,7 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
     # abans del bundle pare perquè el seal final ja trobi les firmes correctes.
     if [ -d "$APP_BUNDLE/Contents/Frameworks" ]; then
         info "Signing InstallNexe.app Frameworks..."
-        find "$APP_BUNDLE/Contents/Frameworks" -type f \( -name '*.dylib' -o -perm +111 \) | while read f; do
+        find "$APP_BUNDLE/Contents/Frameworks" -type f \( -name '*.dylib' -o -perm +111 \) | while read -r f; do
             if file "$f" | grep -q "Mach-O"; then
                 codesign --force --sign "$IDENTITY" --options runtime --timestamp "$f" 2>/dev/null || true
             fi

@@ -36,7 +36,7 @@ echo -e "   ${CYAN}•${NC} Documents a knowledge/ (si n'hi ha)"
 echo -e "   ${CYAN}•${NC} Configuració personality/server.toml"
 echo -e "   ${CYAN}•${NC} Scripts d'instal·lació"
 echo ""
-read -p "$(echo -e ${BOLD}Vols continuar? [y/N]:${NC} )" -n 1 -r
+read -p "$(echo -e "${BOLD}Vols continuar? [y/N]:${NC} ")" -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[YySs]$ ]]
 then

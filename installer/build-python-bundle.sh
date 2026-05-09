@@ -71,7 +71,7 @@ TRIM_DIRS=(
 )
 for d in "${TRIM_DIRS[@]}"; do
     if [ -d "$STDLIB/$d" ]; then
-        rm -rf "$STDLIB/$d"
+        rm -rf "${STDLIB:?}/$d"
         echo "    Removed $d"
     fi
 done
