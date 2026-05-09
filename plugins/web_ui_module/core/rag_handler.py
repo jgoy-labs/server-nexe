@@ -60,7 +60,7 @@ async def generate_rag_metadata(body_content: str, filename: str) -> dict:
 
 
 def _fallback_metadata(body_content: str, stem: str, lang: str) -> dict:
-    """Extracció simple de metadades sense LLM."""
+    """Simple metadata extraction without LLM."""
     return {
         "abstract": " ".join(body_content.split())[:300],
         "tags": [stem],
@@ -71,7 +71,7 @@ def _fallback_metadata(body_content: str, stem: str, lang: str) -> dict:
 
 
 def _parse_llm_metadata_response(response_text: str, stem: str) -> tuple[str, list[str]]:
-    """Extreu abstract i tags del text de resposta del LLM."""
+    """Extract abstract and tags from the LLM response text."""
     text = _re.sub(r"<think>[\s\S]*?</think>\s*", "", response_text).strip()
     abstract = ""
     tags = [stem]
@@ -86,7 +86,7 @@ def _parse_llm_metadata_response(response_text: str, stem: str) -> tuple[str, li
 
 
 def _get_engine_instance(reg: Any) -> Any:
-    """Retorna la instància de l'engine del registre, o None si no disponible."""
+    """Return the engine instance from the registry, or None if not available."""
     if not reg or not reg.instance:
         return None
     if not hasattr(reg.instance, 'get_module_instance'):
@@ -95,7 +95,7 @@ def _get_engine_instance(reg: Any) -> Any:
 
 
 async def _collect_stream_response(chat_result: Any) -> str:
-    """Col·lecta el text d'un async generator chunk a chunk."""
+    """Collect text from an async generator chunk by chunk."""
     text = ""
     async for chunk in chat_result:
         if isinstance(chunk, dict):
@@ -108,7 +108,7 @@ async def _collect_stream_response(chat_result: Any) -> str:
 async def _call_llm_for_metadata(
     engine: Any, model_name: str, system_prompt: str, user_prompt: str
 ) -> str:
-    """Crida engine.chat i retorna el text de resposta com a string."""
+    """Call engine.chat and return the response text as a string."""
     sig = inspect.signature(engine.chat)
     if 'model' in sig.parameters:
         chat_result = engine.chat(
@@ -144,7 +144,7 @@ async def _try_engines(
     stem: str,
     lang: str,
 ) -> dict | None:
-    """Prova els engines en ordre i retorna el dict de metadades si obté un abstract."""
+    """Try engines in order and return the metadata dict if an abstract is obtained."""
     for engine_name in ["mlx_module", "ollama_module", "llama_cpp_module"]:
         engine = _get_engine_instance(module_manager.registry.get_module(engine_name))
         if not engine or not hasattr(engine, 'chat'):

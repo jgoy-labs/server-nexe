@@ -466,7 +466,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                 async with httpx.AsyncClient(timeout=3.0) as client:
                     resp = await client.get(f"{resolve_base_url()}/api/tags")
                     if resp.status_code != 200:
-                        # Ollama no accessible — no podem verificar, accepta
+                        # Ollama not reachable — cannot verify, accept optimistically
                         logger.warning(
                             "Bug 26 mitigant: Ollama returned %d en verificar "
                             "model %r; acceptant optimisticament",
