@@ -166,6 +166,50 @@ class CodeChunker(BaseChunker):
 
     return "unknown"
 
+  def _chunk_python_parse_imports(self, lines: list) -> tuple:
+    """Return (imports, code_start) by scanning leading import lines."""
+    imports: List[str] = []
+    code_start = 0
+    for i, line in enumerate(lines):
+      stripped = line.strip()
+      if stripped.startswith(("import ", "from ")):
+        imports.append(line)
+        code_start = i + 1
+      elif stripped and not stripped.startswith("#"):
+        break
+    return imports, code_start
+
+  def _chunk_python_collect_decorators(self, lines: list, i: int) -> tuple:
+    """Collect decorator lines starting at i. Returns (decorators, new_i, line, stripped)."""
+    decorators: List[str] = []
+    line = lines[i]
+    stripped = line.strip()
+    while stripped.startswith("@"):
+      decorators.append(line)
+      i += 1
+      if i >= len(lines):
+        break
+      line = lines[i]
+      stripped = line.strip()
+    return decorators, i, line, stripped
+
+  def _chunk_python_collect_body(self, lines: list, i: int, decorators: list, line: str) -> tuple:
+    """Collect body lines of a definition. Returns (definition_lines, j)."""
+    definition_lines = decorators + [line]
+    j = i + 1
+    while j < len(lines):
+      next_line = lines[j]
+      next_stripped = next_line.strip()
+      if not next_stripped:
+        definition_lines.append(next_line)
+        j += 1
+        continue
+      if not next_line.startswith((" ", "\t")):
+        break
+      definition_lines.append(next_line)
+      j += 1
+    return definition_lines, j
+
   def _chunk_python(self, text: str) -> List[Tuple[str, Dict[str, Any]]]:
     """
     Chunk Python code by functions and classes.
@@ -176,17 +220,7 @@ class CodeChunker(BaseChunker):
     - Imports (optional in the first chunk)
     """
     lines = text.split("\n")
-
-    imports: List[str] = []
-    code_start = 0
-
-    for i, line in enumerate(lines):
-      stripped = line.strip()
-      if stripped.startswith(("import ", "from ")):
-        imports.append(line)
-        code_start = i + 1
-      elif stripped and not stripped.startswith("#"):
-        break
+    imports, code_start = self._chunk_python_parse_imports(lines)
 
     definitions: List[Tuple[str, Dict[str, Any]]] = []
     i = code_start
@@ -199,38 +233,14 @@ class CodeChunker(BaseChunker):
         i += 1
         continue
 
-      decorators: List[str] = []
-      while stripped.startswith("@"):
-        decorators.append(line)
-        i += 1
-        if i >= len(lines):
-          break
-        line = lines[i]
-        stripped = line.strip()
+      decorators, i, line, stripped = self._chunk_python_collect_decorators(lines, i)
 
       if not line.startswith((" ", "\t")):
         match_func = self.PYTHON_FUNCTION.match(stripped)
         match_class = self.PYTHON_CLASS.match(stripped)
 
         if match_func or match_class:
-          definition_lines = decorators + [line]
-          j = i + 1
-
-          while j < len(lines):
-            next_line = lines[j]
-            next_stripped = next_line.strip()
-
-            if not next_stripped:
-              definition_lines.append(next_line)
-              j += 1
-              continue
-
-            if not next_line.startswith((" ", "\t")):
-              break
-
-            definition_lines.append(next_line)
-            j += 1
-
+          definition_lines, j = self._chunk_python_collect_body(lines, i, decorators, line)
           chunk_text = "\n".join(definition_lines).rstrip()
 
           if match_func:
