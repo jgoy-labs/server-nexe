@@ -235,6 +235,58 @@ async def store_documents_batch(
   return doc_ids
 
 
+def _qdrant_query(qdrant, collection, query_embedding, top_k, threshold, include_expired, filter_metadata):
+  """Execute the qdrant search (legacy .search or modern .query_points) and return raw points."""
+  from memory.memory.engines.qdrant_types import FieldCondition, Filter, MatchValue
+  conditions = []
+  if filter_metadata:
+    for key, value in filter_metadata.items():
+      conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
+  qdrant_filter = Filter(must=conditions) if conditions else None
+  limit = top_k * 2 if not include_expired else top_k
+  score_threshold = threshold if threshold > 0 else None
+  if hasattr(qdrant, "search"):
+    return qdrant.search(
+      collection_name=collection,
+      query_vector=query_embedding,
+      limit=limit,
+      score_threshold=score_threshold,
+      query_filter=qdrant_filter,
+    )
+  res = qdrant.query_points(
+    collection_name=collection,
+    query=query_embedding,
+    limit=limit,
+    score_threshold=score_threshold,
+    query_filter=qdrant_filter,
+  )
+  return res.points
+
+
+def _filter_search_results(results, collection, top_k, include_expired, now_iso):
+  """Convert raw qdrant points to SearchResult list, filtering expired entries."""
+  search_results = []
+  for r in results:
+    expires_at = r.payload.get("expires_at")
+    if not include_expired and expires_at and expires_at < now_iso:
+      continue
+    doc_id = r.payload.get("original_id", str(r.id))
+    search_results.append(
+      SearchResult(
+        id=doc_id,
+        score=r.score,
+        collection=collection,
+        text=r.payload.get("text"),  # May be None if text_store is used
+        metadata={
+          k: v for k, v in r.payload.items() if k not in ("text", "original_id")
+        },
+      )
+    )
+    if len(search_results) >= top_k:
+      break
+  return search_results
+
+
 async def search_documents(
   qdrant: Any,
   executor: ThreadPoolExecutor,
@@ -269,57 +321,8 @@ async def search_documents(
   now_iso = datetime.now(timezone.utc).isoformat()
 
   def _search():
-    from memory.memory.engines.qdrant_types import FieldCondition, Filter, MatchValue
-    conditions = []
-    if filter_metadata:
-      for key, value in filter_metadata.items():
-        conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
-
-    qdrant_filter = Filter(must=conditions) if conditions else None
-
-    if hasattr(qdrant, "search"):
-      results = qdrant.search(
-        collection_name=collection,
-        query_vector=query_embedding,
-        limit=top_k * 2 if not include_expired else top_k,
-        score_threshold=threshold if threshold > 0 else None,
-        query_filter=qdrant_filter,
-      )
-    else:
-      # Fallback for modern qdrant-client versions
-      res = qdrant.query_points(
-        collection_name=collection,
-        query=query_embedding,
-        limit=top_k * 2 if not include_expired else top_k,
-        score_threshold=threshold if threshold > 0 else None,
-        query_filter=qdrant_filter,
-      )
-      results = res.points
-
-    search_results = []
-    for r in results:
-      expires_at = r.payload.get("expires_at")
-      if not include_expired and expires_at:
-        if expires_at < now_iso:
-          continue
-
-      doc_id = r.payload.get("original_id", str(r.id))
-      search_results.append(
-        SearchResult(
-          id=doc_id,
-          score=r.score,
-          collection=collection,
-          text=r.payload.get("text"),  # May be None if text_store is used
-          metadata={
-            k: v for k, v in r.payload.items() if k not in ("text", "original_id")
-          },
-        )
-      )
-
-      if len(search_results) >= top_k:
-        break
-
-    return search_results
+    raw = _qdrant_query(qdrant, collection, query_embedding, top_k, threshold, include_expired, filter_metadata)
+    return _filter_search_results(raw, collection, top_k, include_expired, now_iso)
 
   result = await loop.run_in_executor(executor, _search)
 
