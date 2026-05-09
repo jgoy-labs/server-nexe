@@ -293,7 +293,7 @@ async def _handle_slash_command(
     cmd: str, cmd_arg: str, client: Any,
     session_id: str, stream_kwargs: dict
 ) -> bool:
-    """Retorna True si s'ha processat (cal fer continue al bucle)."""
+    """Returns True if processed (caller must continue the loop)."""
     _session_cmds = {"upload": _cmd_upload, "save": _cmd_save}
     if cmd in _session_cmds and cmd_arg:
         await _session_cmds[cmd](cmd_arg, client, session_id, stream_kwargs)
@@ -314,7 +314,7 @@ async def _handle_slash_command(
 
 
 def _process_metadata_chunk(chunk: dict, state: dict) -> None:
-    """Actualitza l'estat mutable amb MODEL, RAG, RAG_AVG, etc."""
+    """Updates the mutable state with MODEL, RAG, RAG_AVG, etc."""
     if "MODEL" in chunk:
         state["model_name"] = chunk["MODEL"]
     if "RAG" in chunk:

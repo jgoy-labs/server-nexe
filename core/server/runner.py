@@ -101,8 +101,8 @@ def _acquire_pidfile(pid_path: Path, port: int) -> bool:
       try:
         raw = pid_path.read_text()
         if not raw.strip():
-          # Buit: un altre procés acaba de crear-lo amb O_EXCL i encara escriu.
-          # Tractem com a locked — NO eliminem.
+          # Empty: another process just created it with O_EXCL and is still writing.
+          # Treat as locked — do NOT delete.
           logger.debug("PID file exists but empty — another process is acquiring it.")
           return False
         data = _json.loads(raw)
@@ -327,11 +327,11 @@ def _handle_port_conflict(host: str, port: int, headless: bool, sidecar: bool, i
 
 
 def _handle_sigterm(signum, frame):  # noqa: ARG001
-  """SIGTERM handler (N05). Garanteix sortida neta pre-uvicorn.
+  """SIGTERM handler (N05). Guarantees clean exit before uvicorn takes over.
 
-  Un cop uvicorn arrenca, ell mateix gestiona SIGTERM i dispara el
-  lifespan finally (que neteja el PID file). Aquest handler cobreix la
-  finestra entre el registre del senyal i el moment que uvicorn pren el control.
+  Once uvicorn starts, it handles SIGTERM itself and triggers the
+  lifespan finally block (which cleans up the PID file). This handler covers
+  the window between signal registration and when uvicorn takes control.
   """
   logger.info("SIGTERM received — exiting cleanly")
   sys.exit(0)
@@ -418,12 +418,12 @@ def main():
   )
 
   # ─── SIGTERM handler (N05) ────────────────────────────────────────────
-  # Garanteix sortida neta pre-uvicorn (funció definida a nivell de mòdul).
+  # Guarantees clean exit pre-uvicorn (function defined at module level).
   signal.signal(signal.SIGTERM, _handle_sigterm)
 
-  # ─── PID file: gestionat pel lifespan (B06) ───────────────────────────
-  # L'escriptura i neteja del PID s'han mogut a core/lifespan.py.
-  # runner.py ja no gestiona el PID directament.
+  # ─── PID file: managed by the lifespan (B06) ──────────────────────────
+  # PID writing and cleanup have been moved to core/lifespan.py.
+  # runner.py no longer manages the PID directly.
 
   _maybe_launch_tray()
 

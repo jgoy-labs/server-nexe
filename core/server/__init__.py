@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: core/server/__init__.py
-Description: Package del servidor Nexe. Exposa create_app() (factory FastAPI) i main()
+Description: Nexe server package. Exposes create_app() (FastAPI factory) and main()
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

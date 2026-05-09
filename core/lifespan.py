@@ -104,7 +104,7 @@ def _resolve_encryption_enabled(env_value: str, *, sqlcipher_available: bool) ->
     return True
   if normalized == 'false':
     return False
-  return False  # valor desconegut → OFF
+  return False  # unknown value → OFF
 
 
 def _write_pid_file(project_root: Path, port: int) -> bool:
@@ -370,7 +370,7 @@ def _startup_final_banner() -> None:
 
 
 async def _startup(app: FastAPI) -> None:
-    """Orquestrador de startup: delega cada fase al seu helper."""
+    """Startup orchestrator: delegates each phase to its helper."""
     await _startup_init(app)
     await _startup_services(app)
     await _startup_phases_and_tokens(app)
@@ -378,7 +378,7 @@ async def _startup(app: FastAPI) -> None:
 
 
 async def _cancel_background_tasks() -> None:
-    """Cancel·la les tasques en segon pla actives (N04)."""
+    """Cancels active background tasks (N04)."""
     for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task'):
         _task = getattr(server_state, _task_attr, None)
         if _task is not None and not _task.done():
@@ -391,7 +391,7 @@ async def _cancel_background_tasks() -> None:
 
 
 def _reset_circuit_breakers() -> None:
-    """Reseteja els circuit breakers a CLOSED per al proper restart (N03)."""
+    """Resets circuit breakers to CLOSED for the next restart (N03)."""
     try:
         from core.resilience import reset_all_circuit_breakers
         reset_all_circuit_breakers()
@@ -401,7 +401,7 @@ def _reset_circuit_breakers() -> None:
 
 
 async def _shutdown(app: FastAPI) -> None:
-    """Orquestrador de shutdown: neteja ordenada de tots els serveis."""
+    """Shutdown orchestrator: orderly cleanup of all services."""
     msg = _translate(server_state.i18n, "core.server.shutdown_initiated", "System shutdown initiated...")
     logger.info(msg)
 

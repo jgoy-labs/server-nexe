@@ -18,8 +18,8 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Bug 11: handle de la background task de renovacio del bootstrap token.
-# Permet cancellar-la net al shutdown del lifespan.
+# Bug 11: handle for the bootstrap token renewal background task.
+# Allows clean cancellation on lifespan shutdown.
 _renewal_task: Optional[asyncio.Task] = None
 
 
@@ -107,10 +107,10 @@ def setup_bootstrap_tokens(server_state, _translate) -> None:
 
 
 def regenerate_bootstrap_token(ttl_minutes: int = 30) -> str:
-  """Generate i emmagatzema un nou master bootstrap token a la DB.
+  """Generates and stores a new master bootstrap token in the DB.
 
-  Bug 11: usat per la background task d'auto-renovacio i pels tests.
-  Retorna el nou token.
+  Bug 11: used by the auto-renewal background task and by tests.
+  Returns the new token.
   """
   from core.bootstrap_tokens import set_bootstrap_token
 
@@ -120,21 +120,21 @@ def regenerate_bootstrap_token(ttl_minutes: int = 30) -> str:
   return new_token
 
 
-# Fix Consultor passada 1 — Finding 4: backoffs per al retry exponencial
-# quan la regeneracio del token falla (p.ex. disc ple). Abans el loop
-# esperava l'interval_seconds complet (>5 min) i el token expirava.
+# Fix Consultant pass 1 — Finding 4: backoffs for exponential retry
+# when token regeneration fails (e.g. disk full). Previously the loop
+# waited the full interval_seconds (>5 min) and the token expired.
 _BOOTSTRAP_RETRY_BACKOFFS = (1, 5, 30)  # segons
 
 
 async def _bootstrap_token_renewal_loop(interval_seconds: int, ttl_minutes: int):
-  """Loop background que renova el token cada `interval_seconds`.
+  """Background loop that renews the token every `interval_seconds`.
 
-  Bug 11: solucio (b) — background task que regenera el token abans
-  que expiri, evitant la mala UX d'haver de reiniciar el servidor.
+  Bug 11: solution (b) — background task that regenerates the token before
+  it expires, avoiding the bad UX of having to restart the server.
 
-  Fix Consultor passada 1 — Finding 4: si la regeneracio falla, no
-  esperem l'interval sencer; apliquem retry exponencial (1s, 5s, 30s)
-  abans de tornar al cicle normal.
+  Fix Consultant pass 1 — Finding 4: if regeneration fails, do not
+  wait the full interval; apply exponential retry (1s, 5s, 30s)
+  before returning to the normal cycle.
   """
   try:
     while True:
@@ -172,18 +172,18 @@ async def _bootstrap_token_renewal_loop(interval_seconds: int, ttl_minutes: int)
 
 
 def start_bootstrap_token_renewal(ttl_minutes: int = 30, interval_seconds: Optional[int] = None) -> asyncio.Task:
-  """Arrencar la background task de renovacio (Bug 11).
+  """Starts the renewal background task (Bug 11).
 
   Args:
-    ttl_minutes: TTL del token nou (default 30)
-    interval_seconds: cada quants segons regenerar (default = (ttl-5)*60)
+    ttl_minutes: TTL for the new token (default 30)
+    interval_seconds: how often to regenerate in seconds (default = (ttl-5)*60)
 
   Returns:
-    L'asyncio.Task creada (es guarda tambe en variable de modul).
+    The asyncio.Task created (also stored in the module-level variable).
   """
   global _renewal_task
   if interval_seconds is None:
-    # Renovar 5 min abans d'expirar perque mai hi hagi finestra sense token
+    # Renew 5 min before expiry so there is never a window without a token
     interval_seconds = max(60, (ttl_minutes - 5) * 60)
 
   if _renewal_task is not None and not _renewal_task.done():

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: core/messages.py
-Description: Missatges i18n per al core del servidor.
+Description: i18n messages for the server core.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -22,9 +22,9 @@ FALLBACK_MESSAGES = {
 
 def get_message(i18n, key: str, **kwargs) -> str:
     """
-    Obté missatge traduït amb fallback.
+    Gets translated message with fallback.
 
-    Patró idèntic a plugins/security/core/messages.py.
+    Identical pattern to plugins/security/core/messages.py.
     """
     if i18n:
         try:

@@ -380,7 +380,7 @@ def setup_models(ctx: click.Context, apply: bool):
                 # For simplicity and robustness: use the mlx_lm library directly if installed for snapshot.
                 
                 try:
-                    # Alternativa: Use huggingface_hub snapshot_download
+                    # Alternative: Use huggingface_hub snapshot_download
                     from huggingface_hub import snapshot_download
                     local_dir = Path("storage/models") / profile.mlx_model_id.split("/")[-1]
                     click.echo(f"   Destination: {local_dir}")

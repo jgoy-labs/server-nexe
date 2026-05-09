@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: core/qdrant_pool.py
-Description: Pool de QdrantClients per evitar concurrent access a embedded mode.
-             Cacheja per path/url — cada path unic te UNA sola instancia.
+Description: Pool of QdrantClients to avoid concurrent access in embedded mode.
+             Cached by path/url — each unique path has ONE single instance.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -59,17 +59,17 @@ def _create_client(path: Optional[str], url: Optional[str]) -> QdrantClient:
 
 
 def _flush_client(client: QdrantClient) -> None:
-    """Intenta fer flush dels canvis pendents abans de tancar.
+    """Attempts to flush pending changes before closing.
 
-    Bug 13 fix — Qdrant embedded (Local) escriu al disc via RocksDB.
-    `close()` normalment fa el flush implicit, pero si la versio del
-    client no el garanteix podem tenir perdua de dades en cas de
-    shutdown sobtat. Provem diversos punts d'entrada coneguts:
-      1. `client.flush()` (versions futures hipotetiques)
-      2. `client._client.flush()` (capa interna)
-      3. snapshot api per al collection (forca persistencia)
-    Si cap esta disponible, ho deixem en mans del close() — pero
-    hem deixat constancia explicita en lloc de silenci.
+    Bug 13 fix — Qdrant embedded (Local) writes to disk via RocksDB.
+    `close()` normally does an implicit flush, but if the client version
+    does not guarantee it we may lose data on sudden shutdown. We try
+    several known entry points:
+      1. `client.flush()` (hypothetical future versions)
+      2. `client._client.flush()` (internal layer)
+      3. snapshot api for the collection (forces persistence)
+    If none is available, we leave it to close() — but we have
+    left an explicit note rather than silence.
     """
     flush = getattr(client, "flush", None)
     if callable(flush):
@@ -93,12 +93,12 @@ def _flush_client(client: QdrantClient) -> None:
 
 
 def close_qdrant_client():
-    """Graceful shutdown. Cridar des de lifespan shutdown.
+    """Graceful shutdown. Call from lifespan shutdown.
 
-    Bug 13 fix — abans `client.close()` corria sense flush previ i
-    qualsevol excepcio s'engolia (`except: pass`), amagant possibles
-    corrupcions de dades. Ara fem flush -> close, ambdos amb error
-    handling explicit que loguea el problema.
+    Bug 13 fix — previously `client.close()` ran without a prior flush and
+    any exception was swallowed (`except: pass`), hiding possible data
+    corruption. Now we do flush -> close, both with explicit error
+    handling that logs the problem.
     """
     global _instances
     for key, client in list(_instances.items()):

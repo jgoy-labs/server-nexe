@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: core/loader/__init__.py
-Description: API pública de core.loader. Exporta el protocol de mòdul
-             i la factoria de manifest lazy que fa servir tot plugin.
+Description: Public API of core.loader. Exports the module protocol
+             and the lazy manifest factory used by every plugin.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

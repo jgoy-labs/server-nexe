@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: core/dependencies.py
-Description: Shared dependencies per dependency injection. Exposa limiters (global, by_key,
+Description: Shared dependencies for dependency injection. Exposes limiters (global, by_key,
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
