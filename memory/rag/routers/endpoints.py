@@ -129,81 +129,83 @@ async def search_endpoint(request: Dict[str, Any]):
 
 ALLOWED_UPLOAD_EXTENSIONS = {".txt", ".md", ".pdf", ".csv", ".json", ".rst"}
 
+def _parse_upload_metadata(metadata: str) -> dict:
+  """Parse metadata JSON string, returning empty dict on failure."""
+  try:
+    return json.loads(metadata)
+  except Exception:
+    return {}
+
+
+def _validate_upload_filename(filename) -> tuple:
+  """Validate and return (safe_name, ext) or raise HTTPException."""
+  safe_name = Path(filename).name if filename else ""
+  if not safe_name or ".." in safe_name:
+    raise HTTPException(status_code=400, detail="Invalid filename.")
+  ext = Path(safe_name).suffix.lower()
+  if not ext:
+    raise HTTPException(status_code=400, detail="File has no extension. Cannot detect format.")
+  if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+    raise HTTPException(
+      status_code=400,
+      detail=f"File type '{ext}' not allowed. Allowed: {sorted(ALLOWED_UPLOAD_EXTENSIONS)}"
+    )
+  return safe_name, ext
+
+
+def _check_upload_size(file: UploadFile) -> None:
+  """Raise HTTPException(413) if file exceeds 50 MB."""
+  MAX_FILE_SIZE_MB = 50
+  MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+  file_size = 0
+  if hasattr(file, 'size') and file.size:
+    file_size = file.size
+  elif hasattr(file, 'file'):
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+  if file_size > MAX_FILE_SIZE_BYTES:
+    raise HTTPException(
+      status_code=413,
+      detail=f"File too large ({file_size / 1024 / 1024:.1f}MB). Maximum: {MAX_FILE_SIZE_MB}MB"
+    )
+
+
+async def _write_tmp_and_index(file: UploadFile, ext: str, meta_dict: dict) -> JSONResponse:
+  """Write file to a temp path, index via file_rag, and return JSONResponse."""
+  with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
+    content = await file.read()
+    tmp_file.write(content)
+    tmp_path = Path(tmp_file.name)
+  try:
+    file_rag = _get_file_rag()
+    if file_rag is None:
+      raise HTTPException(status_code=501, detail="File upload via RAG API not yet implemented. Use POST /ui/upload instead.")
+    doc_id = await file_rag.add_file(file_path=tmp_path, metadata=meta_dict)
+    metrics = file_rag.get_metrics()
+    return JSONResponse(content={
+      "success": True,
+      "doc_id": doc_id,
+      "filename": file.filename,
+      "format": ext,
+      "chunks": metrics.get("total_chunks", 0),
+      "message": "File uploaded and indexed successfully",
+      "metrics": metrics
+    })
+  finally:
+    if tmp_path.exists():
+      tmp_path.unlink()
+
+
 async def upload_file_endpoint(file: UploadFile = File(...), metadata: str = "{}"):
   """Upload a file to the RAG with auto-format detection."""
   try:
-    try:
-      meta_dict = json.loads(metadata)
-    except Exception:
-      meta_dict = {}
-
-    # SECURITY: Use only the base name — reject any path components (path traversal).
-    safe_name = Path(file.filename).name if file.filename else ""
-    if not safe_name or ".." in safe_name:
-      raise HTTPException(status_code=400, detail="Invalid filename.")
-
+    meta_dict = _parse_upload_metadata(metadata)
+    safe_name, ext = _validate_upload_filename(file.filename)
     meta_dict["filename"] = safe_name
     meta_dict["content_type"] = file.content_type
-
-    file_path = Path(safe_name)
-    ext = file_path.suffix.lower()
-
-    if not ext:
-      raise HTTPException(
-        status_code=400,
-        detail="File has no extension. Cannot detect format."
-      )
-
-    # SECURITY: Whitelist allowed extensions.
-    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
-      raise HTTPException(
-        status_code=400,
-        detail=f"File type '{ext}' not allowed. Allowed: {sorted(ALLOWED_UPLOAD_EXTENSIONS)}"
-      )
-
-    MAX_FILE_SIZE_MB = 50
-    MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
-
-    file_size = 0
-    if hasattr(file, 'size') and file.size:
-      file_size = file.size
-    elif hasattr(file, 'file'):
-      file.file.seek(0, 2)
-      file_size = file.file.tell()
-      file.file.seek(0)
-
-    if file_size > MAX_FILE_SIZE_BYTES:
-      raise HTTPException(
-        status_code=413,
-        detail=f"File too large ({file_size / 1024 / 1024:.1f}MB). Maximum: {MAX_FILE_SIZE_MB}MB"
-      )
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
-      content = await file.read()
-      tmp_file.write(content)
-      tmp_path = Path(tmp_file.name)
-
-    try:
-      file_rag = _get_file_rag()
-      if file_rag is None:
-        raise HTTPException(status_code=501, detail="File upload via RAG API not yet implemented. Use POST /ui/upload instead.")
-      doc_id = await file_rag.add_file(file_path=tmp_path, metadata=meta_dict)
-      metrics = file_rag.get_metrics()
-
-      return JSONResponse(content={
-        "success": True,
-        "doc_id": doc_id,
-        "filename": file.filename,
-        "format": ext,
-        "chunks": metrics.get("total_chunks", 0),
-        "message": "File uploaded and indexed successfully",
-        "metrics": metrics
-      })
-
-    finally:
-      if tmp_path.exists():
-        tmp_path.unlink()
-
+    _check_upload_size(file)
+    return await _write_tmp_and_index(file, ext, meta_dict)
   except HTTPException:
     raise
   except Exception as e:
