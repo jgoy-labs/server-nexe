@@ -168,6 +168,36 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
             detail="Internal error. Check server logs."
         )
 
+def _validate_search_collections(body: "MemorySearchRequest") -> None:
+    """Validate collection names in the request (raises InvalidCollectionNameError)."""
+    if body.collection:
+        validate_collection_name(body.collection)
+    if body.collections:
+        for col in body.collections:
+            validate_collection_name(col)
+
+
+def _resolve_search_collections(body: "MemorySearchRequest") -> list:
+    """Determine the ordered list of collections to search."""
+    if body.collections:
+        return body.collections
+    if body.collection:
+        return [body.collection]
+    return ["nexe_documentation", "personal_memory", "user_knowledge"]
+
+
+def _format_search_result(r, col: str) -> "MemorySearchResult":
+    """Convert a raw search result to MemorySearchResult with source_collection metadata."""
+    meta = r.metadata or {} if hasattr(r, 'metadata') else {}
+    if isinstance(meta, dict):
+        meta["source_collection"] = col
+    return MemorySearchResult(
+        content=r.text if hasattr(r, 'text') else str(r),
+        score=r.score,
+        metadata=meta
+    )
+
+
 @router.post("/search", response_model=MemorySearchResponse, dependencies=[Depends(require_api_key)], summary="Search semantic memory by vector similarity (API key required)", operation_id="memory_search")
 @limiter.limit("60/minute")
 async def memory_search(request: Request, body: MemorySearchRequest):
@@ -183,29 +213,15 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         MemorySearchResponse with matching results
     """
     try:
-        # Validate collection names
-        if body.collection:
-            validate_collection_name(body.collection)
-        if body.collections:
-            for col in body.collections:
-                validate_collection_name(col)
-
+        _validate_search_collections(body)
         memory = await get_memory_api()
-
         # R1 v1.0.4: NFKC-normalize the query to mirror the index path.
         # Documents are NFKC-normalized at ingest, so a fullwidth or compat
         # variant in body.query would otherwise miss the canonical indexed
         # form. Pydantic v1/v2 BaseModel fields are mutable; assigning back
         # also keeps the truncated debug log (line below) in sync.
         body.query = unicodedata.normalize("NFKC", body.query)
-
-        # Determine collections to search
-        if body.collections:
-            cols = body.collections
-        elif body.collection:
-            cols = [body.collection]
-        else:
-            cols = ["nexe_documentation", "personal_memory", "user_knowledge"]
+        cols = _resolve_search_collections(body)
 
         formatted_results = []
         search_errors = 0
@@ -223,14 +239,7 @@ async def memory_search(request: Request, body: MemorySearchRequest):
                     threshold=0.3
                 )
                 for r in results:
-                    meta = r.metadata or {} if hasattr(r, 'metadata') else {}
-                    if isinstance(meta, dict):
-                        meta["source_collection"] = col
-                    formatted_results.append(MemorySearchResult(
-                        content=r.text if hasattr(r, 'text') else str(r),
-                        score=r.score,
-                        metadata=meta
-                    ))
+                    formatted_results.append(_format_search_result(r, col))
             except Exception as e:
                 search_errors += 1
                 last_error = e
@@ -246,19 +255,13 @@ async def memory_search(request: Request, body: MemorySearchRequest):
 
         logger.debug("Memory search for '%s' returned %d results from %d collections", body.query[:50], len(formatted_results), len(cols))
 
-        return MemorySearchResponse(
-            results=formatted_results,
-            total=len(formatted_results)
-        )
+        return MemorySearchResponse(results=formatted_results, total=len(formatted_results))
 
     except InvalidCollectionNameError:
         raise HTTPException(status_code=400, detail="Invalid collection name. Must follow pattern 'module_type' with only lowercase, numbers and underscores.")
     except Exception as e:
         logger.error("Memory search failed: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="Internal error. Check server logs."
-        )
+        raise HTTPException(status_code=500, detail="Internal error. Check server logs.")
 
 @router.get("/health", summary="Health check for memory subsystem and Qdrant collections", operation_id="memory_health")
 async def memory_health():
