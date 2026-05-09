@@ -443,6 +443,132 @@ def _kill_existing_tray() -> None:
             pass
 
 
+def _validate_reinstall_preconditions(project_root: Path, mode: str) -> None:
+    """Raise ValueError/RuntimeError if mode or bundle guard fails."""
+    if mode not in VALID_REINSTALL_MODES:
+        raise ValueError(
+            f"Invalid reinstall mode: {mode!r}. "
+            f"Valid modes: {', '.join(VALID_REINSTALL_MODES)}"
+        )
+    # Advisory 5 — refuse if project_root is the bundle where the process lives.
+    if mode in (REINSTALL_MODE_WIPE, REINSTALL_MODE_BACKUP):
+        if _is_project_root_running_bundle(project_root):
+            raise RuntimeError(
+                f"Refusing to wipe project_root={project_root!r}: "
+                "the running installer process lives inside this path. "
+                "Install to a different location (e.g. ~/nexe) or run "
+                "the installer from outside the bundle."
+            )
+
+
+def _stop_server_or_raise(project_root: Path, stop_server_func: Callable) -> bool:
+    """Stop the server; raise RuntimeError if it cannot be stopped."""
+    server_stopped = False
+    try:
+        server_stopped = bool(stop_server_func(project_root))
+    except Exception as e:
+        logger.warning("stop_server_func raised: %s", e)
+        server_stopped = False
+    if not server_stopped:
+        raise RuntimeError(
+            "Could not stop the running Nexe server before reinstall. "
+            "Stop it manually and retry."
+        )
+    return server_stopped
+
+
+def _apply_overwrite_mode(project_root: Path, result: dict) -> dict:
+    """Handle overwrite mode: validate .env, clean KB marker, replace venv."""
+    # Advisory 2 — validate that .env will be regenerable via merge.
+    _regenerate_env_for_overwrite(project_root)
+
+    # Advisory 3 — delete KB ingestion marker so the new code re-indexes.
+    marker = project_root / "storage" / ".knowledge_ingested"
+    if marker.exists():
+        try:
+            marker.unlink()
+            result["removed"].append(str(marker))
+        except OSError as e:
+            logger.warning("Could not remove knowledge marker: %s", e)
+
+    _kill_existing_tray()
+    venv = project_root / "venv"
+    if venv.exists():
+        _safe_remove(venv)
+        result["removed"].append(str(venv))
+    return result
+
+
+def _apply_backup_mode(
+    project_root: Path,
+    result: dict,
+    backup_root: Path | None,
+    exclude_models: bool,
+    wipe_keychain: bool,
+    wipe_home_nexe: bool,
+) -> dict:
+    """Handle backup mode: backup data, selective wipe, replace venv."""
+    backup_dir = backup_user_data(
+        project_root,
+        backup_root=backup_root,
+        exclude_models=exclude_models,
+    )
+    result["backup_dir"] = str(backup_dir)
+
+    # Dev #3 fix — Bug 7 Consultant pass 1: selective wipe preserving models/.
+    if exclude_models:
+        wipe_paths = [".env"]  # knowledge/ NO: it's system code, tar will refill it
+        removed = wipe_user_data(
+            project_root,
+            paths=wipe_paths,
+            wipe_keychain=wipe_keychain,
+            wipe_home_nexe=wipe_home_nexe,
+        )
+        # Wipe selectiu de storage/: tot excepte models/
+        storage_dir = project_root / "storage"
+        if storage_dir.exists() and storage_dir.is_dir():
+            for child in storage_dir.iterdir():
+                if child.name == "models":
+                    continue
+                _safe_remove(child)
+                removed.append(child)
+    else:
+        removed = wipe_user_data(
+            project_root,
+            wipe_keychain=wipe_keychain,
+            wipe_home_nexe=wipe_home_nexe,
+        )
+
+    result["removed"] = [str(p) for p in removed]
+    _kill_existing_tray()
+    venv = project_root / "venv"
+    if venv.exists():
+        _safe_remove(venv)
+        result["removed"].append(str(venv))
+    return result
+
+
+def _apply_wipe_mode(
+    project_root: Path,
+    result: dict,
+    wipe_keychain: bool,
+    wipe_home_nexe: bool,
+) -> dict:
+    """Handle wipe mode: full user data wipe, replace venv."""
+    removed = wipe_user_data(
+        project_root,
+        wipe_keychain=wipe_keychain,
+        wipe_home_nexe=wipe_home_nexe,
+    )
+    result["removed"] = [str(p) for p in removed]
+    _kill_existing_tray()
+    venv = project_root / "venv"
+    if venv.exists():
+        _safe_remove(venv)
+        result["removed"].append(str(venv))
+    return result
+
+
 def apply_reinstall_mode(
     project_root: Path,
     mode: str,
@@ -470,37 +596,11 @@ def apply_reinstall_mode(
         dict with keys: mode, removed (List[str]), backup_dir (str|None),
         server_stopped (bool).
     """
-    if mode not in VALID_REINSTALL_MODES:
-        raise ValueError(
-            f"Invalid reinstall mode: {mode!r}. "
-            f"Valid modes: {', '.join(VALID_REINSTALL_MODES)}"
-        )
+    _validate_reinstall_preconditions(project_root, mode)
 
-    # Advisory 5 — refuse if project_root is the bundle where the process lives.
-    # Only applies if the mode will touch things inside project_root.
-    if mode in (REINSTALL_MODE_WIPE, REINSTALL_MODE_BACKUP):
-        if _is_project_root_running_bundle(project_root):
-            raise RuntimeError(
-                f"Refusing to wipe project_root={project_root!r}: "
-                "the running installer process lives inside this path. "
-                "Install to a different location (e.g. ~/nexe) or run "
-                "the installer from outside the bundle."
-            )
-
-    # Advisory 1 — stop the server before any mode
     if stop_server_func is None:
         stop_server_func = _default_stop_server
-    server_stopped = False
-    try:
-        server_stopped = bool(stop_server_func(project_root))
-    except Exception as e:
-        logger.warning("stop_server_func raised: %s", e)
-        server_stopped = False
-    if not server_stopped:
-        raise RuntimeError(
-            "Could not stop the running Nexe server before reinstall. "
-            "Stop it manually and retry."
-        )
+    server_stopped = _stop_server_or_raise(project_root, stop_server_func)
 
     result: dict = {
         "mode": mode,
@@ -510,94 +610,15 @@ def apply_reinstall_mode(
     }
 
     if mode == REINSTALL_MODE_OVERWRITE:
-        # Advisory 2 — validate that .env will be regenerable via merge.
-        # Actual regeneration is done by generate_env_file() later in the
-        # installer flow; here we only check integrity.
-        _regenerate_env_for_overwrite(project_root)
-
-        # Advisory 3 — delete KB ingestion marker so the new code
-        # re-indexes and no stale chunks remain.
-        marker = project_root / "storage" / ".knowledge_ingested"
-        if marker.exists():
-            try:
-                marker.unlink()
-                result["removed"].append(str(marker))
-            except OSError as e:
-                logger.warning("Could not remove knowledge marker: %s", e)
-
-        # Kill existing tray before replacing the venv
-        _kill_existing_tray()
-        # Remove the venv (will be regenerated). Keep .env, storage/, knowledge/.
-        venv = project_root / "venv"
-        if venv.exists():
-            _safe_remove(venv)
-            result["removed"].append(str(venv))
-        return result
+        return _apply_overwrite_mode(project_root, result)
 
     if mode == REINSTALL_MODE_BACKUP:
-        backup_dir = backup_user_data(
-            project_root,
-            backup_root=backup_root,
-            exclude_models=exclude_models,
+        return _apply_backup_mode(
+            project_root, result, backup_root, exclude_models, wipe_keychain, wipe_home_nexe
         )
-        result["backup_dir"] = str(backup_dir)
-
-        # Dev #3 fix — Bug 7 Consultant pass 1:
-        # Previously we called wipe_user_data with the default paths
-        # (.env, storage, knowledge). Since `storage/` was handled via
-        # shutil.rmtree, models preserved with exclude_models=True were
-        # deleted anyway. Solution (b): when exclude_models=True, do a
-        # selective wipe of storage/ removing everything EXCEPT models/.
-        # The other paths (.env, knowledge/) have already been moved by
-        # backup_user_data; we still pass them to wipe in case anything
-        # residual remains.
-        if exclude_models:
-            wipe_paths = [".env"]  # knowledge/ NO: it's system code, tar will refill it
-            removed = wipe_user_data(
-                project_root,
-                paths=wipe_paths,
-                wipe_keychain=wipe_keychain,
-                wipe_home_nexe=wipe_home_nexe,
-            )
-            # Wipe selectiu de storage/: tot excepte models/
-            storage_dir = project_root / "storage"
-            if storage_dir.exists() and storage_dir.is_dir():
-                for child in storage_dir.iterdir():
-                    if child.name == "models":
-                        continue
-                    _safe_remove(child)
-                    removed.append(child)
-        else:
-            # Without model preservation, normal full wipe.
-            removed = wipe_user_data(
-                project_root,
-                wipe_keychain=wipe_keychain,
-                wipe_home_nexe=wipe_home_nexe,
-            )
-
-        result["removed"] = [str(p) for p in removed]
-        # Kill existing tray before replacing the venv
-        _kill_existing_tray()
-        venv = project_root / "venv"
-        if venv.exists():
-            _safe_remove(venv)
-            result["removed"].append(str(venv))
-        return result
 
     # mode == REINSTALL_MODE_WIPE
-    removed = wipe_user_data(
-        project_root,
-        wipe_keychain=wipe_keychain,
-        wipe_home_nexe=wipe_home_nexe,
-    )
-    result["removed"] = [str(p) for p in removed]
-    # Kill existing tray before replacing the venv
-    _kill_existing_tray()
-    venv = project_root / "venv"
-    if venv.exists():
-        _safe_remove(venv)
-        result["removed"].append(str(venv))
-    return result
+    return _apply_wipe_mode(project_root, result, wipe_keychain, wipe_home_nexe)
 
 
 __all__ = [
