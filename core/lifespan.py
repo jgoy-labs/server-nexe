@@ -254,7 +254,7 @@ async def _startup_init(app: FastAPI) -> None:
     app.state.config = server_state.config
 
     # PID file — single-instance guard (B06, B07, B10)
-    from core.config import DEFAULT_HOST, DEFAULT_PORT
+    from core.config import DEFAULT_PORT
     _srv_startup_cfg = server_state.config.get('core', {}).get('server', {})
     _startup_port = _srv_startup_cfg.get('port', DEFAULT_PORT)
     if server_state.project_root and not _write_pid_file(server_state.project_root, _startup_port):
