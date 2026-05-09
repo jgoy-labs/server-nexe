@@ -113,7 +113,7 @@ class TestReadFile:
 class TestIngestKnowledge:
 
     def test_creates_folder_if_not_exists(self, tmp_path):
-        """Si knowledge/ no existeix, la crea i retorna True."""
+        """If knowledge/ does not exist, it creates it and returns True."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"
@@ -133,7 +133,7 @@ class TestIngestKnowledge:
         assert knowledge_path.exists()
 
     def test_returns_true_no_files(self, tmp_path):
-        """Si no hi ha fitxers, retorna True."""
+        """If there are no files, returns True."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"
@@ -150,7 +150,7 @@ class TestIngestKnowledge:
         assert result is True
 
     def test_returns_false_on_memory_init_failure(self, tmp_path):
-        """Si MemoryAPI.initialize falla, retorna False."""
+        """If MemoryAPI.initialize fails, returns False."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"
@@ -276,7 +276,7 @@ class TestIngestKnowledge:
         assert result is True
 
     def test_custom_folder_used(self, tmp_path):
-        """folder kwarg s'usa en lloc del default."""
+        """folder kwarg is used instead of the default."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         custom_folder = tmp_path / "custom_knowledge"
@@ -353,7 +353,7 @@ This is the actual content of the document.
         assert result in (True, False)
 
     def test_lang_subfolder_used_when_exists(self, tmp_path):
-        """Si existe knowledge/<lang>/, s'utilitza."""
+        """If knowledge/<lang>/ exists, it is used."""
         from core.ingest.ingest_knowledge import ingest_knowledge
         import os
 

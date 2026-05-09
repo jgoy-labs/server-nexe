@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: core/server/tests/test_factory_cache.py
-Description: Tests per cache de create_app() singleton. Valida caching, force_reload, thread-safety i millora de performance (0.58s→<0.01s).
+Description: Tests for the create_app() singleton cache. Validates caching, force_reload, thread-safety and performance improvement (0.58s→<0.01s).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -21,9 +21,9 @@ from core.server.factory import create_app, reset_app_cache
 @pytest.fixture(autouse=True)
 def cleanup_app_cache(monkeypatch):
   """
-  Reset app cache i variables d'entorn després de cada test.
+  Reset app cache and environment variables after each test.
 
-  Essencial per evitar estat compartit entre tests.
+  Essential to avoid shared state between tests.
   """
   # Ensure event loop exists for create_app (uses async internals)
   try:
@@ -42,9 +42,9 @@ def cleanup_app_cache(monkeypatch):
 
 def test_create_app_basic(monkeypatch):
   """
-  Test bàsic: create_app() retorna FastAPI app vàlida.
+  Basic test: create_app() returns a valid FastAPI app.
 
-  Verificar que caching no trenca funcionalitat bàsica.
+  Verifies that caching does not break basic functionality.
   """
   app = create_app()
 
@@ -54,7 +54,7 @@ def test_create_app_basic(monkeypatch):
 
 def test_create_app_caches_instance(monkeypatch):
   """
-  Test que create_app() retorna la mateixa instància (cached).
+  Test that create_app() returns the same cached instance.
 
   Core feature - singleton pattern.
   """
@@ -66,9 +66,9 @@ def test_create_app_caches_instance(monkeypatch):
 
 def test_create_app_force_reload(monkeypatch):
   """
-  Test que force_reload=True rebuilds app.
+  Test that force_reload=True rebuilds the app.
 
-  Necessari per tests que volen app fresca.
+  Needed for tests that require a fresh app.
   """
   app1 = create_app()
   app2 = create_app(force_reload=True)
@@ -78,7 +78,7 @@ def test_create_app_force_reload(monkeypatch):
 
 def test_create_app_cache_improves_performance(monkeypatch):
   """
-  Test que cache millora startup time significativament.
+  Test that the cache significantly improves startup time.
 
   Performance win - 0.58s → <0.01s
   """
@@ -102,9 +102,9 @@ def test_create_app_cache_improves_performance(monkeypatch):
 
 def test_reset_app_cache(monkeypatch):
   """
-  Test que reset_app_cache() esborra cache correctament.
+  Test that reset_app_cache() clears the cache correctly.
 
-  Necessari per teardown en tests.
+  Needed for test teardown.
   """
   app1 = create_app()
 
@@ -126,7 +126,7 @@ def test_create_app_thread_safe(monkeypatch):
   errors = []
 
   def create_in_thread():
-    """Helper per crear app en thread"""
+    """Helper to create app in a thread"""
     try:
       return create_app()
     except Exception as e:
@@ -149,9 +149,9 @@ def test_create_app_thread_safe(monkeypatch):
 
 def test_create_app_different_project_root_rebuilds(monkeypatch, tmp_path):
   """
-  Test que canviar project_root rebuilds app.
+  Test that changing project_root rebuilds the app.
 
-  Evitar usar cache quan project_root canvia.
+  Avoids using the cache when project_root changes.
   """
   app1 = create_app()
 
@@ -167,9 +167,9 @@ def test_create_app_different_project_root_rebuilds(monkeypatch, tmp_path):
 
 def test_create_app_concurrent_first_call(monkeypatch):
   """
-  Test que concurrent first calls no creen múltiples instances.
+  Test that concurrent first calls do not create multiple instances.
 
-  Double-check locking ha de prevenir race condition.
+  Double-check locking must prevent race conditions.
   """
   reset_app_cache()
 
@@ -177,7 +177,7 @@ def test_create_app_concurrent_first_call(monkeypatch):
   apps = []
 
   def create_with_barrier():
-    """Helper que espera barrier abans de crear"""
+    """Helper that waits for the barrier before creating"""
     barrier.wait()
     return create_app()
 
@@ -190,9 +190,9 @@ def test_create_app_concurrent_first_call(monkeypatch):
 
 def test_create_app_cache_key_includes_project_root(monkeypatch):
   """
-  Test que cache key inclou project_root.
+  Test that the cache key includes project_root.
 
-  Mateix app però diferent project_root → cache miss.
+  Same app but different project_root → cache miss.
   """
   app1 = create_app()
   project_root1 = app1.state.project_root
@@ -208,9 +208,9 @@ def test_create_app_cache_key_includes_project_root(monkeypatch):
 @pytest.mark.slow
 def test_create_app_benchmark_cold_vs_warm(monkeypatch):
   """
-  Benchmark detallat: mesura startup time cold vs warm.
+  Detailed benchmark: measures startup time cold vs warm.
 
-  Demostrar millora de performance.
+  Demonstrates the performance improvement.
 
   Run with: pytest -m slow
   """
@@ -257,9 +257,9 @@ def test_create_app_multiple_sequential_calls(monkeypatch):
 
 def test_create_app_after_exception_in_previous_call(monkeypatch):
   """
-  Test que cache no queda en estat inconsistent després d'error.
+  Test that cache does not remain in an inconsistent state after an error.
 
-  Si primer create_app() falla, segon hauria de funcionar.
+  If the first create_app() fails, the second call should succeed.
   """
   pytest.skip(
       "Requires deep mocking of factory internals (config loader, lifespan, "

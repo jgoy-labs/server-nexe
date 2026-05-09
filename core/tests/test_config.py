@@ -67,7 +67,7 @@ class TestLoadConfig:
         config_file = tmp_path / "server.toml"
         config_file.write_text('[plugins]\nenabled = true\n')
         config = load_config(project_root=tmp_path)
-        # Ha de mantenir els defaults i afegir plugins
+        # Must keep the defaults and add plugins
         assert "core" in config
         assert "plugins" in config
 
@@ -88,7 +88,7 @@ class TestLoadConfig:
         i18n = MagicMock()
         i18n.t.return_value = "Missatge traduit"
         config = load_config(project_root=tmp_path, i18n=i18n)
-        assert "core" in config  # retorna defaults
+        assert "core" in config  # returns defaults
 
     def test_with_i18n_and_valid_config(self, tmp_path):
         from unittest.mock import MagicMock

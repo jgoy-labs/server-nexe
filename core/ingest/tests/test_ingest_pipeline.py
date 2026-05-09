@@ -1,13 +1,13 @@
 """
-Tests del pipeline RAG: ingesta de knowledge/ → cerca → resposta.
+Tests for the RAG pipeline: knowledge/ ingestion → search → response.
 
-Nivells:
-  Unitari  (sense GPU, sense Qdrant) — chunk_text, read_file, header_parser
-  Integrat (Qdrant requerit)          — ingest_knowledge + /rag/search
-  E2E      (GPU + Qdrant requerits)   — ingest → chat → resposta basada en docs
+Levels:
+  Unit        (no GPU, no Qdrant) — chunk_text, read_file, header_parser
+  Integration (Qdrant required)   — ingest_knowledge + /rag/search
+  E2E         (GPU + Qdrant req.) — ingest → chat → doc-grounded response
 
-Marca de tests:
-  pytest -m "not integration and not gpu"   # unitaris
+Test marks:
+  pytest -m "not integration and not gpu"   # unit only
   pytest -m "integration and not gpu"       # integrats (Qdrant)
   pytest -m "integration and gpu"           # E2E complet
 """
@@ -173,16 +173,16 @@ class TestKnowledgeFolderDiscovery:
 
     def test_knowledge_folder_exists(self):
         knowledge = Path(__file__).parents[3] / "knowledge"
-        assert knowledge.exists(), "La carpeta knowledge/ ha d'existir"
+        assert knowledge.exists(), "The knowledge/ folder must exist"
 
     def test_language_subfolders_exist(self):
         knowledge = Path(__file__).parents[3] / "knowledge"
-        assert (knowledge / "ca").is_dir(), "knowledge/ca/ ha d'existir"
+        assert (knowledge / "ca").is_dir(), "knowledge/ca/ must exist"
 
     def test_ca_folder_has_docs(self):
         ca = Path(__file__).parents[3] / "knowledge" / "ca"
         docs = list(ca.glob("*.md")) + list(ca.glob("*.txt"))
-        assert len(docs) > 0, "knowledge/ca/ ha de tenir almenys un document"
+        assert len(docs) > 0, "knowledge/ca/ must have at least one document"
 
     def test_readme_contains_port(self):
         readme = Path(__file__).parents[3] / "knowledge" / "ca" / "README.md"
@@ -200,15 +200,15 @@ class TestKnowledgeFolderDiscovery:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Integrat — ingest_knowledge + /rag/search (Qdrant requerit)
+# Integration — ingest_knowledge + /rag/search (Qdrant required)
 # ═══════════════════════════════════════════════════════════════
 
 @pytest.mark.integration
 @pytest.mark.slow
 class TestIngestAndSearch:
     """
-    Requereix Qdrant a localhost:6333.
-    Injecta els docs de knowledge/ca/ i comprova que es poden cercar.
+    Requires Qdrant at localhost:6333.
+    Ingests docs from knowledge/ca/ and verifies they can be searched.
     """
 
     @pytest.fixture(autouse=True)
@@ -218,7 +218,7 @@ class TestIngestAndSearch:
 
     @pytest.fixture(scope="class")
     def ingested(self):
-        """Executa la ingesta una sola vegada per tota la classe."""
+        """Runs the ingestion once for the entire class."""
         import asyncio
         from core.ingest.ingest_knowledge import ingest_knowledge
         knowledge_path = Path(__file__).parents[3] / "knowledge" / "ca"
@@ -241,7 +241,7 @@ class TestIngestAndSearch:
         assert exists is True
 
     def test_search_finds_port_9119(self, ingested):
-        """Cerca 'port per defecte' → ha de trobar contingut sobre el port 9119."""
+        """Search 'default port' → must find content about port 9119."""
         import asyncio
         from memory.memory.api import MemoryAPI
         async def _search():
@@ -302,7 +302,7 @@ class TestIngestAndSearch:
             assert r.score >= 0.0
 
     def test_rag_search_endpoint(self, ingested):
-        """El endpoint /rag/search retorna resultats rellevants."""
+        """The /rag/search endpoint returns relevant results."""
         from fastapi.testclient import TestClient
         from core.app import app
         api_key = os.environ.get("NEXE_PRIMARY_API_KEY", "nexe-rag-test")
@@ -310,7 +310,7 @@ class TestIngestAndSearch:
         os.environ.setdefault("NEXE_DEV_MODE", "true")
 
         with TestClient(app, base_url="http://localhost") as client:
-            # Obtenir CSRF token via GET primer
+            # Obtain CSRF token via GET first
             get_r = client.get("/health", headers={"X-API-Key": api_key})
             csrf_token = get_r.cookies.get("nexe_csrf_token", "")
             r = client.post(
@@ -318,7 +318,7 @@ class TestIngestAndSearch:
                 headers={"X-API-Key": api_key, "X-CSRF-Token": csrf_token},
                 json={"query": "port per defecte NEXE", "top_k": 3}
             )
-        # 200 si implementat, 501 si encara no implementat (stub)
+        # 200 if implemented, 501 if not yet implemented (stub)
         assert r.status_code in (200, 501)
         body = r.json()
         if r.status_code == 200:
@@ -326,10 +326,10 @@ class TestIngestAndSearch:
 
 
 # ═══════════════════════════════════════════════════════════════
-# E2E — ingest → chat → resposta coherent amb els docs
+# E2E — ingest → chat → doc-grounded coherent response
 # ═══════════════════════════════════════════════════════════════
 
-# Preguntes factuals amb respostes verificables als docs de knowledge/ca/
+# Factual questions with verifiable answers in the knowledge/ca/ docs
 RAG_QA_PAIRS = [
     {
         "question": "Quin port utilitza el servidor NEXE per defecte?",
@@ -359,9 +359,9 @@ def _check_response_has_keywords(response_text: str, keywords: list) -> bool:
 @pytest.mark.slow
 class TestRAGChatOllama:
     """
-    Flux complet: ingest knowledge/ → pregunta via /ui/chat →
-    el model respon amb informació dels documents.
-    Requereix Ollama + Qdrant actius.
+    Full flow: ingest knowledge/ → question via /ui/chat →
+    the model responds with information from the documents.
+    Requires Ollama + Qdrant running.
     """
 
     @pytest.fixture(autouse=True)
@@ -415,7 +415,7 @@ class TestRAGChatOllama:
         assert r.status_code == 200
         body = r.json()
         text = body.get("response") or body.get("message") or body.get("text") or str(body)
-        assert "9119" in text, f"No conté '9119': {text[:300]}"
+        assert "9119" in text, f"Does not contain '9119': {text[:300]}"
 
     def test_chat_answers_install_question(self, rag_client):
         client, headers = rag_client
@@ -428,7 +428,7 @@ class TestRAGChatOllama:
         body = r.json()
         text = body.get("response") or body.get("message") or body.get("text") or str(body)
         assert any(kw in text.lower() for kw in ["setup.sh", "setup"]), \
-            f"No conté 'setup.sh': {text[:300]}"
+            f"Does not contain 'setup.sh': {text[:300]}"
 
     def test_chat_answers_version_question(self, rag_client):
         client, headers = rag_client
@@ -440,10 +440,10 @@ class TestRAGChatOllama:
         assert r.status_code == 200
         body = r.json()
         text = body.get("response") or body.get("message") or body.get("text") or str(body)
-        assert "0.9" in text, f"No conté '0.8': {text[:300]}"
+        assert "0.9" in text, f"Does not contain '0.8': {text[:300]}"
 
     def test_chat_rag_context_present_in_response(self, rag_client):
-        """El camp rag_context o similar ha d'existir si el model troba docs rellevants."""
+        """The rag_context field or similar must exist if the model finds relevant docs."""
         client, headers = rag_client
         r1 = client.post("/ui/session/new", headers=headers)
         sid = r1.json()["session_id"]
@@ -455,7 +455,7 @@ class TestRAGChatOllama:
             timeout=90
         )
         assert r.status_code == 200
-        # La resposta ha de tenir contingut
+        # The response must have content
         body = r.json()
         has_content = any([
             body.get("response"), body.get("message"), body.get("text")

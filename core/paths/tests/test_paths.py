@@ -152,7 +152,7 @@ class TestGetRepoRoot:
         reset_repo_root_cache()
 
     def test_returns_path(self):
-        """Detecta la root del projecte (ha de funcionar en dev)."""
+        """Detects the project root (must work in dev)."""
         root = get_repo_root()
         assert isinstance(root, Path)
         assert root.exists()
@@ -199,7 +199,7 @@ class TestGetRepoRoot:
         root1 = get_repo_root()
         reset_repo_root_cache()
         root2 = get_repo_root()
-        assert root1 == root2  # Mateixa root
+        assert root1 == root2  # Same root
 
 
 class TestConstants:
