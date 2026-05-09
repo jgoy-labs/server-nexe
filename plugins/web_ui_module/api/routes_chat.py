@@ -907,6 +907,54 @@ def _resolve_engines(preferred_engine: str) -> list:
     return _map.get(preferred_engine, _all)
 
 
+def _switch_mlx_model(engine, local_path) -> None:
+    """Hot-swap MLX model config, restoring env var after reading (P0-3 env leak fix)."""
+    import os
+    _prev = os.environ.get("NEXE_MLX_MODEL")
+    try:
+        os.environ["NEXE_MLX_MODEL"] = str(local_path)
+        from plugins.mlx_module.core.config import MLXConfig
+        new_config = MLXConfig.from_env()
+    finally:
+        if _prev is None:
+            os.environ.pop("NEXE_MLX_MODEL", None)
+        else:
+            os.environ["NEXE_MLX_MODEL"] = _prev
+    if hasattr(engine, '_node') and engine._node:
+        if engine._node.config.model_path != new_config.model_path:
+            engine._node.config = new_config  # type: ignore[assignment]
+            engine._node.__class__._config = new_config
+            engine._node.__class__._model = None
+            import logging as _lg
+            _lg.getLogger(__name__).info("MLX model switched to: %s", local_path)
+
+
+def _switch_llama_cpp_model(engine, local_path) -> None:
+    """Hot-swap llama.cpp model config, restoring env var after reading (P0-3 env leak fix)."""
+    import os
+    _prev = os.environ.get("NEXE_LLAMA_CPP_MODEL")
+    try:
+        os.environ["NEXE_LLAMA_CPP_MODEL"] = str(local_path)
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
+        from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
+        from plugins.llama_cpp_module.core.model_pool import ModelPool
+        new_config = LlamaCppConfig.from_env()  # type: ignore[assignment]
+    finally:
+        if _prev is None:
+            os.environ.pop("NEXE_LLAMA_CPP_MODEL", None)
+        else:
+            os.environ["NEXE_LLAMA_CPP_MODULE"] = _prev
+    if hasattr(engine, '_node') and engine._node:
+        if engine._node.config.model_path != new_config.model_path:
+            if LlamaCppChatNode._pool is not None:
+                LlamaCppChatNode._pool.destroy_all()
+            engine._node.config = new_config  # type: ignore[assignment]
+            LlamaCppChatNode._config = new_config  # type: ignore[assignment]
+            LlamaCppChatNode._pool = ModelPool(new_config)  # type: ignore[arg-type]
+            import logging as _lg
+            _lg.getLogger(__name__).info("Llama.cpp model switched to: %s", new_config.model_path)
+
+
 async def _switch_engine_model(engine, engine_name: str, body: dict, model_name: str) -> None:
     """Hot-swap the model on the engine when the UI selector sends body['model'].
 
@@ -922,46 +970,9 @@ async def _switch_engine_model(engine, engine_name: str, body: dict, model_name:
     local_path = models_dir / model_name  # type: ignore[operator]
 
     if engine_name == "mlx_module" and local_path.exists():
-        _prev = os.environ.get("NEXE_MLX_MODEL")
-        try:
-            os.environ["NEXE_MLX_MODEL"] = str(local_path)
-            from plugins.mlx_module.core.config import MLXConfig
-            new_config = MLXConfig.from_env()
-        finally:
-            if _prev is None:
-                os.environ.pop("NEXE_MLX_MODEL", None)
-            else:
-                os.environ["NEXE_MLX_MODEL"] = _prev
-        if hasattr(engine, '_node') and engine._node:
-            if engine._node.config.model_path != new_config.model_path:
-                engine._node.config = new_config  # type: ignore[assignment]
-                engine._node.__class__._config = new_config
-                engine._node.__class__._model = None
-                import logging as _lg
-                _lg.getLogger(__name__).info("MLX model switched to: %s", local_path)
-
+        _switch_mlx_model(engine, local_path)
     elif engine_name == "llama_cpp_module" and local_path.exists():
-        _prev = os.environ.get("NEXE_LLAMA_CPP_MODEL")
-        try:
-            os.environ["NEXE_LLAMA_CPP_MODEL"] = str(local_path)
-            from plugins.llama_cpp_module.core.config import LlamaCppConfig
-            from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
-            from plugins.llama_cpp_module.core.model_pool import ModelPool
-            new_config = LlamaCppConfig.from_env()  # type: ignore[assignment]
-        finally:
-            if _prev is None:
-                os.environ.pop("NEXE_LLAMA_CPP_MODEL", None)
-            else:
-                os.environ["NEXE_LLAMA_CPP_MODULE"] = _prev
-        if hasattr(engine, '_node') and engine._node:
-            if engine._node.config.model_path != new_config.model_path:
-                if LlamaCppChatNode._pool is not None:
-                    LlamaCppChatNode._pool.destroy_all()
-                engine._node.config = new_config  # type: ignore[assignment]
-                LlamaCppChatNode._config = new_config  # type: ignore[assignment]
-                LlamaCppChatNode._pool = ModelPool(new_config)  # type: ignore[arg-type]
-                import logging as _lg
-                _lg.getLogger(__name__).info("Llama.cpp model switched to: %s", new_config.model_path)
+        _switch_llama_cpp_model(engine, local_path)
 
 
 def _build_rag_items_tuple(relevant_results) -> list[tuple[str, float]]:
