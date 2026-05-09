@@ -377,16 +377,80 @@ async def _handle_user_message(
             click.echo(click.style(f"    {col:<15} {bar} {score:.0%}", fg=color))
 
 
+def _chat_emit_ignored_flags(no_rag: bool, system: Optional[str]) -> None:
+    """Warn about CLI flags that are ignored by the UI pipeline."""
+    if no_rag:
+        click.echo(click.style("ℹ️  --no-rag ignored: the UI pipeline always manages memory context.", fg="yellow"))
+    if system:
+        click.echo(click.style("ℹ️  --system ignored: the system prompt is managed by the server.", fg="yellow"))
+
+
+async def _chat_resolve_actual_engine(nexe_url: str, engine: str) -> str:
+    """Best-effort query of /status to detect actual engine (e.g. fallback). Returns updated engine string."""
+    try:
+        import httpx
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.get(f"{nexe_url}/status", timeout=5.0)
+            if response.status_code == 200:
+                status = response.json()
+                actual_engine = status.get("engine", engine)
+                if actual_engine != engine:
+                    return f"{actual_engine} (fallback)"
+    except Exception:  # nosec B110: best-effort engine status fetch; on failure keep the engine value from CLI/.env
+        pass
+    return engine
+
+
+def _chat_build_stream_kwargs(collections: Optional[str], rag_threshold: Optional[float]) -> "dict[str, Any]":
+    """Build and return the stream_kwargs dict from RAG options, echoing active settings."""
+    _rag_collections = _parse_collections(collections)
+    _stream_kwargs: dict[str, Any] = {}
+    if _rag_collections:
+        click.echo(click.style(f"  Collections: {', '.join(_rag_collections)}", fg="cyan"))
+        _stream_kwargs['rag_collections'] = _rag_collections
+    if rag_threshold is not None:
+        click.echo(click.style(f"  RAG threshold: {rag_threshold}", fg="cyan"))
+        _stream_kwargs['rag_threshold'] = rag_threshold
+    return _stream_kwargs
+
+
+async def _chat_handle_input(user_input: str, client, session_id: str, stream_kwargs: dict, verbose: bool) -> "tuple[bool, str]":
+    """Handle a single line of user input.
+
+    Returns (should_break, updated_session_id).
+    """
+    if user_input.lower() in ["exit", "quit", "q"]:
+        return True, session_id
+
+    if user_input.lower() == "clear":
+        new_session_id = await client.create_ui_session()
+        if new_session_id:
+            session_id = new_session_id
+            click.echo("🧹 History cleared.")
+        else:
+            click.echo(click.style("❌ Error reiniciant sessió.", fg="red"))
+        return False, session_id
+
+    KNOWN_COMMANDS = {"save", "recall", "help", "upload"}
+    _first_token = user_input[1:].split()[0].lower() if len(user_input) > 1 else ""
+    if user_input.startswith("/") and _first_token in KNOWN_COMMANDS:
+        cmd_parts = user_input[1:].split(" ", 1)
+        cmd = cmd_parts[0].lower()
+        cmd_arg = cmd_parts[1] if len(cmd_parts) > 1 else ""
+        await _handle_slash_command(cmd, cmd_arg, client, session_id, stream_kwargs)
+        return False, session_id
+
+    await _handle_user_message(user_input, client, session_id, stream_kwargs, verbose)
+    return False, session_id
+
+
 async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool = False,
                       rag_threshold: Optional[float] = None, collections: Optional[str] = None):
     from .utils.api_client import NexeAPIClient
 
     engine, model = await _resolve_chat_engine_and_model(engine, model)
 
-    if no_rag:
-        click.echo(click.style("ℹ️  --no-rag ignored: the UI pipeline always manages memory context.", fg="yellow"))
-    if system:
-        click.echo(click.style("ℹ️  --system ignored: the system prompt is managed by the server.", fg="yellow"))
+    _chat_emit_ignored_flags(no_rag, system)
 
     client = NexeAPIClient()
 
@@ -398,31 +462,14 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
         click.echo("Make sure you have run './nexe go' in another terminal before starting the chat.\n")
         return
 
-    try:
-        import httpx
-        async with httpx.AsyncClient() as http_client:
-            response = await http_client.get(f"{_nexe_url}/status", timeout=5.0)
-            if response.status_code == 200:
-                status = response.json()
-                actual_engine = status.get("engine", engine)
-                if actual_engine != engine:
-                    engine = f"{actual_engine} (fallback)"
-    except Exception:  # nosec B110: best-effort engine status fetch; on failure keep the engine value from CLI/.env
-        pass
+    engine = await _chat_resolve_actual_engine(_nexe_url, engine)
 
     session_id = await _create_chat_session(client)
     if not session_id:
         click.echo(click.style("⚠️  Could not create UI session. Check that the web_ui module is active.", fg="yellow"))
         return
 
-    _rag_collections = _parse_collections(collections)
-    _stream_kwargs: dict[str, Any] = {}
-    if _rag_collections:
-        click.echo(click.style(f"  Collections: {', '.join(_rag_collections)}", fg="cyan"))
-        _stream_kwargs['rag_collections'] = _rag_collections
-    if rag_threshold is not None:
-        click.echo(click.style(f"  RAG threshold: {rag_threshold}", fg="cyan"))
-        _stream_kwargs['rag_threshold'] = rag_threshold
+    _stream_kwargs = _chat_build_stream_kwargs(collections, rag_threshold)
 
     click.echo(f"\n  {click.style('🚀 Nexe Chat', fg='cyan', bold=True)}")
     click.echo(f"  {click.style('Engine:', fg='yellow')} {engine}  |  {click.style('Model:', fg='yellow')} {model}  |  {click.style('Memory:', fg='yellow')} ✅ Active")
@@ -433,30 +480,9 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
     while True:
         try:
             user_input = click.prompt(click.style("Tu", fg="green", bold=True))
-
-            if user_input.lower() in ["exit", "quit", "q"]:
+            should_break, session_id = await _chat_handle_input(user_input, client, session_id, _stream_kwargs, verbose)
+            if should_break:
                 break
-
-            if user_input.lower() == "clear":
-                new_session_id = await client.create_ui_session()
-                if new_session_id:
-                    session_id = new_session_id
-                    click.echo("🧹 History cleared.")
-                else:
-                    click.echo(click.style("❌ Error reiniciant sessió.", fg="red"))
-                continue
-
-            KNOWN_COMMANDS = {"save", "recall", "help", "upload"}
-            _first_token = user_input[1:].split()[0].lower() if len(user_input) > 1 else ""
-            if user_input.startswith("/") and _first_token in KNOWN_COMMANDS:
-                cmd_parts = user_input[1:].split(" ", 1)
-                cmd = cmd_parts[0].lower()
-                cmd_arg = cmd_parts[1] if len(cmd_parts) > 1 else ""
-                await _handle_slash_command(cmd, cmd_arg, client, session_id, _stream_kwargs)
-                continue
-
-            await _handle_user_message(user_input, client, session_id, _stream_kwargs, verbose)
-
         except KeyboardInterrupt:
             click.echo("\n👋 Goodbye!")
             break
