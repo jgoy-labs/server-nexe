@@ -92,6 +92,70 @@ HOME_NEXE_FILES = ("mail365_tokens.json", "mail365.json")
 # ── Stop server helpers ─────────────────────────────────────────────────
 
 
+def _read_pid_file(pid_file: Path) -> Optional[int]:
+    """Read and return the PID from pid_file, or None if corrupt/missing.
+
+    Deletes a corrupt pid_file and logs a warning.
+    """
+    try:
+        return int(pid_file.read_text().strip())
+    except (OSError, ValueError) as e:
+        logger.warning("Could not read supervisor PID file: %s", e)
+        try:
+            pid_file.unlink()
+        except OSError:
+            pass
+        return None
+
+
+def _check_pid_alive(pid: int) -> Optional[bool]:
+    """Return True if pid exists, False if dead, None if permission denied."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return None
+
+
+def _wait_for_pid_exit(pid: int, pid_file: Path, timeout: float) -> bool:
+    """Poll until pid exits or timeout. Clean up pid_file on exit. Return True if gone."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            try:
+                pid_file.unlink()
+            except OSError:
+                pass
+            return True
+        time.sleep(0.2)
+    return False
+
+
+def _sigkill_pid(pid: int, pid_file: Path) -> bool:
+    """Send SIGKILL to pid and confirm it is dead. Return True if gone."""
+    logger.warning("Supervisor PID=%d did not exit on SIGTERM, sending SIGKILL", pid)
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        return False
+
+    time.sleep(0.5)
+    alive = _check_pid_alive(pid)
+    if alive:
+        return False  # still alive
+    try:
+        pid_file.unlink()
+    except OSError:
+        pass
+    return True
+
+
 def _default_stop_server(project_root: Path, timeout: float = 10.0) -> bool:
     """Stop the supervisor if it is running via PID file at storage/logs/.
 
@@ -102,29 +166,18 @@ def _default_stop_server(project_root: Path, timeout: float = 10.0) -> bool:
     if not pid_file.exists():
         return True
 
-    try:
-        pid_str = pid_file.read_text().strip()
-        pid = int(pid_str)
-    except (OSError, ValueError) as e:
-        logger.warning("Could not read supervisor PID file: %s", e)
-        # Corrupt PID file → delete it, consider that no server is running
-        try:
-            pid_file.unlink()
-        except OSError:
-            pass
-        return True
+    pid = _read_pid_file(pid_file)
+    if pid is None:
+        return True  # Corrupt pid file was cleaned up
 
-    # Check if the process exists
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        # Process dead, just clean up the pidfile
+    alive = _check_pid_alive(pid)
+    if alive is False:
         try:
             pid_file.unlink()
         except OSError:
             pass
         return True
-    except PermissionError:
+    if alive is None:
         logger.warning("No permission to signal supervisor PID %d", pid)
         return False
 
@@ -137,38 +190,10 @@ def _default_stop_server(project_root: Path, timeout: float = 10.0) -> bool:
     except PermissionError:
         return False
 
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            try:
-                pid_file.unlink()
-            except OSError:
-                pass
-            return True
-        time.sleep(0.2)
-
-    # Did not die → SIGKILL
-    logger.warning("Supervisor PID=%d did not exit on SIGTERM, sending SIGKILL", pid)
-    try:
-        os.kill(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    except PermissionError:
-        return False
-
-    # Last check
-    time.sleep(0.5)
-    try:
-        os.kill(pid, 0)
-        return False  # still alive
-    except ProcessLookupError:
-        try:
-            pid_file.unlink()
-        except OSError:
-            pass
+    if _wait_for_pid_exit(pid, pid_file, timeout):
         return True
+
+    return _sigkill_pid(pid, pid_file)
 
 
 def detect_existing_install(project_root: Path) -> bool:
