@@ -2045,3 +2045,25 @@ expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
 
+
+# ═══════════════════════════════════════════════════════════════
+# license-compat UNKNOWN — paquets sense metadada de llicència a PyPI
+# ═══════════════════════════════════════════════════════════════
+
+[[exception]]
+rule = "license.unknown"
+path = "pyproject.toml"
+message_contains = "sentencepiece"
+reason = "Google sentencepiece — Apache-2.0 (github.com/google/sentencepiece); PyPI metadata does not declare license field"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "license-compat-20260509"
+
+[[exception]]
+rule = "license.unknown"
+path = "pyproject.toml"
+message_contains = "py_rust_stemmers"
+reason = "py_rust_stemmers — MIT/Apache per convenció Rust crate; PyPI metadata does not declare license field"
+expires = "2027-05-09"
+authorized_by = "Jordi Goy"
+ticket = "license-compat-20260509"
