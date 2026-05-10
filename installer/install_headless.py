@@ -162,6 +162,7 @@ def run_headless(config):
     _original_input = builtins.input
 
     def _auto_input(prompt=""):
+        """Auto-respond to interactive prompts during headless installation."""
         prompt_str = str(prompt)
         if "[1/" in prompt_str or "[1-" in prompt_str:
             response = "1"

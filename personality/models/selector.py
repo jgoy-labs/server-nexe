@@ -19,6 +19,7 @@ from .profiles import PROFILES, HardwareTier, ModelProfile, EngineType
 logger = logging.getLogger(__name__)
 
 class HardwareProfile:
+    """Snapshot of the host machine's hardware capabilities."""
     def __init__(self):
         self.system = platform.system()
         self.processor = platform.processor()
@@ -36,9 +37,11 @@ class ModelSelector:
     """Selecciona el millor perfil de models segons el maquinari."""
     
     def __init__(self):
+        """Initialize the selector with a fresh hardware profile."""
         self.hw = HardwareProfile()
         
     def analyze(self) -> HardwareProfile:
+        """Return the detected hardware profile."""
         return self.hw
 
     def recommend(self) -> ModelProfile:
@@ -58,6 +61,7 @@ class ModelSelector:
         return profile
     
     def _determine_tier(self) -> HardwareTier:
+        """Determine the hardware tier based on total RAM."""
         ram = self.hw.total_ram_gb
         
         if ram < 8:
@@ -70,6 +74,7 @@ class ModelSelector:
             return HardwareTier.ULTRA
 
     def _check_ollama_available(self) -> bool:
+        """Check whether the Ollama binary is available on PATH."""
         return shutil.which("ollama") is not None
 
     def apply_to_config(self, config: dict, profile: ModelProfile) -> dict:

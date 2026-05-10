@@ -278,6 +278,7 @@ class ModuleManager:
     logger.info(get_message(self.i18n, 'api.integrator.set'))
 
   def _resolve_memory_class_name(self, module_name: str) -> str:
+    """Resolve the expected class name for a memory module (e.g. 'rag' -> 'RAGModule')."""
     if module_name == "rag":
       return "RAGModule"
     return f"{module_name.capitalize()}Module"
@@ -288,6 +289,7 @@ class ModuleManager:
     memory_path,
     config: Optional[Dict[Any, Any]],
   ):
+    """Import, instantiate, and initialize a single memory module by name."""
     import importlib
     module_path = memory_path / module_name
     manifest_file = module_path / "manifest.py"
@@ -605,6 +607,7 @@ class ModuleManager:
       register_removed_route(module_name, manifest_route, prefix)
 
   def _attach_named_router(self, app, manifest_module, attr_name: str, module_name: str, removed_routes: list) -> bool:
+    """Attach a router by attribute name from a manifest module to the FastAPI app."""
     if not hasattr(manifest_module, attr_name):
       return False
     router = getattr(manifest_module, attr_name)
@@ -615,6 +618,7 @@ class ModuleManager:
     return True
 
   def _attach_get_router(self, app, manifest_module, module_name: str, removed_routes: list) -> bool:
+    """Attach a router obtained via the manifest's get_router() factory method."""
     from core.loader.protocol import PluginLoadError
     if not hasattr(manifest_module, 'get_router'):
       return False
@@ -650,6 +654,7 @@ class ModuleManager:
     return routers_loaded
 
   def _resolve_plugin_instance(self, module_name: str, manifest_module):
+    """Resolve the plugin instance from a manifest module by trying known attribute names."""
     for attr in ['get_module_instance', 'module_instance', '_module', '_ollama_module']:
       if attr == 'get_module_instance' and hasattr(manifest_module, attr):
         try:

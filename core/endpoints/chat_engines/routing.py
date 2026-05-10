@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def _normalize_engine(engine: Optional[str]) -> Optional[str]:
+    """Normalize engine name to its canonical snake_case form."""
     if not engine:
         return None
     value = engine.strip().lower()
@@ -40,6 +41,7 @@ def _get_preferred_engine(app_state) -> Optional[str]:
     return config.get("plugins", {}).get("models", {}).get("preferred_engine")
 
 def _engine_available(engine: str, app_state) -> bool:
+    """Check whether the given engine's module is loaded in app state."""
     modules = getattr(app_state, "modules", {}) or {}
     if engine == "ollama":
         return "ollama_module" in modules
@@ -50,6 +52,7 @@ def _engine_available(engine: str, app_state) -> bool:
     return False
 
 def _resolve_engine(request_engine: Optional[str], app_state) -> tuple[str, Optional[str]]:
+    """Resolve the engine to use, returning (engine, fallback_from) tuple."""
     requested = _normalize_engine(request_engine)
     if requested and requested != "auto":
         return requested, None

@@ -121,6 +121,7 @@ class RemovedDirectRoutesGuard(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):
+        """Return 403 for paths matching removed plugin routes; pass through otherwise."""
         path = request.url.path
         for pattern, plugin_name, manifest_route, full_route in _REMOVED_ROUTE_PATTERNS:
             if pattern.match(path):

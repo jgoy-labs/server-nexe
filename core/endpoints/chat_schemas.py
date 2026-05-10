@@ -14,12 +14,16 @@ from typing import List, Optional
 
 
 class Message(BaseModel):
+    """A single message in a chat conversation (role + content)."""
+
     role: str
     content: str
 
     model_config = ConfigDict(protected_namespaces=())
 
 class ChatCompletionRequest(BaseModel):
+    """Request body for the ``/v1/chat/completions`` endpoint."""
+
     messages: List[Message] = Field(..., min_length=1)
     model: Optional[str] = None
     engine: Optional[str] = "auto"

@@ -69,6 +69,7 @@ _I18N = {
     "ask_now":        {"ca": "\nAra pots preguntar sobre els teus documents al chat!", "es": "\n¡Ya puedes preguntar sobre tus documentos en el chat!", "en": "\nYou can now ask about your documents in the chat!"},
 }
 def _t(key, **kwargs):
+    """Return the translated string for the given key and current language."""
     s = _I18N.get(key, {}).get(_LANG) or _I18N.get(key, {}).get("ca", key)
     return s.format(**kwargs) if kwargs else s
 
@@ -321,6 +322,7 @@ async def _ingest_from_precomputed(
 
 
 def _resolve_knowledge_path(folder, lang) -> Path:
+    """Resolve the knowledge folder path, preferring a language-specific subdirectory."""
     knowledge_path = folder or PROJECT_ROOT / "knowledge"
     lang_path = knowledge_path / lang
     if lang_path.is_dir():
@@ -329,6 +331,7 @@ def _resolve_knowledge_path(folder, lang) -> Path:
 
 
 def _discover_documents(knowledge_path) -> list[Path]:
+    """Discover all supported documents recursively under the knowledge path."""
     files: list[Path] = []
     for ext in SUPPORTED_EXTENSIONS:
         files.extend(knowledge_path.glob(f"**/*{ext}"))
@@ -343,6 +346,7 @@ def _print_ingestion_header(files) -> None:
 
 
 async def _initialize_memory() -> "Any":
+    """Create and initialize a MemoryAPI instance."""
     from memory.memory.api import MemoryAPI
     memory = MemoryAPI()
     await memory.initialize()
@@ -350,6 +354,7 @@ async def _initialize_memory() -> "Any":
 
 
 async def _ensure_collection(memory, target_collection, log) -> bool:
+    """Ensure the target Qdrant collection exists, creating it if needed."""
     log(_t("preparing_col", c=target_collection))
     try:
         if not await memory.collection_exists(target_collection):
@@ -362,6 +367,7 @@ async def _ensure_collection(memory, target_collection, log) -> bool:
 
 
 async def _try_precomputed_kb(memory, default_root, lang, log) -> bool:
+    """Attempt to load a precomputed knowledge base, returning True on success."""
     try:
         _kb = PrecomputedKB(default_root)
         if _kb.exists():
@@ -382,6 +388,7 @@ async def _try_precomputed_kb(memory, default_root, lang, log) -> bool:
 
 
 async def _process_file_batch(memory, files, target_collection, ingest_cfg, mega_batch_on, log) -> tuple[int, dict[str, list[dict[str, Any]]], int]:
+    """Process all files for ingestion, returning chunk count, batched items, and chunking time."""
     total_chunks = 0
     mega_items_by_collection: dict[str, list[dict[str, Any]]] = {}
     _perf_chunking_ref = [0]
@@ -412,6 +419,7 @@ async def _process_file_batch(memory, files, target_collection, ingest_cfg, mega
 
 
 def _emit_final_summary(files, total_chunks, target_collection, log) -> None:
+    """Print the final ingestion summary with document and chunk counts."""
     log(f"\n{'='*60}")
     log(_t("ingestion_done"))
     log(_t("docs_processed", n=len(files)))

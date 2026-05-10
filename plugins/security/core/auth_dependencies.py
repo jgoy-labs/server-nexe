@@ -69,6 +69,7 @@ def _update_key_metrics(keys_config) -> None:
 
 
 def _check_dev_mode(request: Request, dev_mode: bool) -> str:
+  """Bypass auth in dev mode if the request comes from localhost."""
   if dev_mode:
     client_ip = request.client.host if request.client else "unknown"
     allow_remote = os.getenv("NEXE_DEV_MODE_ALLOW_REMOTE", "false").lower() == "true"
@@ -96,6 +97,7 @@ def _check_dev_mode(request: Request, dev_mode: bool) -> str:
 
 
 def _authenticate_primary(x_api_key: str, keys_config, request: Request) -> Optional[str]:
+  """Attempt constant-time authentication against the primary API key."""
   if keys_config.primary and keys_config.primary.is_valid:
     if secrets.compare_digest(x_api_key, keys_config.primary.key):
       record_auth_attempt('success', 'primary', request.url.path)
@@ -118,6 +120,7 @@ def _authenticate_primary(x_api_key: str, keys_config, request: Request) -> Opti
 
 
 def _authenticate_secondary(x_api_key: str, keys_config, request: Request) -> Optional[str]:
+  """Attempt constant-time authentication against the secondary (deprecated) key."""
   if keys_config.secondary and keys_config.secondary.is_valid:
     if secrets.compare_digest(x_api_key, keys_config.secondary.key):
       record_auth_attempt('success', 'secondary', request.url.path)
@@ -141,6 +144,7 @@ def _authenticate_secondary(x_api_key: str, keys_config, request: Request) -> Op
 
 
 def _log_failure(request: Request, keys_config) -> None:
+  """Record an authentication failure to metrics and the IRONCLAD security log."""
   failure_reason = "invalid_api_key"
   if keys_config.primary and keys_config.primary.status == KeyStatus.EXPIRED:
     failure_reason = "primary_key_expired"

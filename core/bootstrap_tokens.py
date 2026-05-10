@@ -35,6 +35,7 @@ class BootstrapTokenManager:
   _initialized: bool = False
 
   def __new__(cls) -> 'BootstrapTokenManager':
+    """Return the singleton instance, creating it on first call."""
     with cls._lock:
       if cls._instance is None:
         cls._instance = super().__new__(cls)
@@ -80,6 +81,7 @@ class BootstrapTokenManager:
     logger.info("BootstrapTokenManager initialized with persistent storage: %s", self._db_path)
 
   def _get_conn(self):
+    """Open a SQLite connection to the token database, auto-initializing if needed."""
     if not self._initialized:
       # Fall back to a default path if initialize_on_startup was not called
       self.initialize_on_startup(Path.cwd())
@@ -281,12 +283,15 @@ def initialize_tokens(project_root: Path):
   _manager.initialize_on_startup(project_root)
 
 def set_bootstrap_token(token: str, ttl_minutes: int = 30):
+  """Store a bootstrap token with the given TTL (default 30 min)."""
   _manager.set_bootstrap_token(token, ttl_minutes)
 
 def get_bootstrap_token() -> Optional[Dict[str, Any]]:
+  """Retrieve the current bootstrap token record, or ``None`` if expired/absent."""
   return _manager.get_bootstrap_token()
 
 def validate_master_bootstrap(token: str) -> bool:
+  """Validate a master bootstrap token against the stored value."""
   return _manager.validate_master_bootstrap(token)
 
 def check_bootstrap_rate_limit(
@@ -295,13 +300,17 @@ def check_bootstrap_rate_limit(
   global_limit: int = 10,
   ip_limit: int = 3
 ) -> str:
+  """Check bootstrap rate limits and return 'allowed', 'global_exceeded', or 'ip_exceeded'."""
   return _manager.check_bootstrap_rate_limit(client_ip, window_seconds, global_limit, ip_limit)
 
 def create_session_token(ttl_seconds: int = 900) -> str:
+  """Create an ephemeral session token valid for *ttl_seconds*."""
   return _manager.create_session_token(ttl_seconds)
 
 def validate_session_token(token: str) -> bool:
+  """Return ``True`` if the session token exists and has not expired."""
   return _manager.validate_session_token(token)
 
 def invalidate_token(token: str) -> None:
+  """Remove a session token from the database."""
   _manager.invalidate_token(token)

@@ -15,18 +15,24 @@ from typing import Optional
 from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
 
 class EngineType(str, Enum):
+    """Supported LLM inference backends."""
+
     AUTO = "auto"
     MLX = "mlx"
     OLLAMA = "ollama"
     LLAMA_CPP = "llama_cpp"
 
 class HardwareTier(str, Enum):
+    """Hardware classification by available RAM."""
+
     MICRO = "micro"       # RPi, < 8GB
     CONSUMER = "consumer" # 8GB - 16GB
     PRO = "pro"          # 16GB - 32GB
     ULTRA = "ultra"       # > 32GB
 
 class ModelProfile(BaseModel):
+    """Default model configuration for a given hardware tier."""
+
     tier: HardwareTier
     primary_model: str
     secondary_model: str

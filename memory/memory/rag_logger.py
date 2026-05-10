@@ -18,6 +18,8 @@ from typing import Any, Dict, List, Optional
 from memory.embeddings.constants import DEFAULT_VECTOR_SIZE
 
 class Colors:
+  """ANSI escape codes for terminal coloring."""
+
   RESET = "\033[0m"
   BOLD = "\033[1m"
   DIM = "\033[2m"
@@ -44,6 +46,8 @@ class Colors:
   BG_BLUE = "\033[44m"
 
 class RAGEmojis:
+  """Emoji constants used in RAG log output."""
+
   RECALL = "🔍"
   STORE = "💾"
   SEARCH = "🎯"

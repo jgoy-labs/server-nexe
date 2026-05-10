@@ -95,6 +95,7 @@ def _print_hw_summary(hw_type, ram_gb, disk_total_gb, disk_free_gb, is_apple_sil
 
 
 def detect_hardware():
+    """Detect system hardware (RAM, CPU type, Metal support, disk space) and return a summary dict."""
     global HW_INFO
     print_step(f"{BOLD}{t('analyzing_hardware')}{RESET}")
     sys_type = platform.system()

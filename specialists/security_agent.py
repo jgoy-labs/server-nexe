@@ -22,9 +22,11 @@ class SecurityAgent(BaseAgent):
 
     @property
     def agent_name(self) -> str:
+        """Return the unique identifier for this agent."""
         return "security_agent"
 
     def diagnose(self) -> Dict[str, Any]:
+        """Scan all Python files for security patterns and compare with last run."""
         findings: List[Dict] = []
         py_files_scanned = 0
         top_offenders: List[str] = []
@@ -82,6 +84,7 @@ class SecurityAgent(BaseAgent):
         yield from self.project_path.glob("*.py")
 
     def _scan_file(self, py_file: Path) -> List[Dict]:
+        """Scan a single Python file for hardcoded secret patterns."""
         findings = []
         try:
             content = py_file.read_text(encoding="utf-8", errors="ignore")

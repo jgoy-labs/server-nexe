@@ -95,6 +95,7 @@ def _get_system_prompt(app_state: Any, lang: Optional[str] = None) -> str:
 # --- Helper Functions ---
 
 def _validate_chat_request(body: ChatCompletionRequest) -> None:
+    """Sanitize and validate all user-supplied fields in the chat request."""
     if body.model is not None:
         body.model = validate_string_input(body.model, max_length=200, context="param")
     if body.engine is not None:
@@ -169,6 +170,11 @@ def _inject_rag_context_into_messages(messages: list, context_text: str, server_
 async def _build_rag_and_system_prompt(
     body: ChatCompletionRequest, app_state: Any, server_lang: str
 ) -> tuple[list[dict], str]:
+    """Build the final messages list with system prompt and injected RAG context.
+
+    Returns:
+        Tuple of (messages, raw_context_text).
+    """
     context_text = await _fetch_rag_context(body, app_state, server_lang)
 
     messages = [m.model_dump() for m in body.messages]
@@ -184,6 +190,7 @@ async def _dispatch_to_engine(
     engine: str, messages: list[dict], body: ChatCompletionRequest,
     request: Request, app_state: Any, last_user_msg: Optional[str]
 ) -> Any:
+    """Route the chat request to the resolved backend engine (Ollama, MLX, or llama.cpp)."""
     if engine.lower() == "ollama":
         return await _forward_to_ollama(messages, body, app_state, last_user_msg)
     elif engine.lower() == "mlx":
@@ -195,6 +202,7 @@ async def _dispatch_to_engine(
 
 
 def _record_engine_metrics(engine: str, engine_status: str, start_time: float) -> None:
+    """Emit Prometheus counters and histogram for the chat engine invocation."""
     try:
         from core.metrics.registry import CHAT_ENGINE_REQUESTS, CHAT_ENGINE_DURATION
         CHAT_ENGINE_REQUESTS.labels(engine=engine, status=engine_status).inc()
@@ -207,6 +215,7 @@ def _schedule_episodic_memory(
     response: Any, background_tasks: BackgroundTasks,
     app_state: Any, last_user_msg: Optional[str]
 ) -> None:
+    """Queue a background task to save the conversation turn to episodic memory."""
     if not isinstance(response, StreamingResponse):
         try:
             content = ""
@@ -230,6 +239,7 @@ def _schedule_episodic_memory(
 def _inject_response_headers(
     response: Any, engine: str, context_text: str, preferred_fallback: Optional[str]
 ) -> Any:
+    """Add ``X-Nexe-*`` headers (engine, RAG status, fallback) to the response."""
     if isinstance(response, StreamingResponse):
         if "X-Nexe-Engine" not in response.headers:
             response.headers["X-Nexe-Engine"] = engine

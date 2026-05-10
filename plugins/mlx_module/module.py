@@ -34,6 +34,7 @@ class MLXModule:
 
     @property
     def metadata(self) -> ModuleMetadata:
+        """Return static module metadata for the MLX engine."""
         return ModuleMetadata(
             name="mlx_module",
             version="1.0.0-beta",
@@ -77,13 +78,16 @@ class MLXModule:
                 return False
 
     def _init_router(self):
+        """Create the MLX API router from api/routes.py."""
         from .api.routes import create_router
         self._router = create_router(self)
 
     def get_router(self) -> APIRouter:
+        """Return the FastAPI router for MLX endpoints."""
         return self._router
 
     def get_router_prefix(self) -> str:
+        """Return the URL prefix for MLX routes."""
         return "/mlx"
 
     async def is_model_loaded(self, model_name: str = "") -> bool:
@@ -115,6 +119,7 @@ class MLXModule:
         return await self._node.execute(inputs)
 
     async def health_check(self) -> HealthResult:
+        """Check MLX module health by querying the inference pool stats."""
         if not self._initialized:
             return HealthResult(status=HealthStatus.UNKNOWN, message="Module not initialized")
         
@@ -135,6 +140,7 @@ class MLXModule:
         self._initialized = False
 
     def get_info(self) -> Dict[str, Any]:
+        """Return module metadata and current cache statistics."""
         return {
             "name": self.metadata.name,
             "version": self.metadata.version,

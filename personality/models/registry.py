@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ModelEntry:
+    """Registry entry mapping a short model name to its engine IDs and metadata."""
     short_name: str
     description: str
     size_gb: float

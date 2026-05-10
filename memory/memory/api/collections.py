@@ -45,6 +45,7 @@ async def create_collection(
   loop = asyncio.get_running_loop()
 
   def _create():
+    """Create the Qdrant collection if it does not exist (blocking)."""
     from memory.memory.engines.qdrant_types import Distance, VectorParams
 
     collections = qdrant.get_collections().collections
@@ -97,6 +98,7 @@ async def list_collections(
   loop = asyncio.get_running_loop()
 
   def _list():
+    """Retrieve all collections with their vector size and point count (blocking)."""
     collections = qdrant.get_collections().collections
     result = []
 
@@ -123,6 +125,7 @@ async def collection_exists(
   loop = asyncio.get_running_loop()
 
   def _exists():
+    """Check whether the named collection exists in Qdrant (blocking)."""
     collections = qdrant.get_collections().collections
     return name in [c.name for c in collections]
 

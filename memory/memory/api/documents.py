@@ -44,6 +44,7 @@ def hex_to_uuid(hex_id: str) -> str:
   return str(uuid.UUID(padded))
 
 def _delete_points(qdrant: Any, collection: str, point_ids: List[str]) -> None:
+  """Delete points from a Qdrant collection, falling back to raw ID list on error."""
   from memory.memory.engines.qdrant_types import PointIdsList
   try:
     qdrant.delete(
@@ -126,6 +127,7 @@ async def store_document(
     }
 
   def _store():
+    """Upsert a single document point into the Qdrant collection."""
     from memory.memory.engines.qdrant_types import PointStruct
     uuid_id = hex_to_uuid(doc_id)
     point = PointStruct(
@@ -218,6 +220,7 @@ async def store_documents_batch(
   loop = asyncio.get_running_loop()
 
   def _batch_upsert():
+    """Upsert all document points into Qdrant in a single call."""
     from memory.memory.engines.qdrant_types import PointStruct
     points = [
       PointStruct(id=hex_to_uuid(did), vector=emb, payload=pl)
@@ -321,6 +324,7 @@ async def search_documents(
   now_iso = datetime.now(timezone.utc).isoformat()
 
   def _search():
+    """Execute Qdrant similarity search and filter expired results."""
     raw = _qdrant_query(qdrant, collection, query_embedding, top_k, threshold, include_expired, filter_metadata)
     return _filter_search_results(raw, collection, top_k, include_expired, now_iso)
 
@@ -352,6 +356,7 @@ async def get_document(
   loop = asyncio.get_running_loop()
 
   def _get():
+    """Retrieve a single document from Qdrant by its hex ID."""
     uuid_id = hex_to_uuid(doc_id)
     try:
       results = qdrant.retrieve(
@@ -412,6 +417,7 @@ async def delete_document(
   loop = asyncio.get_running_loop()
 
   def _delete():
+    """Delete a single document from Qdrant by its hex ID."""
     uuid_id = hex_to_uuid(doc_id)
     try:
       _delete_points(qdrant, collection, [uuid_id])
@@ -442,6 +448,7 @@ async def count_documents(
   loop = asyncio.get_running_loop()
 
   def _count():
+    """Return the point count for a Qdrant collection."""
     info = qdrant.get_collection(collection)
     return info.points_count
 

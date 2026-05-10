@@ -29,6 +29,7 @@ class ModuleRegistry:
   """
 
   def __init__(self) -> None:
+    """Initialize an empty module registry."""
     self._modules: Dict[str, ModuleRecord] = {}
 
   def register(
@@ -39,6 +40,15 @@ class ModuleRegistry:
     capabilities: Optional[List[str]] = None,
     priority: int = 0,
   ) -> None:
+    """Register a module instance under the given name.
+
+    Args:
+        name: Unique module name used as the lookup key.
+        instance: The module instance to register.
+        module_id: Optional identifier from the module manifest.
+        capabilities: List of capability strings the module provides.
+        priority: Higher values are returned first by :meth:`find_by_capability`.
+    """
     caps = list(capabilities or [])
     self._modules[name] = ModuleRecord(
       name=name,
@@ -49,12 +59,15 @@ class ModuleRegistry:
     )
 
   def get(self, name: str) -> Optional[ModuleRecord]:
+    """Look up a registered module by name, or ``None`` if not found."""
     return self._modules.get(name)
 
   def list(self) -> List[ModuleRecord]:
+    """Return all registered module records."""
     return list(self._modules.values())
 
   def find_by_capability(self, capability: str) -> List[ModuleRecord]:
+    """Return modules that declare the given capability, sorted by priority descending."""
     matches = []
     for record in self._modules.values():
       if capability in record.capabilities:

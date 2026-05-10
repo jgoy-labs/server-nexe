@@ -16,6 +16,7 @@ from installer.install import run_installer
 
 
 def main():
+    """Entry point that delegates to the interactive installer."""
     run_installer()
 
 

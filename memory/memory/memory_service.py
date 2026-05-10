@@ -43,6 +43,7 @@ class MemoryService:
         db_path: Optional[Path] = None,
         qdrant_path: Optional[str] = None,
     ):
+        """Initialize pipeline components and storage backends."""
         self._config = config or get_config()
         self._db_path = db_path or Path(
             self._config.db_path or "storage/vectors/memory_v1.db"
@@ -71,6 +72,7 @@ class MemoryService:
 
     @property
     def initialized(self) -> bool:
+        """Whether the service has been initialized (store + vector index ready)."""
         return self._initialized
 
     async def initialize(self) -> bool:

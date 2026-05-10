@@ -17,6 +17,8 @@ from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL, DEFAULT_VECTOR_
 
 @dataclass
 class ExtractionConfig:
+    """Settings for LLM-assisted fact extraction from conversations."""
+
     llm_enabled: bool = False
     llm_threshold: float = 0.8
     session_extractor: str = "end_only"
@@ -24,16 +26,22 @@ class ExtractionConfig:
 
 @dataclass
 class StagingConfig:
+    """Settings for the staging area where memories await consolidation."""
+
     ttl_hours: int = 48
 
 
 @dataclass
 class DreamingConfig:
+    """Settings for the background dreaming (memory consolidation) cycle."""
+
     interval_minutes: int = 15
 
 
 @dataclass
 class BudgetConfig:
+    """Maximum document limits per memory collection."""
+
     profile_max: int = 200
     episodic_max: int = 1000
     notebooks_max: int = 20
@@ -42,6 +50,8 @@ class BudgetConfig:
 
 @dataclass
 class RetrieveConfig:
+    """Thresholds and token budget for RAG retrieval scoring."""
+
     base_threshold: float = 0.40
     floor_threshold: float = 0.45
     ceiling_threshold: float = 0.65
@@ -52,6 +62,8 @@ class RetrieveConfig:
 
 @dataclass
 class GCConfig:
+    """Settings for the garbage-collection daemon (decay, tombstones, scheduling)."""
+
     episodic_half_life_days: int = 60
     full_gc_interval_hours: int = 24
     tombstone_ttl_days: int = 90
