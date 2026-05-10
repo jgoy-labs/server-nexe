@@ -196,18 +196,7 @@ class APIIntegrator:
         logger.error(msg, component="api_integrator", exc_info=True)
         return False
   
-  def _detect_api_components(self, module_instance: Any) -> Dict[str, Any]:
-    """
-    Detecta components d'API en un mòdul.
-    
-    Args:
-      module_instance: Instància del mòdul
-      
-    Returns:
-      Diccionari amb components d'API detectats
-    """
-    components = {}
-    
+  def _detect_router_or_app(self, module_instance: Any, components: Dict[str, Any]) -> None:
     for attr_name in ['router', 'api_router', 'routes', 'app']:
       if hasattr(module_instance, attr_name):
         attr = getattr(module_instance, attr_name)
@@ -217,18 +206,31 @@ class APIIntegrator:
         elif isinstance(attr, FastAPI):
           components['app'] = attr
           break
-    
+
+  def _detect_fastapi_endpoints(self, module_instance: Any, components: Dict[str, Any]) -> None:
     for attr_name in dir(module_instance):
       if attr_name.startswith('_'):
         continue
-        
       attr = getattr(module_instance, attr_name)
       if inspect.ismethod(attr) or inspect.isfunction(attr):
         if hasattr(attr, '__annotations__') and hasattr(attr, '_fastapi_route'):
           if 'endpoints' not in components:
             components['endpoints'] = []
           components['endpoints'].append(attr)
-    
+
+  def _detect_api_components(self, module_instance: Any) -> Dict[str, Any]:
+    """
+    Detecta components d'API en un mòdul.
+
+    Args:
+      module_instance: Instància del mòdul
+
+    Returns:
+      Diccionari amb components d'API detectats
+    """
+    components: Dict[str, Any] = {}
+    self._detect_router_or_app(module_instance, components)
+    self._detect_fastapi_endpoints(module_instance, components)
     return components
   
   def _determine_api_prefix(self, module_name: str, 

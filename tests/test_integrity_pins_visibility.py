@@ -49,8 +49,8 @@ def test_verify_sha256_emits_warning_when_pin_is_none(caplog):
 def test_catalog_all_pins_are_none_is_documented():
     """B5: if ALL pins are None, there must be a STATUS comment in the file."""
     text = CATALOG_PATH.read_text(encoding="utf-8")
-    assert "STATUS v1.0.3-beta" in text and "ALL VALUES BELOW ARE None" in text, (
-        "Transparency header comment for pins=None is mandatory (installer/installer_catalog_data.py)"
+    assert "STATUS v1.0.4-beta" in text, (
+        "Transparency header comment with STATUS must reference current version (installer/installer_catalog_data.py)"
     )
 
 

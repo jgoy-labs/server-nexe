@@ -277,6 +277,68 @@ class ModuleManager:
     self.module_lifecycle.set_api_integrator(api_integrator)
     logger.info(get_message(self.i18n, 'api.integrator.set'))
 
+  def _resolve_memory_class_name(self, module_name: str) -> str:
+    if module_name == "rag":
+      return "RAGModule"
+    return f"{module_name.capitalize()}Module"
+
+  async def _load_single_memory_module(
+    self,
+    module_name: str,
+    memory_path,
+    config: Optional[Dict[Any, Any]],
+  ):
+    import importlib
+    module_path = memory_path / module_name
+    manifest_file = module_path / "manifest.py"
+    if not manifest_file.exists():
+      logger.debug("Memory module manifest not found: %s", manifest_file)
+      return None
+
+    manifest_module = importlib.import_module(f"memory.{module_name}.manifest")
+    if not hasattr(manifest_module, "MODULE_ID"):
+      logger.error("Memory module %s missing MODULE_ID", module_name)
+      return None
+
+    module_id = manifest_module.MODULE_ID
+    logger.info("Loading memory module: %s (ID: %s)", module_name, module_id)
+
+    module_py = importlib.import_module(f"memory.{module_name}.module")
+    module_class_name = self._resolve_memory_class_name(module_name)
+    if not hasattr(module_py, module_class_name):
+      logger.error("Memory module class not found: %s", module_class_name)
+      return None
+
+    module_class = getattr(module_py, module_class_name)
+    instance = module_class.get_instance()
+
+    module_config = config.get(module_name) if config else None
+    success = await instance.initialize(config=module_config)
+    if not success:
+      logger.error("Memory module initialization failed: %s", module_name)
+      return None
+
+    health_status = instance.get_health().get("status", "unhealthy") if hasattr(instance, 'get_health') else "healthy"
+    logger.info("Memory module loaded: %s (ID: %s, health: %s)", module_name, module_id, health_status)
+
+    self.registry.register_module(
+      name=module_name,
+      instance=instance,
+      manifest={"module_id": module_id, "type": "memory"}
+    )
+
+    from personality.events.event_system import create_system_event
+    event = await create_system_event(
+      source="module_manager",
+      event_type="module_loaded",
+      module=module_name,
+      module_id=module_id,
+      type="memory"
+    )
+    await self.events.emit_event(event)
+
+    return module_id, instance
+
   async def load_memory_modules(self, config: Optional[Dict[Any, Any]] = None) -> Dict[str, Any]:
     """
     Load and initialize memory subsystem modules.
@@ -299,8 +361,6 @@ class ModuleManager:
       modules = await module_manager.load_memory_modules()
       embeddings = modules.get("embeddings")
     """
-    import importlib
-
     loaded_modules: Dict[str, Any] = {}
     memory_path = self.path_discovery.base_path / "memory"
 
@@ -312,82 +372,11 @@ class ModuleManager:
     module_order = ["embeddings", "rag", "memory"]
 
     for module_name in module_order:
-      module_path = memory_path / module_name
-      manifest_file = module_path / "manifest.py"
-
-      if not manifest_file.exists():
-        logger.debug("Memory module manifest not found: %s", manifest_file)
-        continue
-
       try:
-        # Import manifest
-        manifest_module = importlib.import_module(f"memory.{module_name}.manifest")
-
-        if not hasattr(manifest_module, "MODULE_ID"):
-          logger.error("Memory module %s missing MODULE_ID", module_name)
-          continue
-
-        module_id = manifest_module.MODULE_ID
-        logger.info("Loading memory module: %s (ID: %s)", module_name, module_id)
-
-        # Import module class
-        module_py = importlib.import_module(f"memory.{module_name}.module")
-
-        # Determine class name
-        if module_name == "rag":
-          module_class_name = "RAGModule"
-        else:
-          module_class_name = f"{module_name.capitalize()}Module"
-
-        if not hasattr(module_py, module_class_name):
-          logger.error("Memory module class not found: %s", module_class_name)
-          continue
-
-        module_class = getattr(module_py, module_class_name)
-
-        # Get singleton instance
-        instance = module_class.get_instance()
-
-        # Initialize with config
-        module_config = config.get(module_name) if config else None
-        success = await instance.initialize(config=module_config)
-
-        if not success:
-          logger.error("Memory module initialization failed: %s", module_name)
-          continue
-
-        # Health check
-        if hasattr(instance, 'get_health'):
-          health = instance.get_health()
-          health_status = health.get("status", "unhealthy")
-        else:
-          health_status = "healthy"
-
-        logger.info(
-          "Memory module loaded: %s (ID: %s, health: %s)",
-          module_name, module_id, health_status
-        )
-
-        # Register in our registry
-        self.registry.register_module(
-          name=module_name,
-          instance=instance,
-          manifest={"module_id": module_id, "type": "memory"}
-        )
-
-        loaded_modules[module_id] = instance
-
-        # Emit event
-        from personality.events.event_system import create_system_event
-        event = await create_system_event(
-          source="module_manager",
-          event_type="module_loaded",
-          module=module_name,
-          module_id=module_id,
-          type="memory"
-        )
-        await self.events.emit_event(event)
-
+        result = await self._load_single_memory_module(module_name, memory_path, config)
+        if result is not None:
+          module_id, instance = result
+          loaded_modules[module_id] = instance
       except Exception as e:
         logger.error("Memory module load error: %s - %s", module_name, str(e))
         continue
@@ -615,62 +604,52 @@ class ModuleManager:
     for manifest_route in removed_routes:
       register_removed_route(module_name, manifest_route, prefix)
 
+  def _attach_named_router(self, app, manifest_module, attr_name: str, module_name: str, removed_routes: list) -> bool:
+    if not hasattr(manifest_module, attr_name):
+      return False
+    router = getattr(manifest_module, attr_name)
+    self._check_removed_routes_collision(router, removed_routes, module_name)
+    self._register_removed_routes(router, removed_routes, module_name)
+    app.include_router(router)
+    logger.info(f"Loaded {attr_name} from {module_name}")
+    return True
+
+  def _attach_get_router(self, app, manifest_module, module_name: str, removed_routes: list) -> bool:
+    from core.loader.protocol import PluginLoadError
+    if not hasattr(manifest_module, 'get_router'):
+      return False
+    try:
+      router = manifest_module.get_router()
+      if router:
+        self._check_removed_routes_collision(router, removed_routes, module_name)
+        self._register_removed_routes(router, removed_routes, module_name)
+        app.include_router(router)
+        logger.info(f"Loaded router via get_router() from {module_name}")
+        return True
+    except PluginLoadError:
+      raise  # collision is a hard error — propagate to load_plugin_routers
+    except Exception as e:
+      logger.warning(f"Failed to get router from {module_name} via get_router(): {e}")
+    return False
+
   def _load_plugin_routers_from_manifest(self, app, manifest_module, module_name: str, i18n) -> bool:
     """Load routers from manifest module into FastAPI app."""
-    from core.loader.protocol import PluginLoadError
-
     removed_routes = getattr(manifest_module, 'removed_direct_routes', [])
     routers_loaded = False
 
-    if hasattr(manifest_module, 'router_public'):
-      router = manifest_module.router_public
-      self._check_removed_routes_collision(router, removed_routes, module_name)
-      self._register_removed_routes(router, removed_routes, module_name)
-      app.include_router(router)
-      logger.info(f"Loaded router_public from {module_name}")
-      routers_loaded = True
+    for attr_name in ('router_public', 'router_admin', 'router_ui'):
+      if self._attach_named_router(app, manifest_module, attr_name, module_name, removed_routes):
+        routers_loaded = True
 
-    if hasattr(manifest_module, 'router_admin'):
-      router = manifest_module.router_admin
-      self._check_removed_routes_collision(router, removed_routes, module_name)
-      self._register_removed_routes(router, removed_routes, module_name)
-      app.include_router(router)
-      logger.info(f"Loaded router_admin from {module_name}")
-      routers_loaded = True
-
-    if hasattr(manifest_module, 'router_ui'):
-      router = manifest_module.router_ui
-      self._check_removed_routes_collision(router, removed_routes, module_name)
-      self._register_removed_routes(router, removed_routes, module_name)
-      app.include_router(router)
-      logger.info(f"Loaded router_ui from {module_name}")
-      routers_loaded = True
-
-    if not routers_loaded and hasattr(manifest_module, 'get_router'):
-      try:
-        router = manifest_module.get_router()
-        if router:
-          self._check_removed_routes_collision(router, removed_routes, module_name)
-          self._register_removed_routes(router, removed_routes, module_name)
-          app.include_router(router)
-          logger.info(f"Loaded router via get_router() from {module_name}")
-          routers_loaded = True
-      except PluginLoadError:
-        raise  # collision is a hard error — propagate to load_plugin_routers
-      except Exception as e:
-        logger.warning(f"Failed to get router from {module_name} via get_router(): {e}")
+    if not routers_loaded:
+      routers_loaded = self._attach_get_router(app, manifest_module, module_name, removed_routes)
 
     if not routers_loaded:
       logger.info(f"{module_name} has no routers")
 
     return routers_loaded
 
-  def _register_plugin_instance(self, app, module_name: str, manifest_module) -> None:
-    """Register plugin instance in app.state.modules."""
-    if not hasattr(app.state, 'modules'):
-      app.state.modules = {}
-
-    instance = None
+  def _resolve_plugin_instance(self, module_name: str, manifest_module):
     for attr in ['get_module_instance', 'module_instance', '_module', '_ollama_module']:
       if attr == 'get_module_instance' and hasattr(manifest_module, attr):
         try:
@@ -679,14 +658,23 @@ class ModuleManager:
           logger.info(f"{module_name}.{attr}() returned: {instance}")
         except Exception as e:
           logger.error(f"Error calling {module_name}.{attr}(): {e}", exc_info=True)
+          instance = None
       elif hasattr(manifest_module, attr):
         logger.info(f"Getting {module_name}.{attr} (attribute)...")
         instance = getattr(manifest_module, attr)
         logger.info(f"{module_name}.{attr} = {instance}")
-
+      else:
+        instance = None
       if instance is not None:
-        break
+        return instance
+    return None
 
+  def _register_plugin_instance(self, app, module_name: str, manifest_module) -> None:
+    """Register plugin instance in app.state.modules."""
+    if not hasattr(app.state, 'modules'):
+      app.state.modules = {}
+
+    instance = self._resolve_plugin_instance(module_name, manifest_module)
     if instance is None:
       return
 

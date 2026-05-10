@@ -959,7 +959,7 @@ def _switch_llama_cpp_model(engine, local_path) -> None:
         if _prev is None:
             os.environ.pop("NEXE_LLAMA_CPP_MODEL", None)
         else:
-            os.environ["NEXE_LLAMA_CPP_MODULE"] = _prev
+            os.environ["NEXE_LLAMA_CPP_MODEL"] = _prev
     if hasattr(engine, '_node') and engine._node:
         if engine._node.config.model_path != new_config.model_path:
             if LlamaCppChatNode._pool is not None:

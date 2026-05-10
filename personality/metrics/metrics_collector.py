@@ -77,48 +77,47 @@ class MetricsCollector:
             module=module_name,
             **{k: v for k, v in metrics.items() if isinstance(v, (int, float, str))})  # type: ignore[arg-type]  # FP: LoggerAdapter stub rebutja **kwargs custom; runtime ok
   
-  def get_system_metrics(self, modules: Dict[str, ModuleInfo]) -> SystemMetrics:
+  def _compute_avg_load_time(self, running_modules: list) -> float:
+    if not running_modules:
+      return 0.0
+    load_times = [m.load_duration_ms for m in running_modules if m.load_duration_ms]
+    return sum(load_times) / len(load_times) if load_times else 0.0
+
+  def _build_system_metrics(self, modules: Dict[str, ModuleInfo], now) -> "SystemMetrics":
+    total_memory = sum(m.memory_usage_mb for m in modules.values())
+    avg_cpu = sum(m.cpu_usage for m in modules.values()) / max(len(modules), 1)
+    running_modules = [m for m in modules.values() if m.state == ModuleState.RUNNING]
+    avg_load_time = self._compute_avg_load_time(running_modules)
+    uptime_seconds = (now - self._system_start_time).total_seconds()
+    return SystemMetrics(
+      timestamp=now,
+      total_modules=len(modules),
+      running_modules=len(running_modules),
+      total_memory_mb=round(total_memory, 2),
+      average_cpu_usage=round(avg_cpu, 2),
+      average_load_time_ms=round(avg_load_time, 2),
+      total_api_calls=sum(m.api_calls for m in modules.values()),
+      modules_with_errors=len([m for m in modules.values() if m.error_count > 0]),
+      states_breakdown=self._get_states_breakdown(modules),
+      uptime_seconds=uptime_seconds
+    )
+
+  def get_system_metrics(self, modules: Dict[str, ModuleInfo]) -> "SystemMetrics":
     """
     Get comprehensive system metrics.
-    
+
     Args:
       modules: Dictionary of all modules
-      
+
     Returns:
       SystemMetrics snapshot
     """
     with self._lock:
       now = datetime.now(timezone.utc)
-      
-      total_memory = sum(m.memory_usage_mb for m in modules.values())
-      avg_cpu = sum(m.cpu_usage for m in modules.values()) / max(len(modules), 1)
-      
-      running_modules = [m for m in modules.values() if m.state == ModuleState.RUNNING]
-      avg_load_time: float = 0
-      if running_modules:
-        load_times = [m.load_duration_ms for m in running_modules if m.load_duration_ms]
-        avg_load_time = sum(load_times) / len(load_times) if load_times else 0
-      
-      uptime_delta = now - self._system_start_time
-      uptime_seconds = uptime_delta.total_seconds()
-      
-      metrics = SystemMetrics(
-        timestamp=now,
-        total_modules=len(modules),
-        running_modules=len(running_modules),
-        total_memory_mb=round(total_memory, 2),
-        average_cpu_usage=round(avg_cpu, 2),
-        average_load_time_ms=round(avg_load_time, 2),
-        total_api_calls=sum(m.api_calls for m in modules.values()),
-        modules_with_errors=len([m for m in modules.values() if m.error_count > 0]),
-        states_breakdown=self._get_states_breakdown(modules),
-        uptime_seconds=uptime_seconds
-      )
-      
+      metrics = self._build_system_metrics(modules, now)
       self._metrics_history.append(metrics)
       if len(self._metrics_history) > self._max_history:
         self._metrics_history.pop(0)
-      
       return metrics
   
   def _get_states_breakdown(self, modules: Dict[str, ModuleInfo]) -> Dict[str, int]:
@@ -186,44 +185,34 @@ class MetricsCollector:
         for m in recent_metrics
       ]
   
-  def get_performance_summary(self, modules: Dict[str, ModuleInfo]) -> Dict[str, Any]:
-    """
-    Get performance summary for all modules.
-    
-    Args:
-      modules: Dictionary of all modules
-      
-    Returns:
-      Performance summary
-    """
-    running_modules = [m for m in modules.values() if m.state == ModuleState.RUNNING]
-    
-    if not running_modules:
-      return {"status": "no_running_modules"}
-    
-    load_times = [m.load_duration_ms for m in running_modules if m.load_duration_ms]
-    start_times = [m.start_duration_ms for m in running_modules if m.start_duration_ms]
-    
+  @staticmethod
+  def _timing_stats(values: list[float]) -> Dict[str, float]:
+    if not values:
+      return {"min_ms": 0, "max_ms": 0, "avg_ms": 0}
+    return {"min_ms": min(values), "max_ms": max(values), "avg_ms": sum(values) / len(values)}
+
+  @staticmethod
+  def _resource_stats(running: list) -> Dict[str, float]:
     return {
-      "total_running": len(running_modules),
-      "load_performance": {
-        "min_ms": min(load_times) if load_times else 0,
-        "max_ms": max(load_times) if load_times else 0,
-        "avg_ms": sum(load_times) / len(load_times) if load_times else 0
-      },
-      "start_performance": {
-        "min_ms": min(start_times) if start_times else 0,
-        "max_ms": max(start_times) if start_times else 0,
-        "avg_ms": sum(start_times) / len(start_times) if start_times else 0
-      },
-      "resource_usage": {
-        "total_memory_mb": sum(m.memory_usage_mb for m in running_modules),
-        "avg_cpu_percent": sum(m.cpu_usage for m in running_modules) / len(running_modules),
-        "max_memory_mb": max(m.memory_usage_mb for m in running_modules) if running_modules else 0,
-        "max_cpu_percent": max(m.cpu_usage for m in running_modules) if running_modules else 0
-      },
-      "error_rate": len([m for m in running_modules if m.error_count > 0]) / len(running_modules) * 100,
-      "avg_api_calls": sum(m.api_calls for m in running_modules) / len(running_modules)
+      "total_memory_mb": sum(m.memory_usage_mb for m in running),
+      "avg_cpu_percent": sum(m.cpu_usage for m in running) / len(running),
+      "max_memory_mb": max(m.memory_usage_mb for m in running) if running else 0,
+      "max_cpu_percent": max(m.cpu_usage for m in running) if running else 0,
+    }
+
+  def get_performance_summary(self, modules: Dict[str, ModuleInfo]) -> Dict[str, Any]:
+    """Get performance summary for all modules."""
+    running = [m for m in modules.values() if m.state == ModuleState.RUNNING]
+    if not running:
+      return {"status": "no_running_modules"}
+
+    return {
+      "total_running": len(running),
+      "load_performance": self._timing_stats([m.load_duration_ms for m in running if m.load_duration_ms]),
+      "start_performance": self._timing_stats([m.start_duration_ms for m in running if m.start_duration_ms]),
+      "resource_usage": self._resource_stats(running),
+      "error_rate": len([m for m in running if m.error_count > 0]) / len(running) * 100,
+      "avg_api_calls": sum(m.api_calls for m in running) / len(running),
     }
   
   def clear_metrics_history(self) -> int:

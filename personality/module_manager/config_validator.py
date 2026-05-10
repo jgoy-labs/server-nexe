@@ -143,74 +143,77 @@ class ConfigValidator:
     
     return errors
   
+  def _validate_meta_env(self, config: Dict[str, Any]) -> List[str]:
+    """Validate meta.environment value."""
+    if 'meta' not in config:
+      return []
+    env = config['meta'].get('environment')
+    if env and env not in self.VALID_ENVIRONMENTS:
+      return [f"Invalid environment: {env}. Valid: {', '.join(self.VALID_ENVIRONMENTS)}"]
+    return []
+
+  def _validate_server_fields(self, server: Dict[str, Any]) -> List[str]:
+    """Validate core.server port/host/workers fields."""
+    errors: list[str] = []
+    port = server.get('port')
+    if port is not None:
+      if not isinstance(port, int):
+        errors.append(self._get_message('validation.type_mismatch',
+                   key='core.server.port', expected='integer', actual=type(port).__name__))
+      elif not (1 <= port <= 65535):  # nosemgrep: hardcode.port_number
+        errors.append(self._get_message('validation.port_invalid', port=port))
+    host = server.get('host')
+    if host and not isinstance(host, str):
+      errors.append(self._get_message('validation.type_mismatch',
+                 key='core.server.host', expected='string', actual=type(host).__name__))
+    workers = server.get('workers')
+    if workers is not None:
+      if not isinstance(workers, int) or workers < 1:
+        errors.append("core.server.workers must be a positive integer")
+    return errors
+
   def _validate_types_and_values(self, config: Dict[str, Any]) -> tuple[List[str], List[str]]:
-    """Validate data types and value ranges"""
-    errors: list[str] = []
-    warnings: list[str] = []
-    
-    if 'meta' in config:
-      meta = config['meta']
-      
-      env = meta.get('environment')
-      if env and env not in self.VALID_ENVIRONMENTS:
-        errors.append(f"Invalid environment: {env}. Valid: {', '.join(self.VALID_ENVIRONMENTS)}")
-    
+    """Validate data types and value ranges."""
+    errors: list[str] = self._validate_meta_env(config)
     if 'core' in config and 'server' in config['core']:
-      server = config['core']['server']
-      
-      port = server.get('port')
-      if port is not None:
-        if not isinstance(port, int):
-          msg = self._get_message('validation.type_mismatch',
-                     key='core.server.port', expected='integer', actual=type(port).__name__)
-          errors.append(msg)
-        elif not (1 <= port <= 65535):
-          msg = self._get_message('validation.port_invalid', port=port)
-          errors.append(msg)
-      
-      host = server.get('host')
-      if host and not isinstance(host, str):
-        msg = self._get_message('validation.type_mismatch',
-                   key='core.server.host', expected='string', actual=type(host).__name__)
-        errors.append(msg)
-      
-      workers = server.get('workers')
-      if workers is not None:
-        if not isinstance(workers, int) or workers < 1:
-          errors.append("core.server.workers must be a positive integer")
-    
-    return errors, warnings
+      errors.extend(self._validate_server_fields(config['core']['server']))
+    return errors, []
   
-  def _validate_core_section(self, config: Dict[str, Any]) -> List[str]:
-    """Validate core section specifics"""
+  @staticmethod
+  def _validate_timeouts(timeouts: Dict[str, Any]) -> List[str]:
+    """Validate core.timeouts sub-section."""
     errors: list[str] = []
-    
+    for key in ['request_timeout', 'startup_timeout', 'shutdown_timeout']:
+      val = timeouts.get(key)
+      if val is not None and (not isinstance(val, (int, float)) or val <= 0):
+        errors.append(f"core.timeouts.{key} must be a positive number")
+    return errors
+
+  def _validate_cors(self, server: Dict[str, Any]) -> List[str]:
+    """Validate core.server.cors_origins."""
+    cors_origins = server.get('cors_origins')
+    if cors_origins is None:
+      return []
+    if not isinstance(cors_origins, list):
+      return ["core.server.cors_origins must be a list"]
+    errors: list[str] = []
+    for origin in cors_origins:
+      if not isinstance(origin, str):
+        errors.append("All CORS origins must be strings")
+      elif not self._is_valid_url(origin):
+        errors.append(self._get_message('validation.url_invalid', url=origin))
+    return errors
+
+  def _validate_core_section(self, config: Dict[str, Any]) -> List[str]:
+    """Validate core section specifics."""
     if 'core' not in config:
-      return errors
-    
+      return []
     core = config['core']
-    
+    errors: list[str] = []
     if 'timeouts' in core:
-      timeouts = core['timeouts']
-      for timeout_key in ['request_timeout', 'startup_timeout', 'shutdown_timeout']:
-        timeout_val = timeouts.get(timeout_key)
-        if timeout_val is not None:
-          if not isinstance(timeout_val, (int, float)) or timeout_val <= 0:
-            errors.append(f"core.timeouts.{timeout_key} must be a positive number")
-    
+      errors.extend(self._validate_timeouts(core['timeouts']))
     if 'server' in core:
-      cors_origins = core['server'].get('cors_origins')
-      if cors_origins is not None:
-        if not isinstance(cors_origins, list):
-          errors.append("core.server.cors_origins must be a list")
-        else:
-          for origin in cors_origins:
-            if not isinstance(origin, str):
-              errors.append("All CORS origins must be strings")
-            elif not self._is_valid_url(origin):
-              msg = self._get_message('validation.url_invalid', url=origin)
-              errors.append(msg)
-    
+      errors.extend(self._validate_cors(core['server']))
     return errors
   
   def _validate_plugins_section(self, config: Dict[str, Any]) -> List[str]:
@@ -239,44 +242,46 @@ class ConfigValidator:
     
     return errors
   
-  def _validate_storage_section(self, config: Dict[str, Any]) -> List[str]:
-    """Validate storage section specifics"""
+  def _validate_logging_config(self, logging_config: Dict[str, Any]) -> List[str]:
+    """Validate storage.logging sub-section."""
     errors: list[str] = []
-    
+    level = logging_config.get('level')
+    if level and level not in self.VALID_LOG_LEVELS:
+      errors.append(f"Invalid log level: {level}. Valid: {', '.join(self.VALID_LOG_LEVELS)}")
+    retention = logging_config.get('retention_days')
+    if retention is not None:
+      if not isinstance(retention, int) or retention <= 0:
+        errors.append("storage.logging.retention_days must be a positive integer")
+    return errors
+
+  @staticmethod
+  def _validate_storage_limits(storage_inner: Dict[str, Any]) -> List[str]:
+    """Validate storage.storage sub-section (file size, extensions)."""
+    errors: list[str] = []
+    max_size = storage_inner.get('max_file_size')
+    if max_size is not None:
+      if not isinstance(max_size, int) or max_size <= 0:
+        errors.append("storage.storage.max_file_size must be a positive integer")
+    extensions = storage_inner.get('allowed_extensions')
+    if extensions is not None:
+      if not isinstance(extensions, list):
+        errors.append("storage.storage.allowed_extensions must be a list")
+      else:
+        for ext in extensions:
+          if not isinstance(ext, str) or not ext.startswith('.'):
+            errors.append("All allowed extensions must be strings starting with '.'")
+    return errors
+
+  def _validate_storage_section(self, config: Dict[str, Any]) -> List[str]:
+    """Validate storage section specifics."""
     if 'storage' not in config:
-      return errors
-    
+      return []
     storage = config['storage']
-    
+    errors: list[str] = []
     if 'logging' in storage:
-      logging_config = storage['logging']
-      
-      level = logging_config.get('level')
-      if level and level not in self.VALID_LOG_LEVELS:
-        errors.append(f"Invalid log level: {level}. Valid: {', '.join(self.VALID_LOG_LEVELS)}")
-      
-      retention = logging_config.get('retention_days')
-      if retention is not None:
-        if not isinstance(retention, int) or retention <= 0:
-          errors.append("storage.logging.retention_days must be a positive integer")
-    
+      errors.extend(self._validate_logging_config(storage['logging']))
     if 'storage' in storage:
-      storage = storage['storage']
-      
-      max_size = storage.get('max_file_size')
-      if max_size is not None:
-        if not isinstance(max_size, int) or max_size <= 0:
-          errors.append("storage.storage.max_file_size must be a positive integer")
-      
-      extensions = storage.get('allowed_extensions')
-      if extensions is not None:
-        if not isinstance(extensions, list):
-          errors.append("storage.storage.allowed_extensions must be a list")
-        else:
-          for ext in extensions:
-            if not isinstance(ext, str) or not ext.startswith('.'):
-              errors.append("All allowed extensions must be strings starting with '.'")
-    
+      errors.extend(self._validate_storage_limits(storage['storage']))
     return errors
   
   def _validate_paths(self, config: Dict[str, Any]) -> List[str]:

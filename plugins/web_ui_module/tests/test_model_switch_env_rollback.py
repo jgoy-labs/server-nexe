@@ -84,7 +84,7 @@ class TestSourceGuard:
         src = Path(__file__).resolve().parents[1] / "api" / "routes_chat.py"
         content = src.read_text(encoding="utf-8")
         # We look for the two markers that guarantee the try/finally P0-3.
-        assert "_prev_mlx" in content, "MLX env rollback absent a routes_chat.py"
-        assert "_prev_llama" in content, "LLAMA env rollback absent a routes_chat.py"
+        assert 'os.environ.get("NEXE_MLX_MODEL")' in content, "MLX env rollback absent a routes_chat.py"
+        assert 'os.environ.get("NEXE_LLAMA_CPP_MODEL")' in content, "LLAMA env rollback absent a routes_chat.py"
         assert 'os.environ.pop("NEXE_MLX_MODEL"' in content
         assert 'os.environ.pop("NEXE_LLAMA_CPP_MODEL"' in content

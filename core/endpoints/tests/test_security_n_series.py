@@ -270,10 +270,10 @@ class TestSessionCleanupTask:
         assert "max_age_hours" in source
 
     def test_lifespan_imports_and_calls_cleanup_task(self):
-        """lifespan.py calls start_session_cleanup_task() during startup."""
+        """lifespan.py delegates session cleanup startup to _startup_session_cleanup."""
         from core import lifespan
         source = inspect.getsource(lifespan)
-        assert "start_session_cleanup_task" in source
+        assert "_startup_session_cleanup" in source
 
 
 # ═══════════════════════════════════════════════════════════════════════════

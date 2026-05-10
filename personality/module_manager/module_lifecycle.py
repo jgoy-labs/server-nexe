@@ -64,6 +64,55 @@ class ModuleLifecycleManager:
     """Estableix API integrator"""
     self.api_integrator = api_integrator
 
+  async def _load_dependencies(self, module_name: str, module_info) -> bool:
+    for dep in module_info.dependencies:
+      if not await self.load_module(dep):
+        msg = get_message(self.i18n, 'loading.dependency_failed', dep=dep, module=module_name)
+        logger.error(msg, component="module_lifecycle")
+        return False
+    return True
+
+  async def _finalize_load_success(self, module_name: str, module_info, instance, load_duration: int) -> None:
+    async with self._async_lock:
+      module_info.instance = instance
+      module_info.load_time = datetime.now(timezone.utc)
+      module_info.state = ModuleState.LOADED
+      module_info.load_duration_ms = load_duration
+      module_info.error_count = 0
+      module_info.last_error = None
+      for dep in module_info.dependencies:
+        if dep in self.modules:
+          self.modules[dep].dependents.add(module_name)
+
+    self.registry.register_module(module_name, instance, module_info.manifest)
+
+    if self.api_integrator:
+      try:
+        self.api_integrator.integrate_module_api(module_name, instance, module_info)
+      except Exception as e:
+        msg = get_message(self.i18n, 'api.integration.failed', module=module_name, error=str(e))
+        logger.warning(msg)
+
+    await self.events.emit_event(SystemEvent(
+      timestamp=datetime.now(timezone.utc),
+      source="module_lifecycle",
+      event_type="module_loaded",
+      details={"module": module_name, "duration_ms": load_duration}
+    ))
+
+    self.metrics.update_module_metrics(self.modules, module_name, load_duration_ms=load_duration)
+
+    msg = get_message(self.i18n, 'loading.loaded', module=module_name)
+    logger.info(msg, component="module_lifecycle", duration_ms=load_duration)
+
+  async def _handle_load_error(self, module_name: str, module_info, e: Exception) -> None:
+    async with self._async_lock:
+      module_info.state = ModuleState.ERROR
+      module_info.error_count += 1
+      module_info.last_error = str(e)
+    msg = get_message(self.i18n, 'loading.error', module=module_name, error=str(e))
+    logger.error(msg, component="module_lifecycle", exc_info=True)
+
   async def load_module(self, module_name: str) -> bool:
     """
     Carrega un mòdul.
@@ -85,85 +134,32 @@ class ModuleLifecycleManager:
         return True
 
       if not module_info.enabled:
-        msg = get_message(self.i18n, 'loading.disabled',
-                module=module_name)
+        msg = get_message(self.i18n, 'loading.disabled', module=module_name)
         logger.warning(msg, component="module_lifecycle")
         return False
 
       if module_info.state == ModuleState.LOADING:
         return False
 
-    for dep in module_info.dependencies:
-      if not await self.load_module(dep):
-        msg = get_message(self.i18n, 'loading.dependency_failed',
-                dep=dep, module=module_name)
-        logger.error(msg, component="module_lifecycle")
-        return False
+    if not await self._load_dependencies(module_name, module_info):
+      return False
 
     try:
       async with self._async_lock:
         module_info.state = ModuleState.LOADING
 
-      msg = get_message(self.i18n, 'loading.loading',
-              module=module_name)
+      msg = get_message(self.i18n, 'loading.loading', module=module_name)
       logger.info(msg, component="module_lifecycle")
 
       start_time = time.time()
       instance = await self.loader.load_module(module_info)
       load_duration = int((time.time() - start_time) * 1000)
 
-      async with self._async_lock:
-        module_info.instance = instance
-        module_info.load_time = datetime.now(timezone.utc)
-        module_info.state = ModuleState.LOADED
-        module_info.load_duration_ms = load_duration
-        module_info.error_count = 0
-        module_info.last_error = None
-
-        for dep in module_info.dependencies:
-          if dep in self.modules:
-            self.modules[dep].dependents.add(module_name)
-
-      self.registry.register_module(module_name, instance,
-                     module_info.manifest)
-
-      if self.api_integrator:
-        try:
-          self.api_integrator.integrate_module_api(
-            module_name, instance, module_info
-          )
-        except Exception as e:
-          msg = get_message(self.i18n, 'api.integration.failed',
-                  module=module_name, error=str(e))
-          logger.warning(msg)
-
-      await self.events.emit_event(SystemEvent(
-        timestamp=datetime.now(timezone.utc),
-        source="module_lifecycle",
-        event_type="module_loaded",
-        details={"module": module_name, "duration_ms": load_duration}
-      ))
-
-      self.metrics.update_module_metrics(self.modules, module_name,
-                       load_duration_ms=load_duration)
-
-      msg = get_message(self.i18n, 'loading.loaded',
-              module=module_name)
-      logger.info(msg, component="module_lifecycle",
-           duration_ms=load_duration)
-
+      await self._finalize_load_success(module_name, module_info, instance, load_duration)
       return True
 
     except Exception as e:
-      async with self._async_lock:
-        module_info.state = ModuleState.ERROR
-        module_info.error_count += 1
-        module_info.last_error = str(e)
-
-      msg = get_message(self.i18n, 'loading.error',
-              module=module_name, error=str(e))
-      logger.error(msg, component="module_lifecycle", exc_info=True)
-
+      await self._handle_load_error(module_name, module_info, e)
       return False
 
   async def start_module(self, module_name: str) -> bool:

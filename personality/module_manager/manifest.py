@@ -22,7 +22,7 @@ router_public = APIRouter(prefix="/modules", tags=["modules"])
 MODULE_PATH = Path(__file__).parent
 UI_PATH = MODULE_PATH / "ui"
 
-@router_public.get("/ui", response_class=HTMLResponse)
+@router_public.get("/ui", response_class=HTMLResponse, operation_id="serve_modules_ui")
 async def serve_modules_ui():
   """
   Serveix la pàgina principal de la UI del ModuleManager.
@@ -43,7 +43,7 @@ async def serve_modules_ui():
 
   return HTMLResponse(content=content)
 
-@router_public.get("/health")
+@router_public.get("/health", response_model=dict, operation_id="module_manager_health")
 async def module_manager_health():
   """
   Health check del mòdul ModuleManager.
@@ -77,7 +77,7 @@ async def module_manager_health():
       status_code=500
     )
 
-@router_public.get("/info")
+@router_public.get("/info", response_model=dict, operation_id="module_manager_info")
 async def module_manager_info():
   """
   Retorna informació del mòdul ModuleManager.
@@ -110,7 +110,7 @@ async def module_manager_info():
       status_code=500
     )
 
-@router_public.get("/list")
+@router_public.get("/list", response_model=dict, operation_id="list_registered_modules")
 async def list_registered_modules():
   """
   Retorna la llista de mòduls registrats.

@@ -81,18 +81,13 @@ class TestModelSwitchLockPresence:
     assert match, "Could not find lock scope boundary in routes_chat.py"
     scope = match.group(0)
 
-    # These mutations must be inside the locked scope
-    expected_patterns = [
-      'os.environ["NEXE_MLX_MODEL"]',
-      'engine._node.__class__._config',
-      'LlamaCppChatNode._pool.destroy_all()',
-      'LlamaCppChatNode._pool = ModelPool(new_config)',
-    ]
-    for pat in expected_patterns:
-      assert pat in scope, (
-        f"P0-3 fix incomplete: mutation `{pat}` must be inside the "
-        f"`async with _MODEL_SWITCH_LOCK:` block, but was not found in scope"
-      )
+    # The switch is delegated to _switch_engine_model() which calls
+    # _switch_mlx_model / _switch_llama_cpp_model helpers. Verify the
+    # delegation call is inside the locked scope.
+    assert "_switch_engine_model" in scope, (
+      "P0-3 fix incomplete: `_switch_engine_model()` must be called inside the "
+      "`async with _MODEL_SWITCH_LOCK:` block"
+    )
 
 
 class TestAsyncLockReleaseContract:

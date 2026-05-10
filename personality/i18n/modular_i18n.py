@@ -62,53 +62,41 @@ class ModularI18nManager:
       self.current_language = "en-US"
       self.fallback_language = "en-US"
   
+  def _glob_translation_files(self, language: str) -> List[Path]:
+    patterns = [
+      f"**/languages/{language}/messages_*.json",
+      f"**/**/languages/{language}/messages_*.json",
+    ]
+    found: List[Path] = []
+    for pattern in patterns:
+      found.extend(self.base_path.glob(pattern))
+    return list(set(found))
+
+  def _load_primary_translations(self) -> int:
+    found_files = self._glob_translation_files(self.current_language)
+    if not found_files:
+      logger.warning("Cap fitxer de traduccions trobat per %s", self.current_language)
+      return 0
+    loaded_count = sum(1 for fp in found_files if self._load_translation_file(fp))
+    logger.info("Carregades %d/%d traduccions", loaded_count, len(found_files))
+    return loaded_count
+
+  def _load_fallback_translations(self) -> None:
+    if self.fallback_language == self.current_language:
+      return
+    fallback_files = self._glob_translation_files(self.fallback_language)
+    fallback_loaded = sum(
+      1 for fp in fallback_files
+      if self._load_translation_file_for_lang(fp, self.fallback_language)
+    )
+    if fallback_loaded:
+      logger.info("Carregades %d traduccions fallback (%s)", fallback_loaded, self.fallback_language)
+
   def _discover_and_load_translations(self) -> None:
     """Discover and load all translation files"""
     logger.info("Descobrint traduccions per %s...", self.current_language)
-
-    search_patterns = [
-      f"**/languages/{self.current_language}/messages_*.json",
-      f"**/**/languages/{self.current_language}/messages_*.json",
-    ]
-
-    found_files = []
-    for pattern in search_patterns:
-      files = list(self.base_path.glob(pattern))
-      found_files.extend(files)
-
-    found_files = list(set(found_files))
-
-    if not found_files:
-      logger.warning("Cap fitxer de traduccions trobat per %s", self.current_language)
-      return
-
-    loaded_count = 0
-    for file_path in found_files:
-      if self._load_translation_file(file_path):
-        loaded_count += 1
-
-    logger.info("Carregades %d/%d traduccions", loaded_count, len(found_files))
-
-    # Also load fallback language translations if different
-    if self.fallback_language != self.current_language:
-      fallback_patterns = [
-        f"**/languages/{self.fallback_language}/messages_*.json",
-        f"**/**/languages/{self.fallback_language}/messages_*.json",
-      ]
-      fallback_files: list[Path] = []
-      for pattern in fallback_patterns:
-        fallback_files.extend(self.base_path.glob(pattern))
-      fallback_files = list(set(fallback_files))
-
-      fallback_loaded = 0
-      for file_path in fallback_files:
-        if self._load_translation_file_for_lang(file_path, self.fallback_language):
-          fallback_loaded += 1
-
-      if fallback_loaded:
-        logger.info("Carregades %d traduccions fallback (%s)",
-              fallback_loaded, self.fallback_language)
-
+    self._load_primary_translations()
+    self._load_fallback_translations()
     if self.current_language in self.translations:
       components = list(self.translations[self.current_language].keys())
       logger.debug("Components amb traduccions: %s", ', '.join(components))
