@@ -239,6 +239,7 @@ class MLXChatNode:
         loop = asyncio.get_running_loop()
 
         def threadsafe_callback(text: str) -> None:
+            """Bridge streaming tokens from the MLX worker thread to the async event loop."""
             if stream_callback and callable(stream_callback):
                 loop.call_soon_threadsafe(stream_callback, text)
 

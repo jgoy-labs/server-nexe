@@ -17,9 +17,11 @@ class ApiAgent(BaseAgent):
 
     @property
     def agent_name(self) -> str:
+        """Return the unique identifier for this agent."""
         return "api_agent"
 
     def diagnose(self) -> Dict[str, Any]:
+        """Scan FastAPI endpoints via AST and compare against the stored baseline."""
         endpoints = self._scan_endpoints()
         ep_count = len(endpoints)
 

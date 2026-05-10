@@ -181,6 +181,7 @@ class NexeTray(rumps.App):
     """macOS menu bar app for controlling the Nexe server."""
 
     def __init__(self, attach_pid=None):
+        """Initialize the menu bar app, build menus, and optionally attach to a running server."""
         self._attach_pid = attach_pid
         self.lang = _detect_lang()
         self.strings = T.get(self.lang, T["ca"])
@@ -623,6 +624,7 @@ class NexeTray(rumps.App):
 # ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════
 def main():
+    """Launch the Nexe macOS menu bar app with optional autostart and server attach."""
     # Bug #2: rename the tray process so it shows as "nexe-tray" instead of
     # "Python" in `ps aux` and Activity Monitor. Force Quit still shows
     # "Python" (requires CFBundleName via a real .app bundle — deferred to v0.9.1).

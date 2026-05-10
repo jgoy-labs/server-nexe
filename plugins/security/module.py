@@ -43,6 +43,7 @@ class SecurityModule:
 
     @property
     def metadata(self) -> ModuleMetadata:
+        """Return static module metadata for the security plugin."""
         return ModuleMetadata(
             name="security",
             version="0.9.1",
@@ -79,6 +80,7 @@ class SecurityModule:
         self._initialized = False
 
     async def health_check(self) -> HealthResult:
+        """Check security module health: auth config, sanitizer, and IRONCLAD logger."""
         if not self._initialized:
             return HealthResult(
                 status=HealthStatus.UNKNOWN,
@@ -168,9 +170,11 @@ class SecurityModule:
     # --- NexeModuleWithRouter ---
 
     def get_router(self) -> APIRouter:
+        """Return the FastAPI router for security endpoints."""
         return self._router
 
     def get_router_prefix(self) -> str:
+        """Return the URL prefix for security routes."""
         return "/security"
 
     # --- Router setup ---
@@ -184,6 +188,7 @@ class SecurityModule:
     # --- Public methods ---
 
     def get_info(self) -> Dict[str, Any]:
+        """Return module metadata including available security endpoints."""
         return {
             "name": self.metadata.name,
             "version": self.metadata.version,

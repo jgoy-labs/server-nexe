@@ -191,6 +191,7 @@ class MemoryAPI:
     embed_threads = self.ingest_config.embed_threads
 
     def _load_model():
+      """Instantiate the fastembed TextEmbedding model (blocking, run in executor)."""
       from fastembed import TextEmbedding
       kwargs = {}
       if embed_threads is not None:
@@ -499,6 +500,7 @@ class MemoryAPI:
     loop = asyncio.get_running_loop()
 
     def _scroll():
+      """Execute a Qdrant scroll query (blocking, run in executor)."""
       return self._qdrant.scroll(
         collection_name=collection,
         limit=limit,
@@ -553,6 +555,7 @@ class MemoryAPI:
     loop = asyncio.get_running_loop()
 
     def _encode():
+      """Generate and L2-normalize a single embedding vector (blocking)."""
       import numpy as _np
       v = list(self._embedder.embed([text]))[0]
       arr = _np.array(v)
@@ -578,6 +581,7 @@ class MemoryAPI:
     perf_on = self.ingest_config.perf_logging
 
     def _encode_batch():
+      """Generate and L2-normalize embeddings for a batch of texts (blocking)."""
       import numpy as _np
       results = []
       if embed_batch_size is not None:

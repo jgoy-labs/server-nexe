@@ -16,9 +16,11 @@ class PluginAgent(BaseAgent):
 
     @property
     def agent_name(self) -> str:
+        """Return the unique identifier for this agent."""
         return "plugin_agent"
 
     def diagnose(self) -> Dict[str, Any]:
+        """Validate all plugin manifests, health checks, and structural conventions."""
         plugins_dir = self.project_path / "plugins"
         if not plugins_dir.exists():
             return {

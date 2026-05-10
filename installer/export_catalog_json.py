@@ -106,6 +106,7 @@ def export_catalog(output_path: str):
 
 
 def _cli():
+    """CLI entry point for validating sync between Python and JSON model catalogs."""
     import argparse
     parser = argparse.ArgumentParser(
         description="Sync validator between installer_catalog_data.py and models.json"

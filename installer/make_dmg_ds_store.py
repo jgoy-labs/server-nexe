@@ -22,6 +22,7 @@ except ImportError:
     sys.exit(0)
 
 def make_ds_store(mount_point, app_name):
+    """Create a .DS_Store file with background image and icon layout for the DMG."""
     ds_path = os.path.join(mount_point, '.DS_Store')
     bg_path = os.path.join(mount_point, '.background', 'background.png')
 

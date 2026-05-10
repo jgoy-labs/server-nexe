@@ -61,6 +61,7 @@ class WebUIModule:
 
     @property
     def metadata(self) -> ModuleMetadata:
+        """Return static module metadata for the web UI plugin."""
         return ModuleMetadata(
             name="web_ui_module",
             version="1.0.0-beta",
@@ -131,9 +132,11 @@ class WebUIModule:
     # --- NexeModuleWithRouter ---
 
     def get_router(self) -> APIRouter:
+        """Return the FastAPI router for web UI endpoints."""
         return self._router
 
     def get_router_prefix(self) -> str:
+        """Return the URL prefix for web UI routes."""
         return "/ui"
 
     # --- Router setup ---
@@ -159,6 +162,7 @@ class WebUIModule:
     # --- Public methods ---
 
     def get_info(self) -> Dict[str, Any]:
+        """Return module metadata and active session count."""
         return {
             "name": self.metadata.name,
             "version": self.metadata.version,

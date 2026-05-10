@@ -992,6 +992,7 @@ async def _switch_engine_model(engine, engine_name: str, body: dict, model_name:
 
 
 def _build_rag_items_tuple(relevant_results) -> list[tuple[str, float]]:
+    """Extract (source_collection, score) pairs from RAG recall results."""
     return [
         (r.get("metadata", {}).get("source_collection", "?"), r.get("score", 0))
         for r in relevant_results
@@ -1008,6 +1009,7 @@ def _filter_relevant_results(recall_results, rag_threshold, log) -> tuple[list, 
 
 
 def _format_rag_sections_by_language(doc_items, knowledge_items, memory_items, lang_key) -> str:
+    """Format RAG results into labelled sections in the server's active language."""
     _rag_labels = {
         "ca": ("DOCUMENTACIO DEL SISTEMA", "DOCUMENTACIO TECNICA", "MEMORIA DE L'USUARI"),
         "es": ("DOCUMENTACION DEL SISTEMA", "DOCUMENTACION TECNICA", "MEMORIA DEL USUARIO"),
@@ -1853,6 +1855,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
         if stream:
             async def generate():
+                """Yield the pre-built response text one character at a time for SSE."""
                 for char in response_text:
                     yield char
             return StreamingResponse(generate(), media_type="text/plain")

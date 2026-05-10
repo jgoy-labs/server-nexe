@@ -42,6 +42,7 @@ def _get_qdrant_status() -> bool:
     return False
 
 def _normalize_engine(engine: str) -> str:
+  """Normalize engine name to its canonical snake_case form."""
   if not engine:
     return ""
   value = engine.strip().lower()
@@ -50,6 +51,7 @@ def _normalize_engine(engine: str) -> str:
   return value
 
 def _required_modules_from_config(config: dict) -> set:
+  """Determine which modules are required based on config and environment."""
   # Inference engines are OPTIONAL at readiness time. A user can have all
   # three approved (so the Motor dropdown shows them) but only have a model
   # configured for one. Marking a modelless engine as required made the
@@ -86,6 +88,7 @@ def _required_modules_from_config(config: dict) -> set:
   return required
 
 async def _module_health_status(instance) -> str:
+  """Return the health status string of a module instance."""
   if hasattr(instance, "get_health"):
     try:
       health = instance.get_health()

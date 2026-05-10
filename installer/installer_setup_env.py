@@ -407,6 +407,7 @@ def _install_llama_cpp(pip_path, venv_path):
 
 
 def setup_environment(project_root, hw, engine="auto"):
+    """Create the virtualenv, install dependencies, and configure the selected engine."""
     print_step(f"{BOLD}{t('setting_up_env')}{RESET}")
 
     venv_path = project_root / "venv"

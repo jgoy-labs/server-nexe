@@ -225,6 +225,7 @@ def detect_dependency_cycles(modules: Dict[str, ModuleInfo]) -> Optional[List[st
   rec_stack = set()
   
   def visit(module_name: str, path: List[str]) -> Optional[List[str]]:
+    """Recursively visit a module's dependencies and return the cycle path if found."""
     if module_name in rec_stack:
       cycle_start = path.index(module_name)
       return path[cycle_start:] + [module_name]

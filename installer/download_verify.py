@@ -69,6 +69,7 @@ class DownloadIntegrityError(RuntimeError):
         *,
         cause: Optional[Exception] = None,
     ) -> None:
+        """Initialize with the failed artifact name, message, and optional cause."""
         self.artifact = artifact
         self.cause = cause
         super().__init__(message)
@@ -224,6 +225,7 @@ def _compute_actual(
     ollama_bin: str,
     model_id: str,
 ) -> Optional[str]:
+    """Compute the actual SHA256 digest of a downloaded artifact by engine type."""
     if engine == "mlx":
         return sha256_of_dir(target)
     if engine == "gguf":

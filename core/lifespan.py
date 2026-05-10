@@ -192,6 +192,7 @@ def _remove_pid_file(project_root: Path) -> None:
 class ServerState:
   """Holds server global state"""
   def __init__(self) -> None:
+    """Initialize all server-wide state slots to their defaults."""
     self.config: Dict[str, Any] = {}
     self.api_integrator: Optional[APIIntegrator] = None
     self.project_root: Optional[Path] = None

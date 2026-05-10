@@ -189,6 +189,7 @@ class PrecomputedKB:
     """
 
     def __init__(self, knowledge_root: Path):
+        """Initialize the loader pointing at the given knowledge root directory."""
         self.knowledge_root = Path(knowledge_root)
         self.embeddings_dir = self.knowledge_root / EMBEDDINGS_SUBDIR
         self.manifest_path = self.embeddings_dir / MANIFEST_FILENAME
@@ -197,9 +198,11 @@ class PrecomputedKB:
     # -- manifest I/O ------------------------------------------------------- #
 
     def exists(self) -> bool:
+        """Return ``True`` if a manifest file is present on disk."""
         return self.manifest_path.is_file()
 
     def load_manifest(self) -> Optional[Dict[str, Any]]:
+        """Load and cache the manifest JSON, or return ``None`` if absent/invalid."""
         if self._manifest_cache is not None:
             return self._manifest_cache
         if not self.exists():
@@ -309,6 +312,7 @@ class PrecomputedKB:
     # -- loading ------------------------------------------------------------ #
 
     def list_languages(self) -> List[str]:
+        """Return sorted language codes present in the manifest."""
         manifest = self.load_manifest() or {}
         return sorted((manifest.get("langs") or {}).keys())
 
@@ -363,6 +367,7 @@ class PrecomputedKB:
         return entries
 
     def entries_grouped_by_collection(self, lang: str) -> Dict[str, List[PrecomputedEntry]]:
+        """Load entries for a language and group them by target collection name."""
         out: Dict[str, List[PrecomputedEntry]] = {}
         for e in self.load_entries(lang):
             out.setdefault(e.collection, []).append(e)

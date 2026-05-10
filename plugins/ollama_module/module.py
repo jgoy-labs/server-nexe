@@ -79,6 +79,7 @@ class OllamaModule:
 
     @property
     def metadata(self) -> ModuleMetadata:
+        """Return static module metadata for the Ollama integration."""
         return ModuleMetadata(
             name="ollama_module",
             version="1.0.0-beta",
@@ -143,9 +144,11 @@ class OllamaModule:
     # --- NexeModuleWithRouter ---
 
     def get_router(self) -> APIRouter:
+        """Return the FastAPI router for Ollama endpoints."""
         return self._router
 
     def get_router_prefix(self) -> str:
+        """Return the URL prefix for Ollama routes."""
         return "/ollama"
 
     def _init_router(self):
@@ -156,6 +159,7 @@ class OllamaModule:
     # --- Public methods (delegated to core/ components) ---
 
     def get_info(self) -> Dict[str, Any]:
+        """Return module metadata including Ollama base URL and init state."""
         return {
             "name": self.metadata.name,
             "version": self.metadata.version,
@@ -178,26 +182,33 @@ class OllamaModule:
             return fallback.format(**kwargs) if kwargs else fallback
 
     async def check_connection(self) -> bool:
+        """Test connectivity to the Ollama daemon."""
         return await self.client.check_connection()
 
     async def is_model_loaded(self, model_name: str) -> bool:
+        """Check whether a model is currently loaded in Ollama memory."""
         return await self.client.is_model_loaded(model_name)
 
     async def list_models(self) -> List[Dict[str, Any]]:
+        """List all models available in the local Ollama instance."""
         return await self.models_mgr.list_models()
 
     def pull_model(self, model_name: str) -> AsyncIterator[Dict[str, Any]]:
+        """Pull a model from the Ollama registry, yielding progress events."""
         return self.models_mgr.pull_model(model_name)
 
     async def get_model_info(self, model_name: str) -> Dict[str, Any]:
+        """Retrieve detailed metadata for a specific Ollama model."""
         return await self.models_mgr.get_model_info(model_name)
 
     async def delete_model(self, model_name: str) -> bool:
+        """Delete a model from the local Ollama instance."""
         return await self.models_mgr.delete_model(model_name)
 
     def chat(
         self, model: str, messages: List[Dict[str, str]], stream: bool = True,
         images: Optional[List[str]] = None, thinking_enabled: bool = False,
     ) -> AsyncIterator[Dict[str, Any]]:
+        """Send a chat request to Ollama, yielding streamed response chunks."""
         return self.chat_mgr.chat(model, messages, stream=stream, images=images,
                                   thinking_enabled=thinking_enabled)

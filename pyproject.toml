@@ -86,6 +86,17 @@ exclude_dirs = [
     "scripts",
 ]
 
+[tool.muthur.interrogate]
+# Docstring coverage threshold. Trivial items excluded to reduce noise:
+# __init__ modules (empty), __init__ methods (obvious), private (_foo),
+# magic (__str__), semiprivate (_foo used as internal helpers).
+min_coverage = 95
+ignore_init_module = true
+ignore_init_method = true
+ignore_private = true
+ignore_magic = true
+ignore_semiprivate = true
+
 [tool.muthur.coverage]
 # Global coverage is 86% — per-file threshold lowered to avoid FAIL on
 # thin CLI wrappers and integration-heavy modules (api_client 14%, crypto/cli 19%).

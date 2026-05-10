@@ -71,6 +71,7 @@ class RamMonitor:
     """
 
     def __init__(self, pid, interval=10):
+        """Initialize the background RAM polling thread for a given server PID."""
         self._pid = pid
         self._interval = interval
         self._cached_ram = 0

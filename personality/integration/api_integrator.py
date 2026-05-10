@@ -197,6 +197,7 @@ class APIIntegrator:
         return False
   
   def _detect_router_or_app(self, module_instance: Any, components: Dict[str, Any]) -> None:
+    """Detect an APIRouter or FastAPI app instance on a module and store it in components."""
     for attr_name in ['router', 'api_router', 'routes', 'app']:
       if hasattr(module_instance, attr_name):
         attr = getattr(module_instance, attr_name)
@@ -208,6 +209,7 @@ class APIIntegrator:
           break
 
   def _detect_fastapi_endpoints(self, module_instance: Any, components: Dict[str, Any]) -> None:
+    """Detect individually decorated FastAPI endpoint methods on a module."""
     for attr_name in dir(module_instance):
       if attr_name.startswith('_'):
         continue

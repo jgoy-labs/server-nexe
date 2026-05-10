@@ -409,6 +409,7 @@ def _ingest_knowledge_if_present(
 
 
 def run_installer():
+    """Run the interactive server-nexe installer (language, hardware, env, models, knowledge)."""
     # 1. Language selection
     select_language()
 

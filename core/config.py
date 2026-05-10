@@ -408,6 +408,12 @@ def get_server_url(scheme: str = "http") -> str:
 
 if _PYDANTIC_SETTINGS_AVAILABLE:
     class NexeSettings(BaseSettings):
+        """Pydantic settings model that maps every ``NEXE_*`` env var to a typed field.
+
+        Acts as the single source of truth for server configuration.
+        New env vars are added here and become discoverable in the admin panel.
+        """
+
         model_config = SettingsConfigDict(
             env_file=".env",
             extra="ignore",
