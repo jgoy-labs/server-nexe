@@ -148,6 +148,21 @@ class PathDiscovery:
         msg = self._get_message('path_discovery.path_added', path=str(path))
         logger.debug(msg, component="path_discovery")
   
+  def _scan_subdirs_for_modules(self, first_level: Path) -> None:
+    subdir_count = 0
+    for subdir in first_level.iterdir():
+      if subdir_count >= 50:
+        break
+      subdir_count += 1
+      if not subdir.is_dir():
+        continue
+      if any(pattern in subdir.name.lower() for pattern in self.module_patterns):
+        resolved = subdir.resolve()
+        if resolved not in self._discovered_paths:
+          self._discovered_paths.add(resolved)
+          msg = self._get_message('path_discovery.auto_discovered', path=str(subdir))
+          logger.debug(msg, component="path_discovery")
+
   def _auto_discover_paths(self) -> None:
     """Auto-discovery in first-level folders"""
     try:
@@ -156,51 +171,29 @@ class PathDiscovery:
       for first_level in self.base_path.iterdir():
         if first_level.name.startswith(tuple(self.ignore_patterns)):
           continue
-          
         if not first_level.is_dir():
           continue
-        
         if dir_count >= MAX_DIRS:
           msg = self._get_message('path_discovery.max_dirs_reached', max=MAX_DIRS)
           logger.warning(msg, component="path_discovery")
           break
         dir_count += 1
-        
-        subdir_count = 0
-        for subdir in first_level.iterdir():
-          if subdir_count >= 50:
-            break
-          subdir_count += 1
-          if not subdir.is_dir():
-            continue
-          
-          if any(pattern in subdir.name.lower() for pattern in self.module_patterns):
-            resolved = subdir.resolve()
-            if resolved not in self._discovered_paths:
-              self._discovered_paths.add(resolved)
-              msg = self._get_message('path_discovery.auto_discovered', path=str(subdir))
-              logger.debug(msg, component="path_discovery")
+        self._scan_subdirs_for_modules(first_level)
     except PermissionError as e:
       msg = self._get_message('path_discovery.permission_denied', path=str(e))
       logger.warning(msg, component="path_discovery")
   
-  def _add_configured_paths(self) -> None:
-    """Add paths from configuration"""
-    if not self.config:
-      return
-
-    orchestrator_config = self.config.get('personality', {}).get('orchestrator', {})
-    if not isinstance(orchestrator_config, dict):
-      orchestrator_config = {}
-
+  def _add_modules_path(self, orchestrator_config: dict) -> None:
     modules_path = orchestrator_config.get('modules_path')
-    if modules_path:
-      path = self.base_path / modules_path
-      if path.exists() and path.is_dir():
-        self._discovered_paths.add(path.resolve())
-        msg = self._get_message('path_discovery.path_added', path=str(path))
-        logger.debug(msg, component="path_discovery")
+    if not modules_path:
+      return
+    path = self.base_path / modules_path
+    if path.exists() and path.is_dir():
+      self._discovered_paths.add(path.resolve())
+      msg = self._get_message('path_discovery.path_added', path=str(path))
+      logger.debug(msg, component="path_discovery")
 
+  def _add_additional_paths(self, orchestrator_config: dict) -> None:
     add_paths_cfg = orchestrator_config.get('additional_paths', [])
     if isinstance(add_paths_cfg, list):
       additional_paths = add_paths_cfg
@@ -210,13 +203,22 @@ class PathDiscovery:
       additional_paths = []
     if not isinstance(additional_paths, list):
       additional_paths = []
-      
     for path_str in additional_paths:
       path = self.base_path / path_str
       if path.exists() and path.is_dir():
         self._discovered_paths.add(path.resolve())
         msg = self._get_message('path_discovery.path_added', path=str(path))
         logger.debug(msg, component="path_discovery")
+
+  def _add_configured_paths(self) -> None:
+    """Add paths from configuration"""
+    if not self.config:
+      return
+    orchestrator_config = self.config.get('personality', {}).get('orchestrator', {})
+    if not isinstance(orchestrator_config, dict):
+      orchestrator_config = {}
+    self._add_modules_path(orchestrator_config)
+    self._add_additional_paths(orchestrator_config)
   
   def scan_for_modules(self, module_paths: List[Path]) -> Dict[str, Path]:
     """

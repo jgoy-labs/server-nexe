@@ -185,6 +185,70 @@ class ConfigManager:
       }
     }
 
+  def _resolve_module_layer(self, module_info) -> str:
+    module_path = getattr(module_info, "path", None)
+    layer = "plugins"
+    if module_path:
+      try:
+        project_root = self.config_path.parent
+        if project_root.name == "personality":
+          project_root = project_root.parent
+        relative = module_path.resolve().relative_to(project_root.resolve())
+        if len(relative.parts) > 0:
+          layer = relative.parts[0]
+      except Exception as e:
+        logger.debug("Could not determine module layer for %s: %s", module_path, e)
+    return layer
+
+  def _is_plugins_module(self, module_info) -> bool:
+    module_path = getattr(module_info, "path", None)
+    if module_path is None:
+      return True
+    try:
+      resolved_module = module_path.resolve()
+    except Exception:
+      resolved_module = module_path
+    project_root = self.config_path.parent
+    if project_root.name == "personality":
+      project_root = project_root.parent
+    try:
+      relative = resolved_module.relative_to(project_root.resolve())
+    except Exception:
+      return True
+    return len(relative.parts) > 0 and relative.parts[0] == "plugins"
+
+  def _apply_enabled_from_core(self, module_info) -> None:
+    module_info.enabled = True
+    msg = self._t("module_manager.core_module_always_enabled",
+           "Module {name} is CORE, always enabled",
+           name=module_info.name)
+    logger.info(msg)
+
+  def _apply_enabled_from_dict(self, module_info, module_config: dict) -> None:
+    module_info.enabled = module_config.get('enabled', True)
+    logger.debug("Module %s enabled=%s (from dict config)", module_info.name, module_info.enabled)
+
+  def _apply_enabled_from_list_or_manifest(self, module_info, modules_config: dict) -> bool:
+    from personality.data.models import ModuleState
+    enabled_list = modules_config.get('enabled', None)
+    if isinstance(enabled_list, list) and self._is_plugins_module(module_info):
+      if module_info.name in enabled_list:
+        module_info.enabled = True
+        logger.debug("Module %s enabled (from list)", module_info.name)
+      else:
+        module_info.enabled = False
+        logger.info("Module %s not in enabled list, disabling", module_info.name)
+        module_info.state = ModuleState.DISABLED
+        return False  # signals early return
+    elif isinstance(enabled_list, list):
+      logger.debug("Module %s skipping plugins allowlist (module outside plugins/*)", module_info.name)
+      module_info.enabled = module_info.manifest.get('module', {}).get('enabled', True)
+      logger.debug("Module %s enabled=%s (from manifest default)", module_info.name, module_info.enabled)
+    else:
+      module_info.enabled = module_info.manifest.get('module', {}).get('enabled', True)
+      logger.debug("Module %s enabled=%s (from manifest default)", module_info.name, module_info.enabled)
+    return True
+
   def apply_config_to_module(self, module_info) -> None:
     """
     Aplica configuració a un ModuleInfo.
@@ -200,79 +264,18 @@ class ConfigManager:
     """
     from personality.data.models import ModuleState
 
-    module_path = getattr(module_info, "path", None)
-    layer = "plugins"
-    if module_path:
-      try:
-        project_root = self.config_path.parent
-        if project_root.name == "personality":
-          project_root = project_root.parent
-        relative = module_path.resolve().relative_to(project_root.resolve())
-        if len(relative.parts) > 0:
-          layer = relative.parts[0]
-      except Exception as e:
-        logger.debug("Could not determine module layer for %s: %s", module_path, e)
-        pass
-
+    layer = self._resolve_module_layer(module_info)
     modules_config = self._config.get(layer, {}).get('modules', {})
-
-    def _is_plugins_module() -> bool:
-      """
-      Determina si el mòdul forma part de l'espai plugins/*.
-      Serveix per aplicar l'allowlist [plugins.modules].enabled només a aquests mòduls.
-      """
-      module_path = getattr(module_info, "path", None)
-      if module_path is None:
-        return True
-
-      try:
-        resolved_module = module_path.resolve()
-      except Exception:
-        resolved_module = module_path
-
-      project_root = self.config_path.parent
-      if project_root.name == "personality":
-        project_root = project_root.parent
-
-      try:
-        relative = resolved_module.relative_to(project_root.resolve())
-      except Exception:
-        return True
-
-      return len(relative.parts) > 0 and relative.parts[0] == "plugins"
-
     module_config = modules_config.get(module_info.name, {})
 
     module_path = getattr(module_info, "path", None)
     if module_path and '/core/' in str(module_path):
-      module_info.enabled = True
-      msg = self._t("module_manager.core_module_always_enabled",
-             "Module {name} is CORE, always enabled",
-             name=module_info.name)
-      logger.info(msg)
+      self._apply_enabled_from_core(module_info)
     elif isinstance(module_config, dict) and 'enabled' in module_config:
-      module_info.enabled = module_config.get('enabled', True)
-      logger.debug("Module %s enabled=%s (from dict config)", module_info.name, module_info.enabled)
+      self._apply_enabled_from_dict(module_info, module_config)
     else:
-      enabled_list = modules_config.get('enabled', None)
-      if isinstance(enabled_list, list) and _is_plugins_module():
-        if module_info.name in enabled_list:
-          module_info.enabled = True
-          logger.debug("Module %s enabled (from list)", module_info.name)
-        else:
-          module_info.enabled = False
-          logger.info("Module %s not in enabled list, disabling", module_info.name)
-          module_info.state = ModuleState.DISABLED
-          return
-      elif isinstance(enabled_list, list):
-        logger.debug(
-          "Module %s skipping plugins allowlist (module outside plugins/*)", module_info.name
-        )
-        module_info.enabled = module_info.manifest.get('module', {}).get('enabled', True)
-        logger.debug("Module %s enabled=%s (from manifest default)", module_info.name, module_info.enabled)
-      else:
-        module_info.enabled = module_info.manifest.get('module', {}).get('enabled', True)
-        logger.debug("Module %s enabled=%s (from manifest default)", module_info.name, module_info.enabled)
+      if not self._apply_enabled_from_list_or_manifest(module_info, modules_config):
+        return
 
     module_info.priority = module_config.get(
       'priority',

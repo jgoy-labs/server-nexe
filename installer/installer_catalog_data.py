@@ -407,7 +407,7 @@ MODEL_WEIGHT_SHA256: dict[tuple[str, str], Optional[str]] = {
     # ── MLX snapshots (dir hash) ──────────────────────────────────────────
     ("mlx", "mlx-community/gemma-3-4b-it-4bit"): None,
     ("mlx", "mlx-community/Qwen3-4B-4bit"): None,
-    ("mlx", "mlx-community/gemma-4-e4b-it-4bit"): "950d9dea946fb1e85a4e99fd25bdd1fbf0cbc6cfc83298f69bb20190aa9aad72",
+    ("mlx", "mlx-community/gemma-4-e4b-it-4bit"): "5ce81163659f63480301d54e62c410a91228f84cdce7dfeb19e3066a3164ddec",
     ("mlx", "mlx-community/gemma-3-12b-it-4bit"): "7bd7a65af1fe3b1b2e1f67c6ac7131c8e3fae2bc038100a11762a16ed330076f",
     ("mlx", "mlx-community/gemma-4-31b-it-8bit"): "d4cc8cfd30ce9169e9ae6367deff2f8cb93ae28f4991f72e4e2e58f03c6eb0bd",
     ("mlx", "mlx-community/Qwen3-14B-MLX-4bit"): "c557fee4d7cde6e905b497dc534808ed308bb927ef27f067aeabb32340d77b41",
@@ -438,7 +438,7 @@ MODEL_WEIGHT_SHA256: dict[tuple[str, str], Optional[str]] = {
     (
         "gguf",
         "https://huggingface.co/hdnh2006/BSC-LT-salamandra-7b-instruct-gguf/resolve/main/salamandra-7b-instruct-Q4_K_M.gguf",
-    ): "da90a4badcb493ddf7a213b6775732c775f75347a0560f8e1c586ba6ed07596c",
+    ): "2cfa0dec88b75f6db9e6c210fb274948099f0ea5b645750fbf55e428c4190aad",
     (
         "gguf",
         "https://huggingface.co/bartowski/gemma-3-27b-it-GGUF/resolve/main/gemma-3-27b-it-Q4_K_M.gguf",

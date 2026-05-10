@@ -169,10 +169,17 @@ def _known_gguf_url() -> str:
 
 
 def test_verify_gguf_legacy_when_catalog_unpinned(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The live catalog ships all pins as None — legacy mode returns False."""
+    """When a GGUF entry has pin=None, legacy mode returns False + warning."""
     caplog.set_level(logging.WARNING)
+    from installer import installer_catalog_data
+    # Force the entry to None to test the unpinned path
+    original = installer_catalog_data.MODEL_WEIGHT_SHA256.copy()
+    monkeypatch.setattr(
+        installer_catalog_data, "MODEL_WEIGHT_SHA256",
+        {**original, ("gguf", _known_gguf_url()): None},
+    )
     target = tmp_path / "weights.gguf"
     target.write_bytes(b"arbitrary content")
     result = verify_download_integrity("gguf", _known_gguf_url(), target)
@@ -388,14 +395,17 @@ def test_download_integrity_error_carries_artifact() -> None:
 
 
 def test_verify_download_integrity_accepts_every_catalog_pair(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Legacy mode: every (engine, model_id) from the catalog returns False
-    (unpinned) without raising. The downloaded artefacts are stubbed so
-    only the dispatch path + catalog lookup is exercised here."""
+    """Every (engine, model_id) from the catalog is dispatched without raising.
+    Pins are forced to None so only the dispatch path is exercised with stub files."""
     from installer.installer_catalog_data import iter_catalog_model_ids
-    # We only need a valid target per engine — file for gguf, dir for mlx,
-    # anything for ollama (it ignores target and queries the daemon).
+    from installer import installer_catalog_data
+    # Force all pins to None so stub files don't trigger hash mismatch
+    monkeypatch.setattr(
+        installer_catalog_data, "MODEL_WEIGHT_SHA256",
+        {k: None for k in installer_catalog_data.MODEL_WEIGHT_SHA256},
+    )
     file_target = tmp_path / "f.gguf"
     file_target.write_bytes(b"x")
     dir_target = tmp_path / "snap"

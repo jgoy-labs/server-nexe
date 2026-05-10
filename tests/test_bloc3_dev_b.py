@@ -25,8 +25,8 @@ def test_bug12_discover_has_early_return_for_known_modules():
     assert "Module discovery skipped" in source, (
         "Bug 12: early return sense implementar"
     )
-    assert "if not force and modules_dict:" in source, (
-        "Bug 12: condició early return incorrecta"
+    assert "_resolve_force_flag" in source, (
+        "Bug 12: early return delegat a _resolve_force_flag"
     )
 
 

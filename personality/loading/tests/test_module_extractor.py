@@ -19,8 +19,8 @@ def _make_module_info(name="test_module"):
     from personality.data.models import ModuleInfo
     return ModuleInfo(
         name=name,
-        path=Path("/tmp/test_module"),
-        manifest_path=Path("/tmp/test_module/manifest.toml"),
+        path=Path("/tmp/test_module"),  # nosemgrep: hardcode.absolute_path
+        manifest_path=Path("/tmp/test_module/manifest.toml"),  # nosemgrep: hardcode.absolute_path
         manifest={},
     )
 

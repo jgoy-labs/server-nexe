@@ -65,12 +65,12 @@ ticket = "imports-cycles-dev-g-2026-05-07"
 # ═══════════════════════════════════════════════════════════════════════════
 
 [[exception]]
-rule = "api.*"
-path = "InstallNexe.app/**"
-reason = "Bundle pre-compilat InstallNexe.app (inclou personality/). No és codi del projecte — falsos positius."
-expires = "2027-05-07"
+rule = "api.missing_response_schema"
+path = "personality/module_manager/manifest.py"
+reason = "GET /ui returns HTMLResponse (not JSON) — response_model=dict does not apply to HTML endpoints"
+expires = "2027-05-10"
 authorized_by = "Jordi Goy"
-ticket = "api-structure-dev-h-2026-05-07"
+ticket = "personality-api-structure-20260510"
 
 [[exception]]
 rule = "api.post_returns_200"
@@ -172,77 +172,7 @@ ticket = "api-structure-dev-h-2026-05-07"
 # Les entrades TOML documenten la decisió però NO suprimeixen activament.
 # ═══════════════════════════════════════════════════════════════════════════
 
-[[exception]]
-rule = "hardcode.absolute_path"
-path = "core/paths/**"
-reason = "Docstrings d'exemples amb /opt/nexe i /tmp/nexe-test. Paths il·lustratius a docstrings de get_repo_root i _is_valid_core_root. Suprimit via # nosemgrep al codi."
-expires = "2027-05-07"
-authorized_by = "Jordi Goy"
-ticket = "hardcode-dev-i-2026-05-07"
-
-[[exception]]
-rule = "hardcode.ip_address"
-path = "core/config.py"
-reason = "127.0.0.1 és el bind address per defecte del servidor local. Configurable via NEXE_SERVER_HOST env var. DEFAULT_HOST, DEFAULT_LOCALHOST_ALIASES, NexeSettings.server_host. Suprimit via # nosemgrep."
-expires = "2027-05-07"
-authorized_by = "Jordi Goy"
-ticket = "hardcode-dev-i-2026-05-07"
-
-[[exception]]
-rule = "hardcode.absolute_path"
-path = "installer/installer_ollama_install.py"
-reason = "/opt/homebrew/bin/ollama és una cerca de fallback d'instal·lació binari sistema. shutil.which() és el mètode primari; la llista és un fallback per app bundles amb PATH mínim. Suprimit via # nosemgrep."
-expires = "2027-05-07"
-authorized_by = "Jordi Goy"
-ticket = "hardcode-dev-i-2026-05-07"
-
-[[exception]]
-rule = "hardcode.ip_address"
-path = "installer/tray.py"
-reason = "127.0.0.1 en bloc except com a fallback quan core.config no és importable. Configurable via NEXE_SERVER_HOST. Suprimit via # nosemgrep."
-expires = "2027-05-07"
-authorized_by = "Jordi Goy"
-ticket = "hardcode-dev-i-2026-05-07"
-
-[[exception]]
-rule = "hardcode.absolute_path"
-path = "memory/**"
-reason = "/tmp/nexe-logs/rag.log és el darrer recurs de fallback (nosec B108) quan ~/Nexe-Logs i storage/logs no son escrivibles. Patches de tests usen /tmp/rag.log. Suprimit via # nosemgrep."
-expires = "2027-05-07"
-authorized_by = "Jordi Goy"
-ticket = "hardcode-dev-i-2026-05-07"
-
-[[exception]]
-rule = "hardcode.absolute_path"
-path = "plugins/ollama_module/**"
-reason = "Regex sanititzador r'/Users/...' i r'/home/...' per redactar paths en respostes LLM. El pattern detecta el literal dins la regex, no un path real. Suprimit via # nosemgrep."
-expires = "2027-05-07"
-authorized_by = "Jordi Goy"
-ticket = "hardcode-dev-i-2026-05-07"
-
-[[exception]]
-rule = "hardcode.absolute_path"
-path = "plugins/security/**"
-reason = "Patterns de seguretat (/etc/ en detectors traversal), docstrings (/etc/passwd, /var/www/assets), regex sanititzadors (/Users/, /home/), i dades de test de sanitització. Suprimit via # nosemgrep."
-expires = "2027-05-07"
-authorized_by = "Jordi Goy"
-ticket = "hardcode-dev-i-2026-05-07"
-
-[[exception]]
-rule = "hardcode.ip_address"
-path = "plugins/security/**"
-reason = "192.168.1.1 en exemple de docstring del getter singleton. Suprimit via # nosemgrep."
-expires = "2027-05-07"
-authorized_by = "Jordi Goy"
-ticket = "hardcode-dev-i-2026-05-07"
-
-[[exception]]
-rule = "hardcode.absolute_path"
-path = "tests/**"
-reason = "Tests arrel amb /tmp/, /opt/homebrew/, /Users/user/ (genèrics), /etc/passwd. Paths de fixtures de test acceptables. Suprimit via # nosemgrep."
-expires = "2027-05-07"
-authorized_by = "Jordi Goy"
-ticket = "hardcode-dev-i-2026-05-07"
+# (10 orphan entries removed 2026-05-10 — findings already suppressed via inline # nosemgrep)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # mypy whitelist — 2026-05-08
@@ -330,53 +260,7 @@ expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "warn-comments-fp-2026-05-09"
 
-[[exception]]
-rule = "warn_comments.explicit_warning"
-path = "plugins/web_ui_module/ui/app.js"
-reason = "Strings UI: 'col_warning_prefix: ⚠ Desactivat' i similars. Icones visuals de la interfície, no advertències tècniques."
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "warn-comments-fp-2026-05-09"
-
-[[exception]]
-rule = "warn_comments.explicit_warning"
-path = "core/cli/cli.py"
-reason = "click.echo(click.style('⚠️ ...')) — missatges visuals de la CLI per l'usuari, no advertències tècniques de codi."
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "warn-comments-fp-2026-05-09"
-
-[[exception]]
-rule = "warn_comments.explicit_warning"
-path = "core/cli/chat_cli.py"
-reason = "click.echo(click.style('⚠️ ...')) — missatge visual de la CLI per l'usuari."
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "warn-comments-fp-2026-05-09"
-
-[[exception]]
-rule = "warn_comments.explicit_warning"
-path = "core/ingest/ingest_knowledge.py"
-reason = "Dict i18n amb ⚠️ com a prefix visual de missatge d'error per l'usuari (ca/es/en)."
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "warn-comments-fp-2026-05-09"
-
-[[exception]]
-rule = "warn_comments.explicit_warning"
-path = "plugins/web_ui_module/api/routes_auth.py"
-reason = "Missatge visual ⚠️ per l'usuari en resposta d'autenticació."
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "warn-comments-fp-2026-05-09"
-
-[[exception]]
-rule = "warn_comments.explicit_warning"
-path = "memory/memory/rag_logger.py"
-reason = "WARNING = '⚠️' és una constant de string per formatar missatges de log. No és un comentari tècnic pendent."
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "warn-comments-fp-2026-05-09"
+# (6 orphan warn_comments entries removed 2026-05-10 — findings already resolved)
 
 # ═══════════════════════════════════════════════════════════════
 # complexity whitelist — sprint 2026-05-09
@@ -1042,13 +926,7 @@ expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
 
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "plugins/web_ui_module/ui/lucide.min.js"
-reason = "external library (lucide icons v0.577.0) — minified vendor JS, not project code"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
+# (removed orphan: complexity.too_many_parameters lucide.min.js — 2026-05-10)
 
 [[exception]]
 rule = "complexity.too_many_parameters"
@@ -1667,13 +1545,7 @@ expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
 
-[[exception]]
-rule = "complexity.too_many_branches"
-path = "plugins/web_ui_module/ui/lucide.min.js"
-reason = "external library (lucide icons v0.577.0) — minified vendor JS, not project code"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
+# (removed orphan: complexity.too_many_branches lucide.min.js — 2026-05-10)
 
 [[exception]]
 rule = "complexity.too_many_branches"

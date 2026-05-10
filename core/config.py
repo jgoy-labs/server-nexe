@@ -416,7 +416,7 @@ if _PYDANTIC_SETTINGS_AVAILABLE:
 
         # --- Server ---
         server_host: str = Field("127.0.0.1", description="Bind host del server", alias="NEXE_SERVER_HOST")  # nosemgrep
-        server_port: int = Field(9119, description="Port del server (1024-65535)", alias="NEXE_SERVER_PORT", ge=1024, le=65535)
+        server_port: int = Field(9119, description="Port del server (1024-65535)", alias="NEXE_SERVER_PORT", ge=1024, le=65535)  # nosemgrep: hardcode.port_number — configurable via env NEXE_SERVER_PORT
         env: str = Field("production", description="Entorn d'execució (production|development)", alias="NEXE_ENV")
         home: Optional[str] = Field(None, description="Directori arrel del servidor", alias="NEXE_HOME")
         logs_dir: Optional[str] = Field(None, description="Directori de logs", alias="NEXE_LOGS_DIR")

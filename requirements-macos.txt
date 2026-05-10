@@ -9,7 +9,7 @@ mlx-vlm==0.4.4
 
 # Tray app (macOS menu bar)
 rumps==0.4.0  # macOS menu bar tray app (requires PyObjC)
-setproctitle>=1.3.3  # Renames process visible in `ps`/Activity Monitor (Bug #2)
+setproctitle==1.3.7  # Renames process visible in `ps`/Activity Monitor (Bug #2)
 
 # Transitive deps (explicit for offline bundle)
 pyobjc-framework-Cocoa  # required by rumps

@@ -1,0 +1,97 @@
+# typos configuration — server-nexe is a multilingual project (CA/ES/EN)
+# Many Catalan and Spanish words are flagged as typos by the English-only checker.
+
+[files]
+extend-exclude = [
+    "knowledge/",
+    "personality/data/",
+    "*.dmg",
+    "*.gguf",
+    "node_modules/",
+    ".test_venv/",
+    "venv/",
+    "InstallNexe.app/",
+    "Nexe.app/",
+    ".muthur/",
+    "storage/",
+]
+
+[default.extend-words]
+# Catalan words (high-frequency FP from knowledge/ca, THREAT_MODEL, i18n dicts)
+ser = "ser"
+historial = "historial"
+rutes = "rutes"
+complet = "complet"
+cicle = "cicle"
+cicles = "cicles"
+registre = "registre"
+modul = "modul"
+instruccions = "instruccions"
+projecte = "projecte"
+als = "als"
+assistent = "assistent"
+frase = "frase"
+ignora = "ignora"
+suport = "suport"
+buit = "buit"
+generat = "generat"
+generats = "generats"
+directoris = "directoris"
+quarantena = "quarantena"
+minuts = "minuts"
+problemes = "problemes"
+corrent = "corrent"
+grup = "grup"
+configurat = "configurat"
+impacte = "impacte"
+informe = "informe"
+integrat = "integrat"
+exemple = "exemple"
+oficial = "oficial"
+sessio = "sessio"
+versio = "versio"
+claus = "claus"
+nomes = "nomes"
+periode = "periode"
+Fase = "Fase"
+fase = "fase"
+contrasenya = "contrasenya"
+arxiu = "arxiu"
+mida = "mida"
+diari = "diari"
+fitxer = "fitxer"
+llista = "llista"
+cerca = "cerca"
+amunt = "amunt"
+processos = "processos"
+memor = "memor"
+# Spanish words
+persistente = "persistente"
+comandos = "comandos"
+inicio = "inicio"
+configuracion = "configuracion"
+contrasena = "contrasena"
+buscar = "buscar"
+archivo = "archivo"
+documentacion = "documentacion"
+requiere = "requiere"
+responde = "responde"
+dependencias = "dependencias"
+hace = "hace"
+utiliza = "utiliza"
+patrones = "patrones"
+# Technical / project-specific
+MEK = "MEK"
+nexe = "nexe"
+Nexe = "Nexe"
+NEXE = "NEXE"
+qdrant = "qdrant"
+Qdrant = "Qdrant"
+fastembed = "fastembed"
+ollama = "ollama"
+Ollama = "Ollama"
+sqlcipher = "sqlcipher"
+lifespan = "lifespan"
+prewarm = "prewarm"
+ot = "ot"
+ue = "ue"

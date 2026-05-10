@@ -120,22 +120,18 @@ class ModuleExtractor:
 
     return None
 
-  def _try_main_class(self, module: Any, module_name: str) -> Any:
-    """Search for the main class of the module."""
+  def _collect_public_classes(self, module: Any) -> list:
     module_classes = []
     for name in dir(module):
       if name.startswith('_'):
         continue
-
       attr = getattr(module, name)
       if inspect.isclass(attr):
         module_classes.append((name, attr))
+    return module_classes
 
-    if not module_classes:
-      return None
-
+  def _instantiate_by_priority_keyword(self, module_classes: list) -> Any:
     priority_keywords = self.patterns.get_priority_keywords()
-
     for keyword in priority_keywords:
       for name, cls in module_classes:
         if keyword in name.lower():
@@ -143,6 +139,17 @@ class ModuleExtractor:
             return cls()
           except (TypeError, AttributeError):
             continue
+    return None
+
+  def _try_main_class(self, module: Any, module_name: str) -> Any:
+    """Search for the main class of the module."""
+    module_classes = self._collect_public_classes(module)
+    if not module_classes:
+      return None
+
+    result = self._instantiate_by_priority_keyword(module_classes)
+    if result is not None:
+      return result
 
     try:
       return module_classes[0][1]()

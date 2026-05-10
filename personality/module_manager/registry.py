@@ -162,41 +162,40 @@ class ModuleRegistry:
     msg = self._get_message('registry.metadata_extracted', module=registration.name)
     logger.debug(msg, component="registry")
   
+  def _collect_routers_to_scan(self, instance) -> list:
+    routers_to_scan = []
+    for attr_name in ('router', 'router_public', 'router_admin', 'router_ui'):
+      if hasattr(instance, attr_name):
+        routers_to_scan.append((attr_name, getattr(instance, attr_name)))
+    return routers_to_scan
+
+  def _build_endpoints_from_router(self, router_name: str, router, registration: ModuleRegistration) -> None:
+    for route in router.routes:
+      if not (hasattr(route, 'methods') and hasattr(route, 'path')):
+        continue
+      for method in route.methods:
+        if method not in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']:
+          continue
+        endpoint = EndpointInfo(
+          path=route.path,
+          method=method,
+          function=route.endpoint.__name__ if route.endpoint else 'unknown',
+          module_name=registration.name,
+          summary=getattr(route, 'summary', None),
+          tags=getattr(route, 'tags', [])
+        )
+        registration.endpoints.append(endpoint)
+        msg = self._get_message('registry.endpoint_discovered',
+                   method=method, path=endpoint.path,
+                   module=registration.name)
+        logger.debug(msg, component="registry")
+
   def _discover_endpoints(self, registration: ModuleRegistration) -> None:
     """Discover API endpoints from module"""
     instance = registration.instance
-
-    routers_to_scan = []
-
-    if hasattr(instance, 'router'):
-      routers_to_scan.append(('router', instance.router))
-
-    if hasattr(instance, 'router_public'):
-      routers_to_scan.append(('router_public', instance.router_public))
-    if hasattr(instance, 'router_admin'):
-      routers_to_scan.append(('router_admin', instance.router_admin))
-    if hasattr(instance, 'router_ui'):
-      routers_to_scan.append(('router_ui', instance.router_ui))
-
+    routers_to_scan = self._collect_routers_to_scan(instance)
     for router_name, router in routers_to_scan:
-      for route in router.routes:
-        if hasattr(route, 'methods') and hasattr(route, 'path'):
-          for method in route.methods:
-            if method in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']:
-              endpoint = EndpointInfo(
-                path=route.path,
-                method=method,
-                function=route.endpoint.__name__ if route.endpoint else 'unknown',
-                module_name=registration.name,
-                summary=getattr(route, 'summary', None),
-                tags=getattr(route, 'tags', [])
-              )
-              registration.endpoints.append(endpoint)
-
-              msg = self._get_message('registry.endpoint_discovered',
-                         method=method, path=endpoint.path,
-                         module=registration.name)
-              logger.debug(msg, component="registry")
+      self._build_endpoints_from_router(router_name, router, registration)
   
   def get_module(self, name: str) -> Optional[ModuleRegistration]:
     """Get module registration"""
