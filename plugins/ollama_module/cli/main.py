@@ -44,7 +44,8 @@ def _run_async(coro):
 @app.command()
 def status():
   """Show Ollama connection status."""
-  assert console is not None
+  if console is None:
+    raise RuntimeError("Rich console not initialized — install 'rich' to use CLI")
   ollama = OllamaModule()
 
   console.print("\n[bold cyan]Ollama Status[/bold cyan]")
@@ -69,7 +70,8 @@ def status():
 @app.command()
 def models():
   """Lists available models locally"""
-  assert console is not None
+  if console is None:
+    raise RuntimeError("Rich console not initialized — install 'rich' to use CLI")
   ollama = OllamaModule()
 
   with console.status("[bold green]Retrieving models..."):
@@ -108,7 +110,8 @@ def pull(
   model: str = typer.Argument(..., help="Model name to download (e.g.: mistral, llama3.2)")
 ):
   """Download a model from Ollama"""
-  assert console is not None
+  if console is None:
+    raise RuntimeError("Rich console not initialized — install 'rich' to use CLI")
   ollama = OllamaModule()
 
   console.print(f"\n[bold cyan]Downloading model: {model}[/bold cyan]")
@@ -146,7 +149,8 @@ def info(
   model: str = typer.Argument(..., help="Model name")
 ):
   """Show detailed information about a model."""
-  assert console is not None
+  if console is None:
+    raise RuntimeError("Rich console not initialized — install 'rich' to use CLI")
   ollama = OllamaModule()
 
   with console.status(f"[bold green]Getting info for {model}..."):
@@ -181,7 +185,8 @@ def delete(
   force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation")
 ):
   """Delete a local model"""
-  assert console is not None
+  if console is None:
+    raise RuntimeError("Rich console not initialized — install 'rich' to use CLI")
   ollama = OllamaModule()
 
   if not force:
@@ -204,7 +209,8 @@ def chat(
   system: Optional[str] = typer.Option(None, "--system", "-s", help="Initial system message")
 ):
   """Start an interactive chat with an LLM model"""
-  assert console is not None
+  if console is None:
+    raise RuntimeError("Rich console not initialized — install 'rich' to use CLI")
   ollama = OllamaModule()
 
   with console.status("[bold green]Connecting to Ollama..."):
@@ -277,7 +283,8 @@ def ask(
   system: Optional[str] = typer.Option(None, "--system", "-s", help="System message")
 ):
   """Ask the model a quick one-shot question (no interactive chat)."""
-  assert console is not None
+  if console is None:
+    raise RuntimeError("Rich console not initialized — install 'rich' to use CLI")
   ollama = OllamaModule()
 
   with console.status("[bold green]Connecting..."):

@@ -64,6 +64,30 @@ exclude = [
     "conftest\\.py",
 ]
 
+[tool.pyright]
+# Pyright type checker — config compatible amb el check muthur (pyright_check.py).
+# InstallNexe.app/ és Python 3.12 stdlib bundlat (tkinter, turtle, pip/_vendor...)
+# i NO és codi del projecte: 9741 dels 10932 findings inicials hi pertanyen.
+# Els ~1191 findings reals queden deferits a Onada 5 pyright dedicada.
+include = ["core", "memory", "plugins", "personality", "specialists", "installer"]
+exclude = [
+    "**/InstallNexe.app",
+    "**/Nexe.app",
+    "**/.venv",
+    "**/.test_venv",
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.mypy_cache",
+    "**/.pytest_cache",
+    "**/.ruff_cache",
+    "**/.muthur",
+    "tests",
+    "scripts",
+    "dev-tools",
+]
+pythonVersion = "3.11"
+reportMissingImports = "none"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
