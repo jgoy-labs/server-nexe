@@ -11,13 +11,22 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import List, Dict, Any
 
+Console: Any
+Table: Any
+Panel: Any
+box: Any
 try:
-  from rich.console import Console
-  from rich.table import Table
-  from rich.panel import Panel
-  from rich import box
+  from rich.console import Console  # type: ignore[no-redef]
+  from rich.table import Table  # type: ignore[no-redef]
+  from rich.panel import Panel  # type: ignore[no-redef]
+  from rich import box  # type: ignore[no-redef]
   RICH_AVAILABLE = True
 except ImportError:
+  # Fallback stubs so pyright sees the names bound; runtime guards with RICH_AVAILABLE.
+  Console = None
+  Table = None
+  Panel = None
+  box = None
   RICH_AVAILABLE = False
 
 from .router import CLIInfo

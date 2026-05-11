@@ -85,4 +85,4 @@ def logs(module: Optional[str], last: int):
 
 
 if __name__ == "__main__":
-    logs()
+    logs()  # pyright: ignore[reportCallIssue]  # click handles arg parsing at runtime

@@ -129,7 +129,7 @@ async def _update_module_health() -> None:
       module_name = module_info.name
       if hasattr(module_info, "get_health"):
         try:
-          health = module_info.get_health()
+          health = module_info.get_health()  # pyright: ignore[reportAttributeAccessIssue]  # duck-typed via hasattr
           status = health.get("status", "unknown")
           set_module_health(module_name, status)
         except Exception:

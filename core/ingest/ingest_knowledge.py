@@ -70,7 +70,7 @@ _I18N = {
 }
 def _t(key, **kwargs):
     """Return the translated string for the given key and current language."""
-    s = _I18N.get(key, {}).get(_LANG) or _I18N.get(key, {}).get("ca", key)
+    s = _I18N.get(key, {}).get(_LANG) or _I18N.get(key, {}).get("ca", key) or key
     return s.format(**kwargs) if kwargs else s
 
 # Collections
