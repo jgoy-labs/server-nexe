@@ -95,6 +95,54 @@ def check_rate_limit(client_ip: str, request: Request) -> None:
       detail="Too many attempts from your IP. Wait 5 minutes."
     )
 
+def _validate_bootstrap_env() -> None:
+  """Raise 503 if NEXE_ENV is not 'development'."""
+  core_env = os.getenv('NEXE_ENV', 'production').lower()
+  if core_env != 'development':
+    logger.error("Bootstrap attempt in non-development environment (NEXE_ENV=%s)", core_env)
+    raise HTTPException(status_code=503, detail="Bootstrap not available in this environment")
+
+
+def _validate_bootstrap_ip(client_ip: str, i18n) -> None:
+  """Raise HTTPException if client IP is not allowed."""
+  try:
+    if client_ip == "unknown":
+      raise HTTPException(status_code=400, detail=get_message(i18n, "core.bootstrap.invalid_ip"))
+    ip_obj = ipaddress.ip_address(client_ip)
+    if not (ip_obj.is_loopback or ip_obj.is_private or client_ip in VPN_ALLOWED_IPS):
+      logger.warning("Bootstrap attempt from non-allowed IP: %s", client_ip)
+      raise HTTPException(status_code=403, detail="Access denied from this IP address")
+  except ValueError:
+    logger.error("Invalid IP received: %s", client_ip)
+    raise HTTPException(status_code=400, detail=get_message(i18n, "core.bootstrap.invalid_ip"))
+
+
+def _validate_bootstrap_token(token: str, client_ip: str) -> None:
+  """Validate the bootstrap token, raise HTTPException with specific reason on failure."""
+  from core.bootstrap_tokens import validate_master_bootstrap
+  if validate_master_bootstrap(token):
+    return
+
+  from core.bootstrap_tokens import get_bootstrap_token
+  info = get_bootstrap_token()
+
+  if not info:
+    detail = "Server not ready - bootstrap token not initialized"
+    status_code = 503
+  elif info["used"]:
+    detail = "Token already used. Restart server or regenerate token."
+    status_code = 403
+  elif datetime.now(timezone.utc).timestamp() > info["expires"]:
+    detail = "Token expired. Restart server to generate new token."
+    status_code = 410
+  else:
+    detail = "Invalid token. Check the terminal for the correct code."
+    status_code = 401
+
+  logger.warning("Bootstrap failed from %s: %s", client_ip, detail)
+  raise HTTPException(status_code=status_code, detail=detail)
+
+
 @router.post("/api/bootstrap", response_model=BootstrapResponse, summary="Initialize session with bootstrap token (development only)", operation_id="bootstrap_session")
 async def bootstrap_session(
   bootstrap_data: BootstrapRequest,
@@ -113,59 +161,13 @@ async def bootstrap_session(
   client_ip = request.client.host if request.client else "unknown"
   token = bootstrap_data.token.strip().upper()
 
-  core_env = os.getenv('NEXE_ENV', 'production').lower()
-  if core_env != 'development':
-    logger.error("Bootstrap attempt in non-development environment (NEXE_ENV=%s)", core_env)
-    raise HTTPException(
-      status_code=503,
-      detail="Bootstrap not available in this environment"
-    )
+  _validate_bootstrap_env()
 
   # Q3.1 fix: read i18n from app.state instead of passing None (Codex P1 i18n bypass)
   _i18n = getattr(request.app.state, 'i18n', None)
-
-  try:
-    if client_ip == "unknown":
-      raise HTTPException(status_code=400, detail=get_message(_i18n, "core.bootstrap.invalid_ip"))
-    ip_obj = ipaddress.ip_address(client_ip)
-    is_local = ip_obj.is_loopback
-    is_private = ip_obj.is_private
-    is_whitelisted = client_ip in VPN_ALLOWED_IPS
-
-    if not (is_local or is_private or is_whitelisted):
-      logger.warning("Bootstrap attempt from non-allowed IP: %s", client_ip)
-      raise HTTPException(
-        status_code=403,
-        detail="Access denied from this IP address"
-      )
-  except ValueError:
-    logger.error("Invalid IP received: %s", client_ip)
-    raise HTTPException(status_code=400, detail=get_message(_i18n, "core.bootstrap.invalid_ip"))
-
+  _validate_bootstrap_ip(client_ip, _i18n)
   check_rate_limit(client_ip, request)
-  
-  from core.bootstrap_tokens import validate_master_bootstrap
-
-  if not validate_master_bootstrap(token):
-    # Log the failure reason (expired vs invalid vs used)
-    from core.bootstrap_tokens import get_bootstrap_token
-    info = get_bootstrap_token()
-    
-    if not info:
-      detail = "Server not ready - bootstrap token not initialized"
-      status_code = 503
-    elif info["used"]:
-      detail = "Token already used. Restart server or regenerate token."
-      status_code = 403
-    elif datetime.now(timezone.utc).timestamp() > info["expires"]:
-      detail = "Token expired. Restart server to generate new token."
-      status_code = 410
-    else:
-      detail = "Invalid token. Check the terminal for the correct code."
-      status_code = 401
-      
-    logger.warning("Bootstrap failed from %s: %s", client_ip, detail)
-    raise HTTPException(status_code=status_code, detail=detail)
+  _validate_bootstrap_token(token, client_ip)
 
   session_ttl = 900
   session_token = create_session_token(ttl_seconds=session_ttl)
