@@ -1,5 +1,5 @@
 """
-Tests per core/security_headers.py — SecurityHeadersMiddleware
+Tests for core/security_headers.py — SecurityHeadersMiddleware
 """
 import pytest
 from fastapi import FastAPI
@@ -96,7 +96,7 @@ class TestSecurityHeadersMiddleware:
         assert resp.headers.get("X-Permitted-Cross-Domain-Policies") == "none"
 
     def test_csp_no_upgrade_insecure_on_http(self):
-        """HTTP no ha de tenir upgrade-insecure-requests al CSP"""
+        """HTTP must not have upgrade-insecure-requests in CSP"""
         app = make_app()
         client = TestClient(app)
         resp = client.get("/test")

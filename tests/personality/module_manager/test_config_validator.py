@@ -1,5 +1,5 @@
 """
-Tests per personality/module_manager/config_validator.py
+Tests for personality/module_manager/config_validator.py
 """
 import pytest
 import toml
@@ -130,7 +130,7 @@ class TestValidateMethod:
         # Completely empty config → all required sections missing
         config_file.write_text("")
         validator = ConfigValidator()
-        # Patch _get_message per evitar el bug amb 'key' kwarg
+        # Patch _get_message to avoid the bug with 'key' kwarg
         from unittest.mock import patch
         with patch.object(validator, "_get_message", return_value="missing section error"):
             result = validator.validate(config_file)

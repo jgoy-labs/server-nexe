@@ -1,5 +1,5 @@
 """
-Tests per core/middleware.py
+Tests for core/middleware.py
 """
 import pytest
 from unittest.mock import MagicMock, patch

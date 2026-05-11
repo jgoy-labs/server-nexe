@@ -468,7 +468,7 @@ class TestRAGChatOllama:
 @pytest.mark.slow
 class TestRAGChatMLX:
     """
-    Mateix flux E2E amb backend MLX.
+    Same E2E flow with MLX backend.
     """
 
     @pytest.fixture(autouse=True)

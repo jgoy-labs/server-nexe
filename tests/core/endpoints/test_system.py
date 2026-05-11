@@ -27,7 +27,7 @@ def make_app():
     from core.endpoints.system import router_admin, get_router
     from plugins.security.core.auth import require_api_key
 
-    # Override auth per als tests
+    # Override auth for tests
     app.dependency_overrides[require_api_key] = lambda: "test-key"
     app.include_router(router_admin)
     return app
