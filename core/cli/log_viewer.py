@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import os
 import shutil
-import subprocess  # nosec B404: subprocess required to invoke system `tail` for log following; usage validated below
+import subprocess
 import time
 from pathlib import Path
 from typing import Optional

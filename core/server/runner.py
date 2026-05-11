@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 import os
 import signal
-import subprocess  # nosec B404: subprocess required for lsof/pgrep port lookup + tray launching; usage validated below
+import subprocess
 import sys
 import threading
 import time

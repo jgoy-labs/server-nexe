@@ -9,7 +9,7 @@ Description: Hardware detection and model size recommendation.
 import os
 import platform
 import re
-import subprocess  # nosec B404: subprocess required for sysctl probe (hw.memsize / machdep.cpu.brand_string); usage validated below
+import subprocess
 from pathlib import Path
 
 from .installer_display import (

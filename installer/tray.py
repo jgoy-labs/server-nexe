@@ -11,7 +11,7 @@ Description: macOS menu bar app for controlling the Nexe server.
 
 import json
 import os
-import subprocess  # nosec B404: subprocess required to spawn the server (`python -m core.app`), open log paths, pkill stale trays; argv built from PROJECT_ROOT-derived Paths
+import subprocess
 import sys
 import threading
 import time

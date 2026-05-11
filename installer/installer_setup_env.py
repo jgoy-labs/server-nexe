@@ -9,7 +9,7 @@ Description: Virtual environment setup and inference engine installation.
 import os
 import platform
 import sys
-import subprocess  # nosec B404: subprocess required for venv creation, codesign, xattr, pip install; argv built from PROJECT_ROOT-derived Paths and pinned version literals
+import subprocess
 from pathlib import Path
 
 from .installer_display import (

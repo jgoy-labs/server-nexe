@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import os
 import platform
-import subprocess  # nosec B404: subprocess required for Ollama macOS app install (curl + xattr + open) and Linux install script; usage validated below
+import subprocess
 import time
 import shutil
 from pathlib import Path

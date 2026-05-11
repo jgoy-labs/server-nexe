@@ -51,7 +51,7 @@ import logging
 import os
 import shutil
 import signal
-import subprocess  # nosec B404: subprocess required to pgrep stale nexe-tray before venv replacement (B10 fix); usage validated below
+import subprocess
 import sys
 import time
 from pathlib import Path

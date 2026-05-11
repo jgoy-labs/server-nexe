@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import argparse
 import os
-import subprocess  # nosec B404: subprocess required to invoke system `tail -f` on the RAG log; usage validated below (Path is local file)
+import subprocess
 from pathlib import Path
 
 from core.cli.output import NEXE_LOGO

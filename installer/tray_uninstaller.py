@@ -7,7 +7,7 @@ Description: Uninstall logic for the tray app.
 """
 
 import shutil
-import subprocess  # nosec B404: subprocess required for Dock cleanup, Login Items removal, detached install-dir rm; argv built from internal Path/literals
+import subprocess
 from pathlib import Path
 
 

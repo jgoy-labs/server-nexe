@@ -493,7 +493,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
 
     async def _ensure_ollama_running() -> bool:
         """Check if Ollama is reachable; if not, start it headlessly. Returns True if started."""
-        import subprocess  # nosec B404: subprocess required to start Ollama (literal argv); gated by require_ui_auth; mono-user local
+        import subprocess
         import shutil
         try:
             import httpx

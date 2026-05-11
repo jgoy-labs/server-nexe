@@ -7,7 +7,7 @@ Description: UI constants, logo, and print helpers for the installer.
 """
 
 import os
-import subprocess  # nosec B404: subprocess required for safe terminal-clear wrapper (cls/clear, shell=False); usage validated below
+import subprocess
 import sys
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -14,7 +14,7 @@ import os
 import pytest
 import secrets
 import shutil
-import subprocess  # nosec B404: subprocess required to start `ollama serve` for the test session fixture; usage validated below
+import subprocess
 import time
 
 # Configure environment for tests

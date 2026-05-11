@@ -29,7 +29,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-import subprocess  # nosec B404: subprocess required to call `ollama show --json <model>` for digest verification; ollama_bin validated via shutil.which/Path.is_file
+import subprocess
 from pathlib import Path
 from typing import Optional
 

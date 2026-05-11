@@ -8,7 +8,7 @@ Description: Background RAM monitor for the Nexe tray app.
 """
 
 import os
-import subprocess  # nosec B404: subprocess required for ps/pgrep RSS sampling against own server PID; usage validated below
+import subprocess
 import threading
 import urllib.request
 import json as _json
