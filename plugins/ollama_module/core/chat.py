@@ -143,9 +143,10 @@ class OllamaChat:
             )
 
         url = f"{self.base_url}/api/chat"
+        # Build payload outside try so it's always bound in the except clause.
+        payload = self._build_payload(model, messages, stream, images=images,
+                                      thinking_enabled=thinking_enabled)
         try:
-            payload = self._build_payload(model, messages, stream, images=images,
-                                          thinking_enabled=thinking_enabled)
             if stream:
                 async for chunk in self._stream_request(httpx, ollama_breaker, url, payload):
                     yield chunk

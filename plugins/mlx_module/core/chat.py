@@ -361,7 +361,7 @@ class MLXChatNode:
             raise TypeError(
                 f"VLM image[0] must be bytes or base64 str, got {type(raw).__name__}"
             )
-        return raw
+        return bytes(raw)
 
     def _prepare_vlm_prompt(
         self,

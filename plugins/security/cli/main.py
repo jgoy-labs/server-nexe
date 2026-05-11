@@ -22,7 +22,7 @@ app = typer.Typer(help="Security module CLI — Server Nexe")
 @app.command()
 def info():
     """Shows security module information."""
-    from plugins.security.manifest import get_module_instance
+    from plugins.security.manifest import get_module_instance  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]  # FP: install_lazy_manifest() injects get_module_instance dynamically
     module = get_module_instance()
     data = module.get_info()
     typer.echo(f"Name:        {data['name']}")

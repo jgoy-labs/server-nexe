@@ -43,7 +43,8 @@ def is_semantic_http_error(exc: BaseException, httpx_module) -> bool:
     if isinstance(exc, OllamaSemanticError):
         return True
     if isinstance(exc, httpx_module.HTTPStatusError):
-        code = exc.response.status_code
+        # pyright can't narrow through dynamic isinstance against attribute access.
+        code = exc.response.status_code  # pyright: ignore[reportAttributeAccessIssue]
         # 4xx semantics (404 model, 400 bad request, 422 validation...) -> no infra
         return 400 <= code < 500
     return False
