@@ -192,50 +192,6 @@ ticket = "mypy-whitelist-2026-05-08"
 # ═══════════════════════════════════════════════════════════════════════════
 
 [[exception]]
-rule = "unused_variable"
-path = "memory/embeddings/tests/unit/test_workflow_nodes.py"
-reason = "setup_module és una fixture pytest injectada per nom. Vulture no segueix la resolució de fixtures per nom de paràmetre."
-expires = "2027-05-08"
-authorized_by = "Jordi Goy"
-ticket = "vulture-whitelist-2026-05-08"
-
-[[exception]]
-rule = "unused_variable"
-path = "plugins/llama_cpp_module/tests/test_initialize_import_check.py"
-reason = "no_llama_cpp és una fixture pytest injectada per nom als 3 tests de la classe. Vulture no segueix la resolució de fixtures."
-expires = "2027-05-08"
-authorized_by = "Jordi Goy"
-ticket = "vulture-whitelist-2026-05-08"
-
-[[exception]]
-rule = "unused_variable"
-path = "plugins/web_ui_module/tests/test_graceful_degradation.py"
-reason = "security_absent és una fixture pytest injectada per nom a 4 tests. Vulture no segueix la resolució de fixtures."
-expires = "2027-05-08"
-authorized_by = "Jordi Goy"
-ticket = "vulture-whitelist-2026-05-08"
-
-[[exception]]
-rule = "unused_variable"
-path = "plugins/security/sanitizer/tests/test_health_coverage.py"
-reason = "objtype és el segon paràmetre del protocol descriptor Python __get__(self, obj, objtype=None). Vulture no reconeix protocols especials de Python."
-expires = "2027-05-08"
-authorized_by = "Jordi Goy"
-ticket = "vulture-whitelist-2026-05-08"
-
-[[exception]]
-rule = "unused_variable"
-path = "plugins/web_ui_module/tests/test_coverage_gaps.py"
-reason = "self_path és el paràmetre posicional de chmod_fail usada com a reemplaçament de Path.chmod via patch.object. Vulture no veu l'activació indirecta."
-expires = "2027-05-08"
-authorized_by = "Jordi Goy"
-ticket = "vulture-whitelist-2026-05-08"
-
-# ═══════════════════════════════════════════════════════════════════════════
-# api-structure whitelist — 2026-05-09
-# ═══════════════════════════════════════════════════════════════════════════
-
-[[exception]]
 rule = "api.missing_operation_id"
 path = "core/endpoints/v1.py"
 reason = "GET / té include_in_schema=False — no apareix a l'OpenAPI i no necessita operation_id. FP de muthur."
@@ -288,23 +244,7 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.too_many_parameters"
-path = "core/cli/client.py"
-reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
 path = "core/cli/utils/api_client.py"
-reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "core/crypto/provider.py"
 reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
@@ -352,24 +292,8 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.too_many_parameters"
-path = "core/endpoints/tests/test_chat_http.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
 path = "core/ingest/ingest_knowledge.py"
 reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "core/ingest/tests/test_precomputed_loader.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
@@ -520,14 +444,6 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.too_many_parameters"
-path = "memory/embeddings/chunkers/text_chunker.py"
-reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
 path = "memory/embeddings/core/cached_embedder.py"
 reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
 expires = "2027-05-09"
@@ -592,14 +508,6 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.too_many_parameters"
-path = "memory/memory/api/tests/test_documents.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
 path = "memory/memory/api/text_store.py"
 reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
 expires = "2027-05-09"
@@ -616,31 +524,7 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.too_many_parameters"
-path = "memory/memory/engines/persistence_sqlite.py"
-reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
 path = "memory/memory/memory_service.py"
-reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "memory/memory/pipeline/gate.py"
-reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "memory/memory/pipeline/validator.py"
 reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
@@ -697,14 +581,6 @@ ticket = "complexity-sprint-20260509"
 [[exception]]
 rule = "complexity.too_many_parameters"
 path = "memory/memory/workers/gc_daemon.py"
-reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "memory/memory/workers/sync_worker.py"
 reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
@@ -856,22 +732,6 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.too_many_parameters"
-path = "plugins/security/tests/test_coverage_gaps.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "plugins/security/tests/test_input_validators.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
 path = "plugins/web_ui_module/api/routes_chat.py"
 reason = "structural params — FastAPI DI, dataclass constructor, or pipeline config; refactoring would break API contract or force **kwargs antipattern"
 expires = "2027-05-09"
@@ -910,73 +770,6 @@ expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
 
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "plugins/web_ui_module/tests/test_chat_inner_behavior.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "plugins/web_ui_module/tests/test_memory_helper_async.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-# (removed orphan: complexity.too_many_parameters lucide.min.js — 2026-05-10)
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "tests/test_b2_qdrant_filter_privacy.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "tests/test_embeddings_recall_ab.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "tests/test_endpoints_auth.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "tests/test_installer_setup_env.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "tests/test_installer_setup_env_helpers.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_parameters"
-path = "tests/test_response_generator_helpers.py"
-reason = "pytest test file — fixture params inherent to test parameterization patterns"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-# --- complexity.too_many_branches ---
 [[exception]]
 rule = "complexity.too_many_branches"
 path = "core/cli/chat_cli.py"
@@ -1307,14 +1100,6 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.too_many_branches"
-path = "memory/memory/tests/test_pipeline_dev2.py"
-reason = "pytest test file — branch coverage inherent to test scenario permutations"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_branches"
 path = "memory/memory/workers/dreaming_cycle.py"
 reason = "branching inherent to design — parser, FSM, router, or CLI handler with unavoidable conditional logic"
 expires = "2027-05-09"
@@ -1531,14 +1316,6 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.too_many_branches"
-path = "plugins/web_ui_module/tests/test_graceful_degradation.py"
-reason = "pytest test file — branch coverage inherent to test scenario permutations"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_branches"
 path = "plugins/web_ui_module/ui/app.js"
 reason = "branching inherent to design — parser, FSM, router, or CLI handler with unavoidable conditional logic"
 expires = "2027-05-09"
@@ -1564,15 +1341,6 @@ authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
 
 [[exception]]
-rule = "complexity.too_many_branches"
-path = "tests/test_rag_query_nfkc.py"
-reason = "pytest test file — branch coverage inherent to test scenario permutations"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-# --- complexity.file_too_long ---
-[[exception]]
 rule = "complexity.file_too_long"
 path = "core/cli/cli.py"
 reason = "dense but organized file — NLOC justified by feature scope; splitting would fragment cohesion"
@@ -1582,48 +1350,8 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.file_too_long"
-path = "core/cli/utils/tests/test_api_client.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "core/endpoints/tests/test_bootstrap.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "core/endpoints/tests/test_chat_coverage.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "core/endpoints/tests/test_chat_http.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
 path = "core/ingest/ingest_knowledge.py"
 reason = "dense but organized file — NLOC justified by feature scope; splitting would fragment cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "core/ingest/tests/test_ingest_pipeline.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
@@ -1662,32 +1390,8 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.file_too_long"
-path = "memory/embeddings/tests/unit/test_chunkers.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
 path = "memory/memory/api/__init__.py"
 reason = "dense but organized file — NLOC justified by feature scope; splitting would fragment cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "memory/memory/tests/test_persistence.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "memory/rag/tests/test_cli.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
@@ -1726,77 +1430,12 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.file_too_long"
-path = "plugins/web_ui_module/tests/integration/test_web_ui_endpoints.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "plugins/web_ui_module/tests/test_manifest.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "plugins/web_ui_module/tests/test_manifest_coverage.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "plugins/web_ui_module/tests/test_memory_delete.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "plugins/web_ui_module/tests/test_memory_helper_async.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
 path = "plugins/web_ui_module/ui/app.js"
 reason = "2406 NLOC — UI JS deferred to nexe-app Fase 1 redesign (validated by Turing: whitelist preferred over premature refactor)"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
 
-[[exception]]
-rule = "complexity.file_too_long"
-path = "tests/test_final_coverage.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "tests/test_installer_setup_env.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.file_too_long"
-path = "tests/test_integration_real.py"
-reason = "test file — NLOC inherent to exhaustive test coverage; splitting tests reduces cohesion"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-# --- complexity.too_many_statements ---
 [[exception]]
 rule = "complexity.too_many_statements"
 path = "core/endpoints/bootstrap.py"
@@ -1817,14 +1456,6 @@ ticket = "complexity-sprint-20260509"
 rule = "complexity.too_many_statements"
 path = "core/endpoints/chat_engines/mlx.py"
 reason = "function statement count inherent to complete workflow — splitting would break atomicity"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_statements"
-path = "core/ingest/tests/test_precomputed_loader.py"
-reason = "test file — statement count inherent to test setup and assertion patterns"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
@@ -2028,51 +1659,6 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "core/endpoints/tests/test_chat_coverage.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/endpoints/tests/test_chat_http.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/endpoints/tests/test_root.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/endpoints/tests/test_security_n_series.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/endpoints/tests/test_system.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "core/ingest/ingest_docs.py"
 message_contains = "detected: en,"
 reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
@@ -2101,42 +1687,6 @@ ticket = "lang-comments-fp-20260509"
 [[exception]]
 rule = "lang_comments.not_english"
 path = "core/ingest/ingest_knowledge.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/ingest/tests/test_ingest_docs.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/ingest/tests/test_ingest_knowledge.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/ingest/tests/test_ingest_knowledge_mega_batch.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/ingest/tests/test_ingest_pipeline.py"
 message_contains = "detected: non-en,"
 reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
 expires = "2027-05-09"
@@ -2172,34 +1722,7 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "core/metrics/tests/test_endpoint.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/metrics/tests/test_registry.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "core/middleware.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/resilience/tests/test_circuit_breaker_coverage.py"
 message_contains = "detected: non-en,"
 reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
 expires = "2027-05-09"
@@ -2220,132 +1743,6 @@ rule = "lang_comments.not_english"
 path = "core/server/factory_security.py"
 message_contains = "detected: en,"
 reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/server/tests/test_factory_cache.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_bootstrap_tokens.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_config.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_crypto.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_crypto_lifespan.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_dependencies_registry.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_middleware.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_middleware.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_middleware_coverage.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_models.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_security_headers.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_security_headers.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_small_coverage.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_utils.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-fp-20260509"
@@ -2541,33 +1938,6 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "memory/embeddings/chunkers/tests/test_code_chunker.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/embeddings/chunkers/tests/test_code_chunker.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/embeddings/chunkers/tests/test_text_chunker.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "memory/embeddings/core/chunker.py"
 message_contains = "detected: non-en,"
 reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
@@ -2578,51 +1948,6 @@ ticket = "lang-comments-fp-20260509"
 [[exception]]
 rule = "lang_comments.not_english"
 path = "memory/embeddings/core/vectorstore.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/embeddings/tests/test_top_k_cap.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/embeddings/tests/test_vectorstore_protocol.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/embeddings/tests/unit/test_chunkers.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/embeddings/tests/unit/test_chunkers.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/embeddings/tests/unit/test_health.py"
 message_contains = "detected: non-en,"
 reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
 expires = "2027-05-09"
@@ -2677,15 +2002,6 @@ ticket = "lang-comments-fp-20260509"
 [[exception]]
 rule = "lang_comments.not_english"
 path = "memory/memory/api/v1.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/cli/tests/test_rag_viewer.py"
 message_contains = "detected: en,"
 reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
 expires = "2027-05-09"
@@ -2802,78 +2118,6 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "memory/memory/tests/test_api.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/tests/test_models.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/tests/test_persistence.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/tests/test_pipeline_dev2.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/tests/test_rag_logger.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/tests/test_rag_logger_rotation.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/tests/test_ram_context.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/tools/tests/test_tools_init.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "memory/memory/workers/dreaming_cycle.py"
 message_contains = "detected: en,"
 reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
@@ -2902,24 +2146,6 @@ ticket = "lang-comments-fp-20260509"
 [[exception]]
 rule = "lang_comments.not_english"
 path = "memory/memory/workflow/nodes/memory_recall_node.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/workflow/nodes/tests/test_memory_recall_node.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/workflow/nodes/tests/test_memory_store_node.py"
 message_contains = "detected: en,"
 reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
 expires = "2027-05-09"
@@ -2964,33 +2190,6 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "memory/rag/tests/test_constants.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/rag/tests/test_health.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/rag/tests/test_module_integration.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "memory/shared/cache.py"
 message_contains = "detected: en,"
 reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
@@ -3012,15 +2211,6 @@ rule = "lang_comments.not_english"
 path = "plugins/llama_cpp_module/core/config.py"
 message_contains = "detected: en,"
 reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/llama_cpp_module/tests/test_initialize_import_check.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-fp-20260509"
@@ -3072,69 +2262,6 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "plugins/mlx_module/tests/test_mlx_config_coverage.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/mlx_module/tests/test_mlx_module.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/mlx_module/tests/test_mlx_module_coverage.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/mlx_module/tests/test_multimodal.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/mlx_module/tests/test_prompt_cache_manager.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/mlx_module/tests/test_prompt_cache_manager.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/mlx_module/tests/test_prompt_cache_singleton.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "plugins/ollama_module/api/routes.py"
 message_contains = "detected: en,"
 reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
@@ -3145,78 +2272,6 @@ ticket = "lang-comments-fp-20260509"
 [[exception]]
 rule = "lang_comments.not_english"
 path = "plugins/ollama_module/cli/main.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/integration/test_ollama_integration.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/test_multimodal.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/unit/test_client_coverage.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/unit/test_manifest_coverage.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/unit/test_ollama_cli.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/unit/test_ollama_node.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/unit/test_ollama_node.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/workflow/nodes/tests/test_ollama_node_full.py"
 message_contains = "detected: en,"
 reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
 expires = "2027-05-09"
@@ -3261,33 +2316,6 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "plugins/security/core/tests/test_false_positives.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/security/core/tests/test_jailbreak_detector.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/security/sanitizer/tests/test_sanitizer_extended.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "plugins/security/specialists/plugin_specialist.py"
 message_contains = "detected: en,"
 reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
@@ -3309,69 +2337,6 @@ rule = "lang_comments.not_english"
 path = "plugins/security/specialists/trasher_specialist.py"
 message_contains = "detected: en,"
 reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/security/tests/test_auth_dependencies_coverage.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/security/tests/test_coverage_gaps.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/security/tests/test_detect_nosql_depth.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/security/tests/test_input_validators.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/security/tests/test_manifest_coverage.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/security/tests/test_messages_coverage.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/security/tests/test_validate_string_chat_context.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-fp-20260509"
@@ -3487,123 +2452,6 @@ ticket = "lang-comments-fp-20260509"
 [[exception]]
 rule = "lang_comments.not_english"
 path = "plugins/web_ui_module/core/session_manager.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_chat_inner_behavior.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_context_budget_history.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_coverage_gaps.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_file_handler.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_graceful_degradation.py"
-message_contains = "detected: en,"
-reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_latex_sanitizer.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_manifest_coverage.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_memory_delete.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_model_switch_lock.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_p1a_rate_limit.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_p1b_auth_logging.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_routes_auth_fail_closed.py"
-message_contains = "detected: non-en,"
-reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_session_manager.py"
 message_contains = "detected: non-en,"
 reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
 expires = "2027-05-09"
@@ -3945,24 +2793,6 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "core/metrics/tests/test_middleware.py"
-message_contains = "detected: ca,"
-reason = "FP: short EN docstring ('Test error request metrics.') misdetected as Catalan — technical EN comment"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-
-# ═══════════════════════════════════════════════════════════════
-# lang-comments FP — detected:ca i detected:es (Grup K, DONE)
-# Informe: 2026-05-09-192924-55b81a42
-# 87 noves entrades: 60 detected:ca + 27 detected:es
-# Tots FP: el detector Lingua confon termes tècnics EN curts
-# amb Català/Espanyol (locale codes ca-ES, short docstrings, etc.)
-# ═══════════════════════════════════════════════════════════════
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "core/cli/cli.py"
 message_contains = "detected: es,"
 reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
@@ -4008,79 +2838,7 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "core/endpoints/tests/test_bootstrap.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/endpoints/tests/test_root.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/endpoints/tests/test_root.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "core/ingest/ingest_knowledge.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/ingest/tests/test_ingest_knowledge.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/metrics/tests/test_endpoint.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/metrics/tests/test_registry.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/paths/tests/test_paths.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/tests/test_small_coverage.py"
 message_contains = "detected: ca,"
 reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
 expires = "2027-05-09"
@@ -4161,24 +2919,6 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "memory/embeddings/tests/test_top_k_cap.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/embeddings/tests/test_vectorstore_protocol.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "memory/memory/api/__init__.py"
 message_contains = "detected: ca,"
 reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
@@ -4191,15 +2931,6 @@ rule = "lang_comments.not_english"
 path = "memory/memory/api/text_store.py"
 message_contains = "detected: es,"
 reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/cli/tests/test_rag_viewer.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-fp-20260509"
@@ -4242,42 +2973,6 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "memory/memory/tests/test_api.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/tests/test_api.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/tests/test_ingestion.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/memory/tests/test_models.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "memory/memory/workflow/nodes/memory_recall_node.py"
 message_contains = "detected: es,"
 reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
@@ -4290,24 +2985,6 @@ rule = "lang_comments.not_english"
 path = "memory/rag/header_parser.py"
 message_contains = "detected: es,"
 reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/rag/tests/test_cli.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "memory/rag/tests/test_constants.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-fp-20260509"
@@ -4341,15 +3018,6 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "plugins/mlx_module/tests/test_mlx_config_coverage.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "plugins/ollama_module/api/routes.py"
 message_contains = "detected: ca,"
 reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
@@ -4377,87 +3045,6 @@ ticket = "lang-comments-fp-20260509"
 
 [[exception]]
 rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/integration/test_ollama_integration.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/integration/test_ollama_integration.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/unit/test_module_coverage.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/unit/test_ollama_node.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/tests/unit/test_ollama_node.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/workflow/nodes/tests/test_nodes_init.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/workflow/nodes/tests/test_ollama_node_full.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/workflow/nodes/tests/test_ollama_node_full.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/ollama_module/workflow/tests/test_workflow_init.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
 path = "plugins/security/core/input_sanitizers.py"
 message_contains = "detected: ca,"
 reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
@@ -4479,24 +3066,6 @@ rule = "lang_comments.not_english"
 path = "plugins/security/security_logger/helpers.py"
 message_contains = "detected: es,"
 reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/security/tests/test_coverage_gaps.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/security/tests/test_manifest_coverage.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-fp-20260509"
@@ -4531,42 +3100,6 @@ ticket = "lang-comments-fp-20260509"
 [[exception]]
 rule = "lang_comments.not_english"
 path = "plugins/web_ui_module/module.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/integration/test_web_ui_endpoints.py"
-message_contains = "detected: ca,"
-reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_coverage_gaps.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_mem_save_injection.py"
-message_contains = "detected: es,"
-reason = "FP: Lingua detector misclassifies short EN comment as Spanish — technical terms or short docstrings below classification threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
-
-[[exception]]
-rule = "lang_comments.not_english"
-path = "plugins/web_ui_module/tests/test_memory_delete.py"
 message_contains = "detected: ca,"
 reason = "FP: Lingua detector misclassifies short EN comment as Catalan — technical terms, locale codes (ca-ES), or section separators"
 expires = "2027-05-09"
@@ -4744,11 +3277,3 @@ expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-fp-20260509"
 
-[[exception]]
-rule = "lang_comments.not_english"
-path = "core/ingest/tests/test_ingest_pipeline.py"
-message_contains = "detected: en,"
-reason = "FP: Lingua detector misclassifies short EN comment as non-English — section header below confidence threshold"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "lang-comments-fp-20260509"
