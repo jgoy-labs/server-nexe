@@ -1106,6 +1106,49 @@ def _extract_nonstreaming_content(result) -> str:
     return ""
 
 
+def _filter_facts(facts: list, deleted_facts: list) -> list:
+    """Filter atomized facts: remove empty, short, deleted, and junk entries.
+
+    Pure function — no side effects.
+    """
+    filtered = []
+    for fact in facts:
+        fact = fact.strip()
+        if not fact or len(fact) < 5:
+            continue
+        if deleted_facts and any(
+            fact.lower() in d.lower() or d.lower() in fact.lower()
+            for d in deleted_facts
+        ):
+            logger.debug("MEM_SAVE skip (recently deleted): '%s'", fact[:80])
+            continue
+        if _JUNK_PATTERNS_RE.search(fact):
+            logger.debug("MEM_SAVE skip (junk): '%s'", fact[:80])
+            continue
+        filtered.append(fact)
+    return filtered
+
+
+async def _persist_facts(facts: list, memory_helper, session_id: str) -> int:
+    """Save filtered facts to memory. Returns the count of actually saved facts."""
+    saved_count = 0
+    for fact in facts:
+        try:
+            result = await memory_helper.save_to_memory(
+                content=fact,
+                session_id=session_id,
+                metadata={"type": "user_fact", "source": "llm_extract", "is_mem_save": True},
+            )
+            if result.get("document_id"):
+                saved_count += 1
+                logger.info("MEM_SAVE: '%s'", fact[:80])
+            else:
+                logger.debug("MEM_SAVE skip (dedup): '%s'", fact[:80])
+        except Exception as e:
+            logger.debug("MEM_SAVE failed: %s", e)
+    return saved_count
+
+
 async def _yield_atomize_and_save_mem_saves(
     mem_saves: list,
     engine,
@@ -1134,39 +1177,10 @@ async def _yield_atomize_and_save_mem_saves(
             _atomized.append(_raw_fact)
     mem_saves[:] = _atomized
 
-    _mem_saved_count = 0
     _deleted = getattr(session, '_recently_deleted_facts', [])
-    for fact in mem_saves:
-        fact = fact.strip()
-        if not fact or len(fact) < 5:
-            continue
-        # Do not re-save recently deleted facts
-        if _deleted:
-            _skip = False
-            for _del_fact in _deleted:
-                if fact.lower() in _del_fact.lower() or _del_fact.lower() in fact.lower():
-                    logger.debug("MEM_SAVE skip (recently deleted): '%s'", fact[:80])
-                    _skip = True
-                    break
-            if _skip:
-                continue
-        # Filter negative/junk facts
-        if _JUNK_PATTERNS_RE.search(fact):
-            logger.debug("MEM_SAVE skip (junk): '%s'", fact[:80])
-            continue
-        try:
-            result = await memory_helper.save_to_memory(
-                content=fact,
-                session_id=session.id,
-                metadata={"type": "user_fact", "source": "llm_extract", "is_mem_save": True}
-            )
-            if result.get("document_id"):
-                _mem_saved_count += 1
-                logger.info("MEM_SAVE: '%s'", fact[:80])
-            else:
-                logger.debug("MEM_SAVE skip (dedup): '%s'", fact[:80])
-        except Exception as e:
-            logger.debug("MEM_SAVE failed: %s", e)
+    filtered = _filter_facts(mem_saves, _deleted)
+    _mem_saved_count = await _persist_facts(filtered, memory_helper, session.id)
+
     if _mem_saved_count > 0:
         yield f"\x00[MEM:{_mem_saved_count}]\x00"
     count_out.append(_mem_saved_count)
