@@ -22,7 +22,7 @@ app = typer.Typer(help="MLX module CLI — Server Nexe")
 @app.command()
 def info():
     """Shows information about the mlx module."""
-    from .manifest import get_module_instance
+    from .manifest import get_module_instance  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]  # FP: install_lazy_manifest() injects get_module_instance dynamically
     module = get_module_instance()
     data = module.get_info()
     for k, v in data.items():

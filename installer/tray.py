@@ -17,12 +17,19 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
+from typing import Any
 
 from .tray_monitor import RamMonitor as _RamMonitor, format_bytes as _format_bytes, format_uptime as _format_uptime
 from .tray_translations import T, _detect_lang
 
+# rumps is a macOS-only library without type stubs. We import it dynamically and
+# fall back to a stub on non-macOS platforms so the module remains importable
+# (e.g. for tests on Linux/CI). pyright cannot reason about either branch
+# uniformly, so we expose `rumps` as `Any` to silence noisy attribute errors.
+rumps: Any
 try:
-    import rumps
+    import rumps as _rumps_real  # pyright: ignore[reportMissingTypeStubs]
+    rumps = _rumps_real
     _HAS_RUMPS = True
 except ImportError:
     _HAS_RUMPS = False
@@ -303,9 +310,11 @@ class NexeTray(rumps.App):
             self.toggle_item.title = self.t("stop")
             self._ram_monitor = _RamMonitor(self._attach_pid)
 
-    def t(self, key, **kwargs):
+    def t(self, key, **kwargs) -> str:
         """Get translated string."""
         s = self.strings.get(key, key)
+        if s is None:
+            s = key
         if kwargs:
             s = s.format(**kwargs)
         return s

@@ -54,7 +54,10 @@ def _detect_linux_hw():
         with open('/proc/meminfo', 'r') as f:
             for line in f:
                 if "MemTotal" in line:
-                    ram_kb = int(re.search(r'\d+', line).group())
+                    m = re.search(r'\d+', line)
+                    if m is None:
+                        continue
+                    ram_kb = int(m.group())
                     ram_gb = round(ram_kb / (1024*1024))
                     break
         model_path = Path('/proc/device-tree/model')

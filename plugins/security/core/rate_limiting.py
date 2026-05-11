@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from typing import Callable
+from typing import Callable, Any, DefaultDict, Dict
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 import asyncio
@@ -133,7 +133,12 @@ class RateLimitTracker:
   MAX_TRACKED_IDENTIFIERS = 10000
 
   def __init__(self):
-    self._counters = defaultdict(lambda: {"count": 0, "reset": None, "limit": 0})
+    # Per-identifier counter state. `reset` is Optional[datetime]; `count`/`limit` are int.
+    # Heterogeneous values → annotate as Dict[str, Any] to silence reportOperatorIssue
+    # without losing runtime safety (initial values + assignments below are correct).
+    self._counters: DefaultDict[str, Dict[str, Any]] = defaultdict(
+      lambda: {"count": 0, "reset": None, "limit": 0}
+    )
     self._lock = asyncio.Lock()
 
   async def record_request(

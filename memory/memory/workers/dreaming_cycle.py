@@ -245,6 +245,8 @@ class DreamingCycle:
 
     def _process_upsert_profile(self, conn, entry: Dict[str, Any], extractor_output: dict) -> None:
         """Write profile entry from extractor_output if attribute is present."""
+        if self._store is None:
+            return
         user_id = entry["user_id"]
         attribute = extractor_output.get("attribute")
         value = extractor_output.get("value", entry.get("raw_text"))
@@ -292,6 +294,8 @@ class DreamingCycle:
 
     def _process_episodic(self, conn, entry: Dict[str, Any], extractor_output: dict) -> bool:
         """Handle episodic path: tombstone check, dedup, insert. Returns False if entry was short-circuited."""
+        if self._store is None:
+            return False
         user_id = entry["user_id"]
         entry_id = entry["id"]
         content = entry.get("raw_text", "")

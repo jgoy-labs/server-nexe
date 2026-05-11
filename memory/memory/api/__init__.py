@@ -501,6 +501,7 @@ class MemoryAPI:
 
     def _scroll():
       """Execute a Qdrant scroll query (blocking, run in executor)."""
+      assert self._qdrant is not None  # _ensure_initialized() guards this above
       return self._qdrant.scroll(
         collection_name=collection,
         limit=limit,
@@ -557,6 +558,7 @@ class MemoryAPI:
     def _encode():
       """Generate and L2-normalize a single embedding vector (blocking)."""
       import numpy as _np
+      assert self._embedder is not None  # _ensure_initialized() guards this above
       v = list(self._embedder.embed([text]))[0]
       arr = _np.array(v)
       norm = _np.linalg.norm(arr)
@@ -583,6 +585,7 @@ class MemoryAPI:
     def _encode_batch():
       """Generate and L2-normalize embeddings for a batch of texts (blocking)."""
       import numpy as _np
+      assert self._embedder is not None  # _ensure_initialized() guards this above
       results = []
       if embed_batch_size is not None:
         iterator = self._embedder.embed(texts, batch_size=embed_batch_size)

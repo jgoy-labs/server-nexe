@@ -56,12 +56,13 @@ def _create_nexe_flow_mock():
     nf = types.ModuleType("nexe_flow")
     nfc = types.ModuleType("nexe_flow.core")
     nfcn = types.ModuleType("nexe_flow.core.node")
-    nfcn.Node = Node
-    nfcn.NodeMetadata = NodeMetadata
-    nfcn.NodeInput = NodeInput
-    nfcn.NodeOutput = NodeOutput
-    nf.core = nfc
-    nfc.node = nfcn
+    # Dynamic stub injection — ModuleType attributes are set at runtime.
+    nfcn.Node = Node  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+    nfcn.NodeMetadata = NodeMetadata  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+    nfcn.NodeInput = NodeInput  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+    nfcn.NodeOutput = NodeOutput  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+    nf.core = nfc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+    nfc.node = nfcn  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
     sys.modules["nexe_flow"] = nf
     sys.modules["nexe_flow.core"] = nfc

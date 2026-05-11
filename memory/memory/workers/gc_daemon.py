@@ -137,6 +137,8 @@ class GCDaemon:
                 self._vector.delete(to_delete)
             except Exception as e:
                 logger.warning("GC vector delete failed: %s", e)
+        if self._store is None:
+            return
         for eid in to_delete:
             try:
                 self._store.add_tombstone(user_id=user_id, content_hash=eid, reason="gc_decay")

@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from plugins.web_ui_module.messages import get_message, get_i18n
 # R6-15 v1.0.4: tolerate absent security plugin (endpoints gated by require_ui_auth).
 try:
-    from plugins.security.core.input_sanitizers import validate_string_input
+    from plugins.security.core.input_sanitizers import validate_string_input  # pyright: ignore[reportAssignmentType]
 except ImportError:
     def validate_string_input(s, *a, **k):  # type: ignore[misc, no-redef]
         return s
