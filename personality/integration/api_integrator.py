@@ -251,7 +251,7 @@ class APIIntegrator:
         return api_config['prefix']
     
     if module_info and hasattr(module_info.instance, 'api_prefix'):
-      return module_info.instance.api_prefix  # type: ignore[union-attr]  # hasattr guard ja cobreix el cas None
+      return module_info.instance.api_prefix  # type: ignore[union-attr]  # hasattr guard already covers the None case
     
     return f"/api/{module_name}"
   

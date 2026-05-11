@@ -104,7 +104,7 @@ class ModuleExtractor:
     return None
 
   def _try_common_attributes(self, module: Any) -> Any:
-    """Cerca atributs comuns"""
+    """Search for common attributes."""
     common_attrs = self.patterns.get_common_attributes()
 
     for attr_name in common_attrs:
