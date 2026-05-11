@@ -25,22 +25,22 @@ logger = get_logger(__name__)
 
 class APIIntegrator:
   """
-  Integra automàticament les APIs dels mòduls al servidor principal.
-  
-  Funcionalitats:
-  - Detecta routers FastAPI en mòduls carregats
-  - Registra rutes dinàmicament
-  - Gestiona prefixos per evitar col·lisions
-  - Unifica especificacions OpenAPI
+  Automatically integrates module APIs into the main server.
+
+  Features:
+  - Detects FastAPI routers in loaded modules
+  - Registers routes dynamically
+  - Manages prefixes to avoid collisions
+  - Merges OpenAPI specifications
   """
   
   def __init__(self, main_app: FastAPI, i18n_manager=None):
     """
-    Inicialitza l'integrador d'APIs.
-    
+    Initialize the API integrator.
+
     Args:
-      main_app: Aplicació FastAPI principal
-      i18n_manager: Gestor d'internacionalització
+      main_app: Main FastAPI application
+      i18n_manager: Internationalization manager
     """
     self.main_app = main_app
     self.i18n = i18n_manager
@@ -56,15 +56,15 @@ class APIIntegrator:
   def integrate_module_api(self, module_name: str, module_instance: Any,
               module_info: Optional[ModuleInfo] = None) -> bool:
     """
-    Integra l'API d'un mòdul al servidor principal.
+    Integrate a module's API into the main server.
 
     Args:
-      module_name: Nom del mòdul
-      module_instance: Instància del mòdul carregat
-      module_info: Informació del mòdul (opcional)
+      module_name: Module name
+      module_instance: Loaded module instance
+      module_info: Module information (optional)
 
     Returns:
-      True si s'ha integrat correctament
+      True if integrated successfully
     """
     with self._lock:
       try:
@@ -104,7 +104,7 @@ class APIIntegrator:
         return self._handle_integration_error(module_name, e)
 
   def _detect_and_validate_api(self, module_name: str, module_instance: Any) -> Optional[Dict[str, Any]]:
-    """Detecta i valida components d'API."""
+    """Detect and validate API components."""
     api_components = self._detect_api_components(module_instance)
 
     if not api_components:
@@ -120,7 +120,7 @@ class APIIntegrator:
 
   def _register_module_routes(self, module_name: str, api_components: Dict[str, Any],
                 api_prefix: str) -> List[Dict[str, Any]]:
-    """Registra rutes de tots els components d'API."""
+    """Register routes for all API components."""
     registered_routes = []
     for component_type, component in api_components.items():
       routes = self.route_manager.register_module_routes(RouteRegistration(
@@ -152,13 +152,13 @@ class APIIntegrator:
 
   def remove_module_api(self, module_name: str) -> bool:
     """
-    Elimina l'API d'un mòdul del servidor.
-    
+    Remove a module's API from the server.
+
     Args:
-      module_name: Nom del mòdul
-      
+      module_name: Module name
+
     Returns:
-      True si s'ha eliminat correctament
+      True if removed successfully
     """
     with self._lock:
       try:
@@ -220,13 +220,13 @@ class APIIntegrator:
 
   def _detect_api_components(self, module_instance: Any) -> Dict[str, Any]:
     """
-    Detecta components d'API en un mòdul.
+    Detect API components in a module.
 
     Args:
-      module_instance: Instància del mòdul
+      module_instance: Module instance
 
     Returns:
-      Diccionari amb components d'API detectats
+      Dictionary of detected API components
     """
     components: Dict[str, Any] = {}
     self._detect_router_or_app(module_instance, components)
@@ -236,14 +236,14 @@ class APIIntegrator:
   def _determine_api_prefix(self, module_name: str, 
               module_info: Optional[ModuleInfo] = None) -> str:
     """
-    Determina el prefix d'API per un mòdul.
-    
+    Determine the API prefix for a module.
+
     Args:
-      module_name: Nom del mòdul
-      module_info: Informació del mòdul
-      
+      module_name: Module name
+      module_info: Module information
+
     Returns:
-      Prefix d'API
+      API prefix
     """
     if module_info and module_info.manifest:
       api_config = module_info.manifest.get('api', {})

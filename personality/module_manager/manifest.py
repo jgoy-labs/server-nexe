@@ -25,10 +25,10 @@ UI_PATH = MODULE_PATH / "ui"
 @router_public.get("/ui", response_class=HTMLResponse, operation_id="serve_modules_ui")
 async def serve_modules_ui():
   """
-  Serveix la pàgina principal de la UI del ModuleManager.
+  Serve the main ModuleManager UI page.
 
   Returns:
-    HTMLResponse: Contingut HTML de la UI
+    HTMLResponse: HTML content of the UI
   """
   index_path = UI_PATH / "index.html"
 
@@ -46,7 +46,7 @@ async def serve_modules_ui():
 @router_public.get("/health", response_model=dict, operation_id="module_manager_health")
 async def module_manager_health():
   """
-  Health check del mòdul ModuleManager.
+  Health check for the ModuleManager module.
 
   Returns:
     {"name": "module_manager", "status": "HEALTHY|UNHEALTHY", ...}
@@ -80,7 +80,7 @@ async def module_manager_health():
 @router_public.get("/info", response_model=dict, operation_id="module_manager_info")
 async def module_manager_info():
   """
-  Retorna informació del mòdul ModuleManager.
+  Return information about the ModuleManager module.
 
   Returns:
     {"name": "module_manager", "version": "...", ...}
@@ -113,7 +113,7 @@ async def module_manager_info():
 @router_public.get("/list", response_model=dict, operation_id="list_registered_modules")
 async def list_registered_modules():
   """
-  Retorna la llista de mòduls registrats.
+  Return the list of registered modules.
 
   Returns:
     {"modules": [...], "total": N}

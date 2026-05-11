@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: personality/integration/messages.py
-Description: Diccionari centralitzat de missatges fallback per sistema integration. Defineix
+Description: Centralised fallback message dictionary for the integration system. Defines
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -38,15 +38,15 @@ FALLBACK_MESSAGES = {
 
 def get_message(i18n, key: str, **kwargs) -> str:
   """
-  Obté missatge traduït o fallback.
+  Get a translated message or fallback.
 
   Args:
-    i18n: Gestor i18n (pot ser None)
-    key: Clau del missatge
-    **kwargs: Arguments per format
+    i18n: i18n manager (can be None)
+    key: Message key
+    **kwargs: Format arguments
 
   Returns:
-    Missatge formatat
+    Formatted message
   """
   if i18n:
     return i18n.t(f"personality.{key}", **kwargs)

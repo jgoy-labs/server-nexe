@@ -25,41 +25,41 @@ logger = get_logger(__name__)
 
 class ModuleDiscovery:
   """
-  Component especialitzat en descobriment de mòduls.
+  Specialized component for module discovery.
 
-  Responsabilitats:
-  - Descobriment de paths de mòduls
-  - Creació/actualització de ModuleInfo
-  - Detecció de cicles de dependències
-  - Emissió d'events de descobriment
+  Responsibilities:
+  - Module path discovery
+  - Creation/update of ModuleInfo
+  - Dependency cycle detection
+  - Emission of discovery events
   """
 
   def __init__(self, config: DiscoveryConfig) -> None:
     """
-    Inicialitza el component de descobriment.
+    Initialize the discovery component.
 
     Args:
-      config: DiscoveryConfig amb path_discovery, config_manager, events i i18n
+      config: DiscoveryConfig with path_discovery, config_manager, events and i18n
     """
     self.path_discovery = config.path_discovery
     self.config_manager = config.config_manager
     self.events = config.events
     self.i18n = config.i18n
-    # Bug 20 fix — guardem els cicles detectats perque siguin
-    # consultables des de fora (startup summary, status endpoints,
-    # tests). Sense aixo els modules s'inhabilitaven en silenci.
+    # Bug 20 fix — store detected cycles so they can be queried
+    # from outside (startup summary, status endpoints, tests).
+    # Without this, modules were silently disabled.
     self._cycle_warnings: List[str] = []
 
   def get_cycle_warnings(self) -> List[str]:
     """
-    Retorna una copia de la llista de cicles detectats durant el
-    descobriment. El consumidor tipic es el startup summary del lifespan,
-    que imprimeix cada entry amb prefix [WARN].
+    Return a copy of the list of cycles detected during discovery.
+    The typical consumer is the lifespan startup summary,
+    which prints each entry with a [WARN] prefix.
     """
     return list(self._cycle_warnings)
 
   def clear_cycle_warnings(self) -> None:
-    """Neteja la llista de cycle warnings (util en re-descobriments)."""
+    """Clear the cycle warnings list (useful on re-discovery)."""
     self._cycle_warnings.clear()
 
   def _resolve_force_flag(self, force: bool, modules_dict: Dict[str, ModuleInfo]) -> Optional[bool]:
@@ -143,15 +143,15 @@ class ModuleDiscovery:
     force: bool = False
   ) -> List[str]:
     """
-    Descobreix mòduls disponibles.
+    Discover available modules.
 
     Args:
-      modules_dict: Diccionari de mòduls (es modifica in-place)
-      lock: Lock per sincronització
-      force: Força redescobriment encara que hi hagi cache
+      modules_dict: Module dictionary (modified in-place)
+      lock: Synchronization lock
+      force: Force rediscovery even if cache exists
 
     Returns:
-      Llista de noms de mòduls descoberts
+      List of discovered module names
     """
     msg = get_message(self.i18n, 'discovery.starting')
     logger.info(msg, component="module_manager")

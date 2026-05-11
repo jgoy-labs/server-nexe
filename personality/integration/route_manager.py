@@ -22,22 +22,22 @@ logger = get_logger(__name__)
 
 class RouteManager:
   """
-  Gestiona el registre dinàmic de rutes de mòduls.
-  
-  Funcionalitats:
-  - Registra rutes sense reiniciar el servidor
-  - Evita col·lisions de rutes
-  - Mantè un registry de rutes per mòdul
-  - Permet eliminació de rutes dinàmica
+  Manages dynamic route registration for modules.
+
+  Features:
+  - Registers routes without restarting the server
+  - Avoids route collisions
+  - Maintains a route registry per module
+  - Supports dynamic route removal
   """
   
   def __init__(self, main_app: FastAPI, i18n_manager=None):
     """
-    Inicialitza el gestor de rutes.
-    
+    Initialize the route manager.
+
     Args:
-      main_app: Aplicació FastAPI principal
-      i18n_manager: Gestor d'internacionalització
+      main_app: Main FastAPI application
+      i18n_manager: Internationalization manager
     """
     self.main_app = main_app
     self.i18n = i18n_manager
@@ -48,13 +48,13 @@ class RouteManager:
   
   def register_module_routes(self, reg: RouteRegistration) -> List[Dict[str, Any]]:
     """
-    Registra les rutes d'un component d'API.
+    Register routes for an API component.
 
     Args:
-      reg: RouteRegistration amb module_name, api_component, prefix i component_type
+      reg: RouteRegistration with module_name, api_component, prefix and component_type
 
     Returns:
-      Llista de rutes registrades
+      List of registered routes
     """
     with self._lock:
       registered_routes: List[Dict[str, Any]] = []
@@ -98,7 +98,7 @@ class RouteManager:
   
   def _register_router_routes(self, module_name: str, router: APIRouter, 
                prefix: str) -> List[Dict[str, Any]]:
-    """Registra rutes d'un APIRouter"""
+    """Register routes from an APIRouter."""
     registered_routes: List[Dict[str, Any]] = []
     
     try:
@@ -137,7 +137,7 @@ class RouteManager:
   
   def _register_app_routes(self, module_name: str, app: FastAPI, 
               prefix: str) -> List[Dict[str, Any]]:
-    """Registra rutes d'una FastAPI app"""
+    """Register routes from a FastAPI app."""
     registered_routes: List[Dict[str, Any]] = []
     
     try:
@@ -169,21 +169,21 @@ class RouteManager:
   
   def _register_endpoint_routes(self, module_name: str, endpoints: List[Any], 
                 prefix: str) -> List[Dict[str, Any]]:
-    """Registra endpoints individuals"""
+    """Register individual endpoints."""
     registered_routes: List[Dict[str, Any]] = []
     
     return registered_routes
   
   def _check_route_conflict(self, path: str, module_name: str) -> bool:
     """
-    Comprova si hi ha conflicte de rutes.
-    
+    Check whether a route conflict exists.
+
     Args:
-      path: Path de la ruta
-      module_name: Nom del mòdul
-      
+      path: Route path
+      module_name: Module name
+
     Returns:
-      True si hi ha conflicte
+      True if a conflict exists
     """
     if path in self._route_conflicts:
       existing_module = self._route_conflicts[path]
@@ -200,13 +200,13 @@ class RouteManager:
   
   def remove_module_routes(self, module_name: str) -> int:
     """
-    Elimina totes les rutes d'un mòdul.
-    
+    Remove all routes for a module.
+
     Args:
-      module_name: Nom del mòdul
-      
+      module_name: Module name
+
     Returns:
-      Nombre de rutes eliminades
+      Number of routes removed
     """
     with self._lock:
       if module_name not in self._module_routes:
@@ -249,6 +249,6 @@ class RouteManager:
       return self._module_routes.copy()
   
   def get_route_conflicts(self) -> Dict[str, str]:
-    """Retorna mapa de conflictes de rutes"""
+    """Return the route conflict map."""
     with self._lock:
       return self._route_conflicts.copy()

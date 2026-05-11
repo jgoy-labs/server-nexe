@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: personality/module_manager/system_lifecycle.py
-Description: Gestor de cicle de vida del sistema Nexe. Controla start_system (discovery +
+Description: Nexe system lifecycle manager. Controls start_system (discovery +
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -17,15 +17,15 @@ from personality._logger import get_logger
 logger = get_logger(__name__)
 
 class SystemLifecycleManager:
-  """Gestiona cicle de vida del sistema complet"""
+  """Manages the lifecycle of the full system."""
 
   def __init__(self, config: SystemLifecycleConfig) -> None:
     """
-    Inicialitza gestor de cicle de vida del sistema.
+    Initialize system lifecycle manager.
 
     Args:
-      config: SystemLifecycleConfig amb modules, module_lifecycle, discovery_func,
-              list_modules_func i i18n opcionals
+      config: SystemLifecycleConfig with modules, module_lifecycle, discovery_func,
+              list_modules_func and optional i18n
     """
     self.modules = config.modules
     self.module_lifecycle = config.module_lifecycle
@@ -36,10 +36,10 @@ class SystemLifecycleManager:
 
   async def start_system(self) -> bool:
     """
-    Inicia el sistema complet.
+    Start the full system.
 
     Returns:
-      True si s'ha iniciat correctament
+      True if started successfully
     """
     try:
       self._running = True
@@ -74,7 +74,7 @@ class SystemLifecycleManager:
       return False
 
   async def shutdown_system(self) -> None:
-    """Atura el sistema complet"""
+    """Shut down the full system."""
     msg = get_message(self.i18n, 'system.shutdown.initiated')
     logger.info(msg, component="system_lifecycle")
 
