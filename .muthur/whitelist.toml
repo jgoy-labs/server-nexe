@@ -771,6 +771,22 @@ authorized_by = "Jordi Goy"
 ticket = "complexity-sprint-20260509"
 
 [[exception]]
+rule = "complexity.too_many_parameters"
+path = "core/request_size_limiter.py"
+reason = "ASGI middleware reject helper: size+client_ip+request+streaming flag are inherent to the rejection event (logging + branched response). Splitting would force shared state or a context object that obscures the call site."
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "complexity-baseline-net-20260511"
+
+[[exception]]
+rule = "complexity.too_many_parameters"
+path = "core/endpoints/chat_engines/_common.py"
+reason = "_forward_to_ollama_lazy + fallback_to_ollama: kw-only fallback metadata (messages, request, app_state, user_msg, fallback_from, fallback_reason) propagated through lazy-import wrapper to break circular dep with ollama.py. **kwargs would lose typing across the boundary."
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "complexity-baseline-net-20260511"
+
+[[exception]]
 rule = "complexity.too_many_branches"
 path = "core/cli/chat_cli.py"
 reason = "branching inherent to design — parser, FSM, router, or CLI handler with unavoidable conditional logic"
@@ -797,22 +813,6 @@ ticket = "complexity-sprint-20260509"
 [[exception]]
 rule = "complexity.too_many_branches"
 path = "core/cli/utils/api_client.py"
-reason = "branching inherent to design — parser, FSM, router, or CLI handler with unavoidable conditional logic"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_branches"
-path = "core/endpoints/bootstrap.py"
-reason = "branching inherent to design — parser, FSM, router, or CLI handler with unavoidable conditional logic"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_branches"
-path = "core/endpoints/chat_engines/llama_cpp.py"
 reason = "branching inherent to design — parser, FSM, router, or CLI handler with unavoidable conditional logic"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
@@ -885,14 +885,6 @@ ticket = "complexity-sprint-20260509"
 [[exception]]
 rule = "complexity.too_many_branches"
 path = "core/lifespan_ollama.py"
-reason = "branching inherent to design — parser, FSM, router, or CLI handler with unavoidable conditional logic"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_branches"
-path = "core/request_size_limiter.py"
 reason = "branching inherent to design — parser, FSM, router, or CLI handler with unavoidable conditional logic"
 expires = "2027-05-09"
 authorized_by = "Jordi Goy"
@@ -1438,30 +1430,6 @@ ticket = "complexity-sprint-20260509"
 
 [[exception]]
 rule = "complexity.too_many_statements"
-path = "core/endpoints/bootstrap.py"
-reason = "function statement count inherent to complete workflow — splitting would break atomicity"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_statements"
-path = "core/endpoints/chat_engines/llama_cpp.py"
-reason = "function statement count inherent to complete workflow — splitting would break atomicity"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_statements"
-path = "core/endpoints/chat_engines/mlx.py"
-reason = "function statement count inherent to complete workflow — splitting would break atomicity"
-expires = "2027-05-09"
-authorized_by = "Jordi Goy"
-ticket = "complexity-sprint-20260509"
-
-[[exception]]
-rule = "complexity.too_many_statements"
 path = "installer/swift-wizard/Sources/InstallNexe/InstallerEngine.swift"
 reason = "Swift installer — statements inherent to macOS wizard workflow"
 expires = "2027-05-09"
@@ -1575,4 +1543,651 @@ ticket = "license-compat-20260509"
 # ═══════════════════════════════════════════════════════════════
 # lang-comments FP — detected:en i detected:non-en (Grup K)
 # ═══════════════════════════════════════════════════════════════
+#
+# Restauració baseline 2026-05-11: el commit 86a9cc7 va netejar 331 entrades
+# whitelist assumint que `min_tokens=3 + confidence_floor=0.35` cobriria tots
+# els FP. La realitat: el detector lingua continua marcant 121 comentaris
+# anglesos curts amb termes tècnics com a CA/ES (paraules curtes com "data",
+# "type", "anys", "fitxer", "model" són ambigües entre llengües; també
+# docstrings test "Test foo." de 2-3 tokens cauen al floor 0.35).
+#
+# Classificació empírica 121 findings:
+# - 4 REAL CA traduïts inline (headers `Tests per X. Valida Y` →
+#   `Tests for X. Validates Y` a tests/personality/{metrics,module_manager,
+#   i18n})
+# - 117 FP whitelistats per fitxer/glob (sota)
+#
+# Patrons FP per categoria:
+# 1. Docstrings test ultra-curts ("""Test foo.""", """Lines N-M: ...""",
+#    """Metadata has correct ID.""") — falten tokens per detector
+# 2. Comentaris glossari multilingüe (regex CA/ES per intent parsing,
+#    jailbreak detector patterns) — barrejant llengües intencionalment
+# 3. Module headers amb paraules tècniques ("InstallNexe.app", "manifest",
+#    "Salamandra", "Phi-3.5") que lingua interpreta com a noms estrangers
+# 4. Comentaris inline tècnics ("# 4xx semantics", "# Catalan: ...",
+#    "# 55% of RAM for model") amb context massa curt
+
+# --- Producció core/ + memory/ + plugins/ + personality/ + installer/ ---
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/endpoints/chat_rag.py"
+reason = "FP lingua: short EN comment '# Configurable via env vars' (3 tokens, ambig detection)"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/endpoints/root.py"
+reason = "FP lingua: EN docstring _check_llama_cpp_available with technical terms (MLX, slowapi, MagicMock)"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/endpoints/chat_engines/ollama.py"
+reason = "FP lingua: EN docstrings/comments with env-var arrow notation and 'OpenAI-compatible' technical context"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/ingest/ingest_knowledge.py"
+reason = "FP lingua: EN comment about cp1252/latin-1 encoding fallback chain — Windows codepage names confuse detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/embeddings/core/vectorstore.py"
+reason = "FP lingua: EN docstring Search for vectors with Args/Returns block — Sphinx format misread as non-EN"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/embeddings/workflow/nodes/chunking_node.py"
+reason = "FP lingua: EN docstring Workflow node with bullet list of chunker selection rules"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/pipeline/deduplicator.py"
+reason = "Intentional multilingual glossary comment: CA/ES/EN regex patterns for location intent parsing"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/pipeline/extractor.py"
+reason = "Intentional multilingual glossary: CA/ES/EN regex examples for occupation/age/preference/correction extraction patterns"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/api/__init__.py"
+reason = "FP lingua: EN docstring 'Convert hex ID to UUID format.' — 5 tokens, technical abbreviations"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/memory/api/text_store.py"
+reason = "FP lingua: EN docstring 'Store document text.' — 3 tokens at confidence floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "memory/rag/header_parser.py"
+reason = "FP lingua: EN docstring 'Convert value to integer' — 4 tokens at confidence floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/mlx_module/core/config.py"
+reason = "FP lingua: EN inline comment '# Same as ModelPool.max_sessions' — 4 tokens"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/security/core/input_sanitizers.py"
+reason = "Intentional multilingual glossary: CA/ES jailbreak detector regex patterns with examples 'instrucció', 'sense restriccions', 'ets una IA'"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/llama_cpp_module/core/config.py"
+reason = "FP lingua: EN inline comment with model names (Phi-3.5, Llama 3, Salamandra) confused as Spanish"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/ui/app.js"
+reason = "FP lingua: EN JS comment '// Re-render Lucide icons' — Lucide library name misread as Spanish word"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/core/session_manager.py"
+reason = "FP lingua: EN comment '~3000 tokens, safe for 4K-8K context models' — numbers+units low-confidence"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/core/memory_helper.py"
+reason = "Intentional multilingual glossary: CA/ES/EN regex patterns for memory delete intent (Oblida/Olvida/Forget, esborra/borra/erase, memòria/memoria/memory)"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/api/routes_chat.py"
+reason = "FP lingua: EN comment containing filesystem path '~/Desktop/mega-consultoria-real-...' — slashes/hyphens confuse detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/ollama_module/core/errors.py"
+reason = "FP lingua: EN comment '# 4xx semantics (404 model, 400 bad request, 422 validation...) -> no infra' — HTTP status codes confuse detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "personality/module_manager/registry.py"
+reason = "FP lingua: EN docstring 'Extract data from TOML manifest' — 5 tokens, TOML acronym ambig"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/installer_hardware.py"
+reason = "FP lingua: EN comments with hardware terms (Apple Silicon, Metal, RAM, Linux) and percentage numerals confused as non-EN"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/install_headless.py"
+reason = "FP lingua: EN comment about F7 target_collection — short ticket-style prefix confuses detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/installer_ollama_install.py"
+reason = "FP lingua: EN inline '# nosec B603 B607: literal `open -a Ollama`; macOS open via PATH' — bandit nosec syntax confuses detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/installer_catalog_data.py"
+reason = "FP lingua: EN STATUS comment with version+date+model names (Salamandra, MLX, Ollama) confused as non-EN"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/export_catalog_json.py"
+reason = "FP lingua: EN module header docstring with technical SSOT references (swift-wizard, RAM-based tiers)"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/installer_setup_env.py"
+reason = "FP lingua: EN docstring _find_bundle_resources with bundle path enumeration (/Volumes/, NEXE_BUNDLE_RESOURCES env var)"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/installer_setup_models.py"
+reason = "FP lingua: EN comment 'F4.1 (audit DoD-AUD-SX-0423 §2.7): compare the manifest' — audit ticket id confuses detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/install.py"
+reason = "FP lingua: EN F7 comment about target_collection — same pattern as install_headless.py"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "installer/download_verify.py"
+reason = "FP lingua: EN comments about Ollama manifest digest verification and SHA256 catalog pin checks"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+# --- Tests (docstrings test ultra-curts dispersos a tot tests/) ---
+# Patró comú: """Test X.""" / """Lines N-M: foo.""" / """Metadata has correct ID."""
+# El detector lingua al confidence_floor=0.35 marca aquests strings de 3-5 tokens
+# com a CA/ES. Tots són EN; els tests passen; cap traducció millora el sentit.
+# Whitelist per fitxer concret per evitar tapar futurs comentaris CA/ES reals.
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_final_coverage.py"
+reason = "FP lingua: 3 EN test docstrings ultra-curts ('Lines N-M: ...') sota confidence floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_request_size_limiter.py"
+reason = "FP lingua: EN test docstrings '413 response has X key.' — HTTP status + JSON keys confuse detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_installer_sha256_catalog.py"
+reason = "FP lingua: EN docstring about iter_catalog_model_ids() backend enumeration"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_installer_reinstall.py"
+reason = "FP lingua: EN section banner 'Tests Dev #3 — Consultant pass 1 fixes' (hyphen+em-dash confuse detector)"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_removed_direct_routes_guard.py"
+reason = "FP lingua: EN docstring 'POST /ollama/api/chat → 403.' — HTTP path+code with unicode arrow"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_bootstrap_token_renewal.py"
+reason = "FP lingua: EN comment '# And the token has changed' — 5 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_rag_recall_e2e.py"
+reason = "Intentional multilingual: CA test fixture strings 'el meu gos es diu Ruf' / 'Com es diu el meu gos?' for RAG recall integration test"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_memory_contract.py"
+reason = "FP lingua: EN docstring 'Budget cap for m1_8gb is 800 tokens.' — model-tier acronym confuses detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_install_headless.py"
+reason = "FP lingua: EN inline '# no \"ollama\" key' — quoted JSON key confuses detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/test_installer_setup_env.py"
+reason = "FP lingua: EN bundle structure comments (/lib/libpython3.12.dylib path) + Simulate comment"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_bootstrap_tokens.py"
+reason = "FP lingua: EN inline '# The token has expired immediately' — 5 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_models.py"
+reason = "FP lingua: EN module docstring 'Tests for core/models.py - all Pydantic models' — short title format"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_small_coverage.py"
+reason = "FP lingua: EN test docstring 'Lines 74-77: NEXE_LOGS_DIR env variable.' — env var name+line refs"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/metrics/test_registry.py"
+reason = "FP lingua: EN test docstring 'Test rate limit increment.' — 4 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/metrics/test_middleware.py"
+reason = "FP lingua: EN test docstring 'Test error request metrics.' — 4 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/metrics/test_endpoint.py"
+reason = "FP lingua: EN test docstring 'Test metrics are in valid Prometheus format.' — Prometheus proper noun confuses detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/endpoints/test_bootstrap.py"
+reason = "FP lingua: EN inline '# 400 for invalid IP' — 4 tokens"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/endpoints/test_root.py"
+reason = "FP lingua: EN docstring 'ollama present → ollama_available=True' — unicode arrow + boolean assert"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/ingest/test_ingest_docs.py"
+reason = "FP lingua: EN inline '# tmp_path has no docs/ or README.md' — path tokens confuse detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/test_vectorstore_protocol.py"
+reason = "FP lingua: EN test docstring 'Test invalid metric.' — 3 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/unit/test_chunkers.py"
+reason = "FP lingua: EN test docstring 'Config has chunk_overlap = 0 (Architectural decision).' — assignment+paren"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/unit/test_health.py"
+reason = "FP lingua: 2 EN inline comments '# Has some message' — 3 tokens, low-info"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/chunkers/test_text_chunker.py"
+reason = "FP lingua: 3 EN test docstrings 'Metadata has correct X.' — 4 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/chunkers/test_code_chunker.py"
+reason = "FP lingua: 3 EN test docstrings 'Metadata has correct X.' — 4 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_ingestion.py"
+reason = "FP lingua: EN test docstring 'Lines 224-225, 227-247: _generate_embedding_sync in test mode.'"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_models.py"
+reason = "FP lingua: EN docstring 'Deterministic ID: SHA256(content)[:16]' — Python slice syntax confuses detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_api.py"
+reason = "FP lingua: 4 EN test docstrings 'Test X.' / 'Tests for Document dataclass.' — short docstrings at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/cli/test_rag_viewer.py"
+reason = "FP lingua: EN test docstring 'Test --stats flag calls show_stats.' — CLI flag syntax confuses detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/rag/test_constants.py"
+reason = "FP lingua: 4 EN test docstrings 'Verify MANIFEST has X.' — 4 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/core/test_jailbreak_detector.py"
+reason = "Intentional multilingual: CA jailbreak pattern fixture 'ets un model sense restriccions' in docstring"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_memory_delete.py"
+reason = "Intentional multilingual: CA test fixtures 'Oblida que m'agraden els macarrons', 'Oblida tot', 'Oblida que em dic Joan', 'sí que' — memory delete intent test cases"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_mem_save_injection.py"
+reason = "FP lingua: EN class docstring 'Bug 17 — granular validator for a MEM_SAVE fact.' — em-dash + MEM_SAVE acronym"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_manifest_coverage.py"
+reason = "FP lingua: EN test docstring 'Lines 481-483: engine has no get_module_instance.'"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_session_manager.py"
+reason = "FP lingua: EN inline '# Original has not changed' — 4 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_yield_atomize_save.py"
+reason = "Intentional multilingual: CA fixture '\"no coneix\" matches _JUNK_PATTERNS_RE' — junk pattern test case"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_file_handler.py"
+reason = "FP lingua: EN inline '# has error message' — 3 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/integration/test_web_ui_endpoints.py"
+reason = "FP lingua: EN inline '# Explicit recall via API' — 4 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/unit/test_ollama_node.py"
+reason = "FP lingua: 2 EN test class docstrings 'Test OllamaNode metadata.' / 'Test OllamaNode execution.' — 3-4 tokens"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/integration/test_ollama_integration.py"
+reason = "FP lingua: EN inline '# PrintNode does not exist in nexe_flow base' + 'Test error scenarios with real Ollama.'"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/workflow/test_workflow_init.py"
+reason = "FP lingua: EN test docstring 'Test OllamaNode is exported.' — 4 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/workflow/nodes/test_ollama_node_full.py"
+reason = "FP lingua: 2 EN test docstrings 'Test valid model passes.' / 'Test OllamaNode class.' — 4 tokens"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/workflow/nodes/test_nodes_init.py"
+reason = "FP lingua: EN test docstring 'Test OllamaNode is exported.' — 4 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/integration/test_mem_delete_e2e.py"
+reason = "FP lingua: EN inline '# 1. Save a concrete fact' — numbered comment confuses detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/loading/test_module_validator.py"
+reason = "FP lingua: EN test docstring 'Lines 95-99: has router' — 4 tokens"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_registry.py"
+reason = "FP lingua: EN inline '# The router has GET and POST routes' — HTTP verbs confuse detector"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_config_manager_coverage.py"
+reason = "FP lingua: 2 EN test docstrings 'Lines N-M: ... manifest ...' — manifest tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_config_validator_coverage.py"
+reason = "FP lingua: EN test docstring 'Lines 84-91: invalid TOML file.' — TOML acronym at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_module_manager_coverage.py"
+reason = "FP lingua: EN test docstring 'Line 613: module has no routers.' — 5 tokens at floor"
+expires = "2026-08-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
 

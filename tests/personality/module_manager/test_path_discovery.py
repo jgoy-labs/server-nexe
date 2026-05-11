@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: personality/module_manager/tests/test_path_discovery.py
-Description: Tests per PathDiscovery. Valida descobriment de paths, detecció
+Description: Tests for PathDiscovery. Validates path discovery, detection
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: personality/module_manager/tests/test_module_manager.py
-Description: Tests per ModuleManager facade. Valida coordinació de components,
+Description: Tests for ModuleManager facade. Validates component coordination,
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
