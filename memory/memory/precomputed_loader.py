@@ -217,6 +217,81 @@ class PrecomputedKB:
 
     # -- validation --------------------------------------------------------- #
 
+    @staticmethod
+    def _check_fingerprints(
+        manifest: Dict[str, Any],
+        runtime: Dict[str, Any],
+    ) -> Optional[ValidationOutcome]:
+        """Compare runtime fingerprints against the manifest.
+
+        Returns ``None`` when every check passes, or a failing
+        :class:`ValidationOutcome` on the first mismatch.
+
+        ``model_hf_commit`` is treated as a soft fingerprint: a ``None``
+        on either side logs a warning but does not invalidate.
+        """
+        checks = [
+            ("fastembed_version", runtime["fastembed_version"]),
+            ("onnxruntime_version", runtime["onnxruntime_version"]),
+            ("model_name", runtime["model_name"]),
+            ("model_hf_commit", runtime["model_hf_commit"]),
+            ("chunker_source_sha256", runtime["chunker_source_sha256"]),
+            ("prefix_format_version", runtime["prefix_format_version"]),
+        ]
+        for key, expected in checks:
+            got = manifest.get(key)
+            if expected is None or got is None:
+                if key == "model_hf_commit":
+                    logger.warning(
+                        "model_hf_commit: soft-skip "
+                        "(manifest=%r, runtime=%r)",
+                        got, expected,
+                    )
+                    continue
+                # Tolerate None on one side only if both are None.
+                if not (expected is None and got is None):
+                    return ValidationOutcome(
+                        False,
+                        reason=f"{key} missing on one side (manifest={got!r}, runtime={expected!r})",
+                        manifest=manifest,
+                    )
+                continue
+            if got != expected:
+                return ValidationOutcome(
+                    False,
+                    reason=f"{key} mismatch (manifest={got!r}, runtime={expected!r})",
+                    manifest=manifest,
+                )
+        return None
+
+    def _check_lang_sources(
+        self,
+        manifest: Dict[str, Any],
+    ) -> Optional[ValidationOutcome]:
+        """Verify per-language source hashes.
+
+        Returns ``None`` when every language matches, or a failing
+        :class:`ValidationOutcome` on the first mismatch/missing folder.
+        """
+        langs = manifest.get("langs") or {}
+        for lang, info in langs.items():
+            lang_dir = self.knowledge_root / lang
+            if not lang_dir.is_dir():
+                return ValidationOutcome(
+                    False,
+                    reason=f"lang '{lang}' listed in manifest but folder missing",
+                    manifest=manifest,
+                )
+            expected = info.get("source_sha256")
+            got = sha256_of_source_dir(lang_dir)
+            if expected != got:
+                return ValidationOutcome(
+                    False,
+                    reason=f"source_sha256 mismatch for lang '{lang}'",
+                    manifest=manifest,
+                )
+        return None
+
     def validate(
         self,
         *,
@@ -245,67 +320,13 @@ class PrecomputedKB:
             ingest_source_path=ingest_source_path,
         )
 
-        checks = [
-            ("fastembed_version", runtime["fastembed_version"]),
-            ("onnxruntime_version", runtime["onnxruntime_version"]),
-            ("model_name", runtime["model_name"]),
-            ("model_hf_commit", runtime["model_hf_commit"]),
-            ("chunker_source_sha256", runtime["chunker_source_sha256"]),
-            ("prefix_format_version", runtime["prefix_format_version"]),
-        ]
-        for key, expected in checks:
-            got = manifest.get(key)
-            if expected is None or got is None:
-                # model_hf_commit is a soft fingerprint: if the manifest
-                # has a value but the runtime can't read it (e.g. CI
-                # without a Hugging Face cache warmed), log a warning
-                # and skip — the other hashes already guard integrity.
-                # The inverse (runtime has a commit, manifest does not)
-                # also falls through as a warning: older manifests pre-
-                # dated this field.
-                if key == "model_hf_commit":
-                    logger.warning(
-                        "model_hf_commit: soft-skip "
-                        "(manifest=%r, runtime=%r)",
-                        got, expected,
-                    )
-                    continue
-                # Tolerate None on one side only if both are None (e.g.
-                # hub cache layout not found on either). Otherwise fail.
-                if not (expected is None and got is None):
-                    return ValidationOutcome(
-                        False,
-                        reason=f"{key} missing on one side (manifest={got!r}, runtime={expected!r})",
-                        manifest=manifest,
-                    )
-                continue
-            if got != expected:
-                return ValidationOutcome(
-                    False,
-                    reason=f"{key} mismatch (manifest={got!r}, runtime={expected!r})",
-                    manifest=manifest,
-                )
+        fp_fail = self._check_fingerprints(manifest, runtime)
+        if fp_fail is not None:
+            return fp_fail
 
-        # Per-lang source hash check so an edited MD invalidates its lang
-        # without dragging the others down.
-        langs = manifest.get("langs") or {}
-        for lang, info in langs.items():
-            lang_dir = self.knowledge_root / lang
-            if not lang_dir.is_dir():
-                # lang listed in manifest but folder deleted → stale
-                return ValidationOutcome(
-                    False,
-                    reason=f"lang '{lang}' listed in manifest but folder missing",
-                    manifest=manifest,
-                )
-            expected = info.get("source_sha256")
-            got = sha256_of_source_dir(lang_dir)
-            if expected != got:
-                return ValidationOutcome(
-                    False,
-                    reason=f"source_sha256 mismatch for lang '{lang}'",
-                    manifest=manifest,
-                )
+        lang_fail = self._check_lang_sources(manifest)
+        if lang_fail is not None:
+            return lang_fail
 
         return ValidationOutcome(True, manifest=manifest)
 
