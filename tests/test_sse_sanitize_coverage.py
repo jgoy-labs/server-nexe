@@ -54,6 +54,8 @@ BACKEND_FILES = [
   REPO_ROOT / "core/endpoints/chat_engines/mlx.py",
   REPO_ROOT / "core/endpoints/chat_engines/llama_cpp.py",
   REPO_ROOT / "core/endpoints/chat_engines/ollama.py",
+  REPO_ROOT / "core/endpoints/chat_engines/_streaming.py",
+  REPO_ROOT / "core/endpoints/chat_engines/_common.py",
 ]
 
 
@@ -81,7 +83,12 @@ def test_backend_content_assignments_use_sanitize(backend_file):
   # Find every "content": <something> assignment in a JSON-shaped dict
   pattern = re.compile(r'"content"\s*:\s*([^,\n}]+)')
   matches = pattern.findall(text)
-  assert matches, f"No 'content' chunk fields found in {backend_file.name} — backend layout changed?"
+  if not matches:
+    # File delegates chunk formatting to shared modules (_streaming.py, _common.py).
+    # Verify it imports from those modules which are tested separately.
+    if "format_sse_chunk" in text or "build_openai_response" in text:
+      return  # Safe: delegates to sanitized shared code
+    pytest.fail(f"No 'content' chunk fields found in {backend_file.name} — backend layout changed?")
 
   unsafe = []
   for expr in matches:
