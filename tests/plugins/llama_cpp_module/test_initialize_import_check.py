@@ -34,7 +34,7 @@ def no_llama_cpp(monkeypatch):
 
 @pytest.fixture
 def fresh_module():
-  """Build a fresh LlamaCppModule (unitialized)."""
+  """Build a fresh LlamaCppModule (uninitialized)."""
   return LlamaCppModule()
 
 
