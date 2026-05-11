@@ -117,7 +117,9 @@ class PersistenceManager(SqliteStorageMixin):
           2. URL (server mode)
         """
         from memory.embeddings.adapters import QdrantAdapter
-        from memory.memory.engines.qdrant_types import Distance, VectorParams
+        # qdrant_client re-export via local module — pyright cannot resolve the
+        # re-export chain reliably for runtime symbols, so silence false-positive.
+        from .qdrant_types import Distance, VectorParams  # pyright: ignore[reportAttributeAccessIssue]
 
         self.qdrant: Optional[Any] = None
         self._qdrant_available = False
@@ -218,11 +220,13 @@ class PersistenceManager(SqliteStorageMixin):
         metadata: Dict[str, Any],
     ):
         """Save vector to Qdrant via QdrantAdapter."""
-        from memory.memory.engines.qdrant_types import PointStruct
+        from .qdrant_types import PointStruct  # pyright: ignore[reportAttributeAccessIssue]
 
         uuid_id = PersistenceManager._hex_to_uuid(entry_id)
 
         def _sync_upsert():
+            if self.qdrant is None:
+                return
             point = PointStruct(
                 id=uuid_id,
                 vector=embedding,
@@ -255,6 +259,8 @@ class PersistenceManager(SqliteStorageMixin):
         loop = asyncio.get_running_loop()
 
         def _sync_search():
+            if self.qdrant is None:
+                return []
             return self.qdrant.client_search(
                 collection_name=self.collection_name,
                 query_vector=query_vector,

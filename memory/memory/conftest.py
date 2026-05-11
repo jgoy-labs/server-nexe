@@ -13,7 +13,7 @@ from typing import Any
 def _create_qdrant_mock():
     qdrant_key = "memory.memory.tools.qdrant"
     if qdrant_key not in sys.modules:
-        mock_qdrant = types.ModuleType(qdrant_key)
+        mock_qdrant: Any = types.ModuleType(qdrant_key)
         mock_qdrant.QdrantAdapter = type("QdrantAdapter", (), {})
         mock_qdrant.QdrantConfig = type("QdrantConfig", (), {})
         sys.modules[qdrant_key] = mock_qdrant
@@ -65,9 +65,9 @@ def _create_nexe_flow_mock():
                 if inp.required and inp.name not in inputs:
                     raise ValueError(f"Missing required input: '{inp.name}'")
 
-    nf = types.ModuleType("nexe_flow")
-    nfc = types.ModuleType("nexe_flow.core")
-    nfcn = types.ModuleType("nexe_flow.core.node")
+    nf: Any = types.ModuleType("nexe_flow")
+    nfc: Any = types.ModuleType("nexe_flow.core")
+    nfcn: Any = types.ModuleType("nexe_flow.core.node")
     nfcn.Node = Node
     nfcn.NodeMetadata = NodeMetadata
     nfcn.NodeInput = NodeInput
