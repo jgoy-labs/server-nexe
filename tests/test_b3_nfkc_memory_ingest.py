@@ -46,8 +46,8 @@ def test_memory_store_nfkc_fullwidth_to_halfwidth():
     """
     remember_src = _remember_fn_src()
     assert _has_nfkc(remember_src), (
-        "B3: MemoryService.remember() ha d'aplicar unicodedata.normalize('NFKC', text) "
-        "al text d'ingest (fix additiu — NO treure NFKC del query path)"
+        "B3: MemoryService.remember() must apply unicodedata.normalize('NFKC', text) "
+        "to the ingest text (additive fix — do NOT remove NFKC from the query path)"
     )
 
 
@@ -65,12 +65,12 @@ def test_memory_store_nfkc_bidirectional():
 
     # Query path (commit 3469964 — already present, must not regress)
     assert _has_nfkc(api_src), (
-        "Anti-reg query path (commit 3469964): memory/api/v1.py ha perdut NFKC "
-        "(regressió)"
+        "Anti-reg query path (commit 3469964): memory/api/v1.py has lost NFKC "
+        "(regression)"
     )
 
     # Ingest path (post-fix B3 — must exist in remember())
     assert _has_nfkc(remember_src), (
-        "Anti-reg ingest path B3: MemoryService.remember() ha de mantenir NFKC "
-        "— simetria bidireccional indexat↔query"
+        "Anti-reg ingest path B3: MemoryService.remember() must keep NFKC "
+        "— bidirectional symmetry indexed↔query"
     )

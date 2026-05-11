@@ -63,7 +63,7 @@ async def test_singleton_pattern():
   embedder1 = AsyncEmbedder(model_name="test-model", device="cpu")
   embedder2 = AsyncEmbedder(model_name="test-model", device="cpu")
 
-  assert embedder1 is embedder2, "Singleton hauria de retornar mateixa instància"
+  assert embedder1 is embedder2, "Singleton should return the same instance"
 
   await embedder1.shutdown()
   AsyncEmbedder._instances.clear()
@@ -81,7 +81,7 @@ async def test_different_models_different_instances():
   embedder1 = AsyncEmbedder(model_name="model-1", device="cpu")
   embedder2 = AsyncEmbedder(model_name="model-2", device="cpu")
 
-  assert embedder1 is not embedder2, "Models diferents haurien de tenir instàncies diferents"
+  assert embedder1 is not embedder2, "Different models should have different instances"
 
   await embedder1.shutdown()
   await embedder2.shutdown()
@@ -96,12 +96,12 @@ async def test_lazy_loading(async_embedder, mock_text_embedding):
   - Model not loaded until first encode
   - _ensure_loaded() loads model only once
   """
-  assert async_embedder._model is None, "Model no hauria d'estar carregat inicialment"
+  assert async_embedder._model is None, "Model should not be loaded initially"
 
   async_embedder._load_model = Mock(return_value=mock_text_embedding)
   await async_embedder.encode_async("test text")
 
-  assert async_embedder._model is not None, "Model hauria d'estar carregat després encode"
+  assert async_embedder._model is not None, "Model should be loaded after encode"
 
 @pytest.mark.asyncio
 async def test_encode_async_single_text(async_embedder, mock_text_embedding):
@@ -116,8 +116,8 @@ async def test_encode_async_single_text(async_embedder, mock_text_embedding):
   with patch.object(async_embedder, '_model', mock_text_embedding):
     result = await async_embedder.encode_async("hello world", normalize=True)
 
-  assert isinstance(result, list), "Result hauria de ser llista"
-  assert len(result) == 768, "Embedding hauria de tenir 768 dimensions"
+  assert isinstance(result, list), "Result should be a list"
+  assert len(result) == 768, "Embedding should have 768 dimensions"
   assert all(isinstance(x, float) for x in result), "Tots els elements haurien de ser floats"
 
 @pytest.mark.asyncio
@@ -147,8 +147,8 @@ async def test_encode_batch_async(async_embedder, mock_text_embedding):
     results = await async_embedder.encode_batch_async(texts, normalize=True, batch_size=32)
 
   assert isinstance(results, list), "Results haurien de ser llista"
-  assert len(results) == 3, "Hauria de retornar 3 embeddings"
-  assert all(len(emb) == 768 for emb in results), "Cada embedding hauria de tenir 768 dims"
+  assert len(results) == 3, "Should return 3 embeddings"
+  assert all(len(emb) == 768 for emb in results), "Each embedding should have 768 dims"
 
 @pytest.mark.asyncio
 async def test_encode_batch_empty_list(async_embedder):
@@ -224,8 +224,8 @@ async def test_shutdown(async_embedder):
 
   await async_embedder.shutdown()
 
-  assert async_embedder._model is None, "Model hauria d'estar descarregat"
-  assert model_name not in AsyncEmbedder._instances, "Instance hauria d'estar removed del cache"
+  assert async_embedder._model is None, "Model should be unloaded"
+  assert model_name not in AsyncEmbedder._instances, "Instance should be removed from cache"
 
 """
 Test Coverage AsyncEmbedder:

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_lifespan_helpers.py
-Description: Tests dels helpers privats extrets de lifespan
+Description: Tests for the private helpers extracted from lifespan
              (refactor CCN 27→2, façana facade).
 ────────────────────────────────────
 """

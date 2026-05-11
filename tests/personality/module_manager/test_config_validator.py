@@ -11,7 +11,7 @@ from personality.module_manager.config_validator import (
 
 
 def make_valid_config(tmp_path, extra=None):
-    """Crea un fitxer server.toml vàlid per tests"""
+    """Create a valid server.toml file for tests."""
     config = {
         "meta": {
             "version": "0.9.0",
@@ -89,7 +89,7 @@ class TestConfigValidatorInit:
 
     def test_get_message_all_fallbacks(self):
         validator = ConfigValidator()
-        # Nota: 'key' és el primer paràmetre de _get_message, no podem usar-lo a kwargs
+        # Note: 'key' is the first parameter of _get_message, cannot use it as a kwarg
         keys = [
             ("validation.port_invalid", {"port": 99999}),
             ("validation.path_invalid", {"path": "/invalid"}),
@@ -125,9 +125,9 @@ class TestValidateMethod:
         assert any("TOML" in e for e in result.errors)
 
     def test_missing_required_section(self, tmp_path):
-        """Config sense cap secció requerida → errors de seccions que falten"""
+        """Config with no required sections → missing section errors."""
         config_file = tmp_path / "server.toml"
-        # Config completament buida → falten totes les seccions requerides
+        # Completely empty config → all required sections missing
         config_file.write_text("")
         validator = ConfigValidator()
         # Patch _get_message per evitar el bug amb 'key' kwarg
@@ -261,8 +261,8 @@ class TestValidatePluginsSection:
         self.validator = ConfigValidator()
 
     def test_invalid_temperature(self):
-        # temperature=5.0 és > 2.0 → error
-        # Però _get_message té conflicte amb 'key' kwarg, apliquem patch per evitar el TypeError
+        # temperature=5.0 is > 2.0 → error
+        # _get_message has a conflict with 'key' kwarg, apply patch to avoid TypeError
         from unittest.mock import patch
         with patch.object(self.validator, "_get_message", return_value="temperature error"):
             config = {"plugins": {"models": {"primary": "llama3.2", "temperature": 5.0}}}

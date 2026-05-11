@@ -167,7 +167,6 @@ class TestRouteManager:
 
     def test_register_raises_exception_returns_empty(self, rm):
         """Exception in register_module_routes returns empty list, does not propagate."""
-        from unittest.mock import patch
         with patch.object(rm, '_register_router_routes', side_effect=RuntimeError("boom")):
             routes = rm.register_module_routes(RouteRegistration(
                 module_name="err_mod", api_component=APIRouter(), prefix="/err", component_type="router"

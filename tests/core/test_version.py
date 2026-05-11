@@ -26,7 +26,7 @@ def test_version_is_valid_semver():
     from core.version import __version__
 
     assert re.match(r"^\d+\.\d+\.\d+(-[\w.]+)?$", __version__), (
-        f"Version '{__version__}' no és semver vàlid"
+        f"Version '{__version__}' is not a valid semver"
     )
 
 

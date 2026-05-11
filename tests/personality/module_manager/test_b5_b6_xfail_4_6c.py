@@ -12,7 +12,7 @@ from personality.module_manager.types import LifecycleConfig
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# Helpers compartits
+# Shared helpers
 # ────────────────────────────────────────────────────────────────────────────
 
 def _make_module_info(name, state=ModuleState.DISCOVERED, enabled=True):
@@ -55,24 +55,24 @@ def mm(tmp_path):
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# B5 — get_health sense hasattr guard
+# B5 — get_health without hasattr guard
 # ────────────────────────────────────────────────────────────────────────────
 
 class TestB5GetHealthHashattrGuard:
 
     def test_b5_module_without_get_health_is_registered(self, mm, tmp_path):
-        """xfail: mòdul sense get_health() hauria de registrar-se amb default health.
+        """xfail: module without get_health() should register with default health.
 
-        Bug actual: AttributeError és capturat per except Exception → continue →
-        mòdul no apareix a loaded_modules. Post-fix amb hasattr guard, el mòdul
-        es registra amb {"status": "ok", "note": "module without get_health()"}.
+        Current bug: AttributeError is caught by except Exception → continue →
+        module does not appear in loaded_modules. Post-fix with hasattr guard, the module
+        registers with {"status": "ok", "note": "module without get_health()"}.
         """
         mem_path = tmp_path / "memory" / "embeddings"
         mem_path.mkdir(parents=True)
         (mem_path / "manifest.py").touch()
 
         class FakeEmbeddingsModule:
-            """Mòdul sense get_health — simula B5."""
+            """Module without get_health — simulates B5."""
 
             @classmethod
             def get_instance(cls):
@@ -81,7 +81,7 @@ class TestB5GetHealthHashattrGuard:
             async def initialize(self, config=None):
                 return True
 
-            # get_health() deliberadament absent
+            # get_health() deliberately absent
 
         fake_manifest = MagicMock()
         fake_manifest.MODULE_ID = "test_embeddings_id"
@@ -100,11 +100,11 @@ class TestB5GetHealthHashattrGuard:
         with patch("importlib.import_module", side_effect=_fake_import):
             result = asyncio.run(mm.load_memory_modules())
 
-        # Post-fix: mòdul HA d'estar registrat; ara FALLA (és descartat)
+        # Post-fix: module MUST be registered; currently FAILS (is discarded)
         assert "test_embeddings_id" in result
 
     def test_b5_antireg_module_with_get_health_is_registered(self, mm, tmp_path):
-        """Anti-reg: mòdul AMB get_health() segueix registrant-se correctament."""
+        """Anti-reg: module WITH get_health() still registers correctly."""
         mem_path = tmp_path / "memory" / "embeddings"
         mem_path.mkdir(parents=True)
         (mem_path / "manifest.py").touch()
@@ -147,11 +147,11 @@ class TestB5GetHealthHashattrGuard:
 class TestB6StopModuleStateErrorLeak:
 
     def test_b6_stop_module_error_sets_state_error(self, lm):
-        """xfail: state hauria de ser ERROR quan stop() llança excepció.
+        """xfail: state should be ERROR when stop() raises an exception.
 
-        Bug actual (línia ~308-314 module_lifecycle.py): el bloc except captura
-        l'error, fa return False però NO actualitza module_info.state. El mòdul
-        queda en state=STOPPING per sempre. Post-fix: state = ModuleState.ERROR.
+        Current bug (line ~308-314 module_lifecycle.py): the except block catches
+        the error, returns False but does NOT update module_info.state. The module
+        stays in state=STOPPING forever. Post-fix: state = ModuleState.ERROR.
         """
         mod = _make_module_info("test", state=ModuleState.RUNNING)
         mod.instance = MagicMock()
@@ -161,11 +161,11 @@ class TestB6StopModuleStateErrorLeak:
         result = asyncio.run(lm.stop_module("test"))
 
         assert result is False
-        # Post-fix: state HA de ser ERROR; ara FALLA (és STOPPING)
+        # Post-fix: state MUST be ERROR; currently FAILS (is STOPPING)
         assert mod.state == ModuleState.ERROR
 
     def test_b6_antireg_stop_module_success_sets_state_stopped(self, lm):
-        """Anti-reg: stop_module sense error manté state=STOPPED."""
+        """Anti-reg: stop_module without error keeps state=STOPPED."""
         mod = _make_module_info("test", state=ModuleState.RUNNING)
         mod.instance = MagicMock()
         mod.instance.stop = MagicMock(return_value=None)

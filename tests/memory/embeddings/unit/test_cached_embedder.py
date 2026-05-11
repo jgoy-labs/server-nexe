@@ -87,12 +87,12 @@ async def test_cache_hit(cached_embedder):
   request = EmbeddingRequest(text="hello world", use_cache=True)
 
   response1 = await cached_embedder.encode(request)
-  assert not response1.cache_hit, "Primer request hauria de ser cache miss"
+  assert not response1.cache_hit, "First request should be a cache miss"
 
   response2 = await cached_embedder.encode(request)
-  assert response2.cache_hit, "Segon request hauria de ser cache hit"
+  assert response2.cache_hit, "Second request should be a cache hit"
 
-  assert response1.embedding == response2.embedding, "Embeddings haurien de ser iguals"
+  assert response1.embedding == response2.embedding, "Embeddings should be equal"
 
 @pytest.mark.asyncio
 async def test_cache_miss(cached_embedder):
@@ -108,9 +108,9 @@ async def test_cache_miss(cached_embedder):
   response1 = await cached_embedder.encode(request1)
   response2 = await cached_embedder.encode(request2)
 
-  assert not response1.cache_hit, "Primer text hauria de ser miss"
-  assert not response2.cache_hit, "Segon text (diferent) hauria de ser miss"
-  assert response1.embedding != response2.embedding, "Embeddings diferents per texts diferents"
+  assert not response1.cache_hit, "First text should be a miss"
+  assert not response2.cache_hit, "Second text (different) should be a miss"
+  assert response1.embedding != response2.embedding, "Different embeddings for different texts"
 
 @pytest.mark.asyncio
 async def test_cache_disabled(mock_async_embedder, temp_cache_dir):
@@ -151,7 +151,7 @@ async def test_batch_cache_optimization(cached_embedder):
   )
 
   response1 = await cached_embedder.encode_batch(request1)
-  assert response1.cache_hits == 0, "Primer batch tot misses"
+  assert response1.cache_hits == 0, "First batch all misses"
   assert response1.count == 3
 
   request2 = BatchEmbeddingRequest(
@@ -160,7 +160,7 @@ async def test_batch_cache_optimization(cached_embedder):
   )
 
   response2 = await cached_embedder.encode_batch(request2)
-  assert response2.cache_hits == 2, "Hauria de tenir 2 cache hits"
+  assert response2.cache_hits == 2, "Should have 2 cache hits"
   assert response2.count == 3
 
 @pytest.mark.asyncio
@@ -183,9 +183,9 @@ async def test_stats_tracking(cached_embedder):
 
   stats = cached_embedder.get_stats()
 
-  assert stats.total_encodings == 8, "Hauria de tenir 8 requests totals"
-  assert stats.cache_hit_rate == 3/8, "Hit rate hauria de ser 3/8"
-  assert stats.avg_latency_ms >= 0, "Latency hauria de ser >= 0"
+  assert stats.total_encodings == 8, "Should have 8 total requests"
+  assert stats.cache_hit_rate == 3/8, "Hit rate should be 3/8"
+  assert stats.avg_latency_ms >= 0, "Latency should be >= 0"
 
 @pytest.mark.asyncio
 async def test_clear_cache(cached_embedder):
@@ -205,7 +205,7 @@ async def test_clear_cache(cached_embedder):
   await cached_embedder.clear_cache()
 
   response3 = await cached_embedder.encode(request)
-  assert not response3.cache_hit, "Després de clear hauria de ser miss"
+  assert not response3.cache_hit, "After clear should be a miss"
 
 @pytest.mark.asyncio
 async def test_response_metadata(cached_embedder):
@@ -227,10 +227,10 @@ async def test_response_metadata(cached_embedder):
 
   response = await cached_embedder.encode(request)
 
-  assert response.dimensions == 768, "Dimensions hauria de ser 768"
+  assert response.dimensions == 768, "Dimensions should be 768"
   assert response.model == "test-model"
   assert response.normalized == True
-  assert response.latency_ms > 0, "Latency hauria de ser > 0"
+  assert response.latency_ms > 0, "Latency should be > 0"
   assert len(response.embedding) == 768
 
 @pytest.mark.asyncio

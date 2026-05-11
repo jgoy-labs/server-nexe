@@ -121,7 +121,7 @@ class TestCheckCacheDirectories:
                 result = check_cache_directories()
             assert result["status"] == "fail"
         finally:
-            os.chmod(cache_dir, 0o755)
+            os.chmod(cache_dir, 0o755)  # nosemgrep: insecure-file-permissions — restoring normal perms after restrictive test
 
     def test_cache_exception(self):
         """Lines 193-201: exception during cache check."""
