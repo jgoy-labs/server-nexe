@@ -10,11 +10,8 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import asyncio
-import hashlib
 import json
 import logging
-import time
-import uuid
 from typing import Dict, List, Optional
 
 from fastapi import Request
@@ -23,6 +20,7 @@ from fastapi.responses import StreamingResponse
 from ..chat_memory import _pending_save_tasks
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
+from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, fallback_to_ollama
 from ._streaming import TokenBridge, format_sse_chunk, format_sse_done, SSE_DONE, background_memory_save
 
 logger = logging.getLogger(__name__)
@@ -30,109 +28,44 @@ logger = logging.getLogger(__name__)
 
 async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionRequest, req: Request):
     """Forward to Llama.cpp module (GGUF models)."""
+    last_user_msg = extract_last_user_msg(messages)
+
     try:
-        # Get llama_cpp module from app state
         llama_module = None
         if hasattr(req.app.state, 'modules'):
             llama_module = req.app.state.modules.get('llama_cpp_module')
 
-        last_user_msg = next(
-            (m.get("content") for m in reversed(messages) if m.get("role") == "user"),
-            None,
-        )
-
         if not llama_module or not hasattr(llama_module, 'chat'):
-            # Llama.cpp module not loaded - fallback to Ollama
             logger.warning("Llama.cpp module not available (model not configured). Falling back to Ollama.")
             logger.info("To use Llama.cpp: Set NEXE_LLAMA_CPP_MODEL in .env")
-            from .ollama import _forward_to_ollama
-            return await _forward_to_ollama(
-                messages,
-                request,
-                app_state=req.app.state,
-                user_msg=last_user_msg,
-                fallback_from="llama_cpp",
-                fallback_reason="module_unavailable",
-            )
+            return await fallback_to_ollama(messages, request, req.app.state, last_user_msg, "llama_cpp", "module_unavailable")
 
-        # Prepare messages for llama.cpp
-        system_msg = ""
-        user_messages = []
-
-        for msg in messages:
-            if msg.get("role") == "system":
-                system_msg = msg.get("content", "")
-            else:
-                user_messages.append(msg)
-
-        # Derive session_id from X-Session-Id header or API key hash
-        _api_key = (req.headers.get("x-api-key") or req.headers.get("authorization", "")).encode()
-        session_id = req.headers.get("x-session-id") or f"sess_{hashlib.sha256(_api_key).hexdigest()[:16]}"
+        system_msg, user_messages = separate_messages(messages)
+        session_id = derive_session_id(req)
+        model_name = request.model or "llama-cpp-local"
 
         if request.stream:
-            model_name = request.model or "llama-cpp-local"
             return StreamingResponse(
                 _llama_cpp_stream_generator(
-                    llama_module,
-                    user_messages,
-                    system_msg,
-                    model_name,
-                    app_state=req.app.state,
-                    user_msg=last_user_msg,
-                    session_id=session_id,
-                    max_tokens=request.max_tokens,
+                    llama_module, user_messages, system_msg, model_name,
+                    app_state=req.app.state, user_msg=last_user_msg,
+                    session_id=session_id, max_tokens=request.max_tokens,
                     temperature=request.temperature,
                 ),
                 media_type="text/event-stream",
-                headers={
-                    "Cache-Control": "no-cache",
-                    "Connection": "keep-alive",
-                    "X-Accel-Buffering": "no",
-                },
+                headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
             )
 
-        # Call llama.cpp module
         logger.info("Forwarding to Llama.cpp module...")
         result = await llama_module.chat(
-            messages=user_messages,
-            system=system_msg,
-            session_id=session_id,
-            max_tokens=request.max_tokens,
-            temperature=request.temperature,
+            messages=user_messages, system=system_msg, session_id=session_id,
+            max_tokens=request.max_tokens, temperature=request.temperature,
         )
-
-        # Convert llama.cpp response to OpenAI format
-        return {
-            "id": f"llamacpp-{uuid.uuid4().hex}",
-            "object": "chat.completion",
-            "created": int(time.time()),
-            "model": request.model or "llama-cpp-local",
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": _sanitize_sse_token(result.get("response", ""))
-                },
-                "finish_reason": "stop"
-            }],
-            "usage": {
-                "prompt_tokens": result.get("prompt_tokens", 0),
-                "completion_tokens": result.get("tokens", 0),
-                "total_tokens": result.get("context_used", 0)
-            }
-        }
+        return build_openai_response(result, model_name, "llamacpp")
 
     except Exception as e:
         logger.error("Llama.cpp execution failed: %s. Falling back to Ollama.", e)
-        from .ollama import _forward_to_ollama
-        return await _forward_to_ollama(
-            messages,
-            request,
-            app_state=req.app.state,
-            user_msg=last_user_msg,
-            fallback_from="llama_cpp",
-            fallback_reason="execution_failed",
-        )
+        return await fallback_to_ollama(messages, request, req.app.state, last_user_msg, "llama_cpp", "execution_failed")
 
 async def _llama_cpp_stream_generator(
     llama_module,
