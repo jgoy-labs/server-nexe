@@ -44,7 +44,13 @@ def _make_discovery(modules_dict):
     i18n = MagicMock()
     i18n.get.return_value = "msg"
 
-    return ModuleDiscovery(path_disc, config_mgr, events, i18n)
+    from personality.module_manager.types import DiscoveryConfig
+    return ModuleDiscovery(DiscoveryConfig(
+        path_discovery=path_disc,
+        config_manager=config_mgr,
+        events=events,
+        i18n=i18n,
+    ))
 
 
 def test_cycle_detected_disables_modules_and_logs(caplog):

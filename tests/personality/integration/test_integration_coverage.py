@@ -2,6 +2,7 @@
 Tests for uncovered lines in personality/integration/api_integrator.py and route_manager.py.
 """
 import pytest
+from personality.integration.types import RouteRegistration
 from unittest.mock import MagicMock, patch
 from fastapi import FastAPI, APIRouter
 from fastapi.routing import APIRoute
@@ -111,7 +112,7 @@ class TestRouteManager:
         async def hello():
             return {}
 
-        routes = rm.register_module_routes("test", router, "/api/test", "router")
+        routes = rm.register_module_routes(RouteRegistration(module_name="test", api_component=router, prefix="/api/test", component_type="router"))
         assert len(routes) > 0
 
     def test_register_app_routes(self, rm):
@@ -121,12 +122,12 @@ class TestRouteManager:
         async def status():
             return {}
 
-        routes = rm.register_module_routes("test", sub_app, "/mounted", "app")
+        routes = rm.register_module_routes(RouteRegistration(module_name="test", api_component=sub_app, prefix="/mounted", component_type="app"))
         assert isinstance(routes, list)
 
     def test_register_endpoint_routes(self, rm):
         """Empty endpoints list."""
-        routes = rm.register_module_routes("test", [], "/api", "endpoints")
+        routes = rm.register_module_routes(RouteRegistration(module_name="test", api_component=[], prefix="/api", component_type="endpoints"))
         assert routes == []
 
     def test_route_conflict_detection(self, rm):
@@ -136,7 +137,7 @@ class TestRouteManager:
         async def hello():
             return {}
 
-        rm.register_module_routes("mod1", router, "/api", "router")
+        rm.register_module_routes(RouteRegistration(module_name="mod1", api_component=router, prefix="/api", component_type="router"))
         # Register same path from different module
         conflicted = rm._check_route_conflict("/api/hello", "mod2")
         assert conflicted is True
@@ -148,7 +149,7 @@ class TestRouteManager:
         async def hello():
             return {}
 
-        rm.register_module_routes("test", router, "/api", "router")
+        rm.register_module_routes(RouteRegistration(module_name="test", api_component=router, prefix="/api", component_type="router"))
         count = rm.remove_module_routes("test")
         assert count > 0
 
@@ -163,3 +164,12 @@ class TestRouteManager:
     def test_get_route_conflicts(self, rm):
         result = rm.get_route_conflicts()
         assert isinstance(result, dict)
+
+    def test_register_raises_exception_returns_empty(self, rm):
+        """Exception in register_module_routes returns empty list, does not propagate."""
+        from unittest.mock import patch
+        with patch.object(rm, '_register_router_routes', side_effect=RuntimeError("boom")):
+            routes = rm.register_module_routes(RouteRegistration(
+                module_name="err_mod", api_component=APIRouter(), prefix="/err", component_type="router"
+            ))
+        assert routes == []

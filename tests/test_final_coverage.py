@@ -1716,17 +1716,23 @@ class TestRouteManagerFinal:
         async def sub_ep():
             return {"ok": True}
 
-        routes = rm.register_module_routes("mod", sub_app, "/prefix", "app")
+        from personality.integration.types import RouteRegistration
+        routes = rm.register_module_routes(RouteRegistration(
+            module_name="mod", api_component=sub_app, prefix="/prefix", component_type="app"
+        ))
         assert isinstance(routes, list)
 
     def test_register_endpoint_routes(self):
         """Lines 179-184: register individual endpoints."""
         from personality.integration.route_manager import RouteManager
+        from personality.integration.types import RouteRegistration
         from fastapi import FastAPI
 
         main_app = FastAPI()
         rm = RouteManager(main_app)
-        routes = rm.register_module_routes("mod", [], "/prefix", "endpoints")
+        routes = rm.register_module_routes(RouteRegistration(
+            module_name="mod", api_component=[], prefix="/prefix", component_type="endpoints"
+        ))
         assert routes == []
 
     def test_route_conflict(self):
@@ -1973,11 +1979,12 @@ class TestSystemLifecycleFinal:
         mock_lifecycle.load_module = AsyncMock(return_value=True)
         mock_lifecycle.start_module = AsyncMock(return_value=True)
 
-        slm = SystemLifecycleManager(
+        from personality.module_manager.types import SystemLifecycleConfig
+        slm = SystemLifecycleManager(SystemLifecycleConfig(
             modules={}, module_lifecycle=mock_lifecycle,
             discovery_func=AsyncMock(return_value=["test"]),
-            list_modules_func=MagicMock(return_value=[mi])
-        )
+            list_modules_func=MagicMock(return_value=[mi]),
+        ))
         result = asyncio.run(slm.start_system())
         assert result is True
         assert slm.is_running()
@@ -1985,18 +1992,20 @@ class TestSystemLifecycleFinal:
     def test_start_system_failure(self):
         """Lines 76-82: start_system exception."""
         from personality.module_manager.system_lifecycle import SystemLifecycleManager
+        from personality.module_manager.types import SystemLifecycleConfig
 
-        slm = SystemLifecycleManager(
+        slm = SystemLifecycleManager(SystemLifecycleConfig(
             modules={}, module_lifecycle=MagicMock(),
             discovery_func=AsyncMock(side_effect=Exception("fail")),
-            list_modules_func=MagicMock(return_value=[])
-        )
+            list_modules_func=MagicMock(return_value=[]),
+        ))
         result = asyncio.run(slm.start_system())
         assert result is False
 
     def test_shutdown_system(self):
         """Lines 84-100: shutdown_system."""
         from personality.module_manager.system_lifecycle import SystemLifecycleManager
+        from personality.module_manager.types import SystemLifecycleConfig
         from personality.data.models import ModuleInfo, ModuleState
 
         mi = ModuleInfo(name="x", path=Path("/x"),
@@ -2006,11 +2015,11 @@ class TestSystemLifecycleFinal:
         mock_lifecycle = MagicMock()
         mock_lifecycle.stop_module = AsyncMock()
 
-        slm = SystemLifecycleManager(
+        slm = SystemLifecycleManager(SystemLifecycleConfig(
             modules={}, module_lifecycle=mock_lifecycle,
             discovery_func=AsyncMock(return_value=[]),
-            list_modules_func=MagicMock(return_value=[mi])
-        )
+            list_modules_func=MagicMock(return_value=[mi]),
+        ))
         slm._running = True
         asyncio.run(slm.shutdown_system())
         assert not slm.is_running()

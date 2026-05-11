@@ -37,7 +37,11 @@ class TestModuleManagerSystemLifecycle:
                        state=ModuleState.DISCOVERED, auto_start=True, enabled=True)
         ])
 
-        slm = SystemLifecycleManager(modules, mock_lifecycle, discover_fn, list_fn)
+        from personality.module_manager.types import SystemLifecycleConfig
+        slm = SystemLifecycleManager(SystemLifecycleConfig(
+            modules=modules, module_lifecycle=mock_lifecycle,
+            discovery_func=discover_fn, list_modules_func=list_fn,
+        ))
         slm._get_lock = lambda: threading.RLock()
 
         result = asyncio.run(slm.start_system())
@@ -53,7 +57,11 @@ class TestModuleManagerSystemLifecycle:
         mock_lifecycle = MagicMock()
         mock_lifecycle.stop_module = AsyncMock(return_value=True)
 
-        slm = SystemLifecycleManager(modules, mock_lifecycle, AsyncMock(), MagicMock())
+        from personality.module_manager.types import SystemLifecycleConfig
+        slm = SystemLifecycleManager(SystemLifecycleConfig(
+            modules=modules, module_lifecycle=mock_lifecycle,
+            discovery_func=AsyncMock(), list_modules_func=MagicMock(),
+        ))
         slm._get_lock = lambda: threading.RLock()
         slm._running = True
 
@@ -96,7 +104,12 @@ class TestModuleManagerDiscovery:
         mock_events = MagicMock()
         mock_events.emit_event = AsyncMock()
 
-        disc = ModuleDiscovery(mock_path_disc, mock_config, mock_events, i18n=None)
+        from personality.module_manager.types import DiscoveryConfig
+        disc = ModuleDiscovery(DiscoveryConfig(
+            path_discovery=mock_path_disc,
+            config_manager=mock_config,
+            events=mock_events,
+        ))
         lock = threading.RLock()
         result = asyncio.run(disc.discover({}, lock))
         assert isinstance(result, list)

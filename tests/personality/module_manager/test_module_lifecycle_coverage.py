@@ -7,6 +7,7 @@ import threading
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from personality.data.models import ModuleInfo, ModuleState, SystemEvent
+from personality.module_manager.types import LifecycleConfig
 from pathlib import Path
 
 
@@ -32,7 +33,10 @@ class TestModuleLifecycleManager:
         events = MagicMock()
         events.emit_event = AsyncMock()
         metrics = MagicMock()
-        return ModuleLifecycleManager(modules, loader, registry, events, metrics)
+        return ModuleLifecycleManager(LifecycleConfig(
+            modules=modules, loader=loader, registry=registry,
+            events=events, metrics=metrics,
+        ))
 
     def test_load_module_not_in_modules(self, lm):
         """Line 64-65: module not in modules dict."""

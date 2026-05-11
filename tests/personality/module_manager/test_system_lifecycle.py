@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, AsyncMock
 
 from personality.module_manager.system_lifecycle import SystemLifecycleManager
 from personality.module_manager.module_lifecycle import ModuleLifecycleManager
+from personality.module_manager.types import SystemLifecycleConfig
 
 
 def _make_module_info(name="mod", auto_start=True, enabled=True, state=None):
@@ -17,6 +18,17 @@ def _make_module_info(name="mod", auto_start=True, enabled=True, state=None):
     if state:
         info.state = state
     return info
+
+
+def _make_slm(modules=None, lifecycle=None, discovery=None, list_modules=None, i18n=None):
+    """Helper to build SystemLifecycleManager via SystemLifecycleConfig."""
+    return SystemLifecycleManager(SystemLifecycleConfig(
+        modules=modules if modules is not None else {},
+        module_lifecycle=lifecycle or MagicMock(spec=ModuleLifecycleManager),
+        discovery_func=discovery or AsyncMock(),
+        list_modules_func=list_modules or MagicMock(),
+        i18n=i18n,
+    ))
 
 
 class TestStartSystem:
@@ -32,10 +44,7 @@ class TestStartSystem:
         lifecycle.load_module = AsyncMock(return_value=True)
         lifecycle.start_module = AsyncMock(return_value=True)
 
-        mgr = SystemLifecycleManager(
-            modules={}, module_lifecycle=lifecycle,
-            discovery_func=discovery, list_modules_func=list_modules
-        )
+        mgr = _make_slm(lifecycle=lifecycle, discovery=discovery, list_modules=list_modules)
 
         result = await mgr.start_system()
         assert result is True
@@ -52,10 +61,7 @@ class TestStartSystem:
         lifecycle.load_module = AsyncMock(return_value=True)
         lifecycle.start_module = AsyncMock(return_value=True)
 
-        mgr = SystemLifecycleManager(
-            modules={}, module_lifecycle=lifecycle,
-            discovery_func=discovery, list_modules_func=list_modules
-        )
+        mgr = _make_slm(lifecycle=lifecycle, discovery=discovery, list_modules=list_modules)
 
         result = await mgr.start_system()
         assert result is True
@@ -71,10 +77,7 @@ class TestStartSystem:
         lifecycle.load_module = AsyncMock(return_value=False)
         lifecycle.start_module = AsyncMock(return_value=True)
 
-        mgr = SystemLifecycleManager(
-            modules={}, module_lifecycle=lifecycle,
-            discovery_func=discovery, list_modules_func=list_modules
-        )
+        mgr = _make_slm(lifecycle=lifecycle, discovery=discovery, list_modules=list_modules)
 
         result = await mgr.start_system()
         assert result is True
@@ -86,10 +89,7 @@ class TestStartSystem:
         discovery = AsyncMock(side_effect=RuntimeError("discovery fail"))
         list_modules = MagicMock(return_value=[])
 
-        mgr = SystemLifecycleManager(
-            modules={}, module_lifecycle=MagicMock(spec=ModuleLifecycleManager),
-            discovery_func=discovery, list_modules_func=list_modules
-        )
+        mgr = _make_slm(discovery=discovery, list_modules=list_modules)
 
         result = await mgr.start_system()
         assert result is False
@@ -108,10 +108,7 @@ class TestShutdownSystem:
         lifecycle.stop_module = AsyncMock()
         list_modules = MagicMock(return_value=[mod_info])
 
-        mgr = SystemLifecycleManager(
-            modules={}, module_lifecycle=lifecycle,
-            discovery_func=AsyncMock(), list_modules_func=list_modules
-        )
+        mgr = _make_slm(lifecycle=lifecycle, list_modules=list_modules)
         mgr._running = True
 
         await mgr.shutdown_system()
@@ -125,10 +122,7 @@ class TestShutdownSystem:
         lifecycle.stop_module = AsyncMock()
         list_modules = MagicMock(return_value=[])
 
-        mgr = SystemLifecycleManager(
-            modules={}, module_lifecycle=lifecycle,
-            discovery_func=AsyncMock(), list_modules_func=list_modules
-        )
+        mgr = _make_slm(lifecycle=lifecycle, list_modules=list_modules)
         mgr._running = True
 
         await mgr.shutdown_system()
@@ -141,16 +135,10 @@ class TestIsRunningAndGetLock:
 
     def test_is_running_default_false(self):
         """Line 104"""
-        mgr = SystemLifecycleManager(
-            modules={}, module_lifecycle=MagicMock(spec=ModuleLifecycleManager),
-            discovery_func=MagicMock(), list_modules_func=MagicMock()
-        )
+        mgr = _make_slm()
         assert mgr.is_running() is False
 
     def test_get_lock_returns_none(self):
         """Line 108"""
-        mgr = SystemLifecycleManager(
-            modules={}, module_lifecycle=MagicMock(spec=ModuleLifecycleManager),
-            discovery_func=MagicMock(), list_modules_func=MagicMock()
-        )
+        mgr = _make_slm()
         assert mgr._get_lock() is None

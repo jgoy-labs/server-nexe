@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock, AsyncMock, patch
 
 from personality.module_manager.module_lifecycle import ModuleLifecycleManager
+from personality.module_manager.types import LifecycleConfig
 from personality.data.models import ModuleInfo, ModuleState
 
 @pytest.fixture
@@ -43,13 +44,13 @@ def mock_dependencies():
 @pytest.fixture
 def lifecycle_manager(mock_dependencies):
   """Create ModuleLifecycleManager instance."""
-  return ModuleLifecycleManager(
+  return ModuleLifecycleManager(LifecycleConfig(
     modules=mock_dependencies["modules"],
     loader=mock_dependencies["loader"],
     registry=mock_dependencies["registry"],
     events=mock_dependencies["events"],
-    metrics=mock_dependencies["metrics"]
-  )
+    metrics=mock_dependencies["metrics"],
+  ))
 
 @pytest.fixture
 def mock_lock():
@@ -76,14 +77,14 @@ class TestModuleLifecycleManagerInit:
 
   def test_init(self, mock_dependencies):
     """Should initialize with all dependencies."""
-    manager = ModuleLifecycleManager(
+    manager = ModuleLifecycleManager(LifecycleConfig(
       modules=mock_dependencies["modules"],
       loader=mock_dependencies["loader"],
       registry=mock_dependencies["registry"],
       events=mock_dependencies["events"],
       metrics=mock_dependencies["metrics"],
-      i18n=MagicMock()
-    )
+      i18n=MagicMock(),
+    ))
 
     assert manager.modules == mock_dependencies["modules"]
     assert manager.loader == mock_dependencies["loader"]

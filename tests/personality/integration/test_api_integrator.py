@@ -5,6 +5,7 @@ route_manager.py, openapi_merger.py i messages.py
 import pytest
 from unittest.mock import MagicMock
 from fastapi import FastAPI, APIRouter
+from personality.integration.types import RouteRegistration
 
 
 # ─── messages.py ────────────────────────────────────────────────────────────
@@ -111,7 +112,7 @@ class TestRouteManager:
         def hello():
             return {'hello': 'world'}
 
-        routes = self.rm.register_module_routes('mod1', router, '/api/mod1', 'router')
+        routes = self.rm.register_module_routes(RouteRegistration(module_name='mod1', api_component=router, prefix='/api/mod1', component_type='router'))
         assert len(routes) == 1
         assert routes[0]['path'] == '/api/mod1/hello'
 
@@ -123,7 +124,7 @@ class TestRouteManager:
             return {}
 
         # Primer registre
-        routes1 = self.rm.register_module_routes('mod1', router, '/api/mod1', 'router')
+        routes1 = self.rm.register_module_routes(RouteRegistration(module_name='mod1', api_component=router, prefix='/api/mod1', component_type='router'))
         # Simular conflicte: afegir la ruta manualment al _route_conflicts
         # i tornar a registrar el mateix path
         router2 = APIRouter()
@@ -133,7 +134,7 @@ class TestRouteManager:
             return {}
 
         # El path /api/mod1/hello ja existeix → conflicte → s'omet
-        routes2 = self.rm.register_module_routes('mod1', router2, '/api/mod1', 'router')
+        routes2 = self.rm.register_module_routes(RouteRegistration(module_name='mod1', api_component=router2, prefix='/api/mod1', component_type='router'))
         # La ruta ja estava registrada → 0 noves
         assert len(routes2) == 0
 
@@ -144,16 +145,16 @@ class TestRouteManager:
         def test_route():
             return {}
 
-        routes = self.rm.register_module_routes('mod2', sub_app, '/app/mod2', 'app')
+        routes = self.rm.register_module_routes(RouteRegistration(module_name='mod2', api_component=sub_app, prefix='/app/mod2', component_type='app'))
         assert len(routes) >= 0  # pot ser 0 si l'app no té APIRoute directes
 
     def test_register_endpoints_returns_empty(self):
         # _register_endpoint_routes retorna llista buida (no implementat)
-        routes = self.rm.register_module_routes('mod3', [], '/api/mod3', 'endpoints')
+        routes = self.rm.register_module_routes(RouteRegistration(module_name='mod3', api_component=[], prefix='/api/mod3', component_type='endpoints'))
         assert routes == []
 
     def test_register_unknown_component_type(self):
-        routes = self.rm.register_module_routes('mod4', MagicMock(), '/api/mod4', 'unknown')
+        routes = self.rm.register_module_routes(RouteRegistration(module_name='mod4', api_component=MagicMock(), prefix='/api/mod4', component_type='unknown'))
         assert routes == []
 
     def test_remove_nonexistent_module(self):
@@ -167,7 +168,7 @@ class TestRouteManager:
         def foo():
             return {}
 
-        self.rm.register_module_routes('mod5', router, '/api/mod5', 'router')
+        self.rm.register_module_routes(RouteRegistration(module_name='mod5', api_component=router, prefix='/api/mod5', component_type='router'))
         count = self.rm.remove_module_routes('mod5')
         assert count >= 0  # pot ser 0 si no hi havia conflictes registrats
         assert 'mod5' not in self.rm._module_routes
@@ -179,7 +180,7 @@ class TestRouteManager:
         def bar():
             return {}
 
-        self.rm.register_module_routes('mod6', router, '/api/mod6', 'router')
+        self.rm.register_module_routes(RouteRegistration(module_name='mod6', api_component=router, prefix='/api/mod6', component_type='router'))
         all_routes = self.rm.get_all_registered_routes()
         assert 'mod6' in all_routes
 
@@ -329,10 +330,14 @@ class TestAPIIntegrator:
         assert result is False
 
     def test_save_integration_info(self):
-        self.integrator._save_integration_info(
-            'saved_mod', MagicMock(), {'router': MagicMock()}, '/api/saved',
-            [{'path': '/api/saved/x', 'methods': ['GET'], 'name': 'x', 'module': 'saved_mod'}]
-        )
+        routes = [{'path': '/api/saved/x', 'methods': ['GET'], 'name': 'x', 'module': 'saved_mod'}]
+        self.integrator._save_integration_info('saved_mod', {
+            'instance': MagicMock(),
+            'api_components': {'router': MagicMock()},
+            'api_prefix': '/api/saved',
+            'registered_routes': routes,
+            'route_count': len(routes),
+        })
         assert 'saved_mod' in self.integrator._integrated_modules
         assert self.integrator._total_modules_integrated == 1
         assert self.integrator._total_routes_registered == 1
