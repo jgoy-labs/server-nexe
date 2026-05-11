@@ -110,6 +110,8 @@ class LlamaCppModule:
             return False
         try:
             stats = self._node.get_pool_stats()
+            if not stats:
+                return False
             return stats.get("pool_initialized", False) and stats.get("active_sessions", 0) > 0
         except Exception:
             return False
@@ -133,11 +135,11 @@ class LlamaCppModule:
         return await self._node.execute(inputs)
 
     async def health_check(self) -> HealthResult:
-        if not self._initialized:
+        if not self._initialized or self._node is None:
             return HealthResult(status=HealthStatus.UNKNOWN, message="Module not initialized")
-        
+
         try:
-            stats = self._node.get_pool_stats()
+            stats = self._node.get_pool_stats() or {}
             return HealthResult(
                 status=HealthStatus.HEALTHY,
                 message="Llama.cpp motor active",

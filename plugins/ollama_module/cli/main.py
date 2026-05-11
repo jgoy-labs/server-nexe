@@ -22,11 +22,22 @@ try:
   RICH_AVAILABLE = True
 except ImportError:
   RICH_AVAILABLE = False
-  typer = None
+  typer = None  # type: ignore[assignment]
+  # Stubs for type checker; runtime only enters this branch when imports failed
+  # and main() exits before any decorator/usage runs.
+  Console = None  # type: ignore[assignment,misc]
+  Table = None  # type: ignore[assignment,misc]
+  Progress = None  # type: ignore[assignment,misc]
+  SpinnerColumn = None  # type: ignore[assignment,misc]
+  TextColumn = None  # type: ignore[assignment,misc]
+  Panel = None  # type: ignore[assignment,misc]
 
 from ..module import OllamaModule
 
-if typer:
+# When typer/rich unavailable, this module's decorators below would fail at
+# import time. main() detects this and exits cleanly before that path.
+# pyright: reportOptionalMemberAccess=false, reportOptionalCall=false, reportPossiblyUnboundVariable=false
+if typer is not None:
   app = typer.Typer(
     name="ollama",
     help="Management of local LLM models with Ollama",

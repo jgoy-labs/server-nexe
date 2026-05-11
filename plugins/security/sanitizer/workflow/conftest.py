@@ -56,12 +56,13 @@ def _create_nexe_flow_mock():
     nexe_flow = types.ModuleType("nexe_flow")
     nexe_flow_core = types.ModuleType("nexe_flow.core")
     nexe_flow_core_node = types.ModuleType("nexe_flow.core.node")
-    nexe_flow_core_node.Node = Node
-    nexe_flow_core_node.NodeMetadata = NodeMetadata
-    nexe_flow_core_node.NodeInput = NodeInput
-    nexe_flow_core_node.NodeOutput = NodeOutput
-    nexe_flow.core = nexe_flow_core
-    nexe_flow_core.node = nexe_flow_core_node
+    # Dynamic stub injection — ModuleType attributes are set at runtime.
+    nexe_flow_core_node.Node = Node  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+    nexe_flow_core_node.NodeMetadata = NodeMetadata  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+    nexe_flow_core_node.NodeInput = NodeInput  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+    nexe_flow_core_node.NodeOutput = NodeOutput  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+    nexe_flow.core = nexe_flow_core  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+    nexe_flow_core.node = nexe_flow_core_node  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
     sys.modules["nexe_flow"] = nexe_flow
     sys.modules["nexe_flow.core"] = nexe_flow_core

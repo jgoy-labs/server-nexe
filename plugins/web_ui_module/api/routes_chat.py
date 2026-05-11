@@ -26,10 +26,13 @@ from plugins.web_ui_module.messages import get_message, get_i18n
 # all depend on require_ui_auth, which returns 503 in degraded mode, so these
 # stubs never run in practice — they exist only to keep the module importable.
 try:
+    # Real implementations; type signatures differ slightly from the
+    # degraded-mode fallbacks below, but in practice when these are imported
+    # successfully the fallback stubs are never bound.
     from plugins.security.core.input_sanitizers import (
-        validate_string_input,
-        strip_memory_tags,
-        detect_jailbreak_attempt,
+        validate_string_input,  # pyright: ignore[reportAssignmentType]
+        strip_memory_tags,  # pyright: ignore[reportAssignmentType]
+        detect_jailbreak_attempt,  # pyright: ignore[reportAssignmentType]
     )
 except ImportError:
     def validate_string_input(s, *a, **k):  # type: ignore[misc, no-redef]
@@ -1597,8 +1600,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     # If queue is empty, check if task is done
                                     if ml_task.done():
                                         # If task failed, re-raise exception
-                                        if ml_task.exception():
-                                            raise ml_task.exception()
+                                        _exc = ml_task.exception()
+                                        if _exc is not None:
+                                            raise _exc
                                         break
 
                                     # Wait for new tokens with short timeout
@@ -1838,7 +1842,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
         if intent != "chat":
             response_text, memory_action, intent, _mem_deleted_delta = await _handle_memory_intent(
-                intent, extracted_content, session, body, memory_helper, message
+                intent, extracted_content or "", session, body, memory_helper, message
             )
             _mem_deleted += _mem_deleted_delta
 
