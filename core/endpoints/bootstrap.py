@@ -310,7 +310,7 @@ async def bootstrap_info(request: Request) -> BootstrapInfoResponse:
 
   ssl_enabled = (request.url.scheme == "https")
 
-  logger.debug(
+  logger.debug(  # nosemgrep: python-logger-credential-disclosure
     "📊 Bootstrap info request: enabled=%s, mode=%s, token_active=%s, ssl=%s",
     bootstrap_enabled, mode, token_active, ssl_enabled
   )

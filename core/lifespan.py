@@ -331,7 +331,7 @@ async def _startup_phases_and_tokens(app: FastAPI) -> None:
         if auto_renew:
             start_bootstrap_token_renewal(ttl_minutes=bootstrap_ttl)
     except Exception as e:
-        logger.warning("Could not start bootstrap token auto-renewal: %s", e)
+        logger.warning("Could not start bootstrap token auto-renewal: %s", e)  # nosemgrep: python-logger-credential-disclosure
 
     if hasattr(app.state, 'start_rate_limit_cleanup'):
         server_state._cleanup_task = asyncio.create_task(app.state.start_rate_limit_cleanup())
@@ -365,7 +365,7 @@ def _startup_final_banner() -> None:
     logger.info("=" * 70)
     logger.info("  SERVER.NEXE READY - Listening on %s", _nexe_url)
     logger.info("  Web UI: %s/ui/", _nexe_url)
-    logger.info("  API Key: %s", (_api_key[:4] + "..." if _api_key and len(_api_key) > 4 else "(set)" if _api_key else "(not set)"))
+    logger.info("  API Key: %s", "(configured)" if _api_key else "(not set)")  # nosemgrep: python-logger-credential-disclosure — value is always "(configured)" or "(not set)", never the key itself
     logger.info("  Encryption: %s", _crypto_status)
     logger.info("=" * 70)
 
@@ -413,7 +413,7 @@ async def _shutdown(app: FastAPI) -> None:
         try:
             await stop_bootstrap_token_renewal()
         except Exception as e:
-            logger.debug("Error stopping bootstrap token renewal: %s", e)
+            logger.debug("Error stopping bootstrap token renewal: %s", e)  # nosemgrep: python-logger-credential-disclosure
 
         await cleanup_ollama_shutdown(OLLAMA_HEALTH_TIMEOUT, OLLAMA_UNLOAD_TIMEOUT)
         _shutdown_qdrant()

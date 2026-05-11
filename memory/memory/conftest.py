@@ -7,7 +7,6 @@ import sys
 import types
 from dataclasses import dataclass, field
 from typing import Any
-from unittest.mock import MagicMock
 
 
 # Mock qdrant submodule for tools package

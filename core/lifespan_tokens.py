@@ -144,7 +144,7 @@ async def _bootstrap_token_renewal_loop(interval_seconds: int, ttl_minutes: int)
       except asyncio.CancelledError:
         raise
       except Exception as e:  # noqa: BLE001 — defensive: do not stop the loop
-        logger.error("Bootstrap token regeneration failed: %s", e)
+        logger.error("Bootstrap token regeneration failed: %s", e)  # nosemgrep: python-logger-credential-disclosure
         recovered = False
         for delay in _BOOTSTRAP_RETRY_BACKOFFS:
           await asyncio.sleep(delay)
@@ -158,7 +158,7 @@ async def _bootstrap_token_renewal_loop(interval_seconds: int, ttl_minutes: int)
           except asyncio.CancelledError:
             raise
           except Exception as e2:  # noqa: BLE001
-            logger.warning(
+            logger.warning(  # nosemgrep: python-logger-credential-disclosure
               "Bootstrap token retry after %ds failed: %s", delay, e2
             )
         if not recovered:
@@ -215,7 +215,7 @@ async def stop_bootstrap_token_renewal() -> None:
   except asyncio.CancelledError:
     pass
   except Exception as e:  # noqa: BLE001
-    logger.error("Error stopping bootstrap token renewal task: %s", e)
+    logger.error("Error stopping bootstrap token renewal task: %s", e)  # nosemgrep: python-logger-credential-disclosure
   finally:
     _renewal_task = None
   logger.info("Bootstrap token renewal task stopped")

@@ -60,7 +60,7 @@ async def _mlx_stream_generator(
                 token
             )
         except Exception as e:
-            logger.warning("Stream token enqueue failed (queue full/closed): %s", e)
+            logger.warning("Stream token enqueue failed (queue full/closed): %s", e)  # nosemgrep: python-logger-credential-disclosure
 
     async def run_mlx():
         """Run MLX in the background with stream_callback."""

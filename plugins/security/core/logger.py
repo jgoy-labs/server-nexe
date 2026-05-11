@@ -247,7 +247,7 @@ def clear_old_logs(days_to_keep: int = 30) -> int:
   for log_file in SECURITY_LOG_PATH.glob("security_*.jsonl"):
     try:
       date_str = log_file.stem.replace("security_", "")
-      file_date = datetime.strptime(date_str, "%Y%m%d")
+      file_date = datetime.strptime(date_str, "%Y%m%d").replace(tzinfo=timezone.utc)
 
       if file_date < cutoff_date:
         log_file.unlink()

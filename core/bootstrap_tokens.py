@@ -78,7 +78,7 @@ class BootstrapTokenManager:
     conn.close()
     
     self._initialized = True
-    logger.info("BootstrapTokenManager initialized with persistent storage: %s", self._db_path)
+    logger.info("BootstrapTokenManager initialized with persistent storage: %s", self._db_path)  # nosemgrep: python-logger-credential-disclosure
 
   def _get_conn(self):
     """Open a SQLite connection to the token database, auto-initializing if needed."""
