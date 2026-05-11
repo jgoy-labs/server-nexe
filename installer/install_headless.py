@@ -13,7 +13,7 @@ import json
 import logging
 import os
 import platform
-import subprocess  # nosec B404: subprocess required for headless installer venv setup, embeddings download, knowledge ingest; argv built from internal Path/catalog
+import subprocess
 import sys
 import time
 import threading

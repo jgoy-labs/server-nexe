@@ -14,7 +14,7 @@ import logging
 import os
 import shutil
 import signal as _signal
-import subprocess  # nosec B404: subprocess required to start `ollama serve` at server startup; usage validated below
+import subprocess
 from pathlib import Path
 from typing import Any, Dict
 

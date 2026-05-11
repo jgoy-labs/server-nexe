@@ -39,6 +39,7 @@ exclude_dirs = [
     "InstallNexe.app",
     "__pycache__",
 ]
+skips = ["B404"]  # import subprocess — never insecure, risk is at usage (B603/B607)
 
 [tool.vulture]
 # 60% confidence floods the report with false positives from indirect dispatch

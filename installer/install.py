@@ -10,7 +10,7 @@ import os
 import re
 import shutil
 import sys
-import subprocess  # nosec B404: subprocess required for venv setup, model verification, embeddings download; all argv built from internal Path/catalog
+import subprocess
 from datetime import datetime
 from pathlib import Path
 

@@ -143,7 +143,7 @@ def _start_nexe(ctx: click.Context):
   import json
   import os
   import signal
-  import subprocess  # nosec B404: subprocess required to run `python -m core.app`; usage validated below
+  import subprocess
   from pathlib import Path
 
   project_root = Path(__file__).parent.parent.parent
@@ -220,7 +220,7 @@ def _stop_find_pid_from_file(pid_file) -> list:
 
 def _stop_find_via_pgrep() -> list:
   """Fallback: find Nexe processes via pgrep. Returns list of found (name, pattern, pids) or empty."""
-  import subprocess  # nosec B404: subprocess required for pgrep fallback to find Nexe processes
+  import subprocess
   try:
     result = subprocess.run(  # nosec B603 B607: pgrep on hardcoded literal pattern; system tool resolved via PATH (mono-user local)
       ["pgrep", "-f", "uvicorn.*nexe"],
@@ -517,7 +517,7 @@ def install_model(name: str, engine: Optional[str]):
 
     elif engine == "ollama":
         # Ollama Pull
-        import subprocess  # nosec B404: subprocess required to invoke `ollama pull`; tag is from registry catalog
+        import subprocess
         tag = entry.ollama_tag
         click.echo(f"   Running: ollama pull {tag}")
         try:

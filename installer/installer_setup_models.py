@@ -14,7 +14,7 @@ is re-exported from here for backwards compatibility with the existing
 
 import os
 import sys
-import subprocess  # nosec B404: subprocess required for `ollama list/serve/pull`, curl GGUF download, MLX snapshot_download child process; argv built from internal catalog
+import subprocess
 from pathlib import Path
 
 from .download_verify import DownloadIntegrityError, verify_download_integrity
