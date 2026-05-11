@@ -26,14 +26,14 @@ class ModuleFinder:
 
   def find_api_file(self, module_path: Path, module_name: str) -> Optional[Path]:
     """
-    Cerca fitxer API per mòdul seguint diferents patrons.
+    Find the API file for a module following different patterns.
 
     Args:
-      module_path: Path del directori del mòdul
-      module_name: Nom del mòdul
+      module_path: Path to the module directory
+      module_name: Module name
 
     Returns:
-      Path del fitxer trobat o None
+      Path to the found file or None
     """
     api_file = self._find_by_patterns(module_path, module_name)
     if api_file:
@@ -42,7 +42,7 @@ class ModuleFinder:
     return self._find_fallback_py_file(module_path, module_name)
 
   def _find_by_patterns(self, module_path: Path, module_name: str) -> Optional[Path]:
-    """Cerca per patrons definits"""
+    """Search using defined patterns."""
     api_file_patterns = self.patterns.get_api_file_patterns()
     python_ext = self.patterns.get_python_extension()
 
@@ -60,7 +60,7 @@ class ModuleFinder:
     return None
 
   def _find_fallback_py_file(self, module_path: Path, module_name: str) -> Optional[Path]:
-    """Cerca qualsevol fitxer .py com a fallback"""
+    """Search for any .py file as a fallback."""
     python_ext = self.patterns.get_python_extension()
     py_files = list(module_path.glob(f"*{python_ext}"))
 

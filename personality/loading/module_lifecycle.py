@@ -27,11 +27,11 @@ class ModuleLifecycle:
 
   async def initialize_module(self, instance: Any, module_name: str) -> None:
     """
-    Inicialitza mòdul si té mètodes d'inicialització.
+    Initialize module if it has initialization methods.
 
     Args:
-      instance: Instància del mòdul
-      module_name: Nom del mòdul
+      instance: Module instance
+      module_name: Module name
     """
     init_methods = self.patterns.get_init_methods()
 
@@ -62,11 +62,11 @@ class ModuleLifecycle:
 
   async def cleanup_module(self, instance: Any, module_name: str) -> None:
     """
-    Neteja recursos del mòdul abans de descarregar-lo.
+    Clean up module resources before unloading.
 
     Args:
-      instance: Instància del mòdul
-      module_name: Nom del mòdul
+      instance: Module instance
+      module_name: Module name
     """
     cleanup_methods = self.patterns.get_cleanup_methods()
 

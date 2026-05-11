@@ -25,10 +25,10 @@ class ModuleLifecycleManager:
 
   def __init__(self, config: LifecycleConfig) -> None:
     """
-    Inicialitza gestor de cicle de vida.
+    Initialize lifecycle manager.
 
     Args:
-      config: LifecycleConfig amb modules, loader, registry, events, metrics i i18n opcionals
+      config: LifecycleConfig with modules, loader, registry, events, metrics and optional i18n
     """
     self.modules = config.modules
     self.loader = config.loader
@@ -56,7 +56,7 @@ class ModuleLifecycleManager:
     return self.__async_lock
 
   def set_api_integrator(self, api_integrator):
-    """Estableix API integrator"""
+    """Set the API integrator."""
     self.api_integrator = api_integrator
 
   async def _load_dependencies(self, module_name: str, module_info) -> bool:
@@ -113,14 +113,14 @@ class ModuleLifecycleManager:
 
   async def load_module(self, module_name: str) -> bool:
     """
-    Carrega un mòdul.
+    Load a module.
 
     Args:
-      module_name: Nom del mòdul a carregar
-      lock: Lock de threading
+      module_name: Name of the module to load
+      lock: Threading lock
 
     Returns:
-      True si s'ha carregat correctament
+      True if loaded successfully
     """
     async with self._async_lock:
       if module_name not in self.modules:
@@ -162,14 +162,14 @@ class ModuleLifecycleManager:
 
   async def start_module(self, module_name: str) -> bool:
     """
-    Inicia un mòdul carregat.
+    Start a loaded module.
 
     Args:
-      module_name: Nom del mòdul
-      lock: Lock de threading
+      module_name: Module name
+      lock: Threading lock
 
     Returns:
-      True si s'ha iniciat correctament
+      True if started successfully
     """
     async with self._async_lock:
       if module_name not in self.modules:
@@ -237,14 +237,14 @@ class ModuleLifecycleManager:
 
   async def stop_module(self, module_name: str) -> bool:
     """
-    Atura un mòdul en execució.
+    Stop a running module.
 
     Args:
-      module_name: Nom del mòdul
-      lock: Lock de threading
+      module_name: Module name
+      lock: Threading lock
 
     Returns:
-      True si s'ha aturat correctament
+      True if stopped successfully
     """
     async with self._async_lock:
       if module_name not in self.modules:

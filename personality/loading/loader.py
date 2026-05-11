@@ -39,20 +39,20 @@ class ModuleLoader:
   """
   Global dynamic module loader for Nexe 0.9 (FAÇADE).
 
-  Coordina tots els components especialitzats:
-  - ModuleFinder: Cerca fitxers API
-  - ModuleImporter: Import dinàmic
-  - ModuleExtractor: Extreu instància principal
-  - ModuleValidator: Valida mòduls
-  - ModuleLifecycle: Gestiona init/cleanup/unload
+  Coordinates all specialized components:
+  - ModuleFinder: Searches API files
+  - ModuleImporter: Dynamic import
+  - ModuleExtractor: Extracts the main instance
+  - ModuleValidator: Validates modules
+  - ModuleLifecycle: Manages init/cleanup/unload
   """
 
   def __init__(self, i18n_manager=None, suppress_deprecation: bool = False):
     """
-    Inicialitza module loader.
+    Initialize module loader.
 
     Args:
-      i18n_manager: Gestor I18nManager opcional per traduccions
+      i18n_manager: Optional I18nManager for translations
       suppress_deprecation: Set True to suppress deprecation warning
 
     Note:
@@ -77,17 +77,17 @@ class ModuleLoader:
 
   async def load_module(self, module_info: ModuleInfo) -> Any:
     """
-    Carrega un mòdul específic.
+    Load a specific module.
 
     Args:
-      module_info: Informació del mòdul (ModuleInfo)
+      module_info: Module information (ModuleInfo)
 
     Returns:
-      Instància del mòdul carregat
+      Loaded module instance
 
     Raises:
-      ModuleValidationError: Si el mòdul no és vàlid
-      ImportError: Si hi ha errors d'import
+      ModuleValidationError: If the module is invalid
+      ImportError: If there are import errors
     """
     module_name = module_info.name
     module_path = module_info.path
@@ -149,10 +149,10 @@ class ModuleLoader:
 
   def _cleanup_failed_load(self, module_name: str) -> None:
     """
-    Neteja recursos després d'una càrrega fallida.
+    Clean up resources after a failed load.
 
     Args:
-      module_name: Nom del mòdul que ha fallat
+      module_name: Name of the module that failed
     """
     self._loaded_modules.pop(module_name, None)
 
@@ -164,13 +164,13 @@ class ModuleLoader:
 
   async def unload_module(self, module_name: str) -> bool:
     """
-    Descarrega un mòdul del sistema.
+    Unload a module from the system.
 
     Args:
-      module_name: Nom del mòdul a descarregar
+      module_name: Name of the module to unload
 
     Returns:
-      True si s'ha descarregat correctament
+      True if unloaded successfully
     """
     try:
       if module_name in self._loaded_modules:
@@ -207,13 +207,13 @@ class ModuleLoader:
 
   async def reload_module(self, module_info: ModuleInfo) -> Any:
     """
-    Recarrega un mòdul (descarrega i carrega de nou).
+    Reload a module (unload and load again).
 
     Args:
-      module_info: Informació del mòdul
+      module_info: Module information
 
     Returns:
-      Nova instància del mòdul carregat
+      New loaded module instance
     """
     module_name = module_info.name
 

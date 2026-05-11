@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import toml  # type: ignore[import-untyped]  # FP: types-toml disponible però no instal·lat
+import toml  # type: ignore[import-untyped]  # FP: types-toml available but not installed
 import logging
 
 logger = logging.getLogger(__name__)

@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy 
 Location: personality/models/registry.py
-Description: Registre curat de models suportats (MLX & Ollama).
-             Mapeja noms curts (e.g. "llama3") a IDs reals (HF o Ollama library).
+Description: Curated registry of supported models (MLX & Ollama).
+             Maps short names (e.g. "llama3") to real IDs (HF or Ollama library).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -127,11 +127,11 @@ MODEL_REGISTRY: Dict[str, ModelEntry] = {
 }
 
 def get_model_entry(name: str) -> Optional[ModelEntry]:
-    """Busca un model pel seu nom curt."""
+    """Look up a model by its short name."""
     return MODEL_REGISTRY.get(name.lower())
 
 def list_models_table() -> str:
-    """Retorna una taula formatada dels models disponibles."""
+    """Return a formatted table of available models."""
     rows = []
     for m in MODEL_REGISTRY.values():
         rows.append(f"{m.short_name:<15} {m.size_gb:>4.1f}GB  {m.description}")

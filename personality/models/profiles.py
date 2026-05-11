@@ -41,7 +41,7 @@ class ModelProfile(BaseModel):
     max_tokens: int
     context_window: int
     description: str
-    mlx_model_id: Optional[str] = None # HuggingFace Repo ID per MLX
+    mlx_model_id: Optional[str] = None # HuggingFace Repo ID for MLX
 
     model_config = ConfigDict(protected_namespaces=())
 

@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 
 from pathlib import Path
 from typing import Dict, Any, Optional
-import toml  # type: ignore[import-untyped]  # FP: types-toml disponible però no instal·lat
+import toml  # type: ignore[import-untyped]  # FP: types-toml available but not installed
 
 from core.config import (
     load_config as core_load_config,
@@ -28,7 +28,7 @@ logger = get_logger(__name__)
 
 class ConfigManager:
   """
-  Gestiona configuració i manifests del sistema.
+  Manages system configuration and manifests.
 
   Uses core/config.py for unified config loading.
   Adds module-specific functionality (manifests, enabled state).
@@ -36,11 +36,11 @@ class ConfigManager:
 
   def __init__(self, config_path: Optional[Path], i18n=None):
     """
-    Inicialitza gestor de configuració.
+    Initialize configuration manager.
 
     Args:
-      config_path: Path al fitxer server.toml
-      i18n: Gestor i18n opcional
+      config_path: Path to the server.toml file
+      i18n: Optional i18n manager
     """
     self.i18n = i18n
     self.config_path = self._find_config_path(config_path)
@@ -56,15 +56,15 @@ class ConfigManager:
 
   def _t(self, key: str, fallback: str, **kwargs) -> str:
     """
-    Helper per traduir amb fallback.
+    Translation helper with fallback.
 
     Args:
-      key: Clau de traducció
-      fallback: Text per defecte
-      **kwargs: Paràmetres de format
+      key: Translation key
+      fallback: Default text
+      **kwargs: Format parameters
 
     Returns:
-      Text traduït o fallback
+      Translated text or fallback
     """
     if not self.i18n:
       return fallback.format(**kwargs) if kwargs else fallback
@@ -120,14 +120,14 @@ class ConfigManager:
 
   def find_manifest(self, module_name: str, module_path: Path) -> Path:
     """
-    Cerca fitxer manifest per un mòdul.
+    Find manifest file for a module.
 
     Args:
-      module_name: Nom del mòdul
-      module_path: Path del mòdul
+      module_name: Module name
+      module_path: Module path
 
     Returns:
-      Path al manifest
+      Path to the manifest
     """
     manifest_filename = get_message(
       self.i18n, 'files.module_manifest_format',
@@ -154,13 +154,13 @@ class ConfigManager:
 
   def load_manifest(self, manifest_path: Path) -> Dict[str, Any]:
     """
-    Carrega fitxer manifest.
+    Load manifest file.
 
     Args:
-      manifest_path: Path al manifest
+      manifest_path: Path to the manifest
 
     Returns:
-      Diccionari amb dades del manifest
+      Dictionary with manifest data
     """
     try:
       with open(manifest_path, 'r', encoding='utf-8') as f:
@@ -251,16 +251,16 @@ class ConfigManager:
 
   def apply_config_to_module(self, module_info) -> None:
     """
-    Aplica configuració a un ModuleInfo.
+    Apply configuration to a ModuleInfo.
 
-    Suporta dos formats de configuració:
+    Supports two configuration formats:
     - FORMAT 1 (list): [plugins.modules] enabled = ["security", "security"]
     - FORMAT 2 (dict): [plugins.modules.security] enabled = true
 
-    Prioritat: dict > list (més específic guanya)
+    Priority: dict > list (more specific wins)
 
     Args:
-      module_info: ModuleInfo a configurar
+      module_info: ModuleInfo to configure
     """
     from personality.data.models import ModuleState
 
@@ -295,15 +295,15 @@ class ConfigManager:
 
   def update_module_enabled(self, module_name: str, enabled: bool, module_path: Path) -> bool:
     """
-    Actualitza l'estat enabled d'un mòdul i guarda al server.toml.
+    Update the enabled state of a module and persist to server.toml.
 
     Args:
-      module_name: Nom del mòdul
-      enabled: True per activar, False per desactivar
-      module_path: Path del mòdul
+      module_name: Module name
+      enabled: True to enable, False to disable
+      module_path: Module path
 
     Returns:
-      True si s'ha guardat correctament
+      True if saved successfully
     """
     try:
       project_root = self.config_path.parent

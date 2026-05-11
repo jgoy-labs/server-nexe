@@ -28,17 +28,17 @@ class ModuleImporter:
 
   def import_module(self, api_file: Path, module_name: str) -> Any:
     """
-    Importa dinàmicament un mòdul Python.
+    Dynamically import a Python module.
 
     Args:
-      api_file: Path del fitxer a importar
-      module_name: Nom del mòdul
+      api_file: Path to the file to import
+      module_name: Module name
 
     Returns:
-      Mòdul importat
+      Imported module
 
     Raises:
-      ImportError: Si no es pot importar
+      ImportError: If the module cannot be imported
     """
     module_full_name = self.patterns.get_module_name_prefix(
       module_name, id(api_file)
@@ -62,13 +62,13 @@ class ModuleImporter:
 
   def cleanup_module(self, module_name: str) -> int:
     """
-    Neteja mòdul de sys.modules.
+    Remove module from sys.modules.
 
     Args:
-      module_name: Nom del mòdul a netejar
+      module_name: Name of the module to clean up
 
     Returns:
-      Nombre de mòduls eliminats
+      Number of modules removed
     """
     modules_to_remove = []
     prefix = f"module_{module_name}"

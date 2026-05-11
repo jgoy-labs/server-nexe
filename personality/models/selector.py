@@ -23,7 +23,7 @@ class HardwareProfile:
     def __init__(self):
         self.system = platform.system()
         self.processor = platform.processor()
-        self.machine = platform.machine() # 'arm64' per apple silicon
+        self.machine = platform.machine() # 'arm64' for apple silicon
         self.total_ram_gb = round(psutil.virtual_memory().total / (1024**3), 2)
         self.is_apple_silicon = self.system == "Darwin" and self.machine == "arm64"
         self.has_cuda = False  # NVIDIA detection not implemented
@@ -34,7 +34,7 @@ class HardwareProfile:
                 f"Apple Silicon: {self.is_apple_silicon}")
 
 class ModelSelector:
-    """Selecciona el millor perfil de models segons el maquinari."""
+    """Selects the best model profile based on the hardware."""
     
     def __init__(self):
         """Initialize the selector with a fresh hardware profile."""
@@ -45,17 +45,17 @@ class ModelSelector:
         return self.hw
 
     def recommend(self) -> ModelProfile:
-        """Retorna el perfil recomanat."""
+        """Return the recommended profile."""
         tier = self._determine_tier()
-        profile = PROFILES[tier].model_copy() # Copia per modificar engine si cal
-        
-        # Ajustar Engine segons HW real
+        profile = PROFILES[tier].model_copy() # Copy to modify engine if needed
+
+        # Adjust engine based on actual hardware
         if self.hw.is_apple_silicon:
             profile.preferred_engine = EngineType.MLX
         elif self._check_ollama_available():
             profile.preferred_engine = EngineType.OLLAMA
         else:
-            profile.preferred_engine = EngineType.LLAMA_CPP # Fallback CPU
+            profile.preferred_engine = EngineType.LLAMA_CPP # CPU fallback
             
         logger.info(f"Recommended Profile: {tier.value} for {self.hw}")
         return profile

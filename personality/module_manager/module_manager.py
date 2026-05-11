@@ -52,28 +52,28 @@ class ModuleManager(PluginLoaderMixin):
   - Memory modules (memory/*)
   - Core modules (core/*)
 
-  Coordina components especialitzats:
-  - ConfigManager: Gestió de configuració i manifests
-  - PathDiscovery: Descobriment de paths de mòduls
-  - ModuleDiscovery: Lògica de descobriment
-  - ModuleLoader: Càrrega dinàmica de mòduls
-  - ModuleRegistry: Registre i indexació de mòduls
-  - ModuleLifecycleManager: Cicle de vida de mòduls individuals
-  - SystemLifecycleManager: Cicle de vida del sistema
-  - SyncWrapper: Wrappers síncrons per operacions async
-  - EventSystem: Gestió d'events
-  - MetricsCollector: Col·lecció de mètriques
-  - I18nManager: Internacionalització
+  Coordinates specialized components:
+  - ConfigManager: Configuration and manifest management
+  - PathDiscovery: Module path discovery
+  - ModuleDiscovery: Discovery logic
+  - ModuleLoader: Dynamic module loading
+  - ModuleRegistry: Module registry and indexing
+  - ModuleLifecycleManager: Individual module lifecycle
+  - SystemLifecycleManager: System lifecycle
+  - SyncWrapper: Synchronous wrappers for async operations
+  - EventSystem: Event management
+  - MetricsCollector: Metrics collection
+  - I18nManager: Internationalization
 
   See: docs/NEXE_ARCHITECTURAL_DECISIONS.md (ADR-001)
   """
 
   def __init__(self, config_path: Optional[Path] = None):
     """
-    Inicialitza module manager amb tots els components.
+    Initialize module manager with all components.
 
     Args:
-      config_path: Path al fitxer server.toml
+      config_path: Path to the server.toml file
     """
     temp_config_path = self._find_initial_config(config_path)
     self.i18n = I18nManager(temp_config_path, temp_config_path.parent)
@@ -127,7 +127,7 @@ class ModuleManager(PluginLoaderMixin):
     self._log_init()
 
   def _configure_base_path(self) -> None:
-    """Configura base_path per PathDiscovery."""
+    """Configure base_path for PathDiscovery."""
     if self.config_path.parent.name == "personality":
       self.path_discovery.base_path = self.config_path.parent.parent
     else:
@@ -174,9 +174,9 @@ class ModuleManager(PluginLoaderMixin):
 
   def get_cycle_warnings(self) -> List[str]:
     """
-    Retorna els cicles de dependencies detectats a l'ultim discover.
-    Bug 20 fix — exposat perque el startup summary del lifespan (i tests)
-    puguin llegir-los i mostrar-los amb prefix [WARN].
+    Return dependency cycles detected during the last discover call.
+    Bug 20 fix — exposed so the lifespan startup summary (and tests)
+    can read and display them with a [WARN] prefix.
     """
     return self.discovery.get_cycle_warnings()
 
@@ -207,7 +207,7 @@ class ModuleManager(PluginLoaderMixin):
     return await self.module_lifecycle.stop_module(module_name)
 
   async def start_system(self) -> bool:
-    """Inicia el sistema complet."""
+    """Start the full system."""
     original_get_lock = self.system_lifecycle._get_lock
     self.system_lifecycle._get_lock = lambda: self._lock  # type: ignore[method-assign]  # lock injection: shares self._lock with system_lifecycle temporarily
     result = await self.system_lifecycle.start_system()
@@ -216,7 +216,7 @@ class ModuleManager(PluginLoaderMixin):
     return result
 
   async def shutdown_system(self) -> None:
-    """Atura el sistema."""
+    """Shut down the system."""
     original_get_lock = self.system_lifecycle._get_lock
     self.system_lifecycle._get_lock = lambda: self._lock  # type: ignore[method-assign]  # lock injection: shares self._lock with system_lifecycle temporarily
     await self.system_lifecycle.shutdown_system()
@@ -270,7 +270,7 @@ class ModuleManager(PluginLoaderMixin):
     }
 
   def add_event_listener(self, callback, event_type: Optional[str] = None) -> None:
-    """Afegeix listener d'events."""
+    """Add an event listener."""
     self.events.add_event_listener(callback, event_type)
 
   def get_module_metrics(self, module_name: str) -> Dict[str, Any]:
@@ -284,7 +284,7 @@ class ModuleManager(PluginLoaderMixin):
     return self.registry.get_registry_stats()
 
   def set_api_integrator(self, api_integrator):
-    """Estableix l'API integrator."""
+    """Set the API integrator."""
     self.api_integrator = api_integrator
     self.module_lifecycle.set_api_integrator(api_integrator)
     logger.info(get_message(self.i18n, 'api.integrator.set'))

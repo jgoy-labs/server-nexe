@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import toml  # type: ignore[import-untyped]  # FP: types-toml disponible però no instal·lat
+import toml  # type: ignore[import-untyped]  # FP: types-toml available but not installed
 
 __all__ = ['I18nManager']
 
