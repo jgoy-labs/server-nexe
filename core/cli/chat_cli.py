@@ -1,7 +1,7 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: core/cli/chat_cli.py
 Description: Unified Chat CLI. Detects available engine (MLX, Llama.cpp, Ollama)
              and provides a simple interactive interface.
@@ -9,6 +9,9 @@ Description: Unified Chat CLI. Detects available engine (MLX, Llama.cpp, Ollama)
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
+# pyright: reportCallIssue=false
+# Click @command decorator transforms `chat(...)` into a Command at runtime;
+# the bare `chat()` invocation in __main__ is handled by click's arg parsing.
 
 import os
 import re
@@ -40,7 +43,7 @@ def get_default_system_prompt():
             logger.debug("Failed to load system prompt: %s", e)
     return "You are Nexe, a local AI assistant, precise and secure."
 
-def detect_engine():
+def detect_engine() -> str:
     """
     Detect which engine is configured/available.
 
@@ -75,8 +78,8 @@ def detect_engine():
             with open(config_path, "rb") as f:
                 data = tomllib.load(f)
                 engine = data.get("plugins", {}).get("models", {}).get("preferred_engine", "auto")
-                if engine != "auto":
-                    return engine
+                if engine and engine != "auto":
+                    return str(engine)
         except Exception as e:
             logger.debug("Failed to read engine config: %s", e)
 
@@ -180,7 +183,7 @@ def chat(engine: Optional[str], system: Optional[str], no_rag: bool, model: Opti
     """
     asyncio.run(_chat_async(engine, system, no_rag, model, verbose, rag_threshold, collections))
 
-def detect_model():
+def detect_model() -> str:
     """Detect which model is currently configured."""
     import os
     from dotenv import load_dotenv
