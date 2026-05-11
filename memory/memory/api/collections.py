@@ -46,7 +46,8 @@ async def create_collection(
 
   def _create():
     """Create the Qdrant collection if it does not exist (blocking)."""
-    from memory.memory.engines.qdrant_types import Distance, VectorParams
+    # Re-export from qdrant_client; pyright doesn't resolve transitively.
+    from memory.memory.engines.qdrant_types import Distance, VectorParams  # pyright: ignore[reportAttributeAccessIssue]
 
     collections = qdrant.get_collections().collections
     if name in [c.name for c in collections]:

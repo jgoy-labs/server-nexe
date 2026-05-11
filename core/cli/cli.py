@@ -1,13 +1,18 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: core/cli/cli.py
 Description: Central Nexe CLI - Main Click application.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
+# pyright: reportFunctionMemberAccess=false, reportCallIssue=false
+# Click decorators wrap functions returning Command/Group objects at runtime,
+# but pyright sees the original FunctionType (click's stubs don't propagate the
+# transform). The .command/.group/.add_command accesses and `app(...)` invocation
+# are all valid at runtime — mypy accepts them; pyright is over-strict here.
 
 import sys
 import click
@@ -476,11 +481,11 @@ def install_model(name: str, engine: Optional[str]):
         if config_path.exists():
              config = toml.load(config_path)
              engine = config.get("plugins", {}).get("models", {}).get("preferred_engine", "ollama")
-             if engine == "auto":
+             if engine == "auto" or not engine:
                  engine = "ollama"  # Default safe
         else:
              engine = "ollama"
-    
+    assert engine is not None  # always set by branches above
     click.echo(f"💿 Installing {click.style(entry.short_name, bold=True)} ({entry.size_gb}GB) for engine {click.style(engine.upper(), fg='yellow')}...")
     
     if engine == "mlx":

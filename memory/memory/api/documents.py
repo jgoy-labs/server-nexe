@@ -45,7 +45,8 @@ def hex_to_uuid(hex_id: str) -> str:
 
 def _delete_points(qdrant: Any, collection: str, point_ids: List[str]) -> None:
   """Delete points from a Qdrant collection, falling back to raw ID list on error."""
-  from memory.memory.engines.qdrant_types import PointIdsList
+  # Re-export from qdrant_client; pyright doesn't resolve transitively.
+  from memory.memory.engines.qdrant_types import PointIdsList  # pyright: ignore[reportAttributeAccessIssue]
   try:
     qdrant.delete(
       collection_name=collection,
@@ -128,7 +129,7 @@ async def store_document(
 
   def _store():
     """Upsert a single document point into the Qdrant collection."""
-    from memory.memory.engines.qdrant_types import PointStruct
+    from memory.memory.engines.qdrant_types import PointStruct  # pyright: ignore[reportAttributeAccessIssue]
     uuid_id = hex_to_uuid(doc_id)
     point = PointStruct(
       id=uuid_id,
@@ -221,7 +222,7 @@ async def store_documents_batch(
 
   def _batch_upsert():
     """Upsert all document points into Qdrant in a single call."""
-    from memory.memory.engines.qdrant_types import PointStruct
+    from memory.memory.engines.qdrant_types import PointStruct  # pyright: ignore[reportAttributeAccessIssue]
     points = [
       PointStruct(id=hex_to_uuid(did), vector=emb, payload=pl)
       for did, emb, pl in points_data
@@ -240,7 +241,7 @@ async def store_documents_batch(
 
 def _qdrant_query(qdrant, collection, query_embedding, top_k, threshold, include_expired, filter_metadata):
   """Execute the qdrant search (legacy .search or modern .query_points) and return raw points."""
-  from memory.memory.engines.qdrant_types import FieldCondition, Filter, MatchValue
+  from memory.memory.engines.qdrant_types import FieldCondition, Filter, MatchValue  # pyright: ignore[reportAttributeAccessIssue]
   conditions = []
   if filter_metadata:
     for key, value in filter_metadata.items():

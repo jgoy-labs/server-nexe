@@ -1,13 +1,19 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: plugins/security_logger/helpers.py
 Description: Convenience methods for logging specific security events.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
+
+# Mixin class — `self: "SecurityEventLogger"` is intentional (used by
+# SecurityEventLogger(SecurityLoggerHelpers)). Both mypy and pyright flag this
+# as a violation of the LSP self-type rule, but the inheritance invariant
+# guarantees soundness. See per-method `# type: ignore[misc]` for mypy.
+# pyright: reportGeneralTypeIssues=false
 
 from typing import Dict, Any, Optional, TYPE_CHECKING
 

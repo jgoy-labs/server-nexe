@@ -88,7 +88,7 @@ async def initialize_plugin_modules(app, server_state):
                 try:
                     logger.info(f"Initializing plugin: {module_name}")
                     context = {"config": server_state.config, "project_root": server_state.project_root}
-                    success = await instance.initialize(context)
+                    success = await instance.initialize(context)  # pyright: ignore[reportGeneralTypeIssues]  # plugin protocol: initialize() is awaitable (duck-typed)
                     if success:
                         logger.info(f"  {module_name} initialized successfully")
                     else:

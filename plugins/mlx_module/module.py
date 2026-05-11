@@ -120,9 +120,9 @@ class MLXModule:
 
     async def health_check(self) -> HealthResult:
         """Check MLX module health by querying the inference pool stats."""
-        if not self._initialized:
+        if not self._initialized or self._node is None:
             return HealthResult(status=HealthStatus.UNKNOWN, message="Module not initialized")
-        
+
         try:
             stats = self._node.get_pool_stats()
             return HealthResult(

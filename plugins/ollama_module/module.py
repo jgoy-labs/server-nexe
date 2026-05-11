@@ -71,9 +71,9 @@ class OllamaModule:
         # Extracted components
         self.client = OllamaClient(self.base_url)
         self.models_mgr = OllamaModels(self.client)
-        self.models_mgr._owner = self
+        self.models_mgr._owner = self  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
         self.chat_mgr = OllamaChat(self.client)
-        self.chat_mgr._owner = self
+        self.chat_mgr._owner = self  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
     # --- NexeModule Protocol ---
 

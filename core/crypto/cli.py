@@ -8,6 +8,9 @@ Description: CLI commands for encryption management.
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
+# pyright: reportFunctionMemberAccess=false
+# Click @group decorator returns a Group at runtime but pyright sees FunctionType;
+# .command accesses on `encryption` are valid (mypy accepts).
 
 import logging
 from pathlib import Path

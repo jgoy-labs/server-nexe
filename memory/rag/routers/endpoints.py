@@ -242,6 +242,8 @@ async def files_stats_endpoint():
   """Get statistics for uploaded files."""
   try:
     file_rag = _get_file_rag()
+    if file_rag is None:
+      raise HTTPException(status_code=503, detail="RAG not available")
     metrics = file_rag.get_metrics()
 
     documents = []

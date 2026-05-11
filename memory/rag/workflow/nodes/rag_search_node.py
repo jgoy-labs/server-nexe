@@ -9,7 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 import structlog
 
 from nexe_flow.core.node import Node, NodeMetadata, NodeInput, NodeOutput
@@ -18,11 +18,13 @@ from personality.i18n import get_i18n
 
 logger = structlog.get_logger(__name__)
 
+FileRAGSource: Any
 try:
-  from memory.rag_sources.file import FileRAGSource  # type: ignore[attr-defined]  # FP: defensive import under try/except (FileRAGSource is a latent symbol, RAG_AVAILABLE manages its absence)
+  from memory.rag_sources.file import FileRAGSource  # type: ignore[attr-defined,no-redef]  # pyright: ignore[reportMissingImports]  # FP: defensive import under try/except (FileRAGSource is a latent symbol, RAG_AVAILABLE manages its absence)
   RAG_AVAILABLE = True
 except ImportError as e:
   RAG_AVAILABLE = False
+  FileRAGSource = None  # type: ignore[assignment,misc]
   logger.warning(
     "rag_sources_not_available",
     error=str(e),
@@ -58,7 +60,7 @@ class RAGSearchNode(Node):
     """Initialize the RAGSearch node."""
     super().__init__()
 
-    self._rag_source: Optional[FileRAGSource] = None
+    self._rag_source: Optional[Any] = None  # FileRAGSource when RAG_AVAILABLE
     self.config: Dict[str, Any] = {}
 
     logger.info("rag_search_node_initialized")
@@ -227,6 +229,8 @@ class RAGSearchNode(Node):
 
     try:
       rag_source = self._init_rag_source()
+      if rag_source is None:
+        raise RuntimeError("RAG source could not be initialized")
 
       from memory.rag_sources.base import SearchRequest
 

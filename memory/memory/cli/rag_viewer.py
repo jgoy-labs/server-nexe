@@ -43,7 +43,7 @@ def show_stats():
   """Display RAG statistics."""
   import asyncio
 
-  async def _get_stats():
+  async def _get_stats() -> dict:
     try:
       from memory.memory import MemoryModule
       from memory.memory.rag_logger import get_rag_logger
@@ -51,7 +51,7 @@ def show_stats():
       module = MemoryModule.get_instance()
       await module.initialize()
 
-      stats = {}
+      stats: dict = {}
 
       if module._persistence:
         sqlite_stats = await module._persistence.get_stats()

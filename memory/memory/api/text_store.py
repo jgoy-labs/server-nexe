@@ -17,9 +17,11 @@ from typing import Dict, Optional, Any
 
 logger = logging.getLogger(__name__)
 
-# SQLCipher support (optional)
+# SQLCipher support (optional). Typed as Any so runtime branches stay valid;
+# the SQLCIPHER_AVAILABLE flag guards against None access.
+sqlcipher: Any
 try:
-    from sqlcipher3 import dbapi2 as sqlcipher
+    from sqlcipher3 import dbapi2 as sqlcipher  # pyright: ignore[reportMissingImports]
     SQLCIPHER_AVAILABLE = True
 except ImportError:
     sqlcipher = None

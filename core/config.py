@@ -23,6 +23,14 @@ try:
     from pydantic import Field
     _PYDANTIC_SETTINGS_AVAILABLE = True
 except ImportError:  # pragma: no cover
+    # Fallback stubs so the names exist for static analyzers (pyright);
+    # NexeSettings class is only defined when _PYDANTIC_SETTINGS_AVAILABLE is True.
+    BaseSettings = object  # type: ignore[misc,assignment]
+    SettingsConfigDict = dict  # type: ignore[misc,assignment]
+
+    def Field(*args: Any, **kwargs: Any) -> Any:  # type: ignore[misc,assignment]
+        return args[0] if args else None
+
     _PYDANTIC_SETTINGS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
@@ -407,7 +415,7 @@ def get_server_url(scheme: str = "http") -> str:
 # ─────────────────────────────────────────────────────────────
 
 if _PYDANTIC_SETTINGS_AVAILABLE:
-    class NexeSettings(BaseSettings):
+    class NexeSettings(BaseSettings):  # pyright: ignore[reportGeneralTypeIssues]  # BaseSettings is bound to real class when flag True; pyright sees union with object fallback
         """Pydantic settings model that maps every ``NEXE_*`` env var to a typed field.
 
         Acts as the single source of truth for server configuration.
