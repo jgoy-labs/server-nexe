@@ -58,6 +58,18 @@ class TokenBridge:
         """Return the full accumulated response text."""
         return "".join(self._response_parts)
 
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self) -> str:
+        """Yield tokens until generation is done and the queue is drained."""
+        while True:
+            try:
+                return await asyncio.wait_for(self.queue.get(), timeout=0.1)
+            except asyncio.TimeoutError:
+                if self.done.is_set() and self.queue.empty():
+                    raise StopAsyncIteration
+
 
 def format_sse_chunk(token: str, model_name: str, engine_prefix: str) -> str:
     """Format a single token as an OpenAI-compatible SSE chunk."""
