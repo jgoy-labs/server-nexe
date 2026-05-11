@@ -98,6 +98,13 @@ ignore_private = true
 ignore_magic = true
 ignore_semiprivate = true
 
+[tool.muthur.lang_comments]
+# Short EN technical comments get misclassified by lingua detector.
+# min_tokens=3 skips 1-2 word comments; confidence_floor=0.35 accepts
+# English with moderate confidence instead of the default 0.6.
+min_tokens = 3
+confidence_floor = 0.35
+
 [tool.muthur.semgrep]
 # p/default is too aggressive for a mono-user local server (flags logger strings
 # as credentials, localhost http as insecure, non-literal imports as dangerous).
