@@ -3277,3 +3277,1280 @@ expires = "2027-05-09"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-fp-20260509"
 
+[[exception]]
+rule = "lang_comments.not_english"
+path = "core/config.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "personality/models/registry.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "personality/models/registry.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "personality/models/selector.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "personality/module_manager/module_lifecycle.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "personality/module_manager/module_manager.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "personality/module_manager/module_manager.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "personality/module_manager/plugin_loader.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "personality/module_manager/plugin_loader.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "personality/module_manager/registry.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/endpoints/test_bootstrap.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/endpoints/test_chat_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/endpoints/test_chat_http.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/endpoints/test_root.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/endpoints/test_root.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/endpoints/test_root.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/endpoints/test_security_n_series.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/ingest/test_ingest_docs.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/ingest/test_ingest_knowledge.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/ingest/test_ingest_knowledge_mega_batch.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/ingest/test_ingest_pipeline.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/metrics/test_endpoint.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/metrics/test_endpoint.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/metrics/test_middleware.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/metrics/test_registry.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/metrics/test_registry.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/paths/test_paths.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/resilience/test_circuit_breaker_coverage.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_bootstrap_tokens.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_crypto.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_crypto_lifespan.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_dependencies_registry.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_middleware.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_middleware_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_models.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_security_headers.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_small_coverage.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_small_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/core/test_utils.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/chunkers/test_code_chunker.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/chunkers/test_code_chunker.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/chunkers/test_text_chunker.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/test_top_k_cap.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/test_top_k_cap.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/test_vectorstore_protocol.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/test_vectorstore_protocol.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/unit/test_chunkers.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/unit/test_chunkers.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/embeddings/unit/test_health.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/cli/test_rag_viewer.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/cli/test_rag_viewer.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_api.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_api.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_api.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_ingestion.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_models.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_models.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_persistence.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_pipeline_dev2.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_rag_logger.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_rag_logger_rotation.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/test_ram_context.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/tools/test_tools_init.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/workflow/nodes/test_memory_recall_node.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/memory/workflow/nodes/test_memory_store_node.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/rag/test_cli.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/rag/test_constants.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/rag/test_constants.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/rag/test_health.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/memory/rag/test_module_integration.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/i18n/test_i18n_manager.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/loading/test_module_finder.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/loading/test_module_validator.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/loading/test_module_validator.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/loading/test_module_validator.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/metrics/test_metrics_collector.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_config_manager_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_config_manager_coverage.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_config_manager_enabled.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_config_validator.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_config_validator_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_config_validator_coverage.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_module_manager.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_module_manager_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_module_manager_coverage.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_path_discovery.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_path_discovery_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_registry.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/module_manager/test_sync_wrapper.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/personality/test_remaining_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/llama_cpp_module/test_initialize_import_check.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/mlx_module/test_mlx_config_coverage.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/mlx_module/test_mlx_config_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/mlx_module/test_mlx_module.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/mlx_module/test_mlx_module_coverage.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/mlx_module/test_multimodal.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/mlx_module/test_prompt_cache_manager.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/mlx_module/test_prompt_cache_manager.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/mlx_module/test_prompt_cache_singleton.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/integration/test_ollama_integration.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/integration/test_ollama_integration.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/integration/test_ollama_integration.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/unit/test_manifest_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/unit/test_module_coverage.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/unit/test_ollama_cli.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/unit/test_ollama_node.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/unit/test_ollama_node.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/unit/test_ollama_node.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/unit/test_ollama_node.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/workflow/nodes/test_nodes_init.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/workflow/nodes/test_ollama_node_full.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/workflow/nodes/test_ollama_node_full.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/workflow/nodes/test_ollama_node_full.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/ollama_module/workflow/test_workflow_init.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/core/test_false_positives.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/core/test_jailbreak_detector.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/sanitizer/test_sanitizer_extended.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/test_auth_dependencies_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/test_coverage_gaps.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/test_coverage_gaps.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/test_detect_nosql_depth.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/test_input_validators.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/test_manifest_coverage.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/test_manifest_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/test_messages_coverage.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/security/test_validate_string_chat_context.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/integration/test_web_ui_endpoints.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_context_budget_history.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_coverage_gaps.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_coverage_gaps.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_file_handler.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_graceful_degradation.py"
+message_contains = "detected: en,"
+reason = "Detector classifies as English (detected: en) below confidence threshold — FP for short/technical EN comments"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_latex_sanitizer.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_manifest_coverage.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_mem_save_injection.py"
+message_contains = "detected: es,"
+reason = "Detector misclassifies English as Spanish (detected: es) — FP: short technical comment resembles Spanish words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_memory_delete.py"
+message_contains = "detected: ca,"
+reason = "Detector misclassifies English as Catalan (detected: ca) — FP: short technical comment resembles Catalan words"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_memory_delete.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_model_switch_lock.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_p1a_rate_limit.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_p1b_auth_logging.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_routes_auth_fail_closed.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
+
+[[exception]]
+rule = "lang_comments.not_english"
+path = "tests/plugins/web_ui_module/test_session_manager.py"
+message_contains = "detected: non-en,"
+reason = "Detector cannot classify language (non-en) — short technical comment or code literal below minimum token threshold"
+expires = "2027-05-11"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-v2-fp-20260511"
