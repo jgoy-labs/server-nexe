@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock, patch
 
 from personality.data.models import ModuleInfo, ModuleState
+from personality.module_manager.types import LifecycleConfig
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -35,7 +36,10 @@ def lm():
     events = MagicMock()
     events.emit_event = AsyncMock()
     metrics = MagicMock()
-    return ModuleLifecycleManager(modules, loader, registry, events, metrics)
+    return ModuleLifecycleManager(LifecycleConfig(
+        modules=modules, loader=loader, registry=registry,
+        events=events, metrics=metrics,
+    ))
 
 
 @pytest.fixture

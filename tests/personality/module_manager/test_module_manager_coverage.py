@@ -425,19 +425,20 @@ class TestLoadPluginRouters:
         monkeypatch.delenv("NEXE_APPROVED_MODULES", raising=False)
         monkeypatch.setenv("NEXE_ENV", "production")
         with pytest.raises(ValueError, match="SECURITY ERROR"):
-            mm._configure_plugin_allowlist(mm.i18n)
+            mm._configure_plugin_allowlist()
 
     def test_configure_allowlist_with_approved(self, mm, monkeypatch):
         """Lines 512-514: approved modules from env."""
         monkeypatch.setenv("NEXE_APPROVED_MODULES", "mod_a, mod_b")
         monkeypatch.setenv("NEXE_ENV", "development")
-        config = mm._configure_plugin_allowlist(mm.i18n)
+        config = mm._configure_plugin_allowlist()
         assert "mod_a" in config['approved_modules']
         assert "mod_b" in config['approved_modules']
 
     def test_check_security_not_in_allowlist(self, mm):
         """Lines 554-555: module not in allowlist."""
         from fastapi import FastAPI
+        from personality.module_manager.types import SecurityCheckContext
         app = FastAPI()
         mod = ModuleInfo(
             name="bad_mod",
@@ -446,13 +447,15 @@ class TestLoadPluginRouters:
             enabled=True,
         )
         config = {'effective_allowlist': {'good_mod'}}
-        result = mm._check_plugin_security(app, "bad_mod", mod, config, mm.i18n)
+        ctx = SecurityCheckContext(app=app, module_name="bad_mod", module_info=mod, allowlist_config=config)
+        result = mm._check_plugin_security(ctx)
         assert result is False
         assert mod.state == ModuleState.DISABLED
 
     def test_check_security_disabled_module(self, mm):
         """Line 555: module disabled."""
         from fastapi import FastAPI
+        from personality.module_manager.types import SecurityCheckContext
         app = FastAPI()
         mod = ModuleInfo(
             name="dis_mod",
@@ -461,7 +464,8 @@ class TestLoadPluginRouters:
             enabled=False,
         )
         config = {'effective_allowlist': None}
-        result = mm._check_plugin_security(app, "dis_mod", mod, config, mm.i18n)
+        ctx = SecurityCheckContext(app=app, module_name="dis_mod", module_info=mod, allowlist_config=config)
+        result = mm._check_plugin_security(ctx)
         assert result is False
 
 
@@ -486,7 +490,7 @@ class TestPluginRoutersFromManifest:
         manifest.router_admin = APIRouter()
         del manifest.router_ui
         del manifest.get_router
-        result = mm._load_plugin_routers_from_manifest(app, manifest, "test", mm.i18n)
+        result = mm._load_plugin_routers_from_manifest(app, manifest, "test")
         assert result is True
 
     def test_load_router_ui(self, mm):
@@ -498,7 +502,7 @@ class TestPluginRoutersFromManifest:
         del manifest.router_admin
         manifest.router_ui = APIRouter()
         del manifest.get_router
-        result = mm._load_plugin_routers_from_manifest(app, manifest, "test", mm.i18n)
+        result = mm._load_plugin_routers_from_manifest(app, manifest, "test")
         assert result is True
 
     def test_load_get_router_fallback(self, mm):
@@ -510,7 +514,7 @@ class TestPluginRoutersFromManifest:
         del manifest.router_admin
         del manifest.router_ui
         manifest.get_router.return_value = APIRouter()
-        result = mm._load_plugin_routers_from_manifest(app, manifest, "test", mm.i18n)
+        result = mm._load_plugin_routers_from_manifest(app, manifest, "test")
         assert result is True
 
     def test_load_get_router_exception(self, mm):
@@ -522,7 +526,7 @@ class TestPluginRoutersFromManifest:
         del manifest.router_admin
         del manifest.router_ui
         manifest.get_router.side_effect = Exception("fail")
-        result = mm._load_plugin_routers_from_manifest(app, manifest, "test", mm.i18n)
+        result = mm._load_plugin_routers_from_manifest(app, manifest, "test")
         assert result is False
 
     def test_load_no_routers(self, mm):
@@ -530,7 +534,7 @@ class TestPluginRoutersFromManifest:
         from fastapi import FastAPI
         app = FastAPI()
         manifest = MagicMock(spec=[])
-        result = mm._load_plugin_routers_from_manifest(app, manifest, "test", mm.i18n)
+        result = mm._load_plugin_routers_from_manifest(app, manifest, "test")
         assert result is False
 
 
