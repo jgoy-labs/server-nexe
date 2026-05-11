@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: personality/config/tests/test_config_manager_enabled.py
-Description: Tests per ConfigManager amb suport list+dict de mòduls enabled. Valida formats globals, per-module, prioritats i edge cases.
+Description: Tests for ConfigManager with list+dict module enabled support. Validates global formats, per-module, priorities and edge cases.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -16,7 +16,7 @@ from personality.data.models import ModuleInfo, ModuleState
 
 @pytest.fixture
 def mock_module_info():
-  """Fixture que crea un ModuleInfo bàsic per tests"""
+  """Fixture that creates a basic ModuleInfo for tests."""
   def _create(name="test_module", enabled=True, priority=10):
     fake_path = Path(f"/fake/path/{name}")
     info = ModuleInfo(
@@ -91,9 +91,9 @@ def test_config_per_module_dict(mock_module_info):
 
 def test_config_dict_overrides_list(mock_module_info):
   """
-  Test prioritat: dict > list.
+  Test priority: dict > list.
 
-  Si hi ha ambdós formats, dict té prioritat (més específic).
+  When both formats are present, dict takes priority (more specific).
   """
   config_data = {
     "plugins": {
@@ -117,10 +117,10 @@ def test_config_dict_overrides_list(mock_module_info):
 
 def test_config_dict_overrides_list_edge_case(mock_module_info):
   """
-  Test cas límit: dict enabled=true OVERRIDE list que NO l'inclou.
+  Edge case: dict enabled=true OVERRIDE list that does NOT include it.
 
-  M-2 BUG FIX: Si module NO està a list, però dict diu enabled=true,
-  dict té prioritat (més específic guanya sempre).
+  M-2 BUG FIX: If module is NOT in list but dict says enabled=true,
+  dict takes priority (more specific always wins).
   """
   config_data = {
     "plugins": {
@@ -144,7 +144,7 @@ def test_config_dict_overrides_list_edge_case(mock_module_info):
   assert obs_info.state != ModuleState.DISABLED
 
 def test_config_no_enabled_key_uses_manifest(mock_module_info):
-  """Fallback a manifest si no hi ha config."""
+  """Fallback to manifest when no config is present."""
   config_data = {"plugins": {"modules": {}}}
   config_manager = ConfigManager(None)
   config_manager._config = config_data
@@ -154,7 +154,7 @@ def test_config_no_enabled_key_uses_manifest(mock_module_info):
   assert module_enabled.enabled == True
 
 def test_config_empty_list_disables_all(mock_module_info):
-  """Llista buida desactiva tot."""
+  """Empty list disables all modules."""
   config_data = {"plugins": {"modules": {"enabled": []}}}
   config_manager = ConfigManager(None)
   config_manager._config = config_data
@@ -164,7 +164,7 @@ def test_config_empty_list_disables_all(mock_module_info):
   assert security_info.enabled == False
 
 def test_config_list_with_whitespace(mock_module_info):
-  """Comparació exacta de noms."""
+  """Exact name comparison."""
   config_data = {"plugins": {"modules": {"enabled": ["security", " rag "]}}}
   config_manager = ConfigManager(None)
   config_manager._config = config_data
@@ -178,7 +178,7 @@ def test_config_list_with_whitespace(mock_module_info):
   assert rag_info.enabled == False
 
 def test_config_dict_with_other_settings(mock_module_info):
-  """Configuració de priority i auto_start."""
+  """Configuration of priority and auto_start."""
   config_data = {
     "plugins": {
       "modules": {
@@ -196,7 +196,7 @@ def test_config_dict_with_other_settings(mock_module_info):
   assert security_info.auto_start == True
 
 def test_config_mixed_format(mock_module_info):
-  """Format mixt list + dict."""
+  """Mixed format list + dict."""
   config_data = {
     "plugins": {
       "modules": {
@@ -233,14 +233,14 @@ def test_config_case_sensitive_module_names(mock_module_info):
   assert security_lower.enabled == False
 
 def test_config_loads_from_toml_list_format(tmp_path):
-  """Carregar list des de TOML."""
+  """Load list format from TOML."""
   config_file = tmp_path / "server.toml"
   config_file.write_text("[plugins.modules]\nenabled = [\"security\", \"rag\"]")
   config_manager = ConfigManager(config_file)
   assert config_manager._config['plugins']['modules']['enabled'] == ["security", "rag"]
 
 def test_config_loads_from_toml_dict_format(tmp_path):
-  """Carregar dict des de TOML."""
+  """Load dict format from TOML."""
   config_file = tmp_path / "server.toml"
   config_file.write_text("[plugins.modules.security]\nenabled = true\npriority = 5\n\n[plugins.modules.rag]\nenabled = false")
   config_manager = ConfigManager(config_file)

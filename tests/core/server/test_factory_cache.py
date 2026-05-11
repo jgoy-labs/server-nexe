@@ -116,7 +116,7 @@ def test_reset_app_cache(monkeypatch):
 
 def test_create_app_thread_safe(monkeypatch):
   """
-  Test que cache és thread-safe (no race conditions).
+  Test that cache is thread-safe (no race conditions).
 
   Important per multi-worker deployments.
   """

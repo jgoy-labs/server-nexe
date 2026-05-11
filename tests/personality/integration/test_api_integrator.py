@@ -1,6 +1,6 @@
 """
-Tests per personality/integration/api_integrator.py,
-route_manager.py, openapi_merger.py i messages.py
+Tests for personality/integration/api_integrator.py,
+route_manager.py, openapi_merger.py and messages.py.
 """
 import pytest
 from unittest.mock import MagicMock
@@ -38,7 +38,7 @@ class TestGetMessage:
 
     def test_missing_format_args_returns_template(self):
         from personality.integration.messages import get_message
-        # clau amb placeholder però sense args → retorna template sense formatejar
+        # key with placeholder but no args → returns unformatted template
         msg = get_message(None, 'route_manager.info.routes_removed')
         assert isinstance(msg, str)
 
@@ -63,9 +63,9 @@ class TestOpenAPIMerger:
         assert 'test_module' in self.merger._module_specs
 
     def test_merge_empty_components(self):
-        # Amb components buits, _extract_module_openapi retorna dict buit → falsy → return False
+        # With empty components, _extract_module_openapi returns empty dict → falsy → False
         result = self.merger.merge_module_openapi('empty_mod', {}, '/api/empty')
-        # L'extracció retorna {'prefix':..., 'components': []} que és truthy → True
+        # _extract_module_openapi returns non-empty dict (truthy) → True
         assert isinstance(result, bool)
 
     def test_remove_module_openapi_existing(self):
@@ -123,19 +123,19 @@ class TestRouteManager:
         def hello():
             return {}
 
-        # Primer registre
+        # First registration
         routes1 = self.rm.register_module_routes(RouteRegistration(module_name='mod1', api_component=router, prefix='/api/mod1', component_type='router'))
-        # Simular conflicte: afegir la ruta manualment al _route_conflicts
-        # i tornar a registrar el mateix path
+        # Simulate conflict: add route manually to _route_conflicts
+        # and register the same path again
         router2 = APIRouter()
 
         @router2.get('/hello')
         def hello2():
             return {}
 
-        # El path /api/mod1/hello ja existeix → conflicte → s'omet
+        # Route /api/mod1/hello already registered → conflict → skipped
         routes2 = self.rm.register_module_routes(RouteRegistration(module_name='mod1', api_component=router2, prefix='/api/mod1', component_type='router'))
-        # La ruta ja estava registrada → 0 noves
+        # Route already registered → 0 new routes
         assert len(routes2) == 0
 
     def test_register_app_routes(self):
@@ -146,10 +146,10 @@ class TestRouteManager:
             return {}
 
         routes = self.rm.register_module_routes(RouteRegistration(module_name='mod2', api_component=sub_app, prefix='/app/mod2', component_type='app'))
-        assert len(routes) >= 0  # pot ser 0 si l'app no té APIRoute directes
+        assert len(routes) >= 0  # may be 0 if the app has no direct APIRoute instances
 
     def test_register_endpoints_returns_empty(self):
-        # _register_endpoint_routes retorna llista buida (no implementat)
+        # _register_endpoint_routes returns empty list (not implemented)
         routes = self.rm.register_module_routes(RouteRegistration(module_name='mod3', api_component=[], prefix='/api/mod3', component_type='endpoints'))
         assert routes == []
 
@@ -170,7 +170,7 @@ class TestRouteManager:
 
         self.rm.register_module_routes(RouteRegistration(module_name='mod5', api_component=router, prefix='/api/mod5', component_type='router'))
         count = self.rm.remove_module_routes('mod5')
-        assert count >= 0  # pot ser 0 si no hi havia conflictes registrats
+        assert count >= 0  # may be 0 if no conflicts were registered
         assert 'mod5' not in self.rm._module_routes
 
     def test_get_all_registered_routes(self):
