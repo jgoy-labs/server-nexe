@@ -31,9 +31,9 @@ _CORE_MODULES: Set[str] = {
 
 def get_core_modules() -> Set[str]:
   """
-  Retorna el conjunt de noms de mòduls que es consideren interns del projecte.
+  Return the set of module names considered internal to the project.
 
   Returns:
-    Set amb els noms dels mòduls que es carreguen per defecte.
+    Set with the names of the modules loaded by default.
   """
   return set(_CORE_MODULES)

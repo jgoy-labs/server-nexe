@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: personality/data/models.py
-Description: Data models compartits de Nexe Core. Defineix Enums (ModuleState, SystemStatus,
+Description: Shared data models for Nexe Core. Defines Enums (ModuleState, SystemStatus,
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

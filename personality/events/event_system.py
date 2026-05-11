@@ -58,26 +58,26 @@ class EventSystem:
 
   def emit_event_sync(self, event: SystemEvent) -> None:
     """
-    Wrapper síncron per emit_event().
+    Synchronous wrapper for emit_event().
 
-    Permet emetre events des de contextos síncrons creant un event loop temporal.
+    Emits events from synchronous contexts by creating a temporary event loop.
 
     Args:
-      event: SystemEvent a emetre
+      event: SystemEvent to emit
 
     Raises:
-      RuntimeError: Si es crida des d'un event loop ja actiu
+      RuntimeError: If called from an already active event loop
 
     Notes:
-      - Usa asyncio.run() per crear un event loop temporal
-      - Si ja estàs dins d'un event loop, usar 'await emit_event()' directament
+      - Uses asyncio.run() to create a temporary event loop
+      - If already inside an event loop, use 'await emit_event()' directly
 
-    **LIMITACIÓ IMPORTANT:**
-      Si es crida des d'un context amb event loop actiu, l'event s'afegeix
-      a l'historial però NO s'emet als callbacks (per evitar errors de loop).
-      En aquests casos, usar 'await emit_event()' per emetre correctament.
+    **IMPORTANT LIMITATION:**
+      If called from a context with an active event loop, the event is added
+      to the history but NOT emitted to callbacks (to avoid loop errors).
+      In those cases, use 'await emit_event()' to emit correctly.
 
-    **Exemple d'ús correcte:**
+    **Correct usage example:**
       ```python
       event_system.emit_event_sync(event)
 

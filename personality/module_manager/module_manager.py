@@ -135,7 +135,7 @@ class ModuleManager(PluginLoaderMixin):
 
   def _find_initial_config(self, config_path: Optional[Path]) -> Path:
     """
-    Cerca inicial de configuració amb validació de seguretat.
+    Initial configuration search with security validation.
     """
     if config_path:
       config_path = Path(config_path)
