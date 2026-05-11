@@ -1,5 +1,5 @@
 """
-Tests per core/bootstrap_tokens.py — BootstrapTokenManager
+Tests for core/bootstrap_tokens.py — BootstrapTokenManager
 """
 import pytest
 import time
@@ -164,7 +164,7 @@ class TestBootstrapRateLimit:
         # Use a very small window_seconds to simulate expiry
         for _ in range(3):
             self.manager.check_bootstrap_rate_limit(ip, window_seconds=0)
-        # Amb window=0, tots els intents expiren immediatament
+        # With window=0, all attempts expire immediately
         result = self.manager.check_bootstrap_rate_limit(ip, window_seconds=0)
         assert result == "ok"
 

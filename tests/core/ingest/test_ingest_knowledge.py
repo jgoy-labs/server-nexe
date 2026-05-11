@@ -186,7 +186,7 @@ class TestIngestKnowledge:
         assert result is False
 
     def test_ingests_txt_file(self, tmp_path):
-        """Ingereix un fitxer .txt."""
+        """Ingests a .txt file."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"
@@ -208,7 +208,7 @@ class TestIngestKnowledge:
         assert mock_memory.store.call_count >= 1
 
     def test_ingests_md_file(self, tmp_path):
-        """Ingereix un fitxer .md."""
+        """Ingests a .md file."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"
@@ -259,7 +259,7 @@ class TestIngestKnowledge:
         mock_memory.create_collection.assert_not_called()
 
     def test_quiet_mode_suppresses_output(self, tmp_path):
-        """quiet=True → no s'imprimeix res."""
+        """quiet=True → nothing is printed."""
         from core.ingest.ingest_knowledge import ingest_knowledge
 
         knowledge_path = tmp_path / "knowledge"

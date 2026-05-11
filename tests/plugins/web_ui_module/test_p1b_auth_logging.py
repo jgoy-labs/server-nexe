@@ -46,7 +46,7 @@ class TestP1BAuthLogging:
                 assert "1.2.3.4" in all_args
 
     async def test_no_key_logs_auth_failure(self):
-        """Sense key (None header) → log_auth_failure() es crida."""
+        """Without key (None header) → log_auth_failure() is called."""
         require = make_require_ui_auth()
         mock_sec_logger = MagicMock()
         with patch("plugins.web_ui_module.api.routes_auth.get_admin_api_key", return_value="real_key"):

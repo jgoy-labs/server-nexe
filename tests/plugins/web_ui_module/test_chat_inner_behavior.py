@@ -214,7 +214,7 @@ class TestValidacioInput:
         assert result is not None
 
     async def test_imatge_base64_invalida_retorna_400(self):
-        """Base64 il·legal → HTTPException 400."""
+        """Illegal base64 → HTTPException 400."""
         h = _Harness()
         with pytest.raises(HTTPException) as exc:
             await h.call({
@@ -236,7 +236,7 @@ class TestValidacioInput:
         assert exc.value.status_code == 400
 
     async def test_imatge_massa_gran_retorna_400(self):
-        """Imatge > 10 MB → HTTPException 400."""
+        """Image > 10 MB → HTTPException 400."""
         h = _Harness()
         with pytest.raises(HTTPException) as exc:
             await h.call({
@@ -429,7 +429,7 @@ class TestChatLLM:
         assert result["intent"] == "chat"
 
     async def test_chat_streaming_retorna_streaming_response(self):
-        """intent='chat', stream=True → retorna StreamingResponse."""
+        """intent='chat', stream=True → returns StreamingResponse."""
         engine = _MockOllamaEngine()
         h = _Harness(intent="chat")
         state = _make_server_state(engine=engine)
@@ -489,7 +489,7 @@ class TestRetornFinal:
         assert result["memory_action"] == "list"
 
     async def test_memory_intent_stream_retorna_streaming_response(self):
-        """Memory intent amb stream=True → StreamingResponse (chars de response_text)."""
+        """Memory intent with stream=True → StreamingResponse (chars from response_text)."""
         h = _Harness(intent="save", mem_content="test")
         result = await h.call({"message": "Recorda test", "stream": True})
         assert isinstance(result, StreamingResponse)

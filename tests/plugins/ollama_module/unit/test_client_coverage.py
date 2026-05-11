@@ -30,7 +30,7 @@ class TestReapProcess:
 
 
 class TestModuleShutdownReapsProcess:
-    """Test que OllamaModule.shutdown() crida reap_process."""
+    """Test that OllamaModule.shutdown() calls reap_process."""
 
     @pytest.mark.asyncio
     async def test_shutdown_calls_reap_process(self):

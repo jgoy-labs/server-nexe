@@ -1,5 +1,5 @@
 """
-Tests per core/utils.py
+Tests for core/utils.py
 """
 import pytest
 from core.utils import compute_system_hash

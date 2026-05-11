@@ -141,7 +141,7 @@ class TestB5GetHealthHashattrGuard:
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# B6 — stop_module STOPPING leak (state no passa a ERROR)
+# B6 — stop_module STOPPING leak (state does not transition to ERROR)
 # ────────────────────────────────────────────────────────────────────────────
 
 class TestB6StopModuleStateErrorLeak:

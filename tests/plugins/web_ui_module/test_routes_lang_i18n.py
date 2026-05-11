@@ -45,7 +45,7 @@ def _make_set_language_fn(i18n_mock=None):
 @pytest.mark.asyncio
 class TestSetLanguageI18nPropagation:
     async def test_post_lang_calls_i18n_set_language(self):
-        """SC08 happy path: POST /lang ca → crida i18n.set_language('ca')."""
+        """SC08 happy path: POST /lang ca → calls i18n.set_language('ca')."""
         i18n_mock = _make_i18n_mock()
 
         fn = _make_set_language_fn(i18n_mock)

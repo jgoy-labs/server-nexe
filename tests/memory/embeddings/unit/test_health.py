@@ -1,5 +1,5 @@
 """
-Tests per memory/embeddings/health.py
+Tests for memory/embeddings/health.py
 Covers uncovered lines: 44-45, 75, 111-123, 132-139, 169-170, 183-194,
 226-236, 250-251, 293-296, 322-329.
 """

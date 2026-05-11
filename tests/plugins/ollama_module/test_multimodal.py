@@ -137,7 +137,7 @@ async def test_chat_images_reach_payload():
     assert user_msgs[-1]["images"] == [img_b64]
 
 
-# ── OllamaModule.chat — signatura ─────────────────────────────────────────────
+# ── OllamaModule.chat — signature ─────────────────────────────────────────────
 
 def test_module_chat_accepts_images_param():
     """OllamaModule.chat() accepts the images parameter without error."""

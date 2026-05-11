@@ -1,5 +1,5 @@
 """
-Tests per core/config.py
+Tests for core/config.py
 """
 import os
 import pytest
@@ -44,9 +44,9 @@ class TestFindConfigPath:
         assert result is not None
 
     def test_uses_cwd_when_no_root(self):
-        # Sense project_root → usa cwd (pot ser None)
+        # Without project_root → uses cwd (may be None)
         result = find_config_path(None)
-        # No llencem excepcions, el resultat pot ser None o un Path
+        # No exceptions thrown, the result may be None or a Path
         assert result is None or isinstance(result, Path)
 
 
@@ -75,7 +75,7 @@ class TestLoadConfig:
         config_file = tmp_path / "server.toml"
         config_file.write_text("INVALID TOML CONTENT !!!{}")
         config = load_config(project_root=tmp_path)
-        assert "core" in config  # fallback als defaults
+        assert "core" in config  # fallback to defaults
 
     def test_with_direct_config_path(self, tmp_path):
         config_file = tmp_path / "custom.toml"

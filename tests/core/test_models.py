@@ -1,5 +1,5 @@
 """
-Tests per core/models.py - tots els models Pydantic
+Tests for core/models.py - all Pydantic models
 """
 import pytest
 from core.models import (
