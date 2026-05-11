@@ -12,10 +12,10 @@ www.jgoy.net · https://server-nexe.org
 import asyncio
 import time
 from datetime import datetime, timezone
-from typing import Dict
 
 from personality.data.models import ModuleState, SystemEvent
 from .messages import get_message
+from .types import LifecycleConfig
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
@@ -23,24 +23,19 @@ logger = get_logger(__name__)
 class ModuleLifecycleManager:
   """Manages the lifecycle of individual modules."""
 
-  def __init__(self, modules: Dict, loader, registry, events, metrics, i18n=None):
+  def __init__(self, config: LifecycleConfig) -> None:
     """
     Inicialitza gestor de cicle de vida.
 
     Args:
-      modules: Diccionari de mòduls
-      loader: ModuleLoader
-      registry: ModuleRegistry
-      events: EventSystem
-      metrics: MetricsCollector
-      i18n: Gestor i18n opcional
+      config: LifecycleConfig amb modules, loader, registry, events, metrics i i18n opcionals
     """
-    self.modules = modules
-    self.loader = loader
-    self.registry = registry
-    self.events = events
-    self.metrics = metrics
-    self.i18n = i18n
+    self.modules = config.modules
+    self.loader = config.loader
+    self.registry = config.registry
+    self.events = config.events
+    self.metrics = config.metrics
+    self.i18n = config.i18n
     self.api_integrator = None
     self.__async_lock = None
     self.__async_lock_loop_id = None
@@ -72,8 +67,11 @@ class ModuleLifecycleManager:
         return False
     return True
 
-  async def _finalize_load_success(self, module_name: str, module_info, instance, load_duration: int) -> None:
+  async def _finalize_load_success(self, module_name: str, instance, load_duration: int) -> None:
     async with self._async_lock:
+      module_info = self.modules.get(module_name)
+      if module_info is None:
+        return  # module removed between load and finalize — nothing to finalize
       module_info.instance = instance
       module_info.load_time = datetime.now(timezone.utc)
       module_info.state = ModuleState.LOADED
@@ -155,7 +153,7 @@ class ModuleLifecycleManager:
       instance = await self.loader.load_module(module_info)
       load_duration = int((time.time() - start_time) * 1000)
 
-      await self._finalize_load_success(module_name, module_info, instance, load_duration)
+      await self._finalize_load_success(module_name, instance, load_duration)
       return True
 
     except Exception as e:

@@ -11,6 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 from personality.data.models import ModuleState
 from .messages import get_message
+from .types import SystemLifecycleConfig
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
@@ -18,23 +19,19 @@ logger = get_logger(__name__)
 class SystemLifecycleManager:
   """Gestiona cicle de vida del sistema complet"""
 
-  def __init__(self, modules, module_lifecycle, discovery_func, list_modules_func,
-         i18n=None):
+  def __init__(self, config: SystemLifecycleConfig) -> None:
     """
     Inicialitza gestor de cicle de vida del sistema.
 
     Args:
-      modules: Diccionari de mòduls
-      module_lifecycle: ModuleLifecycleManager
-      discovery_func: Funció per descobrir mòduls
-      list_modules_func: Funció per llistar mòduls
-      i18n: Gestor i18n opcional
+      config: SystemLifecycleConfig amb modules, module_lifecycle, discovery_func,
+              list_modules_func i i18n opcionals
     """
-    self.modules = modules
-    self.module_lifecycle = module_lifecycle
-    self.discovery_func = discovery_func
-    self.list_modules_func = list_modules_func
-    self.i18n = i18n
+    self.modules = config.modules
+    self.module_lifecycle = config.module_lifecycle
+    self.discovery_func = config.discovery_func
+    self.list_modules_func = config.list_modules_func
+    self.i18n = config.i18n
     self._running = False
 
   async def start_system(self) -> bool:

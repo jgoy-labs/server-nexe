@@ -18,6 +18,7 @@ from ..data.models import ModuleInfo
 from .route_manager import RouteManager
 from .openapi_merger import OpenAPIMerger
 from .messages import get_message
+from .types import RouteRegistration
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
@@ -80,10 +81,13 @@ class APIIntegrator:
           module_name, api_components, api_prefix
         )
 
-        self._save_integration_info(
-          module_name, module_instance, api_components,
-          api_prefix, registered_routes
-        )
+        self._save_integration_info(module_name, {
+          'instance': module_instance,
+          'api_components': api_components,
+          'api_prefix': api_prefix,
+          'registered_routes': registered_routes,
+          'route_count': len(registered_routes),
+        })
 
         msg = get_message(
           self.i18n,
@@ -119,26 +123,20 @@ class APIIntegrator:
     """Registra rutes de tots els components d'API."""
     registered_routes = []
     for component_type, component in api_components.items():
-      routes = self.route_manager.register_module_routes(
-        module_name, component, api_prefix, component_type
-      )
+      routes = self.route_manager.register_module_routes(RouteRegistration(
+        module_name=module_name,
+        api_component=component,
+        prefix=api_prefix,
+        component_type=component_type,
+      ))
       registered_routes.extend(routes)
 
     return registered_routes
 
-  def _save_integration_info(self, module_name: str, module_instance: Any,
-               api_components: Dict[str, Any], api_prefix: str,
-               registered_routes: List[Dict[str, Any]]) -> None:
+  def _save_integration_info(self, module_name: str, info: Dict[str, Any]) -> None:
     """Save integration info and update statistics."""
-    self._integrated_modules[module_name] = {
-      'instance': module_instance,
-      'api_components': api_components,
-      'api_prefix': api_prefix,
-      'registered_routes': registered_routes,
-      'route_count': len(registered_routes)
-    }
-
-    self._total_routes_registered += len(registered_routes)
+    self._integrated_modules[module_name] = info
+    self._total_routes_registered += info['route_count']
     self._total_modules_integrated += 1
 
   def _handle_integration_error(self, module_name: str, error: Exception) -> bool:

@@ -200,6 +200,20 @@ class MetricsCollector:
       "max_cpu_percent": max(m.cpu_usage for m in running) if running else 0,
     }
 
+  @staticmethod
+  def _error_rate(running: list) -> float:
+    """Percentage of running modules that have encountered at least one error."""
+    if not running:
+      return 0.0
+    return len([m for m in running if m.error_count > 0]) / len(running) * 100
+
+  @staticmethod
+  def _avg_api_calls(running: list) -> float:
+    """Average number of API calls across running modules."""
+    if not running:
+      return 0.0
+    return sum(m.api_calls for m in running) / len(running)
+
   def get_performance_summary(self, modules: Dict[str, ModuleInfo]) -> Dict[str, Any]:
     """Get performance summary for all modules."""
     running = [m for m in modules.values() if m.state == ModuleState.RUNNING]
@@ -211,8 +225,8 @@ class MetricsCollector:
       "load_performance": self._timing_stats([m.load_duration_ms for m in running if m.load_duration_ms]),
       "start_performance": self._timing_stats([m.start_duration_ms for m in running if m.start_duration_ms]),
       "resource_usage": self._resource_stats(running),
-      "error_rate": len([m for m in running if m.error_count > 0]) / len(running) * 100,
-      "avg_api_calls": sum(m.api_calls for m in running) / len(running),
+      "error_rate": self._error_rate(running),
+      "avg_api_calls": self._avg_api_calls(running),
     }
   
   def clear_metrics_history(self) -> int:
