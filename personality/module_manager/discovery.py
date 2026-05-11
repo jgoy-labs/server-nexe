@@ -18,6 +18,7 @@ from personality.data.models import (
 )
 
 from .messages import get_message
+from .types import DiscoveryConfig
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
@@ -33,26 +34,17 @@ class ModuleDiscovery:
   - Emissió d'events de descobriment
   """
 
-  def __init__(
-    self,
-    path_discovery,
-    config_manager,
-    events,
-    i18n
-  ) -> None:
+  def __init__(self, config: DiscoveryConfig) -> None:
     """
     Inicialitza el component de descobriment.
 
     Args:
-      path_discovery: Component PathDiscovery
-      config_manager: Component ConfigManager
-      events: EventSystem
-      i18n: I18nManager
+      config: DiscoveryConfig amb path_discovery, config_manager, events i i18n
     """
-    self.path_discovery = path_discovery
-    self.config_manager = config_manager
-    self.events = events
-    self.i18n = i18n
+    self.path_discovery = config.path_discovery
+    self.config_manager = config.config_manager
+    self.events = config.events
+    self.i18n = config.i18n
     # Bug 20 fix — guardem els cicles detectats perque siguin
     # consultables des de fora (startup summary, status endpoints,
     # tests). Sense aixo els modules s'inhabilitaven en silenci.

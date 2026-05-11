@@ -15,6 +15,7 @@ from fastapi import FastAPI, APIRouter
 from fastapi.routing import APIRoute
 
 from .messages import get_message
+from .types import RouteRegistration
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
@@ -45,58 +46,54 @@ class RouteManager:
     self._route_conflicts: Dict[str, str] = {}
     self._lock = threading.RLock()
   
-  def register_module_routes(self, module_name: str, api_component: Any, 
-               prefix: str, component_type: str) -> List[Dict[str, Any]]:
+  def register_module_routes(self, reg: RouteRegistration) -> List[Dict[str, Any]]:
     """
     Registra les rutes d'un component d'API.
-    
+
     Args:
-      module_name: Nom del mòdul
-      api_component: Component d'API (router, app, etc.)
-      prefix: Prefix per les rutes
-      component_type: Tipus de component ('router', 'app', 'endpoints')
-      
+      reg: RouteRegistration amb module_name, api_component, prefix i component_type
+
     Returns:
       Llista de rutes registrades
     """
     with self._lock:
       registered_routes: List[Dict[str, Any]] = []
-      
+
       try:
-        if component_type == 'router' and isinstance(api_component, APIRouter):
+        if reg.component_type == 'router' and isinstance(reg.api_component, APIRouter):
           registered_routes = self._register_router_routes(
-            module_name, api_component, prefix
+            reg.module_name, reg.api_component, reg.prefix
           )
-        elif component_type == 'app' and isinstance(api_component, FastAPI):
+        elif reg.component_type == 'app' and isinstance(reg.api_component, FastAPI):
           registered_routes = self._register_app_routes(
-            module_name, api_component, prefix
+            reg.module_name, reg.api_component, reg.prefix
           )
-        elif component_type == 'endpoints':
+        elif reg.component_type == 'endpoints':
           registered_routes = self._register_endpoint_routes(
-            module_name, api_component, prefix
+            reg.module_name, reg.api_component, reg.prefix
           )
-        
-        if module_name not in self._module_routes:
-          self._module_routes[module_name] = []
-        self._module_routes[module_name].extend(registered_routes)
+
+        if reg.module_name not in self._module_routes:
+          self._module_routes[reg.module_name] = []
+        self._module_routes[reg.module_name].extend(registered_routes)
 
         msg = get_message(
           self.i18n,
           'route_manager.debug.routes_registered',
           count=len(registered_routes),
-          module=module_name
+          module=reg.module_name
         )
         logger.debug(msg, component="route_manager")
-        
+
       except Exception as e:
         msg = get_message(
           self.i18n,
           'route_manager.errors.failed_to_register',
-          module=module_name,
+          module=reg.module_name,
           error=str(e)
         )
         logger.error(msg, component="route_manager", exc_info=True)
-      
+
       return registered_routes
   
   def _register_router_routes(self, module_name: str, router: APIRouter, 

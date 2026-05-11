@@ -284,35 +284,37 @@ class ConfigValidator:
       errors.extend(self._validate_storage_limits(storage['storage']))
     return errors
   
+  def _check_single_path(self, config: dict, path_desc: str, path_parts: list) -> Optional[str]:
+    """Resolve a single nested config path and return a warning string if it does not exist."""
+    section: Any = config
+    for part in path_parts:
+      if isinstance(section, dict) and part in section:
+        section = section[part]
+      else:
+        return None
+
+    if not (section and isinstance(section, str)):
+      return None
+
+    path = Path(section)
+    check_path = path.parent if (path_desc.endswith('.db') or path_desc.endswith('_file')) else path
+    if not check_path.exists():
+      return f"Path does not exist: {section} (from {path_desc})"
+    return None
+
   def _validate_paths(self, config: Dict[str, Any]) -> List[str]:
     """Validate that specified paths exist"""
-    warnings: list[str] = []
-    
     paths_to_check = [
-      ('personality.orchestrator.modules_path', 'personality', 'orchestrator', 'modules_path'),
-      ('storage.paths.logs_dir', 'storage', 'paths', 'logs_dir'),
-      ('storage.database.sessions_db', 'storage', 'database', 'sessions_db'),
+      ('personality.orchestrator.modules_path', ['personality', 'orchestrator', 'modules_path']),
+      ('storage.paths.logs_dir', ['storage', 'paths', 'logs_dir']),
+      ('storage.database.sessions_db', ['storage', 'database', 'sessions_db']),
     ]
-    
-    for path_desc, *path_parts in paths_to_check:
-      section: Any = config
-      for part in path_parts:
-        if isinstance(section, dict) and part in section:
-          section = section[part]
-        else:
-          section = None
-          break
-      
-      if section and isinstance(section, str):
-        path = Path(section)
-        if path_desc.endswith('.db') or path_desc.endswith('_file'):
-          check_path = path.parent
-        else:
-          check_path = path
-        
-        if not check_path.exists():
-          warnings.append(f"Path does not exist: {section} (from {path_desc})")
-    
+
+    warnings: list[str] = []
+    for path_desc, path_parts in paths_to_check:
+      warning = self._check_single_path(config, path_desc, path_parts)
+      if warning:
+        warnings.append(warning)
     return warnings
   
   def _is_valid_url(self, url: str) -> bool:
