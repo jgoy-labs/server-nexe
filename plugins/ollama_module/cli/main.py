@@ -1,7 +1,7 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: plugins/ollama_module/cli.py
 Description: CLI for the Ollama module - Allows managing local LLM models and
 
@@ -44,6 +44,7 @@ def _run_async(coro):
 @app.command()
 def status():
   """Show Ollama connection status."""
+  assert console is not None
   ollama = OllamaModule()
 
   console.print("\n[bold cyan]Ollama Status[/bold cyan]")
@@ -68,6 +69,7 @@ def status():
 @app.command()
 def models():
   """Lists available models locally"""
+  assert console is not None
   ollama = OllamaModule()
 
   with console.status("[bold green]Retrieving models..."):
@@ -106,9 +108,10 @@ def pull(
   model: str = typer.Argument(..., help="Model name to download (e.g.: mistral, llama3.2)")
 ):
   """Download a model from Ollama"""
+  assert console is not None
   ollama = OllamaModule()
 
-  console.print(f"\n[bold cyan]Downloading model: {model}[/bold cyan]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+  console.print(f"\n[bold cyan]Downloading model: {model}[/bold cyan]")
 
   async def do_pull():
     last_status = ""
@@ -133,9 +136,9 @@ def pull(
 
   try:
     _run_async(do_pull())
-    console.print(f"[green]Model {model} downloaded successfully![/green]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+    console.print(f"[green]Model {model} downloaded successfully![/green]")
   except Exception as e:
-    console.print(f"[red]Error: {e}[/red]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+    console.print(f"[red]Error: {e}[/red]")
     raise typer.Exit(1)
 
 @app.command()
@@ -143,33 +146,34 @@ def info(
   model: str = typer.Argument(..., help="Model name")
 ):
   """Show detailed information about a model."""
+  assert console is not None
   ollama = OllamaModule()
 
-  with console.status(f"[bold green]Getting info for {model}..."):  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+  with console.status(f"[bold green]Getting info for {model}..."):
     try:
       model_info = _run_async(ollama.get_model_info(model))
     except Exception as e:
-      console.print(f"[red]Error: {e}[/red]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+      console.print(f"[red]Error: {e}[/red]")
       raise typer.Exit(1)
 
-  console.print(Panel(f"[bold cyan]{model}[/bold cyan]", title="Model Info"))  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+  console.print(Panel(f"[bold cyan]{model}[/bold cyan]", title="Model Info"))
 
   if "parameters" in model_info:
-    console.print("\n[bold]Parameters:[/bold]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
-    console.print(model_info["parameters"][:500] + "..." if len(model_info.get("parameters", "")) > 500 else model_info.get("parameters", "N/A"))  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+    console.print("\n[bold]Parameters:[/bold]")
+    console.print(model_info["parameters"][:500] + "..." if len(model_info.get("parameters", "")) > 500 else model_info.get("parameters", "N/A"))
 
   if "template" in model_info:
-    console.print("\n[bold]Template:[/bold]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+    console.print("\n[bold]Template:[/bold]")
     template = model_info["template"]
     if len(template) > 300:
       template = template[:300] + "..."
-    console.print(f"[dim]{template}[/dim]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+    console.print(f"[dim]{template}[/dim]")
 
   details = model_info.get("details", {})
   if details:
-    console.print("\n[bold]Details:[/bold]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+    console.print("\n[bold]Details:[/bold]")
     for key, value in details.items():
-      console.print(f" {key}: {value}")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+      console.print(f" {key}: {value}")
 
 @app.command()
 def delete(
@@ -177,20 +181,21 @@ def delete(
   force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation")
 ):
   """Delete a local model"""
+  assert console is not None
   ollama = OllamaModule()
 
   if not force:
     confirm = typer.confirm(f"Are you sure you want to delete model '{model}'?")
     if not confirm:
-      console.print("[yellow]Operation cancelled[/yellow]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+      console.print("[yellow]Operation cancelled[/yellow]")
       raise typer.Exit(0)
 
-  with console.status(f"[bold red]Deleting {model}..."):  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+  with console.status(f"[bold red]Deleting {model}..."):
     try:
       _run_async(ollama.delete_model(model))
-      console.print(f"[green]Model {model} deleted successfully[/green]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+      console.print(f"[green]Model {model} deleted successfully[/green]")
     except Exception as e:
-      console.print(f"[red]Error: {e}[/red]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+      console.print(f"[red]Error: {e}[/red]")
       raise typer.Exit(1)
 
 @app.command()
@@ -199,15 +204,16 @@ def chat(
   system: Optional[str] = typer.Option(None, "--system", "-s", help="Initial system message")
 ):
   """Start an interactive chat with an LLM model"""
+  assert console is not None
   ollama = OllamaModule()
 
-  with console.status("[bold green]Connecting to Ollama..."):  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+  with console.status("[bold green]Connecting to Ollama..."):
     if not _run_async(ollama.check_connection()):
-      console.print("[red]Error: Ollama is not available[/red]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
-      console.print("[yellow]Start Ollama with: ollama serve[/yellow]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+      console.print("[red]Error: Ollama is not available[/red]")
+      console.print("[yellow]Start Ollama with: ollama serve[/yellow]")
       raise typer.Exit(1)
 
-  console.print(Panel(  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+  console.print(Panel(
     f"[bold cyan]Chat with {model}[/bold cyan]\n"
     "[dim]Type 'exit' or 'quit' to leave\n"
     "Type 'clear' to reset history[/dim]",
@@ -218,29 +224,29 @@ def chat(
 
   if system:
     messages.append({"role": "system", "content": system})
-    console.print(f"[dim]System: {system}[/dim]\n")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+    console.print(f"[dim]System: {system}[/dim]\n")
 
   while True:
     try:
-      user_input = console.input("[bold green]You:[/bold green] ")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+      user_input = console.input("[bold green]You:[/bold green] ")
 
       if not user_input.strip():
         continue
 
       if user_input.lower() in ("exit", "quit", "q"):
-        console.print("[dim]Goodbye![/dim]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+        console.print("[dim]Goodbye![/dim]")
         break
 
       if user_input.lower() == "clear":
         messages = []
         if system:
           messages.append({"role": "system", "content": system})
-        console.print("[dim]History cleared[/dim]\n")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+        console.print("[dim]History cleared[/dim]\n")
         continue
 
       messages.append({"role": "user", "content": user_input})
 
-      console.print(f"[bold cyan]{model}:[/bold cyan] ", end="")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+      console.print(f"[bold cyan]{model}:[/bold cyan] ", end="")
 
       full_response = ""
 
@@ -259,10 +265,10 @@ def chat(
       print()
 
     except KeyboardInterrupt:
-      console.print("\n[dim]Interrupted. Goodbye![/dim]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+      console.print("\n[dim]Interrupted. Goodbye![/dim]")
       break
     except Exception as e:
-      console.print(f"\n[red]Error: {e}[/red]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+      console.print(f"\n[red]Error: {e}[/red]")
 
 @app.command()
 def ask(
@@ -271,11 +277,12 @@ def ask(
   system: Optional[str] = typer.Option(None, "--system", "-s", help="System message")
 ):
   """Ask the model a quick one-shot question (no interactive chat)."""
+  assert console is not None
   ollama = OllamaModule()
 
-  with console.status("[bold green]Connecting..."):  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+  with console.status("[bold green]Connecting..."):
     if not _run_async(ollama.check_connection()):
-      console.print("[red]Error: Ollama is not available[/red]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+      console.print("[red]Error: Ollama is not available[/red]")
       raise typer.Exit(1)
 
   messages = []
@@ -283,8 +290,8 @@ def ask(
     messages.append({"role": "system", "content": system})
   messages.append({"role": "user", "content": prompt})
 
-  console.print(f"\n[bold green]Question:[/bold green] {prompt}")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
-  console.print(f"\n[bold cyan]Answer ({model}):[/bold cyan]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+  console.print(f"\n[bold green]Question:[/bold green] {prompt}")
+  console.print(f"\n[bold cyan]Answer ({model}):[/bold cyan]")
 
   async def get_response():
     async for chunk in ollama.chat(model, messages, stream=True):
@@ -296,7 +303,7 @@ def ask(
     _run_async(get_response())
     print("\n")
   except Exception as e:
-    console.print(f"\n[red]Error: {e}[/red]")  # type: ignore[union-attr]  # invariant: RICH_AVAILABLE=False crashes @app.command() at import-time, never reaches console.X
+    console.print(f"\n[red]Error: {e}[/red]")
     raise typer.Exit(1)
 
 def main():
