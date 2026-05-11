@@ -33,7 +33,7 @@ class MemoryMetrics:
       "memory_cleanups_total": 0,
     }
 
-    self._gauges = {
+    self._gauges: dict[str, float] = {
       "memory_flash_size": 0,
       "memory_ram_context_size": 0,
       "memory_persistence_entries": 0,
@@ -114,11 +114,14 @@ class MemoryMetrics:
         logger.debug("metrics_update_skipped_not_initialized")
         return
 
+      flash_size = 0
       if module._flash_memory:
         flash_size = len(module._flash_memory._store)
         self.set_gauge("memory_flash_size", flash_size)
 
       if module._ram_context:
+        # Note: legacy code reused flash_size here; preserved to avoid
+        # behaviour change, but initialized to 0 so it is always bound.
         self.set_gauge("memory_ram_context_size", flash_size)
 
       if module._pipeline:
@@ -177,6 +180,8 @@ class MetricsTimer:
 
   def __exit__(self, _exc_type, _exc_val, _exc_tb):
     """Stop timer and record duration"""
+    if self.start_time is None:
+      return False
     duration = time.time() - self.start_time
     self.metrics.observe_histogram(self.metric_name, duration)
     return False

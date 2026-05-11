@@ -74,7 +74,7 @@ class MemoryCLI:
         ttl_seconds=args.ttl
       )
 
-      if not self.module._pipeline:
+      if self.module is None or self.module._pipeline is None:
         logger.error("Pipeline not initialized")
         return 1
 
@@ -105,7 +105,7 @@ class MemoryCLI:
       0 if success, 1 if error
     """
     try:
-      if not self.module._ram_context:
+      if self.module is None or self.module._ram_context is None:
         logger.error("RAMContext not initialized")
         return 1
 
@@ -170,7 +170,7 @@ class MemoryCLI:
         return 0
 
       # Fallback to legacy RAMContext
-      if not self.module._ram_context:
+      if self.module is None or self.module._ram_context is None:
         logger.error("RAMContext not initialized")
         return 1
       stats = await self.module._ram_context.get_stats()
@@ -191,7 +191,7 @@ class MemoryCLI:
       0 if success, 1 if error
     """
     try:
-      if not self.module._flash_memory:
+      if self.module is None or self.module._flash_memory is None:
         logger.error("FlashMemory not initialized")
         return 1
 

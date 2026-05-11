@@ -19,15 +19,18 @@ import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..models.memory_entry import MemoryEntry
 
 logger = logging.getLogger(__name__)
 
 # SQLCipher: try to import, fall back to plain sqlite3
+# Type as Any so calls remain valid in both branches; runtime guards on
+# SQLCIPHER_AVAILABLE protect against accessing methods on None.
+sqlcipher: Any
 try:
-    from sqlcipher3 import dbapi2 as sqlcipher
+    from sqlcipher3 import dbapi2 as sqlcipher  # pyright: ignore[reportMissingImports]
     SQLCIPHER_AVAILABLE = True
 except ImportError:
     sqlcipher = None
@@ -45,9 +48,12 @@ class SqliteStorageMixin:
         executor: ThreadPoolExecutor — for sync operations
     """
 
-    # Mixin contract: PersistenceManager.__init__ assigns executor; we declare
-    # it only to type mixin accesses (no value: the consumer sets it).
+    # Mixin contract: PersistenceManager.__init__ assigns these; we declare them
+    # only to type mixin accesses (no value: the consumer sets them).
     executor: ThreadPoolExecutor
+    db_path: Path
+    _crypto: Any  # cryptography provider or None
+    _encrypted: bool
 
     # ── Check helpers ────────────────────────────────────────────────────────
 
