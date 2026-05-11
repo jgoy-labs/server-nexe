@@ -299,7 +299,7 @@ def run_streaming_generation(
 
         # SAVE CACHE POST-PREFILL (before the rest times out!)
         cache_manager.insert_cache(model_key, cache_lookup_tokens, cached_kv)
-        logger.info(
+        logger.info(  # nosemgrep: python-logger-credential-disclosure
             "MLXChatNode: cache saved post-prefill (%d tokens, key=%s)",
             len(cache_lookup_tokens), model_key[:30]
         )

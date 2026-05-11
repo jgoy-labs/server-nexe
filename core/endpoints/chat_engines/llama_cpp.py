@@ -165,7 +165,7 @@ async def _llama_cpp_stream_generator(
                 token
             )
         except Exception as e:
-            logger.warning("Llama.cpp stream token enqueue failed (queue full/closed): %s", e)
+            logger.warning("Llama.cpp stream token enqueue failed (queue full/closed): %s", e)  # nosemgrep: python-logger-credential-disclosure
 
     async def run_llama():
         """Run Llama.cpp in the background with stream_callback."""

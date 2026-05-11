@@ -452,7 +452,7 @@ def _run_embeddings_step(project_root, python_path):
         except Exception:  # nosec B110: best-effort server.toml read; on failure keep default embedding model literal
             pass
         emb_env = {**os.environ, "TRANSFORMERS_VERBOSITY": "error"}
-        subprocess.run([  # nosec B603: python_path absolute venv Path; -c is literal headless probe; _emb_model from server.toml
+        subprocess.run([  # nosec B603  # nosemgrep: dangerous-subprocess-use-tainted-env-args — python_path is absolute venv Path; _emb_model from server.toml
             str(python_path), "-c",
             "import sys; "
             "from fastembed import TextEmbedding; "

@@ -97,6 +97,12 @@ ignore_private = true
 ignore_magic = true
 ignore_semiprivate = true
 
+[tool.muthur.semgrep]
+# p/default is too aggressive for a mono-user local server (flags logger strings
+# as credentials, localhost http as insecure, non-literal imports as dangerous).
+# p/python keeps Python-specific security rules without generic noise.
+config = "p/python"
+
 [tool.muthur.coverage]
 # Global coverage is 86% — per-file threshold lowered to avoid FAIL on
 # thin CLI wrappers and integration-heavy modules (api_client 14%, crypto/cli 19%).
