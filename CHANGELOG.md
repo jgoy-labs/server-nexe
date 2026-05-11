@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Refactored
+
+- **`personality/` — 13 complexity findings eliminats** (lizard CCN+params+file_too_long). Refactor pur sense canvi de comportament: (A) `RouterContext` dataclass compacta `_attach_named_router`/`_attach_get_router` (6→2, 5→2 PARAM); (B) `LifecycleConfig` per `ModuleLifecycleManager.__init__` (7→2 PARAM), `_finalize_load_success` elimina param `module_info` + afegeix guard `KeyError`; (C) `SystemLifecycleConfig`/`DiscoveryConfig` per constructors `SystemLifecycleManager`/`ModuleDiscovery` (6→2, 5→2 PARAM); (D) `SecurityCheckContext` per `_check_plugin_security`, `RouteRegistration` per `register_module_routes`, `_save_integration_info` inline dict (6→3 PARAM); (E) `_error_rate`/`_avg_api_calls` extrets de `get_performance_summary` (CCN 11→5), `_check_single_path` extret de `_validate_paths` (CCN 10→4); (F) `PluginLoaderMixin` split — `module_manager.py` 687L→407L, mixin a nou `plugin_loader.py`. Nous fitxers: `personality/module_manager/types.py`, `personality/integration/types.py`, `personality/module_manager/plugin_loader.py`. 3 commits, 6113 tests, 0 regressions.
+
 ### Fixed
 
 - **`core/config.py`: deep-merge `personality/server.toml` + root `server.toml`** (Fix B9). `load_config()` ara usa pattern "default + override" en comptes de "first wins": carrega `personality/server.toml` com a BASE i deep-mergia root `server.toml` com a OVERRIDE. Prioritat: `DEFAULT < personality/server.toml < root server.toml < ENV vars`. Corregeix que un `server.toml` parcial a l'arrel silenciava completament `personality/server.toml`, deixant 9 tests 404. Tests: `tests/test_config_merge.py` (6 escenaris TDD) + `tests/test_session_manager_robustness.py` (6 casos defensius B4).
