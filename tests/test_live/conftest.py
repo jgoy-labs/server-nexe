@@ -223,7 +223,10 @@ def ollama_models(nexe_server: str) -> list[str]:  # noqa: ARG001
 @pytest.fixture(scope="session")
 def smallest_ollama_model(ollama_models: list[str]) -> str:
     """Smallest available Ollama model (for fast tests)."""
-    for preferred in ("gemma4:e4b", "gpt-oss:20b", "gemma4:31b"):
+    # gemma4:e4b is a VL model — fails MLX streaming path (needs PyTorch bundle)
+    # Prefer pure-text models for automated tests
+    for preferred in ("qwen3.5:4b", "qwen3.5:9b", "qwen3:4b", "llama3.2:3b",
+                      "mistral-nemo:12b", "gpt-oss:20b", "gemma3:4b"):
         if any(preferred in m for m in ollama_models):
             return preferred
     if ollama_models:
