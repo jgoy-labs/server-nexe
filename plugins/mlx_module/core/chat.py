@@ -113,8 +113,13 @@ def _detect_vlm_capability(model_path: str) -> bool:
     archs = set(config.get("architectures", []))
     if archs & _VLM_ARCHITECTURES:
         return True
-    if "vision_config" in config and config.get("vision_config"):
-        return True
+    # vision_config alone is not sufficient — some non-VL models (e.g. Qwen3.5 MoE)
+    # include it as a config artefact without actual vision weights. Only trust it
+    # when the architecture name also contains a VL keyword.
+    if "vision_config" in config and config.get("vision_config") and archs:
+        arch_str = " ".join(archs).lower()
+        if any(kw in arch_str for kw in ("vl", "vision", "visual", "llava", "intern", "qwen2vl", "qwen2_5_vl", "qwen3vl")):
+            return True
 
     # 3: safetensors weight map inspection (multi-shard)
     index_path = root / "model.safetensors.index.json"
@@ -191,9 +196,20 @@ class MLXChatNode:
             )
 
             if is_vlm:
-                _require_torch()
-                from mlx_vlm import load
-                MLXChatNode._model, MLXChatNode._tokenizer = load(self.config.model_path)
+                try:
+                    _require_torch()
+                    from mlx_vlm import load
+                    MLXChatNode._model, MLXChatNode._tokenizer = load(self.config.model_path)
+                except MissingDependencyError:
+                    # PyTorch not installed — load vision-capable model in text-only
+                    # mode via mlx-lm. Vision weights are ignored; text inference works.
+                    logger.warning(
+                        "MLXChatNode: PyTorch unavailable — loading VLM %s in text-only mode",
+                        self.config.model_path[-40:] if self.config.model_path else "(empty)",
+                    )
+                    MLXChatNode._is_vlm = False
+                    from mlx_lm import load
+                    MLXChatNode._model, MLXChatNode._tokenizer = load(self.config.model_path)
             else:
                 from mlx_lm import load
                 MLXChatNode._model, MLXChatNode._tokenizer = load(self.config.model_path)
