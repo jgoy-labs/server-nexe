@@ -165,3 +165,88 @@ def client(nexe_server: str) -> httpx.Client:  # noqa: F811
     """Synchronous httpx client pointed at the live server."""
     with httpx.Client(base_url=nexe_server, timeout=60.0) as c:
         yield c
+
+
+# ─── Backend detection ────────────────────────────────────────────────────────
+
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+# Models >32B skipped in automated tests (too slow; run manually if needed)
+_MAX_AUTO_MODEL_GB = 32
+
+# Size hints by name fragment (GB) — used to skip very large models
+_MODEL_SIZE_HINTS: dict[str, float] = {
+    "122b": 75.0,
+    "70b": 40.0,
+    "65b": 38.0,
+    "coder-next": 52.0,
+}
+
+
+def _model_size_gb(name: str) -> float:
+    """Heuristic: estimate model size from name. Returns 0 if unknown."""
+    lower = name.lower()
+    for fragment, gb in _MODEL_SIZE_HINTS.items():
+        if fragment in lower:
+            return gb
+    return 0.0
+
+
+@pytest.fixture(scope="session")
+def ollama_models(nexe_server: str) -> list[str]:  # noqa: ARG001
+    """List of Ollama model names available locally. Empty if Ollama is down."""
+    try:
+        r = httpx.get(f"{OLLAMA_HOST}/api/tags", timeout=5)
+        if r.status_code == 200:
+            return [m["name"] for m in r.json().get("models", [])]
+    except Exception:
+        pass
+    return []
+
+
+@pytest.fixture(scope="session")
+def smallest_ollama_model(ollama_models: list[str]) -> str:
+    """Smallest available Ollama model (for fast tests)."""
+    for preferred in ("gemma4:e4b", "gpt-oss:20b", "gemma4:31b"):
+        if any(preferred in m for m in ollama_models):
+            return preferred
+    if ollama_models:
+        return ollama_models[0]
+    pytest.skip("No Ollama models available — start Ollama and pull a model first")
+    return ""  # unreachable, satisfies type checker
+
+
+@pytest.fixture(scope="session")
+def backends_info(client: httpx.Client, auth_headers: dict[str, str]) -> dict:
+    """Raw backends response from /ui/backends."""
+    try:
+        r = client.get("/ui/backends", headers=auth_headers, timeout=10.0)
+        if r.status_code == 200:
+            return r.json() if isinstance(r.json(), dict) else {"backends": r.json()}
+    except Exception:
+        pass
+    return {}
+
+
+def _backend_is_available(info: dict, names: tuple[str, ...]) -> bool:
+    backends = info.get("backends", info) if isinstance(info, dict) else info
+    if not isinstance(backends, list):
+        return False
+    for b in backends:
+        name = b.get("name", b) if isinstance(b, dict) else b
+        available = b.get("available", True) if isinstance(b, dict) else True
+        if name in names and available:
+            return True
+    return False
+
+
+@pytest.fixture(scope="session")
+def mlx_available(backends_info: dict) -> bool:
+    """True if the MLX backend is loaded and available."""
+    return _backend_is_available(backends_info, ("mlx",))
+
+
+@pytest.fixture(scope="session")
+def llama_cpp_available(backends_info: dict) -> bool:
+    """True if the llama.cpp backend is loaded and available."""
+    return _backend_is_available(backends_info, ("llama_cpp", "llama-cpp"))
