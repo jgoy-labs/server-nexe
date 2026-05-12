@@ -107,6 +107,7 @@ class TestChatOllama:
             if size > _MAX_AUTO_MODEL_GB:
                 results.append(f"⏭ {model} — skipped (>{_MAX_AUTO_MODEL_GB}GB)")
                 continue
+            time.sleep(3.5)  # respect rate limiter between model requests
             t0 = time.monotonic()
             r = client.post(
                 "/ui/chat",
