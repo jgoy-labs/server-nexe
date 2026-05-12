@@ -1,0 +1,167 @@
+"""
+────────────────────────────────────
+Server Nexe
+Author: Jordi Goy
+Location: tests/test_live/conftest.py
+Description: Fixtures for live server tests (test_live marker).
+             Auto-starts the server if not already running.
+             Reuses an external server (Tauri sidecar, dev manual) if found.
+
+Usage:
+  pytest tests/test_live/ -m test_live          # auto-start
+  NEXE_TEST_URL=http://localhost:9119 pytest ... # reuse external
+  python dev-tools/run_live.py                  # via orchestrator
+
+www.jgoy.net · https://server-nexe.org
+────────────────────────────────────
+"""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Generator
+
+import pytest
+import httpx
+
+# ─── Paths ────────────────────────────────────────────────────────────────────
+
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+ENV_FILE = PROJECT_ROOT / ".env"
+
+# ─── Config ───────────────────────────────────────────────────────────────────
+
+def _load_dotenv(path: Path) -> dict[str, str]:
+    """Parse .env file into a dict without importing dotenv."""
+    result: dict[str, str] = {}
+    if not path.exists():
+        return result
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        result[key.strip()] = val.strip().strip('"').strip("'")
+    return result
+
+
+_dotenv = _load_dotenv(ENV_FILE)
+
+NEXE_TEST_URL = os.getenv("NEXE_TEST_URL", "http://localhost:9119")
+NEXE_API_KEY = (
+    os.getenv("NEXE_TEST_API_KEY")
+    or os.getenv("NEXE_PRIMARY_API_KEY")
+    or _dotenv.get("NEXE_PRIMARY_API_KEY", "")
+)
+STARTUP_TIMEOUT = int(os.getenv("NEXE_TEST_STARTUP_TIMEOUT", "45"))
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _is_up(url: str, timeout: float = 2.0) -> bool:
+    """Return True if the server responds to /health."""
+    try:
+        r = httpx.get(f"{url}/health", timeout=timeout)
+        return r.status_code == 200
+    except Exception:
+        return False
+
+
+def _wait_ready(url: str, timeout: int = STARTUP_TIMEOUT) -> None:
+    """Poll /health until the server is ready or timeout."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if _is_up(url, timeout=1.0):
+            return
+        time.sleep(0.5)
+    raise TimeoutError(
+        f"Nexe server did not start within {timeout}s at {url}. "
+        "Check server logs for errors."
+    )
+
+
+def _build_env() -> dict[str, str]:
+    """Merge process env with .env file values (process env wins)."""
+    merged = {**_dotenv, **os.environ}
+    # Suppress tray and watchdog in test mode
+    merged["NEXE_NO_TRAY"] = "1"
+    merged["NEXE_ENV"] = merged.get("NEXE_ENV", "test")
+    merged["NEXE_LOG_LEVEL"] = merged.get("NEXE_LOG_LEVEL", "WARNING")
+    return merged
+
+
+# ─── Fixtures ─────────────────────────────────────────────────────────────────
+
+@pytest.fixture(scope="session")
+def nexe_server() -> Generator[str, None, None]:
+    """
+    Provide the live server URL for test_live tests.
+
+    - If a server is already running at NEXE_TEST_URL → reuse it (no teardown).
+    - Otherwise → start the server via subprocess, yield URL, stop on teardown.
+
+    Compatible with Tauri sidecar: set NEXE_TEST_URL env var before running.
+    """
+    if _is_up(NEXE_TEST_URL):
+        yield NEXE_TEST_URL
+        return  # external server — do not terminate
+
+    if not ENV_FILE.exists():
+        pytest.skip(
+            f"No .env file found at {ENV_FILE} and no server running at "
+            f"{NEXE_TEST_URL}. Either start the server manually (`./nexe go`) "
+            "or create a .env file."
+        )
+
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "core.app"],
+        cwd=str(PROJECT_ROOT),
+        env=_build_env(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+
+    try:
+        _wait_ready(NEXE_TEST_URL, timeout=STARTUP_TIMEOUT)
+    except TimeoutError as exc:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        pytest.skip(str(exc))
+
+    yield NEXE_TEST_URL
+
+    proc.terminate()
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+
+@pytest.fixture(scope="session")
+def api_key() -> str:
+    """API key for authenticated endpoints."""
+    if not NEXE_API_KEY:
+        pytest.skip(
+            "No API key found. Set NEXE_TEST_API_KEY, NEXE_PRIMARY_API_KEY, "
+            "or define NEXE_PRIMARY_API_KEY in .env"
+        )
+    return NEXE_API_KEY
+
+
+@pytest.fixture(scope="session")
+def auth_headers(api_key: str) -> dict[str, str]:
+    """Headers dict with API key."""
+    return {"X-API-Key": api_key}
+
+
+@pytest.fixture(scope="session")
+def client(nexe_server: str) -> httpx.Client:  # noqa: F811
+    """Synchronous httpx client pointed at the live server."""
+    with httpx.Client(base_url=nexe_server, timeout=60.0) as c:
+        yield c
