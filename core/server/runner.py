@@ -10,6 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
+import logging.handlers
 import os
 import signal
 import subprocess
@@ -354,6 +355,20 @@ def main():
 
   setup_signal_handlers()
   _start_parent_watchdog()
+
+  # Always write logs to storage/logs/server.log so the tray "Open Logs"
+  # button works in both dev mode (./nexe go) and production (tray-launched).
+  _log_dir = Path(__file__).parent.parent.parent / "storage" / "logs"
+  _log_dir.mkdir(parents=True, exist_ok=True)
+  _server_log = _log_dir / "server.log"
+  _fh = logging.handlers.TimedRotatingFileHandler(
+    _server_log, when="midnight", interval=1, backupCount=7, encoding="utf-8"
+  )
+  _fh.setLevel(logging.DEBUG)
+  _fh.setFormatter(logging.Formatter(
+    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  ))
+  logging.getLogger().addHandler(_fh)
 
   # Note: .env is now loaded at module level (top of file) for better test compatibility
 
