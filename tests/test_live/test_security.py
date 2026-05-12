@@ -210,12 +210,11 @@ class TestInputValidation:
     ) -> None:
         malicious_name = "<script>alert(1)</script>.txt"
         content = b"test content for xss filename check"
-        # Real upload route: /rag/upload (POST multipart)
+        # Real upload route: /ui/upload (POST multipart)
         r = client.post(
-            "/rag/upload",
+            "/ui/upload",
             headers=auth_headers,
             files={"file": (malicious_name, io.BytesIO(content), "text/plain")},
-            data={"metadata": "{}"},
             timeout=15.0,
         )
         # Server must respond (not crash) and filename must be escaped in any JSON response
