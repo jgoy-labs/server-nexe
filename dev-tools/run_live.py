@@ -74,7 +74,7 @@ def _run_pytest(server_url: str | None) -> int:
 # ─── Report generation ────────────────────────────────────────────────────────
 
 def _status_icon(outcome: str) -> str:
-    return {"passed": "✅", "failed": "❌", "error": "❌", "skipped": "⏭️"}.get(
+    return {"passed": "✅", "failed": "❌", "error": "❌", "skipped": "⏭️", "xfailed": "〰️", "xpassed": "⚠️"}.get(
         outcome, "❓"
     )
 
@@ -99,6 +99,7 @@ def _build_report(json_path: Path, server_url: str) -> str:
     failed   = summary.get("failed", 0)
     errors   = summary.get("error", 0)
     skipped  = summary.get("skipped", 0)
+    xfailed  = summary.get("xfailed", 0)
     duration = data.get("duration", 0.0)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -113,9 +114,10 @@ def _build_report(json_path: Path, server_url: str) -> str:
         (
             f"{'✅' if failed == 0 and errors == 0 else '❌'} "
             f"**{passed} passed** · "
-            f"{'❌ ' + str(failed + errors) + ' failed' if failed + errors else ''} "
-            f"{'⏭️ ' + str(skipped) + ' skipped' if skipped else ''} "
-            f"· ⏱ {_duration_str(duration)}"
+            f"{'❌ ' + str(failed + errors) + ' failed · ' if failed + errors else ''}"
+            f"{'〰️ ' + str(xfailed) + ' xfail · ' if xfailed else ''}"
+            f"{'⏭️ ' + str(skipped) + ' skipped · ' if skipped else ''}"
+            f"⏱ {_duration_str(duration)}"
         ).strip(),
         "",
         "---",
@@ -133,10 +135,12 @@ def _build_report(json_path: Path, server_url: str) -> str:
         by_module[module].append(t)
 
     for module, module_tests in sorted(by_module.items()):
-        mod_passed = sum(1 for t in module_tests if t.get("outcome") == "passed")
-        mod_total  = len(module_tests)
-        mod_ok     = mod_passed == mod_total
-        lines.append(f"### {module} ({mod_passed}/{mod_total} {'✅' if mod_ok else '❌'})")
+        mod_passed  = sum(1 for t in module_tests if t.get("outcome") == "passed")
+        mod_xfailed = sum(1 for t in module_tests if t.get("outcome") == "xfailed")
+        mod_total   = len(module_tests)
+        mod_ok      = (mod_passed + mod_xfailed) == mod_total
+        xfail_note = f"+{mod_xfailed}xfail " if mod_xfailed else ""
+        lines.append(f"### {module} ({mod_passed}/{mod_total} {xfail_note}{'✅' if mod_ok else '❌'})")
         lines.append("")
 
         for t in module_tests:
@@ -170,10 +174,11 @@ def _build_report(json_path: Path, server_url: str) -> str:
         lines.append("")
 
     # Footer with raw counts
+    xfail_footer = f" · {xfailed} 〰️xfail" if xfailed else ""
     lines += [
         "---",
         "",
-        f"*Total: {total} tests · {passed} ✅ · {failed + errors} ❌ · {skipped} ⏭️ · {_duration_str(duration)}*",
+        f"*Total: {total} tests · {passed} ✅ · {failed + errors} ❌{xfail_footer} · {skipped} ⏭️ · {_duration_str(duration)}*",
     ]
 
     return "\n".join(lines)
