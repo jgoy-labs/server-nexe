@@ -49,7 +49,7 @@ class TestChatOllama:
         r = client.post(
             "/ui/chat",
             headers=auth_headers,
-            json={"message": "Di 'ok' en una sola paraula.", "engine": "ollama", "model": smallest_ollama_model, "stream": False},
+            json={"message": "Di 'ok' en una sola paraula.", "backend": "ollama", "model": smallest_ollama_model, "stream": False},
             timeout=90.0,
         )
         assert r.status_code == 200, f"Ollama basic chat: {r.status_code} {r.text[:400]}"
@@ -65,7 +65,7 @@ class TestChatOllama:
             "POST",
             "/ui/chat",
             headers={**auth_headers, "Accept": "text/event-stream"},
-            json={"message": "Di 'ok'.", "engine": "ollama", "model": smallest_ollama_model, "stream": True},
+            json={"message": "Di 'ok'.", "backend": "ollama", "model": smallest_ollama_model, "stream": True},
             timeout=90.0,
         ) as r:
             assert r.status_code == 200, f"Stream returned {r.status_code}"
@@ -88,7 +88,7 @@ class TestChatOllama:
         r = client.post(
             "/ui/chat",
             headers=auth_headers,
-            json={"message": "test", "engine": "ollama", "model": "nexe-nonexistent-model:99b", "stream": False},
+            json={"message": "test", "backend": "ollama", "model": "nexe-nonexistent-model:99b", "stream": False},
             timeout=20.0,
         )
         assert r.status_code in (400, 404, 422, 500), (
@@ -118,7 +118,7 @@ class TestChatOllama:
             r = client.post(
                 "/ui/chat",
                 headers=auth_headers,
-                json={"message": "Di 'ok'.", "engine": "ollama", "model": model, "stream": False},
+                json={"message": "Di 'ok'.", "backend": "ollama", "model": model, "stream": False},
                 timeout=90.0,
             )
             elapsed = time.monotonic() - t0
@@ -150,7 +150,7 @@ class TestChatMLX:
         r = client.post(
             "/ui/chat",
             headers=auth_headers,
-            json={"message": "Di 'ok'.", "engine": "mlx", "stream": False},
+            json={"message": "Di 'ok'.", "backend": "mlx", "stream": False},
             timeout=120.0,
         )
         assert r.status_code == 200, f"MLX chat: {r.status_code} {r.text[:400]}"
@@ -168,7 +168,7 @@ class TestChatMLX:
             "POST",
             "/ui/chat",
             headers={**auth_headers, "Accept": "text/event-stream"},
-            json={"message": "Di 'ok'.", "engine": "mlx", "stream": True},
+            json={"message": "Di 'ok'.", "backend": "mlx", "stream": True},
             timeout=120.0,
         ) as r:
             assert r.status_code == 200
@@ -196,7 +196,7 @@ class TestChatLlamaCpp:
         r = client.post(
             "/ui/chat",
             headers=auth_headers,
-            json={"message": "Di 'ok'.", "engine": "llama_cpp", "stream": False},
+            json={"message": "Di 'ok'.", "backend": "llama_cpp", "stream": False},
             timeout=120.0,
         )
         assert r.status_code == 200, f"llama.cpp chat: {r.status_code} {r.text[:400]}"
@@ -214,7 +214,7 @@ class TestChatLlamaCpp:
             "POST",
             "/ui/chat",
             headers={**auth_headers, "Accept": "text/event-stream"},
-            json={"message": "Di 'ok'.", "engine": "llama_cpp", "stream": True},
+            json={"message": "Di 'ok'.", "backend": "llama_cpp", "stream": True},
             timeout=120.0,
         ) as r:
             assert r.status_code == 200
@@ -245,7 +245,7 @@ class TestChatMEMSAVE:
         chat_r = client.post(
             "/ui/chat",
             headers=auth_headers,
-            json={"message": msg, "engine": "ollama", "model": smallest_ollama_model, "stream": False},
+            json={"message": msg, "backend": "ollama", "model": smallest_ollama_model, "stream": False},
             timeout=90.0,
         )
         assert chat_r.status_code == 200, f"Chat MEM_SAVE: {chat_r.status_code} {chat_r.text[:400]}"
@@ -285,7 +285,7 @@ class TestChatMEMSAVE:
             r = client.post(
                 "/ui/chat",
                 headers=auth_headers,
-                json={"message": phrase, "engine": "ollama", "model": smallest_ollama_model, "stream": False},
+                json={"message": phrase, "backend": "ollama", "model": smallest_ollama_model, "stream": False},
                 timeout=90.0,
             )
             assert r.status_code == 200, f"MEM_SAVE dedup chat: {r.status_code}"
