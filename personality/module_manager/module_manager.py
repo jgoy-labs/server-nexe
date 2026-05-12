@@ -142,7 +142,7 @@ class ModuleManager(PluginLoaderMixin):
       if SECURITY_VALIDATION_AVAILABLE:
         try:
           base_path = Path.cwd()
-          validated_path = validate_safe_path(config_path, base_path)
+          validated_path = validate_safe_path(config_path, base_path)  # pyright: ignore[reportPossiblyUnboundVariable]  # imported under SECURITY_VALIDATION_AVAILABLE guard above
           if validated_path.exists():
             return validated_path
         except Exception as e:

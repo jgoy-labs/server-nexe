@@ -132,7 +132,7 @@ class RateLimitTracker:
   # Maximum number of tracked identifiers to prevent memory exhaustion
   MAX_TRACKED_IDENTIFIERS = 10000
 
-  def __init__(self):
+  def __init__(self) -> None:
     # Per-identifier counter state. `reset` is Optional[datetime]; `count`/`limit` are int.
     # Heterogeneous values → annotate as Dict[str, Any] to silence reportOperatorIssue
     # without losing runtime safety (initial values + assignments below are correct).

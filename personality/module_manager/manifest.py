@@ -122,7 +122,7 @@ async def list_registered_modules():
     from .registry import ModuleRegistry
 
     registry = ModuleRegistry()
-    modules = registry.get_all_modules()
+    modules = registry.get_all_modules()  # pyright: ignore[reportAttributeAccessIssue]  # method exists on ModuleRegistry runtime; stubs incomplete
 
     module_list = []
     for name, info in modules.items():

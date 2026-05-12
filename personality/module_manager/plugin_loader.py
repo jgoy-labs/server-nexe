@@ -64,7 +64,7 @@ class PluginLoaderMixin:
         # Configure security allowlist
         allowlist_config = self._configure_plugin_allowlist()
 
-        for module_name in discovered:
+        for module_name in discovered:  # pyright: ignore[reportOptionalIterable]  # discovered is set just above if None
             module_info = None
             try:
                 module_info = self.get_module_info(module_name)  # type: ignore[attr-defined]

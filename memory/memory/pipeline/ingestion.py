@@ -246,7 +246,7 @@ class IngestionPipeline:
             f"Run the installer to download it. Error: {e}"
         ) from e
 
-    assert fe_model is not None  # narrowing for pyright after the loading branch
+    assert fe_model is not None  # nosec B101  # narrowing for pyright after loading branch above
     embedding = list(fe_model.embed([text]))[0]
     arr = np.array(embedding)
     norm = np.linalg.norm(arr)

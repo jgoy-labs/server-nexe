@@ -29,7 +29,7 @@ except ImportError:
   box = None
   RICH_AVAILABLE = False
 
-from .router import CLIInfo
+from .router import CLIInfo  # noqa: E402  # late import after rich fallback stubs
 
 console: Any
 if RICH_AVAILABLE:
