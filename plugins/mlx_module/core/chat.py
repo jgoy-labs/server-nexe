@@ -242,6 +242,7 @@ class MLXChatNode:
         stream_callback = inputs.get("stream_callback")
         max_tokens_override = inputs.get("max_tokens")
         temperature_override = inputs.get("temperature")
+        thinking_enabled = inputs.get("thinking_enabled", True)  # True = model decides; False = force off
         images = inputs.get("images")  # Optional[List[bytes]] — VLM support
 
         # Log for debugging
@@ -285,6 +286,7 @@ class MLXChatNode:
                     session_id,  # To separate caches per session
                     max_tokens_override,
                     temperature_override,
+                    thinking_enabled,
                 )
 
             elapsed_ms = int((time.time() - start_time) * 1000)
@@ -547,6 +549,7 @@ class MLXChatNode:
         session_id: str = "default",
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        thinking_enabled: bool = True,
     ) -> Dict[str, Any]:
         """
         Blocking generation with MLX and PREFIX MATCHING (executed in thread).
@@ -557,6 +560,7 @@ class MLXChatNode:
             return self._generate_blocking_inner(
                 system, messages, messages_for_cache,
                 stream_callback, session_id, max_tokens, temperature,
+                thinking_enabled,
             )
 
     def _generate_blocking_inner(
@@ -568,6 +572,7 @@ class MLXChatNode:
         session_id: str = "default",
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        thinking_enabled: bool = True,
     ) -> Dict[str, Any]:
         """Inner generation logic, called under lock."""
         from mlx_lm.sample_utils import make_sampler
@@ -583,7 +588,8 @@ class MLXChatNode:
 
         # 1. Prepare tokens (tokenization + sanitization)
         full_tokens, cache_lookup_tokens, all_messages, all_cache_messages = prepare_tokens(
-            system, messages, messages_for_cache, tokenizer
+            system, messages, messages_for_cache, tokenizer,
+            thinking_enabled=thinking_enabled,
         )
         total_tokens = len(full_tokens)
 

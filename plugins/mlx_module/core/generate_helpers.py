@@ -78,11 +78,25 @@ def sanitize_messages_for_alternation(messages: List[Dict]) -> List[Dict]:
     return _enforce_alternation(merged)
 
 
+def _apply_template(tokenizer: Any, messages: List[Dict], thinking_enabled: bool) -> str:
+    """Apply chat template with optional thinking control (Qwen3 enable_thinking)."""
+    kwargs: dict = {"add_generation_prompt": True, "tokenize": False}
+    # Qwen3/Qwen3.5 supports enable_thinking=False to suppress <think> blocks.
+    # Pass defensively — tokenizers that don't know the kwarg will raise TypeError.
+    if not thinking_enabled:
+        try:
+            return tokenizer.apply_chat_template(messages, enable_thinking=False, **kwargs)
+        except TypeError:
+            pass  # tokenizer does not support enable_thinking — fall through
+    return tokenizer.apply_chat_template(messages, **kwargs)
+
+
 def prepare_tokens(
     system: str,
     messages: List[Dict],
     messages_for_cache: List[Dict],
     tokenizer: Any,
+    thinking_enabled: bool = True,
 ) -> Tuple[List[int], List[int], List[Dict], List[Dict]]:
     """
     Prepares and tokenizes messages for generation and cache.
@@ -92,6 +106,7 @@ def prepare_tokens(
         messages: Messages for generation (with memory)
         messages_for_cache: Clean messages for cache (without memory)
         tokenizer: MLX tokenizer
+        thinking_enabled: If False, suppress thinking tokens (Qwen3 enable_thinking=False)
 
     Returns:
         Tuple: (full_tokens, cache_lookup_tokens, all_messages, all_cache_messages)
@@ -105,22 +120,14 @@ def prepare_tokens(
     all_cache_messages = [{"role": "system", "content": system}] + sanitized_cache_messages
 
     # Tokenize for generation (with memory context)
-    prompt_text = tokenizer.apply_chat_template(
-        all_messages,
-        add_generation_prompt=True,
-        tokenize=False
-    )
+    prompt_text = _apply_template(tokenizer, all_messages, thinking_enabled)
     if isinstance(prompt_text, str):
         full_tokens = tokenizer.encode(prompt_text)
     else:
         full_tokens = list(prompt_text)
 
     # Tokenize for cache lookup (clean, without memory context)
-    cache_prompt_text = tokenizer.apply_chat_template(
-        all_cache_messages,
-        add_generation_prompt=True,
-        tokenize=False
-    )
+    cache_prompt_text = _apply_template(tokenizer, all_cache_messages, thinking_enabled)
     if isinstance(cache_prompt_text, str):
         cache_lookup_tokens = tokenizer.encode(cache_prompt_text)
     else:
