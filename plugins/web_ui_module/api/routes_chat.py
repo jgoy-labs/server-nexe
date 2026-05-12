@@ -1755,6 +1755,12 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 session.add_message("assistant", clean_response, stats=_stats)
                                 session_mgr._save_session_to_disk(session)
 
+                            # Always close the SSE stream with [DONE] after all
+                            # post-processing (MEM_SAVE, session save, etc.) is complete.
+                            # The engine emits its own [DONE] but it is consumed by the
+                            # pipeline and never forwarded to the client.
+                            yield "data: [DONE]\n\n"
+
                         return "", model_name, StreamingResponse(
                             response_generator(),
                             media_type="text/plain",
