@@ -31,7 +31,7 @@ def get_default_system_prompt():
     try:
         import tomllib
     except ImportError:
-        import tomli as tomllib
+        import tomli as tomllib  # type: ignore[no-redef]
     
     config_path = Path(__file__).parent.parent.parent / "personality" / "server.toml"
     if config_path.exists():
@@ -57,7 +57,7 @@ def detect_engine() -> str:
     try:
         import tomllib
     except ImportError:
-        import tomli as tomllib
+        import tomli as tomllib  # type: ignore[no-redef]
 
     # IMPORTANT: Load .env BEFORE reading environment variables
     from dotenv import load_dotenv

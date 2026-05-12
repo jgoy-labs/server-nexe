@@ -9,7 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import Dict, Any, Optional
 import structlog
 
 from nexe_flow.core.node import Node, NodeMetadata, NodeInput, NodeOutput

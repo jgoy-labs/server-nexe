@@ -120,7 +120,7 @@ def create_module_manager_with_config(config_dict=None, **kwargs):
   manager = ModuleManager(config_path)
 
   if config_dict:
-    manager._config.update(config_dict)
+    manager._config.update(config_dict)  # pyright: ignore[reportAttributeAccessIssue]  # _config set dynamically by ModuleManager.__init__
 
   return manager
 
@@ -160,6 +160,6 @@ def create_validated_module_manager(config_path=None, validate_config=True):
     errors = validator.validate(config_path)
 
     if errors:
-      raise ValueError("Configuration validation failed:\n" + "\n".join(errors))
+      raise ValueError("Configuration validation failed:\n" + "\n".join(errors))  # pyright: ignore[reportCallIssue,reportArgumentType]  # ValidationResult iterates over str messages
 
   return ModuleManager(config_path)

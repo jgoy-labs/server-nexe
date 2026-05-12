@@ -24,7 +24,7 @@ class MemoryMetrics:
   Planned: Real integration with prometheus_client.
   """
 
-  def __init__(self):
+  def __init__(self) -> None:
     """Initialize metrics storage"""
     self._counters = {
       "memory_ingested_total": 0,
@@ -40,7 +40,7 @@ class MemoryMetrics:
     }
 
     self._histogram_buckets = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
-    self._histograms = {
+    self._histograms: dict[str, list[float]] = {
       "memory_ingestion_duration_seconds": []
     }
 

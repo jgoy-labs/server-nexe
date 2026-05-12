@@ -28,7 +28,7 @@ except ImportError:  # pragma: no cover
     BaseSettings = object  # type: ignore[misc,assignment]
     SettingsConfigDict = dict  # type: ignore[misc,assignment]
 
-    def Field(*args: Any, **kwargs: Any) -> Any:  # type: ignore[misc,assignment]
+    def Field(*args: Any, **kwargs: Any) -> Any:  # type: ignore[no-redef,misc,assignment]
         return args[0] if args else None
 
     _PYDANTIC_SETTINGS_AVAILABLE = False

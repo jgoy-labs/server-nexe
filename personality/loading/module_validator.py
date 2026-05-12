@@ -36,7 +36,7 @@ class ModuleValidator:
 
   def __init__(self, i18n=None, core_root: Optional[Path] = None):
     self.i18n = i18n
-    self._integrity_checker: Optional["IntegrityChecker"] = None
+    self._integrity_checker: Optional["IntegrityChecker"] = None  # pyright: ignore[reportInvalidTypeForm]  # IntegrityChecker falls back to None when import fails; forward ref still valid at runtime
 
     if INTEGRITY_CHECKER_AVAILABLE:
       if core_root is None:
@@ -48,7 +48,7 @@ class ModuleValidator:
 
       lock_path = core_root / "storage" / ".auto_clean" / "manifests.lock"
       try:
-        self._integrity_checker = IntegrityChecker(lock_path)
+        self._integrity_checker = IntegrityChecker(lock_path)  # pyright: ignore[reportOptionalCall]  # guarded by INTEGRITY_CHECKER_AVAILABLE above
         logger.debug("IntegrityChecker initialized for manifest validation")
       except Exception as e:
         logger.warning(f"Failed to initialize IntegrityChecker: {e}")

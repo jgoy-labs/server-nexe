@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # the SQLCIPHER_AVAILABLE flag guards against None access.
 sqlcipher: Any
 try:
-    from sqlcipher3 import dbapi2 as sqlcipher  # pyright: ignore[reportMissingImports]
+    from sqlcipher3 import dbapi2 as sqlcipher  # type: ignore[no-redef]  # pyright: ignore[reportMissingImports]
     SQLCIPHER_AVAILABLE = True
 except ImportError:
     sqlcipher = None

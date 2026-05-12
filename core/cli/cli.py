@@ -485,7 +485,7 @@ def install_model(name: str, engine: Optional[str]):
                  engine = "ollama"  # Default safe
         else:
              engine = "ollama"
-    assert engine is not None  # always set by branches above
+    assert engine is not None  # nosec B101  # always set by branches above (pyright narrowing)
     click.echo(f"💿 Installing {click.style(entry.short_name, bold=True)} ({entry.size_gb}GB) for engine {click.style(engine.upper(), fg='yellow')}...")
     
     if engine == "mlx":
