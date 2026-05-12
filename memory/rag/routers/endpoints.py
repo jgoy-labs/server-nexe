@@ -240,12 +240,17 @@ async def info_endpoint():
 
 async def files_stats_endpoint():
   """Get statistics for uploaded files."""
-  try:
-    file_rag = _get_file_rag()
-    if file_rag is None:
-      raise HTTPException(status_code=503, detail="RAG not available")
-    metrics = file_rag.get_metrics()
+  file_rag = _get_file_rag()
+  if file_rag is None:
+    return JSONResponse(content={
+      "total_documents": 0,
+      "total_chunks": 0,
+      "total_vectors": 0,
+      "documents": []
+    })
 
+  try:
+    metrics = file_rag.get_metrics() if hasattr(file_rag, 'get_metrics') else {}
     documents = []
     if hasattr(file_rag, '_documents'):
       for doc_id, doc_info in file_rag._documents.items():
