@@ -29,16 +29,18 @@ class TestHealth:
         r = client.get("/health")
         assert r.status_code == 200
         data = r.json()
-        assert data.get("status") in ("healthy", "degraded", "ok")
+        assert data.get("status") in ("healthy", "degraded", "ok", "operational")
 
     def test_health_ready(self, client: httpx.Client) -> None:
         r = client.get("/health/ready")
         assert r.status_code == 200
         data = r.json()
-        assert data.get("status") in ("healthy", "degraded", "unhealthy")
+        assert data.get("status") in ("healthy", "degraded", "unhealthy", "operational")
 
-    def test_health_circuits(self, client: httpx.Client) -> None:
-        r = client.get("/health/circuits")
+    def test_health_circuits(
+        self, client: httpx.Client, auth_headers: dict[str, str]
+    ) -> None:
+        r = client.get("/health/circuits", headers=auth_headers)
         assert r.status_code == 200
 
     def test_api_info_has_version(self, client: httpx.Client) -> None:

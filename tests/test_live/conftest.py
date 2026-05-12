@@ -167,6 +167,22 @@ def client(nexe_server: str) -> httpx.Client:  # noqa: F811
         yield c
 
 
+# ─── Rate-limit guard ─────────────────────────────────────────────────────────
+
+_INTER_TEST_DELAY = float(os.getenv("NEXE_TEST_DELAY", "1.5"))
+
+
+@pytest.fixture(autouse=True, scope="function")
+def _rate_limit_guard() -> "Generator[None, None, None]":
+    """
+    Pause between tests to avoid hitting the server's rate limiter.
+    Default 1.5s (40 req/min effective). Override with NEXE_TEST_DELAY=0 to disable.
+    """
+    yield
+    if _INTER_TEST_DELAY > 0:
+        time.sleep(_INTER_TEST_DELAY)
+
+
 # ─── Backend detection ────────────────────────────────────────────────────────
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")

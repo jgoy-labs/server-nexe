@@ -60,11 +60,11 @@ class TestFailClosed:
         )
 
     def test_removed_routes_return_404(self, client: httpx.Client) -> None:
-        """Routes removed in v1.0 must not exist."""
+        """Routes removed in v1.0 must be blocked (RemovedDirectRoutesGuard returns 403/404)."""
         for path in ("/mlx/chat", "/llama-cpp/chat"):
             r = client.post(path, json={"message": "test"}, timeout=5.0)
-            assert r.status_code == 404, (
-                f"Removed route {path} returned {r.status_code} (expected 404)"
+            assert r.status_code in (403, 404), (
+                f"Removed route {path} returned {r.status_code} (expected 403 or 404)"
             )
 
     def test_cors_no_wildcard_origin(self, client: httpx.Client) -> None:
@@ -210,11 +210,12 @@ class TestInputValidation:
     ) -> None:
         malicious_name = "<script>alert(1)</script>.txt"
         content = b"test content for xss filename check"
+        # Real upload route: /rag/upload (POST multipart)
         r = client.post(
-            "/v1/ingest/document",
+            "/rag/upload",
             headers=auth_headers,
             files={"file": (malicious_name, io.BytesIO(content), "text/plain")},
-            data={"collection": "user_knowledge"},
+            data={"metadata": "{}"},
             timeout=15.0,
         )
         # Server must respond (not crash) and filename must be escaped in any JSON response
@@ -290,14 +291,18 @@ class TestRateLimit:
 
     def test_rate_limit_health_endpoint(self, client: httpx.Client) -> None:
         """Hammering /health (60/min limit) must eventually produce 429."""
+        import time as _time
         statuses: list[int] = []
-        for _ in range(75):
+        # Send requests quickly until 429 or exhausted limit (max 65 to stay within 60/min)
+        for _ in range(65):
             r = client.get("/health", timeout=3.0)
             statuses.append(r.status_code)
             if r.status_code == 429:
                 break
 
         assert 429 in statuses, (
-            f"No 429 after 75 requests to /health. "
+            f"No 429 after {len(statuses)} requests to /health. "
             f"Status distribution: {set(statuses)}"
         )
+        # Wait for rate limit window to reset before next tests
+        _time.sleep(62)
