@@ -87,6 +87,75 @@ def _require_torch() -> None:
         ) from exc
 
 
+def _sanitize_safetensors_index(model_path: str) -> bool:
+    """Disable a safetensors index that declares shards which do not exist.
+
+    Known upstream-HuggingFace mislabeling pattern (empirically detected
+    2026-05-13 with ``mlx-community/gemma-3-4b-it-4bit``): the repo ships a
+    single ``model.safetensors`` (~3.4 GB) but ``model.safetensors.index.json``
+    declares a multi-shard layout (``model-00001-of-00002.safetensors`` +
+    ``model-00002-of-00002.safetensors``) pointing at files that don't exist
+    in the repo at all. ``mlx_lm.load`` then tries to open the declared shards
+    and raises ``FileNotFoundError``, with the user-facing symptom being a
+    silent failure to load this otherwise-valid model.
+
+    The fix that mlx-lm itself uses internally (when no index is present): load
+    ``model.safetensors`` directly. Renaming the stale index to ``.stale``
+    triggers exactly that fallback path. The original is preserved (not
+    deleted) so an operator can inspect it or restore it after an upstream fix.
+
+    Idempotent: re-running on a model that already has the index renamed (or
+    no index at all) is a no-op. Failures during the JSON read are logged and
+    treated as "do nothing" rather than blocking the load — the upstream
+    ``mlx_lm.load`` will surface the real error if the model is truly broken.
+
+    Returns
+    -------
+    bool
+        True if a stale index was detected and disabled. False if no action
+        was needed (no index, valid index, or read error).
+    """
+    if not model_path:
+        return False
+    root = Path(model_path)
+    idx_path = root / "model.safetensors.index.json"
+    if not idx_path.is_file():
+        return False
+    try:
+        data = json.loads(idx_path.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(
+            "MLX %s: could not parse safetensors index for sanity check (%s) — "
+            "leaving as-is and letting mlx_lm.load surface any error.",
+            root.name, e,
+        )
+        return False
+    weight_map = data.get("weight_map", {})
+    if not weight_map:
+        return False
+    declared_shards = set(weight_map.values())
+    missing = sorted(s for s in declared_shards if not (root / s).is_file())
+    if not missing:
+        return False
+    bak = root / "model.safetensors.index.json.stale"
+    try:
+        idx_path.rename(bak)
+    except OSError as e:
+        logger.error(
+            "MLX %s: stale safetensors index detected (declared shards %s do not "
+            "exist) but rename to .stale failed: %s. Load may fail.",
+            root.name, missing, e,
+        )
+        return False
+    logger.warning(
+        "MLX %s: stale safetensors index disabled — declared shards %s did not "
+        "exist on disk (renamed to %s). Falling back to single-file load. This "
+        "is a known upstream HuggingFace repo mislabeling; not a local corruption.",
+        root.name, missing, bak.name,
+    )
+    return True
+
+
 def _detect_vlm_capability(model_path: str) -> bool:
     """Detects whether the model is a VLM by combining 3 signals (any-of):
 
@@ -185,6 +254,10 @@ class MLXChatNode:
             tuple: (model, tokenizer_or_processor)
         """
         if MLXChatNode._model is None:
+            # Disable a stale safetensors index before load (known upstream HF
+            # mislabeling pattern — see _sanitize_safetensors_index docstring).
+            _sanitize_safetensors_index(self.config.model_path)
+
             is_vlm = _detect_vlm_capability(self.config.model_path)
             MLXChatNode._is_vlm = is_vlm
 
