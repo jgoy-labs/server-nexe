@@ -5,7 +5,7 @@ id: nexe-threat-model-stride
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe formal STRIDE threat model (v1.0 initial formalization, 2026-04-24). Single-user local-first AI server: 8 trust boundaries (browser/CLI/Qdrant/Ollama/HF/disk/keyring/LAN-bootstrap), 6 asset categories (user data, operational secrets, model weights, code integrity, availability, operational metadata), STRIDE matrix with mitigations citing file:line, out-of-scope enumerated (shell access, nation-state, multi-tenant, supply-chain pre-bundle, Apple firmware, IDE extensions, offline storage copies), residual risks honestly disclosed, LINDDUN privacy appendix. Supersedes the informal threat model at SECURITY.md:3-15. Driven by external audit DoD-AUD-SX-0423-NXE-01 §2.11 (F4.2)."
+abstract: "server-nexe formal STRIDE threat model (v1.0, 2026-04-24). Single-user local-first AI server: 8 trust boundaries (browser/CLI/Qdrant/Ollama/HF/disk/keyring/LAN-bootstrap), 6 asset categories (user data, operational secrets, model weights, code integrity, availability, metadata), STRIDE matrix with mitigations citing file:line, explicit scope, residual risks disclosed, LINDDUN privacy appendix. Supersedes the informal threat model at SECURITY.md:3-15. Driven by external audit DoD-AUD-SX-0423 §2.11 (F4.2)."
 tags: [threat-model, stride, security, audit, dod, local-first, single-user, boundaries, assets, mitigations, privacy, lindduan, compliance, spoofing, tampering, repudiation, disclosure, dos, elevation-of-privilege]
 chunk_size: 800
 priority: P1
