@@ -284,17 +284,69 @@ def _scan_mlx_backend(models_dir: "Path") -> "Optional[dict]":
 
 
 def _scan_llamacpp_backend(module_manager, models_dir: "Path") -> "Optional[dict]":
-    """Return Llama.cpp backend dict or None if module absent or no .gguf files."""
+    """Return Llama.cpp backend dict or None if module absent or no .gguf files.
+
+    Discovery sources (any-of, deduplicated by resolved real path so a
+    symlink and its target don't double-count):
+
+      1. ``NEXE_LLAMA_CPP_MODEL`` env var — the canonical contract of the
+         llama_cpp module itself (``plugins/llama_cpp_module/core/config.py``
+         reads this same env var to decide which model to load). If the
+         operator has the env var pointing at a real .gguf file anywhere
+         on disk, that model MUST appear in the dropdown — otherwise the
+         user has a working backend that they cannot select from the UI.
+         This is the bug fix added 2026-05-13: previously this scan only
+         looked at ``storage/models/`` so removing a stale symlink there
+         hid the entire Llama.cpp backend even though the engine kept
+         working via the env var path.
+
+      2. ``storage/models/*.gguf`` — convenience for users who want
+         multiple .gguf files exposed as a list. Adds any .gguf in the
+         models dir that is not already covered by source 1.
+
+    The module-presence check (registry has llama_cpp_module loaded) is a
+    hard precondition. Without it the backend would be selectable but no
+    code path could serve a request.
+    """
     try:
         reg = module_manager.registry.get_module("llama_cpp_module")
         if not (reg and reg.instance):
             return None
-        gguf_list = []
+
+        # Track resolved real paths to deduplicate symlinks vs targets.
+        seen_real: "set[str]" = set()
+        gguf_list: "list[dict]" = []
+
+        def _add(path: "Path") -> None:
+            try:
+                real = str(path.resolve())
+            except OSError:
+                return
+            if real in seen_real or not path.is_file():
+                return
+            try:
+                size = path.stat().st_size
+            except OSError:
+                size = 0
+            seen_real.add(real)
+            gguf_list.append({
+                "name": path.name,
+                "size_gb": round(size / (1024 ** 3), 1) if size else 0,
+            })
+
+        # Source 1: NEXE_LLAMA_CPP_MODEL — the engine's own contract.
+        env_path_str = _os.environ.get("NEXE_LLAMA_CPP_MODEL", "").strip()
+        if env_path_str:
+            env_path = Path(env_path_str).expanduser()
+            if env_path.is_file() and env_path.suffix == ".gguf":
+                _add(env_path)
+
+        # Source 2: storage/models/*.gguf — user-curated dropdown additions.
         if models_dir.exists():
             for f in models_dir.iterdir():
                 if f.suffix == ".gguf":
-                    size = f.stat().st_size
-                    gguf_list.append({"name": f.name, "size_gb": round(size / (1024 ** 3), 1) if size else 0})
+                    _add(f)
+
         if gguf_list:
             return {"id": "llamacpp", "name": "Llama.cpp", "models": gguf_list, "active": False}
     except Exception as e:
