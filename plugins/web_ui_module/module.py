@@ -81,12 +81,25 @@ class WebUIModule:
 
             try:
                 # Create the one and only SessionManager, with crypto if available.
+                # In production we MUST get a crypto_provider — otherwise sessions
+                # would be persisted as plaintext .json on disk (incident 2026-05-13:
+                # 80 plain .json sessions appeared because crypto was missing here).
                 crypto = None
                 try:
                     from core.lifespan import get_server_state
                     crypto = get_server_state().crypto_provider
                 except Exception:
                     crypto = None
+                if crypto is None:
+                    import os as _os
+                    _env = _os.environ.get("NEXE_ENV", "production").lower()
+                    if _env == "production":
+                        raise RuntimeError(
+                            "WebUIModule.initialize: crypto_provider is None in production "
+                            "mode. Encryption-at-rest must be initialized by lifespan_crypto "
+                            "before web_ui_module init runs. Aborting to prevent plaintext "
+                            "session storage."
+                        )
                 self.session_manager = SessionManager(crypto_provider=crypto)
 
                 # Resolve API base URL
