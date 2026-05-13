@@ -125,6 +125,58 @@ def _prompt_has_open_think_prefix(formatted_prompt: str) -> bool:
     return tail.endswith("<think>")
 
 
+QWEN35_THINKING_DIRECTIVE = (
+    "You MUST reason step-by-step inside <think>...</think> tags before answering. "
+    "Always think first, even for simple questions."
+)
+
+
+def _qwen35_needs_thinking_directive(model_type: str, thinking_enabled: bool) -> bool:
+    """Decide if the Qwen3.5 thinking-force directive must be injected.
+
+    Empirical incident 2026-05-13: with Raonament=ON the Qwen3.5 family on
+    MLX silently skips reasoning in multi-turn conversations. Root cause is
+    *not* the chat template (which already pre-opens ``<think>`` by default)
+    but the model itself: when the prior assistant turns in the history
+    contain no ``<think>...</think>`` blocks, Qwen3.5 mimics that pattern
+    and emits ``</think>`` right after the prompt opener, producing a direct
+    answer with no visible reasoning box on the client.
+
+    The fix is scoped to ``model_type startswith 'qwen3_5'`` only, per
+    Jordi's explicit instruction:
+
+    - gpt-oss: uses native ``<|channel|>analysis<|message|>`` reasoning,
+      already works on MLX.
+    - gemma-4: no thinking support in the family.
+    - other Qwen (qwen2, qwen3 base): not currently bundled; explicit guard
+      against false positives.
+
+    Returns True iff (a) the toggle is ON, (b) the model is Qwen3.5.
+    """
+    if not thinking_enabled:
+        return False
+    return model_type.startswith("qwen3_5")
+
+
+def _inject_thinking_directive_into_messages(
+    messages: List[Dict[str, Any]], directive: str
+) -> List[Dict[str, Any]]:
+    """Return a copy of ``messages`` with ``directive`` reinforcing thinking.
+
+    If the first entry is a system message, the directive is appended to its
+    content separated by a blank line; otherwise a new system entry is
+    prepended at index 0. The original list is not mutated.
+    """
+    if not directive:
+        return messages
+    if messages and messages[0].get("role") == "system":
+        first = dict(messages[0])
+        existing = str(first.get("content") or "").rstrip()
+        first["content"] = f"{existing}\n\n{directive}" if existing else directive
+        return [first, *messages[1:]]
+    return [{"role": "system", "content": directive}, *messages]
+
+
 def _sanitize_safetensors_index(model_path: str) -> bool:
     """Disable a safetensors index that declares shards which do not exist.
 
@@ -540,6 +592,17 @@ class MLXChatNode:
         if messages:
             all_messages.extend(messages)
 
+        # Qwen3.5-only: when Raonament=ON, reinforce thinking in the system
+        # prompt because the chat template alone is not enough (model mimics
+        # historial turns and skips reasoning in multi-turn conversations).
+        # See _qwen35_needs_thinking_directive docstring for the rationale.
+        if _qwen35_needs_thinking_directive(
+            str(mdl_config.get("model_type", "")), thinking_enabled
+        ):
+            all_messages = _inject_thinking_directive_into_messages(
+                all_messages, QWEN35_THINKING_DIRECTIVE
+            )
+
         prompt_arg = all_messages if all_messages else ""
         num_images = 1 if has_image else 0
 
@@ -760,10 +823,20 @@ class MLXChatNode:
         session_key = session_id[:8] if session_id else "default"
         model_key = f"{self.config.model_path}:{identity_hash}:{session_key}"
 
+        # Read model_type once for the Qwen3.5 thinking-force directive.
+        # Cheap read (single JSON load) and safe to fail to empty string —
+        # the directive helper guards against blank/unknown model_type.
+        try:
+            with open(Path(self.config.model_path) / "config.json") as _cf:
+                model_type = str(json.load(_cf).get("model_type", ""))
+        except OSError:
+            model_type = ""
+
         # 1. Prepare tokens (tokenization + sanitization)
         full_tokens, cache_lookup_tokens, all_messages, all_cache_messages = prepare_tokens(
             system, messages, messages_for_cache, tokenizer,
             thinking_enabled=thinking_enabled,
+            model_type=model_type,
         )
         total_tokens = len(full_tokens)
 

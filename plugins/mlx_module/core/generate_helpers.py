@@ -97,6 +97,7 @@ def prepare_tokens(
     messages_for_cache: List[Dict],
     tokenizer: Any,
     thinking_enabled: bool = True,
+    model_type: str = "",
 ) -> Tuple[List[int], List[int], List[Dict], List[Dict]]:
     """
     Prepares and tokenizes messages for generation and cache.
@@ -107,6 +108,9 @@ def prepare_tokens(
         messages_for_cache: Clean messages for cache (without memory)
         tokenizer: MLX tokenizer
         thinking_enabled: If False, suppress thinking tokens (Qwen3 enable_thinking=False)
+        model_type: ``config.json.model_type`` of the loaded model. Used to
+            decide whether to inject the Qwen3.5 thinking-force directive
+            (see ``chat._qwen35_needs_thinking_directive``).
 
     Returns:
         Tuple: (full_tokens, cache_lookup_tokens, all_messages, all_cache_messages)
@@ -118,6 +122,21 @@ def prepare_tokens(
     # Build OpenAI-format messages
     all_messages = [{"role": "system", "content": system}] + sanitized_messages
     all_cache_messages = [{"role": "system", "content": system}] + sanitized_cache_messages
+
+    # Qwen3.5-only: when Raonament=ON, reinforce thinking in the system prompt.
+    # Imported lazily to avoid a circular import (chat → generate_helpers).
+    from .chat import (
+        _qwen35_needs_thinking_directive,
+        _inject_thinking_directive_into_messages,
+        QWEN35_THINKING_DIRECTIVE,
+    )
+    if _qwen35_needs_thinking_directive(model_type, thinking_enabled):
+        all_messages = _inject_thinking_directive_into_messages(
+            all_messages, QWEN35_THINKING_DIRECTIVE
+        )
+        all_cache_messages = _inject_thinking_directive_into_messages(
+            all_cache_messages, QWEN35_THINKING_DIRECTIVE
+        )
 
     # Tokenize for generation (with memory context)
     prompt_text = _apply_template(tokenizer, all_messages, thinking_enabled)
