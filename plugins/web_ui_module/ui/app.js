@@ -1075,14 +1075,18 @@ class NexeUI {
 
     /// Client-side heuristic: a model has vision (VLM) if the name contains
     /// known multimodal families/tags. Equivalent to hasVision in the Swift wizard.
-    /// backend: 'ollama'|'mlx'|'llamacpp' — Qwen3.5 vision works on Ollama but not on MLX (torch).
+    /// backend: 'ollama'|'mlx'|'llamacpp' — used to exclude models that need
+    /// runtime deps not present on a given engine.
     _modelHasVision(name, backend) {
         const n = (name || '').toLowerCase();
-        // Omni-models that require torch/torchvision —
-        // they crash on MLX. They work fine on Ollama.
-        // See knowledge/*/LIMITATIONS.md section "Multimodal models (VLM)".
+        // Models that historically crashed on MLX because they needed torch
+        // and the dev/DMG bundles did not ship it. Empirical 2026-05-13:
+        // PyTorch is now bundled (DMG) and installed in the dev venv, so
+        // Qwen3.5-Omni MLX vision works (verified end-to-end with an image
+        // describe request to qwen3.5:4b returning a correct caption).
+        // Kept here as an empty-by-default list so future incompatibilities
+        // can be re-added without restructuring the heuristic.
         const omniExcludes = [
-            'qwen3.5',      // Qwen3.5 (all sizes) — torch required for MLX
             'qwen3-omni',
             'kimi-vl',
             'qwen3-vl-moe',
