@@ -345,6 +345,7 @@ class MLXChatNode:
                     system, messages, images or [],
                     threadsafe_callback if stream_callback else None,
                     max_tokens_override, temperature_override,
+                    thinking_enabled,
                 )
             else:
                 # Run generation in thread (MLX is blocking)
@@ -460,7 +461,30 @@ class MLXChatNode:
         system: str,
         processor,
         has_image: bool,
+        thinking_enabled: bool = True,
     ) -> str:
+        """Build the VLM prompt with thinking control.
+
+        Empirically detected 2026-05-13 (Qwen3.5-27B-4bit on MLX): the VLM
+        branch was ignoring the user's Raonament toggle entirely. Root cause:
+        ``execute()`` did not forward ``thinking_enabled`` to ``_generate_vlm``,
+        and ``_prepare_vlm_prompt`` did not pass ``enable_thinking`` down to
+        ``mlx_vlm.prompt_utils.apply_chat_template``. The Qwen3/Qwen3.5
+        ``chat_template.jinja`` reads the ``enable_thinking`` Jinja variable to
+        decide whether to inject ``<think>\\n\\n</think>\\n\\n`` (suppressed)
+        or ``<think>\\n`` (force-thinking). With the kwarg missing the template
+        defaulted to the second branch and the model thought every time.
+
+        Fix: forward ``enable_thinking=False`` through ``apply_chat_template``
+        (mlx_vlm forwards kwargs to ``processor.apply_chat_template`` which in
+        turn passes them to the Jinja template). When ``thinking_enabled`` is
+        True we pass nothing — preserving the model's native default
+        behaviour (which for Qwen3.5 happens to be "always think").
+
+        Tokenizer/processor combinations that don't recognise ``enable_thinking``
+        will raise ``TypeError``; we fall back to the no-kwarg call so older or
+        non-Qwen processors keep working.
+        """
         import os
         from mlx_vlm.prompt_utils import apply_chat_template
 
@@ -478,11 +502,26 @@ class MLXChatNode:
         if messages:
             all_messages.extend(messages)
 
+        prompt_arg = all_messages if all_messages else ""
+        num_images = 1 if has_image else 0
+
+        if not thinking_enabled:
+            try:
+                return apply_chat_template(
+                    processor=processor,
+                    config=mdl_config,
+                    prompt=prompt_arg,
+                    num_images=num_images,
+                    enable_thinking=False,
+                )
+            except TypeError:
+                pass  # processor template does not support enable_thinking — fall through
+
         return apply_chat_template(
             processor=processor,
             config=mdl_config,
-            prompt=all_messages if all_messages else "",
-            num_images=1 if has_image else 0,
+            prompt=prompt_arg,
+            num_images=num_images,
         )
 
     def _run_vlm_streaming(
@@ -568,18 +607,25 @@ class MLXChatNode:
         stream_callback: Optional[Callable[[str], None]] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        thinking_enabled: bool = True,
     ) -> Dict[str, Any]:
         """VLM generation with mlx_vlm (text + image). Uses mlx_vlm.generate().
 
         API mlx-vlm >= 0.4: `image` is a path (str) or list of paths, and `generate()`
         returns a `GenerationResult` with .text + real metrics (not a bare string).
+
+        thinking_enabled forwarded to _prepare_vlm_prompt so the chat template
+        sees the Raonament toggle (fix 2026-05-13 — see _prepare_vlm_prompt
+        docstring for the upstream root cause).
         """
         import os
         import tempfile
 
         model, processor = self._get_model()
         has_image = bool(images)
-        formatted_prompt = self._prepare_vlm_prompt(messages, system, processor, has_image)
+        formatted_prompt = self._prepare_vlm_prompt(
+            messages, system, processor, has_image, thinking_enabled=thinking_enabled,
+        )
 
         tmp_path = None
         try:
