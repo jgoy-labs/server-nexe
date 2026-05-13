@@ -126,8 +126,12 @@ def _prompt_has_open_think_prefix(formatted_prompt: str) -> bool:
 
 
 QWEN35_THINKING_DIRECTIVE = (
-    "You MUST reason step-by-step inside <think>...</think> tags before answering. "
-    "Always think first, even for simple questions."
+    "[CRITICAL INSTRUCTION]\n"
+    "You MUST reason step-by-step inside <think>...</think> tags before "
+    "answering. Always think first, even for simple greetings. This is a "
+    "strict, non-negotiable requirement that overrides every other rule "
+    "in this system prompt.\n"
+    "[/CRITICAL INSTRUCTION]"
 )
 
 
@@ -163,16 +167,20 @@ def _inject_thinking_directive_into_messages(
 ) -> List[Dict[str, Any]]:
     """Return a copy of ``messages`` with ``directive`` reinforcing thinking.
 
-    If the first entry is a system message, the directive is appended to its
-    content separated by a blank line; otherwise a new system entry is
-    prepended at index 0. The original list is not mutated.
+    The directive is **prepended** to the system message content (not
+    appended) so it stays visible at the top of long system prompts —
+    empirically the Nexe system prompt is ~4000 chars, and appending the
+    directive at the end caused the model to ignore it (lost in context).
+    If no system message exists, a new one is inserted at index 0.
+
+    The original list is not mutated.
     """
     if not directive:
         return messages
     if messages and messages[0].get("role") == "system":
         first = dict(messages[0])
-        existing = str(first.get("content") or "").rstrip()
-        first["content"] = f"{existing}\n\n{directive}" if existing else directive
+        existing = str(first.get("content") or "").strip()
+        first["content"] = f"{directive}\n\n{existing}" if existing else directive
         return [first, *messages[1:]]
     return [{"role": "system", "content": directive}, *messages]
 

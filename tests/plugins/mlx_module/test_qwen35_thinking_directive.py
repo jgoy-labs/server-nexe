@@ -54,7 +54,10 @@ class TestNeedsDirective:
 class TestInjectDirective:
     """Behaviour of the message-list rewriter."""
 
-    def test_appends_to_existing_system_message(self) -> None:
+    def test_prepends_to_existing_system_message(self) -> None:
+        # Empirical 2026-05-13: directive MUST be prepended (top of system
+        # message), not appended. With the Nexe system prompt at ~4000 chars,
+        # appending at the end caused Qwen3.5 to ignore the instruction.
         messages = [
             {"role": "system", "content": "You are helpful."},
             {"role": "user", "content": "Hi"},
@@ -63,8 +66,8 @@ class TestInjectDirective:
             messages, QWEN35_THINKING_DIRECTIVE
         )
         assert out[0]["role"] == "system"
-        assert out[0]["content"].startswith("You are helpful.")
-        assert QWEN35_THINKING_DIRECTIVE in out[0]["content"]
+        assert out[0]["content"].startswith(QWEN35_THINKING_DIRECTIVE)
+        assert out[0]["content"].endswith("You are helpful.")
         # Subsequent messages must not be touched.
         assert out[1] == {"role": "user", "content": "Hi"}
 
@@ -129,3 +132,9 @@ class TestDirectiveText:
     def test_directive_is_imperative(self) -> None:
         # "MUST" is the strong-language marker the model is trained to obey.
         assert "MUST" in QWEN35_THINKING_DIRECTIVE
+
+    def test_directive_wrapped_in_critical_tags(self) -> None:
+        # Tag fences raise the salience of the directive when prepended to
+        # a long system prompt — empirically required for Qwen3.5 to obey.
+        assert "[CRITICAL INSTRUCTION]" in QWEN35_THINKING_DIRECTIVE
+        assert "[/CRITICAL INSTRUCTION]" in QWEN35_THINKING_DIRECTIVE
