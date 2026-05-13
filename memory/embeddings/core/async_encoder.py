@@ -140,9 +140,10 @@ class AsyncEmbedder:
       TextEmbedding instance
     """
     from fastembed import TextEmbedding
+    from memory.embeddings.paths import default_fastembed_cache_dir
 
     try:
-      return TextEmbedding(self.model_name)
+      return TextEmbedding(self.model_name, cache_dir=str(default_fastembed_cache_dir()))
     except Exception as e:
       raise RuntimeError(
           f"Embedding model '{self.model_name}' not available locally. "

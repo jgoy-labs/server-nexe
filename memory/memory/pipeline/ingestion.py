@@ -229,6 +229,7 @@ class IngestionPipeline:
       return self._generate_test_embedding(text)
 
     from fastembed import TextEmbedding
+    from memory.embeddings.paths import default_fastembed_cache_dir
     import numpy as np
 
     if not text.strip():
@@ -238,7 +239,7 @@ class IngestionPipeline:
     if fe_model is None:
       logger.info("Loading fastembed model: %s", self.embedding_model)
       try:
-        fe_model = TextEmbedding(self.embedding_model)
+        fe_model = TextEmbedding(self.embedding_model, cache_dir=str(default_fastembed_cache_dir()))
         self._fe_model = fe_model
       except Exception as e:
         raise RuntimeError(

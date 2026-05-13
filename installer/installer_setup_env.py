@@ -251,14 +251,14 @@ def _seed_fastembed_cache(bundle_embeddings_dir, cache_dir):
 def _default_fastembed_cache_dir():
     """Location of the fastembed cache for the current user.
 
-    Respects FASTEMBED_CACHE_DIR if exported (used by the wizard on the
-    dev Mac to redirect the cache). Falls back to `~/.cache/fastembed/`
-    which is the cross-platform fastembed convention.
+    Thin wrapper kept for backwards compatibility with existing installer
+    call-sites. The real implementation lives in
+    ``memory.embeddings.paths`` (the single source of truth shared with
+    the runtime ``TextEmbedding(...)`` call-sites). See that module's
+    docstring for the rationale.
     """
-    env_override = os.environ.get("FASTEMBED_CACHE_DIR")
-    if env_override:
-        return Path(env_override).expanduser()
-    return Path.home() / ".cache" / "fastembed"
+    from memory.embeddings.paths import default_fastembed_cache_dir
+    return default_fastembed_cache_dir()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
