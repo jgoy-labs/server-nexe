@@ -87,6 +87,44 @@ def _require_torch() -> None:
         ) from exc
 
 
+def _prompt_has_open_think_prefix(formatted_prompt: str) -> bool:
+    """Detect chat templates that inject ``<think>`` *into the prompt*.
+
+    Empirical incident 2026-05-13: Qwen3 / Qwen3.5 / Gemma-4 chat templates
+    pre-open the reasoning block when ``enable_thinking`` is true (default
+    or explicit). Their tail looks like::
+
+        <|im_start|>assistant\\n<think>\\n
+
+    The model then generates ``[reasoning]</think>\\n[answer]`` — note the
+    *missing* opening ``<think>`` in the model's own output. Downstream
+    parsers (``_process_content_think_tags`` in routes_chat.py) only switch
+    into "thinking" mode when they see ``<think>`` *in the stream*, so they
+    miss the prefix and dump the entire reasoning verbatim into the visible
+    body of the response, while the trailing ``</think>`` and final answer
+    look like noise.
+
+    This helper is the engine-side detector: if the prompt already contains
+    the opener, the engine MUST emit a synthetic ``<think>\\n`` as the very
+    first chunk of the stream so downstream parsers see the canonical
+    ``<think>...</think>`` pattern and split correctly.
+
+    The check is structural (looks at the prompt tail), not family-based
+    (no Qwen/Gemma allowlist). gpt-oss uses a different convention with
+    ``<|channel|>analysis<|message|>`` tags emitted *by the model*, so its
+    prompt does NOT end in ``<think>`` and this helper returns False — its
+    existing pipeline keeps working unchanged.
+
+    Models that don't open the reasoning block in the prompt (e.g.
+    thinking_enabled=False which produces the ``<think>\\n\\n</think>\\n\\n``
+    tail, or models with no reasoning at all) also return False.
+    """
+    if not formatted_prompt:
+        return False
+    tail = formatted_prompt.rstrip()
+    return tail.endswith("<think>")
+
+
 def _sanitize_safetensors_index(model_path: str) -> bool:
     """Disable a safetensors index that declares shards which do not exist.
 
@@ -535,8 +573,16 @@ class MLXChatNode:
     ):
         from mlx_vlm import stream_generate as vlm_stream
 
+        # See _prompt_has_open_think_prefix docstring: when the chat template
+        # injects <think> into the prompt (Qwen3, Qwen3.5, Gemma-4 with
+        # thinking on), the model's stream omits the opening tag, breaking
+        # downstream split. Re-emit the missing opener as the first chunk so
+        # the canonical <think>...</think> pattern reaches the client.
+        prepend_think = _prompt_has_open_think_prefix(formatted_prompt)
+
         full_text = ""
         last = None
+        emitted_prefix = False
         for chunk in vlm_stream(
             model=model,
             processor=processor,
@@ -546,6 +592,10 @@ class MLXChatNode:
         ):
             delta = getattr(chunk, "text", "") or ""
             if delta:
+                if prepend_think and not emitted_prefix:
+                    stream_callback("<think>\n")
+                    full_text += "<think>\n"
+                    emitted_prefix = True
                 stream_callback(delta)
                 full_text += delta
             last = chunk
@@ -569,7 +619,12 @@ class MLXChatNode:
             max_tokens=max_tokens or self.config.max_tokens,
             verbose=False,
         )
-        return (one.text if hasattr(one, "text") else str(one)), one
+        text = one.text if hasattr(one, "text") else str(one)
+        if _prompt_has_open_think_prefix(formatted_prompt):
+            # Same fix as the streaming path: re-emit the synthetic <think>\n
+            # opener so downstream parsers recognise the reasoning block.
+            text = "<think>\n" + text
+        return text, one
 
     def _extract_vlm_metrics(
         self,
