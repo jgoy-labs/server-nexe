@@ -359,7 +359,26 @@ class SessionManager:
             logger.error("Failed to load sessions: %s", e)
 
     def _save_session_to_disk(self, session: ChatSession):
-        """Save session to disk (encrypted if crypto available, plain otherwise)."""
+        """Save session to disk (encrypted if crypto available, plain otherwise).
+
+        Production safety contract (added 2026-05-13 after empirical incident
+        where 80 plaintext .json sessions appeared in storage/sessions/ on a
+        production server because the SessionManager was constructed with
+        crypto_provider=None — see plugins/web_ui_module/module.py and
+        tests/plugins/web_ui_module/test_session_manager_proxy.py for the
+        related regression chain).
+
+        In production (NEXE_ENV=production, the default), refusing to silently
+        write plaintext is the only correct behaviour: the operator opted in
+        to encryption-at-rest at startup and the .json fallback would leak
+        chat content to disk unencrypted. The exception bubbles up so the
+        upstream handler logs it; the in-memory session is preserved either
+        way (the dict assignment in create_session/update_session has already
+        happened by the time we get here).
+
+        In development/test, keep the .json fallback so existing test fixtures
+        and crypto-less local runs still work.
+        """
         self._validate_session_id(session.id)
         try:
             if self._crypto:
@@ -375,6 +394,19 @@ class SessionManager:
                 except OSError:
                     logger.warning("chmod 600 failed on session file %s", file_path)
             else:
+                import os as _os
+                _env = _os.environ.get("NEXE_ENV", "production").lower()
+                if _env == "production":
+                    logger.critical(
+                        "Refusing to write plaintext .json session %s in production "
+                        "(crypto_provider missing). Encryption-at-rest is mandatory; "
+                        "see core.lifespan_crypto and plugins.web_ui_module.module.",
+                        session.id,
+                    )
+                    raise RuntimeError(
+                        "SessionManager in production mode requires crypto_provider; "
+                        "refusing to write plaintext session file."
+                    )
                 file_path = self._storage_path / f"{session.id}.json"
                 with open(file_path, 'w', encoding='utf-8') as f:
                     json.dump(session.to_dict(), f, indent=2, ensure_ascii=False)
