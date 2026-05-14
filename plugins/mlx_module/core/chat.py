@@ -282,6 +282,48 @@ def _sanitize_safetensors_index(model_path: str) -> bool:
     return True
 
 
+# vision_config alone is not sufficient — some non-VL models (e.g. Qwen3.5 MoE)
+# include it as a config artefact without actual vision weights. Only trust it
+# when the architecture name also contains one of these keywords.
+_VLM_ARCH_KEYWORDS = (
+    "vl", "vision", "visual", "llava", "intern",
+    "qwen2vl", "qwen2_5_vl", "qwen3vl",
+)
+
+
+def _load_json_safe(path: Path) -> Optional[Dict[str, Any]]:
+    """Load JSON from path. Returns None if missing or unparseable."""
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except Exception:  # nosec B110: optional VLM inspection — fail-closed (return None)
+        return None
+
+
+def _vlm_from_config(config: Dict[str, Any]) -> bool:
+    """Signal 1+2: VLM detection from config.json architectures + vision_config."""
+    archs = set(config.get("architectures", []))
+    if archs & _VLM_ARCHITECTURES:
+        return True
+    if "vision_config" in config and config.get("vision_config") and archs:
+        arch_str = " ".join(archs).lower()
+        return any(kw in arch_str for kw in _VLM_ARCH_KEYWORDS)
+    return False
+
+
+def _vlm_from_safetensors(root: Path) -> bool:
+    """Signal 3: VLM detection from weight_map keys in safetensors index."""
+    idx = _load_json_safe(root / "model.safetensors.index.json")
+    if idx is None:
+        return False
+    wm = idx.get("weight_map", {})
+    return any(
+        any(p in key for p in _VLM_WEIGHT_PATTERNS)
+        for key in wm
+    )
+
+
 def _detect_vlm_capability(model_path: str) -> bool:
     """Detects whether the model is a VLM by combining 3 signals (any-of):
 
@@ -295,41 +337,10 @@ def _detect_vlm_capability(model_path: str) -> bool:
     if not model_path:
         return False
     root = Path(model_path)
-    config_path = root / "config.json"
-    if not config_path.exists():
+    config = _load_json_safe(root / "config.json")
+    if config is None:
         return False
-
-    # 1 + 2: config.json inspection
-    try:
-        config = json.loads(config_path.read_text())
-    except Exception:
-        return False
-
-    archs = set(config.get("architectures", []))
-    if archs & _VLM_ARCHITECTURES:
-        return True
-    # vision_config alone is not sufficient — some non-VL models (e.g. Qwen3.5 MoE)
-    # include it as a config artefact without actual vision weights. Only trust it
-    # when the architecture name also contains a VL keyword.
-    if "vision_config" in config and config.get("vision_config") and archs:
-        arch_str = " ".join(archs).lower()
-        if any(kw in arch_str for kw in ("vl", "vision", "visual", "llava", "intern", "qwen2vl", "qwen2_5_vl", "qwen3vl")):
-            return True
-
-    # 3: safetensors weight map inspection (multi-shard)
-    index_path = root / "model.safetensors.index.json"
-    try:
-        if index_path.exists():
-            idx = json.loads(index_path.read_text())
-            wm = idx.get("weight_map", {})
-            for key in wm:
-                if any(p in key for p in _VLM_WEIGHT_PATTERNS):
-                    return True
-    except Exception:  # nosec B110: optional VLM inspection — comment below documents intent (do not block decision on JSON failure)
-        # optional inspection; do not block decision if JSON fails
-        pass
-
-    return False
+    return _vlm_from_config(config) or _vlm_from_safetensors(root)
 
 
 class MLXChatNode:
