@@ -23,7 +23,7 @@ from plugins.mlx_module.core.generate_helpers import run_streaming_generation
 
 
 def _make_config() -> MLXConfig:
-    return MLXConfig(model_path="/tmp/fake-model")
+    return MLXConfig(model_path="/tmp/fake-model")  # nosemgrep: hardcode.absolute_path
 
 
 class TestStreamingGenerationCancellation:

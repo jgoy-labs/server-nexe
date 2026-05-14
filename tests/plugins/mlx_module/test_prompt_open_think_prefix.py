@@ -98,7 +98,7 @@ class TestDetector:
 
 def _build_node():
     cfg = MagicMock()
-    cfg.model_path = "/tmp/_fake"
+    cfg.model_path = "/tmp/_fake"  # nosemgrep: hardcode.absolute_path
     cfg.max_tokens = 64
     node = MLXChatNode.__new__(MLXChatNode)
     node.config = cfg

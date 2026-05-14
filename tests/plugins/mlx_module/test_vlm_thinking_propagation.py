@@ -57,7 +57,7 @@ def _stub_mlx_vlm():
 def _build_node():
     """Build a MLXChatNode with a fake config (no real model load)."""
     cfg = MagicMock()
-    cfg.model_path = "/tmp/_fake_model_path"
+    cfg.model_path = "/tmp/_fake_model_path"  # nosemgrep: hardcode.absolute_path
     node = MLXChatNode.__new__(MLXChatNode)
     node.config = cfg
     return node
