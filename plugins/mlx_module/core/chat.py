@@ -17,11 +17,13 @@ Requires:
 
 """
 import asyncio
+import functools
 import gc
 import json
 import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -38,6 +40,32 @@ from .generate_helpers import (
 from core.utils import compute_system_hash
 
 logger = logging.getLogger(__name__)
+
+
+# Dedicated single-worker executor for ALL MLX operations.
+#
+# Empirical incident 2026-05-13: ``asyncio.to_thread()`` picks an arbitrary
+# thread from the default pool. MLX maintains ``default_stream`` *per thread*,
+# so when the prompt-cache KV is created on thread A and the next generation
+# runs on thread B, MLX raises::
+#
+#     RuntimeError: There is no Stream(gpu, 1) in current thread.
+#
+# The state is permanently corrupted — every subsequent MLX call fails and
+# the only recovery is a full server restart. Cancelling a generation
+# mid-stream (Stop button in the UI) reliably reproduces it.
+#
+# Fix: pin every MLX entry point (``_generate_vlm``, ``_generate_blocking``,
+# and any future ``reset_model`` style ops) to a single dedicated worker
+# thread. With max_workers=1 the executor serialises requests on the same
+# thread, so the per-thread ``default_stream`` stays consistent across
+# turns and across cancel/abort transitions.
+#
+# max_workers=1 is correct: MLX already serialises generation internally via
+# ``MLXChatNode._lock``, so we'd be queueing at the asyncio level anyway —
+# moving the queue into the executor keeps everything on one thread without
+# changing the effective concurrency contract.
+_MLX_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mlx-worker")
 
 
 # Known VLM architectures (config.json → architectures[])
@@ -437,28 +465,37 @@ class MLXChatNode:
             # the primary source — it is always fresh and does not depend on the _is_vlm
             # singleton which can go stale when switching from VLM → text within the same session.
             is_vlm = _detect_vlm_capability(self.config.model_path)
+            # Pin MLX calls to the dedicated single-worker executor so all
+            # operations share one thread and the per-thread default_stream
+                # stays consistent across turns (see _MLX_EXECUTOR docstring).
             if is_vlm:
-                result = await asyncio.to_thread(
-                    self._generate_vlm,
-                    system, messages, images or [],
-                    threadsafe_callback if stream_callback else None,
-                    max_tokens_override, temperature_override,
-                    thinking_enabled,
+                result = await loop.run_in_executor(
+                    _MLX_EXECUTOR,
+                    functools.partial(
+                        self._generate_vlm,
+                        system, messages, images or [],
+                        threadsafe_callback if stream_callback else None,
+                        max_tokens_override, temperature_override,
+                        thinking_enabled,
+                    ),
                 )
             else:
                 # Run generation in thread (MLX is blocking)
                 # With PREFIX MATCHING via MLXPromptCacheManager
                 # Pass messages (for generation) and messages_for_cache (to store clean cache)
-                result = await asyncio.to_thread(
-                    self._generate_blocking,
-                    system,
-                    messages,
-                    messages_for_cache,  # To store clean cache (without memory context)
-                    threadsafe_callback if stream_callback else None,
-                    session_id,  # To separate caches per session
-                    max_tokens_override,
-                    temperature_override,
-                    thinking_enabled,
+                result = await loop.run_in_executor(
+                    _MLX_EXECUTOR,
+                    functools.partial(
+                        self._generate_blocking,
+                        system,
+                        messages,
+                        messages_for_cache,  # To store clean cache (without memory context)
+                        threadsafe_callback if stream_callback else None,
+                        session_id,  # To separate caches per session
+                        max_tokens_override,
+                        temperature_override,
+                        thinking_enabled,
+                    ),
                 )
 
             elapsed_ms = int((time.time() - start_time) * 1000)
