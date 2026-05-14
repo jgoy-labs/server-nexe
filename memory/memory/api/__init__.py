@@ -194,7 +194,7 @@ class MemoryAPI:
       """Instantiate the fastembed TextEmbedding model (blocking, run in executor)."""
       from fastembed import TextEmbedding
       from memory.embeddings.paths import default_fastembed_cache_dir
-      kwargs = {"cache_dir": str(default_fastembed_cache_dir())}
+      kwargs: dict[str, Any] = {"cache_dir": str(default_fastembed_cache_dir())}
       if embed_threads is not None:
         kwargs["threads"] = embed_threads
       try:
