@@ -157,6 +157,8 @@ allowed = [
     # Noms PyPI classifier (boltons, click, colorama, glom, grimp, httpx,
     # import-linter, prompt_toolkit, semantic-version, wrapt)
     "BSD License",
+    # torchvision — PyPI metadata returns 'BSD' literally (actual license is BSD-3-Clause)
+    "BSD",
     # Noms PyPI classifier (cyclonedx-python-lib, googleapis-common-protos,
     # lingua-language-detector, pip-api, pip_audit, py-serializable,
     # requests, sortedcontainers, stevedore)
