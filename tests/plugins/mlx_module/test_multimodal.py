@@ -323,16 +323,28 @@ class TestMLXExecuteBifurcation:
             "peak_memory_mb": 0, "identity_hash": "abc",
         }
 
-        with patch("asyncio.to_thread") as mock_thread:
-            mock_thread.return_value = expected
+        # MLX entry now goes through loop.run_in_executor(_MLX_EXECUTOR, partial).
+        # Capture the partial to assert the underlying callable is correct.
+        captured: dict = {}
+
+        async def fake_runner():
+            return expected
+
+        def fake_run_in_executor(exe, fn):
+            captured["fn"] = fn
+            return fake_runner()
+
+        fake_loop = MagicMock()
+        fake_loop.run_in_executor = fake_run_in_executor
+
+        with patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=fake_loop):
             result = await node.execute({
                 "system": "",
                 "messages": [{"role": "user", "content": "Hola"}],
             })
 
-        # Verify that _generate_blocking was called (not _generate_vlm)
-        call_args = mock_thread.call_args
-        assert call_args[0][0] == node._generate_blocking
+        # functools.partial wraps the real method; .func is what was bound.
+        assert captured["fn"].func == node._generate_blocking
 
     @pytest.mark.asyncio
     async def test_images_with_vlm_uses_generate_vlm(self):
@@ -362,18 +374,28 @@ class TestMLXExecuteBifurcation:
             "vlm": True,
         }
 
+        captured: dict = {}
+
+        async def fake_runner():
+            return vlm_result
+
+        def fake_run_in_executor(exe, fn):
+            captured["fn"] = fn
+            return fake_runner()
+
+        fake_loop = MagicMock()
+        fake_loop.run_in_executor = fake_run_in_executor
+
         with patch("plugins.mlx_module.core.chat._detect_vlm_capability", return_value=True), \
-             patch("asyncio.to_thread") as mock_thread:
-            mock_thread.return_value = vlm_result
+             patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=fake_loop):
             result = await node.execute({
                 "system": "",
                 "messages": [{"role": "user", "content": "Descriu la imatge"}],
                 "images": [b"\xff\xd8\xff" + b"\x00" * 100],
             })
 
-        # Verify that _generate_vlm was called (not _generate_blocking)
-        call_args = mock_thread.call_args
-        assert call_args[0][0] == node._generate_vlm
+        # functools.partial wraps the real method; .func is what was bound.
+        assert captured["fn"].func == node._generate_vlm
         # The response is valid
         assert result.get("response") == "Veig un gat."
 

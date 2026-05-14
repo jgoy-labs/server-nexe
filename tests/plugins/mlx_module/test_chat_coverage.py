@@ -118,11 +118,16 @@ class TestExecute:
             "identity_hash": "abc123",
         }
 
-        async def fake_to_thread(fn, *args, **kwargs):
+        # MLX calls now route through loop.run_in_executor(_MLX_EXECUTOR, fn).
+        # Mock the loop so run_in_executor returns an awaitable that yields
+        # the result without touching the real executor or MLX (fix 2026-05-14).
+        async def fake_runner():
             return generate_result
 
-        with patch("plugins.mlx_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
+        fake_loop = MagicMock()
+        fake_loop.run_in_executor = lambda exe, fn: fake_runner()
+
+        with patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=fake_loop):
             result = await node.execute({
                 "system": "You are a helper",
                 "messages": [{"role": "user", "content": "hello"}],
@@ -156,11 +161,13 @@ class TestExecute:
             "identity_hash": "def456",
         }
 
-        async def fake_to_thread(fn, *args, **kwargs):
+        async def fake_runner():
             return generate_result
 
-        with patch("plugins.mlx_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
+        fake_loop = MagicMock()
+        fake_loop.run_in_executor = lambda exe, fn: fake_runner()
+
+        with patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=fake_loop):
             result = await node.execute({
                 "system": "sys",
                 "messages": [],
@@ -190,11 +197,13 @@ class TestExecute:
             "peak_memory_mb": 200.0,
         }
 
-        async def fake_to_thread(fn, *args, **kwargs):
+        async def fake_runner():
             return generate_result
 
-        with patch("plugins.mlx_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
+        fake_loop = MagicMock()
+        fake_loop.run_in_executor = lambda exe, fn: fake_runner()
+
+        with patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=fake_loop):
             result = await node.execute({
                 "system": "s",
                 "messages": [],
@@ -211,11 +220,13 @@ class TestExecute:
         node.config = config
         MLXChatNode._config = config
 
-        async def fake_to_thread(fn, *args, **kwargs):
+        async def fake_runner():
             raise RuntimeError("mlx error")
 
-        with patch("plugins.mlx_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
+        fake_loop = MagicMock()
+        fake_loop.run_in_executor = lambda exe, fn: fake_runner()
+
+        with patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=fake_loop):
             with pytest.raises(RuntimeError, match="mlx error"):
                 await node.execute({"system": "", "messages": []})
 
