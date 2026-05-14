@@ -47,11 +47,116 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Test SQLi al chat: contracte ajustat al disseny** (`tests/test_chat_v1_validation.py`). `test_sql_injection_in_message_content_rejected` renombrat a `test_sql_injection_in_chat_passes_through_to_llm`: en `context="chat"` el sanitizer delega `check_sql` al LLM (Ollama), perquè el pipeline no toca cap SQL DB (RAG = Qdrant vector DB). Discutir "UNION SELECT" és tech talk legítim. El rebuig estricte de SQLi es manté a `context="param"` (model, engine), cobert per `test_sql_injection_in_model_field_rejected`. Cap canvi a `plugins/security/core/input_sanitizers.py` — la decisió `check_sql=False` en chat ja era intencionada i documentada (línies 153-156, 164-169). Auditoria r1 P0.1 (DeepSeek V3 / Turing).
 - **Test `nexe stop` accepta sortida en català o anglès** (`tests/test_cli_stop_pid.py`). `test_stop_no_services_running` només verificava l'output anglès "No Nexe services are running"; quan `NEXE_LANG=ca` (per defecte al Mac de dev) el CLI imprimeix "Cap servei Nexe actiu" i el test fallava. Assert ampliat amb `or` per cobrir ambdós idiomes. Auditoria r1 P1 (DeepSeek V3 / Turing).
 
-## [1.0.4-beta] - in progress
+## [1.0.4-beta] — 2026-05-14
+
+Sprint after 1.0.3-beta with 389 commits focused on security hardening, MLX
+engine reliability, vision model support (Qwen3-VL family), observability,
+and a comprehensive type-safety + complexity reduction pass.
+
+### Security
+
+- **NFKC unicode normalization** on RAG injection filter and memory tag
+  stripper — defends against unicode-confusable bypass of `[MEM_SAVE]` and
+  injection patterns.
+- **API key now required on info/health endpoints** — previously some
+  metadata endpoints leaked version/build info without auth.
+- **Rate-limit on `/v1/memory/search`** (60/min) — prevents search
+  enumeration.
+- **Web UI graceful degradation when security plugin missing** — clean 503
+  instead of stack trace.
+- **SSE error message sanitization** — stream errors no longer leak
+  internal paths; non-streaming completion content also sanitized.
+- **AES-GCM AAD bound to session_id** — prevents session swap attacks on
+  encrypted `.enc` files.
+- **`chmod 600` on session `.enc` writes** + refuse plaintext `.json`
+  sessions in production when crypto missing.
+- **Ollama bundle SHA256 pinning** — first install verifies the bundle hash
+  before extraction.
+- **Stop logging partial API keys** in auth failure logs.
 
 ### Added
 
-- (pendent: completar al final del sprint)
+- **SHA256 pinning of installer downloads** — integrity check infrastructure
+  for MLX snapshots, GGUF files, and Ollama manifests. DMG-bundled fastembed
+  model gets a manifest with three digests. Catalog pins remain `None` at
+  this release; pin population is roadmapped for the next sprint.
+- **Live test suite** (`tests/test_live/`, `dev-tools/run_live.py`) — 53
+  tests across all backends (Ollama, MLX, llama.cpp), MEM_SAVE, prompt
+  injection, fail-closed, input validation, rate limit. Auto-starts the
+  server if down.
+- **Qwen3-VL family in MLX catalog** — 4B / 8B / 30B-A3B with vision
+  capability detection.
+- **PyTorch + torchvision bundled in installer** — vision/multimodal models
+  run on first install without manual setup.
+- **MLX hardware tier detection** (`low`/`mid`/`high`/`ultra`) for adaptive
+  defaults per Apple Silicon variant.
+- **Rotating `rag.log`** — daily rotation, 14-day retention.
+- **Recall@N evaluation** (real, not synthetic) + bracket support for CJK
+  and mathematical brackets.
+- **Web UI thinking-state polish** — Mexican-wave per-letter animation,
+  orange NEXE avatar with traffic-light cycle, placeholder border pulse,
+  MODEL_LOADING banner guaranteed visible ≥ 700 ms.
+- **Shared engine helpers** (`_common.py`, `_streaming.py`) — deduplicated
+  Ollama/MLX/llama.cpp request and stream code.
+- **`THREAT_MODEL.md`** plus per-language versions in `knowledge/`.
+- **138 new docstrings** + `interrogate` configured to enforce coverage.
+
+### Fixed
+
+- **MLX cancel propagation** — HTTP client cancel now reaches the MLX
+  streaming loop (no more zombie generation after disconnect).
+- **MLX stream affinity** — single-worker executor pinning preserves
+  per-thread default_stream, fixing intermittent stream corruption.
+- **Qwen3.5 thinking on MLX** — directive prepended with critical tags
+  (append failed for prompt-length reasons), synthetic `<think>` opener
+  re-emitted when the chat template injects it, `thinking_enabled`
+  forwarded through the VLM branch and `apply_chat_template`.
+- **VL model loading without PyTorch** — clear `MissingDependencyError`,
+  auto-fallback to text-only mode, auto-disable stale safetensors index
+  pointing at non-existent shards.
+- **RAG recall: `MemoryAPI not available` on every chat request** — broken
+  singleton (assigned before `initialize()`), permanent failure flag (no
+  retry), and silent debug fallback all fixed. New 60-second retry window.
+- **`GCDaemon` was never invoked** — score-based episodic pruning, budget
+  enforcement, and tombstones existed but were dead code. Now wired into
+  `DreamingCycle.run_cycle()` per active user.
+- **`DreamingCycle` ran without an embedder** — `_sync_vector_index` was a
+  no-op in production; episodic memories never reached the vector store.
+- **Streaming**: `data: [DONE]` always emitted after post-processing (some
+  clients hung waiting for the marker).
+- **Installer**: int8 quantized ONNX variant for the embedding bundle
+  (fp16 was incompatible with modern ONNX Runtime); Ollama bundle pinned to
+  v0.22.1.
+- **`cancel_event` scoped to MLX only** — Ollama and llama.cpp cancel
+  natively via async transport.
+- **Web UI**: 21 fixes including footer thinking-badge alignment, image
+  MIME persisted in sessions, `NEXE_LLAMA_CPP_MODEL` honored in backend
+  scan, vision icon for MLX Qwen3.5.
+- **Dependency CVEs** patched: `pypdf`, `python-dotenv`, `python-multipart`,
+  `filelock` (9 advisories from `osv-scanner`).
+
+### Changed
+
+- **Documentation honesty pass** — `README.md`, `SECURITY.md`,
+  `IDENTITY.md` aligned with actual behavior on telemetry ("scoped to
+  runtime"), encryption defaults (`auto` is not fail-closed), CSP
+  (`style-src 'unsafe-inline'` is allowed for Web UI), and "agnostic"
+  scope (backend choice only, not platform).
+- **297 test files migrated** from packages to `tests/` root for unified
+  discovery.
+- **Multiple complexity reductions** across the chat handler, response
+  generator, web UI helpers, and runner — facade helpers extracted, no
+  behavior change.
+- **Comprehensive type-safety pass** across plugins, memory, and core.
+
+### Removed
+
+- Internal one-shot scripts and personal tooling (kept locally via
+  `git rm --cached`); all four added to `.gitignore`.
+- Personal path references from `COMMANDS.md` and four test/docs files
+  (anonymized).
+- Stale `type: ignore` annotations and orphan whitelist entries in lint
+  configs.
 
 ## [1.0.3-beta] — 2026-04-24
 
