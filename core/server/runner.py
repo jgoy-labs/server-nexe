@@ -338,26 +338,21 @@ def _handle_sigterm(signum, frame):  # noqa: ARG001
   sys.exit(0)
 
 
-def main():
+def _set_process_title() -> None:
+  """Rename process to 'server-nexe' in ps/Activity Monitor (Bug #2).
+  Force Quit still shows 'Python' (needs CFBundleName via .app bundle — v0.9.1).
   """
-  Main entry point for running the server directly.
-
-  Loads configuration and starts uvicorn with the application factory.
-  """
-  # Bug #2: rename the process so it shows as "server-nexe" instead of "Python"
-  # in `ps aux` and Activity Monitor. Force Quit still shows "Python" because
-  # that requires CFBundleName via a real .app bundle (deferred to v0.9.1).
   try:
     import setproctitle
     setproctitle.setproctitle("server-nexe")
   except ImportError:
     pass  # Optional dependency
 
-  setup_signal_handlers()
-  _start_parent_watchdog()
 
-  # Always write logs to storage/logs/server.log so the tray "Open Logs"
-  # button works in both dev mode (./nexe go) and production (tray-launched).
+def _setup_file_logging() -> None:
+  """Always write logs to storage/logs/server.log so the tray 'Open Logs'
+  button works in both dev mode (./nexe go) and production (tray-launched).
+  """
   _log_dir = Path(__file__).parent.parent.parent / "storage" / "logs"
   _log_dir.mkdir(parents=True, exist_ok=True)
   _server_log = _log_dir / "server.log"
@@ -369,6 +364,58 @@ def main():
     "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   ))
   logging.getLogger().addHandler(_fh)
+
+
+def _log_quick_commands_banner(host: str, port: int) -> None:
+  """Print the quick-reference commands banner to the log."""
+  logger.info(
+    f"\n{BOLD}{RED}QUICK COMMANDS:{RESET}\n"
+    f"  {CYAN}Interactive Chat:{RESET}  ./nexe chat\n"
+    f"  {CYAN}View logs:{RESET}         ./nexe logs\n"
+    f"  {CYAN}RAG ingest:{RESET}        ./nexe memory store \"text\"\n"
+    f"  {CYAN}System status:{RESET}     ./nexe status\n"
+    f"\n{BOLD}QUICK CONFIG:{RESET}\n"
+    f"  To change personality (System Prompt):\n"
+    f"  edit {YELLOW}personality/server.toml{RESET}\n"
+    f"{YELLOW}Server running at: {host}:{port}{RESET}"
+  )
+
+
+def _run_uvicorn_server(host: str, port: int, workers: int, reload: bool, i18n) -> None:
+  """Start uvicorn with the application factory, handling KeyboardInterrupt cleanly."""
+  try:
+    uvicorn.run(
+      "core.app:app",
+      host=host,
+      port=port,
+      workers=workers,
+      reload=reload,
+      log_level="info",
+      timeout_keep_alive=5,
+      timeout_graceful_shutdown=10,
+      limit_concurrency=100,
+      limit_max_requests=None
+    )
+  except KeyboardInterrupt:
+    logger.info(translate(i18n, "core.server.server_stopped_by_user",
+      "Server stopped by user (Ctrl+C)"))
+  except Exception as e:
+    logger.error(translate(i18n, "core.server.server_startup_error",
+      "Error starting server: {error}", error=str(e)))
+    logger.exception(translate(i18n, "core.server.startup_error", "Server startup error: {error}", error=str(e)), exc_info=True)
+    sys.exit(1)
+
+
+def main():
+  """
+  Main entry point for running the server directly.
+
+  Loads configuration and starts uvicorn with the application factory.
+  """
+  _set_process_title()
+  setup_signal_handlers()
+  _start_parent_watchdog()
+  _setup_file_logging()
 
   # Note: .env is now loaded at module level (top of file) for better test compatibility
 
@@ -419,18 +466,7 @@ def main():
     translate(i18n, "server_core.startup.starting_server_on", "Starting server on {host}:{port}", host=host, port=port)
   )
 
-  # Quick reference commands
-  logger.info(
-    f"\n{BOLD}{RED}QUICK COMMANDS:{RESET}\n"
-    f"  {CYAN}Interactive Chat:{RESET}  ./nexe chat\n"
-    f"  {CYAN}View logs:{RESET}         ./nexe logs\n"
-    f"  {CYAN}RAG ingest:{RESET}        ./nexe memory store \"text\"\n"
-    f"  {CYAN}System status:{RESET}     ./nexe status\n"
-    f"\n{BOLD}QUICK CONFIG:{RESET}\n"
-    f"  To change personality (System Prompt):\n"
-    f"  edit {YELLOW}personality/server.toml{RESET}\n"
-    f"{YELLOW}Server running at: {host}:{port}{RESET}"
-  )
+  _log_quick_commands_banner(host, port)
 
   # ─── SIGTERM handler (N05) ────────────────────────────────────────────
   # Guarantees clean exit pre-uvicorn (function defined at module level).
@@ -441,25 +477,4 @@ def main():
   # runner.py no longer manages the PID directly.
 
   _maybe_launch_tray()
-
-  try:
-    uvicorn.run(
-      "core.app:app",
-      host=host,
-      port=port,
-      workers=workers,
-      reload=reload,
-      log_level="info",
-      timeout_keep_alive=5,
-      timeout_graceful_shutdown=10,
-      limit_concurrency=100,
-      limit_max_requests=None
-    )
-  except KeyboardInterrupt:
-    logger.info(translate(i18n, "core.server.server_stopped_by_user",
-      "Server stopped by user (Ctrl+C)"))
-  except Exception as e:
-    logger.error(translate(i18n, "core.server.server_startup_error",
-      "Error starting server: {error}", error=str(e)))
-    logger.exception(translate(i18n, "core.server.startup_error", "Server startup error: {error}", error=str(e)), exc_info=True)
-    sys.exit(1)
+  _run_uvicorn_server(host, port, workers, reload, i18n)
