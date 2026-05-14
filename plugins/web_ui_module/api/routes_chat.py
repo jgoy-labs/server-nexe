@@ -17,6 +17,7 @@ import asyncio
 import logging
 import os as _os
 import re as _re
+import threading
 from fastapi import APIRouter, HTTPException, Depends, Request as FastAPIRequest
 from fastapi.responses import StreamingResponse
 from core.dependencies import limiter
@@ -1415,11 +1416,42 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         session,
         memory_helper,
         message: str,
+        request: FastAPIRequest,
     ) -> tuple[str, Optional[str], Any]:
         """Returns (response_text, model_name, streaming_response_or_None)."""
         model_name = None
         image_b64 = body.get("image_b64")
         stream = body.get("stream", False)
+
+        # Cancellation propagation (Bug C handoff, fix 2026-05-14): when the
+        # HTTP client disconnects (UI Stop button → AbortController) we set
+        # this event so the MLX worker thread can break out of its streaming
+        # loop instead of running to max_tokens. Without this, the
+        # single-worker MLX executor stays busy ~100s after the user clicks
+        # Stop, blocking every subsequent request.
+        cancel_event = threading.Event()
+
+        async def _monitor_disconnect() -> None:
+            # Poll request.is_disconnected() every 0.5s. Starlette only knows
+            # the client is gone after the next ASGI receive event, so a short
+            # poll cadence keeps latency low without busy-waiting.
+            try:
+                while not cancel_event.is_set():
+                    if await request.is_disconnected():
+                        logger.info("Chat: client disconnected — signalling MLX cancel")
+                        cancel_event.set()
+                        return
+                    await asyncio.sleep(0.5)
+            except asyncio.CancelledError:
+                pass  # parent finishes normally before client disconnects
+
+        _disconnect_monitor_task = asyncio.create_task(_monitor_disconnect())
+        # When we return a StreamingResponse, ownership of the monitor task
+        # transfers to response_generator (which cancels it after yielding
+        # [DONE]). The non-streaming path cancels it from the finally block.
+        # The flag prevents premature cancel between `return StreamingResponse`
+        # and the first client read.
+        _returning_stream = False
         # Normal chat - Auto-detect and use available LLM engine
         try:
             from core.lifespan import get_server_state
@@ -1565,9 +1597,12 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         # Ollama-style: chat(model, messages, stream=...)
                         # We inject system prompt as first message for Ollama
                         full_messages = [{"role": "system", "content": system_prompt}] + messages
+                        # cancel_event passed as kwarg — engines that don't
+                        # know it absorb it via **kwargs (back-compat).
                         chat_result = engine.chat(model=model_name, messages=full_messages, stream=stream,
                                                   images=_images_arg,
-                                                  thinking_enabled=thinking_enabled)
+                                                  thinking_enabled=thinking_enabled,
+                                                  cancel_event=cancel_event)
                     else:
                         # MLX/LlamaCpp-style: chat(messages, system=...)
                         if engine_name in ("mlx_module", "llama_cpp_module"):
@@ -1587,6 +1622,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             ml_task = asyncio.create_task(engine.chat(
                                 messages=messages, system=system_prompt, stream_callback=stream_cb,
                                 images=_images_arg, thinking_enabled=thinking_enabled,
+                                cancel_event=cancel_event,
                             ))
 
                             # Async generator that yields from queue until task is done
@@ -1617,7 +1653,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         else:
                             chat_result = engine.chat(messages=messages, system=system_prompt,
                                                       images=_images_arg,
-                                                      thinking_enabled=thinking_enabled)
+                                                      thinking_enabled=thinking_enabled,
+                                                      cancel_event=cancel_event)
 
                     # Flag if compacted to notify the client
                     _compacted = session.compaction_count > 0 and session.context_summary is not None
@@ -1760,7 +1797,12 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             # The engine emits its own [DONE] but it is consumed by the
                             # pipeline and never forwarded to the client.
                             yield "data: [DONE]\n\n"
+                            # Stream finished cleanly — release the disconnect
+                            # monitor so it doesn't keep polling forever.
+                            if not _disconnect_monitor_task.done():
+                                _disconnect_monitor_task.cancel()
 
+                        _returning_stream = True
                         return "", model_name, StreamingResponse(
                             response_generator(),
                             media_type="text/plain",
@@ -1795,10 +1837,20 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             if not response_text:
                 response_text = "Error: No AI engine available (try starting Ollama with 'ollama serve')"
         except HTTPException:
+            # Make sure the disconnect monitor doesn't outlive a 4xx/5xx exit.
+            if not _disconnect_monitor_task.done():
+                _disconnect_monitor_task.cancel()
             raise
         except Exception as e:
             logger.error(f"Error calling LLM: {e}")
             response_text = f"Error: {str(e)}"
+        finally:
+            # Only cancel monitor if NOT returning a stream. For streams the
+            # response_generator owns the monitor and cancels it after [DONE];
+            # cancelling here would kill the monitor before the client even
+            # starts reading the response.
+            if not _returning_stream and not _disconnect_monitor_task.done():
+                _disconnect_monitor_task.cancel()
 
     # Strip MEM_SAVE tags and extract facts (non-streaming path)
         return response_text or "", model_name, None
@@ -1854,7 +1906,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
         if intent == "chat":
             response_text, model_name, _streaming_resp = await _handle_chat_engine(
-                body, session, memory_helper, message
+                body, session, memory_helper, message, request
             )
             if _streaming_resp is not None:
                 return _streaming_resp
