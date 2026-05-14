@@ -19,7 +19,7 @@ from .installer_display import (
 from .installer_i18n import t
 
 # Global hardware info cache
-HW_INFO = {}
+HW_INFO: dict = {}
 
 
 def get_sysctl(key):

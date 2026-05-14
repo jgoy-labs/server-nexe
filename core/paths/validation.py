@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 NEXE_CORE_DIRS = ["plugins", "core", "memory", "storage"]
 
 _cache_lock = threading.Lock()
-_detection_history = []
+_detection_history: List[dict] = []
 
 def _is_valid_core_root(path: Path) -> Tuple[bool, List[str]]:
   """
