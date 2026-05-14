@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["package.json"],
+  "project": ["package.json"],
+  "ignore": [
+    "venv/**",
+    ".test_venv/**",
+    "node_modules/**",
+    "InstallNexe.app/**",
+    "Nexe.app/**",
+    "storage/**",
+    ".muthur/**",
+    "dev-tools/**",
+    "scripts/**",
+    "knowledge/**",
+    "**/__pycache__/**"
+  ],
+  "ignoreBinaries": ["eslint", "htmlhint", "stylelint"],
+  "ignoreDependencies": []
+}
