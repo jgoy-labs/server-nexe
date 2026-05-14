@@ -133,3 +133,14 @@ diari/
 # Node
 node_modules/
 package-lock.json
+
+# =====================
+# SCRIPTS INTERNS (no van a GitHub)
+# =====================
+# One-shot translation script (Group K, ja executat) — té dades personals
+scripts/translate_comments.py
+# Benchmark intern de Bug #16 (ja resolt)
+scripts/bench_ingest_bug16.py
+# Eines personals de Jordi (PDFs legal/whitepaper) — útils local
+scripts/export_source_pdf.py
+scripts/export_whitepaper_pdf.py
