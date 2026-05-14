@@ -33,13 +33,16 @@
     ".gitignore",
     ".gitoss-sync",
     ".gitleaks.toml",
+    ".stylelintrc.json",
     ".typos.toml",
     "CHANGELOG.md",
     "CODE_OF_CONDUCT.md",
     "COMMANDS.md",
     "conftest.py",
     "CONTRIBUTING.md",
+    "eslint.config.js",
     "install_nexe.py",
+    "knip.json",
     "LICENSE",
     "package.json",
     "pyproject.toml",
@@ -53,6 +56,7 @@
     "SECURITY.md",
     "setup.sh",
     "SetupNexe.command",
+    "THREAT_MODEL.md",
   ]
 
 # Fitxers i dirs que MAI han d'arribar a GitHub
