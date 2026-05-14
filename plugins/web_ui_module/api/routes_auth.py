@@ -310,48 +310,56 @@ def _scan_llamacpp_backend(module_manager, models_dir: "Path") -> "Optional[dict
     """
     try:
         reg = module_manager.registry.get_module("llama_cpp_module")
-        if not (reg and reg.instance):
+        if not reg or not reg.instance:
             return None
-
-        # Track resolved real paths to deduplicate symlinks vs targets.
-        seen_real: "set[str]" = set()
-        gguf_list: "list[dict]" = []
-
-        def _add(path: "Path") -> None:
-            try:
-                real = str(path.resolve())
-            except OSError:
-                return
-            if real in seen_real or not path.is_file():
-                return
-            try:
-                size = path.stat().st_size
-            except OSError:
-                size = 0
-            seen_real.add(real)
-            gguf_list.append({
-                "name": path.name,
-                "size_gb": round(size / (1024 ** 3), 1) if size else 0,
-            })
-
-        # Source 1: NEXE_LLAMA_CPP_MODEL — the engine's own contract.
-        env_path_str = _os.environ.get("NEXE_LLAMA_CPP_MODEL", "").strip()
-        if env_path_str:
-            env_path = Path(env_path_str).expanduser()
-            if env_path.is_file() and env_path.suffix == ".gguf":
-                _add(env_path)
-
-        # Source 2: storage/models/*.gguf — user-curated dropdown additions.
-        if models_dir.exists():
-            for f in models_dir.iterdir():
-                if f.suffix == ".gguf":
-                    _add(f)
-
+        gguf_list = _collect_llamacpp_gguf_paths(models_dir)
         if gguf_list:
             return {"id": "llamacpp", "name": "Llama.cpp", "models": gguf_list, "active": False}
     except Exception as e:
         logger.debug(f"Llama.cpp backend scan failed: {e}")
     return None
+
+
+def _collect_llamacpp_gguf_paths(models_dir: "Path") -> "list[dict]":
+    """Collect deduplicated GGUF model entries from both discovery sources.
+
+    Sources: NEXE_LLAMA_CPP_MODEL env var + storage/models/*.gguf.
+    Dedup via resolved real path (symlinks and their targets don't double-count).
+    """
+    seen_real: "set[str]" = set()
+    gguf_list: "list[dict]" = []
+
+    def _add(path: "Path") -> None:
+        try:
+            real = str(path.resolve())
+        except OSError:
+            return
+        if real in seen_real or not path.is_file():
+            return
+        try:
+            size = path.stat().st_size
+        except OSError:
+            size = 0
+        seen_real.add(real)
+        gguf_list.append({
+            "name": path.name,
+            "size_gb": round(size / (1024 ** 3), 1) if size else 0,
+        })
+
+    # Source 1: NEXE_LLAMA_CPP_MODEL — the engine's own contract.
+    env_path_str = _os.environ.get("NEXE_LLAMA_CPP_MODEL", "").strip()
+    if env_path_str:
+        env_path = Path(env_path_str).expanduser()
+        if env_path.is_file() and env_path.suffix == ".gguf":
+            _add(env_path)
+
+    # Source 2: storage/models/*.gguf — user-curated dropdown additions.
+    if models_dir.exists():
+        for f in models_dir.iterdir():
+            if f.suffix == ".gguf":
+                _add(f)
+
+    return gguf_list
 
 
 def _mark_active_backend(backends: list, current_backend: str) -> str:
