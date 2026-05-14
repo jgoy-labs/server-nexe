@@ -36,4 +36,4 @@ find "$HOME/Nexe-Logs" -name 'rag.log.*' -mtime +7 \
 The `nexe.security` logger (`plugins/security/security_logger`) ships its
 own per-day filename pattern (`security_YYYYMMDD.log`) and is not affected
 by this change. Adding `backupCount` retention to that logger is tracked
-as `R6-11b` in `nat/dev/server-nexe/diari/BACKLOG-v1.0.4.md`.
+internally as `R6-11b` in the v1.0.4 backlog.

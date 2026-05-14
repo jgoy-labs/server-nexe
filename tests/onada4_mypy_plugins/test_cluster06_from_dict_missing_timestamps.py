@@ -13,8 +13,6 @@ Post-fix contract (Dev#2): from_dict() does NOT crash with absent keys and retur
 reasonable fallback timestamps (e.g. datetime.now(timezone.utc)).
 
 Contract pin: ChatSession.from_dict({'id': 'x'}) → no TypeError, valid session.
-
-See: nat/dev/server-nexe/diari/2026-05/20260504/onada4-mypy-plugins/02-tests.md
 ────────────────────────────────────
 """
 

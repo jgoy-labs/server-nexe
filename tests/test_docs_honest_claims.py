@@ -2,8 +2,6 @@
 
 Each test verifies empirically that one of the false claims detected by
 audit F16c (and claim 8 added by auditor B6) has been corrected.
-
-Origin: nat/dev/server-nexe/diari/prompts/onada-2-blockers-r4/B7-docs-claims-falsos.md
 """
 import re
 from pathlib import Path
