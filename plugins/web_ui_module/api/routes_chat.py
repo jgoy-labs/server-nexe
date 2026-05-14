@@ -1593,16 +1593,20 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     # Ollama/MLX/LlamaCpp expect base64 strings, not bytes
                     _images_arg = [image_b64] if image_b64 else None
 
+                    # cancel_event is MLX-specific: MLX runs a sync CPU loop
+                    # that won't notice HTTP disconnect on its own. Ollama and
+                    # llama_cpp cancel naturally via httpx async context /
+                    # native transport when the asyncio task is cancelled.
+                    cancel_kwargs = {"cancel_event": cancel_event} if engine_name == "mlx_module" else {}
+
                     if 'model' in sig.parameters:
                         # Ollama-style: chat(model, messages, stream=...)
                         # We inject system prompt as first message for Ollama
                         full_messages = [{"role": "system", "content": system_prompt}] + messages
-                        # cancel_event passed as kwarg — engines that don't
-                        # know it absorb it via **kwargs (back-compat).
                         chat_result = engine.chat(model=model_name, messages=full_messages, stream=stream,
                                                   images=_images_arg,
                                                   thinking_enabled=thinking_enabled,
-                                                  cancel_event=cancel_event)
+                                                  **cancel_kwargs)
                     else:
                         # MLX/LlamaCpp-style: chat(messages, system=...)
                         if engine_name in ("mlx_module", "llama_cpp_module"):
@@ -1622,7 +1626,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             ml_task = asyncio.create_task(engine.chat(
                                 messages=messages, system=system_prompt, stream_callback=stream_cb,
                                 images=_images_arg, thinking_enabled=thinking_enabled,
-                                cancel_event=cancel_event,
+                                **cancel_kwargs,
                             ))
 
                             # Async generator that yields from queue until task is done
@@ -1654,7 +1658,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             chat_result = engine.chat(messages=messages, system=system_prompt,
                                                       images=_images_arg,
                                                       thinking_enabled=thinking_enabled,
-                                                      cancel_event=cancel_event)
+                                                      **cancel_kwargs)
 
                     # Flag if compacted to notify the client
                     _compacted = session.compaction_count > 0 and session.context_summary is not None
