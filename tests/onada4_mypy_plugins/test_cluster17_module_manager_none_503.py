@@ -16,8 +16,6 @@ Contract pin (anti-regression, PASSES pre and post): ServerState.module_manager
 is Optional (None by default), has not been hardened as required post-fix.
 
 Contract TDD (xfail): POST /chat with module_manager=None → 503 (not 200).
-
-See: nat/dev/server-nexe/diari/2026-05/20260504/onada4-mypy-plugins/02-tests.md
 ────────────────────────────────────
 """
 
