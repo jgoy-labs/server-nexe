@@ -21,7 +21,6 @@
     "knowledge",
     "dev-tools",
     ".github",
-    ".muthur",
     "bench",
     "scripts",
   ]
@@ -107,6 +106,8 @@
 
     # Dev intern
     ".claude/",
+    ".muthur/",
+    ".muthur.toml",
     ".ruff_cache/",
     "diari/",
     "dev-tools/run_all_day.sh",

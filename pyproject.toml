@@ -4,15 +4,14 @@ version = "1.0.4-beta"
 requires-python = ">=3.11"
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Static analysis tooling — baseline config (MUTHUR-aware)
+# Static analysis tooling — baseline config
 # ═══════════════════════════════════════════════════════════════════════════
 # Rationale: tests/ uses patterns that are idiomatic in pytest but flagged by
 # bandit/ruff defaults (assert, unused fixtures, mock fixtures with hardcoded
 # tokens). To keep the signal-to-noise ratio useful, tests/ is silenced for
 # style/security rules that don't translate; production code keeps every rule.
 #
-# This config is read by ruff, bandit, vulture, mypy when invoked at the
-# project root (e.g. by `muthur run`).
+# Each tool reads its own [tool.X] section when invoked from the project root.
 
 [tool.ruff]
 target-version = "py311"
@@ -65,10 +64,9 @@ exclude = [
 ]
 
 [tool.pyright]
-# Pyright type checker — config compatible amb el check muthur (pyright_check.py).
-# InstallNexe.app/ és Python 3.12 stdlib bundlat (tkinter, turtle, pip/_vendor...)
-# i NO és codi del projecte: 9741 dels 10932 findings inicials hi pertanyen.
-# Els ~1191 findings reals queden deferits a Onada 5 pyright dedicada.
+# Pyright type checker.
+# InstallNexe.app/ is Python 3.12 stdlib bundled (tkinter, turtle, pip/_vendor...)
+# and is NOT project code: 9741 of 10932 initial findings belong there.
 include = ["core", "memory", "plugins", "personality", "specialists", "installer"]
 exclude = [
     "**/InstallNexe.app",
@@ -80,7 +78,6 @@ exclude = [
     "**/.mypy_cache",
     "**/.pytest_cache",
     "**/.ruff_cache",
-    "**/.muthur",
     "tests",
     "scripts",
     "dev-tools",
@@ -102,107 +99,3 @@ exclude = [
     "Nexe.app/*",
 ]
 
-[tool.muthur]
-# Directoris a excloure de tots els checks MUTHUR (per nom de directori).
-# InstallNexe.app i Nexe.app són bundles pre-compilats, no codi font.
-exclude_dirs = [
-    "InstallNexe.app",
-    "Nexe.app",
-    "dev-tools",
-    "scripts",
-]
-
-[tool.muthur.interrogate]
-# Docstring coverage threshold. Trivial items excluded to reduce noise:
-# __init__ modules (empty), __init__ methods (obvious), private (_foo),
-# magic (__str__), semiprivate (_foo used as internal helpers).
-min_coverage = 95
-ignore_init_module = true
-ignore_init_method = true
-ignore_private = true
-ignore_magic = true
-ignore_semiprivate = true
-
-[tool.muthur.lang_comments]
-# Short EN technical comments get misclassified by lingua detector.
-# min_tokens=3 skips 1-2 word comments; confidence_floor=0.35 accepts
-# English with moderate confidence instead of the default 0.6.
-min_tokens = 3
-confidence_floor = 0.35
-
-[tool.muthur.semgrep]
-# p/default is too aggressive for a mono-user local server (flags logger strings
-# as credentials, localhost http as insecure, non-literal imports as dangerous).
-# p/python keeps Python-specific security rules without generic noise.
-config = "p/python"
-
-[tool.muthur.coverage]
-# Global coverage is 86% — per-file threshold lowered to avoid FAIL on
-# thin CLI wrappers and integration-heavy modules (api_client 14%, crypto/cli 19%).
-file_threshold = 30
-
-[tool.muthur.license]
-# Llicències OSS compatibles. Inclou defaults SPDX + noms PyPI classifier.
-# Afegides en fix license-compat (27 findings BSD/Apache/MPL/PSF/LGPL/Freeware).
-allowed = [
-    # Defaults SPDX (mantenir per no perdre cobertura existent)
-    "MIT",
-    "Apache-2.0",
-    "BSD-2-Clause",
-    "BSD-3-Clause",
-    "ISC",
-    "Python-2.0",
-    "Unlicense",
-    "CC0-1.0",
-    # Noms PyPI classifier (boltons, click, colorama, glom, grimp, httpx,
-    # import-linter, prompt_toolkit, semantic-version, wrapt)
-    "BSD License",
-    # torchvision — PyPI metadata returns 'BSD' literally (actual license is BSD-3-Clause)
-    "BSD",
-    # Noms PyPI classifier (cyclonedx-python-lib, googleapis-common-protos,
-    # lingua-language-detector, pip-api, pip_audit, py-serializable,
-    # requests, sortedcontainers, stevedore)
-    "Apache Software License",
-    # certifi, pathspec
-    "Mozilla Public License 2.0 (MPL 2.0)",
-    # defusedxml
-    "Python Software Foundation License",
-    # protobuf
-    "3-Clause BSD License",
-    # lizard (eina de mètriques, no va a producció)
-    "Freeware",
-    # semgrep (eina de dev)
-    "LGPL-2.1-or-later",
-    # aiohttp — Apache-2.0 AND MIT (compound SPDX expression)
-    "Apache-2.0 AND MIT",
-    # fastembed (Qdrant) — PyPI metadata error; real license is Apache-2.0
-    "Other/Proprietary License",
-    # multidict — Apache License 2.0 (verbose form of Apache-2.0)
-    "Apache License 2.0",
-    # numpy 2.x — compound BSD/MIT/Zlib/CC0 (all permissive)
-    "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
-    # Zlib (used in numpy compound above)
-    "Zlib",
-    # 0BSD (used in numpy compound above)
-    "0BSD",
-    # pillow — MIT-CMU (PIL/CMU variant of MIT)
-    "MIT-CMU",
-    # regex — Apache-2.0 AND CNRI-Python (Python runtime license, permissive)
-    "Apache-2.0 AND CNRI-Python",
-    # CNRI-Python standalone
-    "CNRI-Python",
-    # shellingham — ISC License (ISCL) (verbose form of ISC)
-    "ISC License (ISCL)",
-    # tqdm — MPL-2.0 AND MIT (both already allowed individually)
-    "MPL-2.0 AND MIT",
-    # MPL-2.0 standalone SPDX
-    "MPL-2.0",
-]
-forbidden = [
-    "GPL-2.0-only",
-    "GPL-3.0-only",
-    "BUSL-1.1",
-    "SSPL-1.0",
-    "AGPL-3.0-only",
-    "Commons-Clause",
-]

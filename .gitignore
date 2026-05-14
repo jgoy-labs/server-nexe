@@ -95,8 +95,7 @@ htmlcov/
 *,cover
 
 # MUTHUR (auditor intern) — whitelist.toml és config de projecte, es commit
-.muthur/*
-!.muthur/whitelist.toml
+.muthur/
 .muthur.toml
 
 # Caches temporals
