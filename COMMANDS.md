@@ -64,6 +64,6 @@
 
 📝 **Model actual / Current model**: Gemma 3 4B
 🔧 **Motor / Engine**: mlx
-💾 **Ubicació / Location**: /Users/jgoy/AI/gitoss/server-nexe
+💾 **Ubicació / Location**: `~/server-nexe` (o on l'hagis instal·lat / or wherever you installed it)
 
 *Personal project by Jordi Goy · www.jgoy.net · https://server-nexe.org*
