@@ -190,7 +190,7 @@ class MemoryAPI:
     # currently sets 6 to avoid Apple Silicon E-core contention.
     embed_threads = self.ingest_config.embed_threads
 
-    def _load_model():
+    def _load_model() -> Any:
       """Instantiate the fastembed TextEmbedding model (blocking, run in executor)."""
       from fastembed import TextEmbedding
       from memory.embeddings.paths import default_fastembed_cache_dir
