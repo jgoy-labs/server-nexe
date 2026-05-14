@@ -283,6 +283,7 @@ def run_streaming_generation(
     model_key: str,
     cache_lookup_tokens: List[int],
     model_path: str = "",
+    cancel_event: Any = None,
 ) -> Tuple[str, Any, List[int]]:
     """
     Executes generation with streaming.
@@ -335,6 +336,15 @@ def run_streaming_generation(
     # Continue with the rest of generation
     if not stop_detected:
         for response in generator:
+            # Client cancellation (Bug C handoff): if the HTTP client closed
+            # the connection, the route handler sets cancel_event so we exit
+            # the loop here instead of running to max_tokens. Without this
+            # check the worker thread would keep generating ~100s after the
+            # user clicked Stop, blocking the single-worker MLX executor for
+            # every subsequent request.
+            if cancel_event is not None and cancel_event.is_set():
+                logger.info("MLXChatNode: cancel_event set — breaking stream loop")
+                break
             stop_detected = _emit_token(response, stop_sequences, full_response,
                                         generated_tokens, stream_callback)
             last_response = response

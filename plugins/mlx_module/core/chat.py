@@ -443,6 +443,10 @@ class MLXChatNode:
         temperature_override = inputs.get("temperature")
         thinking_enabled = inputs.get("thinking_enabled", True)  # True = model decides; False = force off
         images = inputs.get("images")  # Optional[List[bytes]] — VLM support
+        # cancel_event: threading.Event-like; route handler sets it when the
+        # HTTP client disconnects so streaming loops can break early instead
+        # of running to max_tokens. None disables cancellation (back-compat).
+        cancel_event = inputs.get("cancel_event")
 
         # Log for debugging
         logger.info(
@@ -477,6 +481,7 @@ class MLXChatNode:
                         threadsafe_callback if stream_callback else None,
                         max_tokens_override, temperature_override,
                         thinking_enabled,
+                        cancel_event,
                     ),
                 )
             else:
@@ -495,6 +500,7 @@ class MLXChatNode:
                         max_tokens_override,
                         temperature_override,
                         thinking_enabled,
+                        cancel_event,
                     ),
                 )
 
@@ -678,6 +684,7 @@ class MLXChatNode:
         tmp_path: Optional[str],
         max_tokens: Optional[int],
         stream_callback: Callable[[str], None],
+        cancel_event: Any = None,
     ):
         from mlx_vlm import stream_generate as vlm_stream
 
@@ -698,6 +705,13 @@ class MLXChatNode:
             prompt=formatted_prompt,
             max_tokens=max_tokens or self.config.max_tokens,
         ):
+            # Honour client-side cancel: when the HTTP client disconnects,
+            # the route handler sets cancel_event so we exit early instead of
+            # running to max_tokens (~100s of useless generation that blocks
+            # the single-worker MLX executor for subsequent requests).
+            if cancel_event is not None and cancel_event.is_set():
+                logger.info("MLXChatNode: cancel_event set — breaking VLM stream loop")
+                break
             delta = getattr(chunk, "text", "") or ""
             if delta:
                 if prepend_think and not emitted_prefix:
@@ -771,6 +785,7 @@ class MLXChatNode:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         thinking_enabled: bool = True,
+        cancel_event: Any = None,
     ) -> Dict[str, Any]:
         """VLM generation with mlx_vlm (text + image). Uses mlx_vlm.generate().
 
@@ -806,7 +821,7 @@ class MLXChatNode:
             if stream_callback:
                 result_text, result_obj = self._run_vlm_streaming(
                     model, processor, formatted_prompt, tmp_path,
-                    max_tokens, stream_callback,
+                    max_tokens, stream_callback, cancel_event,
                 )
             else:
                 result_text, result_obj = self._run_vlm_oneshot(
@@ -832,6 +847,7 @@ class MLXChatNode:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         thinking_enabled: bool = True,
+        cancel_event: Any = None,
     ) -> Dict[str, Any]:
         """
         Blocking generation with MLX and PREFIX MATCHING (executed in thread).
@@ -842,7 +858,7 @@ class MLXChatNode:
             return self._generate_blocking_inner(
                 system, messages, messages_for_cache,
                 stream_callback, session_id, max_tokens, temperature,
-                thinking_enabled,
+                thinking_enabled, cancel_event,
             )
 
     def _generate_blocking_inner(
@@ -855,6 +871,7 @@ class MLXChatNode:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         thinking_enabled: bool = True,
+        cancel_event: Any = None,
     ) -> Dict[str, Any]:
         """Inner generation logic, called under lock."""
         from mlx_lm.sample_utils import make_sampler
@@ -909,7 +926,8 @@ class MLXChatNode:
             model, tokenizer, tokens_to_process, max_tokens if max_tokens is not None else self.config.max_tokens,
             sampler, cached_kv, stream_callback,
             cache_manager, model_key, cache_lookup_tokens,
-            model_path=self.config.model_path
+            model_path=self.config.model_path,
+            cancel_event=cancel_event,
         )
 
         # 6. Save cache post-generation (clean messages, without memory context)
