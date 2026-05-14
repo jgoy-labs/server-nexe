@@ -2191,3 +2191,11 @@ expires = "2026-08-11"
 authorized_by = "Jordi Goy"
 ticket = "lang-comments-baseline-net-20260511"
 
+[[exception]]
+rule = "lang_comments.not_english"
+path = "plugins/web_ui_module/api/routes_auth.py"
+reason = "FP lingua: EN docstring _scan_llamacpp_backend with technical terms (NEXE_LLAMA_CPP_MODEL env var, .gguf files, symlinks dedup) — added 2026-05-13 in commit 8cd12e8"
+expires = "2026-08-14"
+authorized_by = "Jordi Goy"
+ticket = "lang-comments-baseline-net-20260511"
+
