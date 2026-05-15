@@ -5,7 +5,7 @@ id: nexe-limitations
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentacio honesta de les limitacions de server-nexe 1.0.4-beta. Cobreix suport de plataformes (macOS 14+ Apple Silicon only, Linux parcial, Intel i Windows NO suportats), qualitat de models vs nuvol (GPT-4/Claude), limitacions del RAG (embeddings, chunking, inici en fred, contradiccions), compatibilitat parcial amb l'API d'OpenAI, rendiment (instancia unica, concurrencia), restriccions de seguretat, advertencies d'encriptacio (default auto, nova, no provada en batalla) i mancances funcionals (sense multi-usuari, sense sync, sense fine-tuning)."
+abstract: "Documentacio honesta de les limitacions de server-nexe 1.0.4-beta. Cobreix suport de plataformes (macOS 14+ Apple Silicon only, Linux parcial, Intel NO suportat, Windows en desenvolupament), qualitat de models vs nuvol (GPT-4/Claude), limitacions del RAG (embeddings, chunking, inici en fred, contradiccions), compatibilitat parcial amb l'API d'OpenAI, rendiment (instancia unica, concurrencia), restriccions de seguretat, advertencies d'encriptacio (default auto, nova, no provada en batalla) i mancances funcionals (sense multi-usuari, sense sync, sense fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -30,7 +30,7 @@ Aquest document descriu honestament el que server-nexe no pot fer o no fa be.
 | macOS Intel | **NO suportat** (eliminat a v0.9.9 — wheels arm64-only, sense MLX) |
 | Linux ARM64 | Testejat a VM — Ubuntu 24.04 LTS Desktop ARM64 (UTM en Mac Apple Silicon), 8 GB RAM, instal·lacio CLI + backend Ollama a CPU. Hardware ARM64 natiu encara no validat. |
 | Linux x86_64 | Parcial — tests unitaris passen, CI verd. Instal·lacio nativa encara no validada. |
-| Windows | No suportat |
+| Windows | En desenvolupament (sense ETA pública) |
 
 ## Qualitat dels models
 

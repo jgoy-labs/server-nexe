@@ -72,7 +72,7 @@ server-nexe combines five capabilities:
 - **macOS Intel:** **NOT supported** (removed in v0.9.9 due to arm64-only dependencies in the stack)
 - **Linux ARM64:** Tested in VM (Ubuntu 24.04 via UTM on Apple Silicon Mac, 8 GB RAM, CLI install + Ollama on CPU). Native hardware not yet validated.
 - **Linux x86_64:** Partial support (unit tests pass, native install not yet validated)
-- **Windows:** Not yet supported
+- **Windows:** In development (no public ETA)
 - **Default port:** 9119
 - **Tests:** 6259 test functions collected (6474 total — 215 deselected by markers), 0 failures in latest run
 

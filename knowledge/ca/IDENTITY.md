@@ -72,7 +72,7 @@ server-nexe combina cinc capacitats:
 - **macOS Intel:** **NO suportat** (eliminat a v0.9.9 per dependencies arm64-only del stack)
 - **Linux ARM64:** Testejat a VM (Ubuntu 24.04 via UTM en Mac Apple Silicon, 8 GB RAM, instal·lacio CLI + Ollama a CPU). Hardware natiu encara no validat.
 - **Linux x86_64:** Suport parcial (tests unitaris passen, instal·lacio nativa encara no validada)
-- **Windows:** Encara no suportat
+- **Windows:** En desenvolupament (sense ETA pública)
 - **Port per defecte:** 9119
 - **Tests:** 6259 funcions de test col·lectades (6474 totals — 215 deselected per marcadors), 0 errors a l'ultima execucio
 

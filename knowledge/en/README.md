@@ -186,7 +186,7 @@ Authentication required: `X-API-Key` header with value from `.env` (`NEXE_PRIMAR
 | macOS 13 Ventura | **NOT supported** (removed in v0.9.9) |
 | macOS Intel | **NOT supported** (removed in v0.9.9 — arm64-only wheels) |
 | Linux x86_64 | Partial (unit tests pass, CI green, not production-tested) |
-| Windows | Not yet supported |
+| Windows | In development (no public ETA) |
 
 ## Current limitations
 

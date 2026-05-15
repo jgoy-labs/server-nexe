@@ -329,7 +329,7 @@ Server Nexe includes a security module enabled by default:
 | macOS 13 Ventura or earlier | **Not supported** since v0.9.9 (requires macOS 14 Sonoma+) | — |
 | Linux x86_64 | **Partial** — unit tests pass, CI green, **NOT tested in production** | llama.cpp, Ollama |
 | Linux ARM64 | Not directly tested | llama.cpp, Ollama (theoretical) |
-| Windows | Not supported | — |
+| Windows | In development (no public ETA) | — |
 
 > Since v0.9.9, server-nexe requires **macOS 14 Sonoma+ with Apple Silicon (M1 or later)**. The pre-built wheels in the DMG are `arm64` exclusive. Linux with the llama.cpp and Ollama backends should work, but the full compatibility audit is on the roadmap.
 

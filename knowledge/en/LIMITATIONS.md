@@ -5,7 +5,7 @@ id: nexe-limitations
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Honest documentation of server-nexe 1.0.4-beta limitations. Covers platform support (macOS 14+ Apple Silicon only, Linux partial, Intel and Windows NOT supported), model quality vs cloud (GPT-4/Claude), RAG limitations (embeddings, chunking, cold start, contradictions), API partial OpenAI compatibility, performance (single instance, concurrency), security constraints, encryption caveats (default auto, new, not battle-tested), and functional gaps (no multi-user, no sync, no fine-tuning)."
+abstract: "Honest documentation of server-nexe 1.0.4-beta limitations. Covers platform support (macOS 14+ Apple Silicon only, Linux partial, Intel NOT supported, Windows in development), model quality vs cloud (GPT-4/Claude), RAG limitations (embeddings, chunking, cold start, contradictions), API partial OpenAI compatibility, performance (single instance, concurrency), security constraints, encryption caveats (default auto, new, not battle-tested), and functional gaps (no multi-user, no sync, no fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -30,7 +30,7 @@ This document honestly describes what server-nexe cannot do or does not do well.
 | macOS Intel | **NOT supported** (removed in v0.9.9 — arm64-only wheels, no MLX) |
 | Linux ARM64 | Tested in VM — Ubuntu 24.04 LTS Desktop ARM64 (UTM on Apple Silicon Mac), 8 GB RAM, CLI install + Ollama backend on CPU. Native ARM64 hardware not yet validated. |
 | Linux x86_64 | Partial — unit tests pass, CI green. Native install not yet validated. |
-| Windows | Not supported |
+| Windows | In development (no public ETA) |
 
 ## Model Quality
 

@@ -186,7 +186,7 @@ Autenticacio requerida: capcalera `X-API-Key` amb el valor de `.env` (`NEXE_PRIM
 | macOS 13 Ventura | **NO suportat** (eliminat a v0.9.9) |
 | macOS Intel | **NO suportat** (eliminat a v0.9.9 — wheels arm64-only) |
 | Linux x86_64 | Parcial (tests unitaris passen, CI verd, no testejat en produccio) |
-| Windows | Encara no suportat |
+| Windows | En desenvolupament (sense ETA pública) |
 
 ## Limitacions actuals
 
