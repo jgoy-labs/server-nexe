@@ -5,7 +5,7 @@ id: nexe-architecture
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Arquitectura interna de server-nexe 1.0.3-beta. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, pipeline de encriptacion, pipeline de sanitizacion de peticiones, detector VLM 3-signal, precomputed KB embeddings, thinking toggle y diagramas Mermaid."
+abstract: "Arquitectura interna de server-nexe 1.0.4-beta. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, pipeline de encriptacion, pipeline de sanitizacion de peticiones, detector VLM 3-signal, precomputed KB embeddings, thinking toggle y diagramas Mermaid."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Arquitectura — server-nexe 1.0.3-beta
+# Arquitectura — server-nexe 1.0.4-beta
 
 ## Tabla de contenidos
 
@@ -246,7 +246,7 @@ server-nexe/
 ├── knowledge/                    # Documentacion para ingestion RAG (ca/es/en x 12 ficheros)
 │   └── .embeddings/              # KB embeddings precomputados (ONNX, 10.7× speedup en el arranque)
 ├── storage/                      # Datos en tiempo de ejecucion (no en git)
-├── tests/                        # 4842 funciones de test recopiladas (4990 totales)
+├── tests/                        # 6259 funciones de test recopiladas (6474 totales)
 └── nexe                          # Ejecutable CLI
 ```
 
@@ -331,7 +331,7 @@ Gestiona el arranque y apagado del servidor. Dividido en 4 submodulos.
 ```toml
 [module]
 name = "module_name"
-version = "1.0.3-beta"
+version = "1.0.4-beta"
 type = "local_llm_option"
 description = "Descripcion del modulo"
 location = "plugins/module_name/"
@@ -431,7 +431,7 @@ El system prompt define la personalidad y comportamiento de Nexe. Se encuentra e
 
 ## Arquitectura de tests
 
-- 4842 funciones de test recopiladas (4990 totales — 148 deselected por marcadores), 0 fallos en la ultima ejecucion
+- 6259 funciones de test recopiladas (6474 totales — 215 deselected por marcadores), 0 fallos en la ultima ejecucion
 - Cobertura real: ~85% global (baseline honesta, sin inflar)
 - Tests colocados junto a los modulos (cada modulo tiene carpeta tests/)
 - conftest.py raiz para fixtures compartidas

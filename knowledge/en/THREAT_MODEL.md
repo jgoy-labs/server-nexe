@@ -24,13 +24,13 @@ expires: null
 **Status:** Active, reviewed at each minor release.
 **Supersedes:** `SECURITY.md` §"Scope and threat model" (informal, lines 3–15 and 80–90). That section remains as a one-paragraph summary and points here for the detail.
 
-This document formalizes the threat model that until v1.0.3-beta was implicit in the code. It is the artefact referenced by the external audit `DoD-AUD-SX-0423-NXE-01` §2.11. It is not a pen-test report: it describes **what server-nexe defends against, what it does not, and which controls back each claim**, with every control citing the source file and line where it is implemented.
+This document formalizes the threat model that until v1.0.4-beta was implicit in the code. It is the artefact referenced by the external audit `DoD-AUD-SX-0423-NXE-01` §2.11. It is not a pen-test report: it describes **what server-nexe defends against, what it does not, and which controls back each claim**, with every control citing the source file and line where it is implemented.
 
 ---
 
 ## 1. Purpose and scope
 
-server-nexe is a **single-user, local-first AI server** with persistent RAG memory. It runs on the user's own machine, binds to `127.0.0.1:9119` by default, and assumes a trusted local user. This threat model covers the 1.0.3-beta release plus the `[Unreleased]` hardening on `main` (F1–F4.2).
+server-nexe is a **single-user, local-first AI server** with persistent RAG memory. It runs on the user's own machine, binds to `127.0.0.1:9119` by default, and assumes a trusted local user. This threat model covers the 1.0.4-beta release plus the `[Unreleased]` hardening on `main` (F1–F4.2).
 
 In scope:
 
@@ -216,7 +216,7 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 **Oversized request body.** Rejected by `RequestSizeLimiterMiddleware` before reaching handlers (`core/request_size_limiter.py`).
 
-**Out-of-memory via huge model load.** Out of scope: user explicitly selects the tier in the installer. The HardwareDetector (fixed v1.0.3-beta, `installer/swift-wizard/Sources/InstallNexe/HardwareDetector.swift`) warns when a tier exceeds RAM.
+**Out-of-memory via huge model load.** Out of scope: user explicitly selects the tier in the installer. The HardwareDetector (fixed v1.0.4-beta, `installer/swift-wizard/Sources/InstallNexe/HardwareDetector.swift`) warns when a tier exceeds RAM.
 
 ### 6.6 Elevation of Privilege
 
@@ -279,4 +279,4 @@ This document is reviewed:
 
 ---
 
-*server-nexe 1.0.3-beta+ · Apache 2.0 · Jordi Goy · see [SECURITY.md](SECURITY.md) for vulnerability reporting.*
+*server-nexe 1.0.4-beta+ · Apache 2.0 · Jordi Goy · see [SECURITY.md](SECURITY.md) for vulnerability reporting.*

@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Instalacion — server-nexe 1.0.3-beta
+# Instalacion — server-nexe 1.0.4-beta
 
 ## En 30 segundos
 
@@ -252,7 +252,7 @@ Cuando el catalogo lleva un pin (SHA256 concreto) y el valor observado no coinci
 
 ### Modo legacy
 
-Las entradas del catalogo con pin `None` (por ejemplo modelos añadidos despues de un DMG ya publicado) **no abortan**. El installer emite un `WARNING` visible (`⚠️ <model>: SHA256 not pinned in catalog`) y continua. Esto preserva la compatibilidad con instalaciones creadas con DMG anteriores a la v1.0.3-beta.
+Las entradas del catalogo con pin `None` (por ejemplo modelos añadidos despues de un DMG ya publicado) **no abortan**. El installer emite un `WARNING` visible (`⚠️ <model>: SHA256 not pinned in catalog`) y continua. Esto preserva la compatibilidad con instalaciones creadas con DMG anteriores a la v1.0.4-beta.
 
 Para el embedding bundle, un DMG sin `embeddings.manifest.json` (build anterior a F4.1) tambien continua en modo legacy con un warning en stdout.
 
@@ -298,7 +298,7 @@ App de la barra de menu para controlar el servidor sin terminal. Construida sobr
 
 | Item | Que hace | Codigo |
 |------|----------|--------|
-| **server.nexe v1.0.3-beta** | Cabecera no clicable. Version leida dinamicamente de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
+| **server.nexe v1.0.4-beta** | Cabecera no clicable. Version leida dinamicamente de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
 | **Servidor activo / detenido** | Indicador de estado no clicable. El icono de la barra cambia: `ICON_RUNNING` (verde) cuando esta vivo, `ICON_STOPPED` (gris) cuando no. | `tray.py:197` |
 | **Detener / Iniciar servidor** | Arranca o detiene el proceso `core.app` (uvicorn + FastAPI + Qdrant). SIGTERM y, si hace falta, SIGKILL. PID en `storage/run/server.pid`. | `_toggle_server` → `tray.py:296` |
 | **Abrir Web UI** | Abre `http://127.0.0.1:9119/ui` en el navegador por defecto. | `_open_web_ui` → `tray.py:509` |

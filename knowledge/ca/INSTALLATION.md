@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Instal·lacio — server-nexe 1.0.3-beta
+# Instal·lacio — server-nexe 1.0.4-beta
 
 ## En 30 segons
 
@@ -252,7 +252,7 @@ Quan el cataleg porta un pin (SHA256 concret) i el valor observat no coincideix,
 
 ### Mode legacy
 
-Les entrades del cataleg amb pin `None` (per exemple models afegits despres d'un DMG ja publicat) **no aborten**. L'installer emet un `WARNING` visible (`⚠️ <model>: SHA256 not pinned in catalog`) i continua. Aixo preserva compatibilitat amb instal·lacions creades amb DMG anteriors a la v1.0.3-beta.
+Les entrades del cataleg amb pin `None` (per exemple models afegits despres d'un DMG ja publicat) **no aborten**. L'installer emet un `WARNING` visible (`⚠️ <model>: SHA256 not pinned in catalog`) i continua. Aixo preserva compatibilitat amb instal·lacions creades amb DMG anteriors a la v1.0.4-beta.
 
 Per a l'embedding bundle, un DMG sense `embeddings.manifest.json` (build anterior a F4.1) també continua en mode legacy amb un warning a stdout.
 
@@ -298,7 +298,7 @@ Aplicacio de la barra de menu per controlar el servidor sense terminal. Implemen
 
 | Opcio | Que fa | Codi |
 |-------|--------|------|
-| **server.nexe v1.0.3-beta** | Capçalera no clicable. La versio es llegeix dinamicament de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
+| **server.nexe v1.0.4-beta** | Capçalera no clicable. La versio es llegeix dinamicament de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
 | **Servidor actiu / aturat** | Indicador d'estat (no clicable). La icona de la barra canvia: `ICON_RUNNING` (verda) quan el servidor esta viu, `ICON_STOPPED` (gris) quan no. | `tray.py:197` |
 | **Aturar / Iniciar servidor** | Engega o atura el proces `core.app` (uvicorn + FastAPI + Qdrant). Fa SIGTERM i, si cal, SIGKILL. Gestio de PID a `storage/run/server.pid`. | `_toggle_server` → `tray.py:296` |
 | **Obrir Web UI** | Obre `http://127.0.0.1:9119/ui` al navegador per defecte. | `_open_web_ui` → `tray.py:509` |

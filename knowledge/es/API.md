@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Referencia REST API — server-nexe 1.0.3-beta
+# Referencia REST API — server-nexe 1.0.4-beta
 
 ## URL Base
 
@@ -137,11 +137,11 @@ Chat completion compatible con OpenAI con soporte de RAG y streaming.
 
 ## Endpoints de memoria (prefijo: /v1/memory)
 
-| Endpoint | Metodo | Auth | Descripcion |
-|----------|--------|------|-------------|
-| `/v1/memory/store` | POST | Si | Guardar texto en una coleccion |
-| `/v1/memory/search` | POST | Si | Busqueda semantica en una coleccion |
-| `/v1/memory/health` | GET | No | Salud del subsistema de memoria + colecciones Qdrant |
+| Endpoint | Metodo | Auth | Rate limit | Descripcion |
+|----------|--------|------|------------|-------------|
+| `/v1/memory/store` | POST | Si | `NEXE_RATE_LIMIT_MEMORY` (por defecto 30/min) | Guardar texto en una coleccion |
+| `/v1/memory/search` | POST | Si | **60/min** (hardcoded, `memory/memory/api/v1.py`) | Busqueda semantica en una coleccion |
+| `/v1/memory/health` | GET | No | por defecto | Salud del subsistema de memoria + colecciones Qdrant |
 
 **Peticion de almacenamiento:**
 ```json
@@ -164,18 +164,22 @@ Chat completion compatible con OpenAI con soporte de RAG y streaming.
 
 ## Endpoints RAG (prefijo: /v1/rag)
 
+> ⚠️ **NO IMPLEMENTADO (stub):** estos endpoints devuelven HTTP 501. Reservados para una versión futura.
+
 | Endpoint | Metodo | Auth | Descripcion |
 |----------|--------|------|-------------|
-| `/v1/rag/search` | POST | Si | Busqueda semantica en el vector store RAG |
-| `/v1/rag/add` | POST | Si | Anadir documentos al vector store RAG |
-| `/v1/rag/documents/{id}` | DELETE | Si | Borrar documento del RAG |
+| `/v1/rag/search` | POST | Si | Busqueda semantica en el vector store RAG (stub, 501) |
+| `/v1/rag/add` | POST | Si | Anadir documentos al vector store RAG (stub, 501) |
+| `/v1/rag/documents/{id}` | DELETE | Si | Borrar documento del RAG (stub, 501) |
 
 ## Endpoints de embeddings (prefijo: /v1/embeddings)
 
+> ⚠️ **NO IMPLEMENTADO (stub):** estos endpoints devuelven HTTP 501. Reservados para una versión futura.
+
 | Endpoint | Metodo | Auth | Descripcion |
 |----------|--------|------|-------------|
-| `/v1/embeddings/encode` | POST | Si | Generar vectores de embedding para textos |
-| `/v1/embeddings/models` | GET | No | Listar modelos de embeddings disponibles |
+| `/v1/embeddings/encode` | POST | Si | Generar vectores de embedding para textos (stub, 501) |
+| `/v1/embeddings/models` | GET | No | Listar modelos de embeddings disponibles (stub, 501) |
 
 ## Endpoints Web UI (prefijo: /ui)
 
@@ -241,7 +245,7 @@ Estos son comandos CLI (no endpoints HTTP):
 
 **Soportado:** array de messages, model, temperature, max_tokens, stream, top_p
 **Campos extra:** use_rag (boolean), engine (string)
-**No implementado:** /v1/embeddings (usar /v1/embeddings/encode en su lugar), /v1/models, /v1/completions (legacy)
+**No implementado:** /v1/embeddings/encode y /v1/embeddings/models (stubs, devuelven 501), /v1/models, /v1/completions (legacy)
 
 Compatible con herramientas que usan formato de API OpenAI: Cursor, Continue, Zed, scripts personalizados.
 

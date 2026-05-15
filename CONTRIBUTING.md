@@ -30,7 +30,7 @@ nexe go
 
 ## Running tests
 
-The test suite has **4842 passing tests with ~85% code coverage** (of 4990 total; 148 deselected by default markers).
+The test suite has **6259 passing tests with ~85% code coverage** (of 6474 total; 215 deselected by default markers).
 
 ```bash
 # Fast unit tests (no external services needed)
@@ -66,7 +66,7 @@ plugins/my_module/
 ```toml
 [module]
 name = "my_module"
-version = "1.0.3-beta"
+version = "1.0.0"
 description = "What this module does"
 author = "Your Name"
 
@@ -102,7 +102,7 @@ class MyModule:
     def metadata(self) -> ModuleMetadata:
         return ModuleMetadata(
             name="my_module",
-            version="1.0.3-beta",
+            version="1.0.0",
             description="What this module does",
         )
 
@@ -176,4 +176,4 @@ Be respectful and constructive. This is a personal project maintained in spare t
 
 ---
 
-*v1.0.3-beta · Apache 2.0 · Jordi Goy*
+*v1.0.4-beta · Apache 2.0 · Jordi Goy*

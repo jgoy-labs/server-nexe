@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Installation — server-nexe 1.0.3-beta
+# Installation — server-nexe 1.0.4-beta
 
 ## In 30 seconds
 
@@ -252,7 +252,7 @@ When the catalog carries a pin (a concrete SHA256) and the observed digest does 
 
 ### Legacy mode
 
-Catalog entries whose pin is `None` (for example models added after a DMG has shipped) do **not** abort. The installer emits a visible `WARNING` (`⚠️ <model>: SHA256 not pinned in catalog`) and continues. This keeps v1.0.3-beta-and-earlier installs working.
+Catalog entries whose pin is `None` (for example models added after a DMG has shipped) do **not** abort. The installer emits a visible `WARNING` (`⚠️ <model>: SHA256 not pinned in catalog`) and continues. This keeps v1.0.4-beta-and-earlier installs working.
 
 For the embedding bundle, a DMG without `embeddings.manifest.json` (pre-F4.1 build) also proceeds in legacy mode with a stdout warning.
 
@@ -298,7 +298,7 @@ Menu bar app for controlling the server without a terminal. Built on the `rumps`
 
 | Item | What it does | Code |
 |------|--------------|------|
-| **server.nexe v1.0.3-beta** | Non-clickable header. Version read dynamically from `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
+| **server.nexe v1.0.4-beta** | Non-clickable header. Version read dynamically from `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
 | **Server running / stopped** | Non-clickable status indicator. Menu bar icon changes: `ICON_RUNNING` (green) when alive, `ICON_STOPPED` (grey) when not. | `tray.py:197` |
 | **Start / Stop server** | Spawns or stops the `core.app` process (uvicorn + FastAPI + Qdrant). SIGTERM then SIGKILL if needed. PID stored in `storage/run/server.pid`. | `_toggle_server` → `tray.py:296` |
 | **Open Web UI** | Opens `http://127.0.0.1:9119/ui` in the default browser. | `_open_web_ui` → `tray.py:509` |

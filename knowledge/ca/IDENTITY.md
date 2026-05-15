@@ -4,7 +4,7 @@ data: 2026-04-16
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Identitat de server-nexe: projecte de codi obert creat per Jordi Goy a Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que fa (IA local, RAG, multi-backend, encriptacio at-rest), estat actual (1.0.3-beta, macOS 14+ Apple Silicon only), enllacos oficials i com donar suport."
+abstract: "Identitat de server-nexe: projecte de codi obert creat per Jordi Goy a Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que fa (IA local, RAG, multi-backend, encriptacio at-rest), estat actual (1.0.4-beta, macOS 14+ Apple Silicon only), enllacos oficials i com donar suport."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
 chunk_size: 400
 priority: P1
@@ -23,7 +23,7 @@ expires: null
 
 - **Servidor d'IA 100% local** (zero cloud en runtime; descàrrega inicial de models des de Hugging Face / Ollama)
 - **Amb memoria persistent** (RAG + MEM_SAVE)
-- **macOS 14+ Apple Silicon**, versio 1.0.3-beta
+- **macOS 14+ Apple Silicon**, versio 1.0.4-beta
 - **Multi-backend:** MLX, llama.cpp, Ollama
 - **Open source** (Apache 2.0), projecte personal d'un desenvolupador
 
@@ -67,14 +67,14 @@ server-nexe combina cinc capacitats:
 
 ## Estat actual
 
-- **Versio:** 1.0.3-beta
+- **Versio:** 1.0.4-beta
 - **Plataforma principal:** macOS 14 Sonoma o superior, **Apple Silicon (M1+) exclusivament** — testejat
 - **macOS Intel:** **NO suportat** (eliminat a v0.9.9 per dependencies arm64-only del stack)
 - **Linux ARM64:** Testejat a VM (Ubuntu 24.04 via UTM en Mac Apple Silicon, 8 GB RAM, instal·lacio CLI + Ollama a CPU). Hardware natiu encara no validat.
 - **Linux x86_64:** Suport parcial (tests unitaris passen, instal·lacio nativa encara no validada)
 - **Windows:** Encara no suportat
 - **Port per defecte:** 9119
-- **Tests:** 4842 funcions de test col·lectades (4990 totals — 148 deselected per marcadors), 0 errors a l'ultima execucio
+- **Tests:** 6259 funcions de test col·lectades (6474 totals — 215 deselected per marcadors), 0 errors a l'ultima execucio
 
 ## Documentacio AI-Ready
 

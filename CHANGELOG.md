@@ -302,7 +302,7 @@ Pre-release consolidated: Bug #18 MEM_DELETE cirurgia + Bug #19 (4 sub-bugs) + o
   save/list/delete/list-empty cycle, short-query-vs-long-stored matching
   under the 0.20 threshold, unrelated-fact survival guard, clear_memory
   wipe + safety rail, and RAG injection neutralization end-to-end.
-  Closes the empirical gap flagged by BUS v0.9.0 feedback ("mocks enganyen").
+  Closes the empirical gap flagged by the v0.9.0 regression audit ("mocks enganyen").
   Marker `@pytest.mark.integration` — excluded from the default fast
   suite, run explicitly.
 - **Thinking toggle endpoint**: `PATCH /session/{id}/thinking` (HOMAD,

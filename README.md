@@ -72,7 +72,7 @@ Server Nexe started as a learning-by-doing experiment: *"What would it take to h
 
 **This entire project — code, tests, audits, documentation — has been built by one person orchestrating different AI models**, both local (MLX, Ollama) and cloud (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), as collaborators. The human decides what to build, designs the architecture, reviews lines and runs tests. The AIs write, audit, and stress-test under human direction.
 
-What began as a prototype has turned into a genuinely useful product: 5291 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
+What began as a prototype has turned into a genuinely useful product: 6259 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
 
 This is not trying to compete with ChatGPT or Claude. But it can be complementary for less demanding tasks. It's an open-source tool for people who want to own their AI infrastructure. Built by one person in Barcelona, with AI as co-pilot, music, and stubbornness.
 
@@ -160,7 +160,7 @@ Upload `.txt`, `.md` or `.pdf` and they're automatically indexed for RAG. Each d
 <td width="50%">
 
 ### Built to Grow
-5291 tests (~85% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
+6259 tests (~85% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
 
 </td>
 </tr>
@@ -348,7 +348,7 @@ Server Nexe includes a security module enabled by default:
 
 ## Testing
 
-5291 tests collected (of 5453 total, 162 deselected by default markers) with ~85% code coverage. CI runs the full suite on every push.
+6259 tests collected (of 6474 total, 215 deselected by default markers) with ~85% code coverage. CI runs the full suite on every push.
 
 ```bash
 # Unit tests
@@ -442,5 +442,5 @@ See [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Version 1.0.3-beta</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
+  <strong>Version 1.0.4-beta</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
 </p>
