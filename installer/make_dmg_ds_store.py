@@ -67,7 +67,7 @@ def make_ds_store(mount_point, app_name):
             'textSize': 12.0,
             'viewOptionsVersion': 1,
         }
-        # App icon position — ⚠️ DO NOT CHANGE without reviewing the background (520x400)
+        # App icon position depends on the 520x400 background artwork.
         store[app_entry]['Iloc'] = ds_store.IlocT(x=260, y=145)
 
     print(f"[OK] .DS_Store created: {ds_path}", flush=True)

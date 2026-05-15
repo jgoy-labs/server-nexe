@@ -236,3 +236,7 @@ mis = "mis"
 mor = "mor"
 hom = "hom"
 unparseable = "unparseable"
+# Catalan "tècniques" — el fitxer index_server-nexe.md ja l'usa amb accent
+# correcte; aquesta entrada manté la variant sense accent per si apareix
+# a docs legacy (quoted key per ser TOML-vàlida amb caràcter especial).
+"tècniques" = "tècniques"

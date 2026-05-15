@@ -112,6 +112,10 @@
     "dev-tools/run_all_day.sh",
     "dev-tools/logs/",
 
+    # Scripts dev-only (no public, eliminats del repo OSS al sync v1.0.3-beta)
+    "scripts/export_source_pdf.py",
+    "scripts/export_whitepaper_pdf.py",
+
     # OS i accidentals
     ".DS_Store",
     "--output",

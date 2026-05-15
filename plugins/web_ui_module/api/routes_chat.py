@@ -1759,7 +1759,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             # a conversational response, resend with system prompt without
                             # MEM_SAVE instructions so it generates a natural response.
                             if not clean_response and _mem_saves:
-                                _rp_out: list = []
+                                _rp_out = []
                                 async for _chunk in _yield_reprompt(
                                     engine, model_name, sig, _lang,
                                     system_prompt, messages, _mem_saves,
@@ -1779,7 +1779,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 # Atomize + save LLM-extracted facts to memory
                                 _mem_saved_count = 0
                                 if _mem_saves:
-                                    _count_out: list = []
+                                    _count_out = []
                                     async for _tok in _yield_atomize_and_save_mem_saves(
                                         _mem_saves, engine, model_name, sig, _lang,
                                         memory_helper, session, _count_out,

@@ -27,7 +27,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
 REPORTS_DIR = PROJECT_ROOT / "dev-tools" / "reports"
-TMP_JSON = Path("/tmp/nexe_live_result.json")
+TMP_JSON = REPORTS_DIR / "nexe_live_result.json"
 
 # ─── ANSI colours (terminal only) ─────────────────────────────────────────────
 
@@ -67,7 +67,9 @@ def _run_pytest(server_url: str | None) -> int:
     import os
     env = {**os.environ, **env_extra}
 
-    result = subprocess.run(cmd, cwd=str(PROJECT_ROOT), env=env)
+    result = subprocess.run(  # nosec B603: literal pytest cmd via sys.executable -m pytest, shell=False, no user argv
+        cmd, cwd=str(PROJECT_ROOT), env=env,
+    )
     return result.returncode
 
 
@@ -161,9 +163,9 @@ def _build_report(json_path: Path, server_url: str) -> str:
                     if len(longrepr) > 1200:
                         trimmed += f"\n… (truncat, {len(longrepr)} chars total)"
                     indented = textwrap.indent(trimmed, "    ")
-                    lines.append(f"```")
+                    lines.append("```")
                     lines.append(indented)
-                    lines.append(f"```")
+                    lines.append("```")
 
             if outcome == "skipped":
                 call = t.get("setup", {})

@@ -18,12 +18,10 @@ import sys
 # the GUI or redirected to a file), all color constants are set to empty
 # strings to prevent `\033[...m` codes from reaching the consumer literally.
 #
-# ⚠️ Dev D (Consultant pass 1): this detection is a SNAPSHOT at module load
-# time. If client code redirects `sys.stdout` AFTER importing this module
-# (e.g. a test with `capsys`), the constants remain locked to the initial
-# value. In real production (CLI vs GUI headless) each process is new and
-# this is not an issue, but for a 100%-correct solution the constants would
-# need to be converted to a lazy `_color(name)` function. v0.9.1+.
+# This detection is a snapshot at module load time. If client code redirects
+# `sys.stdout` after importing this module, the constants remain locked to the
+# initial value. Production CLI/GUI paths start fresh processes, so lazy color
+# resolution is deferred.
 _USE_COLOR = sys.stdout.isatty()
 
 if _USE_COLOR:

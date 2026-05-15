@@ -61,7 +61,7 @@ _SENSITIVE_UPLOAD_PATTERNS = [
     b"-----BEGIN PRIVATE KEY-----",
     b"-----BEGIN EC PRIVATE KEY-----",
     b"-----BEGIN DSA PRIVATE KEY-----",
-    b"-----BEGIN PGP PRIVATE KEY BLOCK-----",
+    b"-----BEGIN PGP PRIVATE KEY BLOCK-----",  # nosemgrep: detected-pgp-private-key-block — denylist detection pattern, not a real secret
     # API tokens relevant to the real stack (Anthropic / OpenAI / GitHub / Google)
     b"sk-ant-",       # Anthropic (Claude API + Claude Code CLI)
     b"sk-proj-",      # OpenAI project key (GPT, Codex CLI, Responses API)

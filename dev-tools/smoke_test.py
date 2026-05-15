@@ -43,8 +43,8 @@ def info(msg):  print(f"  {CYAN}·{NC}  {msg}")
 def section(t): print(f"\n{BOLD}{CYAN}── {t} ──{NC}")
 
 # ── Global results ────────────────────────────────────────
-PASSED = []
-FAILED = []
+PASSED: list[str] = []
+FAILED: list[str] = []
 
 def record(name, success, detail=""):
     if success:
@@ -85,7 +85,7 @@ def delete(url, headers=None, timeout=10):
 def main():
     parser = argparse.ArgumentParser(description="Nexe API Smoke Test")
     parser.add_argument("--host", default="localhost")
-    parser.add_argument("--port", type=int, default=9119)
+    parser.add_argument("--port", type=int, default=9119)  # nosemgrep: hardcode.port_number — standard Nexe server port (core.config.DEFAULT_PORT), dev tool for local smoke tests
     parser.add_argument("--skip-gpu", action="store_true", help="Skip chat tests (GPU)")
     parser.add_argument("--skip-memory", action="store_true", help="Skip memory tests (Qdrant)")
     parser.add_argument("--verbose", "-v", action="store_true")
