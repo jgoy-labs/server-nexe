@@ -6,7 +6,7 @@ Location: tests/test_b7_ollama_url_resolve.py
 Description: Blind TDD — B7 Ollama URL hardcoded: routes_auth.py ignores NEXE_OLLAMA_HOST.
              4 literals "http://localhost:11434" (L298, L418, L471, L524) must use
              resolve_base_url() from plugins/ollama_module/core/client.py.
-             Wave 4.6d / xfail strict pre-fix.
+             / xfail strict pre-fix.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -52,7 +52,7 @@ def test_routes_auth_no_localhost_hardcoded():
     Permanent static pin: detects if someone re-hardcodes localhost after the fix.
     Covers the 4 points: L298 (urllib/api/ps), L418 (httpx/api/tags in _backend_model_exists),
     L471 (httpx/api/tags in set_backend), L524 (httpx/api/chat in set_backend).
-    Dev#2 must not touch this test — remains as a permanent guard.
+    dev must not touch this test — remains as a permanent guard.
     """
     src = _ROUTES_AUTH_FILE.read_text()
 

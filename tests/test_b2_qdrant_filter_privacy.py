@@ -5,7 +5,7 @@ Author: Jordi Goy
 Location: tests/test_b2_qdrant_filter_privacy.py
 Description: Blind TDD — B2 privacy leak: search_with_filter drops user_id filter
              in qdrant ≥1.11 fallback path (query_points without query_filter).
-             Wave 4.6b / xfail strict pre-fix.
+             / xfail strict pre-fix.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -76,7 +76,7 @@ def test_qdrant_adapter_fallback_passes_filter():
 
     Static pin via source reading to detect silent removal of the fix.
     Post-fix: 'query_filter' must appear in the except block of search_with_filter.
-    Dev#2 removes the xfail once the fix is applied.
+    dev removes the xfail once the fix is applied.
     """
     src = _ADAPTER_FILE.read_text()
 

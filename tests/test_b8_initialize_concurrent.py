@@ -8,7 +8,7 @@ Description: Blind TDD — B8 initialize() race: 4 plugin modules without asynci
              "if self._initialized" when there is an intermediate await.
              Fix: asyncio.Lock per instance + double-check inside lock.
              Affected modules: ollama_module, web_ui_module, mlx_module, llama_cpp_module.
-             Wave 4.6d / xfail strict pre-fix.
+             / xfail strict pre-fix.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -83,7 +83,7 @@ def test_ollama_module_initialize_uses_lock():
 
     Pin: `async with self._init_lock:` must appear in initialize()
     + double-check `if self._initialized: return True` inside the lock block.
-    Dev#2 must not touch this test — remains as a permanent guard.
+    dev must not touch this test — remains as a permanent guard.
     """
     init_src = _get_initialize_src(_MODULE_FILES["ollama_module"])
 
@@ -156,7 +156,7 @@ def test_initialize_module_has_init_lock(plugin_name: str):
     Verifies that the Lock has been applied consistently across all 4 modules:
     ollama_module (real await), web_ui_module, mlx_module, llama_cpp_module.
     Pre-fix: fails for all 4. Post-fix: passes for all 4.
-    Dev#2 must not touch this test — permanent multi-module guard.
+    dev must not touch this test — permanent multi-module guard.
     """
     init_src = _get_init_src(_MODULE_FILES[plugin_name])
 

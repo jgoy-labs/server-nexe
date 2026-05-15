@@ -12,7 +12,6 @@ extend-exclude = [
     "venv/",
     "InstallNexe.app/",
     "Nexe.app/",
-    ".muthur/",
     "storage/",
     "lucide.min.js",
 ]
@@ -232,7 +231,6 @@ clos = "clos"
 pont = "pont"
 optin = "optin"
 sav = "sav"
-quater = "quater"
 oll = "oll"
 mis = "mis"
 mor = "mor"

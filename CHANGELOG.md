@@ -213,8 +213,8 @@ and a comprehensive type-safety + complexity reduction pass.
 ## [1.0.2-beta] - 2026-04-21
 
 End-of-line for the 1.0.x knowledge-base regeneration cycle. See `[1.0.3-beta]`
-above for the F4.1 SHA256 pinning, F4.2 STRIDE threat model, specialists
-Onada 5, security DoD F1-F4, and the auditoria r1 fixes that landed since.
+above for the F4.1 SHA256 pinning, F4.2 STRIDE threat model, and the security
+DoD F1-F4 fixes that landed since.
 
 ### Documentation
 

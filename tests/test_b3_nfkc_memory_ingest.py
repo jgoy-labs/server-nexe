@@ -6,7 +6,7 @@ Location: tests/test_b3_nfkc_memory_ingest.py
 Description: Blind TDD — B3 NFKC asymmetry: memory-API ingest path does not normalise
              text to NFKC. Commit 3469964 fixed the query but not the ingest
              via MemoryService.remember(). Fix: add NFKC to remember() (Option b).
-             Wave 4.6b / xfail strict pre-fix.
+             / xfail strict pre-fix.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -58,7 +58,7 @@ def test_memory_store_nfkc_bidirectional():
     path (memory/api/v1.py) apply NFKC, guaranteeing:
       fullwidth indexed → halfwidth query → match
       halfwidth indexed → fullwidth query → match
-    Dev#2 removes the xfail once the fix is applied. Remains as a permanent guard.
+    dev removes the xfail once the fix is applied. Remains as a permanent guard.
     """
     remember_src = _remember_fn_src()
     api_src = _MEMORY_API_V1_FILE.read_text()

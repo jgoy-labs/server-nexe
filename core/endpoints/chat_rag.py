@@ -71,10 +71,9 @@ async def build_rag_context(
     Returns:
         Context text string (empty if no results)
     """
-    # R1 v1.0.4: NFKC-normalize the query to mirror the ingest path.
-    # Documents are NFKC-normalized at ingest via MemoryService.remember() (fix B3
-    # Onada 4.6b). Single normalization here covers the three downstream
-    # memory.search() calls.
+    # NFKC-normalize the query to mirror the ingest path.
+    # Documents are NFKC-normalized at ingest via MemoryService.remember().
+    # Single normalization here covers the three downstream memory.search() calls.
     last_user_msg = unicodedata.normalize("NFKC", last_user_msg)
 
     context_text = ""

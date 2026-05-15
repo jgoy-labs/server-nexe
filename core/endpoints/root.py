@@ -98,7 +98,7 @@ async def _module_health_status(instance) -> str:
   if hasattr(instance, "health_check"):
     try:
       result = await instance.health_check()
-      return getattr(result, "status", "unknown").value  # type: ignore[union-attr]  # defensive: str fallback "unknown" triggers AttributeError on .value, caught at line 99 returning literal "unhealthy" (Director Onada 4.1 Opció A)
+      return getattr(result, "status", "unknown").value  # type: ignore[union-attr]  # defensive: str fallback "unknown" triggers AttributeError on .value, caught at line 99 returning literal "unhealthy"
     except Exception:
       return "unhealthy"
   return "unknown"

@@ -33,9 +33,8 @@ class RAGCLI:
   def _require_module(self) -> RAGModule:
     """Returns self.module or raises RuntimeError if not initialized.
 
-    Helper Cluster 6 (Wave 4.2): replaces `self.module.X()` with
-    `self._require_module().X()` in cmd_* to give explicit error
-    instead of opaque AttributeError when someone calls a cmd without initialize().
+    Used in cmd_* to give an explicit error instead of an opaque
+    AttributeError when someone calls a cmd without initialize().
     """
     if self.module is None:
       raise RuntimeError("RAG not initialized — must await RAGCLI.initialize() before invoking cmd_*")

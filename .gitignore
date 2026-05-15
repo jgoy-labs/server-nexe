@@ -94,7 +94,7 @@ coverage.xml
 htmlcov/
 *,cover
 
-# MUTHUR (auditor intern) — whitelist.toml és config de projecte, es commit
+# Internal QA tooling (local audits, not part of OSS)
 .muthur/
 .muthur.toml
 
@@ -143,3 +143,4 @@ scripts/bench_ingest_bug16.py
 # Eines personals de Jordi (PDFs legal/whitepaper) — útils local
 scripts/export_source_pdf.py
 scripts/export_whitepaper_pdf.py
+knip.json

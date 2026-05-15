@@ -72,10 +72,9 @@ class QdrantAdapter:
     def _require_client(self) -> Any:
         """Returns self._client or raises RuntimeError if the adapter is closed.
 
-        Helper Cluster 1 (Onada 4.2 — DUBTE 1 opció A): replaces
-        `self._require_client().X()` with `self._require_client().X()` at the 23 callsites
-        to give a semantically correct error (RuntimeError "closed") when
-        someone reuses the adapter after `close()` instead of propagating AttributeError.
+        Used at the 23 callsites to give a semantically correct error
+        (RuntimeError "closed") when someone reuses the adapter after `close()`
+        instead of propagating AttributeError.
         """
         if self._client is None:
             raise RuntimeError("QdrantAdapter is closed")

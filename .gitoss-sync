@@ -41,7 +41,6 @@
     "CONTRIBUTING.md",
     "eslint.config.js",
     "install_nexe.py",
-    "knip.json",
     "LICENSE",
     "package.json",
     "pyproject.toml",
