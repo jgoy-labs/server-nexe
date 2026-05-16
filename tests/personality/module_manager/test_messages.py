@@ -37,7 +37,7 @@ class TestGetMessage:
 
         Pre-fix this would raise NameError because logging.debug was called
         without `import logging`. This test does NOT patch logging — it relies
-        on the real import being present. Codex P1 / F821 fix.
+        on the real import being present. F821 fix.
         """
         mock_i18n = MagicMock()
         mock_i18n.t.side_effect = RuntimeError("translation error")

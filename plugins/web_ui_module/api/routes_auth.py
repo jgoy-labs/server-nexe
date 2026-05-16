@@ -80,7 +80,7 @@ def make_require_ui_auth():
 
     FAIL CLOSED: if no API key is configured on the server, all
     UI requests are rejected with 503. Never permissive mode (which was
-    the Codex P1 bug: if NEXE_PRIMARY_API_KEY/NEXE_ADMIN_API_KEY were
+    the original bug: if NEXE_PRIMARY_API_KEY/NEXE_ADMIN_API_KEY were
     empty, the UI routes were open to everyone).
 
     R6-15 v1.0.4: same FAIL CLOSED behaviour applies when the security plugin

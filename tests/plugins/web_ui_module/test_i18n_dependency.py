@@ -1,7 +1,7 @@
 """
 Tests for plugins/web_ui_module/messages.py::get_i18n FastAPI dependency.
 
-Codex P1 i18n bypass fix — Q3:
+Security fix (i18n bypass) — Q3:
 Web UI routes were calling get_message(None, ...) which forced fallback
 to English regardless of the user's language. The fix injects i18n via
 Depends(get_i18n) in every Web UI route handler.

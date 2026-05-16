@@ -899,7 +899,7 @@ class NexeUI {
         }
 
         // Dynamic status indicator (uses fetchWithCsrf to send X-API-Key)
-        // Codex P2 fix: /status now requires authentication (Q2.3)
+        // /status now requires authentication (Q2.3)
         const statusDot  = document.querySelector('.status-dot');
         const statusText = document.querySelector('.status-indicator span');
         const checkStatus = async () => {

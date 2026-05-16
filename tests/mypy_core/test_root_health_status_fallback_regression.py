@@ -23,7 +23,7 @@ if status_obj else "unknown"`), which would observably change the defensive
 return value from `"unhealthy"` to `"unknown"` and would be a silent regression
 for monitors/dashboards that map `"unhealthy"` to "module down".
 
-**dev MINI correction (external Codex audit):** the initial
+**dev MINI correction (security review):** the initial
 stub version (dev) exposed `get_health()`, but the `# type:
 ignore[union-attr]` lives in the `health_check()` branch (line 98). So the
 forbidden refactor (line 98) did NOT affect the test, which exited via the

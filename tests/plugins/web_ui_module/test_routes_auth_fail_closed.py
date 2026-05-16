@@ -1,7 +1,7 @@
 """
 Tests for plugins/web_ui_module/api/routes_auth.py::make_require_ui_auth.
 
-Codex P1 fix: FAIL CLOSED when no admin API key is configured.
+Security fix: FAIL CLOSED when no admin API key is configured.
 Pre-fix the dependency was FAIL OPEN: if NEXE_PRIMARY_API_KEY/NEXE_ADMIN_API_KEY
 were unset, all UI routes were accessible without authentication.
 

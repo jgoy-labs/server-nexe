@@ -1,7 +1,7 @@
 """
 Tests for core/server/factory_security.py::validate_production_security.
 
-Codex P1 fix: validate_production_security() must pass `config` to
+Security fix: validate_production_security() must pass `config` to
 get_module_allowlist() so production mode detection works via
 server.toml [core.environment.mode], not only NEXE_ENV env var.
 

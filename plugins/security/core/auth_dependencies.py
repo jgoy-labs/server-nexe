@@ -208,7 +208,7 @@ async def require_api_key(
 
   if not x_api_key:
     record_auth_failure('missing_key')
-    # Q3.1 fix: read i18n from app.state instead of None (Codex P1 i18n bypass)
+    # Q3.1 fix: read i18n from app.state instead of None (security fix)
     _i18n = getattr(request.app.state, 'i18n', None)
     raise HTTPException(
       status_code=401,

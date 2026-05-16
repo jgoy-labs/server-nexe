@@ -163,7 +163,7 @@ async def bootstrap_session(
 
   _validate_bootstrap_env()
 
-  # Q3.1 fix: read i18n from app.state instead of passing None (Codex P1 i18n bypass)
+  # Q3.1 fix: read i18n from app.state instead of passing None (security fix)
   _i18n = getattr(request.app.state, 'i18n', None)
   _validate_bootstrap_ip(client_ip, _i18n)
   check_rate_limit(client_ip, request)

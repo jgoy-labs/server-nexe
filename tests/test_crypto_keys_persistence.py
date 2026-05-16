@@ -1,5 +1,5 @@
 """
-Tests for core/crypto/keys.py — Fix bug #19b pre-release (military-grade persistent MEK).
+Tests for core/crypto/keys.py — Fix bug #19b pre-release (persistent MEK).
 
 Objective: guarantee that the Master Encryption Key (MEK) is never regenerated while
 at least ONE persistent source exists, and that it is always replicated to

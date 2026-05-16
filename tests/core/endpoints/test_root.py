@@ -11,7 +11,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
-# Q2.3: /status and /health/circuits now require X-API-Key (Codex P2 fix).
+# Q2.3: /status and /health/circuits now require X-API-Key (security fix).
 # Use same pattern as Bug #22 HOMAD tests.
 _TEST_KEY = "test-status-q23-key"
 _HEADERS = {"X-API-Key": _TEST_KEY}
