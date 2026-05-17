@@ -251,14 +251,15 @@ def _seed_fastembed_cache(bundle_embeddings_dir, cache_dir):
 def _default_fastembed_cache_dir():
     """Location of the fastembed cache for the current user.
 
-    Thin wrapper kept for backwards compatibility with existing installer
-    call-sites. The real implementation lives in
-    ``memory.embeddings.paths`` (the single source of truth shared with
-    the runtime ``TextEmbedding(...)`` call-sites). See that module's
-    docstring for the rationale.
+    Inlined here to avoid importing memory.embeddings.paths at installer
+    time — that module triggers memory/embeddings/__init__.py → module.py
+    → structlog, which is not installed yet when this runs (pre-pip-install).
+    Logic mirrors memory.embeddings.paths.default_fastembed_cache_dir exactly.
     """
-    from memory.embeddings.paths import default_fastembed_cache_dir
-    return default_fastembed_cache_dir()
+    env_override = os.environ.get("FASTEMBED_CACHE_DIR")
+    if env_override:
+        return Path(env_override).expanduser()
+    return Path.home() / ".cache" / "fastembed"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

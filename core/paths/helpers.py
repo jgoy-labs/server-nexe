@@ -91,15 +91,22 @@ def get_config_dir() -> Path:
 
 def get_data_dir(subdir: Optional[str] = None) -> Path:
   """
-  Return the data directory (storage/data/).
+  Return the data directory.
+
+  Priority (F2.2 part 2):
+  1. NEXE_DATA_DIR environment variable (Tauri sidecar injection)
+  2. {project_root}/storage/data/ (standalone fallback)
 
   Args:
-    subdir: Optional subdirectory within storage/data/
+    subdir: Optional subdirectory within the data directory
 
   Returns:
     Path to the data directory
   """
-  data_dir = get_repo_root() / "storage" / "data"
+  if data_env := os.getenv("NEXE_DATA_DIR"):
+    data_dir = Path(data_env)
+  else:
+    data_dir = get_repo_root() / "storage" / "data"
 
   if subdir:
     data_dir = data_dir / subdir
@@ -109,15 +116,22 @@ def get_data_dir(subdir: Optional[str] = None) -> Path:
 
 def get_cache_dir(subdir: Optional[str] = None) -> Path:
   """
-  Return the cache directory (storage/cache/).
+  Return the cache directory.
+
+  Priority (F2.2 part 2):
+  1. NEXE_CACHE_DIR environment variable (Tauri sidecar injection)
+  2. {project_root}/storage/cache/ (standalone fallback)
 
   Args:
-    subdir: Optional subdirectory within storage/cache/
+    subdir: Optional subdirectory within the cache directory
 
   Returns:
     Path to the cache directory
   """
-  cache_dir = get_repo_root() / "storage" / "cache"
+  if cache_env := os.getenv("NEXE_CACHE_DIR"):
+    cache_dir = Path(cache_env)
+  else:
+    cache_dir = get_repo_root() / "storage" / "cache"
 
   if subdir:
     cache_dir = cache_dir / subdir

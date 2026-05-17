@@ -14,7 +14,7 @@ import unicodedata
 from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, HTTPException, Request, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.dependencies import limiter
 from plugins.security.core.auth_dependencies import require_api_key
@@ -26,10 +26,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/memory", tags=["memory-v1"])
 
 class MemoryStoreRequest(BaseModel):
-    """Request body for storing content in memory."""
-    content: str
+    """Request body for storing content in memory.
+
+    F2.4 — Pydantic anti-DoS constraints:
+      - content: max_length=100_000 (~100 KB; well above any legitimate single-doc store,
+        rejects 1 GB DoS payloads at deserialization with HTTP 422)
+      - collection: max_length=128 (mirrors ``validate_collection_name`` snake_case bound)
+    """
+    content: str = Field(..., max_length=100_000)
     metadata: Optional[Dict[str, Any]] = None
-    collection: str = "personal_memory"
+    collection: str = Field(default="personal_memory", max_length=128)
     force: bool = False  # Bypass Gate heuristic (skip min-length check)
 
 class MemoryStoreResponse(BaseModel):
@@ -39,11 +45,17 @@ class MemoryStoreResponse(BaseModel):
     message: str
 
 class MemorySearchRequest(BaseModel):
-    """Request body for searching memory."""
-    query: str
-    limit: int = 5
-    collection: Optional[str] = None
-    collections: Optional[List[str]] = None
+    """Request body for searching memory.
+
+    F2.4 — Pydantic anti-DoS constraints:
+      - query: max_length=2000 (single semantic query; no use case for longer)
+      - limit: ge=1, le=100 (cap top-k to prevent OOM via huge result sets)
+      - collection / collections: max_length=128 per name (mirrors ``validate_collection_name``)
+    """
+    query: str = Field(..., max_length=2000)
+    limit: int = Field(default=5, ge=1, le=100)
+    collection: Optional[str] = Field(default=None, max_length=128)
+    collections: Optional[List[str]] = Field(default=None, max_length=16)
 
 class MemorySearchResult(BaseModel):
     """Single search result."""

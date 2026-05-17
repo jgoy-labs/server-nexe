@@ -119,9 +119,24 @@ class MemoryModule:
 
       project_root = get_server_state().project_root
       if not project_root:
-        from pathlib import Path
-        project_root = Path.cwd()
-        logger.warning("project_root not found in server_state, using cwd: %s", project_root)
+        # F2.6: NEXE_HOME-aware resolution before falling back to cwd.
+        # Sidecar processes launch from $HOME, so an unguarded Path.cwd()
+        # would point the memory module at the user's home directory.
+        try:
+          from core.paths.detection import get_repo_root
+          project_root = get_repo_root()
+          logger.warning(
+            "project_root not found in server_state, using get_repo_root(): %s",
+            project_root,
+          )
+        except Exception as exc:
+          from pathlib import Path
+          project_root = Path.cwd()
+          logger.warning(
+            "project_root not found in server_state and get_repo_root() failed "
+            "(%s), falling back to cwd: %s",
+            exc, project_root,
+          )
 
       vectors_path = project_root / "storage" / "vectors"
       db_path = vectors_path / "metadata_memory.db"

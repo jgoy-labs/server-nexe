@@ -17,7 +17,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 
-from .keys import get_or_create_master_key, KEY_FILE_PATH
+from .keys import get_or_create_master_key, _resolve_key_file_path
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,10 @@ class CryptoProvider:
     - "backup"   → DEK for data export
     """
 
-    def __init__(self, master_key: bytes | None = None, key_file_path: Path = KEY_FILE_PATH):
+    def __init__(self, master_key: bytes | None = None, key_file_path: Path | None = None):
+        # F2.2 part 2: resol path dinàmicament si no s'ha passat (respecta NEXE_SIDECAR_DIR)
+        if key_file_path is None:
+            key_file_path = _resolve_key_file_path()
         if master_key is not None:
             if len(master_key) != KEY_SIZE:
                 raise ValueError(f"Master key must be {KEY_SIZE} bytes, got {len(master_key)}")

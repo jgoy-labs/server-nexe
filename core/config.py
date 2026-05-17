@@ -11,12 +11,13 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import copy
-from pathlib import Path
-from typing import Dict, Any, Optional
-import tomllib
-import toml  # type: ignore[import-untyped]  # toml lacks stubs (deprecated); kept for write path (tomllib stdlib is read-only)
 import logging
 import os
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+import tomllib
+import toml  # type: ignore[import-untyped]  # toml lacks stubs (deprecated); kept for write path (tomllib stdlib is read-only)
 
 try:
     from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -81,6 +82,29 @@ _BASE_CONFIG_FILES = ["personality/server.toml"]
 _OVERRIDE_CONFIG_FILES = ["server.toml", "config/server.toml"]
 
 
+def _safe_repo_root() -> Path:
+    """Best-effort repo-root resolution for config search fallback (F2.6).
+
+    Replaces the previous ``Path.cwd()`` fallback, which depended on the
+    arbitrary directory the process was launched from and silently picked
+    up the wrong tree when launched as a Tauri sidecar (the executable
+    runs from the user's home or `/`). ``get_repo_root()`` honours
+    ``NEXE_HOME`` and the marker-file heuristics; if it can't resolve the
+    root we still surface ``Path.cwd()`` rather than blowing up here.
+    """
+    try:
+        from core.paths.detection import get_repo_root
+        return get_repo_root()
+    except Exception as exc:
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            "F2.6: get_repo_root() unavailable in find_config_path/load_config, "
+            "falling back to Path.cwd(): %s",
+            exc,
+        )
+        return Path.cwd()
+
+
 def find_config_path(project_root: Optional[Path] = None) -> Optional[Path]:
     """
     Find the primary configuration file path (first-wins, for logging).
@@ -94,7 +118,7 @@ def find_config_path(project_root: Optional[Path] = None) -> Optional[Path]:
     Returns:
         Path to config file or None if not found
     """
-    base = Path(project_root) if project_root else Path.cwd()
+    base = Path(project_root) if project_root else _safe_repo_root()
 
     for config_rel in CONFIG_SEARCH_PATHS:
         config_path = base / config_rel
@@ -191,7 +215,7 @@ def load_config(
         return _load_single_config_file(Path(config_path), i18n)
 
     # Multi-file merge: DEFAULT < personality/server.toml < root server.toml < ENV vars
-    base = Path(project_root) if project_root else Path.cwd()
+    base = Path(project_root) if project_root else _safe_repo_root()
     return _load_multi_file_config(base, i18n)
 
 
@@ -321,11 +345,25 @@ def get_module_allowlist(config: Optional[Dict[str, Any]] = None) -> Optional[se
     Raises:
         ValueError: If in production mode without NEXE_APPROVED_MODULES
     """
-    core_env = os.getenv("NEXE_ENV", "development").lower()
+    # F2.3 part 2: prefer SidecarConfig.is_production over reading NEXE_ENV directly,
+    # fallback to os.getenv per backward-compat (tests/scripts sense singleton i
+    # tests que muten NEXE_ENV runtime sense rebuild del singleton).
+    raw_env_is_prod = os.getenv("NEXE_ENV", "development").lower() == "production"
+    sidecar_is_prod = False
+    try:
+        from core.sidecar_config import get_sidecar_config
+        sidecar_is_prod = get_sidecar_config().is_production
+    except Exception as exc:
+        logger.debug(
+            "F2.3 part 2: SidecarConfig unavailable in get_module_allowlist, "
+            "using NEXE_ENV fallback: %s",
+            exc,
+        )
+    is_prod_env = sidecar_is_prod or raw_env_is_prod
     config_mode = ""
     if config:
         config_mode = config.get("core", {}).get("environment", {}).get("mode", "")
-    is_prod = core_env == "production" or config_mode == "production"
+    is_prod = is_prod_env or config_mode == "production"
 
     approved = os.getenv("NEXE_APPROVED_MODULES", "").strip()
     if approved:

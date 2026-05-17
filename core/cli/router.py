@@ -124,7 +124,19 @@ class CLIRouter:
       if (parent / "pyproject.toml").exists():
         return parent
 
-    return Path.cwd()
+    # F2.6: defer to NEXE_HOME-aware resolution before the arbitrary cwd
+    # fallback (sidecar mode launches from $HOME, not the repo).
+    try:
+      from core.paths.detection import get_repo_root
+      return get_repo_root()
+    except Exception as exc:
+      import logging
+      logging.getLogger(__name__).debug(
+        "F2.6: get_repo_root() unavailable in cli._detect_project_root, "
+        "falling back to Path.cwd(): %s",
+        exc,
+      )
+      return Path.cwd()
 
   def discover_all(self) -> List[CLIInfo]:
     """

@@ -50,7 +50,19 @@ def validate_production_security(i18n: Any, config: Any = None) -> None:
   """
   from core.config import get_module_allowlist
 
+  # F2.3 part 2: SidecarConfig.is_production és la font canònica per a
+  # produccio vs no-produccio. Mantenim raw env per distingir "staging"/"development".
   core_env = os.getenv("NEXE_ENV", "development").lower()
+  try:
+    from core.sidecar_config import get_sidecar_config
+    if get_sidecar_config().is_production:
+      core_env = "production"
+  except Exception as exc:
+    logger.debug(
+      "F2.3 part 2: SidecarConfig unavailable in validate_production_security, "
+      "using raw NEXE_ENV: %s",
+      exc,
+    )
   approved_modules = os.getenv("NEXE_APPROVED_MODULES", "").strip()
 
   try:

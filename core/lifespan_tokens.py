@@ -45,8 +45,21 @@ def generate_bootstrap_token() -> str:
 
 
 def setup_bootstrap_tokens(server_state, _translate) -> None:
-  """Generate or retrieve bootstrap token and display if in development mode."""
-  bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
+  """Generate or retrieve bootstrap token and display if in development mode.
+
+  F2.1 S3 part 2: en sidecar mode usa SidecarConfig.bootstrap_ttl; fallback
+  NEXE_BOOTSTRAP_TTL → BOOTSTRAP_TTL → 30 minuts default.
+  """
+  bootstrap_ttl = None
+  try:
+    from core.sidecar_config import get_sidecar_config
+    cfg = get_sidecar_config()
+    if cfg.is_sidecar:
+      bootstrap_ttl = cfg.bootstrap_ttl
+  except Exception as exc:
+    logger.debug("F2.1 S3 part 2: SidecarConfig unavailable in setup_bootstrap_tokens: %s", exc)  # nosemgrep: python-logger-credential-disclosure
+  if bootstrap_ttl is None:
+    bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
 
   # Use persistent DB to share token across workers without overwriting a valid existing one.
   from core.bootstrap_tokens import set_bootstrap_token, get_bootstrap_token
@@ -63,11 +76,24 @@ def setup_bootstrap_tokens(server_state, _translate) -> None:
     token_to_display = existing_bootstrap["token"]
     logger.info("Using existing master bootstrap token from DB")
 
-  nexe_env = os.getenv('NEXE_ENV', 'production').lower()
+  # F2.3 part 2: prefer SidecarConfig.is_production over NEXE_ENV directe,
+  # combinem amb OR sobre el raw env per a robustesa davant singletons stale.
+  raw_is_production = os.getenv('NEXE_ENV', 'production').lower() == 'production'
+  sidecar_is_production = False
+  try:
+    from core.sidecar_config import get_sidecar_config
+    sidecar_is_production = get_sidecar_config().is_production
+  except Exception as exc:
+    logger.debug(
+      "F2.3 part 2: SidecarConfig unavailable in setup_bootstrap_tokens (env check), "
+      "using NEXE_ENV fallback: %s",
+      exc,
+    )
+  is_production = sidecar_is_production or raw_is_production
   # Bootstrap logic is only relevant in development mode
   bootstrap_display = os.getenv('NEXE_BOOTSTRAP_DISPLAY', 'true').lower() == 'true'
 
-  if nexe_env == "development" and bootstrap_display:
+  if (not is_production) and bootstrap_display:
     title = _translate(server_state.i18n, "core.server.bootstrap_token_title",
       "NEXE FRAMEWORK INITIALIZATION CODE")
     from core.config import DEFAULT_HOST, DEFAULT_PORT

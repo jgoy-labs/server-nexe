@@ -224,7 +224,7 @@ class TestMemoryModuleAdditional:
   """Additional tests for uncovered lines."""
 
   async def test_initialize_project_root_none_fallback(self, tmp_path):
-    """Lines 117-119: project_root is None, falls back to cwd."""
+    """project_root None → F2.6 falls back to get_repo_root() (then cwd)."""
     from unittest.mock import patch, MagicMock
 
     MemoryModule._instance = None
@@ -235,7 +235,12 @@ class TestMemoryModuleAdditional:
     mock_state.config = {}
     mock_state.crypto_provider = None
 
+    # F2.6: module now prefers get_repo_root() over Path.cwd(). Patch both so
+    # the test exercises a fresh tmp_path regardless of which branch the
+    # fallback chain reaches first (previously this test relied on Path.cwd()
+    # alone, but get_repo_root() returns the dev repo on this machine).
     with patch("memory.memory.module.get_server_state", return_value=mock_state), \
+         patch("core.paths.detection.get_repo_root", return_value=tmp_path), \
          patch("pathlib.Path.cwd", return_value=tmp_path):
       result = await module.initialize(config={"flash_ttl_seconds": 3600})
       assert result is True

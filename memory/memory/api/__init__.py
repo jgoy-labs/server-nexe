@@ -75,13 +75,25 @@ class MemoryAPI:
       await memory.store("text", "nexe_knowledge", {"type": "road"})
   """
 
-  DEFAULT_QDRANT_URL = os.getenv(
-    "NEXE_QDRANT_URL",
-    f"http://{os.getenv('NEXE_QDRANT_HOST', 'localhost')}:{os.getenv('NEXE_QDRANT_PORT', '6333')}"
-  )
+  # F2.6 BUG-NC-25: NEXE_QDRANT_URL / NEXE_QDRANT_HOST / NEXE_QDRANT_PORT must
+  # be resolved on instance creation, not at module import time. Use the
+  # classmethod accessor below; the class attribute is kept only as backward
+  # compat fallback (returns os.getenv at call time via property semantics).
   DEFAULT_VECTOR_SIZE = DEFAULT_VECTOR_SIZE
 
   DEFAULT_QDRANT_PATH = Path("storage/vectors")
+
+  @classmethod
+  def _resolve_default_qdrant_url(cls) -> str:
+    """Resolve the default Qdrant URL from environment at call time.
+
+    Replaces the previous class-level `DEFAULT_QDRANT_URL` literal that was
+    evaluated at import time and ignored later monkeypatches of NEXE_QDRANT_*
+    env vars (test isolation issue, BUG-NC-25).
+    """
+    host = os.getenv("NEXE_QDRANT_HOST", "localhost")
+    port = os.getenv("NEXE_QDRANT_PORT", "6333")
+    return os.getenv("NEXE_QDRANT_URL", f"http://{host}:{port}")
 
   def __init__(
     self,
@@ -106,8 +118,12 @@ class MemoryAPI:
                      batch_size override, no pre-warm, no mega-batch).
                      Introduced by bug #16 to remove hardcodes.
     """
-    self.qdrant_url = qdrant_url or self.DEFAULT_QDRANT_URL
-    self.qdrant_path = qdrant_path if qdrant_path is not None else self.DEFAULT_QDRANT_PATH
+    # F2.2: resol DEFAULT_QDRANT_PATH via SidecarConfig en sidecar mode
+    from memory.memory._paths import resolve_qdrant_path
+    if qdrant_path is None:
+      qdrant_path = resolve_qdrant_path(self.DEFAULT_QDRANT_PATH)
+    self.qdrant_url = qdrant_url or self._resolve_default_qdrant_url()
+    self.qdrant_path = qdrant_path  # F2.2: resolved above via resolve_qdrant_path
     self.embedding_model = embedding_model
     self.vector_size = self.DEFAULT_VECTOR_SIZE
     self.ingest_config = ingest_config if ingest_config is not None else IngestConfig()

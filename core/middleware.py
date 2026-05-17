@@ -231,6 +231,23 @@ def setup_cors(app: FastAPI, config: Dict[str, Any], i18n = None) -> None:
     "Content-Type", "Authorization", "X-API-Key"
   ])
 
+  # F2.1 Sessió 3: en mode sidecar, override cors_origins amb SidecarConfig
+  # que inclou tauri://localhost + http://localhost:1420 (resol A8/BUG-NX-1).
+  # Standalone (no NEXE_SIDECAR): server.toml mana.
+  try:
+    from core.sidecar_config import get_sidecar_config
+    sidecar_cfg = get_sidecar_config()
+    if sidecar_cfg.is_sidecar:
+      cors_origins = list(sidecar_cfg.cors_origins)
+      logger.info(
+        "CORS: sidecar mode override — using SidecarConfig.cors_origins "
+        "(includes Tauri origins)"
+      )
+  except Exception as e:  # pragma: no cover
+    # Defensive: si get_sidecar_config() falla per qualsevol motiu,
+    # caiem al cors_origins del server.toml (comportament pre-F2.1).
+    logger.warning("CORS: SidecarConfig unavailable, falling back to server.toml: %s", e)
+
   if "*" in cors_origins:
     msg = _translate(i18n, "core.cors.wildcard_not_allowed",
       "CORS wildcard '*' not allowed in air-gapped mode. Define explicit origins in server.toml [core.server] cors_origins")
@@ -302,9 +319,76 @@ def setup_prometheus_metrics(app: FastAPI) -> None:
   except ImportError as e:
     logger.warning(f"prometheus_metrics_not_available: {e}")
 
+def _load_or_create_persistent_csrf_secret() -> str:
+  """Load or generate-and-persist the CSRF cookie-signing secret (F2.6 BUG-NB-3).
+
+  Without persistence the previous implementation generated a fresh secret
+  on every boot via ``secrets.token_hex(32)``, which silently invalidated
+  every signed CSRF cookie and forced users to re-authenticate after each
+  restart. ``NEXE_CSRF_SECRET`` and ``SidecarConfig.csrf_secret`` still take
+  priority and are checked by the caller; this helper is the last-resort
+  fallback that stores the generated secret under the appropriate data
+  directory (``SidecarConfig.data_dir`` in sidecar mode, ``~/.nexe``
+  otherwise) with permission 0600.
+  """
+  import os
+  import secrets
+  from pathlib import Path
+
+  secret_path = None
+  try:
+    from core.sidecar_config import get_sidecar_config
+    cfg = get_sidecar_config()
+    if cfg.is_sidecar and getattr(cfg, "data_dir", None):
+      secret_path = Path(cfg.data_dir) / "csrf_secret"
+  except Exception as exc:
+    logger.debug("F2.6 BUG-NB-3: SidecarConfig unavailable in csrf secret loader: %s", exc)  # nosemgrep: python-logger-credential-disclosure
+
+  if secret_path is None:
+    secret_path = Path.home() / ".nexe" / "csrf_secret"
+
+  try:
+    if secret_path.exists():
+      existing = secret_path.read_text(encoding="ascii").strip()
+      if len(existing) >= 32:
+        logger.info("CSRF secret loaded from %s (persistent)", secret_path)  # nosemgrep: python-logger-credential-disclosure
+        return existing
+      logger.warning(  # nosemgrep: python-logger-credential-disclosure
+        "F2.6 BUG-NB-3: CSRF secret file %s is too short (%d chars), regenerating",
+        secret_path, len(existing),
+      )
+  except Exception as exc:
+    logger.warning("F2.6 BUG-NB-3: failed to read %s, regenerating: %s", secret_path, exc)  # nosemgrep: python-logger-credential-disclosure
+
+  new_secret = secrets.token_hex(32)
+  try:
+    secret_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = secret_path.with_suffix(".tmp")
+    tmp_path.write_text(new_secret, encoding="ascii")
+    os.chmod(tmp_path, 0o600)
+    tmp_path.replace(secret_path)
+    logger.info("CSRF secret generated and persisted to %s", secret_path)  # nosemgrep: python-logger-credential-disclosure
+  except Exception as exc:
+    logger.warning(  # nosemgrep: python-logger-credential-disclosure
+      "F2.6 BUG-NB-3: failed to persist CSRF secret to %s (sessions will "
+      "be invalidated on next boot): %s",
+      secret_path, exc,
+    )
+
+  return new_secret
+
+
 def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
   """
   Setup CSRF protection middleware.
+
+  F2.1 S3 part 3: en sidecar mode usa SidecarConfig.csrf_secret + is_production
+  (override de NEXE_CSRF_SECRET + NEXE_ENV directes per consistència amb la resta
+  de consumers).
+
+  F2.6 BUG-NB-3: si ni l'env ni el SidecarConfig porten secret, el helper
+  _load_or_create_persistent_csrf_secret() persisteix un secret estable a
+  disc (0600) en comptes de regenerar-lo a cada boot.
 
   Args:
     app: FastAPI application instance
@@ -314,22 +398,36 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
 
   csrf_secret = os.getenv("NEXE_CSRF_SECRET")
   config_mode = config.get("core", {}).get("environment", {}).get("mode", "").lower()
-  is_prod = os.getenv("NEXE_ENV", "development") == "production" or config_mode == "production"
+
+  # F2.3 part 2: prefer SidecarConfig.is_production sobre NEXE_ENV directe,
+  # combinem amb OR sobre el raw env per a robustesa davant singletons stale.
+  # F2.1 S3 part 3 ja overrideava csrf_secret + is_prod amb SidecarConfig.
+  raw_is_prod = os.getenv("NEXE_ENV", "development") == "production"
+  sidecar_is_prod = False
+  try:
+    from core.sidecar_config import get_sidecar_config
+    cfg = get_sidecar_config()
+    sidecar_is_prod = cfg.is_production
+    if cfg.is_sidecar and cfg.csrf_secret:
+      csrf_secret = cfg.csrf_secret
+  except Exception as exc:
+    logger.debug(
+      "F2.3 part 2: SidecarConfig unavailable in setup_csrf, using NEXE_ENV fallback: %s",
+      exc,
+    )
+  is_prod = sidecar_is_prod or raw_is_prod or config_mode == "production"
 
   if not csrf_secret:
+    # F2.6 BUG-NB-3: persist a stable secret on disk so cookies survive
+    # restarts. NEXE_CSRF_SECRET still wins when set; this fallback just
+    # avoids the old "regenerate every boot" failure mode.
     if is_prod:
-      # In production, require explicit CSRF secret configuration
-      logger.error("NEXE_CSRF_SECRET not configured in production mode!")
-      logger.error("   Sessions will be invalidated on each restart.")
-      logger.error("   Set NEXE_CSRF_SECRET in .env for persistent sessions.")
-      # Generate temporary but log clearly
-      import secrets
-      csrf_secret = secrets.token_hex(32)
-    else:
-      # Development mode: generate temporary secret with warning
-      import secrets
-      csrf_secret = secrets.token_hex(32)
-      logger.warning("CSRF_SECRET not configured. Using temporary secret (dev mode only)")
+      logger.warning(
+        "NEXE_CSRF_SECRET not configured in production. Falling back to "
+        "the persistent on-disk secret. Set NEXE_CSRF_SECRET in .env if you "
+        "prefer to manage the secret via configuration."
+      )
+    csrf_secret = _load_or_create_persistent_csrf_secret()
 
   from starlette_csrf import CSRFMiddleware
 
@@ -387,6 +485,17 @@ def setup_trusted_hosts(app: FastAPI, config: Dict[str, Any]) -> None:
   # If server binds to a custom host/domain, allow it too
   if host and host not in ("0.0.0.0", ""):  # nosec B104: comparing to "0.0.0.0" string, not binding to it (allow-list construction for TrustedHostMiddleware)
     allowed.add(host)
+
+  # F2.1 Sessió 3: en mode sidecar, SidecarConfig.trusted_hosts pot afegir aliases
+  # custom (NEXE_LOCALHOST_ALIASES). Union amb el set actual per no perdre defaults.
+  try:
+    from core.sidecar_config import get_sidecar_config
+    sidecar_cfg = get_sidecar_config()
+    if sidecar_cfg.is_sidecar:
+      allowed.update(sidecar_cfg.trusted_hosts)
+      logger.debug("TrustedHosts: sidecar mode — union with SidecarConfig.trusted_hosts")
+  except Exception as e:  # pragma: no cover
+    logger.warning("TrustedHosts: SidecarConfig unavailable: %s", e)
 
   app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed))
   logger.info("TrustedHostMiddleware: allowed_hosts=%s", sorted(allowed))

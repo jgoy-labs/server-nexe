@@ -156,8 +156,24 @@ async def _check_needs_reingest(ingested_marker) -> bool:
 async def auto_ingest_knowledge(server_state):
     """Auto-ingest knowledge/ folder on first run only."""
     try:
-        nexe_env = os.getenv("NEXE_ENV", "production").lower()
+        # F2.3 part 2: prefer SidecarConfig.is_production over NEXE_ENV directe,
+        # fallback a os.getenv per backward-compat. Reconstruim la string `nexe_env`
+        # només per al log (vegeu _auto_ingest_is_disabled).
+        # F2.1 S3 part 2: en sidecar mode usa SidecarConfig.auto_ingest_knowledge
         auto_ingest_enabled = os.getenv("NEXE_AUTO_INGEST_KNOWLEDGE", "true").lower() == "true"
+        try:
+            from core.sidecar_config import get_sidecar_config
+            cfg = get_sidecar_config()
+            nexe_env = "production" if cfg.is_production else "development"
+            if cfg.is_sidecar:
+                auto_ingest_enabled = cfg.auto_ingest_knowledge
+        except Exception as exc:
+            logger.debug(
+                "F2.3 part 2: SidecarConfig unavailable in auto_ingest_knowledge, "
+                "falling back to NEXE_ENV: %s",
+                exc,
+            )
+            nexe_env = os.getenv("NEXE_ENV", "production").lower()
 
         if _auto_ingest_is_disabled(nexe_env, auto_ingest_enabled):
             logger.debug(

@@ -34,17 +34,18 @@
       "ram_gb": 4.0,
       "disk_gb": 3.4,
       "backends": [
-        "ollama"
+        "ollama",
+        "mlx"
       ],
-      "mlx": false,
+      "mlx": true,
       "ollama": "qwen3.5:4b",
       "gguf": null,
       "iberic": false,
       "recommended": true,
       "description": {
-        "ca": "👁 🧠 Multimodal, thinking, visió. Ollama recomanat (MLX requereix torch).",
-        "es": "👁 🧠 Multimodal, thinking, visión. Ollama recomendado (MLX requiere torch).",
-        "en": "👁 🧠 Multimodal, thinking, vision. Ollama recommended (MLX requires torch)."
+        "ca": "👁 🧠 Multimodal, thinking, visió. MLX Apple Silicon.",
+        "es": "👁 🧠 Multimodal, thinking, visión. MLX Apple Silicon.",
+        "en": "👁 🧠 Multimodal, thinking, vision. MLX Apple Silicon."
       }
     },
     {
@@ -129,17 +130,18 @@
       "ram_gb": 8.0,
       "disk_gb": 6.6,
       "backends": [
-        "ollama"
+        "ollama",
+        "mlx"
       ],
-      "mlx": false,
+      "mlx": true,
       "ollama": "qwen3.5:9b",
       "gguf": null,
       "iberic": false,
       "recommended": true,
       "description": {
-        "ca": "👁 🧠 Thinking, visió, tool calling. Ollama recomanat (MLX requereix torch).",
-        "es": "👁 🧠 Thinking, visión, tool calling. Ollama recomendado (MLX requiere torch).",
-        "en": "👁 🧠 Thinking, vision, tool calling. Ollama recommended (MLX requires torch)."
+        "ca": "👁 🧠 Thinking, visió, tool calling. MLX Apple Silicon.",
+        "es": "👁 🧠 Thinking, visión, tool calling. MLX Apple Silicon.",
+        "en": "👁 🧠 Thinking, vision, tool calling. MLX Apple Silicon."
       }
     },
     {
@@ -250,16 +252,17 @@
       "ram_gb": 20.0,
       "disk_gb": 17.0,
       "backends": [
-        "ollama"
+        "ollama",
+        "mlx"
       ],
-      "mlx": false,
+      "mlx": true,
       "ollama": "qwen3.5:27b",
       "gguf": null,
       "iberic": false,
       "description": {
-        "ca": "👁 🧠 Thinking excel·lent, visió, tool calling. Ollama recomanat (MLX requereix torch).",
-        "es": "👁 🧠 Thinking excelente, visión, tool calling. Ollama recomendado (MLX requiere torch).",
-        "en": "👁 🧠 Excellent thinking, vision, tool calling. Ollama recommended (MLX requires torch)."
+        "ca": "👁 🧠 Thinking excel·lent, visió, tool calling. MLX Apple Silicon.",
+        "es": "👁 🧠 Thinking excelente, visión, tool calling. MLX Apple Silicon.",
+        "en": "👁 🧠 Excellent thinking, vision, tool calling. MLX Apple Silicon."
       }
     },
     {
@@ -342,16 +345,17 @@
       "ram_gb": 23.0,
       "disk_gb": 21.0,
       "backends": [
-        "ollama"
+        "ollama",
+        "mlx"
       ],
-      "mlx": false,
+      "mlx": true,
       "ollama": "qwen3.5:35b-a3b",
       "gguf": null,
       "iberic": false,
       "description": {
-        "ca": "👁 🧠 Velocitat de 9B amb qualitat de 35B. Thinking, visió. Apache 2.0.",
-        "es": "👁 🧠 Velocidad de 9B con calidad de 35B. Thinking, visión. Apache 2.0.",
-        "en": "👁 🧠 9B speed with 35B quality. Thinking, vision. Apache 2.0."
+        "ca": "👁 🧠 Velocitat de 9B amb qualitat de 35B. MLX Apple Silicon. Apache 2.0.",
+        "es": "👁 🧠 Velocidad de 9B con calidad de 35B. MLX Apple Silicon. Apache 2.0.",
+        "en": "👁 🧠 9B speed with 35B quality. MLX Apple Silicon. Apache 2.0."
       }
     },
     {

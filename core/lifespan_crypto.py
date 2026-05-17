@@ -15,6 +15,30 @@ import os
 logger = logging.getLogger(__name__)
 
 
+def _resolve_storage_root(server_state):
+    """Resolve the storage root honouring sidecar mode (F2.6).
+
+    In sidecar mode the storage tree (memory/, vectors/, etc.) lives under
+    SidecarConfig.data_dir — typically ~/.nexe/data — not inside the Tauri
+    bundle's project_root/storage which is read-only and would mask user
+    data. Standalone mode keeps the legacy project_root/storage layout.
+
+    Returns None if neither resolution succeeds (callers must handle).
+    """
+    try:
+        from core.sidecar_config import get_sidecar_config
+        cfg = get_sidecar_config()
+        if cfg.is_sidecar:
+            return cfg.data_dir
+    except Exception as exc:
+        logger.debug(
+            "F2.6: SidecarConfig unavailable in _resolve_storage_root; "
+            "falling back to project_root/storage: %s",
+            exc,
+        )
+    return server_state.project_root / "storage" if server_state.project_root else None
+
+
 def _check_sqlcipher_required(normalized_env: str, sqlcipher_available: bool) -> None:
     """Raise RuntimeError if encryption is explicitly required but sqlcipher3 is missing."""
     if normalized_env == 'true' and not sqlcipher_available:
@@ -35,7 +59,7 @@ def _check_plaintext_db_exists(server_state, crypto_enabled: bool, normalized_en
     if not (crypto_enabled and normalized_env in ('', 'auto')):
         return crypto_enabled
 
-    storage_path_check = server_state.project_root / "storage" if server_state.project_root else None
+    storage_path_check = _resolve_storage_root(server_state)
     if not storage_path_check:
         return crypto_enabled
 
@@ -92,7 +116,7 @@ async def _startup_encryption(server_state) -> None:
 
         warn_unencrypted = encryption_config.get('warn_unencrypted', True)
         if warn_unencrypted:
-            storage_path = server_state.project_root / "storage" if server_state.project_root else None
+            storage_path = _resolve_storage_root(server_state)
             check_encryption_status(storage_path)
 
     except Exception as e:

@@ -79,6 +79,16 @@ class WebUIModule:
             if self._initialized:
                 return True
 
+            # F2.5: short-circuit declaratiu — si manifest té
+            # `disabled_in_sidecar=true` i `SidecarConfig.is_sidecar=True`,
+            # NO carreguem el mòdul (la UI la serveix Tauri host).
+            if self._is_disabled_in_sidecar():
+                logger.info(
+                    "WebUIModule: disabled_in_sidecar=true and is_sidecar=True; "
+                    "skipping initialization (UI served by Tauri host)"
+                )
+                return False
+
             try:
                 # Create the one and only SessionManager, with crypto if available.
                 # In production we MUST get a crypto_provider — otherwise sessions
@@ -197,3 +207,33 @@ class WebUIModule:
         if host in ("0.0.0.0", "::"):  # nosec B104: comparing to wildcard strings, not binding to them (rewriting to DEFAULT_HOST for client-side URL construction)
             host = DEFAULT_HOST
         return f"http://{host}:{port}"
+
+    # --- F2.5: sidecar-aware initialization ---
+
+    def _is_disabled_in_sidecar(self) -> bool:
+        """Return True only if manifest `disabled_in_sidecar=true` AND sidecar mode actiu.
+
+        Light-touch defensive (lliçó `feedback_revert_mental_obligatori`): qualsevol
+        excepció es loga a debug i tornem False — preservem el comportament històric
+        (carregar el mòdul) si quelcom falla.
+        """
+        try:
+            try:
+                import tomllib
+            except ModuleNotFoundError:  # pragma: no cover — Python < 3.11
+                import tomli as tomllib  # type: ignore[no-redef]
+            manifest_path = self._plugin_dir / "manifest.toml"
+            with open(manifest_path, "rb") as fh:
+                data = tomllib.load(fh)
+            disabled = bool(data.get("module", {}).get("disabled_in_sidecar", False))
+            if not disabled:
+                return False
+            from core.sidecar_config import get_sidecar_config
+            return bool(get_sidecar_config().is_sidecar)
+        except Exception as exc:
+            logger.debug(
+                "WebUIModule._is_disabled_in_sidecar: defensive fallback (%s); "
+                "treating as NOT disabled",
+                exc,
+            )
+            return False

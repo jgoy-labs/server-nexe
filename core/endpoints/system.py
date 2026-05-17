@@ -174,8 +174,23 @@ async def restart_server(
     dict: Restart status and estimated time
 
   Raises:
-    HTTPException: If supervisor is not available
+    HTTPException: If supervisor is not available, or 501 in sidecar mode
+      (BUG-NX-4 F2.5: el Tauri host gestiona el restart, no el sidecar).
   """
+  # F2.5 / BUG-NX-4: el sidecar NO ha de provar de reiniciar-se a si mateix —
+  # és Tauri host qui en gestiona el cicle de vida (spawn_sidecar_process).
+  try:
+    from core.sidecar_config import get_sidecar_config
+    if get_sidecar_config().is_sidecar:
+      raise HTTPException(
+        status_code=501,
+        detail="Restart is managed by host application in sidecar mode",
+      )
+  except HTTPException:
+    raise
+  except Exception as exc:
+    logger.debug("restart_server: get_sidecar_config() failed (%s); proceeding non-sidecar", exc)
+
   try:
     supervisor_pid = get_supervisor_pid()
 

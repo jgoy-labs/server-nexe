@@ -97,7 +97,20 @@ def check_rate_limit(client_ip: str, request: Request) -> None:
 
 def _validate_bootstrap_env() -> None:
   """Raise 503 if NEXE_ENV is not 'development'."""
+  # F2.3 part 2: SidecarConfig.is_production és la font canònica per a
+  # produccio vs no-produccio. Mantenim raw env per distingir "development"
+  # de valors no-produccio com "staging"/"test" que han de bloquejar bootstrap.
   core_env = os.getenv('NEXE_ENV', 'production').lower()
+  try:
+    from core.sidecar_config import get_sidecar_config
+    if get_sidecar_config().is_production:
+      core_env = "production"
+  except Exception as exc:
+    logger.debug(
+      "F2.3 part 2: SidecarConfig unavailable in _validate_bootstrap_env, "
+      "using raw NEXE_ENV: %s",
+      exc,
+    )
   if core_env != 'development':
     logger.error("Bootstrap attempt in non-development environment (NEXE_ENV=%s)", core_env)
     raise HTTPException(status_code=503, detail="Bootstrap not available in this environment")
@@ -285,7 +298,20 @@ async def bootstrap_info(request: Request) -> BootstrapInfoResponse:
   from core.bootstrap_tokens import get_bootstrap_token
   from datetime import datetime
 
+  # F2.3 part 2: SidecarConfig.is_production és la font canònica per a
+  # produccio vs no-produccio. Mantenim raw env per distingir "development"
+  # de valors no-produccio com "staging"/"test".
   core_env = os.getenv('NEXE_ENV', 'production').lower()
+  try:
+    from core.sidecar_config import get_sidecar_config
+    if get_sidecar_config().is_production:
+      core_env = "production"
+  except Exception as exc:
+    logger.debug(
+      "F2.3 part 2: SidecarConfig unavailable in bootstrap info endpoint, "
+      "using raw NEXE_ENV: %s",
+      exc,
+    )
   bootstrap_enabled = (core_env == 'development')
 
   info = get_bootstrap_token()

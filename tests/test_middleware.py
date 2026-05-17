@@ -185,25 +185,42 @@ class TestSetupPrometheusMetrics:
 
 class TestSetupCsrfProtection:
 
-    def test_dev_mode_uses_temp_secret(self, monkeypatch, caplog):
+    def test_dev_mode_uses_persistent_secret(self, monkeypatch, caplog, tmp_path):
+        """F2.6 BUG-NB-3: without NEXE_CSRF_SECRET, the loader persists a
+        stable secret on disk instead of regenerating one every boot."""
+        import logging
         from core.middleware import setup_csrf_protection
         app = FastAPI()
         monkeypatch.delenv("NEXE_CSRF_SECRET", raising=False)
         monkeypatch.delenv("NEXE_ENV", raising=False)
+        # Redirect ~/.nexe to tmp_path so the test does not pollute the dev home
+        monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
         mw_before = len(app.user_middleware)
-        setup_csrf_protection(app, {})
+        with caplog.at_level(logging.INFO, logger="core.middleware"):
+            setup_csrf_protection(app, {})
         assert len(app.user_middleware) > mw_before
-        assert any("temporary secret" in r.message.lower() or "not configured" in r.message.lower() for r in caplog.records)
+        assert (tmp_path / ".nexe" / "csrf_secret").exists(), (
+            "F2.6 BUG-NB-3: dev mode must persist the secret to ~/.nexe/csrf_secret"
+        )
+        assert any(
+            "persistent" in r.message.lower() or "persisted" in r.message.lower()
+            for r in caplog.records
+        )
 
-    def test_production_without_secret_logs_error(self, monkeypatch, caplog):
+    def test_production_without_secret_warns_and_persists(self, monkeypatch, caplog, tmp_path):
+        """F2.6 BUG-NB-3: production without env still persists a fallback
+        secret; the log is now a warning (sessions survive restarts) instead
+        of an error (sessions invalidated)."""
         from core.middleware import setup_csrf_protection
         import logging
         app = FastAPI()
         monkeypatch.delenv("NEXE_CSRF_SECRET", raising=False)
         monkeypatch.setenv("NEXE_ENV", "production")
-        with caplog.at_level(logging.ERROR):
+        monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        with caplog.at_level(logging.WARNING):
             setup_csrf_protection(app, {})
         assert any("production" in r.message.lower() for r in caplog.records)
+        assert (tmp_path / ".nexe" / "csrf_secret").exists()
 
     def test_with_csrf_secret_adds_middleware(self, monkeypatch):
         from core.middleware import setup_csrf_protection

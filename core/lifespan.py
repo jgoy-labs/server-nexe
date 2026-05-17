@@ -205,9 +205,28 @@ class ServerState:
     self._cleanup_task: Optional[asyncio.Task[Any]] = None
     self._prewarm_task: Optional[asyncio.Task[Any]] = None
     self._session_cleanup_task: Optional[asyncio.Task[Any]] = None
+    self._knowledge_ingest_task: Optional[asyncio.Task[Any]] = None
+    self.knowledge_ingest_complete: bool = False
     self.configure_modules_callback: Optional[Callable[..., None]] = None
 
 server_state = ServerState()
+
+
+async def _wrap_knowledge_ingest(state: "ServerState") -> None:
+    """F2.A10: Wraps auto_ingest_knowledge for background execution.
+
+    Sets state.knowledge_ingest_complete=True when finished so endpoints
+    can know whether RAG retrieval is fully primed.
+    """
+    try:
+        await auto_ingest_knowledge(state)
+        state.knowledge_ingest_complete = True
+        logger.info("Knowledge: Background ingest finished")
+    except asyncio.CancelledError:
+        logger.info("Knowledge: Background ingest cancelled (shutdown)")
+        raise
+    except Exception as exc:
+        logger.warning("Knowledge: Background ingest failed: %s", exc)
 
 
 async def _prewarm_fastembed() -> None:
@@ -255,14 +274,41 @@ async def _startup_init(app: FastAPI) -> None:
     app.state.config = server_state.config
 
     # PID file — single-instance guard (B06, B07, B10)
+    # F2.1 Sessió 3 part 2 (2026-05-16 23:50): en mode sidecar Tauri, SKIP el
+    # PID file completament. Tauri gestiona el cicle de vida del procés via
+    # NEXE_PARENT_PID watchdog (lifecycle.rs:graceful_quit). El single-instance
+    # guard és per a standalone (CLI), on hi pot haver col·lisió usuari.
+    # En mode sidecar, cada Tauri pot tenir el seu propi procés sidecar; el
+    # PID file global (storage/run/server.pid, un sol fitxer) provocava
+    # "Server already running" entre sessions Tauri successives — encara que
+    # el procés anterior estigués correctament aturat per Tauri.
     from core.config import DEFAULT_PORT
     _srv_startup_cfg = server_state.config.get('core', {}).get('server', {})
     _startup_port = _srv_startup_cfg.get('port', DEFAULT_PORT)
-    if server_state.project_root and not _write_pid_file(server_state.project_root, _startup_port):
+    _skip_pid_file = False
+    try:
+        from core.sidecar_config import get_sidecar_config
+        sidecar_cfg = get_sidecar_config()
+        if sidecar_cfg.is_sidecar:
+            _startup_port = sidecar_cfg.port  # NEXE_PORT injectat per Tauri
+            _skip_pid_file = True
+            logger.info("Sidecar mode: skipping PID file (Tauri manages lifecycle)")
+    except Exception as exc:  # pragma: no cover — fallback comportament pre-F2.1
+        logger.debug("SidecarConfig unavailable, using default PID file behavior: %s", exc)
+
+    if not _skip_pid_file and server_state.project_root and not _write_pid_file(server_state.project_root, _startup_port):
         raise RuntimeError(
             f"Server already running on port {_startup_port}. "
             "Use './nexe stop' to stop the existing instance."
         )
+
+    if _skip_pid_file:
+        try:
+            from core.server.watchdog import start_parent_watchdog
+            start_parent_watchdog(poll_interval=2.0)
+            logger.info("Parent watchdog: started in sidecar mode (poll 2s)")
+        except Exception as exc:
+            logger.warning("Parent watchdog: failed to start in sidecar mode: %s", exc)
 
     await _startup_encryption(server_state)
     _startup_qdrant()
@@ -310,7 +356,6 @@ async def _startup_phases_and_tokens(app: FastAPI) -> None:
     _startup_phases = [
         ("memory modules", load_memory_modules(app, server_state, _translate)),
         ("plugin modules", initialize_plugin_modules(app, server_state)),
-        ("knowledge ingest", auto_ingest_knowledge(server_state)),
         ("MemoryService v1", start_memory_service_v1(app, server_state)),
     ]
     for _phase_name, _phase_coro in _startup_phases:
@@ -323,6 +368,11 @@ async def _startup_phases_and_tokens(app: FastAPI) -> None:
                 _phase_name, STARTUP_TIMEOUT,
             )
             raise RuntimeError(f"Startup phase '{_phase_name}' timed out after {STARTUP_TIMEOUT}s")
+
+    server_state._knowledge_ingest_task = asyncio.create_task(
+        _wrap_knowledge_ingest(server_state)
+    )
+    logger.info("Knowledge: Auto-ingest scheduled in background (non-blocking)")
 
     setup_bootstrap_tokens(server_state, _translate)
     try:
@@ -380,7 +430,7 @@ async def _startup(app: FastAPI) -> None:
 
 async def _cancel_background_tasks() -> None:
     """Cancels active background tasks (N04)."""
-    for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task'):
+    for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task', '_knowledge_ingest_task'):
         _task = getattr(server_state, _task_attr, None)
         if _task is not None and not _task.done():
             _task.cancel()

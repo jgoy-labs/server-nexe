@@ -9,9 +9,14 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import logging
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+
+logger = logging.getLogger(__name__)
+
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
   """
@@ -41,13 +46,28 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     response = await call_next(request)
 
     # CSP policy:
-    # - script-src: NO 'unsafe-inline' (XSS protection)
+    # - script-src: NO 'unsafe-inline' in standalone (XSS protection); relaxat
+    #   en mode sidecar Tauri (la seguretat la dóna el webview aïllat de Tauri).
     # - style-src: 'unsafe-inline' allowed (needed for Web UI, low security risk)
     # - upgrade-insecure-requests: only on HTTPS (Safari blocks CSS/JS on HTTP if set)
     is_https = request.url.scheme == "https"
+
+    # F2.1 Sessió 3: relaxar script-src en mode sidecar (resol anomalia A9).
+    # En Tauri, el webview executa scripts dins un sandbox aïllat; la garantia
+    # de seguretat XSS la dóna l'aïllament del context Tauri, no aquesta CSP.
+    # Sense aquesta excepció, els scripts inline del web_ui (plugins/web_ui_module)
+    # són bloquejats i la UI no carrega — anomalia A9 de F1-smoke/resultats.md.
+    script_src_extra = ""
+    try:
+      from core.sidecar_config import get_sidecar_config
+      if get_sidecar_config().is_sidecar:
+        script_src_extra = " 'unsafe-inline' 'unsafe-eval'"
+    except Exception as exc:  # pragma: no cover — fallback comportament pre-F2.1
+      logger.debug("SidecarConfig unavailable, using strict CSP: %s", exc)
+
     csp = (
       "default-src 'self'; "
-      "script-src 'self'; "
+      f"script-src 'self'{script_src_extra}; "
       "style-src 'self' 'unsafe-inline'; "
       "img-src 'self' data:; "
       "font-src 'self' data:; "

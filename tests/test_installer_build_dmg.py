@@ -68,7 +68,7 @@ def test_validates_wheels_bundle_size(script_content: str) -> None:
 def test_validates_embedding_bundle_size(script_content: str) -> None:
     """Step 5b must fail hard if the embedding bundle is too small."""
     assert "EMBEDDINGS_SIZE_MB" in script_content
-    assert 'EMBEDDINGS_SIZE_MB" -lt 400' in script_content
+    assert 'EMBEDDINGS_SIZE_MB" -lt 200' in script_content
 
 
 def test_uses_exit_code_14_for_bundle_errors(script_content: str) -> None:

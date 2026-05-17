@@ -12,6 +12,9 @@ description = "Interfície web estil Ollama per demostrar el sistema modular de 
 location = "plugins/web_ui_module/"
 permanent = false
 note = "Plugin de demostració del sistema modular"
+# F2.5: el mòdul es desactiva en sidecar mode (la UI la serveix Tauri host,
+# no aquest plugin). `initialize()` retorna False quan get_sidecar_config().is_sidecar.
+disabled_in_sidecar = true
 
 [module.metadata]
 author = "Jordi Goy"

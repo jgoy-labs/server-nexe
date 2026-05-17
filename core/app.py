@@ -64,10 +64,45 @@ def main():
   _main()
 
 
-__all__ = ['create_app', 'main', 'app']
+_app_instance: Optional[FastAPI] = None
 
-force_reload = os.getenv('NEXE_FORCE_RELOAD', 'false').lower() == 'true'
-app = create_app(force_reload=force_reload)
+
+def get_app() -> FastAPI:
+  """Lazy accessor for the singleton FastAPI app instance.
+
+  Resolves BUG-NX-5 (F2.6): importing core.app no longer eagerly instantiates
+  the FastAPI app at import time. The app is created on first attribute access
+  (e.g. when uvicorn resolves `core.app:app`), so importing the module on a
+  read-only filesystem or in unit tests does not trigger factory side effects.
+  """
+  global _app_instance
+  if _app_instance is None:
+    force_reload = os.getenv('NEXE_FORCE_RELOAD', 'false').lower() == 'true'
+    _app_instance = create_app(force_reload=force_reload)
+  return _app_instance
+
+
+def __getattr__(name: str):
+  """PEP 562 module-level lazy resolution of `app`.
+
+  Uvicorn and tests use `from core.app import app`, which triggers this hook
+  the first time `app` is accessed. After that, the singleton is cached on
+  the module so subsequent accesses are O(1) without re-entering this hook.
+  """
+  if name == 'app':
+    instance = get_app()
+    globals()['app'] = instance
+    return instance
+  raise AttributeError(f"module 'core.app' has no attribute {name!r}")
+
+
+# NOTE: 'app' is intentionally NOT in __all__: it is resolved lazily via
+# PEP 562 __getattr__ above and is not a real module-level binding until
+# first accessed. Listing it here would trigger ruff F822 / pyright
+# reportUnsupportedDunderAll. Consumers should keep using
+# `from core.app import app` (PEP 562 dispatches the access) or `get_app()`.
+__all__ = ['create_app', 'main', 'get_app']
+
 
 if __name__ == '__main__':
   main()

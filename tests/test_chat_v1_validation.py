@@ -100,14 +100,20 @@ class TestChatV1Validation:
         assert r.status_code == 400
 
     def test_oversized_message_rejected(self, client):
-        """Message > 8000 chars -> 400 (DoS prevention)."""
+        """Message > 8000 chars -> 422 (F2.4 Pydantic max_length anti-DoS).
+
+        Pre-F2.4 this returned 400 from ``validate_string_input``. After F2.4
+        the Pydantic ``max_length=8000`` on ``Message.content`` rejects the
+        oversized payload at deserialization, so the request never reaches
+        the endpoint body. 422 is the correct semantic for a malformed body.
+        """
         payload = {
             "messages": [{"role": "user", "content": "A" * 9000}],
             "stream": False,
             "use_rag": False,
         }
         r = client.post("/v1/chat/completions", json=payload, headers=_HEADERS)
-        assert r.status_code == 400
+        assert r.status_code == 422
 
     def test_legitimate_message_passes_validation(self, client, monkeypatch):
         """A normal message must NOT be rejected by validation (it may fail later due to missing engine, not due to a validation 400)."""

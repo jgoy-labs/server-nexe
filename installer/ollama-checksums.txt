@@ -8,9 +8,9 @@
 # Source of truth:        https://github.com/ollama/ollama/releases/download/<version>/sha256sum.txt
 #                         (published and signed by the Ollama maintainers at release time)
 #
-# Last updated:           2026-05-01 13:50 (B8 bump v0.22.0 → v0.22.1)
-# Ollama version pinned:  v0.22.1 (released 2026-04-28T20:30:57Z, ~8h after v0.22.0)
-# File size:              164249113 bytes (~156 MB)
+# Last updated:           2026-05-16 (B8 bump v0.22.1 → v0.24.0)
+# Ollama version pinned:  v0.24.0 (latest, 2026-05-16)
+# File size:              167608636 bytes (~160 MB)
 #
 # Cross-validation performed at pin time (2026-05-01 13:46):
 #   1. Downloaded zip via ollama.com (latest CDN redirect)        → SHA_A
@@ -25,6 +25,9 @@
 #                                                            DMG build (B8 fix
 #                                                            caught upstream rev,
 #                                                            triple cross-val OK)
+#   2026-05-16        v0.24.0 pinned (8073624ec798…99b1)  — bump: upstream release.
+#                                                            Cross-val: CDN + GitHub
+#                                                            sha256sum.txt ✓ match
 #
 # Update procedure (when Ollama releases a new version):
 #   1. Verify the new release tag at https://github.com/ollama/ollama/releases
@@ -45,4 +48,4 @@
 #      to confirm Apple Developer ID signature integrity.
 #
 # ── pinned checksum (one entry per line, format: <sha256>  <filename>) ──
-387536bd3462fbf8a976932eefd97005d4917d284137bf9de5ad5006c061065b  Ollama-darwin.zip
+8073624ec7986f9259f14a1234f5a5818f6285767f08b18cd0fbb4d1136599b1  Ollama-darwin.zip

@@ -10,6 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -77,6 +78,28 @@ def create_app(project_root: Optional[Path] = None, force_reload: bool = False) 
       logger.info("Force reload requested - clearing singleton cache")
       _app_instance = None
       _cache_project_root = None
+
+    # F2.3: fail-fast validation en sidecar mode (NEXE_SIDECAR=1)
+    # SidecarConfig.from_env() valida SIDECAR_REQUIRED_ENV_VARS i llança
+    # SidecarConfigError si manca alguna crítica. Capturar aquí evita un
+    # error críptic més tard al lifespan (p.ex. CORS preflight fallant
+    # sense saber per què). Veure factoria-nexe/diari/director/F2-m0bis/
+    # F2.3-fail-fast-startup/.
+    if os.environ.get("NEXE_SIDECAR") == "1":
+      try:
+        from core.sidecar_config import get_sidecar_config
+        _sidecar_cfg = get_sidecar_config()
+        logger.info(
+          "F2.3: SidecarConfig validated early (is_sidecar=True, port=%d, env=%s)",
+          _sidecar_cfg.port,
+          "production" if _sidecar_cfg.is_production else "development",
+        )
+      except Exception as exc:
+        raise RuntimeError(
+          f"NEXE_SIDECAR=1 but SidecarConfig validation failed: {exc}. "
+          "Required env vars (NEXE_PRIMARY_API_KEY, NEXE_PORT) must be set "
+          "by the launcher (Tauri lib.rs:spawn_sidecar_process)."
+        ) from exc
 
     logger.info("Building FastAPI app...")
     logger.info("  force_reload=%s", force_reload)

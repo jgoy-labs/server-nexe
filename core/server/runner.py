@@ -15,7 +15,6 @@ import os
 import signal
 import subprocess
 import sys
-import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,6 +41,10 @@ logger = logging.getLogger(__name__)
 
 from .helpers import setup_signal_handlers, is_port_in_use, translate  # noqa: E402  # after load_dotenv()
 from .factory import create_app  # noqa: E402  # after load_dotenv()
+# F2.A11 refactor: parent watchdog mogut a core/server/watchdog.py per trencar
+# cicle imports (lifespan → runner → factory → endpoints → lifespan). Re-exportat
+# aquí per backward compatibility amb runner.main() i tests.
+from .watchdog import start_parent_watchdog as _start_parent_watchdog  # noqa: E402  # after load_dotenv()
 
 
 def kill_process_on_port(port: int) -> bool:
@@ -152,38 +155,6 @@ def _release_pidfile(pid_path: Path) -> None:
     logger.debug("Failed to release PID file %s: %s", pid_path, e)
 
 
-def _start_parent_watchdog():
-  """If launched from the tray app, monitor that the parent is still alive.
-
-  When NEXE_TRAY_PID is set, a daemon thread checks every 30s if that
-  process still exists. If the tray dies (e.g. Force Quit), the server
-  shuts itself down to avoid orphaned processes consuming RAM.
-  """
-  tray_pid_str = os.environ.get("NEXE_TRAY_PID")
-  if not tray_pid_str:
-    return
-
-  try:
-    tray_pid = int(tray_pid_str)
-  except ValueError:
-    logger.warning("Invalid NEXE_TRAY_PID=%r — parent watchdog disabled", tray_pid_str)
-    return
-
-  def _watchdog():
-    while True:
-      time.sleep(30)
-      try:
-        os.kill(tray_pid, 0)  # Signal 0 = check if alive, no actual signal
-      except ProcessLookupError:
-        logger.info("Tray process (PID %d) no longer running — shutting down server", tray_pid)
-        os.kill(os.getpid(), signal.SIGTERM)
-        return
-      except PermissionError:
-        pass  # Process exists but we can't signal it — still alive
-
-  t = threading.Thread(target=_watchdog, daemon=True)
-  t.start()
-  logger.debug("Parent watchdog started — monitoring tray PID %d", tray_pid)
 
 
 def _is_tray_already_running() -> bool:
@@ -196,6 +167,10 @@ def _is_tray_already_running() -> bool:
 
 def _is_tray_supported() -> bool:
     """Return True if all conditions for tray launch are met."""
+    # BUG-NX-3b (F1.5): Tauri ja gestiona el tray quan corre en mode sidecar
+    # (ADR-tray-doble-conflicte) — evitem doble icona Python + Tauri.
+    if os.environ.get("NEXE_SIDECAR"):
+        return False
     if sys.platform != "darwin":
         return False
     if os.environ.get("NEXE_DOCKER") or os.environ.get("CONTAINER"):
@@ -433,10 +408,18 @@ def main():
     translate(i18n, "server_core.startup.starting_from", "Starting Nexe 0.9 from: {path}", path=str(project_root))
   )
 
-  from core.config import DEFAULT_HOST, DEFAULT_PORT
+  from core.config import DEFAULT_HOST, DEFAULT_PORT, get_default_host, get_default_port
   server_config = config.get('core', {}).get('server', {})
-  host = server_config.get('host', DEFAULT_HOST)
-  port = server_config.get('port', DEFAULT_PORT)
+  # BUG-C2 (F1.5): NEXE_PORT/NEXE_HOST (injectades per Tauri en mode sidecar)
+  # tenen prioritat màxima sobre server_config. Sense aquest override, el
+  # sidecar arrencaria al port del config.yaml i Tauri no el trobaria.
+  env_port = os.environ.get("NEXE_PORT")
+  port = int(env_port) if env_port else server_config.get('port', DEFAULT_PORT)
+  env_host = os.environ.get("NEXE_HOST")
+  host = env_host if env_host else server_config.get('host', DEFAULT_HOST)
+  # NOTA: import de get_default_host/get_default_port reservat per a M0-bis
+  # (F2) — substituiran els DEFAULT_* constants en el refactor real.
+  _ = (get_default_host, get_default_port)  # noqa: F841 — reserved for F2
   workers = server_config.get('workers', 1)
   if workers > 1:
     logger.warning(

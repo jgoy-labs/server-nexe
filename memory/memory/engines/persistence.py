@@ -81,8 +81,10 @@ class PersistenceManager(SqliteStorageMixin):
         qdrant_url: Optional[str] = None,
         crypto_provider=None,
     ):
+        # F2.2: resol DEFAULT_QDRANT_PATH via SidecarConfig en sidecar mode
+        from memory.memory._paths import resolve_qdrant_path
         self.db_path = db_path
-        self.qdrant_path = qdrant_path if qdrant_path is not None else self.DEFAULT_QDRANT_PATH
+        self.qdrant_path = qdrant_path if qdrant_path is not None else resolve_qdrant_path(self.DEFAULT_QDRANT_PATH)
         self.qdrant_url = qdrant_url
         self.collection_name = collection_name
         self.vector_size = vector_size

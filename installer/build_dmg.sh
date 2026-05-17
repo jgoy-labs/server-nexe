@@ -291,7 +291,7 @@ else
     fi
     info "  Wheels bundle ready"
 
-    info "Building embedding model bundle (~470 MB)..."
+    info "Building embedding model bundle (~283 MB, int8 quantized)..."
     if ! bash "$SCRIPT_DIR/build-embedding-bundle.sh"; then
         bundle_error "build-embedding-bundle.sh failed. DMG would lack RAG at first boot."
     fi
@@ -328,8 +328,8 @@ info "  Ollama:     ${OLLAMA_SIZE_MB} MB"
 if [ "$WHEELS_SIZE_MB" -lt 100 ]; then
     bundle_error "Wheels bundle only ${WHEELS_SIZE_MB} MB — expected 100+ MB."
 fi
-if [ "$EMBEDDINGS_SIZE_MB" -lt 400 ]; then
-    bundle_error "Embedding bundle only ${EMBEDDINGS_SIZE_MB} MB — expected 400+ MB."
+if [ "$EMBEDDINGS_SIZE_MB" -lt 200 ]; then
+    bundle_error "Embedding bundle only ${EMBEDDINGS_SIZE_MB} MB — expected 200+ MB (int8 quantized model)."
 fi
 
 # ── Step 6: Code sign app bundle ──────────────────────────────────

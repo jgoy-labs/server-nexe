@@ -90,10 +90,15 @@ for whl in "$WHEELS_DIR"/*.whl; do
 
     BIN_COUNT=0
     while IFS= read -r -d '' sofile; do
-        codesign --force --timestamp --options runtime \
-            --sign "$CERT" "$sofile" >/dev/null 2>&1
-        BIN_COUNT=$((BIN_COUNT + 1))
-    done < <(find "$WORK" -type f \( -name '*.so' -o -name '*.dylib' \) -print0)
+        # Filter: only sign Mach-O binaries (covers .so, .dylib AND plain
+        # executables like torch/bin/protoc, torch/bin/torch_shm_manager
+        # that Apple notarization rejects if unsigned).
+        if file "$sofile" | grep -q "Mach-O"; then
+            codesign --force --timestamp --options runtime \
+                --sign "$CERT" "$sofile" >/dev/null 2>&1
+            BIN_COUNT=$((BIN_COUNT + 1))
+        fi
+    done < <(find "$WORK" -type f \( -name '*.so' -o -name '*.dylib' -o -perm +111 \) -print0)
 
     if [ "$BIN_COUNT" -eq 0 ]; then
         rm -rf "$WORK"

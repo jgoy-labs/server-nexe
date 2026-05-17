@@ -26,14 +26,33 @@ OLLAMA_UNLOAD_TIMEOUT = float(os.getenv('NEXE_OLLAMA_UNLOAD_TIMEOUT', '10.0'))
 
 
 def _setup_qdrant(project_root: Path, server_state) -> None:
-    """Configure Qdrant storage (external override or embedded mode)."""
-    qdrant_url = os.getenv("NEXE_QDRANT_URL")
+    """Configure Qdrant storage (external override or embedded mode).
+
+    F2.1 S3 part 2: en sidecar mode consulta SidecarConfig.qdrant_url i
+    SidecarConfig.vectors_dir; fallback al comportament previ via env vars
+    directes amb logger.debug si SidecarConfig no disponible.
+    """
+    qdrant_url = None
+    qdrant_path_str = None
+    try:
+        from core.sidecar_config import get_sidecar_config
+        cfg = get_sidecar_config()
+        if cfg.is_sidecar:
+            qdrant_url = cfg.qdrant_url
+            qdrant_path_str = str(cfg.vectors_dir)
+    except Exception as exc:
+        logger.debug("F2.1 S3 part 2: SidecarConfig unavailable in _setup_qdrant: %s", exc)
+
+    if qdrant_url is None:
+        qdrant_url = os.getenv("NEXE_QDRANT_URL")
     if qdrant_url:
         # External Qdrant override (Docker, cluster, Qdrant Cloud)
-        logger.info("Qdrant: External mode via NEXE_QDRANT_URL=%s", qdrant_url)
+        logger.info("Qdrant: External mode via URL=%s", qdrant_url)
     else:
         # Embedded mode (default): just ensure storage directory exists
-        qdrant_path = Path(os.getenv("NEXE_QDRANT_PATH", str(project_root / "storage" / "vectors")))
+        if qdrant_path_str is None:
+            qdrant_path_str = os.getenv("NEXE_QDRANT_PATH", str(project_root / "storage" / "vectors"))
+        qdrant_path = Path(qdrant_path_str)
         if not qdrant_path.is_absolute():
             qdrant_path = project_root / qdrant_path
         qdrant_path.mkdir(parents=True, exist_ok=True)
@@ -42,7 +61,19 @@ def _setup_qdrant(project_root: Path, server_state) -> None:
 
 
 def _resolve_ollama_url() -> str:
-    """Resolve the Ollama base URL from environment variables."""
+    """Resolve the Ollama base URL from environment variables.
+
+    F2.1 S3 part 2: en sidecar mode usa SidecarConfig.ollama_host;
+    fallback NEXE_OLLAMA_HOST → OLLAMA_HOST → default.
+    """
+    try:
+        from core.sidecar_config import get_sidecar_config
+        cfg = get_sidecar_config()
+        if cfg.is_sidecar and cfg.ollama_host:
+            return cfg.ollama_host.rstrip("/")
+    except Exception as exc:
+        logger.debug("F2.1 S3 part 2: SidecarConfig unavailable in _resolve_ollama_url: %s", exc)
+
     _nexe_ollama = os.getenv("NEXE_OLLAMA_HOST")
     if _nexe_ollama:
         return _nexe_ollama.rstrip("/")

@@ -20,9 +20,32 @@ logger = logging.getLogger(__name__)
 KEYRING_SERVICE = "server-nexe"
 KEYRING_USERNAME = "master-encryption-key"
 ENV_VAR_NAME = "NEXE_MASTER_KEY"
-KEY_FILE_DIR = Path.home() / ".nexe"
-KEY_FILE_PATH = KEY_FILE_DIR / "master.key"
 KEY_SIZE = 32  # 256 bits
+
+
+def _resolve_key_file_dir() -> Path:
+    """F2.2 part 2 (BUG-NC-36): resol path master key respectant NEXE_SIDECAR_DIR.
+
+    En mode sidecar (Tauri injecta NEXE_SIDECAR_DIR=~/.nexe per defecte),
+    usa aquest path. En standalone, fallback a ~/.nexe (compatibilitat
+    amb instal·lacions prèvies del DMG / CLI).
+    """
+    if sidecar_dir := os.getenv("NEXE_SIDECAR_DIR"):
+        return Path(sidecar_dir)
+    return Path.home() / ".nexe"
+
+
+def _resolve_key_file_path() -> Path:
+    """F2.2 part 2: master key path dinàmic (respecta NEXE_SIDECAR_DIR)."""
+    return _resolve_key_file_dir() / "master.key"
+
+
+# Backward-compat constants (avaluades a import-time). F2.2 part 2: els
+# nous defaults dels paràmetres `path`/`key_file_path` resolen dinàmicament
+# via _resolve_key_file_path() per respectar canvis runtime de NEXE_SIDECAR_DIR
+# (cas tests + cas multi-instància).
+KEY_FILE_DIR = _resolve_key_file_dir()
+KEY_FILE_PATH = KEY_FILE_DIR / "master.key"
 
 
 def _try_keyring_get() -> bytes | None:
@@ -63,8 +86,10 @@ def _try_env_get() -> bytes | None:
     return None
 
 
-def _try_file_get(path: Path = KEY_FILE_PATH) -> bytes | None:
-    """Try to retrieve master key from file."""
+def _try_file_get(path: Path | None = None) -> bytes | None:
+    """Try to retrieve master key from file. Default path resolved dynamically (F2.2 part 2)."""
+    if path is None:
+        path = _resolve_key_file_path()
     if not path.exists():
         return None
     try:
@@ -77,7 +102,7 @@ def _try_file_get(path: Path = KEY_FILE_PATH) -> bytes | None:
     return None
 
 
-def _try_file_set(key: bytes, path: Path = KEY_FILE_PATH) -> bool:
+def _try_file_set(key: bytes, path: Path | None = None) -> bool:
     """Store master key to file with restricted permissions (600).
 
     Bug 8 fix — TOCTOU window: previously the key was written with
@@ -88,6 +113,8 @@ def _try_file_set(key: bytes, path: Path = KEY_FILE_PATH) -> bool:
     ones. If the file already exists (legitimate reuse case), we
     overwrite atomically via a temp file created the same secure way.
     """
+    if path is None:
+        path = _resolve_key_file_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         # Restrict directory permissions too (700) — best effort. On noexec
@@ -141,7 +168,7 @@ def _try_file_set(key: bytes, path: Path = KEY_FILE_PATH) -> bool:
         return False
 
 
-def get_or_create_master_key(key_file_path: Path = KEY_FILE_PATH) -> bytes:
+def get_or_create_master_key(key_file_path: Path | None = None) -> bytes:
     """
     Retrieve or generate the master encryption key (MEK).
 
@@ -166,6 +193,9 @@ def get_or_create_master_key(key_file_path: Path = KEY_FILE_PATH) -> bytes:
     Returns:
         32-byte master key
     """
+    # F2.2 part 2: resol path dinàmicament si no s'ha passat (respecta NEXE_SIDECAR_DIR)
+    if key_file_path is None:
+        key_file_path = _resolve_key_file_path()
     # 1. File (primary persistent store)
     key = _try_file_get(key_file_path)
     if key:

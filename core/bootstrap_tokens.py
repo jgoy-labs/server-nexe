@@ -83,8 +83,33 @@ class BootstrapTokenManager:
   def _get_conn(self):
     """Open a SQLite connection to the token database, auto-initializing if needed."""
     if not self._initialized:
-      # Fall back to a default path if initialize_on_startup was not called
-      self.initialize_on_startup(Path.cwd())
+      # F2.6: prefer SidecarConfig.data_dir / get_repo_root() over the
+      # arbitrary cwd when initialize_on_startup() was skipped. The cwd
+      # of a Tauri-spawned sidecar is the user's home (or `/`), which
+      # would write the token DB to a random place.
+      fallback_root = None
+      try:
+        from core.sidecar_config import get_sidecar_config
+        cfg = get_sidecar_config()
+        if cfg.is_sidecar and getattr(cfg, "data_dir", None):
+          fallback_root = Path(cfg.data_dir)
+      except Exception as exc:
+        logger.debug(  # nosemgrep: python-logger-credential-disclosure
+          "F2.6: SidecarConfig unavailable in BootstrapTokenManager._get_conn: %s",
+          exc,
+        )
+      if fallback_root is None:
+        try:
+          from core.paths.detection import get_repo_root
+          fallback_root = get_repo_root()
+        except Exception as exc:
+          logger.debug(
+            "F2.6: get_repo_root() unavailable in BootstrapTokenManager._get_conn, "
+            "falling back to Path.cwd(): %s",
+            exc,
+          )
+          fallback_root = Path.cwd()
+      self.initialize_on_startup(fallback_root)
     return sqlite3.connect(str(self._db_path))
 
   def create_session_token(self, ttl_seconds: int = 900) -> str:
