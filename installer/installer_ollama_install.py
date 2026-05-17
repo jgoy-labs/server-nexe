@@ -20,6 +20,7 @@ import platform
 import subprocess
 import time
 import shutil
+import zipfile
 from pathlib import Path
 
 from .installer_display import (
@@ -27,6 +28,42 @@ from .installer_display import (
     print_step, print_success, print_warn,
 )
 from .installer_i18n import t
+
+
+def _safe_extract_zip(zf: zipfile.ZipFile, dest_dir: str) -> None:
+    """F3.4 BUG-NF-24: extract a ZipFile to ``dest_dir`` rejecting any
+    member that escapes the destination (Zip Slip).
+
+    Validates each ``ZipInfo.filename`` by resolving it against ``dest_dir``
+    and ensuring the resulting absolute path stays inside ``dest_dir`` after
+    realpath normalisation. Absolute paths and ``..`` segments are refused.
+
+    Raises ``RuntimeError`` on the first offending member, leaving partially
+    extracted files behind (caller is expected to clean up the destination
+    on failure — same contract as ``zipfile.extractall``).
+    """
+    real_dest = os.path.realpath(dest_dir)
+    for member in zf.infolist():
+        # Reject absolute paths and unsafe characters early.
+        if member.filename.startswith(('/', '\\')):
+            raise RuntimeError(
+                f"Zip Slip refused: absolute path entry {member.filename!r}"
+            )
+        target = os.path.realpath(os.path.join(real_dest, member.filename))
+        # The resolved path must live inside dest_dir; using os.path.commonpath
+        # rather than startswith avoids the classic /foo vs /foobar mismatch.
+        try:
+            common = os.path.commonpath([real_dest, target])
+        except ValueError:
+            # Different drives on Windows, mismatched anchors, etc.
+            raise RuntimeError(
+                f"Zip Slip refused: path resolution failed for {member.filename!r}"
+            )
+        if common != real_dest:
+            raise RuntimeError(
+                f"Zip Slip refused: {member.filename!r} would escape to {target!r}"
+            )
+    zf.extractall(real_dest)
 
 
 def _find_ollama() -> str:
@@ -132,7 +169,6 @@ def _install_ollama_macos() -> bool:
     for the binary to appear at ``/usr/local/bin/ollama``.
     """
     import tempfile
-    import zipfile
 
     url = "https://ollama.com/download/Ollama-darwin.zip"
     dest = Path("/Applications/Ollama.app")
@@ -157,8 +193,14 @@ def _install_ollama_macos() -> bool:
                 return False
 
         print("  📦 Installing to /Applications/Ollama.app...")
+        # F3.4 BUG-NF-24 (2026-05-18): Zip Slip protection. zipfile.extractall
+        # follows arbitrary paths inside the archive (including absolute paths
+        # and ../traversals), so a tampered Ollama-darwin.zip could write
+        # anywhere on disk under the current user's privileges. The helper
+        # below resolves each member against the target dir and refuses any
+        # entry whose normalised path escapes it.
         with zipfile.ZipFile(zip_path, 'r') as zf:
-            zf.extractall("/Applications/")
+            _safe_extract_zip(zf, "/Applications/")
 
         if not bundle_zip and os.path.isfile(zip_path):
             os.unlink(zip_path)

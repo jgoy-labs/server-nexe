@@ -15,6 +15,7 @@ www.jgoy.net · https://server-nexe.org
 import asyncio
 import json
 import logging
+import os
 import time
 
 from ..chat_memory import _save_conversation_to_memory
@@ -23,6 +24,50 @@ from ..chat_sanitization import _sanitize_sse_token
 logger = logging.getLogger(__name__)
 
 SSE_DONE = "data: [DONE]\n\n"
+
+# F3.3 BUG-NC-12 (2026-05-18): hard cap on streamed bytes per response.
+# Without an explicit limit a runaway generation (model loop, prompt
+# injection that keeps the engine talking, mis-configured stop tokens)
+# would accumulate forever in TokenBridge._response_parts and exhaust
+# memory both on the server and on the Tauri client that mirrors the
+# SSE stream. 100 MB ≈ 500 pages of text — plenty of headroom for
+# legitimate responses while still bounded. Configurable via the env
+# var NEXE_MAX_STREAM_MB; values above 100 emit a warning at import
+# time because they materially raise the OOM blast radius.
+_DEFAULT_MAX_STREAM_MB = 100
+
+
+def _resolve_max_stream_bytes() -> int:
+    raw = os.environ.get("NEXE_MAX_STREAM_MB")
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_MAX_STREAM_MB * 1024 * 1024
+    try:
+        value = int(raw.strip())
+    except ValueError:
+        logger.warning(
+            "F3.3 BUG-NC-12: NEXE_MAX_STREAM_MB=%r is not an integer; "
+            "falling back to the %d MB default",
+            raw, _DEFAULT_MAX_STREAM_MB,
+        )
+        return _DEFAULT_MAX_STREAM_MB * 1024 * 1024
+    if value <= 0:
+        logger.warning(
+            "F3.3 BUG-NC-12: NEXE_MAX_STREAM_MB=%d is not positive; "
+            "falling back to the %d MB default",
+            value, _DEFAULT_MAX_STREAM_MB,
+        )
+        return _DEFAULT_MAX_STREAM_MB * 1024 * 1024
+    if value > _DEFAULT_MAX_STREAM_MB:
+        logger.warning(
+            "F3.3 BUG-NC-12: NEXE_MAX_STREAM_MB=%d MB exceeds the recommended "
+            "ceiling of %d MB; raising it increases the OOM blast radius of a "
+            "runaway generation. Keep it lean unless you really need it.",
+            value, _DEFAULT_MAX_STREAM_MB,
+        )
+    return value * 1024 * 1024
+
+
+MAX_STREAM_BYTES = _resolve_max_stream_bytes()
 
 
 class TokenBridge:
@@ -39,9 +84,32 @@ class TokenBridge:
         self.error = None
         self._loop = asyncio.get_running_loop()
         self._response_parts: list = []
+        # F3.3 BUG-NC-12: running byte counter for the cap below.
+        self._response_bytes: int = 0
+        self._cap_triggered: bool = False
 
     def on_token(self, token: str):
-        """Called from the engine thread for each generated token."""
+        """Called from the engine thread for each generated token.
+
+        F3.3 BUG-NC-12: enforce MAX_STREAM_BYTES so a runaway generation
+        cannot keep allocating into `_response_parts` indefinitely. Once
+        the cap fires, set_done is signalled with an explicit error and
+        further tokens are dropped silently (the engine thread may still
+        emit a few before it observes `done`).
+        """
+        if self._cap_triggered:
+            return
+        token_bytes = len(token.encode("utf-8", errors="replace"))
+        if self._response_bytes + token_bytes > MAX_STREAM_BYTES:
+            self._cap_triggered = True
+            logger.warning(
+                "F3.3 BUG-NC-12: stream cap reached (%d bytes ≥ %d). "
+                "Terminating generation early.",
+                self._response_bytes, MAX_STREAM_BYTES,
+            )
+            self.set_done(error="stream_cap_exceeded")
+            return
+        self._response_bytes += token_bytes
         self._response_parts.append(token)
         try:
             self._loop.call_soon_threadsafe(self.queue.put_nowait, token)

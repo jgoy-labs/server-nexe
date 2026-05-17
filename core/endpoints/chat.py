@@ -95,17 +95,70 @@ def _get_system_prompt(app_state: Any, lang: Optional[str] = None) -> str:
 # --- Helper Functions ---
 
 def _validate_chat_request(body: ChatCompletionRequest) -> None:
-    """Sanitize and validate all user-supplied fields in the chat request."""
+    """Sanitize and validate all user-supplied fields in the chat request.
+
+    F3.2 BUG-NC-31 (2026-05-18): user-role messages are now also passed
+    through `SanitizerModule.sanitize()` which detects technical prompt
+    injections / jailbreak patterns before the text reaches the
+    philosophical modules downstream. The sanitizer is allowed to either
+    rewrite the content (`clean_text`) or, when `needs_intervention` is
+    set with a `high`/`critical` severity, raise an HTTPException to
+    short-circuit the request. Lower severities log a warning but let the
+    request continue so legitimate users are not blocked by false
+    positives in the pattern set.
+    """
     if body.model is not None:
         body.model = validate_string_input(body.model, max_length=200, context="param")
     if body.engine is not None:
         body.engine = validate_string_input(body.engine, max_length=50, context="param")
+    sanitizer = None
+    try:
+        from plugins.security.sanitizer import get_sanitizer
+        sanitizer = get_sanitizer()
+    except Exception as exc:
+        logger.debug(
+            "F3.2 BUG-NC-31: SanitizerModule unavailable, falling back to legacy validation only: %s",
+            exc,
+        )
     for _msg in body.messages:
         if _msg.role is not None:
             _msg.role = validate_string_input(_msg.role, max_length=50, context="param")
         if _msg.content is not None:
             if _msg.role == "user":
                 _msg.content = strip_memory_tags(_msg.content)
+                if sanitizer is not None:
+                    try:
+                        result = sanitizer.sanitize(_msg.content)
+                        if result.severity in ("high", "critical"):
+                            logger.warning(
+                                "F3.2 BUG-NC-31: SanitizerModule blocked %s-severity input (threats=%s, patterns=%s)",
+                                result.severity,
+                                result.threats_detected,
+                                result.patterns_matched,
+                            )
+                            from fastapi import HTTPException
+                            raise HTTPException(
+                                status_code=400,
+                                detail={
+                                    "error": "input_rejected_by_sanitizer",
+                                    "severity": result.severity,
+                                    "threats": result.threats_detected,
+                                },
+                            )
+                        if not result.is_safe:
+                            logger.info(
+                                "F3.2 BUG-NC-31: SanitizerModule rewrote user input (severity=%s, threats=%s)",
+                                result.severity,
+                                result.threats_detected,
+                            )
+                        _msg.content = result.clean_text
+                    except HTTPException:
+                        raise
+                    except Exception as exc:
+                        logger.warning(
+                            "F3.2 BUG-NC-31: SanitizerModule.sanitize raised, keeping legacy-validated content: %s",
+                            exc,
+                        )
             _msg.content = validate_string_input(_msg.content, max_length=8000, context="chat")
 
 

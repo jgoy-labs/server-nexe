@@ -227,6 +227,50 @@ async def restart_server(
       }
     )
 
+@router_admin.post(
+  "/shutdown",
+  summary="Graceful shutdown of the running server (API key required)",
+  response_model=dict,
+  operation_id="shutdown_server",
+)
+async def shutdown_server(
+  background_tasks: BackgroundTasks,
+  _: str = Depends(require_api_key),
+) -> Dict[str, Any]:
+  """F3.1 BUG-C1 — Trigger a graceful shutdown of this server process.
+
+  Requires API key authentication (X-API-Key header). The endpoint returns
+  immediately and schedules SIGINT to the current PID 0.3 s later so the
+  lifespan shutdown handlers run cleanly before uvicorn tears down the
+  worker. In sidecar mode this is the well-defined hand-off that the Tauri
+  host invokes when the user closes the window — see lifecycle.rs.
+
+  Returns:
+    dict: status + expected downtime.
+  """
+
+  async def _self_sigint() -> None:
+    await asyncio.sleep(0.3)
+    pid = os.getpid()
+    try:
+      os.kill(pid, signal.SIGINT)
+      logger.info("F3.1 BUG-C1: SIGINT delivered to self (pid=%d)", pid)
+    except Exception as exc:
+      logger.error("F3.1 BUG-C1: failed to deliver SIGINT to self (pid=%d): %s", pid, exc)
+
+  background_tasks.add_task(_self_sigint)
+  logger.info("Shutdown initiated by authenticated user (pid=%d)", os.getpid())
+
+  return {
+    "status": "shutdown_initiated",
+    "message": _t(
+      "system.shutdown_initiated_message",
+      "Server is shutting down gracefully",
+    ),
+    "expected_downtime_seconds": 1,
+  }
+
+
 @router_admin.get("/status", summary="Supervisor status and restart availability (API key required)", response_model=dict, operation_id="supervisor_status")
 async def supervisor_status(_: str = Depends(require_api_key)) -> Dict[str, Any]:
   """
