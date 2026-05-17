@@ -233,26 +233,77 @@ def _install_ollama_macos() -> bool:
 
 
 def _install_ollama_linux() -> bool:
-    """Install Ollama on Linux via the official install script."""
+    """Install Ollama on Linux via the official install script.
+
+    F3.4 BUG-NF-25: instead of piping `curl | bash` (which executes whatever
+    bytes the network returns), download the script to a tempfile first, log
+    its SHA-256, and — if the operator has pinned `NEXE_OLLAMA_INSTALL_SHA256`
+    — abort when the digest does not match. Ollama does not publish a stable
+    SHA upstream, so the pin is opt-in; logging the observed digest at INFO
+    level lets operators record a pin for their environment.
+    """
+    import hashlib
+    import os
+    import tempfile
+
+    url = "https://ollama.com/install.sh"
+    expected = os.environ.get("NEXE_OLLAMA_INSTALL_SHA256", "").strip().lower()
+    tmp_path: str | None = None
     try:
-        print(f"  {DIM}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
-        result = subprocess.run(  # nosec B603 B607: literal Ollama install command per upstream docs (supply chain trust = ollama.com); bash via PATH
-            ["bash", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
+        with tempfile.NamedTemporaryFile(
+            prefix="ollama-install-", suffix=".sh", delete=False
+        ) as f:
+            tmp_path = f.name
+
+        print(f"  {DIM}curl -fsSL {url} -o {tmp_path}{RESET}")
+        dl = subprocess.run(  # nosec B603 B607: literal upstream URL; output is a local tempfile; curl via PATH
+            ["curl", "-fsSL", url, "-o", tmp_path],
+            timeout=60,
+        )
+        if dl.returncode != 0:
+            print_warn(t('ollama_install_failed'))
+            return False
+
+        with open(tmp_path, "rb") as f:
+            observed = hashlib.sha256(f.read()).hexdigest()
+        print(f"  {DIM}install.sh SHA-256: {observed}{RESET}")
+
+        if expected:
+            if observed != expected:
+                print_warn(
+                    f"Ollama install.sh SHA-256 mismatch: "
+                    f"expected {expected}, got {observed}. Aborting install."
+                )
+                return False
+            print(f"  {DIM}SHA-256 matches NEXE_OLLAMA_INSTALL_SHA256 pin{RESET}")
+        else:
+            print(
+                f"  {DIM}(no NEXE_OLLAMA_INSTALL_SHA256 pin set — pin the "
+                f"digest above to fail-fast on future drift){RESET}"
+            )
+
+        result = subprocess.run(  # nosec B603 B607: tmp_path is a tempfile we just created and hashed; bash via PATH
+            ["bash", tmp_path],
             timeout=180,
         )
         if result.returncode == 0:
             print_success(t('ollama_installed'))
             return True
         print_warn(t('ollama_install_failed'))
-        print(f"  {CYAN}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
         return False
     except subprocess.TimeoutExpired:
         print_warn("Ollama install timed out (>3 min)")
         return False
     except Exception as e:
         print_warn(f"{t('ollama_install_failed')}: {e}")
-        print(f"  {CYAN}curl -fsSL https://ollama.com/install.sh | sh{RESET}")
+        print(f"  {CYAN}curl -fsSL {url} -o /tmp/install.sh && bash /tmp/install.sh{RESET}")
         return False
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 __all__ = [

@@ -489,17 +489,28 @@ def run_installer():
     tee.close()
 
 
+def _applescript_quote(s: str) -> str:
+    """F3.4 BUG-NF-19/20 — escape a Python string for a double-quoted AppleScript
+    literal. Backslash first, then double-quote, exactly as AppleScript expects.
+    Without this, a path containing `"` or `\\` either crashes the script or
+    (if a future caller passes attacker-controlled paths) lets the attacker
+    break out of the literal and append arbitrary AppleScript.
+    """
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def add_login_item(app_path: str = "/Applications/Nexe.app") -> bool:
     """Add Nexe to macOS login items via osascript (legacy, universal).
 
     Equivalent to the Swift doAddLoginItem() in CompletionView.swift.
     Returns True on success, False on failure.
     """
+    quoted = _applescript_quote(app_path)
     script = (
         f'tell application "System Events" to make login item at end '
-        f'with properties {{path:"{app_path}", hidden:true}}'
+        f'with properties {{path:"{quoted}", hidden:true}}'
     )
-    result = subprocess.run(  # nosec B603: absolute path to system osascript; script built from app_path parameter (default /Applications/Nexe.app, no external caller)
+    result = subprocess.run(  # nosec B603: absolute path to system osascript; script built from app_path parameter (default /Applications/Nexe.app, escaped via _applescript_quote)
         ["/usr/bin/osascript", "-e", script],
         capture_output=True,
         text=True,

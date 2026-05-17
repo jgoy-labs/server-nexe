@@ -12,6 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 from datetime import datetime, timezone
 
+from core.endpoints.chat_sanitization import _filter_rag_injection
 from memory.memory.constants import DEFAULT_VECTOR_SIZE
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,16 @@ _pending_save_tasks: set = set()
 async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: str):
     """Background task to save conversation data to memory via MemoryService or Qdrant."""
     try:
-        conversation_text = f"User: {user_msg}\nAssistant: {assistant_msg}"
+        # F3.2 BUG-NC-10: neutralise prompt-injection markers BEFORE storage.
+        # Without this, a hostile user message (or a compromised assistant
+        # response) containing `[/INST]`, `<|system|>`, `[MEM_DELETE: ...]`
+        # etc. is persisted verbatim; the next retrieval re-injects it into
+        # the prompt context as if it were a trusted instruction.
+        # `_filter_rag_injection` also NFKC-normalises and maps CJK brackets,
+        # so fullwidth bypass variants are caught at write-time too.
+        safe_user = _filter_rag_injection(user_msg or "")
+        safe_assistant = _filter_rag_injection(assistant_msg or "")
+        conversation_text = f"User: {safe_user}\nAssistant: {safe_assistant}"
 
         # Try MemoryService first (v1 pipeline)
         try:

@@ -38,9 +38,20 @@ def obfuscate_ip(ip: str) -> str:
     return f"{parts[0]}.{parts[1]}.{parts[2]}.xxx"
   return ip
 
+# F3.2 BUG-NB-6 — UUID-shaped API keys (8-4-4-4-12 with hyphens) were not
+# caught by the hex-only regex because `\b` does not cross the `-` chars and
+# each group is shorter than 32. server-nexe and nexe-app issue UUIDv4 keys,
+# so this missed every real production token.
+_UUID_RE = re.compile(
+    r'\b[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\b',
+    re.IGNORECASE,
+)
+_HEX_KEY_RE = re.compile(r'\b[a-f0-9]{32,128}\b', re.IGNORECASE)
+
+
 def redact_api_key(text: str) -> str:
   """
-  Redact API keys from text (hex strings 32-128 chars).
+  Redact API keys from text (UUIDv4 with hyphens + raw hex strings 32-128 chars).
 
   Args:
     text: Text that may contain API keys
@@ -50,7 +61,8 @@ def redact_api_key(text: str) -> str:
   """
   if not text:
     return text
-  return re.sub(r'\b[a-f0-9]{32,128}\b', '[REDACTED_API_KEY]', text, flags=re.IGNORECASE)
+  text = _UUID_RE.sub('[REDACTED_API_KEY]', text)
+  return _HEX_KEY_RE.sub('[REDACTED_API_KEY]', text)
 
 def truncate_prompt(prompt: str, max_length: int = 200) -> str:
   """

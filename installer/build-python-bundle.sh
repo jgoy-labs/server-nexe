@@ -221,11 +221,18 @@ else
     echo "    Copied and cleaned installer + personality"
 fi
 
-# ── Step 8: Ad-hoc codesign ────────────────────────────────────────────
-echo "==> Codesigning binaries and dylibs..."
+# ── Step 8: Ad-hoc codesign (hardened runtime) ─────────────────────────
+# F3.4 BUG-NF-6: enable the hardened runtime (`--options runtime`) and a
+# secure timestamp (`--timestamp`) on every code-signed payload. Apple
+# notarization rejects unhardened binaries with `The signature does not
+# include a secure timestamp` / `not signed with a hardened runtime` and
+# the failure happens far later in the pipeline (notarytool log) — fixing
+# it here avoids the long round-trip. For dev builds with ad-hoc signing
+# the flags are still valid; for Developer ID builds they're required.
+echo "==> Codesigning binaries and dylibs (hardened runtime)..."
 SIGN_COUNT=0
 while IFS= read -r f; do
-    codesign --force --sign - "$f" 2>/dev/null && SIGN_COUNT=$((SIGN_COUNT + 1))
+    codesign --force --options runtime --timestamp --sign - "$f" 2>/dev/null && SIGN_COUNT=$((SIGN_COUNT + 1))
 done < <(find "$RESOURCES/python" "$FRAMEWORKS" \( -name '*.dylib' -o -name '*.so' -o -perm +111 -type f \) 2>/dev/null)
 echo "    Signed $SIGN_COUNT files."
 

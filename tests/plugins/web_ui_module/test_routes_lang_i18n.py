@@ -81,14 +81,25 @@ class TestSetLanguageI18nPropagation:
 
         assert result == {"status": "ok", "lang": "ca"}
 
-    async def test_post_lang_updates_env(self):
-        """SC08: os.environ['NEXE_LANG'] is updated correctly."""
+    async def test_post_lang_updates_server_lang_global(self):
+        """F3.2 BUG-NC-18: POST /lang updates the in-process `_server_lang`
+        global. We no longer mutate `os.environ["NEXE_LANG"]` — that write
+        was a no-op for in-process consumers (only the import-time initialiser
+        read it) and contaminated any future subprocess. The persistent path
+        for restart-time defaults is the .env file via `_persist_env_vars`.
+        """
         i18n_mock = _make_i18n_mock()
         fn = _make_set_language_fn(i18n_mock)
 
+        original_env = os.environ.get("NEXE_LANG")
         with patch.dict(os.environ, {}, clear=False):
-            await fn(body={"lang": "en"}, _auth=None, i18n=i18n_mock)
-            assert os.environ.get("NEXE_LANG") == "en"
+            result = await fn(body={"lang": "en"}, _auth=None, i18n=i18n_mock)
+            assert result == {"status": "ok", "lang": "en"}
+            # `_server_lang` is the in-process source of truth — re-read via the public getter.
+            from plugins.web_ui_module.api.routes_auth import get_server_lang
+            assert get_server_lang() == "en"
+            # And the env var is intentionally NOT touched anymore.
+            assert os.environ.get("NEXE_LANG") == original_env
 
     async def test_post_lang_invalid_returns_400(self):
         """SC08: unsupported language → HTTPException 400."""

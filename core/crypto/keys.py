@@ -224,6 +224,18 @@ def get_or_create_master_key(key_file_path: Path | None = None) -> bytes:
     # keyring is best-effort (some environments lack a secret service).
     key = os.urandom(KEY_SIZE)
     logger.info("Generated new master encryption key")
-    _try_file_set(key, key_file_path)
+    # F3.3 BUG-NC-37: fail-fast on file persistence failure for NEW keys.
+    # Returning the key without persisting it would leave the next boot
+    # generating yet another fresh key — every record we encrypt now becomes
+    # un-decryptable after restart. Better to refuse to start than to lose data
+    # silently. (Reads in steps 1-3 don't fail-fast because the key already
+    # exists somewhere durable; only the brand-new write path is critical.)
+    if not _try_file_set(key, key_file_path):
+        raise RuntimeError(
+            f"Failed to persist newly-generated master key to {key_file_path}. "
+            "Refusing to continue — encrypting data with a non-persisted key "
+            "would render it unrecoverable after restart. Check directory "
+            "permissions, free disk space, and filesystem read-only flags."
+        )
     _try_keyring_set(key)
     return key

@@ -79,8 +79,20 @@ logger = logging.getLogger(__name__)
 
 from core.server.helpers import translate as _translate  # noqa: E402  # after warnings filter
 
-# Startup phase timeout (B09). Configurable via NEXE_STARTUP_TIMEOUT.
-STARTUP_TIMEOUT = float(os.getenv("NEXE_STARTUP_TIMEOUT", "30"))
+# Startup phase timeout (B09). F3.3 BUG-C5: raise default from 30s to 120s and
+# accept the more descriptive `NEXE_LIFESPAN_TIMEOUT` alongside the legacy name.
+# Rationale: MLX/llama.cpp model warmup with a cold cache (Qwen 35B-A3B 4-bit,
+# Mixtral, Qwen3.5-Coder 8-bit) routinely takes 30-90s. The previous 30s budget
+# made cold boots flap with a RuntimeError. Operators who keep a hot cache and
+# want fast-fail can set `NEXE_LIFESPAN_TIMEOUT=30` (or the legacy name) and
+# preserve the old behaviour.
+def _resolve_startup_timeout() -> float:
+    """Pure resolver — testable with `monkeypatch.setenv` (no module reload)."""
+    raw = os.getenv("NEXE_LIFESPAN_TIMEOUT") or os.getenv("NEXE_STARTUP_TIMEOUT", "120")
+    return float(raw)
+
+
+STARTUP_TIMEOUT = _resolve_startup_timeout()
 
 # Canonical path for the PID file (B06, B10, B15).
 _PID_SUBPATH = Path("storage") / "run" / "server.pid"

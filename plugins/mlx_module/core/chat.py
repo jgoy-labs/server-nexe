@@ -19,6 +19,7 @@ Requires:
 import asyncio
 import functools
 import gc
+import atexit
 import json
 import logging
 import threading
@@ -66,6 +67,13 @@ logger = logging.getLogger(__name__)
 # moving the queue into the executor keeps everything on one thread without
 # changing the effective concurrency contract.
 _MLX_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mlx-worker")
+
+# F3.3 BUG-NB-8: register an atexit cleanup so the dedicated MLX worker doesn't
+# linger as a non-daemon thread on shutdown. `wait=False` + `cancel_futures=True`
+# lets us tear down even when a generation is mid-flight (Stop button race,
+# sidecar SIGTERM). Without this, the interpreter may hang at exit waiting for
+# the executor thread to drain.
+atexit.register(_MLX_EXECUTOR.shutdown, wait=False, cancel_futures=True)
 
 
 # Known VLM architectures (config.json → architectures[])

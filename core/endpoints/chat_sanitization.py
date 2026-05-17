@@ -20,8 +20,12 @@ logger = logging.getLogger(__name__)
 # SSE TOKEN SANITIZATION - Strip null bytes and control chars from streaming
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Control chars to strip (except \n and \t which are valid in text)
-_CONTROL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+# Control chars to strip (except \n, \t, \r which are valid in text).
+# F3.2 BUG-NC-14: extend coverage to DEL (\x7f) and C1 control range (\x80-\x9f).
+# Some terminals and SSE consumers interpret C1 bytes as escape sequence
+# initiators (NEL, CSI, OSC) — letting them through allows model-influenced
+# byte injection into client logs/terminals.
+_CONTROL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f]')
 
 def _sanitize_sse_token(token: str) -> str:
     """Remove null bytes and control characters from SSE token content.
@@ -157,6 +161,14 @@ def _sanitize_rag_context(context: str) -> str:
     """
     if not context:
         return ""
+
+    # F3.2 BUG-NC-32: NFKC + CJK/mathematical bracket map ALSO at retrieval time.
+    # `_filter_rag_injection` (ingest path) already normalizes, but stored content
+    # predating that fix — or content stored via a different write path — could
+    # still contain fullwidth/compat variants. Normalizing at retrieval closes
+    # the bypass for both fresh and legacy data.
+    context = unicodedata.normalize("NFKC", context)
+    context = context.translate(_NON_NFKC_BRACKET_MAP)
 
     # 1. Truncate to prevent context overflow (dynamic based on model context window)
     max_chars = max(MAX_RAG_CONTEXT_LENGTH, int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO * CHARS_PER_TOKEN_ESTIMATE))

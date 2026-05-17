@@ -12,10 +12,13 @@ www.jgoy.net · https://server-nexe.org
 
 import json
 import logging
+import os
+import re
+from fnmatch import fnmatch
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from plugins.security.core.validators import validate_safe_path
 from plugins.security.core.auth import require_api_key
@@ -23,9 +26,60 @@ from plugins.security.core.auth import require_api_key
 logger = logging.getLogger(__name__)
 
 
+# F3.2 BUG-NB-10 — Ollama supply-chain hardening.
+#
+# Ollama model names follow `[registry/]repo[:tag]`. We accept ASCII letters,
+# digits, dots, underscores, hyphens and a single optional `:tag` suffix.
+# This rejects shell metacharacters, whitespace, NUL bytes, URLs and any
+# non-ASCII payload that could smuggle homoglyph registries.
+#
+# `\A...\Z` (not `^...$`) so a trailing newline does NOT pass: by default `$`
+# matches before a final `\n`, which would let `qwen3\n; rm -rf /` slip through.
+# Path-traversal `..` segments are rejected by an explicit check after the regex.
+_OLLAMA_MODEL_NAME_RE = re.compile(r'\A[a-zA-Z0-9._\-/]+(:[a-zA-Z0-9._\-]+)?\Z')
+_OLLAMA_MODEL_NAME_MAX_LEN = 200
+
+
+def _ollama_allowlist_patterns() -> list[str] | None:
+    """Read `NEXE_OLLAMA_ALLOWED_MODELS` at call-time (not import-time, so tests
+    can monkeypatch without reload). Comma-separated fnmatch patterns.
+
+    Returns `None` if the env var is unset/empty: only the format regex applies
+    (permissive default, preserving current UX). Returns the parsed list when
+    the operator opts in to a closed allowlist — typical operator value:
+    `"qwen3*,llama3*,gemma*,mistral*"`.
+    """
+    raw = os.environ.get("NEXE_OLLAMA_ALLOWED_MODELS", "").strip()
+    if not raw:
+        return None
+    return [p.strip() for p in raw.split(",") if p.strip()]
+
+
 class PullModelRequest(BaseModel):
     """Request to download a model"""
     name: str
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, v: str) -> str:
+        if not v or len(v) > _OLLAMA_MODEL_NAME_MAX_LEN:
+            raise ValueError("invalid model name length (1..200 ASCII chars)")
+        if not _OLLAMA_MODEL_NAME_RE.match(v):
+            raise ValueError(
+                "invalid model name format — must match "
+                "[a-zA-Z0-9._-/]+(:[a-zA-Z0-9._-]+)?"
+            )
+        # Defence-in-depth: reject path-traversal segments even though the
+        # regex above already restricts the alphabet — the dots+slashes alone
+        # could still spell `../`.
+        if ".." in v:
+            raise ValueError("path traversal segments ('..') not allowed in model name")
+        allowlist = _ollama_allowlist_patterns()
+        if allowlist is not None and not any(fnmatch(v, pat) for pat in allowlist):
+            raise ValueError(
+                f"model {v!r} not in NEXE_OLLAMA_ALLOWED_MODELS allowlist"
+            )
+        return v
 
 
 def create_router(module_instance) -> APIRouter:

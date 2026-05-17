@@ -573,10 +573,15 @@ def _register_macos_app(project_root, config):
         _log.info("Login Items: skipped (managed by GUI wizard)")
     elif nexe_app_ready:
         try:
-            subprocess.run([  # nosec B603 B607: install_nexe_app is project_root-derived Path (controlled); osascript via PATH (macOS-only headless installer)
+            # F3.4 BUG-NF-19: escape the path for the AppleScript literal so a
+            # `"` or `\` in the path can't break out of the string or be
+            # mis-interpreted by AppleScript's grammar.
+            from installer.install import _applescript_quote
+            quoted_path = _applescript_quote(str(install_nexe_app))
+            subprocess.run([  # nosec B603 B607: install_nexe_app is project_root-derived Path (controlled) and escaped via _applescript_quote; osascript via PATH (macOS-only headless installer)
                 "osascript", "-e",
                 f'tell application "System Events" to make login item at end '
-                f'with properties {{path:"{install_nexe_app}", hidden:true}}'
+                f'with properties {{path:"{quoted_path}", hidden:true}}'
             ], capture_output=True, timeout=10)
             _log.info("Nexe added to Login Items at %s", install_nexe_app)
         except Exception as e:

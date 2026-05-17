@@ -422,7 +422,12 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         if lang not in ("ca", "es", "en"):
             raise HTTPException(status_code=400, detail=get_message(i18n, "webui.auth.supported_languages"))
         _server_lang = lang
-        _os.environ["NEXE_LANG"] = lang
+        # F3.2 BUG-NC-18: drop `os.environ["NEXE_LANG"] = lang`. The only consumer
+        # of this env var is the module-level `_server_lang` initialiser (line 46),
+        # which runs once at import. Mutating process env after start was a no-op
+        # for in-process readers and contaminated any subprocess spawned later.
+        # The `_server_lang` global plus `_persist_env_vars` (if added on persist
+        # paths) is sufficient for live reads and restart-time defaults.
         if i18n is not None:
             lang_map = {"ca": "ca-ES", "es": "es-ES", "en": "en-US"}
             i18n.current_language = lang_map.get(lang, lang)

@@ -18,7 +18,20 @@ APP_DIR="$PROJECT_ROOT/InstallNexe.app"
 RESOURCES="$APP_DIR/Contents/Resources"
 OLLAMA_DIR="$RESOURCES/ollama"
 OLLAMA_ZIP="$OLLAMA_DIR/Ollama-darwin.zip"
-OLLAMA_URL="https://ollama.com/download/Ollama-darwin.zip"
+
+# F3.4 BUG-NF-8: prefer a versioned GitHub release URL over the unversioned
+# CDN. The CDN URL (`ollama.com/download/Ollama-darwin.zip`) is updated
+# in-place by upstream, so the build SHA pin in ollama-checksums.txt
+# silently flips from "valid" to "MITM" when Ollama ships a new version.
+# With OLLAMA_VERSION set we fetch a fixed release artifact — the pin
+# corresponds to exactly that version. Unset/latest falls back to the
+# legacy URL with the same SHA gate as before (build will fail-fast on drift).
+OLLAMA_VERSION="${OLLAMA_VERSION:-}"
+if [ -n "$OLLAMA_VERSION" ] && [ "$OLLAMA_VERSION" != "latest" ]; then
+    OLLAMA_URL="https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}/Ollama-darwin.zip"
+else
+    OLLAMA_URL="https://ollama.com/download/Ollama-darwin.zip"
+fi
 CHECKSUMS_FILE="$SCRIPT_DIR/ollama-checksums.txt"
 
 # ── Validate ──────────────────────────────────────────────────────────
