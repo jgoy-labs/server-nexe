@@ -88,7 +88,7 @@ from core.server.helpers import translate as _translate  # noqa: E402  # after w
 # preserve the old behaviour.
 def _resolve_startup_timeout() -> float:
     """Pure resolver — testable with `monkeypatch.setenv` (no module reload)."""
-    raw = os.getenv("NEXE_LIFESPAN_TIMEOUT") or os.getenv("NEXE_STARTUP_TIMEOUT", "120")
+    raw = os.getenv("NEXE_LIFESPAN_TIMEOUT") or os.getenv("NEXE_STARTUP_TIMEOUT") or "120"
     return float(raw)
 
 

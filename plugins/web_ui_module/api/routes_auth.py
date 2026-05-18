@@ -369,7 +369,6 @@ def _collect_llamacpp_gguf_paths(models_dir: "Path") -> "list[dict]":
 
 def _mark_active_backend(backends: list, current_backend: str) -> str:
     """Mark the active backend in-place; falls back to first connected backend. Returns effective current_backend."""
-    import os
     for b in backends:
         if current_backend == b["id"] or (current_backend in ("auto", "ollama_module") and b["id"] == "ollama"):
             if b.get("connected", True):
@@ -445,7 +444,6 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     @router.get("/info", operation_id="webui_info")
     async def get_ui_info(_auth=Depends(require_ui_auth)):
         """Active model and backend info"""
-        import os
         model_name = get_with_env_fallback("NEXE_DEFAULT_MODEL", "")
         configured_backend = get_with_env_fallback("NEXE_MODEL_ENGINE", "auto")
         backend, version = _resolve_backend_version(configured_backend)
@@ -466,7 +464,6 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     @router.get("/backends", operation_id="webui_list_backends")
     async def list_backends(_auth=Depends(require_ui_auth)):
         """List available backends with their models"""
-        import os
         from core.lifespan import get_server_state
 
         module_manager = get_server_state().module_manager
@@ -636,7 +633,6 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     @router.post("/backend", operation_id="webui_set_backend")
     async def set_backend(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Change the active backend and/or model at runtime. Starts Ollama if needed."""
-        import os
         raw_backend = request.get("backend", "")
         model = request.get("model", "")
 

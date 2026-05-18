@@ -11,7 +11,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-import os as _os
 import re as _re
 
 logger = logging.getLogger(__name__)

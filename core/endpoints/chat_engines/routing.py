@@ -10,7 +10,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-import os
 from typing import Optional
 
 logger = logging.getLogger(__name__)

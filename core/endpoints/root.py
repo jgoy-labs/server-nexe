@@ -10,7 +10,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-import os
 from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Depends
 
@@ -18,16 +17,16 @@ from core.version import __version__
 
 logger = logging.getLogger(__name__)
 
-from core.dependencies import limiter, get_i18n
-from plugins.security.core.auth_dependencies import require_api_key
+from core.dependencies import limiter, get_i18n  # noqa: E402
+from plugins.security.core.auth_dependencies import require_api_key  # noqa: E402
 
-from core.resilience import (
+from core.resilience import (  # noqa: E402
   ollama_breaker,
   qdrant_breaker,
   http_breaker,
 )
 
-from core.models import (
+from core.models import (  # noqa: E402
   SystemResponse,
   HealthResponse,
   ApiInfoResponse,
