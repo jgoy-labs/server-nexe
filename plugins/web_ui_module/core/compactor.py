@@ -35,7 +35,8 @@ def _is_ollama_engine(engine) -> bool:
 
 async def _call_engine_ollama(engine, messages, system_msg) -> str:
     """Calls Ollama engine and consumes the async-generator response."""
-    model_name = _os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
+    from core.runtime_state import get_with_env_fallback  # F5.6 BUG-NC-18
+    model_name = get_with_env_fallback("NEXE_DEFAULT_MODEL", "llama3.2:3b")
     full_messages = [{"role": "system", "content": system_msg}] + messages
     result = engine.chat(model=model_name, messages=full_messages, stream=False)
     summary = ""

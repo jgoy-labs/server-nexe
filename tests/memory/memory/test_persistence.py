@@ -742,3 +742,59 @@ class TestPersistenceManagerSQLCipher:
         f = tmp_path / "empty.db"
         f.write_bytes(b"")
         assert not PersistenceManager._is_plaintext_sqlite(f)
+
+    async def test_f56_quarantines_db_from_previous_master_key(self, tmp_path):
+        """F5.6 BUG-NEW-2 — A DB encrypted with key A is moved aside when the
+        app boots with key B; a fresh DB is created so the memory subsystem
+        keeps working.
+
+        Reproduces the second-launch crash on a fresh DMG install where the
+        previous MASTER_KEY differs from the new one and sqlcipher raises
+        'file is not a database'.
+        """
+        import os
+        from core.crypto.provider import CryptoProvider
+
+        db_path = tmp_path / "memories.db"
+        qdrant_path = tmp_path / "qdrant"
+
+        # Round 1 — write data with key A.
+        key_a = os.urandom(32)
+        pm_a = PersistenceManager(
+            db_path=db_path,
+            qdrant_path=qdrant_path,
+            collection_name="test_quarantine",
+            vector_size=768,
+            crypto_provider=CryptoProvider(master_key=key_a),
+        )
+        await pm_a.store(MemoryEntry(
+            entry_type=MemoryType.EPISODIC,
+            content="data encrypted with key A",
+            source="test",
+        ))
+        pm_a.close()
+        assert db_path.exists()
+
+        # Round 2 — boot with key B. Should quarantine and start fresh,
+        # NOT raise "file is not a database".
+        key_b = os.urandom(32)
+        pm_b = PersistenceManager(
+            db_path=db_path,
+            qdrant_path=qdrant_path,
+            collection_name="test_quarantine",
+            vector_size=768,
+            crypto_provider=CryptoProvider(master_key=key_b),
+        )
+        # Fresh DB must accept new writes without error.
+        await pm_b.store(MemoryEntry(
+            entry_type=MemoryType.EPISODIC,
+            content="data encrypted with key B",
+            source="test",
+        ))
+
+        # The original file was quarantined with a timestamp suffix.
+        quarantined = list(tmp_path.glob("memories.db.unrecoverable-*"))
+        assert len(quarantined) == 1, (
+            f"expected exactly one quarantined DB, got {quarantined}"
+        )
+        pm_b.close()

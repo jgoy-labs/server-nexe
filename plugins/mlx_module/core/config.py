@@ -130,11 +130,14 @@ class MLXConfig:
 
     @staticmethod
     def _model_path_autodiscover() -> str:
-        """Auto-discover first valid MLX model in storage/models/ (step 3 fallback)."""
+        """Auto-discover first valid MLX model in models_dir (step 3 fallback).
+
+        F5.6 BUG-NEW-6: use centralized get_models_dir() which honours
+        NEXE_STORAGE_PATH (sidecar override) → NEXE_DATA_DIR/models → cwd → repo.
+        """
         try:
-            models_dir = Path("storage/models")
-            if not models_dir.exists():
-                models_dir = Path(__file__).parents[3] / "storage/models"
+            from core.paths.helpers import get_models_dir
+            models_dir = get_models_dir()
             if models_dir.exists():
                 candidates = sorted(
                     p for p in models_dir.iterdir()
@@ -156,8 +159,13 @@ class MLXConfig:
         Returns:
             MLXConfig with values from the environment or defaults.
         """
+        # F5.6 BUG-NC-18 part 2 — get_with_env_fallback consults the
+        # runtime override singleton first (live UI selections), then the
+        # env var (boot-time configuration). Avoids the previous
+        # os.environ mutation pattern at the call sites.
+        from core.runtime_state import get_with_env_fallback
         model_path = (
-            os.getenv("NEXE_MLX_MODEL", "")
+            get_with_env_fallback("NEXE_MLX_MODEL", "")
             or cls._model_path_from_toml()
             or cls._model_path_autodiscover()
         )

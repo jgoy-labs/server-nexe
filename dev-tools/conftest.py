@@ -215,6 +215,28 @@ def ensure_ollama_running():
             print("[pytest] Ollama: Force killed")
 
 
+@pytest.fixture(autouse=True)
+def _f56_reset_rate_limiter():
+    """F5.6 BUG-A7 — reset the slowapi limiter between every test.
+
+    Without this, pytest-randomly could schedule a test that hits a
+    rate-limited endpoint after another test in the same session has
+    already exhausted the per-IP window, producing a spurious 429 that
+    only appeared with certain seeds. Resetting before each function
+    (function-scope autouse) keeps the limiter state local to the test.
+
+    Best-effort — older slowapi versions may not expose .reset(); in
+    that case the fixture is a no-op rather than blocking the suite.
+    """
+    try:
+        from core.dependencies import limiter
+        if hasattr(limiter, "reset"):
+            limiter.reset()
+    except Exception:  # nosec B110: limiter unavailable in some test paths — non-fatal
+        pass
+    yield
+
+
 @pytest.fixture(scope="function")
 def ollama_available():
     """

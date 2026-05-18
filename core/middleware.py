@@ -46,6 +46,11 @@ _CSRF_EXEMPT_PATTERNS = [
     re.compile(r"^/health"),
     re.compile(r"^/metrics"),
     re.compile(r"^/ui/"),  # UI uses X-API-Key auth (works for local + Tailscale)
+    # F5.6 BUG-NEW-1 — /admin/system/* is X-API-Key authenticated and called
+    # from the Tauri Rust client (cookie-less). Without this exemption,
+    # starlette-csrf returned 403 on the graceful shutdown POST and lifecycle.rs
+    # always fell back to SIGKILL.
+    re.compile(r"^/admin/"),
 ]
 
 from core.server.helpers import translate as _translate  # noqa: E402

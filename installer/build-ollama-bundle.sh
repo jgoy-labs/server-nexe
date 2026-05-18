@@ -27,6 +27,9 @@ OLLAMA_ZIP="$OLLAMA_DIR/Ollama-darwin.zip"
 # corresponds to exactly that version. Unset/latest falls back to the
 # legacy URL with the same SHA gate as before (build will fail-fast on drift).
 OLLAMA_VERSION="${OLLAMA_VERSION:-}"
+# F5.6 OBS-2 — strip a leading "v" so both OLLAMA_VERSION=0.5.4 and
+# OLLAMA_VERSION=v0.5.4 produce the same URL (avoid /releases/download/vv0.5.4/).
+OLLAMA_VERSION="${OLLAMA_VERSION#v}"
 if [ -n "$OLLAMA_VERSION" ] && [ "$OLLAMA_VERSION" != "latest" ]; then
     OLLAMA_URL="https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}/Ollama-darwin.zip"
 else

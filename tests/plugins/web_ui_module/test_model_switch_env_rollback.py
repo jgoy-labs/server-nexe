@@ -75,17 +75,31 @@ class TestRollback:
 
 
 class TestSourceGuard:
-    """Regression grep guard — the routes_chat.py file must have the
-    explicit rollbacks because the `_switch_with_rollback` pattern here
-    is only a didactic copy."""
+    """F5.6 BUG-NC-18 part 2 regression guard — routes_chat.py must use the
+    runtime_state singleton instead of mutating os.environ. The previous
+    pattern (P0-3 env try/finally rollback) was replaced because env writes
+    are thread-unsafe and the singleton stays consistent across concurrent
+    requests.
+    """
 
-    def test_routes_chat_has_mlx_rollback(self):
+    def test_routes_chat_uses_runtime_state_for_mlx(self):
         from pathlib import Path
         import plugins.web_ui_module as _pkg
         src = Path(_pkg.__file__).parent / "api" / "routes_chat.py"
         content = src.read_text(encoding="utf-8")
-        # We look for the two markers that guarantee the try/finally P0-3.
-        assert 'os.environ.get("NEXE_MLX_MODEL")' in content, "MLX env rollback absent a routes_chat.py"
-        assert 'os.environ.get("NEXE_LLAMA_CPP_MODEL")' in content, "LLAMA env rollback absent a routes_chat.py"
-        assert 'os.environ.pop("NEXE_MLX_MODEL"' in content
-        assert 'os.environ.pop("NEXE_LLAMA_CPP_MODEL"' in content
+        # Runtime override path must be in place for both motors.
+        assert 'set_override("NEXE_MLX_MODEL"' in content, (
+            "NEXE_MLX_MODEL must be set through runtime_state.set_override "
+            "(see F5.6 BUG-NC-18 part 2)."
+        )
+        assert 'set_override("NEXE_LLAMA_CPP_MODEL"' in content, (
+            "NEXE_LLAMA_CPP_MODEL must be set through runtime_state.set_override "
+            "(see F5.6 BUG-NC-18 part 2)."
+        )
+        # Anti-regression: no env writes for these motors should sneak back in.
+        assert 'os.environ["NEXE_MLX_MODEL"]' not in content, (
+            "os.environ['NEXE_MLX_MODEL'] write resurfaced — use set_override."
+        )
+        assert 'os.environ["NEXE_LLAMA_CPP_MODEL"]' not in content, (
+            "os.environ['NEXE_LLAMA_CPP_MODEL'] write resurfaced — use set_override."
+        )

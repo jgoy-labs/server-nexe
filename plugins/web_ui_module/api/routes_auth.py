@@ -17,6 +17,9 @@ import secrets
 import time as _time
 from fastapi import APIRouter, HTTPException, Depends, Header, Request
 
+# F5.6 BUG-NC-18 part 2 — runtime override singleton (replaces os.environ writes).
+from core.runtime_state import get_with_env_fallback  # noqa: E402
+
 # R6-15 v1.0.4: tolerate absent security plugin so the web UI can serve its
 # public surface (HTML, static, health) even when the user has disabled the
 # security plugin. Protected endpoints fail closed via _SECURITY_AVAILABLE
@@ -199,22 +202,24 @@ def _resolve_model_name(model_name: str, backend: str, configured_backend: str) 
     if effective_backend in ("ollama", "auto"):
         model_name = os.getenv("NEXE_OLLAMA_MODEL", "")
     elif effective_backend == "mlx":
-        model_name = os.getenv("NEXE_MLX_MODEL", "")
+        model_name = get_with_env_fallback("NEXE_MLX_MODEL", "")
     elif effective_backend == "llama_cpp":
-        model_name = os.getenv("NEXE_LLAMA_CPP_MODEL", "")
+        model_name = get_with_env_fallback("NEXE_LLAMA_CPP_MODEL", "")
     return model_name or "nexe"
 
 
 def _resolve_models_dir() -> "Path":
-    """Return absolute Path to the models directory using server state project root."""
-    import os
-    models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
-    if not models_dir.is_absolute():
-        from core.lifespan import get_server_state
-        _root = get_server_state().project_root
-        root = _root if _root is not None else Path(".")
-        models_dir = root / models_dir
-    return models_dir
+    """Return absolute Path to the models directory.
+
+    F5.6 — delegated to core.paths.helpers.get_models_dir() so the lookup
+    chain (NEXE_STORAGE_PATH → NEXE_DATA_DIR/models → cwd → repo root) is
+    centralised and the same across mlx_module, llama_cpp_module and the
+    web UI. The previous local logic appended "/models" to NEXE_STORAGE_PATH,
+    which broke for the common case where the env var already points to
+    the models directory itself (e.g. NEXE_STORAGE_PATH=~/models).
+    """
+    from core.paths.helpers import get_models_dir
+    return get_models_dir()
 
 
 def _overlay_ollama_ps_sizes(model_list: list) -> None:
@@ -347,7 +352,7 @@ def _collect_llamacpp_gguf_paths(models_dir: "Path") -> "list[dict]":
         })
 
     # Source 1: NEXE_LLAMA_CPP_MODEL — the engine's own contract.
-    env_path_str = _os.environ.get("NEXE_LLAMA_CPP_MODEL", "").strip()
+    env_path_str = get_with_env_fallback("NEXE_LLAMA_CPP_MODEL", "").strip()
     if env_path_str:
         env_path = Path(env_path_str).expanduser()
         if env_path.is_file() and env_path.suffix == ".gguf":
@@ -374,7 +379,8 @@ def _mark_active_backend(backends: list, current_backend: str) -> str:
     for b in backends:
         if b.get("connected", True) and b["models"]:
             b["active"] = True
-            os.environ["NEXE_MODEL_ENGINE"] = b["id"]
+            from core.runtime_state import set_override
+            set_override("NEXE_MODEL_ENGINE", b["id"])
             logger.info(f"Backend fallback: {b['id']} (configured backend unavailable)")
             return b["id"]
     return current_backend
@@ -440,8 +446,8 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     async def get_ui_info(_auth=Depends(require_ui_auth)):
         """Active model and backend info"""
         import os
-        model_name = os.getenv("NEXE_DEFAULT_MODEL", "")
-        configured_backend = os.getenv("NEXE_MODEL_ENGINE", "auto")
+        model_name = get_with_env_fallback("NEXE_DEFAULT_MODEL", "")
+        configured_backend = get_with_env_fallback("NEXE_MODEL_ENGINE", "auto")
         backend, version = _resolve_backend_version(configured_backend)
         model_name = _resolve_model_name(model_name, backend, configured_backend)
         lang = get_server_lang()
@@ -477,8 +483,8 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         if llamacpp:
             backends.append(llamacpp)
 
-        current_backend = os.getenv("NEXE_MODEL_ENGINE", "auto").lower()
-        current_model = os.getenv("NEXE_DEFAULT_MODEL", "")
+        current_backend = get_with_env_fallback("NEXE_MODEL_ENGINE", "auto").lower()
+        current_model = get_with_env_fallback("NEXE_DEFAULT_MODEL", "")
         current_backend = _mark_active_backend(backends, current_backend)
 
         return {"backends": backends, "current_backend": current_backend, "current_model": current_model}
@@ -606,13 +612,18 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
             logger.debug(f"Could not unload previous model {old_model}: {_ue}")
 
     def _apply_and_persist_backend(canonical: str, model: str) -> None:
-        """Set env vars for backend/model and persist them to .env."""
-        import os
+        """Set runtime overrides for backend/model and persist them to .env.
+
+        F5.6 BUG-NC-18 part 2 — overrides go through core.runtime_state instead
+        of mutating os.environ; persistence to .env is still needed so the
+        next process start picks the same selection up via NEXE_* env reading.
+        """
+        from core.runtime_state import set_override
         if canonical:
-            os.environ["NEXE_MODEL_ENGINE"] = canonical
+            set_override("NEXE_MODEL_ENGINE", canonical)
             logger.info(f"Backend changed to: {canonical}")
         if model:
-            os.environ["NEXE_DEFAULT_MODEL"] = model
+            set_override("NEXE_DEFAULT_MODEL", model)
             logger.info(f"Model changed to: {model}")
         persist = {}
         if canonical:
@@ -649,15 +660,15 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                     detail=f"Model '{model}' not found for backend '{canonical}'. Verify the model is installed before switching.",
                 )
 
-        old_model = os.getenv("NEXE_DEFAULT_MODEL", "")
-        old_backend = os.getenv("NEXE_MODEL_ENGINE", "auto")
+        old_model = get_with_env_fallback("NEXE_DEFAULT_MODEL", "")
+        old_backend = get_with_env_fallback("NEXE_MODEL_ENGINE", "auto")
         await _unload_previous_ollama_model(old_model, model, old_backend)
         _apply_and_persist_backend(canonical, model)
 
         return {
             "status": "ok",
-            "backend": os.getenv("NEXE_MODEL_ENGINE", "auto"),
-            "model": os.getenv("NEXE_DEFAULT_MODEL", ""),
+            "backend": get_with_env_fallback("NEXE_MODEL_ENGINE", "auto"),
+            "model": get_with_env_fallback("NEXE_DEFAULT_MODEL", ""),
             "ollama_started": ollama_started,
         }
 

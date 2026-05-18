@@ -110,7 +110,16 @@ class WebUIModule:
                             "before web_ui_module init runs. Aborting to prevent plaintext "
                             "session storage."
                         )
-                self.session_manager = SessionManager(crypto_provider=crypto)
+                # F5.5 — resolve sessions dir via get_data_dir() so sidecar mode
+                # writes to NEXE_DATA_DIR/sessions (writable Application Support)
+                # instead of "storage/sessions" relative to cwd (which may be /
+                # under Tauri parent → Errno 30 read-only file system).
+                from core.paths.helpers import get_data_dir
+                sessions_dir = get_data_dir("sessions")
+                self.session_manager = SessionManager(
+                    storage_path=str(sessions_dir),
+                    crypto_provider=crypto,
+                )
 
                 # Resolve API base URL
                 self.api_base_url = self._resolve_api_base_url(context)

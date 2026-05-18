@@ -9,11 +9,14 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import logging
 import os
 from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Depends
 
 from core.version import __version__
+
+logger = logging.getLogger(__name__)
 
 from core.dependencies import limiter, get_i18n
 from plugins.security.core.auth_dependencies import require_api_key
@@ -169,6 +172,21 @@ async def readiness_check(request: Request) -> dict:
   else:
     overall = "healthy"
 
+  # F5.6 BUG-A6 — instrumentation: log which module(s) drove a non-healthy
+  # verdict so the next empirical session has the data to fix the root
+  # cause. SECURITY: the log line is server-internal — clients still see
+  # only the minimal payload below (no per-module details exposed).
+  if overall != "healthy":
+    logger.warning(
+      "F5.6 A6 readiness=%s missing=%s unhealthy=%s degraded=%s required=%s statuses=%s",
+      overall,
+      sorted(missing),
+      sorted(unhealthy),
+      sorted(degraded),
+      sorted(required),
+      statuses,
+    )
+
   # SECURITY: Return minimal status without exposing internal module details.
   return {
     "status": overall,
@@ -241,9 +259,10 @@ async def server_status(
   - model: Current model loaded
   - modules: Loaded modules status
   """
-  # Load .env to get configured engine
-  env_engine = os.getenv("NEXE_MODEL_ENGINE", "auto")
-  env_model = os.getenv("NEXE_DEFAULT_MODEL", "unknown")
+  # F5.6 BUG-NC-18 — runtime override (live UI selection) > env (.env install-time).
+  from core.runtime_state import get_with_env_fallback
+  env_engine = get_with_env_fallback("NEXE_MODEL_ENGINE", "auto")
+  env_model = get_with_env_fallback("NEXE_DEFAULT_MODEL", "unknown")
 
   # Detect actual engine from loaded modules
   modules = getattr(request.app.state, "modules", {})

@@ -39,6 +39,7 @@ from core.paths.helpers import (
     get_config_dir,
     get_data_dir,
     get_cache_dir,
+    get_models_dir,
 )
 
 
@@ -291,6 +292,58 @@ class TestPathHelpers:
     def test_get_cache_dir_with_subdir(self):
         p = get_cache_dir("test_cache")
         assert "test_cache" in str(p)
+
+
+# ─── Tests get_models_dir (F5.6 BUG-NEW-6) ────────────────────────────────────
+
+class TestGetModelsDir:
+    """Coverage for the get_models_dir resolution chain."""
+
+    def test_storage_path_env_wins(self, monkeypatch, tmp_path):
+        """NEXE_STORAGE_PATH wins when the directory exists."""
+        models = tmp_path / "user_models"
+        models.mkdir()
+        monkeypatch.setenv("NEXE_STORAGE_PATH", str(models))
+        monkeypatch.delenv("NEXE_DATA_DIR", raising=False)
+        assert get_models_dir() == models
+
+    def test_storage_path_ignored_if_nonexistent(self, monkeypatch, tmp_path):
+        """NEXE_STORAGE_PATH pointing to a missing dir falls through to next tier."""
+        ghost = tmp_path / "ghost"
+        data = tmp_path / "data"
+        (data / "models").mkdir(parents=True)
+        monkeypatch.setenv("NEXE_STORAGE_PATH", str(ghost))
+        monkeypatch.setenv("NEXE_DATA_DIR", str(data))
+        result = get_models_dir()
+        assert result == data / "models"
+
+    def test_data_dir_subfolder(self, monkeypatch, tmp_path):
+        """NEXE_DATA_DIR/models is used when it exists."""
+        data = tmp_path / "data"
+        (data / "models").mkdir(parents=True)
+        monkeypatch.delenv("NEXE_STORAGE_PATH", raising=False)
+        monkeypatch.setenv("NEXE_DATA_DIR", str(data))
+        assert get_models_dir() == data / "models"
+
+    def test_fallback_to_repo_root(self, monkeypatch, tmp_path):
+        """When no env vars apply and cwd/repo storage is missing, returns repo-relative path."""
+        monkeypatch.delenv("NEXE_STORAGE_PATH", raising=False)
+        monkeypatch.delenv("NEXE_DATA_DIR", raising=False)
+        monkeypatch.chdir(tmp_path)
+        result = get_models_dir()
+        # Path may or may not exist — caller checks. Must be a Path ending in storage/models.
+        assert isinstance(result, Path)
+        assert result.parts[-2:] == ("storage", "models")
+
+    def test_does_not_mkdir(self, monkeypatch, tmp_path):
+        """Unlike get_data_dir, get_models_dir does NOT create the directory."""
+        monkeypatch.setenv("NEXE_STORAGE_PATH", str(tmp_path / "nope"))
+        monkeypatch.delenv("NEXE_DATA_DIR", raising=False)
+        monkeypatch.chdir(tmp_path)
+        result = get_models_dir()
+        # The function returned the repo-root fallback (since env path doesn't exist)
+        # — what matters is that it didn't create anything spurious.
+        assert not (tmp_path / "nope").exists()
 
 
 # ─── Tests __init__.py (façade) ───────────────────────────────────────────────

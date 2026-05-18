@@ -22,7 +22,7 @@ def register_core_routers(app: FastAPI, i18n: Any) -> None:
     app: FastAPI application
     i18n: I18n manager
   """
-  from core.endpoints import root_router, modules_router, router_v1, sidecar_stubs_router
+  from core.endpoints import root_router, modules_router, router_v1
   from core.endpoints.bootstrap import router as bootstrap_router
   from core.endpoints.system import get_router as get_system_router
   from core.metrics import metrics_router
@@ -38,9 +38,9 @@ def register_core_routers(app: FastAPI, i18n: Any) -> None:
 
   app.include_router(get_system_router())
 
-  # F2.5: stub endpoints /sessions, /info, /backends sidecar-aware.
-  # Registrats sempre — la lògica is_sidecar viu dins (200 vs 501).
-  app.include_router(sidecar_stubs_router)
+  # F5.5: sidecar_stubs_router (F2.5 stubs) eliminat — web_ui_module ara
+  # serveix /ui/* JSON endpoints en sidecar mode (HTML/static es salten
+  # condicionalment a plugins/web_ui_module/api/routes.py).
 
   register_exception_handlers(app, i18n)
 

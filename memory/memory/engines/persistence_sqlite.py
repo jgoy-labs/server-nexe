@@ -114,6 +114,66 @@ class SqliteStorageMixin:
 
     # ── Initialization ────────────────────────────────────────────────────────
 
+    def _quarantine_unreadable_encrypted_db(self) -> bool:
+        """F5.6 BUG-NEW-2 — Archive an encrypted DB that won't open with the
+        current MASTER_KEY-derived key.
+
+        Returns:
+            True when the DB was quarantined (caller should treat the path as
+            absent and create a fresh one). False when the DB opens correctly
+            or doesn't exist.
+
+        When a previous install left a DB encrypted with a different
+        MASTER_KEY, the very first cursor.execute against it raises
+        `DatabaseError: file is not a database`. That bubbled up through
+        MemoryModule.init and broke the whole memory subsystem on the
+        second launch of a freshly-installed DMG. Quarantining keeps the
+        file recoverable (rename back if the user restores the previous
+        key) while letting the app boot cleanly.
+        """
+        if not (self._encrypted and SQLCIPHER_AVAILABLE):
+            return False
+        if not self.db_path.exists() or self.db_path.stat().st_size == 0:
+            return False
+
+        # sqlcipher3.dbapi2.DatabaseError is NOT a subclass of sqlite3.DatabaseError
+        # (separate exception hierarchy in the C extension), so the except clause
+        # must reference the runtime exception class directly.
+        db_error_cls = sqlcipher.DatabaseError if SQLCIPHER_AVAILABLE else sqlite3.DatabaseError
+
+        try:
+            conn = sqlcipher.connect(str(self.db_path))
+            dek = self._crypto.derive_key("sqlite")
+            conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")
+            conn.execute("PRAGMA cipher_compatibility = 4")
+            try:
+                conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
+            finally:
+                conn.close()
+            return False
+        except db_error_cls as e:
+            if "file is not a database" not in str(e).lower():
+                raise
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            quarantine = self.db_path.with_name(
+                f"{self.db_path.name}.unrecoverable-{ts}"
+            )
+            logger.warning(
+                "F5.6 BUG-NEW-2: SQLCipher DB %s cannot be opened with the "
+                "current MASTER_KEY (likely a previous install with a "
+                "different key). Quarantining to %s and starting fresh. "
+                "To recover the data, restore the previous MASTER_KEY and "
+                "rename the .unrecoverable-* file back.",
+                self.db_path,
+                quarantine.name,
+            )
+            self.db_path.rename(quarantine)
+            for suffix in ("-wal", "-shm"):
+                sidecar = self.db_path.with_name(self.db_path.name + suffix)
+                if sidecar.exists():
+                    sidecar.unlink()
+            return True
+
     def _init_sqlite(self):
         """Initialize the SQLite DB with WAL mode."""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -121,6 +181,7 @@ class SqliteStorageMixin:
         if self._crypto and SQLCIPHER_AVAILABLE:
             self._migrate_to_encrypted()
             self._encrypted = True
+            self._quarantine_unreadable_encrypted_db()
         elif self._crypto and not SQLCIPHER_AVAILABLE:
             logger.warning(
                 "CryptoProvider provided but sqlcipher3 not installed. "

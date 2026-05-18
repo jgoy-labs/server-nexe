@@ -80,13 +80,15 @@ class LlamaCppConfig:
         # storage/models/ (real file or symlink). Pick the first match
         # sorted alphabetically for determinism. Enables the UX
         # "drop a .gguf, restart, it just works" — no env var needed.
-        model_path = os.getenv("NEXE_LLAMA_CPP_MODEL", "")
+        # F5.6 BUG-NC-18 part 2 — read from runtime_state (live UI override
+        # set by routes_chat._switch_llama_cpp_model) before falling back to
+        # the env var, so no os.environ mutation is needed at the call site.
+        from core.runtime_state import get_with_env_fallback
+        model_path = get_with_env_fallback("NEXE_LLAMA_CPP_MODEL", "")
         if not model_path:
             try:
-                from pathlib import Path
-                models_dir = Path("storage/models")
-                if not models_dir.exists():
-                    models_dir = Path(__file__).parents[3] / "storage/models"
+                from core.paths.helpers import get_models_dir
+                models_dir = get_models_dir()
                 if models_dir.exists():
                     candidates = sorted(
                         p for p in models_dir.iterdir()

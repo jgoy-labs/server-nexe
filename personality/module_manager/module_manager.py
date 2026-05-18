@@ -136,12 +136,21 @@ class ModuleManager(PluginLoaderMixin):
   def _find_initial_config(self, config_path: Optional[Path]) -> Path:
     """
     Initial configuration search with security validation.
+
+    F5.6 BUG-NEW-3 — use NEXE_HOME (Tauri-propagated, deterministic) as base
+    for path traversal validation instead of Path.cwd(). The cwd can be
+    arbitrary depending on how the app is launched (Finder, terminal,
+    PATH-with-spaces sidecar binary), which produced false-positive
+    path_traversal rejections that disabled the whole plugin loader on
+    second-launch DMG installs. NEXE_HOME points at the sidecar app dir,
+    so any config under it is by construction safe to validate against.
     """
     if config_path:
       config_path = Path(config_path)
       if SECURITY_VALIDATION_AVAILABLE:
         try:
-          base_path = Path.cwd()
+          import os
+          base_path = Path(os.environ.get("NEXE_HOME", os.getcwd()))
           validated_path = validate_safe_path(config_path, base_path)  # pyright: ignore[reportPossiblyUnboundVariable]  # imported under SECURITY_VALIDATION_AVAILABLE guard above
           if validated_path.exists():
             return validated_path

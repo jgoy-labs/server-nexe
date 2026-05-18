@@ -139,6 +139,37 @@ def get_cache_dir(subdir: Optional[str] = None) -> Path:
   cache_dir.mkdir(parents=True, exist_ok=True)
   return cache_dir
 
+def get_models_dir() -> Path:
+  """
+  Return the models directory for engine auto-discovery (MLX, llama.cpp, ...).
+
+  Priority (F5.6 BUG-NEW-6):
+  1. NEXE_STORAGE_PATH environment variable (Tauri sidecar injection or user override)
+  2. NEXE_DATA_DIR/models (sidecar mode — sibling of vectors/, cache/)
+  3. storage/models relative to cwd (legacy dev mode)
+  4. {project_root}/storage/models (standalone fallback)
+
+  Unlike get_data_dir/get_cache_dir, this does NOT mkdir — models are
+  pre-existing assets, not runtime state. The returned path may not exist;
+  callers should check `.exists()` before iterating.
+  """
+  if storage_env := os.getenv("NEXE_STORAGE_PATH", "").strip():
+    candidate = Path(storage_env).expanduser()
+    if candidate.exists():
+      return candidate
+
+  if data_env := os.getenv("NEXE_DATA_DIR", "").strip():
+    candidate = Path(data_env).expanduser() / "models"
+    if candidate.exists():
+      return candidate
+
+  cwd_candidate = Path("storage/models")
+  if cwd_candidate.exists():
+    return cwd_candidate
+
+  return get_repo_root() / "storage" / "models"
+
+
 get_system_logs_dir = get_logs_dir
 get_core_root = get_repo_root
 
@@ -153,6 +184,7 @@ __all__ = [
   "get_config_dir",
   "get_data_dir",
   "get_cache_dir",
+  "get_models_dir",
   "get_system_logs_dir",
   "get_core_root",
 ]

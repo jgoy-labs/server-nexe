@@ -12,9 +12,12 @@ description = "Interfície web estil Ollama per demostrar el sistema modular de 
 location = "plugins/web_ui_module/"
 permanent = false
 note = "Plugin de demostració del sistema modular"
-# F2.5: el mòdul es desactiva en sidecar mode (la UI la serveix Tauri host,
-# no aquest plugin). `initialize()` retorna False quan get_sidecar_config().is_sidecar.
-disabled_in_sidecar = true
+# F5.5: el mòdul s'activa també en sidecar mode, exposant només els JSON
+# endpoints (/ui/info, /ui/backends, /ui/sessions, /ui/chat, etc.). Les
+# rutes HTML/static (/, /static/*) es salten condicionalment a routes.py
+# perquè la webview Tauri serveix la seva pròpia UI. F2.5 era massa
+# agressiva — desactivava la lògica JSON que la Tauri necessita.
+disabled_in_sidecar = false
 
 [module.metadata]
 author = "Jordi Goy"

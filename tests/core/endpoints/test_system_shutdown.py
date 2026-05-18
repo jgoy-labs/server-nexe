@@ -80,3 +80,21 @@ def test_shutdown_endpoint_requires_authentication():
   assert response.status_code in (401, 403, 422), (
     f"shutdown endpoint must enforce auth, got {response.status_code}"
   )
+
+
+def test_admin_paths_csrf_exempt():
+  """F5.6 BUG-NEW-1 — /admin/* must be in the CSRF exempt list.
+
+  The Tauri Rust client calls /admin/system/shutdown with an X-API-Key header
+  but without a CSRF token or cookie. Before F5.6 the request hit starlette-csrf
+  first and returned 403 Forbidden, so lifecycle.rs always fell back to SIGKILL.
+  This test pins the exempt pattern so a future cleanup doesn't accidentally
+  remove it.
+  """
+  from core.middleware import _CSRF_EXEMPT_PATTERNS
+
+  matched = [p for p in _CSRF_EXEMPT_PATTERNS if p.match("/admin/system/shutdown")]
+  assert matched, (
+    "F5.6 BUG-NEW-1 regression: /admin/system/shutdown must be CSRF-exempt "
+    "(authenticated by X-API-Key, called from cookie-less Rust client)."
+  )

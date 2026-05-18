@@ -928,18 +928,21 @@ def _resolve_engines(preferred_engine: str) -> list:
 
 
 def _switch_mlx_model(engine, local_path) -> None:
-    """Hot-swap MLX model config, restoring env var after reading (P0-3 env leak fix)."""
-    import os
-    _prev = os.environ.get("NEXE_MLX_MODEL")
+    """Hot-swap MLX model config via runtime_state override.
+
+    F5.6 BUG-NC-18 part 2 — replaced the previous os.environ try/finally
+    dance with set_override; MLXConfig.from_env() consults
+    runtime_state.get_with_env_fallback so the override is visible without
+    mutating the process env (and concurrent requests no longer race).
+    """
+    from core.runtime_state import set_override, get_override
+    _prev = get_override("NEXE_MLX_MODEL")
     try:
-        os.environ["NEXE_MLX_MODEL"] = str(local_path)
+        set_override("NEXE_MLX_MODEL", str(local_path))
         from plugins.mlx_module.core.config import MLXConfig
         new_config = MLXConfig.from_env()
     finally:
-        if _prev is None:
-            os.environ.pop("NEXE_MLX_MODEL", None)
-        else:
-            os.environ["NEXE_MLX_MODEL"] = _prev
+        set_override("NEXE_MLX_MODEL", _prev)
     if hasattr(engine, '_node') and engine._node:
         if engine._node.config.model_path != new_config.model_path:
             engine._node.config = new_config  # type: ignore[assignment]
@@ -950,20 +953,17 @@ def _switch_mlx_model(engine, local_path) -> None:
 
 
 def _switch_llama_cpp_model(engine, local_path) -> None:
-    """Hot-swap llama.cpp model config, restoring env var after reading (P0-3 env leak fix)."""
-    import os
-    _prev = os.environ.get("NEXE_LLAMA_CPP_MODEL")
+    """Hot-swap llama.cpp model config via runtime_state override (F5.6 NC-18)."""
+    from core.runtime_state import set_override, get_override
+    _prev = get_override("NEXE_LLAMA_CPP_MODEL")
     try:
-        os.environ["NEXE_LLAMA_CPP_MODEL"] = str(local_path)
+        set_override("NEXE_LLAMA_CPP_MODEL", str(local_path))
         from plugins.llama_cpp_module.core.config import LlamaCppConfig
         from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
         from plugins.llama_cpp_module.core.model_pool import ModelPool
         new_config = LlamaCppConfig.from_env()  # type: ignore[assignment]
     finally:
-        if _prev is None:
-            os.environ.pop("NEXE_LLAMA_CPP_MODEL", None)
-        else:
-            os.environ["NEXE_LLAMA_CPP_MODEL"] = _prev
+        set_override("NEXE_LLAMA_CPP_MODEL", _prev)
     if hasattr(engine, '_node') and engine._node:
         if engine._node.config.model_path != new_config.model_path:
             if LlamaCppChatNode._pool is not None:
