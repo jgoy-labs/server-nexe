@@ -974,7 +974,15 @@ class NexeUI {
                 // Apply server language
                 if (data.lang && UI_STRINGS[data.lang]) {
                     this.lang = data.lang;
+                    document.documentElement.lang = data.lang;
+                    const ls = document.getElementById('langSelect');
+                    if (ls) ls.value = data.lang;
                     this.applyI18n();
+                }
+                // Inject version into footer
+                if (data.version) {
+                    const ft = document.querySelector('.footer-text');
+                    if (ft) ft.textContent = ft.textContent.replace('{{NEXE_VERSION}}', 'v' + data.version);
                 }
                 const el = document.getElementById('modelInfoText');
                 if (el) {

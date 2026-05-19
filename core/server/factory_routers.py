@@ -24,8 +24,13 @@ def register_core_routers(app: FastAPI, i18n: Any) -> None:
   """
   from core.endpoints import root_router, modules_router, router_v1
   from core.endpoints.bootstrap import router as bootstrap_router
+  from core.endpoints.installer import router as installer_router
   from core.endpoints.system import get_router as get_system_router
   from core.metrics import metrics_router
+
+  # F5.3: installer endpoints for the onboarding wizard (unauthenticated — no
+  # api_key exists yet when the user runs through the wizard for the first time).
+  app.include_router(installer_router)
 
   app.include_router(root_router)
   app.include_router(modules_router)
