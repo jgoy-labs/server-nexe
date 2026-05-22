@@ -237,6 +237,11 @@ mis = "mis"
 mor = "mor"
 hom = "hom"
 unparseable = "unparseable"
+# Catalan terms in code comments (added 2026-05-21 post-Tier S cleanup)
+completi = "completi"  # Catalan subjunctive of "completar"
+subproces = "subproces"  # Catalan: "subprocess" (no double 's')
+proces = "proces"  # Catalan: "process" (no double 's')
+Ortogonal = "Ortogonal"  # Catalan: "Orthogonal"
 # Catalan "tècniques" — el fitxer index_server-nexe.md ja l'usa amb accent
 # correcte; aquesta entrada manté la variant sense accent per si apareix
 # a docs legacy (quoted key per ser TOML-vàlida amb caràcter especial).

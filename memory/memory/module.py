@@ -138,13 +138,33 @@ class MemoryModule:
             exc, project_root,
           )
 
-      vectors_path = project_root / "storage" / "vectors"
+      # F5.4 Bug G fix: in sidecar mode use the canonical sidecar
+      # vectors_dir so MemoryModule, MemoryService, and MemoryAPI all share
+      # the same Qdrant collection on disk. The previous hardcoded
+      # `project_root / storage / vectors` resolved to
+      # /sidecar/app/storage/vectors while MemoryAPI used data_dir/vectors
+      # (= /sidecar/vectors), splitting qdrant collections.
+      #
+      # Guard with `is_sidecar` because get_sidecar_config() does NOT raise
+      # in dev/test environments — it returns a defaulted SidecarConfig
+      # pointing at the user's real ~/.nexe/data which is the wrong place
+      # for unit tests that pass tmp_path as project_root. Without the
+      # guard, the dev/test paths bypass project_root entirely.
+      try:
+        from core.sidecar_config import get_sidecar_config
+        _sc = get_sidecar_config()
+        if getattr(_sc, "is_sidecar", False):
+          vectors_path = _sc.vectors_dir
+        else:
+          vectors_path = project_root / "storage" / "vectors"
+      except Exception:
+        vectors_path = project_root / "storage" / "vectors"
       db_path = vectors_path / "metadata_memory.db"
       # F8 fix: previously qdrant_path = vectors_path / "qdrant_local" which
       # opened a SECOND QdrantClient on a legacy embedded directory and was
       # the root cause of bug F4 (two clients with diverging collections).
       # Now MemoryModule shares the same singleton client as MemoryAPI and
-      # the rest of the server, all rooted at storage/vectors/.
+      # the rest of the server, all rooted at the canonical vectors path.
       qdrant_path = vectors_path
 
       self._flash_memory = FlashMemory(

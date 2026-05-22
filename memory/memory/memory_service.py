@@ -59,7 +59,14 @@ class MemoryService:
         self._schema_enforcer = SchemaEnforcer()
         self._validator = Validator(schema_enforcer=self._schema_enforcer)
 
-        # Storage
+        # Storage. The SQLiteStore guards its cached sqlite3.Connection with
+        # an RLock — that lock only coordinates within a single store
+        # instance. The lifespan contract (see core/lifespan_modules.py:295
+        # and memory/memory/module.py) keeps MemoryService a process-wide
+        # singleton (MemoryModule creates one; lifespan_modules reuses it),
+        # so all callers share the same RLock-protected SQLiteStore. Any
+        # future refactor that drops the singleton must also coordinate
+        # SQLiteStore access across instances (file lock or per-call conn).
         self._store = SQLiteStore(self._db_path)
         self._vector_index = None  # Lazy init to avoid Qdrant dependency in tests
         self._initialized = False

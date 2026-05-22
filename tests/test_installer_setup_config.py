@@ -247,6 +247,30 @@ class TestAtomicWriteEnv:
         tmp_files = list(tmp_path.glob(".env.tmp.*"))
         assert tmp_files == []
 
+    def test_fsyncs_before_rename(self, tmp_path, monkeypatch):
+        """A power cut between rename and the OS flushing the tmp file
+        contents would leave a zero-byte .env. _atomic_write_env must
+        fsync before rename.
+
+        Patches ``os.fsync`` on the canonical module object. ``_atomic_write_env``
+        does ``import os as _os`` lazily inside the helper, but the binding
+        resolves to the same module object — patching ``os.fsync`` is
+        visible everywhere ``os`` was imported."""
+        import os
+
+        seen_fds: list[int] = []
+        real_fsync = os.fsync
+
+        def _spy(fd: int) -> None:
+            seen_fds.append(fd)
+            real_fsync(fd)
+
+        monkeypatch.setattr(os, "fsync", _spy)
+        env_file = tmp_path / ".env"
+        env_file.write_text("")
+        _atomic_write_env(env_file, ["NEXE_ENV=test\n"])
+        assert seen_fds, "_atomic_write_env must fsync the tmp fd before rename"
+
 
 # ── _update_env_model_config (integration) ────────────────────────────────
 

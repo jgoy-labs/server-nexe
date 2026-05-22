@@ -17,11 +17,12 @@ _TEST_KEY = "test-status-q23-key"
 _HEADERS = {"X-API-Key": _TEST_KEY}
 
 
-def make_app(config=None, modules=None, i18n=None):
+def make_app(config=None, modules=None, i18n=None, minimal_mode=False):
     app = FastAPI()
     app.state.config = config or {}
     app.state.modules = modules or {}
     app.state.i18n = i18n
+    app.state.minimal_mode = minimal_mode
     limiter = Limiter(key_func=get_remote_address)
     app.state.limiter = limiter
     app.add_middleware(SlowAPIMiddleware)

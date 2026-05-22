@@ -80,25 +80,32 @@ class DownloadIntegrityError(RuntimeError):
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def _retry_instructions(engine: str, model_id: str) -> str:
+def _retry_instructions(
+    engine: str, model_id: str, target: Optional[Path] = None
+) -> str:
     if engine == "ollama":
         return (
             "To retry:\n"
             f"  ollama rm {model_id}\n"
             f"  ollama pull {model_id}\n"
         )
+    # mlx/gguf: prefer the real on-disk path (verify_download_integrity always
+    # passes `target`). Fall back to the legacy placeholder only when the
+    # caller didn't provide one (defensive — never hit in practice).
     if engine == "gguf":
         filename = model_id.split("/")[-1]
+        location = str(target) if target is not None else f"<install>/storage/models/{filename}"
         return (
             "To retry:\n"
-            f"  rm <install>/storage/models/{filename}\n"
+            f"  rm {location}\n"
             "  ./nexe model pull\n"
         )
     if engine == "mlx":
         local_name = model_id.split("/")[-1]
+        location = str(target) if target is not None else f"<install>/storage/models/{local_name}"
         return (
             "To retry:\n"
-            f"  rm -rf <install>/storage/models/{local_name}\n"
+            f"  rm -rf {location}\n"
             "  ./nexe model pull\n"
         )
     # Defensive: unreachable — dispatch already rejects unknown engines.
@@ -299,7 +306,7 @@ def verify_download_integrity(
             f"  expected: {exc.expected}\n"
             f"  actual:   {exc.actual}\n"
             f"The downloaded artefact has been preserved at {target} for inspection.\n"
-            f"{_retry_instructions(engine, model_id)}"
+            f"{_retry_instructions(engine, model_id, target)}"
         )
         raise DownloadIntegrityError(
             artifact=model_id, message=msg, cause=exc

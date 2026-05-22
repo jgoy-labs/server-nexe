@@ -44,20 +44,31 @@ async def list_integrated_modules(
   api_integrator=Depends(get_api_integrator)
 ) -> ModulesListResponse:
   """List integrated modules and their APIs"""
+  # F5.6 Bloc 5 (R2 Turing): si app.state.minimal_mode, l'api_integrator
+  # no està set (no s'arrenca a _startup_services). Detectem-ho per donar
+  # un missatge UX clar al client. Validat amb Turing R1 agentic 2026-05-20.
+  minimal = bool(getattr(request.app.state, "minimal_mode", False))
   if api_integrator:
     stats = api_integrator.get_integration_stats()
     all_modules = getattr(request.app.state, 'modules', {})
     stats['modules_loaded'] = list(all_modules.keys())
     stats['total_modules_loaded'] = len(all_modules)
+    stats['minimal_mode'] = minimal
     return ModulesListResponse(  # type: ignore[call-arg]  # Pydantic Field(None, ...) defaults — plugin pendent (BACKLOG M5-pydantic-mypy-plugin)
       status=i18n.t('server_core.api.responses.success') if i18n else "ok",
       data=stats
     )
   else:
+    if minimal:
+      msg = "Onboarding not completed — modules unavailable in minimal mode"
+    else:
+      msg = (
+        i18n.t('server_core.api.errors.integrator_not_initialized')
+        if i18n else "API integrator not initialized"
+      )
     return ModulesListResponse(  # type: ignore[call-arg]  # Pydantic Field(None, ...) defaults — plugin pendent (BACKLOG M5-pydantic-mypy-plugin)
       status=i18n.t('server_core.api.responses.error') if i18n else "error",
-      message=i18n.t('server_core.api.errors.integrator_not_initialized') if i18n else
-          "API integrator not initialized"
+      message=msg
     )
 
 @router.get(

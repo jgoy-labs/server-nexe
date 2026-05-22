@@ -287,7 +287,7 @@ async def _startup_module_discovery(app, server_state, _translate) -> None:
         logger.warning(msg)
 
 
-async def start_memory_service_v1(app, server_state):
+async def start_memory_service_v1(app, server_state) -> None:
     """Initialize MemoryService v1 + DreamingCycle background task.
 
     NOTE: MemoryService is now primarily initialized by MemoryModule
@@ -305,19 +305,45 @@ async def start_memory_service_v1(app, server_state):
             # Fallback: create with absolute path
             from memory.memory.memory_service import MemoryService
             project_root = server_state.project_root
+            # Defensive init so the logger.info below can reference qdrant_path
+            # safely when project_root is falsy (pyright reportPossiblyUnbound).
+            qdrant_path: str = "default"
             if project_root:
                 from pathlib import Path
-                db_path = Path(project_root) / "storage" / "vectors" / "memory_v1.db"
-                # F8 fix: use the canonical storage/vectors path so the
-                # MemoryService shares the same singleton QdrantClient as
-                # the rest of the server (no second client on qdrant_local/).
-                qdrant_path = str(Path(project_root) / "storage" / "vectors")
+                # F5.4 Bug G fix: in sidecar mode derive BOTH db_path and
+                # qdrant_path from the canonical sidecar vectors_dir so
+                # MemoryService, MemoryModule, and MemoryAPI share the same
+                # on-disk location. The previous hardcoded
+                # `project_root / storage / vectors` resolved to
+                # /sidecar/app/storage/vectors while MemoryAPI used
+                # data_dir/vectors (= /sidecar/vectors) — splitting qdrant
+                # collections silently and breaking RAG.
+                #
+                # Guarded with is_sidecar because get_sidecar_config()
+                # returns a defaulted config in dev/test (pointing at
+                # ~/.nexe/data) which is wrong when project_root is a
+                # tmp_path test fixture.
+                try:
+                    from core.sidecar_config import get_sidecar_config
+                    _sc = get_sidecar_config()
+                    if getattr(_sc, "is_sidecar", False):
+                        vectors_dir = Path(_sc.vectors_dir)
+                    else:
+                        vectors_dir = Path(project_root) / "storage" / "vectors"
+                except Exception:
+                    vectors_dir = Path(project_root) / "storage" / "vectors"
+                vectors_dir.mkdir(parents=True, exist_ok=True)
+                db_path = vectors_dir / "memory_v1.db"
+                qdrant_path = str(vectors_dir)
                 memory_service = MemoryService(db_path=db_path, qdrant_path=qdrant_path)
             else:
                 memory_service = MemoryService()
             await memory_service.initialize()
             app.state.memory_service = memory_service
-            logger.info("MemoryService v1 initialized (standalone, absolute path)")
+            logger.info(
+                "MemoryService v1 initialized (standalone, qdrant=%s)",
+                qdrant_path if project_root else "default",
+            )
 
         # DreamingCycle as independent background task
         ms = app.state.memory_service
@@ -343,17 +369,30 @@ async def start_memory_service_v1(app, server_state):
                         "DreamingCycle embedder unavailable — vector sync "
                         "will be skipped (non-fatal): %s", e,
                     )
-                dreaming = DreamingCycle(
-                    store=ms._store,
-                    vector_index=ms._vector_index,
-                    embedder=embedder,
-                )
-                server_state._dreaming_task = asyncio.create_task(dreaming.run())
-                server_state._dreaming_cycle = dreaming
-                logger.info(
-                    "DreamingCycle background task started (embedder=%s)",
-                    "ready" if embedder is not None else "missing",
-                )
+                # F5.4 Bug D fix: do NOT start DreamingCycle without an embedder.
+                # The previous code instantiated and ran the cycle anyway, which
+                # ingested memory entries to SQLite but never to Qdrant —
+                # silently breaking semantic search (RAG returned 0 results).
+                # When the user completes the wizard and the embedder is
+                # downloaded, restart_sidecar will start a new lifespan with
+                # embedder loaded and DreamingCycle will run normally.
+                if embedder is None:
+                    logger.warning(
+                        "DreamingCycle NOT started (embedder=missing). "
+                        "Semantic search disabled until the fastembed model "
+                        "is downloaded via the installer wizard (F5.4 Bug A). "
+                        "Restart the app after the wizard completes to enable "
+                        "DreamingCycle and vector sync."
+                    )
+                else:
+                    dreaming = DreamingCycle(
+                        store=ms._store,
+                        vector_index=ms._vector_index,
+                        embedder=embedder,
+                    )
+                    server_state._dreaming_task = asyncio.create_task(dreaming.run())
+                    server_state._dreaming_cycle = dreaming
+                    logger.info("DreamingCycle background task started (embedder=ready)")
             except Exception as e:
                 logger.warning("DreamingCycle not started (non-fatal): %s", e)
 

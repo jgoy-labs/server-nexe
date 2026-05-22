@@ -1,0 +1,44 @@
+# ─────────────────────────────────────────────────────────────────────
+# pip-audit ignore-list — server-nexe
+# ─────────────────────────────────────────────────────────────────────
+#
+# CVE coneguts en deps transitives crítiques (mlx-lm, mlx-vlm, torch).
+# Acceptats segons:
+#   decisions/ADR-cves-transitives-mlx-torch.md (2026-05-21)
+#   verificació empírica Turing V3 agentic 30 iter + OSV API
+#
+# Format: una línia per CVE (ignora # comentaris)
+# Ús:    pip-audit --ignore-vuln $(grep -v '^#' installer/pip-audit-ignore.txt | xargs)
+# O bé:  pip-audit $(while read -r id; do [ -n "$id" ] && [ "${id:0:1}" != "#" ] && echo "--ignore-vuln $id"; done < installer/pip-audit-ignore.txt)
+#
+# ─────────────────────────────────────────────────────────────────────
+
+# ── transformers 5.8.1 — 8 CVE (transitive via mlx-lm 0.31.2 + mlx-vlm 0.4.4)
+# Fix versions upstream: NONE (cap)
+# Vector inhabilitat: mlx-lm i mlx-vlm NO importen cap dels mòduls vulnerables;
+# els noms similars (Idefics2Perceiver*, GLM4*) són implementacions natives mlx.
+PYSEC-2025-211  # Perceiver Model Deserialization RCE — mòdul no importat per mlx
+PYSEC-2025-212  # Transformer-XL Deserialization RCE — mòdul absent del venv
+PYSEC-2025-213  # megatron_gpt2 Deserialization RCE — no importat
+PYSEC-2025-214  # SEW convert_config Code Injection — no importat
+PYSEC-2025-215  # SEW-D convert_config Code Injection — no importat
+PYSEC-2025-216  # HuBERT convert_config Code Injection — no importat
+PYSEC-2025-217  # X-CLIP Checkpoint Conversion RCE — no importat
+PYSEC-2025-218  # GLM4 (HF transformers) Deserialization RCE — mlx-lm/mlx-vlm usen implementació pròpia
+
+# ── torch 2.11.0 / 2.12.0 — 11 CVE (bundle DMG: 2.11.0; venv DEV: 2.12.0, mateixos IDs)
+# Fix versions upstream: NONE (cap)
+# Vector inhabilitat: server-nexe NO crida cap de les API vulnerables (jit.script,
+# lstm_cell, nn.utils.rnn, cuda, profiler, pt2 loading). Ús de torch limitat a
+# tensor ops via Qwen3VLVideoProcessor (image preprocessing).
+PYSEC-2025-189  # CVE-2025-2148 — torch (codepath específic CUDA, no usat)
+PYSEC-2025-190  # CVE-2025-2149 — nnq_Sigmoid (no usat)
+PYSEC-2025-191  # CVE-2025-2953 / GHSA-3749-ghw9-m3mg — torch CUDA codepath (no usat)
+PYSEC-2025-192  # CVE-2025-2998 — torch function (no usat)
+PYSEC-2025-193  # CVE-2025-2999 — torch.nn.utils.rnn (no usat)
+PYSEC-2025-194  # CVE-2025-3000 — torch.jit.script (no usat, no JIT compile d'inputs untrusted)
+PYSEC-2025-195  # CVE-2025-3001 — torch.lstm_cell (no usat)
+PYSEC-2025-196  # CVE-2025-3121 — torch.jit.jit_module_from_flatbuffer_file (no usat)
+PYSEC-2025-197  # CVE-2025-3136 — torch.cuda function (no usat, Apple Silicon = MPS)
+PYSEC-2025-210  # CVE-2025-63396 — torch.profiler.profile PythonTracer (no usat en runtime)
+PYSEC-2026-139  # CVE-2026-4538 — pt2 Loading Handler (no carreguem .pt2; safetensors only)

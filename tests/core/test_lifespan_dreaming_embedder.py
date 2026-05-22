@@ -110,6 +110,14 @@ class TestStartMemoryServiceV1PassesEmbedder:
         ):
             await start_memory_service_v1(app, server_state)
 
-        # DreamingCycle still constructed, but with embedder=None
-        assert "kwargs" in captured
-        assert captured["kwargs"].get("embedder") is None
+        # F5.4 Bug D (2026-05-19): DreamingCycle MUST NOT be constructed when
+        # the embedder is unavailable. Previously it ran with embedder=None,
+        # silently ingesting to SQLite but never to Qdrant — semantic search
+        # returned 0 results. Now the cycle is skipped entirely; the user is
+        # expected to download the embedder via the wizard (Step 3) and
+        # restart_sidecar to pick it up. See commit c10c5b9.
+        assert "kwargs" not in captured, (
+            "DreamingCycle was instantiated despite embedder=None. F5.4 Bug "
+            "D fix in core/lifespan_modules.py::start_memory_service_v1 "
+            "must skip construction when the embedder load fails."
+        )

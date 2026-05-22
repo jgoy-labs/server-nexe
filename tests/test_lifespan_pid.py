@@ -50,6 +50,21 @@ def test_write_pid_file_creates_file(project_root: Path, pid_path: Path):
     datetime.fromisoformat(data["started"])  # must be parseable
 
 
+def test_write_pid_file_fsyncs_before_close(project_root: Path, pid_path: Path):
+    """_write_pid_file calls os.fsync before close — power-cut safety."""
+    seen_fds: list[int] = []
+    real_fsync = os.fsync
+
+    def _spy(fd: int) -> None:
+        seen_fds.append(fd)
+        real_fsync(fd)
+
+    with patch("core.lifespan.os.fsync", side_effect=_spy):
+        ok = _write_pid_file(project_root, port=9119)
+    assert ok is True
+    assert seen_fds, "os.fsync must be called on the PID file fd before close"
+
+
 def test_write_pid_file_returns_false_if_live_pid(project_root: Path, pid_path: Path):
     """_write_pid_file returns False if a live server already holds the lock (B10)."""
     # First acquire
@@ -177,6 +192,88 @@ async def test_cleanup_task_cancelled_on_shutdown():
 
     assert task.done()
     assert task.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_lifespan_runs_shutdown_when_startup_cancelled():
+    """SIGTERM mid-_startup() must still run _shutdown() and re-raise the
+    CancelledError so the supervisor sees the signal rather than a clean
+    exit. The `finally` clause of `lifespan()` is responsible for this."""
+    from fastapi import FastAPI
+    from core.lifespan import lifespan
+
+    app = FastAPI()
+    shutdown_calls: list[bool] = []
+
+    async def fake_startup(_app):
+        raise asyncio.CancelledError()
+
+    async def fake_shutdown(_app):
+        shutdown_calls.append(True)
+
+    with patch("core.lifespan._startup", new=fake_startup), \
+         patch("core.lifespan._shutdown", new=fake_shutdown):
+        with pytest.raises(asyncio.CancelledError):
+            async with lifespan(app):
+                pass
+
+    assert shutdown_calls == [True], (
+        "_shutdown() must run on CancelledError mid-startup"
+    )
+
+
+@pytest.mark.asyncio
+async def test_lifespan_propagates_when_shutdown_raises_in_finally():
+    """If _shutdown itself raises during the `finally` clause, the lifespan
+    must still surface the original CancelledError to the supervisor — the
+    secondary shutdown error must not swallow it. This documents the
+    current behaviour: Python's finally re-raises the active exception
+    unless the finally itself raises, in which case the finally exception
+    wins. We assert exactly that contract so a future refactor does not
+    silently change which exception the caller sees."""
+    from fastapi import FastAPI
+    from core.lifespan import lifespan
+
+    app = FastAPI()
+
+    async def fake_startup(_app):
+        raise asyncio.CancelledError()
+
+    async def fake_shutdown_that_raises(_app):
+        raise RuntimeError("shutdown explosion")
+
+    with patch("core.lifespan._startup", new=fake_startup), \
+         patch("core.lifespan._shutdown", new=fake_shutdown_that_raises):
+        with pytest.raises(RuntimeError, match="shutdown explosion"):
+            async with lifespan(app):
+                pass
+
+
+@pytest.mark.asyncio
+async def test_lifespan_shutdown_runs_when_yield_body_raises():
+    """If the body inside `async with lifespan(app):` raises, the finally
+    must still run _shutdown so resources are released. This covers the
+    happy-path yield exception (e.g. a HTTP handler raising during a
+    request) as opposed to the CancelledError case above."""
+    from fastapi import FastAPI
+    from core.lifespan import lifespan
+
+    app = FastAPI()
+    shutdown_calls: list[bool] = []
+
+    async def fake_startup(_app):
+        return None
+
+    async def fake_shutdown(_app):
+        shutdown_calls.append(True)
+
+    with patch("core.lifespan._startup", new=fake_startup), \
+         patch("core.lifespan._shutdown", new=fake_shutdown):
+        with pytest.raises(RuntimeError, match="body explosion"):
+            async with lifespan(app):
+                raise RuntimeError("body explosion")
+
+    assert shutdown_calls == [True]
 
 
 @pytest.mark.asyncio

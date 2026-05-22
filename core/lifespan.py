@@ -138,6 +138,11 @@ def _write_pid_file(project_root: Path, port: int) -> bool:
       fd = os.open(str(pid_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
       try:
         os.write(fd, content)
+        # fsync before close so a power cut between this point and the
+        # next boot does not leave a zero-byte PID file behind (the
+        # FileExistsError branch above would then treat the orphan as a
+        # live lock and refuse to start).
+        os.fsync(fd)
       finally:
         os.close(fd)
       logger.debug("PID file written: %s (PID %s)", pid_path, os.getpid())
@@ -219,6 +224,9 @@ class ServerState:
     self._session_cleanup_task: Optional[asyncio.Task[Any]] = None
     self._knowledge_ingest_task: Optional[asyncio.Task[Any]] = None
     self.knowledge_ingest_complete: bool = False
+    # F5.6 Bloc 2 (F01): flag set per _startup_init. Si False, _startup fa
+    # early return abans de _startup_services + _startup_phases_and_tokens.
+    self.has_onboarding: bool = False
     self.configure_modules_callback: Optional[Callable[..., None]] = None
 
 server_state = ServerState()
@@ -266,6 +274,42 @@ async def _startup_init(app: FastAPI) -> None:
     logger.info("=" * 70)
     logger.info("LIFESPAN STARTUP TRIGGERED")
     logger.info("=" * 70)
+
+    # F5.3.1 — apply persisted onboarding state to env vars BEFORE any plugin
+    # initialization (MLXConfig, LlamaCppConfig and routes_chat read these at
+    # import / module-load time). If the user has not yet completed the wizard
+    # the file does not exist and we fall through using compiled-in defaults.
+    from core.onboarding_state import OnboardingState
+    _onboarding = OnboardingState.load()
+    if _onboarding is not None:
+        _onboarding.apply_to_env()
+        logger.info(
+            "onboarding_state: applied (engine=%s model=%s)",
+            _onboarding.engine, _onboarding.model_id,
+        )
+    else:
+        logger.info("onboarding_state: not completed — using defaults")
+    # F5.6 Bloc 2 (F01): flag llegit per _startup per decidir si arrencar
+    # els subsistemes complets (memory, plugins, fastembed) o quedar-se
+    # en minimal_mode (només /installer/*, /health/*).
+    server_state.has_onboarding = _onboarding is not None
+
+    # F5.6 Bloc 8: defensa runtime. hf_xet ha d'estar desactivat (la Tauri
+    # Rust launcher seteja HF_HUB_DISABLE_XET=1 abans del spawn Python). Si
+    # arribem aquí amb xet actiu, sabem que les descàrregues de models grans
+    # es penjaran silenciosament — millor avisar fort i ben aviat. Empíric
+    # 2026-05-20 + GitHub issue huggingface_hub#3266.
+    try:
+        from huggingface_hub.constants import HF_HUB_DISABLE_XET
+        from core.endpoints.installer_progress import is_xet_active
+        if not HF_HUB_DISABLE_XET and is_xet_active():
+            logger.warning(
+                "hf_xet active at startup — model downloads WILL stall. "
+                "The sidecar launcher must set HF_HUB_DISABLE_XET=1 BEFORE "
+                "spawning the Python process (env vars are read at import)."
+            )
+    except Exception as exc:  # noqa: BLE001 — defensive only
+        logger.debug("hf_xet defence check skipped: %s", exc)
 
     msg = _translate(server_state.i18n, "core.server.banner", "Nexe 0.9 - Modular AI System")
     logger.info(msg)
@@ -435,6 +479,29 @@ def _startup_final_banner() -> None:
 async def _startup(app: FastAPI) -> None:
     """Startup orchestrator: delegates each phase to its helper."""
     await _startup_init(app)
+
+    # F5.6 Bloc 2 (F01): si OnboardingState no existeix, NO arrenquem els
+    # subsistemes que depenen del model triat (memory, plugins, fastembed,
+    # auto_start_services, module_discovery). Els endpoints /installer/*,
+    # /health/* i /admin/system/* segueixen accessibles (registrats abans
+    # del lifespan). Quan l'usuari completi el wizard, OnboardingState es
+    # persisteix (POST /installer/finalize → save() atòmic) i Tauri reinicia
+    # el sidecar (invoke restart_sidecar); al next startup aquest check
+    # passarà i tot s'arrencarà normal.
+    # Resol bugs F5.4 A (fastembed silent), B (MLXConfig fallback NEXE_HOME),
+    # D (DreamingCycle embedder=missing cascade) a first boot.
+    # Validat amb Turing R1 agentic 2026-05-20 (21 iters, 1.36M tokens).
+    if not server_state.has_onboarding:
+        app.state.minimal_mode = True
+        logger.info("=" * 70)
+        logger.info("  SERVER.NEXE MINIMAL MODE")
+        logger.info("  Onboarding not completed — skipping subsystems")
+        logger.info("  Active: /installer/*, /health/*, /admin/system/*")
+        logger.info("  Inactive: /modules, /v1/chat (require API key + engine)")
+        logger.info("=" * 70)
+        return
+
+    app.state.minimal_mode = False
     await _startup_services(app)
     await _startup_phases_and_tokens(app)
     _startup_final_banner()
@@ -514,6 +581,14 @@ async def lifespan(app: FastAPI):
   try:
     await _startup(app)
     yield
+  except asyncio.CancelledError:
+    # SIGTERM (or any external cancel) reached us mid-startup or mid-serve.
+    # The `finally` below runs `_shutdown(app)` which is responsible for
+    # tearing down whatever managed to start; logging the cancellation here
+    # surfaces it clearly in the boot log (otherwise it would be lost to
+    # the bare-Exception handler below, which does not catch BaseException).
+    logger.warning("lifespan: cancelled, running shutdown then re-raising")
+    raise
   except Exception as e:
     msg = _translate(server_state.i18n, "core.server.critical_error",
       "Critical system error: {error}", error=str(e))

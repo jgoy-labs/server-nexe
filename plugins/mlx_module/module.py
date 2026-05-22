@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import asyncio
 import logging
-from typing import Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter
 from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
@@ -26,11 +26,22 @@ class MLXModule:
     Implements the NexeModule Protocol for Apple Silicon.
     """
 
-    def __init__(self):
-        self._node = None
+    def __init__(self) -> None:
+        self._node: Optional[MLXChatNode] = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
         self._router = None
+        # F5.4 Bug B fix: lifecycle state for /status and health_check.
+        # "uninitialized"  → before initialize() runs
+        # "ready"          → model loaded and chat-capable
+        # "not_configured" → NEXE_MLX_MODEL unset, server.toml empty, no auto-
+        #                    discovered model. Plugin stays at registry so
+        #                    restart_sidecar (F5.3.1) can re-activate it after
+        #                    the wizard completes.
+        # "no_metal"       → Metal/Apple Silicon not available (catastrophic
+        #                    on the local box, plugin should be popped).
+        # "error"          → unexpected exception during init.
+        self._state: str = "uninitialized"
 
     @property
     def metadata(self) -> ModuleMetadata:
@@ -58,23 +69,50 @@ class MLXModule:
             if not MLXConfig.is_metal_available():
                 logger.error("MLXModule: Metal is not available. Cannot initialize MLX.")
                 logger.info("To use MLX: Ensure you're running on Apple Silicon with Metal support")
-                return False
+                self._state = "no_metal"
+                return False  # catastrophic — loader will pop from registry
 
             try:
                 mlx_config = MLXConfig.from_env()
 
+                # F5.4 Bug B fix: distinguish "no model configured" (recoverable
+                # via restart_sidecar after wizard) from real validation failure
+                # (path set but broken). Empty path is the wizard-not-done case.
+                if not mlx_config.model_path:
+                    logger.info(
+                        "MLXModule: no model configured (NEXE_MLX_MODEL unset, "
+                        "server.toml empty, auto-discover found nothing). "
+                        "Plugin stays at registry with state=not_configured; "
+                        "restart_sidecar will re-activate it after the wizard "
+                        "completes."
+                    )
+                    self._state = "not_configured"
+                    self._node = None  # do NOT create MLXChatNode with empty config
+                    self._initialized = False
+                    return True  # keep plugin at registry — see lifespan_modules.py
+
                 if not mlx_config.validate():
-                    logger.error("MLXModule: Configuration invalid. Check NEXE_MLX_MODEL.")
+                    logger.error(
+                        "MLXModule: Configuration invalid for model_path=%s. "
+                        "Check NEXE_MLX_MODEL.",
+                        mlx_config.model_path,
+                    )
                     logger.info("Expected: NEXE_MLX_MODEL should point to a valid MLX model directory")
-                    return False
+                    self._state = "error"
+                    return False  # path set but broken — loader pops
 
                 self._node = MLXChatNode(config=mlx_config)
                 self._initialized = True
+                self._state = "ready"
 
-                logger.info("MLXModule initialized successfully")
+                logger.info(
+                    "MLXModule initialized successfully (model=%s)",
+                    mlx_config.model_path,
+                )
                 return True
             except Exception as e:
                 logger.error(f"Failed to initialize MLXModule: {e}")
+                self._state = "error"
                 return False
 
     def _init_router(self):
@@ -120,8 +158,21 @@ class MLXModule:
 
     async def health_check(self) -> HealthResult:
         """Check MLX module health by querying the inference pool stats."""
+        # F5.4 Bug B fix: report not_configured explicitly so /status is
+        # actionable (UI can show "Run wizard to install a model") instead
+        # of the generic "Module not initialized".
+        if self._state == "not_configured":
+            return HealthResult(
+                status=HealthStatus.UNKNOWN,
+                message="not_configured: NEXE_MLX_MODEL unset, no MLX model auto-discovered",
+                details={"state": self._state},
+            )
         if not self._initialized or self._node is None:
-            return HealthResult(status=HealthStatus.UNKNOWN, message="Module not initialized")
+            return HealthResult(
+                status=HealthStatus.UNKNOWN,
+                message="Module not initialized",
+                details={"state": self._state},
+            )
 
         try:
             stats = self._node.get_pool_stats()

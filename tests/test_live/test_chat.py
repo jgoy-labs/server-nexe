@@ -40,6 +40,8 @@ def _extract_text(data: dict) -> str:
 class TestChatOllama:
     """Ollama backend — basic chat, streaming, error cases."""
 
+    pytestmark = pytest.mark.slow  # Bug #4 (2026-05-21): each call ~8-10s, schedule last
+
     def test_ollama_basic(
         self,
         client: httpx.Client,
@@ -55,12 +57,17 @@ class TestChatOllama:
         assert r.status_code == 200, f"Ollama basic chat: {r.status_code} {r.text[:400]}"
         assert len(_extract_text(r.json())) > 0, f"Empty response: {r.json()}"
 
-    def test_ollama_stream_done_marker(
+    def test_ollama_stream_no_done_sentinel(
         self,
         client: httpx.Client,
         auth_headers: dict[str, str],
         smallest_ollama_model: str,
     ) -> None:
+        """Bug A regression (2026-05-21): /ui/chat is text/plain, not SSE.
+        The frontend detects end-of-stream via reader.read() returning
+        {done:true}, so the backend must NOT emit a literal 'data: [DONE]'
+        (it would render as text in the chat bubble).
+        """
         with client.stream(
             "POST",
             "/ui/chat",
@@ -70,8 +77,9 @@ class TestChatOllama:
         ) as r:
             assert r.status_code == 200, f"Stream returned {r.status_code}"
             raw = r.read().decode("utf-8", errors="replace")
-        assert "[DONE]" in raw or "data: [DONE]" in raw, (
-            f"[DONE] not found in stream. First 500 chars: {raw[:500]}"
+        assert "data: [DONE]" not in raw, (
+            f"Bug A regression: 'data: [DONE]' literal leaked to client. "
+            f"Last 500 chars: {raw[-500:]}"
         )
 
     @pytest.mark.xfail(
@@ -173,8 +181,9 @@ class TestChatMLX:
         ) as r:
             assert r.status_code == 200
             raw = r.read().decode("utf-8", errors="replace")
-        assert "[DONE]" in raw or "data: [DONE]" in raw, (
-            f"[DONE] not found in MLX stream. First 500: {raw[:500]}"
+        assert "data: [DONE]" not in raw, (
+            f"Bug A regression (MLX): 'data: [DONE]' literal leaked to client. "
+            f"Last 500: {raw[-500:]}"
         )
 
 
@@ -219,7 +228,10 @@ class TestChatLlamaCpp:
         ) as r:
             assert r.status_code == 200
             raw = r.read().decode("utf-8", errors="replace")
-        assert "[DONE]" in raw or "data: [DONE]" in raw
+        assert "data: [DONE]" not in raw, (
+            f"Bug A regression (llama.cpp): 'data: [DONE]' literal leaked. "
+            f"Last 500: {raw[-500:]}"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -228,6 +240,8 @@ class TestChatLlamaCpp:
 
 class TestChatMEMSAVE:
     """Verify that the chat pipeline saves memories when the user asks."""
+
+    pytestmark = pytest.mark.slow  # Bug #4 (2026-05-21): Ollama-backed, schedule last
 
     def test_mem_save_via_chat_and_retrieve(
         self,

@@ -89,3 +89,34 @@ def test_close_logs_warning_on_flush_failure(caplog):
     assert any(
         "flush" in rec.message.lower() for rec in caplog.records
     )
+
+
+# Bug #5 (factoria 2026-05-21): sentinel anti-regression that the close+reopen
+# cycle on the same path within a single process does not leave the lock held.
+# Note: this does NOT reproduce the multi-process race (which is what the
+# real bug is about) — for that we'd need `multiprocessing` (fragile across
+# pytest + macOS spawn). Instead this guards that the productor side
+# (`close_qdrant_client` -> `QdrantLocal.close`) does release the POSIX
+# flock cleanly within a single Python process. Combined with the
+# `_startup_qdrant` retry-with-backoff in core/lifespan_qdrant.py, real
+# multi-process restarts are now resilient to the ~ms-scale FD-release
+# lag.
+def test_close_and_reopen_same_path_releases_lock(tmp_path):
+    """Closing the pool releases the .lock so the same path can be reopened."""
+    from qdrant_client import QdrantClient
+
+    path = str(tmp_path / "qdrant-cycle")
+    # First open: takes the lock
+    pool._instances.clear()
+    c1 = QdrantClient(path=path)
+    pool._instances[f"path:{path}"] = c1
+
+    # Close releases the POSIX flock + closes the FD
+    pool.close_qdrant_client()
+    assert pool._instances == {}
+
+    # Reopen at the same path within the same process must NOT raise
+    # RuntimeError("Storage folder ... is already accessed").
+    c2 = QdrantClient(path=path)
+    pool._instances[f"path:{path}"] = c2
+    pool.close_qdrant_client()

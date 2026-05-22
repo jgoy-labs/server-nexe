@@ -139,6 +139,20 @@ async def readiness_check(request: Request) -> dict:
 
   Verifies that the required modules are loaded and healthy.
   """
+  # F5.6 Bloc 6c (fix end-to-end): en minimal_mode (Bloc 2, pre-onboarding)
+  # els mòduls rag/security/web_ui_module NO s'arrenquen per disseny. El
+  # sidecar SÍ està ready per al que ofereix (endpoints /installer/* per al
+  # wizard). Retornar "healthy" perquè el readinessOverlay del frontend
+  # (public/ui/static/app.js:723) desaparegui i el wizard pugui renderitzar-se.
+  # Sense aquest fix, l'app es queda penjada a "Starting..." perquè el
+  # frontend polleja /health/ready cada 3s i bloca la UI fins a "healthy".
+  if bool(getattr(request.app.state, "minimal_mode", False)):
+    return {
+      "status": "healthy",
+      "minimal_mode": True,
+      "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
   config = getattr(request.app.state, "config", {}) or {}
   modules = getattr(request.app.state, "modules", {}) or {}
 
@@ -292,6 +306,10 @@ async def server_status(
   elif env_engine == "llama_cpp" and not llama_cpp_available:
     actual_engine = "ollama"
 
+  # F5.6 Bloc 5 (R2 Turing): expose minimal_mode flag perquè el frontend
+  # sàpiga si el sidecar està en mode reduït pre-onboarding. NO canviem
+  # el format existent (web UI depèn dels camps actuals); afegim camp
+  # opcional. Validat amb Turing R1 agentic 2026-05-20.
   return {
     "engine": actual_engine,
     "configured_engine": env_engine,
@@ -304,6 +322,7 @@ async def server_status(
     },
     "qdrant_available": getattr(request.app.state, "qdrant_available", False) if hasattr(request.app.state, "qdrant_available") else _get_qdrant_status(),
     "timestamp": datetime.now(timezone.utc).isoformat(),
+    "minimal_mode": bool(getattr(request.app.state, "minimal_mode", False)),
   }
 
 @router.get("/health/circuits", summary="Circuit breaker status (Ollama, Qdrant, external HTTP) (API key required)", response_model=dict, operation_id="circuit_status")

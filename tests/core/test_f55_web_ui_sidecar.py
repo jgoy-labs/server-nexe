@@ -1,14 +1,18 @@
-"""F5.5 — Tests TDD per a web_ui_module enabled in sidecar (JSON only).
+"""F5.5 (revertit 2026-05-21) — web_ui_module sempre serveix UI completa.
 
 Substitueix `test_f25_stubs_sidecar.py` (eliminat). La decisió F2.5 era massa
-agressiva: desactivava web_ui_module sencer en sidecar, però la UI Tauri
-necessita els endpoints JSON (/ui/info, /ui/backends, /ui/sessions, etc.).
+agressiva: desactivava web_ui_module sencer en sidecar. F5.5 va corregir
+això mantenint els JSON endpoints en sidecar, però va saltar les rutes
+HTML/static i va delegar el servei UI a una còpia local a Tauri
+(`nexe-app/public/ui/`). Aquella còpia va quedar stale ràpidament
+(fix S5 21/05 mai va arribar al bundle) — DMG mostrava `{{NEXE_VERSION}}`
+literal i selector d'idioma desincronitzat.
 
-F5.5 corregeix:
-  1. manifest `disabled_in_sidecar=false` — el plugin viu en sidecar mode
-  2. `routes.py` salta condicionalment `register_static_routes()` (HTML/CSS/JS)
-     quan `get_sidecar_config().is_sidecar=True` — la UI HTML la serveix Tauri
-  3. JSON endpoints (/ui/info, /ui/backends, ...) sempre registrats
+Aquesta reversió (2026-05-21 vespre) restableix el comportament històric:
+  1. manifest `disabled_in_sidecar=false` — sense canvi
+  2. `routes.py` registra `register_static_routes()` SEMPRE — la UI Tauri
+     navega a `http://127.0.0.1:{port}/` un cop el sidecar està ready
+  3. JSON endpoints continuen sempre registrats
 
 Run: pytest tests/core/test_f55_web_ui_sidecar.py --no-cov -q -p no:randomly
 """
@@ -103,37 +107,37 @@ def _collect_router_paths(router) -> list[str]:
     return [r.path for r in router.routes if hasattr(r, "path")]
 
 
-def test_router_excludes_html_routes_in_sidecar(sidecar_env, monkeypatch):
-    """F5.5 — en sidecar mode, `create_router()` NO ha de registrar `/ui/` (HTML)
-    ni `/ui/static/{path}`. Sí ha de registrar els JSON endpoints.
+def test_router_includes_html_routes_in_sidecar(sidecar_env, monkeypatch):
+    """F5.5 revertit — en sidecar mode, `create_router()` SÍ ha de registrar
+    `/ui/` (HTML) i `/ui/static/{path}`, igual que en standalone.
+
+    El DMG navega el webview Tauri a http://127.0.0.1:{port}/ un cop el
+    sidecar està ready, i `serve_ui` aplica les substitucions server-side
+    (NEXE_VERSION, data-nexe-lang). Sentinel anti-regressió: si algú torna
+    a saltar `register_static_routes` en sidecar, el bundle DMG tornarà a
+    mostrar `{{NEXE_VERSION}}` literal i strings stale.
     """
-    # Bypass del `disabled_in_sidecar` check (que retornaria False ja per
-    # manifest, però la inicialització necessita context complet — saltem-la).
     from plugins.web_ui_module.module import WebUIModule
     from plugins.web_ui_module.api.routes import create_router
 
     mod = WebUIModule()
-    # Crida directa a create_router (no calen initialize completes — el
-    # _SessionManagerProxy es resol on-demand).
     router = create_router(mod)
     paths = _collect_router_paths(router)
-    # HTML/static routes no han de ser registrades en sidecar mode.
-    assert "/ui/" not in paths, (
-        f"F5.5: ruta HTML /ui/ no hauria de registrar-se en sidecar. paths={paths}"
+    assert "/ui/" in paths, (
+        f"F5.5 revertit: ruta HTML /ui/ ha de registrar-se en sidecar. paths={paths}"
     )
-    assert not any(p.startswith("/ui/static") for p in paths), (
-        f"F5.5: rutes /ui/static/* no haurien de registrar-se en sidecar. paths={paths}"
+    assert any(p.startswith("/ui/static") for p in paths), (
+        f"F5.5 revertit: rutes /ui/static/* han de registrar-se en sidecar. paths={paths}"
     )
-    # JSON endpoints clau SÍ han d'estar (la UI Tauri els consumeix).
-    assert "/ui/info" in paths, f"F5.5: /ui/info absent en sidecar. paths={paths}"
-    assert "/ui/backends" in paths, f"F5.5: /ui/backends absent en sidecar. paths={paths}"
+    assert "/ui/info" in paths, f"/ui/info absent en sidecar. paths={paths}"
+    assert "/ui/backends" in paths, f"/ui/backends absent en sidecar. paths={paths}"
 
 
 def test_router_includes_html_routes_in_standalone(clean_sidecar_env, monkeypatch):
-    """F5.5 — en mode standalone (no sidecar), HTML/static SÍ es registren.
+    """Standalone mode (no sidecar) — HTML/static + JSON endpoints registrats.
 
-    Garantia que el split és condicional, no destructiu — el comportament
-    històric (servir la UI completa) es preserva en standalone.
+    El comportament és idèntic al de sidecar: la UI sencera disponible al
+    sidecar HTTP. La diferència entre modes ja no afecta el router.
     """
     from plugins.web_ui_module.module import WebUIModule
     from plugins.web_ui_module.api.routes import create_router
@@ -141,13 +145,11 @@ def test_router_includes_html_routes_in_standalone(clean_sidecar_env, monkeypatc
     mod = WebUIModule()
     router = create_router(mod)
     paths = _collect_router_paths(router)
-    # En standalone mode HTML/static SÍ es registren (`/` amb prefix `/ui` = `/ui/`).
     assert "/ui/" in paths, (
-        f"F5.5: ruta HTML /ui/ (root index.html) ha de registrar-se en standalone. paths={paths}"
+        f"ruta HTML /ui/ (root index.html) ha de registrar-se en standalone. paths={paths}"
     )
     assert any(p.startswith("/ui/static") for p in paths), (
-        f"F5.5: rutes /ui/static/* haurien d'estar en standalone. paths={paths}"
+        f"rutes /ui/static/* haurien d'estar en standalone. paths={paths}"
     )
-    # JSON endpoints també.
     assert "/ui/info" in paths
     assert "/ui/backends" in paths

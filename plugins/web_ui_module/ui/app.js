@@ -68,6 +68,8 @@ const UI_STRINGS = {
         model_label: "Model",
         starting: "Iniciant...",
         support_link: "Suport",
+        footer_copyright: "© 2026 Barcelona",
+        footer_docs: "Documentació",
         rag_filter_label: "Filtre RAG",
         col_warning_prefix: "⚠ Desactivat: ",
         col_warning_suffix: ". Desmarca per reactivar.",
@@ -163,6 +165,8 @@ const UI_STRINGS = {
         model_label: "Model",
         starting: "Starting...",
         support_link: "Support",
+        footer_copyright: "© 2026 Barcelona",
+        footer_docs: "Docs",
         rag_filter_label: "RAG Filter",
         col_warning_prefix: "⚠ Disabled: ",
         col_warning_suffix: ". Uncheck to re-enable.",
@@ -258,6 +262,8 @@ const UI_STRINGS = {
         model_label: "Modelo",
         starting: "Iniciando...",
         support_link: "Soporte",
+        footer_copyright: "© 2026 Barcelona",
+        footer_docs: "Documentación",
         rag_filter_label: "Filtro RAG",
         col_warning_prefix: "⚠ Desactivado: ",
         col_warning_suffix: ". Desmarca para reactivar.",
@@ -296,11 +302,26 @@ const UI_STRINGS = {
 class NexeUI {
     constructor() {
         this.apiKey = localStorage.getItem('nexe_api_key') || null;
+        // Cross-origin handoff: when Tauri navigates the webview to
+        // http://127.0.0.1:{port}/?nexe_api_key=K (post-F5.5 revert), the
+        // splash's localStorage at tauri://localhost is not visible here.
+        // Persist the key into the sidecar-origin localStorage and scrub
+        // the URL so the secret doesn't linger in history. No-op when the
+        // query param is absent (standalone browser / manual login flow).
+        const _qsApiKey = new URLSearchParams(window.location.search).get('nexe_api_key');
+        if (_qsApiKey) {
+            localStorage.setItem('nexe_api_key', _qsApiKey);
+            this.apiKey = _qsApiKey;
+            const _clean = new URL(window.location.href);
+            _clean.searchParams.delete('nexe_api_key');
+            window.history.replaceState(null, '', _clean.toString());
+        }
         // Language: server (injected data-attr) > html lang > browser > english
         const serverLang = document.documentElement.dataset.nexeLang || document.documentElement.lang;
         const browserLang = (navigator.language || 'en').split('-')[0];
         const preferredLang = serverLang || browserLang;
         this.lang = UI_STRINGS[preferredLang] ? preferredLang : 'en';
+        this.version = null;
         this.currentSessionId = null;
         this.uploadedFile = null;
         this.sessions = [];
@@ -421,6 +442,17 @@ class NexeUI {
             if (heartIcon) supportLink.appendChild(heartIcon);
             supportLink.append(' ' + this.t('support_link'));
         }
+        // Footer copyright (with persisted version). this.version is null
+        // until loadServerInfo() succeeds; we then render without "vX.Y" and
+        // re-apply once the version arrives.
+        const footerText = document.querySelector('.footer-text');
+        if (footerText) {
+            const versionSuffix = this.version ? ` v${this.version}` : '';
+            footerText.textContent = this.t('footer_copyright') + versionSuffix;
+        }
+        // Footer docs link
+        const docsLink = document.querySelector('[data-i18n="footer_docs"]');
+        if (docsLink) docsLink.textContent = this.t('footer_docs');
         // HTML lang
         document.documentElement.lang = this.lang;
         // Re-render Lucide icons
@@ -979,10 +1011,12 @@ class NexeUI {
                     if (ls) ls.value = data.lang;
                     this.applyI18n();
                 }
-                // Inject version into footer
+                // Persist the version on the instance so applyI18n() can
+                // render the footer copyright in any language without losing
+                // the version suffix. Re-apply once after the value lands.
                 if (data.version) {
-                    const ft = document.querySelector('.footer-text');
-                    if (ft) ft.textContent = ft.textContent.replace('{{NEXE_VERSION}}', 'v' + data.version);
+                    this.version = data.version;
+                    this.applyI18n();
                 }
                 const el = document.getElementById('modelInfoText');
                 if (el) {

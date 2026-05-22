@@ -76,6 +76,11 @@ def generate_env_file(project_root, model_config=None):
                 f.write("NEXE_SQLITE_PRELOAD_TIMEOUT=10.0\n")
                 f.write("NEXE_OLLAMA_HEALTH_TIMEOUT=5.0\n")
                 f.write("NEXE_OLLAMA_UNLOAD_TIMEOUT=10.0\n")
+                # fsync before rename so a power cut cannot leave a
+                # zero-byte .env behind (the api_key would be lost and the
+                # next boot would either fail or generate a fresh key).
+                f.flush()
+                os.fsync(f.fileno())
             env_tmp.rename(env_file)
         except Exception:
             env_tmp.unlink(missing_ok=True)
@@ -242,6 +247,10 @@ def _atomic_write_env(env_file, new_lines):
     try:
         with open(env_tmp, 'w') as f:
             f.writelines(new_lines)
+            # fsync before rename so a crash here cannot leave a zero-byte
+            # .env. See _generate_env_file() for the same defence.
+            f.flush()
+            _os.fsync(f.fileno())
         env_tmp.rename(env_file)
     except Exception:
         env_tmp.unlink(missing_ok=True)

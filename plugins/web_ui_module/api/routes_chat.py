@@ -1225,6 +1225,57 @@ def _build_document_context(attached_doc: dict) -> tuple[str, int, int]:
     return document_context, shown, total_chunks
 
 
+# Bug B iter-2 (2026-05-21 nit): natural-language date phrase localised
+# to the user's language. Replaces the iter-1 "Now: Thursday 2026-05-21
+# ..." technical header, which small MLX models (Qwen3-4B-4bit empirically
+# returned date -1 and omitted the weekday) interpreted as metadata rather
+# than a fact to copy. A natural conversational phrase is much more likely
+# to be reproduced verbatim by the model. Hardcoded maps (no setlocale)
+# keep this thread-safe under asyncio interleaving.
+_WEEKDAYS_BY_LANG: dict[str, list[str]] = {
+    "ca": ["dilluns", "dimarts", "dimecres", "dijous", "divendres", "dissabte", "diumenge"],
+    "es": ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"],
+    "en": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+}
+_MONTHS_BY_LANG: dict[str, list[str]] = {
+    # Index 0 is an empty sentinel — datetime.month is 1..12.
+    "ca": ["", "gener", "febrer", "març", "abril", "maig", "juny",
+           "juliol", "agost", "setembre", "octubre", "novembre", "desembre"],
+    "es": ["", "enero", "febrero", "marzo", "abril", "mayo", "junio",
+           "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
+    "en": ["", "January", "February", "March", "April", "May", "June",
+           "July", "August", "September", "October", "November", "December"],
+}
+_DATE_PHRASE_BY_LANG: dict[str, str] = {
+    "ca": "Avui és {dow}, {day} de {month} de {year}, a les {hms} {tz}.",
+    "es": "Hoy es {dow}, {day} de {month} de {year}, a las {hms} {tz}.",
+    "en": "Today is {dow}, {month} {day}, {year}, at {hms} {tz}.",
+}
+
+
+def _format_now_natural(_now, _lang: str) -> str:
+    """Build a natural-language date phrase in the user's language.
+
+    Normalises BCP-47 variants (``ca-ES`` → ``ca``, ``en-US`` → ``en``) to
+    match how the rest of the chat pipeline resolves language. Unknown
+    languages fall back to English. ``_now`` must be a timezone-aware
+    ``datetime`` (caller already does ``.astimezone()``).
+    """
+    base = _lang.split("-")[0].lower() if _lang else "en"
+    if base not in _DATE_PHRASE_BY_LANG:
+        base = "en"
+    dow = _WEEKDAYS_BY_LANG[base][_now.weekday()]
+    month = _MONTHS_BY_LANG[base][_now.month]
+    return _DATE_PHRASE_BY_LANG[base].format(
+        dow=dow,
+        day=_now.day,
+        month=month,
+        year=_now.year,
+        hms=_now.strftime("%H:%M:%S"),
+        tz=_now.strftime("%Z"),
+    )
+
+
 def _build_system_prompt_with_time() -> tuple[str, str]:
     """Read system prompt from server.toml and inject current datetime.
 
@@ -1242,7 +1293,7 @@ def _build_system_prompt_with_time() -> tuple[str, str]:
         base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
     from datetime import datetime as _dt
     _now = _dt.now().astimezone()
-    system_prompt = base_system_prompt + f"\n\nNow: {_now.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+    system_prompt = base_system_prompt + "\n\n" + _format_now_natural(_now, _lang)
     return system_prompt, _lang
 
 
@@ -1447,8 +1498,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
         _disconnect_monitor_task = asyncio.create_task(_monitor_disconnect())
         # When we return a StreamingResponse, ownership of the monitor task
-        # transfers to response_generator (which cancels it after yielding
-        # [DONE]). The non-streaming path cancels it from the finally block.
+        # transfers to response_generator (which cancels it after the
+        # generator finishes). The non-streaming path cancels it from the
+        # finally block.
         # The flag prevents premature cancel between `return StreamingResponse`
         # and the first client read.
         _returning_stream = False
@@ -1796,11 +1848,6 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 session.add_message("assistant", clean_response, stats=_stats)
                                 session_mgr._save_session_to_disk(session)
 
-                            # Always close the SSE stream with [DONE] after all
-                            # post-processing (MEM_SAVE, session save, etc.) is complete.
-                            # The engine emits its own [DONE] but it is consumed by the
-                            # pipeline and never forwarded to the client.
-                            yield "data: [DONE]\n\n"
                             # Stream finished cleanly — release the disconnect
                             # monitor so it doesn't keep polling forever.
                             if not _disconnect_monitor_task.done():

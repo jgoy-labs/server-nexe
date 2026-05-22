@@ -9,10 +9,12 @@ www.jgoy.net · https://server-nexe.org
 ------------------------------------
 """
 
+import functools
 import hashlib
 import json
 import logging
 import sqlite3
+import threading
 import uuid
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -36,6 +38,27 @@ def _validate_table(table: str) -> str:
     return table
 
 
+def _with_lock(method):
+    """Serialise calls on ``self._lock`` so the cached sqlite3.Connection is
+    not used concurrently from multiple threads. The lock is reentrant, so a
+    method that already holds it can safely call into another decorated
+    method (e.g. ``_init_db`` -> ``_connect``).
+
+    Performance note: this serialises both writes AND reads. SQLite WAL mode
+    would normally allow concurrent reads on separate connections, but the
+    cached single connection cannot be used from multiple threads without
+    Python-level synchronisation regardless of the underlying DB engine. For
+    server-nexe (mono-usuari local) the throughput cost is negligible. If a
+    future multi-user fork needs concurrent reads it should either switch
+    to per-call connections (option B in the audit) or to a read-write
+    lock (e.g. ``readerwriterlock.rwlock``)."""
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return wrapper
+
+
 class SQLiteStore:
     """
     SQLite storage backend for the memory system.
@@ -49,50 +72,47 @@ class SQLiteStore:
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn: Optional[sqlite3.Connection] = None
+        # Reentrant so that an operation can call _connect() under the lock
+        # and then call into a helper that also takes the lock without
+        # deadlocking. The lock serialises writers (which SQLite already
+        # forces single-writer anyway) and protects the cached connection
+        # so that concurrent threads do not race on the ``self._conn is None``
+        # check or interleave SELECT/INSERT pairs in upsert_profile.
+        self._lock = threading.RLock()
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
         """Get or create connection.
 
+        Thread-safe: the cached connection is opened with
+        ``check_same_thread=False`` and all public methods serialise on
+        ``self._lock`` (an RLock), so a single ``sqlite3.Connection`` can
+        be shared safely across asyncio worker threads.
+
         DreamingCycle (and any other caller) closes the connection it obtains
-        here after each operation.  When that happens self._conn still holds a
-        reference to the now-closed sqlite3.Connection object, so the
-        ``if self._conn is None`` guard would return the stale closed
-        connection on the next call, raising "Cannot operate on a closed
-        database."
-
-        We detect this by attempting a lightweight no-op against the
-        connection.  On failure we discard it and create a fresh one.
-
-        ⚠️ THREAD-SAFETY WARNING: this connection is created without
-        ``check_same_thread=False`` and is cached in ``self._conn``. Any
-        caller that offloads work via ``asyncio.to_thread`` /
-        ``run_in_executor`` MUST either (a) create its own connection
-        inside the worker (see engines/persistence_sqlite.py which uses
-        a per-call ``with self._connect_sqlite() as conn``), or (b)
-        avoid calling ``_connect()`` from the worker thread. Crossing
-        threads on the cached connection raises
-        ``sqlite3.ProgrammingError: SQLite objects created in a thread
-        can only be used in that same thread`` — which, if the caller
-        swallows exceptions (as GCDaemon.run_gc does), silently turns
-        the whole code path into a no-op. See
-        ``memory/workers/gc_daemon.run_gc_for_active_users`` for the
-        canonical "run synchronously on the loop thread" pattern.
+        here after each operation. When that happens ``self._conn`` still
+        holds a reference to the now-closed object, so the ``is None`` guard
+        would return the stale connection. We detect this by attempting a
+        lightweight no-op and discarding on failure.
         """
-        if self._conn is not None:
-            try:
-                self._conn.execute("SELECT 1")
-            except Exception:
-                # Connection is closed or broken — discard and reconnect.
-                self._conn = None
+        with self._lock:
+            if self._conn is not None:
+                try:
+                    self._conn.execute("SELECT 1")
+                except Exception:
+                    # Connection is closed or broken — discard and reconnect.
+                    self._conn = None
 
-        if self._conn is None:
-            self._conn = sqlite3.connect(str(self._db_path))
-            self._conn.execute("PRAGMA busy_timeout = 5000")
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA foreign_keys = ON")
-            self._conn.row_factory = sqlite3.Row
-        return self._conn
+            if self._conn is None:
+                self._conn = sqlite3.connect(
+                    str(self._db_path),
+                    check_same_thread=False,
+                )
+                self._conn.execute("PRAGMA busy_timeout = 5000")
+                self._conn.execute("PRAGMA journal_mode=WAL")
+                self._conn.execute("PRAGMA foreign_keys = ON")
+                self._conn.row_factory = sqlite3.Row
+            return self._conn
 
     def _init_db(self):
         """Create all tables if they don't exist."""
@@ -102,6 +122,7 @@ class SQLiteStore:
 
     # ── Profile CRUD ──
 
+    @_with_lock
     def upsert_profile(
         self,
         user_id: str,
@@ -160,6 +181,7 @@ class SQLiteStore:
         conn.commit()
         return entry_id
 
+    @_with_lock
     def get_profile(
         self, user_id: str, attribute: Optional[str] = None
     ) -> List[Dict[str, Any]]:
@@ -180,6 +202,7 @@ class SQLiteStore:
 
     # ── Episodic CRUD ──
 
+    @_with_lock
     def insert_episodic(
         self,
         user_id: str,
@@ -216,6 +239,7 @@ class SQLiteStore:
         conn.commit()
         return entry_id
 
+    @_with_lock
     def get_episodic(
         self,
         user_id: str,
@@ -242,6 +266,7 @@ class SQLiteStore:
 
     # ── Staging CRUD ──
 
+    @_with_lock
     def insert_staging(
         self,
         user_id: str,
@@ -283,6 +308,7 @@ class SQLiteStore:
         conn.commit()
         return entry_id
 
+    @_with_lock
     def get_staging(
         self,
         user_id: str,
@@ -301,6 +327,7 @@ class SQLiteStore:
 
     # ── Tombstones ──
 
+    @_with_lock
     def add_tombstone(
         self,
         user_id: str,
@@ -328,6 +355,7 @@ class SQLiteStore:
         )
         conn.commit()
 
+    @_with_lock
     def is_tombstoned(self, user_id: str, content_hash: str) -> bool:
         """Check if content is tombstoned."""
         conn = self._connect()
@@ -341,6 +369,7 @@ class SQLiteStore:
 
     # ── Stats ──
 
+    @_with_lock
     def get_stats(self, user_id: str) -> Dict[str, int]:
         """Get memory statistics for a user."""
         conn = self._connect()
@@ -360,12 +389,14 @@ class SQLiteStore:
 
     # ── Cleanup ──
 
+    @_with_lock
     def close(self):
         """Close the database connection."""
         if self._conn:
             self._conn.close()
             self._conn = None
 
+    @_with_lock
     def get_tables(self) -> List[str]:
         """List all tables in the database."""
         conn = self._connect()

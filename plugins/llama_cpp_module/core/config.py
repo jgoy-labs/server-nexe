@@ -59,6 +59,11 @@ class LlamaCppConfig:
                 "LlamaCppConfig: model_path is empty. "
                 "Set NEXE_LLAMA_CPP_MODEL or pass model_path."
             )
+            # F5.4 Bug C fix: empty path must STAY empty so callers can detect
+            # the not_configured state. Without the guard, the elif below would
+            # collapse "" to str(project_root), creating a fake "valid-looking"
+            # path that gets sliced in logs to substrings like "ication Support/..."
+            return
         # Expand ~ to home directory
         if self.model_path.startswith("~"):
             self.model_path = os.path.expanduser(self.model_path)
@@ -117,10 +122,15 @@ class LlamaCppConfig:
             mmproj_path=os.getenv("LLAMA_MMPROJ_PATH", ""),
         )
 
+        # F5.4 Bug C fix: NEVER slice model_path with [-40:] — for a typical
+        # macOS Application Support path (67 chars) it produces the literal
+        # substring "ication Support/..." which looks like a path corruption
+        # and was the smoking-gun symptom of the empty-path bug. Emit the full
+        # path so logs are unambiguous.
         logger.info(
             "LlamaCppConfig loaded: model=%s, n_ctx=%d, n_batch=%d, gpu_layers=%d, "
             "threads=%d, mlock=%s, mmap=%s, flash_attn=%s",
-            config.model_path[-40:] if config.model_path else "(empty)",
+            config.model_path if config.model_path else "(empty)",
             config.n_ctx,
             config.n_batch,
             config.n_gpu_layers,

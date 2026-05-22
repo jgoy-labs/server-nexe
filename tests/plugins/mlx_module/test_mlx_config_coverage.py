@@ -59,13 +59,19 @@ class TestMLXConfigPostInit:
         config = MLXConfig(model_path="models/test-model")
         assert os.path.isabs(config.model_path)
 
-    def test_empty_path_resolves_to_project_root(self):
-        """Lines 80-84 + 89-92: empty model_path logs warning but resolves relative."""
+    def test_empty_path_stays_empty(self):
+        """F5.4 Bug B (2026-05-19): empty model_path must STAY empty so the
+        module can detect not_configured state. Previously the elif branch
+        collapsed "" to str(project_root) (= NEXE_HOME), producing the
+        notorious "MLXConfig: model_path does not contain config.json"
+        cascade at G10. See commit 7e28cdf.
+        """
         from plugins.mlx_module.core.config import MLXConfig
         config = MLXConfig(model_path="")
-        # Empty string is not abs, not ~, so it gets resolved relative to project root
-        # The warning is still logged
-        assert isinstance(config.model_path, str)
+        assert config.model_path == "", (
+            "MLXConfig.__post_init__ must guard against empty model_path "
+            "before the relative-path elif. The Bug B fix added the guard."
+        )
 
 
 class TestMLXConfigFromEnv:

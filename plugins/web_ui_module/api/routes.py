@@ -110,18 +110,14 @@ def create_router(module_instance) -> APIRouter:
 
     # Register all route groups
     register_auth_routes(router, require_ui_auth=_require_ui_auth, session_mgr=session_mgr)
-    # F5.5 — In sidecar mode the Tauri webview serves its own HTML/CSS/JS, so
-    # we skip the static routes (/, /static/*) and expose only JSON endpoints
-    # (/info, /backends, /sessions, /chat, /memory/*, /files/*). Standalone
-    # mode keeps the full UI surface intact.
-    try:
-        from core.sidecar_config import get_sidecar_config
-        _is_sidecar = bool(get_sidecar_config().is_sidecar)
-    except Exception as exc:
-        logger.debug("sidecar_config probe failed (%s); assuming standalone", exc)
-        _is_sidecar = False
-    if not _is_sidecar:
-        register_static_routes(router, module_ref=_module_ref)
+    # F5.5 reverted (2026-05-21): the sidecar serves the full UI again. The
+    # earlier split (skip static routes in sidecar, let Tauri serve a local
+    # copy at public/ui/) caused two parallel copies of the UI to drift —
+    # client-side i18n fixes shipped to plugins/web_ui_module/ui/ never
+    # reached the Tauri copy, so the bundled DMG kept showing stale strings
+    # and a literal {{NEXE_VERSION}} placeholder. Tauri now navigates the
+    # webview to http://127.0.0.1:{port}/ once the sidecar is ready.
+    register_static_routes(router, module_ref=_module_ref)
     register_session_routes(router, session_mgr=session_mgr, require_ui_auth=_require_ui_auth)
     register_file_routes(router, session_mgr=session_mgr, file_handler=file_handler, require_ui_auth=_require_ui_auth)
     register_chat_routes(router, session_mgr=session_mgr, require_ui_auth=_require_ui_auth)

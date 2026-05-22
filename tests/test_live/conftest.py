@@ -170,17 +170,47 @@ def client(nexe_server: str) -> httpx.Client:  # noqa: F811
 # ─── Rate-limit guard ─────────────────────────────────────────────────────────
 
 _INTER_TEST_DELAY = float(os.getenv("NEXE_TEST_DELAY", "1.5"))
+_SLOW_TEST_DELAY = float(os.getenv("NEXE_TEST_SLOW_DELAY", "10.0"))
 
 
 @pytest.fixture(autouse=True, scope="function")
-def _rate_limit_guard() -> "Generator[None, None, None]":
+def _rate_limit_guard(request: pytest.FixtureRequest) -> "Generator[None, None, None]":
     """
-    Pause between tests to avoid hitting the server's rate limiter.
-    Default 1.5s (40 req/min effective). Override with NEXE_TEST_DELAY=0 to disable.
+    Pause between tests to avoid hitting the server's rate limiter or saturating
+    Ollama. Default 1.5s normal / 10s after a `slow`-marked test (Bug #4
+    2026-05-21: Ollama calls take ~8-10s and accumulate when chained, causing
+    httpcore timeouts on later non-LLM tests). Override with
+    `NEXE_TEST_DELAY=0` / `NEXE_TEST_SLOW_DELAY=0` to disable.
     """
     yield
-    if _INTER_TEST_DELAY > 0:
-        time.sleep(_INTER_TEST_DELAY)
+    if request.node.get_closest_marker("slow"):
+        delay = _SLOW_TEST_DELAY
+    else:
+        delay = _INTER_TEST_DELAY
+    if delay > 0:
+        time.sleep(delay)
+
+
+# ─── Test ordering — slow tests last ──────────────────────────────────────────
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Schedule slow (Ollama-heavy) tests after the fast ones.
+
+    Bug #4 (2026-05-21): the prompt-injection + chat-Ollama tests each take
+    ~8-10s and accumulate server load. When they run before non-LLM tests
+    (alphabetical default: test_security → test_sessions), the later tests
+    hit httpcore timeouts because Ollama is still busy. Reordering keeps
+    fast tests first so the server is fresh when they run; slow tests then
+    cluster at the end where their delay only affects themselves.
+
+    Stable within each group: keeps the original collection order, only
+    splits by `slow` marker. xfail/skip items keep their position.
+    """
+    slow = [it for it in items if it.get_closest_marker("slow")]
+    fast = [it for it in items if not it.get_closest_marker("slow")]
+    items[:] = fast + slow
 
 
 # ─── Backend detection ────────────────────────────────────────────────────────

@@ -51,6 +51,11 @@ _CSRF_EXEMPT_PATTERNS = [
     # starlette-csrf returned 403 on the graceful shutdown POST and lifecycle.rs
     # always fell back to SIGKILL.
     re.compile(r"^/admin/"),
+    # F5.6 Bloc 6c (end-to-end fix): /installer/* es crida pel wizard onboarding
+    # ABANS que l'usuari tingui API key. Loopback-only (127.0.0.1) + Tauri
+    # WebView. POST /installer/finalize sense exempció = 403 → wizard mai
+    # acaba. Descobert empíricament al cicle local 2026-05-20.
+    re.compile(r"^/installer/"),
 ]
 
 from core.server.helpers import translate as _translate  # noqa: E402

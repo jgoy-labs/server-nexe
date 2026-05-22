@@ -58,7 +58,7 @@ class OllamaModule:
 
     DEFAULT_BASE_URL = DEFAULT_BASE_URL
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialises without params — config from env."""
         self.base_url = resolve_base_url()
         self.i18n = None
@@ -67,6 +67,14 @@ class OllamaModule:
         self._initialized = False
         self._init_lock = asyncio.Lock()
         self._router = None
+        # F5.4 Bug E fix: lifecycle state for /status and routes_chat.
+        # "uninitialized" → before initialize() runs
+        # "ready"         → Ollama daemon reachable, chat-capable
+        # "unavailable"   → Ollama not installed or not reachable. Plugin
+        #                   stays at the registry so restart_sidecar (F5.3.1)
+        #                   can retry after the user installs Ollama.
+        # "error"         → unexpected exception during init.
+        self._state: str = "uninitialized"
 
         # Extracted components
         self.client = OllamaClient(self.base_url)
@@ -104,11 +112,33 @@ class OllamaModule:
                 if services and "i18n" in services:
                     self.i18n = services["i18n"]
                 await self.client.ensure_ollama_running()
+                # F5.4 Bug E fix: verify Ollama daemon actually responds; if not,
+                # mark unavailable (kept at registry so restart_sidecar can
+                # retry after the user installs Ollama). Without this check the
+                # previous code logged "OllamaModule initialized" even when
+                # Ollama was absent — causing chat-time ConnectError post-wizard.
+                try:
+                    connected = await self.client.check_connection()
+                except Exception:
+                    connected = False
+                if not connected:
+                    logger.warning(
+                        "OllamaModule: Ollama not reachable at %s. Plugin "
+                        "stays at registry with state=unavailable. Install "
+                        "Ollama (https://ollama.com/download) and restart "
+                        "the app to enable the Ollama backend.",
+                        self.base_url,
+                    )
+                    self._state = "unavailable"
+                    self._initialized = False
+                    return True  # keep at registry — restart_sidecar may retry
                 self._initialized = True
+                self._state = "ready"
                 logger.info("OllamaModule initialized - base_url=%s", self.base_url)
                 return True
             except Exception as e:
                 logger.error("Failed to initialize OllamaModule: %s", e)
+                self._state = "error"
                 return False
 
     async def shutdown(self) -> None:
@@ -124,6 +154,16 @@ class OllamaModule:
             return HealthResult(
                 status=HealthStatus.UNKNOWN,
                 message="httpx not installed",
+            )
+        # F5.4 Bug E fix: report not_configured/unavailable explicitly so
+        # /status is actionable. The previous DEGRADED was ambiguous (could
+        # be temporary network glitch); UNKNOWN+state=unavailable tells the
+        # UI to surface the "install Ollama" hint instead.
+        if self._state == "unavailable":
+            return HealthResult(
+                status=HealthStatus.UNKNOWN,
+                message="not_configured: Ollama not installed or not reachable",
+                details={"base_url": self.base_url, "state": self._state},
             )
         try:
             connected = await self.check_connection()

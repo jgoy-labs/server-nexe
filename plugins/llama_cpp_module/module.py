@@ -11,7 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import asyncio
 import logging
-from typing import Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter
 from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
@@ -26,11 +26,18 @@ class LlamaCppModule:
     Implements the NexeModule Protocol for dynamic loading in the kernel.
     """
 
-    def __init__(self):
-        self._node = None
+    def __init__(self) -> None:
+        self._node: Optional[LlamaCppChatNode] = None
         self._initialized = False
         self._init_lock = asyncio.Lock()
         self._router = None
+        # F5.4 Bug C fix: lifecycle state for /status and health_check.
+        # "uninitialized" → before initialize() runs
+        # "ready"         → model loaded and chat-capable
+        # "not_configured"→ no model path set; plugin stays at registry so
+        #                   restart_sidecar (F5.3.1) can re-activate it after
+        #                   the user completes the wizard
+        self._state: str = "uninitialized"
 
     @property
     def metadata(self) -> ModuleMetadata:
@@ -77,21 +84,50 @@ class LlamaCppModule:
                 # Load config from env or context
                 llama_config = LlamaCppConfig.from_env()
 
+                # F5.4 Bug C fix: distinguish "no model configured" (recoverable
+                # via restart_sidecar after wizard) from "model configured but
+                # broken" (real failure). Empty path is the wizard-not-done case.
+                if not llama_config.model_path:
+                    logger.info(
+                        "LlamaCppModule: no model configured (NEXE_LLAMA_CPP_MODEL "
+                        "unset and auto-discover found no .gguf). Plugin stays at "
+                        "registry with state=not_configured; restart_sidecar will "
+                        "re-activate it after the wizard completes."
+                    )
+                    self._state = "not_configured"
+                    self._node = None  # do NOT create ModelPool with empty config
+                    self._initialized = False
+                    return True  # keep plugin at registry — see lifespan_modules.py
+
                 # Try to validate that the model exists before starting
                 if not llama_config.validate():
-                    logger.warning("LlamaCppModule: Configuration validation failed. Module started in degraded mode.")
-                    self._initialized = True
-                    return True  # Allow startup for diagnostics
+                    logger.warning(
+                        "LlamaCppModule: Configuration validation failed for "
+                        "model_path=%s. Module removed from registry; "
+                        "restart_sidecar will re-register after wizard completes.",
+                        llama_config.model_path,
+                    )
+                    # F5.5 G10: return False (not degraded zombie) so the
+                    # registry pops this module. _node stays None, which avoids
+                    # the _initialized=True + _node=None inconsistent state.
+                    self._state = "error"
+                    self._initialized = False
+                    return False
 
                 self._node = LlamaCppChatNode(config=llama_config)
                 self._initialized = True
+                self._state = "ready"
 
-                logger.info("LlamaCppModule initialized successfully")
+                logger.info(
+                    "LlamaCppModule initialized successfully (model=%s)",
+                    llama_config.model_path,
+                )
                 return True
             except Exception as e:
                 logger.error(f"Failed to initialize LlamaCppModule: {e}")
                 # On catastrophic error, keep initialized=False
                 # but the router should already have been created if it didn't fail earlier
+                self._state = "error"
                 return False
 
     def _init_router(self):
@@ -135,8 +171,21 @@ class LlamaCppModule:
         return await self._node.execute(inputs)
 
     async def health_check(self) -> HealthResult:
+        # F5.4 Bug C fix: differentiate not_configured (wizard pending) from
+        # uninitialized (unexpected) so /status reports a clear actionable
+        # state instead of generic "Module not initialized".
+        if self._state == "not_configured":
+            return HealthResult(
+                status=HealthStatus.UNKNOWN,
+                message="not_configured: NEXE_LLAMA_CPP_MODEL unset, no GGUF auto-discovered",
+                details={"state": self._state},
+            )
         if not self._initialized or self._node is None:
-            return HealthResult(status=HealthStatus.UNKNOWN, message="Module not initialized")
+            return HealthResult(
+                status=HealthStatus.UNKNOWN,
+                message="Module not initialized",
+                details={"state": self._state},
+            )
 
         try:
             stats = self._node.get_pool_stats() or {}

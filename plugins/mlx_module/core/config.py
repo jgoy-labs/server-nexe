@@ -98,6 +98,12 @@ class MLXConfig:
                 "MLXConfig: model_path is empty. "
                 "Set NEXE_MLX_MODEL or pass model_path."
             )
+            # F5.4 Bug B fix: empty path must STAY empty so the module's
+            # initialize() can detect the not_configured state. Without the
+            # guard, the elif below would collapse "" to str(project_root),
+            # producing a NEXE_HOME path that triggered the "config.json not
+            # found" cascade in the empirical G10 log.
+            return
         # Expand ~ to home directory
         if self.model_path.startswith("~"):
             self.model_path = os.path.expanduser(self.model_path)

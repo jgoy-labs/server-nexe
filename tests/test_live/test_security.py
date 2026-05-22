@@ -83,6 +83,8 @@ class TestFailClosed:
 class TestPromptInjection:
     """Server-side sanitisation must neutralise prompt injection attempts."""
 
+    pytestmark = pytest.mark.slow  # Bug #4 (2026-05-21): 4 Ollama calls ~8-10s each, schedule last
+
     def test_jailbreak_classic(
         self,
         client: httpx.Client,
@@ -264,6 +266,7 @@ class TestInputValidation:
             f"Null byte query returned {r.status_code}: {r.text[:300]}"
         )
 
+    @pytest.mark.slow  # Bug #4 (2026-05-21): Ollama call ~8-10s; lives in TestInputValidation so it doesn't inherit TestPromptInjection.pytestmark
     def test_log_injection_chat(
         self,
         client: httpx.Client,
