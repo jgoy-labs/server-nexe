@@ -136,5 +136,7 @@ def test_model_catalog_has_four_tiers() -> None:
 
 def test_model_catalog_total_model_count() -> None:
     total = sum(len(ms) for ms in MODEL_CATALOG.values())
-    # Tolerance for future additions: at least the 16 we shipped in v1.0.2-beta.
-    assert total >= 16, f"Catalog shrunk below 16 models: got {total}"
+    # 2026-05-23 slim: catalog intentionally pruned for the public release
+    # (small=1, medium=4, large=3, xlarge=7 = 15). Lower bound prevents
+    # accidental erasure, not future additions.
+    assert total >= 14, f"Catalog shrunk below 14 models: got {total}"

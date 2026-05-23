@@ -45,8 +45,36 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Server language — mutable via UI
-_server_lang = _os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+# Server language — mutable via UI.
+# Resolution order (2026-05-22):
+#   1. NEXE_LANG env var (set by the launcher / Tauri parent — explicit override)
+#   2. OnboardingState.lang persisted by the wizard at /installer/finalize
+#   3. "en" — neutral OSS default (was "ca" before, which silently forced
+#      Catalan on every fresh install regardless of the user's choice)
+# The UI langSelect at /ui/lang still overrides this at runtime via
+# set_server_lang(); persistence across restarts happens through the
+# OnboardingState.
+_VALID_LANGS = {"ca", "es", "en"}
+
+
+def _initial_server_lang() -> str:
+    env_lang = _os.getenv("NEXE_LANG", "").split("-")[0].lower()
+    if env_lang in _VALID_LANGS:
+        return env_lang
+    try:
+        # Local import to avoid circular dependency at module load time
+        # (core.onboarding_state imports nothing from plugins.web_ui_module).
+        from core.onboarding_state import OnboardingState
+        state = OnboardingState.load()
+        if state is not None and state.lang in _VALID_LANGS:
+            return state.lang
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("get_server_lang: onboarding_state lookup failed: %s", exc)
+    return "en"
+
+
+_server_lang = _initial_server_lang()
+
 
 def get_server_lang() -> str:
     return _server_lang

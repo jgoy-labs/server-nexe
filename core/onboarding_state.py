@@ -6,7 +6,11 @@ sidecar reads it at startup and configures env vars accordingly. This is the
 single source of truth — no other layer holds onboarding state.
 
 Location: $NEXE_DATA_DIR/onboarding.json (sidecar mode injects NEXE_DATA_DIR)
-Fallback: ~/Library/Application Support/com.nexe.app/sidecar/onboarding.json
+Fallback (no NEXE_DATA_DIR):
+  - macOS:   ~/Library/Application Support/com.nexe.app/sidecar/onboarding.json
+             (legacy literal preserved for backward compat with v0.9 Macs)
+  - Linux:   platformdirs.user_data_dir("nexe-app", "nexe")/sidecar/onboarding.json
+             ($XDG_DATA_HOME or ~/.local/share/nexe-app/sidecar/onboarding.json)
 
 Schema versioned. Writes are atomic (tmp + rename within same directory).
 
@@ -28,6 +32,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+import platformdirs
 
 from core.installer_constants import VALID_ENGINES as _VALID_ENGINES
 
@@ -78,18 +84,49 @@ class OnboardingState:
     # is stored in the Keychain (service=_KEYCHAIN_SERVICE). Default False
     # for v1-schema files which lacked this field.
     has_token: bool = False
+    # 2026-05-22: BCP-47 language code selected at the wizard welcome step
+    # (Català/Español/English). Persisted so the sidecar can render the UI
+    # in the chosen language at the next startup (read by
+    # plugins.web_ui_module.api.routes_auth.get_server_lang). Default "en"
+    # for files written by older versions of the wizard that lacked this
+    # field — neutral OSS default, browser fallback still applies if the
+    # field is missing in the loaded JSON.
+    lang: str = "en"
 
     @staticmethod
     def _state_file() -> Path:
-        """Return the canonical path to onboarding.json."""
+        """Return the canonical path to onboarding.json.
+
+        Linux portability (factoria-linux-bus 2026-05-22): the original
+        default was the Mac-only literal
+        ``~/Library/Application Support/com.nexe.app/sidecar/onboarding.json``
+        with no platform gate, which on Linux produced an out-of-place
+        ``~/Library/...`` tree. We now branch on ``platform.system()``:
+          - macOS  → original literal preserved (zero risk for existing Mac
+                     installs — same path, same file).
+          - Linux  → ``platformdirs.user_data_dir("nexe-app", "nexe")`` =
+                     ``$XDG_DATA_HOME`` or ``~/.local/share/nexe-app``.
+          - other  → falls back to platformdirs for sanity.
+        ``NEXE_DATA_DIR`` still wins over the default (sidecar bundle mode).
+        """
+        import platform as _platform
         data_dir = os.environ.get("NEXE_DATA_DIR")
         if data_dir:
             return Path(data_dir).expanduser() / "onboarding.json"
+        if _platform.system() == "Darwin":
+            # Preserved literal — DO NOT change without a migration story
+            # for existing Mac installs that already have onboarding.json
+            # at this exact path.
+            return (
+                Path.home()
+                / "Library"
+                / "Application Support"
+                / "com.nexe.app"
+                / "sidecar"
+                / "onboarding.json"
+            )
         return (
-            Path.home()
-            / "Library"
-            / "Application Support"
-            / "com.nexe.app"
+            Path(platformdirs.user_data_dir("nexe-app", "nexe"))
             / "sidecar"
             / "onboarding.json"
         )
@@ -119,6 +156,12 @@ class OnboardingState:
                 raw_version, SCHEMA_VERSION,
             )
             return None
+        # 2026-05-22: forward-compat for the lang field. v2 files written
+        # before this commit lack it; promote with neutral "en" default so
+        # they still load without re-running the wizard. The dataclass
+        # default would handle missing keyword args but only if we strip
+        # them from the dict — we keep the dict-rebuild pattern explicit.
+        raw.setdefault("lang", "en")
         try:
             return cls(**raw)
         except TypeError as exc:
@@ -140,6 +183,7 @@ class OnboardingState:
         model_id: str,
         model_path: str,
         hf_token: Optional[str] = _UNSET,  # type: ignore[assignment]
+        lang: Optional[str] = None,
     ) -> OnboardingState:
         """Atomically persist a new state. Returns the saved instance.
 
@@ -177,6 +221,18 @@ class OnboardingState:
         else:
             # Non-empty token: attempt keyring write.
             has_token = _store_hf_token_in_keychain(hf_token)
+        # Lang resolution: caller-provided lang wins; otherwise preserve the
+        # previous state's lang (if any); else fall back to "en". Validation
+        # is a simple allowlist — anything else falls back to "en" so a
+        # malformed wizard payload cannot break the next sidecar startup.
+        _valid_langs = {"ca", "es", "en"}
+        if lang and lang in _valid_langs:
+            resolved_lang = lang
+        else:
+            previous_lang = cls.load()
+            resolved_lang = previous_lang.lang if previous_lang is not None else "en"
+            if resolved_lang not in _valid_langs:
+                resolved_lang = "en"
         state = cls(
             version=SCHEMA_VERSION,
             engine=engine,
@@ -184,6 +240,7 @@ class OnboardingState:
             model_path=str(Path(model_path).expanduser().resolve()),
             completed_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
             has_token=has_token,
+            lang=resolved_lang,
         )
         path = cls._state_file()
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -206,8 +263,8 @@ class OnboardingState:
             tmp_path = Path(fh.name)
         os.replace(tmp_path, path)
         logger.info(
-            "onboarding_state: saved (engine=%s model=%s has_token=%s)",
-            engine, model_id, has_token,
+            "onboarding_state: saved (engine=%s model=%s has_token=%s lang=%s)",
+            engine, model_id, has_token, resolved_lang,
         )
         return state
 

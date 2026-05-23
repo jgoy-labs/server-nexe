@@ -1,0 +1,27 @@
+# ─────────────────────────────────────────────────────────────
+# Nexe Server 0.9 - Linux-only Dependencies
+# Installed automatically on Linux by setup.sh / installer
+# FL-L1 (2026-05-21): còpia de requirements-macos.txt sense les
+# 6 línies macOS-only (MLX, rumps, setproctitle, pyobjc-*).
+# factoria-linux-bus (2026-05-22): consolidat — decisió D2 = Ollama-only
+# al 1r release Linux. Tot el que cal per Linux ja viu a requirements.txt
+# (fastapi, uvicorn, httpx, pydantic, fastembed, qdrant-client, cryptography,
+# sqlcipher3, platformdirs, keyring...). Aquest fitxer queda com a placeholder
+# explícit perquè setup.sh / install_nexe.py sàpiguen on afegir Linux-only
+# pins futurs (CUDA, ROCm, llama-cpp-python Linux wheel quan toqui, etc.).
+# ─────────────────────────────────────────────────────────────
+
+# Linux no porta MLX (Apple Silicon-only). Backends d'inference disponibles:
+#   - Ollama (extern)  ← 1r release Linux: Ollama-only (decisió D2 Jordi 2026-05-22)
+#   - llama_cpp_python ← NO al 1r release Linux; revisar quan calgui CPU offline
+#
+# Pyobjc / rumps / setproctitle: macOS-only (frameworks Cocoa).
+# MLX (mlx-lm, mlx-vlm): Apple Silicon Metal-only.
+#
+# Si en el futur cal afegir backends Linux-exclusius (CUDA, ROCm, etc.),
+# afegir aquí els pins corresponents.
+
+# Linux keyring backend (Secret Service via D-Bus). Turing R1 #2 (22/05):
+# sense això, `keyring` falla silenciosament a Linux → HF_TOKEN no es persisteix
+# → rate-limit silenciós a HuggingFace. Mac usa Keychain natiu (no cal).
+secretstorage>=3.3,<4

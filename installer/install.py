@@ -185,9 +185,9 @@ def _resolve_skip_model_config() -> dict:
             "chat_format": "chatml",
         }
     else:
-        print(f"\n{YELLOW}Cap model local detectat — instal·lant Qwen3.5 2B per defecte perquè el servidor arrenqui.{RESET}\n")
+        print(f"\n{YELLOW}Cap model local detectat — instal·lant Qwen3.5 4B per defecte perquè el servidor arrenqui.{RESET}\n")
         _fallback = next(
-            (m for m in MODEL_CATALOG["small"] if m.get("key") == "qwen35_2b"),
+            (m for m in MODEL_CATALOG["small"] if m.get("key") == "qwen35_4b"),
             MODEL_CATALOG["small"][0],
         )
         return {

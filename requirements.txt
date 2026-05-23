@@ -32,6 +32,7 @@ psutil==5.9.8
 # a F5 wheels quan revisem requirements split macOS/general). [refresh 2026-05-17]
 huggingface_hub>=1.5.0
 filelock==3.29.0  # GHSA-qmgc-5h2g-mvrw GHSA-w853-jp5j-5j7f TOCTOU fixed in 3.20.3 (dep transitiva explicitada)
+platformdirs>=4.0,<5  # cross-platform user data dirs (Linux/macOS); used by core.onboarding_state and installer.install_headless
 
 # --- Memory & RAG ---
 fastembed==0.8.0

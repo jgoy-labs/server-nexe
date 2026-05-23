@@ -51,6 +51,7 @@
     "README-es.md",
     "requirements.txt",
     "requirements-macos.txt",
+    "requirements-linux.txt",
     "SECURITY.md",
     "setup.sh",
     "SetupNexe.command",

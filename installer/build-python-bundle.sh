@@ -17,18 +17,25 @@ PY_VERSION="3.12"
 PY_FULL="3.12.8"
 PBS_TAG="20250106"
 
-# Allow architecture override: TARGET_ARCH=x86_64 bash dev-tools/build-python-bundle.sh
-ARCH="${TARGET_ARCH:-$(uname -m)}"
-case "$ARCH" in
-    arm64|aarch64) PBS_ARCH="aarch64" ;;
-    x86_64)        PBS_ARCH="x86_64"  ;;
+# Linux portability (FL-L1, 2026-05-21):
+# Resol el triplet PBS complet (OS+ARCH) en lloc de hardcodejar `-apple-darwin`.
+# uname -s ens dona la familia (Darwin/Linux); uname -m la arch. Mantenim el
+# fallback TARGET_ARCH per a builds creuades macOS host.
+OS=$(uname -s)
+ARCH_RAW="${TARGET_ARCH:-$(uname -m)}"
+case "$OS-$ARCH_RAW" in
+    Darwin-arm64|Darwin-aarch64)   PBS_TRIPLE="aarch64-apple-darwin"; PBS_ARCH="aarch64" ;;
+    Darwin-x86_64)                 PBS_TRIPLE="x86_64-apple-darwin";  PBS_ARCH="x86_64"  ;;
+    Linux-aarch64|Linux-arm64)     PBS_TRIPLE="aarch64-unknown-linux-gnu"; PBS_ARCH="aarch64" ;;
+    Linux-x86_64)                  PBS_TRIPLE="x86_64-unknown-linux-gnu";  PBS_ARCH="x86_64"  ;;
     *)
-        echo "ERROR: Unsupported architecture: $ARCH" >&2
+        echo "ERROR: Unsupported platform: $OS-$ARCH_RAW" >&2
         exit 1
         ;;
 esac
+echo "==> Detected: $OS/$ARCH_RAW → PBS_TRIPLE=$PBS_TRIPLE"
 
-PBS_FILENAME="cpython-${PY_FULL}+${PBS_TAG}-${PBS_ARCH}-apple-darwin-install_only_stripped.tar.gz"
+PBS_FILENAME="cpython-${PY_FULL}+${PBS_TAG}-${PBS_TRIPLE}-install_only_stripped.tar.gz"
 PBS_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/${PBS_FILENAME}"
 
 TMPDIR_BUILD="$(mktemp -d)"

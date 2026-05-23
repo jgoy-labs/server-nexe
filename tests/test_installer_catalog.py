@@ -56,8 +56,11 @@ def test_phi35_not_in_swift_wizard_models_json():
 
 
 def test_catalog_still_has_small_models():
-    """Sanity: small models are still present after removing phi35."""
-    assert len(MODEL_CATALOG.get("small", [])) >= 2
+    """Sanity: small tier slimmed to qwen3.5:4b only (2026-05-23)."""
+    small = MODEL_CATALOG.get("small", [])
+    assert len(small) == 1
+    assert small[0]["key"] == "qwen35_4b"
+    assert small[0].get("recommended") is True
 
 
 # ════════════════════════════════════════════════════════════════════════

@@ -57,7 +57,7 @@ class TestParseHeadlessConfig:
             {
                 "path": str(tmp_path),
                 "lang": "es",
-                "model_key": "gemma3_4b",
+                "model_key": "qwen35_4b",
                 "engine": "mlx",
                 "skip_model_download": True,
                 "reinstall_mode": "wipe",
@@ -65,7 +65,7 @@ class TestParseHeadlessConfig:
         )
         assert lang == "es"
         assert engine == "mlx"
-        assert model_key == "gemma3_4b"
+        assert model_key == "qwen35_4b"
         assert skip_model is True
         assert reinstall == "wipe"
 

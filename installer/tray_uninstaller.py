@@ -6,6 +6,7 @@ Description: Uninstall logic for the tray app.
 ────────────────────────────────────
 """
 
+import platform
 import shutil
 import subprocess
 from pathlib import Path
@@ -38,7 +39,13 @@ def calculate_storage(install_dir: Path) -> str:
 
 
 def remove_from_dock() -> bool:
-    """Remove Nexe.app from the macOS Dock."""
+    """Remove Nexe.app from the macOS Dock.
+
+    Linux portability (factoria-linux-bus 2026-05-22): no-op on non-Darwin.
+    Linux has no equivalent system Dock managed by `defaults`.
+    """
+    if platform.system() != "Darwin":
+        return True  # nothing to remove; treat as success for uninstall flow
     try:
         subprocess.run(["bash", "-c", """
 python3 -c "
@@ -60,7 +67,22 @@ if len(pl['persistent-apps']) < before:
 
 
 def remove_login_items() -> bool:
-    """Remove Nexe from macOS Login Items."""
+    """Remove Nexe from macOS Login Items / Linux autostart.
+
+    Linux portability (factoria-linux-bus 2026-05-22): on Linux removes
+    ``~/.config/autostart/nexe-app.desktop`` (written by
+    ``install_headless._register_linux_autostart``).
+    """
+    if platform.system() == "Linux":
+        try:
+            desktop_file = Path.home() / ".config" / "autostart" / "nexe-app.desktop"
+            if desktop_file.exists():
+                desktop_file.unlink()
+            return True
+        except Exception:
+            return False
+    if platform.system() != "Darwin":
+        return True  # no-op on other platforms
     try:
         subprocess.run([  # nosec B603 B607: literal osascript command targeting our own Login Item; osascript via PATH (macOS-only)
             "osascript", "-e",
@@ -241,15 +263,29 @@ def _uninstall_remove_system_entries(removed, failed):
         except Exception:
             failed.append("/usr/local/bin/nexe")
 
-    nexe_app = Path("/Applications/Nexe.app")
-    if nexe_app.exists():
-        try:
-            shutil.rmtree(nexe_app)
-            removed.append("/Applications/Nexe.app")
-        except Exception:
-            failed.append("/Applications/Nexe.app")
+    # macOS-only: /Applications/Nexe.app legacy bundle removal.
+    # Linux portability (factoria-linux-bus 2026-05-22): skip on non-Darwin
+    # (no /Applications layout on Linux).
+    if platform.system() == "Darwin":
+        nexe_app = Path("/Applications/Nexe.app")
+        if nexe_app.exists():
+            try:
+                shutil.rmtree(nexe_app)
+                removed.append("/Applications/Nexe.app")
+            except Exception:
+                failed.append("/Applications/Nexe.app")
 
-    support_dir = Path.home() / "Library" / "Application Support" / "Nexe"
+    # User-data support dir cleanup. Resolved via platformdirs so the path
+    # matches whatever install_headless._write_project_marker wrote:
+    #   - macOS:   ~/Library/Application Support/Nexe
+    #   - Linux:   $XDG_DATA_HOME or ~/.local/share/Nexe
+    try:
+        import platformdirs
+        support_dir = Path(platformdirs.user_data_dir("Nexe"))
+    except ImportError:
+        # Fallback to historical mac path so an uninstall on a corrupted env
+        # still cleans something. Linux without platformdirs ends up a no-op.
+        support_dir = Path.home() / "Library" / "Application Support" / "Nexe"
     if support_dir.exists():
         try:
             shutil.rmtree(support_dir)

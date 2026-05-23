@@ -1,30 +1,6 @@
 {
   "tier_8": [
     {
-      "key": "gemma3_4b",
-      "name": "Gemma 3 4B",
-      "origin": "Google DeepMind",
-      "year": 2025,
-      "role": "general",
-      "params": "4B",
-      "ram_gb": 4.0,
-      "disk_gb": 3.3,
-      "backends": [
-        "ollama",
-        "mlx"
-      ],
-      "mlx": true,
-      "ollama": "gemma3:4b",
-      "gguf": null,
-      "iberic": false,
-      "recommended": true,
-      "description": {
-        "ca": "👁 🧠 Visió + raonament en 4 GB. El millor default per a Macs amb 8 GB.",
-        "es": "👁 🧠 Visión + razonamiento en 4 GB. El mejor default para Macs con 8 GB.",
-        "en": "👁 🧠 Vision + reasoning in 4 GB. Best default for 8 GB Macs."
-      }
-    },
-    {
       "key": "qwen35_4b",
       "name": "Qwen3.5 4B",
       "origin": "Alibaba",
@@ -47,32 +23,32 @@
         "es": "👁 🧠 Multimodal, thinking, visión. MLX Apple Silicon.",
         "en": "👁 🧠 Multimodal, thinking, vision. MLX Apple Silicon."
       }
-    },
+    }
+  ],
+  "tier_16": [
     {
-      "key": "qwen3_4b",
-      "name": "Qwen3 4B",
+      "key": "qwen35_9b",
+      "name": "Qwen3.5 9B",
       "origin": "Alibaba",
-      "year": 2025,
+      "year": 2026,
       "role": "general",
-      "params": "4B",
-      "ram_gb": 4.0,
-      "disk_gb": 2.5,
+      "params": "9B",
+      "ram_gb": 8.0,
+      "disk_gb": 6.6,
       "backends": [
         "ollama",
         "mlx"
       ],
       "mlx": true,
-      "ollama": "qwen3:4b",
+      "ollama": "qwen3.5:9b",
       "gguf": null,
       "iberic": false,
       "description": {
-        "ca": "Model de text lleuger i ràpid. Apache 2.0.",
-        "es": "Modelo de texto ligero y rápido. Apache 2.0.",
-        "en": "Lightweight fast text model. Apache 2.0."
+        "ca": "👁 🧠 Thinking, visió, tool calling. MLX Apple Silicon.",
+        "es": "👁 🧠 Thinking, visión, tool calling. MLX Apple Silicon.",
+        "en": "👁 🧠 Thinking, vision, tool calling. MLX Apple Silicon."
       }
-    }
-  ],
-  "tier_16": [
+    },
     {
       "key": "gemma4_e4b",
       "name": "Gemma 4 E4B",
@@ -90,11 +66,33 @@
       "ollama": "gemma4:e4b",
       "gguf": null,
       "iberic": false,
-      "recommended": true,
       "description": {
         "ca": "👁 🧠 Visió, thinking, àudio. MLX recomanat.",
         "es": "👁 🧠 Visión, thinking, audio. MLX recomendado.",
         "en": "👁 🧠 Vision, thinking, audio. MLX recommended."
+      }
+    },
+    {
+      "key": "mistral_nemo_12b",
+      "name": "Mistral Nemo 12B",
+      "origin": "Mistral AI",
+      "year": 2024,
+      "role": "general",
+      "params": "12B",
+      "ram_gb": 9.0,
+      "disk_gb": 7.1,
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
+      "mlx": true,
+      "ollama": "mistral-nemo:12b",
+      "gguf": null,
+      "iberic": false,
+      "description": {
+        "ca": "🧠 Context 128K, Apache 2.0. Multilingüe europeu, codi.",
+        "es": "🧠 Contexto 128K, Apache 2.0. Multilingüe europeo, código.",
+        "en": "🧠 128K context, Apache 2.0. European multilingual, code."
       }
     },
     {
@@ -119,56 +117,32 @@
         "es": "El mejor para catalán y lenguas ibéricas. Entrenado en MareNostrum 5.",
         "en": "Best for Catalan and Iberian languages. Trained on MareNostrum 5."
       }
-    },
-    {
-      "key": "qwen35_9b",
-      "name": "Qwen3.5 9B",
-      "origin": "Alibaba",
-      "year": 2026,
-      "role": "general",
-      "params": "9B",
-      "ram_gb": 8.0,
-      "disk_gb": 6.6,
-      "backends": [
-        "ollama",
-        "mlx"
-      ],
-      "mlx": true,
-      "ollama": "qwen3.5:9b",
-      "gguf": null,
-      "iberic": false,
-      "recommended": true,
-      "description": {
-        "ca": "👁 🧠 Thinking, visió, tool calling. MLX Apple Silicon.",
-        "es": "👁 🧠 Thinking, visión, tool calling. MLX Apple Silicon.",
-        "en": "👁 🧠 Thinking, vision, tool calling. MLX Apple Silicon."
-      }
-    },
-    {
-      "key": "gemma3_12b",
-      "name": "Gemma 3 12B",
-      "origin": "Google DeepMind",
-      "year": 2025,
-      "role": "general",
-      "params": "12B",
-      "ram_gb": 9.0,
-      "disk_gb": 7.0,
-      "backends": [
-        "ollama",
-        "mlx"
-      ],
-      "mlx": true,
-      "ollama": "gemma3:12b",
-      "gguf": null,
-      "iberic": false,
-      "description": {
-        "ca": "👁 🧠 Visió, raonament, excel·lent RAG i català. MLX recomanat.",
-        "es": "👁 🧠 Visión, razonamiento, excelente RAG y catalán. MLX recomendado.",
-        "en": "👁 🧠 Vision, reasoning, excellent RAG and Catalan. MLX recommended."
-      }
     }
   ],
   "tier_24": [
+    {
+      "key": "qwen35_27b",
+      "name": "Qwen3.5 27B",
+      "origin": "Alibaba",
+      "year": 2026,
+      "role": "general",
+      "params": "27B",
+      "ram_gb": 20.0,
+      "disk_gb": 17.0,
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
+      "mlx": true,
+      "ollama": "qwen3.5:27b",
+      "gguf": null,
+      "iberic": false,
+      "description": {
+        "ca": "👁 🧠 Thinking excel·lent, visió, tool calling. MLX Apple Silicon.",
+        "es": "👁 🧠 Thinking excelente, visión, tool calling. MLX Apple Silicon.",
+        "en": "👁 🧠 Excellent thinking, vision, tool calling. MLX Apple Silicon."
+      }
+    },
     {
       "key": "gemma4_31b",
       "name": "Gemma 4 31B",
@@ -186,7 +160,6 @@
       "ollama": "gemma4:31b",
       "gguf": null,
       "iberic": false,
-      "recommended": true,
       "description": {
         "ca": "👁 🧠 Raonament potent, visió, context 256K. Thinking excel·lent.",
         "es": "👁 🧠 Razonamiento potente, visión, contexto 256K. Thinking excelente.",
@@ -194,27 +167,26 @@
       }
     },
     {
-      "key": "qwen3_14b",
-      "name": "Qwen3 14B",
-      "origin": "Alibaba",
+      "key": "mistral_small_24b",
+      "name": "Mistral Small 3.2 24B",
+      "origin": "Mistral AI",
       "year": 2025,
-      "role": "reasoning",
-      "params": "14B",
-      "ram_gb": 11.0,
-      "disk_gb": 9.3,
+      "role": "multimodal",
+      "params": "24B",
+      "ram_gb": 18.0,
+      "disk_gb": 14.0,
       "backends": [
         "ollama",
         "mlx"
       ],
       "mlx": true,
-      "ollama": "qwen3:14b",
+      "ollama": "mistral-small3.2",
       "gguf": null,
       "iberic": false,
-      "recommended": true,
       "description": {
-        "ca": "🧠 Thinking, codi, raonament. Molt bon equilibri per a 24 GB.",
-        "es": "🧠 Thinking, código, razonamiento. Muy buen equilibrio para 24 GB.",
-        "en": "🧠 Thinking, code, reasoning. Great balance for 24 GB."
+        "ca": "👁 🧠 Visió, thinking, Apache 2.0. Multilingüe.",
+        "es": "👁 🧠 Visión, thinking, Apache 2.0. Multilingüe.",
+        "en": "👁 🧠 Vision, thinking, Apache 2.0. Multilingual."
       }
     },
     {
@@ -243,49 +215,72 @@
   ],
   "tier_32": [
     {
-      "key": "qwen35_27b",
-      "name": "Qwen3.5 27B",
+      "key": "qwen35_35b_moe",
+      "name": "Qwen3.5 35B-A3B",
       "origin": "Alibaba",
       "year": 2026,
       "role": "general",
-      "params": "27B",
-      "ram_gb": 20.0,
-      "disk_gb": 17.0,
+      "params": "35B totals / 3B actius (MoE)",
+      "ram_gb": 23.0,
+      "disk_gb": 21.0,
       "backends": [
         "ollama",
         "mlx"
       ],
       "mlx": true,
-      "ollama": "qwen3.5:27b",
+      "ollama": "qwen3.5:35b-a3b",
       "gguf": null,
       "iberic": false,
       "description": {
-        "ca": "👁 🧠 Thinking excel·lent, visió, tool calling. MLX Apple Silicon.",
-        "es": "👁 🧠 Thinking excelente, visión, tool calling. MLX Apple Silicon.",
-        "en": "👁 🧠 Excellent thinking, vision, tool calling. MLX Apple Silicon."
+        "ca": "👁 🧠 Velocitat de 9B amb qualitat de 35B. MLX Apple Silicon. Apache 2.0.",
+        "es": "👁 🧠 Velocidad de 9B con calidad de 35B. MLX Apple Silicon. Apache 2.0.",
+        "en": "👁 🧠 9B speed with 35B quality. MLX Apple Silicon. Apache 2.0."
       }
     },
     {
-      "key": "gemma3_27b",
-      "name": "Gemma 3 27B",
-      "origin": "Google DeepMind",
-      "year": 2025,
-      "role": "general",
-      "params": "27B",
-      "ram_gb": 20.0,
-      "disk_gb": 16.2,
+      "key": "gemma4_31b",
+      "name": "Gemma 4 31B",
+      "origin": "Google",
+      "year": 2026,
+      "role": "reasoning",
+      "params": "31B (dense)",
+      "ram_gb": 22.0,
+      "disk_gb": 18.5,
       "backends": [
-        "mlx",
-        "llama.cpp"
+        "ollama",
+        "mlx"
       ],
       "mlx": true,
-      "ollama": null,
-      "gguf": "https://huggingface.co/bartowski/gemma-3-27b-it-GGUF/resolve/main/gemma-3-27b-it-Q4_K_M.gguf",
+      "ollama": "gemma4:31b",
+      "gguf": null,
       "iberic": false,
       "description": {
-        "ca": "👁 🧠 Visió, raonament, excel·lent memòria RAG i català.",
-        "es": "👁 🧠 Visión, razonamiento, excelente memoria RAG y catalán.",
-        "en": "👁 🧠 Vision, reasoning, excellent RAG memory and Catalan."
+        "ca": "👁 🧠 Raonament, visió, context 256K. MLX recomanat amb 32 GB.",
+        "es": "👁 🧠 Razonamiento, visión, contexto 256K. MLX recomendado con 32 GB.",
+        "en": "👁 🧠 Reasoning, vision, 256K context. MLX recommended with 32 GB."
+      }
+    },
+    {
+      "key": "mixtral_8x7b",
+      "name": "Mixtral 8x7B",
+      "origin": "Mistral AI",
+      "year": 2023,
+      "role": "general",
+      "params": "46B totals / ~12.9B actius (MoE)",
+      "ram_gb": 28.0,
+      "disk_gb": 26.0,
+      "backends": [
+        "ollama",
+        "mlx"
+      ],
+      "mlx": true,
+      "ollama": "mixtral:8x7b",
+      "gguf": null,
+      "iberic": false,
+      "description": {
+        "ca": "🧠 MoE eficient, context 32K. Apache 2.0. Clàssic (2023) robust.",
+        "es": "🧠 MoE eficiente, contexto 32K. Apache 2.0. Clásico (2023) robusto.",
+        "en": "🧠 Efficient MoE, 32K context. Apache 2.0. Classic (2023) and robust."
       }
     },
     {
@@ -312,53 +307,6 @@
       }
     },
     {
-      "key": "gemma4_31b",
-      "name": "Gemma 4 31B",
-      "origin": "Google",
-      "year": 2026,
-      "role": "reasoning",
-      "params": "31B (dense)",
-      "ram_gb": 22.0,
-      "disk_gb": 18.5,
-      "backends": [
-        "ollama",
-        "mlx"
-      ],
-      "mlx": true,
-      "ollama": "gemma4:31b",
-      "gguf": null,
-      "iberic": false,
-      "recommended": true,
-      "description": {
-        "ca": "👁 🧠 Raonament, visió, context 256K. MLX recomanat amb 32 GB.",
-        "es": "👁 🧠 Razonamiento, visión, contexto 256K. MLX recomendado con 32 GB.",
-        "en": "👁 🧠 Reasoning, vision, 256K context. MLX recommended with 32 GB."
-      }
-    },
-    {
-      "key": "qwen35_35b_moe",
-      "name": "Qwen3.5 35B-A3B",
-      "origin": "Alibaba",
-      "year": 2026,
-      "role": "general",
-      "params": "35B totals / 3B actius (MoE)",
-      "ram_gb": 23.0,
-      "disk_gb": 21.0,
-      "backends": [
-        "ollama",
-        "mlx"
-      ],
-      "mlx": true,
-      "ollama": "qwen3.5:35b-a3b",
-      "gguf": null,
-      "iberic": false,
-      "description": {
-        "ca": "👁 🧠 Velocitat de 9B amb qualitat de 35B. MLX Apple Silicon. Apache 2.0.",
-        "es": "👁 🧠 Velocidad de 9B con calidad de 35B. MLX Apple Silicon. Apache 2.0.",
-        "en": "👁 🧠 9B speed with 35B quality. MLX Apple Silicon. Apache 2.0."
-      }
-    },
-    {
       "key": "alia_40b",
       "name": "ALIA-40B Instruct",
       "origin": "BSC (Catalunya)",
@@ -375,7 +323,6 @@
       "ollama": "csala/ALIA-40B:Q8_0",
       "gguf": "https://huggingface.co/BSC-LT/ALIA-40b-instruct-2601-GGUF/resolve/main/ALIA-40b-instruct-2601-Q8_0.gguf",
       "iberic": true,
-      "recommended": true,
       "description": {
         "ca": "Model públic multilingüe avançat fet a Europa. 9 idiomes ibèrics.",
         "es": "Modelo público multilingüe avanzado hecho en Europa. 9 idiomas ibéricos.",

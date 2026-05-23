@@ -125,9 +125,18 @@ def _write_project_marker(app_bundle, project_root):
     bundle, readable by the Swift launcher via resolveProjectRoot().
 
     Note: `app_bundle` kept as argument for backward compat — not used now.
+
+    Linux portability (factoria-linux-bus 2026-05-22): the previous Mac-only
+    path ``~/Library/Application Support/Nexe`` is replaced by
+    ``platformdirs.user_data_dir("Nexe")`` which resolves to:
+      - macOS:   ~/Library/Application Support/Nexe
+      - Linux:   $XDG_DATA_HOME or ~/.local/share/Nexe
+    On macOS the resolved path is the SAME literal as before, so existing
+    installations remain backwards compatible without any migration.
     """
     _ = app_bundle  # keep signature compat
-    marker_dir = Path(os.path.expanduser("~/Library/Application Support/Nexe"))
+    import platformdirs
+    marker_dir = Path(platformdirs.user_data_dir("Nexe"))
     marker_dir.mkdir(parents=True, exist_ok=True)
     marker = marker_dir / "project_root.txt"
     marker.write_text(str(project_root), encoding="utf-8")
@@ -599,6 +608,54 @@ def _register_macos_app(project_root, config):
     _log.info("Headless mode: NexeTray.app not installed (no tray icon)")
 
 
+def _register_linux_autostart(project_root, config):
+    """Register Nexe autostart on Linux via FreeDesktop ``.desktop`` file.
+
+    Linux portability (factoria-linux-bus 2026-05-22): Linux equivalent of the
+    macOS Login Item branch. Writes ``~/.config/autostart/nexe-app.desktop``
+    using the minimal viable FreeDesktop spec. The GUI wizard owns the user's
+    autostart choice; with ``--no-login-item`` this is skipped.
+
+    TODO (validation empirical): test on GNOME / KDE / XFCE that the entry is
+    honored at session start. Spec is minimal — may need ``X-KDE-autostart-*``
+    or ``OnlyShowIn=`` keys for niche desktop environments.
+    """
+    skip_login_item = bool(config.get("skip_login_item", False))
+    if skip_login_item:
+        _log.info("Linux autostart: skipped (managed by GUI wizard)")
+        return
+
+    # Resolve the executable to launch. On Linux there is no Nexe.app bundle;
+    # fall back to the nexe wrapper script written by _setup_nexe_wrapper.
+    nexe_wrapper = project_root / "nexe"
+    if not nexe_wrapper.exists():
+        _log.warning("Linux autostart: %s missing, skipping .desktop registration", nexe_wrapper)
+        return
+
+    autostart_dir = Path.home() / ".config" / "autostart"
+    try:
+        autostart_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        _log.warning("Linux autostart: cannot create %s: %s", autostart_dir, e)
+        return
+
+    desktop_file = autostart_dir / "nexe-app.desktop"
+    desktop_contents = (
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=Nexe\n"
+        f"Exec={nexe_wrapper}\n"
+        "X-GNOME-Autostart-enabled=true\n"
+        "Terminal=false\n"
+    )
+    try:
+        desktop_file.write_text(desktop_contents, encoding="utf-8")
+        desktop_file.chmod(0o644)
+        _log.info("Linux autostart: wrote %s", desktop_file)
+    except OSError as e:
+        _log.warning("Linux autostart: could not write %s: %s", desktop_file, e)
+
+
 def _run_headless_inner(config):
     """Inner implementation (with input() already patched)."""
     lang, project_root, model_key, engine, skip_model_download, reinstall_mode = _parse_headless_config(config)
@@ -655,8 +712,10 @@ def _run_headless_inner(config):
 
     if platform.system() == "Darwin":
         _register_macos_app(project_root, config)
+    elif platform.system() == "Linux":
+        _register_linux_autostart(project_root, config)
     else:
-        _log.info("Non-macOS platform: skipping .app registration and Login Items")
+        _log.info("Non-macOS/Linux platform: skipping autostart registration")
 
     print(f"[LOG] {LOG_FILE}", flush=True)
     if _model_ok:

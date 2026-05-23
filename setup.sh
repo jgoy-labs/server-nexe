@@ -95,14 +95,18 @@ echo -e "${NC}"
 echo -e "${BLUE}[STEP]${NC} $_VERIFYING"
 
 # Find Python >= 3.11
+# Linux portability (factoria-linux-bus 2026-05-22): the candidate list is
+# now built per-OS. macOS keeps /opt/homebrew + /usr/local (Homebrew x86 +
+# Apple Silicon). Linux adds the canonical /usr/bin distro paths because
+# systemd/headless shells sometimes start with a minimal PATH missing them.
 PYTHON_BIN=""
-for candidate in \
-    python3.12 python3.11 \
-    /opt/homebrew/bin/python3.12 \
-    /opt/homebrew/bin/python3.11 \
-    /usr/local/bin/python3.12 \
-    /usr/local/bin/python3.11 \
-    python3
+if [ "$(uname -s)" = "Linux" ]; then
+    _PY_CANDIDATES="python3.12 python3.11 /usr/bin/python3.12 /usr/bin/python3.11 /usr/local/bin/python3.12 /usr/local/bin/python3.11 /usr/bin/python3 python3"
+else
+    _PY_CANDIDATES="python3.12 python3.11 /opt/homebrew/bin/python3.12 /opt/homebrew/bin/python3.11 /usr/local/bin/python3.12 /usr/local/bin/python3.11 python3"
+fi
+
+for candidate in $_PY_CANDIDATES
 do
     if command -v "$candidate" &> /dev/null; then
         _MAJOR=$("$candidate" -c "import sys; print(sys.version_info.major)" 2>/dev/null || echo "0")

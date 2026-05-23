@@ -962,6 +962,12 @@ class FinalizeBody(BaseModel):
     engine: str = Field(..., pattern="^(mlx|ollama|gguf)$")
     model_id: str = Field(..., min_length=1, max_length=200)
     hf_token: str | None = Field(default=None, max_length=200)
+    # 2026-05-22: BCP-47 language code chosen at the wizard welcome step.
+    # Allowlist matches the UI locales (Català/Español/English). When None
+    # the OnboardingState.save() helper preserves the previous lang (or
+    # falls back to "en") so a wizard variant that omits the field still
+    # works.
+    lang: str | None = Field(default=None, pattern="^(ca|es|en)$")
 
 
 def _safe_model_basename(model_id: str) -> str:
@@ -1033,6 +1039,7 @@ async def finalize_post(body: FinalizeBody) -> JSONResponse:
         model_id=body.model_id,
         model_path=model_path,
         hf_token=body.hf_token,
+        lang=body.lang,
     )
     # F5.4 NC-18 residual fix (Turing #2 C3): clear runtime_state overrides
     # for the model env vars so the freshly-saved OnboardingState is what
