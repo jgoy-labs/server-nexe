@@ -5,7 +5,7 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia y cobertura de pruebas de server-nexe 1.0.4-beta. 6259 funciones de test recopiladas (6474 totales, 215 deselected), 0 fallos en la ultima ejecucion. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura real ~85% global, correcciones de tests de auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultados de mega-test v1/v2 y valoracion honesta de las limitaciones de las pruebas."
+abstract: "Estrategia y cobertura de pruebas de server-nexe 1.0.4-beta. 6685 funciones de test recopiladas (6900 totales, 215 deselected), 0 fallos en la ultima ejecucion. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura real ~85% global, correcciones de tests de auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultados de mega-test v1/v2 y valoracion honesta de las limitaciones de las pruebas."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
 chunk_size: 800
 priority: P2
@@ -23,15 +23,15 @@ expires: null
 
 | Metrica | Valor |
 |---------|-------|
-| Total de funciones de test recopiladas | **6259** |
-| Total de funciones de test (incl. deseleccionadas) | **6474** (215 deselected por marcadores) |
-| Ultima ejecucion completa pasados | 6259 |
+| Total de funciones de test recopiladas | **6685** |
+| Total de funciones de test (incl. deseleccionadas) | **6900** (215 deselected por marcadores) |
+| Ultima ejecucion completa pasados | 6685 |
 | Fallidos | 0 |
 | Saltados | 6 |
 | XFailed | 1 |
 | **Cobertura real global** | **~85%** (baseline honesta, sin inflar) |
 
-Nota: 6259 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 6474.
+Nota: 6685 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 6900.
 
 > **Nota de honestidad sobre cobertura:** Badges historicos han reportado 97.4%, 91.1% o 93% en fases concretas del mega-test. Esos numeros correspondian a subconjuntos especificos (baseline de una fase, funcional contra servidor en vivo) y no al global del proyecto. La **cobertura real global del codigo**, medida con `pytest --cov` sobre todo el codebase, es **~85%**. Este es el valor que usamos como referencia.
 >

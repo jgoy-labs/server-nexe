@@ -72,7 +72,7 @@ Server Nexe started as a learning-by-doing experiment: *"What would it take to h
 
 **This entire project — code, tests, audits, documentation — has been built by one person orchestrating different AI models**, both local (MLX, Ollama) and cloud (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), as collaborators. The human decides what to build, designs the architecture, reviews lines and runs tests. The AIs write, audit, and stress-test under human direction.
 
-What began as a prototype has turned into a genuinely useful product: 6259 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
+What began as a prototype has turned into a genuinely useful product: 6685 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
 
 This is not trying to compete with ChatGPT or Claude. But it can be complementary for less demanding tasks. It's an open-source tool for people who want to own their AI infrastructure. Built by one person in Barcelona, with AI as co-pilot, music, and stubbornness.
 
@@ -160,7 +160,7 @@ Upload `.txt`, `.md` or `.pdf` and they're automatically indexed for RAG. Each d
 <td width="50%">
 
 ### Built to Grow
-6259 tests (~85% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
+6685 tests (~85% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
 
 </td>
 </tr>
@@ -221,14 +221,14 @@ The installer auto-detects your hardware and recommends the best backend. You ca
 
 ## Available Models by RAM Tier
 
-The installer organizes the 16 catalog models by the RAM available on your machine (4 tiers):
+The installer organizes the 14 catalog models by the RAM available on your machine (4 tiers):
 
 | Tier | Models | Origin |
 |------|--------|--------|
-| **8 GB** | Gemma 3 4B, Qwen3.5 4B, Qwen3 4B | Google, Alibaba |
-| **16 GB** | Gemma 4 E4B, Salamandra 7B, Qwen3.5 9B, Gemma 3 12B | Google, BSC/AINA, Alibaba |
-| **24 GB** | Gemma 4 31B, Qwen3 14B, GPT-OSS 20B | Google, Alibaba, OpenAI |
-| **32 GB** | Qwen3.5 27B, Gemma 3 27B, DeepSeek R1 32B, Qwen3.5 35B-A3B, ALIA-40B | Alibaba, Google, DeepSeek, Spanish Government |
+| **8 GB** | Qwen3.5 4B | Alibaba |
+| **16 GB** | Qwen3.5 9B, Gemma 4 E4B, Mistral Nemo 12B, Salamandra 7B | Alibaba, Google, Mistral AI, BSC/AINA |
+| **24 GB** | Qwen3.5 27B, Gemma 4 31B, Mistral Small 3.2 24B, GPT-OSS 20B | Alibaba, Google, Mistral AI, OpenAI |
+| **32 GB** | Qwen3.5 35B-A3B, Gemma 4 31B, Mixtral 8x7B, DeepSeek R1 32B, ALIA-40B | Alibaba, Google, Mistral AI, DeepSeek, Spanish Government |
 
 In addition, you can use any Ollama model by name or any GGUF model from Hugging Face.
 
@@ -327,11 +327,11 @@ Server Nexe includes a security module enabled by default:
 | macOS Apple Silicon (M1+) | **Supported** — all 3 backends | MLX, llama.cpp, Ollama |
 | macOS Intel | **Not supported** since v0.9.9 | — |
 | macOS 13 Ventura or earlier | **Not supported** since v0.9.9 (requires macOS 14 Sonoma+) | — |
-| Linux x86_64 | **Partial** — unit tests pass, CI green, **NOT tested in production** | llama.cpp, Ollama |
-| Linux ARM64 | Not directly tested | llama.cpp, Ollama (theoretical) |
+| Linux ARM64 | **Supported** (Ollama, CPU) — tested on VM | Ollama |
+| Linux x86_64 | **Supported** (Ollama, CPU) — unit tests pass | Ollama, llama.cpp |
 | Windows | In development (no public ETA) | — |
 
-> Since v0.9.9, server-nexe requires **macOS 14 Sonoma+ with Apple Silicon (M1 or later)**. The pre-built wheels in the DMG are `arm64` exclusive. Linux with the llama.cpp and Ollama backends should work, but the full compatibility audit is on the roadmap.
+> Since v0.9.9, server-nexe requires **macOS 14 Sonoma+ with Apple Silicon (M1 or later)**. The pre-built wheels in the DMG are `arm64` exclusive. Linux is supported with the Ollama backend (CPU). Tested on Ubuntu 24.04 ARM64 VM. Native hardware validation on the roadmap.
 
 ## Requirements
 
@@ -344,11 +344,11 @@ Server Nexe includes a security module enabled by default:
 | **Disk** | 10 GB free | 20 GB+ free |
 
 > **Intel Macs and macOS 13 Ventura are no longer supported.** Apple Silicon only (arm64).
-> **Linux**: Works with llama.cpp and Ollama backends. Full Linux compatibility audit is on the roadmap.
+> **Linux**: Supported with the Ollama backend (CPU). Tested on Ubuntu 24.04 ARM64 VM. Native hardware validation on the roadmap.
 
 ## Testing
 
-6259 tests collected (of 6474 total, 215 deselected by default markers) with ~85% code coverage. CI runs the full suite on every push.
+6685 tests collected (of 6900 total, 215 deselected by default markers) with ~85% code coverage. CI runs the full suite on every push.
 
 ```bash
 # Unit tests
@@ -387,7 +387,7 @@ Honest disclosure of what server Nexe **does not** do or does not do well:
 
 - **Local models < cloud** — Local models are less capable than GPT-4 or Claude. That's the trade-off for privacy.
 - **RAG is not perfect** — Homonymy, negations, cold start (empty memory), and contradictory information across time periods.
-- **Partially OpenAI-compatible API** — `/v1/chat/completions` works. Missing: `/v1/embeddings`, `/v1/models`, function calling, and multimodal.
+- **Partially OpenAI-compatible API** — `/v1/chat/completions` works. Missing: `/v1/embeddings`, `/v1/models`, and function calling.
 - **Single user** — Mono-user by design. No multi-device sync, no accounts.
 - **No fine-tuning** — You cannot train or fine-tune models.
 - **New encryption** — Added in v0.9.0 (default `auto` since v0.9.2; strict fail-closed only when `NEXE_ENCRYPTION_ENABLED=true`). Not battle-tested. If you lose the master key, data cannot be recovered (see MEK fallback: file → keyring → env → generate).

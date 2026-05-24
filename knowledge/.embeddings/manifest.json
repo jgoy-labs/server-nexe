@@ -1,32 +1,32 @@
 {
   "schema_version": 1,
-  "generated_utc": "2026-04-24T21:19:21Z",
+  "generated_utc": "2026-05-24T15:35:03Z",
   "prefix_format_version": "1.0",
   "vector_dim": 768,
   "vector_dtype": "float32",
   "fastembed_version": "0.8.0",
-  "onnxruntime_version": "1.24.4",
+  "onnxruntime_version": "1.26.0",
   "model_name": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
   "model_hf_commit": null,
   "chunker_source_sha256": "f7d3cc436561af6da07385f61263673df0914e4b5b3fbf81d9265a5eefbab053",
   "langs": {
     "ca": {
-      "chunks": 284,
-      "source_sha256": "f22a56e98af80723dc85eeac0d801321f73e4de82b2fa86a842a42092b0c01dd",
-      "vectors_sha256": "358ea76a6f334ab34fe8bbfe8546c68951cb930e10c79d3b9013c858b0f1fe73",
-      "metadata_sha256": "4104a2bb503adcaaaaf40a28a290785137c72c5b4d7e320e087a97a7b1e6b0fe"
+      "chunks": 319,
+      "source_sha256": "f9ef6f5651a090a8acdf7836f19a0c78dd250d21550a8cbcb1b79a1e59aec3dd",
+      "vectors_sha256": "3f0de36696eb3ebe82099243ea9986a3df2e04656e199cff7bf55b3f05446f45",
+      "metadata_sha256": "afd000a96462400e9af272a8d6a654c65884ed7836fcbaf54ec5999192834816"
     },
     "en": {
-      "chunks": 284,
-      "source_sha256": "daf928f494ff245f01c54a9469d1a5ce7e41d813ea0265beff3ed7f86c7a697a",
-      "vectors_sha256": "f99f1ee2e1db74db0cdf46a72c47fcfe40829311e6311be084c1761c4a6f4d26",
-      "metadata_sha256": "cb3dae9bb656c1c5b727edf9f738342d06c9ccd6e5a1065812906070c2072a05"
+      "chunks": 303,
+      "source_sha256": "e3c428baca648fd28c88babf1715a2e74914d665e446f603d5f812727df85a79",
+      "vectors_sha256": "7b4b45f2555401d7d980e9803ee665f658bf8addead92278f84824e369e1a8b8",
+      "metadata_sha256": "9a67aa32a3cd73add97557e90963650f87ee0d56ffad372c39d6835af7b3eb6e"
     },
     "es": {
-      "chunks": 290,
-      "source_sha256": "ea21f753dc481a7a2bdd4a6e1483acb344685dd2af1d9a0cbae094ac3bee3bd8",
-      "vectors_sha256": "e2bb3b4effcab899a1215893610dae1cf0186a488c381ad579038c7d309c11a0",
-      "metadata_sha256": "f81217f3c97de10d88a9b78d08820d4d32e090b587d018bea8015fccffc2d39c"
+      "chunks": 325,
+      "source_sha256": "d0da648f448858b1678a9e81ba1c429fe691b76bb3be01af754682423db47f7f",
+      "vectors_sha256": "0e54d1147d1a27bfdd21678a0ea68f97d32f75e1ac7da262897b79d7f00d9f73",
+      "metadata_sha256": "96d7414ca8691dca9e69cf1754c7d5b310667045673c3a5634f81b9a1ce8024c"
     }
   }
 }

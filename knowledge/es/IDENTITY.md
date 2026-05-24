@@ -70,17 +70,17 @@ server-nexe combina cinco capacidades:
 - **Version:** 1.0.4-beta
 - **Plataforma principal:** macOS 14 Sonoma o superior, **Apple Silicon (M1+) exclusivamente** — probado
 - **macOS Intel:** **NO soportado** (eliminado en v0.9.9 por dependencias arm64-only del stack)
-- **Linux ARM64:** Testeado en VM (Ubuntu 24.04 via UTM en Mac Apple Silicon, 8 GB RAM, instalacion CLI + Ollama en CPU). Hardware nativo aun no validado.
-- **Linux x86_64:** Soporte parcial (tests unitarios pasan, instalacion nativa aun no validada)
+- **Linux ARM64:** Soportado (backend Ollama, CPU). Testeado en VM Ubuntu 24.04 ARM64 via UTM en Mac Apple Silicon. Instalacion via CLI (`setup.sh`) o nexe-app (Tauri). Rutas XDG-compliant (`~/.local/share/nexe/`).
+- **Linux x86_64:** Soportado (backend Ollama, CPU). Tests unitarios pasan, instalacion CLI validada.
 - **Windows:** En desarrollo (sin ETA pública)
 - **Puerto por defecto:** 9119
-- **Tests:** 6259 funciones de test recopiladas (6474 totales — 215 deselected por marcadores), 0 fallos en la ultima ejecucion
+- **Tests:** 6685 funciones de test recopiladas (6900 totales — 215 deselected por marcadores), 0 fallos en la ultima ejecucion
 
 ## Documentacion AI-Ready
 
 La base de conocimiento esta disenada tanto para consumo humano como de IA:
 - Frontmatter YAML estructurado para ingestion RAG
-- 12 ficheros tematicos cubriendo identidad, arquitectura, API, seguridad, pruebas, etc.
+- 14 ficheros tematicos cubriendo identidad, arquitectura, API, seguridad, pruebas, etc.
 - Disponible en ingles, catalan y espanol
 - Apunta cualquier asistente de IA a este repositorio y podra entender la arquitectura completa, crear plugins o contribuir codigo
 

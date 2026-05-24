@@ -5,7 +5,7 @@ id: nexe-installation-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "How to install server-nexe: 2 methods. (1) macOS DMG with SwiftUI wizard, bundled Python 3.12, models by RAM tier. (2) CLI: git clone + ./setup.sh (macOS/Linux). Requirements: macOS 14 Sonoma+ Apple Silicon (M1+), 8GB RAM minimum. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Default port: 9119."
+abstract: "How to install server-nexe: 3 methods. (1) macOS DMG with SwiftUI wizard, bundled Python 3.12, models by RAM tier. (2) CLI: git clone + ./setup.sh (macOS/Linux). (3) nexe-app (Tauri, macOS + Linux). Requirements: macOS 14 Sonoma+ Apple Silicon (M1+), 8GB RAM minimum. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Default port: 9119."
 tags: [installation, setup, dmg, swiftui, wizard, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption, how-to]
 chunk_size: 600
 priority: P1
@@ -21,15 +21,15 @@ expires: null
 
 ## In 30 seconds
 
-- **2 methods:** DMG (macOS, SwiftUI wizard) or CLI (`./setup.sh`)
+- **3 methods:** DMG (macOS, SwiftUI wizard), CLI (`./setup.sh`) or nexe-app (Tauri, macOS + Linux)
 - **DMG ~1.2 GB offline** (wheels + embedding model bundled)
 - **Requires macOS 14 Sonoma + Apple Silicon** (M1+)
-- **Pick a model by RAM** (catalog of 16 models, 4 tiers 8/16/24/32 GB)
+- **Pick a model by RAM** (catalog of 14 models, 4 tiers 8/16/24/32 GB)
 - **Default port:** 9119
 
 ---
 
-Two installation methods available. Choose based on your platform and preferences.
+Three installation methods available. Choose based on your platform and preferences.
 
 ## System Requirements
 
@@ -71,7 +71,7 @@ Requirement: **Apple Silicon (M1+) with macOS 14 Sonoma or later**. Intel Macs a
 
 1. **Welcome:** Language selector (ca/es/en), logo, version info
 2. **Destination:** Folder picker with free space validation
-3. **Model Selection:** 4 tabs (small/medium/large/custom) with hardware detection. Shows 15 models with RAM requirements, engine compatibility, and year. Recommends models based on detected RAM/GPU.
+3. **Model Selection:** 4 tabs (small/medium/large/custom) with hardware detection. Shows 14 models with RAM requirements, engine compatibility, and year. Recommends models based on detected RAM/GPU.
 4. **Confirmation:** Summary of choices before install
 5. **Progress:** 7-step progress bar with real-time log. Python protocol parser ([PROGRESS], [LOG], [DONE], [ERROR] markers). 8-30 minutes depending on model download.
 6. **Completion:** API key display, options to add to Dock and Login Items, countdown to launch
@@ -124,41 +124,55 @@ After setup:
 ./nexe go    # Start server → http://127.0.0.1:9119
 ```
 
-## Model Catalog (16 models, 4 tiers — verified 2026-04-16)
+## Method 3: nexe-app (Tauri — macOS + Linux)
+
+Desktop application that embeds server-nexe as a Python sidecar inside a Tauri v2 shell. The installation experience differs from the standalone DMG:
+
+- **Onboarding wizard** built into the frontend (HTML/JS, not SwiftUI)
+- **Hardware detection** and model selection from the app itself
+- **Ollama bundled** or auto-installed
+- **Cross-platform:** macOS (Apple Silicon) + Linux (ARM64/x86_64)
+- **Sidecar mode:** server-nexe runs with `NEXE_SIDECAR=1`, paths managed by Tauri (`NEXE_HOME`, `NEXE_DATA_DIR`)
+
+The model catalog is the same as standalone (14 models, 4 tiers) — synced via `catalog_fallback.json` embedded in the Tauri binary.
+
+> **Status:** Under active development. Private repository (`nexe-app`). Public release planned when Phase 1 is complete.
+
+Download: when available, from https://github.com/jgoy-labs/nexe-app/releases
+
+## Model Catalog (14 models, 4 tiers — verified 2026-05-24)
 
 ### tier_8 (8 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
-| Gemma 3 4B | Ollama, MLX | 👁 | 🧠 | MLX |
-| Qwen3.5 4B | Ollama | 👁 | 🧠 | Ollama |
-| Qwen3 4B | Ollama, MLX | | | |
+| Qwen3.5 4B | Ollama, MLX | 👁 | 🧠 | ✓ |
 
 ### tier_16 (16 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
-| Gemma 4 E4B | Ollama, MLX | 👁 | 🧠 | MLX |
+| Qwen3.5 9B | Ollama, MLX | 👁 | 🧠 | |
+| Gemma 4 E4B | Ollama, MLX | 👁 | 🧠 | |
+| Mistral Nemo 12B | Ollama, MLX | | 🧠 | |
 | Salamandra 7B | Ollama, llama.cpp | | | iberic |
-| Qwen3.5 9B | Ollama | 👁 | 🧠 | Ollama |
-| Gemma 3 12B | Ollama, MLX | 👁 | 🧠 | |
 
 ### tier_24 (24 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
-| Gemma 4 31B | Ollama, MLX | 👁 | 🧠 | ✓ |
-| Qwen3 14B | Ollama, MLX | | 🧠 | ✓ |
+| Qwen3.5 27B | Ollama, MLX | 👁 | 🧠 | |
+| Gemma 4 31B | Ollama, MLX | 👁 | 🧠 | |
+| Mistral Small 3.2 24B | Ollama, MLX | 👁 | 🧠 | |
 | GPT-OSS 20B | Ollama, MLX | | 🧠 | |
 
 ### tier_32 (32 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
-| Qwen3.5 27B | Ollama | 👁 | 🧠 | |
-| Gemma 3 27B | MLX, llama.cpp | 👁 | 🧠 | |
-| DeepSeek R1 32B | Ollama, llama.cpp | | 🧠 | |
-| Gemma 4 31B | Ollama, MLX | 👁 | 🧠 | MLX |
-| Qwen3.5 35B-A3B | Ollama | 👁 | 🧠 | |
-| ALIA-40B | Ollama, llama.cpp | | | iberic |
+| Qwen3.5 35B-A3B | Ollama, MLX | 👁 | 🧠 | |
+| Gemma 4 31B | Ollama, MLX | 👁 | 🧠 | |
+| Mixtral 8x7B | Ollama, MLX | | 🧠 | |
+| DeepSeek R1 Distill 32B | Ollama, llama.cpp | | 🧠 | |
+| ALIA-40B Instruct | Ollama, llama.cpp | | | iberic |
 
-Qwen3.5 family only works via Ollama (MLX requires torch). DeepSeek R1 only Ollama/GGUF (MLX does not support qwen2 arch).
+DeepSeek R1 Distill only works via Ollama/GGUF (MLX does not support qwen2 arch).
 
 ### How to install these models
 
@@ -168,7 +182,7 @@ Both Qwen3.5 family and DeepSeek R1 are installed via **Ollama**. First make sur
 # Qwen3.5 family (multimodal + thinking)
 ollama pull qwen3.5:4b          # tier_8, ~3.4 GB
 ollama pull qwen3.5:9b          # tier_16, ~6 GB
-ollama pull qwen3.5:27b         # tier_32, ~17 GB
+ollama pull qwen3.5:27b         # tier_24, ~17 GB
 ollama pull qwen3.5:35b-a3b     # tier_32 MoE, ~21 GB
 
 # DeepSeek R1 (reasoning)

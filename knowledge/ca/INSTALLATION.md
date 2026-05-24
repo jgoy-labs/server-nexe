@@ -5,7 +5,7 @@ id: nexe-installation-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Com instal-lar server-nexe: 2 metodes. (1) DMG per macOS amb wizard SwiftUI, Python 3.12 inclos, models per tiers de RAM. (2) CLI: git clone + ./setup.sh (macOS/Linux). Requisits: macOS 14+ Sonoma Apple Silicon (M1+), 8GB RAM minim. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Port per defecte: 9119."
+abstract: "Com instal-lar server-nexe: 3 metodes. (1) DMG per macOS amb wizard SwiftUI, Python 3.12 inclos, models per tiers de RAM. (2) CLI: git clone + ./setup.sh (macOS/Linux). (3) nexe-app (Tauri, macOS + Linux). Requisits: macOS 14+ Sonoma Apple Silicon (M1+), 8GB RAM minim. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Port per defecte: 9119."
 tags: [installation, setup, dmg, swiftui, wizard, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption, how-to]
 chunk_size: 600
 priority: P1
@@ -21,15 +21,15 @@ expires: null
 
 ## En 30 segons
 
-- **2 metodes:** DMG (macOS, wizard SwiftUI) o CLI (`./setup.sh`)
+- **3 metodes:** DMG (macOS, wizard SwiftUI), CLI (`./setup.sh`) o nexe-app (Tauri, macOS + Linux)
 - **DMG ~1.2 GB offline** (wheels + embedding model bundled)
 - **Requereix macOS 14 Sonoma + Apple Silicon** (M1+)
-- **Tria model segons RAM** (cataleg 16 models, 4 tiers 8/16/24/32 GB)
+- **Tria model segons RAM** (cataleg 14 models, 4 tiers 8/16/24/32 GB)
 - **Port per defecte:** 9119
 
 ---
 
-Dos metodes d'instal·lacio disponibles. Tria segons la teva plataforma i preferencies.
+Tres metodes d'instal·lacio disponibles. Tria segons la teva plataforma i preferencies.
 
 ## Requisits del sistema
 
@@ -71,7 +71,7 @@ Requisit: **Apple Silicon (M1+) amb macOS 14 Sonoma o superior**. Intel Mac i ma
 
 1. **Benvinguda:** Selector d'idioma (ca/es/en), logotip, informacio de versio
 2. **Desti:** Selector de carpeta amb validacio d'espai lliure
-3. **Seleccio de model:** 4 pestanyes (petit/mitja/gran/personalitzat) amb deteccio de maquinari. Mostra 15 models amb requisits de RAM, compatibilitat de motor i any. Recomana models basant-se en la RAM/GPU detectada.
+3. **Seleccio de model:** 4 pestanyes (petit/mitja/gran/personalitzat) amb deteccio de maquinari. Mostra 14 models amb requisits de RAM, compatibilitat de motor i any. Recomana models basant-se en la RAM/GPU detectada.
 4. **Confirmacio:** Resum de les opcions abans d'instal·lar
 5. **Progres:** Barra de progres de 7 passos amb log en temps real. Parser de protocol Python (marcadors [PROGRESS], [LOG], [DONE], [ERROR]). 8-30 minuts depenent de la descarrega del model.
 6. **Finalitzacio:** Visualitzacio de la clau API, opcions per afegir al Dock i als Elements d'inici, compte enrere per al llancament
@@ -124,41 +124,55 @@ Despres de la configuracio:
 ./nexe go    # Arrencar servidor -> http://127.0.0.1:9119
 ```
 
-## Cataleg de models (16 models, 4 tiers — verificat 2026-04-16)
+## Metode 3: nexe-app (Tauri — macOS + Linux)
+
+Aplicacio d'escriptori que embeu server-nexe com a sidecar Python dins una shell Tauri v2. L'experiencia d'instal·lacio es diferent del DMG standalone:
+
+- **Onboarding wizard** integrat al frontend (HTML/JS, no SwiftUI)
+- **Deteccio de hardware** i seleccio de model des de la mateixa app
+- **Ollama bundled** o auto-instal·lat
+- **Cross-platform:** macOS (Apple Silicon) + Linux (ARM64/x86_64)
+- **Mode sidecar:** server-nexe corre amb `NEXE_SIDECAR=1`, paths gestionats per Tauri (`NEXE_HOME`, `NEXE_DATA_DIR`)
+
+El cataleg de models es el mateix que el standalone (14 models, 4 tiers) — sincronitzat via `catalog_fallback.json` embedded al binari Tauri.
+
+> **Estat:** En desenvolupament actiu. Repositori privat (`nexe-app`). Push públic previst quan Fase 1 estigui completa.
+
+Descarrega: quan estigui disponible, des de https://github.com/jgoy-labs/nexe-app/releases
+
+## Cataleg de models (14 models, 4 tiers — verificat 2026-05-24)
 
 ### tier_8 (8 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
-| Gemma 3 4B | Ollama, MLX | 👁 | 🧠 | MLX |
-| Qwen3.5 4B | Ollama | 👁 | 🧠 | Ollama |
-| Qwen3 4B | Ollama, MLX | | | |
+| Qwen3.5 4B | Ollama, MLX | 👁 | 🧠 | ✓ |
 
 ### tier_16 (16 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
-| Gemma 4 E4B | Ollama, MLX | 👁 | 🧠 | MLX |
+| Qwen3.5 9B | Ollama, MLX | 👁 | 🧠 | |
+| Gemma 4 E4B | Ollama, MLX | 👁 | 🧠 | |
+| Mistral Nemo 12B | Ollama, MLX | | 🧠 | |
 | Salamandra 7B | Ollama, llama.cpp | | | iberic |
-| Qwen3.5 9B | Ollama | 👁 | 🧠 | Ollama |
-| Gemma 3 12B | Ollama, MLX | 👁 | 🧠 | |
 
 ### tier_24 (24 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
-| Gemma 4 31B | Ollama, MLX | 👁 | 🧠 | ✓ |
-| Qwen3 14B | Ollama, MLX | | 🧠 | ✓ |
+| Qwen3.5 27B | Ollama, MLX | 👁 | 🧠 | |
+| Gemma 4 31B | Ollama, MLX | 👁 | 🧠 | |
+| Mistral Small 3.2 24B | Ollama, MLX | 👁 | 🧠 | |
 | GPT-OSS 20B | Ollama, MLX | | 🧠 | |
 
 ### tier_32 (32 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
-| Qwen3.5 27B | Ollama | 👁 | 🧠 | |
-| Gemma 3 27B | MLX, llama.cpp | 👁 | 🧠 | |
-| DeepSeek R1 32B | Ollama, llama.cpp | | 🧠 | |
-| Gemma 4 31B | Ollama, MLX | 👁 | 🧠 | MLX |
-| Qwen3.5 35B-A3B | Ollama | 👁 | 🧠 | |
-| ALIA-40B | Ollama, llama.cpp | | | iberic |
+| Qwen3.5 35B-A3B | Ollama, MLX | 👁 | 🧠 | |
+| Gemma 4 31B | Ollama, MLX | 👁 | 🧠 | |
+| Mixtral 8x7B | Ollama, MLX | | 🧠 | |
+| DeepSeek R1 Distill 32B | Ollama, llama.cpp | | 🧠 | |
+| ALIA-40B Instruct | Ollama, llama.cpp | | | iberic |
 
-Familia Qwen3.5 nomes funciona via Ollama (MLX requereix torch). DeepSeek R1 nomes Ollama/GGUF (MLX no suporta arch qwen2).
+DeepSeek R1 Distill nomes Ollama/GGUF (MLX no suporta arch qwen2).
 
 ### Com instal·lar aquests models
 
@@ -168,7 +182,7 @@ Tant Qwen3.5 family com DeepSeek R1 s'instal·len via **Ollama**. Primer comprov
 # Qwen3.5 family (multimodal + thinking)
 ollama pull qwen3.5:4b          # tier_8, ~3.4 GB
 ollama pull qwen3.5:9b          # tier_16, ~6 GB
-ollama pull qwen3.5:27b         # tier_32, ~17 GB
+ollama pull qwen3.5:27b         # tier_24, ~17 GB
 ollama pull qwen3.5:35b-a3b     # tier_32 MoE, ~21 GB
 
 # DeepSeek R1 (reasoning)

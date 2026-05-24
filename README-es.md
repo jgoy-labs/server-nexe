@@ -221,14 +221,14 @@ El instalador detecta automáticamente tu hardware y recomienda el mejor backend
 
 ## Modelos disponibles por tiers de RAM
 
-El instalador organiza los 16 modelos del catálogo por la RAM disponible en tu equipo (4 tiers):
+El instalador organiza los 14 modelos del catalogo por la RAM disponible en tu equipo (4 tiers):
 
 | Tier | Modelos | Origen |
 |------|---------|--------|
-| **8 GB** | Gemma 3 4B, Qwen3.5 4B, Qwen3 4B | Google, Alibaba |
-| **16 GB** | Gemma 4 E4B, Salamandra 7B, Qwen3.5 9B, Gemma 3 12B | Google, BSC/AINA, Alibaba |
-| **24 GB** | Gemma 4 31B, Qwen3 14B, GPT-OSS 20B | Google, Alibaba, OpenAI |
-| **32 GB** | Qwen3.5 27B, Gemma 3 27B, DeepSeek R1 32B, Qwen3.5 35B-A3B, ALIA-40B | Alibaba, Google, DeepSeek, Gobierno de España |
+| **8 GB** | Qwen3.5 4B | Alibaba |
+| **16 GB** | Qwen3.5 9B, Gemma 4 E4B, Mistral Nemo 12B, Salamandra 7B | Alibaba, Google, Mistral AI, BSC/AINA |
+| **24 GB** | Qwen3.5 27B, Gemma 4 31B, Mistral Small 3.2 24B, GPT-OSS 20B | Alibaba, Google, Mistral AI, OpenAI |
+| **32 GB** | Qwen3.5 35B-A3B, Gemma 4 31B, Mixtral 8x7B, DeepSeek R1 32B, ALIA-40B | Alibaba, Google, Mistral AI, DeepSeek, Gobierno de Espana |
 
 Además, puedes usar cualquier modelo de Ollama por su nombre o cualquier modelo GGUF de Hugging Face.
 

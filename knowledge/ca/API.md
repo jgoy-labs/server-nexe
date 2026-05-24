@@ -116,7 +116,7 @@ Chat completion compatible amb OpenAI amb suport RAG i streaming.
 | `/health` | GET | No | Health check basic |
 | `/health/ready` | GET | No | Comprovacio de disponibilitat (verifica moduls requerits) |
 | `/health/circuits` | GET | Sí (X-API-Key) | Estat dels circuit breakers (Ollama, Qdrant) |
-| `/status` | GET | No | Estat en temps real: motor actiu, model, moduls carregats |
+| `/status` | GET | Sí (X-API-Key) | Estat en temps real: motor actiu, model, moduls carregats |
 | `/api/info` | GET | No | Informacio de l'API i llista d'endpoints disponibles |
 | `/docs` | GET | No | Documentacio interactiva Swagger/OpenAPI |
 
@@ -124,8 +124,8 @@ Chat completion compatible amb OpenAI amb suport RAG i streaming.
 
 | Endpoint | Metode | Auth | Descripcio |
 |----------|--------|------|-------------|
-| `/modules` | GET | No | Llista de moduls carregats i les seves APIs |
-| `/modules/{name}/routes` | GET | No | Rutes registrades per un modul especific |
+| `/modules` | GET | Sí (X-API-Key) | Llista de moduls carregats i les seves APIs |
+| `/modules/{name}/routes` | GET | Sí (X-API-Key) | Rutes registrades per un modul especific |
 
 ### Bootstrap
 

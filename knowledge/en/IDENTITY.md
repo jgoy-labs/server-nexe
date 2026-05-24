@@ -70,17 +70,17 @@ server-nexe combines five capabilities:
 - **Version:** 1.0.4-beta
 - **Primary platform:** macOS 14 Sonoma or higher, **Apple Silicon (M1+) exclusively** — tested
 - **macOS Intel:** **NOT supported** (removed in v0.9.9 due to arm64-only dependencies in the stack)
-- **Linux ARM64:** Tested in VM (Ubuntu 24.04 via UTM on Apple Silicon Mac, 8 GB RAM, CLI install + Ollama on CPU). Native hardware not yet validated.
-- **Linux x86_64:** Partial support (unit tests pass, native install not yet validated)
+- **Linux ARM64:** Supported (Ollama backend, CPU). Tested on VM Ubuntu 24.04 ARM64 via UTM on Mac Apple Silicon. Install via CLI (`setup.sh`) or nexe-app (Tauri). XDG-compliant paths (`~/.local/share/nexe/`).
+- **Linux x86_64:** Supported (Ollama backend, CPU). Unit tests pass, CLI install validated.
 - **Windows:** In development (no public ETA)
 - **Default port:** 9119
-- **Tests:** 6259 test functions collected (6474 total — 215 deselected by markers), 0 failures in latest run
+- **Tests:** 6685 test functions collected (6900 total — 215 deselected by markers), 0 failures in latest run
 
 ## AI-Ready Documentation
 
 The knowledge base is designed for both human and AI consumption:
 - Structured YAML frontmatter for RAG ingestion
-- 12 thematic files covering identity, architecture, API, security, testing, etc.
+- 14 thematic files covering identity, architecture, API, security, testing, etc.
 - Available in English, Catalan, and Spanish
 - Point any AI assistant at this repository and it can understand the full architecture, create plugins, or contribute code
 

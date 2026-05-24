@@ -57,7 +57,7 @@ The OpenAI-compatible API (`/v1/chat/completions`) works with any tool that acce
 
 **For whom:** users who want to empirically compare speed and quality of different backends and local models.
 
-Switch between **MLX** (Apple Silicon native), **llama.cpp** (universal GGUF) and **Ollama** (easy management) with a config change. 16-model catalog across 4 RAM tiers — from Gemma 3 4B to ALIA-40B.
+Switch between **MLX** (Apple Silicon native), **llama.cpp** (universal GGUF) and **Ollama** (easy management) with a config change. 14-model catalog across 4 RAM tiers — from Qwen3.5 4B to ALIA-40B.
 
 **Example:** try Qwen3.5 9B (Ollama, tier_16) vs Gemma 4 E4B (MLX, tier_16) to figure out which one fits your hardware and use case best.
 

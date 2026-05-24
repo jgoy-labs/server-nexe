@@ -5,7 +5,7 @@ id: nexe-limitations
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentacion honesta de las limitaciones de server-nexe 1.0.4-beta. Cubre soporte de plataformas (macOS 14+ Apple Silicon only, Linux parcial, Intel NO soportado, Windows en desarrollo), calidad de modelos vs nube (GPT-4/Claude), limitaciones de RAG (embeddings, chunking, arranque en frio, contradicciones), compatibilidad parcial de API OpenAI, rendimiento (instancia unica, concurrencia), restricciones de seguridad, advertencias sobre encriptacion (default auto, nueva, no probada en batalla), y carencias funcionales (sin multi-usuario, sin sincronizacion, sin fine-tuning)."
+abstract: "Documentacion honesta de las limitaciones de server-nexe 1.0.4-beta. Cubre soporte de plataformas (macOS 14+ Apple Silicon only, Linux soportado (Ollama, CPU), Intel NO soportado, Windows en desarrollo), calidad de modelos vs nube (GPT-4/Claude), limitaciones de RAG (embeddings, chunking, arranque en frio, contradicciones), compatibilidad parcial de API OpenAI, rendimiento (instancia unica, concurrencia), restricciones de seguridad, advertencias sobre encriptacion (default auto, nueva, no probada en batalla), y carencias funcionales (sin multi-usuario, sin sincronizacion, sin fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -28,8 +28,8 @@ Este documento describe honestamente lo que server-nexe no puede hacer o no hace
 | macOS 14 Sonoma+ Apple Silicon (M1+) | **Target principal** — probado, los 3 backends |
 | macOS 13 Ventura | **NO soportado** (eliminado en v0.9.9 por dependencias arm64-only del stack) |
 | macOS Intel | **NO soportado** (eliminado en v0.9.9 — wheels arm64-only, sin MLX) |
-| Linux ARM64 | Testeado en VM — Ubuntu 24.04 LTS Desktop ARM64 (UTM en Mac Apple Silicon), 8 GB RAM, instalacion CLI + backend Ollama en CPU. Hardware ARM64 nativo aun no validado. |
-| Linux x86_64 | Parcial — tests unitarios pasan, CI verde. Instalacion nativa aun no validada. |
+| Linux ARM64 | Soportado (Ollama, CPU) — testeado en VM Ubuntu 24.04 ARM64 (UTM). Instalacion CLI o nexe-app (Tauri). Rutas XDG. |
+| Linux x86_64 | Soportado (Ollama, CPU) — tests unitarios pasan, CLI validada. |
 | Windows | En desarrollo (sin ETA pública) |
 
 ## Calidad de los modelos

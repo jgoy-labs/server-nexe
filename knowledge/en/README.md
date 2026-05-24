@@ -5,7 +5,7 @@ id: nexe-overview
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), session isolation, encryption at-rest, thinking toggle. Models by RAM tiers (8GB to 32GB, 16 models, 4 tiers), 2 installation methods (offline DMG 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux partial."
+abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), session isolation, encryption at-rest, thinking toggle. Models by RAM tiers (8GB to 32GB, 14 models, 4 tiers), 2 installation methods (offline DMG 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux supported (Ollama, CPU)."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -23,7 +23,7 @@ expires: null
 **Default port:** 9119
 **Author:** Jordi Goy (Barcelona)
 **License:** Apache 2.0
-**Platforms:** macOS 14 Sonoma+ Apple Silicon (M1+) — tested. Linux x86_64 (partial).
+**Platforms:** macOS 14 Sonoma+ Apple Silicon (M1+) — tested. Linux ARM64 and x86_64 — supported (Ollama, CPU).
 **Website:** https://server-nexe.org | https://server-nexe.com
 
 ## What is server-nexe
@@ -86,7 +86,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer
 ├── storage/               # Runtime data (models, logs, qdrant vectors)
-├── tests/                 # Test suite (6259 collected / 6474 total)
+├── tests/                 # Test suite (6685 collected / 6900 total)
 └── nexe                   # Main CLI executable
 ```
 
@@ -104,41 +104,38 @@ User -> CLI/API/Web UI -> Auth -> Rate Limit -> Validate Input -> Core -> Plugin
 
 The knowledge base (`knowledge/`) is designed for both human and AI consumption:
 - **Structured YAML frontmatter** for RAG ingestion (chunk_size, tags, priority)
-- **13 thematic files** covering identity, architecture, API, security, testing, use cases, etc.
+- **14 thematic files** covering identity, architecture, API, security, testing, use cases, etc.
 - **Available in English, Catalan, and Spanish**
 - Point any AI assistant at this repository and it can understand the full architecture, create plugins, or contribute code
 
 ## Available models (by RAM tier)
 
-16 empirically tested models, 4 tiers. Each tier has 2 recommended models (one for Ollama, one for MLX). Icons: 👁 = vision (images), 🧠 = thinking (step-by-step reasoning).
+14 empirically tested models, 4 tiers. Icons: 👁 = vision (images), 🧠 = thinking (step-by-step reasoning).
 
 ### tier_8 (8 GB RAM)
-- 👁 🧠 **Gemma 3 4B** — Google DeepMind, 2025. Ollama + MLX. **Recommended MLX.**
-- 👁 🧠 Qwen3.5 4B — Alibaba, 2026. Ollama only (MLX requires torch). **Recommended Ollama.**
-- Qwen3 4B — Alibaba, 2025. Text, Ollama + MLX.
+- 👁 🧠 **Qwen3.5 4B** — Alibaba, 2026. Ollama + MLX. **Recommended.**
 
 ### tier_16 (16 GB RAM)
-- 👁 🧠 **Gemma 4 E4B** — Google, 2026. Ollama + MLX. **Recommended MLX.**
+- 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Ollama + MLX.
+- 👁 🧠 Gemma 4 E4B — Google, 2026. Ollama + MLX.
+- 🧠 Mistral Nemo 12B — Mistral AI, 2024. Ollama + MLX.
 - Salamandra 7B — BSC/AINA, 2025. Ollama + llama.cpp (GGUF). Best for Catalan.
-- 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Ollama only (MLX requires torch). **Recommended Ollama.**
-- 👁 🧠 Gemma 3 12B — Google DeepMind, 2025. Ollama + MLX.
 
 ### tier_24 (24 GB RAM)
-- 👁 🧠 **Gemma 4 31B** — Google, 2026. Ollama + MLX. **Recommended.**
-- 🧠 **Qwen3 14B** — Alibaba, 2025. Ollama + MLX. **Recommended.**
+- 👁 🧠 Qwen3.5 27B — Alibaba, 2026. Ollama + MLX.
+- 👁 🧠 Gemma 4 31B — Google, 2026. Ollama + MLX.
+- 👁 🧠 Mistral Small 3.2 24B — Mistral AI, 2025. Ollama + MLX.
 - 🧠 GPT-OSS 20B — OpenAI, 2025. Ollama + MLX. Apache 2.0.
 
 ### tier_32 (32 GB RAM)
-- 👁 🧠 Qwen3.5 27B — Alibaba, 2026. Ollama only (MLX requires torch).
-- 👁 🧠 Gemma 3 27B — Google DeepMind, 2025. MLX + llama.cpp (GGUF).
+- 👁 🧠 Qwen3.5 35B-A3B (MoE) — Alibaba, 2026. Ollama + MLX.
+- 👁 🧠 Gemma 4 31B — Google, 2026. Ollama + MLX.
+- 🧠 Mixtral 8x7B (MoE) — Mistral AI, 2024. Ollama + MLX.
 - 🧠 DeepSeek R1 Distill 32B — DeepSeek, 2025. Ollama + llama.cpp (MLX unsupported: qwen2 arch).
-- 👁 🧠 **Gemma 4 31B** — Google, 2026. Ollama + MLX. **Recommended MLX.**
-- 👁 🧠 Qwen3.5 35B-A3B (MoE) — Alibaba, 2026. Ollama only.
 - **ALIA-40B Instruct** — BSC, 2026. Ollama + llama.cpp (GGUF). 9 Iberian languages. **Recommended Iberian.**
 
-### Backend compatibility notes (verified 2026-04-16)
+### Backend compatibility notes (verified 2026-05-24)
 
-- **Qwen3.5 family on MLX**: requires PyTorch and torchvision for VideoProcessor. Works perfectly via Ollama with no extra dependencies. Optional: `pip install torch torchvision` in the venv to unlock MLX (~2 GB). Affects: Qwen3.5 2B/4B/9B/27B/35B-A3B/122B-A10B.
 - **DeepSeek R1 Distill on MLX**: error "Unsupported model: qwen2". Use Ollama or GGUF via llama.cpp.
 - **Gemma 4 E4B on MLX**: may be unstable (repetition loops) in small models. Works well for vision.
 - **Gemma 4 31B on MLX**: requires complete 8-bit download (~33 GB, 7 shards). Verify integrity.
@@ -185,7 +182,8 @@ Authentication required: `X-API-Key` header with value from `.env` (`NEXE_PRIMAR
 | macOS 14 Sonoma+ Apple Silicon (M1+) | Tested (all 3 backends) |
 | macOS 13 Ventura | **NOT supported** (removed in v0.9.9) |
 | macOS Intel | **NOT supported** (removed in v0.9.9 — arm64-only wheels) |
-| Linux x86_64 | Partial (unit tests pass, CI green, not production-tested) |
+| Linux ARM64 | Supported (Ollama, CPU) — tested on VM Ubuntu 24.04 ARM64 (UTM) |
+| Linux x86_64 | Supported (Ollama, CPU) — unit tests pass, CLI validated |
 | Windows | In development (no public ETA) |
 
 ## Current limitations

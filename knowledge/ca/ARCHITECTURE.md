@@ -243,10 +243,10 @@ server-nexe/
 │   ├── tray_uninstaller.py       # Desinstal·lador amb copia de seguretat
 │   └── install_headless.py       # Instal·lador headless (compatible amb Linux)
 │
-├── knowledge/                    # Docs per a ingestio RAG (ca/es/en x 12 fitxers)
+├── knowledge/                    # Docs per a ingestio RAG (ca/es/en x 14 fitxers)
 │   └── .embeddings/              # KB embeddings precomputats (ONNX, 10.7× speedup a l'arrencada)
 ├── storage/                      # Dades en temps d'execucio (no a git)
-├── tests/                        # 6259 funcions de test col·lectades (6474 totals)
+├── tests/                        # 6685 funcions de test col·lectades (6900 totals)
 └── nexe                          # Executable CLI
 ```
 
@@ -429,9 +429,25 @@ El prompt del sistema defineix la personalitat i el comportament de Nexe. Viu a 
 - Web UI: applyI18n() amb atributs de dades, preserva elements fills
 - Compatible amb CSP: atribut data-nexe-lang en lloc de script inline
 
+## Mode sidecar (nexe-app / Tauri)
+
+server-nexe pot executar-se en dos modes:
+
+- **Standalone:** DMG o CLI, el servidor gestiona el seu propi cicle de vida
+- **Sidecar:** embedat dins nexe-app (Tauri v2), el host gestiona arrencada/aturada
+
+La configuracio de mode sidecar viu a `core/sidecar_config.py` (`SidecarConfig`). S'activa amb `NEXE_SIDECAR=1`. Tauri injecta variables d'entorn: `NEXE_HOME`, `NEXE_DATA_DIR`, `NEXE_API_KEY`, `NEXE_PORT`.
+
+Diferencies en mode sidecar:
+- **Paths:** resolts via `NEXE_HOME` / `NEXE_DATA_DIR` (no `Path.cwd()`)
+- **CORS:** inclou `tauri://localhost` i `http://localhost:1420`
+- **`/restart`:** retorna 501 (Tauri host gestiona el restart, no el sidecar)
+- **Plugins:** cada manifest pot declarar `disabled_in_sidecar = true`
+- **Onboarding:** `core/onboarding_state.py` guarda estat a paths XDG-compliant a Linux
+
 ## Arquitectura de tests
 
-- 6259 funcions de test col·lectades (6474 totals — 215 deselected per marcadors), 0 errors a l'ultima execucio
+- 6685 funcions de test col·lectades (6900 totals — 215 deselected per marcadors), 0 errors a l'ultima execucio
 - Cobertura real: ~85% global (baseline honest, sense inflar)
 - Tests col·locats amb els moduls (cada modul te una carpeta tests/)
 - conftest.py arrel per a fixtures compartides
@@ -490,7 +506,7 @@ A partir de v0.9.8, el backend MLX usa un **detector VLM "any-of" amb 3 senyals*
 
 Els fitxers de `knowledge/` poden tenir **embeddings precomputats** guardats a `knowledge/.embeddings/` (post-v0.9.8). A l'arrencada, si els hashes coincideixen amb els fitxers `.md` actuals, el sistema salta el càlcul d'embeddings (fastembed ONNX, ~700ms per fitxer) i carrega directament els vectors ja calculats.
 
-**Speedup mesurat:** 10.7× a l'arrencada en fred (cold boot). Útil especialment al DMG offline, on els embeddings venen ja dins el bundle per cada idioma (ca/es/en × 12 fitxers).
+**Speedup mesurat:** 10.7× a l'arrencada en fred (cold boot). Útil especialment al DMG offline, on els embeddings venen ja dins el bundle per cada idioma (ca/es/en × 14 fitxers).
 
 Els embeddings es regeneren automàticament si canvia el contingut dels `.md` o el model d'embeddings.
 

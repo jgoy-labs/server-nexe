@@ -11,7 +11,7 @@ This document formalizes the threat model that until v1.0.2-beta was implicit in
 
 ## 1. Purpose and scope
 
-server-nexe is a **single-user, local-first AI server** with persistent RAG memory. It runs on the user's own machine, binds to `127.0.0.1:9119` by default, and assumes a trusted local user. This threat model covers the 1.0.3-beta release (F1–F4.2 hardening included).
+server-nexe is a **single-user, local-first AI server** with persistent RAG memory. It runs on the user's own machine, binds to `127.0.0.1:9119` by default, and assumes a trusted local user. This threat model covers the 1.0.4-beta release (F1–F4.2 hardening included).
 
 In scope:
 
@@ -260,4 +260,4 @@ This document is reviewed:
 
 ---
 
-*server-nexe 1.0.3-beta+ · Apache 2.0 · Jordi Goy · see [SECURITY.md](SECURITY.md) for vulnerability reporting.*
+*server-nexe 1.0.4-beta+ · Apache 2.0 · Jordi Goy · see [SECURITY.md](SECURITY.md) for vulnerability reporting.*

@@ -243,10 +243,10 @@ server-nexe/
 │   ├── tray_uninstaller.py       # Uninstaller with backup
 │   └── install_headless.py       # Headless installer (Linux compatible)
 │
-├── knowledge/                    # Docs for RAG ingestion (ca/es/en × 12 files)
+├── knowledge/                    # Docs for RAG ingestion (ca/es/en × 14 files)
 │   └── .embeddings/              # Precomputed KB embeddings (ONNX, 10.7× startup speedup)
 ├── storage/                      # Runtime data (not in git)
-├── tests/                        # 6259 test functions collected (6474 total)
+├── tests/                        # 6685 test functions collected (6900 total)
 └── nexe                          # CLI executable
 ```
 
@@ -429,9 +429,25 @@ The system prompt defines Nexe's personality and behavior. It lives in `personal
 - Web UI: applyI18n() with data attributes, preserves child elements
 - CSP-safe: data-nexe-lang attribute instead of inline script
 
+## Sidecar mode (nexe-app / Tauri)
+
+server-nexe can run in two modes:
+
+- **Standalone:** DMG or CLI, the server manages its own lifecycle
+- **Sidecar:** embedded inside nexe-app (Tauri v2), the host manages start/stop
+
+Sidecar configuration lives in `core/sidecar_config.py` (`SidecarConfig`). Activated with `NEXE_SIDECAR=1`. Tauri injects env vars: `NEXE_HOME`, `NEXE_DATA_DIR`, `NEXE_API_KEY`, `NEXE_PORT`.
+
+Differences in sidecar mode:
+- **Paths:** resolved via `NEXE_HOME` / `NEXE_DATA_DIR` (not `Path.cwd()`)
+- **CORS:** includes `tauri://localhost` and `http://localhost:1420`
+- **`/restart`:** returns 501 (Tauri host manages restarts, not the sidecar)
+- **Plugins:** each manifest can declare `disabled_in_sidecar = true`
+- **Onboarding:** `core/onboarding_state.py` saves state to XDG-compliant paths on Linux
+
 ## Test Architecture
 
-- 6259 test functions collected (6474 total — 215 deselected by markers), 0 failures in latest run
+- 6685 test functions collected (6900 total — 215 deselected by markers), 0 failures in latest run
 - Actual coverage: ~85% global (honest baseline, not inflated)
 - Tests collocated with modules (each module has tests/ folder)
 - Root conftest.py for shared fixtures
@@ -490,7 +506,7 @@ Starting in v0.9.8, the MLX backend uses a **"any-of" VLM detector with 3 signal
 
 Files in `knowledge/` can have **precomputed embeddings** stored in `knowledge/.embeddings/` (post-v0.9.8). At startup, if the hashes match the current `.md` files, the system skips the embedding computation (fastembed ONNX, ~700ms per file) and loads the already-computed vectors directly.
 
-**Measured speedup:** 10.7× on cold boot. Particularly useful in the offline DMG, where embeddings ship inside the bundle for each language (ca/es/en × 12 files).
+**Measured speedup:** 10.7× on cold boot. Particularly useful in the offline DMG, where embeddings ship inside the bundle for each language (ca/es/en × 14 files).
 
 Embeddings regenerate automatically if the content of the `.md` files or the embedding model changes.
 

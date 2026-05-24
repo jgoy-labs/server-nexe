@@ -116,7 +116,7 @@ OpenAI-compatible chat completion with RAG and streaming support.
 | `/health` | GET | No | Basic health check |
 | `/health/ready` | GET | No | Readiness check (verifies required modules) |
 | `/health/circuits` | GET | Yes (X-API-Key) | Circuit breaker states (Ollama, Qdrant) |
-| `/status` | GET | No | Real-time status: active engine, model, loaded modules |
+| `/status` | GET | Yes (X-API-Key) | Real-time status: active engine, model, loaded modules |
 | `/api/info` | GET | No | API info and list of available endpoints |
 | `/docs` | GET | No | Swagger/OpenAPI interactive documentation |
 
@@ -124,8 +124,8 @@ OpenAI-compatible chat completion with RAG and streaming support.
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/modules` | GET | No | List loaded modules and their APIs |
-| `/modules/{name}/routes` | GET | No | Routes registered by a specific module |
+| `/modules` | GET | Yes (X-API-Key) | List loaded modules and their APIs |
+| `/modules/{name}/routes` | GET | Yes (X-API-Key) | Routes registered by a specific module |
 
 ### Bootstrap
 

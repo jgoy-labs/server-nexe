@@ -389,7 +389,23 @@ async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]
                 )
             ollama = _find_ollama_bin()
             if not ollama:
-                raise RuntimeError("Ollama installed but binary still not located")
+                # Ollama.app was extracted but the /usr/local/bin/ollama CLI
+                # symlink is registered asynchronously on first app launch and
+                # may not be ready yet. Fall back to the binary inside the app
+                # bundle, which exists as soon as the zip is extracted.
+                for _fallback in [
+                    "/Applications/Ollama.app/Contents/Resources/ollama",
+                    os.path.expanduser("~/Applications/Ollama.app/Contents/Resources/ollama"),
+                ]:
+                    if os.path.isfile(_fallback) and os.access(_fallback, os.X_OK):
+                        ollama = _fallback
+                        logger.info("ollama: CLI not yet registered; using bundle binary %s", _fallback)
+                        break
+                if not ollama:
+                    raise RuntimeError(
+                        "Ollama installed but binary still not located. "
+                        "Open Ollama.app once to finish setup, then restart server-nexe."
+                    )
         finally:
             _ollama_install_lock.release()
 

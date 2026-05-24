@@ -5,7 +5,7 @@ id: nexe-overview
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe es un servidor d'IA local amb memoria RAG persistent creat per Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalitats: MEM_SAVE, i18n (ca/es/en), aillament de sessions, encriptacio at-rest, thinking toggle. Models per tiers (8GB a 32GB, 16 models 4 tiers), 2 metodes d'instal-lacio (DMG offline 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux parcial."
+abstract: "server-nexe es un servidor d'IA local amb memoria RAG persistent creat per Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalitats: MEM_SAVE, i18n (ca/es/en), aillament de sessions, encriptacio at-rest, thinking toggle. Models per tiers (8GB a 32GB, 14 models 4 tiers), 2 metodes d'instal-lacio (DMG offline 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux suportat (Ollama, CPU)."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -23,7 +23,7 @@ expires: null
 **Port per defecte:** 9119
 **Autor:** Jordi Goy (Barcelona)
 **Llicencia:** Apache 2.0
-**Plataformes:** macOS 14 Sonoma+ Apple Silicon (M1+) — testejat. Linux x86_64 (parcial).
+**Plataformes:** macOS 14 Sonoma+ Apple Silicon (M1+) — testejat. Linux ARM64 i x86_64 — suportat (Ollama, CPU).
 **Web:** https://server-nexe.org | https://server-nexe.com
 
 ## Que es server-nexe
@@ -86,7 +86,7 @@ server-nexe/
 ├── personality/           # Prompts del sistema, module manager, i18n, server.toml
 ├── installer/             # Wizard SwiftUI, constructor de DMG, app de safata, instal·lador headless
 ├── storage/               # Dades en temps d'execucio (models, logs, vectors Qdrant)
-├── tests/                 # Suite de tests (6259 col·lectades / 6474 totals)
+├── tests/                 # Suite de tests (6685 col·lectades / 6900 totals)
 └── nexe                   # Executable CLI principal
 ```
 
@@ -104,41 +104,38 @@ Usuari -> CLI/API/Web UI -> Auth -> Rate Limit -> Validar Input -> Core -> Plugi
 
 La base de coneixement (`knowledge/`) esta dissenyada tant per a consum huma com per a IA:
 - **Frontmatter YAML estructurat** per a ingestio RAG (chunk_size, tags, priority)
-- **13 fitxers tematics** que cobreixen identitat, arquitectura, API, seguretat, testing, casos d'us, etc.
+- **14 fitxers tematics** que cobreixen identitat, arquitectura, API, seguretat, testing, casos d'us, etc.
 - **Disponible en angles, catala i castella**
 - Apunta qualsevol assistent d'IA a aquest repositori i podra entendre l'arquitectura completa, crear plugins o contribuir codi
 
 ## Models disponibles (per tiers de RAM)
 
-16 models testejats empiricament, 4 tiers. Cada tier te 2 models recomanats (un per Ollama, un per MLX). Icones: 👁 = visio (imatges), 🧠 = thinking (raonament pas a pas).
+14 models testejats empiricament, 4 tiers. Icones: 👁 = visio (imatges), 🧠 = thinking (raonament pas a pas).
 
 ### tier_8 (8 GB RAM)
-- 👁 🧠 **Gemma 3 4B** — Google DeepMind, 2025. Ollama + MLX. **Recomanat MLX.**
-- 👁 🧠 Qwen3.5 4B — Alibaba, 2026. Ollama nomes (MLX requereix torch). **Recomanat Ollama.**
-- Qwen3 4B — Alibaba, 2025. Text, Ollama + MLX.
+- 👁 🧠 **Qwen3.5 4B** — Alibaba, 2026. Ollama + MLX. **Recomanat.**
 
 ### tier_16 (16 GB RAM)
-- 👁 🧠 **Gemma 4 E4B** — Google, 2026. Ollama + MLX. **Recomanat MLX.**
+- 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Ollama + MLX.
+- 👁 🧠 Gemma 4 E4B — Google, 2026. Ollama + MLX.
+- 🧠 Mistral Nemo 12B — Mistral AI, 2024. Ollama + MLX.
 - Salamandra 7B — BSC/AINA, 2025. Ollama + llama.cpp (GGUF). El millor per catala.
-- 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Ollama nomes (MLX requereix torch). **Recomanat Ollama.**
-- 👁 🧠 Gemma 3 12B — Google DeepMind, 2025. Ollama + MLX.
 
 ### tier_24 (24 GB RAM)
-- 👁 🧠 **Gemma 4 31B** — Google, 2026. Ollama + MLX. **Recomanat.**
-- 🧠 **Qwen3 14B** — Alibaba, 2025. Ollama + MLX. **Recomanat.**
+- 👁 🧠 Qwen3.5 27B — Alibaba, 2026. Ollama + MLX.
+- 👁 🧠 Gemma 4 31B — Google, 2026. Ollama + MLX.
+- 👁 🧠 Mistral Small 3.2 24B — Mistral AI, 2025. Ollama + MLX.
 - 🧠 GPT-OSS 20B — OpenAI, 2025. Ollama + MLX. Apache 2.0.
 
 ### tier_32 (32 GB RAM)
-- 👁 🧠 Qwen3.5 27B — Alibaba, 2026. Ollama nomes (MLX requereix torch).
-- 👁 🧠 Gemma 3 27B — Google DeepMind, 2025. MLX + llama.cpp (GGUF).
+- 👁 🧠 Qwen3.5 35B-A3B (MoE) — Alibaba, 2026. Ollama + MLX.
+- 👁 🧠 Gemma 4 31B — Google, 2026. Ollama + MLX.
+- 🧠 Mixtral 8x7B (MoE) — Mistral AI, 2024. Ollama + MLX.
 - 🧠 DeepSeek R1 Distill 32B — DeepSeek, 2025. Ollama + llama.cpp (MLX no suportat: qwen2 arch).
-- 👁 🧠 **Gemma 4 31B** — Google, 2026. Ollama + MLX. **Recomanat MLX.**
-- 👁 🧠 Qwen3.5 35B-A3B (MoE) — Alibaba, 2026. Ollama nomes.
 - **ALIA-40B Instruct** — BSC, 2026. Ollama + llama.cpp (GGUF). 9 idiomes iberics. **Recomanat iberic.**
 
-### Notes sobre compatibilitat backends (verificat 2026-04-16)
+### Notes sobre compatibilitat backends (verificat 2026-05-24)
 
-- **Familia Qwen3.5 a MLX**: requereix PyTorch i torchvision per al VideoProcessor. Funciona perfectament via Ollama sense dependencies extra. Opcional: `pip install torch torchvision` al venv per desbloquejar MLX (~2 GB). Afecta: Qwen3.5 2B/4B/9B/27B/35B-A3B/122B-A10B.
 - **DeepSeek R1 Distill a MLX**: error "Unsupported model: qwen2". Usar Ollama o GGUF via llama.cpp.
 - **Gemma 4 E4B a MLX**: pot ser inestable (loops repetitius) en models petits. Funciona be per a visio.
 - **Gemma 4 31B a MLX**: requereix descàrrega completa 8-bit (~33 GB, 7 shards). Verificar integritat.
@@ -185,7 +182,8 @@ Autenticacio requerida: capcalera `X-API-Key` amb el valor de `.env` (`NEXE_PRIM
 | macOS 14 Sonoma+ Apple Silicon (M1+) | Testejat (tots 3 backends) |
 | macOS 13 Ventura | **NO suportat** (eliminat a v0.9.9) |
 | macOS Intel | **NO suportat** (eliminat a v0.9.9 — wheels arm64-only) |
-| Linux x86_64 | Parcial (tests unitaris passen, CI verd, no testejat en produccio) |
+| Linux ARM64 | Suportat (Ollama, CPU) — testejat a VM Ubuntu 24.04 ARM64 (UTM) |
+| Linux x86_64 | Suportat (Ollama, CPU) — tests unitaris passen, CLI validada |
 | Windows | En desenvolupament (sense ETA pública) |
 
 ## Limitacions actuals

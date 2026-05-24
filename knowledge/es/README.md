@@ -5,7 +5,7 @@ id: nexe-overview
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe es un servidor de IA local con memoria RAG persistente creado por Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalidades: MEM_SAVE, i18n (ca/es/en), aislamiento de sesiones, encriptacion en reposo, thinking toggle. Modelos por tiers (8GB a 32GB, 16 modelos 4 tiers), 2 metodos de instalacion (DMG offline 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux parcial."
+abstract: "server-nexe es un servidor de IA local con memoria RAG persistente creado por Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalidades: MEM_SAVE, i18n (ca/es/en), aislamiento de sesiones, encriptacion en reposo, thinking toggle. Modelos por tiers (8GB a 32GB, 14 modelos 4 tiers), 2 metodos de instalacion (DMG offline 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux soportado (Ollama, CPU)."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -23,7 +23,7 @@ expires: null
 **Puerto por defecto:** 9119
 **Autor:** Jordi Goy (Barcelona)
 **Licencia:** Apache 2.0
-**Plataformas:** macOS 14 Sonoma+ Apple Silicon (M1+) — probado. Linux x86_64 (parcial).
+**Plataformas:** macOS 14 Sonoma+ Apple Silicon (M1+) — probado. Linux ARM64 y x86_64 — soportado (Ollama, CPU).
 **Web:** https://server-nexe.org | https://server-nexe.com
 
 ## Que es server-nexe
@@ -86,7 +86,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # Wizard SwiftUI, constructor DMG, tray app, instalador headless
 ├── storage/               # Datos en tiempo de ejecucion (modelos, logs, vectores qdrant)
-├── tests/                 # Suite de tests (6259 recopiladas / 6474 totales)
+├── tests/                 # Suite de tests (6685 recopiladas / 6900 totales)
 └── nexe                   # Ejecutable CLI principal
 ```
 
@@ -104,41 +104,38 @@ Usuario -> CLI/API/Web UI -> Auth -> Rate Limit -> Validar Entrada -> Core -> Pl
 
 La base de conocimiento (`knowledge/`) esta disenada tanto para consumo humano como de IA:
 - **Frontmatter YAML estructurado** para ingestion RAG (chunk_size, tags, priority)
-- **13 ficheros tematicos** cubriendo identidad, arquitectura, API, seguridad, pruebas, casos de uso, etc.
+- **14 ficheros tematicos** cubriendo identidad, arquitectura, API, seguridad, pruebas, casos de uso, etc.
 - **Disponible en ingles, catalan y espanol**
 - Apunta cualquier asistente de IA a este repositorio y podra entender la arquitectura completa, crear plugins o contribuir codigo
 
 ## Modelos disponibles (por tiers de RAM)
 
-16 modelos testeados empiricamente, 4 tiers. Cada tier tiene 2 modelos recomendados (uno para Ollama, uno para MLX). Iconos: 👁 = vision (imagenes), 🧠 = thinking (razonamiento paso a paso).
+14 modelos testeados empiricamente, 4 tiers. Iconos: 👁 = vision (imagenes), 🧠 = thinking (razonamiento paso a paso).
 
 ### tier_8 (8 GB RAM)
-- 👁 🧠 **Gemma 3 4B** — Google DeepMind, 2025. Ollama + MLX. **Recomendado MLX.**
-- 👁 🧠 Qwen3.5 4B — Alibaba, 2026. Solo Ollama (MLX requiere torch). **Recomendado Ollama.**
-- Qwen3 4B — Alibaba, 2025. Texto, Ollama + MLX.
+- 👁 🧠 **Qwen3.5 4B** — Alibaba, 2026. Ollama + MLX. **Recomendado.**
 
 ### tier_16 (16 GB RAM)
-- 👁 🧠 **Gemma 4 E4B** — Google, 2026. Ollama + MLX. **Recomendado MLX.**
+- 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Ollama + MLX.
+- 👁 🧠 Gemma 4 E4B — Google, 2026. Ollama + MLX.
+- 🧠 Mistral Nemo 12B — Mistral AI, 2024. Ollama + MLX.
 - Salamandra 7B — BSC/AINA, 2025. Ollama + llama.cpp (GGUF). El mejor para catalan.
-- 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Solo Ollama (MLX requiere torch). **Recomendado Ollama.**
-- 👁 🧠 Gemma 3 12B — Google DeepMind, 2025. Ollama + MLX.
 
 ### tier_24 (24 GB RAM)
-- 👁 🧠 **Gemma 4 31B** — Google, 2026. Ollama + MLX. **Recomendado.**
-- 🧠 **Qwen3 14B** — Alibaba, 2025. Ollama + MLX. **Recomendado.**
+- 👁 🧠 Qwen3.5 27B — Alibaba, 2026. Ollama + MLX.
+- 👁 🧠 Gemma 4 31B — Google, 2026. Ollama + MLX.
+- 👁 🧠 Mistral Small 3.2 24B — Mistral AI, 2025. Ollama + MLX.
 - 🧠 GPT-OSS 20B — OpenAI, 2025. Ollama + MLX. Apache 2.0.
 
 ### tier_32 (32 GB RAM)
-- 👁 🧠 Qwen3.5 27B — Alibaba, 2026. Solo Ollama (MLX requiere torch).
-- 👁 🧠 Gemma 3 27B — Google DeepMind, 2025. MLX + llama.cpp (GGUF).
+- 👁 🧠 Qwen3.5 35B-A3B (MoE) — Alibaba, 2026. Ollama + MLX.
+- 👁 🧠 Gemma 4 31B — Google, 2026. Ollama + MLX.
+- 🧠 Mixtral 8x7B (MoE) — Mistral AI, 2024. Ollama + MLX.
 - 🧠 DeepSeek R1 Distill 32B — DeepSeek, 2025. Ollama + llama.cpp (MLX no soportado: arch qwen2).
-- 👁 🧠 **Gemma 4 31B** — Google, 2026. Ollama + MLX. **Recomendado MLX.**
-- 👁 🧠 Qwen3.5 35B-A3B (MoE) — Alibaba, 2026. Solo Ollama.
 - **ALIA-40B Instruct** — BSC, 2026. Ollama + llama.cpp (GGUF). 9 idiomas ibericos. **Recomendado iberico.**
 
-### Notas de compatibilidad backends (verificado 2026-04-16)
+### Notas de compatibilidad backends (verificado 2026-05-24)
 
-- **Familia Qwen3.5 en MLX**: requiere PyTorch y torchvision para el VideoProcessor. Funciona perfectamente via Ollama sin dependencias extra. Opcional: `pip install torch torchvision` en el venv para desbloquear MLX (~2 GB). Afecta: Qwen3.5 2B/4B/9B/27B/35B-A3B/122B-A10B.
 - **DeepSeek R1 Distill en MLX**: error "Unsupported model: qwen2". Usar Ollama o GGUF via llama.cpp.
 - **Gemma 4 E4B en MLX**: puede ser inestable (loops repetitivos) en modelos pequenos. Funciona bien para vision.
 - **Gemma 4 31B en MLX**: requiere descarga completa 8-bit (~33 GB, 7 shards). Verificar integridad.
@@ -185,7 +182,8 @@ Autenticacion requerida: cabecera `X-API-Key` con el valor de `.env` (`NEXE_PRIM
 | macOS 14 Sonoma+ Apple Silicon (M1+) | Probado (los 3 backends) |
 | macOS 13 Ventura | **NO soportado** (eliminado en v0.9.9) |
 | macOS Intel | **NO soportado** (eliminado en v0.9.9 — wheels arm64-only) |
-| Linux x86_64 | Parcial (tests unitarios pasan, CI verde, no probado en produccion) |
+| Linux ARM64 | Soportado (Ollama, CPU) — testeado en VM Ubuntu 24.04 ARM64 (UTM) |
+| Linux x86_64 | Soportado (Ollama, CPU) — tests unitarios pasan, CLI validada |
 | Windows | En desarrollo (sin ETA pública) |
 
 ## Limitaciones actuales
