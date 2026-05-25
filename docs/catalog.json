@@ -2,6 +2,38 @@
   {
     "name": "Qwen3.5 4B",
     "params": "4B",
+    "ram_gb": 3.0,
+    "disk_gb": 2.9,
+    "backends": [
+      "MLX",
+      "Ollama"
+    ],
+    "flags": [],
+    "origin": "Alibaba",
+    "ollama": "qwen3.5:4b",
+    "mlx": "mlx-community/Qwen3.5-4B-MLX-4bit",
+    "gguf": null
+  },
+  {
+    "name": "Gemma 4 E4B",
+    "params": "8B totals / ~4B actius (MoE)",
+    "ram_gb": 4.0,
+    "disk_gb": 4.5,
+    "backends": [
+      "MLX",
+      "Ollama"
+    ],
+    "flags": [],
+    "origin": "Google",
+    "ollama": "gemma4:e4b",
+    "mlx": "mlx-community/gemma-4-e4b-it-4bit",
+    "gguf": null,
+    "gated": "manual",
+    "license_url": "https://huggingface.co/google/gemma-4-e4b-it"
+  },
+  {
+    "name": "Qwen3.5 4B (8-bit)",
+    "params": "4B",
     "ram_gb": 4.0,
     "disk_gb": 3.4,
     "backends": [
@@ -79,6 +111,23 @@
     "gguf": "https://huggingface.co/hdnh2006/BSC-LT-salamandra-7b-instruct-gguf/resolve/main/salamandra-7b-instruct-Q4_K_M.gguf"
   },
   {
+    "name": "Gemma 4 31B",
+    "params": "31B (dense)",
+    "ram_gb": 10.0,
+    "disk_gb": 18.5,
+    "backends": [
+      "MLX",
+      "Ollama"
+    ],
+    "flags": [],
+    "origin": "Google",
+    "ollama": "gemma4:31b",
+    "mlx": "mlx-community/gemma-4-31b-it-8bit",
+    "gguf": null,
+    "gated": "manual",
+    "license_url": "https://huggingface.co/google/gemma-4-31b-it"
+  },
+  {
     "name": "Qwen3.5 27B",
     "params": "27B",
     "ram_gb": 20.0,
@@ -92,23 +141,6 @@
     "ollama": "qwen3.5:27b",
     "mlx": "mlx-community/Qwen3.5-27B-4bit",
     "gguf": null
-  },
-  {
-    "name": "Gemma 4 31B",
-    "params": "31B (dense)",
-    "ram_gb": 22.0,
-    "disk_gb": 18.5,
-    "backends": [
-      "MLX",
-      "Ollama"
-    ],
-    "flags": [],
-    "origin": "Google",
-    "ollama": "gemma4:31b",
-    "mlx": "mlx-community/gemma-4-31b-it-8bit",
-    "gguf": null,
-    "gated": "manual",
-    "license_url": "https://huggingface.co/google/gemma-4-31b-it"
   },
   {
     "name": "Mistral Small 3.2 24B",
@@ -154,6 +186,23 @@
     "ollama": "qwen3.5:35b-a3b",
     "mlx": "mlx-community/Qwen3.5-35B-A3B-4bit",
     "gguf": null
+  },
+  {
+    "name": "Gemma 4 31B",
+    "params": "31B (dense)",
+    "ram_gb": 22.0,
+    "disk_gb": 18.5,
+    "backends": [
+      "MLX",
+      "Ollama"
+    ],
+    "flags": [],
+    "origin": "Google",
+    "ollama": "gemma4:31b",
+    "mlx": "mlx-community/gemma-4-31b-it-8bit",
+    "gguf": null,
+    "gated": "manual",
+    "license_url": "https://huggingface.co/google/gemma-4-31b-it"
   },
   {
     "name": "Mixtral 8x7B",
