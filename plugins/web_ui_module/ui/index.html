@@ -270,18 +270,22 @@
 
     <script src="/ui/static/app.js"></script>
     <script>
-      // Open external links in the system browser.
-      // Tauri v2 blocks target="_blank" by default; this interceptor calls
-      // the open_external_url Rust command via __TAURI_INTERNALS__ so the
-      // OS default browser receives the URL instead of the webview.
-      document.addEventListener("click", function (e) {
-        var a = e.target.closest("a[href]");
-        if (!a) return;
-        var href = a.getAttribute("href");
-        if (!href || !/^https?:\/\//.test(href)) return;
-        e.preventDefault();
-        window.__TAURI_INTERNALS__?.invoke("open_external_url", { url: href });
-      });
+      // Open external links via sidecar /ui/open-external endpoint.
+      // Tauri v2 isolation prevents __TAURI_INTERNALS__ at http://127.0.0.1;
+      // a sidecar HTTP call is the only reliable cross-platform approach.
+      (function () {
+        var _key = localStorage.getItem("nexe_api_key") || "";
+        document.addEventListener("click", function (e) {
+          var a = e.target.closest("a[href]");
+          if (!a) return;
+          var href = a.getAttribute("href");
+          if (!href || !/^https?:\/\//.test(href)) return;
+          e.preventDefault();
+          fetch("/ui/open-external?url=" + encodeURIComponent(href), {
+            headers: _key ? { "X-API-Key": _key } : {}
+          }).catch(function () {});
+        });
+      })();
     </script>
 </body>
 </html>

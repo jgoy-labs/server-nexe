@@ -17,6 +17,7 @@ from typing import Optional
 from pathlib import Path
 
 from personality.i18n import get_i18n
+from core.version import __version__
 
 def cmd_info():
   """Show module information"""
@@ -126,7 +127,7 @@ async def cmd_stats():
 def main():
   """Main CLI entry point"""
   parser = argparse.ArgumentParser(
-    description="Embeddings Module - Nexe 0.9",
+    description=f"Embeddings Module - server-nexe {__version__}",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog="""
 Examples:

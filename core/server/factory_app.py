@@ -57,7 +57,7 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
     description=translate(
       i18n,
       "server_core.api.description",
-      "**Nexe 0.9** — Local AI server with persistent memory.\n\n"
+      f"**server-nexe {__version__}** — Local AI server with persistent memory.\n\n"
       "## Authentication\n"
       "Most endpoints require the `X-API-Key` header.\n\n"
       "## Endpoint groups\n"

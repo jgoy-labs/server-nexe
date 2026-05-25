@@ -246,3 +246,6 @@ Ortogonal = "Ortogonal"  # Catalan: "Orthogonal"
 # correcte; aquesta entrada manté la variant sense accent per si apareix
 # a docs legacy (quoted key per ser TOML-vàlida amb caràcter especial).
 "tècniques" = "tècniques"
+# Catalan in requirements/installer comments (2026-05-25)
+corresponents = "corresponents"
+importen = "importen"

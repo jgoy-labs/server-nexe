@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: personality/i18n/i18n_manager.py
-Description: Global internationalization (i18n) system for Nexe 0.9.
+Description: Global internationalization (i18n) system for server-nexe.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -19,7 +19,7 @@ import toml  # type: ignore[import-untyped]  # FP: types-toml available but not 
 __all__ = ['I18nManager']
 
 class I18nManager:
-  """Global internationalization manager for Nexe 0.9 system"""
+  """Global internationalization manager for server-nexe system"""
   
   def __init__(self, config_path: Optional[Path] = None, base_path: Optional[Path] = None):
     """

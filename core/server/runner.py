@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 from .helpers import setup_signal_handlers, is_port_in_use, translate  # noqa: E402  # after load_dotenv()
 from .factory import create_app  # noqa: E402  # after load_dotenv()
+from core.version import __version__  # noqa: E402  # after load_dotenv()
 # F2.A11 refactor: parent watchdog mogut a core/server/watchdog.py per trencar
 # cicle imports (lifespan → runner → factory → endpoints → lifespan). Re-exportat
 # aquí per backward compatibility amb runner.main() i tests.
@@ -405,7 +406,7 @@ def main():
   project_root = app.state.project_root
 
   logger.info(
-    translate(i18n, "server_core.startup.starting_from", "Starting Nexe 0.9 from: {path}", path=str(project_root))
+    translate(i18n, "server_core.startup.starting_from", f"Starting server-nexe {__version__} from: {{path}}", path=str(project_root))
   )
 
   from core.config import DEFAULT_HOST, DEFAULT_PORT, get_default_host, get_default_port

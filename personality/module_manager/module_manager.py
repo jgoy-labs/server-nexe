@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: personality/module_manager/module_manager.py
-Description: Central facade of the Nexe 0.9 module management system.
+Description: Central facade of the server-nexe module management system.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -45,7 +45,7 @@ if not SECURITY_VALIDATION_AVAILABLE:
 
 class ModuleManager(PluginLoaderMixin):
   """
-  UNIFIED Module Manager for Nexe 0.9 system (SINGLE SOURCE OF TRUTH).
+  UNIFIED Module Manager for server-nexe system (SINGLE SOURCE OF TRUTH).
 
   This is the ONLY module loading system. All module operations go through here:
   - Plugin modules (plugins/*)

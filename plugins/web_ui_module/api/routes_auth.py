@@ -82,7 +82,7 @@ def get_server_lang() -> str:
 
 # P1-A: Rate limit for authentication failures per IP.
 # In-memory dict: {ip: [monotonic timestamps of failures within the window]}.
-# Nexe 0.9.x is single-worker (uvicorn workers=1) — no lock needed.
+# server-nexe is single-worker (uvicorn workers=1) — no lock needed.
 _ui_auth_failures: dict[str, list[float]] = {}
 _UI_RATE_LIMIT: int = 20   # maximum failed attempts within the window
 _UI_RATE_WINDOW: float = 60.0  # window in seconds

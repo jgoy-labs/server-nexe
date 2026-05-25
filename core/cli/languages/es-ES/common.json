@@ -1,10 +1,10 @@
 {
  "cli": {
   "name": "CLI Central Nexe",
-  "description": "Orquestador de CLIs de módulos Nexe 0.9",
+  "description": "Orquestador de CLIs de módulos server-nexe",
   "greetings": {
    "hello": "Hola",
-   "welcome": "Bienvenido al CLI Central Nexe 0.9",
+   "welcome": "Bienvenido al CLI Central server-nexe",
    "goodbye": "¡Adiós!"
   },
   "features": {

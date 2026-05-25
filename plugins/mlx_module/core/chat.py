@@ -353,7 +353,7 @@ def _detect_vlm_capability(model_path: str) -> bool:
 
 class MLXChatNode:
     """
-    Inference engine for MLX adapted for Nexe 0.9.
+    Inference engine for MLX adapted for server-nexe.
 
     Maintains:
     - A single loaded model (singleton)

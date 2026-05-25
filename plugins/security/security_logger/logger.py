@@ -21,7 +21,7 @@ from .helpers import SecurityLoggerHelpers
 
 class SecurityEventLogger(SecurityLoggerHelpers):
   """
-  Structured security event logger for Nexe 0.9
+  Structured security event logger for server-nexe
 
   Emits JSON-formatted security events to dedicated log file
   Compatible with SIEM/security monitoring tools

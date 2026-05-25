@@ -1,5 +1,5 @@
 """
-Real integration tests against Nexe 0.9 server.
+Real integration tests against server-nexe.
 
 Requires:
 - Nexe server running at localhost:9119

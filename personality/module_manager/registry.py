@@ -13,6 +13,8 @@ import threading
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 
+from core.version import __version__
+
 from personality.data.models import EndpointInfo, ModuleRegistration
 
 from personality._logger import get_logger
@@ -276,7 +278,7 @@ class ModuleRegistry:
     spec: Dict[str, Any] = {
       'openapi': '3.0.0',
       'info': {
-        'title': 'Nexe 0.9 Modular API',
+        'title': f'server-nexe {__version__} Modular API',
         'version': '0.9.0',
         'description': 'Auto-generated API from Nexe modular system'
       },

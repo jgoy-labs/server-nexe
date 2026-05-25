@@ -311,7 +311,8 @@ async def _startup_init(app: FastAPI) -> None:
     except Exception as exc:  # noqa: BLE001 — defensive only
         logger.debug("hf_xet defence check skipped: %s", exc)
 
-    msg = _translate(server_state.i18n, "core.server.banner", "Nexe 0.9 - Modular AI System")
+    from core.version import __version__ as _nexe_version
+    msg = _translate(server_state.i18n, "core.server.banner", f"server-nexe {_nexe_version} - Modular AI System")
     logger.info(msg)
 
     reload_trigger = server_state.project_root / ".nexe_reload_trigger.py"  # type: ignore[operator]
@@ -392,7 +393,8 @@ async def _startup_services(app: FastAPI) -> None:
     msg = _translate(server_state.i18n, "core.server.binding_server",
         "Server ready at {host}:{port}", host=host, port=port)
     logger.info(msg)
-    msg = _translate(server_state.i18n, "core.server.all_systems_go", "All systems operational - Nexe 0.9 ready!")
+    from core.version import __version__ as _nexe_version
+    msg = _translate(server_state.i18n, "core.server.all_systems_go", f"All systems operational - server-nexe {_nexe_version} ready!")
     logger.info(msg)
 
     server_state.api_integrator = APIIntegrator(app, server_state.i18n)
@@ -567,8 +569,9 @@ async def _shutdown(app: FastAPI) -> None:
             "Error during cleanup: {error}", error=str(e))
         logger.error(msg)
 
+    from core.version import __version__ as _nexe_version
     msg = _translate(server_state.i18n, "core.server.shutdown_goodbye",
-        "Nexe 0.9 stopped successfully. See you soon!")
+        f"server-nexe {_nexe_version} stopped successfully. See you soon!")
     logger.info(msg)
 
 

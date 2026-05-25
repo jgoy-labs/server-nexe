@@ -13,7 +13,7 @@ www.jgoy.net · https://server-nexe.org
 
 import asyncio
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from plugins.web_ui_module.core.memory_helper import get_memory_helper  # noqa: F401 — re-export for test patches
 from plugins.web_ui_module.core.compactor import compact_session  # noqa: F401 — re-export for test patches
@@ -122,5 +122,24 @@ def create_router(module_instance) -> APIRouter:
     register_file_routes(router, session_mgr=session_mgr, file_handler=file_handler, require_ui_auth=_require_ui_auth)
     register_chat_routes(router, session_mgr=session_mgr, require_ui_auth=_require_ui_auth)
     register_memory_routes(router, require_ui_auth=_require_ui_auth)
+
+    # Open an external https?:// URL in the system default browser.
+    # Used by the sidecar UI to open footer links (server-nexe.com, GitHub,
+    # etc.) without relying on Tauri IPC, which is unavailable at HTTP origins.
+    @router.get("/open-external")
+    async def open_external_url(
+        url: str,
+        _auth: None = Depends(_require_ui_auth),
+    ):
+        import platform, subprocess  # noqa: PLC0415
+        if not url.startswith(("https://", "http://")):
+            from fastapi import HTTPException  # noqa: PLC0415
+            raise HTTPException(status_code=400, detail="Only https/http URLs allowed")
+        system = platform.system()
+        if system == "Darwin":
+            subprocess.Popen(["open", url])  # nosec B603 B607
+        elif system == "Linux":
+            subprocess.Popen(["xdg-open", url])  # nosec B603 B607
+        return {"ok": True}
 
     return router

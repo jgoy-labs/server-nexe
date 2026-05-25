@@ -83,13 +83,42 @@ def _wait_ready(url: str, timeout: int = STARTUP_TIMEOUT) -> None:
     )
 
 
+def _ensure_onboarding_state(data_dir: Path) -> None:
+    """Create a minimal onboarding.json so the server exits MINIMAL MODE."""
+    import json as _json
+    from datetime import datetime as _dt, timezone as _tz
+    state_file = data_dir / "onboarding.json"
+    if state_file.exists():
+        return
+    data_dir.mkdir(parents=True, exist_ok=True)
+    state_file.write_text(_json.dumps({
+        "version": 2,
+        "engine": "ollama",
+        "model_id": "qwen3.5:4b",
+        "model_path": "qwen3.5:4b",
+        "completed_at": _dt.now(_tz.utc).isoformat(timespec="seconds"),
+        "has_token": False,
+    }), encoding="utf-8")
+
+
 def _build_env() -> dict[str, str]:
-    """Merge process env with .env file values (process env wins)."""
+    """Merge process env with .env file values (process env wins).
+
+    Runs server in standalone mode with a synthetic onboarding state so all
+    modules load normally (not MINIMAL MODE).
+    """
     merged = {**_dotenv, **os.environ}
-    # Suppress tray and watchdog in test mode
     merged["NEXE_NO_TRAY"] = "1"
     merged["NEXE_ENV"] = merged.get("NEXE_ENV", "test")
     merged["NEXE_LOG_LEVEL"] = merged.get("NEXE_LOG_LEVEL", "WARNING")
+    merged["NEXE_APPROVED_MODULES"] = merged.get(
+        "NEXE_APPROVED_MODULES",
+        "security,memory,rag,embeddings,mlx_module,llama_cpp_module,ollama_module,web_ui_module",
+    )
+    merged.pop("NEXE_SIDECAR", None)
+    data_dir = Path(merged.get("NEXE_DATA_DIR", str(PROJECT_ROOT / ".test_data")))
+    _ensure_onboarding_state(data_dir)
+    merged["NEXE_DATA_DIR"] = str(data_dir)
     return merged
 
 

@@ -17,6 +17,7 @@ import json
 from typing import Optional
 
 from .module import RAGModule
+from core.version import __version__
 
 logging.basicConfig(
   level=logging.INFO,
@@ -264,7 +265,7 @@ def create_parser() -> argparse.ArgumentParser:
   """Create argument parser for RAG CLI"""
   parser = argparse.ArgumentParser(
     prog="rag",
-    description="Nexe 0.9 - RAG Module CLI",
+    description=f"server-nexe {__version__} - RAG Module CLI",
     formatter_class=argparse.RawDescriptionHelpFormatter
   )
 

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/embeddings/manifest.py
-Description: Manifest for the Embeddings module following Nexe 0.9 pattern.
+Description: Manifest for the Embeddings module following server-nexe pattern.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

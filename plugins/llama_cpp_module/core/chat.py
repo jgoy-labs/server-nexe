@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class LlamaCppChatNode:
     """
-    Inference engine for Llama.cpp adapted for Nexe 0.9.
+    Inference engine for Llama.cpp adapted for server-nexe.
 
     Uses ModelPool to manage Llama instances with LRU eviction.
     Each session can have its own instance (if max_sessions > 1).

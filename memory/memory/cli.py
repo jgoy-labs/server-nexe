@@ -16,6 +16,7 @@ import logging
 from typing import Optional
 
 from .module import MemoryModule
+from core.version import __version__
 from .models.memory_entry import MemoryEntry
 from .models.memory_types import MemoryType
 
@@ -280,7 +281,7 @@ def create_parser() -> argparse.ArgumentParser:
   """Create argument parser for Memory CLI"""
   parser = argparse.ArgumentParser(
     prog="memory",
-    description="Nexe 0.9 - Memory Module CLI",
+    description=f"server-nexe {__version__} - Memory Module CLI",
     formatter_class=argparse.RawDescriptionHelpFormatter
   )
 

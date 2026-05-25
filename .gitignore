@@ -145,3 +145,4 @@ scripts/export_source_pdf.py
 scripts/export_whitepaper_pdf.py
 knip.json
 dev-tools/reports/
+.test_data/

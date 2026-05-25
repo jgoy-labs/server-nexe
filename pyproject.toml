@@ -99,3 +99,85 @@ exclude = [
     "Nexe.app/*",
 ]
 
+[tool.muthur]
+# Auditoria zero 2026-05-15 (post-restructura DEV/OSS): muthur només mira
+# codi font + tests. Tot el contingut intern (diari, eines QA, runtime data,
+# bundles pre-compilats, scripts auxiliars no-prod) queda fora.
+#
+# El default EXCLUDED_DIRS de muthur cobreix .venv/node_modules/dist/build/
+# target/bundle/__pycache__/.git. Aquí ampliem amb les carpetes pròpies del
+# projecte que NO són codi a auditar.
+exclude_dirs = [
+    "diari",           # 16 MB, ~10k docs interns (mega-tests, informes, _chaos/chaos_c*.py)
+    "specialists",     # eines QA internes (no public, no prod)
+    "nexe",            # eines internes
+    "storage",         # runtime data (sessions, qdrant, etc.)
+    ".muthur",         # config + audits del propi muthur
+    "InstallNexe.app", # bundle Python pre-compilat (mateix motiu que lizard)
+    "Nexe.app",        # bundle SwiftUI pre-compilat
+    "uploads",         # plugins/web_ui_module/ui/uploads — runtime
+    "worktrees",       # git worktrees (còpies paral·leles, duplicats falsos positius)
+    "tests",           # tests no són codi de producció: ruff/bandit/mypy/vulture
+                       # ja els excloen individualment; semgrep-security genera
+                       # fals positius (denylist patterns, fake tokens als tests
+                       # de validació). Coherent amb la resta de tools.
+]
+exclude_globs = [
+    "dev-tools/reports/**",                  # informes interns auditories velles
+    "installer/swift-wizard/.build/**",      # build artifacts Swift
+    "scripts/export_source_pdf.py",          # eina dev-only (no public)
+    "scripts/export_whitepaper_pdf.py",      # eina dev-only (no public)
+    "**/.module_cache.json",                 # runtime cache
+    "**/*.bak-*",                             # backups locals (whitelist, etc.)
+]
+
+[tool.muthur.license]
+# Auditoria zero 2026-05-15: llicències OSS compatibles amb AGPL-3.0+commercial
+# dual-license del projecte. Validats per consens 4 IAs (Claude/Codex/Gemini +
+# anàlisi automàtic Turing). Tots són permisius o copyleft feble (MPL) sense
+# riscos legals reals.
+#
+# Inclou variants exactes de noms que pip-licenses retorna (composites com
+# "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0" són reals als deps
+# i tots els components individuals són OSS-compatibles).
+allowed = [
+    # MIT family
+    "MIT", "MIT License", "MIT-CMU",
+    # BSD family
+    "BSD-3-Clause", "BSD-2-Clause", "0BSD",
+    "BSD License", "BSD",
+    "3-Clause BSD License",
+    # Apache family
+    "Apache-2.0", "Apache License 2.0", "Apache Software License",
+    "Apache-2.0 AND MIT",
+    "Apache-2.0 AND CNRI-Python",
+    # ISC family
+    "ISC", "ISC License", "ISC License (ISCL)",
+    # PSF
+    "PSF-2.0", "Python Software Foundation License",
+    # Mozilla
+    "MPL-2.0", "Mozilla Public License 2.0 (MPL 2.0)",
+    "MPL-2.0 AND MIT",
+    # AGPL (propi)
+    "AGPL-3.0-or-later", "AGPL-3.0",
+    "GNU Affero General Public License v3 or later (AGPLv3+)",
+    # Public domain / Zlib / CC0
+    "Unlicense", "The Unlicense (Unlicense)",
+    "Public Domain", "Zlib", "CC0-1.0",
+    # Composites coneguts (numpy, etc.)
+    "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+]
+
+# Resolució 2026-05-15 (post-investigació empírica):
+#
+# - fastembed 0.8.0 — License field metadata = "Apache License" (vs classifier
+#   "Other/Proprietary License" mal posat upstream). Patch muthur amb --from=meta
+#   ara prioritza el camp License canonical. "Apache License" afegit a allowed.
+#
+# - py_rust_stemmers 0.1.5 — License field UNKNOWN al metadata però LICENSE
+#   file al dist-info (`licenses/LICENSE`) diu "MIT License" clarament
+#   (verificat 2026-05-15). Whitelist específic al .muthur/whitelist.toml.
+#
+# - sentencepiece — no és dep instal·lada del projecte (només apareixia abans
+#   per quirk de pip-licenses amb venv buit).
+

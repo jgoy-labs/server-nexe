@@ -11,6 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field, ConfigDict
+from core.version import __version__
 
 class SystemResponse(BaseModel):
   """Response model for root endpoint (/)"""
@@ -23,7 +24,7 @@ class SystemResponse(BaseModel):
   model_config = ConfigDict(
     json_schema_extra={
       "example": {
-        "system": "Nexe 0.9",
+        "system": f"server-nexe {__version__}",
         "description": "Module orchestration system operational",
         "status": "System ready and operational",
         "version": "0.9.1",
@@ -66,7 +67,7 @@ class ApiInfoResponse(BaseModel):
   model_config = ConfigDict(
     json_schema_extra={
       "example": {
-        "name": "Nexe 0.9",
+        "name": f"server-nexe {__version__}",
         "version": "0.9.1",
         "description": "Module orchestration system operational",
         "endpoints": [

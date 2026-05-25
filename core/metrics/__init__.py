@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: core/metrics/__init__.py
-Description: Prometheus metrics module per Nexe 0.9.
+Description: Prometheus metrics module per server-nexe.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
