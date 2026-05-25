@@ -17,7 +17,7 @@
   {
     "name": "Qwen3.5 4B (8-bit)",
     "params": "4B",
-    "ram_gb": 4.0,
+    "ram_gb": 10.0,
     "disk_gb": 3.4,
     "backends": [
       "MLX",
