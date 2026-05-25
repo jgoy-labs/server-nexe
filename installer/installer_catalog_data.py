@@ -43,10 +43,10 @@ MODEL_CATALOG = {
             "year": 2026,
             "lang": {"ca": "Multilingüe (excel·lent català)", "es": "Multilingüe (excelente catalán)", "en": "Multilingual (excellent Catalan)"},
             "params": "4B",
-            "disk_gb": 3.4,
-            "ram_gb": 4.0,
+            "disk_gb": 2.9,
+            "ram_gb": 3.0,
             "description": {"ca": "👁 🧠 Multimodal, thinking, visió. MLX Apple Silicon.", "es": "👁 🧠 Multimodal, thinking, visión. MLX Apple Silicon.", "en": "👁 🧠 Multimodal, thinking, vision. MLX Apple Silicon."},
-            "mlx": "mlx-community/Qwen3.5-4B-MLX-8bit",
+            "mlx": "mlx-community/Qwen3.5-4B-MLX-4bit",
             "ollama": "qwen3.5:4b",
             "gguf": None,
             "chat_format": "chatml",
@@ -60,6 +60,22 @@ MODEL_CATALOG = {
     # Nemo 12B (Apache 2.0, 128K context) for European multilingual coverage.
     # ─────────────────────────────────────────────────────────────────────────
     "medium": [
+        {
+            "key": "qwen35_4b_8bit",
+            "name": "Qwen3.5 4B (8-bit)",
+            "origin": "Alibaba",
+            "year": 2026,
+            "lang": {"ca": "Multilingüe (excel·lent català)", "es": "Multilingüe (excelente catalán)", "en": "Multilingual (excellent Catalan)"},
+            "params": "4B",
+            "disk_gb": 3.4,
+            "ram_gb": 10.0,
+            "description": {"ca": "👁 🧠 Multimodal, thinking, visió. Precisió 8-bit.", "es": "👁 🧠 Multimodal, thinking, visión. Precisión 8-bit.", "en": "👁 🧠 Multimodal, thinking, vision. 8-bit precision."},
+            "mlx": "mlx-community/Qwen3.5-4B-MLX-8bit",
+            "ollama": "qwen3.5:4b",
+            "gguf": None,
+            "chat_format": "chatml",
+            "prompt_tier": "small",
+        },
         {
             "key": "qwen35_9b",
             "name": "Qwen3.5 9B",
@@ -325,7 +341,7 @@ MODEL_CATALOG = {
 #
 # ───────────────────────────────────────────────────────────────────────────
 # STATUS v1.0.4-beta (C19, 2026-05-06): Ollama config digests + Salamandra GGUF
-# populated. MLX dir-hashes populated for models available on Wintermute.
+# populated. MLX dir-hashes populated for locally available models.
 # Remaining None values: models not downloaded locally at the time of pinning.
 # ───────────────────────────────────────────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════
@@ -336,6 +352,7 @@ MODEL_WEIGHT_SHA256: dict[tuple[str, str], Optional[str]] = {
     ("mlx", "mlx-community/gemma-4-31b-it-8bit"): "d4cc8cfd30ce9169e9ae6367deff2f8cb93ae28f4991f72e4e2e58f03c6eb0bd",
     ("mlx", "lmstudio-community/Mistral-Small-3.2-24B-Instruct-2506-MLX-4bit"): None,
     ("mlx", "lmstudio-community/gpt-oss-20b-MLX-8bit"): "b9c812af1572191e123c19cd0ad3bf726867e5a86dd09ee2fab62e6efdc4ef0f",
+    ("mlx", "mlx-community/Qwen3.5-4B-MLX-4bit"): None,
     ("mlx", "mlx-community/Qwen3.5-4B-MLX-8bit"): None,
     ("mlx", "mlx-community/Qwen3.5-9B-MLX-4bit"): None,
     ("mlx", "mlx-community/Qwen3.5-27B-4bit"): None,

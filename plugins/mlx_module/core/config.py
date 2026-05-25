@@ -45,9 +45,14 @@ def _auto_max_kv_size() -> int:
         available_for_kv_gb = max(0, total_gb - 20)  # Reserve 20GB for model+system
         kv_bytes_per_token = 256 * 1024  # 256KB/token (Qwen3-32B)
         max_tokens = int((available_for_kv_gb * 1024 ** 3) / kv_bytes_per_token)
-        # Round to nearest multiple of 1024 and cap at 131072
         max_tokens = min(65536, (max_tokens // 1024) * 1024)
-        max_tokens = max(16384, max_tokens)  # Minimum 16K
+        if total_gb < 12:
+            floor = 4096   # 8 GB: model ~4 GB + KV ~1 GB + system ~3 GB
+        elif total_gb < 24:
+            floor = 8192
+        else:
+            floor = 16384
+        max_tokens = max(floor, max_tokens)
         logger.info(f"MLXConfig: auto max_kv_size={max_tokens} (RAM={total_gb:.0f}GB)")
         return max_tokens
     except Exception:

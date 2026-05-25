@@ -32,8 +32,11 @@ class VectorIndex:
     The vector store is a REBUILDABLE INDEX — SQLite is the source of truth.
     """
 
-    def __init__(self, qdrant_path: str = "storage/vectors"):
-        self._qdrant_path = Path(qdrant_path)
+    def __init__(self, qdrant_path: Optional[str] = None):
+        # F2.2: resol path via SidecarConfig.vectors_dir en sidecar mode;
+        # fallback "storage/vectors" en standalone
+        from memory.memory._paths import resolve_qdrant_path
+        self._qdrant_path = Path(qdrant_path) if qdrant_path else resolve_qdrant_path()
         self._client: Optional[QdrantAdapter] = None
         self._available = False
         self._init_client()

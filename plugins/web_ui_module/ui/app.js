@@ -42,6 +42,7 @@ const UI_STRINGS = {
         model_loading: "Carregant model a VRAM",
         doc_chat_only: "Aquest document només estarà disponible en aquest chat.",
         doc_uploading: "Processant document",
+        doc_upload_hint: "Pot trigar segons la mida del document i la teva màquina. Pots veure el progrés al tray (icona del rellotge) → Open sidecar log.",
         language: "Idioma",
         ollama_not_responding: "Ollama no respon — comprova que està instal·lat",
         delete_session: "Eliminar sessió",
@@ -138,6 +139,7 @@ const UI_STRINGS = {
         model_loading: "Loading model into VRAM",
         doc_chat_only: "This document will only be available in this chat.",
         doc_uploading: "Processing document",
+        doc_upload_hint: "This may take a while depending on the document size and your machine. Check progress via the tray icon → Open sidecar log.",
         language: "Language",
         ollama_not_responding: "Ollama is not responding — check it's installed",
         delete_session: "Delete session",
@@ -235,6 +237,7 @@ const UI_STRINGS = {
         model_loading: "Cargando modelo en VRAM",
         doc_chat_only: "Este documento solo estará disponible en este chat.",
         doc_uploading: "Procesando documento",
+        doc_upload_hint: "Puede tardar según el tamaño del documento y tu máquina. Puedes ver el progreso en el tray (icono del reloj) → Open sidecar log.",
         language: "Idioma",
         ollama_not_responding: "Ollama no responde — comprueba que está instalado",
         delete_session: "Eliminar sesión",
@@ -855,7 +858,7 @@ class NexeUI {
         const ragSlider = document.getElementById('ragThresholdSlider');
         const ragBadge = document.getElementById('ragThresholdValue');
         if (ragSlider && ragBadge) {
-            const RAG_DEFAULT = 0.25;
+            const RAG_DEFAULT = 0.35;
             const saved = localStorage.getItem('nexe_rag_threshold');
             if (saved) {
                 const clamped = Math.min(parseFloat(saved), parseFloat(ragSlider.max));
@@ -2601,20 +2604,31 @@ class NexeUI {
         this.uploadBtn.disabled = true;
         this.setAiState('thinking');
 
-        const sizeMB = file.size / (1024 * 1024);
-        const estSec = Math.max(3, Math.round(sizeMB * 4));
         const t0 = Date.now();
+        const _safeFile = this.escapeHtml(file.name);
 
         const overlay = document.createElement('div');
         overlay.className = 'upload-overlay';
-        overlay.innerHTML = `
-            <div class="upload-overlay-content">
-                <span class="upload-spinner-lg"></span>
-                <div class="upload-overlay-text">${this.t('doc_uploading')}</div>
-                <div class="upload-overlay-file">${this.escapeHtml(file.name)}</div>
-                <div class="upload-overlay-timer"><span id="uploadElapsed">0</span>s / ~${estSec}s</div>
-            </div>
-        `;
+        const _c = document.createElement('div');
+        _c.className = 'upload-overlay-content';
+        _c.appendChild(Object.assign(document.createElement('span'), {className: 'upload-spinner-lg'}));
+        const _txt = Object.assign(document.createElement('div'), {className: 'upload-overlay-text'});
+        _txt.textContent = this.t('doc_uploading');
+        _c.appendChild(_txt);
+        const _f = Object.assign(document.createElement('div'), {className: 'upload-overlay-file'});
+        _f.textContent = file.name;
+        _c.appendChild(_f);
+        const _timer = Object.assign(document.createElement('div'), {className: 'upload-overlay-timer'});
+        const _elapsed = document.createElement('span');
+        _elapsed.id = 'uploadElapsed';
+        _elapsed.textContent = '0';
+        _timer.appendChild(_elapsed);
+        _timer.appendChild(document.createTextNode('s'));
+        _c.appendChild(_timer);
+        const _hint = Object.assign(document.createElement('div'), {className: 'upload-overlay-hint'});
+        _hint.textContent = this.t('doc_upload_hint');
+        _c.appendChild(_hint);
+        overlay.appendChild(_c);
         document.querySelector('.chat-main').appendChild(overlay);
 
         const timerInterval = setInterval(() => {

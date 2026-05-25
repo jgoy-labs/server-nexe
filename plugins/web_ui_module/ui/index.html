@@ -274,15 +274,15 @@
       // Tauri v2 isolation prevents __TAURI_INTERNALS__ at http://127.0.0.1;
       // a sidecar HTTP call is the only reliable cross-platform approach.
       (function () {
-        var _key = localStorage.getItem("nexe_api_key") || "";
         document.addEventListener("click", function (e) {
           var a = e.target.closest("a[href]");
           if (!a) return;
           var href = a.getAttribute("href");
           if (!href || !/^https?:\/\//.test(href)) return;
           e.preventDefault();
+          var key = localStorage.getItem("nexe_api_key") || "";
           fetch("/ui/open-external?url=" + encodeURIComponent(href), {
-            headers: _key ? { "X-API-Key": _key } : {}
+            headers: key ? { "X-API-Key": key } : {}
           }).catch(function () {});
         });
       })();

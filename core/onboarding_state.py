@@ -293,6 +293,7 @@ class OnboardingState:
             os.environ[env_var] = self.model_path
         os.environ["NEXE_DEFAULT_MODEL"] = self.model_id
         os.environ["NEXE_MODEL_ENGINE"] = _ENGINE_TO_RESOLVER_KEY[self.engine]
+        os.environ["NEXE_LANG"] = self.lang
         # F5.4 Fase 4b: inject HF_TOKEN from Keychain if the user provided
         # one through the wizard. We never log the token value.
         if self.has_token:

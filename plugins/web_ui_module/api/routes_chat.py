@@ -1048,11 +1048,17 @@ async def _build_rag_context(memory_helper, message: str, body: dict, attached_d
     try:
         _active_colls = body.get("rag_collections")
         _log.info("RAG: attempting recall (collections=%s)", _active_colls or "all")
+        try:
+            import psutil
+            _ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+            _rag_limit = 3 if _ram_gb < 12 else 5
+        except Exception:
+            _rag_limit = 5
         recall_result = await memory_helper.recall_from_memory(
-            message, limit=5, collections=_active_colls, session_id=None,
+            message, limit=_rag_limit, collections=_active_colls, session_id=None,
         )
         if recall_result["success"] and recall_result["results"]:
-            rag_threshold = float(body.get("rag_threshold", 0.25))
+            rag_threshold = float(body.get("rag_threshold", 0.35))
             _log.info("RAG pre-filter: %s results, threshold=%s", len(recall_result["results"]), rag_threshold)
             doc_items, knowledge_items, memory_items = _filter_relevant_results(
                 recall_result["results"], rag_threshold, _log
@@ -1796,7 +1802,21 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             except Exception as e:
                                 err_msg = repr(e) if not str(e) else str(e)
                                 logger.error("Streaming error: %s", err_msg)
-                                yield f"\n[Error: {err_msg}]"
+                                _is_oom = any(k in err_msg for k in (
+                                    "Insufficient Memory", "OutOfMemory",
+                                    "Memòria insuficient", "Memoria insuficiente",
+                                    "Not enough memory",
+                                ))
+                                if _is_oom:
+                                    _lk = _lang[:2] if _lang else "ca"
+                                    _oom = {
+                                        "ca": "Memòria insuficient. Tanca altres aplicacions per alliberar memòria i torna-ho a provar.",
+                                        "es": "Memoria insuficiente. Cierra otras aplicaciones para liberar memoria e inténtalo de nuevo.",
+                                        "en": "Not enough memory. Close other applications to free up memory and try again.",
+                                    }
+                                    yield f"\n⚠️ {_oom.get(_lk, _oom['en'])}"
+                                else:
+                                    yield f"\n[Error: {err_msg}]"
 
                             if not _has_any_thinking:
                                 logger.info("Model did not produce thinking tokens (model decides when to think)")

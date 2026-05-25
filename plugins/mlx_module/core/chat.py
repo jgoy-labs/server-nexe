@@ -399,6 +399,20 @@ class MLXChatNode:
             tuple: (model, tokenizer_or_processor)
         """
         if MLXChatNode._model is None:
+            try:
+                import psutil
+                avail_gb = psutil.virtual_memory().available / (1024 ** 3)
+                if avail_gb < 1.5:
+                    _lang = os.environ.get("NEXE_LANG", "ca")[:2]
+                    _oom_msgs = {
+                        "ca": "Memòria insuficient per carregar el model d'IA. Tanca altres aplicacions per alliberar memòria i torna-ho a provar.",
+                        "es": "Memoria insuficiente para cargar el modelo de IA. Cierra otras aplicaciones para liberar memoria e inténtalo de nuevo.",
+                        "en": "Not enough memory to load the AI model. Close other applications to free up memory and try again.",
+                    }
+                    raise RuntimeError(_oom_msgs.get(_lang, _oom_msgs["en"]))
+            except ImportError:
+                pass
+
             # Disable a stale safetensors index before load (known upstream HF
             # mislabeling pattern — see _sanitize_safetensors_index docstring).
             _sanitize_safetensors_index(self.config.model_path)
