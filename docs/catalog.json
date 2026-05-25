@@ -15,23 +15,6 @@
     "gguf": null
   },
   {
-    "name": "Gemma 4 E4B",
-    "params": "8B totals / ~4B actius (MoE)",
-    "ram_gb": 4.0,
-    "disk_gb": 4.5,
-    "backends": [
-      "MLX",
-      "Ollama"
-    ],
-    "flags": [],
-    "origin": "Google",
-    "ollama": "gemma4:e4b",
-    "mlx": "mlx-community/gemma-4-e4b-it-4bit",
-    "gguf": null,
-    "gated": "manual",
-    "license_url": "https://huggingface.co/google/gemma-4-e4b-it"
-  },
-  {
     "name": "Qwen3.5 4B (8-bit)",
     "params": "4B",
     "ram_gb": 4.0,
