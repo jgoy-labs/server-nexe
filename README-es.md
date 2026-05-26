@@ -42,6 +42,12 @@
 
 ---
 
+> **v1.0.4 — Release App de Escritorio.** Server Nexe ahora se distribuye como aplicación de escritorio Tauri v2 (`app/`) con wizard de onboarding, bandeja del sistema, y gestión automática del sidecar. Disponible como **macOS DMG** (Apple Silicon) y **Linux AppImage** (ARM64). Ver [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
+>
+> **Nota Linux:** probado en máquinas virtuales Ubuntu 24.04 ARM64 (UTM). Inferencia CPU (Ollama) verificada. Si pruebas en hardware nativo o con aceleración GPU, por favor [abre un issue](https://github.com/jgoy-labs/server-nexe/issues) con tus resultados.
+
+---
+
 ## Tabla de contenidos
 
 - [La Historia](#la-historia)
@@ -94,12 +100,10 @@ Más técnicamente: lo que era un **monstruo de espagueti gigante** acabó desti
 </tr>
 <tr>
 <td width="50%" align="center">
-  <img src=".github/screenshots/tray.png" alt="Menú del system tray" />
-  <br/><em>Menú del system tray (NexeTray.app)</em>
+  <img src=".github/screenshots/installer.png" alt="Wizard de onboarding" />
+  <br/><em>Wizard de onboarding</em>
 </td>
 <td width="50%" align="center">
-  <img src=".github/screenshots/installer.png" alt="Wizard del instalador SwiftUI" />
-  <br/><em>Wizard SwiftUI del instalador (DMG)</em>
 </td>
 </tr>
 </table>

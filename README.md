@@ -42,6 +42,12 @@
 
 ---
 
+> **v1.0.4 — Desktop App Release.** Server Nexe now ships as a Tauri v2 desktop application (`app/`) with onboarding wizard, system tray, and automatic sidecar management. Available as **macOS DMG** (Apple Silicon) and **Linux AppImage** (ARM64). See [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
+>
+> **Linux note:** tested on Ubuntu 24.04 ARM64 virtual machines (UTM). CPU inference (Ollama) verified. If you test on native hardware or with GPU acceleration, please [open an issue](https://github.com/jgoy-labs/server-nexe/issues) with your results.
+
+---
+
 ## Table of contents
 
 - [The Story](#the-story)
@@ -94,12 +100,10 @@ More technically: what was a **giant spaghetti monster** ended up distilling, re
 </tr>
 <tr>
 <td width="50%" align="center">
-  <img src=".github/screenshots/tray.png" alt="System tray menu" />
-  <br/><em>System tray menu (NexeTray.app)</em>
+  <img src=".github/screenshots/installer.png" alt="Onboarding wizard" />
+  <br/><em>Onboarding wizard</em>
 </td>
 <td width="50%" align="center">
-  <img src=".github/screenshots/installer.png" alt="SwiftUI installer wizard" />
-  <br/><em>SwiftUI installer wizard (DMG)</em>
 </td>
 </tr>
 </table>
