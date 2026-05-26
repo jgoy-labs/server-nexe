@@ -215,7 +215,7 @@ Dynamic Python import: `from plugins.my_plugin.module import MyPluginModule`. Va
 Calls `await module.initialize(context)`. Context contains config, services (logger, i18n, event_system), and module registry.
 
 ### 4. Integration
-If the module implements `NexeModuleWithRouter`, the kernel registers the router in FastAPI via `app.include_router()`.
+If the module implements `NexeModuleWithRouter`, the core registers the router in FastAPI via `app.include_router()`.
 
 ### 5. Shutdown
 Calls `await module.shutdown()` during server stop. Must be idempotent.
@@ -389,7 +389,7 @@ Both methods may be called multiple times. Always check `self._initialized` guar
 1. **Router first** — Create router before any other setup in initialize()
 2. **Idempotent everything** — initialize() and shutdown() safe to call repeatedly
 3. **Fast health_check** — Under 1 second, no external API calls
-4. **Declare dependencies** — In manifest.toml, the kernel loads them first
+4. **Declare dependencies** — In manifest.toml, the core loads them first
 5. **Use context services** — Access i18n, logger, event system from context
 6. **Tests alongside code** — Put tests in `plugins/my_plugin/tests/`
 7. **Lazy manifest.py** — Never import heavy dependencies at module scan time

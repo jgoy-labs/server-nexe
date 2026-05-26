@@ -227,7 +227,7 @@ Import dinamic de Python: `from plugins.my_plugin.module import MyPluginModule`.
 Crida `await module.initialize(context)`. El context conte config, serveis (logger, i18n, event_system) i registre de moduls.
 
 ### 4. Integration
-Si el modul implementa `NexeModuleWithRouter`, el kernel registra el router a FastAPI via `app.include_router()`.
+Si el modul implementa `NexeModuleWithRouter`, el core registra el router a FastAPI via `app.include_router()`.
 
 ### 5. Shutdown
 Crida `await module.shutdown()` durant l'aturada del servidor. Ha de ser idempotent.
@@ -401,7 +401,7 @@ Ambdos metodes es poden cridar multiples vegades. Posa sempre guard `self._initi
 1. **Router primer** — Crea el router abans de qualsevol altre setup a initialize()
 2. **Tot idempotent** — initialize() i shutdown() segurs de cridar repetidament
 3. **health_check rapid** — Menys d'1 segon, sense crides a APIs externes
-4. **Declarar dependencies** — Al manifest.toml, el kernel les carrega primer
+4. **Declarar dependencies** — Al manifest.toml, el core les carrega primer
 5. **Utilitzar serveis del context** — Accedeix a i18n, logger, event system des del context
 6. **Tests al costat del codi** — Posa els tests a `plugins/my_plugin/tests/`
 7. **manifest.py lazy** — Mai importar dependencies pesades en el moment de l'escaneig

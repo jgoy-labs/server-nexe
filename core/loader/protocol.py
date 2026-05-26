@@ -35,7 +35,7 @@ class ModuleMetadata:
   """
   Module metadata - read from manifest.toml.
 
-  The kernel only needs this data to manage the module.
+  The core only needs this data to manage the module.
   It has no knowledge of the module's internal workings.
   """
   name: str
@@ -90,7 +90,7 @@ class NexeModule(Protocol):
   """
   Protocol defining the minimum interface for a Nexe module.
 
-  The kernel loads modules that implement this protocol.
+  The core loads modules that implement this protocol.
   It is "runtime_checkable" to allow isinstance() checks.
 
   Implementation example:

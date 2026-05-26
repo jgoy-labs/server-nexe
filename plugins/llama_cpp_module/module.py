@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class LlamaCppModule:
     """
     Nexe engine for Llama.cpp.
-    Implements the NexeModule Protocol for dynamic loading in the kernel.
+    Implements the NexeModule Protocol for dynamic loading in the core.
     """
 
     def __init__(self) -> None:
