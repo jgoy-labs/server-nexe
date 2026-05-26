@@ -1,0 +1,98 @@
+# cargo-deny configuration for nexe-app (F3 V2, 2026-05-17)
+#
+# Scope: enforce license compatibility, ban yanked / vulnerable crates,
+# warn on duplicate transitive versions, and forbid crates pulled from
+# unknown registries / git repos. Runs from CI.
+#
+# See https://embarkstudios.github.io/cargo-deny/checks/index.html
+
+[graph]
+all-features = false
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+# ─── Advisories ───────────────────────────────────────────────────────────────
+# RustSec advisory database — deny known vulnerabilities + yanked crates.
+[advisories]
+version = 2
+yanked = "deny"
+# Add advisory IDs here only after documenting the reason in a comment.
+ignore = [
+  # gtk-rs GTK3 bindings — unmaintained, no safe upgrade. Transitive dep via
+  # tray-icon → libappindicator → gtk on Linux only. The macOS build path
+  # (webkit2gtk → cocoa) does not load gtk3 at runtime. Tauri upstream tracks
+  # the migration to gtk4. nexe-app ships macOS-first (F5 release).
+  { id = "RUSTSEC-2024-0411", reason = "gtk3 transitive (Linux-only, macOS-first product)" },
+  { id = "RUSTSEC-2024-0412", reason = "gtk3 transitive (Linux-only, macOS-first product)" },
+  { id = "RUSTSEC-2024-0413", reason = "gtk3 transitive (Linux-only, macOS-first product)" },
+  { id = "RUSTSEC-2024-0414", reason = "gtk3 transitive (Linux-only, macOS-first product)" },
+  { id = "RUSTSEC-2024-0415", reason = "gtk3 transitive (Linux-only, macOS-first product)" },
+  { id = "RUSTSEC-2024-0416", reason = "gtk3 transitive (Linux-only, macOS-first product)" },
+  { id = "RUSTSEC-2024-0417", reason = "gtk3 transitive (Linux-only, macOS-first product)" },
+  { id = "RUSTSEC-2024-0418", reason = "gtk3 transitive (Linux-only, macOS-first product)" },
+  { id = "RUSTSEC-2024-0419", reason = "gtk3 transitive (Linux-only, macOS-first product)" },
+  { id = "RUSTSEC-2024-0420", reason = "gtk3 transitive (Linux-only, macOS-first product)" },
+
+  # unic-* bindings — unmaintained Unicode helper crates. Transitive deps of
+  # Tauri's CSP parser stack; no safe upgrade. Awaiting upstream migration to
+  # the maintained `icu` crate family.
+  { id = "RUSTSEC-2024-0370", reason = "proc-macro-error transitive; awaiting upstream Tauri update" },
+  { id = "RUSTSEC-2025-0057", reason = "fxhash transitive in Tauri toolchain" },
+  { id = "RUSTSEC-2025-0075", reason = "unic-char-property transitive in Tauri CSP parser" },
+  { id = "RUSTSEC-2025-0080", reason = "unic-char-range transitive" },
+  { id = "RUSTSEC-2025-0081", reason = "unic-common transitive" },
+  { id = "RUSTSEC-2025-0098", reason = "unic-ucd-ident transitive" },
+  { id = "RUSTSEC-2025-0100", reason = "unic-ucd-version transitive" },
+]
+
+# ─── Licenses ─────────────────────────────────────────────────────────────────
+# Allow common permissive open-source licenses. Anything outside this list
+# blocks the build until we either swap the crate or explicitly allow it.
+[licenses]
+version = 2
+confidence-threshold = 0.8
+# Don't warn for permitted licenses that aren't currently in the dep tree —
+# we keep them ready for future deps (Unicode-DFS-2016, OpenSSL...).
+unused-allowed-license = "allow"
+allow = [
+  "MIT",
+  "MIT-0",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-DFS-2016",
+  "Unicode-3.0",
+  "MPL-2.0",
+  "Zlib",
+  "CC0-1.0",
+  "OpenSSL",
+  "BSL-1.0",
+  "CDLA-Permissive-2.0",
+]
+
+# ─── Bans ─────────────────────────────────────────────────────────────────────
+[bans]
+# multiple-versions: tree contains ~50 duplicate transient crates pulled by the
+# Tauri toolchain (base64, bitflags, getrandom, cssparser, dirs, derive_more,
+# socket2, syn, etc.). None map to a CVE — they are version-skew artifacts
+# from upstream maintainers updating at different paces. Re-evaluate when
+# Tauri publishes a major dep refresh. CVE coverage is still enforced via the
+# [advisories] section above; this only relaxes the duplicates-as-warnings.
+multiple-versions = "allow"
+wildcards = "deny"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+
+# ─── Sources ──────────────────────────────────────────────────────────────────
+# Pin the registry surface so a typosquatted dep from a private registry can
+# not slip in through a transitive bump.
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

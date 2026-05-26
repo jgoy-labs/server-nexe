@@ -1,0 +1,18 @@
+# Configuracio d'eines de qualitat per nexe-app (Tauri/Rust).
+# NO es un projecte Python — aquest fitxer nomes configura exclusions per a eines dev.
+
+[tool.pyright]
+# nexe-app no es un projecte Python; pyright nomes inspecciona poc-sidecar
+# (script standalone amb venv propi PBS+uv). Build artifacts queden fora.
+include = ["scripts/poc-sidecar"]
+exclude = [
+    "**/__pycache__",
+    "**/node_modules",
+    ".muthur",
+    ".mypy_cache",
+    ".pytest_cache",
+    "dist",
+    "target",
+    "src-tauri/target",
+    "src-tauri/gen",
+]

@@ -1,0 +1,11 @@
+# gitleaks allowlist — nexe-app
+# False positives confirmats: cap secret real al repositori.
+
+[allowlist]
+description = "Test vectors and shape-only fixtures (no real credentials)"
+paths = [
+  # src-tauri tests/ — test vectors with UUIDv4-shaped strings for escape_js_string
+  # and similar helpers. These are not real API keys; they exercise format-only
+  # contracts. Confirmed empirically against the production token generator.
+  "src-tauri/src/lib.rs",
+]

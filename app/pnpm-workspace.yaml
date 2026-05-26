@@ -1,0 +1,31 @@
+# pnpm-workspace.yaml
+# C20 B18: ignoredOptionalDependencies — skip unused @rolldown/binding-* prerelease binaries.
+# Vite 8 pulls rolldown 1.0.0-rc.x which declares 17+ platform-specific optional binary deps.
+# We skip 13 unused platforms; keep 4 for CI matrix coverage:
+#   - darwin-arm64 (local dev M-series + macOS arm64 runner)
+#   - linux-x64-gnu (Linux x64 runner)
+#   - linux-arm64-gnu (Linux ARM64 runner — added 2026-04-23 post Release CI matrix fix)
+#   - win32-x64-msvc (Windows x64 runner — added 2026-04-22)
+# This avoids downloading ~410MB of unused native binaries on each pnpm install.
+# B18: @rolldown/binding-linux-ppc64-gnu added (new in rc.16, verified in pnpm-lock.yaml).
+# pnpm 10+ supports per-dependency opt-out via ignoredOptionalDependencies.
+# See: https://pnpm.io/package_json#pnpmignoredoptionaldependencies
+
+packages:
+  - "."
+
+ignoredOptionalDependencies:
+  - "@rolldown/binding-android-arm64"
+  - "@rolldown/binding-android-arm-eabi"
+  - "@rolldown/binding-darwin-x64"
+  - "@rolldown/binding-freebsd-x64"
+  - "@rolldown/binding-linux-arm-gnueabihf"
+  - "@rolldown/binding-linux-arm64-musl"
+  - "@rolldown/binding-linux-riscv64-gnu"
+  - "@rolldown/binding-linux-s390x-gnu"
+  - "@rolldown/binding-linux-x64-musl"
+  - "@rolldown/binding-openharmony-arm64"
+  - "@rolldown/binding-wasm32-wasi"
+  - "@rolldown/binding-win32-arm64-msvc"
+  - "@rolldown/binding-win32-ia32-msvc"
+  - "@rolldown/binding-linux-ppc64-gnu"

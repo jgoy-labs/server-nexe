@@ -1,0 +1,31 @@
+# ⚠️ SPIKE — plugin fixture de prova per a ADR-0009.
+# Eliminar o reemplaçar amb el plugin RAG real a Fase 4.
+# Format de referència per futurs plugins: veure https://github.com/jgoy-labs/plugins-nexe (futur)
+
+[plugin]
+id = "rag"
+version = "0.1.0-spike"
+description = "Retrieval-Augmented Generation (SPIKE — fixture per validar plugin:// scheme, no és el plugin real)"
+
+[ui]
+type = "iframe"
+entry = "ui/index.html"
+title = "RAG"
+icon = "search"
+trust = "first-party"
+
+[desktop]
+capabilities = ["none"]
+
+[requires]
+browser = false
+microphone = false
+
+# ADR-0014 ACTIU — Plugin integrity SHA-256 (Sprint 0.15 #4).
+# STRICT_INTEGRITY=true a src-tauri/src/lib.rs → verificat a cada primer request.
+# Algorisme: hash de tota la carpeta del plugin amb manifest canonitzat (sense [integrity]).
+# Per recalcular quan el plugin canvia:
+#   cd src-tauri && cargo run --bin plugin-hash -- ../plugins-dev/rag
+# Copia el hex al camp sha256 d'aquesta secció.
+[integrity]
+sha256 = "aa5f0c26e7c548614c77f995f64d4c7419fe024bccb6423fe95e09cfc4053984"
