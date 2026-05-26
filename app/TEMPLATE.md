@@ -363,12 +363,12 @@ Based on two rounds of security consultancy (see commit history):
 
 ### Tests & CI
 
-Baseline tests (pre-`v0.1.1-fase0-militar`):
+Baseline tests (pre-`v0.1.1-fase0-security`):
 - **Rust:** 47 debug / 54 release (STRICT_INTEGRITY=true). Path traversal, cross-plugin, symlink escape, null byte, percent-encoding, directory, plugin integrity, TOCTOU, concurrent verify, rate limit LRU, Windows reserved names, etc.
-- **Vitest:** 55 (2 test files: isolation.test.js + main.test.js, at v0.1.1-fase0-militar).
+- **Vitest:** 55 (2 test files: isolation.test.js + main.test.js, at v0.1.1-fase0-security).
 - **Clippy:** clean on lib+bins.
 
-Exact numbers verified at `v0.1.1-fase0-militar` tag. See CHANGELOG.
+Exact numbers verified at `v0.1.1-fase0-security` tag. See CHANGELOG.
 
 - GitHub Actions matrix: macOS + Ubuntu 22.04 + Windows with timeout + concurrency group.
 - Steps: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo audit`, `pnpm audit`, `pnpm build`, `pnpm test`, `pnpm tauri build --no-bundle` (smoke).

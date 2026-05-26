@@ -1,9 +1,8 @@
 # Investigació C05 — iframe registry race condition
 
-**Finding origen:** Gemini F3 a `20260420_auditoria_militar_gemini.md` (P0).
-**Consolidat:** C05 a `20260421_consolidat_auditoria_militar.md` §4 (P0 condicional,
-pendent verificació).
-**Sessió:** Dev BUS militar A5 (`militar/a5-iframe`), 2026-04-21.
+**Finding origen:** Gemini F3 (P0), security audit 2026-04-20.
+**Consolidat:** C05 §4 (P0 condicional, pendent verificació).
+**Sessió:** Security investigation, 2026-04-21.
 **Veredicte:** **NO REPRODUÏT COM A VECTOR EXPLOTABLE** → recomanem rebaixar de
 P0 a **P2 "defense in depth hardening"**.
 
@@ -168,7 +167,7 @@ vector explotable al codi actual:
 
 **Recomanació:**
 - Rebaixar **C05 de P0 a P2** al consolidat (defense-in-depth hardening).
-- NO aplicar patch preventiu ara (zero codi especulatiu militar).
+- NO aplicar patch preventiu ara (zero codi especulatiu).
 - Considerar a Fase 4+ quan hi hagi molts plugins:
   - `WeakSet` en lloc de `Set` per a auto-GC dels zombies
   - `MutationObserver` sobre `iframe.src` només si es verifica empíricament
@@ -182,7 +181,6 @@ vector explotable al codi actual:
 
 - `src/main.js` línies 25-50, 112-140 — codi actual firewall + iframe registration
 - `src/main.test.js` bloc final — tests H1/H2/H3/H4 documentals
-- `diari/informes/20260419_FASE0_VALIDADA_WINDOWS_ARM64.md` §Bug 6, §Bug 7 —
-  context del fix original `aa19de8`
-- `diari/informes/20260420_auditoria_militar_gemini.md` F3 — claim original
-- `diari/informes/20260421_consolidat_auditoria_militar.md` §4 C05 — agrupació cross-IA
+- Internal diary: Windows ARM64 validation §Bug 6/7 — context del fix original `aa19de8`
+- Security audit F3 — claim original
+- Consolidated audit §4 C05 — cross-review grouping

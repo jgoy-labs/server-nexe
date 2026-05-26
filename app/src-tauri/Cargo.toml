@@ -8,7 +8,7 @@ license = "Apache-2.0"
 readme = "../README.md"
 rust-version = "1.88"
 default-run = "nexe-app"
-# C21 militar (2026-04-21): publish=false evita name-squatting a crates.io.
+# C21 (2026-04-21): publish=false evita name-squatting a crates.io.
 # El repo és starter clonable — cada app derivada ha d'actualitzar author/repo
 # abans de publish=true explícit.
 publish = false
@@ -53,7 +53,7 @@ lru = "0.17"
 serde_json = "1"
 # UUID v4 per session token (128 bits entropia, no re-usable cross-start).
 uuid = { version = "1", features = ["v4"] }
-# B2 militar Sprint 0.18 (2026-04-21): URL parsing estructural per `fetch_from_sidecar`.
+# B2 Sprint 0.18 (2026-04-21): URL parsing estructural per `fetch_from_sidecar`.
 # `starts_with("http://127.0.0.1:")` era bypass via userinfo (vector red team PoC 4 URLs).
 # `url::Url::parse` descomposa authority en host/port/username/password — rebutgem userinfo explícit.
 url = "2"
@@ -68,8 +68,8 @@ flate2 = "1"
 tar = "0.4.45"
 # Tauri 2 plugins baseline (single-instance, dialog, log).
 # Tots estàndard 2026 per a qualsevol app desktop seriosa.
-# B9 militar Sprint 0.18 (2026-04-21): `tauri-plugin-store` + `tauri-plugin-notification`
-# eliminats REALMENT (no només capabilities). Red team Claude-ext va detectar que
+# B9 Sprint 0.18 (2026-04-21): `tauri-plugin-store` + `tauri-plugin-notification`
+# eliminats REALMENT (no només capabilities). Red team va detectar que
 # SECURITY.md afirmava "removed" però els plugins seguien inicialitzats (lib.rs:103,105)
 # i als deps. Surface reduction ara és completa: 2 plugins menys a memòria + codi d'init
 # + build tree (~600KB menys binary estimat, -2 plugin command sets d'IPC surface).
@@ -81,7 +81,7 @@ tar = "0.4.45"
 # them we will start from a sanitised handler instead of the default plugin.
 tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
-# C29 militar: crash-report path via `dirs::data_local_dir()` (escriu a
+# C29: crash-report path via `dirs::data_local_dir()` (escriu a
 # `~/Library/Application Support/nexe-app/crashes/` mac, `%LOCALAPPDATA%` Win).
 # Ja és transitive dep de Tauri — afegir-lo explícit no pull més res.
 dirs = "5"

@@ -19,7 +19,7 @@ configuration oscillated:
    was already initialized`. The plugin was left commented out; release Windows
    (`windows_subsystem="windows"`) users had no log file since stdout is not
    connected.
-2. **Sprint 0.18 (2026-04-22, v0.1.2-fase0-militar-v2 candidate)** — finding
+2. **Sprint 0.18 (2026-04-22, v0.1.2-fase0-security-v2 candidate)** — finding
    C15 theorized that `tracing-subscriber` without the `tracing-log` feature
    did not call `log::set_logger`, and that `tauri-plugin-log` could therefore
    coexist by reactivating it with the `tracing` feature. This claim was merged
@@ -43,7 +43,7 @@ exercise units and frontend logic, not `tauri::Builder::default().run()` boot.
 Red team subagents (F7) produced no GUI session. The regression was only
 observable by a human running the desktop app.
 
-The bug invalidated a signed claim in the `v0.1.2-fase0-militar-v2` tag body.
+The bug invalidated a signed claim in the `v0.1.2-fase0-security-v2` tag body.
 The tag is local-only (unpushed) as of this ADR.
 
 ## Decision
@@ -149,8 +149,7 @@ considered safely shipped:
    (`src-tauri/target/debug/bundle/<platform>/...`) starts without panic.
 
 **Status 2026-04-22:** macOS runtime-verified 4/4 by Jordi (session logged in
-`diari/informes/20260422_runtime_fix_aplicat.md` — internal diary, not exposed
-in this OSS repo). Windows ARM64 VM + Linux UTM human GUI gates are deferred
+internal diary — not exposed in this OSS repo). Windows ARM64 VM + Linux UTM human GUI gates are deferred
 to a follow-up session; the CI matrix (ubuntu-latest + macos-latest +
 windows-latest) covers cargo-level build/test/clippy/audit on every push.
 

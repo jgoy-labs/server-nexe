@@ -49,7 +49,7 @@ Un test que passa amb ambdós és teatre i s'ha eliminat o reescrit.
 - `tauri-plugin-store` + `tauri-plugin-notification` **removed entirely**
   (Sprint 0.18 B9 — not just capability filter): plugin `.init()` calls removed
   from `run()` + `[dependencies]` entries removed from `Cargo.toml`. Red team
-  Claude-ext va detectar que la versió v0.1.1-militar afirmava "removed" però
+  automated red team va detectar que la versió v0.1.1-security afirmava "removed" però
   només havia netejat capabilities; els plugins seguien inicialitzats. Binary
   size ~-600KB est., IPC surface -2 plugin command sets. Remaining capabilities:
   `core:default`, `dialog:default`, `deep-link:*` (specific subset) (C13 + B9).
@@ -61,13 +61,13 @@ Un test que passa amb ambdós és teatre i s'ha eliminat o reescrit.
 
 **Plugin system:**
 - `plugin://` URI scheme with `canonicalize` + per-plugin scope + size cap.
-- Integrity SHA-256 with **atomic snapshot verify+load** (B5 Sprint 0.18 militar):
+- Integrity SHA-256 with **atomic snapshot verify+load** (B5 Sprint 0.18 security):
   `verify_and_load_plugin_asset` opens **all plugin file descriptors BEFORE any
   read**, reads all content from the held fds (Unix: inode pinned against
   rename/unlink/write externs; Windows: `File::open` denies exclusive writers),
   hashes from in-memory snapshot, verifies against manifest, and returns the
   requested file's bytes **from the same snapshot**. Bytes served are, by
-  invariant, the bytes that produced the matching hash. Red team Claude-ext PoC
+  invariant, the bytes that produced the matching hash. Red team PoC
   against v0.1.1 (separate verify + read) showed **70.5% TOCTOU exploitation**
   rate; v0.1.2 test `b5_verify_and_load_atomic_snapshot_no_bypass` confirms 0%
   under spin-write attacker (release-only, 500 requests).
@@ -83,7 +83,7 @@ Un test que passa amb ambdós és teatre i s'ha eliminat o reescrit.
 **Queue + runtime:**
 - Pre-queue bound via **atomic CAS counter** (B3 Sprint 0.18): `PENDING_COUNT:
   AtomicUsize` + `fetch_add(1, AcqRel)` before enqueue; if current `>= MAX_QUEUED`,
-  `fetch_sub(1)` + 503. RAII `PendingGuard` decrements on Drop. Red team Claude-ext
+  `fetch_sub(1)` + 503. RAII `PendingGuard` decrements on Drop. Red team
   showed that v0.1.1 `queued_count() + execute()` non-atomic pattern allowed
   `peak > MAX_QUEUED` under contention; v0.1.2 test `b3_queue_bound_atomic_race`
   confirms strict bound under N=MAX_QUEUED+100 concurrent threads.

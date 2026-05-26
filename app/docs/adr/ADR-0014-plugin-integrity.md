@@ -44,7 +44,7 @@ let bytes = std::fs::read(&canon_file)?;                     // Read 2: serves
 return build_response(bytes);
 ```
 
-Red team Claude-ext (2026-04-21) crafted a spin-write attacker thread that alternated the file's content between "benign" and "malicious" at microsecond intervals. Over 556 requests, **392 (70.5%)** returned malicious bytes that the hash had **not** just verified. The attacker simply had to keep writing; the verify→serve gap was ~µs but reachable by any concurrent writer.
+Red team (2026-04-21) crafted a spin-write attacker thread that alternated the file's content between "benign" and "malicious" at microsecond intervals. Over 556 requests, **392 (70.5%)** returned malicious bytes that the hash had **not** just verified. The attacker simply had to keep writing; the verify→serve gap was ~µs but reachable by any concurrent writer.
 
 The v3 algorithm closes this by reading **once** under an atomic snapshot:
 
@@ -70,7 +70,7 @@ return Ok(contents.find(requested_rel_path)?.bytes);
 
 **Invariant:** the bytes returned are **byte-for-byte identical** to the bytes that produced the hash. Any tampering during walk causes the hash to mismatch; any tampering between open and read is absorbed by the fd's inode-pinning (Unix) or by `File::open`'s default sharing mode (Windows). No intermediate read of the FS occurs between verify and serve.
 
-**Cost:** the snapshot reads every file once (same I/O as the old verify). The handler no longer re-opens the requested file — net I/O is identical. Memory cost: all plugin bytes held transiently during the snapshot; bounded by `MAX_HASH_FILE_BYTES = 10 MB` per file and `MAX_HASH_TOTAL_BYTES = 50 MB` combined (B6 militar Sprint 0.18).
+**Cost:** the snapshot reads every file once (same I/O as the old verify). The handler no longer re-opens the requested file — net I/O is identical. Memory cost: all plugin bytes held transiently during the snapshot; bounded by `MAX_HASH_FILE_BYTES = 10 MB` per file and `MAX_HASH_TOTAL_BYTES = 50 MB` combined (B6 Sprint 0.18).
 
 **Mutation test (release-only):** `b5_verify_and_load_atomic_snapshot_no_bypass` spawns a spin-write attacker, issues 500 verify+load requests, and asserts **zero** returns with bytes mismatching the hash. Re-introducing the pre-fix pattern (separate verify + separate read with a 100 µs sleep) causes the test to fail with 251/500 bypasses — confirming the test is not theater.
 

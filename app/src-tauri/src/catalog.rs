@@ -45,8 +45,7 @@ const FALLBACK_CATALOG: &str =
 /// fell through to the embedded fallback. With this URL the remote manifest is
 /// actually consumed.
 ///
-/// Migration to `main` branch happens when the Factoria push lands at GitHub
-/// (see TODO-factoria-nexe.md §F5.7a).
+/// Migration to `main` branch happens when the catalog data lands at GitHub.
 const MANIFEST_URL: &str =
     "https://raw.githubusercontent.com/jgoy-labs/server-nexe/catalog-bootstrap/docs/catalog.json";
 

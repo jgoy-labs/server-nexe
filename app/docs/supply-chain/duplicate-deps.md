@@ -1,7 +1,7 @@
 # Duplicate Cargo dependencies — snapshot + bump roadmap
 
 **C37** — `Cargo.lock` multi-version crypto/random crates.
-**Generated:** 2026-04-21 via `cargo tree --duplicates` @ `militar/w3-supply`.
+**Generated:** 2026-04-21 via `cargo tree --duplicates`.
 **Baseline raw lines:** 73 (31 unique crate names with 2+ versions).
 
 ---

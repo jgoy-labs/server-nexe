@@ -17,7 +17,7 @@ Commit base: `0c278c6` (`main` at time of fork).
 
 #### Context
 
-The `v0.1.2-fase0-militar-v2` tag (same commit `0c278c6`) was created at the
+The `v0.1.2-fase0-security-v2` tag (same commit `0c278c6`) was created at the
 end of Sprint 0.18 and was **not pushed**. At 2026-04-22 12:30 the first human
 `pnpm tauri dev` against that commit produced:
 
@@ -33,7 +33,7 @@ observe it either.
 
 #### Honest retraction of C15
 
-Sprint 0.18 finding C15 stated in `CHANGELOG.md [0.1.2-fase0-militar-v2]`,
+Sprint 0.18 finding C15 stated in `CHANGELOG.md [0.1.2-fase0-security-v2]`,
 `SECURITY.md §Observability`, and inline in `src-tauri/src/lib.rs`:
 
 > "tracing_subscriber sense `tracing-log` feature NO crida `log::set_logger`
@@ -139,7 +139,7 @@ other Sprint 0.18 work.
    recommended because it conflicts with the application bundle extension on
    macOS.` Changing the identifier would break the `data_local_dir()/com.nexe.app/logs/`
    path just introduced and invalidate the existing `v0.1.0-fase0` /
-   `v0.1.1-fase0-militar` / `v0.1.2-fase0-militar-v2` tags. Out of scope.
+   `v0.1.1-fase0-security` / `v0.1.2-fase0-security-v2` tags. Out of scope.
 3. **Pre-existing `unused imports` warning** in `src-tauri/src/lib.rs:30`
    (`verified_plugins`, `CacheEntry`, `VERIFIED_LRU_CAP`). Verified via `git
    stash` that this warning exists on `main @ 0c278c6` before this hotfix.
@@ -161,12 +161,12 @@ other Sprint 0.18 work.
 
 #### Tag status
 
-The `v0.1.2-fase0-militar-v2` local tag still points at `0c278c6` (the broken
+The `v0.1.2-fase0-security-v2` local tag still points at `0c278c6` (the broken
 runtime commit). This hotfix **does not modify the tag**. The decision to
-retag `v0.1.2-fase0-militar-v2` at the new HEAD or to bump to `v0.1.3` is
+retag `v0.1.2-fase0-security-v2` at the new HEAD or to bump to `v0.1.3` is
 explicitly deferred to Jordi post-merge.
 
-## [0.1.2-fase0-militar-v2] — 2026-04-22
+## [0.1.2-fase0-security-v2] — 2026-04-22
 
 ### 🎖️ Post-RedTeam security — atomic integrity + real mutation-verified tests
 
@@ -182,7 +182,7 @@ Tag després de:
 
 ### Security — P0 resolt (1)
 
-- **B5 — TOCTOU verify→serve double-read (P0 empíric):** red team Claude-ext va
+- **B5 — TOCTOU verify→serve double-read (P0 empíric):** red team va
   demostrar amb PoC que el handler feia dues lectures separades del FS (verify +
   read_to_end). Un atacant local amb spin-write entre les dues lectures
   aconseguia que **70.5% dels requests retornessin bytes no verificats** post-hash-OK.
@@ -201,7 +201,7 @@ Tag després de:
   (release-only) executa spin-write attacker + 500 requests; 0 bypasses amb el
   fix. Pre-fix reintroduït (pattern verify+read separat amb ~100µs sleep):
   **~67-72 bypasses de 500 (13-14% hit-rate reproduït independentment per
-  F7-RT1 i red team extern Claude-ext2 — variabilitat ±2% segons scheduler)**.
+  F7-RT1 i red team extern independent — variabilitat ±2% segons scheduler)**.
   Test regressió pre-fix fallava consistentment; post-fix 0/500.
 
   ADR-0014 actualitzat a v3 documentant el TOCTOU verify→serve gap + el nou
@@ -432,7 +432,7 @@ mutation-verified:
   subagents Claude 4.6 coordinats amb mutation testing obligatori i auditor
   independent.
 
-## [0.1.1-fase0-militar] — 2026-04-21
+## [0.1.1-fase0-security] — 2026-04-21
 
 ## [0.1.1-fase0-security] — 2026-04-21
 

@@ -83,8 +83,7 @@ def create_app(project_root: Optional[Path] = None, force_reload: bool = False) 
     # SidecarConfig.from_env() valida SIDECAR_REQUIRED_ENV_VARS i llança
     # SidecarConfigError si manca alguna crítica. Capturar aquí evita un
     # error críptic més tard al lifespan (p.ex. CORS preflight fallant
-    # sense saber per què). Veure factoria-nexe/diari/director/F2-m0bis/
-    # F2.3-fail-fast-startup/.
+    # sense saber per què).
     if os.environ.get("NEXE_SIDECAR") == "1":
       try:
         from core.sidecar_config import get_sidecar_config
