@@ -1,0 +1,3 @@
+# scripts/poc-sidecar/ — the 127.0.0.1 bind address is intentional (loopback-only C25).
+# The sidecar MUST bind to 127.0.0.1 and never to 0.0.0.0.
+scripts/poc-sidecar/

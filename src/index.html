@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>server-nexe</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        background: #0a0a0a;
+        color: #ccc;
+        font-family: system-ui, -apple-system, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        overflow: hidden;
+      }
+      #splash {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2rem;
+      }
+      #splash-logo {
+        height: 40px;
+        width: auto;
+        opacity: 0.95;
+      }
+      #splash-status {
+        font-size: 0.75rem;
+        font-family: 'JetBrains Mono', monospace;
+        color: #444;
+        min-height: 1.2em;
+        letter-spacing: 0.03em;
+      }
+      .spinner {
+        width: 20px;
+        height: 20px;
+        border: 1.5px solid #1e1e1e;
+        border-top-color: #e62020;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      #splash-error {
+        color: #e62020;
+        font-size: 0.75rem;
+        display: none;
+        max-width: 320px;
+        text-align: center;
+        line-height: 1.5;
+        font-family: 'JetBrains Mono', monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="splash">
+      <img id="splash-logo" src="/onboarding-logo.png" alt="server-nexe" />
+      <div class="spinner"></div>
+      <div id="splash-status"></div>
+      <div id="splash-error"></div>
+    </div>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+[toolchain]
+# C59/ADR-0015 L3: pinned for reproducible builds.
+# Update deliberately when upgrading; never allow floating "stable".
+# MSRV check: src-tauri/Cargo.toml rust-version must be <= this channel.
+# To upgrade: rustup toolchain install <new-version> && update this file + test.
+channel = "1.94.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

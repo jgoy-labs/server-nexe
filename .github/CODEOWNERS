@@ -1,0 +1,13 @@
+# CODEOWNERS — reviewers automatically requested for PRs
+# Format: <pattern> <owner>
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: all files require review from maintainer
+* @jgoy-labs
+
+# Security-sensitive files — explicit review required
+src-tauri/entitlements.plist @jgoy-labs
+src-tauri/src/lib.rs         @jgoy-labs
+src-tauri/capabilities/      @jgoy-labs
+SECURITY.md                  @jgoy-labs
+.github/workflows/           @jgoy-labs

@@ -1,0 +1,134 @@
+# .gitoss-sync — Inventari whitelist per /push paranoic
+# Defineix exactament QUÈ pot arribar a GitHub des de l'OSS clone.
+#
+# Format:
+#   [sync]      → dirs i fitxers permesos
+#   [[exclude]] → sempre bloquejats (per si el .gitignore falla)
+
+[sync]
+
+  # Directoris de codi font
+  dirs = [
+    "src",
+    "src-tauri",
+    "scripts",
+    "public",
+    "docs",
+    "plugins-dev",
+    "isolation-frame",
+    ".github",
+  ]
+
+  # Fitxers arrel OSS-friendly
+  files = [
+    ".editorconfig",
+    ".editorconfig-checker.json",
+    ".gitignore",
+    ".gitoss-sync",
+    "_typos.toml",
+    "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "eslint.config.js",
+    "LICENSE",
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "pyproject.toml",
+    "README.md",
+    "rust-toolchain.toml",
+    "SECURITY.md",
+    "TEMPLATE.md",
+    "vite.config.js",
+  ]
+
+# Substitucions aplicades al gitoss/ post-còpia, pre-commit.
+# Patrons de nomenclatura interna que han de quedar fora del repo públic.
+# El DEV manté la nomenclatura original; només el OSS surt net.
+# Aplicat per /gitoss pas 8a (vegeu skill).
+#
+# Catalogació empírica 2026-05-15: 51 ocurrències a src-tauri/src/{handler,lib,
+# integrity,auth,lifecycle,rate_limit,main}.rs. Tres famílies:
+#  1. `[Mm]ilitary C<N>` (red-team cluster) — substituir per security/Security
+#  2. `[Mm]ilitary invariant` — substituir per [sS]ecurity invariant
+#  3. ` military <contextSep>` (Sprint, paren, dos punts, m-dash) — eliminar paraula
+# L'ordre importa: regles específiques abans del catch-all.
+[[sanitize]]
+  patterns = [
+    # Família 1 — Military/military C<N> (cluster red-team)
+    { from = "Military C(\\d+)",          to = "Security C$1",       motiu = "Red-team cluster (capitalitzat)" },
+    { from = "military C(\\d+)",          to = "security C$1",       motiu = "Red-team cluster (minúscula)" },
+    # Família 2 — invariant doc
+    { from = "Military invariant",        to = "Security invariant", motiu = "Doc invariants" },
+    { from = "military invariant",        to = "security invariant", motiu = "Doc invariants (minúscula)" },
+    # Família 3 — military precedint context, eliminar paraula
+    { from = " military Sprint",          to = " Sprint",            motiu = "Mantenir Sprint, treure adjectiu" },
+    { from = " military \\+ ",            to = " + ",                motiu = "military + F<N>" },
+    { from = " military (\\(\\d)",        to = " $1",                motiu = "military (2026-..." },
+    { from = " military: ",               to = ": ",                 motiu = "military: descripció" },
+    { from = " military:$",               to = ":",                  motiu = "military: a final línia" },
+    { from = " military — ",              to = " — ",                motiu = "military — comentari" },
+    { from = " military\\)",              to = ")",                  motiu = "military) tancament" },
+    # Catch-all final: `military` aïllat (cas extrem `the military`)
+    { from = "(?i)the military",          to = "the security",       motiu = "the military aïllat" },
+  ]
+  scope = ["src-tauri/src/**/*.rs"]
+  # verify intencionalment buit: cargo check/test no executable al gitoss/ nexe-app
+  # (binaris sidecar Python + target/ exclosos per disseny). El verify del codi rust
+  # es fa al DEV abans del sync.
+  verify = []
+  # Post-verify: assertir que no queda cap `[Mm]ilitary` (idempotència)
+  forbidden_after = ["military", "Military"]
+
+# Fitxers i dirs que MAI han d'arribar a GitHub
+# (segona línia de defensa darrere .gitignore)
+[[exclude]]
+  paths = [
+    # Secrets
+    ".env",
+    ".env.*",
+    "*.pem", "*.key", "*.p12", "*.cer", "*.crt",
+    ".nat_secrets",
+
+    # Audit internals (DEV-only)
+    ".muthur/",
+    ".muthur/audits/",
+    ".muthur/whitelist.toml",
+    ".mypy_cache/",
+    ".pytest_cache/",
+    ".coverage",
+    ".coverage.*",
+    "htmlcov/",
+
+    # Build artifacts
+    "target/",
+    "dist/",
+    "dist-ssr/",
+    "node_modules/",
+    "src-tauri/sidecar-bundle.tar.gz",
+    "src-tauri/sidecar-bundle/",
+    "src-tauri/binaries/",
+    "src-tauri/gen/",
+    "src-tauri/storage/",
+    "src-tauri/personality/",
+    "personality/",
+
+    # Distributables
+    "*.dmg",
+    "*.AppImage",
+    "*.msi",
+    "*.exe",
+    "*.app/",
+
+    # Editor / IDE
+    ".vscode/*",
+    ".idea/",
+    ".claude/",
+    ".DS_Store",
+
+    # Internal diary (lives in DEV only)
+    "diari/",
+    "20*_closeout_*.md",
+    "20*_auditoria_*.md",
+    "DIARI-*.md",
+  ]

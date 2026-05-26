@@ -1,0 +1,9 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "ignoreFiles": ["dist/**", "node_modules/**", "src-tauri/target/**", "target/**"],
+  "rules": {
+    "no-descending-specificity": null,
+    "property-no-vendor-prefix": [true, { "ignoreProperties": ["-webkit-text-size-adjust"] }],
+    "value-keyword-case": ["lower", { "camelCaseSvgKeywords": true }]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "Exclude": [
+    "\\.git/",
+    "\\.muthur/audits/",
+    "\\.mypy_cache/",
+    "\\.pytest_cache/",
+    "node_modules/",
+    "__pycache__/",
+    "\\.pyc$",
+    "/dist/",
+    "/target/",
+    "src-tauri/target/",
+    "src-tauri/gen/",
+    "public/ui/",
+    "(^|/)LICENSE$",
+    "(^|/)\\.DS_Store$",
+    "(^|/)diari/"
+  ]
+}

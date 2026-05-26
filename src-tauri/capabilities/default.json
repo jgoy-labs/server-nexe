@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window (S09: baseline Tauri plugins) — hardened C13/C27/B12",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:allow-message",
+    "dialog:allow-open"
+  ]
+}

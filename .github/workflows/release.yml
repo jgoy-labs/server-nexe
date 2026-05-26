@@ -1,0 +1,383 @@
+name: Release
+
+# S11a F015 — release pipeline skeleton.
+# Trigger: push tag v*.*.* OR manual dispatch.
+# Build matrix: macOS x64/arm64/Universal, Linux x64/arm64, Windows x64/ARM64.
+# Signing + notarization queden per S11b (requereixen Apple Dev creds).
+# Artifacts pujats al GitHub Release com a DRAFT (C03 fix — maintainer ha de publicar manualment).
+#
+# Findings aplicats:
+#   C09 — permissions: contents: read global; contents: write només al job release
+#   C08 — quality-gate job prerequisit per release (cargo test/clippy/audit + pnpm test)
+#   C23 — Windows ARM64 afegit al matrix (cross-compile aarch64-pc-windows-msvc)
+#   C24 — persist-credentials: false a totes les invocacions actions/checkout
+#   C32 — cancel-in-progress: true
+#   C33 — SBOM SPDX (cargo-sbom) a més de CycloneDX (cargo-cyclonedx)
+#   C47 — macOS Universal Binary (universal-apple-darwin)
+#   C48 — Linux ARM64 (ubuntu-22.04-arm / cross-compile)
+#   C49 — DEFERRED: bundle.targets a tauri.conf.json — worktree W1 (conflicte)
+#   B8  — quality-gate és superset blocking-equivalent de check.yml (Sprint 0.18).
+#         Post F7-RT2: afegit `pnpm audit all (warning-only)` per paritat cosmètica.
+#         La matrix multi-OS NO es duplica (evita cost CI doble); els regressions
+#         cross-platform són gated pel check.yml al PR.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  # Sprint 0.18 F7-RT2 cleanup: `workflow_dispatch.inputs.tag_name` was dead
+  # code (never referenced in any job). The only real publish gate is
+  # `if: startsWith(github.ref, 'refs/tags/v')` on the release job.
+  # workflow_dispatch from main simply skips the release job.
+  workflow_dispatch: {}
+
+# C09: permissions minimes a nivell workflow (contents: read).
+# Nomes el job `release` rep contents: write.
+permissions:
+  contents: read
+
+# C32: cancel-in-progress: true — evita double-publish en doble push de tag
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # C08 B8: quality-gate — superset de check.yml. Ha de passar abans de build/release.
+  # B8 fix (Sprint 0.18): quality-gate ara executa TOTS els passos de check.yml:
+  #   cargo fmt --check, cargo check, cargo test, cargo clippy, cargo audit,
+  #   pnpm audit --prod (blocker), pnpm run build, pnpm test,
+  #   pnpm tauri build --no-bundle.
+  # Un tag push directe no pot publicar amb format errors, clippy warnings,
+  # CVEs npm prod, build Vite trencat ni packaging Tauri trencat.
+  quality-gate:
+    name: quality gate (superset of check.yml — B8 fix)
+    timeout-minutes: 45
+    runs-on: ubuntu-22.04
+    steps:
+      # C24: persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install Linux WebKitGTK deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        with:
+          components: clippy, rustfmt
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Cache cargo
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-gate-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-gate-
+
+      - name: pnpm setup
+        uses: pnpm/action-setup@0c17529a66aca453f9227af23103ed11469b1e47 # v4.0.0
+
+      - name: Node setup
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install JS deps
+        run: pnpm install --frozen-lockfile
+
+      # B8 fix: cargo fmt --check (era absent del quality-gate anterior)
+      - name: cargo fmt --check
+        working-directory: src-tauri
+        run: cargo fmt -- --check
+
+      # B8 fix: cargo check (era absent del quality-gate anterior)
+      - name: cargo check --locked
+        working-directory: src-tauri
+        run: cargo check --locked
+
+      - name: cargo test --locked
+        working-directory: src-tauri
+        run: cargo test --locked
+
+      - name: cargo clippy --locked (warnings = error)
+        working-directory: src-tauri
+        run: cargo clippy --locked -- -D warnings
+
+      # B8 fix: clippy --all-targets warning-only (mirall de check.yml C70)
+      - name: clippy all targets (warning-only)
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --all-features --locked 2>&1 | tee clippy-all.log
+        continue-on-error: true
+
+      - name: cargo audit --deny warnings
+        working-directory: src-tauri
+        run: cargo audit --deny warnings
+
+      # B20 post-red-team-extern (2026-04-22): CI bloqueja si una review-date
+      # de .cargo/audit.toml ha expirat. Mirror exacte de check.yml:~102.
+      # Tanca l'asimetria reportada per Claude-ext2/Codex2: el comment B8
+      # "superset of check.yml" era fals perquè aquest step només vivia a
+      # check.yml. Ara el quality-gate és veritablement superset.
+      - name: check cargo audit ignore dates not expired
+        run: bash scripts/check-audit-dates.sh
+
+      # B8 fix: pnpm audit --prod blocker (era absent del quality-gate anterior)
+      # C31: prod deps a produccio = blocker. CVE moderate+ en prod deps bloqueja el release.
+      - name: pnpm audit --prod (blocker)
+        run: pnpm audit --prod --audit-level=moderate
+
+      # B8 fix (F7-RT2): pnpm audit all (warning-only) — paritat amb check.yml
+      # Mirall del step C31 warning-only de check.yml. CVE en dev deps no bloqueja
+      # el release però queda visible al log.
+      - name: pnpm audit all (warning-only)
+        run: pnpm audit --audit-level=moderate
+        continue-on-error: true
+
+      # B8 fix: vite build (era absent del quality-gate anterior)
+      - name: vite build
+        run: pnpm run build
+
+      - name: vitest
+        run: pnpm test
+
+      # B8 fix: tauri build smoke --no-bundle (era absent del quality-gate anterior)
+      # Detecta problemes de packaging ABANS de generar artifacts del release.
+      - name: tauri build smoke (no bundle)
+        run: pnpm tauri build --no-bundle
+
+  build:
+    name: build ${{ matrix.platform.display_name }}
+    timeout-minutes: 60
+    needs: [quality-gate]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          # 2026-04-23: macOS x64 (Intel) + macOS Universal eliminats del matrix.
+          # Decisió Jordi: nexe-app no suporta Intel Mac (target = Apple Silicon only).
+          # Beneficis: cap cua infinita runner macos-13 Intel al Free tier + repo públic,
+          # cap pseudo-target universal-apple-darwin (no és rustup target real), matrix
+          # més simple. Si algun dia volem suport Intel: readmetre + cross-compile des
+          # de macos-14 amb `rustup target add x86_64-apple-darwin` + flag `--target`.
+          - runner: macos-14
+            display_name: macOS arm64
+            target: aarch64-apple-darwin
+            artifact_glob: 'src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg'
+          - runner: ubuntu-22.04
+            display_name: Linux x64
+            target: x86_64-unknown-linux-gnu
+            artifact_glob: 'src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage'
+          # C48: Linux ARM64 — ubuntu-22.04-arm si disponible, cross-compile sino
+          - runner: ubuntu-22.04-arm
+            display_name: Linux ARM64
+            target: aarch64-unknown-linux-gnu
+            artifact_glob: 'src-tauri/target/aarch64-unknown-linux-gnu/release/bundle/appimage/*.AppImage'
+          - runner: windows-latest
+            display_name: Windows x64
+            target: x86_64-pc-windows-msvc
+            artifact_glob: 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi'
+          # C23: Windows ARM64 — cross-compile aarch64-pc-windows-msvc
+          # NOTE: binari no verificat en runtime (cross-compile); marcat "unverified runtime" al release body.
+          - runner: windows-latest
+            display_name: Windows ARM64
+            target: aarch64-pc-windows-msvc
+            artifact_glob: 'src-tauri/target/aarch64-pc-windows-msvc/release/bundle/msi/*.msi'
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      # C24: persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install Linux WebKitGTK deps
+        if: startsWith(matrix.platform.runner, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      # C23/C48: rustup target add per cross-compile si el runner no te el target per defecte
+      # (2026-04-23: universal-apple-darwin retirat del matrix; aquest step només dispara
+      #  per Windows ARM64 cross-compile des de Windows x64 i Linux ARM64 natiu).
+      - name: Add cross-compile target
+        if: |
+          matrix.platform.target == 'aarch64-pc-windows-msvc' ||
+          matrix.platform.target == 'aarch64-unknown-linux-gnu'
+        run: rustup target add ${{ matrix.platform.target }}
+
+      - name: pnpm setup
+        # Version ve de package.json `packageManager` (evita ERR_PNPM_BAD_PM_VERSION)
+        uses: pnpm/action-setup@0c17529a66aca453f9227af23103ed11469b1e47 # v4.0.0
+
+      - name: Node setup
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install JS deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Tauri build (release, unsigned)
+        run: pnpm tauri build --target ${{ matrix.platform.target }}
+
+      - name: List artifacts
+        shell: bash
+        run: |
+          ls -la ${{ matrix.platform.artifact_glob }} || true
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: nexe-app-${{ matrix.platform.target }}
+          path: ${{ matrix.platform.artifact_glob }}
+          if-no-files-found: error
+          retention-days: 7
+
+  sbom:
+    name: generate SBOM (CycloneDX + SPDX)
+    timeout-minutes: 20
+    runs-on: ubuntu-22.04
+    steps:
+      # C24: persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+
+      # C33: CycloneDX SBOM (Rust)
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx --locked
+
+      - name: Generate SBOM CycloneDX
+        working-directory: src-tauri
+        # C33 fix (2026-04-23): cargo-cyclonedx 0.5.9 renamed --output-pattern to
+        # --override-filename. Output file remains "bom.json" so downstream upload
+        # glob "src-tauri/**/bom.json" unchanged.
+        run: cargo cyclonedx --format json --override-filename bom
+
+      - name: Upload SBOM CycloneDX
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: sbom-cyclonedx
+          path: src-tauri/**/bom.json
+          if-no-files-found: error
+          retention-days: 90
+
+      # C33: SPDX SBOM (Rust) via cargo-sbom
+      - name: Install cargo-sbom
+        run: cargo install cargo-sbom --locked
+
+      - name: Generate SBOM SPDX
+        working-directory: src-tauri
+        run: cargo sbom --output-format spdx_json_2_3 > bom.spdx.json
+
+      - name: Upload SBOM SPDX
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: sbom-spdx
+          path: src-tauri/bom.spdx.json
+          if-no-files-found: error
+          retention-days: 90
+
+      # C33 B27: npm/JS SBOM via cdxgen — pendent Sprint S12.
+      # Limitation: Rust SBOMs (CycloneDX + SPDX) are generated above but the JS/npm
+      # dependency tree is NOT yet included. cdxgen supports pnpm workspaces but requires
+      # Node.js + cdxgen install + workspace traversal. Deferred because:
+      #   1. pnpm audit --prod (in quality-gate) covers CVE detection for prod JS deps.
+      #   2. A JS SBOM adds supply-chain transparency for consumers but not a security gate.
+      # To implement: add a step after SPDX with cdxgen for pnpm workspace.
+      # See: https://github.com/CycloneDX/cdxgen
+
+  release:
+    name: publish release
+    # C08: release depen de quality-gate + build + sbom
+    needs: [quality-gate, build, sbom]
+    timeout-minutes: 10
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    # C09: contents: write NOMES aqui — els altres jobs hereden read del workflow
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          path: artifacts
+
+      - name: List downloaded
+        run: find artifacts -type f
+
+      - name: Generate SHA256SUMS
+        working-directory: artifacts
+        run: |
+          find . -type f -not -name "SHA256SUMS" -exec sha256sum {} \; | sort > ../SHA256SUMS
+          mv ../SHA256SUMS ./
+          # B4 Codex militar Sprint 0.18: fail si buit o menys artifacts del minim esperat
+          if [ ! -s SHA256SUMS ]; then
+            echo "ERROR: SHA256SUMS is empty -- no artifacts to hash"
+            exit 1
+          fi
+          ARTIFACT_COUNT=$(wc -l < SHA256SUMS)
+          # Minim esperat: 7 builds (macOS x64 + macOS arm64 + macOS Universal +
+          #   Linux x64 + Linux ARM64 + Windows x64 + Windows ARM64)
+          # + 2 SBOMs (CycloneDX bom.json + SPDX bom.spdx.json) = 9 total
+          # Conservador: 7 (nomes builds) per tolerar regressio parcial SBOM
+          if [ "$ARTIFACT_COUNT" -lt 7 ]; then
+            echo "ERROR: SHA256SUMS has only ${ARTIFACT_COUNT} lines (expected >=7)"
+            echo "Artifacts trobats:"
+            cat SHA256SUMS
+            exit 1
+          fi
+          echo "--- SHA256SUMS (${ARTIFACT_COUNT} artifacts) ---"
+          cat SHA256SUMS
+
+      - name: Publish GitHub Release (unsigned — DRAFT)
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          files: |
+            artifacts/**/*
+            artifacts/SHA256SUMS
+          fail_on_unmatched_files: true
+          draft: true
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            ## UNSIGNED BUILD — NOT FOR PRODUCTION
+
+            Binaris construits SENSE signatura Apple ni Authenticode Windows.
+            No recomanem instal·lar-los en produccio. Contacta el maintainer si necessites una build signada per testing intern.
+
+            ### Verificacio integritat
+
+            Abans d'instal·lar, verifica els hashes:
+
+            ```bash
+            shasum -a 256 -c SHA256SUMS
+            ```
+
+            ### Windows ARM64
+
+            El binari aarch64-pc-windows-msvc es genera per cross-compile (no verificat en runtime en aquest pipeline). Funcionalitat basica validada a Fase 0 en VM real; regressions de compilacio detectades, regressions runtime possibles.
+
+            ### SBOM
+
+            CycloneDX + SPDX 2.3 SBOMs adjunts al release per auditoria de supply chain.
