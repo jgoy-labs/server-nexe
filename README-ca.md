@@ -16,6 +16,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
   <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white" alt="Python"></a>
   <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI"></a>
+  <a href="https://v2.tauri.app"><img src="https://img.shields.io/badge/Tauri%20v2-desktop%20app-FFC131?logo=tauri&logoColor=white" alt="Tauri v2"></a>
 </p>
 
 <p align="center">
@@ -47,7 +48,7 @@
 - [Captures](#captures)
 - [Per Què Server Nexe?](#per-què-server-nexe)
 - [Inici Ràpid](#inici-ràpid)
-  - [Opció A: Instal·lador DMG (macOS)](#opció-a-installador-dmg-macos)
+  - [Opció A: App d'escriptori (macOS / Linux)](#opció-a-app-descriptori-macos--linux)
   - [Opció B: Línia de comandes](#opció-b-línia-de-comandes)
   - [Opció C: Headless (servidors, scripts, CI)](#opció-c-headless-servidors-scripts-ci)
 - [Backends](#backends)
@@ -145,8 +146,8 @@ Plugins auto-descoberts amb manifests independents. Seguretat, web UI, RAG, back
 </td>
 <td width="50%">
 
-### Instal·lador macOS
-DMG amb assistent guiat que detecta el teu hardware, tria el backend adequat, recomana models per la teva RAM, i et posa en marxa en minuts.
+### App d'escriptori
+Aplicació Tauri v2 per macOS (DMG) i Linux (AppImage). L'assistent d'onboarding detecta el teu hardware, tria el backend adequat, recomana models per la teva RAM, i et posa en marxa en minuts. Safata del sistema, menús natius, i gestió automàtica del sidecar.
 
 </td>
 </tr>
@@ -168,9 +169,16 @@ Puja .txt, .md o .pdf i s'indexen automàticament per RAG. Cada document només 
 
 ## Inici Ràpid
 
-### Opció A: Instal·lador DMG (macOS)
+### Opció A: App d'escriptori (macOS / Linux)
 
-Descarrega l'últim **[Install Nexe.dmg](https://github.com/jgoy-labs/server-nexe/releases/latest)** de Releases. L'assistent ho gestiona tot: detecció de hardware, selecció de backend, descàrrega de model, i configuració.
+Descarrega l'últim paquet de **[Releases](https://github.com/jgoy-labs/server-nexe/releases/latest)**:
+
+| Plataforma | Paquet | Mida |
+|------------|--------|------|
+| macOS (Apple Silicon) | `nexe-app_1.0.4_aarch64.dmg` | ~1.3 GB |
+| Linux (ARM64) | `nexe-app_1.0.4_aarch64.AppImage` | ~1.2 GB |
+
+L'assistent d'onboarding ho gestiona tot: detecció de hardware, selecció de backend, descàrrega de model, i configuració. L'app executa server-nexe com a procés sidecar amb integració a la safata del sistema.
 
 ### Opció B: Línia de comandes
 
@@ -370,7 +378,7 @@ Server Nexe està en desenvolupament actiu. Pròximament:
 - [x] RAG injection sanitization + CLEAR_ALL 2-turn confirm (v0.9.9)
 - [x] Instal·lació offline 100% — DMG ~1.2 GB amb wheels + embedding bundled (v0.9.9+)
 - [x] Thinking toggle per sessió — endpoint `PATCH /ui/session/{id}/thinking` (v0.9.9+)
-- [ ] App nativa macOS (SwiftUI, substitueix el tray Python)
+- [x] App d'escriptori (Tauri v2) — macOS DMG + Linux AppImage, wizard d'onboarding, safata del sistema (v1.0.4)
 - [ ] Paràmetres d'inferència configurables via UI
 - [ ] Fòrum de comunitat
 
@@ -435,5 +443,5 @@ Consulta [LICENSE](LICENSE) per als detalls.
 ---
 
 <p align="center">
-  <strong>Versió 1.0.3-beta</strong> · Apache 2.0 · Fet per <a href="https://www.jgoy.net">Jordi Goy</a> a Barcelona
+  <strong>Versió 1.0.4</strong> · Apache 2.0 · Fet per <a href="https://www.jgoy.net">Jordi Goy</a> a Barcelona
 </p>

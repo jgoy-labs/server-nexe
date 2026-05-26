@@ -16,6 +16,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
   <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white" alt="Python"></a>
   <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI"></a>
+  <a href="https://v2.tauri.app"><img src="https://img.shields.io/badge/Tauri%20v2-desktop%20app-FFC131?logo=tauri&logoColor=white" alt="Tauri v2"></a>
 </p>
 
 <p align="center">
@@ -47,7 +48,7 @@
 - [Screenshots](#screenshots)
 - [Why Server Nexe?](#why-server-nexe)
 - [Quick Start](#quick-start)
-  - [Option A: DMG Installer (macOS)](#option-a-dmg-installer-macos)
+  - [Option A: Desktop App (macOS / Linux)](#option-a-desktop-app-macos--linux)
   - [Option B: Command Line](#option-b-command-line)
   - [Option C: Headless (servers, scripts, CI)](#option-c-headless-servers-scripts-ci)
 - [Backends](#backends)
@@ -145,8 +146,8 @@ Auto-discovered plugins with independent manifests. Security, web UI, RAG, backe
 </td>
 <td width="50%">
 
-### macOS Installer
-DMG with guided wizard that detects your hardware, picks the right backend, recommends models for your RAM, and gets you running in minutes.
+### Desktop App
+Tauri v2 desktop application for macOS (DMG) and Linux (AppImage). Onboarding wizard detects your hardware, picks the right backend, recommends models for your RAM, and gets you running in minutes. System tray, native menus, and automatic sidecar management.
 
 </td>
 </tr>
@@ -168,9 +169,16 @@ Upload `.txt`, `.md` or `.pdf` and they're automatically indexed for RAG. Each d
 
 ## Quick Start
 
-### Option A: DMG Installer (macOS)
+### Option A: Desktop App (macOS / Linux)
 
-Download the latest **[Install Nexe.dmg](https://github.com/jgoy-labs/server-nexe/releases/latest)** from Releases. The wizard handles everything: hardware detection, backend selection, model download, and configuration.
+Download the latest package from **[Releases](https://github.com/jgoy-labs/server-nexe/releases/latest)**:
+
+| Platform | Package | Size |
+|----------|---------|------|
+| macOS (Apple Silicon) | `nexe-app_1.0.4_aarch64.dmg` | ~1.3 GB |
+| Linux (ARM64) | `nexe-app_1.0.4_aarch64.AppImage` | ~1.2 GB |
+
+The onboarding wizard handles everything: hardware detection, backend selection, model download, and configuration. The app runs server-nexe as a sidecar process with system tray integration.
 
 ### Option B: Command Line
 
@@ -237,7 +245,7 @@ In addition, you can use any Ollama model by name or any GGUF model from Hugging
 ```
 server-nexe/
 ├── core/                 # FastAPI server, endpoints, CLI, config, metrics, resilience
-│   ├── endpoints/        # REST API (v1 chat, health, status, system)
+│   ├── endpoints/        # REST API (v1 chat, health, status, system, installer)
 │   ├── cli/              # CLI commands & i18n (ca/es/en)
 │   └── resilience/       # Circuit breaker, rate limiting
 ├── personality/          # Module manager, plugin discovery, server.toml
@@ -255,6 +263,11 @@ server-nexe/
 │   └── web_ui_module/    # Browser-based chat UI with file upload
 ├── installer/            # Guided installer, headless mode, hardware detection, model catalog
 ├── knowledge/            # Indexed documentation for RAG (ca/es/en)
+├── app/                  # Desktop application (Tauri v2)
+│   ├── src-tauri/        # Rust backend: sidecar lifecycle, IPC, plugin integrity (SHA-256)
+│   ├── src/              # Frontend: onboarding wizard, chat bridge
+│   ├── isolation-frame/  # WebView isolation pattern (security allowlist)
+│   └── scripts/          # Build scripts (sidecar bundling, signing)
 └── tests/                # Integration & e2e test suites
 ```
 
@@ -327,7 +340,7 @@ Server Nexe includes a security module enabled by default:
 | macOS Apple Silicon (M1+) | **Supported** — all 3 backends | MLX, llama.cpp, Ollama |
 | macOS Intel | **Not supported** since v0.9.9 | — |
 | macOS 13 Ventura or earlier | **Not supported** since v0.9.9 (requires macOS 14 Sonoma+) | — |
-| Linux ARM64 | **Supported** (Ollama, CPU) — tested on VM | Ollama |
+| Linux ARM64 | **Supported** — AppImage + Ollama, tested on VM | Ollama |
 | Linux x86_64 | **Supported** (Ollama, CPU) — unit tests pass | Ollama, llama.cpp |
 | Windows | In development (no public ETA) | — |
 
@@ -375,7 +388,7 @@ Server Nexe is actively developed. Here's what's coming:
 - [x] RAG injection sanitization (MEM tags neutralized at ingest and retrieval) (v0.9.9)
 - [x] Offline install bundle — all wheels + embedding model in DMG (~1.2 GB, post-v0.9.9)
 - [x] Thinking toggle endpoint — `PATCH /session/{id}/thinking` (post-v0.9.9)
-- [ ] Native macOS app (SwiftUI, replaces Python tray)
+- [x] Desktop app (Tauri v2) — macOS DMG + Linux AppImage, onboarding wizard, system tray (v1.0.4)
 - [ ] Configurable inference parameters via UI
 - [ ] Community forum
 
@@ -411,6 +424,9 @@ server-nexe is built on the shoulders of these amazing open-source projects:
 - [sentence-transformers](https://www.sbert.net) — Historical: original embedding backend, replaced by `fastembed` in v0.9.3
 - [Hugging Face](https://huggingface.co) — Model hub and transformers library
 
+**Desktop App**
+- [Tauri v2](https://v2.tauri.app) — Cross-platform desktop framework (Rust + WebView)
+
 **Infrastructure**
 - [Qdrant](https://qdrant.tech) — Vector search engine powering RAG memory
 - [FastAPI](https://fastapi.tiangolo.com) — High-performance async web framework
@@ -442,5 +458,5 @@ See [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Version 1.0.4-beta</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
+  <strong>Version 1.0.4</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
 </p>
