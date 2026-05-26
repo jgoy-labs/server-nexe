@@ -128,7 +128,7 @@ jobs:
         # continue-on-error: small knowledge edits between DMG builds
         # must not block CI. Authoritative check runs locally
         # (`scripts/precompute_kb.py --verify`) and at DMG build time
-        # (ship-nexe.sh), where stale embeddings must be regenerated
+        # (build pipeline), where stale embeddings must be regenerated
         # before notarisation.
         continue-on-error: true
         run: |

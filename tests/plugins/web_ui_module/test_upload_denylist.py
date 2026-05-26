@@ -53,7 +53,7 @@ def test_reject_anthropic_api_key():
 
 
 def test_reject_openai_project_key():
-  """OpenAI project key (sk-proj-) — covers GPT, Codex CLI, Responses API."""
+  """OpenAI project key (sk-proj-) — covers GPT, Responses API."""
   content = b"OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n"
   matched = _detect_sensitive_upload(content)
   assert matched == b"sk-proj-"
