@@ -99,12 +99,6 @@ Más técnicamente: lo que era un **monstruo de espagueti gigante** acabó desti
 </td>
 </tr>
 <tr>
-<td width="50%" align="center">
-  <img src=".github/screenshots/installer.png" alt="Wizard de onboarding" />
-  <br/><em>Wizard de onboarding</em>
-</td>
-<td width="50%" align="center">
-</td>
 </tr>
 </table>
 

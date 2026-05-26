@@ -99,12 +99,6 @@ Més tècnicament: el que era un **monstre d'espagueti gegant** va acabar destil
 </td>
 </tr>
 <tr>
-<td width="50%" align="center">
-  <img src=".github/screenshots/installer.png" alt="Wizard d'onboarding" />
-  <br/><em>Wizard d'onboarding</em>
-</td>
-<td width="50%" align="center">
-</td>
 </tr>
 </table>
 

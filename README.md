@@ -98,14 +98,6 @@ More technically: what was a **giant spaghetti monster** ended up distilling, re
   <br/><em>Web UI — dark mode</em>
 </td>
 </tr>
-<tr>
-<td width="50%" align="center">
-  <img src=".github/screenshots/installer.png" alt="Onboarding wizard" />
-  <br/><em>Onboarding wizard</em>
-</td>
-<td width="50%" align="center">
-</td>
-</tr>
 </table>
 
 ## Why Server Nexe?
