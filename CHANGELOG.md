@@ -263,7 +263,7 @@ First public pre-1.0 release. Confidence bump from `0.9.9` after the final docum
 - New document: `USE_CASES.md` (ca/en/es) covering 6 practical use cases and "when server-nexe is NOT the best tool".
 - New section: `ERRORS.md` "How to report an error" with privacy warning for logs.
 - Honest coverage figure (~85%) replaces inflated historical badges (97.4%/91.1%/93%).
-- Security audits attribution expanded: Claude + Gemini + Codex + cross-model reviews (not just Claude).
+- Security audits attribution expanded: Claude + Gemini + other models + cross-model reviews (not just Claude).
 - `AI collaboration` credit in author metadata: `"Jordi Goy with AI collaboration"`.
 - Stripe / Ko-fi / GitHub Sponsors URLs corrected (Ko-fi was wrong: `/jgoylabs` → `/servernexe`).
 - Root READMEs synchronised across CA/EN/ES with screenshots (`.github/screenshots/`) and the "giant spaghetti monster → minimal core" story framing.
@@ -658,7 +658,7 @@ Derived from a full security audit (mega-consultoria) with plan v2.4.
   - System: `root:x:0:0:` (most specific /etc/passwd signature)
   - PEM private keys: RSA, OpenSSH, PKCS8, EC, DSA, PGP
   - API tokens: `sk-ant-` (Anthropic / Claude Code), `sk-proj-` (OpenAI
-    GPT / Codex CLI / Responses API), `ghp_` + `github_pat_` (GitHub
+    GPT / Responses API), `ghp_` + `github_pat_` (GitHub
     PAT classic + fine-grained), `AIzaSy` (Google Gemini / AI Studio /
     Cloud / Firebase).
 

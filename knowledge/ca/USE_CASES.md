@@ -27,7 +27,7 @@ server-nexe esta pensat per a escenaris on **privacitat, control local i memoria
 
 Pregunta sobre projectes en curs, preferencies, terminis. El sistema **MEM_SAVE** recorda el context automaticament (noms, feines, terminis, decisions) i el recupera en sessions futures via RAG. La memoria es persistent, encriptada at-rest, i nomes viu al teu dispositiu.
 
-**Exemple:** "Recorda que el proper dilluns tinc reunio amb Xiri." → Setmanes despres: *"Quan vaig quedar amb l'Xiri?"* → el sistema ho recorda.
+**Exemple:** "Recorda que el proper dilluns tinc reunio amb Marta." → Setmanes despres: *"Quan vaig quedar amb l'Marta?"* → el sistema ho recorda.
 
 ## 2. Base de coneixement privada
 
@@ -82,7 +82,7 @@ Sigues honest sobre les limitacions. Hi ha casos d'us on altres opcions son mill
 | Suport Windows o Linux arm64 de produccio | server-nexe requereix **macOS 14+ Apple Silicon** des de v0.9.9 |
 | Fine-tuning o entrenament de models | No es funcio de server-nexe. Usa MLX, transformers o Axolotl directament |
 | Garantia d'uptime i SLA | Es un projecte open-source mantingut per una persona — no hi ha SLA |
-| Auditoria de seguretat professional | Les auditories actuals son IA-assistides (Claude, Gemini, Codex), no per empreses humanes especialitzades |
+| Auditoria de seguretat professional | Les auditories actuals son IA-assistides (Claude, Gemini), no per empreses humanes especialitzades |
 
 ## Referencies
 

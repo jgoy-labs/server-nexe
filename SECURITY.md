@@ -82,7 +82,7 @@ It does **not** defend against:
 Honest disclosure:
 
 - **Not tested in production.** Server Nexe has not been deployed in a production environment with real users. All testing has been done in development by the author. The 6685 automated tests cover code correctness, not real-world adversarial conditions.
-- **No human security audit.** All security testing has been performed by AI (Claude, Gemini, Codex and other models). AI can find patterns and run systematic checks, but it is not a substitute for a professional penetration test.
+- **No human security audit.** All security testing has been performed by AI (Claude, Gemini, and other models). AI can find patterns and run systematic checks, but it is not a substitute for a professional penetration test.
 - **Formal threat model** — the implicit threat model described above is now formalized in [THREAT_MODEL.md](THREAT_MODEL.md) (STRIDE, 8 trust boundaries, 6 asset categories, out-of-scope enumerated, residual risks declared). The summary above remains; see the formal document for the detail, mitigations and file:line citations.
 - **No bug bounty program.** This is a personal project with no budget for bounties.
 - **No CVE tracking process.** If a vulnerability is found, it will be fixed in the next release.

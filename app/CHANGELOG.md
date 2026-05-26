@@ -460,7 +460,7 @@ clean (`-D warnings`) / cargo audit 0 vulns actives / pnpm audit 0.
   instrucció `xattr -dr com.apple.quarantine` per warning "unsigned — not for
   production".
 - **C04 — Closeout MDs privats committed:** `git filter-repo` purga els 3 fitxers
-  `20260418_closeout_codex*.md` del history sencer. `.gitignore` blindat amb
+  `20260418_closeout_*.md` del history sencer. `.gitignore` blindat amb
   patterns `20*_closeout_*.md`, `20*_auditoria_*.md`, `DIARI-*.md`, `diari/`.
 - **C05 — iframe registry race (Gemini únic):** DESCARTAT després d'investigació
   empírica. No reproduït com a vector explotable. Rebaixat a P2

@@ -27,7 +27,7 @@ server-nexe is designed for scenarios where **privacy, local control and persist
 
 Ask about ongoing projects, preferences, deadlines. The **MEM_SAVE** system automatically remembers context (names, jobs, deadlines, decisions) and retrieves it in future sessions via RAG. Memory is persistent, encrypted at-rest, and lives only on your device.
 
-**Example:** "Remember that next Monday I have a meeting with Xiri." → Weeks later: *"When did I meet with Xiri?"* → the system remembers.
+**Example:** "Remember that next Monday I have a meeting with Marta." → Weeks later: *"When did I meet with Marta?"* → the system remembers.
 
 ## 2. Private knowledge base
 
@@ -82,7 +82,7 @@ Be honest about limitations. There are use cases where other options are better:
 | Production Windows or Linux arm64 support | server-nexe requires **macOS 14+ Apple Silicon** since v0.9.9 |
 | Model fine-tuning or training | Not a server-nexe feature. Use MLX, transformers or Axolotl directly |
 | Uptime guarantees and SLA | It's an open-source project maintained by one person — no SLA |
-| Professional security audit | Current audits are AI-assisted (Claude, Gemini, Codex), not by specialised human security firms |
+| Professional security audit | Current audits are AI-assisted (Claude, Gemini), not by specialised human security firms |
 
 ## References
 

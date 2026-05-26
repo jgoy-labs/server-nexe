@@ -245,7 +245,7 @@ Everything is backwards compatible. If encryption is not enabled, behavior is id
 
 ## Security Audits
 
-All security audits are performed by autonomous AI sessions **(Claude, Gemini, Codex, and other models depending on availability)** as part of the development process. The developer launches dedicated review sessions that analyze code, run tests, and generate structured reports with findings. When a decision needs to be challenged or bias detected, **cross-reviews** are run (one AI audits what another AI produced). These are not external audits by human third-party security firms.
+All security audits are performed by autonomous AI sessions **(Claude, Gemini, and other models depending on availability)** as part of the development process. The developer launches dedicated review sessions that analyze code, run tests, and generate structured reports with findings. When a decision needs to be challenged or bias detected, **cross-reviews** are run (one AI audits what another AI produced). These are not external audits by human third-party security firms.
 
 ### AI Audit v1 (March 2026)
 - 73 findings across 11 areas

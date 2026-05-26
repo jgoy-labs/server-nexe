@@ -245,7 +245,7 @@ Tot es compatible enrere. Si l'encriptacio no esta activada, el comportament es 
 
 ## Auditories de seguretat
 
-Totes les auditories de seguretat les realitzen sessions autonomes d'IA **(Claude, Gemini, Codex i altres models segons disponibilitat)** com a part del proces de desenvolupament. El desenvolupador llanca sessions de revisio dedicades que analitzen codi, executen tests i generen informes estructurats amb troballes. Quan es vol criticar una decisio o detectar biaix, es fan **revisions creuades** (un model IA audita el que ha fet un altre). No son auditories externes d'empreses de seguretat humanes.
+Totes les auditories de seguretat les realitzen sessions autonomes d'IA **(Claude, Gemini i altres models segons disponibilitat)** com a part del proces de desenvolupament. El desenvolupador llanca sessions de revisio dedicades que analitzen codi, executen tests i generen informes estructurats amb troballes. Quan es vol criticar una decisio o detectar biaix, es fan **revisions creuades** (un model IA audita el que ha fet un altre). No son auditories externes d'empreses de seguretat humanes.
 
 ### Auditoria IA v1 (marc 2026)
 - 73 troballes en 11 arees

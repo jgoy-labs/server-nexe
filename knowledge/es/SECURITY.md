@@ -245,7 +245,7 @@ Todo es compatible hacia atras. Si la encriptacion no esta activada, el comporta
 
 ## Auditorias de seguridad
 
-Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA **(Claude, Gemini, Codex y otros modelos segun disponibilidad)** como parte del proceso de desarrollo. El desarrollador lanza sesiones de revision dedicadas que analizan el codigo, ejecutan tests y generan informes estructurados con hallazgos. Cuando se quiere cuestionar una decision o detectar sesgo, se hacen **revisiones cruzadas** (un modelo IA audita lo que ha hecho otro). No son auditorias externas de empresas de seguridad humanas.
+Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA **(Claude, Gemini y otros modelos segun disponibilidad)** como parte del proceso de desarrollo. El desarrollador lanza sesiones de revision dedicadas que analizan el codigo, ejecutan tests y generan informes estructurados con hallazgos. Cuando se quiere cuestionar una decision o detectar sesgo, se hacen **revisiones cruzadas** (un modelo IA audita lo que ha hecho otro). No son auditorias externas de empresas de seguridad humanas.
 
 ### Auditoria IA v1 (marzo 2026)
 - 73 hallazgos en 11 areas

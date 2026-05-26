@@ -22,7 +22,7 @@ P0 a **P2 "defense in depth hardening"**.
 > si un atacant aconsegueix injectar un iframe a la finestra de transició.
 
 **Nota important:** Gemini és l'única IA que menciona aquest finding. Claude
-Opus 4.7 (59 findings) i GPT-5 Codex (23 findings) no el detecten. Gemini no
+Opus 4.7 (59 findings) i GPT-5 (23 findings) no el detecten. Gemini no
 aporta codi d'exploit ni evidència empírica concreta.
 
 ---
