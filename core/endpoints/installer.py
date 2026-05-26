@@ -63,7 +63,7 @@ _SSE_HEADERS = {
 # Single-worker executor for blocking download tasks (MLX snapshot_download).
 _dl_executor = ThreadPoolExecutor(max_workers=1)
 
-# F5.6 Bloc 3 (C2 Turing): mòdul-level lock per evitar instal·lacions Ollama
+# F5.6 Bloc 3 : mòdul-level lock per evitar instal·lacions Ollama
 # concurrents. Si l'usuari clica "instal·lar" 2 cops, el primer agafa el lock i
 # el segon retorna un missatge informatiu. Sense això, dos threads farien
 # zip_extract a /Applications/Ollama.app simultàniament → app corrupta.
@@ -173,7 +173,7 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
         # huggingface_hub has already initialised constants.HF_HUB_DISABLE_XET,
         # is a no-op. The previous Bloc 1 attempt to set them inside this
         # thread was silently ignored (validated by reading hf_hub 1.13.0
-        # source + Turing R1 agentic). The xet bypass therefore lives entirely
+        # source). The xet bypass therefore lives entirely
         # in nexe-app/src-tauri/src/lib.rs::spawn_sidecar_process. We assume
         # constants.HF_HUB_DISABLE_XET == True at this point.
         logger.info(
@@ -338,18 +338,17 @@ async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]
     """Download an Ollama model via ollama pull, streaming real progress.
 
     F5.6 Bloc 3 (F03): si Ollama no es present, l'instal.lem automaticament
-    via ensure_ollama_installed(headless=True) abans del pull. Validat amb
-    Turing R1 agentic 2026-05-20 (8 iters, 92K tokens, 4 correccions C1-C5).
+    via ensure_ollama_installed(headless=True) abans del pull.
     """
     ollama = _find_ollama_bin()
     if not ollama:
-        # C1 Turing: check disconnect ABANS d'iniciar long operation. Si l'usuari
+        # Check disconnect ABANS d'iniciar long operation. Si l'usuari
         # ha cancel.lat el wizard, no comencem la instal.lacio (que no es pot
         # interrompre des de fora un cop el thread executor agafa el subproces).
         if await request.is_disconnected():
             return
         yield {"type": "progress", "stage": "Instal.lant Ollama...", "percent": 0}
-        # C2 Turing: lock no-blocking per evitar 2 instal.lacions concurrents
+        # lock no-blocking per evitar 2 instal.lacions concurrents
         # (2 SSE simultanis farien zipfile.extractall a /Applications/ alhora ->
         # corrupcio). Si ja n'hi ha una en curs, retornem sense fer res.
         if not _ollama_install_lock.acquire(blocking=False):
@@ -361,7 +360,7 @@ async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]
             try:
                 installed = await loop.run_in_executor(None, ensure_ollama_installed, True)
             except PermissionError as exc:
-                # C3 Turing: missatge UX-friendly per platform. macOS pot demanar
+                # missatge UX-friendly per platform. macOS pot demanar
                 # autoritzacio explicita per /Applications/; Linux sudo per /usr/local/bin/.
                 logger.exception("Ollama install: permission denied")
                 _system = platform.system().lower()
@@ -371,7 +370,7 @@ async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]
                         "Permis denegat. Instal.la'l manualment des d'ollama.com"
                     ) from None
                 if _system == "linux":
-                    # C4 Turing: Linux necessita sudo per /usr/local/bin/. AppImage
+                    # Linux necessita sudo per /usr/local/bin/. AppImage
                     # Tauri no te sudo per defecte. Missatge especific.
                     raise RuntimeError(
                         "Linux: l'instal.lador d'Ollama necessita sudo. "
@@ -379,7 +378,7 @@ async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]
                     ) from None
                 raise RuntimeError(f"Ollama install permission denied: {exc}") from None
             except Exception as exc:
-                # C5 Turing: logger.exception preserva el stack trace al log.
+                # logger.exception preserva el stack trace al log.
                 logger.exception("Ollama auto-install failed")
                 raise RuntimeError(f"Ollama auto-install failed: {exc}") from exc
             if not installed:
@@ -704,7 +703,7 @@ def _dry_run_plan(repo_id: str, token: str | None = None) -> dict:
 async def preflight(engine: str, model_id: str) -> JSONResponse:
     """Probe a model BEFORE downloading: gated status + total bytes.
 
-    F5.4 Fase 5 (Turing #2 + #3): exposed so the wizard can show the user
+    F5.4 Fase 5: exposed so the wizard can show the user
     a meaningful summary ("Will download 4.5 GB in 12 files, 1.2 GB
     already cached") and surface gated-model errors before the user
     commits to a download.
@@ -819,7 +818,6 @@ async def download_model(engine: str, model_id: str, request: Request) -> Stream
             # Ortogonal al gated check de dalt:
             #   gated check (pre):  l'usuari té accés al repositori
             #   SHA256 check (post): el descarregat és íntegre + no manipulat
-            # Validat amb Turing R1 agentic 2026-05-20 (23 iters, 631K tokens).
             # NO aplica a "embedder" (no hi ha pin al MODEL_WEIGHT_SHA256).
             if engine in ("mlx", "ollama", "gguf"):
                 try:
@@ -904,7 +902,7 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
 
     F5.6 Bloc 3 (F03): substitueix el placeholder "already_installed: False"
     per una crida real a ensure_ollama_installed(headless=True). Mateixes
-    correccions C1-C5 de Turing R1 que _stream_ollama (cancel detection,
+    correccions C1-C5 que _stream_ollama (cancel detection,
     lock concurrent, error UX-friendly per platform, logger.exception).
     """
 
@@ -913,11 +911,11 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
         if binary:
             yield await _sse({"type": "done", "already_installed": True})
             return
-        # C1 Turing: check disconnect abans de comencar.
+        # check disconnect abans de comencar.
         if await request.is_disconnected():
             return
         yield await _sse({"type": "progress", "stage": "Instal.lant Ollama...", "percent": 0})
-        # C2 Turing: lock no-blocking per evitar 2 instal.lacions concurrents.
+        # lock no-blocking per evitar 2 instal.lacions concurrents.
         if not _ollama_install_lock.acquire(blocking=False):
             yield await _sse({"type": "error", "message": "Ja s'esta instal.lant Ollama en un altre proces"})
             return
@@ -927,7 +925,7 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
             try:
                 installed = await loop.run_in_executor(None, ensure_ollama_installed, True)
             except PermissionError as exc:
-                # C3+C4 Turing: missatge UX-friendly per platform.
+                # missatge UX-friendly per platform.
                 logger.exception("Ollama install: permission denied")
                 _system = platform.system().lower()
                 if _system == "darwin":
@@ -944,7 +942,7 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
                     yield await _sse({"type": "error", "message": f"Permission denied: {exc}"})
                 return
             except Exception as exc:
-                # C5 Turing: logger.exception preserva stack trace al log.
+                # logger.exception preserva stack trace al log.
                 logger.exception("Ollama auto-install failed")
                 yield await _sse({"type": "error", "message": f"Install failed: {exc}"})
                 return
@@ -1057,7 +1055,7 @@ async def finalize_post(body: FinalizeBody) -> JSONResponse:
         hf_token=body.hf_token,
         lang=body.lang,
     )
-    # F5.4 NC-18 residual fix (Turing #2 C3): clear runtime_state overrides
+    # F5.4 NC-18 residual fix: clear runtime_state overrides
     # for the model env vars so the freshly-saved OnboardingState is what
     # the next sidecar restart sees. Without this, a stale UI override from
     # an earlier session (set by routes_chat._switch_*_model) would shadow
@@ -1127,8 +1125,7 @@ async def check_metal() -> JSONResponse:
 
     El wizard usa aquest endpoint per saber si pot oferir MLX com a backend.
     A Macs Intel (sense Metal) o Linux/Windows, mlx no s'ha d'oferir.
-    Validat amb Turing R1 agentic 2026-05-20 (thread executor suficient,
-    no cal subprocess). Memory pressure ~200-500 MB del MLX framework
+    Memory pressure ~200-500 MB del MLX framework
     s'acceptarà perquè el sidecar ja el carregara per chat.
     """
     def _check() -> bool:
@@ -1147,12 +1144,12 @@ async def check_metal() -> JSONResponse:
 
 @router.get("/state", operation_id="installer_state")
 async def installer_state() -> JSONResponse:
-    """F5.6 Bloc 5 (R1 Turing): Return the current onboarding state.
+    """F5.6 Bloc 5: Return the current onboarding state.
 
     El frontend Tauri usa aquest endpoint per saber si l'onboarding s'ha
     completat sense necessitat de llegir el fitxer JSON del disc. Util quan
     el sidecar es reinicia i el frontend vol decidir si mostrar wizard o UI.
-    NO retorna api_key (sensible). Validat amb Turing R1 agentic 2026-05-20.
+    NO retorna api_key (sensible).
     """
     state = OnboardingState.load()
     if state is None:

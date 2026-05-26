@@ -5,7 +5,7 @@
 # CVE coneguts en deps transitives crítiques (mlx-lm, mlx-vlm, torch).
 # Acceptats segons:
 #   decisions/ADR-cves-transitives-mlx-torch.md (2026-05-21)
-#   verificació empírica Turing V3 agentic 30 iter + OSV API
+#   verificació empírica agentic 30 iter + OSV API
 #
 # Format: una línia per CVE (ignora # comentaris)
 # Ús:    pip-audit --ignore-vuln $(grep -v '^#' installer/pip-audit-ignore.txt | xargs)

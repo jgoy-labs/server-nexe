@@ -209,7 +209,7 @@ class TestOnboardingStateV1Compatibility:
 
 
 class TestSaveSentinelPreservesHasToken:
-    """Turing #3 P4: save() without hf_token must preserve the existing
+    """save() without hf_token must preserve the existing
     has_token flag (read from previous state). Only explicit hf_token=None
     clears the token; hf_token="" is treated as the sentinel for safety."""
 

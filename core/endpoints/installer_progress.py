@@ -16,11 +16,11 @@ truth:
    for big-file transfers.
 
 The ``DownloadTracker`` combines both sources with an exponentially weighted
-moving average (EWMA, window 15 s — Turing #2 C1) so the surfaced speed and
+moving average (EWMA, window 15 s) so the surfaced speed and
 ETA don't jitter on small-chunk transfers. Returns at any moment the
 ``max(tqdm_n, dir_size)`` so the displayed progress never goes backwards.
 
-Threading contract (see Turing #2 C1):
+Threading contract:
   * The tqdm callback runs inside the ``_dl_executor`` worker thread.
   * ``stdlib_queue.Queue`` is thread-safe by design (internal Lock).
   * Consumers ``get_nowait()`` from the main asyncio loop.
@@ -44,17 +44,17 @@ except ImportError:  # pragma: no cover — tqdm is always present in the bundle
     _tqdm = None  # type: ignore[assignment]
 
 
-# Default polling interval for the directory-size fallback. 3s is the
-# Turing #2 recommendation (1s was too aggressive on dirs with many files).
+# Default polling interval for the directory-size fallback.
+# 3s chosen because 1s was too aggressive on dirs with many files.
 DEFAULT_DIR_POLL_SECONDS = 3.0
 
-# EWMA window for speed/ETA smoothing. Turing #2: 15s (was 5s) gives a
+# EWMA window for speed/ETA smoothing. 15s (was 5s) gives a
 # more stable display on jittery networks.
 DEFAULT_EWMA_WINDOW_SECONDS = 15.0
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# hf_xet detection — Turing #2 C1
+# hf_xet detection
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -322,7 +322,7 @@ class DownloadTracker:
         elapsed AND something looks like it has changed (mtime delta).
 
         The mtime check avoids redundant ``rglob`` scans on idle dirs —
-        Turing #2 recommendation."""
+        """
         now = time.monotonic()
         if not force and (now - self._last_dir_check) < self._dir_poll_seconds:
             return

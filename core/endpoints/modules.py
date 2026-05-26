@@ -44,9 +44,9 @@ async def list_integrated_modules(
   api_integrator=Depends(get_api_integrator)
 ) -> ModulesListResponse:
   """List integrated modules and their APIs"""
-  # F5.6 Bloc 5 (R2 Turing): si app.state.minimal_mode, l'api_integrator
-  # no està set (no s'arrenca a _startup_services). Detectem-ho per donar
-  # un missatge UX clar al client. Validat amb Turing R1 agentic 2026-05-20.
+  # Si app.state.minimal_mode, l'api_integrator no està set
+  # (no s'arrenca a _startup_services). Detectem-ho per donar
+  # un missatge UX clar al client.
   minimal = bool(getattr(request.app.state, "minimal_mode", False))
   if api_integrator:
     stats = api_integrator.get_integration_stats()

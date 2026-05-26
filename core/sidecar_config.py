@@ -320,7 +320,7 @@ class SidecarConfig:
     prompt_tier: str          # NEXE_PROMPT_TIER (full/compact)
     lang: str                 # NEXE_LANG (ca/es/en)
 
-    # === Services (Turing #3 expansion for Sessió 3 consumers) ===
+    # === Services ===
     ollama_host: str          # NEXE_OLLAMA_HOST — default "http://localhost:11434"
     qdrant_url: Optional[str] # NEXE_QDRANT_URL — Optional Qdrant extern; embedded if None
     csrf_secret: Optional[str]    # NEXE_CSRF_SECRET — None disables persistent CSRF
@@ -368,7 +368,7 @@ class SidecarConfig:
             model_engine=os.environ.get("NEXE_MODEL_ENGINE"),
             prompt_tier=os.environ.get("NEXE_PROMPT_TIER", "full"),
             lang=os.environ.get("NEXE_LANG", "ca"),
-            # Services (Turing #3 — preparat per Sessió 3)
+            # Services
             ollama_host=os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434"),  # nosemgrep
             qdrant_url=os.environ.get("NEXE_QDRANT_URL"),
             csrf_secret=os.environ.get("NEXE_CSRF_SECRET"),

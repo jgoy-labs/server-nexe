@@ -492,7 +492,6 @@ async def _startup(app: FastAPI) -> None:
     # passarà i tot s'arrencarà normal.
     # Resol bugs F5.4 A (fastembed silent), B (MLXConfig fallback NEXE_HOME),
     # D (DreamingCycle embedder=missing cascade) a first boot.
-    # Validat amb Turing R1 agentic 2026-05-20 (21 iters, 1.36M tokens).
     if not server_state.has_onboarding:
         app.state.minimal_mode = True
         logger.info("=" * 70)

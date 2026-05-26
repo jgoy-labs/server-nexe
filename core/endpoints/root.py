@@ -306,10 +306,9 @@ async def server_status(
   elif env_engine == "llama_cpp" and not llama_cpp_available:
     actual_engine = "ollama"
 
-  # F5.6 Bloc 5 (R2 Turing): expose minimal_mode flag perquè el frontend
-  # sàpiga si el sidecar està en mode reduït pre-onboarding. NO canviem
-  # el format existent (web UI depèn dels camps actuals); afegim camp
-  # opcional. Validat amb Turing R1 agentic 2026-05-20.
+  # Expose minimal_mode flag perquè el frontend sàpiga si el sidecar
+  # està en mode reduït pre-onboarding. No canviem el format existent
+  # (web UI depèn dels camps actuals); afegim camp opcional.
   return {
     "engine": actual_engine,
     "configured_engine": env_engine,
