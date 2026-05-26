@@ -162,7 +162,7 @@ if [ -n "$APP_SOURCE_DIR" ]; then
         --exclude='/storage' --exclude='.env' --exclude='/.git' \
         --exclude='__pycache__' --exclude='/venv' --exclude='/diari' \
         --exclude='/tests' --exclude='/InstallNexe.app' --exclude='/Nexe.app' \
-        --exclude='/.muthur' --exclude='/dev-tools' \
+        --exclude='/.qa-audit' --exclude='/dev-tools' \
         --exclude='/.test_venv' --exclude='/.venv' \
         --exclude='/node_modules' --exclude='/.pytest_cache' --exclude='/.mypy_cache' \
         --exclude='/.coverage' --exclude='.DS_Store' --exclude='._*' \

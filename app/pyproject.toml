@@ -8,7 +8,7 @@ include = ["scripts/poc-sidecar"]
 exclude = [
     "**/__pycache__",
     "**/node_modules",
-    ".muthur",
+    ".qa-audit",
     ".mypy_cache",
     ".pytest_cache",
     "dist",

@@ -1,7 +1,7 @@
 {
   "Exclude": [
     "\\.git/",
-    "\\.muthur/audits/",
+    "\\.qa-audit/",
     "\\.mypy_cache/",
     "\\.pytest_cache/",
     "node_modules/",

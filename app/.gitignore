@@ -51,7 +51,7 @@ src-tauri/sidecar-bundle.tar.gz
 src-tauri/sidecar-bundle.sha256
 
 # Internal audit artifacts (DEV-only, not for OSS)
-.muthur/
+.qa-audit/
 
 # Python (si s'afegeix sidecar amb venv local)
 __pycache__/
