@@ -180,7 +180,7 @@ class TestHealthEndpointSecurity:
     silently broke when commit 304e8b0 (F5.6 Bloc 6c) introduced a second
     `return` for minimal_mode: split()[1] then captured the function body
     between the two returns instead of the final response dict. See
-    diari/2026-05/20260521/bug2-test-readiness-resolucio.md for details.
+    See internal diary for details.
     """
 
     @pytest.mark.parametrize(
