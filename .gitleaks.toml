@@ -1,9 +1,9 @@
 # gitleaks allowlist — server-nexe
-# Tots els findings auditats per Turing/DeepSeek V3 (2026-05-09) i confirmats FP.
+# Tots els findings auditats i confirmats com a false positives (2026-05-09).
 # Cap secret real al repositori.
 
 [allowlist]
-description = "False positives confirmats per auditoria Turing 2026-05-09"
+description = "False positives confirmats per auditoria de seguretat 2026-05-09"
 paths = [
   # tests/ — cobreix tests/ arrel i plugins/**/tests/ (substring match)
   "tests/",
