@@ -135,7 +135,7 @@ describe("Isolation filter", () => {
     });
 
     // C02 — quit_app (S05) takes no payload and must pass the hook.
-    // get_auth_token removed (Codex audit 2026-05-06): exposed Bearer via XSS.
+    // get_auth_token removed (security audit 2026-05-06): exposed Bearer via XSS.
     it("rejects removed get_auth_token command", () => {
         expect(() =>
             win.__TAURI_ISOLATION_HOOK__({ cmd: "get_auth_token" })
@@ -213,7 +213,7 @@ describe("Isolation filter", () => {
             .filter(Boolean);
 
         // Must have at least the 3 current commands (greet, quit_app,
-        // fetch_from_sidecar). get_auth_token removed (Codex audit 2026-05-06).
+        // fetch_from_sidecar). get_auth_token removed (security audit 2026-05-06).
         expect(cmds.length).toBeGreaterThanOrEqual(3);
 
         // Every command registered in the Rust handler must have a validator in the allowlist.
@@ -435,7 +435,7 @@ describe("Isolation filter", () => {
         // ─────────────────────────────────────────────────────────────────
         // B2 Sprint 0.18 (2026-04-21) — structural URL parse
         //
-        // Claude-ext + Codex red team (consensus 2/2 AIs, P1 latent Phase 2)
+        // external red team (consensus 2/2 AIs, P1 latent Phase 2)
         // detected 4 bypass vectors in the old `startsWith("http://127.0.0.1:")`.
         // These tests exercise the fix (structural parse via `new URL(...)`).
         // Mutation test: with the old `startsWith` all these vectors passed.
