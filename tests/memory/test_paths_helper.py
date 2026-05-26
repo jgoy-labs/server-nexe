@@ -22,7 +22,7 @@ def test_returns_legacy_default_when_standalone(monkeypatch, caplog):
 
 def test_returns_sidecar_vectors_dir_when_sidecar():
     """Sidecar mode → returns SidecarConfig.vectors_dir."""
-    expected = Path("/Users/jgoy/.nexe/data/vectors")
+    expected = Path("/Users/testuser/.nexe/data/vectors")
     fake_cfg = MagicMock(is_sidecar=True, vectors_dir=expected)
     with patch("core.sidecar_config.get_sidecar_config", return_value=fake_cfg):
         result = resolve_qdrant_path()

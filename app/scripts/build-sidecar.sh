@@ -152,7 +152,7 @@ if [ -n "$APP_SOURCE_DIR" ]; then
     # de tests, node_modules/, scripts/, docs/, knowledge/, README*.md i
     # pytest configs s'inclouien al sidecar/app/. El .test_venv en particular
     # exposava .pth files al sys.path que feien que el module_manager
-    # descobrís els plugins a /Users/.../nat/dev/server-nexe/plugins/ enlloc
+    # descobrís els plugins a /Users/.../dev/server-nexe/plugins/ enlloc
     # del sidecar extret. Cada fix de NEW-* destapava una capa nova.
     #
     # Leading slash a /pattern = anchored a $APP_SOURCE_DIR; sense slash
@@ -365,7 +365,7 @@ echo "==> Rewriting venv symlinks to relative PBS paths..."
 echo "    Symlinks: python, python3, python3.12 -> ../../python-runtime/bin/python3.12"
 
 # ── Step 5.7: Rewrite pyvenv.cfg relocatable (F5.2.1) ────────────────
-# Substitueix `home = /Users/jgoy/.local/share/uv/python/.../bin` per un path
+# Substitueix `home = /Users/$USER/.local/share/uv/python/.../bin` per un path
 # relatiu (../../python-runtime/bin) i activa `relocatable = true`. Python 3.12
 # resol `home` relatiu respecte al directori del pyvenv.cfg (venv/), via site.py.
 # `relocatable = true` forca recalcular sys.prefix des de la ubicacio real del

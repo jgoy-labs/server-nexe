@@ -139,7 +139,7 @@ def _find_bundle_resources(project_root):
 
     Search order:
     1. NEXE_BUNDLE_RESOURCES env var (set explicitly by the caller).
-    2. project_root/InstallNexe.app/... (dev/gitoss layout, co-located).
+    2. project_root/InstallNexe.app/... (development layout, co-located).
     3. Mounted volumes (/Volumes/*/InstallNexe.app/...) — real DMG case: the
        SwiftUI wizard runs from the mounted DMG, extracts the payload to
        project_root (/Applications/server-nexe/), but the app bundle with
@@ -156,7 +156,7 @@ def _find_bundle_resources(project_root):
         if candidate.is_dir() and (candidate / "wheels").is_dir():
             return candidate
 
-    # 2. Co-located with project (dev/gitoss layout)
+    # 2. Co-located with project (development layout)
     candidate = project_root / "InstallNexe.app" / "Contents" / "Resources"
     if candidate.is_dir() and (candidate / "wheels").is_dir():
         return candidate

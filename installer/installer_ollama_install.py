@@ -89,7 +89,7 @@ def _find_bundle_ollama_zip():
     ``installer_setup_env.py``:
 
     1. ``NEXE_BUNDLE_RESOURCES`` environment variable.
-    2. Co-located ``InstallNexe.app`` in the repo root (dev / gitoss).
+    2. Co-located ``InstallNexe.app`` in the repo root (development layout).
     3. Mounted DMG volumes under ``/Volumes/``.
     """
     candidates = []

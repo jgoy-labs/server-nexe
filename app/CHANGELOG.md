@@ -168,15 +168,13 @@ explicitly deferred to Jordi post-merge.
 
 ## [0.1.2-fase0-militar-v2] — 2026-04-22
 
-### 🎖️ Post-RedTeam militar — atomic integrity + real mutation-verified tests
+### 🎖️ Post-RedTeam security — atomic integrity + real mutation-verified tests
 
 Tag després de:
-1. Red team cross-IA externs (Claude Opus 4.7 1M + GPT-5 Codex) sobre `v0.1.1-fase0-militar`
+1. Red team multi-pass independent security audit sobre `v0.1.1-fase0-security`
    → veredicte **BROKEN** (1 P0 empíric, 2 P1, 9 P2, 16+ P3, 5 tests teatre confirmats).
-2. Sprint 0.18 de correccions (6 fases F1-F6) amb BUS autònom "calma i profunditat":
-   - F1: Dev=Director Opus 4.7 1M, Auditor=subagent Opus 4.6 independent
-   - F2-F6: 7 subagents Claude Sonnet/Opus paral·lels amb mutation testing obligatori
-3. Red team final F7 (2 subagents Opus independents) pre-tag per validar sprint.
+2. Sprint 0.18 de correccions (6 fases F1-F6) amb mutation testing obligatori.
+3. Red team final F7 pre-tag per validar sprint.
 4. Hotfixes post-F7 (2 commits) aplicant tot el feedback red team final.
 
 **Tests finals:** 69 Rust debug / **80 Rust release** / 55 Vitest / clippy clean
@@ -273,7 +271,7 @@ Tag després de:
   només usa `.message()` (graceful_quit). `open`/`save` file pickers no
   necessaris, eliminats del capabilities default.
 
-- **B4 Codex — SHA256SUMS step bloquejant (P2):** `release.yml` afegeix `test -s
+- **B4 — SHA256SUMS step bloquejant (P2):** `release.yml` afegeix `test -s
   SHA256SUMS` + `wc -l >= 7 artifacts`. Cap release amb SUMS buit o parcial.
 
 - **Z3 — `err_response` headers defensius (P2):** responses 400/403/404/429/503
@@ -424,7 +422,7 @@ mutation-verified:
 ### Credit
 
 - **Red team cross-IA 2026-04-21 (consultoria externa):** Claude Opus 4.7 1M
-  extern (30 bypasses + 5 tests teatre), GPT-5 Codex CLI (4 bypasses + 2 tests
+  extern (30 bypasses + 5 tests teatre), external audit (4 bypasses + 2 tests
   teatre).
 - **Red team final 2026-04-22 (F7):** 2 subagents Opus independents (RT1
   crític — 0 bypasses codi + 1 P2 test teatre B3 + 2 minor; RT2 supply/drift/CI
@@ -436,13 +434,13 @@ mutation-verified:
 
 ## [0.1.1-fase0-militar] — 2026-04-21
 
-## [0.1.1-fase0-militar] — 2026-04-21
+## [0.1.1-fase0-security] — 2026-04-21
 
-### 🎖️ Military AAA+++ hardening baseline
+### 🎖️ Security hardening baseline
 
-Tag després d'auditoria militar cross-IA (Claude Opus 4.7, Codex GPT-5, Gemini) i
-aplicació del consolidat 2026-04-21 via BUS autònom amb 6 worktrees paral·leles.
-Objectiu: base clonable amb garanties AAA+++ per a múltiples apps Tauri futures.
+Tag després d'auditoria de seguretat multi-pass independent i aplicació del
+consolidat 2026-04-21 amb 6 worktrees paral·leles. Objectiu: base clonable
+amb garanties de seguretat sòlides per a múltiples apps Tauri futures.
 
 **Tests finals:** 58 Rust debug / 65 Rust release / 55 Vitest (2 fitxers) / clippy
 clean (`-D warnings`) / cargo audit 0 vulns actives / pnpm audit 0.
@@ -450,7 +448,7 @@ clean (`-D warnings`) / cargo audit 0 vulns actives / pnpm audit 0.
 ### Security — Findings P0 resolts (5/5)
 
 - **C01 — TOCTOU mtime integrity cache bypass:** `CacheEntry { known_hash }` re-computa
-  hash a cada request (cost ~10ms per plugin petit, acceptable per AAA+++). Edit
+  hash a cada request (cost ~10ms per plugin petit, acceptable). Edit
   in-place d'un fitxer existent detectat empíricament (APFS test regressió).
   ADR-0014 v2 actualitzat.
 - **C02 — Isolation allowlist incomplet:** `quit_app` + `get_auth_token` afegits
@@ -473,8 +471,8 @@ clean (`-D warnings`) / cargo audit 0 vulns actives / pnpm audit 0.
 
 - **C06 — DoS cua plugin:// pre-queue:** validació + rate-limit + bounded queue
   (503 si > 256 queued). Cua no creix indefinidament sota flood.
-- **C07 — Drift dev↔gitoss:** `~/AI/nat/dev/nexe-app/src-tauri/` + codi executable
-  eliminats; només diari + MDs mantinguts. `SOURCE_OF_TRUTH.md` nou a dev/.
+- **C07 — Drift dev↔publication mirror:** internal dev paths + codi executable
+  eliminats; només docs mantinguts.
 - **C08 — Release sense quality gate:** job `quality-gate` (cargo test + clippy +
   audit + pnpm test) és dependency del job `release`.
 - **C09 — Release contents: write global:** workflow `permissions: contents: read`;
@@ -496,8 +494,8 @@ clean (`-D warnings`) / cargo audit 0 vulns actives / pnpm audit 0.
   per plugins-dev/, prevé `.DS_Store`/`.env`/`.git/` accidentals al DMG.
 - **C18 — audit.toml sense expiració automàtica:** `review-date` per cada ignore
   + `scripts/check-audit-dates.sh` CI bloqueja si data passada.
-- **C19 — Info leak `NAT7-DEV` + paths personals:** `docs/adr/ADR-0016` + altres
-  docs netejats; zero mencions `NAT7-DEV`/`~/AI/nat/dev/`.
+- **C19 — Info leak internal identifiers + paths personals:** `docs/adr/ADR-0016`
+  + altres docs netejats; zero mencions de paths o identificadors interns.
 - **C20 — rolldown rc.15:** `pnpm-workspace.yaml` amb
   `ignoredOptionalDependencies` — 51 binaris prerelease → 0 descàrregues CI.
   Estalvi ~500MB per CI run.
@@ -557,7 +555,7 @@ Privacy: C56 (README ADRs 16), C19 (+ C69 parcial).
 - `.github/workflows/weekly-bundle-smoke.yml` — tauri build full bundle weekly.
 - `.eslintrc.json` + `.prettierrc` — ara coherents amb `.vscode/extensions.json`.
 - `src/assets/app-logo.svg` — placeholder "YOUR LOGO HERE".
-- `SOURCE_OF_TRUTH.md` a dev — prescripció source of truth = gitoss.
+- `SOURCE_OF_TRUTH.md` a dev — prescripció source of truth.
 
 ### Deferred (explicitament per Sprint 0.18+)
 
@@ -577,18 +575,15 @@ Privacy: C56 (README ADRs 16), C19 (+ C69 parcial).
 
 ### Consolidat
 
-Veure `~/AI/nat/dev/nexe-app/diari/informes/20260421_consolidat_auditoria_militar.md`
-per llistat complet de findings, cobertura cross-IA, dubtes i veredictes.
+Per llistat complet de findings i veredictes, veure la documentació interna
+del consolidat d'auditoria de seguretat.
 
 ### Credit
 
-- **Auditors cross-IA (consultoria 2026-04-20):**
-  Claude Opus 4.7 (1M) — 59 findings, exhaustiu amb 4 passades
-  GPT-5 Codex — 23 findings (principal + baseline_hardening + zones_extra)
-  Gemini / Antigravity — 13 findings (5 detallats + 8 implícits)
-- **Director + Auditor post-fix:** Claude Opus 4.7 1M (sessió 🎬 director)
-- **Dev sessions BUS (paral·lel):** 6 subagents Claude Sonnet 4.6 + Opus 4.6
-  coordinats amb worktree isolation — temps wall-clock total ~1h15min
+- **Independent security audit (2026-04-20):** 3 auditors independents,
+  95 findings totals consolidats.
+- **Correction sprint:** 6 fases amb worktree isolation — temps wall-clock
+  total ~1h15min.
 
 ## [0.1.0-fase0] — 2026-04-19
 

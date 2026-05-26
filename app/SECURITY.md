@@ -23,9 +23,9 @@ latest.
 
 ## Security Baseline
 
-Post-militar AAA+++ v2 (2026-04-22, tag `v0.1.2-fase0-militar-v2`) baseline.
-**Updated after red team cross-IA externs (Claude Opus 4.7 1M + GPT-5 Codex)
-broke v0.1.1-fase0-militar** — Sprint 0.18 tanca els 1 P0 + 2 P1 + 9 P2 + 16 P3
+Post-security audit v2 (2026-04-22, tag `v0.1.2-fase0-security-v2`) baseline.
+**Updated after independent red team broke v0.1.1-fase0-security** —
+Sprint 0.18 tanca els 1 P0 + 2 P1 + 9 P2 + 16 P3
 identificats, reescriu 5 tests teatre amb mutation-verified regression, i passa
 red team final F7 amb veredicte CLEAR.
 
@@ -167,7 +167,7 @@ Un test que passa amb ambdós és teatre i s'ha eliminat o reescrit.
 - MSRV 1.88 CI job (`msrv-check` workflow in `check.yml`, Sprint 0.18 B29) —
   fails if code uses Rust 1.89+ features without bumping declared MSRV.
 
-**Testing discipline (militar):**
+**Testing discipline:**
 - **Mutation testing obligatory for all regression tests:** each test MUST fail
   when the specific line(s) of the fix are reverted (manually verified with a
   `/tmp/` copy of the repo). Tests that pass both pre-fix and post-fix are

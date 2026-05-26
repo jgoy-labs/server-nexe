@@ -2,8 +2,7 @@
 # Git privat de desenvolupament
 #
 # Aquest repo és PRIVAT — mai connectat a GitHub directament.
-# Flux publicació: dev/ → (revisió /gitoss) → gitoss/ → GitHub
-# Remote futur: Nostromo (NAS, backup privat)
+# Flux publicació: dev/ → (revisió) → GitHub
 #
 # ⚠️ PARANOIC MODE: tot el que pugui contenir secrets,
 # binaris, o dades personals està exclòs.
@@ -95,8 +94,8 @@ htmlcov/
 *,cover
 
 # Internal QA tooling (local audits, not part of OSS)
-.muthur/
-.muthur.toml
+.qa-audit/
+.qa-audit.toml
 
 # Caches temporals
 tmp/
