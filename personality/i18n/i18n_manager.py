@@ -33,7 +33,7 @@ class I18nManager:
     self.base_path = base_path or self.config_path.parent
     self.config: Dict[str, Any] = {}
     self.translations: Dict[str, Any] = {}
-    _default_lang = os.getenv("NEXE_LANG", "ca-ES")
+    _default_lang = os.getenv("NEXE_LANG", "en-US")
     self.current_language = _default_lang
     self.fallback_language = _default_lang
     self._translations_loaded = False
@@ -58,7 +58,7 @@ class I18nManager:
       self.fallback_language = loc_config.get('fallback_idioma', 'ca-ES')
       
     except Exception:
-      _fallback = os.getenv("NEXE_LANG", "ca-ES")
+      _fallback = os.getenv("NEXE_LANG", "en-US")
       self.current_language = _fallback
       self.fallback_language = _fallback
   

@@ -96,9 +96,10 @@ def test_stuck_handler_threshold_is_99():
     """Stuck-99% handler must only trigger at pct >= 99, not 90."""
     import inspect
     import core.endpoints.installer as mod
-    src = inspect.getsource(mod._stream_mlx)
-    assert "pct >= 99" in src, "Stuck handler threshold must be 99"
-    assert "pct >= 90" not in src, "Old 90% threshold must be removed from _stream_mlx"
+    # Logic was extracted to _get_finalizing_hint for CCN reduction.
+    src = inspect.getsource(mod._get_finalizing_hint)
+    assert "pct < 99" in src or "pct >= 99" in src, "Stuck handler threshold must be 99"
+    assert "pct < 90" not in src and "pct >= 90" not in src, "Old 90% threshold must not appear"
 
 
 # ──────────────────────────────────────────────────────────────────────────────

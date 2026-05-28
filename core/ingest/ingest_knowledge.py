@@ -40,7 +40,7 @@ from memory.memory.precomputed_loader import PrecomputedKB  # noqa: E402
 from memory.rag.header_parser import parse_rag_header, VALID_PRIORITIES  # noqa: E402  # after sys.path setup
 
 import os as _os  # noqa: E402  # after sys.path setup
-_LANG = _os.environ.get("NEXE_LANG", "ca")
+_LANG = _os.environ.get("NEXE_LANG", "en")
 _I18N = {
     "title":          {"ca": "NEXE KNOWLEDGE INGESTION", "es": "NEXE KNOWLEDGE INGESTION", "en": "NEXE KNOWLEDGE INGESTION"},
     "add_docs":       {"ca": "Afegeix els teus documents a la carpeta 'knowledge/'", "es": "Añade tus documentos a la carpeta 'knowledge/'", "en": "Add your documents to the 'knowledge/' folder"},
@@ -146,7 +146,7 @@ def _build_file_items(
         doc_abstract = ""
         doc_id = filename
         doc_type = DEFAULT_TYPE
-        doc_lang = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
+        doc_lang = _os.environ.get("NEXE_LANG", "en").split("-")[0].lower()
 
     doc_overlap = max(DEFAULT_OVERLAP_FLOOR, doc_chunk_size // DEFAULT_OVERLAP_FACTOR)
 

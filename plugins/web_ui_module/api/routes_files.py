@@ -64,7 +64,7 @@ _SENSITIVE_UPLOAD_PATTERNS = [
     b"-----BEGIN PGP PRIVATE KEY BLOCK-----",  # nosemgrep: detected-pgp-private-key-block — denylist detection pattern, not a real secret
     # API tokens relevant to the real stack (Anthropic / OpenAI / GitHub / Google)
     b"sk-ant-",       # Anthropic (Claude API + Claude Code CLI)
-    b"sk-proj-",      # OpenAI project key (GPT, Responses API)
+    b"sk-proj-",      # OpenAI project key (GPT, Codex CLI, Responses API)
     b"ghp_",          # GitHub personal access token (classic)
     b"github_pat_",   # GitHub fine-grained PAT
     b"AIzaSy",        # Google API key (Gemini, AI Studio, Cloud, Firebase)
@@ -134,7 +134,7 @@ def _apply_rag_header_metadata(doc_metadata: dict, rag_header, body_content: str
         logger.info(f"RAG header found: id={rag_header.id}, priority={rag_header.priority}")
     else:
         # Simple metadata (without LLM — avoids blocking for MLX/Ollama)
-        _lang = _os.getenv("NEXE_LANG", "ca").split("-")[0]
+        _lang = _os.getenv("NEXE_LANG", "en").split("-")[0]
         _stem = filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ")
         doc_metadata.update({
             "abstract": " ".join(body_content.split())[:300],

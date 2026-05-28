@@ -514,7 +514,7 @@ if _PYDANTIC_SETTINGS_AVAILABLE:
         qdrant_url: Optional[str] = Field(None, description="URL Qdrant extern (si no embedded)", alias="NEXE_QDRANT_URL")
 
         # --- RAG / Language ---
-        lang: str = Field("ca", description="Idioma del servidor (ca|es|en)", alias="NEXE_LANG")
+        lang: str = Field("en", description="Idioma del servidor (ca|es|en)", alias="NEXE_LANG")
         rag_docs_threshold: float = Field(0.4, description="Llindar similaritat RAG docs", alias="NEXE_RAG_DOCS_THRESHOLD")
         rag_knowledge_threshold: float = Field(0.35, description="Llindar similaritat RAG knowledge", alias="NEXE_RAG_KNOWLEDGE_THRESHOLD")
         rag_memory_threshold: float = Field(0.3, description="Llindar similaritat RAG memory", alias="NEXE_RAG_MEMORY_THRESHOLD")

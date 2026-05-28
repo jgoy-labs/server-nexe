@@ -58,7 +58,7 @@ class RAGHeader:
     priority: str = "P2"
 
     # Optional fields
-    lang: str = field(default_factory=lambda: os.getenv("NEXE_LANG", "ca").split("-")[0].lower())
+    lang: str = field(default_factory=lambda: os.getenv("NEXE_LANG", "en").split("-")[0].lower())
     type: str = "docs"
     # collection=None → caller applies their target_collection (bug 2026-04-14)
     collection: Optional[str] = None
@@ -152,7 +152,7 @@ class RAGHeaderParser:
         header.priority = str(parsed.get("priority", "P2")).strip('"\'').upper()
 
         # Assign optional fields
-        _default_lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+        _default_lang = os.getenv("NEXE_LANG", "en").split("-")[0].lower()
         header.lang = str(parsed.get("lang", _default_lang)).strip('"\'').lower()
         header.type = str(parsed.get("type", "docs")).strip('"\'').lower()
         # IMPORTANT: default must be None so the caller (ingest_knowledge)

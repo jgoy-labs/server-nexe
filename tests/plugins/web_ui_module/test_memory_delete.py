@@ -491,15 +491,12 @@ class TestListMemories:
         assert result["facts"] == []
 
     def test_list_no_memory_api(self):
-        mh_module._memory_api_instance = None
-        mh_module._memory_api_init_failed = True
         helper = MemoryHelper()
-
-        result = asyncio.run(helper.list_memories())
+        with patch.object(helper, 'get_memory_api', new=AsyncMock(return_value=None)):
+            result = asyncio.run(helper.list_memories())
 
         assert result["success"] is False
         assert result["facts"] == []
-        mh_module._memory_api_init_failed = False
 
 
 # ═══════════════════════════════════════════════════════════════

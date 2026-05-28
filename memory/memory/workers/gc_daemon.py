@@ -130,7 +130,7 @@ class GCDaemon:
         """Archive entries in RDBMS, remove from vector index, create tombstones."""
         placeholders = ",".join("?" for _ in to_delete)
         sql = f"UPDATE episodic SET state = 'archived' WHERE id IN ({placeholders})"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
-        conn.execute(sql, to_delete)
+        conn.execute(sql, to_delete)  # nosemgrep: sqlalchemy-execute-raw-query — parameterized with '?' placeholders
         conn.commit()
         if self._vector:
             try:

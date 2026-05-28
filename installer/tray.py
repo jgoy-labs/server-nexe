@@ -393,7 +393,7 @@ class NexeTray(rumps.App):
             blink_on = not blink_on
 
             try:
-                req = urllib.request.urlopen(  # nosec B310: hardcoded localhost server health check, SERVER_PORT is a module constant
+                req = urllib.request.urlopen(  # nosec B310  # nosemgrep: dynamic-urllib-use-detected,insecure-urlopen — hardcoded localhost server health check
                     f"http://localhost:{SERVER_PORT}/health", timeout=2
                 )
                 if req.status == 200:
@@ -663,7 +663,7 @@ def main():
             app._start_server()
             for _ in range(40):  # 20s timeout (M1 8GB may take this long)
                 try:
-                    req = urllib.request.urlopen(  # nosec B310: hardcoded localhost server health check, SERVER_PORT is a module constant
+                    req = urllib.request.urlopen(  # nosec B310  # nosemgrep: dynamic-urllib-use-detected,insecure-urlopen — hardcoded localhost server health check
                         f"http://localhost:{SERVER_PORT}/health", timeout=2
                     )
                     if req.status == 200:

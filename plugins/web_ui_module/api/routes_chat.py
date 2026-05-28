@@ -1066,7 +1066,7 @@ async def _build_rag_context(memory_helper, message: str, body: dict, attached_d
             relevant = doc_items + knowledge_items + memory_items
             if relevant:
                 rag_count = len(relevant)
-                _lang_key = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
+                _lang_key = _os.environ.get("NEXE_LANG", "en").split("-")[0].lower()
                 rag_context = _format_rag_sections_by_language(
                     doc_items, knowledge_items, memory_items, _lang_key
                 )
@@ -1292,7 +1292,7 @@ def _build_system_prompt_with_time() -> tuple[str, str]:
         from core.endpoints.chat import _get_system_prompt
         import os as _os_inner
         _state = get_server_state()
-        _lang = _os_inner.getenv("NEXE_LANG", "ca")
+        _lang = _os_inner.getenv("NEXE_LANG", "en")
         base_system_prompt = _get_system_prompt(_state, _lang)
     except Exception:
         _lang = "ca"
@@ -1373,7 +1373,7 @@ def _inject_context_into_messages(
                 "NEVER say you know it from training if the info comes from here:"
             ),
         }
-        _lang_key = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
+        _lang_key = _os.environ.get("NEXE_LANG", "en").split("-")[0].lower()
         _instr = _rag_instruction.get(_lang_key, _rag_instruction["en"])
         rag_block = f"[CONTEXT]\n{_instr}\n{rag_context}\n[FI CONTEXT]\n\n{message}"
         engine_messages.append({"role": "user", "content": rag_block})
@@ -1407,7 +1407,7 @@ def _inject_image_block(messages: list) -> list:
             "[END IMAGE]"
         ),
     }
-    _lang_key2 = _os.environ.get("NEXE_LANG", "ca").split("-")[0].lower()
+    _lang_key2 = _os.environ.get("NEXE_LANG", "en").split("-")[0].lower()
     _img_block = _img_blocks.get(_lang_key2, _img_blocks["en"])
     if messages and messages[-1]["role"] == "user":
         messages[-1] = dict(messages[-1])

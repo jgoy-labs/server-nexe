@@ -63,7 +63,7 @@ _SSE_HEADERS = {
 # Single-worker executor for blocking download tasks (MLX snapshot_download).
 _dl_executor = ThreadPoolExecutor(max_workers=1)
 
-# F5.6 Bloc 3 : mòdul-level lock per evitar instal·lacions Ollama
+# F5.6 Bloc 3 (C2 Turing): mòdul-level lock per evitar instal·lacions Ollama
 # concurrents. Si l'usuari clica "instal·lar" 2 cops, el primer agafa el lock i
 # el segon retorna un missatge informatiu. Sense això, dos threads farien
 # zip_extract a /Applications/Ollama.app simultàniament → app corrupta.
@@ -90,15 +90,57 @@ def _models_dir() -> Path:
     return get_models_dir()
 
 
+def _hf_download_with_retry(
+    model_id: str,
+    dest: Path,
+    tqdm_class: type,
+    cancel_ev: "_threading.Event",
+    errors: "list[Exception]",
+) -> bool:
+    """Attempt snapshot_download up to 3×. Returns True if cancelled between retries."""
+    from huggingface_hub import snapshot_download as _sd  # type: ignore[import]
+    from huggingface_hub.utils import (  # type: ignore[import]
+        HfHubHTTPError, RepositoryNotFoundError, GatedRepoError, RevisionNotFoundError,
+    )
+    for attempt in range(3):
+        try:
+            _sd(repo_id=model_id, local_dir=str(dest), tqdm_class=tqdm_class)  # nosec B615
+            break
+        except (RepositoryNotFoundError, GatedRepoError, RevisionNotFoundError) as exc:
+            errors.append(exc)
+            break
+        except HfHubHTTPError as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            if status is not None and 400 <= status < 500:
+                errors.append(exc)
+                break
+            if attempt < 2:
+                logger.warning("installer: HfHubHTTPError attempt %d/3 (status=%s): %s", attempt + 1, status, exc)
+                time.sleep(5)
+                if cancel_ev.is_set():
+                    return True
+                continue
+            errors.append(exc)
+        except Exception as exc:  # noqa: BLE001
+            if attempt < 2:
+                logger.warning("installer: download error attempt %d/3: %s", attempt + 1, exc)
+                time.sleep(5)
+                if cancel_ev.is_set():
+                    return True
+                continue
+            errors.append(exc)
+    return False
+
+
 def _find_ollama_bin() -> str | None:
     found = shutil.which("ollama")
     if found:
         return found
     for candidate in [
-        "/usr/local/bin/ollama",
-        "/opt/homebrew/bin/ollama",
+        "/usr/local/bin/ollama",  # nosemgrep: absolute_path
+        "/opt/homebrew/bin/ollama",  # nosemgrep: absolute_path
         os.path.expanduser("~/bin/ollama"),
-        "/Applications/Ollama.app/Contents/Resources/ollama",
+        "/Applications/Ollama.app/Contents/Resources/ollama",  # nosemgrep: absolute_path
         os.path.expanduser("~/Applications/Ollama.app/Contents/Resources/ollama"),
     ]:
         if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
@@ -114,7 +156,6 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
     transfers don't write to Python tqdm, so we always run the dir poller
     in parallel — the DownloadTracker takes max(tqdm_n, dir_size).
     """
-    from huggingface_hub import snapshot_download  # type: ignore[import]
     import queue as stdlib_queue
 
     from core.endpoints.installer_progress import (
@@ -155,85 +196,18 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
             return
 
         from huggingface_hub import constants as hf_constants  # type: ignore[import]
-        from huggingface_hub.utils import (  # type: ignore[import]
-            HfHubHTTPError,
-            RepositoryNotFoundError,
-            GatedRepoError,
-            RevisionNotFoundError,
-        )
         import huggingface_hub as _hf  # type: ignore[import]
 
         prev_env = os.environ.pop("HF_HUB_OFFLINE", None)
         prev_const = hf_constants.HF_HUB_OFFLINE
         hf_constants.HF_HUB_OFFLINE = False
         prev_tqdm_disable = os.environ.pop("TQDM_DISABLE", None)
-        # F5.6 Bloc 8 (2026-05-20): hf_xet disabled at SIDECAR SPAWN by the
-        # Tauri Rust launcher (HF_HUB_DISABLE_XET=1 set before Python import).
-        # HF Hub env vars are read at import time — setting them here, after
-        # huggingface_hub has already initialised constants.HF_HUB_DISABLE_XET,
-        # is a no-op. The previous Bloc 1 attempt to set them inside this
-        # thread was silently ignored (validated by reading hf_hub 1.13.0
-        # source). The xet bypass therefore lives entirely
-        # in nexe-app/src-tauri/src/lib.rs::spawn_sidecar_process. We assume
-        # constants.HF_HUB_DISABLE_XET == True at this point.
         logger.info(
             "installer: starting MLX download %s -> %s (xet_active=%s, hf=%s)",
             model_id, dest, xet_active, _hf.__version__,
         )
-        # F5.6 Bloc 1 (F05): retry 3x amb sleep 5s per errors transitoris.
-        # IMPORTANT: ordre dels except — subclasses ABANS de superclasses.
-        # RepositoryNotFoundError/GatedRepoError/RevisionNotFoundError són
-        # subclasses de HfHubHTTPError; capturades primer per fer break ràpid.
-        # NO afegim args local_dir_use_symlinks/resume_download/max_workers —
-        # eliminats a hf 1.x (TypeError); `local_dir` ja posa fitxers reals,
-        # cache .cache/huggingface/ gestiona resume, max_workers default 8.
-        cancelled = False
         try:
-            for attempt in range(3):
-                try:
-                    snapshot_download(
-                        repo_id=model_id,
-                        local_dir=str(dest),
-                        tqdm_class=SSEProgressTqdm,
-                    )
-                    break
-                except RepositoryNotFoundError as exc:
-                    errors.append(exc)
-                    break
-                except GatedRepoError as exc:
-                    errors.append(exc)
-                    break
-                except RevisionNotFoundError as exc:
-                    errors.append(exc)
-                    break
-                except HfHubHTTPError as exc:
-                    status = getattr(getattr(exc, "response", None), "status_code", None)
-                    if status is not None and 400 <= status < 500:
-                        errors.append(exc)
-                        break
-                    if attempt < 2:
-                        logger.warning(
-                            "installer: HfHubHTTPError attempt %d/3 (status=%s): %s",
-                            attempt + 1, status, exc,
-                        )
-                        time.sleep(5)
-                        if cancel_ev.is_set():
-                            cancelled = True
-                            break
-                        continue
-                    errors.append(exc)
-                except Exception as exc:  # noqa: BLE001
-                    if attempt < 2:
-                        logger.warning(
-                            "installer: download error attempt %d/3: %s",
-                            attempt + 1, exc,
-                        )
-                        time.sleep(5)
-                        if cancel_ev.is_set():
-                            cancelled = True
-                            break
-                        continue
-                    errors.append(exc)
+            cancelled = _hf_download_with_retry(model_id, dest, SSEProgressTqdm, cancel_ev, errors)
             if cancelled:
                 logger.info("installer: download cancelled by user between retries")
         finally:
@@ -242,9 +216,6 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
                 os.environ["HF_HUB_OFFLINE"] = prev_env
             if prev_tqdm_disable is not None:
                 os.environ["TQDM_DISABLE"] = prev_tqdm_disable
-            # F5.6 Bloc 8: no HF_HUB_DISABLE_XET / HF_HUB_ENABLE_HF_TRANSFER
-            # restore here — they're set globally by the sidecar launcher
-            # (lib.rs) and must persist for the entire sidecar lifetime.
             loop.call_soon_threadsafe(done_ev.set)
 
     loop.run_in_executor(_dl_executor, _run)
@@ -287,27 +258,16 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
             ev = tracker.to_event()
             pct = ev["percent"]
             now = time.monotonic()
-            # F5.4 Fase 6b: stuck-handler (F5.5 G4: threshold 99%, not 90%).
-            # Track when speed dropped below the threshold; if it has stayed
-            # that low for STUCK_WINDOW_S
-            # and we haven't already announced "finalizing", emit the hint
-            # exactly once so the user sees something change.
-            if not finalizing_announced and pct >= 99:
-                if ev["speed_bps"] < STUCK_LOW_SPEED_BPS:
-                    if slow_since_t is None:
-                        slow_since_t = now
-                    elif (now - slow_since_t) >= STUCK_WINDOW_S:
-                        finalizing_announced = True
-                        hint_ev = dict(ev)
-                        hint_ev["finalizing"] = True
-                        hint_ev["message"] = (
-                            "Finalitzant últims chunks (pot trigar 1-3 min)…"
-                        )
-                        yield hint_ev
-                        last_emit_t = now
-                        continue
-                else:
-                    slow_since_t = None
+            # Stuck-99% handler — logic extracted to _get_finalizing_hint.
+            hint_ev, slow_since_t = _get_finalizing_hint(
+                ev, pct, finalizing_announced, slow_since_t, now,
+                STUCK_LOW_SPEED_BPS, STUCK_WINDOW_S,
+            )
+            if hint_ev is not None:
+                finalizing_announced = True
+                yield hint_ev
+                last_emit_t = now
+                continue
             # Only emit when the percent changes — keeps the SSE stream
             # lean and the WebView responsive.
             if pct != last_pct:
@@ -334,79 +294,97 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
         set_tqdm_queue(None)
 
 
+async def _install_ollama_if_needed(request: Request) -> str:
+    """Auto-install Ollama and return its binary path. Raises RuntimeError on failure."""
+    if await request.is_disconnected():
+        raise RuntimeError("client disconnected before Ollama install")
+    if not _ollama_install_lock.acquire(blocking=False):
+        raise RuntimeError("Ja s'esta instal.lant Ollama en un altre proces")
+    try:
+        from installer.installer_ollama_install import ensure_ollama_installed
+        loop = asyncio.get_event_loop()
+        try:
+            installed = await loop.run_in_executor(None, ensure_ollama_installed, True)
+        except PermissionError:
+            logger.exception("Ollama install: permission denied")
+            _system = platform.system().lower()
+            if _system == "darwin":
+                raise RuntimeError(
+                    "No s'ha pogut instal.lar Ollama a /Applications/. "
+                    "Permis denegat. Instal.la'l manualment des d'ollama.com"
+                ) from None
+            if _system == "linux":
+                raise RuntimeError(
+                    "Linux: l'instal.lador d'Ollama necessita sudo. "
+                    "Instal.la manualment des d'ollama.com/download/linux"
+                ) from None
+            raise RuntimeError("Ollama install permission denied") from None
+        except Exception as exc:
+            logger.exception("Ollama auto-install failed")
+            raise RuntimeError(f"Ollama auto-install failed: {exc}") from exc
+        if not installed:
+            raise RuntimeError(
+                "Ollama install did not complete. Restart the app or "
+                "install manually from https://ollama.com"
+            )
+        ollama = _find_ollama_bin()
+        if not ollama:
+            for _fallback in [
+                "/Applications/Ollama.app/Contents/Resources/ollama",  # nosemgrep: absolute_path
+                os.path.expanduser("~/Applications/Ollama.app/Contents/Resources/ollama"),
+            ]:
+                if os.path.isfile(_fallback) and os.access(_fallback, os.X_OK):
+                    logger.info("ollama: CLI not yet registered; using bundle binary %s", _fallback)
+                    return _fallback
+            raise RuntimeError(
+                "Ollama installed but binary still not located. "
+                "Open Ollama.app once to finish setup, then restart server-nexe."
+            )
+        return ollama
+    finally:
+        _ollama_install_lock.release()
+
+
+def _get_finalizing_hint(
+    ev: dict,
+    pct: int,
+    finalizing_announced: bool,
+    slow_since_t: "float | None",
+    now: float,
+    stuck_speed_bps: int = 100 * 1024,
+    stuck_window_s: float = 30.0,
+) -> "tuple[dict | None, float | None]":
+    """Return (hint_event_or_None, new_slow_since_t) for the stuck-99% handler.
+
+    Extracts the branching logic from _stream_mlx to keep its CCN ≤ 15.
+    Returns (hint, slow_since_t) where hint is non-None only once: the first
+    time speed stays below stuck_speed_bps for stuck_window_s at pct >= 99.
+    """
+    if finalizing_announced or pct < 99:
+        return None, slow_since_t
+    if ev["speed_bps"] < stuck_speed_bps:
+        if slow_since_t is None:
+            return None, now
+        if (now - slow_since_t) >= stuck_window_s:
+            hint = dict(ev)
+            hint["finalizing"] = True
+            hint["message"] = "Finalitzant últims chunks (pot trigar 1-3 min)…"
+            return hint, slow_since_t
+        return None, slow_since_t
+    return None, None  # speed recovered — reset timer
+
+
 async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]:
     """Download an Ollama model via ollama pull, streaming real progress.
 
     F5.6 Bloc 3 (F03): si Ollama no es present, l'instal.lem automaticament
-    via ensure_ollama_installed(headless=True) abans del pull.
+    via ensure_ollama_installed(headless=True) abans del pull. Validat amb
+    Turing R1 agentic 2026-05-20 (8 iters, 92K tokens, 4 correccions C1-C5).
     """
     ollama = _find_ollama_bin()
     if not ollama:
-        # Check disconnect ABANS d'iniciar long operation. Si l'usuari
-        # ha cancel.lat el wizard, no comencem la instal.lacio (que no es pot
-        # interrompre des de fora un cop el thread executor agafa el subproces).
-        if await request.is_disconnected():
-            return
         yield {"type": "progress", "stage": "Instal.lant Ollama...", "percent": 0}
-        # lock no-blocking per evitar 2 instal.lacions concurrents
-        # (2 SSE simultanis farien zipfile.extractall a /Applications/ alhora ->
-        # corrupcio). Si ja n'hi ha una en curs, retornem sense fer res.
-        if not _ollama_install_lock.acquire(blocking=False):
-            yield {"type": "error", "message": "Ja s'esta instal.lant Ollama en un altre proces"}
-            return
-        try:
-            from installer.installer_ollama_install import ensure_ollama_installed
-            loop = asyncio.get_event_loop()
-            try:
-                installed = await loop.run_in_executor(None, ensure_ollama_installed, True)
-            except PermissionError as exc:
-                # missatge UX-friendly per platform. macOS pot demanar
-                # autoritzacio explicita per /Applications/; Linux sudo per /usr/local/bin/.
-                logger.exception("Ollama install: permission denied")
-                _system = platform.system().lower()
-                if _system == "darwin":
-                    raise RuntimeError(
-                        "No s'ha pogut instal.lar Ollama a /Applications/. "
-                        "Permis denegat. Instal.la'l manualment des d'ollama.com"
-                    ) from None
-                if _system == "linux":
-                    # Linux necessita sudo per /usr/local/bin/. AppImage
-                    # Tauri no te sudo per defecte. Missatge especific.
-                    raise RuntimeError(
-                        "Linux: l'instal.lador d'Ollama necessita sudo. "
-                        "Instal.la manualment des d'ollama.com/download/linux"
-                    ) from None
-                raise RuntimeError(f"Ollama install permission denied: {exc}") from None
-            except Exception as exc:
-                # logger.exception preserva el stack trace al log.
-                logger.exception("Ollama auto-install failed")
-                raise RuntimeError(f"Ollama auto-install failed: {exc}") from exc
-            if not installed:
-                raise RuntimeError(
-                    "Ollama install did not complete. Restart the app or "
-                    "install manually from https://ollama.com"
-                )
-            ollama = _find_ollama_bin()
-            if not ollama:
-                # Ollama.app was extracted but the /usr/local/bin/ollama CLI
-                # symlink is registered asynchronously on first app launch and
-                # may not be ready yet. Fall back to the binary inside the app
-                # bundle, which exists as soon as the zip is extracted.
-                for _fallback in [
-                    "/Applications/Ollama.app/Contents/Resources/ollama",
-                    os.path.expanduser("~/Applications/Ollama.app/Contents/Resources/ollama"),
-                ]:
-                    if os.path.isfile(_fallback) and os.access(_fallback, os.X_OK):
-                        ollama = _fallback
-                        logger.info("ollama: CLI not yet registered; using bundle binary %s", _fallback)
-                        break
-                if not ollama:
-                    raise RuntimeError(
-                        "Ollama installed but binary still not located. "
-                        "Open Ollama.app once to finish setup, then restart server-nexe."
-                    )
-        finally:
-            _ollama_install_lock.release()
+        ollama = await _install_ollama_if_needed(request)
 
     proc = await asyncio.create_subprocess_exec(
         ollama, "pull", model_id,
@@ -604,7 +582,7 @@ async def _stream_gguf(model_id: str, request: Request) -> AsyncIterator[dict]:
     dest = _models_dir() / filename
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=None) as client:
+    async with httpx.AsyncClient(follow_redirects=True, timeout=None) as client:  # nosec B113 — GGUF downloads are unbounded by design; disconnect detection via request.is_disconnected()
         async with client.stream("GET", model_id) as resp:
             resp.raise_for_status()
             total = int(resp.headers.get("content-length", 0))
@@ -680,7 +658,7 @@ def _dry_run_plan(repo_id: str, token: str | None = None) -> dict:
     except ImportError as exc:
         return {"error": f"huggingface_hub missing: {exc}"}
     try:
-        plan = snapshot_download(repo_id=repo_id, dry_run=True, token=token)
+        plan = snapshot_download(repo_id=repo_id, dry_run=True, token=token)  # nosec B615 — dry_run=True: no download occurs, only metadata; token from Keychain
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)}
     total = 0
@@ -703,7 +681,7 @@ def _dry_run_plan(repo_id: str, token: str | None = None) -> dict:
 async def preflight(engine: str, model_id: str) -> JSONResponse:
     """Probe a model BEFORE downloading: gated status + total bytes.
 
-    F5.4 Fase 5: exposed so the wizard can show the user
+    F5.4 Fase 5 (Turing #2 + #3): exposed so the wizard can show the user
     a meaningful summary ("Will download 4.5 GB in 12 files, 1.2 GB
     already cached") and surface gated-model errors before the user
     commits to a download.
@@ -735,6 +713,63 @@ async def preflight(engine: str, model_id: str) -> JSONResponse:
     })
 
 
+async def _preflight_hf_access(engine: str, model_id: str) -> "dict | None":
+    """Pre-flight HuggingFace gated/not-found check for mlx/gguf engines.
+
+    Returns an error event dict if access is denied or model not found, else None.
+    Extracted from download_model.generate to reduce CCN.
+    """
+    if engine not in ("mlx", "gguf"):
+        return None
+    token = os.environ.get("HF_TOKEN") or None
+    loop = asyncio.get_event_loop()
+    access = await loop.run_in_executor(_dl_executor, _check_model_access, model_id, token)
+    status = access.get("status")
+    if status == "gated_no_access":
+        return {
+            "type": "error",
+            "code": "GATED_NO_TOKEN",
+            "message": (
+                "This model requires accepting a Hugging Face "
+                "license and a connected HF token. Open the "
+                "URL, accept the terms, and configure your "
+                "token in Step 2 Advanced."
+            ),
+            "url": access.get("url"),
+        }
+    if status == "not_found":
+        return {"type": "error", "code": "NOT_FOUND", "message": f"Model not found on Hugging Face: {model_id}"}
+    return None  # network_error / ok → fall through to download
+
+
+async def _sha256_check(engine: str, model_id: str) -> "dict | None":
+    """Run SHA256 integrity check. Returns an error event dict on failure, None on success/skip."""
+    try:
+        from installer.download_verify import verify_download_integrity  # type: ignore[import]
+        loop = asyncio.get_event_loop()
+        if engine == "ollama":
+            ollama_bin = _find_ollama_bin() or "ollama"
+            matched = await loop.run_in_executor(
+                None,
+                lambda: verify_download_integrity(engine, model_id, Path("."), ollama_bin=ollama_bin),
+            )
+        else:
+            target_path = Path(_resolve_model_path(engine, model_id))
+            matched = await loop.run_in_executor(None, verify_download_integrity, engine, model_id, target_path)
+        if not matched:
+            logger.info("installer: SHA256 not pinned for %s/%s — install continues", engine, model_id)
+        return None
+    except DownloadIntegrityError as exc:
+        logger.error("installer: SHA256 mismatch for %s/%s: %s", engine, model_id, exc)
+        return {"type": "error", "code": "SHA256_FAIL", "message": f"Integrity check failed: {exc}"}
+    except (ValueError, FileNotFoundError, PermissionError) as exc:
+        logger.error("installer: SHA256 verify hard error for %s/%s: %s", engine, model_id, exc)
+        return {"type": "error", "code": "SHA256_FAIL", "message": f"Integrity check error: {exc}"}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("installer: SHA256 verify skipped for %s/%s (%s)", engine, model_id, exc)
+        return None
+
+
 @router.get("/download", operation_id="installer_download_model")
 async def download_model(engine: str, model_id: str, request: Request) -> StreamingResponse:
     """Stream model download progress as SSE events.
@@ -763,39 +798,11 @@ async def download_model(engine: str, model_id: str, request: Request) -> Stream
 
     async def generate() -> AsyncIterator[str]:
         try:
-            # F5.4 Fase 5: pre-flight gated detection for HuggingFace-hosted
-            # engines. Emits a structured SSE error with the HF URL so the
-            # frontend can render an actionable link instead of a generic
-            # download failure several minutes into the snapshot.
-            if engine in ("mlx", "gguf"):
-                token = os.environ.get("HF_TOKEN") or None
-                loop = asyncio.get_event_loop()
-                access = await loop.run_in_executor(
-                    _dl_executor, _check_model_access, model_id, token,
-                )
-                status = access.get("status")
-                if status == "gated_no_access":
-                    yield await _sse({
-                        "type": "error",
-                        "code": "GATED_NO_TOKEN",
-                        "message": (
-                            "This model requires accepting a Hugging Face "
-                            "license and a connected HF token. Open the "
-                            "URL, accept the terms, and configure your "
-                            "token in Step 2 Advanced."
-                        ),
-                        "url": access.get("url"),
-                    })
-                    return
-                if status == "not_found":
-                    yield await _sse({
-                        "type": "error",
-                        "code": "NOT_FOUND",
-                        "message": f"Model not found on Hugging Face: {model_id}",
-                    })
-                    return
-                # network_error / ok fall through; offline installs will
-                # surface as a snapshot_download exception below if relevant.
+            # Pre-flight gated/not-found check for HF-hosted engines (mlx/gguf).
+            preflight_err = await _preflight_hf_access(engine, model_id)
+            if preflight_err is not None:
+                yield await _sse(preflight_err)
+                return
 
             if engine == "mlx":
                 async for ev in _stream_mlx(model_id, request):
@@ -814,79 +821,12 @@ async def download_model(engine: str, model_id: str, request: Request) -> Stream
                 async for ev in _stream_gguf(model_id, request):
                     yield await _sse(ev)
 
-            # ── F5.6 Bloc 6 (F08): SHA256 integrity check post-descàrrega ──
-            # Ortogonal al gated check de dalt:
-            #   gated check (pre):  l'usuari té accés al repositori
-            #   SHA256 check (post): el descarregat és íntegre + no manipulat
-            # NO aplica a "embedder" (no hi ha pin al MODEL_WEIGHT_SHA256).
+            # SHA256 integrity check post-download (mlx/ollama/gguf only, not embedder).
             if engine in ("mlx", "ollama", "gguf"):
-                try:
-                    # DownloadIntegrityError is imported at module top.
-                    from installer.download_verify import (  # type: ignore[import]
-                        verify_download_integrity,
-                    )
-                    loop = asyncio.get_event_loop()
-                    # Ollama no usa target file path — verify_download_integrity
-                    # consulta el daemon via `ollama show --json`. Path(".")
-                    # és un valor dummy semànticament correcte (ignorat).
-                    if engine == "ollama":
-                        target_path = Path(".")
-                        ollama_bin = _find_ollama_bin() or "ollama"
-                        matched = await loop.run_in_executor(
-                            None,  # NO _dl_executor — hash CPU-bound, executor separat
-                            lambda: verify_download_integrity(
-                                engine, model_id, target_path,
-                                ollama_bin=ollama_bin,
-                            ),
-                        )
-                    else:
-                        target_path = Path(_resolve_model_path(engine, model_id))
-                        matched = await loop.run_in_executor(
-                            None,
-                            verify_download_integrity,
-                            engine, model_id, target_path,
-                        )
-                    if not matched:
-                        # Pin absent o digest no computable — install continua,
-                        # warning ja emès per verify_download_integrity.
-                        logger.info(
-                            "installer: SHA256 not pinned for %s/%s — install continues",
-                            engine, model_id,
-                        )
-                except DownloadIntegrityError as exc:
-                    # Fail-hard: pin existeix però digest no coincideix.
-                    # El fitxer/dir corrupte queda al disc per post-mortem
-                    # (decisió documentada a download_verify.py).
-                    logger.error(
-                        "installer: SHA256 mismatch for %s/%s: %s",
-                        engine, model_id, exc,
-                    )
-                    yield await _sse({
-                        "type": "error",
-                        "code": "SHA256_FAIL",
-                        "message": f"Integrity check failed: {exc}",
-                    })
+                err_ev = await _sha256_check(engine, model_id)
+                if err_ev is not None:
+                    yield await _sse(err_ev)
                     return
-                except (ValueError, FileNotFoundError, PermissionError) as exc:
-                    # Fail-hard: coding bug (engine desconegut), target missing,
-                    # o no podem llegir el fitxer descarregat.
-                    logger.error(
-                        "installer: SHA256 verify hard error for %s/%s: %s",
-                        engine, model_id, exc,
-                    )
-                    yield await _sse({
-                        "type": "error",
-                        "code": "SHA256_FAIL",
-                        "message": f"Integrity check error: {exc}",
-                    })
-                    return
-                except Exception as exc:  # noqa: BLE001
-                    # Graceful: errors inesperats no bloquen install
-                    # (e.g. download_verify import fail per bundle corrupte).
-                    logger.warning(
-                        "installer: SHA256 verify skipped for %s/%s (%s)",
-                        engine, model_id, exc,
-                    )
 
             yield await _sse({"type": "done", "model_id": model_id})
         except Exception as exc:
@@ -902,7 +842,7 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
 
     F5.6 Bloc 3 (F03): substitueix el placeholder "already_installed: False"
     per una crida real a ensure_ollama_installed(headless=True). Mateixes
-    correccions C1-C5 que _stream_ollama (cancel detection,
+    correccions C1-C5 de Turing R1 que _stream_ollama (cancel detection,
     lock concurrent, error UX-friendly per platform, logger.exception).
     """
 
@@ -911,11 +851,11 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
         if binary:
             yield await _sse({"type": "done", "already_installed": True})
             return
-        # check disconnect abans de comencar.
+        # C1 Turing: check disconnect abans de comencar.
         if await request.is_disconnected():
             return
         yield await _sse({"type": "progress", "stage": "Instal.lant Ollama...", "percent": 0})
-        # lock no-blocking per evitar 2 instal.lacions concurrents.
+        # C2 Turing: lock no-blocking per evitar 2 instal.lacions concurrents.
         if not _ollama_install_lock.acquire(blocking=False):
             yield await _sse({"type": "error", "message": "Ja s'esta instal.lant Ollama en un altre proces"})
             return
@@ -925,7 +865,7 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
             try:
                 installed = await loop.run_in_executor(None, ensure_ollama_installed, True)
             except PermissionError as exc:
-                # missatge UX-friendly per platform.
+                # C3+C4 Turing: missatge UX-friendly per platform.
                 logger.exception("Ollama install: permission denied")
                 _system = platform.system().lower()
                 if _system == "darwin":
@@ -942,7 +882,7 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
                     yield await _sse({"type": "error", "message": f"Permission denied: {exc}"})
                 return
             except Exception as exc:
-                # logger.exception preserva stack trace al log.
+                # C5 Turing: logger.exception preserva stack trace al log.
                 logger.exception("Ollama auto-install failed")
                 yield await _sse({"type": "error", "message": f"Install failed: {exc}"})
                 return
@@ -1055,7 +995,7 @@ async def finalize_post(body: FinalizeBody) -> JSONResponse:
         hf_token=body.hf_token,
         lang=body.lang,
     )
-    # F5.4 NC-18 residual fix: clear runtime_state overrides
+    # F5.4 NC-18 residual fix (Turing #2 C3): clear runtime_state overrides
     # for the model env vars so the freshly-saved OnboardingState is what
     # the next sidecar restart sees. Without this, a stale UI override from
     # an earlier session (set by routes_chat._switch_*_model) would shadow
@@ -1125,7 +1065,8 @@ async def check_metal() -> JSONResponse:
 
     El wizard usa aquest endpoint per saber si pot oferir MLX com a backend.
     A Macs Intel (sense Metal) o Linux/Windows, mlx no s'ha d'oferir.
-    Memory pressure ~200-500 MB del MLX framework
+    Validat amb Turing R1 agentic 2026-05-20 (thread executor suficient,
+    no cal subprocess). Memory pressure ~200-500 MB del MLX framework
     s'acceptarà perquè el sidecar ja el carregara per chat.
     """
     def _check() -> bool:
@@ -1144,12 +1085,12 @@ async def check_metal() -> JSONResponse:
 
 @router.get("/state", operation_id="installer_state")
 async def installer_state() -> JSONResponse:
-    """F5.6 Bloc 5: Return the current onboarding state.
+    """F5.6 Bloc 5 (R1 Turing): Return the current onboarding state.
 
     El frontend Tauri usa aquest endpoint per saber si l'onboarding s'ha
     completat sense necessitat de llegir el fitxer JSON del disc. Util quan
     el sidecar es reinicia i el frontend vol decidir si mostrar wizard o UI.
-    NO retorna api_key (sensible).
+    NO retorna api_key (sensible). Validat amb Turing R1 agentic 2026-05-20.
     """
     state = OnboardingState.load()
     if state is None:

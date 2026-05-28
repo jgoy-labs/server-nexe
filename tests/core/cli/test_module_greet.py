@@ -78,10 +78,10 @@ class TestGreet:
         out = cli.greet("Jordi")
         assert "Bienvenido" in out
 
-    def test_env_var_missing_defaults_to_ca(self, cli, monkeypatch):
+    def test_env_var_missing_defaults_to_en(self, cli, monkeypatch):
         monkeypatch.delenv("NEXE_LANG", raising=False)
         out = cli.greet("Jordi")
-        assert "Benvingut" in out
+        assert "Welcome" in out
 
     def test_greet_includes_ascii_art(self, cli):
         out = cli.greet("Jordi", lang="ca-ES")

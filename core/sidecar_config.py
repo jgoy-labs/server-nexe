@@ -15,7 +15,7 @@ Wraps the NEXE_* env vars (registered at core.config.NexeSettings) and exposes
 
 Goal: centralize what was scattered across middleware.py, lifespan_*.py,
 paths/helpers.py, factory_security.py — the meta-bug "mode sidecar fictici"
-documented in the internal ADR for the "fake sidecar mode" meta-bug.
+documented at factoria-nexe/diari/decisions/ADR-meta-mode-sidecar-fictici.md.
 
 ═══════════════════════════════════════════════════════════════════════════
 SidecarConfig vs NexeSettings — quan usar cadascú
@@ -320,7 +320,7 @@ class SidecarConfig:
     prompt_tier: str          # NEXE_PROMPT_TIER (full/compact)
     lang: str                 # NEXE_LANG (ca/es/en)
 
-    # === Services ===
+    # === Services (Turing #3 expansion for Sessió 3 consumers) ===
     ollama_host: str          # NEXE_OLLAMA_HOST — default "http://localhost:11434"
     qdrant_url: Optional[str] # NEXE_QDRANT_URL — Optional Qdrant extern; embedded if None
     csrf_secret: Optional[str]    # NEXE_CSRF_SECRET — None disables persistent CSRF
@@ -367,8 +367,8 @@ class SidecarConfig:
             default_model=os.environ.get("NEXE_DEFAULT_MODEL", ""),
             model_engine=os.environ.get("NEXE_MODEL_ENGINE"),
             prompt_tier=os.environ.get("NEXE_PROMPT_TIER", "full"),
-            lang=os.environ.get("NEXE_LANG", "ca"),
-            # Services
+            lang=os.environ.get("NEXE_LANG", "en"),
+            # Services (Turing #3 — preparat per Sessió 3)
             ollama_host=os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434"),  # nosemgrep
             qdrant_url=os.environ.get("NEXE_QDRANT_URL"),
             csrf_secret=os.environ.get("NEXE_CSRF_SECRET"),

@@ -403,7 +403,8 @@ class MLXChatNode:
                 import psutil
                 avail_gb = psutil.virtual_memory().available / (1024 ** 3)
                 if avail_gb < 1.5:
-                    _lang = os.environ.get("NEXE_LANG", "ca")[:2]
+                    import os as _os_oom  # noqa: PLC0415
+                    _lang = _os_oom.environ.get("NEXE_LANG", "en")[:2]
                     _oom_msgs = {
                         "ca": "Memòria insuficient per carregar el model d'IA. Tanca altres aplicacions per alliberar memòria i torna-ho a provar.",
                         "es": "Memoria insuficiente para cargar el modelo de IA. Cierra otras aplicaciones para liberar memoria e inténtalo de nuevo.",

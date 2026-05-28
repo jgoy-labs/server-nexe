@@ -239,12 +239,16 @@ class TestDownloadValidation:
         assert "bad_engine" in resp.text
 
     @pytest.mark.parametrize("engine", sorted(_VALID_ENGINES))
-    def test_valid_engines_do_not_return_error_event(self, client, engine):
+    def test_valid_engines_do_not_return_error_event(self, client, engine, monkeypatch):
         """Each valid engine must return at least one non-error SSE event."""
+        async def _fake_stream(model_id, request):
+            yield {"type": "done", "model_id": model_id}
+
+        monkeypatch.setattr("core.endpoints.installer._stream_gguf", _fake_stream)
+        monkeypatch.setattr("core.endpoints.installer._stream_ollama", _fake_stream)
         resp = client.get(f"/installer/download?engine={engine}&model_id=test-model")
         assert resp.status_code == 200
         body = resp.text
-        # The stub / real path must emit at least a 'done' event.
         assert '"type": "done"' in body or '"type": "progress"' in body
 
 

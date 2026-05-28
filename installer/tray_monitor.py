@@ -46,7 +46,7 @@ def _read_ollama_model_ram() -> int:
     Runs in background thread only — never call from the main thread.
     """
     try:
-        req = urllib.request.urlopen(  # nosec B310: hardcoded localhost Ollama URL, no scheme injection possible
+        req = urllib.request.urlopen(  # nosec B310  # nosemgrep: dynamic-urllib-use-detected,insecure-urlopen — hardcoded localhost Ollama URL
             "http://localhost:11434/api/ps", timeout=2
         )
         data = _json.loads(req.read())

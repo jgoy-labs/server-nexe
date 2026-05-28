@@ -318,7 +318,7 @@ class ModuleManager(PluginLoaderMixin):
       logger.debug("Memory module manifest not found: %s", manifest_file)
       return None
 
-    manifest_module = importlib.import_module(f"memory.{module_name}.manifest")
+    manifest_module = importlib.import_module(f"memory.{module_name}.manifest")  # nosemgrep: non-literal-import — module_name from internal registry, validated by NEXE_APPROVED_MODULES
     if not hasattr(manifest_module, "MODULE_ID"):
       logger.error("Memory module %s missing MODULE_ID", module_name)
       return None
@@ -326,7 +326,7 @@ class ModuleManager(PluginLoaderMixin):
     module_id = manifest_module.MODULE_ID
     logger.info("Loading memory module: %s (ID: %s)", module_name, module_id)
 
-    module_py = importlib.import_module(f"memory.{module_name}.module")
+    module_py = importlib.import_module(f"memory.{module_name}.module")  # nosemgrep: non-literal-import — module_name from internal registry, validated by NEXE_APPROVED_MODULES
     module_class_name = self._resolve_memory_class_name(module_name)
     if not hasattr(module_py, module_class_name):
       logger.error("Memory module class not found: %s", module_class_name)

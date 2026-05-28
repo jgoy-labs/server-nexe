@@ -76,9 +76,12 @@ class TestOllamaModuleGaps:
     @pytest.mark.asyncio
     async def test_initialize_and_shutdown(self):
         """initialize and shutdown lifecycle."""
+        from unittest.mock import AsyncMock, patch
         from plugins.ollama_module.module import OllamaModule
         mod = OllamaModule()
-        result = await mod.initialize({"services": {}})
+        with patch.object(mod.client, 'ensure_ollama_running', new=AsyncMock()), \
+             patch.object(mod.client, 'check_connection', new=AsyncMock(return_value=True)):
+            result = await mod.initialize({"services": {}})
         assert result is True
         assert mod._initialized is True
         await mod.shutdown()

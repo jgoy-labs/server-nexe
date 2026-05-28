@@ -327,7 +327,7 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
     start_time = time.time()
     engine_status = "success"
 
-    _server_lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+    _server_lang = os.getenv("NEXE_LANG", "en").split("-")[0].lower()
 
     messages, context_text = await _build_rag_and_system_prompt(body, request.app.state, _server_lang)
 

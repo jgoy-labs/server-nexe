@@ -164,7 +164,7 @@ def _resolve_skip_model_config() -> dict:
     try:
         import json as _json
         import urllib.request as _urlreq
-        with _urlreq.urlopen("http://localhost:11434/api/tags", timeout=2) as _resp:  # nosec B310: hardcoded localhost Ollama URL, no scheme injection possible
+        with _urlreq.urlopen("http://localhost:11434/api/tags", timeout=2) as _resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected,insecure-urlopen — hardcoded localhost Ollama URL
             _data = _json.loads(_resp.read().decode("utf-8"))
             _models = _data.get("models", [])
             if _models:

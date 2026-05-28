@@ -110,7 +110,7 @@ def _resolve_model_name(model_name: str, available_models: list, chat_models: li
         logger.info("Using available model: %s", model_name)
         return model_name
 
-    _lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+    _lang = os.getenv("NEXE_LANG", "en").split("-")[0].lower()
     if chat_models:
         raise HTTPException(
             status_code=404,
@@ -134,7 +134,7 @@ async def _validate_ollama_model(host: str, model_name: str) -> tuple[str, list]
         chat_models = _filter_chat_models(available_models)
         model_name = _resolve_model_name(model_name, available_models, chat_models)
     except httpx.ConnectError:
-        _lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+        _lang = os.getenv("NEXE_LANG", "en").split("-")[0].lower()
         raise HTTPException(
             status_code=503,
             detail=_OLLAMA_ERRORS.get(_lang, _OLLAMA_ERRORS["en"])["unavailable"]
@@ -293,7 +293,7 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
         logger.debug("Ollama stream cancelled (client disconnected)")
         return
     except httpx.ConnectError:
-        _lang = os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+        _lang = os.getenv("NEXE_LANG", "en").split("-")[0].lower()
         error_msg = {"error": _sanitize_sse_token(_OLLAMA_ERRORS.get(_lang, _OLLAMA_ERRORS["en"])["stream_unavailable"])}
         yield f"data: {json.dumps(error_msg)}\n\n"
         yield "data: [DONE]\n\n"

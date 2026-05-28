@@ -126,12 +126,13 @@ def create_router(module_instance) -> APIRouter:
     # Open an external https?:// URL in the system default browser.
     # Used by the sidecar UI to open footer links (server-nexe.com, GitHub,
     # etc.) without relying on Tauri IPC, which is unavailable at HTTP origins.
-    @router.get("/open-external")
+    @router.get("/open-external", operation_id="open_external_url")
     async def open_external_url(
         url: str,
         _auth: None = Depends(_require_ui_auth),
     ):
-        import platform, subprocess  # noqa: PLC0415
+        import platform  # noqa: PLC0415
+        import subprocess  # noqa: PLC0415
         if not url.startswith(("https://", "http://")):
             from fastapi import HTTPException  # noqa: PLC0415
             raise HTTPException(status_code=400, detail="Only https/http URLs allowed")

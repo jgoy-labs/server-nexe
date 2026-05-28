@@ -113,7 +113,7 @@ def _auto_ingest_is_disabled(nexe_env: str, auto_ingest_enabled: bool) -> bool:
 def _resolve_knowledge_path_for_auto_ingest(project_root) -> Path:
     """Resolve the effective knowledge path, applying lang subdirectory if present."""
     knowledge_path = project_root / "knowledge"
-    _nexe_lang = os.getenv("NEXE_LANG", "ca")
+    _nexe_lang = os.getenv("NEXE_LANG", "en")
     lang_path = knowledge_path / _nexe_lang
     if lang_path.is_dir():
         knowledge_path = lang_path

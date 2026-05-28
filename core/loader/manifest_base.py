@@ -55,7 +55,7 @@ def create_lazy_manifest(
 
     def _get_module():
         if _state["module"] is None:
-            mod = importlib.import_module(module_path)
+            mod = importlib.import_module(module_path)  # nosemgrep: non-literal-import — module_path from validated manifest, constrained by NEXE_APPROVED_MODULES allowlist
             cls = getattr(mod, module_class)
             instance = cls()
             instance._init_router()

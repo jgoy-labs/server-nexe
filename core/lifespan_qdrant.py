@@ -89,7 +89,7 @@ def _startup_qdrant() -> None:
                 len(_LOCK_RETRY_BACKOFF_S),
             )
 
-    assert last_error is not None  # invariant: loop ran at least once
+    assert last_error is not None  # nosec B101 — invariant: loop ran at least once; assert is correct here
     raise last_error
 
 

@@ -197,7 +197,7 @@ class PluginLoaderMixin:
 
         for import_path in [f'{base_import_path}.manifest', f'{base_import_path}.readme.manifest']:
             try:
-                manifest_module = importlib.import_module(import_path)
+                manifest_module = importlib.import_module(import_path)  # nosemgrep: non-literal-import — import_path constructed from base_import_path (validated plugin path), not user input
                 break
             except ModuleNotFoundError:
                 tried_paths.append(import_path)

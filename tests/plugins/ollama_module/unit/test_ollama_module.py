@@ -8,7 +8,9 @@ from plugins.ollama_module.module import OllamaModule
 
 
 class TestOllamaModuleInit:
-    def test_default_creation(self):
+    def test_default_creation(self, monkeypatch):
+        monkeypatch.delenv("OLLAMA_HOST", raising=False)
+        monkeypatch.delenv("NEXE_OLLAMA_HOST", raising=False)
         module = OllamaModule()
         assert module.metadata.name == "ollama_module"
         assert module.metadata.version is not None

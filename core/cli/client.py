@@ -92,7 +92,7 @@ class NexeClient:
     )
 
     try:
-      response = urllib.request.urlopen(  # nosec B310: scheme already validated against ALLOWED_URL_SCHEMES (http/https only) above
+      response = urllib.request.urlopen(  # nosec B310  # nosemgrep: dynamic-urllib-use-detected — scheme validated against ALLOWED_URL_SCHEMES above
         request,
         timeout=self.config.timeout,
         context=self._ssl_context,

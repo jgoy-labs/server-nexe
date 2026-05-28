@@ -211,7 +211,7 @@ class ChunkerRegistry:
 
       try:
         module_name = py_file.stem
-        module = importlib.import_module(f".{module_name}", package=__package__)
+        module = importlib.import_module(f".{module_name}", package=__package__)  # nosemgrep: non-literal-import — module_name from py_file.stem in package directory, not user input
 
         for name, obj in inspect.getmembers(module, inspect.isclass):
           if (

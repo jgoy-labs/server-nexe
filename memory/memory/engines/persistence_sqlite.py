@@ -85,7 +85,7 @@ class SqliteStorageMixin:
 
             enc_conn = sqlcipher.connect(str(tmp_path))
             dek = self._crypto.derive_key("sqlite")
-            enc_conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")
+            enc_conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")  # nosemgrep: formatted-sql-query,sqlalchemy-execute-raw-query — SQLCipher key directive; dek is internal crypto key
             enc_conn.execute("PRAGMA cipher_compatibility = 4")
             enc_conn.execute("PRAGMA busy_timeout = 5000")
 
@@ -357,7 +357,7 @@ class SqliteStorageMixin:
                 ORDER BY timestamp DESC
                 LIMIT ?
             """  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
-            cursor.execute(query, (*types_filter, limit * 2))
+            cursor.execute(query, (*types_filter, limit * 2))  # nosemgrep: sqlalchemy-execute-raw-query — parameterized with '?' placeholders
             rows = cursor.fetchall()
             conn.close()
 

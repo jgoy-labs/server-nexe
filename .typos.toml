@@ -249,3 +249,4 @@ Ortogonal = "Ortogonal"  # Catalan: "Orthogonal"
 # Catalan in requirements/installer comments (2026-05-25)
 corresponents = "corresponents"
 importen = "importen"
+insuficient = "insuficient"  # Catalan/Spanish: "insuficient/insuficiente" (one 's')

@@ -558,7 +558,7 @@ def ingest_knowledge_cmd():
 
     project_root = Path(__file__).parent.parent.parent
     knowledge_path = project_root / "knowledge"
-    _nexe_lang = os.getenv("NEXE_LANG", "ca")
+    _nexe_lang = os.getenv("NEXE_LANG", "en")
     lang_path = knowledge_path / _nexe_lang
     if lang_path.is_dir():
         knowledge_path = lang_path

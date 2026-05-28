@@ -301,7 +301,9 @@ class TestInitialize:
     async def test_initialize_success(self):
         """Initialize sets _initialized and loads i18n if available."""
         module = OllamaModule()
-        result = await module.initialize({"services": {}})
+        with patch.object(module.client, 'ensure_ollama_running', new=AsyncMock()), \
+             patch.object(module.client, 'check_connection', new=AsyncMock(return_value=True)):
+            result = await module.initialize({"services": {}})
         assert result is True
         assert module._initialized is True
 
@@ -310,7 +312,9 @@ class TestInitialize:
         """Initialize loads i18n service from context."""
         mock_i18n = MagicMock()
         module = OllamaModule()
-        result = await module.initialize({"services": {"i18n": mock_i18n}})
+        with patch.object(module.client, 'ensure_ollama_running', new=AsyncMock()), \
+             patch.object(module.client, 'check_connection', new=AsyncMock(return_value=True)):
+            result = await module.initialize({"services": {"i18n": mock_i18n}})
         assert result is True
         assert module.i18n is mock_i18n
 
@@ -318,15 +322,19 @@ class TestInitialize:
     async def test_initialize_idempotent(self):
         """Initialize returns True on second call (already initialized)."""
         module = OllamaModule()
-        await module.initialize({"services": {}})
-        result = await module.initialize({"services": {}})
+        with patch.object(module.client, 'ensure_ollama_running', new=AsyncMock()), \
+             patch.object(module.client, 'check_connection', new=AsyncMock(return_value=True)):
+            await module.initialize({"services": {}})
+            result = await module.initialize({"services": {}})
         assert result is True
 
     @pytest.mark.asyncio
     async def test_shutdown(self):
         """Shutdown resets _initialized."""
         module = OllamaModule()
-        await module.initialize({"services": {}})
+        with patch.object(module.client, 'ensure_ollama_running', new=AsyncMock()), \
+             patch.object(module.client, 'check_connection', new=AsyncMock(return_value=True)):
+            await module.initialize({"services": {}})
         assert module._initialized is True
         await module.shutdown()
         assert module._initialized is False

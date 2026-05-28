@@ -405,7 +405,7 @@ class DreamingCycle:
         ids = [r["id"] for r in rows]
         placeholders = ",".join("?" for _ in ids)
         sql = f"UPDATE episodic SET vector_synced = 1 WHERE id IN ({placeholders})"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
-        conn.execute(sql, ids)
+        conn.execute(sql, ids)  # nosemgrep: sqlalchemy-execute-raw-query — parameterized with '?' placeholders
         conn.commit()
         logger.debug("Synced %d entries to vector index", len(ids))
 

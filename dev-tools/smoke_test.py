@@ -60,7 +60,7 @@ def request(method, url, headers=None, body=None, timeout=30):
     h = {"Content-Type": "application/json", **(headers or {})}
     req = urllib.request.Request(url, data=data, headers=h, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:  # nosec B310: dev smoke-test against operator-provided localhost server URL, no untrusted input
+        with urllib.request.urlopen(req, timeout=timeout) as r:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected — dev smoke-test, operator-provided URL
             return r.status, json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         try:

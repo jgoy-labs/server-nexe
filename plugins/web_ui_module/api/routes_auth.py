@@ -255,7 +255,7 @@ def _overlay_ollama_ps_sizes(model_list: list) -> None:
     try:
         import urllib.request
         import json as _json
-        req = urllib.request.urlopen(f"{resolve_base_url()}/api/ps", timeout=2)  # nosec B310
+        req = urllib.request.urlopen(f"{resolve_base_url()}/api/ps", timeout=2)  # nosec B310  # nosemgrep: dynamic-urllib-use-detected — URL from resolve_base_url() uses validated NEXE_OLLAMA_HOST env var
         ps_data = _json.loads(req.read())
         for loaded in ps_data.get("models", []):
             loaded_name = loaded.get("name", "")

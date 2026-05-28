@@ -47,7 +47,7 @@ class TextStore:
         if self._crypto and SQLCIPHER_AVAILABLE:
             conn = sqlcipher.connect(str(self._db_path))
             dek = self._crypto.derive_key("text_store")
-            conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")
+            conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")  # nosemgrep: formatted-sql-query,sqlalchemy-execute-raw-query — SQLCipher key directive; dek is internal crypto key, never user input
             conn.execute("PRAGMA cipher_compatibility = 4")
             self._encrypted = True
         else:
@@ -117,7 +117,7 @@ class TextStore:
         placeholders = ",".join(["?" for _ in doc_ids])
         sql = f"SELECT doc_id, text, metadata_json, created_at, expires_at FROM document_texts WHERE doc_id IN ({placeholders}) AND collection = ?"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
         with self._connect() as conn:
-            rows = conn.execute(sql, (*doc_ids, collection)).fetchall()
+            rows = conn.execute(sql, (*doc_ids, collection)).fetchall()  # nosemgrep: sqlalchemy-execute-raw-query — sql uses '?' placeholders, all params bound
         result = {}
         for doc_id, text, meta_json, created_at, expires_at in rows:
             result[doc_id] = {

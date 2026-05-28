@@ -21,7 +21,7 @@
 # Si en el futur cal afegir backends Linux-exclusius (CUDA, ROCm, etc.),
 # afegir aquí els pins corresponents.
 
-# Linux keyring backend (Secret Service via D-Bus).
-# Sense això, `keyring` falla silenciosament a Linux → HF_TOKEN no es persisteix
+# Linux keyring backend (Secret Service via D-Bus). Turing R1 #2 (22/05):
+# sense això, `keyring` falla silenciosament a Linux → HF_TOKEN no es persisteix
 # → rate-limit silenciós a HuggingFace. Mac usa Keychain natiu (no cal).
-secretstorage>=3.3,<4
+secretstorage==3.3.3

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, cast
 
 if sys.version_info >= (3, 9):
-  from importlib.resources import files
+  from importlib.resources import files  # nosemgrep: python37-compatibility-importlib2 — server-nexe requires Python 3.11+
 else:
   try:
     from importlib_resources import files
@@ -127,7 +127,7 @@ def _get_resource_via_file(package: str, resource: str) -> Path:
   import importlib
 
   try:
-    mod = importlib.import_module(package)
+    mod = importlib.import_module(package)  # nosemgrep: non-literal-import — package is an internal resource path, not user input
   except ImportError as e:
     raise ImportError(f"Could not import package {package}: {e}")
 

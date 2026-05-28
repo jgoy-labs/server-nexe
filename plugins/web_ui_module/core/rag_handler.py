@@ -26,7 +26,7 @@ async def generate_rag_metadata(body_content: str, filename: str) -> dict:
     Uses the first 3000 chars as a sample. Falls back to simple extraction if it fails.
     """
     stem = Path(filename).stem.replace("_", " ").replace("-", " ")
-    lang = _os.getenv("NEXE_LANG", "ca").split("-")[0].lower()
+    lang = _os.getenv("NEXE_LANG", "en").split("-")[0].lower()
 
     try:
         from core.lifespan import get_server_state

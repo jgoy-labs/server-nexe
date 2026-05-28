@@ -168,7 +168,7 @@ class ModuleValidator:
     for dep in external_deps:
       dep_name = dep.split('>=')[0].split('==')[0].strip()
       try:
-        importlib.import_module(dep_name)
+        importlib.import_module(dep_name)  # nosemgrep: non-literal-import — dep_name from manifest dependencies list, validated by manifest schema
       except ImportError:
         missing_deps.append(dep_name)
 

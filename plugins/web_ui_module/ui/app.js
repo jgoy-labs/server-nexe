@@ -2605,8 +2605,6 @@ class NexeUI {
         this.setAiState('thinking');
 
         const t0 = Date.now();
-        const _safeFile = this.escapeHtml(file.name);
-
         const overlay = document.createElement('div');
         overlay.className = 'upload-overlay';
         const _c = document.createElement('div');

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import sys
-import xml.etree.ElementTree as ET  # nosec B405: CI tooling parsing trusted coverage.xml emitted by pytest-cov in the same workflow run (consistent with B314 at line 70; defusedxml migration tracked at BACKLOG-v1.0.5 M5-01)
+import defusedxml.ElementTree as ET  # type: ignore[import-untyped]
 from pathlib import Path
 
 
@@ -67,7 +67,7 @@ def main(argv: list[str]) -> int:
     print(f"coverage file not found: {in_path}", file=sys.stderr)
     return 1
 
-  root = ET.parse(in_path).getroot()  # nosec B314: CI tooling parsing trusted coverage.xml emitted by pytest-cov in the same workflow run
+  root = ET.parse(in_path).getroot()
   line_rate = float(root.attrib.get("line-rate", "0") or 0)
   pct = int(round(line_rate * 100))
 

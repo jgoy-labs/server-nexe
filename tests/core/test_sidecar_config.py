@@ -90,7 +90,7 @@ def test_sidecar_config_has_required_fields():
         "host", "port", "cors_origins", "trusted_hosts",
         "api_key", "parent_pid", "approved_modules",
         "default_model", "model_engine", "prompt_tier", "lang",
-        # Services
+        # Services (Turing #3)
         "ollama_host", "qdrant_url", "csrf_secret", "encryption_enabled",
         "auto_ingest_knowledge", "bootstrap_ttl",
     }
@@ -434,7 +434,7 @@ def test_nexe_sidecar_falsy_values(clean_env, falsy_value):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# NEXE_ENV whitespace + case
+# NEXE_ENV whitespace + case (Turing recomanació #6)
 # ─────────────────────────────────────────────────────────────────────
 
 
@@ -457,7 +457,7 @@ def test_nexe_env_non_production_variants(clean_env, env_value):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Services fields
+# Services fields (Turing #3 — expansion per Sessió 3)
 # ─────────────────────────────────────────────────────────────────────
 
 
@@ -576,10 +576,10 @@ def test_model_engine_optional(clean_env):
     assert config.model_engine is None
 
 
-def test_lang_default_ca(clean_env):
-    """No NEXE_LANG → default 'ca' (català, ecosistema)."""
+def test_lang_default_en(clean_env):
+    """No NEXE_LANG → default 'en' (English, international default)."""
     config = SidecarConfig.from_env()
-    assert config.lang == "ca"
+    assert config.lang == "en"
 
 
 def test_prompt_tier_default_full(clean_env):

@@ -72,7 +72,7 @@ def _query_osv(name: str, version: str) -> list[dict]:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected — hardcoded HTTPS OSV API endpoint
             data = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError) as exc:
         print(f"ERROR: OSV query failed for {name}=={version}: {exc}", file=sys.stderr)
