@@ -42,7 +42,7 @@
 
 ---
 
-> **v1.0.4 — Desktop App Release.** Server Nexe now ships as a Tauri v2 desktop application (`app/`) with onboarding wizard, system tray, and automatic sidecar management. Available as **macOS DMG** (Apple Silicon) and **Linux AppImage** (ARM64). See [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
+> **v1.0.4 — Desktop App Release.** Server Nexe now ships as a Tauri v2 desktop application with onboarding wizard, system tray, and automatic sidecar management. Available as **macOS DMG** (Apple Silicon) and **Linux AppImage** (ARM64). See [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
 >
 > **Linux note:** tested on Ubuntu 24.04 ARM64 virtual machines (UTM). CPU inference (Ollama) verified. If you test on native hardware or with GPU acceleration, please [open an issue](https://github.com/jgoy-labs/server-nexe/issues) with your results.
 
@@ -259,11 +259,6 @@ server-nexe/
 │   └── web_ui_module/    # Browser-based chat UI with file upload
 ├── installer/            # Guided installer, headless mode, hardware detection, model catalog
 ├── knowledge/            # Indexed documentation for RAG (ca/es/en)
-├── app/                  # Desktop application (Tauri v2)
-│   ├── src-tauri/        # Rust backend: sidecar lifecycle, IPC, plugin integrity (SHA-256)
-│   ├── src/              # Frontend: onboarding wizard, chat bridge
-│   ├── isolation-frame/  # WebView isolation pattern (security allowlist)
-│   └── scripts/          # Build scripts (sidecar bundling, signing)
 └── tests/                # Integration & e2e test suites
 ```
 
