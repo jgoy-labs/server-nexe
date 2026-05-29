@@ -42,7 +42,7 @@
 
 ---
 
-> **v1.0.4 — Release App d'Escriptori.** Server Nexe ara es distribueix com a aplicació d'escriptori Tauri v2 amb wizard d'onboarding, safata del sistema, i gestió automàtica del sidecar. Disponible com a **macOS DMG** (Apple Silicon) i **Linux AppImage** (ARM64). Veure [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
+> **v1.0.5 — Release App d'Escriptori.** Server Nexe ara es distribueix com a aplicació d'escriptori Tauri v2 amb wizard d'onboarding, safata del sistema, i gestió automàtica del sidecar. Disponible com a **macOS DMG** (Apple Silicon) i **Linux AppImage** (ARM64). Veure [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
 >
 > **Nota Linux:** provat a màquines virtuals Ubuntu 24.04 ARM64 (UTM). Inferència CPU (Ollama) verificada. Si proves en hardware natiu o amb acceleració GPU, si us plau [obre un issue](https://github.com/jgoy-labs/server-nexe/issues) amb els teus resultats.
 
@@ -173,8 +173,8 @@ Descarrega l'últim paquet de **[Releases](https://github.com/jgoy-labs/server-n
 
 | Plataforma | Paquet | Mida |
 |------------|--------|------|
-| macOS (Apple Silicon) | `nexe-app_1.0.4_aarch64.dmg` | ~1.3 GB |
-| Linux (ARM64) | `nexe-app_1.0.4_aarch64.AppImage` | ~1.2 GB |
+| macOS (Apple Silicon) | `nexe-app_1.0.5_aarch64.dmg` | ~1.3 GB |
+| Linux (ARM64) | `nexe-app_1.0.5_aarch64.AppImage` | ~1.2 GB |
 
 L'assistent d'onboarding ho gestiona tot: detecció de hardware, selecció de backend, descàrrega de model, i configuració. L'app executa server-nexe com a procés sidecar amb integració a la safata del sistema.
 
@@ -376,7 +376,7 @@ Server Nexe està en desenvolupament actiu. Pròximament:
 - [x] RAG injection sanitization + CLEAR_ALL 2-turn confirm (v0.9.9)
 - [x] Instal·lació offline 100% — DMG ~1.2 GB amb wheels + embedding bundled (v0.9.9+)
 - [x] Thinking toggle per sessió — endpoint `PATCH /ui/session/{id}/thinking` (v0.9.9+)
-- [x] App d'escriptori (Tauri v2) — macOS DMG + Linux AppImage, wizard d'onboarding, safata del sistema (v1.0.4)
+- [x] App d'escriptori (Tauri v2) — macOS DMG + Linux AppImage, wizard d'onboarding, safata del sistema (v1.0.5)
 - [ ] Paràmetres d'inferència configurables via UI
 - [ ] Fòrum de comunitat
 
@@ -441,5 +441,5 @@ Consulta [LICENSE](LICENSE) per als detalls.
 ---
 
 <p align="center">
-  <strong>Versió 1.0.4</strong> · Apache 2.0 · Fet per <a href="https://www.jgoy.net">Jordi Goy</a> a Barcelona
+  <strong>Versió 1.0.5</strong> · Apache 2.0 · Fet per <a href="https://www.jgoy.net">Jordi Goy</a> a Barcelona
 </p>

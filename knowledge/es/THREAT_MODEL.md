@@ -30,7 +30,7 @@ Este documento formaliza el threat model que hasta la v1.0.4-beta estaba implici
 
 ## 1. Proposito y alcance
 
-server-nexe es un **servidor de IA local, mono-usuario** con memoria RAG persistente. Se ejecuta en la maquina del propio usuario, hace bind a `127.0.0.1:9119` por defecto, y asume un usuario local de confianza. Este threat model cubre la release 1.0.4-beta mas el hardening `[Unreleased]` en `main` (F1–F4.2).
+server-nexe es un **servidor de IA local, mono-usuario** con memoria RAG persistente. Se ejecuta en la maquina del propio usuario, hace bind a `127.0.0.1:9119` por defecto, y asume un usuario local de confianza. Este threat model cubre la release 1.0.5 mas el hardening `[Unreleased]` en `main` (F1–F4.2).
 
 Dentro del alcance:
 
@@ -279,4 +279,4 @@ Este documento se revisa:
 
 ---
 
-*server-nexe 1.0.4-beta+ · Apache 2.0 · Jordi Goy · vease [SECURITY.md](../../SECURITY.md) para informar de vulnerabilidades.*
+*server-nexe 1.0.5+ · Apache 2.0 · Jordi Goy · vease [SECURITY.md](../../SECURITY.md) para informar de vulnerabilidades.*

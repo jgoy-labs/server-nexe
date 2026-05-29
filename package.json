@@ -1,6 +1,6 @@
 {
   "name": "server-nexe",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "<p align=\"center\">   <img src=\".github/logo.svg\" alt=\"server.nexe\" width=\"400\"> </p>",
   "main": "index.js",
   "directories": {

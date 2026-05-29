@@ -42,7 +42,7 @@
 
 ---
 
-> **v1.0.4 — Release App de Escritorio.** Server Nexe ahora se distribuye como aplicación de escritorio Tauri v2 con wizard de onboarding, bandeja del sistema, y gestión automática del sidecar. Disponible como **macOS DMG** (Apple Silicon) y **Linux AppImage** (ARM64). Ver [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
+> **v1.0.5 — Release App de Escritorio.** Server Nexe ahora se distribuye como aplicación de escritorio Tauri v2 con wizard de onboarding, bandeja del sistema, y gestión automática del sidecar. Disponible como **macOS DMG** (Apple Silicon) y **Linux AppImage** (ARM64). Ver [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
 >
 > **Nota Linux:** probado en máquinas virtuales Ubuntu 24.04 ARM64 (UTM). Inferencia CPU (Ollama) verificada. Si pruebas en hardware nativo o con aceleración GPU, por favor [abre un issue](https://github.com/jgoy-labs/server-nexe/issues) con tus resultados.
 
@@ -173,8 +173,8 @@ Descarga el último paquete de **[Releases](https://github.com/jgoy-labs/server-
 
 | Plataforma | Paquete | Tamaño |
 |------------|---------|--------|
-| macOS (Apple Silicon) | `nexe-app_1.0.4_aarch64.dmg` | ~1.3 GB |
-| Linux (ARM64) | `nexe-app_1.0.4_aarch64.AppImage` | ~1.2 GB |
+| macOS (Apple Silicon) | `nexe-app_1.0.5_aarch64.dmg` | ~1.3 GB |
+| Linux (ARM64) | `nexe-app_1.0.5_aarch64.AppImage` | ~1.2 GB |
 
 El asistente de onboarding lo gestiona todo: detección de hardware, selección de backend, descarga de modelo, y configuración. La app ejecuta server-nexe como proceso sidecar con integración en la bandeja del sistema.
 
@@ -376,7 +376,7 @@ Server Nexe está en desarrollo activo. Próximamente:
 - [x] RAG injection sanitization + CLEAR_ALL 2-turn confirm (v0.9.9)
 - [x] Instalación offline 100% — DMG ~1.2 GB con wheels + embedding bundled (v0.9.9+)
 - [x] Thinking toggle por sesión — endpoint `PATCH /ui/session/{id}/thinking` (v0.9.9+)
-- [x] App de escritorio (Tauri v2) — macOS DMG + Linux AppImage, wizard de onboarding, bandeja del sistema (v1.0.4)
+- [x] App de escritorio (Tauri v2) — macOS DMG + Linux AppImage, wizard de onboarding, bandeja del sistema (v1.0.5)
 - [ ] Parámetros de inferencia configurables vía UI
 - [ ] Foro de comunidad
 
@@ -441,5 +441,5 @@ Consulta [LICENSE](LICENSE) para los detalles.
 ---
 
 <p align="center">
-  <strong>Versión 1.0.4</strong> · Apache 2.0 · Hecho por <a href="https://www.jgoy.net">Jordi Goy</a> en Barcelona
+  <strong>Versión 1.0.5</strong> · Apache 2.0 · Hecho por <a href="https://www.jgoy.net">Jordi Goy</a> en Barcelona
 </p>

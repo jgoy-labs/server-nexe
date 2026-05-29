@@ -302,11 +302,11 @@ class TestSystemHealthVersion:
         assert ".config" in source
 
     def test_health_has_fallback_version(self):
-        """/health has a fallback version if config is not available."""
+        """/health falls back to __version__ (from pyproject.toml) when config is unavailable."""
         from core.endpoints.system import system_health
         source = inspect.getsource(system_health)
-        # Must have a fallback (0.9.x)
-        assert "0.9" in source
+        # Fallback is __version__ (core.version reads pyproject.toml, SSOT), not a hardcoded literal
+        assert "__version__" in source
 
 
 # ═══════════════════════════════════════════════════════════════════════════

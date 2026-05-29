@@ -1,6 +1,6 @@
 [project]
 name = "server-nexe"
-version = "1.0.4"
+version = "1.0.5"
 requires-python = ">=3.11"
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -98,4 +98,3 @@ exclude = [
     "InstallNexe.app/*",
     "Nexe.app/*",
 ]
-

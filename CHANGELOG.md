@@ -4,21 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.0.5] — 2026-05-29
+
+### Changed
+
+- **Desktop app split — server-nexe torna a ser motor Python pur.** L'app d'escriptori (Tauri v2) surt del repositori i es distribueix com a binari separat via [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest) (DMG macOS Apple Silicon + AppImage Linux ARM64). server-nexe i l'app es mantenen com a projectes separats; el README apunta a Releases per a la descàrrega. (2026-05-28)
+- **i18n: `NEXE_LANG` per defecte `"ca"` → `"en"`** a tot el pipeline (chat, web UI, lifecycle, RAG, constants i18n, config). Una instal·lació nova arrenca en anglès per defecte. (2026-05-27)
+- **RAG: llindar per defecte `0.25` → `0.35` + `top_k` 3 per a màquines amb < 12 GB RAM.** Millora la precisió del recall en hardware amb poca memòria. (2026-05-25)
 
 ### Refactored
 
+- **`_stream_mlx` complexity CCN 16 → 12** via `_get_finalizing_hint` (refactor pur, sense canvi de comportament). (2026-05-27)
 - **`personality/` — 13 complexity findings eliminats** (lizard CCN+params+file_too_long). Refactor pur sense canvi de comportament: (A) `RouterContext` dataclass compacta `_attach_named_router`/`_attach_get_router` (6→2, 5→2 PARAM); (B) `LifecycleConfig` per `ModuleLifecycleManager.__init__` (7→2 PARAM), `_finalize_load_success` elimina param `module_info` + afegeix guard `KeyError`; (C) `SystemLifecycleConfig`/`DiscoveryConfig` per constructors `SystemLifecycleManager`/`ModuleDiscovery` (6→2, 5→2 PARAM); (D) `SecurityCheckContext` per `_check_plugin_security`, `RouteRegistration` per `register_module_routes`, `_save_integration_info` inline dict (6→3 PARAM); (E) `_error_rate`/`_avg_api_calls` extrets de `get_performance_summary` (CCN 11→5), `_check_single_path` extret de `_validate_paths` (CCN 10→4); (F) `PluginLoaderMixin` split — `module_manager.py` 687L→407L, mixin a nou `plugin_loader.py`. Nous fitxers: `personality/module_manager/types.py`, `personality/integration/types.py`, `personality/module_manager/plugin_loader.py`. 3 commits, 6113 tests, 0 regressions.
 
 ### Fixed
 
+- **34 findings semgrep-security resolts** — neteja completa del report semgrep abans del split de repositoris. (2026-05-28)
+- **Neteja de qualitat de codi** (auditoria interna 2026-05-27): linting, typing, security i complexity checks resolts. (2026-05-27)
+- **deps: revert `starlette` a `0.52.1`** — la versió superior era incompatible amb `fastapi 0.128.8`. (2026-05-27)
 - **`core/config.py`: deep-merge `personality/server.toml` + root `server.toml`** (Fix B9). `load_config()` ara usa pattern "default + override" en comptes de "first wins": carrega `personality/server.toml` com a BASE i deep-mergia root `server.toml` com a OVERRIDE. Prioritat: `DEFAULT < personality/server.toml < root server.toml < ENV vars`. Corregeix que un `server.toml` parcial a l'arrel silenciava completament `personality/server.toml`, deixant 9 tests 404. Tests: `tests/test_config_merge.py` (6 escenaris TDD) + `tests/test_session_manager_robustness.py` (6 casos defensius B4).
 
 ### Added
 
 - **Qwen3-VL models added to MLX catalog** (`installer/installer_catalog_data.py`). Three native vision-language models from the Qwen3-VL family are now offered as MLX options, confirmed available at `mlx-community` (sizes verified via HF Warehouse API 2026-05-06): `qwen3_vl_4b` (4B, 3.1 GB, tier small — `mlx-community/Qwen3-VL-4B-Instruct-4bit`), `qwen3_vl_8b` (8B, 5.8 GB, tier medium — `mlx-community/Qwen3-VL-8B-Instruct-4bit`), `qwen3_vl_30b_a3b` (30B-A3B MoE, 18.3 GB, tier xlarge — `mlx-community/Qwen3-VL-30B-A3B-Instruct-4bit`). All three use `Qwen3VLForConditionalGeneration` architecture, already registered in `_VLM_ARCHITECTURES` and now covered by an explicit regression test. Ollama tags confirmed available: `qwen3-vl:4b`, `qwen3-vl:8b`, `qwen3-vl:30b-a3b` (verified 2026-05-06). SHA256 pins left `None` (legacy-mode, C19 backlog). Requires `torch`/`torchvision` wheels already bundled since TODO 1.3. Sprint v1.0.4-beta Fase 2.
 
-- **C19 SHA256 pins poblats — 17/32 entrades verificades** (`installer/installer_catalog_data.py`). Primera població real de `MODEL_WEIGHT_SHA256` (backlog C19, v1.0.3-beta tots `None`). Mètode: MLX via `sha256_of_dir` sobre models locals; Ollama via digest config del manifest local `~/.ollama/models/manifests/`; GGUF via `shasum -a 256`. Pins verificats 2026-05-06: 6 MLX (gemma-4-e4b, gemma-3-12b, gemma-3-27b, gemma-4-31b, Qwen3-14B, gpt-oss-20b), 9 Ollama (gemma3:4b, qwen3.5:4b, qwen3:4b, gemma4:e4b, salamandra-7b, qwen3.5:9b, qwen3:14b, qwen3.5:27b, gemma4:31b, qwen3.5:35b-a3b), 1 GGUF (salamandra-7b-instruct-Q4_K_M). `None` restants (15): models Qwen3-VL i GGUF grans no descarregats localment — pins es poblaran quan s'instal·lin. Sprint v1.0.4-beta C19.
+- **C19 SHA256 pins poblats — 17/32 entrades verificades** (`installer/installer_catalog_data.py`). Primera població real de `MODEL_WEIGHT_SHA256` (backlog C19, v1.0.3-beta tots `None`). Mètode: MLX via `sha256_of_dir` sobre els models locals; Ollama via digest config del manifest local `~/.ollama/models/manifests/`; GGUF via `shasum -a 256`. Pins verificats 2026-05-06: 6 MLX (gemma-4-e4b, gemma-3-12b, gemma-3-27b, gemma-4-31b, Qwen3-14B, gpt-oss-20b), 9 Ollama (gemma3:4b, qwen3.5:4b, qwen3:4b, gemma4:e4b, salamandra-7b, qwen3.5:9b, qwen3:14b, qwen3.5:27b, gemma4:31b, qwen3.5:35b-a3b), 1 GGUF (salamandra-7b-instruct-Q4_K_M). `None` restants (15): models Qwen3-VL i GGUF grans no descarregats localment — pins es poblaran quan s'instal·lin. Sprint v1.0.4-beta C19.
 
 - **B4 recall@N A/B regression — implementació real** (`tests/test_embeddings_recall_ab.py`). Substitueix l'esquelet skip-only per una implementació completa i agnòstica de Qdrant. `InMemoryVectorStore` (numpy cosine similarity, zero dependència `qdrant_client`) implementa el protocol `VectorStore`. Dataset golden inline de 10 parells (query → doc rellevant, temàtica Nexe/IA en català). 5 tests: `recall@5 ≥ 0.50`, `recall@10 ≥ 0.70`, `top-1 hit rate ≥ 3/10`, search ordering, delete. Skip automàtic si `fastembed` no disponible al cache. Sprint v1.0.4-beta Fase 3.
 
@@ -40,12 +50,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- **Plists `Nexe.app` i `NexeTray.app` desincronitzats** (`Nexe.app/Contents/Info.plist`, `installer/NexeTray.app/Contents/Info.plist`). Els bundles anaven amb `1.0.2-beta` mentre `pyproject.toml` ja era `1.0.3-beta`, fent fallar `core/tests/test_plist_versions.py::test_synced_plists_match_pyproject`. Resolt amb `python -m installer.sync_plist_versions` (eina ja existent al projecte). Auditoria r1 P0.2.
+- **Plists `Nexe.app` i `NexeTray.app` desincronitzats** (`Nexe.app/Contents/Info.plist`, `installer/NexeTray.app/Contents/Info.plist`). Els bundles anaven amb `1.0.2-beta` mentre `pyproject.toml` ja era `1.0.3-beta`, fent fallar `core/tests/test_plist_versions.py::test_synced_plists_match_pyproject`. Resolt amb `python -m installer.sync_plist_versions` (eina ja existent al projecte). Auditoria r1 P0.2 (DeepSeek V3 / Turing).
 
 ### Changed
 
-- **Test SQLi al chat: contracte ajustat al disseny** (`tests/test_chat_v1_validation.py`). `test_sql_injection_in_message_content_rejected` renombrat a `test_sql_injection_in_chat_passes_through_to_llm`: en `context="chat"` el sanitizer delega `check_sql` al LLM (Ollama), perquè el pipeline no toca cap SQL DB (RAG = Qdrant vector DB). Discutir "UNION SELECT" és tech talk legítim. El rebuig estricte de SQLi es manté a `context="param"` (model, engine), cobert per `test_sql_injection_in_model_field_rejected`. Cap canvi a `plugins/security/core/input_sanitizers.py` — la decisió `check_sql=False` en chat ja era intencionada i documentada (línies 153-156, 164-169). Auditoria r1 P0.1.
-- **Test `nexe stop` accepta sortida en català o anglès** (`tests/test_cli_stop_pid.py`). `test_stop_no_services_running` només verificava l'output anglès "No Nexe services are running"; quan `NEXE_LANG=ca` (per defecte al Mac de dev) el CLI imprimeix "Cap servei Nexe actiu" i el test fallava. Assert ampliat amb `or` per cobrir ambdós idiomes. Auditoria r1 P1.
+- **Test SQLi al chat: contracte ajustat al disseny** (`tests/test_chat_v1_validation.py`). `test_sql_injection_in_message_content_rejected` renombrat a `test_sql_injection_in_chat_passes_through_to_llm`: en `context="chat"` el sanitizer delega `check_sql` al LLM (Ollama), perquè el pipeline no toca cap SQL DB (RAG = Qdrant vector DB). Discutir "UNION SELECT" és tech talk legítim. El rebuig estricte de SQLi es manté a `context="param"` (model, engine), cobert per `test_sql_injection_in_model_field_rejected`. Cap canvi a `plugins/security/core/input_sanitizers.py` — la decisió `check_sql=False` en chat ja era intencionada i documentada (línies 153-156, 164-169). Auditoria r1 P0.1 (DeepSeek V3 / Turing).
+- **Test `nexe stop` accepta sortida en català o anglès** (`tests/test_cli_stop_pid.py`). `test_stop_no_services_running` només verificava l'output anglès "No Nexe services are running"; quan `NEXE_LANG=ca` (per defecte al Mac de dev) el CLI imprimeix "Cap servei Nexe actiu" i el test fallava. Assert ampliat amb `or` per cobrir ambdós idiomes. Auditoria r1 P1 (DeepSeek V3 / Turing).
 
 ## [1.0.4-beta] — 2026-05-14
 
@@ -246,7 +256,7 @@ DoD F1-F4 fixes that landed since.
 
 ### Changed
 
-- Dependency security bumps: `fastapi`, `python-multipart`, `pytest`.
+- Dependency security bumps from gitoss sync: `fastapi`, `python-multipart`, `pytest`.
 - Version metadata bumped from `1.0.0-beta` to `1.0.1-beta` (pyproject, personality/server.toml, READMEs, SECURITY, CONTRIBUTING, installer Info.plist, knowledge base).
 - Plugin-owned versions (`plugins/*/manifest.toml` and `plugins/*/module.py`) untouched: plugins follow their own release cycle (version = codi introduït), independent of product bumps.
 
@@ -263,7 +273,7 @@ First public pre-1.0 release. Confidence bump from `0.9.9` after the final docum
 - New document: `USE_CASES.md` (ca/en/es) covering 6 practical use cases and "when server-nexe is NOT the best tool".
 - New section: `ERRORS.md` "How to report an error" with privacy warning for logs.
 - Honest coverage figure (~85%) replaces inflated historical badges (97.4%/91.1%/93%).
-- Security audits attribution expanded: Claude + Gemini + other models + cross-model reviews (not just Claude).
+- Security audits attribution expanded: Claude + Gemini + Codex + cross-model reviews (not just Claude).
 - `AI collaboration` credit in author metadata: `"Jordi Goy with AI collaboration"`.
 - Stripe / Ko-fi / GitHub Sponsors URLs corrected (Ko-fi was wrong: `/jgoylabs` → `/servernexe`).
 - Root READMEs synchronised across CA/EN/ES with screenshots (`.github/screenshots/`) and the "giant spaghetti monster → minimal core" story framing.
@@ -658,7 +668,7 @@ Derived from a full security audit (mega-consultoria) with plan v2.4.
   - System: `root:x:0:0:` (most specific /etc/passwd signature)
   - PEM private keys: RSA, OpenSSH, PKCS8, EC, DSA, PGP
   - API tokens: `sk-ant-` (Anthropic / Claude Code), `sk-proj-` (OpenAI
-    GPT / Responses API), `ghp_` + `github_pat_` (GitHub
+    GPT / Codex CLI / Responses API), `ghp_` + `github_pat_` (GitHub
     PAT classic + fine-grained), `AIzaSy` (Google Gemini / AI Studio /
     Cloud / Firebase).
 
