@@ -107,17 +107,21 @@ def test_stuck_handler_threshold_is_99():
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_valid_engines_consistent():
-    """Both installer and onboarding_state must use the same VALID_ENGINES set."""
-    from core.installer_constants import VALID_ENGINES
+    """Installer uses VALID_ENGINES (download allowlist); onboarding_state uses
+    ONBOARDING_ENGINES (= VALID_ENGINES + 'local' for the local-folder wizard
+    flow). Both must derive from core.installer_constants — single source."""
+    from core.installer_constants import VALID_ENGINES, ONBOARDING_ENGINES
     from core.endpoints.installer import _VALID_ENGINES as installer_engines
-    from core.onboarding_state import _VALID_ENGINES as state_engines
+    from core.onboarding_state import _ONBOARDING_ENGINES as state_engines
 
     assert installer_engines == VALID_ENGINES, (
         f"installer._VALID_ENGINES {installer_engines} != constants {VALID_ENGINES}"
     )
-    assert state_engines == VALID_ENGINES, (
-        f"onboarding_state._VALID_ENGINES {state_engines} != constants {VALID_ENGINES}"
+    assert state_engines == ONBOARDING_ENGINES, (
+        f"onboarding_state._ONBOARDING_ENGINES {state_engines} != constants {ONBOARDING_ENGINES}"
     )
+    # onboarding accepts exactly the download engines plus the local-folder marker
+    assert ONBOARDING_ENGINES == VALID_ENGINES | {"local"}
 
 
 def test_valid_engines_contains_expected_values():

@@ -35,7 +35,7 @@ from typing import Optional
 
 import platformdirs
 
-from core.installer_constants import VALID_ENGINES as _VALID_ENGINES
+from core.installer_constants import ONBOARDING_ENGINES as _ONBOARDING_ENGINES
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +201,7 @@ class OnboardingState:
         explicitly is treated as "clear the token" (deletes keychain
         entry, sets has_token=False).
         """
-        if engine not in _VALID_ENGINES:
+        if engine not in _ONBOARDING_ENGINES:
             raise ValueError(f"invalid engine: {engine!r}")
 
         # Resolve has_token according to the sentinel semantics.
@@ -288,11 +288,21 @@ class OnboardingState:
             lookup succeeds. Failure falls back silently (HF Hub still works,
             just rate-limited).
         """
-        env_var = _ENGINE_TO_MODEL_ENV.get(self.engine)
-        if env_var:
-            os.environ[env_var] = self.model_path
-        os.environ["NEXE_DEFAULT_MODEL"] = self.model_id
-        os.environ["NEXE_MODEL_ENGINE"] = _ENGINE_TO_RESOLVER_KEY[self.engine]
+        if self.engine == "local":
+            # Local models folder: NEXE_STORAGE_PATH points to the CONTAINER
+            # directory of models (auto-discovery in mlx_module/core/config.py
+            # iterates its subdirs looking for config.json). The chat UI model
+            # selector picks the concrete model at runtime, so we deliberately
+            # do NOT set NEXE_DEFAULT_MODEL (an empty value would break the
+            # "llama3.2:3b" fallback in routes_chat) nor a per-engine model env.
+            os.environ["NEXE_STORAGE_PATH"] = self.model_path
+            os.environ["NEXE_MODEL_ENGINE"] = "auto"
+        else:
+            env_var = _ENGINE_TO_MODEL_ENV.get(self.engine)
+            if env_var:
+                os.environ[env_var] = self.model_path
+            os.environ["NEXE_DEFAULT_MODEL"] = self.model_id
+            os.environ["NEXE_MODEL_ENGINE"] = _ENGINE_TO_RESOLVER_KEY[self.engine]
         os.environ["NEXE_LANG"] = self.lang
         # F5.4 Fase 4b: inject HF_TOKEN from Keychain if the user provided
         # one through the wizard. We never log the token value.

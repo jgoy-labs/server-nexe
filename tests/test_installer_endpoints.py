@@ -205,6 +205,22 @@ class TestResolveModelPath:
         with pytest.raises(ValueError, match="invalid model_id"):
             _resolve_model_path("mlx", "mlx-community/..")
 
+    def test_local_rejects_nonexistent_folder(self):
+        """engine='local' with a folder that does not exist → ValueError (→400)."""
+        from core.endpoints.installer import _resolve_model_path
+
+        with pytest.raises(ValueError, match="local models folder not found"):
+            _resolve_model_path("local", "/no/such/models/folder/xyz")
+
+    def test_local_accepts_existing_dir(self, tmp_path):
+        """engine='local' with an existing dir returns its resolved path."""
+        from core.endpoints.installer import _resolve_model_path
+
+        folder = tmp_path / "my-models"
+        folder.mkdir()
+        resolved = _resolve_model_path("local", str(folder))
+        assert resolved == str(folder.resolve())
+
     def test_accepts_normal_mlx_model_id(self, tmp_path, monkeypatch):
         from core.endpoints.installer import _resolve_model_path
 

@@ -913,8 +913,11 @@ class FinalizeBody(BaseModel):
     against accidental paste of huge blobs).
     """
 
-    engine: str = Field(..., pattern="^(mlx|ollama|gguf)$")
-    model_id: str = Field(..., min_length=1, max_length=200)
+    # "local" = user picked a local models folder; model_id carries the
+    # absolute folder path (no fixed model — the chat UI selector chooses).
+    engine: str = Field(..., pattern="^(mlx|ollama|gguf|local)$")
+    # 512 chars: model ids are short, but a "local" folder path can be long.
+    model_id: str = Field(..., min_length=1, max_length=512)
     hf_token: str | None = Field(default=None, max_length=200)
     # 2026-05-22: BCP-47 language code chosen at the wizard welcome step.
     # Allowlist matches the UI locales (Català/Español/English). When None
@@ -957,6 +960,15 @@ def _resolve_model_path(engine: str, model_id: str) -> str:
     a symlinked basename that resolves outside the models directory). The
     caller is responsible for turning that into an HTTP 4xx response.
     """
+    if engine == "local":
+        # model_id carries the user-picked models FOLDER (from the native
+        # Tauri directory picker — trusted). It must be the container dir of
+        # models (auto-discovery iterates its subdirs). Validate it exists;
+        # no _safe_model_basename (that assumes a catalog model id).
+        folder = Path(model_id).expanduser().resolve()
+        if not folder.is_dir():
+            raise ValueError(f"local models folder not found: {model_id!r}")
+        return str(folder)
     if engine in ("mlx", "gguf"):
         basename = _safe_model_basename(model_id)
         models_root = _models_dir().resolve()
@@ -988,9 +1000,13 @@ async def finalize_post(body: FinalizeBody) -> JSONResponse:
     # F5.4 Fase 4b: if the wizard supplied an HF token, pass it to the
     # Keychain-aware save() — the token never lands on disk, only a
     # has_token=True marker in onboarding.json.
+    # For "local", model_id is the folder path; persist a clear sentinel
+    # instead (the chat UI selector chooses the real model). model_path keeps
+    # the resolved folder so apply_to_env can set NEXE_STORAGE_PATH.
+    saved_model_id = "local" if body.engine == "local" else body.model_id
     OnboardingState.save(
         engine=body.engine,
-        model_id=body.model_id,
+        model_id=saved_model_id,
         model_path=model_path,
         hf_token=body.hf_token,
         lang=body.lang,

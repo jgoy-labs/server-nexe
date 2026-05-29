@@ -159,6 +159,45 @@ def test_apply_to_env_gguf(tmp_data_dir: Path, monkeypatch: pytest.MonkeyPatch) 
     assert os.environ["NEXE_MODEL_ENGINE"] == "llamacpp"
 
 
+def test_save_local_roundtrip(tmp_data_dir: Path) -> None:
+    """save(engine='local') round-trips and marks onboarding complete."""
+    folder = tmp_data_dir / "models-folder"
+    folder.mkdir()
+    OnboardingState.save(engine="local", model_id="local", model_path=str(folder))
+    loaded = OnboardingState.load()
+    assert loaded is not None
+    assert loaded.engine == "local"
+    assert OnboardingState.is_completed() is True
+
+
+def test_apply_to_env_local(tmp_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Local-folder onboarding sets NEXE_STORAGE_PATH (container dir) + engine
+    'auto', and does NOT set NEXE_DEFAULT_MODEL (an empty value would break the
+    chat fallback) nor a per-engine model env. The chat UI selector picks the
+    concrete model at runtime."""
+    # apply_to_env() WRITES these directly to os.environ; seed them via
+    # monkeypatch.setenv so they are guaranteed to be restored/removed at
+    # teardown (delenv on a non-existent var would NOT register an undo, so
+    # the value apply_to_env creates would leak and contaminate later tests
+    # that read NEXE_STORAGE_PATH, e.g. _models_dir()).
+    monkeypatch.setenv("NEXE_STORAGE_PATH", "__seed__")
+    monkeypatch.setenv("NEXE_MODEL_ENGINE", "__seed__")
+    monkeypatch.setenv("NEXE_LANG", "__seed__")
+    for var in ("NEXE_DEFAULT_MODEL", "NEXE_MLX_MODEL", "NEXE_LLAMA_CPP_MODEL"):
+        monkeypatch.delenv(var, raising=False)
+    folder = tmp_data_dir / "my-models"
+    folder.mkdir()
+    state = OnboardingState.save(
+        engine="local", model_id="local", model_path=str(folder)
+    )
+    state.apply_to_env()
+    assert os.environ["NEXE_STORAGE_PATH"] == state.model_path
+    assert os.environ["NEXE_MODEL_ENGINE"] == "auto"
+    assert "NEXE_DEFAULT_MODEL" not in os.environ
+    assert "NEXE_MLX_MODEL" not in os.environ
+    assert "NEXE_LLAMA_CPP_MODEL" not in os.environ
+
+
 def test_atomic_write_no_partial_file(tmp_data_dir: Path) -> None:
     """save() leaves no stray .tmp files in the data directory."""
     OnboardingState.save(engine="ollama", model_id="gemma3:4b", model_path="gemma3:4b")

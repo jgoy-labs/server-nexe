@@ -982,9 +982,14 @@ async def _switch_engine_model(engine, engine_name: str, body: dict, model_name:
     then restores them (P0-3 env leak fix). Uses _MODEL_SWITCH_LOCK to
     serialize concurrent mutations on class-level singletons.
     """
-    import os
     from core.lifespan import get_server_state as _gss
-    models_dir = Path(os.getenv("NEXE_STORAGE_PATH", "storage")) / "models"
+    # Delegate to get_models_dir() so the lookup chain (NEXE_STORAGE_PATH →
+    # NEXE_DATA_DIR/models → cwd → repo) is centralised and matches
+    # routes_auth._resolve_models_dir(). The previous `NEXE_STORAGE_PATH /
+    # "models"` broke when the env var already points at the models dir
+    # (e.g. a user-selected local models folder).
+    from core.paths.helpers import get_models_dir
+    models_dir = get_models_dir()
     if not models_dir.is_absolute():
         models_dir = Path(_gss().project_root) / models_dir  # type: ignore[arg-type]
     local_path = models_dir / model_name  # type: ignore[operator]
