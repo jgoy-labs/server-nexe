@@ -1,5 +1,5 @@
 """
-F5.3: HTTP endpoints for the onboarding wizard.
+HTTP endpoints for the onboarding wizard.
 
 All endpoints are intentionally unauthenticated — the user has no API key
 yet when running through the wizard. The wizard is only reachable from the
@@ -8,7 +8,7 @@ local WebView (same-machine, loopback only) so the risk is minimal.
 Endpoints:
   GET  /installer/download   — SSE stream: model download progress
   POST /installer/ollama     — SSE stream: Ollama install check
-  POST /installer/finalize   — JSON: {api_key, status} + persists onboarding state (F5.3.1)
+  POST /installer/finalize   — JSON: {api_key, status} + persists onboarding state
   GET  /installer/finalize   — JSON: {api_key, status} — legacy, no state persisted
 """
 
@@ -34,7 +34,7 @@ from pydantic import BaseModel, Field
 from core.installer_constants import VALID_ENGINES as _VALID_ENGINES
 from core.onboarding_state import OnboardingState
 
-# F5.6 Bloc 6 / 2026-05-21 cleanup: import DownloadIntegrityError at top to
+# cleanup: import DownloadIntegrityError at top to
 # avoid pyright `reportPossiblyUnboundVariable` when the lazy import inside
 # the SHA256 verification block is re-used in the except clause. The lazy
 # import is kept below (for verify_download_integrity which has heavier
@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/installer", tags=["installer"])
 
-# F5.4 Bug A: canonical fastembed model id for the wizard. Kept here (not
+# canonical fastembed model id for the wizard. Kept here (not
 # imported from memory.embeddings.constants) so the installer remains
 # import-safe in PBS bundles where memory/structlog chains can fail —
 # see memory `feedback_dmg_structlog_import.md`.
@@ -77,7 +77,7 @@ async def _sse(data: dict) -> str:
 def _models_dir() -> Path:
     """Return the canonical models directory (same as MLX auto-discovery).
 
-    F5.3.1: delegate to `core.paths.helpers.get_models_dir()` so the wizard
+    delegate to `core.paths.helpers.get_models_dir()` so the wizard
     download path matches the path scanned by the MLX/llama.cpp plugins. In
     sidecar mode `get_models_dir()` prefers `NEXE_DATA_DIR/models` but only
     returns it if it already exists; we pre-create it so the canonical path
@@ -151,7 +151,7 @@ def _find_ollama_bin() -> str | None:
 async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
     """Download an MLX model via huggingface_hub.snapshot_download.
 
-    F5.4 Fase 4a: real-byte progress via SSEProgressTqdm + DirSize polling
+    real-byte progress via SSEProgressTqdm + DirSize polling
     (replaces the legacy pct += 3 / 1.5s fake-progress loop). hf_xet
     transfers don't write to Python tqdm, so we always run the dir poller
     in parallel — the DownloadTracker takes max(tqdm_n, dir_size).
@@ -171,11 +171,11 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
 
     loop = asyncio.get_event_loop()
     done_ev = asyncio.Event()
-    # F5.5 G11: cancel event so _run() skips snapshot_download if the client
+    # cancel event so _run() skips snapshot_download if the client
     # disconnects before the worker thread actually starts. Cannot interrupt
     # snapshot_download mid-flight (no hook), but prevents a new download from
     # starting after an AbortController cancel on the frontend.
-    # F5.6 Bloc 3: _threading ara importat al top del mòdul (per _ollama_install_lock).
+    # _threading now imported at the top of the module (for _ollama_install_lock).
     cancel_ev = _threading.Event()
     errors: list[Exception] = []
 
@@ -190,7 +190,7 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
         # phoning home on startup. The constant is read once at import time,
         # so os.environ changes don't propagate — we must monkey-patch the
         # constant directly. Restore on exit.
-        # F5.5 G11: skip download if client already disconnected before we started.
+        # skip download if client already disconnected before we started.
         if cancel_ev.is_set():
             loop.call_soon_threadsafe(done_ev.set)
             return
@@ -221,7 +221,7 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
     loop.run_in_executor(_dl_executor, _run)
 
     tracker = DownloadTracker(dest_dir=dest)
-    tracker.maybe_poll_dir(force=True)  # stabilise initial baseline (F5.5 G6)
+    tracker.maybe_poll_dir(force=True)  # stabilise initial baseline
     if xet_active:
         logger.info(
             "installer: hf_xet active for %s — relying on dir polling for progress",
@@ -230,12 +230,12 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
 
     try:
         last_pct = -1
-        # F5.4 Fase 6a — WebKit SSE keepalive: WebKit (used by Tauri's
+        # WebKit SSE keepalive: WebKit (used by Tauri's
         # WebView on macOS) drops EventSource/fetch streams that go silent
         # for >~30s. Emit a 'keepalive' event every 15s so the frontend
         # stays connected even when hf_xet has been transferring a giant
         # single file with no per-chunk updates.
-        # F5.4 Fase 6b — Stuck-99% handler: when speed drops below
+        # Stuck-99% handler: when speed drops below
         # 100 KB/s for >30s while we're not done yet, surface a
         # "finalizing" hint so the user understands the silence is normal
         # checksum/extract work (huggingface_hub 1.1.x bug + xet finalize).
@@ -251,7 +251,7 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
         while not done_ev.is_set():
             await asyncio.sleep(0.25)
             if await request.is_disconnected():
-                cancel_ev.set()  # F5.5 G11: prevent worker from starting if not yet running
+                cancel_ev.set()  # prevent worker from starting if not yet running
                 return
             tracker.drain_tqdm_queue(tqdm_queue)
             tracker.maybe_poll_dir()
@@ -275,7 +275,7 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
                 yield ev
                 last_emit_t = now
                 continue
-            # F5.4 Fase 6a: keepalive when nothing else has been emitted.
+            # keepalive when nothing else has been emitted.
             if (now - last_emit_t) >= KEEPALIVE_S:
                 yield {"type": "keepalive", "ts": now}
                 last_emit_t = now
@@ -377,7 +377,7 @@ def _get_finalizing_hint(
 async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]:
     """Download an Ollama model via ollama pull, streaming real progress.
 
-    F5.6 Bloc 3 (F03): si Ollama no es present, l'instal.lem automaticament
+    If Ollama is not present, install it automatically
     via ensure_ollama_installed(headless=True) abans del pull. Validat amb
     agentic audit 2026-05-20 (8 iters, 92K tokens, 4 correccions C1-C5).
     """
@@ -451,7 +451,7 @@ def _fastembed_model_bytes(cache_dir: Path, model_id: str) -> int:
       models--{org}--{name}/snapshots/{sha}/onnx/   (HF-style layout)
     or legacy flat layout: {name}/
 
-    F5.5 G8: use this instead of _fastembed_cache_size_bytes to avoid
+    use this instead of _fastembed_cache_size_bytes to avoid
     counting other models already in cache.
     """
     safe_id = model_id.replace("/", "--")
@@ -499,7 +499,7 @@ _EMBEDDER_EXPECTED_BYTES = 430 * 1024 * 1024  # ~430 MB (int8 ONNX)
 async def _stream_embedder(model_id: str, request: Request) -> AsyncIterator[dict]:
     """Download the fastembed embedding model with directory-size polling.
 
-    F5.4 Bug A: fastembed.TextEmbedding triggers a download from HuggingFace
+    fastembed.TextEmbedding triggers a download from HuggingFace
     when the model is not in cache_dir. The download progress is not exposed
     via Python tqdm in a way we can intercept reliably across fastembed
     versions, so we poll the cache directory size at 1s intervals.
@@ -602,7 +602,7 @@ async def _stream_gguf(model_id: str, request: Request) -> AsyncIterator[dict]:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# F5.4 Fase 5 — Gated-model detection + dry_run preflight
+# Gated-model detection + dry_run preflight
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -698,7 +698,7 @@ async def preflight(engine: str, model_id: str) -> JSONResponse:
             "plan": {"total_bytes": 0, "cached_bytes": 0, "files_count": 0},
         })
 
-    # F5.4 Fase 4b: if the user has stored an HF token, the access check
+    # if the user has stored an HF token, the access check
     # and dry-run plan use it so gated repos the user has access to are
     # reported as "ok" instead of "gated_no_access".
     token = os.environ.get("HF_TOKEN") or None
@@ -811,7 +811,7 @@ async def download_model(engine: str, model_id: str, request: Request) -> Stream
                 async for ev in _stream_ollama(model_id, request):
                     yield await _sse(ev)
             elif engine == "embedder":
-                # F5.4 Bug A: download the fastembed embedding model. The
+                # download the fastembed embedding model. The
                 # wizard supplies model_id explicitly (or the default
                 # constant via _EMBEDDER_MODEL_ID).
                 effective_id = model_id or _EMBEDDER_MODEL_ID
@@ -840,7 +840,7 @@ async def download_model(engine: str, model_id: str, request: Request) -> Stream
 async def install_ollama_endpoint(request: Request) -> StreamingResponse:
     """Install Ollama if not present, streaming status as SSE.
 
-    F5.6 Bloc 3 (F03): substitueix el placeholder "already_installed: False"
+    Replaces the placeholder "already_installed: False"
     per una crida real a ensure_ollama_installed(headless=True). Mateixes
     correccions C1-C5 de l'auditoria agèntica que _stream_ollama (cancel detection,
     lock concurrent, error UX-friendly per platform, logger.exception).
@@ -901,13 +901,13 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
 
 
 class FinalizeBody(BaseModel):
-    """Body for the F5.3.1 POST /installer/finalize endpoint.
+    """Body for the POST /installer/finalize endpoint.
 
     Validated server-side so the wizard cannot smuggle in arbitrary engines
     or oversized model identifiers (defense in depth — same allowlist as
     `_VALID_ENGINES` for /installer/download).
 
-    F5.4 Fase 4b: optional ``hf_token`` field. When provided (non-empty),
+    optional ``hf_token`` field. When provided (non-empty),
     OnboardingState.save() stores it to the macOS Keychain — never to disk.
     Length capped at 200 chars (HF tokens are ~40 chars; the cap protects
     against accidental paste of huge blobs).
@@ -985,7 +985,7 @@ def _resolve_model_path(engine: str, model_id: str) -> str:
 async def finalize_post(body: FinalizeBody) -> JSONResponse:
     """Persist onboarding state and return the local API key and server status.
 
-    F5.3.1: the wizard calls this after a successful download. The model_path
+    the wizard calls this after a successful download. The model_path
     is derived from `model_id` (same logic as the download streamers). The
     state is written atomically to `$NEXE_DATA_DIR/onboarding.json`; the next
     sidecar restart will pick it up and configure the right engine.
@@ -997,7 +997,7 @@ async def finalize_post(body: FinalizeBody) -> JSONResponse:
             status_code=400,
             content={"detail": str(exc)},
         )
-    # F5.4 Fase 4b: if the wizard supplied an HF token, pass it to the
+    # if the wizard supplied an HF token, pass it to the
     # Keychain-aware save() — the token never lands on disk, only a
     # has_token=True marker in onboarding.json.
     # For "local", model_id is the folder path; persist a clear sentinel
@@ -1077,7 +1077,7 @@ async def finalize_get() -> JSONResponse:
 
 @router.get("/check-metal", operation_id="installer_check_metal")
 async def check_metal() -> JSONResponse:
-    """F5.6 Bloc 5 (F07): Check if Apple Metal/MLX is available on this system.
+    """Check if Apple Metal/MLX is available on this system.
 
     El wizard usa aquest endpoint per saber si pot oferir MLX com a backend.
     A Macs Intel (sense Metal) o Linux/Windows, mlx no s'ha d'oferir.

@@ -1,4 +1,4 @@
-"""F5.4 Bug — Real-byte download progress tracker for the installer wizard.
+"""Real-byte download progress tracker for the installer wizard.
 
 Replaces the legacy `pct += 3 / 1.5s` fake-progress polling at
 core/endpoints/installer.py::_stream_mlx with two complementary sources of
@@ -65,7 +65,7 @@ def is_xet_active() -> bool:
     on directory-size polling for progress. Detection is conservative:
     returns True if any of the known hf_xet activation paths are present.
 
-    F5.6 Bloc 8: honour ``HF_HUB_DISABLE_XET`` first. When the constant
+    honour ``HF_HUB_DISABLE_XET`` first. When the constant
     evaluates True (because the env var was set BEFORE huggingface_hub
     import — see lib.rs::spawn_sidecar_process) huggingface_hub bypasses
     xet entirely regardless of whether the ``hf_xet`` package is installed.
@@ -105,7 +105,7 @@ def is_xet_active() -> bool:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-# Class-level queue. F5.5 G13: protected by a Lock to prevent concurrent
+# Class-level queue. Protected by a Lock to prevent concurrent
 # set_tqdm_queue() calls from racing (two simultaneous SSE requests could
 # overwrite each other's queue). max_workers=1 prevents two simultaneous
 # downloads, but the Lock makes the invariant explicit and safe.
@@ -128,7 +128,7 @@ if _tqdm is not None:  # pragma: no branch — always true when tqdm is installe
         ``huggingface_hub.snapshot_download`` so every chunk update is
         forwarded to the SSE stream consumer in the main loop.
 
-        F5.5 G13: reads _TQDM_QUEUE under _TQDM_QUEUE_LOCK to prevent a race
+        reads _TQDM_QUEUE under _TQDM_QUEUE_LOCK to prevent a race
         where a concurrent set_tqdm_queue(None) nulls the reference after we
         checked it but before we call put_nowait.
 
@@ -252,7 +252,7 @@ class DownloadTracker:
     def bytes_done(self) -> int:
         """Bytes downloaded so far. Always >= last observation (monotonic).
 
-        F5.5 G9: pure getter — no longer mutates _samples. Call
+        pure getter — no longer mutates _samples. Call
         record_sample() explicitly once per poll cycle instead.
         """
         return max(self._tqdm_n, max(0, self._dir_bytes - self._initial_dir_bytes))
@@ -347,7 +347,7 @@ class DownloadTracker:
         """Serialise current state to an SSE-friendly dict.
 
         Calls record_sample() so every emitted event contributes exactly one
-        speed-estimation sample (F5.5 G9: side-effect removed from bytes_done).
+        speed-estimation sample (side-effect removed from bytes_done).
         """
         self.record_sample()
         return {

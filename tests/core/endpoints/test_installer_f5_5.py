@@ -1,4 +1,4 @@
-"""F5.5 findings fixes — tests for G1-G8 (installer + progress tracker).
+"""Findings fixes — tests for G1-G8 (installer + progress tracker).
 
 G1 — Ollama detected in ~/Applications/ (user-level install)
 G2 — GGUF re-download overwrites (wb not ab)

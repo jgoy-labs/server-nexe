@@ -79,7 +79,7 @@ logger = logging.getLogger(__name__)
 
 from core.server.helpers import translate as _translate  # noqa: E402  # after warnings filter
 
-# Startup phase timeout (B09). F3.3 BUG-C5: raise default from 30s to 120s and
+# Startup phase timeout: raise default from 30s to 120s and
 # accept the more descriptive `NEXE_LIFESPAN_TIMEOUT` alongside the legacy name.
 # Rationale: MLX/llama.cpp model warmup with a cold cache (Qwen 35B-A3B 4-bit,
 # Mixtral, Qwen3.5-Coder 8-bit) routinely takes 30-90s. The previous 30s budget
@@ -224,7 +224,7 @@ class ServerState:
     self._session_cleanup_task: Optional[asyncio.Task[Any]] = None
     self._knowledge_ingest_task: Optional[asyncio.Task[Any]] = None
     self.knowledge_ingest_complete: bool = False
-    # F5.6 Bloc 2 (F01): flag set per _startup_init. Si False, _startup fa
+    # flag set by _startup_init. If False, _startup does
     # early return abans de _startup_services + _startup_phases_and_tokens.
     self.has_onboarding: bool = False
     self.configure_modules_callback: Optional[Callable[..., None]] = None
@@ -270,12 +270,12 @@ async def _prewarm_fastembed() -> None:
 
 
 async def _startup_init(app: FastAPI) -> None:
-    """Bloc 1: log inicial, reload trigger, config, PID, encryption, qdrant."""
+    """Phase 1: initial log, reload trigger, config, PID, encryption, qdrant."""
     logger.info("=" * 70)
     logger.info("LIFESPAN STARTUP TRIGGERED")
     logger.info("=" * 70)
 
-    # F5.3.1 — apply persisted onboarding state to env vars BEFORE any plugin
+    # apply persisted onboarding state to env vars BEFORE any plugin
     # initialization (MLXConfig, LlamaCppConfig and routes_chat read these at
     # import / module-load time). If the user has not yet completed the wizard
     # the file does not exist and we fall through using compiled-in defaults.
@@ -289,12 +289,12 @@ async def _startup_init(app: FastAPI) -> None:
         )
     else:
         logger.info("onboarding_state: not completed — using defaults")
-    # F5.6 Bloc 2 (F01): flag llegit per _startup per decidir si arrencar
+    # flag read by _startup to decide whether to start
     # els subsistemes complets (memory, plugins, fastembed) o quedar-se
     # en minimal_mode (només /installer/*, /health/*).
     server_state.has_onboarding = _onboarding is not None
 
-    # F5.6 Bloc 8: defensa runtime. hf_xet ha d'estar desactivat (la Tauri
+    # runtime defense. hf_xet must be disabled (the Tauri
     # Rust launcher seteja HF_HUB_DISABLE_XET=1 abans del spawn Python). Si
     # arribem aquí amb xet actiu, sabem que les descàrregues de models grans
     # es penjaran silenciosament — millor avisar fort i ben aviat. Empíric
@@ -331,7 +331,7 @@ async def _startup_init(app: FastAPI) -> None:
     app.state.config = server_state.config
 
     # PID file — single-instance guard (B06, B07, B10)
-    # F2.1 Sessió 3 part 2 (2026-05-16 23:50): en mode sidecar Tauri, SKIP el
+    # in sidecar Tauri mode, SKIP the
     # PID file completament. Tauri gestiona el cicle de vida del procés via
     # NEXE_PARENT_PID watchdog (lifecycle.rs:graceful_quit). El single-instance
     # guard és per a standalone (CLI), on hi pot haver col·lisió usuari.
@@ -350,7 +350,7 @@ async def _startup_init(app: FastAPI) -> None:
             _startup_port = sidecar_cfg.port  # NEXE_PORT injectat per Tauri
             _skip_pid_file = True
             logger.info("Sidecar mode: skipping PID file (Tauri manages lifecycle)")
-    except Exception as exc:  # pragma: no cover — fallback comportament pre-F2.1
+    except Exception as exc:  # pragma: no cover — fallback behaviour pre-sidecar
         logger.debug("SidecarConfig unavailable, using default PID file behavior: %s", exc)
 
     if not _skip_pid_file and server_state.project_root and not _write_pid_file(server_state.project_root, _startup_port):
@@ -372,7 +372,7 @@ async def _startup_init(app: FastAPI) -> None:
 
 
 async def _startup_services(app: FastAPI) -> None:
-    """Bloc 2: serveis externs (timeout), APIIntegrator, Ollama cleanup, module discovery."""
+    """Phase 2: external services (timeout), APIIntegrator, Ollama cleanup, module discovery."""
     try:
         await asyncio.wait_for(
             _auto_start_services(server_state.config, server_state.project_root, server_state),  # type: ignore[arg-type]
@@ -410,7 +410,7 @@ async def _startup_services(app: FastAPI) -> None:
 
 
 async def _startup_phases_and_tokens(app: FastAPI) -> None:
-    """Bloc 3: phases startup (timeout each), tokens bootstrap, tasques segon pla, callbacks."""
+    """Phase 3: startup phases (timeout each), token bootstrap, background tasks, callbacks."""
     _startup_phases = [
         ("memory modules", load_memory_modules(app, server_state, _translate)),
         ("plugin modules", initialize_plugin_modules(app, server_state)),
@@ -460,7 +460,7 @@ async def _startup_phases_and_tokens(app: FastAPI) -> None:
 
 
 def _startup_final_banner() -> None:
-    """Bloc 4: banner final amb URL, API key i estat encryption."""
+    """Phase 4: final banner with URL, API key and encryption status."""
     from core.config import DEFAULT_HOST, DEFAULT_PORT
     _srv_cfg = server_state.config.get("core", {}).get("server", {})
     _nexe_url = os.environ.get(
@@ -482,7 +482,7 @@ async def _startup(app: FastAPI) -> None:
     """Startup orchestrator: delegates each phase to its helper."""
     await _startup_init(app)
 
-    # F5.6 Bloc 2 (F01): si OnboardingState no existeix, NO arrenquem els
+    # if OnboardingState does not exist, do NOT start the
     # subsistemes que depenen del model triat (memory, plugins, fastembed,
     # auto_start_services, module_discovery). Els endpoints /installer/*,
     # /health/* i /admin/system/* segueixen accessibles (registrats abans
@@ -490,7 +490,7 @@ async def _startup(app: FastAPI) -> None:
     # persisteix (POST /installer/finalize → save() atòmic) i Tauri reinicia
     # el sidecar (invoke restart_sidecar); al next startup aquest check
     # passarà i tot s'arrencarà normal.
-    # Resol bugs F5.4 A (fastembed silent), B (MLXConfig fallback NEXE_HOME),
+    # Resolves bugs: A (fastembed silent), B (MLXConfig fallback NEXE_HOME),
     # D (DreamingCycle embedder=missing cascade) a first boot.
     if not server_state.has_onboarding:
         app.state.minimal_mode = True

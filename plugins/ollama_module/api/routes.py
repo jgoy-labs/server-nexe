@@ -26,7 +26,7 @@ from plugins.security.core.auth import require_api_key
 logger = logging.getLogger(__name__)
 
 
-# F3.2 BUG-NB-10 — Ollama supply-chain hardening.
+# Ollama supply-chain hardening.
 #
 # Ollama model names follow `[registry/]repo[:tag]`. We accept ASCII letters,
 # digits, dots, underscores, hyphens and a single optional `:tag` suffix.

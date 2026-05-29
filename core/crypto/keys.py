@@ -24,7 +24,7 @@ KEY_SIZE = 32  # 256 bits
 
 
 def _resolve_key_file_dir() -> Path:
-    """F2.2 part 2 (BUG-NC-36): resol path master key respectant NEXE_SIDECAR_DIR.
+    """Resolve master key path respecting NEXE_SIDECAR_DIR.
 
     En mode sidecar (Tauri injecta NEXE_SIDECAR_DIR=~/.nexe per defecte),
     usa aquest path. En standalone, fallback a ~/.nexe (compatibilitat
@@ -36,11 +36,11 @@ def _resolve_key_file_dir() -> Path:
 
 
 def _resolve_key_file_path() -> Path:
-    """F2.2 part 2: master key path dinàmic (respecta NEXE_SIDECAR_DIR)."""
+    """Dynamic master key path (respects NEXE_SIDECAR_DIR)."""
     return _resolve_key_file_dir() / "master.key"
 
 
-# Backward-compat constants (avaluades a import-time). F2.2 part 2: els
+# Backward-compat constants (evaluated at import-time). The
 # nous defaults dels paràmetres `path`/`key_file_path` resolen dinàmicament
 # via _resolve_key_file_path() per respectar canvis runtime de NEXE_SIDECAR_DIR
 # (cas tests + cas multi-instància).
@@ -87,7 +87,7 @@ def _try_env_get() -> bytes | None:
 
 
 def _try_file_get(path: Path | None = None) -> bytes | None:
-    """Try to retrieve master key from file. Default path resolved dynamically (F2.2 part 2)."""
+    """Try to retrieve master key from file. Default path resolved dynamically."""
     if path is None:
         path = _resolve_key_file_path()
     if not path.exists():
@@ -193,7 +193,7 @@ def get_or_create_master_key(key_file_path: Path | None = None) -> bytes:
     Returns:
         32-byte master key
     """
-    # F2.2 part 2: resol path dinàmicament si no s'ha passat (respecta NEXE_SIDECAR_DIR)
+    # resolve path dynamically if not passed (respects NEXE_SIDECAR_DIR)
     if key_file_path is None:
         key_file_path = _resolve_key_file_path()
     # 1. File (primary persistent store)
@@ -224,7 +224,7 @@ def get_or_create_master_key(key_file_path: Path | None = None) -> bytes:
     # keyring is best-effort (some environments lack a secret service).
     key = os.urandom(KEY_SIZE)
     logger.info("Generated new master encryption key")
-    # F3.3 BUG-NC-37: fail-fast on file persistence failure for NEW keys.
+    # fail-fast on file persistence failure for NEW keys.
     # Returning the key without persisting it would leave the next boot
     # generating yet another fresh key — every record we encrypt now becomes
     # un-decryptable after restart. Better to refuse to start than to lose data

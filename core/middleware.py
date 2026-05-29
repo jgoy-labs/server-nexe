@@ -46,12 +46,12 @@ _CSRF_EXEMPT_PATTERNS = [
     re.compile(r"^/health"),
     re.compile(r"^/metrics"),
     re.compile(r"^/ui/"),  # UI uses X-API-Key auth (works for local + Tailscale)
-    # F5.6 BUG-NEW-1 — /admin/system/* is X-API-Key authenticated and called
+    # /admin/system/* is X-API-Key authenticated and called
     # from the Tauri Rust client (cookie-less). Without this exemption,
     # starlette-csrf returned 403 on the graceful shutdown POST and lifecycle.rs
     # always fell back to SIGKILL.
     re.compile(r"^/admin/"),
-    # F5.6 Bloc 6c (end-to-end fix): /installer/* es crida pel wizard onboarding
+    # /installer/* is called by the onboarding wizard
     # ABANS que l'usuari tingui API key. Loopback-only (127.0.0.1) + Tauri
     # WebView. POST /installer/finalize sense exempció = 403 → wizard mai
     # acaba. Descobert empíricament al cicle local 2026-05-20.
@@ -241,8 +241,8 @@ def setup_cors(app: FastAPI, config: Dict[str, Any], i18n = None) -> None:
     "Content-Type", "Authorization", "X-API-Key"
   ])
 
-  # F2.1 Sessió 3: en mode sidecar, override cors_origins amb SidecarConfig
-  # que inclou tauri://localhost + http://localhost:1420 (resol A8/BUG-NX-1).
+  # in sidecar mode, override cors_origins with SidecarConfig
+  # which includes tauri://localhost + http://localhost:1420 (resolves A8).
   # Standalone (no NEXE_SIDECAR): server.toml mana.
   try:
     from core.sidecar_config import get_sidecar_config
@@ -255,7 +255,7 @@ def setup_cors(app: FastAPI, config: Dict[str, Any], i18n = None) -> None:
       )
   except Exception as e:  # pragma: no cover
     # Defensive: si get_sidecar_config() falla per qualsevol motiu,
-    # caiem al cors_origins del server.toml (comportament pre-F2.1).
+    # fall back to cors_origins from server.toml (pre-sidecar behaviour).
     logger.warning("CORS: SidecarConfig unavailable, falling back to server.toml: %s", e)
 
   if "*" in cors_origins:
@@ -330,7 +330,7 @@ def setup_prometheus_metrics(app: FastAPI) -> None:
     logger.warning(f"prometheus_metrics_not_available: {e}")
 
 def _load_or_create_persistent_csrf_secret() -> str:
-  """Load or generate-and-persist the CSRF cookie-signing secret (F2.6 BUG-NB-3).
+  """Load or generate-and-persist the CSRF cookie-signing secret.
 
   Without persistence the previous implementation generated a fresh secret
   on every boot via ``secrets.token_hex(32)``, which silently invalidated
@@ -392,11 +392,11 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
   """
   Setup CSRF protection middleware.
 
-  F2.1 S3 part 3: en sidecar mode usa SidecarConfig.csrf_secret + is_production
+  In sidecar mode use SidecarConfig.csrf_secret + is_production
   (override de NEXE_CSRF_SECRET + NEXE_ENV directes per consistència amb la resta
   de consumers).
 
-  F2.6 BUG-NB-3: si ni l'env ni el SidecarConfig porten secret, el helper
+  If neither env nor SidecarConfig carry a secret, the helper
   _load_or_create_persistent_csrf_secret() persisteix un secret estable a
   disc (0600) en comptes de regenerar-lo a cada boot.
 
@@ -409,9 +409,9 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
   csrf_secret = os.getenv("NEXE_CSRF_SECRET")
   config_mode = config.get("core", {}).get("environment", {}).get("mode", "").lower()
 
-  # F2.3 part 2: prefer SidecarConfig.is_production sobre NEXE_ENV directe,
+  # prefer SidecarConfig.is_production over direct NEXE_ENV,
   # combinem amb OR sobre el raw env per a robustesa davant singletons stale.
-  # F2.1 S3 part 3 ja overrideava csrf_secret + is_prod amb SidecarConfig.
+  # Session 3 part 3 already overrode csrf_secret + is_prod with SidecarConfig.
   raw_is_prod = os.getenv("NEXE_ENV", "development") == "production"
   sidecar_is_prod = False
   try:
@@ -428,7 +428,7 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
   is_prod = sidecar_is_prod or raw_is_prod or config_mode == "production"
 
   if not csrf_secret:
-    # F2.6 BUG-NB-3: persist a stable secret on disk so cookies survive
+    # persist a stable secret on disk so cookies survive
     # restarts. NEXE_CSRF_SECRET still wins when set; this fallback just
     # avoids the old "regenerate every boot" failure mode.
     if is_prod:
@@ -496,7 +496,7 @@ def setup_trusted_hosts(app: FastAPI, config: Dict[str, Any]) -> None:
   if host and host not in ("0.0.0.0", ""):  # nosec B104: comparing to "0.0.0.0" string, not binding to it (allow-list construction for TrustedHostMiddleware)
     allowed.add(host)
 
-  # F2.1 Sessió 3: en mode sidecar, SidecarConfig.trusted_hosts pot afegir aliases
+  # in sidecar mode, SidecarConfig.trusted_hosts can add aliases
   # custom (NEXE_LOCALHOST_ALIASES). Union amb el set actual per no perdre defaults.
   try:
     from core.sidecar_config import get_sidecar_config

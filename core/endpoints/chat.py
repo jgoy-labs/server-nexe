@@ -98,7 +98,7 @@ def _get_system_prompt(app_state: Any, lang: Optional[str] = None) -> str:
 def _validate_chat_request(body: ChatCompletionRequest) -> None:
     """Sanitize and validate all user-supplied fields in the chat request.
 
-    F3.2 BUG-NC-31 (2026-05-18): user-role messages are now also passed
+    user-role messages are now also passed
     through `SanitizerModule.sanitize()` which detects technical prompt
     injections / jailbreak patterns before the text reaches the
     philosophical modules downstream. The sanitizer is allowed to either

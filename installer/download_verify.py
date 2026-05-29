@@ -315,7 +315,7 @@ def verify_download_integrity(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Embedding bundle — DMG-shipped fastembed model (F4.1 §2.7)
+# Embedding bundle — DMG-shipped fastembed model
 # ═══════════════════════════════════════════════════════════════════════
 #
 # The build-embedding-bundle.sh script writes an integrity manifest next
@@ -334,7 +334,7 @@ def verify_download_integrity(
 #
 # ``verify_embedding_bundle`` re-hashes the three files at copy time. A
 # tampered or missing file raises DownloadIntegrityError. A missing
-# manifest — older DMGs built before F4.1 — returns False so pre-release
+# manifest — older DMGs built before the integrity check — returns False so pre-release
 # installs keep working with a visible warning.
 
 

@@ -7,7 +7,7 @@ Description: Thread-safe singleton for runtime engine/model overrides set by
 the UI (web_ui_module routes_auth/routes_chat) and consumed by motor plugins
 (mlx_module, llama_cpp_module) and chat orchestration.
 
-F5.6 BUG-NC-18 part 2:
+part 2:
   Replaces the previous pattern of mutating ``os.environ["NEXE_*"]`` from
   request handlers. The env writes were thread-unsafe (concurrent requests
   could race), opaque (no logging), and a security smell flagged by the

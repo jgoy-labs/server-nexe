@@ -67,11 +67,11 @@ class OllamaModule:
         self._initialized = False
         self._init_lock = asyncio.Lock()
         self._router = None
-        # F5.4 Bug E fix: lifecycle state for /status and routes_chat.
+        # Lifecycle state for /status and routes_chat.
         # "uninitialized" → before initialize() runs
         # "ready"         → Ollama daemon reachable, chat-capable
         # "unavailable"   → Ollama not installed or not reachable. Plugin
-        #                   stays at the registry so restart_sidecar (F5.3.1)
+        #                   stays at the registry so restart_sidecar
         #                   can retry after the user installs Ollama.
         # "error"         → unexpected exception during init.
         self._state: str = "uninitialized"
@@ -112,7 +112,7 @@ class OllamaModule:
                 if services and "i18n" in services:
                     self.i18n = services["i18n"]
                 await self.client.ensure_ollama_running()
-                # F5.4 Bug E fix: verify Ollama daemon actually responds; if not,
+                # Verify Ollama daemon actually responds; if not,
                 # mark unavailable (kept at registry so restart_sidecar can
                 # retry after the user installs Ollama). Without this check the
                 # previous code logged "OllamaModule initialized" even when
@@ -155,7 +155,7 @@ class OllamaModule:
                 status=HealthStatus.UNKNOWN,
                 message="httpx not installed",
             )
-        # F5.4 Bug E fix: report not_configured/unavailable explicitly so
+        # Report not_configured/unavailable explicitly so
         # /status is actionable. The previous DEGRADED was ambiguous (could
         # be temporary network glitch); UNKNOWN+state=unavailable tells the
         # UI to surface the "install Ollama" hint instead.

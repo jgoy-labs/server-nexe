@@ -59,7 +59,7 @@ class LlamaCppConfig:
                 "LlamaCppConfig: model_path is empty. "
                 "Set NEXE_LLAMA_CPP_MODEL or pass model_path."
             )
-            # F5.4 Bug C fix: empty path must STAY empty so callers can detect
+            # Empty path must STAY empty so callers can detect
             # the not_configured state. Without the guard, the elif below would
             # collapse "" to str(project_root), creating a fake "valid-looking"
             # path that gets sliced in logs to substrings like "ication Support/..."
@@ -85,7 +85,7 @@ class LlamaCppConfig:
         # storage/models/ (real file or symlink). Pick the first match
         # sorted alphabetically for determinism. Enables the UX
         # "drop a .gguf, restart, it just works" — no env var needed.
-        # F5.6 BUG-NC-18 part 2 — read from runtime_state (live UI override
+        # Read from runtime_state (live UI override
         # set by routes_chat._switch_llama_cpp_model) before falling back to
         # the env var, so no os.environ mutation is needed at the call site.
         from core.runtime_state import get_with_env_fallback
@@ -122,7 +122,7 @@ class LlamaCppConfig:
             mmproj_path=os.getenv("LLAMA_MMPROJ_PATH", ""),
         )
 
-        # F5.4 Bug C fix: NEVER slice model_path with [-40:] — for a typical
+        # NEVER slice model_path with [-40:] — for a typical
         # macOS Application Support path (67 chars) it produces the literal
         # substring "ication Support/..." which looks like a path corruption
         # and was the smoking-gun symptom of the empty-path bug. Emit the full

@@ -1,4 +1,4 @@
-"""F2.6 — BUG-NB-3: persistent CSRF secret.
+"""Persistent CSRF secret.
 
 Verifies that the CSRF cookie-signing secret survives process restarts when
 no NEXE_CSRF_SECRET / SidecarConfig.csrf_secret is configured. Without

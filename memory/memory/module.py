@@ -119,7 +119,7 @@ class MemoryModule:
 
       project_root = get_server_state().project_root
       if not project_root:
-        # F2.6: NEXE_HOME-aware resolution before falling back to cwd.
+        # NEXE_HOME-aware resolution before falling back to cwd.
         # Sidecar processes launch from $HOME, so an unguarded Path.cwd()
         # would point the memory module at the user's home directory.
         try:
@@ -138,7 +138,7 @@ class MemoryModule:
             exc, project_root,
           )
 
-      # F5.4 Bug G fix: in sidecar mode use the canonical sidecar
+      # In sidecar mode use the canonical sidecar
       # vectors_dir so MemoryModule, MemoryService, and MemoryAPI all share
       # the same Qdrant collection on disk. The previous hardcoded
       # `project_root / storage / vectors` resolved to

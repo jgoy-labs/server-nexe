@@ -115,7 +115,7 @@ class MemoryConfig:
     gc: GCConfig = field(default_factory=GCConfig)
     ingest: IngestConfig = field(default_factory=IngestConfig)
     db_path: Optional[str] = None
-    # F2.2: None = consumer (MemoryService) resol via SidecarConfig.vectors_dir
+    # None = consumer (MemoryService) resol via SidecarConfig.vectors_dir
     # en sidecar mode o "storage/vectors" en standalone (vegeu memory.memory._paths)
     qdrant_path: Optional[str] = None
     embedding_model: str = DEFAULT_EMBEDDING_MODEL

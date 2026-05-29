@@ -83,7 +83,7 @@ class BootstrapTokenManager:
   def _get_conn(self):
     """Open a SQLite connection to the token database, auto-initializing if needed."""
     if not self._initialized:
-      # F2.6: prefer SidecarConfig.data_dir / get_repo_root() over the
+      # prefer SidecarConfig.data_dir / get_repo_root() over the
       # arbitrary cwd when initialize_on_startup() was skipped. The cwd
       # of a Tauri-spawned sidecar is the user's home (or `/`), which
       # would write the token DB to a random place.

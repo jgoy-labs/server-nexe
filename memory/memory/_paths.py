@@ -1,11 +1,11 @@
-"""F2.2: Centralized resolver for the default Qdrant/vectors path.
+"""Centralized resolver for the default Qdrant/vectors path.
 
 In sidecar mode (`NEXE_SIDECAR=1`) returns `SidecarConfig.vectors_dir`
 (propagates `NEXE_QDRANT_PATH` injected by Tauri). In standalone mode
 returns the legacy literal `storage/vectors` (relative to cwd).
 
 Light-touch defensive: any failure resolving SidecarConfig falls back to
-the legacy default with `logger.debug` (no silent `pass` — lliçó F2.1).
+the legacy default with `logger.debug` (no silent `pass`).
 
 Used by:
 - `memory.memory.api.MemoryAPI`
@@ -46,7 +46,7 @@ def resolve_qdrant_path(default: Union[Path, str, None] = None) -> Path:
         cfg = get_sidecar_config()
         if cfg.is_sidecar:
             return cfg.vectors_dir
-    except Exception as exc:  # pragma: no cover — fallback comportament pre-F2.2
+    except Exception as exc:  # pragma: no cover — fallback when SidecarConfig unavailable
         logger.debug(
             "F2.2: SidecarConfig unavailable, using legacy default %r: %s",
             default if default is not None else _LEGACY_DEFAULT,

@@ -1,4 +1,4 @@
-"""F2.3 part 2: anti-regression tests for NEXE_ENV → SidecarConfig.is_production.
+"""Anti-regression tests for NEXE_ENV → SidecarConfig.is_production.
 
 Validates that the 8 migrated points consult SidecarConfig.is_production
 when available, falling back to os.getenv("NEXE_ENV") for backward-compat

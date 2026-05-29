@@ -103,7 +103,7 @@ class MLXConfig:
                 "MLXConfig: model_path is empty. "
                 "Set NEXE_MLX_MODEL or pass model_path."
             )
-            # F5.4 Bug B fix: empty path must STAY empty so the module's
+            # Empty path must STAY empty so the module's
             # initialize() can detect the not_configured state. Without the
             # guard, the elif below would collapse "" to str(project_root),
             # producing a NEXE_HOME path that triggered the "config.json not
@@ -143,7 +143,7 @@ class MLXConfig:
     def _model_path_autodiscover() -> str:
         """Auto-discover first valid MLX model in models_dir (step 3 fallback).
 
-        F5.6 BUG-NEW-6: use centralized get_models_dir() which honours
+        Use centralized get_models_dir() which honours
         NEXE_STORAGE_PATH (sidecar override) → NEXE_DATA_DIR/models → cwd → repo.
         """
         try:
@@ -170,7 +170,7 @@ class MLXConfig:
         Returns:
             MLXConfig with values from the environment or defaults.
         """
-        # F5.6 BUG-NC-18 part 2 — get_with_env_fallback consults the
+        # get_with_env_fallback consults the
         # runtime override singleton first (live UI selections), then the
         # env var (boot-time configuration). Avoids the previous
         # os.environ mutation pattern at the call sites.

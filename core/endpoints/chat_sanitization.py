@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Control chars to strip (except \n, \t, \r which are valid in text).
-# F3.2 BUG-NC-14: extend coverage to DEL (\x7f) and C1 control range (\x80-\x9f).
+# extend coverage to DEL (\x7f) and C1 control range (\x80-\x9f).
 # Some terminals and SSE consumers interpret C1 bytes as escape sequence
 # initiators (NEL, CSI, OSC) — letting them through allows model-influenced
 # byte injection into client logs/terminals.
@@ -162,7 +162,7 @@ def _sanitize_rag_context(context: str) -> str:
     if not context:
         return ""
 
-    # F3.2 BUG-NC-32: NFKC + CJK/mathematical bracket map ALSO at retrieval time.
+    # NFKC + CJK/mathematical bracket map ALSO at retrieval time.
     # `_filter_rag_injection` (ingest path) already normalizes, but stored content
     # predating that fix — or content stored via a different write path — could
     # still contain fullwidth/compat variants. Normalizing at retrieval closes

@@ -1,7 +1,7 @@
-"""F5.5 (revertit 2026-05-21) — web_ui_module sempre serveix UI completa.
+"""(Revertit 2026-05-21) — web_ui_module sempre serveix UI completa.
 
-Substitueix `test_f25_stubs_sidecar.py` (eliminat). La decisió F2.5 era massa
-agressiva: desactivava web_ui_module sencer en sidecar. F5.5 va corregir
+Substitueix `test_f25_stubs_sidecar.py` (eliminat). La decisió anterior era massa
+agressiva: desactivava web_ui_module sencer en sidecar. Es va corregir
 això mantenint els JSON endpoints en sidecar, però va saltar les rutes
 HTML/static i va delegar el servei UI a una còpia local a Tauri
 (`nexe-app/public/ui/`). Aquella còpia va quedar stale ràpidament
@@ -59,14 +59,14 @@ def sidecar_env(monkeypatch, clean_sidecar_env, tmp_path):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Manifest contract — F5.5
+# Manifest contract
 # ─────────────────────────────────────────────────────────────────────
 
 
 def test_manifest_disabled_in_sidecar_is_false():
-    """F5.5 — manifest ha de tenir `disabled_in_sidecar=false`.
+    """Manifest ha de tenir `disabled_in_sidecar=false`.
 
-    Contrari a F2.5 (que era true). El plugin viu en sidecar mode i exposa
+    Contrari a l'anterior (que era true). El plugin viu en sidecar mode i exposa
     els JSON endpoints; només les rutes HTML/static es salten al register.
     """
     import tomllib
@@ -81,14 +81,14 @@ def test_manifest_disabled_in_sidecar_is_false():
 
 
 # ─────────────────────────────────────────────────────────────────────
-# initialize() — F5.5: retorna True en sidecar (perquè manifest disabled=false)
+# initialize() — retorna True en sidecar (perquè manifest disabled=false)
 # ─────────────────────────────────────────────────────────────────────
 
 
 def test_web_ui_module_is_disabled_in_sidecar_returns_false(sidecar_env):
-    """F5.5 — `_is_disabled_in_sidecar()` retorna False quan manifest=false.
+    """`_is_disabled_in_sidecar()` retorna False quan manifest=false.
 
-    Anti-regressió de la decisió F2.5 — el helper continua existint per si
+    Anti-regressió de la decisió anterior — el helper continua existint per si
     en el futur volem tornar a desactivar el plugin en sidecar mode.
     """
     from plugins.web_ui_module.module import WebUIModule
@@ -98,7 +98,7 @@ def test_web_ui_module_is_disabled_in_sidecar_returns_false(sidecar_env):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Router composition — F5.5: static routes skipped in sidecar
+# Router composition — static routes skipped in sidecar
 # ─────────────────────────────────────────────────────────────────────
 
 
@@ -108,7 +108,7 @@ def _collect_router_paths(router) -> list[str]:
 
 
 def test_router_includes_html_routes_in_sidecar(sidecar_env, monkeypatch):
-    """F5.5 revertit — en sidecar mode, `create_router()` SÍ ha de registrar
+    """En sidecar mode, `create_router()` SÍ ha de registrar
     `/ui/` (HTML) i `/ui/static/{path}`, igual que en standalone.
 
     El DMG navega el webview Tauri a http://127.0.0.1:{port}/ un cop el

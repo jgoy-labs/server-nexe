@@ -16,7 +16,7 @@ from typing import List, Optional
 class Message(BaseModel):
     """A single message in a chat conversation (role + content).
 
-    F2.4 — Pydantic anti-DoS constraints:
+    Pydantic anti-DoS constraints:
       - role: max_length=64 (standard short identifier, e.g. ``user``, ``assistant``, ``system``)
       - content: max_length=8000 (mirrors the existing ``validate_string_input`` guard;
         rejects oversized payloads at deserialization with HTTP 422 before reaching
@@ -31,7 +31,7 @@ class Message(BaseModel):
 class ChatCompletionRequest(BaseModel):
     """Request body for the ``/v1/chat/completions`` endpoint.
 
-    F2.4 — Pydantic anti-DoS constraints:
+    Pydantic anti-DoS constraints:
       - messages: max_length=100 (no real conversation needs more; prevents DoS via 1M msgs)
       - model: max_length=200 (long enough for HF-style ``org/repo-name:tag``)
       - engine: max_length=50 (``mlx``/``ollama``/``llama_cpp``/``auto``)

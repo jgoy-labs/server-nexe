@@ -311,7 +311,7 @@ MODEL_CATALOG = {
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# INTEGRITY — SHA256 pins for downloaded model weights (F4.1 audit DoD-AUD-SX-0423)
+# INTEGRITY — SHA256 pins for downloaded model weights
 # ═══════════════════════════════════════════════════════════════════════════
 # Map: (engine, model_id) → sha256 expected hex digest (64 chars) or None.
 #
@@ -337,7 +337,7 @@ MODEL_CATALOG = {
 # ``tests/test_installer_sha256_catalog.py`` enforces this.
 #
 # Refresh the values with ``scripts/refresh_model_hashes.py`` (optional
-# F4.1.b tool — regenerates from HF Hub API + local ollama daemon).
+# tool — regenerates from HF Hub API + local ollama daemon).
 #
 # ───────────────────────────────────────────────────────────────────────────
 # STATUS v1.0.4-beta (C19, 2026-05-06): Ollama config digests + Salamandra GGUF

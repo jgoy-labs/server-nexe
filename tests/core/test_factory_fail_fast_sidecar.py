@@ -1,11 +1,11 @@
-"""F2.3: tests for early fail-fast SidecarConfig validation at create_app().
+"""Tests for early fail-fast SidecarConfig validation at create_app().
 
 Validates that when NEXE_SIDECAR=1, create_app() invokes SidecarConfig
 validation immediately. If required env vars (NEXE_PRIMARY_API_KEY,
 NEXE_PORT) are missing, RuntimeError is raised with a clear message
 pointing to the launcher (Tauri lib.rs:spawn_sidecar_process).
 
-Without this F2.3 check, the error would surface much later (lifespan,
+Without this check, the error would surface much later (lifespan,
 CORS preflight, etc.) with cryptic messages.
 """
 from __future__ import annotations
@@ -42,7 +42,7 @@ def clean_sidecar_env(monkeypatch):
         "NEXE_QDRANT_PATH",
     ]:
         monkeypatch.delenv(var, raising=False)
-    # Reset SidecarConfig singleton so it re-reads env (F2.1 helper)
+    # Reset SidecarConfig singleton so it re-reads env
     from core.sidecar_config import reset_sidecar_config
     reset_sidecar_config()
 

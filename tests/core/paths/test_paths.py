@@ -294,7 +294,7 @@ class TestPathHelpers:
         assert "test_cache" in str(p)
 
 
-# ─── Tests get_models_dir (F5.6 BUG-NEW-6) ────────────────────────────────────
+# ─── Tests get_models_dir ────────────────────────────────────
 
 class TestGetModelsDir:
     """Coverage for the get_models_dir resolution chain."""

@@ -1,8 +1,8 @@
 """
-F3.3 lifecycle + crypto hardening regression tests.
+Lifecycle + crypto hardening regression tests.
 
 Covers:
-- BUG-NC-37: master key fail-fast when file persistence fails on a newly-generated key
+- Master key fail-fast when file persistence fails on a newly-generated key
 - BUG-C5: `STARTUP_TIMEOUT` respects new `NEXE_LIFESPAN_TIMEOUT` alias + default raised
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ import pytest
 
 
 class TestMasterKeyFailFast:
-    """BUG-NC-37 — refuse to return a newly-generated key that wasn't persisted."""
+    """Refuse to return a newly-generated key that wasn't persisted."""
 
     def test_get_or_create_raises_when_file_set_fails(self, tmp_path):
         from core.crypto import keys as crypto_keys

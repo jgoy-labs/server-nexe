@@ -306,7 +306,7 @@ class NexeUI {
     constructor() {
         this.apiKey = localStorage.getItem('nexe_api_key') || null;
         // Cross-origin handoff: when Tauri navigates the webview to
-        // http://127.0.0.1:{port}/?nexe_api_key=K (post-F5.5 revert), the
+        // http://127.0.0.1:{port}/?nexe_api_key=K (post-revert), the
         // splash's localStorage at tauri://localhost is not visible here.
         // Persist the key into the sidecar-origin localStorage and scrub
         // the URL so the secret doesn't linger in history. No-op when the

@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 # changing the effective concurrency contract.
 _MLX_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mlx-worker")
 
-# F3.3 BUG-NB-8: register an atexit cleanup so the dedicated MLX worker doesn't
+# Register an atexit cleanup so the dedicated MLX worker doesn't
 # linger as a non-daemon thread on shutdown. `wait=False` + `cancel_futures=True`
 # lets us tear down even when a generation is mid-flight (Stop button race,
 # sidecar SIGTERM). Without this, the interpreter may hang at exit waiting for

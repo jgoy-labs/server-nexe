@@ -582,7 +582,7 @@ def _register_macos_app(project_root, config):
         _log.info("Login Items: skipped (managed by GUI wizard)")
     elif nexe_app_ready:
         try:
-            # F3.4 BUG-NF-19: escape the path for the AppleScript literal so a
+            # escape the path for the AppleScript literal so a
             # `"` or `\` in the path can't break out of the string or be
             # mis-interpreted by AppleScript's grammar.
             from installer.install import _applescript_quote

@@ -79,7 +79,7 @@ def create_app(project_root: Optional[Path] = None, force_reload: bool = False) 
       _app_instance = None
       _cache_project_root = None
 
-    # F2.3: fail-fast validation en sidecar mode (NEXE_SIDECAR=1)
+    # fail-fast validation in sidecar mode (NEXE_SIDECAR=1)
     # SidecarConfig.from_env() valida SIDECAR_REQUIRED_ENV_VARS i llança
     # SidecarConfigError si manca alguna crítica. Capturar aquí evita un
     # error críptic més tard al lifespan (p.ex. CORS preflight fallant

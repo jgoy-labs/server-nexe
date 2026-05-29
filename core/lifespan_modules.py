@@ -156,10 +156,10 @@ async def _check_needs_reingest(ingested_marker) -> bool:
 async def auto_ingest_knowledge(server_state):
     """Auto-ingest knowledge/ folder on first run only."""
     try:
-        # F2.3 part 2: prefer SidecarConfig.is_production over NEXE_ENV directe,
+        # prefer SidecarConfig.is_production over direct NEXE_ENV,
         # fallback a os.getenv per backward-compat. Reconstruim la string `nexe_env`
         # només per al log (vegeu _auto_ingest_is_disabled).
-        # F2.1 S3 part 2: en sidecar mode usa SidecarConfig.auto_ingest_knowledge
+        # in sidecar mode use SidecarConfig.auto_ingest_knowledge
         auto_ingest_enabled = os.getenv("NEXE_AUTO_INGEST_KNOWLEDGE", "true").lower() == "true"
         try:
             from core.sidecar_config import get_sidecar_config
@@ -310,7 +310,7 @@ async def start_memory_service_v1(app, server_state) -> None:
             qdrant_path: str = "default"
             if project_root:
                 from pathlib import Path
-                # F5.4 Bug G fix: in sidecar mode derive BOTH db_path and
+                # in sidecar mode derive BOTH db_path and
                 # qdrant_path from the canonical sidecar vectors_dir so
                 # MemoryService, MemoryModule, and MemoryAPI share the same
                 # on-disk location. The previous hardcoded
@@ -369,7 +369,7 @@ async def start_memory_service_v1(app, server_state) -> None:
                         "DreamingCycle embedder unavailable — vector sync "
                         "will be skipped (non-fatal): %s", e,
                     )
-                # F5.4 Bug D fix: do NOT start DreamingCycle without an embedder.
+                # do NOT start DreamingCycle without an embedder.
                 # The previous code instantiated and ran the cycle anyway, which
                 # ingested memory entries to SQLite but never to Qdrant —
                 # silently breaking semantic search (RAG returned 0 results).

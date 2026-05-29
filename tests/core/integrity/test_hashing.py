@@ -7,7 +7,7 @@ Description: Unit tests for core.integrity.hashing — SHA256 helpers and the
              supply-chain mismatches.
 
              TDD RED → GREEN flow for audit finding DoD-AUD-SX-0423 §2.7
-             (SHA256 pinning of downloaded model weights — F4.1).
+             (SHA256 pinning of downloaded model weights).
 ────────────────────────────────────
 """
 

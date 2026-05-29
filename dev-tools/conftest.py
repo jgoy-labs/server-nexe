@@ -217,7 +217,7 @@ def ensure_ollama_running():
 
 @pytest.fixture(autouse=True)
 def _f56_reset_rate_limiter():
-    """F5.6 BUG-A7 — reset the slowapi limiter between every test.
+    """Reset the slowapi limiter between every test.
 
     Without this, pytest-randomly could schedule a test that hits a
     rate-limited endpoint after another test in the same session has

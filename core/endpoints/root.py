@@ -139,7 +139,7 @@ async def readiness_check(request: Request) -> dict:
 
   Verifies that the required modules are loaded and healthy.
   """
-  # F5.6 Bloc 6c (fix end-to-end): en minimal_mode (Bloc 2, pre-onboarding)
+  # in minimal_mode (pre-onboarding)
   # els mòduls rag/security/web_ui_module NO s'arrenquen per disseny. El
   # sidecar SÍ està ready per al que ofereix (endpoints /installer/* per al
   # wizard). Retornar "healthy" perquè el readinessOverlay del frontend
@@ -185,7 +185,7 @@ async def readiness_check(request: Request) -> dict:
   else:
     overall = "healthy"
 
-  # F5.6 BUG-A6 — instrumentation: log which module(s) drove a non-healthy
+  # instrumentation: log which module(s) drove a non-healthy
   # verdict so the next empirical session has the data to fix the root
   # cause. SECURITY: the log line is server-internal — clients still see
   # only the minimal payload below (no per-module details exposed).
@@ -272,7 +272,7 @@ async def server_status(
   - model: Current model loaded
   - modules: Loaded modules status
   """
-  # F5.6 BUG-NC-18 — runtime override (live UI selection) > env (.env install-time).
+  # runtime override (live UI selection) > env (.env install-time).
   from core.runtime_state import get_with_env_fallback
   env_engine = get_with_env_fallback("NEXE_MODEL_ENGINE", "auto")
   env_model = get_with_env_fallback("NEXE_DEFAULT_MODEL", "unknown")

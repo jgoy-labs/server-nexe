@@ -75,7 +75,7 @@ class MemoryAPI:
       await memory.store("text", "nexe_knowledge", {"type": "road"})
   """
 
-  # F2.6 BUG-NC-25: NEXE_QDRANT_URL / NEXE_QDRANT_HOST / NEXE_QDRANT_PORT must
+  # NEXE_QDRANT_URL / NEXE_QDRANT_HOST / NEXE_QDRANT_PORT must
   # be resolved on instance creation, not at module import time. Use the
   # classmethod accessor below; the class attribute is kept only as backward
   # compat fallback (returns os.getenv at call time via property semantics).
@@ -89,7 +89,7 @@ class MemoryAPI:
 
     Replaces the previous class-level `DEFAULT_QDRANT_URL` literal that was
     evaluated at import time and ignored later monkeypatches of NEXE_QDRANT_*
-    env vars (test isolation issue, BUG-NC-25).
+    env vars (test isolation issue).
     """
     host = os.getenv("NEXE_QDRANT_HOST", "localhost")
     port = os.getenv("NEXE_QDRANT_PORT", "6333")
@@ -118,12 +118,12 @@ class MemoryAPI:
                      batch_size override, no pre-warm, no mega-batch).
                      Introduced by bug #16 to remove hardcodes.
     """
-    # F2.2: resol DEFAULT_QDRANT_PATH via SidecarConfig en sidecar mode
+    # resol DEFAULT_QDRANT_PATH via SidecarConfig en sidecar mode
     from memory.memory._paths import resolve_qdrant_path
     if qdrant_path is None:
       qdrant_path = resolve_qdrant_path(self.DEFAULT_QDRANT_PATH)
     self.qdrant_url = qdrant_url or self._resolve_default_qdrant_url()
-    self.qdrant_path = qdrant_path  # F2.2: resolved above via resolve_qdrant_path
+    self.qdrant_path = qdrant_path  # resolved above via resolve_qdrant_path
     self.embedding_model = embedding_model
     self.vector_size = self.DEFAULT_VECTOR_SIZE
     self.ingest_config = ingest_config if ingest_config is not None else IngestConfig()

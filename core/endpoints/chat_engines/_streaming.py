@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 SSE_DONE = "data: [DONE]\n\n"
 
-# F3.3 BUG-NC-12 (2026-05-18): hard cap on streamed bytes per response.
+# hard cap on streamed bytes per response.
 # Without an explicit limit a runaway generation (model loop, prompt
 # injection that keeps the engine talking, mis-configured stop tokens)
 # would accumulate forever in TokenBridge._response_parts and exhaust
@@ -84,14 +84,14 @@ class TokenBridge:
         self.error = None
         self._loop = asyncio.get_running_loop()
         self._response_parts: list = []
-        # F3.3 BUG-NC-12: running byte counter for the cap below.
+        # running byte counter for the cap below.
         self._response_bytes: int = 0
         self._cap_triggered: bool = False
 
     def on_token(self, token: str):
         """Called from the engine thread for each generated token.
 
-        F3.3 BUG-NC-12: enforce MAX_STREAM_BYTES so a runaway generation
+        enforce MAX_STREAM_BYTES so a runaway generation
         cannot keep allocating into `_response_parts` indefinitely. Once
         the cap fires, set_done is signalled with an explicit error and
         further tokens are dropped silently (the engine thread may still

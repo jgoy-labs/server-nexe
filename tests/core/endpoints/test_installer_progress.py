@@ -1,4 +1,4 @@
-"""F5.4 Fase 4a — tests for the real-byte progress tracker.
+"""Tests for the real-byte progress tracker.
 
 Covers DownloadTracker (combines tqdm queue + dir polling, EWMA), the
 SSEProgressTqdm shim, hf_xet detection, and the integration into
@@ -89,7 +89,7 @@ class TestDownloadTracker:
         from core.endpoints.installer_progress import DownloadTracker
         tracker = DownloadTracker(dest_dir=tmp_path, expected_total_bytes=10_000)
         # Two manual samples spaced ~50ms apart at 100B and 600B.
-        # F5.5 G9: use record_sample() explicitly (bytes_done is now a pure getter).
+        # Use record_sample() explicitly (bytes_done is now a pure getter).
         tracker.update_from_tqdm(n=100, total=10_000)
         tracker.record_sample()
         time.sleep(0.05)

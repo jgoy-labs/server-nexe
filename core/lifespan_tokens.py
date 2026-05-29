@@ -47,7 +47,7 @@ def generate_bootstrap_token() -> str:
 def setup_bootstrap_tokens(server_state, _translate) -> None:
   """Generate or retrieve bootstrap token and display if in development mode.
 
-  F2.1 S3 part 2: en sidecar mode usa SidecarConfig.bootstrap_ttl; fallback
+  In sidecar mode use SidecarConfig.bootstrap_ttl; fallback
   NEXE_BOOTSTRAP_TTL → BOOTSTRAP_TTL → 30 minuts default.
   """
   bootstrap_ttl = None
@@ -76,7 +76,7 @@ def setup_bootstrap_tokens(server_state, _translate) -> None:
     token_to_display = existing_bootstrap["token"]
     logger.info("Using existing master bootstrap token from DB")
 
-  # F2.3 part 2: prefer SidecarConfig.is_production over NEXE_ENV directe,
+  # prefer SidecarConfig.is_production over direct NEXE_ENV,
   # combinem amb OR sobre el raw env per a robustesa davant singletons stale.
   raw_is_production = os.getenv('NEXE_ENV', 'production').lower() == 'production'
   sidecar_is_production = False

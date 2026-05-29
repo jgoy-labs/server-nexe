@@ -18,8 +18,8 @@ from .messages import get_message
 from core.paths import get_repo_root
 SECURITY_LOG_PATH = get_repo_root() / "storage" / "system-logs" / "security"
 
-# F2.6 import-time IO refactor: mkdir mogut a lazy init (primer ús de _ensure_log_dir()).
-# Pre-F2.6, aquest mkdir corria a import time — en filesystem read-only (sandbox,
+# Import-time IO refactor: mkdir moved to lazy init (first use of _ensure_log_dir()).
+# Previously this mkdir ran at import time — on read-only filesystem (sandbox,
 # mock test, contenidor restrictiu) trencava l'import. Ara és lazy i només es
 # crea quan realment cal escriure un log de seguretat.
 
@@ -27,7 +27,7 @@ logger = logging.getLogger("security")
 
 
 def _ensure_log_dir() -> None:
-  """F2.6: lazy mkdir del directori de logs de seguretat. Idempotent."""
+  """Lazy mkdir del directori de logs de seguretat. Idempotent."""
   try:
     SECURITY_LOG_PATH.mkdir(parents=True, exist_ok=True)
   except OSError as exc:  # noqa: BLE001 — fallback explicit
@@ -59,7 +59,7 @@ def log_security_event(
     }, severity="WARNING")
   """
   try:
-    _ensure_log_dir()  # F2.6: lazy mkdir abans d'escriure
+    _ensure_log_dir()  # lazy mkdir before writing
     log_file = SECURITY_LOG_PATH / f"security_{datetime.now(timezone.utc).strftime('%Y%m%d')}.jsonl"
 
     event = {

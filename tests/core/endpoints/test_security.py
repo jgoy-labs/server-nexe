@@ -227,7 +227,7 @@ class TestHealthEndpointSecurity:
         assert "timestamp" in data, f"[{label}] missing 'timestamp' key"
 
     def test_readiness_minimal_mode_returns_healthy_with_marker(self, monkeypatch):
-        """minimal_mode=True must return healthy + the minimal_mode marker (F5.6 Bloc 6c contract)."""
+        """minimal_mode=True must return healthy + the minimal_mode marker."""
         monkeypatch.delenv("NEXE_APPROVED_MODULES", raising=False)
 
         from fastapi.testclient import TestClient

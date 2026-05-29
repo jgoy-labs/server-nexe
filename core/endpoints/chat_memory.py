@@ -24,7 +24,7 @@ _pending_save_tasks: set = set()
 async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: str):
     """Background task to save conversation data to memory via MemoryService or Qdrant."""
     try:
-        # F3.2 BUG-NC-10: neutralise prompt-injection markers BEFORE storage.
+        # neutralise prompt-injection markers BEFORE storage.
         # Without this, a hostile user message (or a compromised assistant
         # response) containing `[/INST]`, `<|system|>`, `[MEM_DELETE: ...]`
         # etc. is persisted verbatim; the next retrieval re-injects it into

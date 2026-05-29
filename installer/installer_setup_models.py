@@ -113,7 +113,7 @@ def _ollama_verify_and_report(ollama_bin, model_id):
     result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal subcommand (post-download verification)
     model_base = model_id.split(":")[0]
     if model_base in result.stdout or model_id in result.stdout:
-        # F4.1 (audit DoD-AUD-SX-0423 §2.7): compare the manifest
+        # compare the manifest
         # digest reported by Ollama against the catalog pin.
         try:
             matched = verify_download_integrity(
@@ -229,7 +229,7 @@ def _gguf_fetch_and_verify(model_config, project_root):
     if not output_path.exists() or output_path.stat().st_size == 0:
         raise RuntimeError(f"Downloaded file is empty or missing: {output_path}")
 
-    # F4.1 (audit DoD-AUD-SX-0423 §2.7): SHA256 integrity check.
+    # SHA256 integrity check.
     try:
         matched = verify_download_integrity("gguf", model_config['id'], output_path)
     except DownloadIntegrityError as exc:
@@ -266,7 +266,7 @@ def _download_gguf_model(model_config, project_root, headless=False):
             # situation — the file is still on disk, the pin is wrong, or
             # the download is poisoned. Downgrading to _show_manual_instructions
             # would turn a security control into a warning the user can click
-            # past, which defeats the entire point of F4.1.
+            # past, which defeats the entire point of the integrity check.
             raise
         except subprocess.CalledProcessError:
             print_warn(t('download_failed'))
@@ -367,7 +367,7 @@ def _mlx_validate_and_verify(model_id, local_model_path):
     else:
         print(f"{GREEN}✓{RESET} {t('mlx_validated_ok')}")
 
-    # F4.1 (audit DoD-AUD-SX-0423 §2.7): SHA256 check of the
+    # SHA256 check of the
     # whole snapshot dir against the catalog pin. Legacy
     # entries (expected=None) surface a not-pinned notice.
     print(f"\n{CYAN}[3/3]{RESET} Integrity verification (SHA256)")

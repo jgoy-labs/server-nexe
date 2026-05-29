@@ -175,9 +175,9 @@ async def restart_server(
 
   Raises:
     HTTPException: If supervisor is not available, or 501 in sidecar mode
-      (BUG-NX-4 F2.5: el Tauri host gestiona el restart, no el sidecar).
+      (the Tauri host manages the restart, not the sidecar).
   """
-  # F2.5 / BUG-NX-4: el sidecar NO ha de provar de reiniciar-se a si mateix —
+  # the sidecar MUST NOT try to restart itself —
   # és Tauri host qui en gestiona el cicle de vida (spawn_sidecar_process).
   try:
     from core.sidecar_config import get_sidecar_config
@@ -237,7 +237,7 @@ async def shutdown_server(
   background_tasks: BackgroundTasks,
   _: str = Depends(require_api_key),
 ) -> Dict[str, Any]:
-  """F3.1 BUG-C1 — Trigger a graceful shutdown of this server process.
+  """Trigger a graceful shutdown of this server process.
 
   Requires API key authentication (X-API-Key header). The endpoint returns
   immediately and schedules SIGINT to the current PID 0.3 s later so the

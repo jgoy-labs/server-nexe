@@ -3,10 +3,10 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/core/test_f24_pydantic_constraints.py
-Description: F2.4 — Anti-DoS Pydantic constraints (max_length / ge / le).
+Description: Anti-DoS Pydantic constraints (max_length / ge / le).
              Verifies that oversized payloads are rejected at deserialization
              time (HTTP 422) before reaching the endpoint logic.
-             Covers BUG-NC-15 (chat messages list) and BUG-NC-16 (memory
+             Covers ChatCompletionRequest anti-DoS (max_length on messages) and MemoryStore/SearchRequest anti-DoS.
              store/search) from the F0 stoppers triage.
 
 www.jgoy.net · https://server-nexe.org
@@ -96,7 +96,7 @@ _HEADERS = {"X-API-Key": API_KEY}
 
 
 class TestChatPydanticConstraints:
-    """BUG-NC-15 — ChatCompletionRequest anti-DoS."""
+    """ChatCompletionRequest anti-DoS."""
 
     def test_message_content_over_8000_chars_rejected(self, chat_client):
         """1 message with 8001 chars → 422 (Pydantic max_length on Message.content)."""
@@ -144,7 +144,7 @@ def _mock_memory():
 
 
 class TestMemoryPydanticConstraints:
-    """BUG-NC-16 — MemoryStoreRequest / MemorySearchRequest anti-DoS."""
+    """MemoryStoreRequest / MemorySearchRequest anti-DoS."""
 
     def test_store_content_over_100k_chars_rejected(self, memory_client):
         """100_001-char content → 422 (Pydantic max_length on content)."""
@@ -191,6 +191,6 @@ class TestMemoryPydanticConstraints:
 # The installer does NOT expose a Pydantic input model for API keys: the key
 # is generated server-side via ``secrets.token_hex(32)`` which is fixed-length
 # (64 hex chars) by construction. There is no untrusted input surface to
-# constrain via Pydantic. The BUG-NF-15 stopper (env file without model) was
+# constrain via Pydantic. The stopper (env file without model) was
 # fixed independently by the existing ``model_config=None`` branch in
 # ``generate_env_file``. No Pydantic schema applies — documented decision.

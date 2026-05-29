@@ -1,10 +1,10 @@
-"""F2.2 part 2: tests for env-aware path resolvers.
+"""Tests for env-aware path resolvers.
 
 Validates that the path helpers (core/paths/helpers.py + core/crypto/keys.py)
 respect Tauri-injected env vars in sidecar mode:
 - NEXE_DATA_DIR    → get_data_dir()
 - NEXE_CACHE_DIR   → get_cache_dir()
-- NEXE_SIDECAR_DIR → _resolve_key_file_dir() (master key location, BUG-NC-36)
+- NEXE_SIDECAR_DIR → _resolve_key_file_dir() (master key location)
 
 Without these, the F2.A10 manifestation persisted: sidecar logs showed paths
 relative to cwd instead of the Tauri-managed sidecar directory.

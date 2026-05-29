@@ -930,7 +930,7 @@ def _resolve_engines(preferred_engine: str) -> list:
 def _switch_mlx_model(engine, local_path) -> None:
     """Hot-swap MLX model config via runtime_state override.
 
-    F5.6 BUG-NC-18 part 2 — replaced the previous os.environ try/finally
+    Replaced the previous os.environ try/finally
     dance with set_override; MLXConfig.from_env() consults
     runtime_state.get_with_env_fallback so the override is visible without
     mutating the process env (and concurrent requests no longer race).
@@ -953,7 +953,7 @@ def _switch_mlx_model(engine, local_path) -> None:
 
 
 def _switch_llama_cpp_model(engine, local_path) -> None:
-    """Hot-swap llama.cpp model config via runtime_state override (F5.6 NC-18)."""
+    """Hot-swap llama.cpp model config via runtime_state override."""
     from core.runtime_state import set_override, get_override
     _prev = get_override("NEXE_LLAMA_CPP_MODEL")
     try:

@@ -1,4 +1,4 @@
-"""F3.3 BUG-NC-12 — Hard cap on streamed bytes per response.
+"""Hard cap on streamed bytes per response.
 
 Tests target the pure resolver `_resolve_max_stream_bytes` (env parsing)
 and the runtime `TokenBridge.on_token` behaviour (with the cap patched

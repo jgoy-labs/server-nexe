@@ -83,7 +83,7 @@ _OVERRIDE_CONFIG_FILES = ["server.toml", "config/server.toml"]
 
 
 def _safe_repo_root() -> Path:
-    """Best-effort repo-root resolution for config search fallback (F2.6).
+    """Best-effort repo-root resolution for config search fallback.
 
     Replaces the previous ``Path.cwd()`` fallback, which depended on the
     arbitrary directory the process was launched from and silently picked
@@ -345,7 +345,7 @@ def get_module_allowlist(config: Optional[Dict[str, Any]] = None) -> Optional[se
     Raises:
         ValueError: If in production mode without NEXE_APPROVED_MODULES
     """
-    # F2.3 part 2: prefer SidecarConfig.is_production over reading NEXE_ENV directly,
+    # prefer SidecarConfig.is_production over reading NEXE_ENV directly,
     # fallback to os.getenv per backward-compat (tests/scripts sense singleton i
     # tests que muten NEXE_ENV runtime sense rebuild del singleton).
     raw_env_is_prod = os.getenv("NEXE_ENV", "development").lower() == "production"

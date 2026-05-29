@@ -110,7 +110,7 @@ def create_router(module_instance) -> APIRouter:
 
     # Register all route groups
     register_auth_routes(router, require_ui_auth=_require_ui_auth, session_mgr=session_mgr)
-    # F5.5 reverted (2026-05-21): the sidecar serves the full UI again. The
+    # Reverted (2026-05-21): the sidecar serves the full UI again. The
     # earlier split (skip static routes in sidecar, let Tauri serve a local
     # copy at public/ui/) caused two parallel copies of the UI to drift —
     # client-side i18n fixes shipped to plugins/web_ui_module/ui/ never

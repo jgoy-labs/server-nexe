@@ -115,7 +115,7 @@ class SqliteStorageMixin:
     # ── Initialization ────────────────────────────────────────────────────────
 
     def _quarantine_unreadable_encrypted_db(self) -> bool:
-        """F5.6 BUG-NEW-2 — Archive an encrypted DB that won't open with the
+        """Archive an encrypted DB that won't open with the
         current MASTER_KEY-derived key.
 
         Returns:

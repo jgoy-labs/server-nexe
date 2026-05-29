@@ -28,7 +28,7 @@ OLLAMA_UNLOAD_TIMEOUT = float(os.getenv('NEXE_OLLAMA_UNLOAD_TIMEOUT', '10.0'))
 def _setup_qdrant(project_root: Path, server_state) -> None:
     """Configure Qdrant storage (external override or embedded mode).
 
-    F2.1 S3 part 2: en sidecar mode consulta SidecarConfig.qdrant_url i
+    In sidecar mode consult SidecarConfig.qdrant_url and
     SidecarConfig.vectors_dir; fallback al comportament previ via env vars
     directes amb logger.debug si SidecarConfig no disponible.
     """
@@ -63,7 +63,7 @@ def _setup_qdrant(project_root: Path, server_state) -> None:
 def _resolve_ollama_url() -> str:
     """Resolve the Ollama base URL from environment variables.
 
-    F2.1 S3 part 2: en sidecar mode usa SidecarConfig.ollama_host;
+    In sidecar mode use SidecarConfig.ollama_host;
     fallback NEXE_OLLAMA_HOST → OLLAMA_HOST → default.
     """
     try:

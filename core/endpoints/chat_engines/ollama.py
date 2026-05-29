@@ -62,7 +62,7 @@ def _resolve_ollama_model(request, app_state) -> str:
         model_name = os.environ.get("NEXE_OLLAMA_MODEL")
     if not model_name:
         # Legacy: NEXE_DEFAULT_MODEL may be an HF URL or path — ignore it for Ollama.
-        # F5.6 BUG-NC-18 — read via runtime_state so a UI selection wins.
+        # read via runtime_state so a UI selection wins.
         from core.runtime_state import get_with_env_fallback
         _default = get_with_env_fallback("NEXE_DEFAULT_MODEL", "")
         if _default and not _default.startswith(("http", "/", "~", "storage/")):

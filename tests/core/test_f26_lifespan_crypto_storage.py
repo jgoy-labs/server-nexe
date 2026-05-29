@@ -1,4 +1,4 @@
-"""F2.6 — lifespan_crypto storage root honours sidecar mode.
+"""Lifespan_crypto storage root honours sidecar mode.
 
 Verifies that `_resolve_storage_root` returns `SidecarConfig.data_dir` when
 the process runs as a Tauri sidecar (NEXE_SIDECAR=1) and falls back to the

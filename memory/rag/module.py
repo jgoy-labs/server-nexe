@@ -401,7 +401,7 @@ def get_file_rag():
           table_name="uploaded_files"
         )
       else:
-        # F2.2: en sidecar mode usa SidecarConfig.vectors_dir; en standalone manté
+        # en sidecar mode usa SidecarConfig.vectors_dir; en standalone manté
         # comportament previ (NEXE_QDRANT_PATH env var o fallback "storage/vectors")
         from memory.memory._paths import resolve_qdrant_path
         _qdrant_path = os.environ.get("NEXE_QDRANT_PATH") or str(resolve_qdrant_path())

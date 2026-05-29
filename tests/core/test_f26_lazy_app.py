@@ -1,4 +1,4 @@
-"""F2.6 — Tests for lazy `core.app:app` resolution (BUG-NX-5).
+"""Tests for lazy `core.app:app` resolution.
 
 Importing `core.app` must NOT instantiate the FastAPI factory at import time.
 The `app` attribute is resolved on first access via PEP 562 `__getattr__`,

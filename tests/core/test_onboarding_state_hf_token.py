@@ -1,4 +1,4 @@
-"""F5.4 Fase 4b — tests for the optional Hugging Face token persisted to
+"""Tests for the optional Hugging Face token persisted to
 the macOS Keychain via the ``keyring`` package.
 
 Contract:

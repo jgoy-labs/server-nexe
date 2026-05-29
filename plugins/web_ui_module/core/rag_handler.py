@@ -34,7 +34,7 @@ async def generate_rag_metadata(body_content: str, filename: str) -> dict:
         if module_manager is None:
             return _fallback_metadata(body_content, stem, lang)
 
-        from core.runtime_state import get_with_env_fallback  # F5.6 BUG-NC-18
+        from core.runtime_state import get_with_env_fallback  # import for runtime fallback
         model_name = get_with_env_fallback("NEXE_DEFAULT_MODEL", "llama3.2:3b")
         sample = body_content[:3000].strip()
         system_prompt = "Ets un sistema d'indexacio de documents. Respon NOMES en el format demanat, sense explicacions."

@@ -93,7 +93,7 @@ def get_data_dir(subdir: Optional[str] = None) -> Path:
   """
   Return the data directory.
 
-  Priority (F2.2 part 2):
+  Priority:
   1. NEXE_DATA_DIR environment variable (Tauri sidecar injection)
   2. {project_root}/storage/data/ (standalone fallback)
 
@@ -118,7 +118,7 @@ def get_cache_dir(subdir: Optional[str] = None) -> Path:
   """
   Return the cache directory.
 
-  Priority (F2.2 part 2):
+  Priority:
   1. NEXE_CACHE_DIR environment variable (Tauri sidecar injection)
   2. {project_root}/storage/cache/ (standalone fallback)
 
@@ -143,7 +143,7 @@ def get_models_dir() -> Path:
   """
   Return the models directory for engine auto-discovery (MLX, llama.cpp, ...).
 
-  Priority (F5.6 BUG-NEW-6):
+  Priority:
   1. NEXE_STORAGE_PATH environment variable (Tauri sidecar injection or user override)
   2. NEXE_DATA_DIR/models (sidecar mode — sibling of vectors/, cache/)
   3. storage/models relative to cwd (legacy dev mode)

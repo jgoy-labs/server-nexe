@@ -44,7 +44,7 @@ class MemoryService:
         qdrant_path: Optional[str] = None,
     ):
         """Initialize pipeline components and storage backends."""
-        # F2.2: resol path via SidecarConfig en sidecar mode
+        # resol path via SidecarConfig en sidecar mode
         from memory.memory._paths import resolve_qdrant_path
         self._config = config or get_config()
         _default_vectors = resolve_qdrant_path()

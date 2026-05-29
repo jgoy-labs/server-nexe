@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_storage_root(server_state):
-    """Resolve the storage root honouring sidecar mode (F2.6).
+    """Resolve the storage root honouring sidecar mode.
 
     In sidecar mode the storage tree (memory/, vectors/, etc.) lives under
     SidecarConfig.data_dir — typically ~/.nexe/data — not inside the Tauri

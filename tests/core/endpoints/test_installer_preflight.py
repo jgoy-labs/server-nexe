@@ -1,4 +1,4 @@
-"""F5.4 Fase 5 — tests for gated-model detection + dry_run preflight.
+"""Tests for gated-model detection + dry_run preflight.
 
 Covers:
 - GET /installer/preflight returns access + plan

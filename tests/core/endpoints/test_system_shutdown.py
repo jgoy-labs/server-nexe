@@ -1,4 +1,4 @@
-"""F3.1 BUG-C1 — Tests for the graceful /admin/system/shutdown endpoint.
+"""Tests for the graceful /admin/system/shutdown endpoint.
 
 The Tauri host calls this endpoint from `graceful_quit` before falling back
 to SIGKILL. The endpoint must:
@@ -83,10 +83,10 @@ def test_shutdown_endpoint_requires_authentication():
 
 
 def test_admin_paths_csrf_exempt():
-  """F5.6 BUG-NEW-1 — /admin/* must be in the CSRF exempt list.
+  """/admin/* must be in the CSRF exempt list.
 
   The Tauri Rust client calls /admin/system/shutdown with an X-API-Key header
-  but without a CSRF token or cookie. Before F5.6 the request hit starlette-csrf
+  but without a CSRF token or cookie. Previously the request hit starlette-csrf
   first and returned 403 Forbidden, so lifecycle.rs always fell back to SIGKILL.
   This test pins the exempt pattern so a future cleanup doesn't accidentally
   remove it.

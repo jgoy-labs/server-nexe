@@ -137,7 +137,7 @@ class ModuleManager(PluginLoaderMixin):
     """
     Initial configuration search with security validation.
 
-    F5.6 BUG-NEW-3 — use NEXE_HOME (Tauri-propagated, deterministic) as base
+    Use NEXE_HOME (Tauri-propagated, deterministic) as base
     for path traversal validation instead of Path.cwd(). The cwd can be
     arbitrary depending on how the app is launched (Finder, terminal,
     PATH-with-spaces sidecar binary), which produced false-positive

@@ -31,12 +31,12 @@ class MLXModule:
         self._initialized = False
         self._init_lock = asyncio.Lock()
         self._router = None
-        # F5.4 Bug B fix: lifecycle state for /status and health_check.
+        # Lifecycle state for /status and health_check.
         # "uninitialized"  → before initialize() runs
         # "ready"          → model loaded and chat-capable
         # "not_configured" → NEXE_MLX_MODEL unset, server.toml empty, no auto-
         #                    discovered model. Plugin stays at registry so
-        #                    restart_sidecar (F5.3.1) can re-activate it after
+        #                    restart_sidecar can re-activate it after
         #                    the wizard completes.
         # "no_metal"       → Metal/Apple Silicon not available (catastrophic
         #                    on the local box, plugin should be popped).
@@ -75,7 +75,7 @@ class MLXModule:
             try:
                 mlx_config = MLXConfig.from_env()
 
-                # F5.4 Bug B fix: distinguish "no model configured" (recoverable
+                # Distinguish "no model configured" (recoverable
                 # via restart_sidecar after wizard) from real validation failure
                 # (path set but broken). Empty path is the wizard-not-done case.
                 if not mlx_config.model_path:
@@ -158,7 +158,7 @@ class MLXModule:
 
     async def health_check(self) -> HealthResult:
         """Check MLX module health by querying the inference pool stats."""
-        # F5.4 Bug B fix: report not_configured explicitly so /status is
+        # Report not_configured explicitly so /status is
         # actionable (UI can show "Run wizard to install a model") instead
         # of the generic "Module not initialized".
         if self._state == "not_configured":

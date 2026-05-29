@@ -79,7 +79,7 @@ class WebUIModule:
             if self._initialized:
                 return True
 
-            # F2.5: short-circuit declaratiu — si manifest té
+            # Short-circuit declaratiu — si manifest té
             # `disabled_in_sidecar=true` i `SidecarConfig.is_sidecar=True`,
             # NO carreguem el mòdul (la UI la serveix Tauri host).
             if self._is_disabled_in_sidecar():
@@ -110,7 +110,7 @@ class WebUIModule:
                             "before web_ui_module init runs. Aborting to prevent plaintext "
                             "session storage."
                         )
-                # F5.5 — resolve sessions dir via get_data_dir() so sidecar mode
+                # Resolve sessions dir via get_data_dir() so sidecar mode
                 # writes to NEXE_DATA_DIR/sessions (writable Application Support)
                 # instead of "storage/sessions" relative to cwd (which may be /
                 # under Tauri parent → Errno 30 read-only file system).
@@ -217,7 +217,7 @@ class WebUIModule:
             host = DEFAULT_HOST
         return f"http://{host}:{port}"
 
-    # --- F2.5: sidecar-aware initialization ---
+    # --- Sidecar-aware initialization ---
 
     def _is_disabled_in_sidecar(self) -> bool:
         """Return True only if manifest `disabled_in_sidecar=true` AND sidecar mode actiu.

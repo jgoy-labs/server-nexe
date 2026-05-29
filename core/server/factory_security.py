@@ -50,7 +50,7 @@ def validate_production_security(i18n: Any, config: Any = None) -> None:
   """
   from core.config import get_module_allowlist
 
-  # F2.3 part 2: SidecarConfig.is_production és la font canònica per a
+  # SidecarConfig.is_production is the canonical source for
   # produccio vs no-produccio. Mantenim raw env per distingir "staging"/"development".
   core_env = os.getenv("NEXE_ENV", "development").lower()
   try:

@@ -17,7 +17,7 @@ import secrets
 import time as _time
 from fastapi import APIRouter, HTTPException, Depends, Header, Request
 
-# F5.6 BUG-NC-18 part 2 — runtime override singleton (replaces os.environ writes).
+# Runtime override singleton (replaces os.environ writes).
 from core.runtime_state import get_with_env_fallback  # noqa: E402
 
 # R6-15 v1.0.4: tolerate absent security plugin so the web UI can serve its
@@ -239,7 +239,7 @@ def _resolve_model_name(model_name: str, backend: str, configured_backend: str) 
 def _resolve_models_dir() -> "Path":
     """Return absolute Path to the models directory.
 
-    F5.6 — delegated to core.paths.helpers.get_models_dir() so the lookup
+    Delegated to core.paths.helpers.get_models_dir() so the lookup
     chain (NEXE_STORAGE_PATH → NEXE_DATA_DIR/models → cwd → repo root) is
     centralised and the same across mlx_module, llama_cpp_module and the
     web UI. The previous local logic appended "/models" to NEXE_STORAGE_PATH,
@@ -455,7 +455,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         if lang not in ("ca", "es", "en"):
             raise HTTPException(status_code=400, detail=get_message(i18n, "webui.auth.supported_languages"))
         _server_lang = lang
-        # F3.2 BUG-NC-18: drop `os.environ["NEXE_LANG"] = lang`. The only consumer
+        # Drop `os.environ["NEXE_LANG"] = lang`. The only consumer
         # of this env var is the module-level `_server_lang` initialiser (line 46),
         # which runs once at import. Mutating process env after start was a no-op
         # for in-process readers and contaminated any subprocess spawned later.
@@ -639,7 +639,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     def _apply_and_persist_backend(canonical: str, model: str) -> None:
         """Set runtime overrides for backend/model and persist them to .env.
 
-        F5.6 BUG-NC-18 part 2 — overrides go through core.runtime_state instead
+        Overrides go through core.runtime_state instead
         of mutating os.environ; persistence to .env is still needed so the
         next process start picks the same selection up via NEXE_* env reading.
         """

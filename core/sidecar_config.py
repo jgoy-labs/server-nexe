@@ -42,7 +42,7 @@ Regla pràctica:
 - Vols mostrar un valor a l'usuari amb metadata → NexeSettings (.list_settings()).
 - Vols overrides dinàmics post-startup → cap dels dos (SidecarConfig és FROZEN; NexeSettings encara no té setter).
 
-Camps que existeixen a tots dos (sincronitzats manualment fins a Sessió 2):
+Fields that exist in both (manually synced up to Session 2):
 - host (NEXE_SERVER_HOST) / port (NEXE_SERVER_PORT) / lang / default_model
 - model_engine / prompt_tier / logs_dir / approved_modules
 Camps només a SidecarConfig (parse derivat): is_sidecar, is_production,
@@ -60,7 +60,7 @@ Usage runtime:
         ...
 
 Status: Initial implementation (2026-05-16). Impl bàsica
-direct os.environ — integració amb NexeSettings deferida a Sessió 2.
+direct os.environ — integration with NexeSettings deferred to Session 2.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -78,7 +78,7 @@ from typing import Optional
 # només injecta el subset crític sotabaix. Per tant fem fail-fast SOLS d'aquestes
 # (sense fallback raonable); les altres tenen defaults a _resolve_paths().
 #
-# Anomalia descoberta empíric F1.9 (2026-05-16 23:42): exigir NEXE_HOME/DATA_DIR/etc.
+# Anomaly discovered empirically: requiring NEXE_HOME/DATA_DIR/etc.
 # trencava `pnpm tauri dev` perquè dev mode no les injecta — SidecarConfigError
 # es propagava al try/except defensiu de setup_cors, que feia fallback a server.toml
 # CORS sense Tauri origins → webview rebutjat.

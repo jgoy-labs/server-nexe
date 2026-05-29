@@ -28,7 +28,7 @@ router = APIRouter(prefix="/memory", tags=["memory-v1"])
 class MemoryStoreRequest(BaseModel):
     """Request body for storing content in memory.
 
-    F2.4 — Pydantic anti-DoS constraints:
+    Pydantic anti-DoS constraints:
       - content: max_length=100_000 (~100 KB; well above any legitimate single-doc store,
         rejects 1 GB DoS payloads at deserialization with HTTP 422)
       - collection: max_length=128 (mirrors ``validate_collection_name`` snake_case bound)
@@ -47,7 +47,7 @@ class MemoryStoreResponse(BaseModel):
 class MemorySearchRequest(BaseModel):
     """Request body for searching memory.
 
-    F2.4 — Pydantic anti-DoS constraints:
+    Pydantic anti-DoS constraints:
       - query: max_length=2000 (single semantic query; no use case for longer)
       - limit: ge=1, le=100 (cap top-k to prevent OOM via huge result sets)
       - collection / collections: max_length=128 per name (mirrors ``validate_collection_name``)

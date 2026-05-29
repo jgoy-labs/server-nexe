@@ -38,7 +38,7 @@ def obfuscate_ip(ip: str) -> str:
     return f"{parts[0]}.{parts[1]}.{parts[2]}.xxx"
   return ip
 
-# F3.2 BUG-NB-6 — UUID-shaped API keys (8-4-4-4-12 with hyphens) were not
+# UUID-shaped API keys (8-4-4-4-12 with hyphens) were not
 # caught by the hex-only regex because `\b` does not cross the `-` chars and
 # each group is shorter than 32. server-nexe and nexe-app issue UUIDv4 keys,
 # so this missed every real production token.

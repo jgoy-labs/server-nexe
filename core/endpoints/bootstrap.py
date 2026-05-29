@@ -97,7 +97,7 @@ def check_rate_limit(client_ip: str, request: Request) -> None:
 
 def _validate_bootstrap_env() -> None:
   """Raise 503 if NEXE_ENV is not 'development'."""
-  # F2.3 part 2: SidecarConfig.is_production és la font canònica per a
+  # SidecarConfig.is_production is the canonical source for
   # produccio vs no-produccio. Mantenim raw env per distingir "development"
   # de valors no-produccio com "staging"/"test" que han de bloquejar bootstrap.
   core_env = os.getenv('NEXE_ENV', 'production').lower()
@@ -298,7 +298,7 @@ async def bootstrap_info(request: Request) -> BootstrapInfoResponse:
   from core.bootstrap_tokens import get_bootstrap_token
   from datetime import datetime
 
-  # F2.3 part 2: SidecarConfig.is_production és la font canònica per a
+  # SidecarConfig.is_production is the canonical source for
   # produccio vs no-produccio. Mantenim raw env per distingir "development"
   # de valors no-produccio com "staging"/"test".
   core_env = os.getenv('NEXE_ENV', 'production').lower()

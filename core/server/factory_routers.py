@@ -28,7 +28,7 @@ def register_core_routers(app: FastAPI, i18n: Any) -> None:
   from core.endpoints.system import get_router as get_system_router
   from core.metrics import metrics_router
 
-  # F5.3: installer endpoints for the onboarding wizard (unauthenticated — no
+  # installer endpoints for the onboarding wizard (unauthenticated — no
   # api_key exists yet when the user runs through the wizard for the first time).
   app.include_router(installer_router)
 
@@ -43,7 +43,7 @@ def register_core_routers(app: FastAPI, i18n: Any) -> None:
 
   app.include_router(get_system_router())
 
-  # F5.5: sidecar_stubs_router (F2.5 stubs) eliminat — web_ui_module ara
+  # sidecar_stubs_router removed — web_ui_module now
   # serveix /ui/* JSON endpoints en sidecar mode (HTML/static es salten
   # condicionalment a plugins/web_ui_module/api/routes.py).
 

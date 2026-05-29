@@ -168,7 +168,7 @@ def _is_tray_already_running() -> bool:
 
 def _is_tray_supported() -> bool:
     """Return True if all conditions for tray launch are met."""
-    # BUG-NX-3b (F1.5): Tauri ja gestiona el tray quan corre en mode sidecar
+    # Tauri already manages the tray when running in sidecar mode
     # (ADR-tray-doble-conflicte) — evitem doble icona Python + Tauri.
     if os.environ.get("NEXE_SIDECAR"):
         return False
@@ -411,7 +411,7 @@ def main():
 
   from core.config import DEFAULT_HOST, DEFAULT_PORT, get_default_host, get_default_port
   server_config = config.get('core', {}).get('server', {})
-  # BUG-C2 (F1.5): NEXE_PORT/NEXE_HOST (injectades per Tauri en mode sidecar)
+  # NEXE_PORT/NEXE_HOST (injected by Tauri in sidecar mode)
   # tenen prioritat màxima sobre server_config. Sense aquest override, el
   # sidecar arrencaria al port del config.yaml i Tauri no el trobaria.
   env_port = os.environ.get("NEXE_PORT")

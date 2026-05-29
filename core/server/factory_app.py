@@ -37,7 +37,7 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
   # Bug 22 (security): /docs, /redoc, /openapi.json reveal full API map.
   # Disable them outside development mode (NEXE_ENV=development) so production
   # installations don't leak internal endpoint structure.
-  # F2.3 part 2: SidecarConfig.is_production és la font canònica; mantenim raw
+  # SidecarConfig.is_production is the canonical source; keep raw
   # env per distingir "development" vs "test" (ambdós permeten docs).
   _nexe_env = os.getenv("NEXE_ENV", "production").lower()
   try:

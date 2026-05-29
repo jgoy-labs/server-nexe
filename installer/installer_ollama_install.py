@@ -193,7 +193,7 @@ def _install_ollama_macos() -> bool:
                 return False
 
         print("  📦 Installing to /Applications/Ollama.app...")
-        # F3.4 BUG-NF-24 (2026-05-18): Zip Slip protection. zipfile.extractall
+        # Zip Slip protection. zipfile.extractall
         # follows arbitrary paths inside the archive (including absolute paths
         # and ../traversals), so a tampered Ollama-darwin.zip could write
         # anywhere on disk under the current user's privileges. The helper

@@ -33,7 +33,7 @@ class VectorIndex:
     """
 
     def __init__(self, qdrant_path: Optional[str] = None):
-        # F2.2: resol path via SidecarConfig.vectors_dir en sidecar mode;
+        # resol path via SidecarConfig.vectors_dir en sidecar mode;
         # fallback "storage/vectors" en standalone
         from memory.memory._paths import resolve_qdrant_path
         self._qdrant_path = Path(qdrant_path) if qdrant_path else resolve_qdrant_path()

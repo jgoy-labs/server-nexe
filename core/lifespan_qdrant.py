@@ -42,7 +42,7 @@ def _resolve_qdrant_target() -> tuple[Optional[str], Optional[str]]:
         if sidecar_cfg.qdrant_url:
             qdrant_url = sidecar_cfg.qdrant_url
         qdrant_path = str(sidecar_cfg.vectors_dir)
-    except Exception:  # pragma: no cover — fallback to pre-F2.1 behaviour
+    except Exception:  # pragma: no cover — fallback to pre-sidecar behaviour
         qdrant_path = os.environ.get("NEXE_QDRANT_PATH", "storage/vectors")
     if qdrant_url:
         return qdrant_url, None
@@ -52,7 +52,7 @@ def _resolve_qdrant_target() -> tuple[Optional[str], Optional[str]]:
 def _startup_qdrant() -> None:
     """Initialize the Qdrant singleton pool with lock-retry backoff.
 
-    F2.1 Sessió 3: in sidecar mode, paths come from SidecarConfig
+    In sidecar mode, paths come from SidecarConfig
     (NEXE_QDRANT_PATH respected explicitly) — resolves anomaly A5
     "NEXE_QDRANT_PATH not respected".
 

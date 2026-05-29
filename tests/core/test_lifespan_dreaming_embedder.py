@@ -110,7 +110,7 @@ class TestStartMemoryServiceV1PassesEmbedder:
         ):
             await start_memory_service_v1(app, server_state)
 
-        # F5.4 Bug D (2026-05-19): DreamingCycle MUST NOT be constructed when
+        # DreamingCycle MUST NOT be constructed when
         # the embedder is unavailable. Previously it ran with embedder=None,
         # silently ingesting to SQLite but never to Qdrant — semantic search
         # returned 0 results. Now the cycle is skipped entirely; the user is

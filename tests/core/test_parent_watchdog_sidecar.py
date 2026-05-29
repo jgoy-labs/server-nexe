@@ -3,7 +3,7 @@
 Validates the poll_interval parameter introduced for sidecar mode (2s default
 via lifespan vs 30s default for standalone).
 
-BUG-NX-WATCHDOG context: el watchdog `_start_parent_watchdog` només s'invocava
+Context: el watchdog `_start_parent_watchdog` només s'invocava
 des de `runner.main()`. En mode sidecar (Tauri llança `uvicorn core.app:app`),
 `main()` mai s'executa → watchdog inactiu → si Tauri mor abrupte (Ctrl+C
 terminal `pnpm tauri dev`, crash), el sidecar queda orfe consumint RAM i

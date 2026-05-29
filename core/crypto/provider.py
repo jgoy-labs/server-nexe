@@ -41,7 +41,7 @@ class CryptoProvider:
     """
 
     def __init__(self, master_key: bytes | None = None, key_file_path: Path | None = None):
-        # F2.2 part 2: resol path dinàmicament si no s'ha passat (respecta NEXE_SIDECAR_DIR)
+        # resolve path dynamically if not passed (respects NEXE_SIDECAR_DIR)
         if key_file_path is None:
             key_file_path = _resolve_key_file_path()
         if master_key is not None:

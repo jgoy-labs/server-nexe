@@ -241,7 +241,7 @@ if [ "$SIZE_MB" -gt 600 ]; then
     echo "WARN: Embedding bundle is ${SIZE_MB} MB — larger than expected (~280 MB)" >&2
 fi
 
-# ── Step 6: Integrity manifest (F4.1 audit DoD-AUD-SX-0423 §2.7) ───────
+# ── Step 6: Integrity manifest ───────
 # Emit `embeddings.manifest.json` alongside the downloaded model with the
 # SHA256 digests of the three critical files (model*.onnx, tokenizer.json,
 # config.json). The client installer (`installer/download_verify.py`:

@@ -1,5 +1,5 @@
 """
-F5.4 Bug D — regression tests: DreamingCycle must NOT start when the embedder
+Regression tests: DreamingCycle must NOT start when the embedder
 is unavailable (cascade from Bug A — fastembed model not downloaded).
 
 Empirical log evidence (G10 portàtil 2026-05-19):
@@ -14,7 +14,7 @@ results). The system reports "healthy" but the vector layer is dead.
 
 Fix expected: when embedder is None, skip starting the DreamingCycle task
 entirely. Log a clear warning. The user will install fastembed via the
-wizard (F5.4 Fase 3) and restart_sidecar will restart with embedder ready.
+wizard and restart_sidecar will restart with embedder ready.
 """
 
 from __future__ import annotations

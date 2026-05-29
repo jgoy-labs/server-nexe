@@ -31,11 +31,11 @@ class LlamaCppModule:
         self._initialized = False
         self._init_lock = asyncio.Lock()
         self._router = None
-        # F5.4 Bug C fix: lifecycle state for /status and health_check.
+        # Lifecycle state for /status and health_check.
         # "uninitialized" → before initialize() runs
         # "ready"         → model loaded and chat-capable
         # "not_configured"→ no model path set; plugin stays at registry so
-        #                   restart_sidecar (F5.3.1) can re-activate it after
+        #                   restart_sidecar can re-activate it after
         #                   the user completes the wizard
         self._state: str = "uninitialized"
 
@@ -84,7 +84,7 @@ class LlamaCppModule:
                 # Load config from env or context
                 llama_config = LlamaCppConfig.from_env()
 
-                # F5.4 Bug C fix: distinguish "no model configured" (recoverable
+                # Distinguish "no model configured" (recoverable
                 # via restart_sidecar after wizard) from "model configured but
                 # broken" (real failure). Empty path is the wizard-not-done case.
                 if not llama_config.model_path:
@@ -107,7 +107,7 @@ class LlamaCppModule:
                         "restart_sidecar will re-register after wizard completes.",
                         llama_config.model_path,
                     )
-                    # F5.5 G10: return False (not degraded zombie) so the
+                    # Return False (not degraded zombie) so the
                     # registry pops this module. _node stays None, which avoids
                     # the _initialized=True + _node=None inconsistent state.
                     self._state = "error"
@@ -171,7 +171,7 @@ class LlamaCppModule:
         return await self._node.execute(inputs)
 
     async def health_check(self) -> HealthResult:
-        # F5.4 Bug C fix: differentiate not_configured (wizard pending) from
+        # Differentiate not_configured (wizard pending) from
         # uninitialized (unexpected) so /status reports a clear actionable
         # state instead of generic "Module not initialized".
         if self._state == "not_configured":

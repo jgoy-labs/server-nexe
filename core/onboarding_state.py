@@ -1,5 +1,5 @@
 """
-F5.3.1: Persistent onboarding state.
+Persistent onboarding state.
 
 The wizard writes the user's engine + model selection to a JSON file. The
 sidecar reads it at startup and configures env vars accordingly. This is the
@@ -14,7 +14,7 @@ Fallback (no NEXE_DATA_DIR):
 
 Schema versioned. Writes are atomic (tmp + rename within same directory).
 
-F5.4 Fase 4b — optional Hugging Face token persisted to the macOS Keychain
+Optional Hugging Face token persisted to the macOS Keychain
 via the ``keyring`` package (service name "nexe-hf-token" to
 avoid iCloud-keychain sync with com.nexe.app personal keychain entries).
 The token itself NEVER hits disk; only a boolean marker ``has_token`` is
@@ -39,7 +39,7 @@ from core.installer_constants import ONBOARDING_ENGINES as _ONBOARDING_ENGINES
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 2  # F5.4 Fase 4b: added has_token field. Older v1 files
+SCHEMA_VERSION = 2  # added has_token field. Older v1 files
                     # are still readable (has_token defaults to False) but we
                     # bump the schema so a backwards-incompatible field could
                     # be added without silently misreading older state.
@@ -80,7 +80,7 @@ class OnboardingState:
     model_id: str  # e.g. "mlx-community/gemma-3-4b-it-4bit" or "gemma3:4b"
     model_path: str  # absolute path to local model dir/file (or model_id for ollama)
     completed_at: str  # ISO 8601 UTC
-    # F5.4 Fase 4b: marker for Hugging Face token presence. The token itself
+    # marker for Hugging Face token presence. The token itself
     # is stored in the Keychain (service=_KEYCHAIN_SERVICE). Default False
     # for v1-schema files which lacked this field.
     has_token: bool = False
@@ -142,7 +142,7 @@ class OnboardingState:
         except (OSError, json.JSONDecodeError) as exc:
             logger.warning("onboarding_state: failed to load: %s", exc)
             return None
-        # F5.4 Fase 4b: forward-compat with v1 schema (pre-has_token). v1
+        # forward-compat with v1 schema (pre-has_token). v1
         # files lack the has_token field; promote them to v2 by injecting
         # the default False so a user who completed onboarding before the
         # token field existed doesn't have to redo the wizard.
@@ -187,7 +187,7 @@ class OnboardingState:
     ) -> OnboardingState:
         """Atomically persist a new state. Returns the saved instance.
 
-        F5.4 Fase 4b: when ``hf_token`` is provided (non-empty string), it is
+        When ``hf_token`` is provided (non-empty string), it is
         stored to the macOS Keychain via ``keyring`` (service
         ``nexe-hf-token``) and ``has_token`` is set to True in the JSON
         marker. The token itself is NEVER written to disk. If the keyring
@@ -284,7 +284,7 @@ class OnboardingState:
           - NEXE_MLX_MODEL or NEXE_LLAMA_CPP_MODEL (path) — engine-specific
           - NEXE_DEFAULT_MODEL (model id) — read by routes_chat default
           - NEXE_MODEL_ENGINE (resolver key) — read by routes_chat to pick engine
-          - HF_TOKEN — F5.4 Fase 4b, only when has_token=True and the Keychain
+          - HF_TOKEN — only when has_token=True and the Keychain
             lookup succeeds. Failure falls back silently (HF Hub still works,
             just rate-limited).
         """
@@ -304,7 +304,7 @@ class OnboardingState:
             os.environ["NEXE_DEFAULT_MODEL"] = self.model_id
             os.environ["NEXE_MODEL_ENGINE"] = _ENGINE_TO_RESOLVER_KEY[self.engine]
         os.environ["NEXE_LANG"] = self.lang
-        # F5.4 Fase 4b: inject HF_TOKEN from Keychain if the user provided
+        # inject HF_TOKEN from Keychain if the user provided
         # one through the wizard. We never log the token value.
         if self.has_token:
             token = _read_hf_token_from_keychain()
@@ -320,7 +320,7 @@ class OnboardingState:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# F5.4 Fase 4b — Keychain helpers (kept at module scope so save/apply share)
+# Keychain helpers (kept at module scope so save/apply share)
 # ──────────────────────────────────────────────────────────────────────────────
 
 

@@ -1,5 +1,5 @@
 """
-F5.4 Bug A — regression tests: the wizard must be able to download the
+Regression tests: the wizard must be able to download the
 fastembed embedding model via /installer/download?engine=embedder.
 
 Empirical evidence from G10 portàtil 2026-05-19: ~/.cache/fastembed/ was
