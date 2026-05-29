@@ -525,14 +525,13 @@ class TestPathsHelpersFinal:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 8. core/paths.py — lines 13-15 (facade)
+# 8. core.paths package — public API re-exports
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestPathsFacadeFinal:
 
     def test_wildcard_import_works(self):
-        """Lines 13-15: from .paths import * works."""
-        # core/paths.py line 13: from .paths import *
+        """The core.paths package re-exports its public API."""
         import core.paths
         assert hasattr(core.paths, 'get_repo_root')
         assert hasattr(core.paths, 'DetectionMethod')

@@ -317,7 +317,7 @@ def main():
         method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:  # nosec B310: dev smoke-test against operator-provided localhost server URL, no untrusted input
+        with urllib.request.urlopen(req, timeout=10) as r:  # nosec B310  # nosemgrep: dynamic-urllib-use-detected — dev smoke-test against operator-provided localhost server URL, no untrusted input
             status = r.status
     except urllib.error.HTTPError as e:
         status = e.code

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_paths_facade.py
-Description: Tests for core/paths.py (facade) and gaps in core/paths/detection.py.
+Description: Tests for the core.paths package public API and gaps in core/paths/detection.py.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 
 class TestPathsFacadeModule:
-    """Tests for core/paths.py (the facade file, not the package)."""
+    """Tests for the public API re-exported by the core.paths package."""
 
     def test_get_repo_root_importable_from_facade(self):
         import core.paths as paths_module
@@ -45,14 +45,6 @@ class TestPathsFacadeModule:
     def test_nexe_core_dirs_importable(self):
         import core.paths as paths_module
         assert hasattr(paths_module, "NEXE_CORE_DIRS")
-
-    def test_core_paths_py_file_exists(self):
-        """Verifies that the facade file exists."""
-        import core
-        core_dir = Path(core.__file__).parent
-        facade = core_dir / "paths.py"
-        assert facade.exists()
-
 
 class TestDetectionViaMarkers:
     """Tests for _detect_via_markers (lines 146-167)."""

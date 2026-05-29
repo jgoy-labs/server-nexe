@@ -63,8 +63,8 @@ def _normalize_base_url(raw: str) -> str:
         return DEFAULT_BASE_URL
 
     # Bind-all addresses mean "listen everywhere"; they are not a client target.
-    if host in ("0.0.0.0", "::"):
-        host = "127.0.0.1"
+    if host in ("0.0.0.0", "::"):  # nosec B104 — rewrites a user-supplied bind-all OLLAMA_HOST to loopback; client target, never a server bind
+        host = "127.0.0.1"  # nosemgrep: hardcode.ip_address — intentional loopback fallback when OLLAMA_HOST is a bind-all; local mono-user client target
 
     netloc_host = f"[{host}]" if ":" in host else host  # keep IPv6 bracketing
 

@@ -54,7 +54,9 @@ def test_module_allowlist_dev_allows_all(monkeypatch):
 
   app = create_app(force_reload=True)
   assert app is not None
-  assert "Nexe" in app.title
+  # Robust a l'estat i18n global: el títol pot ser el fallback "Nexe {ver} API"
+  # (i18n no carregat) o la traducció "server-nexe API" (clau server_core.api.title).
+  assert "nexe" in app.title.lower()
 
 def test_module_allowlist_staging_allows_all_with_warning(monkeypatch, caplog):
   """

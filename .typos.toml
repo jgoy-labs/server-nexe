@@ -250,3 +250,7 @@ Ortogonal = "Ortogonal"  # Catalan: "Orthogonal"
 corresponents = "corresponents"
 importen = "importen"
 insuficient = "insuficient"  # Catalan/Spanish: "insuficient/insuficiente" (one 's')
+# Catalan/Spanish false positives (added 2026-05-29)
+ganes = "ganes"  # Catalan: "tenir ganes" (test_lang_detect.py fixture)
+remots = "remots"  # Catalan plural of "remot" (CHANGELOG.md)
+distribuye = "distribuye"  # Spanish: "se distribuye" (README-es.md)

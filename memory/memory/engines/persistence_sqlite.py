@@ -144,7 +144,7 @@ class SqliteStorageMixin:
         try:
             conn = sqlcipher.connect(str(self.db_path))
             dek = self._crypto.derive_key("sqlite")
-            conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")
+            conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")  # nosemgrep: formatted-sql-query,sqlalchemy-execute-raw-query — SQLCipher key directive; dek is internal crypto key
             conn.execute("PRAGMA cipher_compatibility = 4")
             try:
                 conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
@@ -218,7 +218,7 @@ class SqliteStorageMixin:
         if self._encrypted and SQLCIPHER_AVAILABLE:
             conn = sqlcipher.connect(str(self.db_path))
             dek = self._crypto.derive_key("sqlite")
-            conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")
+            conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")  # nosemgrep: formatted-sql-query,sqlalchemy-execute-raw-query — SQLCipher key directive; dek is internal crypto key
             conn.execute("PRAGMA cipher_compatibility = 4")
         else:
             conn = sqlite3.connect(str(self.db_path))

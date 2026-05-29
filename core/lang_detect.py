@@ -14,10 +14,15 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import re
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from lingua import LanguageDetector
 
 logger = logging.getLogger(__name__)
 
@@ -49,21 +54,21 @@ _LANG_NAMES_EN = {
     "cy": "Welsh", "af": "Afrikaans", "sw": "Swahili",
 }
 
-_LINGUA_AVAILABLE = False
+_DETECTOR: LanguageDetector | None = None
 try:
     from lingua import LanguageDetectorBuilder
 
     # All languages → truly global support (the 75 lingua covers). Subset only
     # affects RAM/latency, not disk; accuracy on our cases is already perfect.
     _DETECTOR = LanguageDetectorBuilder.from_all_languages().build()
-    _LINGUA_AVAILABLE = True
 except ImportError:  # pragma: no cover - optional dependency
-    _DETECTOR = None
+    pass
 
 
 def _fallback_lang(fallback: Optional[str]) -> str:
     """Resolve the fallback language: explicit arg → NEXE_LANG → 'en'."""
-    return (fallback or os.getenv("NEXE_LANG", "en")).split("-")[0].lower()[:2] or "en"
+    base = fallback or os.getenv("NEXE_LANG") or "en"
+    return base.split("-")[0].lower()[:2] or "en"
 
 
 def _strip_noise(text: str) -> str:
@@ -80,7 +85,7 @@ def detect_user_lang(message: str, fallback: Optional[str] = None) -> str:
     Falls back to ``fallback`` (else ``NEXE_LANG``, else ``"en"``) when lingua is
     unavailable, the message is too short/ambiguous/code, or confidence is low.
     """
-    if not _LINGUA_AVAILABLE or not message:
+    if _DETECTOR is None or not message:
         return _fallback_lang(fallback)
 
     cleaned = _strip_noise(message)
