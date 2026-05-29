@@ -12,6 +12,7 @@ www.jgoy.net · https://server-nexe.org
 
 import logging
 import os
+from urllib.parse import urlsplit, urlunsplit
 
 from core.resilience import CircuitOpenError
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 OLLAMA_CONNECTION_TIMEOUT = float(os.getenv("NEXE_OLLAMA_CONNECTION_TIMEOUT", "10.0"))
 
 DEFAULT_BASE_URL = "http://localhost:11434"
+DEFAULT_OLLAMA_PORT = 11434
 
 
 def _parent():
@@ -42,14 +44,47 @@ def _parent():
     return _m
 
 
+def _normalize_base_url(raw: str) -> str:
+    """Normalise an Ollama host string into a connectable client URL.
+
+    Handles the values users commonly set in ``OLLAMA_HOST``:
+    - missing scheme (``localhost:11434``)        → prepend ``http://``
+    - bind-all addresses (``0.0.0.0`` / ``::``)   → loopback (not connectable as-is)
+    - missing port on plain ``http``              → default 11434
+    Legitimate remote hosts and ``https://`` URLs are preserved untouched.
+    """
+    url = raw.strip().rstrip("/")
+    if not url.startswith(("http://", "https://")):
+        url = "http://" + url
+
+    parts = urlsplit(url)
+    host = parts.hostname
+    if not host:  # unparseable netloc → fall back to a safe default
+        return DEFAULT_BASE_URL
+
+    # Bind-all addresses mean "listen everywhere"; they are not a client target.
+    if host in ("0.0.0.0", "::"):
+        host = "127.0.0.1"
+
+    netloc_host = f"[{host}]" if ":" in host else host  # keep IPv6 bracketing
+
+    port = parts.port
+    if port is None and parts.scheme == "http":
+        port = DEFAULT_OLLAMA_PORT  # https with no port → leave httpx to use 443
+    netloc = f"{netloc_host}:{port}" if port is not None else netloc_host
+
+    return urlunsplit((parts.scheme, netloc, parts.path.rstrip("/"), parts.query, parts.fragment))
+
+
 def resolve_base_url() -> str:
-    """Resolves the Ollama base_url from env vars."""
-    base_url = (
-        os.getenv("NEXE_OLLAMA_HOST")
-        or os.getenv("OLLAMA_HOST")
-        or DEFAULT_BASE_URL
-    )
-    return base_url.rstrip("/")
+    """Resolves the Ollama base_url from env vars, normalised for client use.
+
+    Priority: ``NEXE_OLLAMA_HOST`` > ``OLLAMA_HOST`` > :data:`DEFAULT_BASE_URL`.
+    """
+    raw = (os.getenv("NEXE_OLLAMA_HOST") or os.getenv("OLLAMA_HOST") or "").strip()
+    if not raw:
+        return DEFAULT_BASE_URL
+    return _normalize_base_url(raw)
 
 
 class OllamaClient:

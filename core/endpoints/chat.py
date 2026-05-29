@@ -56,6 +56,7 @@ from .chat_engines.ollama import (
 from .chat_engines.mlx import _forward_to_mlx, _mlx_stream_generator
 from .chat_engines.llama_cpp import _forward_to_llama_cpp, _llama_cpp_stream_generator
 from core.dependencies import limiter
+from core.lang_detect import detect_user_lang, prepend_language_directive, append_language_reminder
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +176,8 @@ async def _fetch_rag_context(body: ChatCompletionRequest, app_state: Any, server
 def _ensure_system_message(messages: list, app_state: Any, server_lang: str) -> None:
     """Prepend a system message to messages list if none is present (in-place)."""
     if not (messages and messages[0]['role'] == 'system'):
-        nexe_prompt = _get_system_prompt(app_state, server_lang)
+        nexe_prompt = prepend_language_directive(_get_system_prompt(app_state, server_lang), server_lang)
+        nexe_prompt = append_language_reminder(nexe_prompt, server_lang)
         messages.insert(0, {"role": "system", "content": nexe_prompt})
 
 
@@ -327,11 +329,12 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
     start_time = time.time()
     engine_status = "success"
 
-    _server_lang = os.getenv("NEXE_LANG", "en").split("-")[0].lower()
+    last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
+
+    # Reply language follows the user's message (not just the install language).
+    _server_lang = detect_user_lang(last_user_msg or "", fallback=os.getenv("NEXE_LANG", "en"))
 
     messages, context_text = await _build_rag_and_system_prompt(body, request.app.state, _server_lang)
-
-    last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
 
     response = None
     try:

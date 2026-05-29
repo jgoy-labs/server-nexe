@@ -1287,24 +1287,40 @@ def _format_now_natural(_now, _lang: str) -> str:
     )
 
 
-def _build_system_prompt_with_time() -> tuple[str, str]:
-    """Read system prompt from server.toml and inject current datetime.
+def _build_system_prompt_with_time(message: str = "") -> tuple[str, str]:
+    """Read system prompt from server.toml, adapt to the user's language and
+    inject current datetime.
+
+    The reply language follows the *message* (detected by lingua, any of 75
+    languages), not just the install language (``NEXE_LANG``): the matching
+    ca/es/en prompt variant is selected (others fall back to the English base)
+    and a CRITICAL directive (English, names the language) is prepended **and**
+    reinforced at the end so small models reply in the user's language. Falls
+    back to ``NEXE_LANG`` when detection is unavailable/ambiguous.
 
     Returns (system_prompt, lang).
     """
+    from core.lang_detect import (
+        detect_user_lang,
+        prepend_language_directive,
+        append_language_reminder,
+    )
+    import os as _os_inner
+    _lang = detect_user_lang(message, fallback=_os_inner.getenv("NEXE_LANG", "en"))
     try:
         from core.lifespan import get_server_state
         from core.endpoints.chat import _get_system_prompt
-        import os as _os_inner
-        _state = get_server_state()
-        _lang = _os_inner.getenv("NEXE_LANG", "en")
-        base_system_prompt = _get_system_prompt(_state, _lang)
+        base_system_prompt = _get_system_prompt(get_server_state(), _lang)
     except Exception:
-        _lang = "ca"
         base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
+    base_system_prompt = prepend_language_directive(base_system_prompt, _lang)
     from datetime import datetime as _dt
     _now = _dt.now().astimezone()
-    system_prompt = base_system_prompt + "\n\n" + _format_now_natural(_now, _lang)
+    # The datetime phrase only has ca/es/en variants; use 'en' for other langs.
+    _date_lang = _lang if _lang in ("ca", "es", "en") else "en"
+    system_prompt = base_system_prompt + "\n\n" + _format_now_natural(_now, _date_lang)
+    # Recency reinforcement: small models obey the instruction closest to generation.
+    system_prompt = append_language_reminder(system_prompt, _lang)
     return system_prompt, _lang
 
 
@@ -1602,8 +1618,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                         memory_helper, message, body, attached_doc,
                     )
 
-                    # 4. Construct Final System Prompt
-                    system_prompt, _lang = _build_system_prompt_with_time()
+                    # 4. Construct Final System Prompt (reply language follows the message)
+                    system_prompt, _lang = _build_system_prompt_with_time(message)
 
                     # 4. Prepare messages payload for engine
                     engine_messages = [

@@ -39,6 +39,7 @@ platformdirs==4.9.6  # cross-platform user data dirs (Linux/macOS); used by core
 # --- Memory & RAG ---
 fastembed==0.8.0
 pypdf==6.10.2  # PDF support for knowledge ingestion; GHSA-3crg-w4f6-42mx GHSA-4pxv-j86v-mhcw GHSA-7gw9-cf7v-778f GHSA-jj6c-8h6c-hppx GHSA-x284-j5p8-9c5p fixed in 6.10.0
+lingua-language-detector==2.1.1  # Reply-language detection (75 langs) for user messages; offline (models bundled in wheel), accurate on short text & close languages (ca/es/pt/fr/it), Apache-2.0. Chosen over langdetect (failed short ca/es) and fast-langdetect (downloads 125MB at runtime). ~95MB on disk.
 
 # --- Encryption at rest ---
 cryptography==48.0.0
