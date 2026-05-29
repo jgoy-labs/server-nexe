@@ -52,12 +52,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- **Plists `Nexe.app` i `NexeTray.app` desincronitzats** (`Nexe.app/Contents/Info.plist`, `installer/NexeTray.app/Contents/Info.plist`). Els bundles anaven amb `1.0.2-beta` mentre `pyproject.toml` ja era `1.0.3-beta`, fent fallar `core/tests/test_plist_versions.py::test_synced_plists_match_pyproject`. Resolt amb `python -m installer.sync_plist_versions` (eina ja existent al projecte). Auditoria r1 P0.2 (DeepSeek V3 / Turing).
+- **Plists `Nexe.app` i `NexeTray.app` desincronitzats** (`Nexe.app/Contents/Info.plist`, `installer/NexeTray.app/Contents/Info.plist`). Els bundles anaven amb `1.0.2-beta` mentre `pyproject.toml` ja era `1.0.3-beta`, fent fallar `core/tests/test_plist_versions.py::test_synced_plists_match_pyproject`. Resolt amb `python -m installer.sync_plist_versions` (eina ja existent al projecte). Auditoria r1 P0.2 (DeepSeek V3).
 
 ### Changed
 
-- **Test SQLi al chat: contracte ajustat al disseny** (`tests/test_chat_v1_validation.py`). `test_sql_injection_in_message_content_rejected` renombrat a `test_sql_injection_in_chat_passes_through_to_llm`: en `context="chat"` el sanitizer delega `check_sql` al LLM (Ollama), perquè el pipeline no toca cap SQL DB (RAG = Qdrant vector DB). Discutir "UNION SELECT" és tech talk legítim. El rebuig estricte de SQLi es manté a `context="param"` (model, engine), cobert per `test_sql_injection_in_model_field_rejected`. Cap canvi a `plugins/security/core/input_sanitizers.py` — la decisió `check_sql=False` en chat ja era intencionada i documentada (línies 153-156, 164-169). Auditoria r1 P0.1 (DeepSeek V3 / Turing).
-- **Test `nexe stop` accepta sortida en català o anglès** (`tests/test_cli_stop_pid.py`). `test_stop_no_services_running` només verificava l'output anglès "No Nexe services are running"; quan `NEXE_LANG=ca` (per defecte al Mac de dev) el CLI imprimeix "Cap servei Nexe actiu" i el test fallava. Assert ampliat amb `or` per cobrir ambdós idiomes. Auditoria r1 P1 (DeepSeek V3 / Turing).
+- **Test SQLi al chat: contracte ajustat al disseny** (`tests/test_chat_v1_validation.py`). `test_sql_injection_in_message_content_rejected` renombrat a `test_sql_injection_in_chat_passes_through_to_llm`: en `context="chat"` el sanitizer delega `check_sql` al LLM (Ollama), perquè el pipeline no toca cap SQL DB (RAG = Qdrant vector DB). Discutir "UNION SELECT" és tech talk legítim. El rebuig estricte de SQLi es manté a `context="param"` (model, engine), cobert per `test_sql_injection_in_model_field_rejected`. Cap canvi a `plugins/security/core/input_sanitizers.py` — la decisió `check_sql=False` en chat ja era intencionada i documentada (línies 153-156, 164-169). Auditoria r1 P0.1 (DeepSeek V3).
+- **Test `nexe stop` accepta sortida en català o anglès** (`tests/test_cli_stop_pid.py`). `test_stop_no_services_running` només verificava l'output anglès "No Nexe services are running"; quan `NEXE_LANG=ca` (per defecte al Mac de dev) el CLI imprimeix "Cap servei Nexe actiu" i el test fallava. Assert ampliat amb `or` per cobrir ambdós idiomes. Auditoria r1 P1 (DeepSeek V3).
 
 ## [1.0.4-beta] — 2026-05-14
 
@@ -551,7 +551,7 @@ Dependency: replace `sentence-transformers` + PyTorch (~600 MB) with `fastembed`
 
 ## [0.9.2] - 2026-04-12
 
-Security hardening: 4 P1 fixes from mega-consultoria 2026-04-11.
+Security hardening: 4 P1 fixes from a security audit 2026-04-11.
 
 ### Security fixes
 
@@ -586,11 +586,11 @@ Security hardening: 4 P1 fixes from mega-consultoria 2026-04-11.
 
 ## [0.9.1] - 2026-04-11
 
-Consolidated release: Cirurgia Bloc 2 (2026-04-08) + Mega-consultoria hardening (2026-04-11).
+Consolidated release: Security & Memory pipeline refactor (2026-04-08) + security audit hardening (2026-04-11).
 
-### Security fixes (Mega-consultoria 2026-04-11)
+### Security fixes (security audit 2026-04-11)
 
-Derived from a full security audit (mega-consultoria) with plan v2.4.
+Derived from a full security audit with plan v2.4.
 
 - **P0-1** — httpx split timeout for Ollama (chat + models). Previously a
   single 600s default meant Ollama hangs took up to 10 minutes to detect.
@@ -682,7 +682,7 @@ Derived from a full security audit (mega-consultoria) with plan v2.4.
     were explicitly NOT included — this project does not use AWS and a
     generic OWASP checklist would add noise without value.
 
-### Cirurgia Bloc 2 — Security & Memory Pipeline (2026-04-08)
+### Security & Memory Pipeline (2026-04-08)
 
 #### Fixed
 

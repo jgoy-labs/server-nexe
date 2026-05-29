@@ -59,7 +59,7 @@ Usage runtime:
         # tauri://localhost is in config.cors_origins, etc.
         ...
 
-Status: F2.1 Sessió 1 (2026-05-16, Director autònom Opus 4.7). Impl bàsica
+Status: Initial implementation (2026-05-16). Impl bàsica
 direct os.environ — integració amb NexeSettings deferida a Sessió 2.
 
 www.jgoy.net · https://server-nexe.org
@@ -102,7 +102,7 @@ SIDECAR_RELEASE_ENV_VARS: tuple[str, ...] = (
 # - tauri://localhost: release webview (custom scheme)
 # - http://localhost:1420: Vite dev server (pnpm tauri dev)
 # - http://tauri.localhost: some Tauri 2.x setups (rare)
-# Resolves anomaly A8 (BUG-NX-1) from F1-smoke/resultats.md.
+# Resolves a startup configuration anomaly.
 SIDECAR_CORS_ORIGINS: tuple[str, ...] = (
     "tauri://localhost",
     "http://localhost:1420",
@@ -320,7 +320,7 @@ class SidecarConfig:
     prompt_tier: str          # NEXE_PROMPT_TIER (full/compact)
     lang: str                 # NEXE_LANG (ca/es/en)
 
-    # === Services (Turing #3 expansion for Sessió 3 consumers) ===
+    # === Services (expanded fields for sidecar consumers) ===
     ollama_host: str          # NEXE_OLLAMA_HOST — default "http://localhost:11434"
     qdrant_url: Optional[str] # NEXE_QDRANT_URL — Optional Qdrant extern; embedded if None
     csrf_secret: Optional[str]    # NEXE_CSRF_SECRET — None disables persistent CSRF
@@ -368,7 +368,7 @@ class SidecarConfig:
             model_engine=os.environ.get("NEXE_MODEL_ENGINE"),
             prompt_tier=os.environ.get("NEXE_PROMPT_TIER", "full"),
             lang=os.environ.get("NEXE_LANG", "en"),
-            # Services (Turing #3 — preparat per Sessió 3)
+            # Services (prepared for future iterations)
             ollama_host=os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434"),  # nosemgrep
             qdrant_url=os.environ.get("NEXE_QDRANT_URL"),
             csrf_secret=os.environ.get("NEXE_CSRF_SECRET"),

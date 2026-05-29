@@ -38,7 +38,7 @@ os.environ.setdefault("TQDM_DISABLE", "1")
 # Bug 6 (2026-04-06) — silence noisy warnings when loading embedders.
 # `paraphrase-multilingual-mpnet-base-v2` emits UserWarning for
 # `position_ids UNEXPECTED` and `Some weights of...` which add no value.
-# Dev D (Consultant pass 1): moved BEFORE `from .lifespan_modules import ...`
+# Moved BEFORE `from .lifespan_modules import ...`
 # to ensure they apply even if a transitive import loads sentence_transformers
 # at import time.
 _warnings.filterwarnings("ignore", message=".*position_ids.*", category=UserWarning)

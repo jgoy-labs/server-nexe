@@ -5,7 +5,7 @@ Security fix: validate_production_security() must pass `config` to
 get_module_allowlist() so production mode detection works via
 server.toml [core.environment.mode], not only NEXE_ENV env var.
 
-Cirurgia post-BUS Q2.2.
+
 """
 
 import os

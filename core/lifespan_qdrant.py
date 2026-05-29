@@ -54,7 +54,7 @@ def _startup_qdrant() -> None:
 
     F2.1 Sessió 3: in sidecar mode, paths come from SidecarConfig
     (NEXE_QDRANT_PATH respected explicitly) — resolves anomaly A5
-    "NEXE_QDRANT_PATH not respected" from F1-smoke/resultats.md.
+    "NEXE_QDRANT_PATH not respected".
 
     Bug #5 (2026-05-21): retry with backoff if the previous sidecar
     has not fully released `vectors/.lock` yet. Without this, a clean restart

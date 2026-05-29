@@ -52,11 +52,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     # - upgrade-insecure-requests: only on HTTPS (Safari blocks CSS/JS on HTTP if set)
     is_https = request.url.scheme == "https"
 
-    # F2.1 Sessió 3: relaxar script-src en mode sidecar (resol anomalia A9).
+    # Relaxar script-src en mode sidecar.
     # En Tauri, el webview executa scripts dins un sandbox aïllat; la garantia
     # de seguretat XSS la dóna l'aïllament del context Tauri, no aquesta CSP.
     # Sense aquesta excepció, els scripts inline del web_ui (plugins/web_ui_module)
-    # són bloquejats i la UI no carrega — anomalia A9 de F1-smoke/resultats.md.
+    # són bloquejats i la UI no carrega.
     script_src_extra = ""
     try:
       from core.sidecar_config import get_sidecar_config

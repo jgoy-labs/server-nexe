@@ -3,7 +3,7 @@
 Validates that auto-ingest runs as a background task (non-blocking) and that
 the lifespan can complete startup before ingest finishes.
 
-Anomalia A10 (knowledge ingest blocant 22s) era la causa del Tauri webview
+El knowledge ingest blocant 22s era la causa del Tauri webview
 quedant-se "loading" — el splash timeout (30s) saltava abans que uvicorn
 acceptés connexions perquè el lifespan esperava l'ingest.
 """

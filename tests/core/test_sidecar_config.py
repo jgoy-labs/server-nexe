@@ -90,7 +90,7 @@ def test_sidecar_config_has_required_fields():
         "host", "port", "cors_origins", "trusted_hosts",
         "api_key", "parent_pid", "approved_modules",
         "default_model", "model_engine", "prompt_tier", "lang",
-        # Services (Turing #3)
+        # Services
         "ollama_host", "qdrant_url", "csrf_secret", "encryption_enabled",
         "auto_ingest_knowledge", "bootstrap_ttl",
     }
@@ -213,7 +213,7 @@ def test_sidecar_mode_can_override_env_development(sidecar_env):
 def test_cors_origins_includes_tauri_when_sidecar(sidecar_env):
     """is_sidecar=True → cors_origins MUST include all Tauri origins.
 
-    This is the FIX for anomalia A8 (BUG-NX-1) from F1-smoke/resultats.md:
+    This is the FIX for a startup configuration anomaly:
     the old hard-coded list at core/middleware.py didn't include
     tauri://localhost nor http://localhost:1420.
     """
@@ -434,7 +434,7 @@ def test_nexe_sidecar_falsy_values(clean_env, falsy_value):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# NEXE_ENV whitespace + case (Turing recomanació #6)
+# NEXE_ENV whitespace + case
 # ─────────────────────────────────────────────────────────────────────
 
 
@@ -457,7 +457,7 @@ def test_nexe_env_non_production_variants(clean_env, env_value):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Services fields (Turing #3 — expansion per Sessió 3)
+# Services fields
 # ─────────────────────────────────────────────────────────────────────
 
 

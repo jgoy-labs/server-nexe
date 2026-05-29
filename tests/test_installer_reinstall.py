@@ -120,7 +120,7 @@ def test_backup_user_data_moves_files(tmp_path):
 
 
 def test_backup_does_not_recurse_into_existing_backups(tmp_path):
-    """Dev #3 fix (Consultant pass 1, finding 4): the original test
+    """The original test
     checked `backup2/storage/backups` but the real code uses
     `.nexe-backups/` as the backup folder, so the assert was passing
     by construction without testing anything. We now verify that the second
@@ -534,7 +534,7 @@ import shutil  # noqa: E402 — usat pels tests de move tracking
 
 
 # ════════════════════════════════════════════════════════════════════════
-# Tests Dev #3 — Consultant pass 1 fixes
+# Reinstall tests
 # ════════════════════════════════════════════════════════════════════════
 
 
@@ -542,7 +542,7 @@ import shutil  # noqa: E402 — usat pels tests de move tracking
 
 
 def test_apply_backup_preserves_models_end_to_end(tmp_path):
-    """Finding 2 Consultant pass 1: before the fix, BACKUP mode called
+    """Before the fix, BACKUP mode called
     backup_user_data(exclude_models=True) — which preserved models/ — and
     then called wipe_user_data with USER_DATA_PATHS including 'storage'
     → shutil.rmtree(storage) deleted the models we had preserved.
@@ -603,7 +603,7 @@ def test_apply_backup_full_wipe_when_include_models(tmp_path):
 
 
 def test_apply_overwrite_preserves_secrets_e2e(tmp_path):
-    """Finding 5 Consultant pass 1: full flow
+    """Full flow
     apply_reinstall_mode(OVERWRITE) → generate_env_file() real → secrets
     preserved. Previously we only verified the _update_env_model_config unit
     but not the full flow."""

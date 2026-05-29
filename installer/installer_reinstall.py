@@ -515,7 +515,7 @@ def _apply_backup_mode(
     )
     result["backup_dir"] = str(backup_dir)
 
-    # Dev #3 fix — Bug 7 Consultant pass 1: selective wipe preserving models/.
+    # Selective wipe preserving models/.
     if exclude_models:
         wipe_paths = [".env"]  # knowledge/ NO: it's system code, tar will refill it
         removed = wipe_user_data(

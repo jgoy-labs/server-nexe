@@ -4,7 +4,7 @@ Tests for core.config.get_localhost_aliases() — Gemini hardcode fix.
 Centralizes the previously-hardcoded ["127.0.0.1", "::1", "localhost"]
 lists spread across bootstrap.py and middleware.py.
 
-Cirurgia post-BUS Q2.4.
+
 """
 
 import pytest

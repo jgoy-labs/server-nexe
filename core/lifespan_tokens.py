@@ -146,7 +146,7 @@ def regenerate_bootstrap_token(ttl_minutes: int = 30) -> str:
   return new_token
 
 
-# Fix Consultant pass 1 — Finding 4: backoffs for exponential retry
+# Backoffs for exponential retry
 # when token regeneration fails (e.g. disk full). Previously the loop
 # waited the full interval_seconds (>5 min) and the token expired.
 _BOOTSTRAP_RETRY_BACKOFFS = (1, 5, 30)  # segons
@@ -158,7 +158,7 @@ async def _bootstrap_token_renewal_loop(interval_seconds: int, ttl_minutes: int)
   Bug 11: solution (b) — background task that regenerates the token before
   it expires, avoiding the bad UX of having to restart the server.
 
-  Fix Consultant pass 1 — Finding 4: if regeneration fails, do not
+  If regeneration fails, do not
   wait the full interval; apply exponential retry (1s, 5s, 30s)
   before returning to the normal cycle.
   """

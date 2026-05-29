@@ -15,7 +15,7 @@ Fallback (no NEXE_DATA_DIR):
 Schema versioned. Writes are atomic (tmp + rename within same directory).
 
 F5.4 Fase 4b — optional Hugging Face token persisted to the macOS Keychain
-via the ``keyring`` package (Turing #2 C5: service name "nexe-hf-token" to
+via the ``keyring`` package (service name "nexe-hf-token" to
 avoid iCloud-keychain sync with com.nexe.app personal keychain entries).
 The token itself NEVER hits disk; only a boolean marker ``has_token`` is
 written to onboarding.json so the next sidecar restart knows to attempt
@@ -44,7 +44,7 @@ SCHEMA_VERSION = 2  # F5.4 Fase 4b: added has_token field. Older v1 files
                     # bump the schema so a backwards-incompatible field could
                     # be added without silently misreading older state.
 
-# Turing #2 C5: use a dedicated keyring service (not "com.nexe.app") to
+# Use a dedicated keyring service (not "com.nexe.app") to
 # avoid the macOS Keychain potentially sharing the entry with other apps
 # that also identify as com.nexe.app, and to opt out of iCloud Keychain
 # sync (which can mirror application-keychain entries across devices).
@@ -170,7 +170,7 @@ class OnboardingState:
 
     # Sentinel: distinguish "caller did not pass hf_token" (preserve existing
     # has_token flag) from "caller passed hf_token=None" (explicitly clear).
-    # Turing #3 P4: without this, a re-run of the wizard without a token
+    # Without this, a re-run of the wizard without a token
     # would silently flip has_token from True to False, breaking the next
     # apply_to_env. Use a unique object so None remains a valid "clear" value.
     _UNSET = object()
@@ -195,7 +195,7 @@ class OnboardingState:
         ``has_token`` stays False — the safety net at startup will then
         fall back to operating without a token.
 
-        Turing #3 P4: ``hf_token`` defaults to a sentinel so callers that
+        ``hf_token`` defaults to a sentinel so callers that
         do NOT touch the token preserve the existing ``has_token`` flag
         (read from the previous state file). Passing ``hf_token=None``
         explicitly is treated as "clear the token" (deletes keychain

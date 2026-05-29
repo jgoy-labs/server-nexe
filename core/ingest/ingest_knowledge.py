@@ -229,7 +229,7 @@ def _read_text_with_fallback(file_path: Path) -> str:
     (ingests ended up with lost chunks without any warning). Now we try a
     chain of common encodings and warn via logger.info when not UTF-8.
     """
-    # Dev D (Consultant pass 1): cp1252 BEFORE latin-1. latin-1 accepts
+    # cp1252 BEFORE latin-1. latin-1 accepts
     # all bytes 0-255 by construction, so it would never fall through to cp1252
     # if it came first. Windows-1252 smart quotes/em-dashes would appear
     # as invisible control characters. By trying cp1252 first we preserve

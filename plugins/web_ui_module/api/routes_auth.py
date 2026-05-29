@@ -548,7 +548,7 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         corresponding plugin: we always accept (best-effort) and it will fail
         on first use if the model doesn't exist.
 
-        ⚠️ Dev D (Consultant pass 1): if Ollama is not accessible or we return
+        ⚠️ If Ollama is not accessible or we return
         before verification due to timeout/error, we accept optimistically
         (return True) to avoid blocking backend switches during Ollama downtime.
         This is a **partial mitigation** of the bug: when Ollama is down,

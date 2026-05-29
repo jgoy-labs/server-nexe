@@ -288,7 +288,7 @@ def compute_context_budget(
           - doc_kept_chars: chars of the document that are sent
     """
     history_ratio = max(0.0, min(0.9, history_ratio))
-    # Fix Consultant pass 1 — Finding 5: `history_reserve` is actually
+    # `history_reserve` is actually
     # the "minimum floor" reserved for history. The real history
     # (`history_effective`) can grow above this floor if messages
     # are long. We keep the public name (env var
@@ -1466,8 +1466,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     # different body.model values racing to mutate LlamaCppChatNode._pool /
     # MLXChatNode._model. For mono-user local use the scenario is effectively
     # never triggered; the lock exists as a breadcrumb for future multi-user.
-    # Full refactor (multi-pool LRU + config_override) deferred — see
-    # ~/Desktop/mega-consultoria-real-20260411/fix/ISSUE-multiuser-refactor.md
+    # Full refactor (multi-pool LRU + config_override) deferred to a future
+    # multi-user design.
     _MODEL_SWITCH_LOCK = asyncio.Lock()
 
     # -- POST /chat --

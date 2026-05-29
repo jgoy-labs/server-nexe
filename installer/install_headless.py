@@ -62,7 +62,7 @@ from installer.installer_reinstall import (  # noqa: E402  # after sys.path setu
 # ═══════════════════════════════════════════════════════════════════════════
 # INSTALLATION LOG — persistent file for debugging failures
 # ═══════════════════════════════════════════════════════════════════════════
-# Dev #3 fix (Consultant pass 1, finding 3): previously LOG_DIR was
+# Previously LOG_DIR was
 # PROJECT_ROOT/storage/logs, but `apply_reinstall_mode(BACKUP)` moves
 # `storage/` to `.nexe-backups/` and the FileHandler keeps writing to a
 # dead fd. Installation logs now live at ~/.nexe/install_logs/, outside

@@ -6,7 +6,7 @@ Web UI routes were calling get_message(None, ...) which forced fallback
 to English regardless of the user's language. The fix injects i18n via
 Depends(get_i18n) in every Web UI route handler.
 
-Cirurgia post-BUS Q3.
+
 """
 
 from unittest.mock import MagicMock

@@ -6,7 +6,7 @@ get_server_url() to remove hardcoded "9119" / "127.0.0.1" literals across
 runner.py, lifespan.py, middleware.py, cli/*, installer/tray.py and
 plugins/web_ui_module/module.py.
 
-Cirurgia post-BUS Q4.1 (Gemini hardcode fix).
+
 """
 
 import pytest
