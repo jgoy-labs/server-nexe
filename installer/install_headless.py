@@ -126,7 +126,7 @@ def _write_project_marker(app_bundle, project_root):
 
     Note: `app_bundle` kept as argument for backward compat — not used now.
 
-    Linux portability (factoria-linux-bus 2026-05-22): the previous Mac-only
+    Linux portability (2026-05-22): the previous Mac-only
     path ``~/Library/Application Support/Nexe`` is replaced by
     ``platformdirs.user_data_dir("Nexe")`` which resolves to:
       - macOS:   ~/Library/Application Support/Nexe
@@ -611,7 +611,7 @@ def _register_macos_app(project_root, config):
 def _register_linux_autostart(project_root, config):
     """Register Nexe autostart on Linux via FreeDesktop ``.desktop`` file.
 
-    Linux portability (factoria-linux-bus 2026-05-22): Linux equivalent of the
+    Linux portability (2026-05-22): Linux equivalent of the
     macOS Login Item branch. Writes ``~/.config/autostart/nexe-app.desktop``
     using the minimal viable FreeDesktop spec. The GUI wizard owns the user's
     autostart choice; with ``--no-login-item`` this is skipped.

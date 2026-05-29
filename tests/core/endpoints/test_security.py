@@ -241,7 +241,7 @@ class TestHealthEndpointSecurity:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Bug #3 (factoria 2026-05-21) — readiness aggregation contract sentinel
+# Bug #3 (2026-05-21) — readiness aggregation contract sentinel
 # ═══════════════════════════════════════════════════════════════════════════
 
 # The 7 sub-checks declared by memory/rag/health.py::check_health (line 261-268).

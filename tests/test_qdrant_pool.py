@@ -91,7 +91,7 @@ def test_close_logs_warning_on_flush_failure(caplog):
     )
 
 
-# Bug #5 (factoria 2026-05-21): sentinel anti-regression that the close+reopen
+# Bug #5 (2026-05-21): sentinel anti-regression that the close+reopen
 # cycle on the same path within a single process does not leave the lock held.
 # Note: this does NOT reproduce the multi-process race (which is what the
 # real bug is about) — for that we'd need `multiprocessing` (fragile across

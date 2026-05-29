@@ -95,7 +95,7 @@ echo -e "${NC}"
 echo -e "${BLUE}[STEP]${NC} $_VERIFYING"
 
 # Find Python >= 3.11
-# Linux portability (factoria-linux-bus 2026-05-22): the candidate list is
+# Linux portability (2026-05-22): the candidate list is
 # now built per-OS. macOS keeps /opt/homebrew + /usr/local (Homebrew x86 +
 # Apple Silicon). Linux adds the canonical /usr/bin distro paths because
 # systemd/headless shells sometimes start with a minimal PATH missing them.

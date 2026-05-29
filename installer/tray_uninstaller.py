@@ -41,7 +41,7 @@ def calculate_storage(install_dir: Path) -> str:
 def remove_from_dock() -> bool:
     """Remove Nexe.app from the macOS Dock.
 
-    Linux portability (factoria-linux-bus 2026-05-22): no-op on non-Darwin.
+    Linux portability (2026-05-22): no-op on non-Darwin.
     Linux has no equivalent system Dock managed by `defaults`.
     """
     if platform.system() != "Darwin":
@@ -69,7 +69,7 @@ if len(pl['persistent-apps']) < before:
 def remove_login_items() -> bool:
     """Remove Nexe from macOS Login Items / Linux autostart.
 
-    Linux portability (factoria-linux-bus 2026-05-22): on Linux removes
+    Linux portability (2026-05-22): on Linux removes
     ``~/.config/autostart/nexe-app.desktop`` (written by
     ``install_headless._register_linux_autostart``).
     """
@@ -264,7 +264,7 @@ def _uninstall_remove_system_entries(removed, failed):
             failed.append("/usr/local/bin/nexe")
 
     # macOS-only: /Applications/Nexe.app legacy bundle removal.
-    # Linux portability (factoria-linux-bus 2026-05-22): skip on non-Darwin
+    # Linux portability (2026-05-22): skip on non-Darwin
     # (no /Applications layout on Linux).
     if platform.system() == "Darwin":
         nexe_app = Path("/Applications/Nexe.app")

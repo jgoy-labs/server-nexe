@@ -15,7 +15,7 @@ Wraps the NEXE_* env vars (registered at core.config.NexeSettings) and exposes
 
 Goal: centralize what was scattered across middleware.py, lifespan_*.py,
 paths/helpers.py, factory_security.py — the meta-bug "mode sidecar fictici"
-documented at factoria-nexe/diari/decisions/ADR-meta-mode-sidecar-fictici.md.
+documented at the project's meta-mode sidecar ADR.
 
 ═══════════════════════════════════════════════════════════════════════════
 SidecarConfig vs NexeSettings — quan usar cadascú

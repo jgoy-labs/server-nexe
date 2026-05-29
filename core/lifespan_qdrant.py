@@ -18,7 +18,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-# Bug #5 (factoria 2026-05-21): backoff schedule for Qdrant lock acquisition on
+# Bug #5 (2026-05-21): backoff schedule for Qdrant lock acquisition on
 # restart. POSIX flock release can lag process exit by tens-of-ms; without a
 # retry the second sidecar fails with "Storage folder already accessed". Five
 # attempts (0, 100, 200, 400, 800 ms = 1.5 s total) cover the empirical
@@ -56,7 +56,7 @@ def _startup_qdrant() -> None:
     (NEXE_QDRANT_PATH respected explicitly) — resolves anomaly A5
     "NEXE_QDRANT_PATH not respected" from F1-smoke/resultats.md.
 
-    Bug #5 (factoria 2026-05-21): retry with backoff if the previous sidecar
+    Bug #5 (2026-05-21): retry with backoff if the previous sidecar
     has not fully released `vectors/.lock` yet. Without this, a clean restart
     cycle (sidecar 1 exits → sidecar 2 starts within ~1 s) requires the
     skill consumer to do `sleep 5 + rm -f vectors/.lock` manually. The
@@ -97,7 +97,7 @@ def _shutdown_qdrant() -> None:
     """Close the Qdrant singleton pool and emit a diagnostic warning if the
     `.lock` sentinel is still held afterwards.
 
-    Bug #5 (factoria 2026-05-21): the diagnostic is best-effort and never
+    Bug #5 (2026-05-21): the diagnostic is best-effort and never
     blocks shutdown. We do NOT delete the `.lock` file — it is a sentinel,
     not the actual lock (POSIX flock lives in the FD), and deleting it
     would mask real two-instance contention. The next sidecar startup

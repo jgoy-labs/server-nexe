@@ -379,7 +379,7 @@ async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]
 
     F5.6 Bloc 3 (F03): si Ollama no es present, l'instal.lem automaticament
     via ensure_ollama_installed(headless=True) abans del pull. Validat amb
-    Turing R1 agentic 2026-05-20 (8 iters, 92K tokens, 4 correccions C1-C5).
+    agentic audit 2026-05-20 (8 iters, 92K tokens, 4 correccions C1-C5).
     """
     ollama = _find_ollama_bin()
     if not ollama:
@@ -842,7 +842,7 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
 
     F5.6 Bloc 3 (F03): substitueix el placeholder "already_installed: False"
     per una crida real a ensure_ollama_installed(headless=True). Mateixes
-    correccions C1-C5 de Turing R1 que _stream_ollama (cancel detection,
+    correccions C1-C5 de l'auditoria agèntica que _stream_ollama (cancel detection,
     lock concurrent, error UX-friendly per platform, logger.exception).
     """
 
@@ -1065,7 +1065,7 @@ async def check_metal() -> JSONResponse:
 
     El wizard usa aquest endpoint per saber si pot oferir MLX com a backend.
     A Macs Intel (sense Metal) o Linux/Windows, mlx no s'ha d'oferir.
-    Validat amb Turing R1 agentic 2026-05-20 (thread executor suficient,
+    Validat amb agentic audit 2026-05-20 (thread executor suficient,
     no cal subprocess). Memory pressure ~200-500 MB del MLX framework
     s'acceptarà perquè el sidecar ja el carregara per chat.
     """
@@ -1090,7 +1090,7 @@ async def installer_state() -> JSONResponse:
     El frontend Tauri usa aquest endpoint per saber si l'onboarding s'ha
     completat sense necessitat de llegir el fitxer JSON del disc. Util quan
     el sidecar es reinicia i el frontend vol decidir si mostrar wizard o UI.
-    NO retorna api_key (sensible). Validat amb Turing R1 agentic 2026-05-20.
+    NO retorna api_key (sensible). Validat amb agentic audit 2026-05-20.
     """
     state = OnboardingState.load()
     if state is None:

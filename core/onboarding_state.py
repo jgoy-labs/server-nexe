@@ -97,7 +97,7 @@ class OnboardingState:
     def _state_file() -> Path:
         """Return the canonical path to onboarding.json.
 
-        Linux portability (factoria-linux-bus 2026-05-22): the original
+        Linux portability (2026-05-22): the original
         default was the Mac-only literal
         ``~/Library/Application Support/com.nexe.app/sidecar/onboarding.json``
         with no platform gate, which on Linux produced an out-of-place
