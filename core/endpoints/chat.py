@@ -118,7 +118,7 @@ def _validate_chat_request(body: ChatCompletionRequest) -> None:
         sanitizer = get_sanitizer()
     except Exception as exc:
         logger.debug(
-            "F3.2 BUG-NC-31: SanitizerModule unavailable, falling back to legacy validation only: %s",
+            "SanitizerModule unavailable, falling back to legacy validation only: %s",
             exc,
         )
     for _msg in body.messages:
@@ -132,7 +132,7 @@ def _validate_chat_request(body: ChatCompletionRequest) -> None:
                         result = sanitizer.sanitize(_msg.content)
                         if result.severity in ("high", "critical"):
                             logger.warning(
-                                "F3.2 BUG-NC-31: SanitizerModule blocked %s-severity input (threats=%s, patterns=%s)",
+                                "SanitizerModule blocked %s-severity input (threats=%s, patterns=%s)",
                                 result.severity,
                                 result.threats_detected,
                                 result.patterns_matched,
@@ -147,7 +147,7 @@ def _validate_chat_request(body: ChatCompletionRequest) -> None:
                             )
                         if not result.is_safe:
                             logger.info(
-                                "F3.2 BUG-NC-31: SanitizerModule rewrote user input (severity=%s, threats=%s)",
+                                "SanitizerModule rewrote user input (severity=%s, threats=%s)",
                                 result.severity,
                                 result.threats_detected,
                             )
@@ -156,7 +156,7 @@ def _validate_chat_request(body: ChatCompletionRequest) -> None:
                         raise
                     except Exception as exc:
                         logger.warning(
-                            "F3.2 BUG-NC-31: SanitizerModule.sanitize raised, keeping legacy-validated content: %s",
+                            "SanitizerModule.sanitize raised, keeping legacy-validated content: %s",
                             exc,
                         )
             _msg.content = validate_string_input(_msg.content, max_length=8000, context="chat")

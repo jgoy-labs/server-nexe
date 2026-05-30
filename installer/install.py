@@ -490,7 +490,7 @@ def run_installer():
 
 
 def _applescript_quote(s: str) -> str:
-    """F3.4 BUG-NF-19/20 — escape a Python string for a double-quoted AppleScript
+    """Escape a Python string for a double-quoted AppleScript
     literal. Backslash first, then double-quote, exactly as AppleScript expects.
     Without this, a path containing `"` or `\\` either crashes the script or
     (if a future caller passes attacker-controlled paths) lets the attacker

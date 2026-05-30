@@ -254,9 +254,9 @@ async def shutdown_server(
     pid = os.getpid()
     try:
       os.kill(pid, signal.SIGINT)
-      logger.info("F3.1 BUG-C1: SIGINT delivered to self (pid=%d)", pid)
+      logger.info("SIGINT delivered to self (pid=%d)", pid)
     except Exception as exc:
-      logger.error("F3.1 BUG-C1: failed to deliver SIGINT to self (pid=%d): %s", pid, exc)
+      logger.error("failed to deliver SIGINT to self (pid=%d): %s", pid, exc)
 
   background_tasks.add_task(_self_sigint)
   logger.info("Shutdown initiated by authenticated user (pid=%d)", os.getpid())

@@ -31,7 +31,7 @@ from .installer_i18n import t
 
 
 def _safe_extract_zip(zf: zipfile.ZipFile, dest_dir: str) -> None:
-    """F3.4 BUG-NF-24: extract a ZipFile to ``dest_dir`` rejecting any
+    """Extract a ZipFile to ``dest_dir`` rejecting any
     member that escapes the destination (Zip Slip).
 
     Validates each ``ZipInfo.filename`` by resolving it against ``dest_dir``
@@ -235,7 +235,7 @@ def _install_ollama_macos() -> bool:
 def _install_ollama_linux() -> bool:
     """Install Ollama on Linux via the official install script.
 
-    F3.4 BUG-NF-25: instead of piping `curl | bash` (which executes whatever
+    Instead of piping `curl | bash` (which executes whatever
     bytes the network returns), download the script to a tempfile first, log
     its SHA-256, and — if the operator has pinned `NEXE_OLLAMA_INSTALL_SHA256`
     — abort when the digest does not match. Ollama does not publish a stable

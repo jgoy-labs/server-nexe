@@ -27,7 +27,7 @@ def _normalize_engine(engine: Optional[str]) -> Optional[str]:
 def _get_preferred_engine(app_state) -> Optional[str]:
     """
     Get preferred engine from:
-    1. Runtime override / NEXE_MODEL_ENGINE env (F5.6 BUG-NC-18 — live UI selection or installer-set env)
+    1. Runtime override / NEXE_MODEL_ENGINE env (live UI selection or installer-set env)
     2. Config file fallback
     """
     # Priority 1: Runtime override > env var.

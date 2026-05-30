@@ -70,7 +70,7 @@ _app_instance: Optional[FastAPI] = None
 def get_app() -> FastAPI:
   """Lazy accessor for the singleton FastAPI app instance.
 
-  Resolves BUG-NX-5 (F2.6): importing core.app no longer eagerly instantiates
+  Importing core.app no longer eagerly instantiates
   the FastAPI app at import time. The app is created on first attribute access
   (e.g. when uvicorn resolves `core.app:app`), so importing the module on a
   read-only filesystem or in unit tests does not trigger factory side effects.

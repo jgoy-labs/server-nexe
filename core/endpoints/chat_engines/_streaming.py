@@ -45,21 +45,21 @@ def _resolve_max_stream_bytes() -> int:
         value = int(raw.strip())
     except ValueError:
         logger.warning(
-            "F3.3 BUG-NC-12: NEXE_MAX_STREAM_MB=%r is not an integer; "
+            "NEXE_MAX_STREAM_MB=%r is not an integer; "
             "falling back to the %d MB default",
             raw, _DEFAULT_MAX_STREAM_MB,
         )
         return _DEFAULT_MAX_STREAM_MB * 1024 * 1024
     if value <= 0:
         logger.warning(
-            "F3.3 BUG-NC-12: NEXE_MAX_STREAM_MB=%d is not positive; "
+            "NEXE_MAX_STREAM_MB=%d is not positive; "
             "falling back to the %d MB default",
             value, _DEFAULT_MAX_STREAM_MB,
         )
         return _DEFAULT_MAX_STREAM_MB * 1024 * 1024
     if value > _DEFAULT_MAX_STREAM_MB:
         logger.warning(
-            "F3.3 BUG-NC-12: NEXE_MAX_STREAM_MB=%d MB exceeds the recommended "
+            "NEXE_MAX_STREAM_MB=%d MB exceeds the recommended "
             "ceiling of %d MB; raising it increases the OOM blast radius of a "
             "runaway generation. Keep it lean unless you really need it.",
             value, _DEFAULT_MAX_STREAM_MB,
@@ -103,7 +103,7 @@ class TokenBridge:
         if self._response_bytes + token_bytes > MAX_STREAM_BYTES:
             self._cap_triggered = True
             logger.warning(
-                "F3.3 BUG-NC-12: stream cap reached (%d bytes ≥ %d). "
+                "stream cap reached (%d bytes ≥ %d). "
                 "Terminating generation early.",
                 self._response_bytes, MAX_STREAM_BYTES,
             )

@@ -352,7 +352,7 @@ def _load_or_create_persistent_csrf_secret() -> str:
     if cfg.is_sidecar and getattr(cfg, "data_dir", None):
       secret_path = Path(cfg.data_dir) / "csrf_secret"
   except Exception as exc:
-    logger.debug("F2.6 BUG-NB-3: SidecarConfig unavailable in csrf secret loader: %s", exc)  # nosemgrep: python-logger-credential-disclosure
+    logger.debug("SidecarConfig unavailable in csrf secret loader: %s", exc)  # nosemgrep: python-logger-credential-disclosure
 
   if secret_path is None:
     secret_path = Path.home() / ".nexe" / "csrf_secret"
@@ -364,11 +364,11 @@ def _load_or_create_persistent_csrf_secret() -> str:
         logger.info("CSRF secret loaded from %s (persistent)", secret_path)  # nosemgrep: python-logger-credential-disclosure
         return existing
       logger.warning(  # nosemgrep: python-logger-credential-disclosure
-        "F2.6 BUG-NB-3: CSRF secret file %s is too short (%d chars), regenerating",
+        "CSRF secret file %s is too short (%d chars), regenerating",
         secret_path, len(existing),
       )
   except Exception as exc:
-    logger.warning("F2.6 BUG-NB-3: failed to read %s, regenerating: %s", secret_path, exc)  # nosemgrep: python-logger-credential-disclosure
+    logger.warning("failed to read %s, regenerating: %s", secret_path, exc)  # nosemgrep: python-logger-credential-disclosure
 
   new_secret = secrets.token_hex(32)
   try:
@@ -380,7 +380,7 @@ def _load_or_create_persistent_csrf_secret() -> str:
     logger.info("CSRF secret generated and persisted to %s", secret_path)  # nosemgrep: python-logger-credential-disclosure
   except Exception as exc:
     logger.warning(  # nosemgrep: python-logger-credential-disclosure
-      "F2.6 BUG-NB-3: failed to persist CSRF secret to %s (sessions will "
+      "failed to persist CSRF secret to %s (sessions will "
       "be invalidated on next boot): %s",
       secret_path, exc,
     )

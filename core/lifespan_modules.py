@@ -292,7 +292,7 @@ async def start_memory_service_v1(app, server_state) -> None:
 
     NOTE: MemoryService is now primarily initialized by MemoryModule
     (memory/memory/module.py) with absolute paths. This function reuses
-    that instance if available, avoiding double initialization (BUG-08).
+    that instance if available, avoiding double initialization.
     """
     try:
         # Try to reuse the instance already created by MemoryModule

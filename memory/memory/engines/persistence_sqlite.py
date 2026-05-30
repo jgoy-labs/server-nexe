@@ -159,7 +159,7 @@ class SqliteStorageMixin:
                 f"{self.db_path.name}.unrecoverable-{ts}"
             )
             logger.warning(
-                "F5.6 BUG-NEW-2: SQLCipher DB %s cannot be opened with the "
+                "SQLCipher DB %s cannot be opened with the "
                 "current MASTER_KEY (likely a previous install with a "
                 "different key). Quarantining to %s and starting fresh. "
                 "To recover the data, restore the previous MASTER_KEY and "
