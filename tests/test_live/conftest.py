@@ -145,11 +145,20 @@ def nexe_server() -> Generator[str, None, None]:
             "or create a .env file."
         )
 
+    # Redirect the server's stdout/stderr to a file, NOT subprocess.PIPE.
+    # With PIPE nobody drains the buffer during the session, so once the OS
+    # pipe (~64KB) fills with accumulated logs the server blocks on its next
+    # write() — the in-flight request hangs forever (GPU idle, client times
+    # out). A file sink never blocks the writer and keeps logs for debugging.
+    server_log_path = PROJECT_ROOT / "dev-tools" / "reports" / "live_server.log"
+    server_log_path.parent.mkdir(parents=True, exist_ok=True)
+    server_log = server_log_path.open("w", encoding="utf-8")
+
     proc = subprocess.Popen(
         [sys.executable, "-m", "core.app"],
         cwd=str(PROJECT_ROOT),
         env=_build_env(),
-        stdout=subprocess.PIPE,
+        stdout=server_log,
         stderr=subprocess.STDOUT,
     )
 
@@ -161,6 +170,7 @@ def nexe_server() -> Generator[str, None, None]:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
+        server_log.close()
         pytest.skip(str(exc))
 
     yield NEXE_TEST_URL
@@ -170,6 +180,7 @@ def nexe_server() -> Generator[str, None, None]:
         proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
         proc.kill()
+    server_log.close()
 
 
 @pytest.fixture(scope="session")
@@ -244,7 +255,25 @@ def pytest_collection_modifyitems(
 
 # ─── Backend detection ────────────────────────────────────────────────────────
 
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+def _resolve_ollama_host() -> str:
+    """Resolve the Ollama host the same way the server does.
+
+    ``OLLAMA_HOST=0.0.0.0`` (a common bind-all setting) is not a connectable
+    client URL — a raw ``os.getenv`` would hand ``"0.0.0.0"`` to httpx, which
+    raises *missing protocol* and silently skips every live chat test. Reuse the
+    canonical ``resolve_base_url()`` so the fixtures see the exact host the
+    production Ollama client connects to. Falls back to the previous behaviour
+    if the plugin module is unavailable (never worse than before).
+    """
+    try:
+        from plugins.ollama_module.core.client import resolve_base_url
+
+        return resolve_base_url()
+    except Exception:
+        return os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+
+OLLAMA_HOST = _resolve_ollama_host()
 
 # Models >32B skipped in automated tests (too slow; run manually if needed)
 _MAX_AUTO_MODEL_GB = 32
@@ -307,13 +336,21 @@ def backends_info(client: httpx.Client, auth_headers: dict[str, str]) -> dict:
 
 
 def _backend_is_available(info: dict, names: tuple[str, ...]) -> bool:
+    # Match on the canonical backend id (e.g. "mlx", "llamacpp"), case-insensitive.
+    # /ui/backends returns {"id": "mlx", "name": "MLX", ...}; comparing the display
+    # "name" missed every backend (case + id/name mismatch).
     backends = info.get("backends", info) if isinstance(info, dict) else info
     if not isinstance(backends, list):
         return False
+    wanted = {n.lower() for n in names}
     for b in backends:
-        name = b.get("name", b) if isinstance(b, dict) else b
-        available = b.get("available", True) if isinstance(b, dict) else True
-        if name in names and available:
+        if isinstance(b, dict):
+            ident = str(b.get("id") or b.get("name") or "").lower()
+            available = b.get("available", True)
+        else:
+            ident = str(b).lower()
+            available = True
+        if ident in wanted and available:
             return True
     return False
 
@@ -327,4 +364,4 @@ def mlx_available(backends_info: dict) -> bool:
 @pytest.fixture(scope="session")
 def llama_cpp_available(backends_info: dict) -> bool:
     """True if the llama.cpp backend is loaded and available."""
-    return _backend_is_available(backends_info, ("llama_cpp", "llama-cpp"))
+    return _backend_is_available(backends_info, ("llamacpp", "llama_cpp", "llama-cpp"))
