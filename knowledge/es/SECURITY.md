@@ -41,8 +41,8 @@ expires: null
 - [Auditorias de seguridad](#auditorias-de-seguridad)
   - [Auditoria IA v1 (marzo 2026)](#auditoria-ia-v1-marzo-2026)
   - [Auditoria IA v2 (marzo 2026)](#auditoria-ia-v2-marzo-2026)
-  - [Mega-Test v1 Pre-Release (marzo 2026)](#mega-test-v1-pre-release-marzo-2026)
-  - [Mega-Test v2 Post-Correcciones (marzo 2026)](#mega-test-v2-post-correcciones-marzo-2026)
+  - [Tests masivos automatizados, ronda 1: Pre-Release (ejecutados por IA, marzo 2026)](#tests-masivos-automatizados-ronda-1-pre-release-ejecutados-por-ia-marzo-2026)
+  - [Tests masivos automatizados, ronda 2: Post-Correcciones (ejecutados por IA, marzo 2026)](#tests-masivos-automatizados-ronda-2-post-correcciones-ejecutados-por-ia-marzo-2026)
   - [Correcciones clave de las auditorias](#correcciones-clave-de-las-auditorias)
   - [Nota de honestidad](#nota-de-honestidad)
 - [Riesgos aceptados](#riesgos-aceptados)
@@ -154,7 +154,7 @@ El endpoint API `POST /v1/chat/completions` valida y sanitiza la entrada a trave
 - `[OLVIDA:…]` / `[OBLIT:…]` / `[FORGET:…]` — eliminados (trilingue)
 - `[MEMORIA:…]` — eliminado
 
-Esto forma parte del fix del Bug #18 (ver RAG.md). Se aplica tanto en ingest (cuando se guarda un documento o memoria) como en retrieval (cuando se recupera para inyectar en el prompt).
+Esto forma parte de la correccion de MEM_DELETE de v0.9.9 (ver RAG.md). Se aplica tanto en ingest (cuando se guarda un documento o memoria) como en retrieval (cuando se recupera para inyectar en el prompt).
 
 **Limite de tamano de peticion:** Cuerpo maximo de 100MB (proteccion contra DoS).
 
@@ -175,7 +175,7 @@ Esto forma parte del fix del Bug #18 (ver RAG.md). Se aplica tanto en ingest (cu
 ### CryptoProvider
 
 - Algoritmo: **AES-256-GCM** con derivacion de claves **HKDF-SHA256**
-- **Cadena de fallback de la MEK (Master Encryption Key)** (corregida en v0.9.9 — Bug #19b): **fichero `~/.nexe/master.key` (permisos 600) → OS Keyring (macOS Keychain) → variable de entorno `NEXE_MASTER_KEY` → generacion nueva**.
+- **Cadena de fallback de la MEK (Master Encryption Key)** (corregida en v0.9.9): **fichero `~/.nexe/master.key` (permisos 600) → OS Keyring (macOS Keychain) → variable de entorno `NEXE_MASTER_KEY` → generacion nueva**.
   - Esto permite que las sesiones `.enc` sobrevivan a un reset del Keychain siempre que el fichero local o la env esten intactos.
   - Antes de v0.9.9 el orden era keyring primero, y un reset del Keychain dejaba los datos irrecuperables.
 - Claves derivadas por proposito: `"sqlite"`, `"sessions"`, `"text_store"`, `"backup"`
@@ -258,15 +258,15 @@ Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA **
 - 229 tests fallidos -> 0
 - Calificacion: A
 
-### Mega-Test v1 Pre-Release (marzo 2026)
-- Auditoria autonoma de 4 fases: baseline, seguridad (23 hallazgos), funcional (158 tests), GO/NO-GO
+### Tests masivos automatizados, ronda 1: Pre-Release (ejecutados por IA, marzo 2026)
+- Revision por IA de 4 fases: baseline, seguridad (23 hallazgos), funcional (158 tests), GO/NO-GO
 - 23 hallazgos (1 critico, 6 altos, 7 medios, 7 bajos)
 - Veredicto: **GO CON CONDICIONES**
 - Correcciones aplicadas: validacion de entrada UI, sanitizacion de contexto RAG, rate limiting, CVEs de dependencias
 
-### Mega-Test v2 Post-Correcciones (marzo 2026)
-- Misma metodologia de 4 fases, re-ejecutada tras aplicar las correcciones de v1
-- 10 hallazgos (vs 23 en v1, **57% de reduccion**)
+### Tests masivos automatizados, ronda 2: Post-Correcciones (ejecutados por IA, marzo 2026)
+- Misma metodologia de 4 fases, re-ejecutada tras aplicar las correcciones de la primera ronda
+- 10 hallazgos (vs 23 en la primera ronda, **57% de reduccion**)
 - 7 correcciones adicionales aplicadas: validacion de endpoints de memoria (CRITICO), path traversal en sesiones, validacion de nombres de fichero, rate limiting en todos los endpoints UI, normalizacion Unicode en detectores de inyeccion, migracion print()->logger
 - Ejecucion final (v0.9.9): **4842 tests recopilados pasados, 0 fallidos** (4990 totales, 148 deselected por marcadores)
 - Veredicto: **GO CON CONDICIONES** (mejorado)

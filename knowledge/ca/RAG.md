@@ -5,7 +5,7 @@ id: nexe-rag-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v1.0.5). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat (DELETE_THRESHOLD 0.20 post-Bug #18), pujada de documents amb aillament de sessio, embeddings (768D, fastembed ONNX principal offline), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio RAG injection (_filter_rag_injection), confirmacio clear_all 2-torns, precomputed KB embeddings, poda intel·ligent, deduplicacio, TextStore encriptat."
+abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v1.0.5). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat (DELETE_THRESHOLD 0.20 des de v0.9.9), pujada de documents amb aillament de sessio, embeddings (768D, fastembed ONNX principal offline), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio RAG injection (_filter_rag_injection), confirmacio clear_all 2-torns, precomputed KB embeddings, poda intel·ligent, deduplicacio, TextStore encriptat."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -33,7 +33,7 @@ expires: null
 - [Pujada de documents amb aillament de sessio](#pujada-de-documents-amb-aillament-de-sessio)
 - [Ingestio de documents](#ingestio-de-documents)
   - [Documentacio del sistema (nexe_documentation)](#documentacio-del-sistema-nexe_documentation)
-  - [Coneixement de l'usuari (user_knowledge via CLI)](#coneixement-de-lusuari-user_knowledge-via-cli)
+  - [Documentació del sistema via CLI (nexe_documentation)](#documentacio-del-sistema-via-cli-nexe_documentation)
 - [Construccio del context](#construccio-del-context)
 - [Visualitzacio de pesos RAG](#visualitzacio-de-pesos-rag)
 - [Poda intel·ligent (col·leccio personal_memory)](#poda-intelligent-colleccio-personal_memory)
@@ -165,7 +165,7 @@ Qdrant — col·leccio personal_memory
 
 **Intent d'esborrat (MEM_DELETE):** Quan l'usuari diu "oblida que X", cerca entrades amb similitud >= **DELETE_THRESHOLD (0.20 des de v0.9.9)**. Esborra la coincidencia mes propera. Guard anti-re-save: `_recently_deleted_facts` evita que el model torni a guardar un fet acabat d'esborrar dins la mateixa sessio.
 
-> **Bug #18 fix (v0.9.9):** El threshold anterior (0.70) era massa alt i cap coincidència passava la prova. Es va ajustar a **0.20** després de 8 tests e2e reals (`tests/integration/test_mem_delete_e2e.py`) contra Qdrant embedded + fastembed. Ara l'esborrat funciona consistentment.
+> **A la v0.9.9 es va abaixar el threshold de memòria:** el valor anterior (0.70) era massa alt i cap coincidència passava la prova. Es va ajustar a **0.20** després de 8 tests e2e reals (`tests/integration/test_mem_delete_e2e.py`) contra Qdrant embedded + fastembed. Ara l'esborrat funciona consistentment.
 
 ### Confirmacio `clear_all` 2-torns
 
@@ -215,8 +215,9 @@ Els documents pujats via la Web UI s'indexen a la col·leccio `user_knowledge` a
 - Ingerida via `core/ingest/ingest_docs.py`
 - Recrea la col·leccio a cada ingestio (inici net)
 
-### Coneixement de l'usuari (user_knowledge via CLI)
+### Documentació del sistema via CLI (nexe_documentation)
 - Font: carpeta `knowledge/` (subcarpetes ca/en/es)
+- Col·lecció destí: `nexe_documentation` (per defecte des del fix F7; `user_knowledge` és possible amb `--collection` explícit)
 - Chunking: 1500 caracters per chunk per defecte (configurable via capcalera RAG chunk_size), solapament = max(50, chunk_size/10)
 - Ingerit via `core/ingest/ingest_knowledge.py`
 - Suporta capcaleres RAG amb metadades (`#!RAG id=..., priority=...`)

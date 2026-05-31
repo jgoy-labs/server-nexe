@@ -234,7 +234,7 @@ L'instal·lador organitza els 14 models del catàleg per la RAM disponible al te
 | **8 GB** | Qwen3.5 4B | Alibaba |
 | **16 GB** | Qwen3.5 9B, Gemma 4 E4B, Mistral Nemo 12B, Salamandra 7B | Alibaba, Google, Mistral AI, BSC/AINA |
 | **24 GB** | Qwen3.5 27B, Gemma 4 31B, Mistral Small 3.2 24B, GPT-OSS 20B | Alibaba, Google, Mistral AI, OpenAI |
-| **32 GB** | Qwen3.5 35B-A3B, Gemma 4 31B, Mixtral 8x7B, DeepSeek R1 32B, ALIA-40B | Alibaba, Google, Mistral AI, DeepSeek, Govern d'Espanya |
+| **32 GB** | Qwen3.5 35B-A3B, Gemma 4 31B, Mixtral 8x7B, DeepSeek R1 32B, ALIA-40B | Alibaba, Google, Mistral AI, DeepSeek, BSC (Barcelona Supercomputing Center) |
 
 A més, pots usar qualsevol model d'Ollama pel seu nom o qualsevol model GGUF de Hugging Face.
 

@@ -5,7 +5,7 @@ id: nexe-rag-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete reference of the server-nexe RAG memory system (v1.0.5). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent (DELETE_THRESHOLD 0.20 post-Bug #18), session-isolated document upload, embeddings (768D, fastembed ONNX primary offline), chunking parameters, context building with i18n labels, RAG weight visualization, RAG injection sanitization (_filter_rag_injection), 2-turn clear_all confirmation, precomputed KB embeddings, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
+abstract: "Complete reference of the server-nexe RAG memory system (v1.0.5). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent (DELETE_THRESHOLD 0.20 since v0.9.9), session-isolated document upload, embeddings (768D, fastembed ONNX primary offline), chunking parameters, context building with i18n labels, RAG weight visualization, RAG injection sanitization (_filter_rag_injection), 2-turn clear_all confirmation, precomputed KB embeddings, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -165,7 +165,7 @@ Qdrant — personal_memory collection
 
 **Delete intent (MEM_DELETE):** When the user says "forget that X", searches for entries with similarity >= **DELETE_THRESHOLD (0.20 since v0.9.9)**. Deletes the closest match. Anti-re-save guard: `_recently_deleted_facts` prevents the model from re-saving a just-deleted fact within the same session.
 
-> **Bug #18 fix (v0.9.9):** The previous threshold (0.70) was too high and no match passed the check. It was adjusted to **0.20** after 8 real e2e tests (`tests/integration/test_mem_delete_e2e.py`) against embedded Qdrant + fastembed. Deletion now works consistently.
+> **In v0.9.9 the memory threshold was lowered:** the previous value (0.70) was too high and no match passed the check. It was adjusted to **0.20** after 8 real e2e tests (`tests/integration/test_mem_delete_e2e.py`) against embedded Qdrant + fastembed. Deletion now works consistently.
 
 ### 2-turn `clear_all` confirmation
 

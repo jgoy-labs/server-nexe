@@ -41,8 +41,8 @@ expires: null
 - [Auditories de seguretat](#auditories-de-seguretat)
   - [Auditoria IA v1 (marc 2026)](#auditoria-ia-v1-marc-2026)
   - [Auditoria IA v2 (marc 2026)](#auditoria-ia-v2-marc-2026)
-  - [Mega-Test v1 Pre-Release (marc 2026)](#mega-test-v1-pre-release-marc-2026)
-  - [Mega-Test v2 Post-Correccions (marc 2026)](#mega-test-v2-post-correccions-marc-2026)
+  - [Tests massius automatitzats, ronda 1: Pre-Release (executats per IA, marc 2026)](#tests-massius-automatitzats-ronda-1-pre-release-executats-per-ia-marc-2026)
+  - [Tests massius automatitzats, ronda 2: Post-Correccions (executats per IA, marc 2026)](#tests-massius-automatitzats-ronda-2-post-correccions-executats-per-ia-marc-2026)
   - [Correccions clau de les auditories](#correccions-clau-de-les-auditories)
   - [Nota d'honestedat](#nota-dhonestedat)
 - [Riscos acceptats](#riscos-acceptats)
@@ -154,7 +154,7 @@ L'endpoint `POST /v1/chat/completions` valida i sanititza l'input a traves del s
 - `[OLVIDA:…]` / `[OBLIT:…]` / `[FORGET:…]` — eliminats (trilingue)
 - `[MEMORIA:…]` — eliminat
 
-Aixo forma part del fix de Bug #18 (veure RAG.md). S'aplica tant a ingest (quan es guarda un document o memoria) com a retrieval (quan es recupera per injectar al prompt).
+Aixo forma part de la correccio de MEM_DELETE de v0.9.9 (veure RAG.md). S'aplica tant a ingest (quan es guarda un document o memoria) com a retrieval (quan es recupera per injectar al prompt).
 
 **Limit de mida de peticio:** Cos de peticio maxim de 100MB (proteccio contra DoS).
 
@@ -175,7 +175,7 @@ Logging d'events de seguretat **compatible amb RFC5424** via `plugins/security/s
 ### CryptoProvider
 
 - Algorisme: **AES-256-GCM** amb derivacio de claus **HKDF-SHA256**
-- **Cadena de fallback de la MEK (Master Encryption Key)** (corregit a v0.9.9 — Bug #19b): **fitxer `~/.nexe/master.key` (permisos 600) → OS Keyring (macOS Keychain) → variable d'entorn `NEXE_MASTER_KEY` → generacio nova**.
+- **Cadena de fallback de la MEK (Master Encryption Key)** (corregit a v0.9.9): **fitxer `~/.nexe/master.key` (permisos 600) → OS Keyring (macOS Keychain) → variable d'entorn `NEXE_MASTER_KEY` → generacio nova**.
   - Aixo permet que sessions `.enc` sobrevisquin un reset del Keychain sempre que el fitxer local o l'env estiguin intactes.
   - Abans de v0.9.9 l'ordre era keyring primer, i un reset del Keychain feia les dades irrecuperables.
 - Claus derivades per proposit: `"sqlite"`, `"sessions"`, `"text_store"`, `"backup"`
@@ -258,15 +258,15 @@ Totes les auditories de seguretat les realitzen sessions autonomes d'IA **(Claud
 - 229 tests fallant -> 0
 - Nota: A
 
-### Mega-Test v1 Pre-Release (marc 2026)
-- Auditoria autonoma de 4 fases: baseline, seguretat (23 troballes), funcional (158 tests), GO/NO-GO
+### Tests massius automatitzats, ronda 1: Pre-Release (executats per IA, marc 2026)
+- Revisio per IA de 4 fases: baseline, seguretat (23 troballes), funcional (158 tests), GO/NO-GO
 - 23 troballes (1 critica, 6 altes, 7 mitjanes, 7 baixes)
 - Veredicte: **GO WITH CONDITIONS**
 - Correccions aplicades: validacio d'input UI, sanititzacio de context RAG, rate limiting, CVEs de dependencies
 
-### Mega-Test v2 Post-Correccions (marc 2026)
-- Mateixa metodologia de 4 fases, re-executada despres d'aplicar les correccions de la v1
-- 10 troballes (vs 23 a la v1, **57% de reduccio**)
+### Tests massius automatitzats, ronda 2: Post-Correccions (executats per IA, marc 2026)
+- Mateixa metodologia de 4 fases, re-executada despres d'aplicar les correccions de la primera ronda
+- 10 troballes (vs 23 a la primera ronda, **57% de reduccio**)
 - 7 correccions addicionals aplicades: validacio d'endpoints de memoria (CRITIC), path traversal de sessions, validacio de noms de fitxer, rate limiting a tots els endpoints UI, normalitzacio Unicode als detectors d'injeccio, migracio print()->logger
 - Execucio final (v0.9.9): **4842 tests col·lectats passats, 0 fallats** (4990 totals, 148 deselected per marcadors)
 - Veredicte: **GO WITH CONDITIONS** (millorat)

@@ -207,7 +207,7 @@ server-nexe/
 │   │
 │   ├── ingest/                   # Ingestion de documentos
 │   │   ├── ingest_docs.py        # docs/ -> nexe_documentation (500/50 chars, destructivo)
-│   │   └── ingest_knowledge.py   # knowledge/ -> nexe_documentation (default, idempotente post-F7, chunk_size por documento via frontmatter)
+│   │   └── ingest_knowledge.py   # knowledge/ -> nexe_documentation (default, re-ingest idempotente, chunk_size por documento via frontmatter)
 │   │
 │   ├── metrics/                  # Prometheus /metrics
 │   ├── resilience/               # Circuit breaker, retry
@@ -246,7 +246,7 @@ server-nexe/
 ├── knowledge/                    # Documentacion para ingestion RAG (ca/es/en x 14 ficheros)
 │   └── .embeddings/              # KB embeddings precomputados (ONNX, 10.7× speedup en el arranque)
 ├── storage/                      # Datos en tiempo de ejecucion (no en git)
-├── tests/                        # 6685 funciones de test recopiladas (6900 totales)
+├── tests/                        # 6723 funciones de test recopiladas (6938 totales)
 └── nexe                          # Ejecutable CLI
 ```
 
@@ -447,7 +447,7 @@ Diferencias en modo sidecar:
 
 ## Arquitectura de tests
 
-- 6685 funciones de test recopiladas (6900 totales — 215 deselected por marcadores), 0 fallos en la ultima ejecucion
+- 6723 funciones de test recopiladas (6938 totales — 215 deselected por marcadores), 0 fallos en la ultima ejecucion
 - Cobertura real: ~85% global (baseline honesta, sin inflar)
 - Tests colocados junto a los modulos (cada modulo tiene carpeta tests/)
 - conftest.py raiz para fixtures compartidas

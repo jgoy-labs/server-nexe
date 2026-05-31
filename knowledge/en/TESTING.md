@@ -5,8 +5,8 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Testing strategy and coverage for server-nexe 1.0.5. 6685 test functions collected (6900 total, 215 deselected), 0 failures in latest run. Tests collocated with modules. Covers test structure, running tests, honest actual coverage ~85% global, AI audit test fixes, crypto tests (68), MEM_DELETE e2e tests (8), mega-test v1/v2 results, and honest assessment of testing limitations."
-tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
+abstract: "Testing strategy and coverage for server-nexe 1.0.5. 6723 test functions collected (6938 total, 215 deselected), 0 failures in latest run. Tests collocated with modules. Covers test structure, running tests, honest actual coverage ~85% global, AI audit test fixes, crypto tests (68), MEM_DELETE e2e tests (8), automated mass test run results (AI-run), and honest assessment of testing limitations."
+tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mass-tests]
 chunk_size: 800
 priority: P2
 
@@ -23,17 +23,17 @@ expires: null
 
 | Metric | Value |
 |--------|-------|
-| Total test functions collected | **6685** |
-| Total test functions (incl. deselected) | **6900** (215 deselected by markers) |
-| Latest full run passed | 6685 |
+| Total test functions collected | **6723** |
+| Total test functions (incl. deselected) | **6938** (215 deselected by markers) |
+| Latest full run passed | 6723 |
 | Failed | 0 |
 | Skipped | 6 |
 | XFailed | 1 |
 | **Actual global coverage** | **~85%** (honest baseline, not inflated) |
 
-Note: 6685 functions collected in the standard run (excluding integration/e2e/slow markers). The raw total including deselected tests is 6900.
+Note: 6723 functions collected in the standard run (excluding integration/e2e/slow markers). The raw total including deselected tests is 6938.
 
-> **Honesty note on coverage:** Historical badges have reported 97.4%, 91.1% or 93% in specific mega-test phases. Those numbers correspond to specific subsets (a phase baseline, functional against a live server) and not to the project global. The **actual global code coverage**, measured with `pytest --cov` over the whole codebase, is **~85%**. That is the value we use as reference.
+> **Honesty note on coverage:** Historical badges have reported 97.4%, 91.1% or 93% in specific mass-test phases. Those numbers correspond to specific subsets (a phase baseline, functional against a live server) and not to the project global. The **actual global code coverage**, measured with `pytest --cov` over the whole codebase, is **~85%**. That is the value we use as reference.
 >
 > **Whether the AIs are fooling us or not, you'll be the judge.** The audits we have so far were run by AI models (Claude, Gemini, and others), often with **cross-reviews** between models and final human review by the developer. It's a useful process but not foolproof — one model can defend a wrong decision that another fails to catch. That's why the community (via [GitHub Issues](https://github.com/jgoy-labs/server-nexe/issues) or the forum at server-nexe.com) has a real role: if you see tests that look like theatre, numbers that don't add up, or claims that sound too optimistic, **say so**. This doc is our bet on honesty, not the definitive proof that we got it right.
 
@@ -93,7 +93,7 @@ Root `conftest.py` provides shared fixtures. Each module can have its own `conft
 
 ## MEM_DELETE e2e tests (v0.9.9)
 
-In v0.9.9, the Bug #18 fix (DELETE_THRESHOLD 0.70 → 0.20) brought an associated battery of **8 end-to-end tests** in `tests/integration/test_mem_delete_e2e.py`:
+In v0.9.9, the MEM_DELETE fix (DELETE_THRESHOLD 0.70 → 0.20) brought an associated battery of **8 end-to-end tests** in `tests/integration/test_mem_delete_e2e.py`:
 
 - Real embedded Qdrant (not mocked)
 - Real fastembed ONNX (not mocked)
@@ -115,16 +115,16 @@ All security audits are performed by autonomous AI sessions (Claude), not extern
 - 229 failing tests fixed (8 root causes, 54 tests affected)
 - Root causes: CLI refactor, manifest changes, paths, versions, event loops, import changes
 
-### Mega-Test v1 Pre-Release
-- 4-phase autonomous audit: baseline, security, functional, GO/NO-GO
+### Automated mass test run 1: Pre-Release (AI-run)
+- 4-phase AI-run review: baseline, security, functional, GO/NO-GO
 - Baseline (phase sample): 298 tests, 97.4% coverage **of that specific phase** (not global)
 - Functional (phase sample): 158 tests against live server, 91.1% pass rate
 - 23 findings (1 critical, 6 high, 7 medium, 7 low)
 - Verdict: GO WITH CONDITIONS
 
-### Mega-Test v2 Post-Fixes
-- Same 4-phase methodology, re-run after applying v1 fixes
-- 10 findings (vs 23 in v1, 57% reduction)
+### Automated mass test run 2: Post-Fixes (AI-run)
+- Same 4-phase methodology, re-run after applying the first round of fixes
+- 10 findings (vs 23 in the first run, 57% reduction)
 - 7 fixes applied (memory validation, path traversal, filename validation, rate limiting, Unicode normalization, print→logger)
 - Final run (v0.9.9): **4842 collected tests passed, 0 failed** (4990 total)
 - Verdict: GO WITH CONDITIONS (improved)

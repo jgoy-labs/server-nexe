@@ -5,8 +5,8 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia y cobertura de pruebas de server-nexe 1.0.5. 6685 funciones de test recopiladas (6900 totales, 215 deselected), 0 fallos en la ultima ejecucion. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura real ~85% global, correcciones de tests de auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultados de mega-test v1/v2 y valoracion honesta de las limitaciones de las pruebas."
-tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
+abstract: "Estrategia y cobertura de pruebas de server-nexe 1.0.5. 6723 funciones de test recopiladas (6938 totales, 215 deselected), 0 fallos en la ultima ejecucion. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura real ~85% global, correcciones de tests de auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultados de los tests masivos automatizados (ejecutados por IA) y valoracion honesta de las limitaciones de las pruebas."
+tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mass-tests]
 chunk_size: 800
 priority: P2
 
@@ -23,17 +23,17 @@ expires: null
 
 | Metrica | Valor |
 |---------|-------|
-| Total de funciones de test recopiladas | **6685** |
-| Total de funciones de test (incl. deseleccionadas) | **6900** (215 deselected por marcadores) |
-| Ultima ejecucion completa pasados | 6685 |
+| Total de funciones de test recopiladas | **6723** |
+| Total de funciones de test (incl. deseleccionadas) | **6938** (215 deselected por marcadores) |
+| Ultima ejecucion completa pasados | 6723 |
 | Fallidos | 0 |
 | Saltados | 6 |
 | XFailed | 1 |
 | **Cobertura real global** | **~85%** (baseline honesta, sin inflar) |
 
-Nota: 6685 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 6900.
+Nota: 6723 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 6938.
 
-> **Nota de honestidad sobre cobertura:** Badges historicos han reportado 97.4%, 91.1% o 93% en fases concretas del mega-test. Esos numeros correspondian a subconjuntos especificos (baseline de una fase, funcional contra servidor en vivo) y no al global del proyecto. La **cobertura real global del codigo**, medida con `pytest --cov` sobre todo el codebase, es **~85%**. Este es el valor que usamos como referencia.
+> **Nota de honestidad sobre cobertura:** Badges historicos han reportado 97.4%, 91.1% o 93% en fases concretas de los tests masivos. Esos numeros correspondian a subconjuntos especificos (baseline de una fase, funcional contra servidor en vivo) y no al global del proyecto. La **cobertura real global del codigo**, medida con `pytest --cov` sobre todo el codebase, es **~85%**. Este es el valor que usamos como referencia.
 >
 > **Si las IAs nos estan enganando o no, lo direis vosotros.** Las auditorias que tenemos hasta ahora las han hecho modelos de IA (Claude, Gemini y otros), a menudo con **revisiones cruzadas** entre modelos y revision humana final por parte del desarrollador. Es un proceso util pero no infalible — un modelo puede defender una decision equivocada que otro no detecta. Por eso la comunidad (via [GitHub Issues](https://github.com/jgoy-labs/server-nexe/issues) o el foro en server-nexe.com) tiene un papel real: si veis tests que parecen teatro, cifras que no cuadran, o claims demasiado optimistas, **decidlo**. Esta doc es nuestra apuesta por la honestidad, no la prueba definitiva de que lo hemos acertado.
 
@@ -93,7 +93,7 @@ El `conftest.py` raiz proporciona fixtures compartidas. Cada modulo puede tener 
 
 ## Tests e2e MEM_DELETE (v0.9.9)
 
-En v0.9.9, el fix de Bug #18 (DELETE_THRESHOLD 0.70 → 0.20) vino acompanado de una bateria de **8 tests end-to-end** en `tests/integration/test_mem_delete_e2e.py`:
+En v0.9.9, la correccion de MEM_DELETE (DELETE_THRESHOLD 0.70 → 0.20) vino acompanado de una bateria de **8 tests end-to-end** en `tests/integration/test_mem_delete_e2e.py`:
 
 - Qdrant embedded real (no mockeado)
 - fastembed ONNX real (no mockeado)
@@ -115,16 +115,16 @@ Todas las auditorias de seguridad son realizadas por sesiones autonomas de IA (C
 - 229 tests fallidos corregidos (8 causas raiz, 54 tests afectados)
 - Causas raiz: refactorizacion CLI, cambios en manifests, rutas, versiones, event loops, cambios de imports
 
-### Mega-Test v1 Pre-Release
-- Auditoria autonoma de 4 fases: baseline, seguridad, funcional, GO/NO-GO
+### Tests masivos automatizados, ronda 1: Pre-Release (ejecutados por IA)
+- Revision por IA de 4 fases: baseline, seguridad, funcional, GO/NO-GO
 - Baseline (muestra de una fase): 298 tests, 97.4% cobertura **de esa fase concreta** (no global)
 - Funcional (muestra de una fase): 158 tests contra servidor en vivo, 91.1% tasa de exito
 - 23 hallazgos (1 critico, 6 altos, 7 medios, 7 bajos)
 - Veredicto: GO CON CONDICIONES
 
-### Mega-Test v2 Post-Correcciones
-- Misma metodologia de 4 fases, re-ejecutada tras aplicar las correcciones de v1
-- 10 hallazgos (vs 23 en v1, 57% de reduccion)
+### Tests masivos automatizados, ronda 2: Post-Correcciones (ejecutados por IA)
+- Misma metodologia de 4 fases, re-ejecutada tras aplicar las correcciones de la primera ronda
+- 10 hallazgos (vs 23 en la primera ronda, 57% de reduccion)
 - 7 correcciones aplicadas (validacion de memoria, path traversal, validacion de nombres de fichero, rate limiting, normalizacion Unicode, print->logger)
 - Ejecucion final (v0.9.9): **4842 tests recopilados pasados, 0 fallidos** (4990 totales)
 - Veredicto: GO CON CONDICIONES (mejorado)

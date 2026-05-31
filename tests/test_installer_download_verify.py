@@ -4,7 +4,7 @@ Server Nexe
 Location: tests/test_installer_download_verify.py
 Description: Unit tests for installer.download_verify — post-download SHA256
              enforcement for Hugging Face MLX snapshots, GGUF files and
-             Ollama models (F4.1 audit DoD-AUD-SX-0423 §2.7).
+             Ollama models (internal security review AUD-INT-001 §2.7).
 
              TDD RED → GREEN flow. Tests mock subprocess / filesystem so
              they stay in the default fast suite (no network, no real

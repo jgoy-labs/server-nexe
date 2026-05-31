@@ -3,7 +3,7 @@
 Server Nexe
 Location: tests/test_installer_sha256_catalog.py
 Description: Smoke tests for the MODEL_WEIGHT_SHA256 map and its helpers
-             introduced in F4.1 (audit DoD-AUD-SX-0423 §2.7). Enforces that:
+             introduced by the SHA256 weight pinning (internal security review AUD-INT-001 §2.7). Enforces that:
 
              1. Every downloadable artefact referenced by MODEL_CATALOG has
                 a matching entry in MODEL_WEIGHT_SHA256 (value may be None).

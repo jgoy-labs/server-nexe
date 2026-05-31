@@ -3,7 +3,7 @@
 Server Nexe
 Location: tests/test_installer_embedding_bundle.py
 Description: Integrity tests for the DMG-bundled fastembed model
-             (F4.1 audit DoD-AUD-SX-0423 §2.7).
+             (internal security review AUD-INT-001 §2.7).
 
 Covers:
   * ``verify_embedding_bundle`` at runtime — happy path, manifest missing
@@ -216,7 +216,7 @@ def test_build_script_has_manifest_generation_step() -> None:
     text = _BUILD_SCRIPT.read_text(encoding="utf-8")
     assert "embeddings.manifest.json" in text, (
         "build-embedding-bundle.sh must emit embeddings.manifest.json "
-        "(F4.1 audit DoD-AUD-SX-0423 §2.7)"
+        "(internal security review AUD-INT-001 §2.7)"
     )
     assert "sha256" in text.lower()
     assert "Step 6" in text or "step 6" in text.lower()

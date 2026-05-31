@@ -6,7 +6,7 @@ Description: Model catalog data (MODEL_CATALOG).
              4 tiers: small (8 GB), medium (16 GB), large (24 GB), xlarge (32 GB).
              Revised 2026-04-16 after empirical testing of 24 models.
 
-             2026-04-23 (F4.1 audit DoD-AUD-SX-0423 §2.7): added
+             2026-04-23 (SHA256 weight pinning, internal security review AUD-INT-001 §2.7): added
              MODEL_WEIGHT_SHA256 map and get_expected_sha256() helper for
              post-download integrity verification. Kept as a separate map
              so the Swift wizard models.json contract stays unchanged and

@@ -5,8 +5,8 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia de testing i cobertura per a server-nexe 1.0.5. 6685 funcions de test col·lectades (6900 totals, 215 deselected), 0 errors a l'ultima execucio. Tests col·locats amb els moduls. Cobreix estructura de tests, execucio, cobertura real ~85% global, correccions de tests de l'auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultats del mega-test v1/v2 i valoracio honesta de les limitacions del testing."
-tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mega-test]
+abstract: "Estrategia de testing i cobertura per a server-nexe 1.0.5. 6723 funcions de test col·lectades (6938 totals, 215 deselected), 0 errors a l'ultima execucio. Tests col·locats amb els moduls. Cobreix estructura de tests, execucio, cobertura real ~85% global, correccions de tests de l'auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultats dels tests massius automatitzats (executats per IA) i valoracio honesta de les limitacions del testing."
+tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mass-tests]
 chunk_size: 800
 priority: P2
 
@@ -23,17 +23,17 @@ expires: null
 
 | Metrica | Valor |
 |--------|-------|
-| Total funcions de test col·lectades | **6685** |
-| Total funcions de test (incl. deseleccionades) | **6900** (215 deselected per marcadors) |
-| Ultima execucio completa passats | 6685 |
+| Total funcions de test col·lectades | **6723** |
+| Total funcions de test (incl. deseleccionades) | **6938** (215 deselected per marcadors) |
+| Ultima execucio completa passats | 6723 |
 | Fallats | 0 |
 | Omesos | 6 |
 | XFailed | 1 |
 | **Cobertura real global** | **~85%** (baseline honest, sense inflar) |
 
-Nota: 6685 funcions col·lectades per l'execucio estandard (sense marcadors integration/e2e/slow). El total brut incloent tests deseleccionats es 6900.
+Nota: 6723 funcions col·lectades per l'execucio estandard (sense marcadors integration/e2e/slow). El total brut incloent tests deseleccionats es 6938.
 
-> **Nota d'honestedat sobre cobertura:** Badges històrics han reportat 97.4%, 91.1% o 93% en fases concretes del mega-test. Aquests números corresponien a subconjunts específics (baseline d'una fase, funcional contra servidor en viu) i no al global del projecte. La **cobertura real global del codi**, mesurada amb `pytest --cov` sobre tot el codebase, és **~85%**. Aquest és el valor que fem servir com a referència.
+> **Nota d'honestedat sobre cobertura:** Badges històrics han reportat 97.4%, 91.1% o 93% en fases concretes dels tests massius. Aquests números corresponien a subconjunts específics (baseline d'una fase, funcional contra servidor en viu) i no al global del projecte. La **cobertura real global del codi**, mesurada amb `pytest --cov` sobre tot el codebase, és **~85%**. Aquest és el valor que fem servir com a referència.
 >
 > **Si les IAs ens estan enganyant o no, ho direu vosaltres.** Les auditories que tenim fins ara les han fet models d'IA (Claude, Gemini i altres), sovint amb **revisions creuades** entre models i revisió humana final per part del desenvolupador. És un procés útil però no infal·lible — un model pot defensar una decisió equivocada que un altre no detecta. Per això la comunitat (via [GitHub Issues](https://github.com/jgoy-labs/server-nexe/issues) o el fòrum a server-nexe.com) té un paper important: si veieu tests que semblen teatre, xifres que no quadren, o claims massa optimistes, **digueu-ho**. Aquesta doc és la nostra aposta per l'honestedat, no la prova definitiva que ho hem encertat.
 
@@ -93,7 +93,7 @@ El `conftest.py` arrel proporciona fixtures compartides. Cada modul pot tenir el
 
 ## Tests e2e MEM_DELETE (v0.9.9)
 
-A v0.9.9, el fix de Bug #18 (DELETE_THRESHOLD 0.70 → 0.20) va portar associada una bateria de **8 tests end-to-end** a `tests/integration/test_mem_delete_e2e.py`:
+A v0.9.9, la correccio de MEM_DELETE (DELETE_THRESHOLD 0.70 → 0.20) va portar associada una bateria de **8 tests end-to-end** a `tests/integration/test_mem_delete_e2e.py`:
 
 - Qdrant embedded real (no mockat)
 - fastembed ONNX real (no mockat)
@@ -115,16 +115,16 @@ Totes les auditories de seguretat les realitzen sessions autonomes d'IA (Claude)
 - 229 tests fallant corregits (8 causes arrel, 54 tests afectats)
 - Causes arrel: refactoritzacio CLI, canvis de manifest, rutes, versions, event loops, canvis d'imports
 
-### Mega-Test v1 Pre-Release
-- Auditoria autonoma de 4 fases: baseline, seguretat, funcional, GO/NO-GO
+### Tests massius automatitzats, ronda 1: Pre-Release (executats per IA)
+- Revisio per IA de 4 fases: baseline, seguretat, funcional, GO/NO-GO
 - Baseline (mostra d'una fase): 298 tests, 97.4% cobertura **d'aquella fase concreta** (no global)
 - Funcional (mostra d'una fase): 158 tests contra servidor en viu, 91.1% taxa de pas
 - 23 troballes (1 critica, 6 altes, 7 mitjanes, 7 baixes)
 - Veredicte: GO WITH CONDITIONS
 
-### Mega-Test v2 Post-Correccions
-- Mateixa metodologia de 4 fases, re-executada despres d'aplicar les correccions de la v1
-- 10 troballes (vs 23 a la v1, 57% de reduccio)
+### Tests massius automatitzats, ronda 2: Post-Correccions (executats per IA)
+- Mateixa metodologia de 4 fases, re-executada despres d'aplicar les correccions de la primera ronda
+- 10 troballes (vs 23 a la primera ronda, 57% de reduccio)
 - 7 correccions aplicades (validacio de memoria, path traversal, validacio de noms de fitxer, rate limiting, normalitzacio Unicode, print->logger)
 - Execucio final (v0.9.9): **4842 tests col·lectats passats, 0 fallats** (4990 totals)
 - Veredicte: GO WITH CONDITIONS (millorat)

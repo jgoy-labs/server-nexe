@@ -74,7 +74,7 @@ server-nexe combina cinco capacidades:
 - **Linux x86_64:** Soportado (backend Ollama, CPU). Tests unitarios pasan, instalacion CLI validada.
 - **Windows:** En desarrollo (sin ETA pública)
 - **Puerto por defecto:** 9119
-- **Tests:** 6685 funciones de test recopiladas (6900 totales — 215 deselected por marcadores), 0 fallos en la ultima ejecucion
+- **Tests:** 6723 funciones de test recopiladas (6938 totales — 215 deselected por marcadores), 0 fallos en la ultima ejecucion
 
 ## Documentacion AI-Ready
 

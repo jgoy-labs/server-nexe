@@ -247,7 +247,7 @@ Reinicia el servidor per aplicar els canvis: `./nexe restart`
 
 ## Verificacio d'integritat (SHA256)
 
-Des de la remediacio de l'audit `DoD-AUD-SX-0423` (§2.7), tots els pesos descarregats durant la instal·lacio es verifiquen amb SHA256 contra un cataleg intern (`installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256`). El check aplica a tres superficies de descarrega:
+Des de la remediacio de la revisio interna de seguretat assistida per IA `AUD-INT-001` (§2.7), tots els pesos descarregats durant la instal·lacio es verifiquen amb SHA256 contra un cataleg intern (`installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256`). El check aplica a tres superficies de descarrega:
 
 | Backend | Que es verifica | Com |
 |---------|-----------------|-----|
@@ -268,7 +268,7 @@ Quan el cataleg porta un pin (SHA256 concret) i el valor observat no coincideix,
 
 Les entrades del cataleg amb pin `None` (per exemple models afegits despres d'un DMG ja publicat) **no aborten**. L'installer emet un `WARNING` visible (`⚠️ <model>: SHA256 not pinned in catalog`) i continua. Aixo preserva compatibilitat amb instal·lacions creades amb DMG anteriors a la v1.0.4-beta.
 
-Per a l'embedding bundle, un DMG sense `embeddings.manifest.json` (build anterior a F4.1) també continua en mode legacy amb un warning a stdout.
+Per a l'embedding bundle, un DMG sense `embeddings.manifest.json` (build anterior al pinning dels pesos) també continua en mode legacy amb un warning a stdout.
 
 ### Protecció extra: escapament per symlinks
 
@@ -319,7 +319,7 @@ Aplicacio de la barra de menu per controlar el servidor sense terminal. Implemen
 | **Obrir logs** | Obre `storage/logs/server.log` a l'editor associat amb `.log`. | `_open_logs` → `tray.py:512` |
 | **Server RAM** | RAM consumida pel proces servidor + model carregat. El polling (`psutil`) es fa a un daemon thread (`_RamMonitor`, `installer/tray_monitor.py`, 141 linies) per no bloquejar el menu (fix post-v0.9.0 — abans freezava el teclat). | `tray_monitor.py`; `tray.py:205` |
 | **Temps (uptime)** | Temps viu del servidor calculat des de `server_start_time`. | `tray.py:208` |
-| **Documentacio** | Obre la documentacio oficial. Item afegit al menu principal (Bug #9) per reemplaçar un enllaç duplicat. | `_open_docs` → `tray.py:523` |
+| **Documentacio** | Obre la documentacio oficial. Item afegit al menu principal per reemplaçar un enllaç duplicat. | `_open_docs` → `tray.py:523` |
 | **Configuracio** | Submenu amb 3 opcions: | `tray.py:227-243` |
 | ↳ server-nexe.com | Obre la web oficial al navegador. | `_open_website` → `tray.py:520` |
 | ↳ Suportar el projecte | Obre GitHub Sponsors. | `_open_donate` → `tray.py:528` |

@@ -5,7 +5,7 @@ id: nexe-errors-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Common errors and solutions for server-nexe 1.0.5. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, streaming, encryption errors, and Bug #19 fixes (MEK fallback, personal_memory wipe)."
+abstract: "Common errors and solutions for server-nexe 1.0.5. Covers installation errors, server startup, Web UI, API authentication, model loading, memory/RAG, streaming, encryption errors, and the v0.9.9 memory fixes (MEK fallback, personal_memory wipe)."
 tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, streaming, encryption]
 chunk_size: 600
 priority: P1
@@ -89,22 +89,22 @@ expires: null
 
 ## Historical errors fixed in v0.9.9
 
-### Bug #18 — MEM_DELETE did not delete facts (P0)
+### MEM_DELETE did not delete facts (fixed in v0.9.9)
 
-**Symptom (pre-v0.9.9):** The user said "forget that my name is Jordi" and the system did not delete the fact from memory. `DELETE_THRESHOLD` of `0.70` was too high and no match exceeded the threshold.
+**Symptom (pre-v0.9.9):** The user said "forget that my name is Alex" and the system did not delete the fact from memory. `DELETE_THRESHOLD` of `0.70` was too high and no match exceeded the threshold.
 
 **Fix (v0.9.9):**
 - **`DELETE_THRESHOLD` adjusted from `0.70` to `0.20`** (discovered empirically with 8 real e2e tests against embedded Qdrant + fastembed).
 - **`_filter_rag_injection`** neutralises `[MEM_SAVE:…]`, `[MEM_DELETE:…]`, `[OLVIDA|OBLIT|FORGET:…]`, `[MEMORIA:…]` patterns on both ingest and retrieval to prevent the model from self-deleting as a side effect.
 - **2-turn `clear_all` confirmation:** if the user asks to delete EVERYTHING (not a specific fact), the system asks for confirmation on the next turn (`session._pending_clear_all`). Prevents accidental mass wipes.
 
-### Bug #19a — `personal_memory` wiped on restart
+### `personal_memory` was wiped on restart (fixed in v0.9.9)
 
 **Symptom (pre-v0.9.9):** Every server restart triggered a defensive "dim-check" branch that silently deleted the `personal_memory` collection. Users lost memory between sessions.
 
 **Fix (v0.9.9):** Defensive branch removed. Memory now persists across restarts without explicit user authorisation.
 
-### Bug #19b — `.enc` sessions survive Keychain reset
+### `.enc` sessions did not survive a Keychain reset (fixed in v0.9.9)
 
 **Symptom (pre-v0.9.9):** If the user reset the macOS Keychain (or lost it), the CryptoProvider could not recover the MEK (Master Encryption Key) and `.enc` sessions became unrecoverable even though `~/.nexe/master.key` was on disk.
 
@@ -112,8 +112,8 @@ expires: null
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| Memory lost after restart (pre-v0.9.9) | Bug #19a | Update to v0.9.9. No retroactive workaround: the memory was already lost. |
-| .enc sessions do not decrypt after Keychain reset (pre-v0.9.9) | Bug #19b | Update to v0.9.9. If you have the `~/.nexe/master.key` file or the `NEXE_MASTER_KEY` env var, recovery is now automatic. |
+| Memory lost after restart (pre-v0.9.9) | `personal_memory` wipe on restart | Update to v0.9.9. No retroactive workaround: the memory was already lost. |
+| .enc sessions do not decrypt after Keychain reset (pre-v0.9.9) | MEK fallback order | Update to v0.9.9. If you have the `~/.nexe/master.key` file or the `NEXE_MASTER_KEY` env var, recovery is now automatic. |
 
 ## How to report an error
 

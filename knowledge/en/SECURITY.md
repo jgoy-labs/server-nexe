@@ -41,8 +41,8 @@ expires: null
 - [Security Audits](#security-audits)
   - [AI Audit v1 (March 2026)](#ai-audit-v1-march-2026)
   - [AI Audit v2 (March 2026)](#ai-audit-v2-march-2026)
-  - [Mega-Test v1 Pre-Release (March 2026)](#mega-test-v1-pre-release-march-2026)
-  - [Mega-Test v2 Post-Fixes (March 2026)](#mega-test-v2-post-fixes-march-2026)
+  - [Automated mass test run 1: Pre-Release (AI-run, March 2026)](#automated-mass-test-run-1-pre-release-ai-run-march-2026)
+  - [Automated mass test run 2: Post-Fixes (AI-run, March 2026)](#automated-mass-test-run-2-post-fixes-ai-run-march-2026)
   - [Key fixes from audits](#key-fixes-from-audits)
   - [Honesty note](#honesty-note)
 - [Accepted Risks](#accepted-risks)
@@ -154,7 +154,7 @@ The API endpoint `POST /v1/chat/completions` validates and sanitizes input throu
 - `[OLVIDA:…]` / `[OBLIT:…]` / `[FORGET:…]` — removed (trilingual)
 - `[MEMORIA:…]` — removed
 
-This is part of the Bug #18 fix (see RAG.md). It applies both on ingest (when a document or memory is stored) and on retrieval (when content is fetched for injection into the prompt).
+This is part of the v0.9.9 MEM_DELETE fix (see RAG.md). It applies both on ingest (when a document or memory is stored) and on retrieval (when content is fetched for injection into the prompt).
 
 **Request size limit:** 100MB maximum request body (DoS protection).
 
@@ -175,7 +175,7 @@ This is part of the Bug #18 fix (see RAG.md). It applies both on ingest (when a 
 ### CryptoProvider
 
 - Algorithm: **AES-256-GCM** with **HKDF-SHA256** key derivation
-- **MEK (Master Encryption Key) fallback chain** (corrected in v0.9.9 — Bug #19b): **file `~/.nexe/master.key` (permissions 600) → OS Keyring (macOS Keychain) → env var `NEXE_MASTER_KEY` → new generation**.
+- **MEK (Master Encryption Key) fallback chain** (corrected in v0.9.9): **file `~/.nexe/master.key` (permissions 600) → OS Keyring (macOS Keychain) → env var `NEXE_MASTER_KEY` → new generation**.
   - This allows `.enc` sessions to survive a Keychain reset provided the local file or env var remains intact.
   - Before v0.9.9 the order was keyring first, and a Keychain reset made the data unrecoverable.
 - Derived keys per purpose: `"sqlite"`, `"sessions"`, `"text_store"`, `"backup"`
@@ -258,15 +258,15 @@ All security audits are performed by autonomous AI sessions **(Claude, Gemini, a
 - 229 failing tests → 0
 - Grade: A
 
-### Mega-Test v1 Pre-Release (March 2026)
-- 4-phase autonomous audit: baseline, security (23 findings), functional (158 tests), GO/NO-GO
+### Automated mass test run 1: Pre-Release (AI-run, March 2026)
+- 4-phase AI-run review: baseline, security (23 findings), functional (158 tests), GO/NO-GO
 - 23 findings (1 critical, 6 high, 7 medium, 7 low)
 - Verdict: **GO WITH CONDITIONS**
 - Fixes applied: UI input validation, RAG context sanitization, rate limiting, dependency CVEs
 
-### Mega-Test v2 Post-Fixes (March 2026)
-- Same 4-phase methodology, re-run after applying v1 fixes
-- 10 findings (vs 23 in v1, **57% reduction**)
+### Automated mass test run 2: Post-Fixes (AI-run, March 2026)
+- Same 4-phase methodology, re-run after applying the first round of fixes
+- 10 findings (vs 23 in the first run, **57% reduction**)
 - 7 additional fixes applied: memory endpoint validation (CRITICAL), session path traversal, filename validation, rate limiting all UI endpoints, Unicode normalization in injection detectors, print()→logger migration
 - Final run (v0.9.9): **4842 collected tests passed, 0 failed** (4990 total, 148 deselected by markers)
 - Verdict: **GO WITH CONDITIONS** (improved)

@@ -33,7 +33,7 @@ class TestMemoryHelperInit:
     def test_detect_intent_save(self):
         from plugins.web_ui_module.core.memory_helper import MemoryHelper
         helper = MemoryHelper()
-        intent, _ = helper.detect_intent("My name is Jordi, save it")
+        intent, _ = helper.detect_intent("My name is Alex, save it")
         assert intent == "save"
 
     def test_detect_intent_recall(self):
@@ -46,7 +46,7 @@ class TestMemoryHelperInit:
         from plugins.web_ui_module.core.memory_helper import MemoryHelper
         helper = MemoryHelper()
         assert helper._is_trivial_message("hi") is True
-        assert helper._is_trivial_message("My name is Jordi and I work at Helefante") is False
+        assert helper._is_trivial_message("My name is Alex and I work at Acme Corp") is False
 
     def test_get_memory_helper_singleton(self):
         from plugins.web_ui_module.core.memory_helper import get_memory_helper

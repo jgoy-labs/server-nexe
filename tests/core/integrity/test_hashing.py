@@ -6,7 +6,7 @@ Description: Unit tests for core.integrity.hashing — SHA256 helpers and the
              verify_sha256 policy function used by the installer to abort on
              supply-chain mismatches.
 
-             TDD RED → GREEN flow for audit finding DoD-AUD-SX-0423 §2.7
+             TDD RED → GREEN flow for internal security-review finding AUD-INT-001 §2.7
              (SHA256 pinning of downloaded model weights).
 ────────────────────────────────────
 """

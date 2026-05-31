@@ -2017,7 +2017,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         })
         session_mgr._save_session_to_disk(session)
 
-        # auto_save call removed per HOMAD memoria v1 (2026-04-01) decision —
+        # auto_save call removed per the memory-v1 decision (2026-04-01) —
         # manual MEM_SAVE only until Part 2. The helper.auto_save function is
         # kept for direct test invocation but no longer called from the chat path.
 

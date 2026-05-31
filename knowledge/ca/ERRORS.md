@@ -5,7 +5,7 @@ id: nexe-errors-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Errors comuns i solucions per a server-nexe 1.0.5. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, streaming, errors d'encriptacio i fixes de Bug #19 (MEK fallback, personal_memory wipe)."
+abstract: "Errors comuns i solucions per a server-nexe 1.0.5. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, streaming, errors d'encriptacio i les correccions de memoria de v0.9.9 (MEK fallback, personal_memory wipe)."
 tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, streaming, encryption]
 chunk_size: 600
 priority: P1
@@ -89,22 +89,22 @@ expires: null
 
 ## Errors històrics corregits a v0.9.9
 
-### Bug #18 — MEM_DELETE no esborrava fets (P0)
+### MEM_DELETE no esborrava fets (corregit a v0.9.9)
 
-**Símptoma (pre-v0.9.9):** L'usuari deia "oblida que em dic Jordi" i el sistema no esborrava el fet de la memòria. El DELETE_THRESHOLD de `0.70` era massa alt i cap coincidència superava el llindar.
+**Símptoma (pre-v0.9.9):** L'usuari deia "oblida que em dic Alex" i el sistema no esborrava el fet de la memòria. El DELETE_THRESHOLD de `0.70` era massa alt i cap coincidència superava el llindar.
 
 **Fix (v0.9.9):**
 - **`DELETE_THRESHOLD` ajustat de `0.70` a `0.20`** (descobert empíricament amb 8 tests e2e reals contra Qdrant embedded + fastembed).
 - **`_filter_rag_injection`** neutralitza patrons `[MEM_SAVE:…]`, `[MEM_DELETE:…]`, `[OLVIDA|OBLIT|FORGET:…]`, `[MEMORIA:…]` tant a ingest com a retrieval per evitar que el model auto-esborri per efecte rebot.
 - **Confirmació `clear_all` 2-torns:** si l'usuari demana esborrar TOT (no un fet concret), el sistema demana confirmació al torn següent (`session._pending_clear_all`). Evita pèrdues massives accidentals.
 
-### Bug #19a — `personal_memory` es wipeja al reiniciar
+### `personal_memory` es wipejava al reiniciar (corregit a v0.9.9)
 
 **Símptoma (pre-v0.9.9):** Cada reinici del servidor disparava una branca defensiva de "dim-check" que esborrava silenciosament la col·lecció `personal_memory`. Els usuaris perdien la memòria entre sessions.
 
 **Fix (v0.9.9):** Eliminada la branca defensiva. Ara la memòria persisteix entre reinicis sense autorització explícita de l'usuari.
 
-### Bug #19b — sessions `.enc` sobreviuen reset del Keychain
+### Sessions `.enc` no sobrevivien un reset del Keychain (corregit a v0.9.9)
 
 **Símptoma (pre-v0.9.9):** Si l'usuari reiniciava el macOS Keychain (o el perdia), el CryptoProvider no podia recuperar la MEK (Master Encryption Key) i les sessions `.enc` quedaven irrecuperables tot i tenir `~/.nexe/master.key` al disc.
 
@@ -112,8 +112,8 @@ expires: null
 
 | Error | Causa | Solucio |
 |-------|-------|----------|
-| Memoria perduda despres de reiniciar (pre-v0.9.9) | Bug #19a | Actualitza a v0.9.9. Sense workaround retroactiu: la memoria ja s'havia perdut. |
-| Sessions .enc no desencripten despres de reset Keychain (pre-v0.9.9) | Bug #19b | Actualitza a v0.9.9. Si tens el fitxer `~/.nexe/master.key` o l'entorn `NEXE_MASTER_KEY`, ara es recupera automaticament. |
+| Memoria perduda despres de reiniciar (pre-v0.9.9) | Wipe de `personal_memory` al reinici | Actualitza a v0.9.9. Sense workaround retroactiu: la memoria ja s'havia perdut. |
+| Sessions .enc no desencripten despres de reset Keychain (pre-v0.9.9) | Ordre de fallback de la MEK | Actualitza a v0.9.9. Si tens el fitxer `~/.nexe/master.key` o l'entorn `NEXE_MASTER_KEY`, ara es recupera automaticament. |
 
 ## Com reportar un error
 

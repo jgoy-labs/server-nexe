@@ -197,8 +197,8 @@ fi
 #     but here the entries reference wheels in $WHEELS_DIR (not CWD), and
 #     embedding the cross-validation provenance + per-wheel diagnostics in
 #     the loop body keeps the supply chain audit trail visible.
-#   - Reuses the same _sha256() helper as build-embedding-bundle.sh (F4.1
-#     audit DoD-AUD-SX-0423 §2.7) — single behaviour, two scripts.
+#   - Reuses the same _sha256() helper as build-embedding-bundle.sh
+#     (internal security review AUD-INT-001 §2.7) — single behaviour, two scripts.
 #
 # Why we do NOT do a tamper test against the live bundle in CI: this script
 # starts with `rm -rf "$WHEELS_DIR"` at Step 2 and re-downloads, so any

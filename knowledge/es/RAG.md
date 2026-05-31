@@ -5,7 +5,7 @@ id: nexe-rag-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v1.0.5). Cubre 3 colecciones Qdrant con thresholds, memoria automatica MEM_SAVE, intent de borrado (DELETE_THRESHOLD 0.20 post-Bug #18), subida de documentos con aislamiento por sesion, embeddings (768D, fastembed ONNX principal offline), parametros de chunking, construccion de contexto con etiquetas i18n, visualizacion de pesos RAG, sanitizacion RAG injection (_filter_rag_injection), confirmacion clear_all 2-turnos, precomputed KB embeddings, poda inteligente, deduplicacion, TextStore encriptado."
+abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v1.0.5). Cubre 3 colecciones Qdrant con thresholds, memoria automatica MEM_SAVE, intent de borrado (DELETE_THRESHOLD 0.20 desde v0.9.9), subida de documentos con aislamiento por sesion, embeddings (768D, fastembed ONNX principal offline), parametros de chunking, construccion de contexto con etiquetas i18n, visualizacion de pesos RAG, sanitizacion RAG injection (_filter_rag_injection), confirmacion clear_all 2-turnos, precomputed KB embeddings, poda inteligente, deduplicacion, TextStore encriptado."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -165,7 +165,7 @@ Qdrant — colección personal_memory
 
 **Intent de borrado (MEM_DELETE):** Cuando el usuario dice "olvida que X", busca entradas con similitud >= **DELETE_THRESHOLD (0.20 desde v0.9.9)**. Borra la coincidencia mas cercana. Guard anti-re-save: `_recently_deleted_facts` evita que el modelo vuelva a guardar un hecho recien borrado dentro de la misma sesion.
 
-> **Bug #18 fix (v0.9.9):** El threshold anterior (0.70) era demasiado alto y ninguna coincidencia pasaba la prueba. Se ajusto a **0.20** tras 8 tests e2e reales (`tests/integration/test_mem_delete_e2e.py`) contra Qdrant embedded + fastembed. Ahora el borrado funciona consistentemente.
+> **En v0.9.9 se bajo el threshold de memoria:** el valor anterior (0.70) era demasiado alto y ninguna coincidencia pasaba la prueba. Se ajusto a **0.20** tras 8 tests e2e reales (`tests/integration/test_mem_delete_e2e.py`) contra Qdrant embedded + fastembed. Ahora el borrado funciona consistentemente.
 
 ### Confirmacion `clear_all` 2-turnos
 

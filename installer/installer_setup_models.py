@@ -3,7 +3,7 @@
 Server Nexe
 Location: installer/installer_setup_models.py
 Description: Model downloads (Ollama / GGUF / MLX) with post-download
-             SHA256 verification (F4.1 audit DoD-AUD-SX-0423 §2.7).
+             SHA256 verification (internal security review AUD-INT-001 §2.7).
 
 Ollama runtime installation (app bundle + install script) moved to
 ``installer.installer_ollama_install`` on 2026-04-23. ``ensure_ollama_installed``

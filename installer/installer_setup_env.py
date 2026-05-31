@@ -212,7 +212,7 @@ def _seed_fastembed_cache(bundle_embeddings_dir, cache_dir):
     downloads nothing from HuggingFace. RAG works offline from the first
     boot.
 
-    F4.1 (audit DoD-AUD-SX-0423 §2.7): before copying, validate the bundle's
+    SHA256 weight pinning (internal security review AUD-INT-001 §2.7): before copying, validate the bundle's
     integrity manifest (``embeddings.manifest.json``). On mismatch,
     ``DownloadIntegrityError`` propagates so the installer aborts before
     poisoning the user's fastembed cache. Legacy DMGs (built before F4.1)

@@ -5,8 +5,8 @@ id: nexe-threat-model-stride
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Threat model formal STRIDE de server-nexe (v1.0, 2026-04-24). Servidor de IA local mono-usuario: 8 trust boundaries (navegador/CLI/Qdrant/Ollama/HF/disco/keyring/LAN-bootstrap), 6 categorias de activos (datos de usuario, secretos operativos, pesos de modelo, integridad de codigo, disponibilidad, metadatos), matriz STRIDE con mitigaciones citando file:line, alcance explicito, riesgos residuales declarados, apendice LINDDUN de privacidad. Sustituye el threat model informal en SECURITY.md:3-15. Impulsado por auditoria externa DoD-AUD-SX-0423 §2.11 (F4.2)."
-tags: [threat-model, stride, seguridad, audit, dod, local-first, mono-usuario, boundaries, activos, mitigaciones, privacidad, lindduan, compliance, spoofing, tampering, repudio, disclosure, dos, elevacion-privilegio]
+abstract: "Threat model formal STRIDE de server-nexe (v1.0, 2026-04-24). Servidor de IA local mono-usuario: 8 trust boundaries (navegador/CLI/Qdrant/Ollama/HF/disco/keyring/LAN-bootstrap), 6 categorias de activos (datos de usuario, secretos operativos, pesos de modelo, integridad de codigo, disponibilidad, metadatos), matriz STRIDE con mitigaciones citando file:line, alcance explicito, riesgos residuales declarados, apendice LINDDUN de privacidad. Sustituye el threat model informal en SECURITY.md:3-15. Impulsado por la revision interna de seguridad asistida por IA AUD-INT-001 §2.11 (STRIDE threat model)."
+tags: [threat-model, stride, seguridad, audit, local-first, mono-usuario, boundaries, activos, mitigaciones, privacidad, lindduan, compliance, spoofing, tampering, repudio, disclosure, dos, elevacion-privilegio]
 chunk_size: 800
 priority: P1
 
@@ -24,13 +24,13 @@ expires: null
 **Estado:** Activo, revisado en cada minor release.
 **Sustituye:** `SECURITY.md` §"Scope and threat model" (informal, lineas 3–15 y 80–90). Esa seccion se queda como resumen de un parrafo y apunta aqui para el detalle.
 
-Este documento formaliza el threat model que hasta la v1.0.4-beta estaba implicito en el codigo. Es el artefacto referenciado por la auditoria externa `DoD-AUD-SX-0423-NXE-01` §2.11. No es un informe de pen-test: describe **de que defiende server-nexe, de que no, y que controles avalan cada afirmacion**, con cada control citando el fichero:linea donde esta implementado.
+Este documento formaliza el threat model que hasta la v1.0.4-beta estaba implicito en el codigo. Es el artefacto referenciado por la revision interna de seguridad asistida por IA `AUD-INT-001` §2.11. No es un informe de pen-test: describe **de que defiende server-nexe, de que no, y que controles avalan cada afirmacion**, con cada control citando el fichero:linea donde esta implementado.
 
 ---
 
 ## 1. Proposito y alcance
 
-server-nexe es un **servidor de IA local, mono-usuario** con memoria RAG persistente. Se ejecuta en la maquina del propio usuario, hace bind a `127.0.0.1:9119` por defecto, y asume un usuario local de confianza. Este threat model cubre la release 1.0.5 mas el hardening `[Unreleased]` en `main` (F1–F4.2).
+server-nexe es un **servidor de IA local, mono-usuario** con memoria RAG persistente. Se ejecuta en la maquina del propio usuario, hace bind a `127.0.0.1:9119` por defecto, y asume un usuario local de confianza. Este threat model cubre la release 1.0.5 mas el hardening `[Unreleased]` en `main` (hardening de seguridad y el threat model STRIDE).
 
 Dentro del alcance:
 
@@ -51,7 +51,7 @@ Instalas el DMG o clonas el repo, usas server-nexe para hablar con un LLM local 
 
 ### 2.2 Administrador auditando para compliance
 
-Evaluas server-nexe contra una politica interna (estilo DoD, ISO 27001, o similar). Necesitas ver: **cual es el threat model, cuales los controles, que queda sin mitigar, que esta explicitamente fuera de alcance**. Los §§5–9 responden eso. server-nexe es una herramienta OSS personal, no un SaaS multi-tenant; varias casillas de un checklist de compliance tradicional se marcaran "fuera de alcance" honestamente (vease §7), y la seccion de riesgos residuales (§8) es deliberadamente explicita.
+Evaluas server-nexe contra una politica interna (ISO 27001 o similar). Necesitas ver: **cual es el threat model, cuales los controles, que queda sin mitigar, que esta explicitamente fuera de alcance**. Los §§5–9 responden eso. server-nexe es una herramienta OSS personal, no un SaaS multi-tenant; varias casillas de un checklist de compliance tradicional se marcaran "fuera de alcance" honestamente (vease §7), y la seccion de riesgos residuales (§8) es deliberadamente explicita.
 
 ## 3. Asunciones
 
@@ -89,9 +89,9 @@ Sensibilidad primaria: **confidencialidad** del material secreto, **integridad**
 
 Pesos LLM descargados por el installer en el primer arranque (Hugging Face snapshot_download, Ollama pull, o URL GGUF directa), mas el modelo de embedding fastembed ONNX empaquetado en el DMG. Tras la instalacion viven bajo `~/.cache/huggingface/`, `~/.ollama/`, y el subdirectorio `embeddings/` del arbol de instalacion.
 
-Desde F4.1 (`bff18cc`), cada peso descargado en el primer arranque es verificado SHA-256 contra `installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256` via `core/integrity/hashing.py` e `installer/download_verify.py`. El modelo fastembed empaquetado en el DMG va acompañado de un `embeddings.manifest.json` (tres digests para `model*.onnx`, `tokenizer.json`, `config.json`).
+Desde que llego el pinning SHA256 de los pesos (`bff18cc`), cada peso descargado en el primer arranque es verificado SHA-256 contra `installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256` via `core/integrity/hashing.py` e `installer/download_verify.py`. El modelo fastembed empaquetado en el DMG va acompañado de un `embeddings.manifest.json` (tres digests para `model*.onnx`, `tokenizer.json`, `config.json`).
 
-Sensibilidad primaria: **integridad**. Un peso manipulado instala una backdoor en cada inferencia futura; F4.1 lo cierra en el momento de descarga.
+Sensibilidad primaria: **integridad**. Un peso manipulado instala una backdoor en cada inferencia futura; el pinning de los pesos lo cierra en el momento de descarga.
 
 ### 4.4 Integridad del codigo
 
@@ -170,9 +170,9 @@ Leyenda: ● = amenaza activa con mitigacion, ◐ = parcial / solo defensa-en-pr
 
 **El navegador se hace pasar por un usuario autenticado (boundary 1).** Mitigado por validacion dual-key `X-API-Key` con `secrets.compare_digest` en `plugins/security/core/auth_dependencies.py:require_api_key` (linea 47). Los fallos se registran con la IP del cliente. El bypass dev-mode esta gated a loopback solo (la rama `if dev_mode:` en la linea 100 fuerza `_is_loopback_ip` en las lineas 102-107 y lanza 403 salvo que `NEXE_DEV_MODE_ALLOW_REMOTE=true`).
 
-**Otro proceso de la misma maquina envia peticiones como si fuese el daemon Ollama (boundary 4).** Parcial: Ollama escucha en loopback sin autenticacion. Cualquier proceso local corriendo como el mismo usuario puede llamarlo. Aceptado — el mismo usuario local puede leer `~/.ollama/` directamente. La defensa de server-nexe es que el pipeline de chat siempre pasa por `/ui/chat` o `/v1/chat/completions` (ambos autenticados); los endpoints por-backend directos (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) **no estan registrados** en los routers de los plugins (`plugins/mlx_module/api/routes.py`, `plugins/llama_cpp_module/api/routes.py`, `plugins/ollama_module/api/routes.py`) — una llamada directa devuelve HTTP 404. El `manifest.toml` de mlx/llama_cpp declara `protected_routes = ["/chat"]` como aseveracion de diseño, pero las rutas simplemente no estan presentes en la superficie HTTP.
+**Otro proceso de la misma maquina envia peticiones como si fuese el daemon Ollama (boundary 4).** Parcial: Ollama escucha en loopback sin autenticacion. Cualquier proceso local corriendo como el mismo usuario puede llamarlo. Aceptado — el mismo usuario local puede leer `~/.ollama/` directamente. La defensa de server-nexe es que el pipeline de chat siempre pasa por `/ui/chat` o `/v1/chat/completions` (ambos autenticados); los endpoints por-backend directos (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) estan bloqueados por el middleware `RemovedDirectRoutesGuard` (`core/middleware.py`) — una llamada directa devuelve HTTP 403 con codigo de error `direct_plugin_endpoint_disabled` antes de llegar a ningun handler. Las rutas se declaran como `removed_direct_routes` en el `manifest.toml` de cada plugin y se aplican tanto en tiempo de peticion como en tiempo de carga del plugin (vease §6.6).
 
-**Atacante sirve un peso de modelo manipulado desde Hugging Face (boundary 5).** Mitigado por SHA-256 pinning de F4.1: `installer/download_verify.py` rechaza cualquier snapshot cuyo hash de directorio (`core/integrity/hashing.py:sha256_of_dir`) no coincida con el pin del catalogo. Single-file GGUF usa `sha256_of_file`; Ollama usa digests `ollama show --json`.
+**Atacante sirve un peso de modelo manipulado desde Hugging Face (boundary 5).** Mitigado por el pinning SHA-256 de los pesos: `installer/download_verify.py` rechaza cualquier snapshot cuyo hash de directorio (`core/integrity/hashing.py:sha256_of_dir`) no coincida con el pin del catalogo. Single-file GGUF usa `sha256_of_file`; Ollama usa digests `ollama show --json`.
 
 **Atacante LAN envia un bootstrap token (boundary 8).** Gated por `NEXE_ENV != development` → HTTP 503 (`core/endpoints/bootstrap.py:116-122`), mas allow-list de IP (loopback + RFC1918 + whitelist VPN; `core/endpoints/bootstrap.py:127-140`), mas rate-limit `3/IP + 10 global / 5 min` (`core/endpoints/bootstrap.py:67-96` `check_rate_limit`, implementacion en `core/bootstrap_tokens.py:check_bootstrap_rate_limit`).
 
@@ -184,9 +184,9 @@ Leyenda: ● = amenaza activa con mitigacion, ◐ = parcial / solo defensa-en-pr
 
 **Inyeccion en memoria / RAG (boundaries 1 y 6).** El input del usuario es limpiado de tags de rol-memoria (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]`…) por `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:85-102`). Los documentos ingestados en el RAG y los resultados de retrieval pasan por `_filter_rag_injection` y `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:64` y linea 91). Un documento malicioso no puede incrustar un tag `[MEM_DELETE:]` que el LLM copiase verbatim.
 
-**JSON profundamente anidado como tampering de ingenieria de payload (boundary 1).** Acotado por `MAX_NOSQL_DEPTH=100` en `detect_nosql_injection` (F1.1). Antes hacia crashear el proceso con `RecursionError`; ahora devuelve "sospechoso" en profundidades > 100.
+**JSON profundamente anidado como tampering de ingenieria de payload (boundary 1).** Acotado por `MAX_NOSQL_DEPTH=100` en `detect_nosql_injection`. Antes hacia crashear el proceso con `RecursionError`; ahora devuelve "sospechoso" en profundidades > 100.
 
-**Peso del modelo o bundle fastembed modificado en disco entre install y primera ejecucion (boundaries 5 y 6).** F4.1 re-hashea el bundle fastembed en el momento de copia (`verify_embedding_bundle`) y rechaza objetivos de symlink que salen del root del bundle. GGUF y snapshots HF se hashean una vez en la descarga; el tampering en disco despues del install solo se detecta si el usuario reejecuta el installer o si se añade una verificacion de integridad futura (vease §8).
+**Peso del modelo o bundle fastembed modificado en disco entre install y primera ejecucion (boundaries 5 y 6).** El pinning de los pesos re-hashea el bundle fastembed en el momento de copia (`verify_embedding_bundle`) y rechaza objetivos de symlink que salen del root del bundle. GGUF y snapshots HF se hashean una vez en la descarga; el tampering en disco despues del install solo se detecta si el usuario reejecuta el installer o si se añade una verificacion de integridad futura (vease §8).
 
 ### 6.3 Repudio
 
@@ -196,9 +196,9 @@ Leyenda: ● = amenaza activa con mitigacion, ◐ = parcial / solo defensa-en-pr
 
 ### 6.4 Information Disclosure
 
-**Historial de chat / memorias / documentos subidos filtran fuera del dispositivo.** Defensa primaria: cero telemetria runtime, cero llamadas salientes durante la operacion (fraseologia honesta del README post-F2). Las descargas en install-time (HF, Ollama) son explicitas y acotadas.
+**Historial de chat / memorias / documentos subidos filtran fuera del dispositivo.** Defensa primaria: cero telemetria runtime, cero llamadas salientes durante la operacion (fraseologia honesta del README tras el trabajo offline-by-default). Las descargas en install-time (HF, Ollama) son explicitas y acotadas.
 
-**El historial de chat filtra via un dispositivo compartido o robado (boundary 6).** Defensa-en-profundidad: AES-256-GCM con HKDF-SHA256, SQLCipher para SQLite, `.enc` para sesiones. Default `auto` (activado cuando `sqlcipher3` esta disponible; plaintext con un banner multi-linea al arranque si no, vease `core/crypto/__init__.py:format_plaintext_startup_banner` — F3.1b). Fail-closed estricto solo cuando `NEXE_ENCRYPTION_ENABLED=true`. Proteccion solo en cold-boot; un portatil caliente con el MEK en RAM queda fuera de alcance de este documento.
+**El historial de chat filtra via un dispositivo compartido o robado (boundary 6).** Defensa-en-profundidad: AES-256-GCM con HKDF-SHA256, SQLCipher para SQLite, `.enc` para sesiones. Default `auto` (activado cuando `sqlcipher3` esta disponible; plaintext con un banner multi-linea al arranque si no, vease `core/crypto/__init__.py:format_plaintext_startup_banner`). Fail-closed estricto solo cuando `NEXE_ENCRYPTION_ENABLED=true`. Proteccion solo en cold-boot; un portatil caliente con el MEK en RAM queda fuera de alcance de este documento.
 
 **Contaminacion cruzada de sesiones — documentos subidos en la sesion A visibles en la sesion B.** Mitigado por metadatos `session_id` en cada punto Qdrant de la coleccion `user_knowledge` (vease README §Capacidades principales 7 y `plugins/web_ui_module`).
 
@@ -208,7 +208,7 @@ Leyenda: ● = amenaza activa con mitigacion, ◐ = parcial / solo defensa-en-pr
 
 ### 6.5 Denial of Service
 
-**Flood de `/ui/chat` o `/v1/chat/completions` con peticiones concurrentes.** Los decorators por-endpoint de `slowapi` imponen 20/min en el chat (`core/endpoints/chat.py:98`), 30/min en la familia `/status` (`core/endpoints/root.py:104+`), 2/min en endpoints de seguridad sensibles (`plugins/security/api/routes.py:64`), 10/min en operaciones de modulo (`plugins/security/api/routes.py:128`).
+**Flood de `/ui/chat` o `/v1/chat/completions` con peticiones concurrentes.** Los decorators por-endpoint de `slowapi` imponen 20/min en el chat (`core/endpoints/chat.py:318`), 30/min en la familia `/status` (`core/endpoints/root.py:104+`), 2/min en endpoints de seguridad sensibles (`plugins/security/api/routes.py:64`), 10/min en operaciones de modulo (`plugins/security/api/routes.py:128`).
 
 **Endpoint bootstrap flooded (boundary 8).** `check_rate_limit` impone 3/IP + 10 global por 5 min en ventana deslizante (`core/endpoints/bootstrap.py:67-96`). En produccion el endpoint devuelve 503 antes de que corra cualquier logica de rate-limit.
 
@@ -222,13 +222,13 @@ Leyenda: ● = amenaza activa con mitigacion, ◐ = parcial / solo defensa-en-pr
 
 **Dev-mode bypass desde un origen no-loopback.** Bloqueado en la linea 100 de `auth_dependencies.py`: `NEXE_DEV_MODE=true` da bypass solo cuando la IP cliente es loopback y `NEXE_DEV_MODE_ALLOW_REMOTE` esta explicitamente set.
 
-**Bypass del pipeline canonico de chat.** Mitigado por el middleware `RemovedDirectRoutesGuard` (`core/middleware.py`): cualquier peticion a `/mlx/chat`, `/llama-cpp/chat` o `/ollama/api/chat` devuelve HTTP 403 con codigo de error `direct_plugin_endpoint_disabled` antes de llegar a ningun handler (se ejecuta antes de SlowAPI, CORS y el dispatch de rutas). Las rutas se declaran como `removed_direct_routes` en el `manifest.toml` de cada plugin y se aplican tanto en tiempo de peticion como en tiempo de carga — un plugin que declara una ruta como eliminada y al mismo tiempo la registra lanza `PluginLoadError` y es rechazado. Todo chat debe pasar por `/ui/chat` o `/v1/chat/completions` para que corra el pipeline completo (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip). Cierra el seguimiento de la auditoria DoD §2.11.
+**Bypass del pipeline canonico de chat.** Mitigado por el middleware `RemovedDirectRoutesGuard` (`core/middleware.py`): cualquier peticion a `/mlx/chat`, `/llama-cpp/chat` o `/ollama/api/chat` devuelve HTTP 403 con codigo de error `direct_plugin_endpoint_disabled` antes de llegar a ningun handler (se ejecuta antes de SlowAPI, CORS y el dispatch de rutas). Las rutas se declaran como `removed_direct_routes` en el `manifest.toml` de cada plugin y se aplican tanto en tiempo de peticion como en tiempo de carga — un plugin que declara una ruta como eliminada y al mismo tiempo la registra lanza `PluginLoadError` y es rechazado. Todo chat debe pasar por `/ui/chat` o `/v1/chat/completions` para que corra el pipeline completo (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip). Cierra el seguimiento de la revision interna de seguridad §2.11.
 
-**Path traversal en session IDs o filenames.** `validate_string_input(context="path")` corre el detector de path-traversal en inputs tipo path (el contexto chat lo omite, vease trade-off F1.3). La validacion de filename en uploads se fuerza en servidor.
+**Path traversal en session IDs o filenames.** `validate_string_input(context="path")` corre el detector de path-traversal en inputs tipo path (el contexto chat lo omite, un trade-off documentado). La validacion de filename en uploads se fuerza en servidor.
 
-**Tightening del directorio de master-key falla silenciosamente.** `core/crypto/keys.py:_try_file_set` (linea 80+) ahora loggea un WARNING cuando `chmod 0o700` falla en `~/.nexe/` (F1.2). El fichero de clave sigue naciendo `0o600` via `os.open(O_CREAT|O_EXCL)` asi que esto es solo un fix defensa-en-profundidad.
+**Tightening del directorio de master-key falla silenciosamente.** `core/crypto/keys.py:_try_file_set` (linea 80+) ahora loggea un WARNING cuando `chmod 0o700` falla en `~/.nexe/`. El fichero de clave sigue naciendo `0o600` via `os.open(O_CREAT|O_EXCL)` asi que esto es solo un fix defensa-en-profundidad.
 
-**Intento de jailbreak dentro del chat.** 11 patrones regex (detector speed-bump, `plugins/security/core/input_sanitizers.py:_JAILBREAK_PATTERNS`, linea 33; cubre formas imperativas CA/EN y handles conocidos como `DAN mode`, `do anything now`) añaden un prefijo `[SECURITY NOTICE]` en lugar de rechazar — los ataques sofisticados lo evaden trivialmente y esto esta documentado explicitamente (`SECURITY.md:36`). La proteccion real requiere moderacion a nivel de modelo (fuera de alcance, §7).
+**Intento de jailbreak dentro del chat.** 11 patrones regex (detector speed-bump, `plugins/security/core/input_sanitizers.py:_JAILBREAK_PATTERNS`, linea 41; cubre formas imperativas CA/EN y handles conocidos como `DAN mode`, `do anything now`) añaden un prefijo `[SECURITY NOTICE]` en lugar de rechazar — los ataques sofisticados lo evaden trivialmente y esto esta documentado explicitamente (`SECURITY.md:36`). La proteccion real requiere moderacion a nivel de modelo (fuera de alcance, §7).
 
 ## 7. Fuera de alcance
 
@@ -268,14 +268,14 @@ La unica amenaza de privacidad que si aplica es **exfiltracion de MEM_SAVE via p
 Este documento se revisa:
 
 - **En cada minor release.** Si se añade un nuevo boundary, un nuevo activo, o un nuevo control, se actualiza la matriz del §6 y el log de revisiones recibe una entrada.
-- **Cuando un hallazgo de auditoria toca el threat model.** La auditoria `DoD-AUD-SX-0423-NXE-01` es la que produjo este documento; futuras auditorias externas se loggearan aqui.
+- **Cuando un hallazgo de la revision toca el threat model.** La revision interna de seguridad asistida por IA `AUD-INT-001` es la que produjo este documento; futuras revisiones se loggearan aqui.
 - **A peticion de un lector.** Abre una issue con la etiqueta `threat-model`.
 
 ### Log de revisiones
 
 | Fecha | Version | Cambio | Impulsado por |
 |-------|---------|--------|---------------|
-| 2026-04-24 | 1.0 | Formalizacion inicial. Matriz STRIDE, 8 boundaries, 6 categorias de activos, fuera de alcance enumerado. | `DoD-AUD-SX-0423-NXE-01` §2.11 (F4.2) |
+| 2026-04-24 | 1.0 | Formalizacion inicial. Matriz STRIDE, 8 boundaries, 6 categorias de activos, fuera de alcance enumerado. | `AUD-INT-001` §2.11 (threat model STRIDE) |
 
 ---
 

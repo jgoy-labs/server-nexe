@@ -5,8 +5,8 @@ id: nexe-threat-model-stride
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Threat model formal STRIDE de server-nexe (v1.0, 2026-04-24). Servidor d'IA local mono-usuari: 8 trust boundaries (navegador/CLI/Qdrant/Ollama/HF/disc/keyring/LAN-bootstrap), 6 categories d'assets (dades d'usuari, secrets operatius, pesos de model, integritat de codi, disponibilitat, metadades), matriu STRIDE amb mitigacions citant file:line, abast explicit, riscos residuals declarats, apendix LINDDUN de privacitat. Substitueix el threat model informal a SECURITY.md:3-15. Impulsat per auditoria externa DoD-AUD-SX-0423 §2.11 (F4.2)."
-tags: [threat-model, stride, seguretat, audit, dod, local-first, mono-usuari, boundaries, assets, mitigacions, privacitat, lindduan, compliance, spoofing, tampering, repudi, disclosure, dos, elevacio-privilegi]
+abstract: "Threat model formal STRIDE de server-nexe (v1.0, 2026-04-24). Servidor d'IA local mono-usuari: 8 trust boundaries (navegador/CLI/Qdrant/Ollama/HF/disc/keyring/LAN-bootstrap), 6 categories d'assets (dades d'usuari, secrets operatius, pesos de model, integritat de codi, disponibilitat, metadades), matriu STRIDE amb mitigacions citant file:line, abast explicit, riscos residuals declarats, apendix LINDDUN de privacitat. Substitueix el threat model informal a SECURITY.md:3-15. Impulsat per la revisio interna de seguretat assistida per IA AUD-INT-001 §2.11 (STRIDE threat model)."
+tags: [threat-model, stride, seguretat, audit, local-first, mono-usuari, boundaries, assets, mitigacions, privacitat, lindduan, compliance, spoofing, tampering, repudi, disclosure, dos, elevacio-privilegi]
 chunk_size: 800
 priority: P1
 
@@ -24,13 +24,13 @@ expires: null
 **Estat:** Actiu, revisat a cada minor release.
 **Substitueix:** `SECURITY.md` §"Scope and threat model" (informal, linies 3–15 i 80–90). Aquella seccio es queda com a resum d'un paragraf i apunta aqui per al detall.
 
-Aquest document formalitza el threat model que fins a la v1.0.4-beta estava implicit al codi. Es l'artefacte referenciat per l'auditoria externa `DoD-AUD-SX-0423-NXE-01` §2.11. No es un informe de pen-test: descriu **de que defensa server-nexe, de que no defensa, i quins controls avalen cada afirmacio**, amb cada control citant el fitxer:linia on esta implementat.
+Aquest document formalitza el threat model que fins a la v1.0.4-beta estava implicit al codi. Es l'artefacte referenciat per la revisio interna de seguretat assistida per IA `AUD-INT-001` §2.11. No es un informe de pen-test: descriu **de que defensa server-nexe, de que no defensa, i quins controls avalen cada afirmacio**, amb cada control citant el fitxer:linia on esta implementat.
 
 ---
 
 ## 1. Proposit i abast
 
-server-nexe es un **servidor d'IA local, mono-usuari** amb memoria RAG persistent. S'executa a la maquina de l'usuari, bind a `127.0.0.1:9119` per defecte, i assumeix un usuari local de confiança. Aquest threat model cobreix la release 1.0.5 mes el hardening `[Unreleased]` a `main` (F1–F4.2).
+server-nexe es un **servidor d'IA local, mono-usuari** amb memoria RAG persistent. S'executa a la maquina de l'usuari, bind a `127.0.0.1:9119` per defecte, i assumeix un usuari local de confiança. Aquest threat model cobreix la release 1.0.5 mes el hardening `[Unreleased]` a `main` (hardening de seguretat i el threat model STRIDE).
 
 Dins l'abast:
 
@@ -51,7 +51,7 @@ Instal·les el DMG o clones el repo, uses server-nexe per parlar amb un LLM loca
 
 ### 2.2 Administrador auditant per compliance
 
-Avalues server-nexe contra una politica interna (estil DoD, ISO 27001, o similar). Necessites veure: **quin es el threat model, quins son els controls, que queda sense mitigar, que esta explicitament fora d'abast**. Els §§5–9 responen aixo. server-nexe es una eina OSS personal, no un SaaS multi-tenant; diverses caselles d'un checklist de compliance tradicional es marcaran "fora d'abast" honestament (vegeu §7), i la seccio de riscos residuals (§8) es deliberadament explicita.
+Avalues server-nexe contra una politica interna (ISO 27001 o similar). Necessites veure: **quin es el threat model, quins son els controls, que queda sense mitigar, que esta explicitament fora d'abast**. Els §§5–9 responen aixo. server-nexe es una eina OSS personal, no un SaaS multi-tenant; diverses caselles d'un checklist de compliance tradicional es marcaran "fora d'abast" honestament (vegeu §7), i la seccio de riscos residuals (§8) es deliberadament explicita.
 
 ## 3. Assumpcions
 
@@ -89,9 +89,9 @@ Sensibilitat primaria: **confidencialitat** del material secret, **integritat** 
 
 Pesos LLM descarregats per l'installer a la primera arrencada (Hugging Face snapshot_download, Ollama pull, o URL GGUF directa), mes el model d'embedding fastembed ONNX empaquetat al DMG. Despres de l'instal·lacio viuen sota `~/.cache/huggingface/`, `~/.ollama/`, i el subdirectori `embeddings/` de l'arbre d'instal·lacio.
 
-Des de F4.1 (`bff18cc`), cada pes baixat a la primera arrencada es verificat SHA-256 contra `installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256` via `core/integrity/hashing.py` i `installer/download_verify.py`. El model fastembed empaquetat al DMG ve acompanyat d'un `embeddings.manifest.json` (tres digests per a `model*.onnx`, `tokenizer.json`, `config.json`).
+Des que va arribar el pinning SHA256 dels pesos (`bff18cc`), cada pes baixat a la primera arrencada es verificat SHA-256 contra `installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256` via `core/integrity/hashing.py` i `installer/download_verify.py`. El model fastembed empaquetat al DMG ve acompanyat d'un `embeddings.manifest.json` (tres digests per a `model*.onnx`, `tokenizer.json`, `config.json`).
 
-Sensibilitat primaria: **integritat**. Un pes manipulat fa de backdoor a cada inferencia futura; F4.1 tanca aixo al moment de descarrega.
+Sensibilitat primaria: **integritat**. Un pes manipulat fa de backdoor a cada inferencia futura; el pinning dels pesos tanca aixo al moment de descarrega.
 
 ### 4.4 Integritat del codi
 
@@ -170,9 +170,9 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 **El navegador es fa passar per un usuari autenticat (boundary 1).** Mitigat per validacio dual-key `X-API-Key` amb `secrets.compare_digest` a `plugins/security/core/auth_dependencies.py:require_api_key` (linia 47). Les errades son loggejades amb IP client. El bypass dev-mode esta gated a loopback nomes (la branca `if dev_mode:` a la linia 100 força `_is_loopback_ip` a les linies 102-107 i llança 403 si `NEXE_DEV_MODE_ALLOW_REMOTE` no es `true`).
 
-**Un altre proces de la mateixa maquina envia peticions com si fos el daemon Ollama (boundary 4).** Parcial: Ollama escolta a loopback sense autenticacio. Qualsevol proces local corrent com el mateix usuari pot cridar-lo. Acceptat — el mateix usuari local pot llegir `~/.ollama/` directament. La defensa de server-nexe es que el pipeline de xat sempre passa per `/ui/chat` o `/v1/chat/completions` (tots dos autenticats); els endpoints per-backend directes (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) **no estan registrats** als routers dels plugins (`plugins/mlx_module/api/routes.py`, `plugins/llama_cpp_module/api/routes.py`, `plugins/ollama_module/api/routes.py`) — una crida directa retorna HTTP 404. El `manifest.toml` de mlx/llama_cpp declara `protected_routes = ["/chat"]` com a afirmacio de disseny, pero les rutes simplement no son presents a la superficie HTTP.
+**Un altre proces de la mateixa maquina envia peticions com si fos el daemon Ollama (boundary 4).** Parcial: Ollama escolta a loopback sense autenticacio. Qualsevol proces local corrent com el mateix usuari pot cridar-lo. Acceptat — el mateix usuari local pot llegir `~/.ollama/` directament. La defensa de server-nexe es que el pipeline de xat sempre passa per `/ui/chat` o `/v1/chat/completions` (tots dos autenticats); els endpoints per-backend directes (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) estan bloquejats pel middleware `RemovedDirectRoutesGuard` (`core/middleware.py`) — una crida directa retorna HTTP 403 amb codi d'error `direct_plugin_endpoint_disabled` abans d'arribar a cap handler. Les rutes es declaren com a `removed_direct_routes` al `manifest.toml` de cada plugin i s'apliquen tant en temps de peticio com en temps de carrega del plugin (vegeu §6.6).
 
-**Atacant serveix un pes de model manipulat des de Hugging Face (boundary 5).** Mitigat per SHA-256 pinning de F4.1: `installer/download_verify.py` rebutja qualsevol snapshot el hash de directori del qual (`core/integrity/hashing.py:sha256_of_dir`) no coincideix amb el pin del cataleg. Single-file GGUF usa `sha256_of_file`; Ollama usa digests `ollama show --json`.
+**Atacant serveix un pes de model manipulat des de Hugging Face (boundary 5).** Mitigat pel pinning SHA-256 dels pesos: `installer/download_verify.py` rebutja qualsevol snapshot el hash de directori del qual (`core/integrity/hashing.py:sha256_of_dir`) no coincideix amb el pin del cataleg. Single-file GGUF usa `sha256_of_file`; Ollama usa digests `ollama show --json`.
 
 **Atacant LAN envia un bootstrap token (boundary 8).** Gated per `NEXE_ENV != development` → HTTP 503 (`core/endpoints/bootstrap.py:116-122`), mes allow-list d'IP (loopback + RFC1918 + whitelist VPN; `core/endpoints/bootstrap.py:127-140`), mes rate-limit `3/IP + 10 global / 5 min` (`core/endpoints/bootstrap.py:67-96` `check_rate_limit`, implementacio a `core/bootstrap_tokens.py:check_bootstrap_rate_limit`).
 
@@ -184,9 +184,9 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 **Injeccio a memoria / RAG (boundaries 1 i 6).** L'input de l'usuari es net de tags de rol-memoria (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]`…) per `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:85-102`). Els documents ingestats al RAG i els resultats de retrieval passen per `_filter_rag_injection` i `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:64` i linia 91). Un document malicios no pot incrustar un tag `[MEM_DELETE:]` que el LLM copiaria verbatim.
 
-**JSON profundament niat com a tampering d'enginyeria de payload (boundary 1).** Acotat per `MAX_NOSQL_DEPTH=100` a `detect_nosql_injection` (F1.1). Abans feia crashejar el proces amb `RecursionError`; ara retorna "sospitos" en profunditats > 100.
+**JSON profundament niat com a tampering d'enginyeria de payload (boundary 1).** Acotat per `MAX_NOSQL_DEPTH=100` a `detect_nosql_injection`. Abans feia crashejar el proces amb `RecursionError`; ara retorna "sospitos" en profunditats > 100.
 
-**Pes del model o bundle fastembed modificat al disc entre install i primera execucio (boundaries 5 i 6).** F4.1 re-hasheja el bundle fastembed al moment de copia (`verify_embedding_bundle`) i rebutja objectius de symlink que surten del root del bundle. GGUF i snapshots HF es hashegen un cop a la descarrega; el tampering al disc despres de l'install nomes es detecta si l'usuari reexecuta l'installer o si s'afegeix una verificacio d'integritat futura (vegeu §8).
+**Pes del model o bundle fastembed modificat al disc entre install i primera execucio (boundaries 5 i 6).** El pinning dels pesos re-hasheja el bundle fastembed al moment de copia (`verify_embedding_bundle`) i rebutja objectius de symlink que surten del root del bundle. GGUF i snapshots HF es hashegen un cop a la descarrega; el tampering al disc despres de l'install nomes es detecta si l'usuari reexecuta l'installer o si s'afegeix una verificacio d'integritat futura (vegeu §8).
 
 ### 6.3 Repudi
 
@@ -196,9 +196,9 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 ### 6.4 Informacio Disclosure
 
-**Historial de xat / memories / documents pujats filtren fora del dispositiu.** Defensa primaria: zero telemetria runtime, zero crides sortints durant l'operacio (fraseologia honesta del README post-F2). Les descarregues a install-time (HF, Ollama) son explicites i acotades.
+**Historial de xat / memories / documents pujats filtren fora del dispositiu.** Defensa primaria: zero telemetria runtime, zero crides sortints durant l'operacio (fraseologia honesta del README despres del treball offline-by-default). Les descarregues a install-time (HF, Ollama) son explicites i acotades.
 
-**L'historial de xat filtra via un dispositiu compartit o robat (boundary 6).** Defensa-en-profunditat: AES-256-GCM amb HKDF-SHA256, SQLCipher per a SQLite, `.enc` per a sessions. Default `auto` (activat quan `sqlcipher3` esta disponible; plaintext amb un banner multi-linia a l'arrencada si no, vegeu `core/crypto/__init__.py:format_plaintext_startup_banner` — F3.1b). Fail-closed estricte nomes quan `NEXE_ENCRYPTION_ENABLED=true`. Proteccio nomes en cold-boot; un portatil calent amb el MEK en RAM queda fora d'abast d'aquest document.
+**L'historial de xat filtra via un dispositiu compartit o robat (boundary 6).** Defensa-en-profunditat: AES-256-GCM amb HKDF-SHA256, SQLCipher per a SQLite, `.enc` per a sessions. Default `auto` (activat quan `sqlcipher3` esta disponible; plaintext amb un banner multi-linia a l'arrencada si no, vegeu `core/crypto/__init__.py:format_plaintext_startup_banner`). Fail-closed estricte nomes quan `NEXE_ENCRYPTION_ENABLED=true`. Proteccio nomes en cold-boot; un portatil calent amb el MEK en RAM queda fora d'abast d'aquest document.
 
 **Contaminacio creuada de sessions — documents pujats a la sessio A visibles a la sessio B.** Mitigat per metadades `session_id` a cada punt Qdrant de la col·leccio `user_knowledge` (vegeu README §Capacitats principals 7 i `plugins/web_ui_module`).
 
@@ -208,7 +208,7 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 ### 6.5 Denial of Service
 
-**Flooding de `/ui/chat` o `/v1/chat/completions` amb peticions concurrents.** Els decorators per-endpoint de `slowapi` forcen 20/min al xat (`core/endpoints/chat.py:98`), 30/min a la familia `/status` (`core/endpoints/root.py:104+`), 2/min en endpoints de seguretat sensibles (`plugins/security/api/routes.py:64`), 10/min en operacions de modul (`plugins/security/api/routes.py:128`).
+**Flooding de `/ui/chat` o `/v1/chat/completions` amb peticions concurrents.** Els decorators per-endpoint de `slowapi` forcen 20/min al xat (`core/endpoints/chat.py:318`), 30/min a la familia `/status` (`core/endpoints/root.py:104+`), 2/min en endpoints de seguretat sensibles (`plugins/security/api/routes.py:64`), 10/min en operacions de modul (`plugins/security/api/routes.py:128`).
 
 **Endpoint bootstrap flooded (boundary 8).** `check_rate_limit` forcia 3/IP + 10 global per 5 min en finestra lliscant (`core/endpoints/bootstrap.py:67-96`). En produccio l'endpoint retorna 503 abans que corri cap logica de rate-limit.
 
@@ -222,13 +222,13 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 **Dev-mode bypass des d'un origen no-loopback.** Bloquejat a la linia 100 de `auth_dependencies.py`: `NEXE_DEV_MODE=true` dona bypass nomes quan la IP client es loopback i `NEXE_DEV_MODE_ALLOW_REMOTE` esta explicitament set.
 
-**Bypass del pipeline canonic de xat.** Mitigat pel middleware `RemovedDirectRoutesGuard` (`core/middleware.py`): qualsevol peticio a `/mlx/chat`, `/llama-cpp/chat` o `/ollama/api/chat` retorna HTTP 403 amb codi d'error `direct_plugin_endpoint_disabled` abans d'arribar a cap handler (s'executa abans de SlowAPI, CORS i el dispatch de rutes). Les rutes estan declarades com a `removed_direct_routes` al `manifest.toml` de cada plugin i s'aplica tant en temps de peticio com en temps de carrega — un plugin que declara una ruta com a eliminada i alhora la registra llanca `PluginLoadError` i es rebutjat. Tot xat ha de passar per `/ui/chat` o `/v1/chat/completions` perque corri el pipeline complet (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip). Tanca el seguiment de l'auditoria DoD §2.11.
+**Bypass del pipeline canonic de xat.** Mitigat pel middleware `RemovedDirectRoutesGuard` (`core/middleware.py`): qualsevol peticio a `/mlx/chat`, `/llama-cpp/chat` o `/ollama/api/chat` retorna HTTP 403 amb codi d'error `direct_plugin_endpoint_disabled` abans d'arribar a cap handler (s'executa abans de SlowAPI, CORS i el dispatch de rutes). Les rutes estan declarades com a `removed_direct_routes` al `manifest.toml` de cada plugin i s'aplica tant en temps de peticio com en temps de carrega — un plugin que declara una ruta com a eliminada i alhora la registra llanca `PluginLoadError` i es rebutjat. Tot xat ha de passar per `/ui/chat` o `/v1/chat/completions` perque corri el pipeline complet (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip). Tanca el seguiment de la revisio interna de seguretat §2.11.
 
-**Path traversal en session IDs o filenames.** `validate_string_input(context="path")` corre el detector de path-traversal en inputs de tipus path (el context chat l'omet, vegeu trade-off F1.3). La validacio de filename en uploads es forçada a servidor.
+**Path traversal en session IDs o filenames.** `validate_string_input(context="path")` corre el detector de path-traversal en inputs de tipus path (el context chat l'omet, un trade-off documentat). La validacio de filename en uploads es forçada a servidor.
 
-**Tightening del directori de master-key falla silenciosament.** `core/crypto/keys.py:_try_file_set` (linia 80+) ara logueja un WARNING quan `chmod 0o700` falla a `~/.nexe/` (F1.2). El fitxer clau segueix naixent `0o600` via `os.open(O_CREAT|O_EXCL)` aixi que aixo es nomes un fix defensa-en-profunditat.
+**Tightening del directori de master-key falla silenciosament.** `core/crypto/keys.py:_try_file_set` (linia 80+) ara logueja un WARNING quan `chmod 0o700` falla a `~/.nexe/`. El fitxer clau segueix naixent `0o600` via `os.open(O_CREAT|O_EXCL)` aixi que aixo es nomes un fix defensa-en-profunditat.
 
-**Intent de jailbreak dins del xat.** 11 patrons regex (detector speed-bump, `plugins/security/core/input_sanitizers.py:_JAILBREAK_PATTERNS`, linia 33; cobreix formes imperatives CA/EN i handles coneguts com `DAN mode`, `do anything now`) afegeixen un prefix `[SECURITY NOTICE]` en lloc de rebutjar — els atacs sofisticats l'evaden trivialment i aixo esta documentat explicitament (`SECURITY.md:36`). La proteccio real requereix moderacio a nivell de model (fora d'abast, §7).
+**Intent de jailbreak dins del xat.** 11 patrons regex (detector speed-bump, `plugins/security/core/input_sanitizers.py:_JAILBREAK_PATTERNS`, linia 41; cobreix formes imperatives CA/EN i handles coneguts com `DAN mode`, `do anything now`) afegeixen un prefix `[SECURITY NOTICE]` en lloc de rebutjar — els atacs sofisticats l'evaden trivialment i aixo esta documentat explicitament (`SECURITY.md:36`). La proteccio real requereix moderacio a nivell de model (fora d'abast, §7).
 
 ## 7. Fora d'abast
 
@@ -268,14 +268,14 @@ L'unica amenaça de privacitat que si aplica es **exfiltracio de MEM_SAVE via pr
 Aquest document es revisa:
 
 - **A cada minor release.** Si s'afegeix un nou boundary, un nou asset, o un nou control, s'actualitza la matriu del §6 i el log de revisions rep una entrada.
-- **Quan una troballa d'auditoria toca el threat model.** L'auditoria `DoD-AUD-SX-0423-NXE-01` es la que va produir aquest document; futures auditories externes es loggejaran aqui.
+- **Quan una troballa de la revisio toca el threat model.** La revisio interna de seguretat assistida per IA `AUD-INT-001` es la que va produir aquest document; futures revisions es loggejaran aqui.
 - **A peticio d'un lector.** Obre una issue amb l'etiqueta `threat-model`.
 
 ### Log de revisions
 
 | Data | Versio | Canvi | Impulsat per |
 |------|--------|-------|--------------|
-| 2026-04-24 | 1.0 | Formalitzacio inicial. Matriu STRIDE, 8 boundaries, 6 categories d'assets, fora d'abast enumerat. | `DoD-AUD-SX-0423-NXE-01` §2.11 (F4.2) |
+| 2026-04-24 | 1.0 | Formalitzacio inicial. Matriu STRIDE, 8 boundaries, 6 categories d'assets, fora d'abast enumerat. | `AUD-INT-001` §2.11 (threat model STRIDE) |
 
 ---
 

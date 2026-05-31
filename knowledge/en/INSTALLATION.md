@@ -247,7 +247,7 @@ Restart the server to apply changes: `./nexe restart`
 
 ## Integrity Verification (SHA256)
 
-Since the `DoD-AUD-SX-0423` audit remediation (§2.7), every model weight downloaded during installation is verified with SHA256 against an internal catalog (`installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256`). The check covers three download surfaces:
+Since the internal AI-assisted security review `AUD-INT-001` remediation (§2.7), every model weight downloaded during installation is verified with SHA256 against an internal catalog (`installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256`). The check covers three download surfaces:
 
 | Backend | What is checked | How |
 |---------|-----------------|-----|
@@ -268,7 +268,7 @@ When the catalog carries a pin (a concrete SHA256) and the observed digest does 
 
 Catalog entries whose pin is `None` (for example models added after a DMG has shipped) do **not** abort. The installer emits a visible `WARNING` (`⚠️ <model>: SHA256 not pinned in catalog`) and continues. This keeps v1.0.4-beta-and-earlier installs working.
 
-For the embedding bundle, a DMG without `embeddings.manifest.json` (pre-F4.1 build) also proceeds in legacy mode with a stdout warning.
+For the embedding bundle, a DMG without `embeddings.manifest.json` (a build from before the weight pinning) also proceeds in legacy mode with a stdout warning.
 
 ### Extra hardening: symlink escape rejection
 
@@ -319,7 +319,7 @@ Menu bar app for controlling the server without a terminal. Built on the `rumps`
 | **Open logs** | Opens `storage/logs/server.log` in the `.log`-associated editor. | `_open_logs` → `tray.py:512` |
 | **Server RAM** | RAM consumed by the server process + loaded model. `psutil` polling runs in a daemon thread (`_RamMonitor`, `installer/tray_monitor.py`, 141 lines) to avoid blocking the menu (post-v0.9.0 fix — previously froze the keyboard). | `tray_monitor.py`; `tray.py:205` |
 | **Uptime** | Server uptime calculated from `server_start_time`. | `tray.py:208` |
-| **Documentation** | Opens the official documentation. Item added to the main menu (Bug #9) to replace a duplicate link. | `_open_docs` → `tray.py:523` |
+| **Documentation** | Opens the official documentation. Item added to the main menu to replace a duplicate link. | `_open_docs` → `tray.py:523` |
 | **Settings** | Submenu with 3 options: | `tray.py:227-243` |
 | ↳ server-nexe.com | Opens the official website in the browser. | `_open_website` → `tray.py:520` |
 | ↳ Support the project | Opens GitHub Sponsors. | `_open_donate` → `tray.py:528` |

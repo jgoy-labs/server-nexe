@@ -79,7 +79,7 @@ Sigues honest sobre les limitacions. Hi ha casos d'us on altres opcions son mill
 |------------------|----------|
 | Models frontier (GPT-5, Claude Opus 4.5, Gemini 3) | Serveis cloud oficials — els models locals encara son menys capaços |
 | Multi-usuari amb sync entre dispositius | server-nexe es **mono-usuari per disseny**. Considera un desplegament client-servidor extern |
-| Suport Windows o Linux arm64 de produccio | server-nexe requereix **macOS 14+ Apple Silicon** des de v0.9.9 |
+| Suport Windows de produccio | Windows esta en desenvolupament actiu — no es recomanable per a producció ara mateix. Linux ARM64 i x86_64 **estan suportats** (backend Ollama/llama.cpp, CPU) |
 | Fine-tuning o entrenament de models | No es funcio de server-nexe. Usa MLX, transformers o Axolotl directament |
 | Garantia d'uptime i SLA | Es un projecte open-source mantingut per una persona — no hi ha SLA |
 | Auditoria de seguretat professional | Les auditories actuals son IA-assistides (Claude, Gemini), no per empreses humanes especialitzades |

@@ -86,7 +86,7 @@ server-nexe/
 ├── personality/           # Prompts del sistema, module manager, i18n, server.toml
 ├── installer/             # Wizard SwiftUI, constructor de DMG, app de safata, instal·lador headless
 ├── storage/               # Dades en temps d'execucio (models, logs, vectors Qdrant)
-├── tests/                 # Suite de tests (6685 col·lectades / 6900 totals)
+├── tests/                 # Suite de tests (6723 col·lectades / 6938 totals)
 └── nexe                   # Executable CLI principal
 ```
 
@@ -218,4 +218,4 @@ Altres documents de coneixement en aquesta carpeta:
 - Documentacio: https://server-nexe.org
 - Web comercial: https://server-nexe.com
 - Autor: https://jgoy.net
-- Suport: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/jgoylabs
+- Suport: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/servernexe

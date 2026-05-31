@@ -3,8 +3,8 @@
 Server Nexe
 Author: Jordi Goy
 Location: installer/download_verify.py
-Description: Post-download SHA256 enforcement for LLM weights (F4.1 audit
-             DoD-AUD-SX-0423 §2.7).
+Description: Post-download SHA256 enforcement for LLM weights (internal
+             security review AUD-INT-001 §2.7).
 
 Shared by the CLI headless installer (``install_headless.py``) and the
 interactive wizard path (``installer_catalog.select_model`` + friends).

@@ -86,7 +86,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer
 ├── storage/               # Runtime data (models, logs, qdrant vectors)
-├── tests/                 # Test suite (6685 collected / 6900 total)
+├── tests/                 # Test suite (6723 collected / 6938 total)
 └── nexe                   # Main CLI executable
 ```
 
@@ -110,7 +110,7 @@ The knowledge base (`knowledge/`) is designed for both human and AI consumption:
 
 ## Available models (by RAM tier)
 
-14 empirically tested models, 4 tiers. Icons: 👁 = vision (images), 🧠 = thinking (step-by-step reasoning).
+13 empirically tested models, 4 tiers. Icons: 👁 = vision (images), 🧠 = thinking (step-by-step reasoning).
 
 ### tier_8 (8 GB RAM)
 - 👁 🧠 **Qwen3.5 4B** — Alibaba, 2026. Ollama + MLX. **Recommended.**
@@ -218,4 +218,4 @@ Other knowledge documents in this folder:
 - Documentation: https://server-nexe.org
 - Commercial site: https://server-nexe.com
 - Author: https://jgoy.net
-- Support: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/jgoylabs
+- Support: https://github.com/sponsors/jgoy-labs | https://ko-fi.com/servernexe
