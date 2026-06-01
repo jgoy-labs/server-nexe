@@ -145,3 +145,8 @@ scripts/export_whitepaper_pdf.py
 knip.json
 dev-tools/reports/
 .test_data/
+
+# Interns (no van a GitHub) — afegit pre-release v1.0.5
+.gitoss-sync
+.muthur/
+dev-tools/

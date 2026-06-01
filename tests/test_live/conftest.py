@@ -10,7 +10,6 @@ Description: Fixtures for live server tests (test_live marker).
 Usage:
   pytest tests/test_live/ -m test_live          # auto-start
   NEXE_TEST_URL=http://localhost:9119 pytest ... # reuse external
-  python dev-tools/run_live.py                  # via orchestrator
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

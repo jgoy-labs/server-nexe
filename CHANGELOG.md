@@ -92,7 +92,7 @@ and a comprehensive type-safety + complexity reduction pass.
   for MLX snapshots, GGUF files, and Ollama manifests. DMG-bundled fastembed
   model gets a manifest with three digests. Catalog pins remain `None` at
   this release; pin population is roadmapped for the next sprint.
-- **Live test suite** (`tests/test_live/`, `dev-tools/run_live.py`) — 53
+- **Live test suite** (`tests/test_live/`) — 53
   tests across all backends (Ollama, MLX, llama.cpp), MEM_SAVE, prompt
   injection, fail-closed, input validation, rate limit. Auto-starts the
   server if down.
