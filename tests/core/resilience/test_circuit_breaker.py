@@ -212,7 +212,7 @@ class TestPreConfiguredBreakers:
     """Ollama breaker is configured"""
     assert ollama_breaker is not None
     assert ollama_breaker.name == "ollama"
-    assert ollama_breaker.config.failure_threshold == 3
+    assert ollama_breaker.config.failure_threshold == 5
     assert ollama_breaker.config.timeout_seconds == 60
 
   def test_qdrant_breaker_exists(self):

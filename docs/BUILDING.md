@@ -6,7 +6,7 @@ How to build the macOS installer DMG from source.
 
 - macOS 13+ (Ventura or later)
 - Xcode Command Line Tools: `xcode-select --install`
-- Signing certificate: "Developer ID Application: Jordi Goy (NHG3THR2AF)"
+- A "Developer ID Application" signing certificate in your keychain, exported via the `NEXE_SIGNING_IDENTITY` environment variable, e.g. `export NEXE_SIGNING_IDENTITY="Developer ID Application: NAME (TEAMID)"`
 - Notarization credentials in Keychain (profile "nexe")
 
 ## Step 1: Build Python bundle (one-time, ~2 min)

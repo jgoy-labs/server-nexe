@@ -5,7 +5,7 @@ Author: Jordi Goy
 Location: plugins/security/specialists/trasher_specialist.py
 Description: Specialist for trasher_manager — reports storage of the security module.
 
-STUB — Functional in Part 2 when trasher_manager arrives from NAT7.
+STUB — Functional in Part 2 when trasher_manager arrives.
 
 Contract:
   - trasher_manager calls get_storage_report()

@@ -66,6 +66,9 @@ def _sanitize_sse_token(token: str) -> str:
 # Maximum characters for RAG context injection
 MAX_RAG_CONTEXT_LENGTH = 4000
 
+# Maximum characters for a single user chat message (input validation)
+MAX_CHAT_INPUT_LENGTH = 8000
+
 # RAG context window control — prevent RAG from overflowing the model's context
 MAX_CONTEXT_RATIO = float(os.environ.get('NEXE_MAX_CONTEXT_RATIO', '0.3'))
 DEFAULT_CONTEXT_WINDOW = int(os.environ.get('NEXE_DEFAULT_CONTEXT_WINDOW', '8192'))

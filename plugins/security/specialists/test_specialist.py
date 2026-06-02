@@ -5,7 +5,7 @@ Author: Jordi Goy
 Location: plugins/security/specialists/test_specialist.py
 Description: Specialist for test_manager — reports tests of the security module.
 
-STUB — Functional in Part 2 when test_manager arrives from NAT7.
+STUB — Functional in Part 2 when test_manager arrives.
 
 Contract:
   - test_manager calls get_test_report()

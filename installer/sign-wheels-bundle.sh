@@ -33,7 +33,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 APP_DIR="$PROJECT_ROOT/InstallNexe.app"
 WHEELS_DIR="$APP_DIR/Contents/Resources/wheels"
 
-CERT="Developer ID Application: Jordi Goy (NHG3THR2AF)"
+CERT="${NEXE_SIGNING_IDENTITY:?Set NEXE_SIGNING_IDENTITY, e.g. 'Developer ID Application: NAME (TEAMID)'}"
 
 # ── Step 1: Pre-flight ─────────────────────────────────────────────────
 if [ ! -d "$WHEELS_DIR" ]; then
@@ -41,7 +41,7 @@ if [ ! -d "$WHEELS_DIR" ]; then
     exit 1
 fi
 
-if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "Developer ID Application: Jordi Goy"; then
+if ! security find-identity -v -p codesigning 2>/dev/null | grep -qF "$CERT"; then
     echo "ERROR: Developer ID certificate not found in keychain" >&2
     exit 2
 fi

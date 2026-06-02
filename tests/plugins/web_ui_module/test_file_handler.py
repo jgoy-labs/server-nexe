@@ -314,7 +314,8 @@ class TestGetUploadedFiles:
         assert "filename" in files[0]
         assert "size" in files[0]
         assert "modified" in files[0]
-        assert "path" in files[0]
+        # No absolute "path" — it would leak the OS username / FS layout (B012).
+        assert "path" not in files[0]
 
     def test_sorted_newest_first(self, fh):
         import os

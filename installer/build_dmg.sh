@@ -16,7 +16,7 @@
 #   - "Install Nexe.dmg" at project root
 #
 # Notes:
-#   - Codesign + notarization included (Developer ID Application: Jordi Goy)
+#   - Codesign + notarization included (identity from $NEXE_SIGNING_IDENTITY)
 #   - The wizard binary (InstallNexe) is built from swift-wizard/
 #     If swift-wizard/ is not present, falls back to the launcher
 #     shell script (dev mode)
@@ -333,7 +333,8 @@ if [ "$EMBEDDINGS_SIZE_MB" -lt 200 ]; then
 fi
 
 # ── Step 6: Code sign app bundle ──────────────────────────────────
-IDENTITY="${NEXE_SIGNING_IDENTITY:-Developer ID Application: Jordi Goy (NHG3THR2AF)}"
+# Identity from env (release). Unset → placeholder that won't match the keychain → signing skipped (dev build).
+IDENTITY="${NEXE_SIGNING_IDENTITY:-UNSET_SIGNING_IDENTITY}"
 ENTITLEMENTS="$SWIFT_WIZARD_DIR/InstallNexe.entitlements"
 
 if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then

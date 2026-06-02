@@ -285,7 +285,7 @@ class FileHandler:
                         "filename": file_path.name,
                         "size": stat.st_size,
                         "modified": stat.st_mtime,
-                        "path": str(file_path)
+                        # NB: no absolute "path" — it would leak the OS username/FS layout.
                     })
             # Sort by modified time descending (newest first)
             files.sort(key=lambda x: x["modified"], reverse=True)  # type: ignore[arg-type, return-value]  # lambda x["modified"]: float — dict[str,object] però "modified" sempre float

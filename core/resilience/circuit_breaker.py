@@ -268,7 +268,8 @@ class CircuitOpenError(Exception):
 ollama_breaker = CircuitBreaker(
   "ollama",
   CircuitBreakerConfig(
-    failure_threshold=3,
+    # 5 (no 3): a brief Ollama hiccup shouldn't block AI for everyone for 60s.
+    failure_threshold=5,
     success_threshold=2,
     timeout_seconds=60,
     max_retries=2,

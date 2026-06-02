@@ -1,15 +1,12 @@
 # ===========================================
-# Git privat de desenvolupament
+# .gitignore — server-nexe
 #
-# Aquest repo és PRIVAT — mai connectat a GitHub directament.
-# Flux publicació: dev/ → (revisió) → GitHub
-#
-# ⚠️ PARANOIC MODE: tot el que pugui contenir secrets,
-# binaris, o dades personals està exclòs.
+# Excludes secrets, build artifacts, caches, runtime data
+# and OS files from version control.
 # ===========================================
 
 # =====================
-# SECRETS — ZONA ZERO
+# Secrets
 # =====================
 .env
 .env.*
@@ -24,59 +21,42 @@
 *token*
 !**/*token*.py
 !**/*secret*.py
-.nat_secrets
 
 # =====================
-# BINARIS I BUILDS
+# Binaries & build artifacts
 # =====================
-
-# Binaris del projecte
 qdrant
 nexe
-
-# Build artifacts
 dist/
 build/
 *.egg-info/
 Install Nexe.app/
 InstallNexe.app/
+Nexe.app/
 installer/swift-wizard/.build/
 
-# Releases (DMGs, PKGs — van a GitHub Releases, no al repo)
+# Releases (DMGs/PKGs go to GitHub Releases, not the repo)
 releases/
 *.dmg
 *.pkg
 
-# Dev tray app (compilat local)
-Nexe.app/
-
 # =====================
-# RUNTIME I DADES
+# Runtime data
 # =====================
-
-# Storage (124 GB! — Qdrant vectors, DBs, logs de producció)
 storage/
 !memory/memory/storage/
 *.db
 *.sqlite
 *.log
 logs/
-
-# Markers runtime
 .qdrant-initialized
-
-# Snapshots Qdrant
 snapshots/
-
-# User uploads (poden contenir dades personals)
 plugins/web_ui_module/static/uploads/
 plugins/web_ui_module/ui/uploads/
-
-# Cache personalitat
 personality/.module_cache.json
 
 # =====================
-# PYTHON
+# Python
 # =====================
 __pycache__/
 *.py[cod]
@@ -84,33 +64,26 @@ __pycache__/
 venv/
 .venv/
 ENV/
-
-# Test/coverage
 .pytest_cache/
 .coverage
 .coverage.*
 coverage.xml
 htmlcov/
 *,cover
-
-# Internal QA tooling (local audits, not part of OSS)
-.qa-audit/
-.qa-audit.toml
-
-# Caches temporals
 tmp/
 
 # =====================
-# DEV TOOLS I IDE
+# Node
+# =====================
+node_modules/
+package-lock.json
+
+# =====================
+# IDE & tooling caches
 # =====================
 .claude/
 .ruff_cache/
 *.code-workspace
-dev-tools/run_all_day.sh
-dev-tools/logs/
-
-# Fitxers generats/temporals
-TESTING_REPORT.md
 
 # =====================
 # OS
@@ -119,34 +92,7 @@ TESTING_REPORT.md
 Thumbs.db
 
 # =====================
-# FITXERS ACCIDENTALS
+# Accidental CLI artifacts (--output, --help)
 # =====================
-# (generats per errors de CLI: --output, --help)
 --output
 --help
-
-# DIARI INTERN (notes privades de dev, no van a GitHub)
-diari/
-
-# Node
-node_modules/
-package-lock.json
-
-# =====================
-# SCRIPTS INTERNS (no van a GitHub)
-# =====================
-# One-shot translation script (Group K, ja executat) — té dades personals
-scripts/translate_comments.py
-# Benchmark intern de Bug #16 (ja resolt)
-scripts/bench_ingest_bug16.py
-# Eines personals de Jordi (PDFs legal/whitepaper) — útils local
-scripts/export_source_pdf.py
-scripts/export_whitepaper_pdf.py
-knip.json
-dev-tools/reports/
-.test_data/
-
-# Interns (no van a GitHub) — afegit pre-release v1.0.5
-.gitoss-sync
-.muthur/
-dev-tools/

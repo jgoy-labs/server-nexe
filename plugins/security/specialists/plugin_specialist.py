@@ -5,7 +5,7 @@ Author: Jordi Goy
 Location: plugins/security/specialists/plugin_specialist.py
 Description: Specialist for doctor_manager — reports health of the security module.
 
-STUB — Functional in Part 2 when doctor_manager arrives from NAT7.
+STUB — Functional in Part 2 when doctor_manager arrives.
 
 Contract:
   - doctor_manager calls get_health_report()

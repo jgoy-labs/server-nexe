@@ -26,6 +26,7 @@ from .chat_sanitization import (
     _sanitize_sse_token,
     _estimate_tokens,
     MAX_RAG_CONTEXT_LENGTH,
+    MAX_CHAT_INPUT_LENGTH,
     MAX_CONTEXT_RATIO,
     DEFAULT_CONTEXT_WINDOW,
     CHARS_PER_TOKEN_ESTIMATE,
@@ -159,7 +160,7 @@ def _validate_chat_request(body: ChatCompletionRequest) -> None:
                             "SanitizerModule.sanitize raised, keeping legacy-validated content: %s",
                             exc,
                         )
-            _msg.content = validate_string_input(_msg.content, max_length=8000, context="chat")
+            _msg.content = validate_string_input(_msg.content, max_length=MAX_CHAT_INPUT_LENGTH, context="chat")
 
 
 async def _fetch_rag_context(body: ChatCompletionRequest, app_state: Any, server_lang: str) -> str:
