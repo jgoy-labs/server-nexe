@@ -516,6 +516,7 @@ class MLXChatNode:
                         max_tokens_override, temperature_override,
                         thinking_enabled,
                         cancel_event,
+                        session_id,
                     ),
                 )
             else:
@@ -719,6 +720,7 @@ class MLXChatNode:
         max_tokens: Optional[int],
         stream_callback: Callable[[str], None],
         cancel_event: Any = None,
+        prompt_cache_state: Any = None,
     ):
         from mlx_vlm import stream_generate as vlm_stream
 
@@ -732,12 +734,20 @@ class MLXChatNode:
         full_text = ""
         last = None
         emitted_prefix = False
+        # prompt_cache_state (mlx_vlm >= 0.4): reuse the KV cache from previous
+        # turns — mlx_vlm finds the common prefix and prefills only new tokens,
+        # then updates the state. Passed only when present so an older mlx_vlm
+        # that doesn't accept this kwarg keeps working unchanged (no reuse).
+        cache_kwargs = {}
+        if prompt_cache_state is not None:
+            cache_kwargs["prompt_cache_state"] = prompt_cache_state
         for chunk in vlm_stream(
             model=model,
             processor=processor,
             image=tmp_path,
             prompt=formatted_prompt,
             max_tokens=max_tokens or self.config.max_tokens,
+            **cache_kwargs,
         ):
             # Honour client-side cancel: when the HTTP client disconnects,
             # the route handler sets cancel_event so we exit early instead of
@@ -787,6 +797,9 @@ class MLXChatNode:
         result_obj,
         result_text: str,
         elapsed_ms: int,
+        prefix_reused: bool = False,
+        cached_tokens: int = 0,
+        identity_hash: str = "",
     ) -> Dict[str, Any]:
         prompt_tokens = getattr(result_obj, "prompt_tokens", 0)
         gen_tokens = getattr(result_obj, "generation_tokens", len(result_text.split()))
@@ -801,12 +814,12 @@ class MLXChatNode:
                 gen_tokens / max(elapsed_ms / 1000, 0.001), 1
             ),
             "prompt_tokens": prompt_tokens,
-            "prefix_reused": False,
-            "cached_tokens": 0,
-            "actual_prefill_tokens": prompt_tokens,
+            "prefix_reused": prefix_reused,
+            "cached_tokens": cached_tokens,
+            "actual_prefill_tokens": max(prompt_tokens - cached_tokens, 0),
             "prompt_tps": round(prompt_tps, 1),
             "peak_memory_mb": round(peak_memory, 1),
-            "identity_hash": "",
+            "identity_hash": identity_hash,
             "vlm": True,
         }
 
@@ -820,6 +833,7 @@ class MLXChatNode:
         temperature: Optional[float] = None,
         thinking_enabled: bool = True,
         cancel_event: Any = None,
+        session_id: str = "default",
     ) -> Dict[str, Any]:
         """VLM generation with mlx_vlm (text + image). Uses mlx_vlm.generate().
 
@@ -839,6 +853,30 @@ class MLXChatNode:
             messages, system, processor, has_image, thinking_enabled=thinking_enabled,
         )
 
+        # Prefix-cache for the VLM path (mlx_vlm native PromptCacheState), keyed
+        # per session like the text path (_generate_blocking). Without this the
+        # VLM path re-prefilled the whole context every turn (the historical
+        # cached=0): MLXPromptCacheManager was only wired into the text path, so
+        # any VLM model (e.g. the Qwen3.5 family — VL at every tier) never
+        # reused its KV cache. get_or_create returns None on older mlx_vlm with
+        # no PromptCacheState → no reuse, identical to the previous behaviour.
+        from .vlm_cache_manager import get_vlm_cache_manager
+        identity_hash = compute_system_hash(system)
+        session_key = session_id[:8] if session_id else "default"
+        model_key = f"{self.config.model_path}:{identity_hash}:{session_key}"
+        cache_state = get_vlm_cache_manager().get_or_create(model_key)
+        had_cache = cache_state is not None and getattr(cache_state, "cache", None) is not None
+        # Best-effort reuse count for the log/metrics (text-only prompts tokenize
+        # cleanly; with images the count is approximate). The real saving is
+        # always visible in the prefill time regardless of this number.
+        cached_tokens = 0
+        if had_cache:
+            try:
+                _tok = getattr(processor, "tokenizer", processor)
+                cached_tokens = cache_state.find_prefix_length(_tok.encode(formatted_prompt))
+            except Exception:  # nosec B110: metric estimate only — never blocks generation
+                cached_tokens = 0
+
         tmp_path = None
         try:
             if has_image:
@@ -856,6 +894,7 @@ class MLXChatNode:
                 result_text, result_obj = self._run_vlm_streaming(
                     model, processor, formatted_prompt, tmp_path,
                     max_tokens, stream_callback, cancel_event,
+                    prompt_cache_state=cache_state,
                 )
             else:
                 result_text, result_obj = self._run_vlm_oneshot(
@@ -869,7 +908,11 @@ class MLXChatNode:
                     pass
 
         elapsed_ms = int((time.time() - start_time) * 1000)
-        return self._extract_vlm_metrics(result_obj, result_text, elapsed_ms)
+        return self._extract_vlm_metrics(
+            result_obj, result_text, elapsed_ms,
+            prefix_reused=had_cache, cached_tokens=cached_tokens,
+            identity_hash=identity_hash,
+        )
 
     def _generate_blocking(
         self,
@@ -987,6 +1030,14 @@ class MLXChatNode:
                 cache_manager.clear()
             except Exception as e:
                 logger.warning("MLXChatNode: error clearing cache manager: %s", e)
+
+            # Clear VLM prompt-cache states too (KV caches bound to the old
+            # model — free them on reload, mirror of the text path above).
+            try:
+                from .vlm_cache_manager import get_vlm_cache_manager
+                get_vlm_cache_manager().clear()
+            except Exception as e:
+                logger.warning("MLXChatNode: error clearing VLM cache manager: %s", e)
 
             # Destroy model
             if cls._model is not None:
